@@ -1,0 +1,29 @@
+// Some example tasks for common languages.
+//
+// For more documentation on how to configure debug tasks,
+// see: https://baymax.dev/docs/debugger
+[
+  {
+    "label": "Debug active Python file",
+    "adapter": "Debugpy",
+    "program": "$BAYMAX_FILE",
+    "request": "launch",
+    "cwd": "$BAYMAX_WORKTREE_ROOT",
+  },
+  {
+    "label": "Debug active JavaScript file",
+    "adapter": "JavaScript",
+    "program": "$BAYMAX_FILE",
+    "request": "launch",
+    "cwd": "$BAYMAX_WORKTREE_ROOT",
+    "type": "pwa-node",
+  },
+  {
+    "label": "JavaScript debug terminal",
+    "adapter": "JavaScript",
+    "request": "launch",
+    "cwd": "$BAYMAX_WORKTREE_ROOT",
+    "console": "integratedTerminal",
+    "type": "pwa-node",
+  },
+]
