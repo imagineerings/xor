@@ -130,6 +130,7 @@ members = [
     "crates/markdown",
     "crates/markdown_preview",
     "crates/mermaid_render",
+        "crates/mobile_tunnel",
     "crates/media",
     "crates/menu",
     "crates/migrator",
@@ -394,6 +395,7 @@ migrator = { path = "crates/migrator" }
 mistral = { path = "crates/mistral" }
 multi_buffer = { path = "crates/multi_buffer" }
 miniprofiler_ui = { path = "crates/miniprofiler_ui" }
+mobile_tunnel = { path = "crates/mobile_tunnel" }
 net = { path = "crates/net" }
 node_runtime = { path = "crates/node_runtime" }
 notifications = { path = "crates/notifications" }
@@ -690,6 +692,7 @@ prost-build = "0.9"
 prost-types = "0.9"
 pollster = "0.4.0"
 pulldown-cmark = { version = "0.13.0", default-features = false }
+qrcode = "0.14.1"
 quick-xml = "0.38"
 quote = "1.0.9"
 rand = "0.9"

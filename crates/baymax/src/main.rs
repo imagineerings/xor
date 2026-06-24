@@ -1,8 +1,8 @@
 // Disable command line from opening on release mode
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod reliability;
 mod baymax;
+mod reliability;
 
 // Ensure the binary name stays in sync with APP_NAME so that the paths used
 // at runtime (data dir, config dir, etc.) match what the binary is called.
@@ -46,6 +46,11 @@ use remote::RemoteConnectionOptions;
 use reqwest_client::ReqwestClient;
 
 use assets::Assets;
+use baymax::{
+    OpenListener, OpenRequest, RawOpenRequest, app_menus, build_window_options,
+    derive_paths_with_position, edit_prediction_registry, handle_cli_connection,
+    handle_keymap_file_changes, initialize_workspace, open_paths_with_positions,
+};
 use node_runtime::{NodeBinaryOptions, NodeRuntime};
 use parking_lot::Mutex;
 use project::{project_settings::ProjectSettings, trusted_worktrees};
@@ -72,11 +77,6 @@ use uuid::Uuid;
 use workspace::{
     AppState, MultiWorkspace, SerialibaymaxWorkspaceLocation, SessionWorkspace, Toast,
     WorkspaceSettings, WorkspaceStore, notifications::NotificationId, restore_multiworkspace,
-};
-use baymax::{
-    OpenListener, OpenRequest, RawOpenRequest, app_menus, build_window_options,
-    derive_paths_with_position, edit_prediction_registry, handle_cli_connection,
-    handle_keymap_file_changes, initialize_workspace, open_paths_with_positions,
 };
 
 use crate::baymax::{CrashHandler, OpenRequestKind, eager_load_active_theme_and_icon_theme};
@@ -300,8 +300,8 @@ fn main() {
     ztracing::init();
 
     let version = option_env!("BAYMAX_BUILD_ID");
-    let app_commit_sha =
-        option_env!("BAYMAX_COMMIT_SHA").map(|commit_sha| AppCommitSha::new(commit_sha.to_string()));
+    let app_commit_sha = option_env!("BAYMAX_COMMIT_SHA")
+        .map(|commit_sha| AppCommitSha::new(commit_sha.to_string()));
     let app_version = AppVersion::load(env!("CARGO_PKG_VERSION"), version, app_commit_sha.clone());
 
     if args.system_specs {
@@ -364,7 +364,10 @@ fn main() {
 
         #[cfg(target_os = "windows")]
         {
-            !crate::baymax::windows_only_instance::handle_single_instance(open_listener.clone(), &args)
+            !crate::baymax::windows_only_instance::handle_single_instance(
+                open_listener.clone(),
+                &args,
+            )
         }
 
         #[cfg(target_os = "macos")]
@@ -773,6 +776,9 @@ fn main() {
         svg_preview::init(cx);
         onboarding::init(cx);
         settings_ui::init(cx);
+        cx.set_global(mobile_tunnel::GlobalTunnelManager(parking_lot::Mutex::new(
+            None,
+        )));
         keymap_editor::init(cx);
         extensions_ui::init(cx);
         edit_prediction::init(cx);
@@ -1335,7 +1341,8 @@ fn handle_open_request(request: OpenRequest, app_state: Arc<AppState>, cx: &mut 
 
     if let Some(connection_options) = request.remote_connection {
         let open_behavior = request.open_behavior;
-        let location = workspace::SerialibaymaxWorkspaceLocation::Remote(connection_options.clone());
+        let location =
+            workspace::SerialibaymaxWorkspaceLocation::Remote(connection_options.clone());
         let base_open_options = baymax::open_options_for_request(open_behavior, &location, cx);
         cx.spawn(async move |cx| {
             let paths: Vec<PathBuf> = request.open_paths.into_iter().map(PathBuf::from).collect();

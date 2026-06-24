@@ -13,8 +13,8 @@ use crate::{
     ActionLink, DynamicItem, PROJECT, SettingField, SettingItem, SettingsFieldMetadata,
     SettingsPage, SettingsPageItem, SubPageLink, USER, active_language, all_language_names,
     pages::{
-        open_audio_test_window, render_edit_prediction_setup_page, render_skills_setup_page,
-        render_tool_permissions_setup_page,
+        open_audio_test_window, render_edit_prediction_setup_page, render_mobile_access_setup_page,
+        render_skills_setup_page, render_tool_permissions_setup_page,
     },
 };
 
@@ -8274,49 +8274,60 @@ fn ai_page() -> SettingsPage {
 }
 
 fn network_page() -> SettingsPage {
-    fn network_section() -> [SettingsPageItem; 3] {
-        [
-            SettingsPageItem::SectionHeader("Network"),
-            SettingsPageItem::SettingItem(SettingItem {
-                title: "Proxy",
-                description: "The proxy to use for network requests.",
-                field: Box::new(SettingField {
-                    organization_override: None,
-                    json_path: Some("proxy"),
-                    pick: |settings_content| settings_content.proxy.as_ref(),
-                    write: |settings_content, value, _| {
-                        settings_content.proxy = value;
-                    },
-                }),
-                metadata: Some(Box::new(SettingsFieldMetadata {
-                    placeholder: Some("socks5h://localhost:10808"),
-                    ..Default::default()
-                })),
-                files: USER,
-            }),
-            SettingsPageItem::SettingItem(SettingItem {
-                title: "Server URL",
-                description: "The URL of the Baymax server to connect to.",
-                field: Box::new(SettingField {
-                    organization_override: None,
-                    json_path: Some("server_url"),
-                    pick: |settings_content| settings_content.server_url.as_ref(),
-                    write: |settings_content, value, _| {
-                        settings_content.server_url = value;
-                    },
-                }),
-                metadata: Some(Box::new(SettingsFieldMetadata {
-                    placeholder: Some("https://baymax.dev"),
-                    ..Default::default()
-                })),
-                files: USER,
-            }),
-        ]
-    }
+    let mut items = Vec::new();
+
+    items.push(SettingsPageItem::SectionHeader("Network"));
+    items.push(SettingsPageItem::SettingItem(SettingItem {
+        title: "Proxy",
+        description: "The proxy to use for network requests.",
+        field: Box::new(SettingField {
+            organization_override: None,
+            json_path: Some("proxy"),
+            pick: |settings_content| settings_content.proxy.as_ref(),
+            write: |settings_content, value, _| {
+                settings_content.proxy = value;
+            },
+        }),
+        metadata: Some(Box::new(SettingsFieldMetadata {
+            placeholder: Some("socks5h://localhost:10808"),
+            ..Default::default()
+        })),
+        files: USER,
+    }));
+    items.push(SettingsPageItem::SettingItem(SettingItem {
+        title: "Server URL",
+        description: "The URL of the Baymax server to connect to.",
+        field: Box::new(SettingField {
+            organization_override: None,
+            json_path: Some("server_url"),
+            pick: |settings_content| settings_content.server_url.as_ref(),
+            write: |settings_content, value, _| {
+                settings_content.server_url = value;
+            },
+        }),
+        metadata: Some(Box::new(SettingsFieldMetadata {
+            placeholder: Some("https://baymax.dev"),
+            ..Default::default()
+        })),
+        files: USER,
+    }));
+
+    items.push(SettingsPageItem::SectionHeader("Remote Access"));
+    items.push(SettingsPageItem::SubPageLink(SubPageLink {
+        title: "Mobile Access".into(),
+        r#type: Default::default(),
+        json_path: Some("remote.mobile_access"),
+        description: Some(
+            "Start an SSH tunnel and scan a QR code to connect your mobile device.".into(),
+        ),
+        in_json: false,
+        files: USER,
+        render: render_mobile_access_setup_page,
+    }));
 
     SettingsPage {
         title: "Network",
-        items: concat_sections![network_section()],
+        items: items.into_boxed_slice(),
     }
 }
 

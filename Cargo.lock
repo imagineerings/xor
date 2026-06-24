@@ -2240,6 +2240,7 @@ dependencies = [
  "migrator",
  "mimalloc",
  "miniprofiler_ui",
+ "mobile_tunnel",
  "node_runtime",
  "notifications",
  "onboarding",
@@ -11353,6 +11354,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "mobile_tunnel"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "futures 0.3.32",
+ "gpui",
+ "image",
+ "log",
+ "parking_lot",
+ "qrcode",
+ "remote",
+ "serde",
+ "serde_json",
+ "smallvec 1.15.2",
+ "smol",
+ "util",
+]
+
+[[package]]
 name = "moka"
 version = "0.12.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -14607,6 +14627,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "qrcode"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d68782463e408eb1e668cf6152704bd856c78c5b6417adaee3203d8f4c1fc9ec"
+dependencies = [
+ "image",
+]
+
+[[package]]
 name = "quick-error"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -16833,6 +16862,7 @@ dependencies = [
  "language",
  "log",
  "menu",
+ "mobile_tunnel",
  "paths",
  "picker",
  "platform_title_bar",
@@ -16840,6 +16870,7 @@ dependencies = [
  "project",
  "regex",
  "release_channel",
+ "remote",
  "rodio",
  "schemars 1.2.1",
  "search",
