@@ -107,5 +107,5 @@ Migrate the LLM provider integrations from goose that do not yet have equivalent
 
 ## References
 
-- Source: `goose/crates/goose/src/providers/` — azure.rs, gcpvertexai.rs, huggingface.rs, litellm.rs, snowflake.rs, sagemaker_tgi.rs, nanogpt.rs, tetrate.rs, avian.rs, kimicode.rs, databricks.rs, databricks_v2.rs, local_inference.rs, claude_acp.rs, claude_code.rs, codex.rs, chatgpt_codex.rs, cursor_agent.rs, gemini_cli.rs, declarative/, provider_registry.rs, embedding.rs, init.rs
+- Source: `projects/goose/crates/goose/src/providers/` — azure.rs, gcpvertexai.rs, huggingface.rs, litellm.rs, snowflake.rs, sagemaker_tgi.rs, nanogpt.rs, tetrate.rs, avian.rs, kimicode.rs, databricks.rs, databricks_v2.rs, local_inference.rs, claude_acp.rs, claude_code.rs, codex.rs, chatgpt_codex.rs, cursor_agent.rs, gemini_cli.rs, declarative/, provider_registry.rs, embedding.rs, init.rs
 - Existing baymax providers: `crates/language_models/src/provider/`

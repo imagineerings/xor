@@ -203,7 +203,7 @@ _For any_ blocked action [by security or permission systems], THE system SHALL i
 
 ## References
 
-- Source: `goose/crates/goose/src/security/`
-- Source: `goose/crates/goose/src/permission/`
+- Source: `projects/goose/crates/goose/src/security/`
+- Source: `projects/goose/crates/goose/src/permission/`
 - Baymax: `crates/sandbox/`
 - Baymax: `crates/agent/src/tool_permissions.rs`

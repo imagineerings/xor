@@ -59,7 +59,7 @@ Migrate goose's evaluation infrastructure: the Harbor eval framework, Open Model
 
 ## References
 
-- Source: `goose/evals/harbor/`
-- Source: `goose/evals/open-model-gym/`
-- Source: `goose/crates/goose-cli/src/scenario_tests/`
-- Source: `goose/scripts/run-benchmarks.sh`, `parse-benchmark-results.sh`, `bench-postprocess-scripts/`
+- Source: `projects/goose/evals/harbor/`
+- Source: `projects/goose/evals/open-model-gym/`
+- Source: `projects/goose/crates/goose-cli/src/scenario_tests/`
+- Source: `projects/goose/scripts/run-benchmarks.sh`, `parse-benchmark-results.sh`, `bench-postprocess-scripts/`

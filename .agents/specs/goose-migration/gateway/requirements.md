@@ -58,4 +58,4 @@ Migrate the goose gateway system — a multi-channel communication layer that al
 
 ## References
 
-- Source: `goose/crates/goose/src/gateway/` — handler.rs, manager.rs, pairing.rs, telegram.rs, telegram_format.rs
+- Source: `projects/goose/crates/goose/src/gateway/` — handler.rs, manager.rs, pairing.rs, telegram.rs, telegram_format.rs

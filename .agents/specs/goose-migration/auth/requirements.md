@@ -49,7 +49,7 @@ Migrate goose's authentication infrastructure: the OIDC proxy (Cloudflare Worker
 
 ## References
 
-- Source: `goose/oidc-proxy/` — Cloudflare Worker implementation
-- Source: `goose/crates/goose/src/oauth/` — persist.rs, mod.rs
-- Source: `goose/crates/goose/src/providers/oauth_device_flow.rs`
+- Source: `projects/goose/oidc-proxy/` — Cloudflare Worker implementation
+- Source: `projects/goose/crates/goose/src/oauth/` — persist.rs, mod.rs
+- Source: `projects/goose/crates/goose/src/providers/oauth_device_flow.rs`
 - Existing baymax: `crates/oauth_callback_server/`
