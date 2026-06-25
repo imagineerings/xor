@@ -84,5 +84,5 @@ Migrate the Model Context Protocol (MCP) tools from goose that provide desktop a
 
 ## References
 
-- Source: `goose/crates/goose-mcp/src/` — autovisualiser/, computercontroller/, memory/, peekaboo/, tutorial/, mcp_server_runner.rs, subprocess.rs
+- Source: `projects/goose/crates/goose-mcp/src/` — autovisualiser/, computercontroller/, memory/, peekaboo/, tutorial/, mcp_server_runner.rs, subprocess.rs
 - Existing baymax: `crates/context_server/` (MCP client), `crates/agent_servers/` (agent server management)

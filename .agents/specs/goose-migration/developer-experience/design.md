@@ -231,8 +231,8 @@ _For any_ task registered with the execution manager, [after it completes], THE 
 
 ## References
 
-- Source: `goose/crates/goose/src/slash_commands/`
-- Source: `goose/crates/goose/src/hints/`
-- Source: `goose/crates/goose/src/goose_apps/`
-- Source: `goose/crates/goose/src/source_roots.rs`, `sources.rs`
-- Source: `goose/crates/goose/src/execution/`
+- Source: `projects/goose/crates/goose/src/slash_commands/`
+- Source: `projects/goose/crates/goose/src/hints/`
+- Source: `projects/goose/crates/goose/src/goose_apps/`
+- Source: `projects/goose/crates/goose/src/source_roots.rs`, `sources.rs`
+- Source: `projects/goose/crates/goose/src/execution/`

@@ -184,4 +184,4 @@ _For any_ paired platform account, [after the application restarts], THE pairing
 
 ## References
 
-- Source: `goose/crates/goose/src/gateway/`
+- Source: `projects/goose/crates/goose/src/gateway/`

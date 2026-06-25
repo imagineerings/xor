@@ -259,10 +259,10 @@ _For any_ text [of known token count for a given model], THE token counter SHALL
 
 ## References
 
-- Source: `goose/crates/goose/src/tracing/`
-- Source: `goose/crates/goose/src/otel/`
-- Source: `goose/crates/goose/src/posthog.rs`
-- Source: `goose/crates/goose/src/token_counter.rs`
-- Source: `goose/crates/goose/src/tool_monitor.rs`
-- Source: `goose/crates/goose/src/tool_inspection.rs`
+- Source: `projects/goose/crates/goose/src/tracing/`
+- Source: `projects/goose/crates/goose/src/otel/`
+- Source: `projects/goose/crates/goose/src/posthog.rs`
+- Source: `projects/goose/crates/goose/src/token_counter.rs`
+- Source: `projects/goose/crates/goose/src/tool_monitor.rs`
+- Source: `projects/goose/crates/goose/src/tool_inspection.rs`
 - Baymax: `crates/telemetry/`

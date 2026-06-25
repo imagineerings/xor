@@ -299,5 +299,5 @@ _For any_ doctor run, ALL registered checks SHALL execute and produce a result.
 
 ## References
 
-- Source: All `goose/crates/goose/src/` files listed in requirements
+- Source: All `projects/goose/crates/goose/src/` files listed in requirements
 - Baymax: `crates/agent/`, `crates/settings/`, `crates/agent_settings/`, `crates/util/`

@@ -249,7 +249,7 @@ _For any_ schedule [created via the scheduling UI], [at the configured cron time
 
 ## References
 
-- Source: `goose/ui/desktop/` — Electron/React app (design reference only)
+- Source: `projects/goose/ui/desktop/` — Electron/React app (design reference only)
 - Baymax: `crates/baymax/` — main desktop binary
 - Baymax: `crates/agent_ui/` — agent panel, conversation, configuration
 - Baymax: `crates/settings_ui/` — settings panel

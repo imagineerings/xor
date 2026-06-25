@@ -174,8 +174,8 @@ _For any_ session shared via Nostr, [after sharing], THE session SHALL NOT be sh
 
 ## References
 
-- Source: `goose/services/ask-ai-bot/`
-- Source: `goose/crates/goose/src/session/import_formats/`
-- Source: `goose/crates/goose/src/session/nostr_share.rs`
-- Source: `goose/examples/`
-- Source: `goose/scripts/`
+- Source: `projects/goose/services/ask-ai-bot/`
+- Source: `projects/goose/crates/goose/src/session/import_formats/`
+- Source: `projects/goose/crates/goose/src/session/nostr_share.rs`
+- Source: `projects/goose/examples/`
+- Source: `projects/goose/scripts/`

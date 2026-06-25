@@ -69,4 +69,4 @@ Migrate goose's documentation infrastructure — a Docusaurus-based documentatio
 
 ## References
 
-- Source: `goose/documentation/` — Docusaurus documentation site
+- Source: `projects/goose/documentation/` — Docusaurus documentation site

@@ -82,9 +82,9 @@ Migrate the remaining goose services, scripts, and examples: the Ask AI bot serv
 
 ## References
 
-- Source: `goose/services/ask-ai-bot/`
-- Source: `goose/crates/goose/src/session/import_formats/`
-- Source: `goose/crates/goose/src/session/nostr_share.rs`
-- Source: `goose/examples/`
-- Source: `goose/scripts/`
-- Source: `goose/scripts/provider-error-proxy/`
+- Source: `projects/goose/services/ask-ai-bot/`
+- Source: `projects/goose/crates/goose/src/session/import_formats/`
+- Source: `projects/goose/crates/goose/src/session/nostr_share.rs`
+- Source: `projects/goose/examples/`
+- Source: `projects/goose/scripts/`
+- Source: `projects/goose/scripts/provider-error-proxy/`

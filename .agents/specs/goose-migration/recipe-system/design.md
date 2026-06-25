@@ -230,7 +230,7 @@ _For any_ recipe [in any registered source], THE `discover_all` method SHALL inc
 
 ## References
 
-- Source: `goose/crates/goose/src/recipe/`
-- Source: `goose/crates/goose-cli/src/recipes/`
-- Source: `goose/recipe-scanner/`
-- Source: `goose/workflow_recipes/`
+- Source: `projects/goose/crates/goose/src/recipe/`
+- Source: `projects/goose/crates/goose-cli/src/recipes/`
+- Source: `projects/goose/recipe-scanner/`
+- Source: `projects/goose/workflow_recipes/`

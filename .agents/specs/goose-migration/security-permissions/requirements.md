@@ -113,6 +113,6 @@ Migrate the comprehensive security and permission systems from goose. The securi
 
 ## References
 
-- Source: `goose/crates/goose/src/security/` — adversary_inspector.rs, egress_inspector.rs, classification_client.rs, scanner.rs, patterns.rs, security_inspector.rs
-- Source: `goose/crates/goose/src/permission/` — permission_confirmation.rs, permission_inspector.rs, permission_judge.rs, permission_store.rs
+- Source: `projects/goose/crates/goose/src/security/` — adversary_inspector.rs, egress_inspector.rs, classification_client.rs, scanner.rs, patterns.rs, security_inspector.rs
+- Source: `projects/goose/crates/goose/src/permission/` — permission_confirmation.rs, permission_inspector.rs, permission_judge.rs, permission_store.rs
 - Existing baymax: `crates/agent/src/tool_permissions.rs`, `crates/sandbox/`
