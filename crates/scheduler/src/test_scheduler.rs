@@ -326,7 +326,7 @@ impl TestScheduler {
                     state.runnables.remove(candidate_indices[selected_idx])
                 }
             } else {
-                // Non-randomibaymax: just take the first candidate task
+                // Non-randomized: just take the first candidate task
                 state.runnables.remove(candidate_indices[0])
             }
         };

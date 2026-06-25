@@ -41,6 +41,16 @@ Baymax supports separate themes for light and dark mode with automatic switching
 }
 ```
 
+### Spectrum 2 Inspired Theme
+
+A community theme inspired by [Adobe's Spectrum 2](https://adobe.design/ideas/introducing-spectrum-2) design language. It features a layered surface system with approachable, bright aesthetics, clear visual hierarchy, readable contrast, modular surfaces, subtle depth, and restrained expressive accents.
+
+- **Light variant**: `Spectrum 2 Inspired Light`
+- **Dark variant**: `Spectrum 2 Inspired Dark`
+- **Author**: Ahmad Vegah
+
+To install, copy the theme file to `~/.config/baymax/themes/` and select it from the Theme Selector ({#kb theme_selector::Toggle}).
+
 You can also override specific theme attributes for fine-grained control.
 
 → [Themes documentation](./themes.md)

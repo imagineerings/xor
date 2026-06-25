@@ -243,19 +243,19 @@ fn test_randomize_order() {
         "Deterministic mode should always produce same execution order"
     );
 
-    // Test randomibaymax mode: different seeds can produce different execution orders
-    let mut randomibaymax_results = HashSet::new();
+    // Test randomized mode: different seeds can produce different execution orders
+    let mut randomized_results = HashSet::new();
     for seed in 0..20 {
         let config = TestSchedulerConfig::with_seed(seed);
         let order = block_on(capture_execution_order(config));
         assert_eq!(order.len(), 6);
-        randomibaymax_results.insert(order);
+        randomized_results.insert(order);
     }
 
-    // Randomibaymax mode should produce multiple different execution orders
+    // randomized mode should produce multiple different execution orders
     assert!(
-        randomibaymax_results.len() > 1,
-        "Randomibaymax mode should produce multiple different orders"
+        randomized_results.len() > 1,
+        "randomized mode should produce multiple different orders"
     );
 }
 

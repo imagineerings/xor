@@ -202,7 +202,7 @@ pub fn bench(args: TokenStream, function: TokenStream) -> TokenStream {
 
 /// A variant of `#[gpui::test]` that supports property-based testing.
 ///
-/// A property test, much like a standard GPUI randomibaymax test, allows testing
+/// A property test, much like a standard GPUI randomized test, allows testing
 /// claims of the form "for any possible X, Y should hold". For example:
 /// ```
 /// #[gpui::property_test]
@@ -210,7 +210,7 @@ pub fn bench(args: TokenStream, function: TokenStream) -> TokenStream {
 ///     assert!(x == y || x < y || x > y);
 /// }
 /// ```
-/// Standard GPUI randomibaymax tests provide you with an instance of `StdRng` to
+/// Standard GPUI randomized tests provide you with an instance of `StdRng` to
 /// generate random data in a controlled manner. Property-based tests have some
 /// advantages, however:
 /// - Shrinking - the harness also understands a notion of the "complexity" of a
@@ -226,7 +226,7 @@ pub fn bench(args: TokenStream, function: TokenStream) -> TokenStream {
 /// Property tests work best when all inputs can be generated up-front and kept
 /// in a simple data structure. Sometimes, this isn't possible - for example, if
 /// a test needs to make a random decision based on the current state of some
-/// structure. In this case, a standard GPUI randomibaymax test may be more
+/// structure. In this case, a standard GPUI randomized test may be more
 /// suitable.
 ///
 /// ## Customizing random values

@@ -10,7 +10,7 @@ const CARGO_TEST_ARGS = ["--release", "--lib", "--package", "collab"];
 if (require.main === module) {
   if (process.argv.length < 4) {
     process.stderr.write(
-      "usage: script/randomibaymax-test-minimize <input-plan> <output-plan> [start-index]\n",
+      "usage: script/randomized-test-minimize <input-plan> <output-plan> [start-index]\n",
     );
     process.exit(1);
   }

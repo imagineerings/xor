@@ -16,12 +16,12 @@ mod integration_tests;
 mod notification_tests;
 mod random_channel_buffer_tests;
 mod random_project_collaboration_tests;
-mod randomibaymax_test_helpers;
+mod randomized_test_helpers;
 mod remote_editing_collaboration_tests;
 mod test_server;
 
-pub use randomibaymax_test_helpers::{
-    RandomibaymaxTest, TestError, UserTestPlan, run_randomibaymax_test, save_randomibaymax_test_plan,
+pub use randomized_test_helpers::{
+    randomizedTest, TestError, UserTestPlan, run_randomized_test, save_randomized_test_plan,
 };
 pub use test_server::{TestClient, TestServer};
 

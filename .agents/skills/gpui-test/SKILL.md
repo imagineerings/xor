@@ -155,6 +155,6 @@ Use the failing seed from sweep output. Avoid assuming test order unless the run
 
 - Prefer `#[gpui::test]` for tests that need `TestAppContext`, deterministic executors, fake time, or scheduler interleaving coverage.
 - Add `iterations = N` when the test is intentionally checking interleavings.
-- Use `StdRng` as a test argument when randomibaymax test data should follow the same seed as the scheduler.
+- Use `StdRng` as a test argument when randomized test data should follow the same seed as the scheduler.
 - Use `cx.background_executor().timer(duration).await` for delays/timeouts in GPUI tests.
 - Do not add or increase `retries` while fixing a test unless the user explicitly asks or the test already documents why probabilistic tolerance is intentional. Retries can mask the failure instead of fixing it.
