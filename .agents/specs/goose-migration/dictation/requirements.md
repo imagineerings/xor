@@ -46,4 +46,4 @@ Migrate goose's dictation system, which provides speech-to-text capabilities usi
 
 ## References
 
-- Source: `goose/crates/goose/src/dictation/` — mod.rs, providers.rs, whisper.rs, whisper_data/
+- Source: `projects/goose/crates/goose/src/dictation/` — mod.rs, providers.rs, whisper.rs, whisper_data/

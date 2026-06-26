@@ -208,19 +208,19 @@ Migrate several foundational agent infrastructure features from goose: context m
 
 ## References
 
-- Source: `goose/crates/goose/src/context_mgmt/`
-- Source: `goose/crates/goose/src/plugins/`
-- Source: `goose/crates/goose/src/hooks/`
-- Source: `goose/crates/goose/src/agents/subagent_execution_tool/`, `subagent_handler.rs`, `subagent_task_config.rs`
-- Source: `goose/crates/goose/src/agents/platform_extensions/`
-- Source: `goose/crates/goose/src/agents/large_response_handler.rs`
-- Source: `goose/crates/goose/src/agents/final_output_tool.rs`
-- Source: `goose/crates/goose/src/agents/snapshots/`
-- Source: `goose/crates/goose/src/agents/extension_malware_check.rs`
-- Source: `goose/crates/goose/src/action_required_manager.rs`
-- Source: `goose/crates/goose/src/doctor.rs`
-- Source: `goose/crates/goose/src/download_manager.rs`
-- Source: `goose/crates/goose/src/instance_id.rs`
-- Source: `goose/crates/goose/src/prompt_template.rs`
-- Source: `goose/crates/goose/src/subprocess.rs`
-- Source: `goose/crates/goose/src/config/migrations.rs`, `config/goose_mode.rs`
+- Source: `projects/goose/crates/goose/src/context_mgmt/`
+- Source: `projects/goose/crates/goose/src/plugins/`
+- Source: `projects/goose/crates/goose/src/hooks/`
+- Source: `projects/goose/crates/goose/src/agents/subagent_execution_tool/`, `subagent_handler.rs`, `subagent_task_config.rs`
+- Source: `projects/goose/crates/goose/src/agents/platform_extensions/`
+- Source: `projects/goose/crates/goose/src/agents/large_response_handler.rs`
+- Source: `projects/goose/crates/goose/src/agents/final_output_tool.rs`
+- Source: `projects/goose/crates/goose/src/agents/snapshots/`
+- Source: `projects/goose/crates/goose/src/agents/extension_malware_check.rs`
+- Source: `projects/goose/crates/goose/src/action_required_manager.rs`
+- Source: `projects/goose/crates/goose/src/doctor.rs`
+- Source: `projects/goose/crates/goose/src/download_manager.rs`
+- Source: `projects/goose/crates/goose/src/instance_id.rs`
+- Source: `projects/goose/crates/goose/src/prompt_template.rs`
+- Source: `projects/goose/crates/goose/src/subprocess.rs`
+- Source: `projects/goose/crates/goose/src/config/migrations.rs`, `config/goose_mode.rs`

@@ -244,8 +244,8 @@ _For any_ model comparison run, [for each model], THE metrics SHALL include late
 
 ## References
 
-- Source: `goose/evals/harbor/`
-- Source: `goose/evals/open-model-gym/`
-- Source: `goose/crates/goose-cli/src/scenario_tests/`
-- Source: `goose/scripts/bench-*`
+- Source: `projects/goose/evals/harbor/`
+- Source: `projects/goose/evals/open-model-gym/`
+- Source: `projects/goose/crates/goose-cli/src/scenario_tests/`
+- Source: `projects/goose/scripts/bench-*`
 - Baymax: `crates/eval_cli/`, `crates/eval_utils/`, `crates/benchmarks/`

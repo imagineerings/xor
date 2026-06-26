@@ -105,10 +105,10 @@ Migrate goose's observability and analytics infrastructure: Langfuse tracing, Op
 
 ## References
 
-- Source: `goose/crates/goose/src/tracing/` — mod.rs, langfuse_layer.rs, observation_layer.rs, rate_limiter.rs
-- Source: `goose/crates/goose/src/otel/` — mod.rs, otlp.rs
-- Source: `goose/crates/goose/src/posthog.rs`
-- Source: `goose/crates/goose/src/token_counter.rs`
-- Source: `goose/crates/goose/src/tool_monitor.rs`
-- Source: `goose/crates/goose/src/tool_inspection.rs`
+- Source: `projects/goose/crates/goose/src/tracing/` — mod.rs, langfuse_layer.rs, observation_layer.rs, rate_limiter.rs
+- Source: `projects/goose/crates/goose/src/otel/` — mod.rs, otlp.rs
+- Source: `projects/goose/crates/goose/src/posthog.rs`
+- Source: `projects/goose/crates/goose/src/token_counter.rs`
+- Source: `projects/goose/crates/goose/src/tool_monitor.rs`
+- Source: `projects/goose/crates/goose/src/tool_inspection.rs`
 - Existing baymax: `crates/telemetry/`

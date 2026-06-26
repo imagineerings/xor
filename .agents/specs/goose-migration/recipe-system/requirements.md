@@ -132,9 +132,9 @@ Migrate the goose recipe engine — a system for defining, templating, validatin
 
 ## References
 
-- Source: `goose/crates/goose/src/recipe/` — mod.rs, manifest.rs, local_recipes.rs, template_recipe.rs, validate_recipe.rs, yaml_format_utils.rs, read_recipe_file_content.rs, recipe_extension_adapter.rs
-- Source: `goose/crates/goose/src/recipe/build_recipe/`
-- Source: `goose/crates/goose-cli/src/recipes/` — mod.rs, recipe.rs, extract_from_cli.rs, github_recipe.rs, print_recipe.rs, search_recipe.rs, secret_discovery.rs
-- Source: `goose/crates/goose/src/recipe_deeplink.rs`
-- Source: `goose/recipe-scanner/`
-- Source: `goose/workflow_recipes/`
+- Source: `projects/goose/crates/goose/src/recipe/` — mod.rs, manifest.rs, local_recipes.rs, template_recipe.rs, validate_recipe.rs, yaml_format_utils.rs, read_recipe_file_content.rs, recipe_extension_adapter.rs
+- Source: `projects/goose/crates/goose/src/recipe/build_recipe/`
+- Source: `projects/goose/crates/goose-cli/src/recipes/` — mod.rs, recipe.rs, extract_from_cli.rs, github_recipe.rs, print_recipe.rs, search_recipe.rs, secret_discovery.rs
+- Source: `projects/goose/crates/goose/src/recipe_deeplink.rs`
+- Source: `projects/goose/recipe-scanner/`
+- Source: `projects/goose/workflow_recipes/`

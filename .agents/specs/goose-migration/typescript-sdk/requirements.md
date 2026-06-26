@@ -75,8 +75,8 @@ Migrate goose's TypeScript SDK, which provides a programmatic client for interac
 
 ## References
 
-- Source: `goose/ui/sdk/` — TypeScript SDK implementation
+- Source: `projects/goose/ui/sdk/` — TypeScript SDK implementation
 - Key files: goose-client.ts, http-stream.ts, mcp-apps.ts, resolve-binary.ts, client-capabilities.ts, index.ts
-- Source: `goose/ui/sdk/src/generated/` — generated schema types
-- Source: `goose/crates/goose-sdk/` — Rust SDK bindings
-- Source: `goose/crates/goose-sdk-types/` — SDK type definitions
+- Source: `projects/goose/ui/sdk/src/generated/` — generated schema types
+- Source: `projects/goose/crates/goose-sdk/` — Rust SDK bindings
+- Source: `projects/goose/crates/goose-sdk-types/` — SDK type definitions
