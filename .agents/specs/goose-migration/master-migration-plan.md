@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Identify all features and functionality present in the `goose/` directory and plan their migration into baymax, avoiding duplication where baymax already has equivalent functionality.
+Identify all features and functionality present in the `projects/goose/` directory and plan their migration into baymax, avoiding duplication where baymax already has equivalent functionality.
 
 ## Methodology
 
@@ -15,7 +15,7 @@ For each goose feature, we assess:
 
 ## Feature Inventory
 
-### 1. Core Agent Engine (`crates/goose/src/agents/`)
+### 1. Core Agent Engine (`projects/goose/crates/goose/src/agents/`)
 
 | Goose Feature | Baymax Equivalent | Status |
 |---|---|---|
@@ -33,7 +33,7 @@ For each goose feature, we assess:
 | Validate extensions | — | ❌ New |
 | MOIM (multi-agent?) | — | ❌ New |
 
-### 2. LLM Providers (`crates/goose/src/providers/`)
+### 2. LLM Providers (`projects/goose/crates/goose/src/providers/`)
 
 | Goose Provider | Baymax Equivalent | Status |
 |---|---|---|
@@ -71,7 +71,7 @@ For each goose feature, we assess:
 | **Embedding providers** | — | ❌ New |
 | **Provider registry** | — | ❌ New |
 
-### 3. ACP Protocol (`crates/goose/src/acp/`)
+### 3. ACP Protocol (`projects/goose/crates/goose/src/acp/`)
 
 | Goose Feature | Baymax Equivalent | Status |
 |---|---|---|
@@ -94,7 +94,7 @@ For each goose feature, we assess:
 | **Peekaboo** (screen monitoring) | — | ❌ New |
 | **Tutorial** | — | ❌ New |
 
-### 5. Configuration (`crates/goose/src/config/`)
+### 5. Configuration (`projects/goose/crates/goose/src/config/`)
 
 | Goose Feature | Baymax Equivalent | Status |
 |---|---|---|
@@ -107,7 +107,7 @@ For each goose feature, we assess:
 | Permission config | — | ❌ New |
 | Declarative providers | — | ❌ New (see providers) |
 
-### 6. Security (`crates/goose/src/security/`)
+### 6. Security (`projects/goose/crates/goose/src/security/`)
 
 | Goose Feature | Baymax Equivalent | Status |
 |---|---|---|
@@ -118,7 +118,7 @@ For each goose feature, we assess:
 | Pattern detection | — | ❌ New |
 | Security inspector (combined) | — | ❌ New |
 
-### 7. Permissions (`crates/goose/src/permission/`)
+### 7. Permissions (`projects/goose/crates/goose/src/permission/`)
 
 | Goose Feature | Baymax Equivalent | Status |
 |---|---|---|
@@ -127,7 +127,7 @@ For each goose feature, we assess:
 | Permission judge | — | ❌ New |
 | Permission store | — | ❌ New |
 
-### 8. Gateway (`crates/goose/src/gateway/`)
+### 8. Gateway (`projects/goose/crates/goose/src/gateway/`)
 
 | Goose Feature | Baymax Equivalent | Status |
 |---|---|---|
@@ -137,14 +137,14 @@ For each goose feature, we assess:
 | **Telegram integration** | — | ❌ New |
 | Telegram format | — | ❌ New |
 
-### 9. Dictation (`crates/goose/src/dictation/`)
+### 9. Dictation (`projects/goose/crates/goose/src/dictation/`)
 
 | Goose Feature | Baymax Equivalent | Status |
 |---|---|---|
 | Whisper STT | — | ❌ New |
 | Cloud dictation providers | — | ❌ New |
 
-### 10. Session (`crates/goose/src/session/`)
+### 10. Session (`projects/goose/crates/goose/src/session/`)
 
 | Goose Feature | Baymax Equivalent | Status |
 |---|---|---|
@@ -157,7 +157,7 @@ For each goose feature, we assess:
 | Nostr sharing | — | ❌ New |
 | Import formats | — | ❌ New |
 
-### 11. Skills (`crates/goose/src/skills/`)
+### 11. Skills (`projects/goose/crates/goose/src/skills/`)
 
 | Goose Feature | Baymax Equivalent | Status |
 |---|---|---|
@@ -167,7 +167,7 @@ For each goose feature, we assess:
 | Skill client | `crates/agent_skills/` | ✅ Already exists |
 | Skill discovery | `crates/agent_skills/` | ✅ Already exists |
 
-### 12. Slash Commands (`crates/goose/src/slash_commands/`)
+### 12. Slash Commands (`projects/goose/crates/goose/src/slash_commands/`)
 
 | Goose Feature | Baymax Equivalent | Status |
 |---|---|---|
@@ -176,14 +176,14 @@ For each goose feature, we assess:
 | Skill slash command | — | ❌ New |
 | Types & utilities | — | ❌ New |
 
-### 13. Hints (`crates/goose/src/hints/`)
+### 13. Hints (`projects/goose/crates/goose/src/hints/`)
 
 | Goose Feature | Baymax Equivalent | Status |
 |---|---|---|
 | Import files hints | — | ❌ New |
 | Load hints | — | ❌ New |
 
-### 14. Goose Apps (`crates/goose/src/goose_apps/`)
+### 14. Goose Apps (`projects/goose/crates/goose/src/goose_apps/`)
 
 | Goose Feature | Baymax Equivalent | Status |
 |---|---|---|
@@ -191,19 +191,19 @@ For each goose feature, we assess:
 | Cache | — | ❌ New |
 | Resource | — | ❌ New |
 
-### 15. Execution (`crates/goose/src/execution/`)
+### 15. Execution (`projects/goose/crates/goose/src/execution/`)
 
 | Goose Feature | Baymax Equivalent | Status |
 |---|---|---|
 | Execution manager | `crates/agent/` | ⚠️ Partial |
 
-### 16. Scheduler (`crates/goose/src/scheduler*.rs`)
+### 16. Scheduler (`projects/goose/crates/goose/src/scheduler*.rs`)
 
 | Goose Feature | Baymax Equivalent | Status |
 |---|---|---|
 | Scheduler | `crates/scheduler/` | ✅ Already exists |
 
-### 17. Prompts (`crates/goose/src/prompts/`)
+### 17. Prompts (`projects/goose/crates/goose/src/prompts/`)
 
 | Goose Feature | Baymax Equivalent | Status |
 |---|---|---|
@@ -213,7 +213,7 @@ For each goose feature, we assess:
 | Compaction prompt | — | ❌ New |
 | Permission judge prompt | — | ❌ New |
 
-### 18. Tracing/Observability (`crates/goose/src/tracing/`)
+### 18. Tracing/Observability (`projects/goose/crates/goose/src/tracing/`)
 
 | Goose Feature | Baymax Equivalent | Status |
 |---|---|---|
@@ -222,7 +222,7 @@ For each goose feature, we assess:
 | Rate limiter | — | ❌ New |
 | OpenTelemetry (OTLP) | `crates/otel/` | ⚠️ Partial |
 
-### 19. OAuth (`crates/goose/src/oauth/`)
+### 19. OAuth (`projects/goose/crates/goose/src/oauth/`)
 
 | Goose Feature | Baymax Equivalent | Status |
 |---|---|---|
@@ -230,26 +230,26 @@ For each goose feature, we assess:
 | OAuth persistence | — | ❌ New |
 | OAuth device flow | — | ❌ New |
 
-### 20. Context Management (`crates/goose/src/context_mgmt/`)
+### 20. Context Management (`projects/goose/crates/goose/src/context_mgmt/`)
 
 | Goose Feature | Baymax Equivalent | Status |
 |---|---|---|
 | Context window management | — | ❌ New |
 
-### 21. Plugins (`crates/goose/src/plugins/`)
+### 21. Plugins (`projects/goose/crates/goose/src/plugins/`)
 
 | Goose Feature | Baymax Equivalent | Status |
 |---|---|---|
 | Plugin discovery | — | ❌ New |
 | Plugin formats | — | ❌ New |
 
-### 22. Hooks (`crates/goose/src/hooks/`)
+### 22. Hooks (`projects/goose/crates/goose/src/hooks/`)
 
 | Goose Feature | Baymax Equivalent | Status |
 |---|---|---|
 | Hook system | — | ❌ New |
 
-### 23. Platform Extensions (`crates/goose/src/agents/platform_extensions/`)
+### 23. Platform Extensions (`projects/goose/crates/goose/src/agents/platform_extensions/`)
 
 | Goose Feature | Baymax Equivalent | Status |
 |---|---|---|
@@ -265,7 +265,7 @@ For each goose feature, we assess:
 | Developer | — | ❌ New |
 | Extension manager | — | ❌ New |
 
-### 24. Other Core Files (`crates/goose/src/*.rs`)
+### 24. Other Core Files (`projects/goose/crates/goose/src/*.rs`)
 
 | Goose Feature | Baymax Equivalent | Status |
 |---|---|---|

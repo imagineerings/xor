@@ -178,5 +178,5 @@ _For any_ dictation provider, [for each supported format], THE provider SHALL ac
 
 ## References
 
-- Source: `goose/crates/goose/src/dictation/`
+- Source: `projects/goose/crates/goose/src/dictation/`
 - Baymax: `crates/audio/`

@@ -1,0 +1,161 @@
+# Implementation Plan: Custom User Status
+
+## Overview
+
+This plan implements custom user status — emoji + short text labels with optional auto-clear timers — across five layers: protobuf messages, database schema, server RPC handlers + expiry sweeper, client data model + message handlers, and UI components. Each layer builds on the previous one, with tests following each implementation phase. The ordering ensures the server can handle new proto messages before clients send them, and UI components have the client data model ready before rendering.
+
+## Tasks
+
+- [ ] 1. Define protobuf messages and register in proto layer
+  - Add `UserCustomStatus`, `SetStatus`, `SetStatusResponse`, `ClearStatus`, `UpdateUserStatus`, and `UpdateUserStatuses` messages in `crates/proto/proto/baymax.proto` with `oneof payload` entries (field numbers 250–254)
+  - Register all messages in `messages!()` macro in `crates/proto/src/proto.rs`
+  - Register `SetStatus` and `ClearStatus` in `request_messages!()` macro
+  - _Requirements: 8.1, 8.2_
+  - _writes: crates/proto/proto/baymax.proto, crates/proto/src/proto.rs_
+
+- [ ] 2. Create database migration for `user_custom_statuses` table
+  - Write SQL migration creating the table with `user_id` (PK, FK `users(id)` ON DELETE CASCADE), `emoji` (nullable VARCHAR), `status_text` (NOT NULL VARCHAR), `expires_at` (nullable TIMESTAMP), `updated_at` (TIMESTAMP DEFAULT NOW())
+  - Add partial index on `expires_at WHERE expires_at IS NOT NULL`
+  - Add the migration file to the migrations directory and register it
+  - _Requirements: 8.1 (AC 5)_
+  - _writes: crates/collab/migrations/XXXXXX_add_custom_user_status.sql_
+
+- [ ] 3. Implement server-side `handle_set_status` RPC handler
+  - [ ] 3.1 Add `handle_set_status` method to the RPC handler struct in `crates/collab/src/rpc.rs`
+    - Validate `text` length ≤ 100 chars, validate emoji is recognized, validate `clear_after_minutes` is an allowed value
+    - Upsert into `user_custom_statuses` table (compute `expires_at` from `clear_after_minutes` if set)
+    - Broadcast `UpdateUserStatus` to all connected sessions
+    - Return `SetStatusResponse`
+    - _Requirements: 8.1 (AC 2, AC 5)_
+    - _writes: crates/collab/src/rpc.rs_
+  - [ ] 3.2 Add `handle_clear_status` method in `crates/collab/src/rpc.rs`
+    - Delete from `user_custom_statuses WHERE user_id = session.user_id`
+    - Broadcast `UpdateUserStatus { user_id, status: None }` to all sessions
+    - Return success (idempotent — succeeds even if no status exists)
+    - _Requirements: 8.2 (AC 2, AC 3)_
+    - _writes: crates/collab/src/rpc.rs_
+
+- [ ] 4. Implement `StatusExpirySweeper`
+  - Create `StatusExpirySweeper` struct in `crates/collab/src/` with `db: Arc<Database>` and `executor: Executor`
+  - Implement `new()`, `start() -> Task<()>` (periodic loop every 30s), and `sweep() -> Result<Vec<UserId>>`
+  - `sweep` runs `DELETE FROM user_custom_statuses WHERE expires_at < NOW() RETURNING user_id` and broadcasts `UpdateUserStatus { status: None }` for each cleared user
+  - Start the sweeper on server startup (in `collab/src/main.rs` or the server initialization path)
+  - Errors are logged but do not halt the sweep loop
+  - _Requirements: 8.2 (AC 1)_
+  - _writes: crates/collab/src/status_expiry_sweeper.rs, crates/collab/src/main.rs_ (or equivalent server init)
+
+- [ ] 5. Add DB query methods for `user_custom_statuses`
+  - [ ] 5.1 Add `upsert_custom_status(user_id, emoji, text, expires_at)` to the database layer
+    - _writes: crates/collab/src/db/_
+  - [ ] 5.2 Add `delete_custom_status(user_id)` to the database layer
+    - _writes: crates/collab/src/db/_
+  - [ ] 5.3 Add `delete_expired_custom_statuses()` → returning cleared user ids
+    - _writes: crates/collab/src/db/_
+
+- [ ] 6. Extend client `Contact` struct and add `CustomStatus` model
+  - [ ] 6.1 Define `CustomStatus` struct in `crates/client/src/user.rs` with `emoji: Option<SharedString>`, `text: SharedString`, `expires_at: Option<i64>`
+    - _writes: crates/client/src/user.rs_
+  - [ ] 6.2 Add `custom_status: Option<CustomStatus>` field to the `Contact` struct
+    - Update all construction sites and pattern matches for `Contact`
+    - _Requirements: 8.3 (AC 1)_
+    - _writes: crates/client/src/user.rs_
+
+- [ ] 7. Add `UserStore` methods for status management
+  - [ ] 7.1 Implement `update_user_status(&mut self, user_id, status)` on `UserStore` — finds the contact by user_id and sets/clears `custom_status`
+    - _writes: crates/client/src/user.rs_
+  - [ ] 7.2 Implement `set_status(&mut self, emoji, text, clear_after_minutes, cx) -> Task<Result<()>>` — sends `SetStatus` RPC and returns the response
+    - _writes: crates/client/src/user.rs_
+  - [ ] 7.3 Implement `clear_status(&mut self, cx) -> Task<Result<()>>` — sends `ClearStatus` RPC
+    - _writes: crates/client/src/user.rs_
+
+- [ ] 8. Register client message handlers for status pushes
+  - In `UserStore::handle_message_to_client` (or equivalent), add handlers for:
+    - `UpdateUserStatus` → calls `self.update_user_status(update.user_id, update.status)`
+    - `UpdateUserStatuses` → iterates and calls `update_user_status` for each entry
+  - _Requirements: 8.3 (AC 3)_
+  - _writes: crates/client/src/user.rs_
+
+- [ ] 9. Build `StatusDisplay` reusable widget
+  - Create `StatusDisplay` struct with `status: Option<CustomStatus>` in `crates/collab_ui/src/`
+  - Implement `RenderOnce` — when `status` is `Some`, renders `{emoji} {text}` in muted/secondary color; when `None`, renders nothing
+  - _Requirements: 8.3 (AC 1, AC 2)_
+  - _writes: crates/collab_ui/src/status_display.rs_
+
+- [ ] 10. Build `UserStatusModal` component
+  - [ ] 10.1 Define supporting types: `ClearAfterOption` enum (Never, ThirtyMinutes, OneHour, FourHours, Today, ThisWeek) and `StatusPreset` struct (emoji, label, text)
+    - _writes: crates/collab_ui/src/user_status_modal.rs_
+  - [ ] 10.2 Implement `UserStatusModal` struct with fields: `emoji`, `text`, `clear_after`, `user_store`, `current_user_id`, `presets`
+    - _writes: crates/collab_ui/src/user_status_modal.rs_
+  - [ ] 10.3 Implement `UserStatusModal::render` — header, preset grid (2×4 with 7 presets: "In a meeting", "Out sick", "Working remotely", "On vacation", "In a call", "Away", "Busy"), custom section with emoji picker button + text input (max 100 chars with character counter), "Clear after" dropdown, footer with Save + Clear + Cancel buttons
+    - _Requirements: 8.1 (AC 2, AC 4)_
+    - _writes: crates/collab_ui/src/user_status_modal.rs_
+  - [ ] 10.4 Implement event handlers: `on_select_preset`, `on_select_emoji`, `on_text_input`, `on_save`, `on_clear`
+    - `on_save` calls `user_store.set_status(…)` and closes modal
+    - `on_clear` calls `user_store.clear_status(…)` and closes modal
+    - _Requirements: 8.1 (AC 1, AC 3), 8.2 (AC 2)_
+    - _writes: crates/collab_ui/src/user_status_modal.rs_
+
+- [ ] 11. Wire UI integration points
+  - [ ] 11.1 Add "Set a status" menu item to the user avatar context menu (opens `UserStatusModal`)
+    - _Requirements: 8.1 (AC 1)_
+    - _writes: crates/collab_ui/src/_
+  - [ ] 11.2 Add `StatusDisplay` below user name/avatar in the channel sidebar contact list (`CollabPanel::render_contact`)
+    - _Requirements: 8.3 (AC 1)_
+    - _writes: crates/collab_ui/src/_
+  - [ ] 11.3 Add `StatusDisplay` below sender name in message headers (`ChannelView` / message header component)
+    - _Requirements: 8.3 (AC 1)_
+    - _writes: crates/collab_ui/src/_
+  - [ ] 11.4 Add `StatusDisplay` in mentions autocomplete popover rows
+    - _Requirements: 8.3 (AC 1)_
+    - _writes: crates/collab_ui/src/_
+  - [ ] 11.5 Add `StatusDisplay` in user profile popover
+    - _Requirements: 8.3 (AC 1)_
+    - _writes: crates/collab_ui/src/_
+
+- [ ] 12. Write server unit tests
+  - [ ] 12.1 `test_set_status_validation` - rejects text > 100 chars, accepts valid input
+    - _writes: crates/collab/src/rpc.rs_ (tests module)
+  - [ ] 12.2 `test_clear_status_idempotent` - clearing a non-existent status returns success
+    - _writes: crates/collab/src/rpc.rs_ (tests module)
+  - [ ] 12.3 `test_expiry_sweeper` - expired rows are deleted and broadcasts sent
+    - _writes: crates/collab/src/status_expiry_sweeper.rs_ (or separate test file)
+  - [ ] 12.4 `test_expiry_sweeper_no_expired` - sweep with no expired rows produces no broadcasts
+    - _writes: crates/collab/src/status_expiry_sweeper.rs_
+  - [ ] 12.5 `test_set_status_persistence` - verifies upsert creates/updates row correctly
+    - _writes: crates/collab/src/db/_ (tests module)
+
+- [ ] 13. Write client unit tests
+  - [ ] 13.1 `test_contact_custom_status_field` - `update_user_status` correctly sets/clears `Contact.custom_status`
+    - _writes: crates/client/src/user.rs_ (tests module)
+  - [ ] 13.2 `test_update_user_statuses_batch` - batch initialization populates all contacts correctly
+    - _writes: crates/client/src/user.rs_ (tests module)
+  - [ ] 13.3 `test_clear_after_duration_parsing` - each `ClearAfterOption` maps to correct minutes value
+    - _writes: crates/collab_ui/src/user_status_modal.rs_ (tests module)
+
+- [ ] 14. Write UI tests
+  - [ ] 14.1 `UserStatusModal` renders all 7 presets (visible and clickable)
+    - _writes: crates/collab_ui/src/user_status_modal.rs_ (tests module)
+  - [ ] 14.2 `UserStatusModal` text input — character counter updates, Save disabled when text > 100 chars
+    - _writes: crates/collab_ui/src/user_status_modal.rs_ (tests module)
+  - [ ] 14.3 `UserStatusModal` clear_after dropdown — all 6 options selectable, "Never" is default
+    - _writes: crates/collab_ui/src/user_status_modal.rs_ (tests module)
+  - [ ] 14.4 `StatusDisplay` renders correctly — emoji + text in muted color; hidden when `None`
+    - _writes: crates/collab_ui/src/status_display.rs_ (tests module)
+
+- [ ] 15. Write integration tests
+  - [ ] 15.1 Set status flow — Client A sets status → Server broadcasts → Client B receives and shows it
+    - _writes: crates/collab/tests/_
+  - [ ] 15.2 Clear status flow — Client A clears → Server broadcasts → Client B sees removal
+    - _writes: crates/collab/tests/_
+  - [ ] 15.3 Auto-expiry flow — Set status with short expiry → wait → both clients see it cleared
+    - _writes: crates/collab/tests/_
+  - [ ] 15.4 Reconnect sync — Client A sets status → Client B reconnects → receives status in initial batch
+    - _writes: crates/collab/tests/_
+  - [ ] 15.5 Multiple clients — 3 clients, status update reaches all
+    - _writes: crates/collab/tests/_
+
+- [ ] 16. Write property-based tests
+  - [ ] 16.1 Property 5.1 (text length) — generate random strings up to 200 chars; verify rejection boundary at 100
+  - [ ] 16.2 Property 5.3 (timer expiry) — generate random future timestamps; verify status cleared after timestamp passes
+  - [ ] 16.3 Property 5.4 (clear idempotency) — generate sequences of set/clear operations; verify clear always succeeds
+  - [ ] 16.4 Property 5.9 (one status per user) — generate concurrent `SetStatus` for same user; verify exactly one row exists

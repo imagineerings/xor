@@ -1,0 +1,196 @@
+# Implementation Plan: Channel Message Search
+
+## Overview
+
+Add full-text search across channel messages using PostgreSQL tsvector/tsquery, with a client-side search bar, filter syntax (`in:`, `from:`, `before:`/`after:`), paginated result display, and click-to-navigate. The implementation spans six crates: `migrations`, `proto`, `collab`, `rpc`, `client`, and `collab_ui`.
+
+## Tasks
+
+### Phase 1 — Database & Proto Foundation
+
+- [ ] 1. Add database migration for search index
+  - Add `search_vector tsvector` column to `channel_messages` table
+  - Create `idx_channel_messages_search` GIN index on `search_vector`
+  - Create `update_message_search_vector()` trigger function (calls `to_tsvector('english', NEW.body)`)
+  - Create `trg_message_search_vector` BEFORE INSERT OR UPDATE trigger
+  - Add `UPDATE channel_messages SET search_vector = ...` for existing rows
+  - Add migration rollback (DROP TRIGGER, DROP FUNCTION, DROP INDEX, DROP COLUMN)
+  - _Requirements: 5.4_
+  - _writes: crates/db/migrations/XXXXX_add_message_search_vector.sql_
+  - _writes: crates/db/migrations/XXXXX_add_message_search_vector_down.sql_
+
+- [ ] 2. Define protobuf messages for search
+  - Add `SearchChannelMessages` message (channel_id, query, before_id, limit, filter_channel, filter_user, filter_after, filter_before)
+  - Add `SearchChannelMessagesResponse` message (repeated results, done)
+  - Add `SearchResult` message (message, channel_name, sender_name, match_positions)
+  - Register the new RPC in the service definition
+  - Run proto codegen to produce Rust types
+  - _Requirements: 5.1, 5.3_
+  - _writes: crates/proto/proto/baymax/proto/collab/search.proto_
+  - _writes: crates/proto/src/gen/collab/search.rs_ (codegen output)
+
+### Phase 2 — Server-Side Search Engine
+
+- [ ] 3. Implement `SearchEngine` in the `collab` crate
+  - Create `SearchEngine` struct wrapping a `db::Pool`
+  - Define `SearchParams` struct (channel_id, query, before_id, limit, filter_channel, filter_username, filter_after, filter_before)
+  - Define `SearchResult` struct (message_id, channel_id, channel_name, body, sender_id, sender_name, created_at, rank)
+  - Implement `SearchMessages(ctx, params)` that:
+    - Rejects queries < 2 chars with error
+    - Truncates queries > 200 chars
+    - Escapes/strips characters that break tsquery
+    - Builds parameterised SQL using query from §4.2 of the design doc
+    - Orders by `ts_rank(...) DESC, cm.id DESC`
+    - Returns `(results, done)` — `done = true` when fewer rows returned than `limit`
+  - _Requirements: 5.1, 5.2_
+  - _writes: crates/collab/src/search_engine.rs_
+  - _tests: crates/collab/src/search_engine.rs_
+
+- [ ] 4. Enforce channel access control in server search
+  - Accept `user_id` in `SearchMessages` to filter accessible channels
+  - Join through `channel_participants` table to ensure user is a member
+  - Only return messages from channels the user belongs to
+  - Return empty result set (not error) when user has no access to any matching channels
+  - _Requirements: 5.1_ (Property 5.2)
+  - _writes: crates/collab/src/search_engine.rs_
+
+- [ ] 5. Wire search RPC handler in the `collab` crate
+  - Implement `handle_search_channel_messages` on the main RPC handler
+  - Deserialise `SearchChannelMessages` → `SearchParams` (resolve `filter_channel` name to channel_id, `filter_user` name to user_id)
+  - Parse date strings in `filter_after`/`filter_before` to `DateTime` (ISO 8601)
+  - Call `SearchEngine::SearchMessages`
+  - Serialise `SearchResult` vec into `SearchChannelMessagesResponse`
+  - Handle error cases: invalid date format, unknown channel/user name, database error
+  - _Requirements: 5.1, 5.2_
+  - _writes: crates/collab/src/rpc/search_messages.rs_
+  - _tests: crates/collab/src/rpc/search_messages.rs_
+
+- [ ] 6. Write server integration tests for search
+  - Seed test database with a few channels and messages
+  - Test plain text search returns correct messages
+  - Test `in:` filter narrows to specific channel
+  - Test `from:` filter narrows to specific user
+  - Test `before:`/`after:` date range filtering
+  - Test combined filters
+  - Test query < 2 chars is rejected
+  - Test pagination (insert 25 messages, fetch with limit=10, verify 3 pages)
+  - Test access control (user not in channel gets no results)
+  - Test edit updates search vector (re-index on UPDATE)
+  - _Requirements: 5.1, 5.2, 5.3, 5.4_
+  - _writes: crates/collab/src/search_engine.rs_
+  - _writes: crates/collab/src/rpc/search_messages.rs_
+
+### Phase 3 — Client Search RPC & State
+
+- [ ] 7. Add search request/response types to the `client` crate
+  - Define `SearchChannelMessagesParams` in the client types
+  - Add `search_channel_messages` method on `Client` or `ChannelStore` that sends the RPC and returns results
+  - Handle reconnection: re-send search after reconnect if UI still needs results
+  - _Requirements: 5.1_
+  - _writes: crates/client/src/channel_store.rs_
+
+- [ ] 8. Implement `search_message` RPC call routing in `rpc` crate
+  - Add `SearchChannelMessages` to the RPC dispatch table
+  - Ensure the `REQUEST_TYPES`/`RESPONSE_TYPES` tuple list includes the new message pair
+  - _writes: crates/rpc/src/connection.rs_
+
+### Phase 4 — Client UI
+
+- [ ] 9. Build `SearchBar` component in `collab_ui`
+  - Create `SearchBar` struct with `editor: Entity<Editor>`, `active_filters: SearchFilters`, `results_panel: Option<Entity<SearchResultsPanel>>`
+  - Implement `Render` with a text input styled to match the channel header
+  - Add placeholder text: "Search messages… (in:, from:, before:, after:)"
+  - Implement `on_query_changed` with 300 ms debounce via `cx.spawn` + background timer
+  - Wire debounced query to launch a search via `Client::search_channel_messages`
+  - Clear results when query is empty
+  - Show loading spinner while search is in-flight
+  - _Requirements: 5.1_
+  - _writes: crates/collab_ui/src/channel_search_bar.rs_
+
+- [ ] 10. Implement `SearchFilters` parsing and `SearchFilterChip` display
+  - Implement `parse_filters(query: &str) -> (SearchFilters, String)` that extracts:
+    - `in:channel-name` → `SearchFilters.channel_name`
+    - `from:username` → `SearchFilters.username`
+    - `before:YYYY-MM-DD` → `SearchFilters.before_date`
+    - `after:YYYY-MM-DD` → `SearchFilters.after_date`
+  - Support quoted strings: `"in:general from:alice"` keeps literal text
+  - Render active filters as removable chips below the search input
+  - Each chip shows the filter label (e.g., "in: general") with an × to remove
+  - Removing a chip updates the query text and re-triggers search
+  - _Requirements: 5.2_
+  - _writes: crates/collab_ui/src/channel_search_bar.rs_
+
+- [ ] 11. Build `SearchResultsPanel` component
+  - Create `SearchResultsPanel` struct with `results: Vec<SearchResult>`, `loading: bool`, `done: bool`, `active_query: String`
+  - Implement `Render`:
+    - "No results found" empty state with suggestions message when done and results empty
+    - Result cards showing: `#channel · @user · timestamp` header line
+    - Message body with matched text highlighted (use `match_positions` to inject `<span class="match">`)
+    - Surrounding context lines (previous/next messages — requires server returning adjacent messages, or client fetching channel history around the match)
+    - "Load more" button when `done == false`
+    - Loading spinner when new page is being fetched
+  - _Requirements: 5.3_
+  - _writes: crates/collab_ui/src/channel_search_results_panel.rs_
+
+- [ ] 12. Wire `SearchBar` and `SearchResultsPanel` into the channel UI
+  - Add `SearchBar` to the channel header (toggleable via a search icon button or `Cmd-F` keyboard shortcut)
+  - Show `SearchResultsPanel` below the channel header when search is active (overlay or inline)
+  - Close search and return to normal channel view on `Escape`
+  - _Requirements: 5.1, 5.3_
+  - _writes: crates/collab_ui/src/channel.rs_
+
+- [ ] 13. Navigate to message on result click
+  - Implement `on_result_clicked` handler that:
+    - Fetches the channel the result belongs to (if not already open)
+    - Navigates to the channel
+    - Calls `ChannelStore::scroll_to_message(message_id)` or similar
+    - Highlights the target message briefly (e.g., yellow background fade)
+  - Close `SearchResultsPanel` after navigation
+  - _Requirements: 5.3_
+  - _writes: crates/collab_ui/src/channel_search_results_panel.rs_
+  - _writes: crates/client/src/channel_store.rs_
+
+### Phase 5 — Polish & Edge Cases
+
+- [ ] 14. Add keyboard navigation for search results
+  - Support `Up`/`Down` arrow keys to move selection through results
+  - Show a subtle focus ring on the selected result
+  - `Enter` triggers navigation on the selected result
+  - _Requirements: 5.3_
+  - _writes: crates/collab_ui/src/channel_search_results_panel.rs_
+
+- [ ] 15. Handle error states in the UI
+  - Show inline error banner for:
+    - "Query must be at least 2 characters"
+    - "Search timed out, try narrowing your query"
+    - "Failed to load search results. [Retry]" button
+  - Show "Indexing in progress — some results may be incomplete" banner on first search if migration has not completed
+  - _Requirements: 5.1_ (Error Handling §6)
+  - _writes: crates/collab_ui/src/channel_search_results_panel.rs_
+
+- [ ] 16. Write client-side unit tests
+  - Test `SearchFilters::parse_filters` with various query strings (single filter, combined filters, quoted strings, no filters)
+  - Test that empty query does not trigger a search request
+  - Test that `SearchResultsPanel` renders "No results found" for empty results
+  - Test that "Load more" appears when `done == false`
+  - Test pagination accumulation (appending results on "Load more")
+  - _Requirements: 5.2, 5.3_
+  - _writes: crates/collab_ui/src/channel_search_bar.rs_
+  - _writes: crates/collab_ui/src/channel_search_results_panel.rs_
+
+### Phase 6 — Index Maintenance
+
+- [ ] 17. Handle message edit and delete for search index
+  - Verify that the PostgreSQL trigger on UPDATE re-indexes when `body` changes (already covered by trigger)
+  - Verify that DELETE cascades — removing a row also removes its search vector (automatic with column removal)
+  - Add a `reindex_search` admin endpoint or CLI command that re-runs `UPDATE channel_messages SET search_vector = ...`
+  - _Requirements: 5.4_
+  - _writes: crates/collab/src/search_engine.rs_
+
+- [ ] 18. Benchmark and tune search performance
+  - Add `EXPLAIN ANALYZE` test to confirm GIN index is used for typical queries
+  - Verify `ts_rank` ordering is efficient with large datasets (10k+ messages)
+  - Consider adding `pg_trgm` extension for fuzzy/partial matching if prefix-only search is insufficient
+  - Document known performance characteristics and limits
+  - _Requirements: 5.4_
+  - _tests: crates/collab/src/search_engine.rs_

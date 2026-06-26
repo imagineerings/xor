@@ -255,7 +255,7 @@ _For any_ input [submitted in the interactive session], [when the user presses u
 
 ## References
 
-- Source: `goose/ui/text/` — React TUI (design reference)
+- Source: `projects/goose/ui/text/` — React TUI (design reference)
 - Baymax: `crates/cli/` — CLI framework
 - Baymax: `crates/terminal/`, `crates/terminal_view/` — terminal emulator
 - Baymax: `crates/markdown/` — markdown parsing

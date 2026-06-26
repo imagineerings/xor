@@ -206,8 +206,8 @@ _For any_ device flow initiation, THE system SHALL display the user code and ver
 
 ## References
 
-- Source: `goose/oidc-proxy/` — Cloudflare Worker
-- Source: `goose/crates/goose/src/oauth/persist.rs`
-- Source: `goose/crates/goose/src/providers/oauth_device_flow.rs`
+- Source: `projects/goose/oidc-proxy/` — Cloudflare Worker
+- Source: `projects/goose/crates/goose/src/oauth/persist.rs`
+- Source: `projects/goose/crates/goose/src/providers/oauth_device_flow.rs`
 - Baymax: `crates/oauth_callback_server/`
 - Baymax: `crates/credentials_provider/`

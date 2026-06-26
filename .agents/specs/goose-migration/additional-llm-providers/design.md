@@ -197,6 +197,6 @@ _For any_ provider credential [stored or transmitted], THE system SHALL NOT log,
 
 ## References
 
-- Source: `goose/crates/goose/src/providers/` (all files listed in requirements)
+- Source: `projects/goose/crates/goose/src/providers/` (all files listed in requirements)
 - Baymax trait: `crates/language_model_core/`
 - Baymax providers: `crates/language_models/src/provider/`

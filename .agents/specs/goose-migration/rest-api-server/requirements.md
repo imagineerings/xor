@@ -166,6 +166,6 @@ Migrate goose's HTTP REST API server (`goose-server`), which provides a full HTT
 
 ## References
 
-- Source: `goose/crates/goose-server/` — main.rs, lib.rs, configuration.rs, auth.rs, error.rs, logging.rs, openapi.rs, state.rs, tls.rs, session_event_bus.rs
-- Source: `goose/crates/goose-server/src/routes/` — agent.rs, session.rs, session_events.rs, recipe.rs, config_management.rs, schedule.rs, dictation.rs, gateway.rs, status.rs, telemetry.rs, setup.rs, action_required.rs, features.rs, local_inference.rs, mcp_app_proxy.rs, mcp_ui_proxy.rs, prompts.rs, reply.rs, sampling.rs, tunnel.rs, utils.rs, errors.rs
-- Source: `goose/crates/goose-server/src/commands/` — agent.rs
+- Source: `projects/goose/crates/goose-server/` — main.rs, lib.rs, configuration.rs, auth.rs, error.rs, logging.rs, openapi.rs, state.rs, tls.rs, session_event_bus.rs
+- Source: `projects/goose/crates/goose-server/src/routes/` — agent.rs, session.rs, session_events.rs, recipe.rs, config_management.rs, schedule.rs, dictation.rs, gateway.rs, status.rs, telemetry.rs, setup.rs, action_required.rs, features.rs, local_inference.rs, mcp_app_proxy.rs, mcp_ui_proxy.rs, prompts.rs, reply.rs, sampling.rs, tunnel.rs, utils.rs, errors.rs
+- Source: `projects/goose/crates/goose-server/src/commands/` — agent.rs
