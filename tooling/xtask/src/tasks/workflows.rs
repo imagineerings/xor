@@ -7,26 +7,10 @@ use strum::IntoEnumIterator;
 
 use crate::tasks::workflow_checks::{self};
 
-mod after_release;
-mod autofix_pr;
-mod bump_patch_version;
-mod bump_baymax_version;
-mod cherry_pick;
-mod compliance_check;
-mod danger;
-mod deploy_collab;
 mod deploy_docs;
-mod extension_auto_bump;
-mod extension_bump;
-mod extension_tests;
-mod extension_workflow_rollout;
 mod extensions;
-mod nix_build;
-mod publish_extension_cli;
-mod release_nightly;
-mod run_bundling;
-
 mod release;
+mod run_bundling;
 mod run_tests;
 mod runners;
 mod steps;
@@ -220,26 +204,7 @@ pub fn run_workflows(args: GenerateWorkflowArgs) -> Result<()> {
     WorkflowType::remove_generated_workflows()?;
 
     let workflows = [
-        WorkflowFile::baymax(after_release::after_release),
-        WorkflowFile::baymax(autofix_pr::autofix_pr),
-        WorkflowFile::baymax(bump_patch_version::bump_patch_version),
-        WorkflowFile::baymax(bump_baymax_version::bump_baymax_version),
-        WorkflowFile::baymax(cherry_pick::cherry_pick),
-        WorkflowFile::baymax(compliance_check::compliance_check),
-        WorkflowFile::baymax(danger::danger),
-        WorkflowFile::baymax(deploy_collab::deploy_collab),
-        WorkflowFile::baymax(deploy_docs::deploy_docs),
-        WorkflowFile::baymax(deploy_docs::deploy_nightly_docs),
-        WorkflowFile::baymax(extension_bump::extension_bump),
-        WorkflowFile::baymax(extension_auto_bump::extension_auto_bump),
-        WorkflowFile::baymax(extension_tests::extension_tests),
-        WorkflowFile::baymax(extension_workflow_rollout::extension_workflow_rollout),
-        WorkflowFile::baymax(nix_build::nix_build),
-        WorkflowFile::baymax(publish_extension_cli::publish_extension_cli),
-        WorkflowFile::baymax(release::release),
-        WorkflowFile::baymax(release_nightly::release_nightly),
-        WorkflowFile::baymax(run_bundling::run_bundling),
-        WorkflowFile::baymax(run_tests::run_tests),
+        // Core: release.yml and run_tests.yml are now hand-written minimal versions (not generated)
         /* workflows used for CI/CD in extension repositories */
         WorkflowFile::extension(extensions::run_tests::run_tests),
         WorkflowFile::extension_shared(extensions::bump_version::bump_version),

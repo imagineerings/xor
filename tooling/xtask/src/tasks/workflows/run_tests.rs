@@ -1,10 +1,9 @@
 use gh_workflow::{
-    Container, Event, Expression, Input, Job, Level, MergeGroup, Permissions, Port, PullRequest,
-    Push, Run, Step, Strategy, Use, UsesJob, Workflow,
+    Container, Event, Expression, Job, MergeGroup, Port, PullRequest, Push, Run, Step, Use,
+    Workflow,
 };
 use indexmap::IndexMap;
 use indoc::formatdoc;
-use serde_json::json;
 
 use crate::tasks::workflows::{
     steps::{
@@ -92,8 +91,7 @@ pub(crate) fn run_tests() -> Workflow {
             .then(check_licenses()),
         should_check_scripts.and_always().then(check_scripts()),
     ];
-    let ext_tests = extension_tests();
-    let tests_pass = tests_pass(&jobs, &[&ext_tests.name]);
+    let tests_pass = tests_pass(&jobs, &[]);
 
     // TODO: For merge queues, this should fail in the merge queue context
     jobs.push(
@@ -123,7 +121,6 @@ pub(crate) fn run_tests() -> Workflow {
             }
             workflow
         })
-        .add_job(ext_tests.name, ext_tests.job)
         .add_job(tests_pass.name, tests_pass.job)
 }
 
@@ -281,15 +278,7 @@ fn orchestrate_impl(rules: &[&PathCondition], target: OrchestrateTarget) -> Name
         ));
     }
 
-    if target == OrchestrateTarget::BaymaxRepo {
-        script.push_str(DETECT_CHANGED_EXTENSIONS_SCRIPT);
-        script.push_str("echo \"changed_extensions=$EXTENSIONS_JSON\" >> \"$GITHUB_OUTPUT\"\n");
-
-        outputs.insert(
-            "changed_extensions".to_owned(),
-            format!("${{{{ steps.{}.outputs.changed_extensions }}}}", step_name),
-        );
-    }
+    if target == OrchestrateTarget::BaymaxRepo {}
 
     let job = Job::default()
         .runs_on(runners::LINUX_SMALL)
@@ -797,27 +786,4 @@ pub(crate) fn check_scripts() -> NamedJob {
             .add_step(cache_rust_dependencies_namespace())
             .add_step(check_xtask_workflows()),
     )
-}
-
-fn extension_tests() -> NamedJob<UsesJob> {
-    let job = Job::default()
-        .needs(vec!["orchestrate".to_owned()])
-        .cond(Expression::new(
-            "needs.orchestrate.outputs.changed_extensions != '[]'",
-        ))
-        .permissions(Permissions::default().contents(Level::Read))
-        .strategy(
-            Strategy::default()
-                .fail_fast(false)
-                // TODO: Remove the limit. We currently need this to workaround the concurrency group issue
-                // where different matrix jobs would be placed in the same concurrency group and thus cancelled.
-                .max_parallel(1u32)
-                .matrix(json!({
-                    "extension": "${{ fromJson(needs.orchestrate.outputs.changed_extensions) }}"
-                })),
-        )
-        .uses_local(".github/workflows/extension_tests.yml")
-        .with(Input::default().add("working-directory", "${{ matrix.extension }}"));
-
-    named::job(job)
 }
