@@ -221,6 +221,6 @@ _For any_ MCP server launched by the server runner, [if the process exits unexpe
 
 ## References
 
-- Source: `goose/crates/goose-mcp/src/`
+- Source: `projects/goose/crates/goose-mcp/src/`
 - Baymax: `crates/agent/src/tools/` — existing agent tool pattern
 - Baymax: `crates/context_server/` — MCP client

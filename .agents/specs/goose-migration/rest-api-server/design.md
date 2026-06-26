@@ -242,5 +242,5 @@ _For any_ config update request [with invalid values], THE server SHALL return 4
 
 ## References
 
-- Source: `goose/crates/goose-server/`
+- Source: `projects/goose/crates/goose-server/`
 - Baymax: `crates/agent/`, `crates/session/`, `crates/settings/`, `crates/scheduler/`

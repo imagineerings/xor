@@ -116,4 +116,4 @@ _For any_ page [in the documentation], [after search index generation], THE page
 
 ## References
 
-- Source: `goose/documentation/`
+- Source: `projects/goose/documentation/`

@@ -5,7 +5,6 @@
 ```
 crates/          Main Baymax Rust workspace — all production crates
 extensions/      In-tree WASM extensions (glsl, html, proto, test-extension)
-mobile/          Goose iOS and Android clients (not part of the Rust workspace)
 tooling/         Build tooling crates (compliance, perf, xtask)
 docs/            mdBook documentation source
 assets/          Static assets (icons, fonts, keymaps, themes, sounds)

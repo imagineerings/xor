@@ -121,7 +121,7 @@ toolcall.tsx                           →  Enhanced tool output in CLI
 
 ## References
 
-- Source (goose): `goose/ui/text/` — React TUI application
+- Source (goose): `projects/goose/ui/text/` — React TUI application
 - Existing baymax: `crates/cli/` — CLI framework
 - Existing baymax: `crates/terminal/`, `crates/terminal_view/` — terminal emulator
 - Existing baymax: `crates/markdown/` — markdown parsing and rendering

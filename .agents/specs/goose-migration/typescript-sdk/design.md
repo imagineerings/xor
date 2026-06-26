@@ -243,7 +243,7 @@ _For any_ platform [macOS, Linux, Windows], THE binary resolver SHALL find the c
 
 ## References
 
-- Source: `goose/ui/sdk/` — TypeScript SDK
-- Source: `goose/crates/goose-sdk/` — Rust SDK bindings
-- Source: `goose/crates/goose-sdk-types/` — SDK type definitions
+- Source: `projects/goose/ui/sdk/` — TypeScript SDK
+- Source: `projects/goose/crates/goose-sdk/` — Rust SDK bindings
+- Source: `projects/goose/crates/goose-sdk-types/` — SDK type definitions
 - Baymax: `crates/baymax-server/` (design) — REST API server

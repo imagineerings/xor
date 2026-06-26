@@ -73,8 +73,8 @@ Migrate several goose developer-experience features: slash commands, hints syste
 
 ## References
 
-- Source: `goose/crates/goose/src/slash_commands/` — mod.rs, slash_command.rs, recipe_slash_command.rs, skill_slash_command.rs, types.rs, util.rs
-- Source: `goose/crates/goose/src/hints/` — mod.rs, import_files.rs, load_hints.rs
-- Source: `goose/crates/goose/src/goose_apps/` — mod.rs, app.rs, cache.rs, chat.html, clock.html, resource.rs
-- Source: `goose/crates/goose/src/source_roots.rs`, `sources.rs`
-- Source: `goose/crates/goose/src/execution/` — mod.rs, manager.rs
+- Source: `projects/goose/crates/goose/src/slash_commands/` — mod.rs, slash_command.rs, recipe_slash_command.rs, skill_slash_command.rs, types.rs, util.rs
+- Source: `projects/goose/crates/goose/src/hints/` — mod.rs, import_files.rs, load_hints.rs
+- Source: `projects/goose/crates/goose/src/goose_apps/` — mod.rs, app.rs, cache.rs, chat.html, clock.html, resource.rs
+- Source: `projects/goose/crates/goose/src/source_roots.rs`, `sources.rs`
+- Source: `projects/goose/crates/goose/src/execution/` — mod.rs, manager.rs

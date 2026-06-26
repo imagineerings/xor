@@ -163,7 +163,7 @@ mesh.ts                               →  Evaluate; may not be needed in baymax
 
 ## References
 
-- Source (goose): `goose/ui/desktop/` — Full Electron/React app
+- Source (goose): `projects/goose/ui/desktop/` — Full Electron/React app
 - Existing baymax: `crates/baymax/` — main desktop binary
 - Existing baymax: `crates/agent_ui/` — agent panel, conversation, configuration
 - Existing baymax: `crates/gpui/` — GPUI framework
