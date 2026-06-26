@@ -1,6 +1,6 @@
 use collab::db::*;
 
-use super::{RandomibaymaxTest, TestClient, TestError, TestServer, UserTestPlan, run_randomibaymax_test};
+use super::{randomizedTest, TestClient, TestError, TestServer, UserTestPlan, run_randomized_test};
 use anyhow::Result;
 use async_trait::async_trait;
 use gpui::{BackgroundExecutor, SharedString, TestAppContext};
@@ -13,13 +13,13 @@ use std::{
 };
 use text::Bias;
 
-#[gpui::test(iterations = 100, on_failure = "crate::save_randomibaymax_test_plan")]
+#[gpui::test(iterations = 100, on_failure = "crate::save_randomized_test_plan")]
 async fn test_random_channel_buffers(
     cx: &mut TestAppContext,
     executor: BackgroundExecutor,
     rng: StdRng,
 ) {
-    run_randomibaymax_test::<RandomChannelBufferTest>(cx, executor, rng).await;
+    run_randomized_test::<RandomChannelBufferTest>(cx, executor, rng).await;
 }
 
 struct RandomChannelBufferTest;
@@ -42,7 +42,7 @@ enum ChannelBufferOperation {
 const CHANNEL_COUNT: usize = 3;
 
 #[async_trait(?Send)]
-impl RandomibaymaxTest for RandomChannelBufferTest {
+impl randomizedTest for RandomChannelBufferTest {
     type Operation = ChannelBufferOperation;
 
     async fn initialize(server: &mut TestServer, users: &[UserTestPlan]) {

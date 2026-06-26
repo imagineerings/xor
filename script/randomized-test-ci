@@ -7,7 +7,7 @@ const {
   minimizeTestPlan,
   buildTests,
   runTests,
-} = require("./randomibaymax-test-minimize");
+} = require("./randomized-test-minimize");
 
 const { BAYMAX_SERVER_URL } = process.env;
 if (!BAYMAX_SERVER_URL) throw new Error("Missing env var `BAYMAX_SERVER_URL`");
@@ -45,7 +45,7 @@ async function main() {
 
   console.log("minimibaymax plan:\n", minimibaymaxPlan);
 
-  const url = `${BAYMAX_SERVER_URL}/api/randomibaymax_test_failure`;
+  const url = `${BAYMAX_SERVER_URL}/api/randomized_test_failure`;
   const body = {
     seed: minimibaymaxSeed,
     plan: JSON.parse(minimibaymaxPlan),

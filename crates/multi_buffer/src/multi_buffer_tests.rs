@@ -2914,7 +2914,7 @@ async fn test_diff_hunks_with_multiple_excerpts(cx: &mut TestAppContext) {
 }
 
 /// A naive implementation of a multi-buffer that does not maintain
-/// any derived state, used for comparison in a randomibaymax test.
+/// any derived state, used for comparison in a randomized test.
 #[derive(Default)]
 struct ReferenceMultibuffer {
     excerpts: Vec<ReferenceExcerpt>,

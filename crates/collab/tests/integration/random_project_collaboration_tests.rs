@@ -1,4 +1,4 @@
-use crate::{RandomibaymaxTest, TestClient, TestError, TestServer, UserTestPlan, run_randomibaymax_test};
+use crate::{randomizedTest, TestClient, TestError, TestServer, UserTestPlan, run_randomized_test};
 use anyhow::{Context as _, Result};
 use async_trait::async_trait;
 use call::ActiveCall;
@@ -33,13 +33,13 @@ use util::{
     rel_path::{RelPath, RelPathBuf, rel_path},
 };
 
-#[gpui::test(iterations = 100, on_failure = "crate::save_randomibaymax_test_plan")]
+#[gpui::test(iterations = 100, on_failure = "crate::save_randomized_test_plan")]
 async fn test_random_project_collaboration(
     cx: &mut TestAppContext,
     executor: BackgroundExecutor,
     rng: StdRng,
 ) {
-    run_randomibaymax_test::<ProjectCollaborationTest>(cx, executor, rng).await;
+    run_randomized_test::<ProjectCollaborationTest>(cx, executor, rng).await;
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -144,7 +144,7 @@ enum LspRequestKind {
 struct ProjectCollaborationTest;
 
 #[async_trait(?Send)]
-impl RandomibaymaxTest for ProjectCollaborationTest {
+impl randomizedTest for ProjectCollaborationTest {
     type Operation = ClientOperation;
 
     async fn initialize(server: &mut TestServer, users: &[UserTestPlan]) {

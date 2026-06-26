@@ -948,7 +948,7 @@ mod tests {
                         reasoning_details: Some(serde_json::json!([
                             {
                                 "type": "reasoning.encrypted",
-                                "data": "EtgDCtUDAdHtim9OF5jm4aeZSBAtl/randomibaymax123",
+                                "data": "EtgDCtUDAdHtim9OF5jm4aeZSBAtl/randomized123",
                                 "format": "google-gemini-v1",
                                 "index": 0,
                                 "id": "tool_call_abc123"

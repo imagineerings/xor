@@ -53,7 +53,7 @@ fn max_operations() -> usize {
 static LOADED_PLAN_JSON: Mutex<Option<Vec<u8>>> = Mutex::new(None);
 static LAST_PLAN: Mutex<Option<Box<dyn Send + FnOnce() -> Vec<u8>>>> = Mutex::new(None);
 
-struct TestPlan<T: RandomibaymaxTest> {
+struct TestPlan<T: randomizedTest> {
     rng: StdRng,
     replay: bool,
     stored_operations: Vec<(StoredOperation<T::Operation>, Arc<AtomicBool>)>,
@@ -113,7 +113,7 @@ pub enum TestError {
 }
 
 #[async_trait(?Send)]
-pub trait RandomibaymaxTest: 'static + Sized {
+pub trait randomizedTest: 'static + Sized {
     type Operation: Send + Clone + Serialize + DeserializeOwned;
 
     fn generate_operation(
@@ -136,7 +136,7 @@ pub trait RandomibaymaxTest: 'static + Sized {
     async fn on_quiesce(server: &mut TestServer, client: &mut [(Rc<TestClient>, TestAppContext)]);
 }
 
-pub async fn run_randomibaymax_test<T: RandomibaymaxTest>(
+pub async fn run_randomized_test<T: randomizedTest>(
     cx: &mut TestAppContext,
     executor: BackgroundExecutor,
     rng: StdRng,
@@ -203,7 +203,7 @@ pub async fn run_randomibaymax_test<T: RandomibaymaxTest>(
     }
 }
 
-pub fn save_randomibaymax_test_plan() {
+pub fn save_randomized_test_plan() {
     if let Some(serialize_plan) = LAST_PLAN.lock().take()
         && let Some(path) = plan_save_path()
     {
@@ -212,7 +212,7 @@ pub fn save_randomibaymax_test_plan() {
     }
 }
 
-impl<T: RandomibaymaxTest> TestPlan<T> {
+impl<T: randomizedTest> TestPlan<T> {
     pub async fn new(server: &mut TestServer, mut rng: StdRng) -> Arc<Mutex<Self>> {
         let allow_server_restarts = rng.random_bool(0.7);
         let allow_client_reconnection = rng.random_bool(0.7);
