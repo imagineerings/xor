@@ -1402,8 +1402,14 @@ mod tests {
         //   2. Add it to this list with a comment explaining why it's excluded.
         const EXCLUDED_TOOLS: &[&str] = &[
             // Read-only / low-risk tools that don't call decide_permission_from_settings
+            "analyze",
             "apply_code_action",
+            "apps",
+            "chatrecall",
+            "code_execution",
+            "developer",
             "diagnostics",
+            "final_output",
             "find_path",
             "find_references",
             "get_code_actions",
@@ -1411,10 +1417,15 @@ mod tests {
             "grep",
             "list_agents_and_models",
             "list_directory",
+            "orchestrator",
             "open",
             "read_file",
             "rename_symbol",
+            "summarize",
+            "summon",
             "thinking",
+            "todo",
+            "tom",
             // streaming_edit_file uses "edit_file" for permission lookups,
             // so its rules are configured under the edit_file entry.
             "streaming_edit_file",

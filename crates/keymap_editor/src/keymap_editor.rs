@@ -43,8 +43,8 @@ use workspace::{
     register_serializable_item, with_active_or_new_workspace,
 };
 
-pub use ui_components::*;
 use baymax_actions::{ChangeKeybinding, OpenKeymap};
+pub use ui_components::*;
 
 use crate::{
     action_completion_provider::ActionCompletionProvider,
@@ -1881,7 +1881,9 @@ impl ProcessedBinding {
         match (self, other) {
             (Self::Mapped(keybind1, action1), Self::Mapped(keybind2, action2)) => {
                 match keybind1.source.cmp(&keybind2.source) {
-                    cmp::Ordering::Equal => action1.humanibaymax_name.cmp(&action2.humanibaymax_name),
+                    cmp::Ordering::Equal => {
+                        action1.humanibaymax_name.cmp(&action2.humanibaymax_name)
+                    }
                     ordering => ordering,
                 }
             }

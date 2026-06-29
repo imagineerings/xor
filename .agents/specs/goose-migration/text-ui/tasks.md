@@ -4,6 +4,10 @@
 
 Implement an interactive terminal UI mode for baymax's CLI using crossterm/ratatui, with a configuration wizard, extension management, markdown rendering, onboarding, and slash commands. This extends `crates/cli/` with a new `goose interactive` subcommand.
 
+## Repo Reconciliation
+
+- Agent slash-command dispatch already exists for desktop/ACP flows. The TUI should call into shared command behavior where possible instead of creating a divergent slash-command implementation.
+
 ## Tasks
 
 - [ ] 1. Implement interactive session core
@@ -21,13 +25,10 @@ Implement an interactive terminal UI mode for baymax's CLI using crossterm/ratat
   - _Requirements: 4, 7_
   - _writes: crates/cli/src/interactive/renderer.rs, crates/cli/src/interactive/markdown_renderer.rs_
 
-- [ ] 3. Implement slash commands in interactive mode
-  - `/help` — show available commands
-  - `/recipe` — run a recipe
-  - `/clear` — clear conversation
-  - `/save` / `/load` — session persistence
-  - `/model` — switch model
-  - Autocomplete/suggestions for slash commands
+- [ ] 3. Wire interactive mode to shared slash command behavior
+  - Add TUI-only commands such as `/help`, `/clear`, `/save`, `/load`, and `/model`
+  - Reuse agent command paths for `/recipe`, `/skill`, and `/compact` where possible
+  - Add autocomplete/suggestions backed by the shared command catalog
   - _Requirements: 6_
   - _writes: crates/cli/src/interactive/slash_commands.rs_
 

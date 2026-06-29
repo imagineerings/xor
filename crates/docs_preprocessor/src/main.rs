@@ -664,7 +664,9 @@ fn handle_postprocessing() -> Result<()> {
         .expect("has output")
         .as_table_mut()
         .expect("output is table");
-    let baymax_html = output.remove("baymax-html").expect("baymax-html output defined");
+    let baymax_html = output
+        .remove("baymax-html")
+        .expect("baymax-html output defined");
     let default_description = baymax_html
         .get("default-description")
         .expect("Default description not found")

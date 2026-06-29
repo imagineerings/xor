@@ -1,6 +1,7 @@
 use std::rc::Rc;
 use std::sync::Arc;
 
+use baymax_actions::ShowCallStats;
 use call::{ActiveCall, Room};
 use channel::ChannelStore;
 use client::{User, proto::PeerId};
@@ -23,7 +24,6 @@ use ui::{
 };
 use util::rel_path::RelPath;
 use workspace::{ParticipantLocation, notifications::DetachAndPromptErr};
-use baymax_actions::ShowCallStats;
 
 use crate::TitleBar;
 

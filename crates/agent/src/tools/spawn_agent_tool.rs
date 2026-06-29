@@ -1,12 +1,14 @@
 use acp_thread::{SUBAGENT_SESSION_INFO_META_KEY, SubagentSessionInfo};
 use agent_client_protocol::schema as acp;
-use anyhow::Result;
+use anyhow::{Result, anyhow};
+use futures::FutureExt as _;
 use gpui::{App, SharedString, Task};
 use language_model::LanguageModelToolResultContent;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
 use std::sync::Arc;
+use std::time::Duration;
 
 use crate::{AgentTool, ThreadEnvironment, ToolCallEventStream, ToolInput};
 
@@ -44,6 +46,9 @@ pub struct SpawnAgentToolInput {
     /// Session ID of an existing agent session to continue instead of creating a new one.
     #[serde(default)]
     pub session_id: Option<acp::SessionId>,
+    /// Optional maximum runtime for this delegated turn, in milliseconds.
+    #[serde(default)]
+    pub timeout_ms: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -170,7 +175,40 @@ impl AgentTool for SpawnAgentTool {
                 Ok((subagent, session_info))
             })?;
 
-            let send_result = subagent.send(input.message, cx).await;
+            let send_result = {
+                let send_task = subagent.send(input.message, cx);
+                let cancellation_stream = event_stream.clone();
+                match input.timeout_ms {
+                    Some(timeout_ms) => {
+                        let timeout = cx
+                            .background_executor()
+                            .timer(Duration::from_millis(timeout_ms));
+                        futures::pin_mut!(send_task);
+                        futures::pin_mut!(timeout);
+                        futures::select! {
+                            result = send_task.fuse() => result,
+                            _ = timeout.fuse() => {
+                                subagent.cancel(cx).detach();
+                                Err(anyhow!("Subagent timed out after {timeout_ms} ms"))
+                            }
+                            _ = cancellation_stream.cancelled_by_user().fuse() => {
+                                subagent.cancel(cx).detach();
+                                Err(anyhow!("Subagent canceled by user"))
+                            }
+                        }
+                    }
+                    None => {
+                        futures::pin_mut!(send_task);
+                        futures::select! {
+                            result = send_task.fuse() => result,
+                            _ = cancellation_stream.cancelled_by_user().fuse() => {
+                                subagent.cancel(cx).detach();
+                                Err(anyhow!("Subagent canceled by user"))
+                            }
+                        }
+                    }
+                }
+            };
 
             let status = if send_result.is_ok() {
                 "completed"

@@ -879,8 +879,11 @@ mod linux {
 
                 // libexec is the standard, lib/baymax is for Arch (and other non-libexec distros),
                 // ./baymax is for the target directory in development builds.
-                let possible_locations =
-                    ["../libexec/baymax-editor", "../lib/baymax/baymax-editor", "./baymax"];
+                let possible_locations = [
+                    "../libexec/baymax-editor",
+                    "../lib/baymax/baymax-editor",
+                    "./baymax",
+                ];
                 possible_locations
                     .iter()
                     .find_map(|p| dir.join(p).canonicalize().ok().filter(|path| path != &cli))
@@ -1060,7 +1063,12 @@ mod flatpak {
             && args.baymax.is_none()
         {
             args.baymax = Some("/app/libexec/baymax-editor".into());
-            unsafe { env::set_var("BAYMAX_UPDATE_EXPLANATION", "Please use flatpak to update baymax") };
+            unsafe {
+                env::set_var(
+                    "BAYMAX_UPDATE_EXPLANATION",
+                    "Please use flatpak to update baymax",
+                )
+            };
         }
         args
     }
@@ -1217,7 +1225,11 @@ mod windows {
 
                 // ../Baymax.exe is the standard, lib/baymax is for MSYS2, ./baymax.exe is for the target
                 // directory in development builds.
-                let possible_locations = ["../Baymax.exe", "../lib/baymax/baymax-editor.exe", "./baymax.exe"];
+                let possible_locations = [
+                    "../Baymax.exe",
+                    "../lib/baymax/baymax-editor.exe",
+                    "./baymax.exe",
+                ];
                 possible_locations
                     .iter()
                     .find_map(|p| dir.join(p).canonicalize().ok().filter(|path| path != &cli))

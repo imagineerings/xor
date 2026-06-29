@@ -196,7 +196,9 @@ impl BaymaxSyntaxToken {
             BaymaxSyntaxToken::Boolean => vec!["constant.language"],
             BaymaxSyntaxToken::Comment => vec!["comment"],
             BaymaxSyntaxToken::CommentDoc => vec!["comment.block.documentation"],
-            BaymaxSyntaxToken::Constant => vec!["constant", "constant.language", "constant.character"],
+            BaymaxSyntaxToken::Constant => {
+                vec!["constant", "constant.language", "constant.character"]
+            }
             BaymaxSyntaxToken::Constructor => {
                 vec![
                     "entity.name.tag",

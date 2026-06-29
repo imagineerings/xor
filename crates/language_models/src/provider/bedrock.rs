@@ -193,7 +193,8 @@ const AMAZON_AWS_URL: &str = "https://amazonaws.com";
 
 // These environment variables all use a `BAYMAX_` prefix because we don't want to overwrite the user's AWS credentials.
 static BAYMAX_BEDROCK_ACCESS_KEY_ID_VAR: LazyLock<EnvVar> = env_var!("BAYMAX_ACCESS_KEY_ID");
-static BAYMAX_BEDROCK_SECRET_ACCESS_KEY_VAR: LazyLock<EnvVar> = env_var!("BAYMAX_SECRET_ACCESS_KEY");
+static BAYMAX_BEDROCK_SECRET_ACCESS_KEY_VAR: LazyLock<EnvVar> =
+    env_var!("BAYMAX_SECRET_ACCESS_KEY");
 static BAYMAX_BEDROCK_SESSION_TOKEN_VAR: LazyLock<EnvVar> = env_var!("BAYMAX_SESSION_TOKEN");
 static BAYMAX_AWS_PROFILE_VAR: LazyLock<EnvVar> = env_var!("BAYMAX_AWS_PROFILE");
 static BAYMAX_BEDROCK_REGION_VAR: LazyLock<EnvVar> = env_var!("BAYMAX_AWS_REGION");
@@ -303,42 +304,43 @@ impl State {
         let credentials_provider = self.credentials_provider.clone();
         cx.spawn(async move |this, cx| {
             // Try environment variables first
-            let (auth, from_env) = if let Some(bearer_token) = &BAYMAX_BEDROCK_BEARER_TOKEN_VAR.value {
-                if !bearer_token.is_empty() {
-                    (
-                        Some(BedrockAuth::ApiKey {
-                            api_key: bearer_token.to_string(),
-                        }),
-                        true,
-                    )
-                } else {
-                    (None, false)
-                }
-            } else if let Some(access_key_id) = &BAYMAX_BEDROCK_ACCESS_KEY_ID_VAR.value {
-                if let Some(secret_access_key) = &BAYMAX_BEDROCK_SECRET_ACCESS_KEY_VAR.value {
-                    if !access_key_id.is_empty() && !secret_access_key.is_empty() {
-                        let session_token = BAYMAX_BEDROCK_SESSION_TOKEN_VAR
-                            .value
-                            .as_deref()
-                            .filter(|s| !s.is_empty())
-                            .map(|s| s.to_string());
+            let (auth, from_env) =
+                if let Some(bearer_token) = &BAYMAX_BEDROCK_BEARER_TOKEN_VAR.value {
+                    if !bearer_token.is_empty() {
                         (
-                            Some(BedrockAuth::IamCredentials {
-                                access_key_id: access_key_id.to_string(),
-                                secret_access_key: secret_access_key.to_string(),
-                                session_token,
+                            Some(BedrockAuth::ApiKey {
+                                api_key: bearer_token.to_string(),
                             }),
                             true,
                         )
                     } else {
                         (None, false)
                     }
+                } else if let Some(access_key_id) = &BAYMAX_BEDROCK_ACCESS_KEY_ID_VAR.value {
+                    if let Some(secret_access_key) = &BAYMAX_BEDROCK_SECRET_ACCESS_KEY_VAR.value {
+                        if !access_key_id.is_empty() && !secret_access_key.is_empty() {
+                            let session_token = BAYMAX_BEDROCK_SESSION_TOKEN_VAR
+                                .value
+                                .as_deref()
+                                .filter(|s| !s.is_empty())
+                                .map(|s| s.to_string());
+                            (
+                                Some(BedrockAuth::IamCredentials {
+                                    access_key_id: access_key_id.to_string(),
+                                    secret_access_key: secret_access_key.to_string(),
+                                    session_token,
+                                }),
+                                true,
+                            )
+                        } else {
+                            (None, false)
+                        }
+                    } else {
+                        (None, false)
+                    }
                 } else {
                     (None, false)
-                }
-            } else {
-                (None, false)
-            };
+                };
 
             // If we got auth from env vars, use it
             if let Some(auth) = auth {
@@ -1536,7 +1538,8 @@ impl Render for ConfigurationView {
             Some(BedrockAuth::IamCredentials { .. }) if env_var_set => {
                 format!(
                     "Using IAM credentials from {} and {} environment variables",
-                    BAYMAX_BEDROCK_ACCESS_KEY_ID_VAR.name, BAYMAX_BEDROCK_SECRET_ACCESS_KEY_VAR.name
+                    BAYMAX_BEDROCK_ACCESS_KEY_ID_VAR.name,
+                    BAYMAX_BEDROCK_SECRET_ACCESS_KEY_VAR.name
                 )
             }
             Some(BedrockAuth::IamCredentials { .. }) => "Using IAM credentials".into(),

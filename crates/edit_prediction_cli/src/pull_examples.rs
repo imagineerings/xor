@@ -1228,8 +1228,15 @@ fn build_rated_example(
                 settled_editable_region,
             )
         });
-    let mut example =
-        build_example_from_snowflake(request_id, device_id, time, input, tags, None, baymax_version);
+    let mut example = build_example_from_snowflake(
+        request_id,
+        device_id,
+        time,
+        input,
+        tags,
+        None,
+        baymax_version,
+    );
 
     example.spec.rating = Some(parsed_rating);
 

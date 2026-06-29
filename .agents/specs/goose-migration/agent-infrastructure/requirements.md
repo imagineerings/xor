@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Migrate several foundational agent infrastructure features from goose: context management, plugins, hooks, subagent execution, platform extensions, large response handling, final output tool, agent snapshots, extension malware checking, action required manager, doctor, download manager, instance ID, prompt templates, subprocess management, built-in extensions, config migrations, and goose mode.
+Migrate several foundational agent infrastructure features from goose: context management, plugins, hooks, subagent execution, platform extensions, large response handling, final output tool, agent snapshots, extension malware checking, action required manager, doctor, download manager, instance ID, prompt templates, subprocess management, built-in extensions, config migrations, and Baymax mode.
 
 ## Glossary
 
@@ -223,4 +223,4 @@ Migrate several foundational agent infrastructure features from goose: context m
 - Source: `projects/goose/crates/goose/src/instance_id.rs`
 - Source: `projects/goose/crates/goose/src/prompt_template.rs`
 - Source: `projects/goose/crates/goose/src/subprocess.rs`
-- Source: `projects/goose/crates/goose/src/config/migrations.rs`, `config/goose_mode.rs`
+- Source: `projects/goose/crates/goose/src/config/migrations.rs`, `config/goose_mode.rs` (renamed to Baymax mode in Baymax)

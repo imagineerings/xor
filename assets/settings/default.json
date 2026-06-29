@@ -1063,6 +1063,12 @@
       //   "temperature": 1.0
       // }
     ],
+    // The default behavior mode for Baymax-compatible agent prompts.
+    // One of:
+    //   - "focus": prefer narrow, low-risk execution.
+    //   - "balanced": balance directness with enough context to finish the task.
+    //   - "creative": allow broader exploration when it helps solve the task.
+    "baymax_mode": "balanced",
     // Permission rules for tool actions.
     //
     // The "default" setting applies when no tool-specific rules match.
@@ -1112,6 +1118,11 @@
     "auto_compact": {
       // Whether to automatically compact the agent's context near the limit.
       "enabled": true,
+      // The strategy to use when auto-compaction runs. One of:
+      //   - "summarize": summarize earlier context with the configured model.
+      //   - "trim": drop earlier model context at a compaction boundary while
+      //     keeping the visible thread history intact.
+      "strategy": "summarize",
       // The threshold at which auto-compaction runs. One of:
       //   - A percentage string ending in "%" (e.g. "90%"), measured against
       //     the model's context window. Decimals are allowed (e.g. "95.5%").
@@ -1131,12 +1142,23 @@
         "enable_all_context_servers": true,
         "tools": {
           "copy_path": true,
+          "code_execution": true,
           "create_directory": true,
           "create_thread": true,
           "delete_path": true,
           "diagnostics": true,
+          "apps": true,
+          "chatrecall": true,
+          "orchestrator": true,
+          "summarize": true,
+          "summon": true,
+          "todo": true,
+          "tom": true,
+          "analyze": true,
+          "developer": true,
           "apply_code_action": true,
           "edit_file": true,
+          "final_output": true,
           "write_file": true,
           "fetch": true,
           "find_path": true,
@@ -1161,8 +1183,18 @@
         // "enable_all_context_servers": true,
         "tools": {
           "create_thread": true,
+          "apps": true,
+          "chatrecall": true,
+          "orchestrator": true,
+          "summarize": true,
+          "summon": true,
+          "todo": true,
+          "tom": true,
+          "analyze": true,
+          "developer": true,
           "diagnostics": true,
           "fetch": true,
+          "final_output": true,
           "list_agents_and_models": true,
           "list_directory": true,
           "find_path": true,

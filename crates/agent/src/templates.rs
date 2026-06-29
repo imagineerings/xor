@@ -22,6 +22,30 @@ impl Templates {
     }
 }
 
+pub fn render_template_string<T>(template: &str, context: &T) -> Result<String>
+where
+    T: Serialize,
+{
+    render_template_string_with_partials(template, std::iter::empty::<(&str, &str)>(), context)
+}
+
+pub fn render_template_string_with_partials<'a, T>(
+    template: &str,
+    partials: impl IntoIterator<Item = (&'a str, &'a str)>,
+    context: &T,
+) -> Result<String>
+where
+    T: Serialize,
+{
+    let mut handlebars = Handlebars::new();
+    handlebars.set_strict_mode(true);
+    handlebars.register_helper("contains", Box::new(contains));
+    for (name, partial) in partials {
+        handlebars.register_partial(name, partial)?;
+    }
+    Ok(handlebars.render_template(template, context)?)
+}
+
 pub trait Template: Sized {
     const TEMPLATE_NAME: &'static str;
 
@@ -83,6 +107,7 @@ fn contains(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn test_system_prompt_template() {
@@ -101,6 +126,39 @@ mod tests {
         assert!(rendered.contains("Today's Date: 2026-01-01"));
         assert!(rendered.contains("## Fixing Diagnostics"));
         assert!(rendered.contains("test-model"));
+    }
+
+    #[test]
+    fn test_render_template_string_substitutes_variables() {
+        let rendered = render_template_string(
+            "Run {{command}} in {{worktree}}.",
+            &json!({
+                "command": "cargo check",
+                "worktree": "baymax",
+            }),
+        )
+        .unwrap();
+
+        assert_eq!(rendered, "Run cargo check in baymax.");
+    }
+
+    #[test]
+    fn test_render_template_string_is_strict() {
+        let error = render_template_string("Missing {{value}}", &json!({})).unwrap_err();
+
+        assert!(error.to_string().contains("value"));
+    }
+
+    #[test]
+    fn test_render_template_string_supports_partials() {
+        let rendered = render_template_string_with_partials(
+            "Before {{> body}} After",
+            [("body", "{{thing}}")],
+            &json!({ "thing": "middle" }),
+        )
+        .unwrap();
+
+        assert_eq!(rendered, "Before middle After");
     }
 
     #[test]

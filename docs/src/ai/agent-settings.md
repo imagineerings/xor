@@ -55,20 +55,28 @@ For feature-specific model examples, see [Feature-specific Models](#feature-spec
 
 ## Automatic Compaction {#automatic-compaction}
 
-Baymax Agent can automatically compact long threads before they reach the selected model's context window. Compaction summarizes earlier messages and keeps the conversation usable without starting a new thread.
+Baymax Agent can automatically compact long threads before they reach the selected model's context window. By default, compaction summarizes earlier messages and keeps the conversation usable without starting a new thread.
 
-Automatic compaction is enabled by default and runs when the thread reaches `90%` of the model's context window. You can change the threshold or disable automatic compaction in `settings.json`:
+Automatic compaction is enabled by default and runs when the thread reaches `90%` of the model's context window. You can change the strategy, change the threshold, or disable automatic compaction in `settings.json`:
 
 ```json [settings]
 {
   "agent": {
     "auto_compact": {
       "enabled": true,
+      "strategy": "summarize",
       "threshold": "90%"
     }
   }
 }
 ```
+
+The `strategy` value can be one of:
+
+| Value       | Meaning                                                                 |
+| ----------- | ----------------------------------------------------------------------- |
+| `summarize` | Summarize earlier context with the configured model. This is the default. |
+| `trim`      | Drop earlier model context at a compaction boundary without summarizing. |
 
 The `threshold` value can be one of:
 

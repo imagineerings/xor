@@ -394,7 +394,10 @@ impl DebugAdapter for GoDebugAdapter {
         })
     }
 
-    async fn config_from_baymax_format(&self, baymax_scenario: BaymaxDebugConfig) -> Result<DebugScenario> {
+    async fn config_from_baymax_format(
+        &self,
+        baymax_scenario: BaymaxDebugConfig,
+    ) -> Result<DebugScenario> {
         let mut args = match &baymax_scenario.request {
             dap::DebugRequest::Attach(attach_config) => {
                 json!({

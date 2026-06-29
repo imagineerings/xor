@@ -4,13 +4,13 @@ use agent_ui::TerminalId;
 use agent_ui::{
     terminal_thread_metadata_store::TerminalThreadMetadata, thread_metadata_store::ThreadMetadata,
 };
+use baymax_actions::agents_sidebar::ToggleThreadSwitcher;
 use gpui::{
     Action as _, DismissEvent, Entity, EventEmitter, FocusHandle, Focusable, Modifiers,
     ModifiersChangedEvent, Render, ScrollHandle, SharedString, prelude::*,
 };
 use ui::{AgentThreadStatus, ThreadItem, ThreadItemWorktreeInfo, WithScrollbar, prelude::*};
 use workspace::{ModalView, Workspace};
-use baymax_actions::agents_sidebar::ToggleThreadSwitcher;
 
 use super::ThreadEntryWorkspace;
 

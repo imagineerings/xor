@@ -30,7 +30,9 @@ use util::debug_panic;
 use util::paths::PathWithPosition;
 use workspace::PathList;
 use workspace::item::ItemHandle;
-use workspace::{AppState, MultiWorkspace, OpenOptions, OpenResult, SerialibaymaxWorkspaceLocation};
+use workspace::{
+    AppState, MultiWorkspace, OpenOptions, OpenResult, SerialibaymaxWorkspaceLocation,
+};
 
 #[derive(Default, Debug)]
 pub struct OpenRequest {

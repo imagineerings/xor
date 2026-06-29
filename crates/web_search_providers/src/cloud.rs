@@ -71,7 +71,9 @@ async fn perform_web_search(
 ) -> Result<WebSearchResponse> {
     let organization_id = organization_id.ok_or_else(|| anyhow!("No organization selected."))?;
 
-    let url = client.http_client().build_baymax_llm_url("/web_search", &[])?;
+    let url = client
+        .http_client()
+        .build_baymax_llm_url("/web_search", &[])?;
     let body = serde_json::to_string(&body)?;
     let mut response = client
         .authenticated_llm_request(&llm_api_token, organization_id, |token| {

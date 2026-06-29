@@ -317,7 +317,9 @@ impl<'de> Deserialize<'de> for BaymaxCustomizationsWrapper {
         let value = Value::deserialize(deserializer)?;
         let baymax = value
             .get("baymax")
-            .map(|baymax_value| serde_json_lenient::from_value::<BaymaxCustomization>(baymax_value.clone()))
+            .map(|baymax_value| {
+                serde_json_lenient::from_value::<BaymaxCustomization>(baymax_value.clone())
+            })
             .transpose()
             .map_err(serde::de::Error::custom)?
             .unwrap_or_default();
@@ -627,10 +629,10 @@ mod test {
     use crate::{
         devcontainer_api::DevContainerError,
         devcontainer_json::{
-            ContainerBuild, DevContainer, DevContainerBuildType, FeatureOptions, ForwardPort,
-            HostRequirements, LifecycleCommand, LifecycleScript, MountDefinition, OnAutoForward,
-            PortAttributeProtocol, PortAttributes, ShutdownAction, UserEnvProbe, BaymaxCustomization,
-            BaymaxCustomizationsWrapper, deserialize_devcontainer_json,
+            BaymaxCustomization, BaymaxCustomizationsWrapper, ContainerBuild, DevContainer,
+            DevContainerBuildType, FeatureOptions, ForwardPort, HostRequirements, LifecycleCommand,
+            LifecycleScript, MountDefinition, OnAutoForward, PortAttributeProtocol, PortAttributes,
+            ShutdownAction, UserEnvProbe, deserialize_devcontainer_json,
         },
     };
 

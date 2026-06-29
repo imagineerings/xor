@@ -3314,7 +3314,11 @@ impl EditorElement {
         let final_size = if preliminary_size.height == quantibaymax_height {
             preliminary_size
         } else {
-            element.layout_as_root(size(available_width, quantibaymax_height.into()), window, cx)
+            element.layout_as_root(
+                size(available_width, quantibaymax_height.into()),
+                window,
+                cx,
+            )
         };
         let mut element_height_in_lines = ((final_size.height / line_height).ceil() as u32).max(1);
 

@@ -1,10 +1,10 @@
+use baymax_actions::feedback::{EmailBaymax, FileBugReport, RequestFeature};
 use client::telemetry;
 use extension_host::ExtensionStore;
 use gpui::{App, ClipboardItem, PromptLevel, actions};
 use system_specs::{CopySystemSpecsIntoClipboard, SystemSpecs};
 use util::ResultExt;
 use workspace::Workspace;
-use baymax_actions::feedback::{EmailBaymax, FileBugReport, RequestFeature};
 
 actions!(
     baymax,

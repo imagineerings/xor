@@ -38,7 +38,13 @@ impl RenderOnce for LinuxWindowControls {
                 WindowButton::Close => true,
             })
             .map(|button| {
-                create_window_button(button, button.id(), is_maximibaymax, &*self.close_action, cx)
+                create_window_button(
+                    button,
+                    button.id(),
+                    is_maximibaymax,
+                    &*self.close_action,
+                    cx,
+                )
             })
             .collect();
 

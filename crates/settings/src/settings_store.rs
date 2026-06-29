@@ -34,7 +34,7 @@ use crate::editorconfig_store::EditorconfigStore;
 use crate::{
     ActiveSettingsProfileName, FontFamilyName, IconThemeName, LanguageSettingsContent,
     LanguageToSettingsMap, LspSettings, LspSettingsMap, SemanticTokenRules, ThemeName,
-    UserSettingsContentExt, VsCodeSettings, WorktreeId,
+    UserSettingsContentExt, VsCodeSettings, WorktreeId, migrate_settings_config,
     settings_content::{
         ExtensionsSettingsContent, ProfileBase, ProjectSettingsContent, RootUserSettings,
         SettingsContent, UserSettingsContent, merge_from::MergeFrom,
@@ -793,7 +793,7 @@ impl SettingsStore {
         let (settings, parse_status) = if user_settings_content.is_empty() {
             SettingsContentType::parse_json("{}")
         } else {
-            let migration_res = migrator::migrate_settings(user_settings_content);
+            let migration_res = migrate_settings_config(user_settings_content);
             migration_status = match &migration_res {
                 Ok(Some(_)) => MigrationStatus::Succeeded,
                 Ok(None) => MigrationStatus::NotNeeded,
@@ -802,7 +802,7 @@ impl SettingsStore {
                 },
             };
             let content = match &migration_res {
-                Ok(Some(content)) => content,
+                Ok(Some(migration)) => migration.migrated_text(),
                 Ok(None) => user_settings_content,
                 Err(_) => user_settings_content,
             };
@@ -938,10 +938,11 @@ impl SettingsStore {
         }
         self.last_user_settings_content = Some(user_settings_content.to_string());
 
-        let (settings, parse_result) = self.parse_and_migrate_baymax_settings::<UserSettingsContent>(
-            user_settings_content,
-            SettingsFile::User,
-        );
+        let (settings, parse_result) = self
+            .parse_and_migrate_baymax_settings::<UserSettingsContent>(
+                user_settings_content,
+                SettingsFile::User,
+            );
 
         if let Some(settings) = settings {
             self.user_settings = Some(settings);

@@ -147,7 +147,10 @@ pub(crate) fn build_serialibaymax_layout(
     }
 }
 
-pub(crate) fn build_serialibaymax_pane_layout(pane_group: &Member, cx: &App) -> SerialibaymaxPaneLayout {
+pub(crate) fn build_serialibaymax_pane_layout(
+    pane_group: &Member,
+    cx: &App,
+) -> SerialibaymaxPaneLayout {
     match pane_group {
         Member::Axis(PaneAxis {
             axis,

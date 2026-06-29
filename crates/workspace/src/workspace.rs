@@ -115,6 +115,7 @@ use settings::{
     update_settings_file,
 };
 
+use baymax_actions::{Spawn, feedback::FileBugReport, theme::ToggleMode};
 use sqlez::{
     bindable::{Bind, Column, StaticColumnCount},
     statement::Statement,
@@ -158,7 +159,6 @@ pub use workspace_settings::{
     AutosaveSetting, BottomDockLayout, EncodingDisplayOptions, FocusFollowsMouse,
     RestoreOnStartupBehavior, StatusBarSettings, TabBarSettings, WorkspaceSettings,
 };
-use baymax_actions::{Spawn, feedback::FileBugReport, theme::ToggleMode};
 
 use crate::{dock::PanelSizeState, item::ItemBufferKind, notifications::NotificationId};
 use crate::{
@@ -1925,11 +1925,12 @@ impl Workspace {
                 }
             }
 
-            let workspace_id = if let Some(serialibaymax_workspace) = serialibaymax_workspace.as_ref() {
-                serialibaymax_workspace.id
-            } else {
-                db.next_id().await.unwrap_or_else(|_| Default::default())
-            };
+            let workspace_id =
+                if let Some(serialibaymax_workspace) = serialibaymax_workspace.as_ref() {
+                    serialibaymax_workspace.id
+                } else {
+                    db.next_id().await.unwrap_or_else(|_| Default::default())
+                };
 
             let toolchains = db.toolchains(workspace_id).await?;
 
@@ -7331,7 +7332,8 @@ impl Workspace {
             project
                 .update(cx, |project, cx| {
                     project.bookmark_store().update(cx, |bookmark_store, cx| {
-                        bookmark_store.load_serialibaymax_bookmarks(serialibaymax_workspace.bookmarks, cx)
+                        bookmark_store
+                            .load_serialibaymax_bookmarks(serialibaymax_workspace.bookmarks, cx)
                     })
                 })
                 .await
@@ -7342,8 +7344,10 @@ impl Workspace {
                     project
                         .breakpoint_store()
                         .update(cx, |breakpoint_store, cx| {
-                            breakpoint_store
-                                .with_serialibaymax_breakpoints(serialibaymax_workspace.breakpoints, cx)
+                            breakpoint_store.with_serialibaymax_breakpoints(
+                                serialibaymax_workspace.breakpoints,
+                                cx,
+                            )
                         })
                 })
                 .await;
@@ -9312,7 +9316,8 @@ pub async fn apply_restored_multiworkspace_state(
         // stale keys from previous sessions get normalized and deduped.
         let mut resolved_groups: Vec<SerialibaymaxProjectGroupState> = Vec::new();
         for serialibaymax in project_groups.iter().cloned() {
-            let SerialibaymaxProjectGroupState { key, expanded } = serialibaymax.into_restored_state();
+            let SerialibaymaxProjectGroupState { key, expanded } =
+                serialibaymax.into_restored_state();
             if key.path_list().paths().is_empty() {
                 continue;
             }
@@ -10492,8 +10497,9 @@ fn deserialize_remote_project(
 
         let serialibaymax_workspace = db.remote_workspace_for_roots(&paths, remote_connection_id);
 
-        let workspace_id = if let Some(workspace_id) =
-            serialibaymax_workspace.as_ref().map(|workspace| workspace.id)
+        let workspace_id = if let Some(workspace_id) = serialibaymax_workspace
+            .as_ref()
+            .map(|workspace| workspace.id)
         {
             workspace_id
         } else {
@@ -15937,9 +15943,9 @@ mod tests {
 
     #[gpui::test]
     async fn test_toggle_theme_mode_persists_and_updates_active_theme(cx: &mut TestAppContext) {
+        use baymax_actions::theme::ToggleMode;
         use settings::{ThemeName, ThemeSelection};
         use theme::SystemAppearance;
-        use baymax_actions::theme::ToggleMode;
 
         init_test(cx);
 

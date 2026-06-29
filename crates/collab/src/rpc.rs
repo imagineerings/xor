@@ -31,7 +31,7 @@ use axum::{
     routing::get,
 };
 use collections::{HashSet, TypeIdHashMap};
-pub use connection_pool::{ConnectionPool, BaymaxVersion};
+pub use connection_pool::{BaymaxVersion, ConnectionPool};
 use core::fmt::{self, Debug, Formatter};
 use futures::TryFutureExt as _;
 use rpc::proto::split_repository_update;

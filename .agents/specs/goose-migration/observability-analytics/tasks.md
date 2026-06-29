@@ -4,6 +4,11 @@
 
 Extend baymax's observability infrastructure with Langfuse tracing, OpenTelemetry OTLP export, an observation layer, rate limiter, PostHog analytics, token counter, and tool monitoring.
 
+## Repo Reconciliation
+
+- `crates/language_model_core/src/rate_limiter.rs` already provides a semaphore-based request limiter used by several providers.
+- `crates/agent/src/thread.rs` already tracks provider-reported token usage and emits token usage updates; this is not the same as a model-aware preflight token counter.
+
 ## Tasks
 
 - [ ] 1. Implement token counter
@@ -34,12 +39,13 @@ Extend baymax's observability infrastructure with Langfuse tracing, OpenTelemetr
   - _Requirements: 3_
   - _writes: crates/telemetry/src/observation.rs_
 
-- [ ] 5. Implement rate limiter
-  - Token-bucket or sliding-window rate limiter
-  - Per-provider configuration
-  - Queue/delay when rate limited
+- [ ] 5. Extend existing provider rate limiter
+  - Audit current semaphore-based `language_model_core::RateLimiter`
+  - Add token-bucket or sliding-window behavior only if Goose requires rate-over-time enforcement
+  - Add per-provider configuration for limits
+  - Preserve existing queue/delay behavior used by providers
   - _Requirements: 4_
-  - _writes: crates/language_models/src/rate_limiter.rs_
+  - _writes: crates/language_model_core/src/rate_limiter.rs, crates/language_models/src/provider/_
 
 - [ ] 6. Implement PostHog analytics
   - Create `crates/posthog/` with PostHog client

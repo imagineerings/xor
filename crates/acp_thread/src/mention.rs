@@ -742,7 +742,10 @@ mod tests {
             abs_path: PathBuf::from(path!("/path/to/dir")),
         };
         let serialibaymax = uri.to_uri().to_string();
-        assert!(serialibaymax.ends_with('/'), "directory URI must end with /");
+        assert!(
+            serialibaymax.ends_with('/'),
+            "directory URI must end with /"
+        );
         let parsed = MentionUri::parse(&serialibaymax, PathStyle::local()).unwrap();
         assert!(
             matches!(parsed, MentionUri::Directory { .. }),

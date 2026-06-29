@@ -18,9 +18,10 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 pub use adapter_schema::{AdapterSchema, AdapterSchemas};
+pub use baymax_actions::RevealTarget;
 pub use debug_format::{
-    AttachRequest, BuildTaskDefinition, DebugRequest, DebugScenario, DebugTaskFile, LaunchRequest,
-    Request, TcpArgumentsTemplate, BaymaxDebugConfig,
+    AttachRequest, BaymaxDebugConfig, BuildTaskDefinition, DebugRequest, DebugScenario,
+    DebugTaskFile, LaunchRequest, Request, TcpArgumentsTemplate,
 };
 pub use task_template::{
     DebugArgsRequest, HideStrategy, RevealStrategy, SaveStrategy, TaskHook, TaskTemplate,
@@ -30,7 +31,6 @@ pub use util::shell::{Shell, ShellKind};
 pub use util::shell_builder::ShellBuilder;
 pub use vscode_debug_format::VsCodeDebugTaskFile;
 pub use vscode_format::VsCodeTaskFile;
-pub use baymax_actions::RevealTarget;
 
 /// Task identifier, unique within the application.
 /// Based on it, task reruns and terminal tabs are managed.
@@ -274,8 +274,12 @@ impl std::fmt::Display for VariableName {
             Self::MainGitWorktree => write!(f, "{BAYMAX_VARIABLE_NAME_PREFIX}MAIN_GIT_WORKTREE"),
             Self::GitSha => write!(f, "{BAYMAX_VARIABLE_NAME_PREFIX}GIT_SHA"),
             Self::GitShaShort => write!(f, "{BAYMAX_VARIABLE_NAME_PREFIX}GIT_SHA_SHORT"),
-            Self::GitRepositoryName => write!(f, "{BAYMAX_VARIABLE_NAME_PREFIX}GIT_REPOSITORY_NAME"),
-            Self::GitRepositoryPath => write!(f, "{BAYMAX_VARIABLE_NAME_PREFIX}GIT_REPOSITORY_PATH"),
+            Self::GitRepositoryName => {
+                write!(f, "{BAYMAX_VARIABLE_NAME_PREFIX}GIT_REPOSITORY_NAME")
+            }
+            Self::GitRepositoryPath => {
+                write!(f, "{BAYMAX_VARIABLE_NAME_PREFIX}GIT_REPOSITORY_PATH")
+            }
             Self::GitRef => write!(f, "{BAYMAX_VARIABLE_NAME_PREFIX}GIT_REF"),
             Self::Custom(s) => write!(
                 f,

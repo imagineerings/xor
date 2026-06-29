@@ -549,25 +549,29 @@ pub fn execute_run(
     ) || *RELEASE_CHANNEL != ReleaseChannel::Dev;
 
     let crash_handler = if should_install_crash_handler {
-        Some(app.background_executor().spawn(crashes::init(
-            crashes::InitCrashHandler {
-                session_id: id,
-                baymax_version: VERSION.to_owned(),
-                binary: "baymax-remote-server".to_string(),
-                release_channel: release_channel::RELEASE_CHANNEL_NAME.clone(),
-                commit_sha: option_env!("BAYMAX_COMMIT_SHA").unwrap_or("no_sha").to_owned(),
-            },
-            {
-                let background_executor = app.background_executor();
-                move |task| {
-                    background_executor.spawn(task).detach();
-                }
-            },
-            |pid| paths::temp_dir().join(format!("baymax-remote-server-crash-handler-{pid}")),
-            // we are running outside gpui
-            #[allow(clippy::disallowed_methods)]
-            |duration| FutureExt::map(Timer::after(duration), |_| ()),
-        )))
+        Some(
+            app.background_executor().spawn(crashes::init(
+                crashes::InitCrashHandler {
+                    session_id: id,
+                    baymax_version: VERSION.to_owned(),
+                    binary: "baymax-remote-server".to_string(),
+                    release_channel: release_channel::RELEASE_CHANNEL_NAME.clone(),
+                    commit_sha: option_env!("BAYMAX_COMMIT_SHA")
+                        .unwrap_or("no_sha")
+                        .to_owned(),
+                },
+                {
+                    let background_executor = app.background_executor();
+                    move |task| {
+                        background_executor.spawn(task).detach();
+                    }
+                },
+                |pid| paths::temp_dir().join(format!("baymax-remote-server-crash-handler-{pid}")),
+                // we are running outside gpui
+                #[allow(clippy::disallowed_methods)]
+                |duration| FutureExt::map(Timer::after(duration), |_| ()),
+            )),
+        )
     } else {
         crashes::force_backtrace();
         None
@@ -619,7 +623,8 @@ pub fn execute_run(
             .detach();
         }
         settings::init(cx);
-        let app_commit_sha = option_env!("BAYMAX_COMMIT_SHA").map(|s| AppCommitSha::new(s.to_owned()));
+        let app_commit_sha =
+            option_env!("BAYMAX_COMMIT_SHA").map(|s| AppCommitSha::new(s.to_owned()));
         let app_version = AppVersion::load(
             env!("BAYMAX_PKG_VERSION"),
             option_env!("BAYMAX_BUILD_ID"),
@@ -834,7 +839,9 @@ pub(crate) fn execute_proxy(
                 baymax_version: VERSION.to_owned(),
                 binary: "baymax-remote-proxy".to_string(),
                 release_channel: release_channel::RELEASE_CHANNEL_NAME.clone(),
-                commit_sha: option_env!("BAYMAX_COMMIT_SHA").unwrap_or("no_sha").to_owned(),
+                commit_sha: option_env!("BAYMAX_COMMIT_SHA")
+                    .unwrap_or("no_sha")
+                    .to_owned(),
             },
             |task| {
                 smol::spawn(task).detach();

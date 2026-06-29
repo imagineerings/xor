@@ -494,7 +494,10 @@ impl TerminalThreadMetadataDb {
             if row.main_worktree_paths().is_empty() {
                 (None, None)
             } else {
-                (Some(main_serialibaymax.paths), Some(main_serialibaymax.order))
+                (
+                    Some(main_serialibaymax.paths),
+                    Some(main_serialibaymax.order),
+                )
             };
         let remote_connection = row
             .remote_connection

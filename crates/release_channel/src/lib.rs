@@ -12,10 +12,15 @@ const BAYMAX_DOCS_URL: &str = "https://baymax.dev/docs";
 /// stable | dev | nightly | preview
 pub static RELEASE_CHANNEL_NAME: LazyLock<String> = LazyLock::new(|| {
     if cfg!(debug_assertions) {
-        env::var("BAYMAX_RELEASE_CHANNEL")
-            .unwrap_or_else(|_| include_str!("../../baymax/RELEASE_CHANNEL").trim().to_string())
+        env::var("BAYMAX_RELEASE_CHANNEL").unwrap_or_else(|_| {
+            include_str!("../../baymax/RELEASE_CHANNEL")
+                .trim()
+                .to_string()
+        })
     } else {
-        include_str!("../../baymax/RELEASE_CHANNEL").trim().to_string()
+        include_str!("../../baymax/RELEASE_CHANNEL")
+            .trim()
+            .to_string()
     }
 });
 

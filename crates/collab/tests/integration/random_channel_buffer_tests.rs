@@ -1,6 +1,6 @@
 use collab::db::*;
 
-use super::{randomizedTest, TestClient, TestError, TestServer, UserTestPlan, run_randomized_test};
+use super::{TestClient, TestError, TestServer, UserTestPlan, randomizedTest, run_randomized_test};
 use anyhow::Result;
 use async_trait::async_trait;
 use gpui::{BackgroundExecutor, SharedString, TestAppContext};

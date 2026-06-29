@@ -5029,7 +5029,8 @@ impl Panel for AgentPanel {
     }
 
     fn icon(&self, _window: &Window, cx: &App) -> Option<IconName> {
-        (self.enabled(cx) && AgentSettings::get_global(cx).button).then_some(IconName::BaymaxAssistant)
+        (self.enabled(cx) && AgentSettings::get_global(cx).button)
+            .then_some(IconName::BaymaxAssistant)
     }
 
     fn icon_tooltip(&self, _window: &Window, _cx: &App) -> Option<&'static str> {
@@ -5976,8 +5977,10 @@ impl AgentPanel {
                                 .icon_color(Color::Muted)
                                 .handler({
                                     move |window, cx| {
-                                        window
-                                            .dispatch_action(Box::new(baymax_actions::AcpRegistry), cx)
+                                        window.dispatch_action(
+                                            Box::new(baymax_actions::AcpRegistry),
+                                            cx,
+                                        )
                                     }
                                 }),
                         )
@@ -6260,7 +6263,9 @@ impl AgentPanel {
 
         let user_store = self.user_store.read(cx);
 
-        if user_store.plan().is_some_and(|plan| plan == Plan::BaymaxPro)
+        if user_store
+            .plan()
+            .is_some_and(|plan| plan == Plan::BaymaxPro)
             && user_store
                 .subscription_period()
                 .and_then(|period| period.0.checked_add_days(chrono::Days::new(1)))

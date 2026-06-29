@@ -16,6 +16,7 @@ use editor::{
 use futures_lite::future::yield_now;
 use git::repository::DiffType;
 
+use baymax_actions::agent::ReviewBranchDiff;
 use git::{
     Commit, StageAll, StageAndNext, ToggleStaged, UnstageAll, UnstageAndNext, repository::RepoPath,
     status::FileStatus,
@@ -50,7 +51,6 @@ use workspace::{
     notifications::NotifyTaskExt,
     searchable::SearchableItemHandle,
 };
-use baymax_actions::agent::ReviewBranchDiff;
 use ztracing::instrument;
 
 actions!(

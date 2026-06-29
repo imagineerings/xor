@@ -1,4 +1,5 @@
 mod agent_profile;
+mod baymax_mode;
 mod user_agents_md;
 
 use std::cmp::Ordering::{Equal, Greater, Less};
@@ -16,14 +17,16 @@ use project::DisableAiSettings;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use settings::{
-    DockPosition, DockSide, LanguageModelParameters, LanguageModelSelection,
-    NotifyWhenAgentWaiting, PlaySoundWhenAgentDone, RegisterSetting, Settings, SettingsContent,
-    SettingsStore, SidebarDockPosition, SidebarSide, ThinkingBlockDisplay, ToolPermissionMode,
-    update_settings_file, update_settings_file_with_completion,
+    AutoCompactStrategyContent, DockPosition, DockSide, LanguageModelParameters,
+    LanguageModelSelection, NotifyWhenAgentWaiting, PlaySoundWhenAgentDone, RegisterSetting,
+    Settings, SettingsContent, SettingsStore, SidebarDockPosition, SidebarSide,
+    ThinkingBlockDisplay, ToolPermissionMode, update_settings_file,
+    update_settings_file_with_completion,
 };
 use util::ResultExt as _;
 
 pub use crate::agent_profile::*;
+pub use crate::baymax_mode::*;
 pub use crate::user_agents_md::{UserAgentsMd, UserAgentsMdState, init as init_user_agents_md};
 
 pub const SUMMARIZE_THREAD_PROMPT: &str = include_str!("prompts/summarize_thread_prompt.txt");
@@ -166,9 +169,35 @@ impl fmt::Display for AutoCompactThreshold {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum AutoCompactStrategy {
+    #[default]
+    Summarize,
+    Trim,
+}
+
+impl fmt::Display for AutoCompactStrategy {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Summarize => formatter.write_str("summarize"),
+            Self::Trim => formatter.write_str("trim"),
+        }
+    }
+}
+
+impl From<AutoCompactStrategyContent> for AutoCompactStrategy {
+    fn from(value: AutoCompactStrategyContent) -> Self {
+        match value {
+            AutoCompactStrategyContent::Summarize => Self::Summarize,
+            AutoCompactStrategyContent::Trim => Self::Trim,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct AutoCompactSettings {
     pub enabled: bool,
+    pub strategy: AutoCompactStrategy,
     pub threshold: AutoCompactThreshold,
 }
 
@@ -227,6 +256,7 @@ pub struct AgentSettings {
     pub play_sound_when_agent_done: PlaySoundWhenAgentDone,
     pub single_file_review: bool,
     pub model_parameters: Vec<LanguageModelParameters>,
+    pub baymax_mode: BaymaxMode,
     pub auto_compact: AutoCompactSettings,
     pub enable_feedback: bool,
     pub expand_edit_card: bool,
@@ -749,6 +779,7 @@ impl Settings for AgentSettings {
             play_sound_when_agent_done: agent.play_sound_when_agent_done.unwrap_or_default(),
             single_file_review: agent.single_file_review.unwrap(),
             model_parameters: agent.model_parameters,
+            baymax_mode: agent.baymax_mode.unwrap_or_default().into(),
             auto_compact: {
                 let auto_compact = agent.auto_compact.unwrap();
                 let threshold = parse_auto_compact_threshold(&auto_compact.threshold.unwrap().0)
@@ -756,6 +787,7 @@ impl Settings for AgentSettings {
                     .unwrap_or(AutoCompactThreshold::DEFAULT);
                 AutoCompactSettings {
                     enabled: auto_compact.enabled.unwrap(),
+                    strategy: auto_compact.strategy.unwrap().into(),
                     threshold,
                 }
             },
@@ -944,6 +976,21 @@ mod tests {
         assert!(parse_auto_compact_threshold("150%").is_err());
         assert!(parse_auto_compact_threshold("0.8").is_err());
         assert!(parse_auto_compact_threshold("eighty percent").is_err());
+    }
+
+    #[test]
+    fn test_parse_auto_compact_strategy() {
+        let content: settings::AutoCompactSettingsContent = serde_json::from_value(json!({
+            "enabled": true,
+            "strategy": "trim",
+            "threshold": "90%",
+        }))
+        .unwrap();
+
+        assert_eq!(
+            content.strategy,
+            Some(settings::AutoCompactStrategyContent::Trim)
+        );
     }
 
     #[test]

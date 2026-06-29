@@ -329,11 +329,11 @@ mod tests {
         time::Duration,
     };
 
+    use baymax_actions::editor::{MoveDown, MoveUp};
     use futures::StreamExt as _;
     use gpui::TestAppContext;
     use settings::{DocumentSymbols, SettingsStore};
     use util::path;
-    use baymax_actions::editor::{MoveDown, MoveUp};
 
     use crate::{
         Editor, LSP_REQUEST_DEBOUNCE_TIMEOUT,

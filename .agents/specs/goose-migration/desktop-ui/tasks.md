@@ -4,14 +4,20 @@
 
 Build GPUI-native views for recipe browsing, scheduling, diagnostics, shared sessions, and ACP connection status within baymax's existing desktop UI architecture. No Electron/React code is ported — all UI is native GPUI.
 
+## Repo Reconciliation
+
+- Agent connection state already exists through `crates/agent_ui/src/agent_connection_store.rs` and is consumed by agent UI configuration/panel code.
+- Diagnostics collection for agent context already exists in `crates/agent_ui/src/diagnostics.rs`; this task should add Goose-style doctor/system diagnostics rather than rebuild editor diagnostics.
+- Auto-update notification UI already exists in `crates/auto_update_ui/src/auto_update_ui.rs`.
+
 ## Tasks
 
-- [ ] 1. Implement ACP connection status indicator
-  - GPUI component showing connection state (connected/reconnecting/disconnected)
-  - Real-time state updates via subscription to acp_thread connection events
-  - Click to show details or reconnect
+- [ ] 1. Extend existing agent connection status UI for ACP details
+  - Audit existing `AgentConnectionStatus` usage
+  - Add Goose-specific ACP details on hover/click
+  - Add manual reconnect only if not already covered by existing controls
   - _Requirements: 6_
-  - _writes: crates/agent_ui/src/acp_connection_indicator.rs_
+  - _writes: crates/agent_ui/src/agent_connection_store.rs, crates/agent_ui/src/agent_panel.rs_
 
 - [ ] 2. Implement recipe browser panel
   - Recipe search bar with filtering
@@ -30,13 +36,14 @@ Build GPUI-native views for recipe browsing, scheduling, diagnostics, shared ses
   - _Requirements: 3_
   - _writes: crates/settings_ui/src/scheduling_settings.rs_
 
-- [ ] 4. Implement diagnostics view
+- [ ] 4. Extend diagnostics UI with Goose doctor results
+  - Reuse existing diagnostics collection where applicable
   - Run health checks with visual status (pass/warning/fail)
   - Expandable detail per check with remediation steps
   - Auto-run on first open; manual re-run button
   - Integration with `crates/doctor/`
   - _Requirements: 4_
-  - _writes: crates/agent_ui/src/diagnostics_view.rs_
+  - _writes: crates/agent_ui/src/diagnostics.rs, crates/agent_ui/src/agent_panel.rs_
 
 - [ ] 5. Implement shared session support
   - Export session as shareable data (serialized JSON)
@@ -60,12 +67,12 @@ Build GPUI-native views for recipe browsing, scheduling, diagnostics, shared ses
   - _Requirements: 9_
   - _writes: crates/i18n/src/lib.rs (if new)_
 
-- [ ] 8. Enhance auto-update UI
-  - Check for updates on startup (using existing `crates/auto_update/`)
-  - Show update notification in UI
-  - Allow triggering update install from UI
+- [ ] 8. Reconcile and enhance existing auto-update UI
+  - Audit existing update notifications and release notes handling
+  - Add only missing Goose update states or progress details
+  - Keep using existing `crates/auto_update/`
   - _Requirements: 10_
-  - _writes: crates/auto_update_ui/src/update_notification.rs_
+  - _writes: crates/auto_update_ui/src/auto_update_ui.rs_
 
 - [ ] 9. Write tests
   - Visual tests for each new GPUI component

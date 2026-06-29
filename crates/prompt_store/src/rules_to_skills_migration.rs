@@ -346,7 +346,11 @@ async fn migrate_default_rules_to_agents_md(
         if !is_customibaymax_builtin_body(builtin, &body) {
             continue;
         }
-        entries.push((title, body, AgentsMdMigrationEntryKind::CustomibaymaxBuiltin));
+        entries.push((
+            title,
+            body,
+            AgentsMdMigrationEntryKind::CustomibaymaxBuiltin,
+        ));
     }
 
     // Then user Default Rules.

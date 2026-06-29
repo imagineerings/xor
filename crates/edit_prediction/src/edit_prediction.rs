@@ -12,10 +12,9 @@ use cloud_llm_client::predict_edits_v3::{
     PredictEditsV3Response, RawCompletionRequest, RawCompletionResponse,
 };
 use cloud_llm_client::{
-    EditPredictionRejectReason, EditPredictionRejection,
+    BAYMAX_VERSION_HEADER_NAME, EditPredictionRejectReason, EditPredictionRejection,
     MAX_EDIT_PREDICTION_REJECTIONS_PER_REQUEST, MINIMUM_REQUIRED_VERSION_HEADER_NAME,
     PREFERRED_EXPERIMENT_HEADER_NAME, PredictEditsRequestTrigger, RejectEditPredictionsBodyRef,
-    BAYMAX_VERSION_HEADER_NAME,
 };
 use collections::{HashMap, HashSet};
 use copilot::{Copilot, Reinstall, SignIn, SignOut};
@@ -85,9 +84,9 @@ mod prediction;
 
 pub mod udiff;
 
+mod baymax_edit_prediction_delegate;
 mod capture_example;
 pub mod open_ai_compatible;
-mod baymax_edit_prediction_delegate;
 pub mod zeta;
 
 #[cfg(test)]
@@ -108,9 +107,9 @@ use crate::onboarding_modal::BaymaxPredictModal;
 pub use crate::prediction::EditPrediction;
 pub use crate::prediction::EditPredictionId;
 use crate::prediction::EditPredictionResult;
+pub use baymax_edit_prediction_delegate::BaymaxEditPredictionDelegate;
 pub use language_model::ApiKeyState;
 pub use telemetry_events::EditPredictionRating;
-pub use baymax_edit_prediction_delegate::BaymaxEditPredictionDelegate;
 
 actions!(
     edit_prediction,

@@ -1302,7 +1302,10 @@ impl WorkspaceDb {
         })
     }
 
-    fn bookmarks(&self, workspace_id: WorkspaceId) -> BTreeMap<Arc<Path>, Vec<SerialibaymaxBookmark>> {
+    fn bookmarks(
+        &self,
+        workspace_id: WorkspaceId,
+    ) -> BTreeMap<Arc<Path>, Vec<SerialibaymaxBookmark>> {
         let bookmarks: Result<Vec<(PathBuf, Bookmark)>> = self
             .select_bound(sql! {
                 SELECT path, row
@@ -2018,7 +2021,9 @@ impl WorkspaceDb {
                 if let Some(connection_options) = remote_connections.get(&remote_connection_id) {
                     result.push(RecentWorkspace {
                         workspace_id: id,
-                        location: SerialibaymaxWorkspaceLocation::Remote(connection_options.clone()),
+                        location: SerialibaymaxWorkspaceLocation::Remote(
+                            connection_options.clone(),
+                        ),
                         paths: paths.clone(),
                         identity_paths: identity_paths_hint.unwrap_or(paths),
                         timestamp,
@@ -2760,8 +2765,8 @@ mod tests {
         multi_workspace::MultiWorkspace,
         persistence::{
             model::{
-                SerialibaymaxItem, SerialibaymaxPane, SerialibaymaxPaneGroup, SerialibaymaxWorkspace,
-                SessionWorkspace,
+                SerialibaymaxItem, SerialibaymaxPane, SerialibaymaxPaneGroup,
+                SerialibaymaxWorkspace, SessionWorkspace,
             },
             read_multi_workspace_state,
         },
@@ -4046,22 +4051,24 @@ mod tests {
             (4, remote_connections[3].clone(), 2),
         ]
         .into_iter()
-        .map(|(id, remote_connection, window_id)| SerialibaymaxWorkspace {
-            id: WorkspaceId(id),
-            paths: PathList::default(),
-            identity_paths: None,
-            location: SerialibaymaxWorkspaceLocation::Remote(remote_connection),
-            center_group: Default::default(),
-            window_bounds: Default::default(),
-            display: Default::default(),
-            docks: Default::default(),
-            centered_layout: false,
-            session_id: Some("one-session".to_owned()),
-            bookmarks: Default::default(),
-            breakpoints: Default::default(),
-            window_id: Some(window_id),
-            user_toolchains: Default::default(),
-        })
+        .map(
+            |(id, remote_connection, window_id)| SerialibaymaxWorkspace {
+                id: WorkspaceId(id),
+                paths: PathList::default(),
+                identity_paths: None,
+                location: SerialibaymaxWorkspaceLocation::Remote(remote_connection),
+                center_group: Default::default(),
+                window_bounds: Default::default(),
+                display: Default::default(),
+                docks: Default::default(),
+                centered_layout: false,
+                session_id: Some("one-session".to_owned()),
+                bookmarks: Default::default(),
+                breakpoints: Default::default(),
+                window_id: Some(window_id),
+                user_toolchains: Default::default(),
+            },
+        )
         .collect::<Vec<_>>();
 
         for workspace in workspaces.iter() {

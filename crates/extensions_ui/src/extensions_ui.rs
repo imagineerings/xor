@@ -7,6 +7,7 @@ use std::time::Duration;
 use std::{ops::Range, sync::Arc};
 
 use anyhow::Context as _;
+use baymax_actions::ExtensionCategoryFilter;
 use cloud_api_types::{ExtensionMetadata, ExtensionProvides};
 use collections::{BTreeMap, BTreeSet};
 use editor::{Editor, EditorElement, EditorStyle};
@@ -33,7 +34,6 @@ use workspace::{
     Workspace,
     item::{Item, ItemEvent},
 };
-use baymax_actions::ExtensionCategoryFilter;
 
 use crate::components::ExtensionCard;
 use crate::extension_version_selector::{

@@ -12,7 +12,7 @@ use collab::{
     AppState, Config,
     db::UserId,
     executor::Executor,
-    rpc::{CLEANUP_TIMEOUT, Principal, RECONNECT_TIMEOUT, Server, BaymaxVersion},
+    rpc::{BaymaxVersion, CLEANUP_TIMEOUT, Principal, RECONNECT_TIMEOUT, Server},
 };
 use collab_ui::channel_view::ChannelView;
 use collections::{HashMap, HashSet};

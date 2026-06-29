@@ -4,14 +4,20 @@
 
 Implement slash commands, hints system, goose apps (GPUI panels), source roots, and execution manager by extending existing baymax crates.
 
+## Repo Reconciliation
+
+- A slash-command path already exists for `/compact`, MCP prompts, and skills in `crates/agent/src/agent.rs`, with UI autocomplete support in `crates/agent_ui/src/conversation_view/thread_view.rs`.
+- Treat Goose slash-command work as incremental command coverage, not a new parser/system.
+
 ## Tasks
 
-- [ ] 1. Implement slash command system in agent input processing
-  - Create `SlashCommandParser` that detects `/command` patterns in agent input
-  - Create `SlashCommandRouter` with handler registration
-  - Implement built-in slash commands: `/help`, `/recipe`, `/skill`, `/clear`
+- [ ] 1. Extend existing slash command handling for Goose-specific commands
+  - Audit existing `/compact`, MCP prompt, and skill invocation paths
+  - Add missing Goose commands such as `/recipe`, `/help`, and `/clear`
+  - Reuse existing autocomplete and prompt dispatch flow
+  - Add arguments parsing only where existing command parsing is insufficient
   - _Requirements: 1_
-  - _writes: crates/agent/src/slash_commands/mod.rs, crates/agent/src/slash_commands/parser.rs, crates/agent/src/slash_commands/builtin.rs_
+  - _writes: crates/agent/src/agent.rs, crates/agent_ui/src/conversation_view/thread_view.rs_
 
 - [ ] 2. Implement hints system
   - Create `HintLoader` that discovers `.goosehints` files

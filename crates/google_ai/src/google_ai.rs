@@ -771,9 +771,18 @@ mod tests {
         let serialibaymax = serde_json::to_value(&original).unwrap();
         let deserialibaymax: FunctionCallPart = serde_json::from_value(serialibaymax).unwrap();
 
-        assert_eq!(deserialibaymax.function_call.name, original.function_call.name);
-        assert_eq!(deserialibaymax.function_call.args, original.function_call.args);
-        assert_eq!(deserialibaymax.thought_signature, original.thought_signature);
+        assert_eq!(
+            deserialibaymax.function_call.name,
+            original.function_call.name
+        );
+        assert_eq!(
+            deserialibaymax.function_call.args,
+            original.function_call.args
+        );
+        assert_eq!(
+            deserialibaymax.thought_signature,
+            original.thought_signature
+        );
     }
 
     #[test]

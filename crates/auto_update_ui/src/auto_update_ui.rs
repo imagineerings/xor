@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use agent_skills::GLOBAL_SKILLS_DIR_DISPLAY;
 use auto_update::{AutoUpdater, release_notes_url};
+use baymax_actions::ShowUpdateNotification;
 use client::baymax_urls;
 use db::kvp::Dismissable;
 use editor::{Editor, MultiBuffer};
@@ -25,7 +26,6 @@ use workspace::{
     },
     workspace_error::{ErrorAction, ErrorSeverity, WorkspaceError},
 };
-use baymax_actions::ShowUpdateNotification;
 
 actions!(
     auto_update,

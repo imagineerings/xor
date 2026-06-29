@@ -2,7 +2,7 @@ use client::{Client, UserStore};
 use codestral::{CodestralEditPredictionDelegate, load_codestral_api_key};
 use collections::HashMap;
 use copilot::CopilotEditPredictionDelegate;
-use edit_prediction::{EditPredictionModel, BaymaxEditPredictionDelegate};
+use edit_prediction::{BaymaxEditPredictionDelegate, EditPredictionModel};
 use editor::Editor;
 use gpui::{AnyWindowHandle, App, AppContext as _, Context, Entity, WeakEntity};
 use language::{
@@ -116,9 +116,9 @@ fn edit_prediction_provider_config_for_settings(cx: &App) -> Option<EditPredicti
     match provider {
         EditPredictionProvider::None => None,
         EditPredictionProvider::Copilot => Some(EditPredictionProviderConfig::Copilot),
-        EditPredictionProvider::Baymax => {
-            Some(EditPredictionProviderConfig::Baymax(EditPredictionModel::Zeta))
-        }
+        EditPredictionProvider::Baymax => Some(EditPredictionProviderConfig::Baymax(
+            EditPredictionModel::Zeta,
+        )),
         EditPredictionProvider::Codestral => Some(EditPredictionProviderConfig::Codestral),
         EditPredictionProvider::Ollama | EditPredictionProvider::OpenAiCompatibleApi => {
             let custom_settings = if provider == EditPredictionProvider::Ollama {
@@ -138,7 +138,9 @@ fn edit_prediction_provider_config_for_settings(cx: &App) -> Option<EditPredicti
             }
 
             if matches!(format, EditPredictionPromptFormat::Zeta(_)) {
-                Some(EditPredictionProviderConfig::Baymax(EditPredictionModel::Zeta))
+                Some(EditPredictionProviderConfig::Baymax(
+                    EditPredictionModel::Zeta,
+                ))
             } else {
                 Some(EditPredictionProviderConfig::Baymax(
                     EditPredictionModel::Fim { format },

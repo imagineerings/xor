@@ -5600,6 +5600,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "doctor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "tempfile",
+]
+
+[[package]]
 name = "document-features"
 version = "0.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5645,6 +5654,21 @@ name = "downcast-rs"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
+
+[[package]]
+name = "download_manager"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-io",
+ "futures 0.3.32",
+ "serde",
+ "smol",
+ "tempfile",
+ "thiserror 2.0.18",
+ "url",
+ "zed-reqwest",
+]
 
 [[package]]
 name = "doxygen-rs"
@@ -13806,6 +13830,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "plugins"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "png"
 version = "0.17.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -20071,6 +20106,7 @@ dependencies = [
  "log",
  "mach2 0.5.0",
  "nix 0.29.0",
+ "parking_lot",
  "percent-encoding",
  "pretty_assertions",
  "rand 0.9.4",
@@ -20088,6 +20124,7 @@ dependencies = [
  "unicase",
  "url",
  "util_macros",
+ "uuid",
  "walkdir",
  "which 6.0.3",
 ]

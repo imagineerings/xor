@@ -91,6 +91,10 @@ use uuid::Uuid;
 use vim_mode_setting::VimModeSetting;
 use workspace::notifications::{NotificationId, dismiss_app_notification, show_app_notification};
 
+use baymax_actions::{
+    About, OpenAccountSettings, OpenBaymaxUrl, OpenBrowser, OpenDocs, OpenServerSettings,
+    OpenSettingsFile, OpenStatusPage, Quit,
+};
 use workspace::{
     AppState, MultiWorkspace, NewFile, NewWindow, OpenLog, Panel, Toast, Workspace,
     WorkspaceSettings, create_and_open_local_file,
@@ -100,10 +104,6 @@ use workspace::{
     CloseIntent, CloseProject, CloseWindow, RestoreBanner, with_active_or_new_workspace,
 };
 use workspace::{Pane, notifications::DetachAndPromptErr};
-use baymax_actions::{
-    About, OpenAccountSettings, OpenBrowser, OpenDocs, OpenServerSettings, OpenSettingsFile,
-    OpenStatusPage, OpenBaymaxUrl, Quit,
-};
 
 const DOCS_URL: &str = "https://baymax.dev/docs/";
 const STATUS_URL: &str = "https://status.baymax.dev";
@@ -1937,7 +1937,10 @@ fn notify_settings_errors(result: settings::SettingsParseResult, is_user: bool, 
                         .primary_message("Open Settings File")
                         .primary_icon(IconName::Settings)
                         .primary_on_click(|window, cx| {
-                            window.dispatch_action(baymax_actions::OpenSettingsFile.boxed_clone(), cx);
+                            window.dispatch_action(
+                                baymax_actions::OpenSettingsFile.boxed_clone(),
+                                cx,
+                            );
                             cx.emit(DismissEvent);
                         })
                     })
@@ -5697,8 +5700,12 @@ mod tests {
         // 5. Critical: Verify .baymax is actually excluded from worktree
         let worktree = cx.update(|cx| project.read(cx).worktrees(cx).next().unwrap());
 
-        let has_baymax_entry =
-            cx.update(|cx| worktree.read(cx).entry_for_path(rel_path(".baymax")).is_some());
+        let has_baymax_entry = cx.update(|cx| {
+            worktree
+                .read(cx)
+                .entry_for_path(rel_path(".baymax"))
+                .is_some()
+        });
 
         eprintln!(
             "Is .baymax directory visible in worktree after exclusion: {}",

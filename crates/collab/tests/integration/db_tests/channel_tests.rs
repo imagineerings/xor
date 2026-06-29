@@ -26,7 +26,10 @@ async fn test_channels(db: &Arc<Database>) {
         .await
         .unwrap();
 
-    let crdb_id = db.create_sub_channel("crdb", baymax_id, a_id).await.unwrap();
+    let crdb_id = db
+        .create_sub_channel("crdb", baymax_id, a_id)
+        .await
+        .unwrap();
     let livestreaming_id = db
         .create_sub_channel("livestreaming", baymax_id, a_id)
         .await
@@ -292,9 +295,15 @@ async fn test_db_channel_moving(db: &Arc<Database>) {
 
     let baymax_id = db.create_root_channel("baymax", a_id).await.unwrap();
 
-    let crdb_id = db.create_sub_channel("crdb", baymax_id, a_id).await.unwrap();
+    let crdb_id = db
+        .create_sub_channel("crdb", baymax_id, a_id)
+        .await
+        .unwrap();
 
-    let gpui2_id = db.create_sub_channel("gpui2", baymax_id, a_id).await.unwrap();
+    let gpui2_id = db
+        .create_sub_channel("gpui2", baymax_id, a_id)
+        .await
+        .unwrap();
 
     let livestreaming_id = db
         .create_sub_channel("livestreaming", crdb_id, a_id)
@@ -316,7 +325,10 @@ async fn test_db_channel_moving(db: &Arc<Database>) {
             (baymax_id, &[]),
             (crdb_id, &[baymax_id]),
             (livestreaming_id, &[baymax_id, crdb_id]),
-            (livestreaming_sub_id, &[baymax_id, crdb_id, livestreaming_id]),
+            (
+                livestreaming_sub_id,
+                &[baymax_id, crdb_id, livestreaming_id],
+            ),
             (gpui2_id, &[baymax_id]),
         ],
     );
@@ -699,7 +711,10 @@ async fn test_user_is_channel_participant(db: &Arc<Database>) {
     let channels = db.get_channels_for_user(guest).await.unwrap().channels;
     assert_channel_tree(
         channels,
-        &[(baymax_channel, &[]), (public_channel_id, &[baymax_channel])],
+        &[
+            (baymax_channel, &[]),
+            (public_channel_id, &[baymax_channel]),
+        ],
     );
     let channels = db.get_channels_for_user(member).await.unwrap().channels;
     assert_channel_tree(
@@ -867,7 +882,10 @@ async fn test_user_is_channel_participant(db: &Arc<Database>) {
     let channels = db.get_channels_for_user(guest).await.unwrap().channels;
     assert_channel_tree(
         channels,
-        &[(baymax_channel, &[]), (public_channel_id, &[baymax_channel])],
+        &[
+            (baymax_channel, &[]),
+            (public_channel_id, &[baymax_channel]),
+        ],
     )
 }
 

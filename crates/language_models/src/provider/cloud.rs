@@ -1,7 +1,7 @@
 use ai_onboarding::YoungAccountBanner;
 use anyhow::{Result, anyhow};
 use client::{
-    Client, RefreshLlmTokenListener, TelemetrySettings, UserStore, global_llm_token, baymax_urls,
+    Client, RefreshLlmTokenListener, TelemetrySettings, UserStore, baymax_urls, global_llm_token,
 };
 use cloud_api_client::LlmApiToken;
 use cloud_api_types::OrganizationId;
@@ -11,17 +11,17 @@ use futures::StreamExt;
 use futures::future::BoxFuture;
 use gpui::{AnyElement, AnyView, App, AppContext, Context, Entity, Subscription, Task, TaskExt};
 use language_model::{
-    AuthenticateError, FastModeConfirmation, IconOrSvg, LanguageModel, LanguageModelProvider,
-    LanguageModelProviderId, LanguageModelProviderName, LanguageModelProviderState,
-    BAYMAX_CLOUD_PROVIDER_ID, BAYMAX_CLOUD_PROVIDER_NAME,
+    AuthenticateError, BAYMAX_CLOUD_PROVIDER_ID, BAYMAX_CLOUD_PROVIDER_NAME, FastModeConfirmation,
+    IconOrSvg, LanguageModel, LanguageModelProvider, LanguageModelProviderId,
+    LanguageModelProviderName, LanguageModelProviderState,
 };
 use language_models_cloud::{CloudLlmTokenProvider, CloudModelProvider};
 use rand::{Rng as _, SeedableRng as _, rngs::StdRng};
 use release_channel::AppVersion;
 
-use settings::SettingsStore;
 pub use settings::BaymaxDotDevAvailableModel as AvailableModel;
 pub use settings::BaymaxDotDevAvailableProvider as AvailableProvider;
+use settings::SettingsStore;
 use std::sync::Arc;
 use std::time::Duration;
 use ui::{TintColor, prelude::*};
@@ -469,7 +469,9 @@ impl RenderOnce for BaymaxAiConfiguration {
                     Button::new("upgrade", "Upgrade to Pro")
                         .style(ui::ButtonStyle::Tinted(ui::TintColor::Accent))
                         .full_width()
-                        .on_click(|_, _, cx| cx.open_url(&baymax_urls::upgrade_to_baymax_pro_url(cx))),
+                        .on_click(|_, _, cx| {
+                            cx.open_url(&baymax_urls::upgrade_to_baymax_pro_url(cx))
+                        }),
                 )
             } else {
                 this.text_sm()
