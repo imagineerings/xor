@@ -1,0 +1,712 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Symphony Workflow</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0d1117;
+      --panel: #161b22;
+      --panel-2: #1f2630;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --line: #30363d;
+      --accent: #7c3aed;
+      --accent-2: #22c55e;
+      --danger: #ef4444;
+      --warn: #f59e0b;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at top left, rgba(124, 58, 237, 0.22), transparent 34rem),
+        radial-gradient(circle at top right, rgba(34, 197, 94, 0.14), transparent 30rem),
+        var(--bg);
+      color: var(--text);
+    }
+
+    header {
+      padding: 32px clamp(18px, 4vw, 48px) 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    h1 { margin: 0 0 8px; font-size: clamp(30px, 5vw, 54px); letter-spacing: -0.04em; }
+    h2 { margin: 0 0 14px; font-size: 18px; }
+    p { margin: 0; color: var(--muted); line-height: 1.5; }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(300px, 430px) 1fr;
+      gap: 18px;
+      padding: 18px clamp(18px, 4vw, 48px) 42px;
+    }
+
+    section {
+      background: rgba(22, 27, 34, 0.86);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 20px 80px rgba(0, 0, 0, 0.24);
+      backdrop-filter: blur(14px);
+    }
+
+    .stack { display: grid; gap: 14px; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .wide { grid-column: 1 / -1; }
+
+    label { display: grid; gap: 7px; color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+    input, textarea, select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #0d1117;
+      color: var(--text);
+      padding: 11px 12px;
+      font: inherit;
+      outline: none;
+    }
+    textarea { min-height: 180px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; line-height: 1.5; }
+    input:focus, textarea:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.22); }
+
+    button {
+      border: 0;
+      border-radius: 12px;
+      color: white;
+      background: var(--accent);
+      padding: 11px 14px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); }
+    button.success { background: var(--accent-2); color: #06200f; }
+    button.warn { background: var(--warn); color: #241500; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+
+    .items { display: grid; gap: 10px; max-height: 380px; overflow: auto; padding-right: 4px; }
+    .item {
+      width: 100%;
+      text-align: left;
+      background: #0d1117;
+      border: 1px solid var(--line);
+      color: var(--text);
+      display: grid;
+      gap: 6px;
+    }
+    .item.active { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.25); }
+    .meta { color: var(--muted); font-size: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .pill { border: 1px solid var(--line); border-radius: 999px; padding: 3px 8px; background: var(--panel-2); }
+
+    pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      min-height: 320px;
+      margin: 0;
+      padding: 16px;
+      background: #0d1117;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      line-height: 1.5;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 13px;
+    }
+
+    .status {
+      border-radius: 12px;
+      padding: 11px 12px;
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      color: var(--muted);
+    }
+    .status.error { border-color: rgba(239, 68, 68, 0.6); color: #fecaca; }
+    .status.ok { border-color: rgba(34, 197, 94, 0.6); color: #bbf7d0; }
+
+    @media (max-width: 980px) {
+      main { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Symphony Workflow</h1>
+    <p>Load GitHub Projects work, render a repository-owned agent prompt, and move item status — all from one static page.</p>
+  </header>
+
+  <main>
+    <div class="stack">
+      <section class="stack">
+        <h2>Connection</h2>
+        <div class="grid">
+          <label class="wide">GitHub token
+            <input id="token" type="password" autocomplete="off" placeholder="ghp_… or github_pat_…">
+          </label>
+          <label>Owner
+            <input id="owner" placeholder="org-or-user">
+          </label>
+          <label>Project number
+            <input id="projectNumber" type="number" min="1" value="1">
+          </label>
+          <label>Status field
+            <input id="statusField" value="Status">
+          </label>
+          <label>Active states
+            <input id="activeStates" value="Todo, In Progress">
+          </label>
+          <label class="wide">Terminal states
+            <input id="terminalStates" value="Done, Closed, Cancelled, Canceled, Duplicate">
+          </label>
+        </div>
+        <div class="actions">
+          <button id="saveSettings">Save settings</button>
+          <button id="loadItems" class="success">Load items</button>
+        </div>
+        <p>Token stays in session storage; non-secret settings stay in local storage.</p>
+      </section>
+
+      <section class="stack">
+        <h2>Workflow Template</h2>
+        <textarea id="workflow">---
+tracker:
+  kind: github_projects
+polling:
+  interval_ms: 30000
+---
+
+You are working on a GitHub Projects item.
+
+Title: {{ issue.title }}
+Repository: {{ issue.repository }}
+URL: {{ issue.url }}
+Status: {{ issue.status }}
+
+Issue body:
+{{ issue.body }}</textarea>
+        <div class="actions">
+          <button id="validateWorkflow" class="secondary">Validate</button>
+          <button id="renderPrompt">Render prompt</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="stack">
+      <section class="stack">
+        <div class="actions" style="justify-content: space-between;">
+          <h2 style="margin: 0;">Project Items</h2>
+          <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;">
+            <input id="activeOnly" type="checkbox" checked style="width:auto;"> Active only
+          </label>
+        </div>
+        <div id="items" class="items"></div>
+      </section>
+
+      <section class="stack">
+        <h2>Rendered Agent Prompt</h2>
+        <pre id="promptOut">Select an item, then render the prompt.</pre>
+        <div class="grid">
+          <label>Move selected item to
+            <select id="statusTarget"></select>
+          </label>
+          <label>Attempt
+            <input id="attempt" type="number" min="1" placeholder="optional">
+          </label>
+        </div>
+        <div class="actions">
+          <button id="copyPrompt" class="secondary">Copy prompt</button>
+          <button id="claimItem" class="warn">Update status</button>
+        </div>
+        <div id="status" class="status">Ready.</div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const GITHUB_GRAPHQL_URL = "https://api.github.com/graphql";
+    const state = {
+      items: [],
+      selectedItemId: null,
+      statusOptions: [],
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    const fields = {
+      token: $("token"),
+      owner: $("owner"),
+      projectNumber: $("projectNumber"),
+      statusField: $("statusField"),
+      activeStates: $("activeStates"),
+      terminalStates: $("terminalStates"),
+      workflow: $("workflow"),
+      activeOnly: $("activeOnly"),
+      statusTarget: $("statusTarget"),
+      attempt: $("attempt"),
+      items: $("items"),
+      promptOut: $("promptOut"),
+      status: $("status"),
+    };
+
+    function setStatus(message, kind = "") {
+      fields.status.textContent = message;
+      fields.status.className = `status ${kind}`;
+    }
+
+    function parseList(value) {
+      return value.split(",").map((part) => part.trim()).filter(Boolean);
+    }
+
+    function settings() {
+      return {
+        token: fields.token.value.trim(),
+        owner: fields.owner.value.trim(),
+        projectNumber: Number(fields.projectNumber.value),
+        statusField: fields.statusField.value.trim() || "Status",
+        activeStates: parseList(fields.activeStates.value),
+        terminalStates: parseList(fields.terminalStates.value),
+      };
+    }
+
+    function saveSettings() {
+      const config = settings();
+      sessionStorage.setItem("symphony.github_token", config.token);
+      localStorage.setItem("symphony.settings", JSON.stringify({
+        owner: config.owner,
+        projectNumber: config.projectNumber,
+        statusField: config.statusField,
+        activeStates: config.activeStates,
+        terminalStates: config.terminalStates,
+        workflow: fields.workflow.value,
+      }));
+      setStatus("Settings saved.", "ok");
+    }
+
+    function loadSettings() {
+      const saved = JSON.parse(localStorage.getItem("symphony.settings") || "{}");
+      fields.token.value = sessionStorage.getItem("symphony.github_token") || "";
+      fields.owner.value = saved.owner || "";
+      fields.projectNumber.value = saved.projectNumber || 1;
+      fields.statusField.value = saved.statusField || "Status";
+      fields.activeStates.value = (saved.activeStates || ["Todo", "In Progress"]).join(", ");
+      fields.terminalStates.value = (saved.terminalStates || ["Done", "Closed", "Cancelled", "Canceled", "Duplicate"]).join(", ");
+      if (saved.workflow) fields.workflow.value = saved.workflow;
+    }
+
+    async function github(query, variables = {}) {
+      const config = settings();
+      if (!config.token) throw new Error("GitHub token is required.");
+      if (!config.owner) throw new Error("Owner is required.");
+      if (!config.projectNumber) throw new Error("Project number is required.");
+
+      const response = await fetch(GITHUB_GRAPHQL_URL, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${config.token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ query, variables }),
+      });
+      const payload = await response.json();
+      if (!response.ok || payload.errors) {
+        throw new Error(payload.errors ? JSON.stringify(payload.errors, null, 2) : response.statusText);
+      }
+      return payload.data;
+    }
+
+    function parseWorkflow(text) {
+      let config = {};
+      let body = text;
+      if (text.startsWith("---\n") || text.startsWith("---\r\n")) {
+        const newline = text.startsWith("---\r\n") ? "\r\n" : "\n";
+        const marker = `${newline}---${newline}`;
+        const end = text.indexOf(marker, 3);
+        if (end === -1) throw new Error("workflow_parse_error: unterminated YAML front matter");
+        config = parseSimpleYamlMap(text.slice(3 + newline.length, end));
+        body = text.slice(end + marker.length);
+      }
+      return { config, promptTemplate: body.trim() };
+    }
+
+    function parseSimpleYamlMap(yaml) {
+      const lines = yaml
+        .split(/\r?\n/)
+        .map((raw) => ({ raw, line: raw.replace(/\s+#.*$/, "") }))
+        .filter(({ line }) => line.trim());
+      let index = 0;
+
+      function indentation(line) {
+        return line.match(/^ */)[0].length;
+      }
+
+      function parseNode(expectedIndent) {
+        const current = lines[index]?.line || "";
+        if (current.trim().startsWith("- ")) return parseList(expectedIndent);
+        return parseMap(expectedIndent);
+      }
+
+      function parseList(expectedIndent) {
+        const values = [];
+        while (index < lines.length) {
+          const { line } = lines[index];
+          const indent = indentation(line);
+          const trimmed = line.trim();
+          if (indent < expectedIndent || !trimmed.startsWith("- ")) break;
+          if (indent !== expectedIndent) throw new Error(`workflow_parse_error: unsupported YAML indentation: ${trimmed}`);
+          values.push(parseYamlScalar(trimmed.slice(2).trim()));
+          index += 1;
+        }
+        return values;
+      }
+
+      function parseMap(expectedIndent) {
+        const value = {};
+        while (index < lines.length) {
+          const { line } = lines[index];
+          const indent = indentation(line);
+          const trimmed = line.trim();
+          if (indent < expectedIndent || trimmed.startsWith("- ")) break;
+          if (indent !== expectedIndent) throw new Error(`workflow_parse_error: unsupported YAML indentation: ${trimmed}`);
+          const match = trimmed.match(/^([^:]+):(.*)$/);
+          if (!match) throw new Error(`workflow_parse_error: unsupported YAML line: ${trimmed}`);
+          const key = match[1].trim();
+          const valueText = match[2].trim();
+          index += 1;
+          if (valueText === "|" || valueText === "|-") {
+            value[key] = parseBlockScalar(indent);
+          } else if (!valueText) {
+            if (index >= lines.length || indentation(lines[index].line) <= indent) {
+              value[key] = {};
+            } else {
+              value[key] = parseNode(indentation(lines[index].line));
+            }
+          } else {
+            value[key] = parseYamlScalar(valueText);
+          }
+        }
+        return value;
+      }
+
+      function parseBlockScalar(parentIndent) {
+        const blockIndent = parentIndent + 2;
+        const blockLines = [];
+        while (index < lines.length) {
+          const raw = lines[index].raw;
+          const indent = indentation(raw);
+          if (indent <= parentIndent) break;
+          blockLines.push(raw.length >= blockIndent ? raw.slice(blockIndent) : raw.trimStart());
+          index += 1;
+        }
+        return blockLines.join("\n");
+      }
+
+      return parseNode(0);
+    }
+
+    function parseYamlScalar(value) {
+      if (value === "true") return true;
+      if (value === "false") return false;
+      if (value === "null") return null;
+      if (/^-?\d+$/.test(value)) return Number.parseInt(value, 10);
+      if (value.startsWith("[") && value.endsWith("]")) {
+        return value.slice(1, -1).split(",").map((part) => parseYamlScalar(part.trim())).filter((part) => part !== "");
+      }
+      return value.replace(/^["']|["']$/g, "");
+    }
+
+    function resolveTemplateValue(expression, scope) {
+      const parts = expression.split(".");
+      let value = scope[parts.shift()];
+      for (const part of parts) {
+        if (value == null || !Object.prototype.hasOwnProperty.call(value, part)) return undefined;
+        value = value[part];
+      }
+      return value;
+    }
+
+    function renderTemplate(template, issue, attempt) {
+      const source = template || "You are working on an issue from GitHub Projects.";
+      return source.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_match, expression) => {
+        if (expression.includes("|")) throw new Error(`template_render_error: filters are not supported: ${expression}`);
+        const value = resolveTemplateValue(expression.trim(), { issue, attempt });
+        if (value === undefined) throw new Error(`template_render_error: unknown variable ${expression.trim()}`);
+        if (value === null) return "";
+        if (typeof value === "object") return JSON.stringify(value, null, 2);
+        return String(value);
+      });
+    }
+
+    function validateWorkflowContract(workflow) {
+      const template = workflow.promptTemplate || "";
+      if (/{%[\s\S]*?%}/.test(template)) {
+        throw new Error("workflow_validation_error: Liquid tag blocks are not supported; use {{ issue.field }} interpolation only");
+      }
+      const allowedIssueFields = new Set([
+        "id",
+        "type",
+        "title",
+        "body",
+        "url",
+        "number",
+        "state",
+        "repository",
+        "status",
+        "labels",
+        "assignees",
+        "fields",
+      ]);
+      const matches = template.matchAll(/\{\{\s*([^}]+?)\s*\}\}/g);
+      for (const match of matches) {
+        const expression = match[1].trim();
+        if (expression.includes("|")) throw new Error(`workflow_validation_error: filters are not supported: ${expression}`);
+        if (expression === "attempt") continue;
+        if (expression.startsWith("issue.")) {
+          const field = expression.slice("issue.".length).split(".")[0];
+          if (allowedIssueFields.has(field)) continue;
+        }
+        throw new Error(`workflow_validation_error: unknown variable ${expression}`);
+      }
+      return workflow;
+    }
+
+    function normalizeItem(item, config) {
+      const projectFields = {};
+      for (const field of item.fieldValues?.nodes || []) {
+        if (!field?.field?.name) continue;
+        projectFields[field.field.name] = field.name || field.text || field.date || null;
+      }
+      const content = item.content || {};
+      return {
+        id: item.id,
+        type: item.type,
+        title: content.title || "(untitled)",
+        body: content.body || "",
+        url: content.url || null,
+        number: content.number || null,
+        state: content.state || null,
+        repository: content.repository?.nameWithOwner || null,
+        status: projectFields[config.statusField] || null,
+        labels: (content.labels?.nodes || []).map((label) => label.name),
+        assignees: (content.assignees?.nodes || []).map((assignee) => assignee.login),
+        fields: projectFields,
+      };
+    }
+
+    function activeItems(items) {
+      const config = settings();
+      const active = new Set(config.activeStates.map((value) => value.toLowerCase()));
+      const terminal = new Set(config.terminalStates.map((value) => value.toLowerCase()));
+      return items.filter((item) => {
+        const status = (item.status || "").toLowerCase();
+        if (active.size > 0) return active.has(status);
+        return !terminal.has(status);
+      });
+    }
+
+    async function loadProjectItems() {
+      saveSettings();
+      setStatus("Loading GitHub Projects items…");
+      const config = settings();
+      const query = `
+        query($owner: String!, $number: Int!, $limit: Int!) {
+          organization(login: $owner) { projectV2(number: $number) { ...ProjectItems } }
+          user(login: $owner) { projectV2(number: $number) { ...ProjectItems } }
+        }
+        fragment ProjectItems on ProjectV2 {
+          id
+          title
+          fields(first: 50) {
+            nodes {
+              ... on ProjectV2SingleSelectField { id name options { id name } }
+              ... on ProjectV2Field { id name }
+            }
+          }
+          items(first: $limit) {
+            nodes {
+              id
+              type
+              fieldValues(first: 50) {
+                nodes {
+                  ... on ProjectV2ItemFieldSingleSelectValue {
+                    name
+                    field { ... on ProjectV2FieldCommon { id name } }
+                  }
+                  ... on ProjectV2ItemFieldTextValue {
+                    text
+                    field { ... on ProjectV2FieldCommon { id name } }
+                  }
+                  ... on ProjectV2ItemFieldDateValue {
+                    date
+                    field { ... on ProjectV2FieldCommon { id name } }
+                  }
+                }
+              }
+              content {
+                ... on DraftIssue { title body }
+                ... on Issue {
+                  title body url number state
+                  repository { nameWithOwner }
+                  labels(first: 20) { nodes { name } }
+                  assignees(first: 10) { nodes { login } }
+                }
+                ... on PullRequest {
+                  title body url number state
+                  repository { nameWithOwner }
+                  labels(first: 20) { nodes { name } }
+                  assignees(first: 10) { nodes { login } }
+                }
+              }
+            }
+          }
+        }`;
+      const data = await github(query, { owner: config.owner, number: config.projectNumber, limit: 100 });
+      const project = data.organization?.projectV2 || data.user?.projectV2;
+      if (!project) throw new Error(`GitHub Project not found: ${config.owner}/${config.projectNumber}`);
+      const statusField = project.fields.nodes.find((field) => field?.name === config.statusField && Array.isArray(field.options));
+      state.statusOptions = statusField?.options || [];
+      state.items = project.items.nodes.map((item) => normalizeItem(item, config));
+      if (!state.selectedItemId && state.items[0]) state.selectedItemId = state.items[0].id;
+      renderItems();
+      renderStatusOptions();
+      setStatus(`Loaded ${state.items.length} items from ${project.title}.`, "ok");
+    }
+
+    function renderItems() {
+      const visibleItems = fields.activeOnly.checked ? activeItems(state.items) : state.items;
+      fields.items.innerHTML = "";
+      if (visibleItems.length === 0) {
+        fields.items.innerHTML = "<p>No matching items.</p>";
+        return;
+      }
+      for (const item of visibleItems) {
+        const button = document.createElement("button");
+        button.className = `item ${item.id === state.selectedItemId ? "active" : ""}`;
+        button.innerHTML = `
+          <strong>${escapeHtml(item.title)}</strong>
+          <span class="meta">
+            <span class="pill">${escapeHtml(item.status || "No status")}</span>
+            <span>${escapeHtml(item.repository || "Draft item")}</span>
+            ${item.number ? `<span>#${item.number}</span>` : ""}
+          </span>`;
+        button.addEventListener("click", () => {
+          state.selectedItemId = item.id;
+          renderItems();
+          renderSelectedPrompt();
+        });
+        fields.items.appendChild(button);
+      }
+    }
+
+    function renderStatusOptions() {
+      fields.statusTarget.innerHTML = "";
+      for (const option of state.statusOptions) {
+        const element = document.createElement("option");
+        element.value = option.name;
+        element.textContent = option.name;
+        fields.statusTarget.appendChild(element);
+      }
+    }
+
+    function selectedItem() {
+      return state.items.find((item) => item.id === state.selectedItemId);
+    }
+
+    function renderSelectedPrompt() {
+      const item = selectedItem();
+      if (!item) throw new Error("Select an item first.");
+      const workflow = validateWorkflowContract(parseWorkflow(fields.workflow.value));
+      const attempt = fields.attempt.value ? Number(fields.attempt.value) : null;
+      fields.promptOut.textContent = renderTemplate(workflow.promptTemplate, item, attempt);
+      setStatus(`Rendered prompt for “${item.title}”.`, "ok");
+    }
+
+    async function updateSelectedStatus() {
+      const item = selectedItem();
+      const target = fields.statusTarget.value;
+      if (!item) throw new Error("Select an item first.");
+      if (!target) throw new Error("No target status is available.");
+      const config = settings();
+      const statusOption = state.statusOptions.find((option) => option.name === target);
+      if (!statusOption) throw new Error(`Status option not found: ${target}`);
+
+      const projectQuery = `
+        query($owner: String!, $number: Int!) {
+          organization(login: $owner) { projectV2(number: $number) { ...ProjectFields } }
+          user(login: $owner) { projectV2(number: $number) { ...ProjectFields } }
+        }
+        fragment ProjectFields on ProjectV2 {
+          id
+          fields(first: 50) {
+            nodes {
+              ... on ProjectV2SingleSelectField { id name options { id name } }
+              ... on ProjectV2Field { id name }
+            }
+          }
+        }`;
+      const data = await github(projectQuery, { owner: config.owner, number: config.projectNumber });
+      const project = data.organization?.projectV2 || data.user?.projectV2;
+      const statusField = project.fields.nodes.find((field) => field?.name === config.statusField && Array.isArray(field.options));
+      if (!statusField) throw new Error(`Status field not found or not single-select: ${config.statusField}`);
+
+      const mutation = `
+        mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+          updateProjectV2ItemFieldValue(input: {
+            projectId: $projectId
+            itemId: $itemId
+            fieldId: $fieldId
+            value: { singleSelectOptionId: $optionId }
+          }) {
+            projectV2Item { id }
+          }
+        }`;
+      await github(mutation, {
+        projectId: project.id,
+        itemId: item.id,
+        fieldId: statusField.id,
+        optionId: statusOption.id,
+      });
+      item.status = target;
+      renderItems();
+      setStatus(`Moved “${item.title}” to ${target}.`, "ok");
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;",
+      }[char]));
+    }
+
+    function bind(id, handler) {
+      $(id).addEventListener("click", async () => {
+        try {
+          await handler();
+        } catch (error) {
+          setStatus(error.message || String(error), "error");
+        }
+      });
+    }
+
+    bind("saveSettings", saveSettings);
+    bind("loadItems", loadProjectItems);
+    bind("validateWorkflow", () => {
+      const workflow = validateWorkflowContract(parseWorkflow(fields.workflow.value));
+      setStatus(`Workflow is valid. Template length: ${workflow.promptTemplate.length} characters.`, "ok");
+    });
+    bind("renderPrompt", renderSelectedPrompt);
+    bind("copyPrompt", async () => {
+      await navigator.clipboard.writeText(fields.promptOut.textContent);
+      setStatus("Prompt copied.", "ok");
+    });
+    bind("claimItem", updateSelectedStatus);
+    fields.activeOnly.addEventListener("change", renderItems);
+
+    loadSettings();
+  </script>
+</body>
+</html>

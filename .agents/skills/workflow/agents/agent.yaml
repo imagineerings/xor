@@ -1,0 +1,7 @@
+interface:
+  display_name: "Symphony Workflow"
+  short_description: "Render GitHub Project work packets."
+  default_prompt: "Use $symphony-workflow to list or claim a GitHub Projects item, render the repository WORKFLOW.md prompt, complete the work, and update status."
+
+policy:
+  allow_implicit_invocation: true
