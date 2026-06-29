@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand Colors - White primary for dark mode like iOS -->
+    <color name="baymax_primary">#FFFFFF</color>
+    <color name="baymax_primary_dark">#E0E0E0</color>
+    <color name="baymax_secondary">#64B5F6</color>
+    
+    <!-- Background Colors - Dark Mode matching iOS -->
+    <color name="background_primary">#1C1C1E</color>
+    <color name="background_secondary">#2C2C2E</color>
+    <color name="background_tertiary">#38383A</color>
+    <color name="surface_card">#2C2C2E</color>
+    
+    <!-- Input backgrounds -->
+    <color name="input_background">#2C2C2E</color>
+    <color name="input_border">#48484A</color>
+    
+    <!-- Text Colors - Dark Mode -->
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#B0B0B0</color>
+    <color name="text_tertiary">#808080</color>
+    
+    <!-- Message Bubble Colors - Light bubbles for dark mode -->
+    <color name="bubble_user">#FFFFFF</color>
+    <color name="bubble_user_text">#1C1C1E</color>
+    <color name="bubble_assistant">#2C2C2E</color>
+    <color name="bubble_assistant_text">#FFFFFF</color>
+    
+    <!-- Status Colors -->
+    <color name="status_success">#66BB6A</color>
+    <color name="status_error">#EF5350</color>
+    <color name="status_warning">#FFD54F</color>
+    <color name="status_info">#42A5F5</color>
+    
+    <!-- Tool/Code Colors -->
+    <color name="tool_background">#2C2C2E</color>
+    <color name="code_background">#1E1E1E</color>
+    <color name="code_text">#D4D4D4</color>
+    
+    <!-- Thinking indicator -->
+    <color name="thinking_cyan">#4DD0E1</color>
+    <color name="thinking_yellow">#FFF176</color>
+</resources>

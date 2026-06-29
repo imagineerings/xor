@@ -1,0 +1,63 @@
+# Android Studio / IntelliJ IDEA
+*.iml
+.idea/
+.gradle/
+local.properties
+
+# Build outputs
+build/
+app/build/
+*/build/
+
+# Signing files
+*.jks
+*.keystore
+keystore.properties
+
+# APK files
+*.apk
+*.aab
+
+# Log files
+*.log
+
+# Native
+*.so
+obj/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Kotlin
+*.kotlin_module
+
+# Gradle
+.gradle/
+gradle-app.setting
+!gradle-wrapper.jar
+!gradle-wrapper.properties
+
+# Android Studio captures
+captures/
+
+# NDK
+.externalNativeBuild/
+.cxx/
+
+# Google Services
+google-services.json
+
+# Proguard
+proguard/
+
+# Misc
+*.hprof
+lint/outputs/
+lint/generated/
+lint/tmp/
