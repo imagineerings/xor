@@ -82,6 +82,7 @@ private fun AppNoticeBanner(
     onAction: (NoticeAction) -> Unit
 ) {
     val backgroundColor = when (notice.type) {
+        NoticeType.CONFIGURATION_SUCCESS -> Color(0xFF4CAF50)
         NoticeType.TUNNEL_DISABLED -> Color(0xFFF44336)  // Red
         NoticeType.TUNNEL_UNREACHABLE -> Color(0xFFFF9800)  // Orange
         NoticeType.APP_NEEDS_UPDATE -> Color(0xFF2196F3)  // Blue
@@ -107,6 +108,7 @@ private fun AppNoticeBanner(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = when (notice.type) {
+                        NoticeType.CONFIGURATION_SUCCESS -> "Configuration Saved"
                         NoticeType.TUNNEL_DISABLED -> "Tunnel Disabled"
                         NoticeType.TUNNEL_UNREACHABLE -> "Tunnel Unreachable"
                         NoticeType.APP_NEEDS_UPDATE -> "Update Available"

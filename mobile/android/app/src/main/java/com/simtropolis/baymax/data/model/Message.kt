@@ -14,16 +14,16 @@ data class Message(
     val metadata: MessageMetadata = MessageMetadata()
 ) {
     val hasNonEmptyTextContent: Boolean
-        get() = content.any { 
+        get() = content.any {
             it is MessageContent.Text && it.text.isNotBlank()
         }
-    
+
     companion object {
         fun user(text: String) = Message(
             role = MessageRole.USER,
             content = listOf(MessageContent.Text(text = text))
         )
-        
+
         fun assistant(text: String) = Message(
             role = MessageRole.ASSISTANT,
             content = listOf(MessageContent.Text(text = text))
@@ -33,9 +33,12 @@ data class Message(
 
 @Serializable
 enum class MessageRole {
-    @SerialName("user") USER,
-    @SerialName("assistant") ASSISTANT,
-    @SerialName("system") SYSTEM
+    @SerialName("user")
+    USER,
+    @SerialName("assistant")
+    ASSISTANT,
+    @SerialName("system")
+    SYSTEM
 }
 
 @Serializable
@@ -53,26 +56,55 @@ sealed class MessageContent {
     data class Text(
         val text: String
     ) : MessageContent()
-    
+
     @Serializable
     @SerialName("toolRequest")
     data class ToolRequest(
         val id: String,
         val toolCall: ToolCall
     ) : MessageContent()
-    
+
     @Serializable
     @SerialName("toolResponse")
     data class ToolResponse(
         val id: String,
         val toolResult: ToolResult
     ) : MessageContent()
-    
+
     @Serializable
     @SerialName("thinking")
     data class Thinking(
         val thinking: String,
         val signature: String
+    ) : MessageContent()
+
+    @Serializable
+    @SerialName("toolConfirmationRequest")
+    data class ToolConfirmationRequest(
+        val id: String,
+        @SerialName("tool_name")
+        val toolName: String = "",
+        val arguments: Map<String, JsonElement> = emptyMap()
+    ) : MessageContent()
+
+    @Serializable
+    @SerialName("summarizationRequested")
+    data class SummarizationRequested(
+        val msg: String = ""
+    ) : MessageContent()
+
+    @Serializable
+    @SerialName("conversationCompacted")
+    data class ConversationCompacted(
+        val msg: String
+    ) : MessageContent()
+
+    @Serializable
+    @SerialName("systemNotification")
+    data class SystemNotification(
+        @SerialName("notification_type")
+        val notificationType: String? = null,
+        val msg: String
     ) : MessageContent()
 }
 

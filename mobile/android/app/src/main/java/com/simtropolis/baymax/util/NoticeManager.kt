@@ -90,6 +90,19 @@ object NoticeManager {
         )
     }
 
+    fun showConfigurationSuccess() {
+        dismissJob?.cancel()
+        _currentNotice.value = AppNotice(
+            type = NoticeType.CONFIGURATION_SUCCESS,
+            message = "Configuration applied successfully.",
+            action = null
+        )
+        dismissJob = scope.launch {
+            delay(3_000)
+            _currentNotice.value = null
+        }
+    }
+
     /** Get the human-readable message for a TunnelType. */
     fun messageForTunnelType(tunnelType: TunnelType): String {
         return when (tunnelType) {

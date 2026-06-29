@@ -18,6 +18,9 @@ data class ChatSession(
 ) {
     val displayName: String
         get() = description.ifEmpty { "Session ${id.take(8)}" }
+
+    val directoryName: String
+        get() = workingDir?.substringAfterLast("/").orEmpty()
 }
 
 @Serializable

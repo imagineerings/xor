@@ -18,10 +18,12 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.simtropolis.baymax.data.model.VoiceMode
+import com.simtropolis.baymax.data.model.VoiceState
 
 @Composable
 fun ChatInputView(
@@ -39,6 +41,7 @@ fun ChatInputView(
     // Voice parameters
     isListening: Boolean = false,
     voiceMode: VoiceMode? = null,
+    voiceState: VoiceState? = null,
     onVoiceToggle: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -133,7 +136,7 @@ fun ChatInputView(
                         // Show voice mode label when active
                         if (isListening && voiceMode != null && voiceMode != VoiceMode.Normal) {
                             Text(
-                                text = when (voiceMode) {
+                                text = voiceState?.stateLabel?.takeIf { it != "Idle" } ?: when (voiceMode) {
                                     VoiceMode.Transcribe -> "Auto"
                                     VoiceMode.Continuous -> "∞"
                                     else -> ""
@@ -154,10 +157,10 @@ fun ChatInputView(
                                 )
                         ) {
                             Icon(
-                                imageVector = if (isListening) Icons.Default.Mic else Icons.Default.MicNone,
+                                painter = painterResource(voiceState?.iconRes ?: if (isListening) android.R.drawable.ic_btn_speak_now else com.simtropolis.baymax.R.drawable.ic_baymax_outline),
                                 contentDescription = if (isListening) "Stop listening" else "Start voice input",
                                 modifier = Modifier.size(20.dp),
-                                tint = if (isListening) MaterialTheme.colorScheme.primary
+                                tint = voiceState?.tintColor ?: if (isListening) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }

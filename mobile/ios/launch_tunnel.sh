@@ -14,9 +14,9 @@ NC='\033[0m' # No Color
 # Configuration
 PREFERRED_PORT=62998
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BAYMAXD_URL="https://github.com/michaelneale/baymax-tunnel/releases/download/test/baymaxd"
+BAYMAXED_URL="https://github.com/michaelneale/baymax-tunnel/releases/download/test/baymaxed"
 TUNNEL_DIR="${HOME}/.baymax-tunnel"
-BAYMAXD_LOCAL_PATH="${TUNNEL_DIR}/baymaxd"
+BAYMAXED_LOCAL_PATH="${TUNNEL_DIR}/baymaxed"
 TUNNEL_REPO="https://github.com/michaelneale/lapstone-tunnel"
 TUNNEL_CLIENT_PATH="${TUNNEL_DIR}/client.js"
 WORKER_URL="https://cloudflare-tunnel-proxy.michael-neale.workers.dev"
@@ -54,30 +54,30 @@ else
     echo -e "${YELLOW}✓ Using available port $PORT (preferred $PREFERRED_PORT was in use)${NC}"
 fi
 
-# Function to download baymaxd binary
+# Function to download baymaxed binary
 download_baymaxd() {
     echo ""
     echo -e "${BOLD}${MAGENTA}╔═══════════════════════════════════════════════════════════════════════╗${NC}"
     echo -e "${BOLD}${MAGENTA}║                                                                       ║${NC}"
-    echo -e "${BOLD}${MAGENTA}║                   🚀  DOWNLOADING BAYMAXD BINARY  🚀                   ║${NC}"
+    echo -e "${BOLD}${MAGENTA}║                   🚀  DOWNLOADING BAYMAXED BINARY  🚀                   ║${NC}"
     echo -e "${BOLD}${MAGENTA}║                                                                       ║${NC}"
     echo -e "${BOLD}${MAGENTA}╚═══════════════════════════════════════════════════════════════════════╝${NC}"
     echo ""
-    echo -e "${BOLD}${CYAN}⬇️  Fetching from: ${BAYMAXD_URL}${NC}"
-    echo -e "${BOLD}${CYAN}📦 Saving to: ${BAYMAXD_LOCAL_PATH}${NC}"
+    echo -e "${BOLD}${CYAN}⬇️  Fetching from: ${BAYMAXED_URL}${NC}"
+    echo -e "${BOLD}${CYAN}📦 Saving to: ${BAYMAXED_LOCAL_PATH}${NC}"
     echo ""
     
     # Ensure tunnel directory exists
     mkdir -p "$TUNNEL_DIR"
     
-    if curl -L -o "$BAYMAXD_LOCAL_PATH" "$BAYMAXD_URL"; then
-        chmod +x "$BAYMAXD_LOCAL_PATH"
+    if curl -L -o "$BAYMAXED_LOCAL_PATH" "$BAYMAXED_URL"; then
+        chmod +x "$BAYMAXED_LOCAL_PATH"
         echo ""
         echo -e "${BOLD}${GREEN}╔═══════════════════════════════════════════════════════════════════════╗${NC}"
         echo -e "${BOLD}${GREEN}║                                                                       ║${NC}"
         echo -e "${BOLD}${GREEN}║                  ✅  DOWNLOAD SUCCESSFUL!  ✅                         ║${NC}"
         echo -e "${BOLD}${GREEN}║                                                                       ║${NC}"
-        echo -e "${BOLD}${GREEN}║              baymaxd binary is now available locally!                  ║${NC}"
+        echo -e "${BOLD}${GREEN}║              baymaxed binary is now available locally!                  ║${NC}"
         echo -e "${BOLD}${GREEN}║                                                                       ║${NC}"
         echo -e "${BOLD}${GREEN}╚═══════════════════════════════════════════════════════════════════════╝${NC}"
         echo ""
@@ -95,39 +95,39 @@ download_baymaxd() {
     fi
 }
 
-# Determine which baymaxd to use
-BAYMAXD_CMD=""
-if command -v baymaxd &> /dev/null; then
+# Determine which baymaxed to use
+BAYMAXED_CMD=""
+if command -v baymaxed &> /dev/null; then
     # Found in PATH
-    BAYMAXD_CMD="baymaxd"
+    BAYMAXED_CMD="baymaxed"
     echo ""
     echo -e "${BOLD}${BLUE}╔═══════════════════════════════════════════════════════════════════════╗${NC}"
     echo -e "${BOLD}${BLUE}║                                                                       ║${NC}"
-    echo -e "${BOLD}${BLUE}║                   📍  USING BAYMAXD FROM PATH  📍                      ║${NC}"
+    echo -e "${BOLD}${BLUE}║                   📍  USING BAYMAXED FROM PATH  📍                      ║${NC}"
     echo -e "${BOLD}${BLUE}║                                                                       ║${NC}"
     echo -e "${BOLD}${BLUE}╚═══════════════════════════════════════════════════════════════════════╝${NC}"
     echo ""
-    echo -e "${BOLD}${CYAN}📂 Location: $(which baymaxd)${NC}"
+    echo -e "${BOLD}${CYAN}📂 Location: $(which baymaxed)${NC}"
     echo ""
-elif [ -f "$BAYMAXD_LOCAL_PATH" ]; then
+elif [ -f "$BAYMAXED_LOCAL_PATH" ]; then
     # Found locally
-    BAYMAXD_CMD="$BAYMAXD_LOCAL_PATH"
+    BAYMAXED_CMD="$BAYMAXED_LOCAL_PATH"
     echo ""
     echo -e "${BOLD}${YELLOW}╔═══════════════════════════════════════════════════════════════════════╗${NC}"
     echo -e "${BOLD}${YELLOW}║                                                                       ║${NC}"
-    echo -e "${BOLD}${YELLOW}║                  📦  USING LOCAL BAYMAXD BINARY  📦                    ║${NC}"
+    echo -e "${BOLD}${YELLOW}║                  📦  USING LOCAL BAYMAXED BINARY  📦                    ║${NC}"
     echo -e "${BOLD}${YELLOW}║                                                                       ║${NC}"
     echo -e "${BOLD}${YELLOW}╚═══════════════════════════════════════════════════════════════════════╝${NC}"
     echo ""
-    echo -e "${BOLD}${CYAN}📂 Location: $BAYMAXD_LOCAL_PATH${NC}"
+    echo -e "${BOLD}${CYAN}📂 Location: $BAYMAXED_LOCAL_PATH${NC}"
     echo ""
 else
     # Not found anywhere - download it
     if download_baymaxd; then
-        BAYMAXD_CMD="$BAYMAXD_LOCAL_PATH"
+        BAYMAXED_CMD="$BAYMAXED_LOCAL_PATH"
     else
-        echo -e "${RED}Error: Failed to download baymaxd${NC}"
-        echo -e "${YELLOW}Please manually download from: ${BAYMAXD_URL}${NC}"
+        echo -e "${RED}Error: Failed to download baymaxed${NC}"
+        echo -e "${YELLOW}Please manually download from: ${BAYMAXED_URL}${NC}"
         echo -e "${YELLOW}Or add baymax/target/release to your PATH${NC}"
         exit 1
     fi
@@ -160,8 +160,8 @@ setup_tunnel_client() {
             echo -e "${YELLOW}$TUNNEL_DIR exists but is not a git repository${NC}"
             echo -e "${YELLOW}Saving existing binary and re-cloning...${NC}"
             # Move the binary if it exists
-            if [ -f "$TUNNEL_DIR/baymaxd" ]; then
-                mv "$TUNNEL_DIR/baymaxd" /tmp/baymaxd.backup
+            if [ -f "$TUNNEL_DIR/baymaxed" ]; then
+                mv "$TUNNEL_DIR/baymaxed" /tmp/baymaxed.backup
             fi
             rm -rf "$TUNNEL_DIR"
         fi
@@ -170,9 +170,9 @@ setup_tunnel_client() {
         if git clone "$TUNNEL_REPO" "$TUNNEL_DIR"; then
             echo -e "${GREEN}✓ Repository cloned successfully${NC}"
             # Restore the binary if we backed it up
-            if [ -f /tmp/baymaxd.backup ]; then
-                mv /tmp/baymaxd.backup "$TUNNEL_DIR/baymaxd"
-                chmod +x "$TUNNEL_DIR/baymaxd"
+            if [ -f /tmp/baymaxed.backup ]; then
+                mv /tmp/baymaxed.backup "$TUNNEL_DIR/baymaxed"
+                chmod +x "$TUNNEL_DIR/baymaxed"
             fi
         else
             echo -e "${RED}Error: Failed to clone tunnel repository${NC}"
@@ -227,9 +227,9 @@ echo ""
 # Cleanup function
 cleanup() {
     echo -e "\n${YELLOW}Shutting down...${NC}"
-    if [ ! -z "$BAYMAXD_PID" ]; then
-        echo "Stopping baymaxd (PID: $BAYMAXD_PID)"
-        kill $BAYMAXD_PID 2>/dev/null || true
+    if [ ! -z "$BAYMAXED_PID" ]; then
+        echo "Stopping baymaxed (PID: $BAYMAXED_PID)"
+        kill $BAYMAXED_PID 2>/dev/null || true
     fi
     if [ ! -z "$TUNNEL_PID" ]; then
         echo "Stopping tunnel client (PID: $TUNNEL_PID)"
@@ -240,22 +240,22 @@ cleanup() {
 
 trap cleanup SIGINT SIGTERM EXIT
 
-# Start baymaxd in the background
-echo -e "${GREEN}Starting baymaxd on port ${PORT}...${NC}"
+# Start baymaxed in the background
+echo -e "${GREEN}Starting baymaxed on port ${PORT}...${NC}"
 export BAYMAX_PORT=$PORT
 export BAYMAX_SERVER__SECRET_KEY="$SECRET"
-$BAYMAXD_CMD agent > /dev/null 2>&1 &
-BAYMAXD_PID=$!
+$BAYMAXED_CMD agent > /dev/null 2>&1 &
+BAYMAXED_PID=$!
 
-# Wait for baymaxd to be ready
-echo "Waiting for baymaxd to start..."
+# Wait for baymaxed to be ready
+echo "Waiting for baymaxed to start..."
 for i in {1..30}; do
     if curl -s "http://localhost:${PORT}/health" > /dev/null 2>&1; then
-        echo -e "${GREEN}✓ Baymaxd is running (PID: $BAYMAXD_PID)${NC}"
+        echo -e "${GREEN}✓ Baymaxed is running (PID: $BAYMAXED_PID)${NC}"
         break
     fi
     if [ $i -eq 30 ]; then
-        echo -e "${RED}Error: baymaxd failed to start${NC}"
+        echo -e "${RED}Error: baymaxed failed to start${NC}"
         exit 1
     fi
     sleep 0.5

@@ -41,7 +41,7 @@ Your app is **production-ready** and can be submitted to the App Store as an **u
 2. **Write App Store text** (30 minutes)
    - App name (30 chars)
    - Subtitle (30 chars) 
-   - Description (explain it connects to baymaxd)
+   - Description (explain it connects to baymaxed)
    - Keywords for search
 
 3. **Fill App Store Connect metadata** (30 minutes)

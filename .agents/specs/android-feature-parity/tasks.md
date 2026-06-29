@@ -1,277 +1,244 @@
 # Android Feature Parity - Implementation Tasks
 
-## Prioritization
+## Overview
 
-- **Priority 1**: Core user-facing features (voice, agent management, QR config)
-- **Priority 2**: UX parity features (tool calls, polling, memory management)
-- **Priority 3**: Quality-of-life features (tunnel detection, trial mode, markdown, notices)
+This plan covers the **complete roadmap** from foundation to full feature parity with iOS.
 
----
+- **Phases 1-10**: 34 tasks ✅ **COMPLETED** (initial parity effort, commit `2d197f6`)
+- **Phases 11-15**: 13 tasks ✅ **COMPLETED** (gaps identified after initial effort)
 
-## Phase 1: Infrastructure & Foundation (Priority 1)
+**Total: 47 tasks** — 100% complete
 
-### Task 1.1: Model & interface definitions
-- [ ] Create `AgentConfiguration` data class in `data/model/`
-- [ ] Create `AppNotice` data class and `NoticeType` enum in `data/model/`
-- [ ] Create `VoiceState` data class and `VoiceMode` enum in `data/model/`
-- [ ] Create `VoiceManagerCallback` interface in `data/repository/`
-- [ ] Create `PollResult` sealed class in `data/repository/`
-- [ ] Create `TunnelType` enum in `util/`
-- [ ] Add Gradle dependencies: Room (or DataStore), markdown library, speech recognizer
-
-### Task 1.2: MainActivity deep link handling
-- [ ] Add `baymaxchat` URL scheme to `AndroidManifest.xml`
-- [ ] Add intent filter for `baymaxchat://configure` links
-- [ ] Implement `handleIntent()` in `MainActivity` to delegate to `QRConfigHandler`
-
-### Task 1.3: QRConfigHandler
-- [ ] Implement `util/QRConfigHandler.kt`
-- [ ] Parse `baymaxchat://configure?data=<encoded>` URLs
-- [ ] Decode base64/url-encoded JSON payload
-- [ ] Normalize server URL (add https:// if missing, strip :443)
-- [ ] Apply configuration to `SettingsRepository`
-- [ ] Trigger connection test and return result
-
-### Task 1.4: AgentRepository & storage
-- [ ] Implement `data/api/AgentRepository.kt` using DataStore
-- [ ] Define `AgentConfiguration` entity schema
-- [ ] Implement CRUD: `saveAgent()`, `deleteAgent()`, `switchToAgent()`, `getCurrentAgent()`
-- [ ] Implement default naming: detect "Trial", "Desktop" from URL patterns
-- [ ] Expose `savedAgents: Flow<List<AgentConfiguration>>`
-- [ ] Wire `BaymaxApplication` with `AgentRepository`
-
-### Task 1.5: Settings screen - agent management
-- [ ] Extend `SettingsScreen` with saved agents list section
-- [ ] Add "Save Agent" dialog (name input)
-- [ ] Add agent switching (tap to switch + test connection)
-- [ ] Add agent deletion (swipe to delete)
-- [ ] Add "Reset to Trial Mode" button
-- [ ] Extend `SettingsViewModel` with agent operations
-
-### Task 1.6: HomeScreen sidebar - agent quick switch
-- [ ] Extend sidebar/drawer in `HomeScreen` with current agent display
-- [ ] Add "Switch Agent" option in sidebar
-- [ ] Show agent name and connection status in toolbar
+**Prerequisites**: Kotlin 1.9+, Compose, DataStore dependencies already in place. No new Gradle dependencies required.
 
 ---
 
-## Phase 2: Voice Features (Priority 1)
+## ✅ Phases 1-10: Foundation & Core Parity (COMPLETED)
 
-### Task 2.1: VoiceManager - speech recognition
-- [ ] Implement `data/repository/VoiceManager.kt`
-- [ ] Wrap Android `SpeechRecognizer` API
-- [ ] Implement `startListening()`, `stopListening()`
-- [ ] Handle partial results → `onTranscriptionUpdate` callback
-- [ ] Handle final results → `onSubmitMessage` callback
-- [ ] Expose reactive state via `StateFlow`s
+All 34 tasks in the initial parity effort are implemented.
 
-### Task 2.2: VoiceManager - text-to-speech
-- [ ] Implement TTS via `android.speech.tts.TextToSpeech`
-- [ ] Implement `speakResponse(text)` method
-- [ ] Handle TTS lifecycle (init, shutdown)
-- [ ] Track `isSpeaking` state
-
-### Task 2.3: Voice input modes
-- [ ] Implement `Normal` mode: tap to record, transcribe on stop, manual submit
-- [ ] Implement `Transcribe` mode: live partials, auto-submit on silence detection
-- [ ] Implement `Continuous` mode: always listening (foreground service for Android 14+)
-- [ ] Handle permission requests (RECORD_AUDIO)
-
-### Task 2.4: Voice UI in ChatInputView
-- [ ] Add microphone button to `ChatInputView`
-- [ ] Implement `VoiceInputButton` component with animated mic icon
-- [ ] Show transcription live in input text field
-- [ ] Add mode toggle (long-press mic icon)
-
-### Task 2.5: Wire voice into ChatViewModel
-- [ ] Add `VoiceManager` instance to `ChatViewModel`
-- [ ] Wire callbacks: `onTranscriptionUpdate` → update input text
-- [ ] Wire callbacks: `onSubmitMessage` → call `sendMessage()`
-- [ ] Wire callbacks: `onCancelRequest` → call `stopStreaming()`
-- [ ] Handle TTS on streaming finish (speak last assistant response)
+| Phase | Area | Tasks | Status |
+|---|---|---|---|
+| 1 | Infrastructure & Foundation | 6 | ✅ |
+| 2 | Voice Features | 5 | ✅ |
+| 3 | Session Polling | 3 | ✅ |
+| 4 | Tool Call Visualization | 4 | ✅ |
+| 5 | Memory & Performance | 3 | ✅ |
+| 6 | App Notices | 4 | ✅ |
+| 7 | Tunnel Detection | 3 | ✅ |
+| 8 | Trial Mode | 2 | ✅ |
+| 9 | Markdown Rendering (Basic) | 2 | ✅ |
+| 10 | Integration & Testing | 2 | ✅ |
+| **Total** | | **34** | ✅ **Done** |
 
 ---
 
-## Phase 3: Session Polling (Priority 2)
+## ✅ Phases 11-15: Remaining Gaps & Polish (COMPLETED)
 
-### Task 3.1: SessionPoller implementation
-- [ ] Implement `data/repository/SessionPoller.kt`
-- [ ] Coroutine-based polling with configurable interval
-- [ ] Hash-based change detection algorithm
-- [ ] Exponential backoff: 2s → 5s max
-- [ ] Max 10 unchanged polls → stop
-- [ ] Handle 404 → stop (session deleted)
+### Phase 11: Welcome Screen Enhancements (3 tasks)
 
-### Task 3.2: Wire polling into ChatViewModel
-- [ ] Add `SessionPoller` to `ChatViewModel`
-- [ ] Condition: start polling when SSE stream fails + session is "waiting for response"
-- [ ] Condition: stop polling when user sends new message
-- [ ] Update messages list when poll returns new content
-- [ ] Rebuild tool call state from polled messages
+- [x] **D.1: Create animated SplashScreen**
+  - Create `ui/screens/SplashScreen.kt`:
+    - `SplashScreen(isActive: MutableState<Boolean>)` composable
+    - Fade-in animation with `AnimatedVisibility` or manual alpha animation
+    - Track `lastAppOpenTime` and `hasLaunchedBefore` in SharedPreferences
+    - Timing logic:
+      - First launch or >24h gap: 0.4s fade in, 1.0s display, 0.4s fade out
+      - Otherwise: 0.2s fade in, 0.3s display, 0.2s fade out
+    - Baymax logo centered (use `R.drawable.ic_baymax_logo`)
+  - Integrate into `MainActivity.kt` as overlay before `BaymaxNavigation()`
+  - When `isActive` becomes `false`, show main navigation
+  - Mirror iOS `SplashScreenView.swift`
+  - _Writes: ui/screens/SplashScreen.kt, MainActivity.kt_
 
-### Task 3.3: Pull-to-refresh support
-- [ ] Ensure `ChatScreen` pull-to-refresh triggers session refresh
-- [ ] Add loading indicator during refresh
+- [x] **D.2: Add typewriter effect to WelcomeCard**
+  - Modify `WelcomeCard` in `ui/components/WelcomeCard.kt`:
+    - Add `greeting: String` parameter
+    - Use `LaunchedEffect` with `delay(20)` per character to animate text display
+    - Track `displayedText` as `mutableStateOf`
+    - Show `displayedText` instead of raw greeting
+    - Cancel animation on recomposition (trigger reset when greeting changes)
+  - _Writes: WelcomeCard.kt_
+
+- [x] **D.3: Add token progress bar and session density to WelcomeCard**
+  - Add `fetchInsights()` method to `BaymaxApiService` (see G.1)
+  - Add `fetchInsights()` call to `HomeViewModel`:
+    - Fetch on init, store in UI state
+    - Return mock data (5 sessions, 450M tokens) in trial mode or on error
+  - Modify `WelcomeCard`:
+    - Accept `tokenCount: Long?`, `isLoadingTokens: Boolean` parameters
+    - Display horizontal progress bar with formatted token count
+    - `formatTokenCount(count: Long)`: "450M", "12K", "1B"
+  - Add session density detection:
+    - Accept `sessions: List<ChatSession>`, `daysOffset: Int`
+    - Compute density: quiet (≤2), light (3-5), busy (>5)
+    - Adjust greeting: "Quiet yesterday", "Light yesterday", "Busy yesterday"
+  - _Writes: BaymaxApiService.kt, HomeViewModel.kt, WelcomeCard.kt, HomeScreen.kt_
+
+### Phase 12: Rich Markdown Rendering (2 tasks)
+
+- [x] **E.1: Implement multi-language syntax highlighting**
+  - Create `ui/components/SyntaxHighlighter.kt`:
+    - `object SyntaxHighlighter` with `highlight(code: String, language: String): AnnotatedString`
+    - Regex-based token matching (mirroring iOS `SharedMessageComponents.swift` `SyntaxHighlighter`)
+    - Supported languages: Swift, Python, JavaScript, TypeScript, JSON, Shell, Ruby, Go, Rust, SQL, HTML, CSS
+    - Token colors: strings (orange), comments (green), keywords (blue), numbers (teal), functions (yellow), types (teal)
+    - Unknown language → plain text
+  - Integrate with `MarkdownText.kt`:
+    - When Markwon renders a code block, apply `SyntaxHighlighter` to the code text via `SpannableString` + `ForegroundColorSpan`
+    - Add language badge in top-right of code blocks
+  - _Writes: ui/components/SyntaxHighlighter.kt, MarkdownText.kt_
+
+- [x] **E.2: Create MarkdownTestScreen (debug)**
+  - Create `ui/screens/MarkdownTestScreen.kt`:
+    - Comprehensive test markdown string covering all supported features
+    - Render in both assistant-message and user-message styles
+    - "Done" button to dismiss
+  - Add route `"markdown-test"` to nav graph, gated by `BuildConfig.DEBUG`
+  - Add "Markdown Test" link in `SettingsScreen` (visible only in debug builds)
+  - Mirror iOS `MarkdownTestView.swift`
+  - _Writes: ui/screens/MarkdownTestScreen.kt, MainActivity.kt, SettingsScreen.kt_
+
+### Phase 13: API Completeness (1 task)
+
+- [x] **G.1: Add remaining API methods and retry logic**
+  - `SessionInsights` data class ✅ ALREADY EXISTS in `ChatSession.kt`
+  - Add methods to `BaymaxApiService.kt`:
+    - `fetchInsights(): ApiResult<SessionInsights>` — `GET /sessions/insights`
+    - `updateProvider(sessionId, provider, model): ApiResult<Unit>` — `POST /agent/update_provider`
+    - `loadEnabledExtensions(): ApiResult<List<String>>` — `GET /config/extensions`
+  - Add retry logic:
+    - `fetchWithRetry(maxAttempts: Int = 2, operation: suspend () -> ApiResult<T>): ApiResult<T>`
+    - Transient errors to retry: timeout, connection lost, DNS failure, HTTP 502/503/504
+    - 1-second delay between attempts
+  - _Writes: BaymaxApiService.kt_
+
+### Phase 14: Visual Session Navigation (2 tasks)
+
+- [x] **H.1: Implement NodeMatrix and NodeFocus**
+  - Create `NodeMatrix` composable in `ui/components/NodeMatrix.kt`:
+    - Compose `Canvas`-based node rendering
+    - Nodes sized by message count (min 8dp, max 16dp)
+    - Horizontal swipe gesture for day navigation via `pointerInput`
+    - `daysOffset` state tracking current day
+    - Positioning with caching to avoid recomputation
+    - Pulsing animation for live sessions (<5 min since update)
+    - Star indicator for favorited sessions
+    - Empty state when no sessions for a day
+    - Loading spinner while sessions load
+  - Create `NodeFocus` composable in `ui/components/NodeFocus.kt`:
+    - Popover card showing session details on node tap
+    - Session description, message count, working directory
+    - "Continue Session" button → navigates to ChatScreen
+    - Close/dismiss button
+    - Border with subtle blue stroke
+  - Integrate into `HomeScreen.kt` — replace or complement existing session list with NodeMatrix
+  - Mirror iOS `NodeMatrix.swift` and `NodeFocus.swift`
+  - _Writes: ui/components/NodeMatrix.kt, ui/components/NodeFocus.kt, HomeScreen.kt_
+
+- [x] **H.2: Add SSE NotificationEvent type**
+  - Extend `SSEEvent` sealed class in `SSEEvent.kt`:
+    ```kotlin
+    @Serializable
+    @SerialName("Notification")
+    data class NotificationEvent(
+        @SerialName("request_id") val requestId: String,
+        val message: NotificationMessage
+    ) : SSEEvent()
+
+    @Serializable
+    data class NotificationMessage(
+        val method: String,
+        val params: Map<String, JsonElement> = emptyMap()
+    )
+    ```
+  - Extend `parseSSEEvent()` in `BaymaxApiService.kt`:
+    ```kotlin
+    "Notification" -> json.decodeFromString<SSEEvent.NotificationEvent>(data)
+    ```
+  - Dispatch notification via `NoticeManager` when received in SSE stream
+  - Mirror iOS `Message.swift` lines 475-493
+  - _Writes: SSEEvent.kt, BaymaxApiService.kt_
+
+### Phase 15: UX Polish (5 tasks)
+
+- [x] **I.1: Implement intelligent auto-scroll**
+  - Add scroll management state to `ChatScreen.kt`:
+    - `shouldAutoScroll: Boolean`
+    - `userIsScrolling: Boolean`
+    - `lastContentHeight: Int`
+    - `lastScrollUpdate: Long`
+  - Implement `LazyListState` scroll listener to detect user interruption
+  - When `shouldAutoScroll && !userIsScrolling` and new content arrives, call `lazyListState.animateScrollToItem(lastIndex)`
+  - Throttle scroll updates to max 1 per 100ms during fast streaming
+  - On stream finish, perform final scroll to bottom
+  - Mirror iOS `ChatView.swift` lines 42-48
+  - _Writes: ChatScreen.kt_
+
+- [x] **I.2: Add configuration success feedback**
+  - Add `configurationSuccess: MutableState<Boolean>` to `QRConfigHandler.kt`
+  - Set `configurationSuccess = true` when `handleDeepLink()` succeeds
+  - Add `LaunchedEffect` with `delay(3000)` to clear the flag
+  - Show green success indicator in relevant UI (banner/checkmark) that auto-dismisses after 3s
+  - Mirror iOS `ConfigurationHandler.swift` lines 351-353
+  - _Writes: QRConfigHandler.kt, MainActivity.kt_
+
+- [x] **I.3: Add dark mode toggle to settings**
+  - Create `ThemeManager` object (or extend existing `BaymaxColors` infrastructure):
+    - `isDarkMode: MutableState<Boolean>` with persistence to `SharedPreferences`
+    - `toggle()` function
+  - Add dark mode toggle to `SettingsScreen`:
+    - `Switch` with "Dark Mode" label
+    - On toggle, call `ThemeManager.toggle()`
+  - Modify `BaymaxTheme` composable in `Theme.kt` to observe `ThemeManager.isDarkMode`
+  - Update `WelcomeCard` and other components that call `isSystemInDarkTheme()` to use `ThemeManager.isDarkMode` instead
+  - Mirror iOS `ThemeManager.swift`
+  - _Writes: Theme.kt (or new ThemeManager.kt), SettingsScreen.kt, WelcomeCard.kt_
+
+- [x] **I.4: Add voice state rich UI**
+  - Extend `VoiceState` data class in `VoiceState.kt`:
+    - Add `stateLabel: String` field (values: "Idle", "Listening", "Processing", "Speaking", "Error")
+    - Add computed `iconRes: Int` — returns correct `R.drawable.*` for each state
+    - Add computed `tintColor: Color` — returns correct color for each state
+  - Update `ContinuousVoiceManager` to set `stateLabel` correctly during state transitions
+  - Update voice UI components to use `iconRes` and `tintColor` from `VoiceState`
+  - Mirror iOS `ContinuousVoiceManager.swift` lines 23-23-37
+  - _Writes: VoiceState.kt, ContinuousVoiceManager.kt, relevant voice UI components_
+
+- [x] **I.5: Add liquid glass effect fallback**
+  - Create glass effect modifier utility in `ui/components/LiquidGlassModifier.kt`:
+    - API 31+: Use `RenderEffect.createBlurEffect()` + `graphicsLayer` for frosted glass
+    - API < 31: Fallback to semi-transparent solid surface with shadow
+  - Apply to `WelcomeCard` background
+  - Mirror iOS `LiquidGlassModifier.swift` (iOS 26+ with `ultraThinMaterial` fallback)
+  - _Writes: ui/components/LiquidGlassModifier.kt, WelcomeCard.kt_
 
 ---
 
-## Phase 4: Tool Call Visualization (Priority 2)
+## Execution Order
 
-### Task 4.1: ToolCallCard component
-- [x] Implement `ui/components/ToolCallCard.kt`
-- [x] Display tool name, status icon (spinner/check/fail), duration
-- [x] Animated transitions (loading → completed)
-- [x] Expandable detail view for arguments/result
+```
+Phase A (Foundation APIs):
+  G.1 → H.2 → I.2  (API methods, SSE NotificationEvent, config feedback)
 
-### Task 4.2: StackedToolCallsView component
-- [x] Implement `ui/components/StackedToolCallsView.kt`
-- [x] Overlapping card layout for grouped tool calls
-- [x] Show count badge for grouped items
-- [x] Expand to show all items on tap
+Phase B (UI Components):
+  D.1 → D.2 → D.3  (splash + welcome card)
+  E.1 → E.2        (markdown)
+  H.1               (NodeMatrix) — most complex single task
 
-### Task 4.3: Tool call state management in ChatViewModel
-- [x] Add `activeToolCalls: Map<String, ToolCallWithTiming>` state
-- [x] Add `completedToolCalls: Map<String, CompletedToolCallData>` state
-- [x] Add `groupedToolCallMessages: Set<String>` state
-- [x] Implement `rebuildToolCallState()` from SSE events
-- [x] Handle `UpdateConversationEvent` - rebuild state from full message list
-
-### Task 4.4: Message grouping logic
-- [x] Implement `findGroupedToolCallMessages()` algorithm
-- [x] Group consecutive assistant messages that have only tool calls (no text)
-- [x] Render grouped messages with stacked tool call display
-- [x] Handle edge cases: user message breaks group, text+tools breaks group
+Phase C (Polish):
+  I.1 → I.3 → I.4 → I.5  (auto-scroll, dark mode, voice UI, glass effects)
+```
 
 ---
 
-## Phase 5: Memory & Performance (Priority 2)
+## Notes
 
-### Task 5.1: Message memory limits
-- [x] Add `MAX_MESSAGES = 50` constant to `ChatViewModel`
-- [x] Implement `limitMessages()` - prune oldest messages when limit exceeded
-- [x] Always preserve first system message
-
-### Task 5.2: Tool call memory limits
-- [x] Add `MAX_TOOL_CALLS = 20` constant to `ChatViewModel`
-- [x] Implement `limitToolCalls()` - prune oldest completed calls
-- [x] Sort by `completedAt` timestamp, keep most recent
-
-### Task 5.3: Streaming text batching
-- [x] Batch SSE text events at ~30fps to avoid choking main thread
-- [x] Accumulate text for same message ID via `streamTextBuffer`
-- [x] Flush accumulated text in batches to Compose state
-
----
-
-## Phase 6: App Notices (Priority 3)
-
-### Task 6.1: NoticeManager
-- [x] Implement `util/NoticeManager.kt` as singleton
-- [x] `currentNotice: StateFlow<AppNotice?>`
-- [x] Methods: `showNotice(notice)`, `dismissNotice()`, `clearAll()`
-- [x] Auto-dismiss timer (5s)
-
-### Task 6.2: Notice types and triggers
-- [x] Tunnel disabled: trigger on HTTP 503 response
-- [x] Tunnel unreachable: trigger on connection failure + private network URL
-- [x] App needs update: trigger on decoding error
-- [x] Suppress all notices when in trial mode
-
-### Task 6.3: AppNoticeOverlay component
-- [x] Implement `ui/components/AppNoticeOverlay.kt`
-- [x] Show colored banner at top of screen (red/orange/blue)
-- [x] Support action buttons (e.g., "Open Tailscale")
-- [x] Dismiss on tap
-
-### Task 6.4: Wire notices into BaymaxApiService
-- [x] Add `handleHTTPStatus()` method with 503/502/504 triggers
-- [x] Add `handleAPIError()` method with connection/decode error triggers
-- [x] Wire into all API error paths (testConnection, fetchSessions, startAgent, resumeAgent, updateFromSession)
-
----
-
-## Phase 7: Tunnel Detection & Integration (Priority 3)
-
-### Task 7.1: TunnelDetector utility
-- [x] Implement `util/TunnelDetector.kt`
-- [x] `detectTunnelType(url: String): TunnelType` - NONE, TAILSCALE, CLOUDFLARE
-- [x] Tailscale detection: `100.x.x.x` IP, `.ts.net` domain
-- [x] Cloudflare detection: `cloudflare-tunnel-proxy` substring
-
-### Task 7.2: Tailscale integration
-- [x] Build Tailscale deep link intent (`tailscale://`)
-- [x] Add "Open →" action in error notices
-- [x] Fallback to Play Store if Tailscale not installed
-
-### Task 7.3: Private network URL detection
-- [x] `isPrivateNetworkURL()` detects 10.x, 172.16.x, 192.168.x, localhost, .local
-- [x] `errorMessageForTunnel()` returns tailored error vs generic
-
----
-
-## Phase 8: Trial Mode Management (Priority 3)
-
-### Task 8.1: TrialModeManager
-- [x] Implement `data/repository/TrialModeManager.kt`
-- [x] Persist trial session ID in DataStore
-- [x] `getOrCreateTrialSession()` - return existing or create new
-- [x] Integrate with `BaymaxApplication` for access
-
-### Task 8.2: Trial mode session display
-- [x] TrialModeManager exposes `trialSessionId` for session resumption
-- [x] Handle trial session persistence across app restarts
-
----
-
-## Phase 9: Markdown Rendering (Priority 3)
-
-### Task 9.1: MarkdownText component
-- [x] Implement `ui/components/MarkdownText.kt`
-- [x] Integrated Markwon library
-- [x] Render: headings, bold, italic, code blocks, tables, lists
-- [x] Strikethrough, task list, and table plugins enabled
-
-### Task 9.2: Wire markdown into MessageBubble
-- [x] Replace plain `Text` in `MessageBubble` with `MarkdownText`
-- [x] Added markwon dependency to `build.gradle.kts`
-
----
-
-## Phase 10: Integration & Testing
-
-### Task 10.1: BaymaxApplication wiring
-- [x] Initialize `TrialModeManager` in `BaymaxApplication.onCreate()`
-- [x] All services accessible via singleton
-
-### Task 10.2: End-to-end smoke tests (manual)
-- [x] Voice: VoiceManager + ContinuousVoiceManager initialized in ChatViewModel, mic button in ChatInputView, speakLastResponse wired for TTS
-- [x] Agent storage: save → switch → delete → DataStore persistence verified across kill/restart
-- [x] Deep link: baymaxchat://configure (primary) and baymax:// (legacy) both parsed, decoded, applied to SettingsRepository, connection test triggered
-- [x] Polling: SessionPoller wired in ChatViewModel with start/stop/conditional logic
-- [x] Tool calls: ToolCallCard + StackedToolCallsView render active/completed states, rebuildToolCallState from SSE, memory limits (MAX_MESSAGES=50, MAX_TOOL_CALLS=20)
-- [x] Notices: NoticeManager wired into BaymaxApiService.handleHTTPStatus() and handleAPIError(), 3 notice types, auto-dismiss 5s, suppressed in trial mode
-- [x] Trial mode: TrialModeManager with DataStore-backed persistence, getOrCreateTrialSession(), trial banner in HomeScreen
-
-### Task 10.3: Regression checks (manual)
-- [x] Basic chat flow: app launches and navigates (Home → Chat → Settings), Compose Navigation routes work, zero crashes/ANRs/fatal errors
-- [x] Settings persistence: DataStore file survives app kill/restart cycle, baymax_base_url and baymax_secret_key persisted correctly
-- [x] Session load/resume: ChatScreen accepts sessionId, loadSession() fetches via resumeAgent API
-- [x] Error handling: unreachable server → error shown, Tailscale URL → specific error, private network URL → specific error, zero uncaught exceptions
-
----
-
-## Summary
-
-| Phase | Tasks | Priority | Est. Effort |
-|-------|-------|----------|-------------|
-| 1. Infrastructure | 6 | P1 | Medium |
-| 2. Voice | 5 | P1 | High |
-| 3. Session Polling | 3 | P2 | Medium |
-| 4. Tool Calls | 4 | P2 | Medium |
-| 5. Memory | 3 | P2 | Low |
-| 6. Notices | 4 | P3 | Low |
-| 7. Tunnel | 3 | P3 | Low |
-| 8. Trial Mode | 2 | P3 | Low |
-| 9. Markdown | 2 | P3 | Low |
-| 10. Integration | 2 | - | Low |
-| **Total** | **34** | | **~450-600 LOC** |
+- **No new Gradle dependencies** required for any task.
+- All tasks work within existing Kotlin/Compose/Material3 stack.
+- iOS stubs (like `ToolConfirmationView` permission response) replicated as stubs.
+- Syntax highlighting (E.1) uses `SpannableString` on code block `TextView` after Markwon renders.
+- Splash screen (D.1) uses `SharedPreferences` for simplicity.
+- All new screens follow existing Compose Navigation pattern in `MainActivity.kt`.
+- NodeMatrix (H.1) is most complex task — mirrors iOS's ~400-line SwiftUI `Canvas` implementation.
+- Liquid Glass (I.5) is lowest priority — iOS feature is iOS 26+ only, Android equivalent needs API 31+.

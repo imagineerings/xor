@@ -1,4 +1,4 @@
-This is a swift app - which is a client to the baymaxd service (scripts here are just for helpers to launch it in dev time)
+This is a swift app - which is a client to the baymaxed service (scripts here are just for helpers to launch it in dev time)
 
 validating changes when needed, can do things like this (or be smarter) with iphone 17:
 ```sh

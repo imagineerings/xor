@@ -18,7 +18,7 @@ class BaymaxAPIService: ObservableObject {
 
     // Trial mode detection
     var isTrialMode: Bool {
-        return baseURL.contains("demo-baymaxd.fly.dev")
+        return baseURL.contains("demo-baymaxed.fly.dev")
     }
     
     // Private network detection (tailscale, private IPs)
@@ -262,7 +262,7 @@ class BaymaxAPIService: ObservableObject {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.setValue(self.secretKey, forHTTPHeaderField: "X-Secret-Key")
 
-            // For remote baymaxd: use "." (current directory where baymaxd is running)
+            // For remote baymaxed: use "." (current directory where baymaxed is running)
             // This matches CLI behavior which uses std::env::current_dir()
             let effectiveWorkingDir = workingDir ?? "."
             

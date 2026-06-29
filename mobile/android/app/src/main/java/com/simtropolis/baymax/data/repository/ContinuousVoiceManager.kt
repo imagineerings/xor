@@ -34,14 +34,14 @@ class ContinuousVoiceManager(private val context: Context) {
     init {
         voiceManager.callback = object : VoiceManagerCallback {
             override fun onTranscriptionUpdate(partial: String) {
-                _state.value = _state.value.copy(transcription = partial)
+                _state.value = _state.value.copy(transcription = partial, stateLabel = "Listening")
                 callback?.onTranscriptionUpdate(partial)
             }
 
             override fun onSubmitMessage(text: String) {
                 if (text.isNotBlank()) {
                     isProcessing = true
-                    _state.value = _state.value.copy(transcription = text)
+                    _state.value = _state.value.copy(transcription = text, stateLabel = "Processing")
                     callback?.onSubmitMessage(text)
                 }
             }
@@ -58,7 +58,7 @@ class ContinuousVoiceManager(private val context: Context) {
         isProcessing = false
         voiceManager.mode = VoiceMode.Continuous
         voiceManager.startListening()
-        _state.value = _state.value.copy(isListening = true)
+        _state.value = _state.value.copy(isListening = true, stateLabel = "Listening")
     }
 
     /** Stop continuous voice mode. */
@@ -67,23 +67,23 @@ class ContinuousVoiceManager(private val context: Context) {
         isProcessing = false
         voiceManager.stopListening()
         voiceManager.stopSpeaking()
-        _state.value = _state.value.copy(isListening = false, isSpeaking = false, transcription = "")
+        _state.value = _state.value.copy(isListening = false, isSpeaking = false, transcription = "", stateLabel = "Idle")
     }
 
     /** Speak a response, then resume listening. */
     fun speakResponse(text: String) {
-        _state.value = _state.value.copy(isSpeaking = true)
+        _state.value = _state.value.copy(isSpeaking = true, isListening = false, stateLabel = "Speaking")
 
         voiceManager.speakResponse(text)
 
         // After TTS finishes, resume listening
         scope.launch {
             delay(estimateSpeechDuration(text))
-            _state.value = _state.value.copy(isSpeaking = false)
+            _state.value = _state.value.copy(isSpeaking = false, stateLabel = "Idle")
 
             if (isVoiceMode && !isProcessing) {
                 voiceManager.startListening()
-                _state.value = _state.value.copy(isListening = true)
+                _state.value = _state.value.copy(isListening = true, stateLabel = "Listening")
             }
         }
     }
@@ -91,13 +91,13 @@ class ContinuousVoiceManager(private val context: Context) {
     /** Handle user interaction (tap) — stops speech and resumes listening. */
     fun handleUserInteraction() {
         voiceManager.stopSpeaking()
-        _state.value = _state.value.copy(isSpeaking = false)
+        _state.value = _state.value.copy(isSpeaking = false, stateLabel = "Idle")
 
         if (isVoiceMode) {
             isProcessing = false
             voiceManager.cancelListening()
             voiceManager.startListening()
-            _state.value = _state.value.copy(isListening = true)
+            _state.value = _state.value.copy(isListening = true, stateLabel = "Listening")
         }
     }
 
@@ -106,7 +106,7 @@ class ContinuousVoiceManager(private val context: Context) {
         isProcessing = false
         if (isVoiceMode) {
             voiceManager.startListening()
-            _state.value = _state.value.copy(isListening = true)
+            _state.value = _state.value.copy(isListening = true, stateLabel = "Listening")
         }
     }
 

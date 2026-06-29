@@ -1368,7 +1368,7 @@ struct ChatView: View {
     }
 }
 
-// MARK: - Chat Session Model (matches baymaxd API)
+// MARK: - Chat Session Model (matches baymaxed API)
 struct ChatSession: Identifiable, Codable, Equatable {
     let id: String
     let description: String

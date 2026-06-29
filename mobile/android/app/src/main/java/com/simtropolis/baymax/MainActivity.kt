@@ -1,16 +1,20 @@
 package com.simtropolis.baymax
 
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavType
@@ -20,9 +24,17 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.simtropolis.baymax.ui.screens.ChatScreen
 import com.simtropolis.baymax.ui.screens.HomeScreen
+import com.simtropolis.baymax.ui.screens.MarkdownTestScreen
 import com.simtropolis.baymax.ui.screens.SettingsScreen
+import com.simtropolis.baymax.ui.screens.SplashScreen
+import com.simtropolis.baymax.ui.screens.TaskDetailScreen
+import com.simtropolis.baymax.ui.screens.TaskOutputDetailScreen
+import com.simtropolis.baymax.ui.screens.ToolCallDetailScreen
+import com.simtropolis.baymax.ui.screens.TrialModeInstructionsScreen
 import com.simtropolis.baymax.ui.theme.BaymaxTheme
+import com.simtropolis.baymax.ui.components.AppNoticeOverlay
 import com.simtropolis.baymax.util.QRConfigHandler
+import kotlinx.coroutines.delay
 import java.net.URLDecoder
 import java.net.URLEncoder
 
@@ -41,7 +53,23 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    BaymaxNavigation()
+                    val splashActive = remember { mutableStateOf(true) }
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        if (!splashActive.value) {
+                            BaymaxNavigation()
+                        }
+                        AppNoticeOverlay()
+                        if (splashActive.value) {
+                            SplashScreen(splashActive)
+                        }
+                    }
+
+                    LaunchedEffect(QRConfigHandler.configurationSuccess.value) {
+                        if (QRConfigHandler.configurationSuccess.value) {
+                            delay(3_000)
+                            QRConfigHandler.configurationSuccess.value = false
+                        }
+                    }
                 }
             }
         }
@@ -112,6 +140,9 @@ fun BaymaxNavigation() {
                 },
                 onNavigateToSettings = {
                     navController.navigate("settings")
+                },
+                onNavigateToTrialInstructions = {
+                    navController.navigate("trial-instructions")
                 }
             )
         }
@@ -148,8 +179,62 @@ fun BaymaxNavigation() {
             SettingsScreen(
                 onNavigateBack = {
                     navController.popBackStack()
+                },
+                onNavigateToMarkdownTest = {
+                    if (isDebugBuild()) {
+                        navController.navigate("markdown-test")
+                    }
+                }
+            )
+        }
+
+        if (isDebugBuild()) {
+            composable("markdown-test") {
+                MarkdownTestScreen(onDismiss = { navController.popBackStack() })
+            }
+        }
+
+        composable("trial-instructions") {
+            TrialModeInstructionsScreen(
+                onDismiss = {
+                    navController.popBackStack()
+                },
+                onNavigateToSettings = {
+                    navController.popBackStack()
+                    navController.navigate("settings")
+                }
+            )
+        }
+
+        composable("tool-call-detail") {
+            ToolCallDetailScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable("task-detail") {
+            TaskDetailScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onNavigateToTaskOutput = {
+                    navController.navigate("task-output-detail")
+                }
+            )
+        }
+
+        composable("task-output-detail") {
+            TaskOutputDetailScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
                 }
             )
         }
     }
+}
+
+private fun isDebugBuild(): Boolean {
+    return BaymaxApplication.instance.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
 }

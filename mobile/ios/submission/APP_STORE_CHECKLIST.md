@@ -49,7 +49,7 @@ This checklist covers everything needed to move from TestFlight to an unlisted A
 
 - [ ] **Description** (4000 chars max)
   - Explain what Baymax does
-  - Mention it connects to baymaxd server
+  - Mention it connects to baymaxed server
   - Highlight key features (voice input, markdown, tool calls)
   - Note: Can be updated anytime without new build
 
@@ -103,15 +103,15 @@ You need screenshots for at least one device size:
   - For unlisted app, reviewers need to test it
   - Options:
     1. Provide trial mode credentials (already works)
-    2. Provide test baymaxd server URL + secret
+    2. Provide test baymaxed server URL + secret
     3. Explain app requires personal server setup
   
 - [ ] **Notes for Reviewer**
   ```
   Example:
-  "Baymax is a client app that connects to a self-hosted baymaxd server.
+  "Baymax is a client app that connects to a self-hosted baymaxed server.
   The app includes a trial mode that connects to our demo server at
-  https://demo-baymaxd.fly.dev with limited functionality for testing purposes.
+  https://demo-baymaxed.fly.dev with limited functionality for testing purposes.
   
   To test:
   1. Launch app (defaults to trial mode)
@@ -119,7 +119,7 @@ You need screenshots for at least one device size:
   3. Ask questions or give tasks
   4. Try voice input (microphone icon)
   
-  The app is designed for developers who run their own baymaxd instance,
+  The app is designed for developers who run their own baymaxed instance,
   typically accessed via Tailscale or Cloudflare tunnel."
   ```
 
@@ -192,12 +192,12 @@ You need screenshots for at least one device size:
    - ✅ No analytics SDKs
    - ✅ No advertising
    - ✅ Data stays on user's server
-   - ✅ Only connects to user-specified baymaxd instance
+   - ✅ Only connects to user-specified baymaxed instance
 
 8. **Third-Party Content**
-   - App generates AI responses via baymaxd
+   - App generates AI responses via baymaxed
    - Apple may ask: How do you handle inappropriate content?
-   - Answer: "Content moderation is handled by the underlying LLM provider and baymaxd server configuration"
+   - Answer: "Content moderation is handled by the underlying LLM provider and baymaxed server configuration"
 
 ---
 
@@ -325,12 +325,12 @@ If you want to submit ASAP with minimum effort:
 2. **Write Descriptions** (30 min)
    - App name: "Baymax"
    - Subtitle: "AI Assistant Client"
-   - Description: 2-3 paragraphs explaining it's a client for baymaxd
+   - Description: 2-3 paragraphs explaining it's a client for baymaxed
    - Keywords: "AI,assistant,developer,chat"
 
 3. **Review Notes** (10 min)
    - Explain trial mode works for testing
-   - Provide demo-baymaxd.fly.dev info
+   - Provide demo-baymaxed.fly.dev info
 
 4. **Privacy** (5 min)
    - No data collection
@@ -361,7 +361,7 @@ If you want to submit ASAP with minimum effort:
 ### 3. Confusing Description
 - **Issue**: Reviewers don't understand purpose
 - **Solution**: Clear, simple description
-- **Action**: Explain it's a client app for baymaxd server
+- **Action**: Explain it's a client app for baymaxed server
 
 ### 4. Privacy Policy (if collecting data)
 - **Issue**: Required if you collect/transmit data

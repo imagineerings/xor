@@ -11,8 +11,8 @@ NC='\033[0m' # No Color
 # Configuration
 PREFERRED_PORT=62997
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BAYMAXD_URL="https://github.com/michaelneale/baymax-tunnel/releases/download/test/baymaxd"
-BAYMAXD_LOCAL_PATH="${SCRIPT_DIR}/baymaxd"
+BAYMAXED_URL="https://github.com/michaelneale/baymax-tunnel/releases/download/test/baymaxed"
+BAYMAXED_LOCAL_PATH="${SCRIPT_DIR}/baymaxed"
 
 # Function to find an available port starting from the preferred port
 find_available_port() {
@@ -47,38 +47,38 @@ else
     echo -e "${YELLOW}✓ Using available port $PORT (preferred $PREFERRED_PORT was in use)${NC}"
 fi
 
-# Function to download baymaxd binary
+# Function to download baymaxed binary
 download_baymaxd() {
-    echo -e "${YELLOW}Downloading baymaxd binary...${NC}"
-    if curl -L -o "$BAYMAXD_LOCAL_PATH" "$BAYMAXD_URL"; then
-        chmod +x "$BAYMAXD_LOCAL_PATH"
-        echo -e "${GREEN}✓ Downloaded baymaxd to: $BAYMAXD_LOCAL_PATH${NC}"
+    echo -e "${YELLOW}Downloading baymaxed binary...${NC}"
+    if curl -L -o "$BAYMAXED_LOCAL_PATH" "$BAYMAXED_URL"; then
+        chmod +x "$BAYMAXED_LOCAL_PATH"
+        echo -e "${GREEN}✓ Downloaded baymaxed to: $BAYMAXED_LOCAL_PATH${NC}"
         return 0
     else
-        echo -e "${RED}Error: Failed to download baymaxd${NC}"
+        echo -e "${RED}Error: Failed to download baymaxed${NC}"
         return 1
     fi
 }
 
 # Parse command line arguments
-BAYMAXD_PATH=""
+BAYMAXED_PATH=""
 if [ $# -gt 0 ]; then
     # Path provided as argument
-    BAYMAXD_PATH="$1"
-    if [ ! -f "$BAYMAXD_PATH" ]; then
-        echo -e "${RED}Error: baymaxd not found at: $BAYMAXD_PATH${NC}"
+    BAYMAXED_PATH="$1"
+    if [ ! -f "$BAYMAXED_PATH" ]; then
+        echo -e "${RED}Error: baymaxed not found at: $BAYMAXED_PATH${NC}"
         exit 1
     fi
-    echo -e "${GREEN}Using baymaxd from: $BAYMAXD_PATH${NC}"
+    echo -e "${GREEN}Using baymaxed from: $BAYMAXED_PATH${NC}"
 else
     # No argument provided, check if we have a local copy
-    if [ -f "$BAYMAXD_LOCAL_PATH" ]; then
-        echo -e "${GREEN}Using local baymaxd from: $BAYMAXD_LOCAL_PATH${NC}"
-        BAYMAXD_PATH="$BAYMAXD_LOCAL_PATH"
+    if [ -f "$BAYMAXED_LOCAL_PATH" ]; then
+        echo -e "${GREEN}Using local baymaxed from: $BAYMAXED_LOCAL_PATH${NC}"
+        BAYMAXED_PATH="$BAYMAXED_LOCAL_PATH"
     else
-        # Download baymaxd automatically
+        # Download baymaxed automatically
         if download_baymaxd; then
-            BAYMAXD_PATH="$BAYMAXD_LOCAL_PATH"
+            BAYMAXED_PATH="$BAYMAXED_LOCAL_PATH"
         else
             exit 1
         fi
@@ -92,21 +92,21 @@ echo -e "${BLUE}║                   Baymax Tailscale Remote Access            
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
-# Check if baymaxd is available (either from provided path or PATH)
-if [ -n "$BAYMAXD_PATH" ]; then
+# Check if baymaxed is available (either from provided path or PATH)
+if [ -n "$BAYMAXED_PATH" ]; then
     # Use the provided path
-    if [ ! -f "$BAYMAXD_PATH" ]; then
-        echo -e "${RED}Error: baymaxd not found at: $BAYMAXD_PATH${NC}"
+    if [ ! -f "$BAYMAXED_PATH" ]; then
+        echo -e "${RED}Error: baymaxed not found at: $BAYMAXED_PATH${NC}"
         exit 1
     fi
-    BAYMAXD_CMD="$BAYMAXD_PATH"
-elif command -v baymaxd &> /dev/null; then
-    # Use baymaxd from PATH
-    BAYMAXD_CMD="baymaxd"
+    BAYMAXED_CMD="$BAYMAXED_PATH"
+elif command -v baymaxed &> /dev/null; then
+    # Use baymaxed from PATH
+    BAYMAXED_CMD="baymaxed"
 else
-    echo -e "${RED}Error: baymaxd not found${NC}"
+    echo -e "${RED}Error: baymaxed not found${NC}"
     echo -e "${YELLOW}Either:${NC}"
-    echo -e "${YELLOW}  1. Provide path to baymaxd as first argument${NC}"
+    echo -e "${YELLOW}  1. Provide path to baymaxed as first argument${NC}"
     echo -e "${YELLOW}  2. Add baymax/target/release to your PATH${NC}"
     echo -e "${YELLOW}Example: export PATH=\$PATH:${SCRIPT_DIR}/../baymax/target/release${NC}"
     exit 1
@@ -151,9 +151,9 @@ fi
 # Cleanup function
 cleanup() {
     echo -e "\n${YELLOW}Shutting down...${NC}"
-    if [ ! -z "$BAYMAXD_PID" ]; then
-        echo "Stopping baymaxd (PID: $BAYMAXD_PID)"
-        kill $BAYMAXD_PID 2>/dev/null || true
+    if [ ! -z "$BAYMAXED_PID" ]; then
+        echo "Stopping baymaxed (PID: $BAYMAXED_PID)"
+        kill $BAYMAXED_PID 2>/dev/null || true
     fi
     if [ ! -z "$TAILSCALE_SERVE_PID" ]; then
         echo "Stopping Tailscale serve (PID: $TAILSCALE_SERVE_PID)"
@@ -166,22 +166,22 @@ cleanup() {
 
 trap cleanup SIGINT SIGTERM EXIT
 
-# Start baymaxd in the background
-echo -e "${GREEN}Starting baymaxd on port ${PORT}...${NC}"
+# Start baymaxed in the background
+echo -e "${GREEN}Starting baymaxed on port ${PORT}...${NC}"
 export BAYMAX_PORT=$PORT
 export BAYMAX_SERVER__SECRET_KEY="$SECRET"
-$BAYMAXD_CMD agent > /dev/null 2>&1 &
-BAYMAXD_PID=$!
+$BAYMAXED_CMD agent > /dev/null 2>&1 &
+BAYMAXED_PID=$!
 
-# Wait for baymaxd to be ready
-echo "Waiting for baymaxd to start..."
+# Wait for baymaxed to be ready
+echo "Waiting for baymaxed to start..."
 for i in {1..30}; do
     if curl -s "http://localhost:${PORT}/health" > /dev/null 2>&1; then
-        echo -e "${GREEN}✓ Baymaxd is running (PID: $BAYMAXD_PID)${NC}"
+        echo -e "${GREEN}✓ Baymaxed is running (PID: $BAYMAXED_PID)${NC}"
         break
     fi
     if [ $i -eq 30 ]; then
-        echo -e "${RED}Error: baymaxd failed to start${NC}"
+        echo -e "${RED}Error: baymaxed failed to start${NC}"
         exit 1
     fi
     sleep 0.5
@@ -247,7 +247,7 @@ HOST=$(tailscale --socket $TS_SOCK status --json | jq -r '.Self.DNSName' | sed '
 V4=$(tailscale --socket "$TS_SOCK" ip -4 2>/dev/null | head -n1)
 V6=$(tailscale --socket "$TS_SOCK" ip -6 2>/dev/null | head -n1)
 
-# Setup Tailscale serve to map port 80 to our local baymaxd
+# Setup Tailscale serve to map port 80 to our local baymaxed
 echo -e "${GREEN}Setting up Tailscale serve (port 80 → localhost:${PORT})...${NC}"
 tailscale --socket "$TS_SOCK" serve reset >/dev/null 2>&1 || true
 tailscale --socket "$TS_SOCK" serve --tcp=80 127.0.0.1:$PORT >/dev/null &

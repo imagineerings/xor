@@ -1,6 +1,7 @@
 package com.simtropolis.baymax.ui.components
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -21,16 +22,17 @@ import com.simtropolis.baymax.data.model.ToolResult
 /** A single tool call state — either loading or completed. */
 sealed class ToolCallState {
     abstract val id: String
+    abstract val toolCall: ToolCall
 
     data class Active(
         override val id: String,
-        val toolCall: ToolCall,
+        override val toolCall: ToolCall,
         val startTime: Long = System.currentTimeMillis()
     ) : ToolCallState()
 
     data class Completed(
         override val id: String,
-        val toolCall: ToolCall,
+        override val toolCall: ToolCall,
         val result: ToolResult,
         val durationMs: Long,
         val completedAt: Long = System.currentTimeMillis()
@@ -55,6 +57,7 @@ data class CompletedToolCallData(
 @Composable
 fun ToolCallCard(
     toolCallState: ToolCallState,
+    onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val name: String
@@ -81,7 +84,9 @@ fun ToolCallCard(
     }
 
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
         tonalElevation = 1.dp

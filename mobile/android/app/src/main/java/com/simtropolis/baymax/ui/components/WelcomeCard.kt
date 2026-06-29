@@ -2,7 +2,6 @@ package com.simtropolis.baymax.ui.components
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -12,7 +11,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
@@ -20,17 +18,24 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.simtropolis.baymax.R
+import com.simtropolis.baymax.data.model.ChatSession
+import com.simtropolis.baymax.data.repository.ThemeManager
+import kotlinx.coroutines.delay
 import java.util.Calendar
 
 @Composable
 fun WelcomeCard(
     onMenuClick: () -> Unit,
+    greeting: String? = null,
+    tokenCount: Long? = null,
+    isLoadingTokens: Boolean = false,
+    sessions: List<ChatSession> = emptyList(),
+    daysOffset: Int = 0,
     modifier: Modifier = Modifier
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = ThemeManager.isDarkMode.value
     
-    // Time-based greeting like iOS
-    val greeting = remember {
+    val baseGreeting = greeting ?: remember {
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         when {
             hour < 12 -> "Good morning!"
@@ -39,21 +44,35 @@ fun WelcomeCard(
             else -> "Good night!"
         }
     }
+    val densityGreeting = remember(sessions, daysOffset, baseGreeting) {
+        if (daysOffset == 0) {
+            baseGreeting
+        } else {
+            val dayLabel = if (daysOffset == 1) "yesterday" else "$daysOffset days ago"
+            when (sessions.size) {
+                in 0..2 -> "Quiet $dayLabel"
+                in 3..5 -> "Light $dayLabel"
+                else -> "Busy $dayLabel"
+            }
+        }
+    }
+    var displayedText by remember(densityGreeting) { mutableStateOf("") }
+
+    LaunchedEffect(densityGreeting) {
+        displayedText = ""
+        for (index in densityGreeting.indices) {
+            displayedText = densityGreeting.substring(0, index + 1)
+            delay(20)
+        }
+    }
     
-    // Card background matching iOS systemBackground
     val cardBackground = if (isDark) Color(0xFF1C1C1E) else Color.White
     
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .shadow(
-                elevation = 16.dp,
-                shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp),
-                ambientColor = Color.Black.copy(alpha = if (isDark) 0.3f else 0.12f),
-                spotColor = Color.Black.copy(alpha = if (isDark) 0.3f else 0.12f)
-            )
             .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
-            .background(cardBackground)
+            .liquidGlassBackground(cardBackground)
             .padding(top = 48.dp, bottom = 32.dp)
     ) {
         Column(
@@ -91,7 +110,7 @@ fun WelcomeCard(
                 ) {
                     // Main greeting - 32px semibold like iOS
                     Text(
-                        text = greeting,
+                        text = displayedText,
                         fontSize = 32.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -106,6 +125,13 @@ fun WelcomeCard(
                         fontWeight = FontWeight.Normal,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    TokenProgress(
+                        tokenCount = tokenCount,
+                        isLoading = isLoadingTokens
+                    )
                 }
                 
                 Spacer(modifier = Modifier.width(16.dp))
@@ -119,5 +145,53 @@ fun WelcomeCard(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun TokenProgress(
+    tokenCount: Long?,
+    isLoading: Boolean
+) {
+    val count = tokenCount ?: 0L
+    val progress = (count.toFloat() / 1_000_000_000f).coerceIn(0f, 1f)
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Tokens",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = if (isLoading) "Loading" else formatTokenCount(count),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        LinearProgressIndicator(
+            progress = if (isLoading) 0f else progress,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp)),
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    }
+}
+
+fun formatTokenCount(count: Long): String {
+    return when {
+        count >= 1_000_000_000 -> "${count / 1_000_000_000}B"
+        count >= 1_000_000 -> "${count / 1_000_000}M"
+        count >= 1_000 -> "${count / 1_000}K"
+        else -> count.toString()
     }
 }

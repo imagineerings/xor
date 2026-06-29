@@ -21,8 +21,8 @@ struct AgentConfiguration: Identifiable, Codable, Equatable {
     static func defaultName(for url: String) -> String? {
         let lowercaseURL = url.lowercased()
         
-        // Check for demo-baymaxd pattern
-        if lowercaseURL.contains("demo-baymaxd") {
+        // Check for demo-baymaxed pattern
+        if lowercaseURL.contains("demo-baymaxed") {
             return "Trial"
         }
         
@@ -398,7 +398,7 @@ class ConfigurationHandler: ObservableObject {
     /// Reset configuration to demo/trial mode
     func resetToTrialMode() {
         let config = ConfigurationData(
-            url: "https://demo-baymaxd.fly.dev",
+            url: "https://demo-baymaxed.fly.dev",
             secret: "test"
         )
         applyConfiguration(config)

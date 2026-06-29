@@ -101,6 +101,6 @@ class TrialModeManager(private val context: Context) {
     val isTrial: Boolean
         get() {
             val repo = BaymaxApplication.instance.settingsRepository
-            return repo.baseUrl.contains("demo-baymaxd.fly.dev")
+            return repo.baseUrl.contains("demo-baymaxed.fly.dev")
         }
 }

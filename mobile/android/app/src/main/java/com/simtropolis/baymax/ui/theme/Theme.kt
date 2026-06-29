@@ -2,7 +2,6 @@ package com.simtropolis.baymax.ui.theme
 
 import android.app.Activity
 import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -15,6 +14,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import com.simtropolis.baymax.data.repository.ThemeManager
 
 // Neutral/System colors - matching iOS which uses black/dark for primary
 val BaymaxPrimary = Color(0xFF1C1C1E)  // Dark neutral - same as iOS dark mode background
@@ -72,27 +72,27 @@ private val DarkColorScheme = darkColorScheme(
 object BaymaxColors {
     // Message bubbles - user bubbles are dark/black like iOS
     @Composable
-    fun userBubble() = if (isSystemInDarkTheme()) Color.White else Color(0xFF1C1C1E)
+    fun userBubble() = if (ThemeManager.isDarkMode.value) Color.White else Color(0xFF1C1C1E)
     
     @Composable
-    fun userBubbleText() = if (isSystemInDarkTheme()) Color(0xFF1C1C1E) else Color.White
+    fun userBubbleText() = if (ThemeManager.isDarkMode.value) Color(0xFF1C1C1E) else Color.White
     
     @Composable
-    fun assistantBubble() = if (isSystemInDarkTheme()) Color(0xFF2C2C2E) else Color(0xFFF0F0F2)
+    fun assistantBubble() = if (ThemeManager.isDarkMode.value) Color(0xFF2C2C2E) else Color(0xFFF0F0F2)
     
     @Composable
-    fun assistantBubbleText() = if (isSystemInDarkTheme()) Color.White else Color(0xFF1C1C1E)
+    fun assistantBubbleText() = if (ThemeManager.isDarkMode.value) Color.White else Color(0xFF1C1C1E)
     
     // Input field
     @Composable
-    fun inputBackground() = if (isSystemInDarkTheme()) Color(0xFF2C2C2E) else Color(0xFFF5F5F8)
+    fun inputBackground() = if (ThemeManager.isDarkMode.value) Color(0xFF2C2C2E) else Color(0xFFF5F5F8)
     
     @Composable
-    fun inputBorder() = if (isSystemInDarkTheme()) Color(0xFF48484A) else Color(0xFFE0E0E0)
+    fun inputBorder() = if (ThemeManager.isDarkMode.value) Color(0xFF48484A) else Color(0xFFE0E0E0)
     
     // Tool/code backgrounds
     @Composable
-    fun toolBackground() = if (isSystemInDarkTheme()) Color(0xFF2C2C2E) else Color(0xFFF5F5F5)
+    fun toolBackground() = if (ThemeManager.isDarkMode.value) Color(0xFF2C2C2E) else Color(0xFFF5F5F5)
     
     val CodeBackground = Color(0xFF1E1E1E)
     val CodeText = Color(0xFFD4D4D4)
@@ -109,12 +109,12 @@ object BaymaxColors {
     
     // Logo tint - dark in light mode, white in dark mode
     @Composable
-    fun logoTint() = if (isSystemInDarkTheme()) Color.White else Color(0xFF1C1C1E)
+    fun logoTint() = if (ThemeManager.isDarkMode.value) Color.White else Color(0xFF1C1C1E)
 }
 
 @Composable
 fun BaymaxTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = ThemeManager.isDarkMode.value,
     dynamicColor: Boolean = false, // Disabled to use Baymax brand colors
     content: @Composable () -> Unit
 ) {

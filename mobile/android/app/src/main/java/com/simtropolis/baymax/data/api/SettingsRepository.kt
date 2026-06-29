@@ -19,7 +19,7 @@ class SettingsRepository(private val context: Context) {
         private val BASE_URL_KEY = stringPreferencesKey("baymax_base_url")
         private val SECRET_KEY_KEY = stringPreferencesKey("baymax_secret_key")
         
-        const val DEFAULT_BASE_URL = "https://demo-baymaxd.fly.dev"
+        const val DEFAULT_BASE_URL = "https://demo-baymaxed.fly.dev"
         const val DEFAULT_SECRET_KEY = "test"
     }
     
@@ -44,7 +44,7 @@ class SettingsRepository(private val context: Context) {
     }
     
     val isTrialModeFlow: Flow<Boolean> = baseUrlFlow.map { url ->
-        url.contains("demo-baymaxd.fly.dev")
+        url.contains("demo-baymaxed.fly.dev")
     }
     
     suspend fun saveSettings(baseUrl: String, secretKey: String) {

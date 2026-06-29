@@ -417,10 +417,10 @@ struct ContentView: View {
     /// Warm up the server on first launch (non-blocking)
     private func warmUpServer() {
         // Check if we're using the demo server
-        let baseURL = UserDefaults.standard.string(forKey: "baymax_base_url") ?? "https://demo-baymaxd.fly.dev"
+        let baseURL = UserDefaults.standard.string(forKey: "baymax_base_url") ?? "https://demo-baymaxed.fly.dev"
         
         // Only warm up if it's the demo server
-        if baseURL.contains("demo-baymaxd.fly.dev") {
+        if baseURL.contains("demo-baymaxed.fly.dev") {
             Task {
                 // Fire-and-forget warm-up request
                 // We don't care about the response, just want to wake up the server

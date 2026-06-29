@@ -68,7 +68,7 @@ Or from command line:
 
 ## API Compatibility
 
-This app is designed to work with the same baymaxd API as the iOS app:
+This app is designed to work with the same baymaxed API as the iOS app:
 
 - `/status` - Connection test
 - `/sessions` - List sessions  

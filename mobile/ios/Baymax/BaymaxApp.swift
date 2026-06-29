@@ -30,7 +30,7 @@ struct BaymaxApp: App {
         // Only set defaults if neither URL nor secret has been configured
         if !hasConfiguredURL && !hasConfiguredSecret {
             print("🎯 First launch detected - setting demo defaults")
-            UserDefaults.standard.set("https://demo-baymaxd.fly.dev", forKey: "baymax_base_url")
+            UserDefaults.standard.set("https://demo-baymaxed.fly.dev", forKey: "baymax_base_url")
             UserDefaults.standard.set("test", forKey: "baymax_secret_key")
             UserDefaults.standard.synchronize()
         }

@@ -1,6 +1,6 @@
 # Baymax for mobile
 
-A native iOS client for the Baymax AI Assistant that communicates with the baymaxd server.
+A native iOS client for the Baymax AI Assistant that communicates with the baymaxed server.
 
 *Supporting infrastructure*
 
@@ -19,10 +19,10 @@ This opens an outbound websocket connection, and provides a stable https url for
 
 # Trial service (default config)
 
-There is a demo grade "baymaxd" service hosted on fly.io which is default value for the app when installed.
+There is a demo grade "baymaxed" service hosted on fly.io which is default value for the app when installed.
 This only supports limited functionality, and one session per device, which is ephemeral (and limited tools).
 
-Code for this: https://github.com/michaelneale/demo-baymaxd-fly.io
+Code for this: https://github.com/michaelneale/demo-baymaxed-fly.io
 
 This is not intended for production use but just so app works with zero config.
 
@@ -32,7 +32,7 @@ Some ways to run this below
 
 ## Run the baymax app in emulator
 
-* run `./launch_baymaxd.sh` - it will show you url and secret to use (needs baymaxd binary from baymax on your $PATH)
+* run `./launch_baymaxd.sh` - it will show you url and secret to use (needs baymaxed binary from baymax on your $PATH)
 use that in the simulator app
 *
 

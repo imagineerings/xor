@@ -32,6 +32,7 @@ data class ChatUiState(
     val isSpeaking: Boolean = false,
     val voiceMode: VoiceMode = VoiceMode.Normal,
     val voiceTranscription: String = "",
+    val voiceState: VoiceState = VoiceState(),
     // Polling state
     val isPolling: Boolean = false,
     // Tool call state
@@ -110,7 +111,8 @@ class ChatViewModel : ViewModel() {
                         isListening = voiceState.isListening,
                         isSpeaking = voiceState.isSpeaking,
                         voiceMode = voiceState.mode,
-                        voiceTranscription = voiceState.transcription
+                        voiceTranscription = voiceState.transcription,
+                        voiceState = voiceState
                     )
                 }
             }
@@ -122,7 +124,8 @@ class ChatViewModel : ViewModel() {
                         it.copy(
                             isListening = voiceState.isListening,
                             isSpeaking = voiceState.isSpeaking,
-                            voiceTranscription = voiceState.transcription
+                            voiceTranscription = voiceState.transcription,
+                            voiceState = voiceState
                         )
                     }
                 }
@@ -432,6 +435,10 @@ class ChatViewModel : ViewModel() {
 
             is SSEEvent.PingEvent -> {
                 // Ignore ping events
+            }
+
+            is SSEEvent.NotificationEvent -> {
+                Log.d(TAG, "Notification: ${event.message.method}")
             }
         }
     }

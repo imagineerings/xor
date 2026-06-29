@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -39,7 +41,7 @@ class BaymaxApiService(
         .build()
 
     val isTrialMode: Boolean
-        get() = settingsRepository.baseUrl.contains("demo-baymaxd.fly.dev")
+        get() = settingsRepository.baseUrl.contains("demo-baymaxed.fly.dev")
 
     private val baseUrl: String
         get() = settingsRepository.baseUrl
@@ -51,6 +53,35 @@ class BaymaxApiService(
         return Request.Builder()
             .url("${baseUrl}$path")
             .header("X-Secret-Key", secretKey)
+    }
+
+    suspend fun <T> fetchWithRetry(
+        maxAttempts: Int = 2,
+        operation: suspend () -> ApiResult<T>
+    ): ApiResult<T> {
+        var lastResult: ApiResult<T>? = null
+        repeat(maxAttempts.coerceAtLeast(1)) { attempt ->
+            val result = operation()
+            if (result !is ApiResult.Error || !isTransientError(result)) {
+                return result
+            }
+            lastResult = result
+            if (attempt < maxAttempts - 1) {
+                kotlinx.coroutines.delay(1_000)
+            }
+        }
+        return lastResult ?: ApiResult.Error("Request failed")
+    }
+
+    private fun isTransientError(error: ApiResult.Error): Boolean {
+        val message = error.message.lowercase()
+        return error.code in setOf(502, 503, 504) ||
+                "timeout" in message ||
+                "timed out" in message ||
+                "failed to connect" in message ||
+                "connection" in message ||
+                "unable to resolve host" in message ||
+                "dns" in message
     }
 
     // Test connection
@@ -94,6 +125,85 @@ class BaymaxApiService(
             Log.e(TAG, "Failed to fetch sessions", e)
             handleAPIError(e)
             ApiResult.Error(e.message ?: "Failed to fetch sessions")
+        }
+    }
+
+    suspend fun fetchInsights(): ApiResult<SessionInsights> = fetchWithRetry {
+        withContext(Dispatchers.IO) {
+            if (isTrialMode) {
+                return@withContext ApiResult.Success(SessionInsights(totalSessions = 5, totalTokens = 450_000_000))
+            }
+
+            try {
+                val request = createRequest("/sessions/insights").get().build()
+                client.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        val body = response.body?.string() ?: return@withContext ApiResult.Error("Empty response")
+                        ApiResult.Success(json.decodeFromString<SessionInsights>(body))
+                    } else {
+                        handleHTTPStatus(response.code)
+                        ApiResult.Error("HTTP ${response.code}", response.code)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to fetch insights", e)
+                handleAPIError(e)
+                ApiResult.Error(e.message ?: "Failed to fetch insights")
+            }
+        }
+    }
+
+    suspend fun updateProvider(
+        sessionId: String,
+        provider: String,
+        model: String
+    ): ApiResult<Unit> = fetchWithRetry {
+        withContext(Dispatchers.IO) {
+            try {
+                val bodyJson = buildJsonObject {
+                    put("session_id", sessionId)
+                    put("provider", provider)
+                    put("model", model)
+                }.toString()
+                val request = createRequest("/agent/update_provider")
+                    .post(bodyJson.toRequestBody("application/json".toMediaType()))
+                    .build()
+
+                client.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        ApiResult.Success(Unit)
+                    } else {
+                        val errorBody = response.body?.string() ?: "No error details"
+                        handleHTTPStatus(response.code)
+                        ApiResult.Error("HTTP ${response.code}: $errorBody", response.code)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to update provider", e)
+                handleAPIError(e)
+                ApiResult.Error(e.message ?: "Failed to update provider")
+            }
+        }
+    }
+
+    suspend fun loadEnabledExtensions(): ApiResult<List<String>> = fetchWithRetry {
+        withContext(Dispatchers.IO) {
+            try {
+                val request = createRequest("/config/extensions").get().build()
+                client.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        val body = response.body?.string() ?: return@withContext ApiResult.Error("Empty response")
+                        ApiResult.Success(json.decodeFromString<List<String>>(body))
+                    } else {
+                        handleHTTPStatus(response.code)
+                        ApiResult.Error("HTTP ${response.code}", response.code)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to load enabled extensions", e)
+                handleAPIError(e)
+                ApiResult.Error(e.message ?: "Failed to load enabled extensions")
+            }
         }
     }
 
@@ -351,6 +461,14 @@ class BaymaxApiService(
                 "ModelChange" -> json.decodeFromString<SSEEvent.ModelChangeEvent>(data)
                 "Ping" -> json.decodeFromString<SSEEvent.PingEvent>(data)
                 "UpdateConversation" -> json.decodeFromString<SSEEvent.UpdateConversationEvent>(data)
+                "Notification" -> json.decodeFromString<SSEEvent.NotificationEvent>(data).also { event ->
+                    NoticeManager.showNotice(
+                        AppNotice(
+                            type = NoticeType.APP_NEEDS_UPDATE,
+                            message = event.message.method
+                        )
+                    )
+                }
                 else -> {
                     Log.w(TAG, "Unknown SSE event type: $type")
                     null

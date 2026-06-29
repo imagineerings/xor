@@ -47,7 +47,22 @@ sealed class SSEEvent {
         val type: String = "UpdateConversation",
         val conversation: List<Message>
     ) : SSEEvent()
+
+    @Serializable
+    @SerialName("Notification")
+    data class NotificationEvent(
+        val type: String = "Notification",
+        @SerialName("request_id")
+        val requestId: String,
+        val message: NotificationMessage
+    ) : SSEEvent()
 }
+
+@Serializable
+data class NotificationMessage(
+    val method: String,
+    val params: Map<String, JsonElement> = emptyMap()
+)
 
 @Serializable
 data class ChatRequest(

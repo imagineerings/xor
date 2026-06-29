@@ -1,5 +1,6 @@
 package com.simtropolis.baymax.ui.screens
 
+import android.content.pm.ApplicationInfo
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -14,12 +15,15 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.simtropolis.baymax.BaymaxApplication
 import com.simtropolis.baymax.data.model.AgentConfiguration
+import com.simtropolis.baymax.data.repository.ThemeManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToMarkdownTest: () -> Unit = {},
     viewModel: SettingsViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -175,6 +179,37 @@ fun SettingsScreen(
                 }
             }
 
+            SettingsSection(title = "Appearance") {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Dark Mode", style = MaterialTheme.typography.bodyLarge)
+                    Switch(
+                        checked = ThemeManager.isDarkMode.value,
+                        onCheckedChange = { ThemeManager.setDarkMode(it) }
+                    )
+                }
+            }
+
+            if (isDebugBuild()) {
+                SettingsSection(title = "Debug") {
+                    OutlinedButton(
+                        onClick = onNavigateToMarkdownTest,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Code,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Markdown Test")
+                    }
+                }
+            }
+
             // About Section
             SettingsSection(title = "About") {
                 Column {
@@ -275,6 +310,10 @@ fun SettingsScreen(
             }
         )
     }
+}
+
+private fun isDebugBuild(): Boolean {
+    return BaymaxApplication.instance.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
 }
 
 @Composable

@@ -68,7 +68,7 @@ class VoiceManager(private val context: Context) {
 
         speechRecognizer = recognizer
         recognitionListener = listener
-        _state.value = _state.value.copy(isListening = true)
+        _state.value = _state.value.copy(isListening = true, stateLabel = "Listening")
     }
 
     /** Stop listening and finalize any pending transcription. */
@@ -79,7 +79,7 @@ class VoiceManager(private val context: Context) {
         }
         speechRecognizer = null
         recognitionListener = null
-        _state.value = _state.value.copy(isListening = false)
+        _state.value = _state.value.copy(isListening = false, stateLabel = "Processing")
     }
 
     /** Cancel listening without producing a final result. */
@@ -92,7 +92,8 @@ class VoiceManager(private val context: Context) {
         recognitionListener = null
         _state.value = _state.value.copy(
             isListening = false,
-            transcription = ""
+            transcription = "",
+            stateLabel = "Idle"
         )
     }
 
@@ -109,7 +110,7 @@ class VoiceManager(private val context: Context) {
                 val matches = partialResults
                     ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                 val text = matches?.firstOrNull() ?: ""
-                _state.value = _state.value.copy(transcription = text)
+                _state.value = _state.value.copy(transcription = text, stateLabel = "Listening")
                 callback?.onTranscriptionUpdate(text)
             }
 
@@ -119,6 +120,7 @@ class VoiceManager(private val context: Context) {
                 val text = matches?.firstOrNull() ?: ""
                 _state.value = _state.value.copy(
                     isListening = false,
+                    stateLabel = "Processing",
                     transcription = text
                 )
                 callback?.onSubmitMessage(text)
@@ -127,6 +129,7 @@ class VoiceManager(private val context: Context) {
             override fun onError(error: Int) {
                 _state.value = _state.value.copy(
                     isListening = false,
+                    stateLabel = "Error",
                     transcription = ""
                 )
                 // Don't propagate speech-recognition errors to the UI
@@ -148,12 +151,12 @@ class VoiceManager(private val context: Context) {
             tts = android.speech.tts.TextToSpeech(context) { status ->
                 if (status == android.speech.tts.TextToSpeech.SUCCESS) {
                     ttsInitialized = true
-                    _state.value = _state.value.copy(isSpeaking = true)
+                    _state.value = _state.value.copy(isSpeaking = true, stateLabel = "Speaking")
                     tts?.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, null)
                 }
             }
         } else {
-            _state.value = _state.value.copy(isSpeaking = true)
+            _state.value = _state.value.copy(isSpeaking = true, stateLabel = "Speaking")
             tts?.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, null)
         }
     }
@@ -161,7 +164,7 @@ class VoiceManager(private val context: Context) {
     /** Stop any ongoing TTS. */
     fun stopSpeaking() {
         tts?.stop()
-        _state.value = _state.value.copy(isSpeaking = false)
+        _state.value = _state.value.copy(isSpeaking = false, stateLabel = "Idle")
     }
 
     /** Release all resources. Call from ViewModel.onCleared(). */

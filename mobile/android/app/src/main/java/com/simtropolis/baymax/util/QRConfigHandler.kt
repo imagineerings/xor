@@ -2,6 +2,8 @@ package com.simtropolis.baymax.util
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
 import com.simtropolis.baymax.BaymaxApplication
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -21,6 +23,7 @@ import org.json.JSONObject
 object QRConfigHandler {
 
     private val scope = CoroutineScope(Dispatchers.IO)
+    val configurationSuccess: MutableState<Boolean> = mutableStateOf(false)
 
     /**
      * Attempt to parse and apply a deep-link configuration URI.
@@ -76,6 +79,8 @@ object QRConfigHandler {
             val connected = apiService.testConnection()
 
             if (connected is com.simtropolis.baymax.data.api.ApiResult.Success && connected.data) {
+                configurationSuccess.value = true
+                NoticeManager.showConfigurationSuccess()
                 onResult?.invoke(true, null)
             } else {
                 val errorMsg = when (connected) {

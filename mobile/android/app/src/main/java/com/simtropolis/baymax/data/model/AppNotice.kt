@@ -11,6 +11,9 @@ data class AppNotice(
 )
 
 enum class NoticeType {
+    /** Configuration was applied successfully from a QR/deep link. */
+    CONFIGURATION_SUCCESS,
+
     /** Server returned 503 — tunnel is disabled. */
     TUNNEL_DISABLED,
 

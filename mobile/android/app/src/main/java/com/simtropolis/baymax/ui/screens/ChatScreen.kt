@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -18,11 +19,14 @@ import com.simtropolis.baymax.data.model.Message
 import com.simtropolis.baymax.data.model.MessageRole
 import com.simtropolis.baymax.ui.components.AppNoticeOverlay
 import com.simtropolis.baymax.ui.components.ChatInputView
+import com.simtropolis.baymax.ui.components.CompletedToolCallData
+import com.simtropolis.baymax.ui.components.FullTextOverlay
 import com.simtropolis.baymax.ui.components.MessageBubble
 import com.simtropolis.baymax.ui.components.StackedToolCallsView
 import com.simtropolis.baymax.ui.components.ToolCallCard
 import com.simtropolis.baymax.ui.components.ToolCallState
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,15 +34,22 @@ fun ChatScreen(
     sessionId: String?,
     initialMessage: String? = null,
     onNavigateBack: () -> Unit,
+    onNavigateToToolCallDetail: () -> Unit = {},
+    onNavigateToTaskDetail: () -> Unit = {},
     viewModel: ChatViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+    var shouldAutoScroll by remember { mutableStateOf(true) }
+    var userIsScrolling by remember { mutableStateOf(false) }
+    var lastContentHeight by remember { mutableStateOf(0) }
+    var lastScrollUpdate by remember { mutableStateOf(0L) }
 
     // Track if we've sent the initial message
     var hasProcessedInitialMessage by remember { mutableStateOf(false) }
+    var showFullTextMessage by remember { mutableStateOf<Message?>(null) }
 
     // Load session or start new one
     LaunchedEffect(sessionId) {
@@ -62,11 +73,45 @@ fun ChatScreen(
         }
     }
 
-    // Auto-scroll to bottom when new messages arrive
-    LaunchedEffect(uiState.messages.size) {
-        if (uiState.messages.isNotEmpty()) {
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress }
+            .distinctUntilChanged()
+            .collect { scrolling ->
+                userIsScrolling = scrolling
+                if (!scrolling) {
+                    val layoutInfo = listState.layoutInfo
+                    val lastVisible = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                    shouldAutoScroll = lastVisible >= layoutInfo.totalItemsCount - 2
+                } else {
+                    shouldAutoScroll = false
+                }
+            }
+    }
+
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.layoutInfo.totalItemsCount }
+            .collect { lastContentHeight = it }
+    }
+
+    val contentVersion = uiState.messages.joinToString("|") { message ->
+        "${message.id}:${message.content.hashCode()}"
+    }
+
+    LaunchedEffect(contentVersion, lastContentHeight) {
+        val lastIndex = listState.layoutInfo.totalItemsCount - 1
+        val now = System.currentTimeMillis()
+        if (lastIndex >= 0 && shouldAutoScroll && !userIsScrolling && now - lastScrollUpdate >= 100) {
+            lastScrollUpdate = now
             coroutineScope.launch {
-                listState.animateScrollToItem(uiState.messages.size - 1)
+                listState.animateScrollToItem(lastIndex)
+            }
+        }
+    }
+
+    LaunchedEffect(uiState.isLoading) {
+        if (!uiState.isLoading && uiState.messages.isNotEmpty()) {
+            coroutineScope.launch {
+                listState.animateScrollToItem((listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0))
             }
         }
     }
@@ -184,13 +229,22 @@ fun ChatScreen(
                                     ) { item ->
                                         when (item) {
                                             is DisplayItem.MessageItem -> {
-                                                MessageBubble(message = item.message)
+                                                MessageBubble(
+                                                    message = item.message,
+                                                    onLongPress = {
+                                                        showFullTextMessage = item.message
+                                                    }
+                                                )
                                             }
 
                                             is DisplayItem.ToolCallItem -> {
                                                 val state = item.toolCallState
                                                 ToolCallCard(
                                                     toolCallState = state,
+                                                    onClick = {
+                                                        ToolCallDetailData.toolCallState = state
+                                                        onNavigateToToolCallDetail()
+                                                    },
                                                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                                                 )
                                             }
@@ -276,11 +330,20 @@ fun ChatScreen(
                         // Voice parameters
                         isListening = uiState.isListening,
                         voiceMode = uiState.voiceMode,
+                        voiceState = uiState.voiceState,
                         onVoiceToggle = { viewModel.toggleVoiceInput() },
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
                 }
             }
+        }
+
+        // Full text overlay dialog
+        showFullTextMessage?.let { message ->
+            FullTextOverlay(
+                message = message,
+                onDismiss = { showFullTextMessage = null }
+            )
         }
     }
 }

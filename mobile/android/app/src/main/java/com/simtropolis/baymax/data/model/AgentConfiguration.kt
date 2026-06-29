@@ -32,7 +32,7 @@ data class AgentConfiguration(
         fun defaultNameFor(url: String): String? {
             val lower = url.lowercase()
             return when {
-                lower.contains("demo-baymaxd") -> "Trial"
+                lower.contains("demo-baymaxed") -> "Trial"
                 lower.contains("cloudflare-tunnel-proxy") -> "Desktop"
                 lower.contains("100.") || lower.contains(".ts.net") -> "Tailscale"
                 lower.contains("localhost") || lower.contains("127.0.0.1") -> "Local"
