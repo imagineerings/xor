@@ -7,7 +7,7 @@ use crate::{
     TemplateEngine,
 };
 
-pub trait RecipeSource {
+pub trait RecipeSource: Send + Sync {
     fn discover(&self) -> Result<Vec<RecipeManifest>>;
     fn load(&self, name: &str) -> Result<Recipe>;
     fn priority(&self) -> u8;
