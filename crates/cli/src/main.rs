@@ -27,6 +27,8 @@ use walkdir::WalkDir;
 
 use std::io::IsTerminal;
 
+mod recipe_commands;
+
 const URL_PREFIX: [&'static str; 5] = ["baymax://", "http://", "https://", "file://", "ssh://"];
 
 struct Detect;
@@ -492,6 +494,11 @@ fn run() -> Result<()> {
     // and passes the socket path via env var to avoid argument parsing.
     if let Ok(socket) = std::env::var("BAYMAX_ASKPASS_SOCKET") {
         askpass::main_from_args(&socket, std::env::args().skip(1));
+        return Ok(());
+    }
+
+    if std::env::args().nth(1).as_deref() == Some("recipe") {
+        recipe_commands::run(std::env::args().skip(1))?;
         return Ok(());
     }
 

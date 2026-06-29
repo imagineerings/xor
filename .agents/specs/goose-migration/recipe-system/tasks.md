@@ -6,83 +6,83 @@ Implement the recipe engine as a new `crates/recipe/` crate with YAML-based reci
 
 ## Tasks
 
-- [ ] 1. Create `crates/recipe/` crate with core data structures
+- [x] 1. Create `crates/recipe/` crate with core data structures
   - Define Recipe, RecipeStep, VariableDefinition, RecipeManifest types
   - Implement YAML serialization/deserialization with schema validation
   - _Requirements: 1.1, 5_
   - _writes: crates/recipe/src/lib.rs, crates/recipe/src/types.rs_
 
-- [ ] 2. Implement recipe YAML format utilities
+- [x] 2. Implement recipe YAML format utilities
   - Consistent YAML formatting, parsing with error context
   - Schema validation for required fields and types
   - _Requirements: 5_
   - _writes: crates/recipe/src/yaml_format.rs, crates/recipe/src/validator.rs_
 
-- [ ] 3. Implement template engine
+- [x] 3. Implement template engine
   - Variable substitution with `{{ variable }}` syntax
   - Template validation (detect missing variables)
   - Template composition (nested templates)
   - _Requirements: 2_
   - _writes: crates/recipe/src/template.rs_
 
-- [ ] 4. Implement recipe sources
-  - [ ] 4.1 Local recipe source — discover and load from filesystem directory
+- [x] 4. Implement recipe sources
+  - [x] 4.1 Local recipe source — discover and load from filesystem directory
     - _Requirements: 4.1_
     - _writes: crates/recipe/src/sources/local.rs_
-  - [ ] 4.2 Builtin recipe source — embed recipes in the binary
+  - [x] 4.2 Builtin recipe source — embed recipes in the binary
     - _Requirements: 4.2_
     - _writes: crates/recipe/src/sources/builtin.rs_
-  - [ ] 4.3 GitHub recipe source — fetch recipes from GitHub repositories
+  - [x] 4.3 GitHub recipe source — fetch recipes from GitHub repositories
     - _Requirements: 7_
     - _writes: crates/recipe/src/sources/github.rs_
 
-- [ ] 5. Implement recipe engine
+- [x] 5. Implement recipe engine
   - Recipe discovery across all registered sources
   - Recipe loading with deduplication (local overrides builtin)
   - Recipe execution with step sequencing, error policies, and variable injection
   - _Requirements: 1_
   - _writes: crates/recipe/src/engine.rs, crates/recipe/src/execution.rs_
 
-- [ ] 6. Implement recipe deeplink handler
+- [x] 6. Implement recipe deeplink handler
   - Parse recipe deeplink URIs
   - Resolve and load recipe from deeplink
   - _Requirements: 9_
   - _writes: crates/recipe/src/deeplink.rs_
 
-- [ ] 7. Implement recipe CLI commands
-  - [ ] 7.1 `goose recipe list` — list available recipes
+- [x] 7. Implement recipe CLI commands
+  - [x] 7.1 `goose recipe list` — list available recipes
     - _Requirements: 6.1_
     - _writes: crates/cli/src/commands/recipe.rs_
-  - [ ] 7.2 `goose recipe search` — search recipes by keyword
+  - [x] 7.2 `goose recipe search` — search recipes by keyword
     - _Requirements: 6.2_
     - _writes: crates/cli/src/commands/recipe.rs_
-  - [ ] 7.3 `goose recipe print` — print recipe contents
+  - [x] 7.3 `goose recipe print` — print recipe contents
     - _Requirements: 6.3_
     - _writes: crates/cli/src/commands/recipe.rs_
-  - [ ] 7.4 `goose recipe run` — execute a recipe
+  - [x] 7.4 `goose recipe run` — execute a recipe
     - _Requirements: 6.4_
     - _writes: crates/cli/src/commands/recipe.rs_
 
-- [ ] 8. Implement GitHub recipe and secret discovery
+- [x] 8. Implement GitHub recipe and secret discovery
   - GitHub recipe fetching with caching
   - Secret/variable discovery — detect required secrets, check configuration
   - _Requirements: 7, 8_
   - _writes: crates/recipe/src/sources/github.rs, crates/recipe/src/secrets.rs_
 
-- [ ] 9. Implement recipe scanner (Docker-based)
+- [x] 9. Implement recipe scanner (Docker-based)
   - Docker image with recipe testing environment
   - Scan script that runs each recipe and checks output
   - Result reporting
   - _Requirements: 10_
   - _writes: recipe-scanner/Dockerfile, recipe-scanner/scan.sh_
 
-- [ ] 10. Ship workflow recipes
+- [x] 10. Ship workflow recipes
   - Create release risk check recipe
   - Add recipe installation path in the application
   - _Requirements: 11_
   - _writes: crates/recipe/src/builtin_recipes/_
 
-- [ ] 11. Write tests
+- [x] 11. Write tests
   - Unit tests: YAML parsing, template rendering, validation
   - Integration tests: Full recipe execution with mock agent
   - CLI tests: All recipe subcommands
