@@ -232,6 +232,7 @@ members = [
     "crates/x_ai",
     "crates/baymax",
     "crates/baymax_actions",
+    "crates/baymax-server",
     "crates/windows_resources",
     "crates/baymax_credentials_provider",
     "crates/baymax_env_vars",
@@ -493,6 +494,7 @@ worktree = { path = "crates/worktree" }
 x_ai = { path = "crates/x_ai" }
 baymax = { path = "crates/baymax" }
 baymax_actions = { path = "crates/baymax_actions" }
+baymax_server = { path = "crates/baymax-server" }
 baymax_credentials_provider = { path = "crates/baymax_credentials_provider" }
 baymax_env_vars = { path = "crates/baymax_env_vars" }
 edit_prediction = { path = "crates/edit_prediction" }

@@ -2370,6 +2370,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "baymax_server"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "futures 0.3.32",
+ "recipe",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tower 0.4.13",
+ "tower-http 0.4.4",
+]
+
+[[package]]
 name = "baymax_test_extension"
 version = "0.1.0"
 dependencies = [
