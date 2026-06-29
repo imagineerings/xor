@@ -1,6 +1,7 @@
 use anyhow::Result;
 use fs::Fs;
 
+use baymax_actions::agents_sidebar::ToggleThreadSwitcher;
 use gpui::{
     AnyView, App, Context, DragMoveEvent, Entity, EntityId, EventEmitter, FocusHandle, Focusable,
     ManagedView, MouseButton, Pixels, Render, Subscription, Task, TaskExt, Tiling, WeakEntity,
@@ -18,7 +19,6 @@ use std::rc::Rc;
 use ui::prelude::*;
 use util::ResultExt;
 use util::path_list::PathList;
-use baymax_actions::agents_sidebar::ToggleThreadSwitcher;
 
 use agent_settings::AgentSettings;
 use settings::SidebarDockPosition;
@@ -1646,7 +1646,10 @@ impl MultiWorkspace {
                             })
                             .collect::<Vec<_>>(),
                         sidebar_open: this.sidebar_open,
-                        sidebar_state: this.sidebar.as_ref().and_then(|s| s.serialibaymax_state(cx)),
+                        sidebar_state: this
+                            .sidebar
+                            .as_ref()
+                            .and_then(|s| s.serialibaymax_state(cx)),
                     };
                     (this.window_id, state)
                 })

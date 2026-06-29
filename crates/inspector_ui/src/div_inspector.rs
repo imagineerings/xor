@@ -348,7 +348,8 @@ impl DivInspector {
     ) {
         let rust_style = rust_style_buffer.update(cx, |rust_style_buffer, cx| {
             let snapshot = rust_style_buffer.snapshot();
-            let (rust_style, unrecognibaymax_ranges) = self.style_from_rust_buffer_snapshot(&snapshot);
+            let (rust_style, unrecognibaymax_ranges) =
+                self.style_from_rust_buffer_snapshot(&snapshot);
             Self::set_rust_buffer_diagnostics(
                 unrecognibaymax_ranges,
                 rust_style_buffer,
@@ -438,19 +439,20 @@ impl DivInspector {
         snapshot: &BufferSnapshot,
         cx: &mut Context<Buffer>,
     ) {
-        let diagnostic_entries = unrecognibaymax_ranges
-            .into_iter()
-            .enumerate()
-            .map(|(ix, range)| DiagnosticEntry {
-                range,
-                diagnostic: Diagnostic {
-                    message: "unrecognibaymax".to_string(),
-                    severity: DiagnosticSeverity::WARNING,
-                    is_primary: true,
-                    group_id: ix,
-                    ..Default::default()
-                },
-            });
+        let diagnostic_entries =
+            unrecognibaymax_ranges
+                .into_iter()
+                .enumerate()
+                .map(|(ix, range)| DiagnosticEntry {
+                    range,
+                    diagnostic: Diagnostic {
+                        message: "unrecognibaymax".to_string(),
+                        severity: DiagnosticSeverity::WARNING,
+                        is_primary: true,
+                        group_id: ix,
+                        ..Default::default()
+                    },
+                });
         let diagnostics = DiagnosticSet::from_sorted_entries(diagnostic_entries, snapshot);
         rust_style_buffer.update_diagnostics(LanguageServerId(0), diagnostics, cx);
     }

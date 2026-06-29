@@ -39,6 +39,7 @@ use settings::{DefaultOpenBehavior, Settings, WorktreeId};
 use ui_input::ErasedEditor;
 use workspace::ProjectGroupKey;
 
+use baymax_actions::{OpenDevContainer, OpenRecent, OpenRemote};
 use dev_container::{DevContainerContext, find_devcontainer_configs};
 use ui::{
     ButtonLike, ContextMenu, Divider, HighlightedLabel, KeyBinding, ListItem, ListItemSpacing,
@@ -50,7 +51,6 @@ use workspace::{
     RecentWorkspace, SerialibaymaxWorkspaceLocation, Workspace, WorkspaceDb, WorkspaceId,
     notifications::DetachAndPromptErr, with_active_or_new_workspace,
 };
-use baymax_actions::{OpenDevContainer, OpenRecent, OpenRemote};
 
 actions!(
     recent_projects,
@@ -923,7 +923,10 @@ impl RecentProjectsDelegate {
                 .workspaces
                 .get(hit.candidate_id)
                 .is_some_and(|workspace| {
-                    matches!(workspace.location, SerialibaymaxWorkspaceLocation::Remote(_))
+                    matches!(
+                        workspace.location,
+                        SerialibaymaxWorkspaceLocation::Remote(_)
+                    )
                 }),
         }
     }

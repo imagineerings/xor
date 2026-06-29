@@ -1,11 +1,14 @@
 use crate::{
-    ApplyCodeActionTool, CodeActionStore, ContextServerRegistry, CopyPathTool, CreateDirectoryTool,
-    CreateThreadTool, DbLanguageModel, DbThread, DeletePathTool, DiagnosticsTool, EditFileTool,
-    FetchTool, FindPathTool, FindReferencesTool, GetCodeActionsTool, GoToDefinitionTool, GrepTool,
-    ListAgentsAndModelsTool, ListDirectoryTool, MovePathTool, ProjectSnapshot, ReadFileTool,
-    RenameTool, SandboxedTerminalTool, SpawnAgentTool, SystemPromptTemplate, Template, Templates,
-    TerminalTool, ToolPermissionDecision, WebSearchTool, WriteFileTool,
-    decide_permission_from_settings,
+    AgentHook, AgentHookContext, AgentHooks, AnalyzeTool, ApplyCodeActionTool, AppsTool,
+    ChatrecallTool, CodeActionStore, CodeExecutionTool, ContextServerRegistry, CopyPathTool,
+    CreateDirectoryTool, CreateThreadTool, DbLanguageModel, DbThread, DeletePathTool,
+    DeveloperTool, DiagnosticsTool, EditFileTool, FetchTool, FinalOutputTool, FindPathTool,
+    FindReferencesTool, GetCodeActionsTool, GoToDefinitionTool, GrepTool, HookFlow,
+    ListAgentsAndModelsTool, ListDirectoryTool, LlmCallHookContext, LlmRequestHookFlow,
+    MovePathTool, OrchestratorTool, ProjectSnapshot, ReadFileTool, RenameTool,
+    SandboxedTerminalTool, SessionHookContext, SpawnAgentTool, SummarizeTool, SummonTool,
+    SystemPromptTemplate, Template, Templates, TerminalTool, TodoTool, TomTool, ToolHookContext,
+    ToolPermissionDecision, WebSearchTool, WriteFileTool, decide_permission_from_settings,
 };
 use acp_thread::{MentionUri, UserMessageId};
 use action_log::ActionLog;
@@ -14,7 +17,7 @@ use agent_settings::UserAgentsMd;
 use crate::sandboxing::{SandboxRequest, ThreadSandboxGrants, sandboxing_enabled};
 use agent_client_protocol::schema as acp;
 use agent_settings::{
-    AgentProfileId, AgentSettings, AutoCompactThreshold, COMPACTION_PROMPT,
+    AgentProfileId, AgentSettings, AutoCompactStrategy, AutoCompactThreshold, COMPACTION_PROMPT,
     SUMMARIZE_THREAD_DETAILED_PROMPT, SUMMARIZE_THREAD_PROMPT,
 };
 use anyhow::{Context as _, Result, anyhow};
@@ -35,12 +38,12 @@ use gpui::{
 };
 use heck::ToSnakeCase as _;
 use language_model::{
-    CompletionIntent, LanguageModel, LanguageModelCompletionError, LanguageModelCompletionEvent,
-    LanguageModelId, LanguageModelImage, LanguageModelProviderId, LanguageModelRegistry,
-    LanguageModelRequest, LanguageModelRequestMessage, LanguageModelRequestTool,
-    LanguageModelToolResult, LanguageModelToolResultContent, LanguageModelToolSchemaFormat,
-    LanguageModelToolUse, LanguageModelToolUseId, MessageContent, Role, SelectedModel, Speed,
-    StopReason, TokenUsage, BAYMAX_CLOUD_PROVIDER_ID,
+    BAYMAX_CLOUD_PROVIDER_ID, CompletionIntent, LanguageModel, LanguageModelCompletionError,
+    LanguageModelCompletionEvent, LanguageModelId, LanguageModelImage, LanguageModelProviderId,
+    LanguageModelRegistry, LanguageModelRequest, LanguageModelRequestMessage,
+    LanguageModelRequestTool, LanguageModelToolResult, LanguageModelToolResultContent,
+    LanguageModelToolSchemaFormat, LanguageModelToolUse, LanguageModelToolUseId, MessageContent,
+    Role, SelectedModel, Speed, StopReason, TokenUsage,
 };
 use project::Project;
 use prompt_store::ProjectContext;
@@ -143,6 +146,7 @@ pub enum Message {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum CompactionInfo {
     Summary(SharedString),
+    Trimmed,
     ProviderNative {
         provider: LanguageModelProviderId,
         items: Vec<serde_json::Value>,
@@ -162,6 +166,7 @@ impl CompactionInfo {
                 cache: false,
                 reasoning_details: None,
             }],
+            Self::Trimmed => Vec::new(),
             Self::ProviderNative { .. } => Vec::new(),
         }
     }
@@ -702,6 +707,9 @@ pub trait SubagentHandle {
     fn num_entries(&self, cx: &App) -> usize;
     /// Runs a turn for a given message and returns both the response and the index of that output message.
     fn send(&self, message: String, cx: &AsyncApp) -> Task<Result<String>>;
+    fn cancel(&self, _cx: &AsyncApp) -> Task<()> {
+        Task::ready(())
+    }
 }
 
 pub trait ThreadEnvironment {
@@ -1171,6 +1179,7 @@ pub struct Thread {
     /// already-granted permissions skip the approval prompt.
     /// Never persisted — lives and dies with this thread.
     sandbox_grants: Rc<RefCell<ThreadSandboxGrants>>,
+    hooks: AgentHooks,
 }
 
 impl Thread {
@@ -1179,6 +1188,20 @@ impl Thread {
         acp::PromptCapabilities::new()
             .image(image)
             .embedded_context(true)
+    }
+
+    fn hook_context(&self) -> AgentHookContext {
+        AgentHookContext {
+            thread_id: self.id.to_string().into(),
+            prompt_id: self.prompt_id.to_string().into(),
+        }
+    }
+
+    fn session_hook_context(&self, user_message_id: Option<UserMessageId>) -> SessionHookContext {
+        SessionHookContext {
+            agent: self.hook_context(),
+            user_message_id,
+        }
     }
 
     pub fn new_subagent(parent_thread: &Entity<Thread>, cx: &mut Context<Self>) -> Self {
@@ -1301,6 +1324,7 @@ impl Thread {
             inherits_parent_model_settings: true,
             sandboxed_terminal_temp_dir: None,
             sandbox_grants: Rc::new(RefCell::new(ThreadSandboxGrants::default())),
+            hooks: AgentHooks::default(),
         }
     }
 
@@ -1413,6 +1437,12 @@ impl Thread {
                                 acp_thread::ContextCompactionStatus::Completed,
                             );
                             stream.send_context_compaction_update(compaction_id.clone(), summary);
+                        }
+                        CompactionInfo::Trimmed => {
+                            stream.send_context_compaction(
+                                compaction_id,
+                                acp_thread::ContextCompactionStatus::Completed,
+                            );
                         }
                         CompactionInfo::ProviderNative { .. } => {
                             stream.send_context_compaction(
@@ -1679,6 +1709,7 @@ impl Thread {
             inherits_parent_model_settings: true,
             sandboxed_terminal_temp_dir: db_thread.sandboxed_terminal_temp_dir,
             sandbox_grants: Rc::new(RefCell::new(ThreadSandboxGrants::default())),
+            hooks: AgentHooks::default(),
         }
     }
 
@@ -1930,6 +1961,17 @@ impl Thread {
             environment.clone(),
         ));
         self.add_tool(WebSearchTool);
+        self.add_tool(FinalOutputTool);
+        self.add_tool(CodeExecutionTool);
+        self.add_tool(OrchestratorTool);
+        self.add_tool(SummarizeTool);
+        self.add_tool(TodoTool);
+        self.add_tool(AppsTool);
+        self.add_tool(ChatrecallTool);
+        self.add_tool(SummonTool);
+        self.add_tool(TomTool);
+        self.add_tool(AnalyzeTool);
+        self.add_tool(DeveloperTool);
 
         self.add_tool(DiagnosticsTool::new(self.project.clone()));
 
@@ -1966,6 +2008,10 @@ impl Thread {
             T::NAME,
         );
         self.tools.insert(T::NAME.into(), tool.erase());
+    }
+
+    pub fn add_hook(&mut self, hook: Arc<dyn AgentHook>) {
+        self.hooks.push(hook);
     }
 
     #[cfg(any(test, feature = "test-support"))]
@@ -2419,6 +2465,40 @@ impl Thread {
     async fn run_turn_internal(
         this: &WeakEntity<Self>,
         event_stream: &ThreadEventStream,
+        cancellation_rx: watch::Receiver<bool>,
+        cx: &mut AsyncApp,
+    ) -> Result<()> {
+        let (hooks, context) = this.read_with(cx, |this, _cx| {
+            (this.hooks.clone(), this.session_hook_context(None))
+        })?;
+        if hooks.is_empty() {
+            return Self::run_turn_loop(this, event_stream, cancellation_rx, cx).await;
+        }
+
+        match hooks.before_session(context.clone()).await? {
+            HookFlow::Continue => {}
+            HookFlow::Abort { message } => {
+                event_stream.send_error(anyhow!("agent session aborted by hook: {message}"));
+                return Ok(());
+            }
+        }
+
+        let result = Self::run_turn_loop(this, event_stream, cancellation_rx, cx).await;
+        let after_session_result = hooks.after_session(context).await;
+        match (result, after_session_result) {
+            (Ok(()), Ok(())) => Ok(()),
+            (Err(error), Ok(())) => Err(error),
+            (Ok(()), Err(error)) => Err(error),
+            (Err(error), Err(after_session_error)) => {
+                log::error!("after-session hook failed: {after_session_error}");
+                Err(error)
+            }
+        }
+    }
+
+    async fn run_turn_loop(
+        this: &WeakEntity<Self>,
+        event_stream: &ThreadEventStream,
         mut cancellation_rx: watch::Receiver<bool>,
         cx: &mut AsyncApp,
     ) -> Result<()> {
@@ -2506,7 +2586,7 @@ impl Thread {
             // mid-turn changes (e.g. the user switches model, toggles tools,
             // or changes profile) take effect between tool-call rounds.
             // If a refusal fallback is active, use that model instead.
-            let (model, request) = this.update(cx, |this, cx| {
+            let (model, request, hooks, hook_context) = this.update(cx, |this, cx| {
                 let model = refusal_fallback_model
                     .clone()
                     .or_else(|| this.model.clone())
@@ -2514,8 +2594,22 @@ impl Thread {
                 this.refresh_turn_tools(cx);
                 let request = this.build_completion_request(intent, cx)?;
                 this.current_request_token_usage = TokenUsage::default();
-                anyhow::Ok((model, request))
+                let hook_context = LlmCallHookContext {
+                    agent: this.hook_context(),
+                    intent,
+                    model_id: model.id(),
+                    provider_id: model.provider_id(),
+                };
+                anyhow::Ok((model, request, this.hooks.clone(), hook_context))
             })??;
+
+            let request = match hooks.before_llm_call(hook_context.clone(), request).await? {
+                LlmRequestHookFlow::Continue(request) => request,
+                LlmRequestHookFlow::Abort { message } => {
+                    event_stream.send_error(anyhow!("LLM call aborted by hook: {message}"));
+                    return Ok(());
+                }
+            };
 
             telemetry::event!(
                 "Agent Thread Completion",
@@ -2535,6 +2629,13 @@ impl Thread {
                 Ok(events) => (events.fuse(), None),
                 Err(err) => (stream::empty().boxed().fuse(), Some(err)),
             };
+            match hooks.after_llm_call(hook_context).await? {
+                HookFlow::Continue => {}
+                HookFlow::Abort { message } => {
+                    event_stream.send_error(anyhow!("LLM call aborted by hook: {message}"));
+                    return Ok(());
+                }
+            }
             let mut tool_results: FuturesUnordered<Task<LanguageModelToolResult>> =
                 FuturesUnordered::new();
             let mut early_tool_results: Vec<LanguageModelToolResult> = Vec::new();
@@ -2801,32 +2902,76 @@ impl Thread {
         cancellation_rx: watch::Receiver<bool>,
         cx: &mut AsyncApp,
     ) -> Result<ControlFlow<()>> {
-        let Some((model, request, insertion_ix)) = this.update(cx, |this, cx| {
+        let Some((strategy, model, request, insertion_ix)) = this.update(cx, |this, cx| {
             let insertion_ix = this.compaction_message_target_ix(cx)?;
+            let strategy = AgentSettings::get_global(cx).auto_compact.strategy;
             let model = this.model.clone()?;
-            let request = this.build_compaction_request(insertion_ix, &model, cx);
+            let request = match strategy {
+                AutoCompactStrategy::Summarize => {
+                    Some(this.build_compaction_request(insertion_ix, &model, cx))
+                }
+                AutoCompactStrategy::Trim => None,
+            };
             this.current_request_token_usage = TokenUsage::default();
             // Preserve telemetry across retries so the retry count keeps
             // accumulating rather than resetting on each attempt.
             if this.pending_compaction_telemetry.is_none() {
                 this.pending_compaction_telemetry = this.build_compaction_telemetry("auto", cx);
             }
-            Some((model, request, insertion_ix))
+            Some((strategy, model, request, insertion_ix))
         })?
         else {
             return Ok(ControlFlow::Continue(()));
         };
 
-        Self::stream_compaction(
-            this,
-            event_stream,
-            cancellation_rx,
-            model,
-            request,
-            CompactionInsertion::Auto { insertion_ix },
-            cx,
-        )
-        .await
+        match strategy {
+            AutoCompactStrategy::Summarize => {
+                let Some(request) = request else {
+                    anyhow::bail!("missing summarization request for auto-compaction")
+                };
+                Self::stream_compaction(
+                    this,
+                    event_stream,
+                    cancellation_rx,
+                    model,
+                    request,
+                    CompactionInsertion::Auto { insertion_ix },
+                    cx,
+                )
+                .await
+            }
+            AutoCompactStrategy::Trim => {
+                Self::trim_compaction(this, event_stream, insertion_ix, cx).await
+            }
+        }
+    }
+
+    async fn trim_compaction(
+        this: &WeakEntity<Self>,
+        event_stream: &ThreadEventStream,
+        insertion_ix: usize,
+        cx: &mut AsyncApp,
+    ) -> Result<ControlFlow<()>> {
+        let compaction_id = acp_thread::ContextCompactionId(Uuid::new_v4().to_string().into());
+        event_stream.send_context_compaction(
+            compaction_id.clone(),
+            acp_thread::ContextCompactionStatus::InProgress,
+        );
+        this.update(cx, |this, cx| {
+            let compaction = Arc::new(Message::Compaction(CompactionInfo::Trimmed));
+            if insertion_ix <= this.messages.len() {
+                this.messages.insert(insertion_ix, compaction);
+            } else {
+                this.messages.push(compaction);
+            }
+            this.pending_compaction_telemetry.take();
+            cx.notify();
+        })?;
+        event_stream.update_context_compaction_status(
+            compaction_id,
+            acp_thread::ContextCompactionStatus::Completed,
+        );
+        Ok(ControlFlow::Continue(()))
     }
 
     async fn stream_compaction(
@@ -3100,15 +3245,21 @@ impl Thread {
     }
 
     fn handle_text_event(&mut self, new_text: String, event_stream: &ThreadEventStream) {
-        event_stream.send_text(&new_text);
-
         let last_message = self.pending_message();
         if let Some(AgentMessageContent::Text(text)) = last_message.content.last_mut() {
-            text.push_str(&new_text);
+            if let Some(emitted_text) =
+                crate::large_response_handler::append_text_chunk(text, &new_text)
+            {
+                event_stream.send_text(&emitted_text);
+            }
         } else {
-            last_message
-                .content
-                .push(AgentMessageContent::Text(new_text));
+            let mut text = String::new();
+            if let Some(emitted_text) =
+                crate::large_response_handler::append_text_chunk(&mut text, &new_text)
+            {
+                event_stream.send_text(&emitted_text);
+            }
+            last_message.content.push(AgentMessageContent::Text(text));
         }
     }
 
@@ -3245,9 +3396,41 @@ impl Thread {
         tool_event_stream.update_fields(
             acp::ToolCallUpdateFields::new().status(acp::ToolCallStatus::InProgress),
         );
+        let hooks = self.hooks.clone();
+        let hook_context = ToolHookContext {
+            agent: self.hook_context(),
+            tool_use_id: tool_use_id.clone(),
+            tool_name: tool_name.clone(),
+        };
         let supports_images = self.model().is_some_and(|model| model.supports_images());
         let tool_result = tool.run(tool_input, tool_event_stream, cx);
         cx.foreground_executor().spawn(async move {
+            match hooks.before_tool(hook_context.clone()).await {
+                Ok(HookFlow::Continue) => {}
+                Ok(HookFlow::Abort { message }) => {
+                    return LanguageModelToolResult {
+                        tool_use_id: tool_use_id.clone(),
+                        tool_name: tool_name.clone(),
+                        is_error: true,
+                        content: vec![LanguageModelToolResultContent::Text(Arc::from(format!(
+                            "Tool call aborted by hook: {message}"
+                        )))],
+                        output: None,
+                    };
+                }
+                Err(error) => {
+                    return LanguageModelToolResult {
+                        tool_use_id: tool_use_id.clone(),
+                        tool_name: tool_name.clone(),
+                        is_error: true,
+                        content: vec![LanguageModelToolResultContent::Text(Arc::from(format!(
+                            "Tool hook failed: {error}"
+                        )))],
+                        output: None,
+                    };
+                }
+            }
+
             let (is_error, output) = match tool_result.await {
                 Ok(mut output) => {
                     let contains_image = output
@@ -3291,12 +3474,22 @@ impl Thread {
                 Err(output) => (true, output),
             };
 
-            LanguageModelToolResult {
+            let result = LanguageModelToolResult {
                 tool_use_id,
                 tool_name,
                 is_error,
                 content: output.llm_output,
                 output: Some(output.raw_output),
+            };
+            match hooks.after_tool(hook_context, result.clone()).await {
+                Ok(result) => result,
+                Err(error) => LanguageModelToolResult {
+                    is_error: true,
+                    content: vec![LanguageModelToolResultContent::Text(Arc::from(format!(
+                        "Tool hook failed: {error}"
+                    )))],
+                    ..result
+                },
             }
         })
     }
@@ -6024,6 +6217,7 @@ mod tests {
                     cx,
                     agent_settings::AutoCompactSettings {
                         enabled: true,
+                        strategy: AutoCompactStrategy::default(),
                         threshold: AutoCompactThreshold::TokensRemaining(20_000),
                     },
                 );
@@ -6061,6 +6255,7 @@ mod tests {
                 cx,
                 agent_settings::AutoCompactSettings {
                     enabled: false,
+                    strategy: AutoCompactStrategy::default(),
                     threshold: AutoCompactThreshold::Percentage(0.9),
                 },
             );
@@ -6093,6 +6288,7 @@ mod tests {
                 cx,
                 agent_settings::AutoCompactSettings {
                     enabled: true,
+                    strategy: AutoCompactStrategy::default(),
                     threshold: AutoCompactThreshold::TokensUsed(100_000),
                 },
             );
@@ -6126,6 +6322,7 @@ mod tests {
                     cx,
                     agent_settings::AutoCompactSettings {
                         enabled: true,
+                        strategy: AutoCompactStrategy::default(),
                         threshold: AutoCompactThreshold::TokensRemaining(20_000),
                     },
                 );
@@ -6431,6 +6628,69 @@ mod tests {
         assert!(model.pending_completions().is_empty());
         thread.read_with(cx, |thread, _cx| {
             assert!(thread.messages.is_empty());
+        });
+    }
+
+    #[gpui::test]
+    async fn test_trim_auto_compaction_inserts_boundary_without_summarization(
+        cx: &mut TestAppContext,
+    ) {
+        let (thread, _event_stream) = setup_thread_for_test(cx).await;
+        let model = Arc::new(FakeLanguageModel::default());
+        let old_user_message_id = UserMessageId::new();
+        let new_user_message_id = UserMessageId::new();
+
+        cx.update(|cx| {
+            set_auto_compact_settings(
+                cx,
+                agent_settings::AutoCompactSettings {
+                    enabled: true,
+                    strategy: AutoCompactStrategy::Trim,
+                    threshold: AutoCompactThreshold::Percentage(0.9),
+                },
+            );
+            thread.update(cx, |thread, cx| {
+                thread.set_model(model.clone(), cx);
+                thread
+                    .messages
+                    .push(user_text_message(old_user_message_id.clone(), "old user"));
+                thread.messages.push(agent_text_message("old assistant"));
+                thread.request_token_usage.insert(
+                    old_user_message_id.clone(),
+                    language_model::TokenUsage {
+                        input_tokens: 960_000,
+                        ..Default::default()
+                    },
+                );
+            });
+        });
+
+        let _events = cx
+            .update(|cx| {
+                thread.update(cx, |thread, cx| {
+                    thread.send(new_user_message_id, vec!["new prompt"], cx)
+                })
+            })
+            .unwrap();
+        cx.run_until_parked();
+
+        let pending_completions = model.pending_completions();
+        assert_eq!(pending_completions.len(), 1);
+        let final_request = pending_completions.into_iter().next().unwrap();
+        assert_eq!(final_request.intent, Some(CompletionIntent::UserPrompt));
+        assert_eq!(
+            request_texts_after_system(&final_request.messages),
+            vec!["new prompt".to_string()]
+        );
+
+        thread.read_with(cx, |thread, _cx| {
+            assert!(matches!(&*thread.messages[0], Message::User(_)));
+            assert!(matches!(&*thread.messages[1], Message::Agent(_)));
+            assert!(matches!(
+                &*thread.messages[2],
+                Message::Compaction(CompactionInfo::Trimmed)
+            ));
+            assert!(matches!(&*thread.messages[3], Message::User(_)));
         });
     }
 

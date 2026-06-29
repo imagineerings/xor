@@ -1,5 +1,5 @@
 use gpui::{Action, IntoElement, ParentElement, RenderOnce, point};
-use language_model::{IconOrSvg, LanguageModelRegistry, BAYMAX_CLOUD_PROVIDER_ID};
+use language_model::{BAYMAX_CLOUD_PROVIDER_ID, IconOrSvg, LanguageModelRegistry};
 use ui::{Divider, List, ListBulletItem, prelude::*};
 
 pub struct ApiKeysWithProviders {
@@ -143,7 +143,8 @@ impl RenderOnce for ApiKeysWithoutProviders {
                     .full_width()
                     .style(ButtonStyle::Outlined)
                     .on_click(move |_, window, cx| {
-                        window.dispatch_action(baymax_actions::agent::OpenSettings.boxed_clone(), cx);
+                        window
+                            .dispatch_action(baymax_actions::agent::OpenSettings.boxed_clone(), cx);
                     }),
             )
     }

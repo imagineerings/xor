@@ -3,7 +3,7 @@ use std::sync::Arc;
 use client::{Client, UserStore};
 use cloud_api_types::Plan;
 use gpui::{Entity, IntoElement, ParentElement};
-use language_model::{LanguageModelRegistry, BAYMAX_CLOUD_PROVIDER_ID};
+use language_model::{BAYMAX_CLOUD_PROVIDER_ID, LanguageModelRegistry};
 use ui::prelude::*;
 
 use crate::{AgentPanelOnboardingCard, ApiKeysWithoutProviders, BaymaxAiOnboarding};
@@ -48,7 +48,9 @@ impl AgentPanelOnboarding {
         LanguageModelRegistry::read_global(cx)
             .visible_providers()
             .iter()
-            .any(|provider| provider.is_authenticated(cx) && provider.id() != BAYMAX_CLOUD_PROVIDER_ID)
+            .any(|provider| {
+                provider.is_authenticated(cx) && provider.id() != BAYMAX_CLOUD_PROVIDER_ID
+            })
     }
 }
 

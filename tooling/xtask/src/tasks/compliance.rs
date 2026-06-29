@@ -143,7 +143,9 @@ async fn check_compliance_impl(args: ComplianceArgs) -> Result<()> {
 
     for report in report.errors() {
         if let Some(pr_number) = report.commit.pr_number()
-            && let Ok(pull_request) = client.get_pull_request(&Repository::BAYMAX, pr_number).await
+            && let Ok(pull_request) = client
+                .get_pull_request(&Repository::BAYMAX, pr_number)
+                .await
             && pull_request.labels.is_none_or(|labels| {
                 labels
                     .iter()

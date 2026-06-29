@@ -14,7 +14,7 @@ use gpui::BackgroundExecutor;
 use language::LanguageName;
 use lsp::LanguageServerName;
 use release_channel::ReleaseChannel;
-use task::{DebugScenario, SpawnInTerminal, TaskTemplate, BaymaxDebugConfig};
+use task::{BaymaxDebugConfig, DebugScenario, SpawnInTerminal, TaskTemplate};
 
 use latest::dap::StartDebuggingRequestArgumentsRequest;
 

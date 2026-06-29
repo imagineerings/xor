@@ -3803,7 +3803,10 @@ fn checkpoint_author_envs() -> HashMap<String, String> {
         ("GIT_AUTHOR_NAME".to_string(), "Baymax".to_string()),
         ("GIT_AUTHOR_EMAIL".to_string(), "hi@baymax.dev".to_string()),
         ("GIT_COMMITTER_NAME".to_string(), "Baymax".to_string()),
-        ("GIT_COMMITTER_EMAIL".to_string(), "hi@baymax.dev".to_string()),
+        (
+            "GIT_COMMITTER_EMAIL".to_string(),
+            "hi@baymax.dev".to_string(),
+        ),
     ])
 }
 

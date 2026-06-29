@@ -1208,7 +1208,8 @@ mod git_worktrees {
 
         // Valid: subdirectory
         assert!(
-            worktrees_directory_for_repo(work_dir, ".git/baymax-worktrees", PathStyle::Posix).is_ok()
+            worktrees_directory_for_repo(work_dir, ".git/baymax-worktrees", PathStyle::Posix)
+                .is_ok()
         );
         assert!(worktrees_directory_for_repo(work_dir, "my-worktrees", PathStyle::Posix).is_ok());
 
@@ -1772,7 +1773,11 @@ mod resolve_worktree_tests {
                 "/home/bob/worktrees/olivetti/baymax",
                 Some("olivetti".into()),
             ),
-            ("/home/bob/baymax", "/home/bob/baymax2", Some("baymax2".into())),
+            (
+                "/home/bob/baymax",
+                "/home/bob/baymax2",
+                Some("baymax2".into()),
+            ),
             (
                 "/home/bob/baymax",
                 "/home/bob/worktrees/baymax/selectric",

@@ -584,9 +584,16 @@ impl AutoUpdater {
                 .context("auto-update not initialized")
         })?;
 
-        let release =
-            Self::get_release_asset(&this, channel, version, "baymax-remote-server", os, arch, cx)
-                .await?;
+        let release = Self::get_release_asset(
+            &this,
+            channel,
+            version,
+            "baymax-remote-server",
+            os,
+            arch,
+            cx,
+        )
+        .await?;
 
         Ok(Some(release.url))
     }
@@ -1334,7 +1341,10 @@ mod tests {
         cx.update(|cx| cx.restart());
         let path = will_restart.await.unwrap().unwrap();
         assert_eq!(path, tmp_dir.path().join("baymax"));
-        assert_eq!(std::fs::read_to_string(path).unwrap(), "<fake-baymax-update>");
+        assert_eq!(
+            std::fs::read_to_string(path).unwrap(),
+            "<fake-baymax-update>"
+        );
     }
 
     #[test]

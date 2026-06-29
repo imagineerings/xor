@@ -25,7 +25,10 @@ fn parse_resize_behavior(
         } else if col.starts_with('*') {
             resize_behavior.push(TableResizeBehavior::MinSize(col.len() as f32 / total_size));
         } else {
-            panic!("invalid test input: unrecognibaymax resize behavior: {}", col);
+            panic!(
+                "invalid test input: unrecognibaymax resize behavior: {}",
+                col
+            );
         }
     }
 

@@ -19,6 +19,7 @@ use ui::{
     WithScrollbar as _, prelude::*, rems_from_px,
 };
 
+use baymax_actions::OpenOnboarding;
 pub use workspace::welcome::ShowWelcome;
 use workspace::welcome::WelcomePage;
 use workspace::{
@@ -28,7 +29,6 @@ use workspace::{
     notifications::NotifyResultExt as _,
     open_new, register_serializable_item, with_active_or_new_workspace,
 };
-use baymax_actions::OpenOnboarding;
 
 mod base_keymap_picker;
 mod basics_page;
@@ -346,7 +346,10 @@ impl Render for Onboarding {
                                     .child(
                                         h_flex()
                                             .gap_4()
-                                            .child(Vector::square(VectorName::BaymaxLogo, rems(2.5)))
+                                            .child(Vector::square(
+                                                VectorName::BaymaxLogo,
+                                                rems(2.5),
+                                            ))
                                             .child(
                                                 v_flex()
                                                     .child(

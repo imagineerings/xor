@@ -1,4 +1,5 @@
 mod apply_code_action_tool;
+mod code_execution;
 mod context_server_registry;
 mod copy_path_tool;
 mod create_directory_tool;
@@ -10,6 +11,7 @@ mod edit_session;
 #[cfg(all(test, feature = "unit-eval"))]
 mod evals;
 mod fetch_tool;
+mod final_output_tool;
 mod find_path_tool;
 mod find_references_tool;
 mod get_code_actions_tool;
@@ -18,12 +20,16 @@ mod grep_tool;
 mod list_agents_and_models_tool;
 mod list_directory_tool;
 mod move_path_tool;
+mod orchestrator;
+mod platform_extension_tools;
 mod read_file_tool;
 mod rename_tool;
 mod skill_tool;
 mod spawn_agent_tool;
+mod summarize;
 mod symbol_locator;
 mod terminal_tool;
+mod todo;
 mod tool_permissions;
 mod web_search_tool;
 mod write_file_tool;
@@ -63,6 +69,7 @@ where
 }
 
 pub use apply_code_action_tool::*;
+pub use code_execution::*;
 pub use context_server_registry::*;
 pub use copy_path_tool::*;
 pub use create_directory_tool::*;
@@ -71,6 +78,7 @@ pub use delete_path_tool::*;
 pub use diagnostics_tool::*;
 pub use edit_file_tool::*;
 pub use fetch_tool::*;
+pub use final_output_tool::*;
 pub use find_path_tool::*;
 pub use find_references_tool::*;
 pub use get_code_actions_tool::*;
@@ -79,12 +87,16 @@ pub use grep_tool::*;
 pub use list_agents_and_models_tool::*;
 pub use list_directory_tool::*;
 pub use move_path_tool::*;
+pub use orchestrator::*;
+pub use platform_extension_tools::*;
 pub use read_file_tool::*;
 pub use rename_tool::*;
 pub use skill_tool::*;
 pub use spawn_agent_tool::*;
+pub use summarize::*;
 pub use symbol_locator::*;
 pub use terminal_tool::*;
+pub use todo::*;
 pub use tool_permissions::*;
 pub use web_search_tool::*;
 pub use write_file_tool::*;
@@ -173,14 +185,20 @@ macro_rules! tools {
 //    are dropped unless it is active. The agent-profile UI uses the same gate so
 //    it never offers a tool the agent can't actually use.
 tools! {
+    AnalyzeTool,
+    AppsTool,
     ApplyCodeActionTool,
+    ChatrecallTool,
+    CodeExecutionTool,
     CopyPathTool,
     CreateDirectoryTool,
     CreateThreadTool,
     DeletePathTool,
+    DeveloperTool,
     DiagnosticsTool,
     EditFileTool,
     FetchTool,
+    FinalOutputTool,
     FindPathTool,
     FindReferencesTool,
     GetCodeActionsTool,
@@ -189,11 +207,16 @@ tools! {
     ListAgentsAndModelsTool,
     ListDirectoryTool,
     MovePathTool,
+    OrchestratorTool,
     ReadFileTool,
     RenameTool,
     SkillTool,
     SpawnAgentTool,
+    SummarizeTool,
     TerminalTool,
+    TodoTool,
+    TomTool,
+    SummonTool,
     WebSearchTool,
     WriteFileTool,
 }

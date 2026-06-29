@@ -3665,7 +3665,8 @@ mod tests {
 
     #[gpui::test]
     async fn test_hyperlink_ctrl_click_same_position(cx: &mut TestAppContext) {
-        let terminal = init_ctrl_click_hyperlink_test(cx, b"Visit https://baymax.dev/ for more\r\n");
+        let terminal =
+            init_ctrl_click_hyperlink_test(cx, b"Visit https://baymax.dev/ for more\r\n");
 
         terminal.update(cx, |terminal, cx| {
             let click_position = point(px(80.0), px(10.0));
@@ -3709,7 +3710,8 @@ mod tests {
 
     #[gpui::test]
     async fn test_hyperlink_ctrl_click_drag_within_bounds(cx: &mut TestAppContext) {
-        let terminal = init_ctrl_click_hyperlink_test(cx, b"Visit https://baymax.dev/ for more\r\n");
+        let terminal =
+            init_ctrl_click_hyperlink_test(cx, b"Visit https://baymax.dev/ for more\r\n");
 
         terminal.update(cx, |terminal, cx| {
             let down_position = point(px(70.0), px(10.0));

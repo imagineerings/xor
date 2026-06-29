@@ -5,6 +5,7 @@ use acp_thread::{
 };
 
 use anyhow::Result;
+use baymax_actions::agent::OpenSettings;
 use collections::{HashSet, IndexMap};
 use futures::FutureExt;
 use fuzzy::{StringMatchCandidate, match_strings};
@@ -18,7 +19,6 @@ use picker::{Picker, PickerDelegate};
 use settings::SettingsStore;
 use ui::{DocumentationAside, IntoElement, prelude::*};
 use util::ResultExt;
-use baymax_actions::agent::OpenSettings;
 
 use crate::ui::{
     ModelSelectorFooter, ModelSelectorHeader, ModelSelectorListItem, documentation_aside_side,
@@ -684,7 +684,10 @@ mod tests {
         let results = fuzzy_search(models.clone(), "mini".into(), cx.executor()).await;
         assert_models_eq(
             results,
-            vec![("baymax", vec!["gpt-5-mini"]), ("openai", vec!["gpt-5-mini"])],
+            vec![
+                ("baymax", vec!["gpt-5-mini"]),
+                ("openai", vec!["gpt-5-mini"]),
+            ],
         );
 
         // Fuzzy search - test with specific model name

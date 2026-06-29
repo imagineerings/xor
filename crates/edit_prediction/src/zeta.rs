@@ -1,7 +1,7 @@
 use crate::{
-    CloudRequestTimeoutError, CurrentEditPrediction, DebugEvent, EditPredictionFinishedDebugEvent,
-    EditPredictionId, EditPredictionModelInput, EditPredictionStartedDebugEvent,
-    EditPredictionStore, BaymaxUpdateRequiredError, buffer_path_with_id_fallback,
+    BaymaxUpdateRequiredError, CloudRequestTimeoutError, CurrentEditPrediction, DebugEvent,
+    EditPredictionFinishedDebugEvent, EditPredictionId, EditPredictionModelInput,
+    EditPredictionStartedDebugEvent, EditPredictionStore, buffer_path_with_id_fallback,
     cursor_excerpt::{self, compute_cursor_excerpt, compute_syntax_ranges},
     data_collection::UncommittedDiffResult,
     prediction::EditPredictionResult,

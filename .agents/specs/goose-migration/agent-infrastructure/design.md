@@ -15,7 +15,7 @@ Migrate ~17 foundational agent infrastructure features from goose into baymax's 
   - Doctor → new `crates/doctor/`
   - Download manager → new `crates/download_manager/`
   - Config migrations → `crates/settings/`
-  - Goose mode → `crates/agent_settings/`
+  - Baymax mode → `crates/agent_settings/`
   - Misc (instance_id, subprocess, prompt_template, etc.) → `crates/util/` or small modules
 
 ## 2. Architecture
@@ -40,7 +40,7 @@ graph TD
 
     subgraph "crates/settings/ + crates/agent_settings/"
         ConfigMigrate[ConfigMigrations]
-        GooseMode[GooseMode]
+        BaymaxMode[BaymaxMode]
     end
 
     subgraph "crates/util/ + small modules"
@@ -207,17 +207,17 @@ pub trait Migration: Send + Sync {
 }
 ```
 
-### Component: Goose Mode
+### Component: Baymax Mode
 
 ```rust
-pub enum GooseMode {
+pub enum BaymaxMode {
     Balanced,
     Focus,
     Creative,
     Custom { prompt_override: String, temperature: Option<f32> },
 }
 
-impl GooseMode {
+impl BaymaxMode {
     pub fn system_prompt_modifier(&self) -> &str;
     pub fn temperature(&self) -> Option<f32>;
 }

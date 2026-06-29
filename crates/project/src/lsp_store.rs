@@ -12392,7 +12392,9 @@ impl LspStore {
         let start = serialibaymax_symbol.start.context("invalid start")?;
         let end = serialibaymax_symbol.end.context("invalid end")?;
         Ok(CoreSymbol {
-            language_server_name: LanguageServerName(serialibaymax_symbol.language_server_name.into()),
+            language_server_name: LanguageServerName(
+                serialibaymax_symbol.language_server_name.into(),
+            ),
             source_worktree_id,
             source_language_server_id: LanguageServerId::from_proto(
                 serialibaymax_symbol.language_server_id,
@@ -12430,7 +12432,8 @@ impl LspStore {
                 serialibaymax_completion.old_insert_end = old_insert_end;
                 serialibaymax_completion.source = proto::completion::Source::Lsp as i32;
                 serialibaymax_completion.server_id = server_id.0 as u64;
-                serialibaymax_completion.lsp_completion = serde_json::to_vec(lsp_completion).unwrap();
+                serialibaymax_completion.lsp_completion =
+                    serde_json::to_vec(lsp_completion).unwrap();
                 serialibaymax_completion.lsp_defaults = lsp_defaults
                     .as_deref()
                     .map(|lsp_defaults| serde_json::to_vec(lsp_defaults).unwrap());
@@ -12441,7 +12444,8 @@ impl LspStore {
                 resolved,
             } => {
                 serialibaymax_completion.source = proto::completion::Source::BufferWord as i32;
-                serialibaymax_completion.buffer_word_start = Some(serialize_anchor(&word_range.start));
+                serialibaymax_completion.buffer_word_start =
+                    Some(serialize_anchor(&word_range.start));
                 serialibaymax_completion.buffer_word_end = Some(serialize_anchor(&word_range.end));
                 serialibaymax_completion.resolved = *resolved;
             }

@@ -4,7 +4,7 @@ pub mod room;
 
 use anyhow::{Context as _, Result, anyhow};
 use audio::Audio;
-use client::{ChannelId, Client, TypedEnvelope, User, UserStore, BAYMAX_ALWAYS_ACTIVE, proto};
+use client::{BAYMAX_ALWAYS_ACTIVE, ChannelId, Client, TypedEnvelope, User, UserStore, proto};
 use collections::HashSet;
 use futures::{Future, FutureExt, channel::oneshot, future::Shared};
 use gpui::{

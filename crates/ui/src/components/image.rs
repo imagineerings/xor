@@ -173,6 +173,9 @@ mod tests {
 
     #[test]
     fn vector_path() {
-        assert_eq!(VectorName::BaymaxLogo.path().as_ref(), "images/baymax_logo.svg");
+        assert_eq!(
+            VectorName::BaymaxLogo.path().as_ref(),
+            "images/baymax_logo.svg"
+        );
     }
 }

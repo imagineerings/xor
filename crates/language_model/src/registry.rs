@@ -1,6 +1,6 @@
 use crate::{
-    LanguageModel, LanguageModelId, LanguageModelProvider, LanguageModelProviderId,
-    LanguageModelProviderState, BAYMAX_CLOUD_PROVIDER_ID,
+    BAYMAX_CLOUD_PROVIDER_ID, LanguageModel, LanguageModelId, LanguageModelProvider,
+    LanguageModelProviderId, LanguageModelProviderState,
 };
 use collections::{BTreeMap, HashSet};
 use gpui::{App, Context, Entity, EventEmitter, Global, prelude::*};

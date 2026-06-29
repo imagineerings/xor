@@ -1,4 +1,4 @@
-use crate::{randomizedTest, TestClient, TestError, TestServer, UserTestPlan, run_randomized_test};
+use crate::{TestClient, TestError, TestServer, UserTestPlan, randomizedTest, run_randomized_test};
 use anyhow::{Context as _, Result};
 use async_trait::async_trait;
 use call::ActiveCall;

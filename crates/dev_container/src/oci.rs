@@ -203,8 +203,8 @@ mod test {
     use serde::Deserialize;
 
     use crate::oci::{
-        TokenResponse, download_oci_tarball, get_deserializable_oci_blob,
-        get_deserialibaymax_response, get_latest_oci_manifest, get_oci_token,
+        TokenResponse, download_oci_tarball, get_deserialibaymax_response,
+        get_deserializable_oci_blob, get_latest_oci_manifest, get_oci_token,
     };
 
     async fn build_test_tarball() -> Vec<u8> {
@@ -270,7 +270,8 @@ mod test {
         });
 
         let response =
-            get_deserialibaymax_response::<TokenResponse>("", "https://ghcr.io/token", &client).await;
+            get_deserialibaymax_response::<TokenResponse>("", "https://ghcr.io/token", &client)
+                .await;
         assert!(response.is_ok());
         assert_eq!(response.unwrap().token, "thisisatoken".to_string())
     }

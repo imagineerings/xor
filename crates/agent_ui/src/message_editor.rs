@@ -14,6 +14,7 @@ use agent::ThreadStore;
 use agent_client_protocol::schema as acp;
 use anyhow::{Result, anyhow};
 use base64::Engine as _;
+use baymax_actions::agent::{Chat, PasteRaw};
 use editor::{
     Addon, AnchorRangeExt, ContextMenuOptions, Editor, EditorElement, EditorEvent, EditorMode,
     EditorStyle, Inlay, MultiBuffer, MultiBufferOffset, MultiBufferSnapshot, ToOffset,
@@ -43,7 +44,6 @@ use ui::{ContextMenu, prelude::*};
 use util::paths::PathStyle;
 use util::{ResultExt, debug_panic};
 use workspace::{CollaboratorId, Workspace};
-use baymax_actions::agent::{Chat, PasteRaw};
 
 #[derive(Default)]
 pub struct SessionCapabilities {
@@ -2380,7 +2380,9 @@ mod tests {
         // an MCP server prefix — the dotted form `/baymax.deploy` is an
         // MCP-style lookup, which doesn't match here.
         MessageEditor::validate_slash_commands("/baymax.deploy", &commands, &skills, &agent_id)
-            .expect_err("/baymax.deploy (dotted) should be treated as an MCP-style prefix and fail");
+            .expect_err(
+                "/baymax.deploy (dotted) should be treated as an MCP-style prefix and fail",
+            );
 
         // Wrong scope is rejected so the resolver doesn't silently
         // fall through when the user meant a skill. `baymax:help` looks
@@ -5276,7 +5278,11 @@ mod tests {
             .decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==")
             .expect("decode png");
         let file_name = match extension {
-            Some(extension) => format!("baymax-agent-ui-test-{}.{}", uuid::Uuid::new_v4(), extension),
+            Some(extension) => format!(
+                "baymax-agent-ui-test-{}.{}",
+                uuid::Uuid::new_v4(),
+                extension
+            ),
             None => format!("baymax-agent-ui-test-{}", uuid::Uuid::new_v4()),
         };
         let path = std::env::temp_dir().join(file_name);

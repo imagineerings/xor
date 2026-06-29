@@ -45,6 +45,7 @@ use project::{AgentId, AgentServerStore, Project, ProjectEntryId, ProjectPath};
 
 use crate::message_editor::SessionCapabilities;
 use crate::{AgentThreadSource, DEFAULT_THREAD_TITLE, resolve_agent_image};
+use baymax_actions::agent::{Chat, ToggleModelSelector};
 use lru::LruCache;
 use rope::Point;
 use settings::{NotifyWhenAgentWaiting, Settings as _, SettingsStore, ThinkingBlockDisplay};
@@ -73,7 +74,6 @@ use workspace::{
     CollaboratorId, MultiWorkspace, NewTerminal, PathList, Toast, Workspace,
     path_link::sanitize_path_text,
 };
-use baymax_actions::agent::{Chat, ToggleModelSelector};
 
 use super::config_options::ConfigOptionsView;
 use super::entry_view_state::EntryViewState;

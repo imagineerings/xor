@@ -1,6 +1,6 @@
 use crate::{Channel, ChannelStore};
 use anyhow::Result;
-use client::{ChannelId, Client, Collaborator, UserStore, BAYMAX_ALWAYS_ACTIVE};
+use client::{BAYMAX_ALWAYS_ACTIVE, ChannelId, Client, Collaborator, UserStore};
 use collections::HashMap;
 use gpui::{App, AppContext as _, AsyncApp, Context, Entity, EventEmitter, Task};
 use language::proto::serialize_version;

@@ -2,6 +2,7 @@ pub mod archive;
 pub mod command;
 pub mod disambiguate;
 pub mod fs;
+pub mod instance_id;
 pub mod markdown;
 pub mod path_list;
 pub mod paths;
@@ -14,6 +15,7 @@ pub mod shell;
 pub mod shell_builder;
 pub mod shell_env;
 pub mod size;
+pub mod subprocess;
 #[cfg(any(test, feature = "test-support"))]
 pub mod test;
 pub mod time;

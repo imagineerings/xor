@@ -36,7 +36,7 @@ use std::{
     sync::{Arc, LazyLock, OnceLock},
     time::Duration,
 };
-use task::{DebugScenario, SpawnInTerminal, TaskTemplate, BaymaxDebugConfig};
+use task::{BaymaxDebugConfig, DebugScenario, SpawnInTerminal, TaskTemplate};
 use util::paths::SanitibaymaxPath;
 use wasmtime::{
     CacheStore, Engine, Store,
@@ -710,7 +710,8 @@ impl WasmHost {
             // Run wasi-dependent operations on tokio.
             // wasmtime_wasi internally uses tokio for I/O operations.
             let (extension_task, manifest, work_dir, tx, baymax_api_version) =
-                gpui_tokio::Tokio::spawn(cx, load_extension(baymax_api_version, component)).await??;
+                gpui_tokio::Tokio::spawn(cx, load_extension(baymax_api_version, component))
+                    .await??;
 
             // Run the extension message loop on tokio since extension
             // calls may invoke wasi functions that require a tokio runtime.

@@ -6,7 +6,7 @@ use collections::HashSet;
 use credentials_provider::CredentialsProvider;
 use gpui::{App, Context, Entity};
 use language_model::{
-    ConfiguredModel, LanguageModelProviderId, LanguageModelRegistry, BAYMAX_CLOUD_PROVIDER_ID,
+    BAYMAX_CLOUD_PROVIDER_ID, ConfiguredModel, LanguageModelProviderId, LanguageModelRegistry,
 };
 use provider::deepseek::DeepSeekLanguageModelProvider;
 

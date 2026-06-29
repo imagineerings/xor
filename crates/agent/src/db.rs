@@ -3,6 +3,7 @@ use acp_thread::UserMessageId;
 use agent_client_protocol::schema as acp;
 use agent_settings::AgentProfileId;
 use anyhow::{Result, anyhow};
+use baymax_env_vars::BAYMAX_STATELESS;
 use chrono::{DateTime, Utc};
 use collections::{HashMap, IndexMap};
 use futures::{FutureExt, future::Shared};
@@ -19,7 +20,6 @@ use sqlez::{
 use std::{io::ErrorKind, path::PathBuf, sync::Arc};
 use ui::{App, SharedString};
 use util::path_list::PathList;
-use baymax_env_vars::BAYMAX_STATELESS;
 
 pub type DbMessage = crate::Message;
 pub type DbSummary = crate::legacy_thread::DetailedSummaryState;
@@ -161,13 +161,13 @@ impl DbThread {
         match saved_thread_json.get("version") {
             Some(serde_json::Value::String(version)) => match version.as_str() {
                 Self::VERSION => Ok(serde_json::from_value(saved_thread_json)?),
-                _ => Self::upgrade_from_agent_1(crate::legacy_thread::SerialibaymaxThread::from_json(
-                    json,
-                )?),
+                _ => Self::upgrade_from_agent_1(
+                    crate::legacy_thread::SerialibaymaxThread::from_json(json)?,
+                ),
             },
-            _ => {
-                Self::upgrade_from_agent_1(crate::legacy_thread::SerialibaymaxThread::from_json(json)?)
-            }
+            _ => Self::upgrade_from_agent_1(crate::legacy_thread::SerialibaymaxThread::from_json(
+                json,
+            )?),
         }
     }
 

@@ -1,9 +1,16 @@
+mod action_required_manager;
+mod builtin_extensions;
 mod db;
+mod extension_malware_check;
+mod hooks;
+mod large_response_handler;
 mod legacy_thread;
 mod native_agent_server;
 pub mod outline;
 mod pattern_extraction;
+mod platform_extensions;
 mod sandboxing;
+mod snapshot;
 mod templates;
 #[cfg(test)]
 mod tests;
@@ -12,12 +19,18 @@ mod thread_store;
 mod tool_permissions;
 mod tools;
 
+pub use action_required_manager::*;
+pub use builtin_extensions::*;
 use context_server::ContextServerId;
 pub use db::*;
+pub use extension_malware_check::*;
+pub use hooks::*;
 use itertools::Itertools;
 pub use native_agent_server::NativeAgentServer;
 pub use pattern_extraction::*;
+pub use platform_extensions::*;
 pub use shell_command_parser::extract_commands;
+pub use snapshot::*;
 pub use templates::*;
 pub use thread::*;
 pub use thread_store::*;
@@ -3309,6 +3322,13 @@ impl SubagentHandle for NativeSubagentHandle {
                 .ok();
 
             result
+        })
+    }
+
+    fn cancel(&self, cx: &AsyncApp) -> Task<()> {
+        let acp_thread = self.acp_thread.clone();
+        cx.spawn(async move |cx| {
+            acp_thread.update(cx, |thread, cx| thread.cancel(cx)).await;
         })
     }
 }

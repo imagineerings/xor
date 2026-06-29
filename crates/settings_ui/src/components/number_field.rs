@@ -11,12 +11,12 @@ use gpui::{
     TextStyleRefinement, WeakEntity,
 };
 
+use baymax_actions::editor::{MoveDown, MoveUp};
 use settings::{
     CenteredPaddingSettings, CodeFade, DelayMs, FontSize, FontWeightContent, InactiveOpacity,
     MinimumContrast,
 };
 use ui::prelude::*;
-use baymax_actions::editor::{MoveDown, MoveUp};
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum NumberFieldMode {

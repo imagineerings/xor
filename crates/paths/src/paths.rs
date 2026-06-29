@@ -114,7 +114,9 @@ pub fn set_custom_data_dir(dir: &str) -> &'static PathBuf {
         // with `\\?\`. Strip that prefix so downstream consumers (e.g.
         // Node.js language servers) that receive derived paths as arguments
         // don't choke on the verbatim syntax.
-        SanitibaymaxPath::new(&canonicalibaymax).as_path().to_path_buf()
+        SanitibaymaxPath::new(&canonicalibaymax)
+            .as_path()
+            .to_path_buf()
     })
 }
 

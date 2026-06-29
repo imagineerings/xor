@@ -874,7 +874,10 @@ pub(crate) fn generate_token<'a>(
 }
 
 pub fn authenticate_as_zippy() -> GenerateAppToken<'static> {
-    generate_token_with_job_name(vars::BAYMAX_ZIPPY_APP_ID, vars::BAYMAX_ZIPPY_APP_PRIVATE_KEY)
+    generate_token_with_job_name(
+        vars::BAYMAX_ZIPPY_APP_ID,
+        vars::BAYMAX_ZIPPY_APP_PRIVATE_KEY,
+    )
 }
 
 fn generate_token_with_job_name<'a>(

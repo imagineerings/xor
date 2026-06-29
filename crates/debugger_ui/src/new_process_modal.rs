@@ -21,7 +21,7 @@ use gpui::{
 use itertools::Itertools as _;
 use picker::{Picker, PickerDelegate, highlighted_match_with_paths::HighlightedMatch};
 use project::{DebugScenarioContext, Project, TaskContexts, TaskSourceKind, task_store::TaskStore};
-use task::{DebugScenario, RevealTarget, SharedTaskContext, VariableName, BaymaxDebugConfig};
+use task::{BaymaxDebugConfig, DebugScenario, RevealTarget, SharedTaskContext, VariableName};
 use ui::{
     ContextMenu, DropdownMenu, IconWithIndicator, Indicator, KeyBinding, ListItem, ListItemSpacing,
     Switch, SwitchLabelPosition, ToggleButtonGroup, ToggleButtonSimple, ToggleState, Tooltip,
@@ -341,7 +341,12 @@ impl NewProcessModal {
             .global::<DapRegistry>()
             .adapter(&session_scenario.adapter);
 
-        cx.spawn(async move |_| adapter?.config_from_baymax_format(session_scenario).await.ok())
+        cx.spawn(async move |_| {
+            adapter?
+                .config_from_baymax_format(session_scenario)
+                .await
+                .ok()
+        })
     }
 
     fn start_new_session(&mut self, window: &mut Window, cx: &mut Context<Self>) {

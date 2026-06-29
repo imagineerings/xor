@@ -848,7 +848,9 @@ impl BreakpointStore {
                         })?
                         .await;
                     let Ok(buffer) = buffer else {
-                        log::error!("Todo: Serialibaymax breakpoints which do not have buffer (yet)");
+                        log::error!(
+                            "Todo: Serialibaymax breakpoints which do not have buffer (yet)"
+                        );
                         continue;
                     };
                     let snapshot = buffer.read_with(cx, |buffer, _| buffer.snapshot());
@@ -860,7 +862,9 @@ impl BreakpointStore {
                         let max_point = snapshot.max_point_utf16();
                         let point = PointUtf16::new(bp.row, 0);
                         if point > max_point {
-                            log::error!("skipping a deserialibaymax breakpoint that's out of range");
+                            log::error!(
+                                "skipping a deserialibaymax breakpoint that's out of range"
+                            );
                             continue;
                         }
                         let position = snapshot.anchor_after(point);

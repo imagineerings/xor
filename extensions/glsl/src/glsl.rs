@@ -1,5 +1,5 @@
-use std::fs;
 use baymax::settings::LspSettings;
+use std::fs;
 use zed_extension_api::{self as baymax, LanguageServerId, Result, serde_json};
 
 struct GlslExtension {

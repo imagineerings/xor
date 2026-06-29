@@ -1,6 +1,6 @@
+use baymax_actions::agent::ToggleModelSelector;
 use gpui::{Action, ClickEvent, FocusHandle, prelude::*};
 use ui::{Chip, ElevationIndex, KeyBinding, ListItem, ListItemSpacing, Tooltip, prelude::*};
-use baymax_actions::agent::ToggleModelSelector;
 
 use crate::CycleFavoriteModels;
 

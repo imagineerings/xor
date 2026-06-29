@@ -4,6 +4,7 @@ use acp_thread::AgentSessionConfigOptions;
 use agent_client_protocol::schema as acp;
 use agent_servers::AgentServer;
 
+use baymax_actions::agent::ToggleModelSelector;
 use collections::HashSet;
 use fs::Fs;
 use fuzzy::StringMatchCandidate;
@@ -19,7 +20,6 @@ use ui::{
     prelude::*,
 };
 use util::ResultExt as _;
-use baymax_actions::agent::ToggleModelSelector;
 
 use crate::ui::documentation_aside_side;
 use crate::{

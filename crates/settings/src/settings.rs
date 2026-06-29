@@ -3,6 +3,7 @@ mod content_into_gpui;
 mod editable_setting_control;
 mod editorconfig_store;
 mod keymap_file;
+pub mod migrations;
 mod settings_file;
 mod settings_store;
 mod vscode_import;
@@ -52,6 +53,9 @@ pub use settings_store::{
 pub use vscode_import::{VsCodeSettings, VsCodeSettingsSource};
 
 pub use keymap_file::ActionSequence;
+pub use migrations::{
+    SettingsMigration, SettingsMigrationStatus, detect_settings_migration, migrate_settings_config,
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ActiveSettingsProfileName(pub String);

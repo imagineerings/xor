@@ -7,8 +7,8 @@ use serde_json::json;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use task::{
-    DebugRequest, DebugScenario, LaunchRequest, SharedTaskContext, TaskContext, VariableName,
-    BaymaxDebugConfig,
+    BaymaxDebugConfig, DebugRequest, DebugScenario, LaunchRequest, SharedTaskContext, TaskContext,
+    VariableName,
 };
 use text::Point;
 use util::path;
@@ -112,7 +112,8 @@ async fn test_debug_session_substitutes_variables_and_relativizes_paths(
                         );
 
                         let expected_other_field = if input_path.contains("$BAYMAX_WORKTREE_ROOT") {
-                            input_path.replace("$BAYMAX_WORKTREE_ROOT", path!("/test/worktree/path"))
+                            input_path
+                                .replace("$BAYMAX_WORKTREE_ROOT", path!("/test/worktree/path"))
                         } else {
                             input_path.to_string()
                         };

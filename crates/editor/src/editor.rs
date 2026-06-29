@@ -131,6 +131,8 @@ pub use text::Bias;
 use ::git::status::FileStatus;
 use aho_corasick::{AhoCorasick, AhoCorasickBuilder, BuildError};
 use anyhow::{Context as _, Result, anyhow, bail};
+pub use baymax_actions::editor::RevealInFileManager;
+use baymax_actions::editor::{MoveDown, MoveUp};
 use blink_manager::BlinkManager;
 use client::{Collaborator, ParticipantIndex, parse_baymax_link};
 use clock::ReplicaId;
@@ -268,8 +270,6 @@ use workspace::{
     notifications::{DetachAndPromptErr, NotificationId, NotifyResultExt, NotifyTaskExt},
     searchable::SearchEvent,
 };
-pub use baymax_actions::editor::RevealInFileManager;
-use baymax_actions::editor::{MoveDown, MoveUp};
 
 use crate::{
     code_context_menus::CompletionsMenuSource,

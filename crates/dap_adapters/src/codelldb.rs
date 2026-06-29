@@ -7,7 +7,7 @@ use dap::adapters::{DebugTaskDefinition, latest_github_release};
 use futures::StreamExt;
 use gpui::AsyncApp;
 use serde_json::Value;
-use task::{DebugRequest, DebugScenario, BaymaxDebugConfig};
+use task::{BaymaxDebugConfig, DebugRequest, DebugScenario};
 use util::fs::remove_matching;
 
 use crate::*;
@@ -89,7 +89,10 @@ impl DebugAdapter for CodeLldbDebugAdapter {
         DebugAdapterName(Self::ADAPTER_NAME.into())
     }
 
-    async fn config_from_baymax_format(&self, baymax_scenario: BaymaxDebugConfig) -> Result<DebugScenario> {
+    async fn config_from_baymax_format(
+        &self,
+        baymax_scenario: BaymaxDebugConfig,
+    ) -> Result<DebugScenario> {
         let mut configuration = json!({
             "request": match baymax_scenario.request {
                 DebugRequest::Launch(_) => "launch",

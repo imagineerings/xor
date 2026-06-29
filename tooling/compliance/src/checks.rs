@@ -4,7 +4,7 @@ use futures::StreamExt;
 use itertools::Itertools as _;
 
 use crate::{
-    git::{AutomatedChangeKind, CommitDetails, CommitList, BAYMAX_ZIPPY_LOGIN},
+    git::{AutomatedChangeKind, BAYMAX_ZIPPY_LOGIN, CommitDetails, CommitList},
     github::{
         Approvable, CommitAuthor, CommitFileChange, CommitMetadata, GithubApiClient, GithubLogin,
         PullRequestComment, PullRequestData, PullRequestReview, Repository, ReviewState,
@@ -82,7 +82,10 @@ impl fmt::Display for ReviewFailure {
             Self::Unreviewed => formatter
                 .write_str("No qualifying organization approval found for the pull request"),
             Self::UnexpectedZippyAction(failure) => {
-                write!(formatter, "Validating Baymax Zippy change failed: {failure}")
+                write!(
+                    formatter,
+                    "Validating Baymax Zippy change failed: {failure}"
+                )
             }
             Self::Other(error) => write!(formatter, "Failed to inspect review state: {error}"),
         }
@@ -407,7 +410,8 @@ impl Reporter {
     }
 
     fn contains_approving_pattern(body: &str) -> bool {
-        body.contains(BAYMAX_ZIPPY_COMMENT_APPROVAL_PATTERN) || body.contains(BAYMAX_ZIPPY_GROUP_APPROVAL)
+        body.contains(BAYMAX_ZIPPY_COMMENT_APPROVAL_PATTERN)
+            || body.contains(BAYMAX_ZIPPY_GROUP_APPROVAL)
     }
 
     pub async fn generate_report(mut self, max_concurrent_checks: usize) -> Report {
@@ -450,7 +454,8 @@ mod tests {
     use std::str::FromStr;
 
     use crate::git::{
-        AutomatedChangeKind, CommitDetails, CommitList, CommitSha, BAYMAX_ZIPPY_EMAIL, BAYMAX_ZIPPY_LOGIN,
+        AutomatedChangeKind, BAYMAX_ZIPPY_EMAIL, BAYMAX_ZIPPY_LOGIN, CommitDetails, CommitList,
+        CommitSha,
     };
     use crate::github::{
         AuthorAssociation, CommitFileChange, CommitMetadataBySha, GithubApiClient, GithubLogin,

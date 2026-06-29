@@ -3,7 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use agent::{ThreadStore, BAYMAX_AGENT_ID};
+use agent::{BAYMAX_AGENT_ID, ThreadStore};
 use agent_client_protocol::schema as acp;
 use anyhow::Context as _;
 use chrono::{DateTime, Utc};
@@ -1520,7 +1520,10 @@ impl ThreadMetadataDb {
             if row.main_worktree_paths().is_empty() {
                 (None, None)
             } else {
-                (Some(main_serialibaymax.paths), Some(main_serialibaymax.order))
+                (
+                    Some(main_serialibaymax.paths),
+                    Some(main_serialibaymax.order),
+                )
             };
         let remote_connection = row
             .remote_connection

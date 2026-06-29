@@ -3657,7 +3657,10 @@ async fn test_local_settings(
     // As client A, change and remove settings files while client B is disconnected.
     client_a
         .fs()
-        .insert_file("/dir/a/.baymax/settings.json", r#"{"hard_tabs":true}"#.into())
+        .insert_file(
+            "/dir/a/.baymax/settings.json",
+            r#"{"hard_tabs":true}"#.into(),
+        )
         .await;
     client_a
         .fs()

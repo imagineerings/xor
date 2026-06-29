@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{EditPredictionStore, BaymaxPredictUpsell};
+use crate::{BaymaxPredictUpsell, EditPredictionStore};
 use ai_onboarding::EditPredictionOnboarding;
 use client::{Client, UserStore};
 use db::kvp::Dismissable;

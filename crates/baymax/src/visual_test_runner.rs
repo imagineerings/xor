@@ -99,6 +99,7 @@ use {
     agent_servers::{AgentServer, AgentServerDelegate},
     anyhow::{Context as _, Result},
     assets::Assets,
+    baymax_actions::OpenSettingsAt,
     editor::display_map::DisplayRow,
     feature_flags::FeatureFlagAppExt as _,
     git_ui::project_diff::ProjectDiff,
@@ -120,7 +121,6 @@ use {
     },
     util::ResultExt as _,
     workspace::{AppState, MultiWorkspace, Workspace},
-    baymax_actions::OpenSettingsAt,
 };
 
 // All macOS-specific constants grouped together
@@ -2314,9 +2314,9 @@ fn run_tool_permissions_visual_tests(
     _update_baseline: bool,
 ) -> Result<TestResult> {
     use agent_settings::{AgentSettings, CompiledRegex, ToolPermissions, ToolRules};
+    use baymax_actions::OpenSettingsAt;
     use collections::HashMap;
     use settings::ToolPermissionMode;
-    use baymax_actions::OpenSettingsAt;
 
     // Set up tool permissions with "hi" as both always_deny and always_allow for terminal
     cx.update(|cx| {

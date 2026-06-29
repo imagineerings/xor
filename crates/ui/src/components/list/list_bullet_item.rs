@@ -100,7 +100,10 @@ impl Component for ListBulletItem {
                 "With Link",
                 ListBulletItem::new("")
                     .child(Label::new("Create a Baymax account by"))
-                    .child(ButtonLink::new("visiting the website", "https://baymax.dev"))
+                    .child(ButtonLink::new(
+                        "visiting the website",
+                        "https://baymax.dev",
+                    ))
                     .into_any_element(),
             ),
         ];

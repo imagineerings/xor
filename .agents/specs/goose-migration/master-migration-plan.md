@@ -26,7 +26,7 @@ For each goose feature, we assess:
 | Retry logic | `crates/agent/` (partial) | ⚠️ Partially exists |
 | Large response handler | — | ❌ New |
 | Final output tool | `crates/agent/src/tools/` | ⚠️ Needs assessment |
-| Subagent execution & task config | — | ❌ New |
+| Subagent execution & task config | `crates/agent/src/tools/spawn_agent_tool.rs`, `crates/agent/src/thread.rs`, `crates/agent/src/agent.rs` | ⚠️ Partially exists |
 | Tool confirmation | `crates/agent/src/tool_permissions.rs` | ⚠️ Partially exists |
 | Agent snapshots | — | ❌ New |
 | Extension malware check | — | ❌ New |
@@ -101,7 +101,7 @@ For each goose feature, we assess:
 | Base config | `crates/settings/` | ✅ Already exists |
 | Provider config | `crates/agent_settings/` | ✅ Already exists |
 | Extension config | `crates/settings/` | ✅ Already exists |
-| Goose mode | — | ❌ New |
+| Baymax mode | `crates/agent_settings/src/baymax_mode.rs` | ✅ Implemented |
 | Experiments/feature flags | `crates/feature_flags/` | ✅ Already exists |
 | Migrations | — | ❌ New |
 | Permission config | — | ❌ New |
@@ -171,9 +171,9 @@ For each goose feature, we assess:
 
 | Goose Feature | Baymax Equivalent | Status |
 |---|---|---|
-| Slash command system | — | ❌ New |
+| Slash command system | `crates/agent/src/agent.rs`, `crates/agent_ui/src/conversation_view/thread_view.rs` | ⚠️ Partially exists |
 | Recipe slash command | — | ❌ New |
-| Skill slash command | — | ❌ New |
+| Skill slash command | `crates/agent/src/agent.rs` | ✅ Already exists |
 | Types & utilities | — | ❌ New |
 
 ### 13. Hints (`projects/goose/crates/goose/src/hints/`)
@@ -219,8 +219,8 @@ For each goose feature, we assess:
 |---|---|---|
 | Langfuse layer | — | ❌ New |
 | Observation layer | — | ❌ New |
-| Rate limiter | — | ❌ New |
-| OpenTelemetry (OTLP) | `crates/otel/` | ⚠️ Partial |
+| Rate limiter | `crates/language_model_core/src/rate_limiter.rs` | ⚠️ Partially exists |
+| OpenTelemetry (OTLP) | `crates/telemetry/`, `crates/baymax/src/baymax/telemetry_log.rs` | ⚠️ Partial |
 
 ### 19. OAuth (`projects/goose/crates/goose/src/oauth/`)
 
@@ -234,7 +234,7 @@ For each goose feature, we assess:
 
 | Goose Feature | Baymax Equivalent | Status |
 |---|---|---|
-| Context window management | — | ❌ New |
+| Context window management | `crates/agent/src/thread.rs`, `crates/agent_settings/src/agent_settings.rs` | ⚠️ Partially exists |
 
 ### 21. Plugins (`projects/goose/crates/goose/src/plugins/`)
 
@@ -278,7 +278,7 @@ For each goose feature, we assess:
 | MCP utilities | `crates/context_server/` | ✅ Already exists |
 | Model abstraction | `crates/language_model_core/` | ✅ Already exists |
 | PostHog analytics | — | ❌ New |
-| Prompt template | — | ⚠️ Partial |
+| Prompt template | `crates/agent/src/templates.rs`, `crates/prompt_store/src/prompts.rs` | ⚠️ Partial |
 | Recipe deeplink | — | ❌ New |
 | Source roots/sources | — | ❌ New |
 | Subprocess | — | ❌ New |

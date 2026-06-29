@@ -3,7 +3,8 @@ use std::{cmp, path::PathBuf, process::ExitStatus, sync::Arc, time::Duration};
 use crate::{
     TerminalView, default_working_directory,
     persistence::{
-        SerialibaymaxItems, SerialibaymaxTerminalPanel, deserialize_terminal_panel, serialize_pane_group,
+        SerialibaymaxItems, SerialibaymaxTerminalPanel, deserialize_terminal_panel,
+        serialize_pane_group,
     },
 };
 use breadcrumbs::Breadcrumbs;
@@ -1344,7 +1345,10 @@ impl Render for FailedToSpawnTerminal {
                         ButtonLike::new("open-settings-ui")
                             .child(Label::new("Edit Settings").size(LabelSize::Small))
                             .on_click(|_, window, cx| {
-                                window.dispatch_action(baymax_actions::OpenSettings.boxed_clone(), cx);
+                                window.dispatch_action(
+                                    baymax_actions::OpenSettings.boxed_clone(),
+                                    cx,
+                                );
                             }),
                         popover_menu.into_any_element(),
                     )),

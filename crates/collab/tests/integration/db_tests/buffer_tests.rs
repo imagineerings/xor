@@ -110,7 +110,10 @@ async fn test_channel_buffers(db: &Arc<Database>) {
     );
 
     // Ensure that get_channel_buffer_collaborators works
-    let baymax_collaborats = db.get_channel_buffer_collaborators(baymax_id).await.unwrap();
+    let baymax_collaborats = db
+        .get_channel_buffer_collaborators(baymax_id)
+        .await
+        .unwrap();
     assert_eq!(baymax_collaborats, &[a_id, b_id]);
 
     let left_buffer = db
@@ -128,7 +131,10 @@ async fn test_channel_buffers(db: &Arc<Database>) {
 
     db.leave_channel_buffers(connection_id_a).await.unwrap();
 
-    let baymax_collaborators = db.get_channel_buffer_collaborators(baymax_id).await.unwrap();
+    let baymax_collaborators = db
+        .get_channel_buffer_collaborators(baymax_id)
+        .await
+        .unwrap();
     let cargo_collaborators = db.get_channel_buffer_collaborators(cargo_id).await.unwrap();
     assert_eq!(baymax_collaborators, &[]);
     assert_eq!(cargo_collaborators, &[]);

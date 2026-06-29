@@ -22,6 +22,7 @@ use gpui::{
     Subscription, Task, TaskExt, WeakEntity, anchored, deferred,
 };
 
+use baymax_actions::debug_panel::ToggleFocus;
 use itertools::Itertools as _;
 use language::Buffer;
 use project::debugger::session::{Session, SessionQuirks, SessionState, SessionStateEvent};
@@ -44,7 +45,6 @@ use workspace::{
     Item, Pane, Workspace,
     dock::{DockPosition, Panel, PanelEvent},
 };
-use baymax_actions::debug_panel::ToggleFocus;
 
 pub struct DebuggerHistoryFeatureFlag;
 
@@ -1463,7 +1463,10 @@ async fn register_session_inner(
     .ok();
     let serialibaymax_layout = this
         .update(cx, |_, cx| {
-            persistence::get_serialibaymax_layout(&adapter_name, &db::kvp::KeyValueStore::global(cx))
+            persistence::get_serialibaymax_layout(
+                &adapter_name,
+                &db::kvp::KeyValueStore::global(cx),
+            )
         })
         .ok()
         .flatten();
@@ -1851,7 +1854,9 @@ impl Render for DebugPanel {
                                         .size(IconSize::Small)
                                         .color(Color::Muted),
                                 )
-                                .on_click(|_, _, cx| cx.open_url("https://baymax.dev/docs/debugger")),
+                                .on_click(|_, _, cx| {
+                                    cx.open_url("https://baymax.dev/docs/debugger")
+                                }),
                         )
                         .child(
                             Button::new(

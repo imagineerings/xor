@@ -439,7 +439,10 @@ impl DebugAdapter for PythonDebugAdapter {
         Some(SharedString::new_static("Python").into())
     }
 
-    async fn config_from_baymax_format(&self, baymax_scenario: BaymaxDebugConfig) -> Result<DebugScenario> {
+    async fn config_from_baymax_format(
+        &self,
+        baymax_scenario: BaymaxDebugConfig,
+    ) -> Result<DebugScenario> {
         let mut args = json!({
             "request": match baymax_scenario.request {
                 DebugRequest::Launch(_) => "launch",

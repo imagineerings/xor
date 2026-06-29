@@ -78,6 +78,8 @@ pub use crate::inline_assistant::InlineAssistant;
 pub use crate::message_editor::MessageEditorEvent;
 pub use crate::thread_metadata_store::ThreadId;
 pub use agent_diff::{AgentDiffPane, AgentDiffToolbar};
+use baymax_actions;
+pub use baymax_actions::{CreateWorktree, NewWorktreeBranchTarget, SwitchWorktree};
 pub use conversation_view::open_markdown_in_workspace;
 pub use conversation_view::{ConversationView, StateChange};
 pub use external_source_prompt::ExternalSourcePrompt;
@@ -88,8 +90,6 @@ pub use thread_import::{
     AcpThreadImportOnboarding, CrossChannelImportOnboarding, ThreadImportModal,
     channels_with_threads, import_threads_from_other_channels,
 };
-use baymax_actions;
-pub use baymax_actions::{CreateWorktree, NewWorktreeBranchTarget, SwitchWorktree};
 
 pub(crate) fn resolve_agent_image(
     dest_url: &str,
@@ -797,7 +797,8 @@ fn update_command_palette_filter(cx: &mut App) {
             filter.hide_namespace("edit_prediction");
 
             filter.hide_action_types(&edit_prediction_actions);
-            filter.hide_action_types(&[TypeId::of::<baymax_actions::OpenBaymaxPredictOnboarding>()]);
+            filter
+                .hide_action_types(&[TypeId::of::<baymax_actions::OpenBaymaxPredictOnboarding>()]);
         } else {
             if agent_enabled {
                 filter.show_namespace("agent");
@@ -832,7 +833,8 @@ fn update_command_palette_filter(cx: &mut App) {
             }
 
             filter.show_namespace("baymax_predict_onboarding");
-            filter.show_action_types(&[TypeId::of::<baymax_actions::OpenBaymaxPredictOnboarding>()]);
+            filter
+                .show_action_types(&[TypeId::of::<baymax_actions::OpenBaymaxPredictOnboarding>()]);
 
             filter.show_namespace("multi_workspace");
         }
@@ -959,6 +961,7 @@ mod tests {
             model_parameters: vec![],
             auto_compact: agent_settings::AutoCompactSettings {
                 enabled: false,
+                strategy: agent_settings::AutoCompactStrategy::default(),
                 threshold: agent_settings::AutoCompactThreshold::DEFAULT,
             },
             enable_feedback: false,

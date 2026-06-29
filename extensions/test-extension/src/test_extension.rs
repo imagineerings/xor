@@ -1,6 +1,6 @@
-use std::fs;
 use baymax::lsp::CompletionKind;
 use baymax::{CodeLabel, CodeLabelSpan, LanguageServerId};
+use std::fs;
 use zed_extension_api::process::Command;
 use zed_extension_api::{self as baymax, Result};
 

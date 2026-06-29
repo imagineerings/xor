@@ -561,7 +561,9 @@ mod tests {
     use crate::pattern_extraction::extract_terminal_pattern;
     use crate::tools::{DeletePathTool, FetchTool, TerminalTool};
     use crate::{AgentTool, EditFileTool};
-    use agent_settings::{AgentProfileId, CompiledRegex, InvalidRegexPattern, ToolRules};
+    use agent_settings::{
+        AgentProfileId, BaymaxMode, CompiledRegex, InvalidRegexPattern, ToolRules,
+    };
     use gpui::px;
     use settings::{DockPosition, NotifyWhenAgentWaiting, PlaySoundWhenAgentDone};
     use std::sync::Arc;
@@ -590,8 +592,10 @@ mod tests {
             play_sound_when_agent_done: PlaySoundWhenAgentDone::default(),
             single_file_review: false,
             model_parameters: vec![],
+            baymax_mode: BaymaxMode::default(),
             auto_compact: agent_settings::AutoCompactSettings {
                 enabled: false,
+                strategy: agent_settings::AutoCompactStrategy::default(),
                 threshold: agent_settings::AutoCompactThreshold::DEFAULT,
             },
             enable_feedback: false,
@@ -2271,7 +2275,10 @@ mod tests {
         assert_eq!(normalize_path("a/b/../c"), "a/c");
         assert_eq!(normalize_path("a/./b/c"), "a/b/c");
         assert_eq!(normalize_path("a/b/./c/../d"), "a/b/d");
-        assert_eq!(normalize_path(".baymax/settings.json"), ".baymax/settings.json");
+        assert_eq!(
+            normalize_path(".baymax/settings.json"),
+            ".baymax/settings.json"
+        );
         assert_eq!(normalize_path("a/b/c"), "a/b/c");
     }
 
@@ -2396,7 +2403,13 @@ mod tests {
     #[test]
     fn decide_permission_for_path_no_change_when_already_simple() {
         // When path has no `.` or `..` segments, behavior matches decide_permission_from_settings
-        let decision = path_perm("copy_path", ".baymax/settings.json", &["^\\.baymax/"], &[], &[]);
+        let decision = path_perm(
+            "copy_path",
+            ".baymax/settings.json",
+            &["^\\.baymax/"],
+            &[],
+            &[],
+        );
         assert!(matches!(decision, ToolPermissionDecision::Deny(_)));
     }
 

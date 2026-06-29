@@ -4,6 +4,7 @@ mod file_finder_tests;
 use futures::future::join_all;
 pub use open_path_prompt::OpenPathDelegate;
 
+use baymax_actions::search::ToggleIncludeIgnored;
 use channel::ChannelStore;
 use client::ChannelId;
 use collections::HashMap;
@@ -52,7 +53,6 @@ use workspace::{
     ModalView, OpenChannelNotesById, OpenOptions, OpenVisible, SplitDirection, Workspace,
     item::PreviewTabsSettings, notifications::NotifyResultExt, pane,
 };
-use baymax_actions::search::ToggleIncludeIgnored;
 
 actions!(
     file_finder,

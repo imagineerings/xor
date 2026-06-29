@@ -21,7 +21,7 @@ mod remote_editing_collaboration_tests;
 mod test_server;
 
 pub use randomized_test_helpers::{
-    randomizedTest, TestError, UserTestPlan, run_randomized_test, save_randomized_test_plan,
+    TestError, UserTestPlan, randomizedTest, run_randomized_test, save_randomized_test_plan,
 };
 pub use test_server::{TestClient, TestServer};
 

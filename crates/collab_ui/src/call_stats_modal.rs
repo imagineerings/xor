@@ -1,3 +1,4 @@
+use baymax_actions::ShowCallStats;
 use call::{ActiveCall, Room, room};
 use gpui::{
     DismissEvent, Entity, EventEmitter, FocusHandle, Focusable, FontWeight, Render, Subscription,
@@ -6,7 +7,6 @@ use gpui::{
 use livekit_client::ConnectionQuality;
 use ui::prelude::*;
 use workspace::{ModalView, Workspace};
-use baymax_actions::ShowCallStats;
 
 pub fn init(cx: &mut App) {
     cx.observe_new(|workspace: &mut Workspace, _, _cx| {

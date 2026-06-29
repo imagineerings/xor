@@ -4,7 +4,7 @@ use collections::HashMap;
 use dap::{StartDebuggingRequestArguments, adapters::DebugTaskDefinition};
 use gpui::AsyncApp;
 use std::ffi::OsStr;
-use task::{DebugScenario, BaymaxDebugConfig};
+use task::{BaymaxDebugConfig, DebugScenario};
 
 use crate::*;
 
@@ -29,7 +29,10 @@ impl DebugAdapter for GdbDebugAdapter {
         DebugAdapterName(Self::ADAPTER_NAME.into())
     }
 
-    async fn config_from_baymax_format(&self, baymax_scenario: BaymaxDebugConfig) -> Result<DebugScenario> {
+    async fn config_from_baymax_format(
+        &self,
+        baymax_scenario: BaymaxDebugConfig,
+    ) -> Result<DebugScenario> {
         let mut obj = serde_json::Map::default();
 
         match &baymax_scenario.request {

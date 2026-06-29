@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use askpass::AskPassDelegate;
+use baymax_actions::NewWorktreeBranchTarget;
 use collections::HashSet;
 use fs::Fs;
 use gpui::{
@@ -21,7 +22,6 @@ use ui::prelude::*;
 use workspace::{
     MultiWorkspace, OpenMode, PreviousWorkspaceState, ToastView, Workspace, dock::DockPosition,
 };
-use baymax_actions::NewWorktreeBranchTarget;
 
 use git::repository::{FetchOptions, Remote};
 

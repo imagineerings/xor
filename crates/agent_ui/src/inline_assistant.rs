@@ -46,11 +46,11 @@ use project::{DisableAiSettings, Project};
 use prompt_store::PromptBuilder;
 use settings::{Settings, SettingsStore};
 
+use baymax_actions::agent::OpenSettings;
 use terminal_view::{TerminalView, terminal_panel::TerminalPanel};
 use ui::prelude::*;
 use util::{RangeExt, ResultExt, maybe};
 use workspace::{Toast, Workspace, dock::Panel, notifications::NotificationId};
-use baymax_actions::agent::OpenSettings;
 
 pub fn init(fs: Arc<dyn Fs>, prompt_builder: Arc<PromptBuilder>, cx: &mut App) {
     cx.set_global(InlineAssistant::new(fs, prompt_builder));

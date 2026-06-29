@@ -196,7 +196,8 @@ pub async fn create_batch(
 ) -> Result<Batch, RequestError> {
     let uri = format!("{api_url}/batches");
 
-    let serialibaymax = serde_json::to_string(&request).map_err(|e| RequestError::Other(e.into()))?;
+    let serialibaymax =
+        serde_json::to_string(&request).map_err(|e| RequestError::Other(e.into()))?;
 
     let request = HttpRequest::builder()
         .method(Method::POST)

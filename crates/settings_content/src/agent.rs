@@ -71,6 +71,32 @@ pub enum ThinkingBlockDisplay {
     AlwaysCollapsed,
 }
 
+/// The default behavior mode for Baymax-compatible agent prompts.
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    JsonSchema,
+    MergeFrom,
+    strum::VariantArray,
+    strum::VariantNames,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum BaymaxModeContent {
+    /// Prefer narrow, low-risk execution.
+    Focus,
+    /// Balance directness with enough context to finish the task.
+    #[default]
+    Balanced,
+    /// Allow broader exploration when it helps solve the task.
+    Creative,
+}
+
 /// Threshold at which agent auto-compaction runs. See
 /// [`AutoCompactSettingsContent::threshold`] for the accepted formats.
 ///
@@ -163,6 +189,20 @@ impl JsonSchema for AutoCompactThreshold {
     }
 }
 
+/// Strategy used when automatic agent context compaction runs.
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema, MergeFrom,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum AutoCompactStrategyContent {
+    /// Summarize earlier context with the configured language model.
+    #[default]
+    Summarize,
+    /// Drop earlier model context at a compaction boundary while keeping the
+    /// visible thread history intact.
+    Trim,
+}
+
 #[with_fallible_options]
 #[derive(Clone, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom, Debug, Default)]
 pub struct AutoCompactSettingsContent {
@@ -172,6 +212,10 @@ pub struct AutoCompactSettingsContent {
     ///
     /// Default: true
     pub enabled: Option<bool>,
+    /// The strategy to use when automatic compaction runs.
+    ///
+    /// Default: summarize
+    pub strategy: Option<AutoCompactStrategyContent>,
     /// The threshold at which auto-compaction runs. This is one of:
     ///
     /// - A percentage string ending in `%`, e.g. `"90%"`, measured against the
@@ -282,6 +326,10 @@ pub struct AgentSettingsContent {
     /// Default: []
     #[serde(default)]
     pub model_parameters: Vec<LanguageModelParameters>,
+    /// The default behavior mode for Baymax-compatible agent prompts.
+    ///
+    /// Default: balanced
+    pub baymax_mode: Option<BaymaxModeContent>,
     /// Settings for automatic agent context compaction, which summarizes
     /// earlier messages to free up room in the model's context window once the
     /// context grows too large.

@@ -8,6 +8,7 @@ use std::{ops::Range, rc::Rc, sync::Arc};
 
 use agent::ContextServerRegistry;
 use anyhow::Result;
+use baymax_actions::{ExtensionCategoryFilter, OpenBrowser};
 use cloud_api_types::Plan;
 use collections::HashMap;
 use context_server::ContextServerId;
@@ -22,8 +23,8 @@ use gpui::{
 use itertools::Itertools;
 use language::LanguageRegistry;
 use language_model::{
-    IconOrSvg, LanguageModelProvider, LanguageModelProviderId, LanguageModelRegistry,
-    BAYMAX_CLOUD_PROVIDER_ID,
+    BAYMAX_CLOUD_PROVIDER_ID, IconOrSvg, LanguageModelProvider, LanguageModelProviderId,
+    LanguageModelRegistry,
 };
 use language_models::AllLanguageModelSettings;
 use notifications::status_toast::StatusToast;
@@ -39,7 +40,6 @@ use ui::{
 };
 use util::ResultExt as _;
 use workspace::{Workspace, create_and_open_local_file};
-use baymax_actions::{ExtensionCategoryFilter, OpenBrowser};
 
 pub(crate) use configure_context_server_modal::ConfigureContextServerModal;
 pub(crate) use configure_context_server_tools_modal::ConfigureContextServerToolsModal;
@@ -282,7 +282,10 @@ impl AgentConfiguration {
                                             .map(|this| {
                                                 if is_baymax_provider && is_signed_in {
                                                     this.child(
-                                                        self.render_baymax_plan_info(current_plan, cx),
+                                                        self.render_baymax_plan_info(
+                                                            current_plan,
+                                                            cx,
+                                                        ),
                                                     )
                                                 } else {
                                                     this.when(
@@ -490,7 +493,11 @@ impl AgentConfiguration {
             )
     }
 
-    fn render_baymax_plan_info(&self, plan: Option<Plan>, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_baymax_plan_info(
+        &self,
+        plan: Option<Plan>,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
         if let Some(plan) = plan {
             let free_chip_bg = cx
                 .theme()

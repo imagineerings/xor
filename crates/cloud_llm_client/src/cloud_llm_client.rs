@@ -33,7 +33,8 @@ pub const OUTDATED_LLM_TOKEN_HEADER_NAME: &str = "x-baymax-outdated-token";
 pub const EDIT_PREDICTIONS_USAGE_LIMIT_HEADER_NAME: &str = "x-baymax-edit-predictions-usage-limit";
 
 /// The name of the header used to indicate the usage amount for edit predictions.
-pub const EDIT_PREDICTIONS_USAGE_AMOUNT_HEADER_NAME: &str = "x-baymax-edit-predictions-usage-amount";
+pub const EDIT_PREDICTIONS_USAGE_AMOUNT_HEADER_NAME: &str =
+    "x-baymax-edit-predictions-usage-amount";
 
 pub const EDIT_PREDICTIONS_RESOURCE_HEADER_VALUE: &str = "edit_predictions";
 

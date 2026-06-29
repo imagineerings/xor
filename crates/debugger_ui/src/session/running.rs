@@ -47,8 +47,8 @@ use serde_json::Value;
 use settings::Settings;
 use stack_frame_list::StackFrameList;
 use task::{
-    BuildTaskDefinition, DebugScenario, SharedTaskContext, Shell, ShellBuilder, SpawnInTerminal,
-    TaskContext, BaymaxDebugConfig, substitute_variables_in_str,
+    BaymaxDebugConfig, BuildTaskDefinition, DebugScenario, SharedTaskContext, Shell, ShellBuilder,
+    SpawnInTerminal, TaskContext, substitute_variables_in_str,
 };
 use terminal_view::TerminalView;
 use ui::{

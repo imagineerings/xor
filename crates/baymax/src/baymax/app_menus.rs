@@ -1,8 +1,8 @@
+use baymax_actions::{debug_panel, dev};
 use collab_ui::collab_panel;
 use gpui::{App, Menu, MenuItem, OsAction};
 use release_channel::ReleaseChannel;
 use terminal_view::terminal_panel;
-use baymax_actions::{debug_panel, dev};
 
 pub fn app_menus(cx: &mut App) -> Vec<Menu> {
     use baymax_actions::Quit;
@@ -75,7 +75,10 @@ pub fn app_menus(cx: &mut App) -> Vec<Menu> {
                     MenuItem::separator(),
                     MenuItem::action("Open Keymap", baymax_actions::OpenKeymap),
                     MenuItem::action("Open Keymap File", baymax_actions::OpenKeymapFile),
-                    MenuItem::action("Open Default Key Bindings", baymax_actions::OpenDefaultKeymap),
+                    MenuItem::action(
+                        "Open Default Key Bindings",
+                        baymax_actions::OpenDefaultKeymap,
+                    ),
                     MenuItem::separator(),
                     MenuItem::action(
                         "Select Theme...",
@@ -222,7 +225,10 @@ pub fn app_menus(cx: &mut App) -> Vec<Menu> {
                 MenuItem::action("Back", workspace::GoBack),
                 MenuItem::action("Forward", workspace::GoForward),
                 MenuItem::separator(),
-                MenuItem::action("Command Palette...", baymax_actions::command_palette::Toggle),
+                MenuItem::action(
+                    "Command Palette...",
+                    baymax_actions::command_palette::Toggle,
+                ),
                 MenuItem::separator(),
                 MenuItem::action("Go to File...", workspace::ToggleFileFinder::default()),
                 // MenuItem::action("Go to Symbol in Project", project_symbols::Toggle),
@@ -293,8 +299,14 @@ pub fn app_menus(cx: &mut App) -> Vec<Menu> {
                 MenuItem::action("View Dependency Licenses", baymax_actions::OpenLicenses),
                 MenuItem::action("Show Welcome", onboarding::ShowWelcome),
                 MenuItem::separator(),
-                MenuItem::action("File Bug Report...", baymax_actions::feedback::FileBugReport),
-                MenuItem::action("Request Feature...", baymax_actions::feedback::RequestFeature),
+                MenuItem::action(
+                    "File Bug Report...",
+                    baymax_actions::feedback::FileBugReport,
+                ),
+                MenuItem::action(
+                    "Request Feature...",
+                    baymax_actions::feedback::RequestFeature,
+                ),
                 MenuItem::action("Email Us...", baymax_actions::feedback::EmailBaymax),
                 MenuItem::separator(),
                 MenuItem::action(

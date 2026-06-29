@@ -16,8 +16,7 @@ pub use serde_json;
 // that we may want to shadow to provide a cleaner Rust API.
 pub use wit::{
     CodeLabel, CodeLabelSpan, CodeLabelSpanLiteral, Command, DownloadedFileType, EnvVars,
-    KeyValueStore, LanguageServerInstallationStatus, Project, Range, Worktree, download_file,
-    make_file_executable,
+    KeyValueStore, LanguageServerInstallationStatus, Project, Range, Worktree,
     baymax::extension::context_server::ContextServerConfiguration,
     baymax::extension::dap::{
         AttachRequest, BuildTaskDefinition, BuildTaskDefinitionTemplatePayload, BuildTaskTemplate,
@@ -37,6 +36,7 @@ pub use wit::{
     baymax::extension::slash_command::{
         SlashCommand, SlashCommandArgumentCompletion, SlashCommandOutput, SlashCommandOutputSection,
     },
+    download_file, make_file_executable,
 };
 
 // Undocumented WIT re-exports.
@@ -350,7 +350,8 @@ static mut EXTENSION: Option<Box<dyn Extension>> = None;
 #[cfg(target_arch = "wasm32")]
 #[unsafe(link_section = "baymax:api-version")]
 #[doc(hidden)]
-pub static BAYMAX_API_VERSION: [u8; 6] = *include_bytes!(concat!(env!("OUT_DIR"), "/version_bytes"));
+pub static BAYMAX_API_VERSION: [u8; 6] =
+    *include_bytes!(concat!(env!("OUT_DIR"), "/version_bytes"));
 
 mod wit {
     wit_bindgen::generate!({

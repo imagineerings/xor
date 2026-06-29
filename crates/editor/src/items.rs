@@ -8,6 +8,9 @@ use crate::{
     scroll::{ScrollAnchor, ScrollOffset},
 };
 use anyhow::{Context as _, Result, anyhow};
+use baymax_actions::preview::{
+    markdown::OpenPreview as OpenMarkdownPreview, svg::OpenPreview as OpenSvgPreview,
+};
 use collections::{HashMap, HashSet};
 use file_icons::FileIcons;
 use fs::MTime;
@@ -56,9 +59,6 @@ use workspace::{
     Pane, WorkspaceSettings,
     item::{FollowEvent, ProjectItemKind},
     searchable::SearchOptions,
-};
-use baymax_actions::preview::{
-    markdown::OpenPreview as OpenMarkdownPreview, svg::OpenPreview as OpenSvgPreview,
 };
 
 pub const MAX_TAB_TITLE_LEN: usize = 24;
@@ -1349,7 +1349,9 @@ impl SerializableItem for Editor {
 
                             if let Some(contents) = contents {
                                 buffer.update(cx, |buffer, cx| {
-                                    restore_serialibaymax_buffer_contents(buffer, contents, mtime, cx);
+                                    restore_serialibaymax_buffer_contents(
+                                        buffer, contents, mtime, cx,
+                                    );
                                 });
                             }
 
