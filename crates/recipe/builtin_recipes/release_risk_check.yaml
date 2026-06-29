@@ -1,0 +1,27 @@
+version: 1.0.0
+title: Release Risk Check
+description: Assess pull request risk for an upcoming Baymax release.
+tags:
+  - release
+  - risk
+  - qa
+instructions: |
+  Produce a release risk report for version {{ version }}.
+
+  Review the pull requests or commits included in the release and classify each
+  change as HIGH, MEDIUM, or LOW risk.
+
+  Treat these areas as higher risk:
+  - agent loop, tool execution, permissions, security inspection, and sandboxing
+  - authentication, provider credentials, and session persistence
+  - settings migrations and filesystem writes
+  - broad refactors touching multiple subsystems
+
+  For each HIGH or MEDIUM risk item, include concrete verification steps.
+prompt: |
+  Generate the release risk report for {{ version }}.
+parameters:
+  - key: version
+    input_type: string
+    requirement: required
+    description: Release version or release branch to assess.

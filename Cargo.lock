@@ -3400,6 +3400,7 @@ dependencies = [
  "paths",
  "plist",
  "rayon",
+ "recipe",
  "release_channel",
  "serde",
  "serde_json",
@@ -15132,6 +15133,21 @@ dependencies = [
  "windows-registry 0.6.1",
  "workspace",
  "worktree",
+]
+
+[[package]]
+name = "recipe"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "regex",
+ "serde",
+ "serde_json",
+ "serde_yaml_ng",
+ "tempfile",
+ "thiserror 2.0.18",
+ "url",
 ]
 
 [[package]]
