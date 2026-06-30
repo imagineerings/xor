@@ -203,6 +203,22 @@ The Baymax mobile app provides AI agent interaction, collaboration, voice/calls,
 
 ---
 
+### 12. Mobile Build and Publish
+
+**Summary**: Build, sign, validate, and publish Android and iOS mobile apps for tester distribution and real-device validation.
+
+| Feature | Android | iOS | Notes |
+|---------|---------|-----|-------|
+| Local build/test scripts | New | New | Shared entry points under `mobile/scripts/` |
+| Signed release artifacts | New AAB/APK | New IPA | Signing material supplied via env/CI secrets |
+| Root CI workflows | New | New | Active workflows under `.github/workflows/` |
+| Tester publishing | Play internal track | TestFlight | Optional publish mode |
+| Feature readiness validation | New | New | Derived from mobile specs |
+
+**Location**: `mobile-build-publish/`
+
+---
+
 ## Summary
 
 | Spec | Area | Platform | Status |
@@ -218,6 +234,7 @@ The Baymax mobile app provides AI agent interaction, collaboration, voice/calls,
 | 9. User Experience | Profile, themes, onboarding | iOS + Android | Design complete |
 | 10. Secure Tunneling | Desktop tunnel → mobile | Desktop (mobile enabler) | Design complete |
 | 11. Android Feature Parity | Android ↔ iOS parity | Android | ✅ Phases 1–10 complete, ❌ 11–15 |
+| 12. Mobile Build and Publish | Build, sign, validate, publish | iOS + Android + CI | Design complete |
 
 ## Related Specs
 

@@ -4,6 +4,26 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
+val baymaxVersionName = providers.gradleProperty("baymax.versionName")
+    .orElse(providers.environmentVariable("BAYMAX_VERSION_NAME"))
+    .orElse("1.0")
+
+val baymaxVersionCode = providers.gradleProperty("baymax.versionCode")
+    .orElse(providers.environmentVariable("BAYMAX_VERSION_CODE"))
+    .orElse("1")
+    .map { value ->
+        value.toIntOrNull()
+            ?.takeIf { it > 0 }
+            ?: throw GradleException("baymax.versionCode must be a positive integer, got '${value}'")
+    }
+
+val androidReleaseSigningEnabled = listOf(
+    "ANDROID_KEYSTORE_PATH",
+    "ANDROID_KEYSTORE_PASSWORD",
+    "ANDROID_KEY_ALIAS",
+    "ANDROID_KEY_PASSWORD",
+).all { name -> providers.environmentVariable(name).isPresent }
+
 android {
     namespace = "com.simtropolis.baymax"
     compileSdk = 34
@@ -12,8 +32,8 @@ android {
         applicationId = "com.simtropolis.baymax"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = baymaxVersionCode.get()
+        versionName = baymaxVersionName.get()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -21,9 +41,23 @@ android {
         }
     }
 
+    if (androidReleaseSigningEnabled) {
+        signingConfigs {
+            create("release") {
+                storeFile = file(providers.environmentVariable("ANDROID_KEYSTORE_PATH").get())
+                storePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSWORD").get()
+                keyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS").get()
+                keyPassword = providers.environmentVariable("ANDROID_KEY_PASSWORD").get()
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (androidReleaseSigningEnabled) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

@@ -1,0 +1,286 @@
+name: mobile_release
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Mobile platform to build
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - android
+          - ios
+      channel:
+        description: Release channel metadata
+        required: true
+        type: choice
+        default: artifact
+        options:
+          - artifact
+          - play-internal
+          - testflight
+      version:
+        description: Marketing version, for example 1.0.0
+        required: true
+        type: string
+        default: 1.0.0
+      build_number:
+        description: Positive integer build number
+        required: true
+        type: string
+        default: "1"
+      publish:
+        description: Publish to external tester channels
+        required: true
+        type: boolean
+        default: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      platform: ${{ steps.inputs.outputs.platform }}
+      channel: ${{ steps.inputs.outputs.channel }}
+      version: ${{ steps.inputs.outputs.version }}
+      build_number: ${{ steps.inputs.outputs.build_number }}
+      publish: ${{ steps.inputs.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate mobile release inputs
+        id: inputs
+        env:
+          MOBILE_PLATFORM: ${{ inputs.platform }}
+          MOBILE_CHANNEL: ${{ inputs.channel }}
+          MOBILE_VERSION: ${{ inputs.version }}
+          MOBILE_BUILD_NUMBER: ${{ inputs.build_number }}
+          MOBILE_PUBLISH: ${{ inputs.publish }}
+        run: |
+          set -euo pipefail
+
+          mobile/scripts/validate-version.sh \
+            --platform "${MOBILE_PLATFORM}" \
+            --channel "${MOBILE_CHANNEL}" \
+            --version "${MOBILE_VERSION}" \
+            --build-number "${MOBILE_BUILD_NUMBER}"
+
+          if [[ "${MOBILE_PUBLISH}" == "true" ]]; then
+            case "${MOBILE_PLATFORM}:${MOBILE_CHANNEL}" in
+              android:play-internal | ios:testflight) ;;
+              all:*)
+                echo "External publishing for platform=all needs separate per-platform channels. Re-run one platform at a time."
+                exit 1
+                ;;
+              *)
+                echo "External publishing requires android/play-internal or ios/testflight."
+                exit 1
+                ;;
+            esac
+          fi
+
+          {
+            printf 'platform=%s\n' "${MOBILE_PLATFORM}"
+            printf 'channel=%s\n' "${MOBILE_CHANNEL}"
+            printf 'version=%s\n' "${MOBILE_VERSION}"
+            printf 'build_number=%s\n' "${MOBILE_BUILD_NUMBER}"
+            printf 'publish=%s\n' "${MOBILE_PUBLISH}"
+          } >>"${GITHUB_OUTPUT}"
+
+      - name: Run mobile readiness validation
+        run: mobile/scripts/mobile-readiness-check.sh
+
+      - name: Upload mobile readiness summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: baymax-mobile-readiness-${{ inputs.channel }}-${{ inputs.version }}-${{ inputs.build_number }}-${{ github.sha }}
+          path: mobile/build/readiness/manual-summary.md
+          if-no-files-found: error
+
+  android:
+    needs: validate
+    if: ${{ needs.validate.outputs.platform == 'android' || needs.validate.outputs.platform == 'all' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Build Android release artifact
+        id: build
+        env:
+          MOBILE_VERSION: ${{ needs.validate.outputs.version }}
+          MOBILE_BUILD_NUMBER: ${{ needs.validate.outputs.build_number }}
+          MOBILE_PUBLISH: ${{ needs.validate.outputs.publish }}
+        run: |
+          set -euo pipefail
+
+          signed=false
+          if [[ "${MOBILE_PUBLISH}" == "true" ]]; then
+            signed=true
+          fi
+
+          artifact_path="$(mobile/scripts/android-build.sh \
+            --variant release \
+            --artifact aab \
+            --signed "${signed}" \
+            --version "${MOBILE_VERSION}" \
+            --build-number "${MOBILE_BUILD_NUMBER}" \
+            | tail -n 1)"
+
+          printf 'artifact_path=%s\n' "${artifact_path}" >>"${GITHUB_OUTPUT}"
+
+      - name: Build Android downloadable APK
+        id: downloadable_apk
+        if: ${{ needs.validate.outputs.publish == 'false' }}
+        env:
+          MOBILE_VERSION: ${{ needs.validate.outputs.version }}
+          MOBILE_BUILD_NUMBER: ${{ needs.validate.outputs.build_number }}
+        run: |
+          set -euo pipefail
+
+          apk_path="$(mobile/scripts/android-build.sh \
+            --variant debug \
+            --artifact apk \
+            --version "${MOBILE_VERSION}" \
+            --build-number "${MOBILE_BUILD_NUMBER}" \
+            | tail -n 1)"
+
+          printf 'apk_path=%s\n' "${apk_path}" >>"${GITHUB_OUTPUT}"
+
+      - name: Install Fastlane
+        if: ${{ needs.validate.outputs.publish == 'true' && needs.validate.outputs.channel == 'play-internal' }}
+        run: sudo gem install fastlane --no-document
+
+      - name: Publish Android to Play internal
+        if: ${{ needs.validate.outputs.publish == 'true' && needs.validate.outputs.channel == 'play-internal' }}
+        env:
+          ANDROID_PLAY_SERVICE_ACCOUNT_JSON_BASE64: ${{ secrets.ANDROID_PLAY_SERVICE_ACCOUNT_JSON_BASE64 }}
+          ANDROID_PACKAGE_NAME: ${{ vars.ANDROID_PACKAGE_NAME }}
+        run: mobile/scripts/android-publish.sh --aab "${{ steps.build.outputs.artifact_path }}" --track internal
+
+      - name: Write Android release metadata
+        id: metadata
+        env:
+          MOBILE_CHANNEL: ${{ needs.validate.outputs.channel }}
+          MOBILE_VERSION: ${{ needs.validate.outputs.version }}
+          MOBILE_BUILD_NUMBER: ${{ needs.validate.outputs.build_number }}
+          MOBILE_PUBLISH: ${{ needs.validate.outputs.publish }}
+          DOWNLOADABLE_APK_PATH: ${{ steps.downloadable_apk.outputs.apk_path }}
+        run: |
+          set -euo pipefail
+
+          metadata_args=(
+            --platform android
+            --channel "${MOBILE_CHANNEL}"
+            --version "${MOBILE_VERSION}"
+            --build-number "${MOBILE_BUILD_NUMBER}"
+            --artifact "${{ steps.build.outputs.artifact_path }}"
+            --published "${MOBILE_PUBLISH}"
+          )
+          if [[ -n "${DOWNLOADABLE_APK_PATH}" ]]; then
+            metadata_args+=(--artifact "${DOWNLOADABLE_APK_PATH}")
+          fi
+
+          metadata_path="$(mobile/scripts/write-release-metadata.sh \
+            "${metadata_args[@]}" \
+            | tail -n 1)"
+
+          printf 'metadata_path=%s\n' "${metadata_path}" >>"${GITHUB_OUTPUT}"
+
+      - name: Upload Android release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: baymax-android-${{ needs.validate.outputs.channel }}-${{ needs.validate.outputs.version }}-${{ needs.validate.outputs.build_number }}-${{ github.sha }}
+          path: |
+            ${{ steps.build.outputs.artifact_path }}
+            ${{ steps.downloadable_apk.outputs.apk_path }}
+            ${{ steps.metadata.outputs.metadata_path }}
+          if-no-files-found: error
+
+      - name: Upload Android APK download
+        if: ${{ needs.validate.outputs.publish == 'false' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: baymax-android-apk-${{ needs.validate.outputs.version }}-${{ needs.validate.outputs.build_number }}-${{ github.sha }}
+          path: ${{ steps.downloadable_apk.outputs.apk_path }}
+          if-no-files-found: error
+
+  ios:
+    needs: validate
+    if: ${{ needs.validate.outputs.platform == 'ios' || needs.validate.outputs.platform == 'all' }}
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build iOS archive artifact
+        id: build
+        env:
+          MOBILE_VERSION: ${{ needs.validate.outputs.version }}
+          MOBILE_BUILD_NUMBER: ${{ needs.validate.outputs.build_number }}
+          MOBILE_PUBLISH: ${{ needs.validate.outputs.publish }}
+        run: |
+          set -euo pipefail
+
+          signed=false
+          export_ipa=false
+          if [[ "${MOBILE_PUBLISH}" == "true" ]]; then
+            signed=true
+            export_ipa=true
+          fi
+
+          artifact_path="$(mobile/scripts/ios-archive.sh \
+            --signed "${signed}" \
+            --export "${export_ipa}" \
+            --version "${MOBILE_VERSION}" \
+            --build-number "${MOBILE_BUILD_NUMBER}" \
+            | tail -n 1)"
+
+          printf 'artifact_path=%s\n' "${artifact_path}" >>"${GITHUB_OUTPUT}"
+
+      - name: Publish iOS to TestFlight
+        if: ${{ needs.validate.outputs.publish == 'true' && needs.validate.outputs.channel == 'testflight' }}
+        env:
+          IOS_APP_STORE_CONNECT_KEY_ID: ${{ secrets.IOS_APP_STORE_CONNECT_KEY_ID }}
+          IOS_APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.IOS_APP_STORE_CONNECT_ISSUER_ID }}
+          IOS_APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.IOS_APP_STORE_CONNECT_API_KEY_BASE64 }}
+        run: mobile/scripts/ios-publish.sh --ipa "${{ steps.build.outputs.artifact_path }}"
+
+      - name: Write iOS release metadata
+        id: metadata
+        env:
+          MOBILE_CHANNEL: ${{ needs.validate.outputs.channel }}
+          MOBILE_VERSION: ${{ needs.validate.outputs.version }}
+          MOBILE_BUILD_NUMBER: ${{ needs.validate.outputs.build_number }}
+          MOBILE_PUBLISH: ${{ needs.validate.outputs.publish }}
+        run: |
+          set -euo pipefail
+
+          metadata_path="$(mobile/scripts/write-release-metadata.sh \
+            --platform ios \
+            --channel "${MOBILE_CHANNEL}" \
+            --version "${MOBILE_VERSION}" \
+            --build-number "${MOBILE_BUILD_NUMBER}" \
+            --artifact "${{ steps.build.outputs.artifact_path }}" \
+            --published "${MOBILE_PUBLISH}" \
+            | tail -n 1)"
+
+          printf 'metadata_path=%s\n' "${metadata_path}" >>"${GITHUB_OUTPUT}"
+
+      - name: Upload iOS release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: baymax-ios-${{ needs.validate.outputs.channel }}-${{ needs.validate.outputs.version }}-${{ needs.validate.outputs.build_number }}-${{ github.sha }}
+          path: |
+            ${{ steps.build.outputs.artifact_path }}
+            ${{ steps.metadata.outputs.metadata_path }}
+          if-no-files-found: error
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.run_id }}
+  cancel-in-progress: false
