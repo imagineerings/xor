@@ -5,6 +5,9 @@
 //! browser. The HTML response page rendered to the browser is kept alongside
 //! the server so all OAuth callback presentation lives in one place.
 
+pub mod device_flow;
+pub mod token_store;
+
 /// Generate a styled HTML page for OAuth callback responses.
 ///
 /// Returns a complete HTML document (no HTTP headers) with a centered card

@@ -5,10 +5,8 @@ use client::{Client, UserStore};
 use collections::HashSet;
 use credentials_provider::CredentialsProvider;
 use gpui::{App, Context, Entity};
-use language_model::{
-    BAYMAX_CLOUD_PROVIDER_ID, ConfiguredModel, LanguageModelProviderId, LanguageModelRegistry,
-};
-use provider::deepseek::DeepSeekLanguageModelProvider;
+use language_model::{BAYMAX_CLOUD_PROVIDER_ID, ConfiguredModel, LanguageModelRegistry};
+use provider::registry::ProviderRegistry;
 
 pub mod extension;
 pub mod provider;
@@ -16,21 +14,8 @@ mod settings;
 
 pub use crate::extension::init_proxy as init_extension_proxy;
 
-use crate::provider::anthropic::AnthropicLanguageModelProvider;
-use crate::provider::bedrock::BedrockLanguageModelProvider;
 use crate::provider::cloud::CloudLanguageModelProvider;
-use crate::provider::copilot_chat::CopilotChatLanguageModelProvider;
-use crate::provider::google::GoogleLanguageModelProvider;
-use crate::provider::lmstudio::LmStudioLanguageModelProvider;
 pub use crate::provider::mistral::MistralLanguageModelProvider;
-use crate::provider::ollama::OllamaLanguageModelProvider;
-use crate::provider::open_ai::OpenAiLanguageModelProvider;
-use crate::provider::open_ai_compatible::OpenAiCompatibleLanguageModelProvider;
-use crate::provider::open_router::OpenRouterLanguageModelProvider;
-use crate::provider::openai_subscribed::OpenAiSubscribedProvider;
-use crate::provider::opencode::OpenCodeLanguageModelProvider;
-use crate::provider::vercel_ai_gateway::VercelAiGatewayLanguageModelProvider;
-use crate::provider::x_ai::XAiLanguageModelProvider;
 pub use crate::settings::*;
 
 pub fn init(user_store: Entity<UserStore>, client: Arc<Client>, cx: &mut App) {
@@ -198,145 +183,35 @@ fn register_openai_compatible_providers(
     credentials_provider: Arc<dyn CredentialsProvider>,
     cx: &mut Context<LanguageModelRegistry>,
 ) {
-    for provider_id in old {
-        if !new.contains(provider_id) {
-            registry.unregister_provider(LanguageModelProviderId::from(provider_id.clone()), cx);
-        }
-    }
-
-    for provider_id in new {
-        if !old.contains(provider_id) {
-            registry.register_provider(
-                Arc::new(OpenAiCompatibleLanguageModelProvider::new(
-                    provider_id.clone(),
-                    client.http_client(),
-                    credentials_provider.clone(),
-                    cx,
-                )),
-                cx,
-            );
-        }
-    }
+    ProviderRegistry::register_declarative_providers(
+        client.http_client(),
+        credentials_provider,
+        old,
+        new,
+        registry,
+        cx,
+    );
 }
 
 fn register_language_model_providers(
     registry: &mut LanguageModelRegistry,
-    user_store: Entity<UserStore>,
+    _user_store: Entity<UserStore>,
     client: Arc<Client>,
     credentials_provider: Arc<dyn CredentialsProvider>,
     cx: &mut Context<LanguageModelRegistry>,
 ) {
+    // Register the cloud (baymax.dev) provider separately since it needs
+    // user_store, which the ProviderRegistry doesn't hold.
     registry.register_provider(
         Arc::new(CloudLanguageModelProvider::new(
-            user_store,
+            _user_store,
             client.clone(),
             cx,
         )),
         cx,
     );
-    registry.register_provider(
-        Arc::new(AnthropicLanguageModelProvider::new(
-            client.http_client(),
-            credentials_provider.clone(),
-            cx,
-        )),
-        cx,
-    );
-    registry.register_provider(
-        Arc::new(OpenAiLanguageModelProvider::new(
-            client.http_client(),
-            credentials_provider.clone(),
-            cx,
-        )),
-        cx,
-    );
-    registry.register_provider(
-        Arc::new(OllamaLanguageModelProvider::new(
-            client.http_client(),
-            credentials_provider.clone(),
-            cx,
-        )),
-        cx,
-    );
-    registry.register_provider(
-        Arc::new(LmStudioLanguageModelProvider::new(
-            client.http_client(),
-            credentials_provider.clone(),
-            cx,
-        )),
-        cx,
-    );
-    registry.register_provider(
-        Arc::new(DeepSeekLanguageModelProvider::new(
-            client.http_client(),
-            credentials_provider.clone(),
-            cx,
-        )),
-        cx,
-    );
-    registry.register_provider(
-        Arc::new(GoogleLanguageModelProvider::new(
-            client.http_client(),
-            credentials_provider.clone(),
-            cx,
-        )),
-        cx,
-    );
-    registry.register_provider(
-        MistralLanguageModelProvider::global(
-            client.http_client(),
-            credentials_provider.clone(),
-            cx,
-        ),
-        cx,
-    );
-    registry.register_provider(
-        Arc::new(BedrockLanguageModelProvider::new(
-            client.http_client(),
-            credentials_provider.clone(),
-            cx,
-        )),
-        cx,
-    );
-    registry.register_provider(
-        Arc::new(OpenRouterLanguageModelProvider::new(
-            client.http_client(),
-            credentials_provider.clone(),
-            cx,
-        )),
-        cx,
-    );
-    registry.register_provider(
-        Arc::new(VercelAiGatewayLanguageModelProvider::new(
-            client.http_client(),
-            credentials_provider.clone(),
-            cx,
-        )),
-        cx,
-    );
-    registry.register_provider(
-        Arc::new(XAiLanguageModelProvider::new(
-            client.http_client(),
-            credentials_provider.clone(),
-            cx,
-        )),
-        cx,
-    );
-    registry.register_provider(
-        Arc::new(OpenCodeLanguageModelProvider::new(
-            client.http_client(),
-            credentials_provider.clone(),
-            cx,
-        )),
-        cx,
-    );
-    registry.register_provider(Arc::new(CopilotChatLanguageModelProvider::new(cx)), cx);
-    registry.register_provider(
-        Arc::new(OpenAiSubscribedProvider::new(
-            client.http_client(),
-            credentials_provider,
-            cx,
-        )),
-        cx,
-    );
+
+    // Register all built-in and declarative providers via the registry.
+    let provider_registry = ProviderRegistry::new(client.http_client(), credentials_provider);
+    provider_registry.register_all(registry, cx);
 }

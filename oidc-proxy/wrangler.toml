@@ -1,0 +1,40 @@
+name = "baymax-oidc-proxy"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# ── Routes ──────────────────────────────────────────────────────────────────
+# Route traffic to this Worker.  Update the zone/pattern to match your
+# Cloudflare deployment.
+#
+#   pattern = "oidc.baymax.sh/*"
+#   zone_id = "<your-zone-id>"
+
+routes = [
+  { pattern = "oidc.baymax.sh/*", zone_id = "<your-zone-id>" },
+]
+
+# ── Environment variables ───────────────────────────────────────────────────
+# These are set at deploy time via `wrangler secret put <NAME>` for
+# sensitive values or `wrangler deploy --var <NAME>=<VALUE>` for non-secret
+# overrides.
+
+[vars]
+# URL of the upstream OIDC provider's authorisation endpoint.
+OIDC_PROVIDER_AUTHORIZE_URL = "https://auth.anthropic.com/authorize"
+# URL of the upstream OIDC provider's token endpoint.
+OIDC_PROVIDER_TOKEN_URL = "https://auth.anthropic.com/oauth/token"
+# Issuer identifier returned in the well-known configuration.
+OIDC_ISSUER = "https://oidc.baymax.sh"
+
+# ── Secrets (set via `wrangler secret put <NAME>`) ──────────────────────────
+# OIDC_CLIENT_ID       — OAuth client identifier issued by the provider.
+# OIDC_CLIENT_SECRET   — OAuth client secret issued by the provider.
+
+# ── Build configuration ─────────────────────────────────────────────────────
+
+[build]
+command = "npm run build"
+watch_dir = "src"
+```
+
+<｜｜DSML｜｜parameter name="path" string="true">baymax/oidc-proxy/package.json
