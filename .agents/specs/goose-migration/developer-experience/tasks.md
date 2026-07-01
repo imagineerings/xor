@@ -11,11 +11,21 @@ Implement slash commands, hints system, goose apps (GPUI panels), source roots, 
 
 ## Tasks
 
-- [ ] 1. Extend existing slash command handling for Goose-specific commands
+- [x] 1. Extend existing slash command handling for Goose-specific commands
   - Audit existing `/compact`, MCP prompt, and skill invocation paths
   - Add missing Goose commands such as `/recipe`, `/help`, and `/clear`
   - Reuse existing autocomplete and prompt dispatch flow
   - Add arguments parsing only where existing command parsing is insufficient
+  - Added `HELP_COMMAND_NAME`, `CLEAR_COMMAND_NAME`, `RECIPE_COMMAND_NAME` constants
+  - Registered all three in `build_available_commands_for_project()` with `Native` category
+  - Added dispatch in `NativeAgentConnection::prompt()` for each command
+  - `send_help_command`: Queries available commands from ACP thread, formats markdown, injects via channel-based event stream
+  - `send_clear_command`: Clears ACP thread entries via `AcpThread::clear_entries()`, shows confirmation
+  - `send_recipe_command`: Placeholder listing recipes — full engine integration deferred to later task
+  - Added `AcpThread::clear_entries()` to `crates/acp_thread/src/acp_thread.rs`
+  - Added `recipe` dependency to `crates/agent/Cargo.toml`
+  - Uses existing `leading_native_command()`/`send_command_queueing_remainder()` flow — no new parser needed
+  - All existing `acp_thread` tests pass (70/70)
   - _Requirements: 1_
   - _writes: crates/agent/src/agent.rs, crates/agent_ui/src/conversation_view/thread_view.rs_
 
