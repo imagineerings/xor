@@ -10,8 +10,7 @@ Use this skill whenever you need to create a git commit in the Baymax workspace.
 ## 1. Validation gate
 
 Before staging, review the changed files and run validation that matches the
-change. Do not use stale `server` or `webapp` commands; this repository is a
-Rust workspace with mobile subprojects.
+change. This repository is a Rust workspace with mobile subprojects.
 
 Always run:
 

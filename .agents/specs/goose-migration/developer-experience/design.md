@@ -26,9 +26,9 @@ graph TD
 
     subgraph "Hints System"
         HintLoader[HintLoader]
-        HintFiles[.goosehints files]
-        ProjectHint[Project Hints]
-        GlobalHint[Global Hints]
+        HintFiles[.baymaxhints files]
+                ProjectHint[Project Hints]
+                GlobalHint[Global Hints]
     end
 
     subgraph "Goose Apps"

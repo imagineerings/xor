@@ -29,11 +29,12 @@ Implement slash commands, hints system, goose apps (GPUI panels), source roots, 
   - _Requirements: 1_
   - _writes: crates/agent/src/agent.rs, crates/agent_ui/src/conversation_view/thread_view.rs_
 
-- [ ] 2. Implement hints system
-  - Create `HintLoader` that discovers `.goosehints` files
-  - Support global hints (`~/.config/baymax/hints/`) and project hints (`.goosehints` in project root)
-  - Hint content injection into agent context
-  - File import resolution for hints that reference other files
+- [x] 2. Implement hints system
+  - Created `HintLoader` in `crates/agent/src/hints/loader.rs`
+  - Supports global hints (`~/.config/baymax/hints/`) and project hints (`.baymaxhints` in worktree roots)
+  - Hint content injected into agent context via `ProjectContext.hints_content`
+  - `@import` file resolution for hints that reference other files
+  - Hints rendered in `## Project Hints` section of system prompt
   - _Requirements: 2_
   - _writes: crates/agent/src/hints/mod.rs, crates/agent/src/hints/loader.rs_
 
