@@ -184,7 +184,7 @@ impl TunnelManager {
     ///
     /// Kills the forward-session subprocess but does NOT kill the ControlMaster
     /// (the existing SSH remote connection remains intact).
-    pub async fn stop(&mut self) -> Result<()> {
+    pub fn stop(&mut self) -> Result<()> {
         self.status = TunnelStatus::Stopping;
         self.kill_child();
         self.status = TunnelStatus::Stopped;
@@ -201,6 +201,12 @@ impl TunnelManager {
         if let Some(mut child) = self.child_process.take() {
             child.kill().ok();
         }
+    }
+
+    /// Set the tunnel status for testing purposes only.
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn set_status_for_test(&mut self, status: TunnelStatus) {
+        self.status = status;
     }
 }
 
@@ -226,4 +232,183 @@ fn generate_auth_token() -> String {
         .unwrap_or_default()
         .subsec_nanos();
     format!("tun-{:08x}", t)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn default_opts() -> SshConnectionOptions {
+        SshConnectionOptions {
+            host: "test-host".into(),
+            username: None,
+            port: None,
+            password: None,
+            args: None,
+            port_forwards: None,
+            connection_timeout: None,
+            nickname: None,
+            upload_binary_over_ssh: false,
+        }
+    }
+
+    #[test]
+    fn test_new_standalone_starts_stopped() {
+        let manager = TunnelManager::new_standalone(default_opts());
+        assert_eq!(manager.status(), &TunnelStatus::Stopped);
+    }
+
+    #[test]
+    fn test_stop_on_stopped_manager_is_safe() {
+        let mut manager = TunnelManager::new_standalone(default_opts());
+        assert_eq!(manager.status(), &TunnelStatus::Stopped);
+
+        let result = manager.stop();
+        assert!(result.is_ok());
+        assert_eq!(manager.status(), &TunnelStatus::Stopped);
+    }
+
+    #[test]
+    fn test_double_stop_is_safe() {
+        let mut manager = TunnelManager::new_standalone(default_opts());
+        assert!(manager.stop().is_ok());
+        assert!(manager.stop().is_ok());
+        assert_eq!(manager.status(), &TunnelStatus::Stopped);
+    }
+
+    #[test]
+    fn test_allocate_local_port_returns_valid_port() {
+        let port = allocate_local_port().unwrap();
+        assert!(
+            port > 0,
+            "allocated port should be a positive number, got {}",
+            port
+        );
+    }
+
+    #[test]
+    fn test_generate_auth_token_is_non_empty() {
+        let token = generate_auth_token();
+        assert!(!token.is_empty(), "auth token should not be empty");
+        assert!(
+            token.starts_with("tun-"),
+            "auth token should start with 'tun-', got {}",
+            token
+        );
+    }
+
+    #[test]
+    fn test_generate_auth_token_produces_unique_values() {
+        // Generate several tokens over time and verify they're not all the same.
+        let tokens: Vec<String> = (0..10).map(|_| generate_auth_token()).collect();
+        let mut unique = tokens.clone();
+        unique.sort();
+        unique.dedup();
+        assert!(
+            unique.len() > 1,
+            "expected at least 2 unique tokens out of 10, got {}: {:?}",
+            unique.len(),
+            tokens
+        );
+    }
+
+    #[test]
+    fn test_drop_does_not_panic() {
+        let manager = TunnelManager::new_standalone(default_opts());
+        drop(manager);
+    }
+
+    #[gpui::test]
+    #[ignore = "requires real SSH binary; start() uses smol::Timer/smol::net which don't progress in GPUI test scheduler"]
+    async fn test_start_standalone_fails_without_ssh(cx: &mut gpui::TestAppContext) {
+        let mut manager = TunnelManager::new_standalone(SshConnectionOptions {
+            host: "nope.invalid".into(),
+            username: None,
+            port: Some(22),
+            password: None,
+            args: None,
+            port_forwards: None,
+            connection_timeout: Some(1),
+            nickname: None,
+            upload_binary_over_ssh: false,
+        });
+
+        let (final_status, result) = cx
+            .spawn(|cx| async move {
+                let mut cx = cx;
+                let result = manager.start(&mut cx).await;
+                (manager.status().clone(), result)
+            })
+            .await;
+
+        assert!(result.is_err(), "start should fail without SSH");
+        match &final_status {
+            TunnelStatus::Starting | TunnelStatus::Error { .. } => {}
+            other => panic!(
+                "expected Starting or Error after failed start, got {:?}",
+                other
+            ),
+        }
+    }
+
+    #[gpui::test]
+    #[ignore = "requires real SSH binary; start() uses smol::Timer/smol::net which don't progress in GPUI test scheduler"]
+    async fn test_double_start_does_not_panic(cx: &mut gpui::TestAppContext) {
+        let mut manager = TunnelManager::new_standalone(SshConnectionOptions {
+            host: "nope.invalid".into(),
+            username: None,
+            port: Some(22),
+            password: None,
+            args: None,
+            port_forwards: None,
+            connection_timeout: Some(1),
+            nickname: None,
+            upload_binary_over_ssh: false,
+        });
+
+        let result = cx
+            .spawn(|cx| async move {
+                let mut cx = cx;
+                let result = manager.start(&mut cx).await;
+                (manager.status().clone(), result)
+            })
+            .await;
+
+        assert!(result.1.is_err(), "first start should fail");
+    }
+
+    #[test]
+    fn test_tunnel_info_equality() {
+        let info1 = TunnelInfo {
+            endpoint_url: "127.0.0.1:8080".into(),
+            auth_token: Some("tok-123".into()),
+            local_port: 8080,
+        };
+        let info2 = TunnelInfo {
+            endpoint_url: "127.0.0.1:8080".into(),
+            auth_token: Some("tok-123".into()),
+            local_port: 8080,
+        };
+        assert_eq!(info1, info2);
+    }
+
+    #[test]
+    fn test_tunnel_status_clone_and_equality() {
+        let variants: &[TunnelStatus] = &[
+            TunnelStatus::Stopped,
+            TunnelStatus::Starting,
+            TunnelStatus::Running(TunnelInfo {
+                endpoint_url: "test".into(),
+                auth_token: None,
+                local_port: 1234,
+            }),
+            TunnelStatus::Stopping,
+            TunnelStatus::Error {
+                message: "oops".into(),
+            },
+        ];
+        for variant in variants {
+            assert_eq!(variant, &variant.clone());
+        }
+    }
 }

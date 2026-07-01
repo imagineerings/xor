@@ -1,0 +1,55 @@
+name: mobile_android_ci
+
+on:
+  pull_request:
+    branches:
+      - "**"
+    paths:
+      - "mobile/android/**"
+      - "mobile/scripts/**"
+      - ".agents/specs/mobile/mobile-build-publish/**"
+      - ".github/workflows/mobile_android_ci.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "mobile/android/**"
+      - "mobile/scripts/**"
+      - ".agents/specs/mobile/mobile-build-publish/**"
+      - ".github/workflows/mobile_android_ci.yml"
+  merge_group: {}
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Run mobile script tests
+        run: mobile/scripts/tests/run.sh
+
+      - name: Run mobile readiness validation
+        run: mobile/scripts/mobile-readiness-check.sh
+
+      - name: Run Android unit tests
+        run: mobile/scripts/android-test.sh
+
+      - name: Build Android debug APK
+        run: mobile/scripts/android-build.sh --variant debug --artifact apk --version 1.0.0 --build-number "${{ github.run_number }}"
+
+      - name: Upload Android debug artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: baymax-android-debug
+          path: mobile/build/android/*.apk
+          if-no-files-found: error
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.ref_name == 'main' && github.sha || 'anysha' }}
+  cancel-in-progress: true

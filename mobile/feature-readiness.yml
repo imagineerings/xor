@@ -1,0 +1,81 @@
+items:
+  - id: connection-configuration
+    title: Connection configuration and QR/deep-link intake
+    platforms: [android, ios]
+    validation: automated
+    specs:
+      - .agents/specs/mobile/mobile-core-infrastructure/requirements.md
+      - .agents/specs/mobile/mobile-settings-config/requirements.md
+    checks:
+      - android_deeplink_manifest
+      - ios_deeplink_plist
+      - qr_configuration_handlers
+
+  - id: remote-tunneling
+    title: Remote connection and tunneling readiness
+    platforms: [android, ios, desktop]
+    validation: manual
+    specs:
+      - .agents/specs/mobile/mobile-access-secure-tunneling/requirements.md
+      - .agents/specs/mobile/mobile-core-infrastructure/requirements.md
+
+  - id: session-listing
+    title: Session listing, selection, and refresh
+    platforms: [android, ios]
+    validation: manual
+    specs:
+      - .agents/specs/mobile/mobile-core-infrastructure/requirements.md
+
+  - id: agent-chat
+    title: Agent chat send/resume flow
+    platforms: [android, ios]
+    validation: manual
+    specs:
+      - .agents/specs/mobile/mobile-agent-chat/requirements.md
+
+  - id: sse-streaming
+    title: SSE streaming and fallback behavior
+    platforms: [android, ios]
+    validation: manual
+    specs:
+      - .agents/specs/mobile/mobile-core-infrastructure/requirements.md
+      - .agents/specs/mobile/mobile-agent-chat/requirements.md
+
+  - id: settings
+    title: Server settings and display preferences
+    platforms: [android, ios]
+    validation: manual
+    specs:
+      - .agents/specs/mobile/mobile-settings-config/requirements.md
+
+  - id: trial-mode
+    title: Trial mode setup and recovery
+    platforms: [android, ios]
+    validation: manual
+    specs:
+      - .agents/specs/mobile/mobile-core-infrastructure/requirements.md
+      - .agents/specs/mobile/mobile-user-experience/requirements.md
+
+  - id: voice
+    title: Voice input and speech output
+    platforms: [android, ios]
+    validation: manual
+    specs:
+      - .agents/specs/mobile/mobile-calls-voice/requirements.md
+
+  - id: android-ios-parity
+    title: Android and iOS feature parity
+    platforms: [android, ios]
+    validation: manual
+    specs:
+      - .agents/specs/mobile/android-feature-parity/requirements.md
+
+  - id: build-publish
+    title: Build, archive, artifact metadata, and publish gates
+    platforms: [android, ios]
+    validation: automated
+    specs:
+      - .agents/specs/mobile/mobile-build-publish/requirements.md
+    checks:
+      - mobile_build_scripts
+      - mobile_release_workflow

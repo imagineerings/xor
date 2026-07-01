@@ -7,6 +7,8 @@
 **/.direnv
 *.wasm
 *.xcodeproj
+!mobile/ios/Baymax.xcodeproj
+!mobile/ios/Baymax.xcodeproj/**
 .DS_Store
 .blob_store
 .build

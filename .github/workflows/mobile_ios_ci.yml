@@ -1,0 +1,42 @@
+name: mobile_ios_ci
+
+on:
+  pull_request:
+    branches:
+      - "**"
+    paths:
+      - "mobile/ios/**"
+      - "mobile/scripts/**"
+      - ".agents/specs/mobile/mobile-build-publish/**"
+      - ".github/workflows/mobile_ios_ci.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "mobile/ios/**"
+      - "mobile/scripts/**"
+      - ".agents/specs/mobile/mobile-build-publish/**"
+      - ".github/workflows/mobile_ios_ci.yml"
+  merge_group: {}
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Run mobile script tests
+        run: mobile/scripts/tests/run.sh
+
+      - name: Run mobile readiness validation
+        run: mobile/scripts/mobile-readiness-check.sh
+
+      - name: Build iOS app
+        run: mobile/scripts/ios-build.sh --configuration Debug --version 1.0.0 --build-number "${{ github.run_number }}"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.ref_name == 'main' && github.sha || 'anysha' }}
+  cancel-in-progress: true

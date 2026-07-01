@@ -1,113 +1,171 @@
 ---
 name: push
-description: Push the current branch to origin and create or update a GitHub PR using the gh CLI. Runs pre-push test validation and handles PR body templating and authentication.
+description: Push the current Baymax branch to origin and create or update a GitHub PR using gh, with repo-appropriate validation and PR hygiene.
 ---
 
-# Push Skill
+# push skill
 
-Use this skill to push your branch to `origin` and open or update a GitHub pull request.
+Use this skill to push the current branch to `origin` and open or update a
+GitHub pull request.
 
-## Pre-push Validation Gate
+## 1. Pre-push validation gate
 
-Before pushing, run both test suites. Both must pass.
-
-```bash
-cd server && make test-server
-```
+Before pushing, inspect the current branch and worktree:
 
 ```bash
-cd webapp && bun run test
+git branch --show-current
+git status -sb
 ```
 
-If either command exits non-zero, **abort the push**. Fix all failures and re-run the failing suite before retrying. Do not push a branch with failing tests.
+If there are uncommitted changes, do not push them implicitly. Commit relevant
+changes first, or stop and report the remaining files.
 
-## Verify gh CLI is Available
+Run validation appropriate to the changes in the branch. Do not use stale
+`server` or `webapp` commands; this repository is a Rust workspace with mobile
+subprojects.
 
-Before any `gh` operation, confirm the binary is present:
+Always run:
+
+```bash
+git diff --check
+git diff --cached --check
+```
+
+Then run the relevant checks:
+
+| Changed area | Validation |
+|---|---|
+| Rust crates, `Cargo.toml`, `Cargo.lock` | `cargo fmt --all -- --check` and `./script/clippy` |
+| Rust tests or behavior with meaningful risk | Relevant `cargo test ...` or `cargo nextest ...` command |
+| Mobile scripts/workflows/specs | `mobile/scripts/tests/run.sh`, `mobile/scripts/mobile-readiness-check.sh`, and YAML parse for touched workflow/checklist files |
+| Android app/build files | `mobile/scripts/android-test.sh` and, when feasible, `mobile/scripts/android-build.sh --variant debug --artifact apk --version 1.0.0 --build-number 1` |
+| iOS project/build files on macOS | `mobile/scripts/ios-build.sh --configuration Debug --version 1.0.0 --build-number 1` |
+| Docs/spec-only changes | `git diff --check`; add targeted parser/check commands when the docs are structured files |
+
+If a relevant check cannot run in the current environment, say so in the PR body
+under Testing. If a relevant check fails, abort the push, fix it, and retry from
+the validation gate.
+
+## 2. Verify `gh` authentication
+
+Verify `gh` is available:
 
 ```bash
 command -v gh >/dev/null 2>&1 || { echo "ERROR: gh CLI not found in PATH. Install gh before using the push skill."; exit 1; }
 ```
 
-If `gh` is absent, abort immediately with the error above. Do not attempt any GitHub operations.
-
-## Verify GITHUB_TOKEN
-
-All `gh` CLI operations require a valid `GITHUB_TOKEN`. Check before proceeding:
+Verify authentication:
 
 ```bash
-if [ -z "${GITHUB_TOKEN:-}" ]; then
-  echo "ERROR: GITHUB_TOKEN is not set. Set GITHUB_TOKEN before using the push skill."
-  exit 1
-fi
+gh auth status
 ```
 
-Export it so `gh` picks it up automatically:
+If `gh auth status` fails, either authenticate with `gh auth login` or set
+`GH_TOKEN`/`GITHUB_TOKEN` in the environment. If only `GITHUB_TOKEN` is set,
+export it for `gh`:
 
 ```bash
 export GH_TOKEN="$GITHUB_TOKEN"
 ```
 
-If `GITHUB_TOKEN` is absent or `gh` reports an authentication error, abort immediately. Do **not** write any partial output to files in the workspace.
+Abort on authentication errors.
 
-## Push the Branch
+## 3. Push the branch
+
+Use a normal upstream push for new or linear branches:
 
 ```bash
 git push --set-upstream origin HEAD
 ```
 
-Use `--force-with-lease` instead of `--force` if you need to overwrite a previous push on the same branch:
+Use `--force-with-lease` only if you intentionally amended or rebased commits
+that were already pushed:
 
 ```bash
 git push --force-with-lease origin HEAD
 ```
 
-## Compose the PR Body
+Never use plain `--force`.
 
-Check whether the repository provides a PR template:
+## 4. Compose the PR title and body
 
-```bash
-if [ -f .github/pull_request_template.md ]; then
-  PR_BODY_FILE=".github/pull_request_template.md"
-else
-  PR_BODY_FILE=""
-fi
+Follow the repo PR hygiene rules:
+
+- Use a clear, correctly capitalized, imperative PR title.
+- Do not use conventional commit prefixes in PR titles (`fix:`, `feat:`, `docs:`, etc.).
+- Do not use trailing punctuation in PR titles.
+- Optionally prefix with a crate or area when one scope is clear, for example `mobile: Add Android APK release artifact`.
+- Include `Release Notes:` as the final section.
+- Use exactly one release-notes bullet:
+  - `- Added ...`, `- Fixed ...`, or `- Improved ...` for user-facing changes
+  - `- N/A` for docs-only or other non-user-facing changes
+
+If `.github/pull_request_template.md` exists, use it as the starting point and
+fill in placeholders. Otherwise, write a concise temporary PR body with:
+
+```markdown
+## Summary
+
+- ...
+
+## Testing
+
+- ...
+
+Release Notes:
+
+- ...
 ```
 
-- **If the template exists**: use it as the PR body. Fill in all placeholder sections (e.g. "Summary", "Testing", "Checklist") with information relevant to the changes in this branch.
-- **If the template does not exist**: write a concise summary PR body covering: what changed, why it changed, and how it was tested. Write the body to a temporary file (e.g. `/tmp/pr_body_$$.md`) and pass it with `--body-file`.
+Use a temporary file outside the repo, for example:
 
-## Create or Update the PR
+```bash
+PR_BODY_FILE=$(mktemp /tmp/pr-body.XXXXXX.md)
+```
 
-**Create a new PR** (first push):
+## 5. Create or update the PR
+
+Check whether the current branch already has a PR:
+
+```bash
+gh pr view --json number,url,state,title
+```
+
+If no PR exists, create one:
 
 ```bash
 gh pr create \
-  --title "<Linear issue title>" \
-  --body-file "${PR_BODY_FILE:-/tmp/pr_body_$$.md}" \
+  --title "<PR title>" \
+  --body-file "$PR_BODY_FILE" \
   --base main
 ```
 
-**Update an existing PR** (subsequent pushes — the branch already has an open PR):
+If a PR exists, update it:
 
 ```bash
 gh pr edit \
-  --body-file "${PR_BODY_FILE:-/tmp/pr_body_$$.md}"
+  --title "<PR title>" \
+  --body-file "$PR_BODY_FILE"
 ```
 
-Use the Linear issue identifier and title as the PR title (e.g. `SIM-123: Add user profile endpoint`).
+After creating or updating, retrieve the URL:
 
-## After the PR is Open
+```bash
+gh pr view --json url -q .url
+```
 
-1. Note the PR URL printed by `gh pr create` (or retrieve it with `gh pr view --json url -q .url`).
-2. Pass the PR URL to the `linear` skill to attach it to the issue and move the issue to "Human Review".
+Report the PR URL to the user.
 
-## Error Handling
+## 6. Error handling
 
 | Condition | Action |
 |---|---|
-| `gh` not in PATH | Print `ERROR: gh CLI not found in PATH` and abort |
-| `GITHUB_TOKEN` absent or invalid | Print `ERROR: GITHUB_TOKEN is not set` (or `authentication failed`) and abort; do not write partial output |
-| Pre-push tests fail | Fix failures, then retry from the validation gate |
-| `git push` rejected (non-lease conflict) | Investigate before force-pushing; prefer rebasing |
-| `gh pr create` fails | Surface the full error from `gh`; do not silently continue |
+| Dirty worktree | Abort unless the user asks to commit specific files first |
+| Relevant validation fails | Fix failures before pushing |
+| `gh` not in PATH | Abort with the install/auth requirement |
+| `gh` authentication fails | Abort and ask for auth/token |
+| `git push` rejected | Investigate; pull/rebase only with user consent when needed |
+| Force push needed | Use `--force-with-lease`, never `--force` |
+| `gh pr create/edit` fails | Surface the full `gh` error and halt |
+
+Never silently continue after a failed push or PR command.

@@ -16930,6 +16930,7 @@ dependencies = [
  "log",
  "menu",
  "mobile_tunnel",
+ "parking_lot",
  "paths",
  "picker",
  "platform_title_bar",
