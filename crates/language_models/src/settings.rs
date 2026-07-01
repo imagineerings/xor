@@ -4,11 +4,15 @@ use collections::HashMap;
 use settings::RegisterSetting;
 
 use crate::provider::{
-    anthropic, anthropic::AnthropicSettings, bedrock, bedrock::AmazonBedrockSettings,
-    cloud::BaymaxDotDevSettings, deepseek::DeepSeekSettings, google::GoogleSettings,
-    lmstudio::LmStudioSettings, mistral, mistral::MistralSettings, ollama::OllamaSettings,
+    anthropic, anthropic::AnthropicSettings, avian::AvianSettings, azure::AzureSettings, bedrock,
+    bedrock::AmazonBedrockSettings, cloud::BaymaxDotDevSettings, databricks::DatabricksV1Settings,
+    databricks_v2::DatabricksSettings, deepseek::DeepSeekSettings,
+    gcp_vertex_ai::GcpVertexAiSettings, google::GoogleSettings, huggingface::HuggingFaceSettings,
+    kimicode::KimiCodeSettings, litellm::LiteLlmSettings, lmstudio::LmStudioSettings, mistral,
+    mistral::MistralSettings, nanogpt::NanoGptSettings, ollama::OllamaSettings,
     open_ai::OpenAiSettings, open_ai_compatible::OpenAiCompatibleSettings, open_router,
     open_router::OpenRouterSettings, opencode, opencode::OpenCodeSettings, resolve_custom_headers,
+    sagemaker_tgi::SageMakerTgiSettings, snowflake::SnowflakeSettings, tetrate::TetrateSettings,
     vercel_ai_gateway::VercelAiGatewaySettings, x_ai::XAiSettings,
 };
 
@@ -27,7 +31,19 @@ pub struct AllLanguageModelSettings {
     pub openai_compatible: HashMap<Arc<str>, OpenAiCompatibleSettings>,
     pub vercel_ai_gateway: VercelAiGatewaySettings,
     pub x_ai: XAiSettings,
+    pub azure: AzureSettings,
     pub baymax_dot_dev: BaymaxDotDevSettings,
+    pub gcp_vertex_ai: GcpVertexAiSettings,
+    pub huggingface: HuggingFaceSettings,
+    pub litellm: LiteLlmSettings,
+    pub nanogpt: NanoGptSettings,
+    pub sagemaker_tgi: SageMakerTgiSettings,
+    pub snowflake: SnowflakeSettings,
+    pub databricks: DatabricksSettings,
+    pub databricks_v1: DatabricksV1Settings,
+    pub tetrate: TetrateSettings,
+    pub avian: AvianSettings,
+    pub kimicode: KimiCodeSettings,
 }
 
 fn custom_headers_from(
@@ -59,8 +75,27 @@ impl settings::Settings for AllLanguageModelSettings {
         let openai_compatible = language_models.openai_compatible.unwrap();
         let vercel_ai_gateway = language_models.vercel_ai_gateway.unwrap();
         let x_ai = language_models.x_ai.unwrap();
-        let baymax_dot_dev = language_models.baymax_dot_dev.unwrap();
+        let azure = language_models.azure.unwrap_or_default();
+        let baymax_dot_dev = language_models.baymax_dot_dev.unwrap_or_default();
+        let gcp_vertex_ai = language_models.gcp_vertex_ai.unwrap_or_default();
+        let huggingface = language_models.huggingface.unwrap_or_default();
+        let litellm = language_models.litellm.unwrap_or_default();
+        let nanogpt = language_models.nanogpt.unwrap_or_default();
+        let tetrate = language_models.tetrate.unwrap_or_default();
+        let avian = language_models.avian.unwrap_or_default();
+        let sagemaker_tgi = language_models.sagemaker_tgi.unwrap_or_default();
+        let snowflake = language_models.snowflake.unwrap_or_default();
+        let databricks = language_models.databricks.unwrap_or_default();
+        let databricks_v1 = language_models.databricks_v1.unwrap_or_default();
+        let kimicode = language_models.kimicode.unwrap_or_default();
         Self {
+            azure: AzureSettings {
+                resource_name: azure.resource_name.unwrap_or_default(),
+                deployments: azure.deployments.unwrap_or_default(),
+                api_version: azure.api_version,
+                endpoint: azure.endpoint,
+                use_ad_token: azure.use_ad_token.unwrap_or(false),
+            },
             anthropic: AnthropicSettings {
                 api_url: anthropic.api_url.unwrap(),
                 available_models: anthropic.available_models.unwrap_or_default(),
@@ -177,6 +212,65 @@ impl settings::Settings for AllLanguageModelSettings {
             },
             baymax_dot_dev: BaymaxDotDevSettings {
                 available_models: baymax_dot_dev.available_models.unwrap_or_default(),
+            },
+            gcp_vertex_ai: GcpVertexAiSettings {
+                api_url: gcp_vertex_ai.api_url.unwrap_or_default(),
+                project_id: gcp_vertex_ai.project_id.unwrap_or_default(),
+                region: gcp_vertex_ai.region.unwrap_or_default(),
+                available_models: gcp_vertex_ai.available_models.unwrap_or_default(),
+                custom_headers: custom_headers_from(
+                    "GCP Vertex AI",
+                    gcp_vertex_ai.custom_headers,
+                    &[],
+                ),
+            },
+            huggingface: HuggingFaceSettings {
+                api_url: huggingface.api_url.unwrap_or_default(),
+                custom_headers: custom_headers_from("HuggingFace", huggingface.custom_headers, &[]),
+            },
+            litellm: LiteLlmSettings {
+                api_url: litellm.api_url.unwrap_or_default(),
+                custom_headers: custom_headers_from("LiteLLM", litellm.custom_headers, &[]),
+            },
+            nanogpt: NanoGptSettings {
+                api_url: nanogpt.api_url.unwrap_or_default(),
+                custom_headers: custom_headers_from("NanoGPT", nanogpt.custom_headers, &[]),
+            },
+            tetrate: TetrateSettings {
+                api_url: tetrate.api_url.unwrap_or_default(),
+                custom_headers: custom_headers_from("Tetrate", tetrate.custom_headers, &[]),
+            },
+            avian: AvianSettings {
+                api_url: avian.api_url.unwrap_or_default(),
+                custom_headers: custom_headers_from("Avian", avian.custom_headers, &[]),
+            },
+            sagemaker_tgi: SageMakerTgiSettings {
+                api_url: sagemaker_tgi.api_url.unwrap_or_default(),
+                custom_headers: custom_headers_from(
+                    "SageMaker TGI",
+                    sagemaker_tgi.custom_headers,
+                    &[],
+                ),
+            },
+            snowflake: SnowflakeSettings {
+                api_url: snowflake.api_url.unwrap_or_default(),
+                custom_headers: custom_headers_from("Snowflake", snowflake.custom_headers, &[]),
+            },
+            databricks: DatabricksSettings {
+                api_url: databricks.api_url.unwrap_or_default(),
+                custom_headers: custom_headers_from("Databricks", databricks.custom_headers, &[]),
+            },
+            databricks_v1: DatabricksV1Settings {
+                api_url: databricks_v1.api_url.unwrap_or_default(),
+                custom_headers: custom_headers_from(
+                    "Databricks v1",
+                    databricks_v1.custom_headers,
+                    &[],
+                ),
+            },
+            kimicode: KimiCodeSettings {
+                api_url: kimicode.api_url.unwrap_or_default(),
+                custom_headers: custom_headers_from("KimiCode", kimicode.custom_headers, &[]),
             },
         }
     }

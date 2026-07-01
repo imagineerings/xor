@@ -2,23 +2,49 @@ use collections::HashMap;
 use http_client::CustomHeaders;
 use http_client::http::{HeaderName, HeaderValue};
 
+pub mod acp_subprocess;
 pub mod anthropic;
+pub mod avian;
+pub mod azure;
 pub mod bedrock;
+pub mod claude_acp;
+pub mod claude_code;
 pub mod cloud;
+pub mod codex;
 pub mod copilot_chat;
+pub mod cursor_agent;
+pub mod databricks;
+pub mod databricks_v2;
+pub mod declarative;
 pub mod deepseek;
+pub mod embedding;
+pub mod gcp_vertex_ai;
+pub mod gemini_cli;
 pub mod google;
+pub mod huggingface;
+pub mod kimicode;
+pub mod litellm;
 pub mod lmstudio;
+pub mod local_inference;
 pub mod mistral;
+pub mod nanogpt;
+pub mod oauth_integration;
 pub mod ollama;
 pub mod open_ai;
 pub mod open_ai_compatible;
 pub mod open_router;
 pub mod openai_subscribed;
 pub mod opencode;
+pub mod registry;
+pub mod sagemaker_tgi;
+pub mod snowflake;
+pub mod tetrate;
 
 pub mod vercel_ai_gateway;
 pub mod x_ai;
+
+#[cfg(test)]
+pub mod tests;
 
 const COMMON_RESERVED_HEADER_NAMES: &[&str] = &["Authorization", "Content-Type", "Accept"];
 
@@ -66,7 +92,7 @@ pub(crate) fn resolve_custom_headers(
 }
 
 #[cfg(test)]
-mod tests {
+mod custom_headers_tests {
     use super::*;
 
     fn map(pairs: &[(&str, &str)]) -> HashMap<String, String> {

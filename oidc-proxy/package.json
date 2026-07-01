@@ -1,0 +1,19 @@
+{
+  "name": "baymax-oidc-proxy",
+  "version": "0.1.0",
+  "description": "OIDC proxy (Cloudflare Worker) for baymax authentication",
+  "private": true,
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --outfile=dist/index.js --format=esm --platform=browser --external:__STATIC_CONTENT_MANIFEST",
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250101.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.7.0",
+    "wrangler": "^3.100.0"
+  }
+}
