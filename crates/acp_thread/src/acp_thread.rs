@@ -2594,6 +2594,13 @@ impl AcpThread {
         cx.notify();
     }
 
+    /// Remove all conversation entries, clearing the thread display.
+    pub fn clear_entries(&mut self, cx: &mut Context<Self>) {
+        Self::flush_streaming_text(&mut self.streaming_text_buffer, cx);
+        self.entries.clear();
+        cx.notify();
+    }
+
     #[cfg(any(test, feature = "test-support"))]
     pub fn send_raw(
         &mut self,

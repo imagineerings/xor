@@ -177,6 +177,9 @@ impl From<&Skill> for NativeAvailableSkill {
 }
 
 pub const COMPACT_COMMAND_NAME: &str = "compact";
+pub const HELP_COMMAND_NAME: &str = "help";
+pub const CLEAR_COMMAND_NAME: &str = "clear";
+pub const RECIPE_COMMAND_NAME: &str = "recipe";
 
 /// Returns the set of MCP prompt names that must be server-qualified
 /// (`/<server>.<name>`) to stay unambiguous in the slash-command popup: names
@@ -1506,21 +1509,38 @@ impl NativeAgent {
         let Some(state) = project_state else {
             return Vec::new();
         };
-        let compact_command = acp::AvailableCommand::new(
-            COMPACT_COMMAND_NAME,
-            "Summarize the conversation so far to free up context",
-        )
-        .meta(acp_thread::meta_with_command_category(
-            acp_thread::CommandCategory::Native,
-        ));
+        let native_commands = [
+            (
+                COMPACT_COMMAND_NAME,
+                "Summarize the conversation so far to free up context",
+            ),
+            (HELP_COMMAND_NAME, "Show available slash commands and usage"),
+            (CLEAR_COMMAND_NAME, "Clear the current conversation"),
+            (
+                RECIPE_COMMAND_NAME,
+                "List or run recipes (e.g. `/recipe release`)",
+            ),
+        ];
+
+        let native_commands = native_commands.into_iter().map(|(name, description)| {
+            acp::AvailableCommand::new(name, description).meta(
+                acp_thread::meta_with_command_category(acp_thread::CommandCategory::Native),
+            )
+        });
 
         let registry = state.context_server_registry.read(cx);
 
-        // Reserve the built-in command name so a same-named MCP prompt is
-        // force-prefixed (`/<server>.compact`) and stays reachable: an
-        // unqualified `/compact` always routes to the native command.
+        // Reserve the built-in command names so same-named MCP prompts are
+        // force-prefixed (`/<server>.<name>`) and stay reachable: an
+        // unqualified invocation always routes to the native command.
+        let reserved: [&str; 4] = [
+            COMPACT_COMMAND_NAME,
+            HELP_COMMAND_NAME,
+            CLEAR_COMMAND_NAME,
+            RECIPE_COMMAND_NAME,
+        ];
         let ambiguous_prompt_names = ambiguous_mcp_prompt_names(
-            [COMPACT_COMMAND_NAME],
+            reserved,
             registry.prompts().map(|p| p.prompt.name.as_str()),
         );
 
@@ -1559,9 +1579,7 @@ impl NativeAgent {
             Some(command)
         });
 
-        std::iter::once(compact_command)
-            .chain(mcp_commands)
-            .collect()
+        native_commands.chain(mcp_commands).collect()
     }
 
     pub fn load_thread(
@@ -1913,6 +1931,114 @@ impl NativeAgent {
                     connection,
                     cx,
                 )
+            })
+            .await
+        })
+    }
+
+    /// Show a help message listing all available slash commands and their
+    /// descriptions. Triggered by the `/help` native slash command.
+    fn send_help_command(
+        &self,
+        session_id: acp::SessionId,
+        cx: &mut Context<Self>,
+    ) -> Task<Result<acp::PromptResponse>> {
+        cx.spawn(async move |this, cx| {
+            let (acp_thread, available_commands) = this.update(cx, |this, _cx| {
+                let session = this
+                    .sessions
+                    .get(&session_id)
+                    .context("Failed to get session")?;
+                let commands = session.acp_thread.read(_cx).available_commands().to_vec();
+                anyhow::Ok((session.acp_thread.clone(), commands))
+            })??;
+
+            let mut help_text = String::from("## Available Commands\n\n");
+            for cmd in &available_commands {
+                help_text.push_str(&format!("- **`/{}`** — {}\n", cmd.name, cmd.description));
+            }
+
+            let (mut tx, rx) = mpsc::unbounded();
+            let _ = tx.start_send(Ok(ThreadEvent::AgentText(help_text)));
+            let _ = tx.start_send(Ok(ThreadEvent::Stop(acp::StopReason::EndTurn)));
+            // Drop the sender so the receiver gets None after the last message.
+            drop(tx);
+
+            cx.update(|cx| {
+                NativeAgentConnection::handle_thread_events(rx, acp_thread.downgrade(), None, cx)
+            })
+            .await
+        })
+    }
+
+    /// Clear all conversation entries in response to the `/clear` native
+    /// slash command. Removes all entries from the ACP thread and shows a
+    /// confirmation message.
+    fn send_clear_command(
+        &self,
+        session_id: acp::SessionId,
+        cx: &mut Context<Self>,
+    ) -> Task<Result<acp::PromptResponse>> {
+        cx.spawn(async move |this, cx| {
+            let acp_thread = this.update(cx, |this, _cx| {
+                let session = this
+                    .sessions
+                    .get(&session_id)
+                    .context("Failed to get session")?;
+                anyhow::Ok(session.acp_thread.clone())
+            })??;
+
+            // Clear all entries from the ACP thread display.
+            acp_thread.update(cx, |thread, cx| thread.clear_entries(cx));
+
+            let (mut tx, rx) = mpsc::unbounded();
+            let _ = tx.start_send(Ok(ThreadEvent::AgentText(
+                "Conversation cleared.".to_string(),
+            )));
+            let _ = tx.start_send(Ok(ThreadEvent::Stop(acp::StopReason::EndTurn)));
+            drop(tx);
+
+            cx.update(|cx| {
+                NativeAgentConnection::handle_thread_events(rx, acp_thread.downgrade(), None, cx)
+            })
+            .await
+        })
+    }
+
+    /// Handle `/recipe` — list available recipes when invoked without an
+    /// argument, or run a named recipe when a recipe name is provided.
+    fn send_recipe_command(
+        &self,
+        _arg: &str,
+        session_id: acp::SessionId,
+        cx: &mut Context<Self>,
+    ) -> Task<Result<acp::PromptResponse>> {
+        let arg = _arg.to_string();
+        cx.spawn(async move |this, cx| {
+            let acp_thread = this.update(cx, |this, _cx| {
+                let session = this
+                    .sessions
+                    .get(&session_id)
+                    .context("Failed to get session")?;
+                anyhow::Ok(session.acp_thread.clone())
+            })??;
+
+            let recipe_text = if arg.is_empty() {
+                build_recipe_list_text()
+            } else {
+                build_recipe_run_text(&arg)
+                // TODO: Full recipe execution in a follow-up.
+                // The recipe engine needs a project-aware initialisation
+                // with appropriate sources (builtin, local, GitHub).
+            };
+
+            let (mut tx, rx) = mpsc::unbounded();
+            let _ = tx.start_send(Ok(ThreadEvent::AgentText(recipe_text)));
+            let _ = tx.start_send(Ok(ThreadEvent::Stop(acp::StopReason::EndTurn)));
+            drop(tx);
+
+            cx.update(|cx| {
+                NativeAgentConnection::handle_thread_events(rx, acp_thread.downgrade(), None, cx)
             })
             .await
         })
@@ -2328,6 +2454,33 @@ fn strip_slash_command_prefix(text: &str) -> String {
         .unwrap_or_default()
 }
 
+/// Build a help-text response for `/recipe` when no recipe name is given.
+fn build_recipe_list_text() -> String {
+    let mut text = String::from("## Recipes\n\n");
+    text.push_str(
+        "Recipes are community-contributed automation workflows. \
+         Use `/recipe <name>` to run a specific recipe.\n\n",
+    );
+    // TODO: Integrate with RecipeEngine::discover_all() to list
+    // available recipes from builtin, local, and GitHub sources.
+    text.push_str(
+        "_Recipe engine is available but source discovery is not yet \
+         wired into the slash command handler._",
+    );
+    text
+}
+
+/// Build a response for `/recipe <name>` indicating the argument was
+/// received but execution is not yet wired through.
+fn build_recipe_run_text(name: &str) -> String {
+    format!(
+        "## Recipe: `{name}`\n\n\
+         Recipe lookup and execution is not yet wired into the \
+         slash command handler. Use the recipe CLI tools to run \
+         this recipe: `goose recipe run {name}`.\n"
+    )
+}
+
 struct NativeAgentModelSelector {
     session_id: acp::SessionId,
     connection: NativeAgentConnection,
@@ -2597,6 +2750,24 @@ impl acp_thread::AgentConnection for NativeAgentConnection {
             if parsed_command.is_unqualified(COMPACT_COMMAND_NAME) {
                 return self.0.update(cx, |agent, cx| {
                     agent.send_compact_command(id, session_id, cx)
+                });
+            }
+
+            if parsed_command.is_unqualified(HELP_COMMAND_NAME) {
+                return self
+                    .0
+                    .update(cx, |agent, cx| agent.send_help_command(session_id, cx));
+            }
+
+            if parsed_command.is_unqualified(CLEAR_COMMAND_NAME) {
+                return self
+                    .0
+                    .update(cx, |agent, cx| agent.send_clear_command(session_id, cx));
+            }
+
+            if parsed_command.is_unqualified(RECIPE_COMMAND_NAME) {
+                return self.0.update(cx, |agent, cx| {
+                    agent.send_recipe_command(parsed_command.arg_value, session_id, cx)
                 });
             }
 

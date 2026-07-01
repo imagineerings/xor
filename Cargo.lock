@@ -318,6 +318,7 @@ dependencies = [
  "proptest",
  "quick-xml 0.38.4",
  "rand 0.9.4",
+ "recipe",
  "regex",
  "reqwest_client",
  "rust-embed",
