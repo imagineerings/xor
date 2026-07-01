@@ -550,6 +550,7 @@ aws-sdk-bedrockruntime = { version = "1.112.0", features = [
 ] }
 aws-smithy-runtime-api = { version = "1.9.2", features = ["http-1x", "client"] }
 aws-smithy-types = { version = "1.3.4", features = ["http-body-1-x"] }
+aes-gcm = "0.10"
 backtrace = "0.3"
 base64 = "0.22"
 bitflags = "2.6.0"
@@ -628,6 +629,7 @@ jsonschema = "0.37.0"
 jsonwebtoken = "10.0"
 jupyter-protocol = "1.4.0"
 jupyter-websocket-client = "1.1.0"
+keyring = "3"
 libc = "0.2"
 libsqlite3-sys = { version = "0.30.1", features = ["bundled"] }
 linkify = "0.10.0"

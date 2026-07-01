@@ -4,7 +4,7 @@ version = "0.1.0"
 edition.workspace = true
 publish = false
 license = "Apache-2.0"
-description = "Loopback OAuth 2.0 callback server and shared HTML response page for Baymax sign-in flows"
+description = "Loopback OAuth 2.0 callback server, token persistence, and device flow for Baymax sign-in flows"
 
 [lints]
 workspace = true
@@ -14,10 +14,19 @@ path = "src/oauth_callback_server.rs"
 doctest = false
 
 [dependencies]
+aes-gcm.workspace = true
 anyhow.workspace = true
+base64.workspace = true
+keyring.workspace = true
+rand.workspace = true
+serde = { workspace = true, features = ["derive"] }
+chrono = { workspace = true, features = ["serde"] }
+serde_json.workspace = true
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 futures.workspace = true
 log.workspace = true
+reqwest = { workspace = true, features = ["json"] }
 tiny_http.workspace = true
+tokio = { workspace = true, features = ["time", "rt", "macros"] }
 url.workspace = true

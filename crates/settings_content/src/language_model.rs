@@ -25,6 +25,18 @@ pub struct AllLanguageModelSettingsContent {
     pub x_ai: Option<XAiSettingsContent>,
     #[serde(rename = "baymax.dev")]
     pub baymax_dot_dev: Option<BaymaxDotDevSettingsContent>,
+    pub azure: Option<AzureSettingsContent>,
+    pub gcp_vertex_ai: Option<GcpVertexAiSettingsContent>,
+    pub huggingface: Option<HuggingFaceSettingsContent>,
+    pub litellm: Option<LiteLlmSettingsContent>,
+    pub nanogpt: Option<NanoGptSettingsContent>,
+    pub tetrate: Option<TetrateSettingsContent>,
+    pub avian: Option<AvianSettingsContent>,
+    pub kimicode: Option<KimiCodeSettingsContent>,
+    pub sagemaker_tgi: Option<SageMakerTgiSettingsContent>,
+    pub snowflake: Option<SnowflakeSettingsContent>,
+    pub databricks: Option<DatabricksSettingsContent>,
+    pub databricks_v1: Option<DatabricksV1SettingsContent>,
 }
 
 #[with_fallible_options]
@@ -442,6 +454,109 @@ pub enum BaymaxDotDevAvailableProvider {
     Anthropic,
     OpenAi,
     Google,
+}
+
+#[with_fallible_options]
+#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema, MergeFrom)]
+pub struct AzureSettingsContent {
+    pub resource_name: Option<String>,
+    pub deployments: Option<Vec<AzureDeployment>>,
+    pub api_version: Option<String>,
+    pub endpoint: Option<String>,
+    pub use_ad_token: Option<bool>,
+}
+
+#[with_fallible_options]
+#[derive(Default, Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct GcpVertexAiSettingsContent {
+    pub api_url: Option<String>,
+    pub project_id: Option<String>,
+    pub region: Option<String>,
+    pub available_models: Option<Vec<GoogleAvailableModel>>,
+    pub custom_headers: Option<HashMap<String, String>>,
+}
+
+#[with_fallible_options]
+#[derive(Default, Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct HuggingFaceSettingsContent {
+    pub api_url: Option<String>,
+    pub custom_headers: Option<HashMap<String, String>>,
+}
+
+#[with_fallible_options]
+#[derive(Default, Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct LiteLlmSettingsContent {
+    pub api_url: Option<String>,
+    pub custom_headers: Option<HashMap<String, String>>,
+}
+
+#[with_fallible_options]
+#[derive(Default, Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct NanoGptSettingsContent {
+    pub api_url: Option<String>,
+    pub custom_headers: Option<HashMap<String, String>>,
+}
+
+#[with_fallible_options]
+#[derive(Default, Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct TetrateSettingsContent {
+    pub api_url: Option<String>,
+    pub custom_headers: Option<HashMap<String, String>>,
+}
+
+#[with_fallible_options]
+#[derive(Default, Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct AvianSettingsContent {
+    pub api_url: Option<String>,
+    pub custom_headers: Option<HashMap<String, String>>,
+}
+
+#[with_fallible_options]
+#[derive(Default, Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct KimiCodeSettingsContent {
+    pub api_url: Option<String>,
+    pub custom_headers: Option<HashMap<String, String>>,
+}
+
+#[with_fallible_options]
+#[derive(Default, Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct SageMakerTgiSettingsContent {
+    pub api_url: Option<String>,
+    pub custom_headers: Option<HashMap<String, String>>,
+}
+
+#[with_fallible_options]
+#[derive(Default, Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct SnowflakeSettingsContent {
+    pub api_url: Option<String>,
+    pub custom_headers: Option<HashMap<String, String>>,
+}
+
+#[with_fallible_options]
+#[derive(Default, Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct DatabricksSettingsContent {
+    pub api_url: Option<String>,
+    pub custom_headers: Option<HashMap<String, String>>,
+}
+
+#[with_fallible_options]
+#[derive(Default, Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct DatabricksV1SettingsContent {
+    pub api_url: Option<String>,
+    pub custom_headers: Option<HashMap<String, String>>,
+}
+
+#[with_fallible_options]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct AzureDeployment {
+    pub id: String,
+    pub model: String,
+    pub name: Option<String>,
+    pub max_tokens: Option<u64>,
+    #[serde(default = "default_true")]
+    pub supports_tools: bool,
+    #[serde(default)]
+    pub supports_images: bool,
 }
 
 #[with_fallible_options]
