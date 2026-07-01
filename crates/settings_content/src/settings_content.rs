@@ -1135,6 +1135,18 @@ pub struct RemoteSettingsContent {
     pub dev_container_connections: Option<Vec<DevContainerConnection>>,
     pub read_ssh_config: Option<bool>,
     pub use_podman: Option<bool>,
+    pub mobile_access: Option<MobileAccessSettingsContent>,
+}
+
+#[with_fallible_options]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, MergeFrom, PartialEq)]
+pub struct MobileAccessSettingsContent {
+    /// SSH host for standalone tunnel connections.
+    /// Default: "localhost"
+    pub ssh_host: Option<String>,
+    /// SSH port for standalone tunnel connections.
+    /// Default: 22
+    pub ssh_port: Option<u16>,
 }
 
 #[with_fallible_options]
