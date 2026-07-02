@@ -7460,6 +7460,7 @@ dependencies = [
  "futures 0.3.32",
  "gpui",
  "log",
+ "pulldown-cmark 0.13.4",
  "serde",
  "serde_json",
  "smol",
