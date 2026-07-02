@@ -38,13 +38,20 @@ Implement slash commands, hints system, goose apps (GPUI panels), source roots, 
   - _Requirements: 2_
   - _writes: crates/agent/src/hints/mod.rs, crates/agent/src/hints/loader.rs_
 
-- [ ] 3. Implement goose apps as GPUI panels
-  - Create `AppRegistry` for registering and launching embedded apps
-  - Implement ChatApp GPUI panel (chat-like interface)
-  - Implement ClockApp GPUI panel (clock/time tools)
-  - Implement Resource and Cache managers for app state
+- [x] 3. Implement baymax apps as GPUI panels
+  - Created `AppRegistry` for registering and launching embedded apps
+  - Implemented `ChatApp` (plain struct with `BaymaxApp` trait impl, chat-like interface)
+  - Implemented `ClockApp` (plain struct with `BaymaxApp` trait impl, clock/time display)
+  - Implemented `ResourceManager` for app data (key-value with JSON values)
+  - Implemented `CacheManager` for app cache (key-value with optional TTL)
+  - Created `AppsPanel` GPUI Entity implementing `Panel`, `Focusable`, `EventEmitter<PanelEvent>`, `Render`
+  - `AppsPanel` owns `AppRegistry`, registers ChatApp + ClockApp by default, launches ChatApp on startup
+  - Panel registered in workspace initialization (`initialize_panels` in `crates/baymax/src/baymax.rs`)
+  - ToggleFocus action registered for keyboard shortcut
+  - AppsPanel docked to right side by default, 320px width
+  - Removed dead `ChatApp.input` field, removed GPUI Entity pattern from ChatApp/ClockApp
   - _Requirements: 3_
-  - _writes: crates/goose_apps/src/lib.rs, crates/goose_apps/src/chat.rs, crates/goose_apps/src/clock.rs_
+  - _writes: crates/baymax_apps/src/baymax_apps.rs, crates/baymax_apps/src/chat_app.rs, crates/baymax_apps/src/clock_app.rs, crates/baymax_apps/src/app_registry.rs, crates/baymax_apps/src/resource_manager.rs, crates/baymax_apps/src/cache_manager.rs, crates/baymax/src/baymax/apps_panel.rs, crates/baymax/src/baymax.rs, crates/baymax/Cargo.toml_
 
 - [ ] 4. Implement source roots and sources
   - Define SourceRoot and Source types
@@ -72,4 +79,4 @@ Implement slash commands, hints system, goose apps (GPUI panels), source roots, 
 
 - Slash commands are parsed before the input reaches the LLM, giving them priority over model-generated commands
 - Hints integrate with the prompt builder to inject context
-- Goose apps follow the same panel pattern as existing GPUI workspace panels
+- Baymax apps follow the same GPUI Entity pattern as existing workspace panels

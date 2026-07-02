@@ -2,13 +2,13 @@
 
 ## 1. Overview
 
-Migrate goose's developer experience features: slash commands, hints system, goose apps (embedded mini-apps), source roots/sources management, and the execution manager. These enhance day-to-day interaction with the agent.
+Migrate goose's developer experience features: slash commands, hints system, baymax apps (embedded mini-apps), source roots/sources management, and the execution manager. These enhance day-to-day interaction with the agent.
 
 ### Key Architectural Decisions
 
 - **Slash commands in agent input processing**: Rather than a separate system, slash commands are parsed at the agent input boundary and routed to handlers — similar to how `crates/agent/` already processes messages.
 - **Hints as skill-like files**: Hints are essentially auto-loaded skills without explicit user invocation. Use the existing `crates/agent_skills/` discovery mechanism.
-- **Goose apps → GPUI panels**: The chat app, clock app, etc. map naturally to GPUI panel components that can be docked in the workspace.
+- **Baymax apps → GPUI entities**: The chat app, clock app, etc. map naturally to GPUI Entity components with `Render` implementations.
 - **Execution manager in `crates/agent/`**: Goose's execution manager is conceptually similar to baymax's task/scheduling infrastructure. Extend `crates/scheduler/` or `crates/task/` rather than creating a new crate.
 
 ## 2. Architecture
@@ -31,7 +31,7 @@ graph TD
                 GlobalHint[Global Hints]
     end
 
-    subgraph "Goose Apps"
+    subgraph "Baymax Apps"
         AppRegistry[AppRegistry]
         ChatApp[ChatApp Panel]
         ClockApp[ClockApp Panel]
@@ -113,10 +113,10 @@ pub struct Hint {
 }
 ```
 
-### Component: Goose Apps (GPUI Panels)
+### Component: Baymax Apps (GPUI Entities)
 
 ```rust
-pub trait GooseApp {
+pub trait BaymaxApp {
     fn id(&self) -> &str;
     fn name(&self) -> &str;
     fn render(&self, window: &mut Window, cx: &mut App) -> impl IntoElement;

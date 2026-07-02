@@ -1,4 +1,5 @@
 mod app_menus;
+pub mod apps_panel;
 pub mod edit_prediction_registry;
 #[cfg(target_os = "macos")]
 pub(crate) mod mac_only_instance;
@@ -742,6 +743,7 @@ fn initialize_panels(window: &mut Window, cx: &mut Context<Workspace>) -> Task<a
         let channels_panel =
             collab_ui::collab_panel::CollabPanel::load(workspace_handle.clone(), cx.clone());
         let debug_panel = DebugPanel::load(workspace_handle.clone(), cx);
+        let apps_panel = apps_panel::AppsPanel::load(workspace_handle.clone(), cx.clone());
 
         async fn add_panel_when_ready(
             panel_task: impl Future<Output = anyhow::Result<Entity<impl workspace::Panel>>> + 'static,
@@ -765,6 +767,7 @@ fn initialize_panels(window: &mut Window, cx: &mut Context<Workspace>) -> Task<a
             add_panel_when_ready(git_panel, workspace_handle.clone(), cx.clone()),
             add_panel_when_ready(channels_panel, workspace_handle.clone(), cx.clone()),
             add_panel_when_ready(debug_panel, workspace_handle.clone(), cx.clone()),
+            add_panel_when_ready(apps_panel, workspace_handle.clone(), cx.clone()),
             initialize_agent_panel(workspace_handle, cx.clone()).map(|r| r.log_err()),
         );
 
@@ -1164,14 +1167,22 @@ fn register_actions(
             },
         )
         .register_action(
-            |workspace: &mut Workspace,
-             _: &terminal_panel::ToggleFocus,
-             window: &mut Window,
-             cx: &mut Context<Workspace>| {
-                workspace.toggle_panel_focus::<TerminalPanel>(window, cx);
-            },
-        )
-        .register_action({
+                    |workspace: &mut Workspace,
+                     _: &terminal_panel::ToggleFocus,
+                     window: &mut Window,
+                     cx: &mut Context<Workspace>| {
+                        workspace.toggle_panel_focus::<TerminalPanel>(window, cx);
+                    },
+                )
+                .register_action(
+                    |workspace: &mut Workspace,
+                     _: &apps_panel::ToggleFocus,
+                     window: &mut Window,
+                     cx: &mut Context<Workspace>| {
+                        workspace.toggle_panel_focus::<apps_panel::AppsPanel>(window, cx);
+                    },
+                )
+                .register_action({
             let app_state = app_state.clone();
             move |_, _: &NewWindow, _, cx| {
                 open_new(
