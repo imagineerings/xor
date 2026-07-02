@@ -1,9 +1,11 @@
 mod manager;
+mod pairing;
 mod telegram;
 mod telegram_format;
 mod types;
 
 pub use manager::*;
+pub use pairing::*;
 pub use telegram::*;
 pub use types::*;
 
