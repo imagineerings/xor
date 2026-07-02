@@ -1,7 +1,9 @@
 mod manager;
+mod telegram;
 mod types;
 
 pub use manager::*;
+pub use telegram::*;
 pub use types::*;
 
 use anyhow::Result;
