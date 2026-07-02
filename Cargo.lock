@@ -7452,6 +7452,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "gateway"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "futures 0.3.32",
+ "gpui",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "uuid",
+]
+
+[[package]]
 name = "generator"
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
