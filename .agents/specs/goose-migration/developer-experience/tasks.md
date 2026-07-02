@@ -53,12 +53,16 @@ Implement slash commands, hints system, goose apps (GPUI panels), source roots, 
   - _Requirements: 3_
   - _writes: crates/baymax_apps/src/baymax_apps.rs, crates/baymax_apps/src/chat_app.rs, crates/baymax_apps/src/clock_app.rs, crates/baymax_apps/src/app_registry.rs, crates/baymax_apps/src/resource_manager.rs, crates/baymax_apps/src/cache_manager.rs, crates/baymax/src/baymax/apps_panel.rs, crates/baymax/src/baymax.rs, crates/baymax/Cargo.toml_
 
-- [ ] 4. Implement source roots and sources
-  - Define SourceRoot and Source types
-  - Path resolution from source name
-  - Priority-based source ordering
+- [x] 4. Implement source roots and sources
+  - Defined `SourceRoot` and `SourceRoots` types with `add_root`, `get`, `resolve`, `remove`, `roots`, `into_roots`
+  - Defined `Source` type with `resolve()` against a `SourceRoots` collection
+  - Defined `Sources` collection with `add`, `get`, `resolve`, `names`
+  - Path resolution from `"root_name/relative/path"` format
+  - Priority-based ordering with `roots()` returning highest-priority first
+  - Wired into `crates/agent` as `pub mod source_roots`
+  - 12 unit tests covering add/get/missing/resolve/priority/remove/sources collection
   - _Requirements: 4_
-  - _writes: crates/agent/src/source_roots.rs, crates/agent/src/sources.rs_
+  - _writes: crates/agent/src/source_roots.rs_
 
 - [ ] 5. Implement execution manager
   - Track running tasks with metadata

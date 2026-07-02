@@ -12,6 +12,7 @@ mod pattern_extraction;
 mod platform_extensions;
 mod sandboxing;
 mod snapshot;
+pub mod source_roots;
 mod templates;
 #[cfg(test)]
 mod tests;
