@@ -2190,6 +2190,7 @@ dependencies = [
  "auto_update",
  "auto_update_ui",
  "baymax_actions",
+ "baymax_apps",
  "baymax_env_vars",
  "breadcrumbs",
  "call",
@@ -2349,6 +2350,19 @@ dependencies = [
  "gpui",
  "schemars 1.2.1",
  "serde",
+ "util",
+]
+
+[[package]]
+name = "baymax_apps"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "gpui",
+ "serde",
+ "serde_json",
+ "ui",
  "util",
 ]
 

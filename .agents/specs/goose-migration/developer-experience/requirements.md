@@ -8,7 +8,7 @@ Migrate several goose developer-experience features: slash commands, hints syste
 
 - **Slash Command**: A text command starting with `/` that the agent can interpret (e.g., `/help`, `/recipe`)
 - **Hint**: Contextual information loaded into the agent's prompt based on the current project or task
-- **Goose App**: An embedded mini-application within goose (chat app, clock app, etc.)
+- **Baymax App**: An embedded mini-application within baymax (chat app, clock app, etc.)
 - **Source Root**: A directory root for source code or content that the agent can reference
 - **Source**: A named source of information for the agent (files, directories, snippets)
 - **Execution Manager**: Coordinates task execution and manages running processes
@@ -38,7 +38,7 @@ Migrate several goose developer-experience features: slash commands, hints syste
 3. WHEN a hint file matches the current context THEN the system SHALL include it in the agent's prompt
 4. THE hints SHALL support importing content from referenced files
 
-### Requirement 3: Goose Apps
+### Requirement 3: Baymax Apps
 
 **User Story:** As a baymax user, I want embedded mini-applications within the agent (chat, clock, etc.), so that I can access utility functions without leaving the agent interface.
 
