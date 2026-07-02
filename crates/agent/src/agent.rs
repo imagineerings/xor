@@ -2,6 +2,7 @@ mod action_required_manager;
 mod builtin_extensions;
 mod db;
 mod extension_malware_check;
+mod hints;
 mod hooks;
 mod large_response_handler;
 mod legacy_thread;
@@ -24,6 +25,7 @@ pub use builtin_extensions::*;
 use context_server::ContextServerId;
 pub use db::*;
 pub use extension_malware_check::*;
+pub use hints::*;
 pub use hooks::*;
 use itertools::Itertools;
 pub use native_agent_server::NativeAgentServer;
@@ -1028,6 +1030,28 @@ impl NativeAgent {
             })
             .collect::<Vec<_>>();
 
+        // Collect worktree root names and paths for hints loading.
+        let worktree_roots: Vec<(String, PathBuf)> = worktrees
+            .iter()
+            .map(|worktree| {
+                let snapshot = worktree.read(cx);
+                (
+                    snapshot.root_name_str().to_string(),
+                    snapshot.abs_path().to_path_buf(),
+                )
+            })
+            .collect();
+
+        // Load hints (global + project) concurrently with skills.
+        let hints_task = {
+            let hint_fs = fs.clone();
+            let roots = worktree_roots.clone();
+            cx.background_spawn(async move {
+                let loader = HintLoader::new(hint_fs);
+                loader.load_all(&roots).await
+            })
+        };
+
         // Load global skills
         let global_skills_task = {
             let global_skills_dir = global_skills_dir();
@@ -1205,7 +1229,28 @@ impl NativeAgent {
             let (catalog_skills, budget_issues) = select_catalog_skills(&overridden);
             skill_issues.extend(budget_issues);
 
-            let project_context = ProjectContext::new(worktrees).with_skills(catalog_skills);
+            // Load hints (global + project) merged together.
+            let (hints, hint_errors) = hints_task.await;
+            if !hint_errors.is_empty() {
+                log::warn!("Hint loading errors: {:?}", hint_errors);
+            }
+
+            // Build hints content from all loaded hints, ordered by
+            // priority (project hints first).
+            let hints_content: String = hints
+                .into_iter()
+                .map(|h| h.content)
+                .collect::<Vec<_>>()
+                .join("\n\n");
+            let hints_content = if hints_content.is_empty() {
+                None
+            } else {
+                Some(hints_content)
+            };
+
+            let project_context = ProjectContext::new(worktrees)
+                .with_skills(catalog_skills)
+                .with_hints(hints_content);
             (project_context, skills, skill_issues)
         })
     }

@@ -212,6 +212,14 @@ To use a Skill:
 4. If the Skill references additional files, use `read_file` to access them. Paths inside a Skill resolve relative to that Skill's directory (the parent of its `SKILL.md`).
 
 {{/if}}
+{{#if has_hints}}
+## Project Hints
+
+The following hints provide additional context about this project:
+
+{{{hints_content}}}
+
+{{/if}}
 {{#if (or user_agents_md has_rules)}}
 ## User's Custom Instructions
 
