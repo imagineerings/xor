@@ -219,4 +219,163 @@ mod tests {
         assert!(!is_hint_file(Path::new("test.rs")));
         assert!(!is_hint_file(Path::new("test.py")));
     }
+
+    use fs::FakeFs;
+    use gpui::TestAppContext;
+
+    fn test_loader(cx: &mut TestAppContext) -> (HintLoader, Arc<FakeFs>) {
+        let executor = cx.background_executor.clone();
+        let fs = FakeFs::new(executor);
+        let loader = HintLoader::new(fs.clone());
+        (loader, fs)
+    }
+
+    #[gpui::test]
+    async fn test_load_global_no_dir(cx: &mut TestAppContext) {
+        // When no global hints directory exists, load_global_hints
+        // returns empty results.
+        let (loader, _fs) = test_loader(cx);
+        let (hints, errors) = loader.load_global_hints().await;
+        assert!(hints.is_empty());
+        assert!(errors.is_empty());
+    }
+
+    #[gpui::test]
+    async fn test_load_project_hints_empty(cx: &mut TestAppContext) {
+        let (loader, _fs) = test_loader(cx);
+        let (hints, errors) = loader
+            .load_project_hints(&[("test".to_string(), PathBuf::from("/test"))])
+            .await;
+        assert!(hints.is_empty());
+        assert!(errors.is_empty());
+    }
+
+    #[gpui::test]
+    async fn test_load_project_hints_with_file(cx: &mut TestAppContext) {
+        let (loader, fs) = test_loader(cx);
+        fs.create_dir(Path::new("/test")).await.unwrap();
+        fs.insert_file(
+            Path::new("/test/.baymaxhints"),
+            b"use rust edition 2021".to_vec(),
+        )
+        .await;
+
+        let (hints, errors) = loader
+            .load_project_hints(&[("root".to_string(), PathBuf::from("/test"))])
+            .await;
+
+        assert!(errors.is_empty(), "{errors:?}");
+        assert_eq!(hints.len(), 1);
+        assert_eq!(hints[0].content, "use rust edition 2021");
+        assert_eq!(hints[0].priority, 10);
+        match &hints[0].source {
+            HintSource::Project {
+                worktree_root,
+                path: _,
+            } => {
+                assert_eq!(worktree_root, "root");
+            }
+            _ => panic!("expected Project source"),
+        }
+    }
+
+    #[gpui::test]
+    async fn test_load_project_hints_multiple_roots(cx: &mut TestAppContext) {
+        let (loader, fs) = test_loader(cx);
+        fs.create_dir(Path::new("/a")).await.unwrap();
+        fs.create_dir(Path::new("/b")).await.unwrap();
+        fs.insert_file(Path::new("/a/.baymaxhints"), b"hint from a".to_vec())
+            .await;
+        fs.insert_file(Path::new("/b/.baymaxhints"), b"hint from b".to_vec())
+            .await;
+
+        let (hints, errors) = loader
+            .load_project_hints(&[
+                ("a".to_string(), PathBuf::from("/a")),
+                ("b".to_string(), PathBuf::from("/b")),
+            ])
+            .await;
+
+        assert!(errors.is_empty());
+        assert_eq!(hints.len(), 2);
+    }
+
+    #[gpui::test]
+    async fn test_load_project_hints_skips_empty_content(cx: &mut TestAppContext) {
+        let (loader, fs) = test_loader(cx);
+        fs.create_dir(Path::new("/test")).await.unwrap();
+        fs.insert_file(Path::new("/test/.baymaxhints"), b"   ".to_vec())
+            .await;
+
+        let (hints, errors) = loader
+            .load_project_hints(&[("root".to_string(), PathBuf::from("/test"))])
+            .await;
+
+        assert!(errors.is_empty());
+        assert!(hints.is_empty(), "whitespace-only hints should be skipped");
+    }
+
+    #[gpui::test]
+    async fn test_resolve_imports_resolves_file(cx: &mut TestAppContext) {
+        let (loader, fs) = test_loader(cx);
+        fs.create_dir(Path::new("/project")).await.unwrap();
+        fs.insert_file(Path::new("/project/shared.rules"), b"shared-rule".to_vec())
+            .await;
+
+        let content = "line1\n@import \"shared.rules\"\nline3";
+        let result = loader.resolve_imports(content, Path::new("/project")).await;
+
+        assert!(result.contains("line1"), "non-import lines preserved");
+        assert!(result.contains("shared-rule"), "imported content present");
+        assert!(result.contains("line3"), "lines after import preserved");
+    }
+
+    #[gpui::test]
+    async fn test_resolve_imports_missing_file_adds_comment(cx: &mut TestAppContext) {
+        let (loader, _fs) = test_loader(cx);
+        let content = "@import \"nonexistent.md\"";
+        let result = loader.resolve_imports(content, Path::new("/project")).await;
+        assert!(result.contains("Unresolved import"), "result: {result}");
+    }
+
+    #[gpui::test]
+    async fn test_resolve_imports_single_quotes(cx: &mut TestAppContext) {
+        let (loader, fs) = test_loader(cx);
+        fs.create_dir(Path::new("/project")).await.unwrap();
+        fs.insert_file(Path::new("/project/inc.md"), b"included content".to_vec())
+            .await;
+
+        let content = "@import 'inc.md'";
+        let result = loader.resolve_imports(content, Path::new("/project")).await;
+        assert!(result.contains("included content"), "result: {result}");
+    }
+
+    #[gpui::test]
+    async fn test_load_all_merges_hints(cx: &mut TestAppContext) {
+        let (loader, fs) = test_loader(cx);
+        fs.create_dir(Path::new("/p1")).await.unwrap();
+        fs.insert_file(Path::new("/p1/.baymaxhints"), b"project-hint".to_vec())
+            .await;
+
+        let (hints, errors) = loader
+            .load_all(&[("p1".to_string(), PathBuf::from("/p1"))])
+            .await;
+
+        assert!(errors.is_empty());
+        assert_eq!(hints.len(), 1);
+        assert_eq!(hints[0].content, "project-hint");
+    }
+
+    #[gpui::test]
+    async fn test_load_project_hints_missing_file_no_error(cx: &mut TestAppContext) {
+        let (loader, fs) = test_loader(cx);
+        fs.create_dir(Path::new("/empty")).await.unwrap();
+
+        let (hints, errors) = loader
+            .load_project_hints(&[("empty".to_string(), PathBuf::from("/empty"))])
+            .await;
+
+        assert!(hints.is_empty());
+        assert!(errors.is_empty(), "no error for missing file");
+    }
 }

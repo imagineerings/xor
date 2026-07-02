@@ -64,20 +64,22 @@ Implement slash commands, hints system, goose apps (GPUI panels), source roots, 
   - _Requirements: 4_
   - _writes: crates/agent/src/source_roots.rs_
 
-- [ ] 5. Implement execution manager
+- [x] 5. Implement execution manager
   - Track running tasks with metadata
   - Support spawn, cancel, status, and list operations
   - Integration with agent task spawning
   - _Requirements: 5_
   - _writes: crates/agent/src/execution_manager.rs_
 
-- [ ] 6. Write tests
-  - Slash command parsing and routing
-  - Hint discovery and loading
-  - App rendering and action handling
-  - Source root resolution
-  - Execution manager task lifecycle
+- [x] 6. Write tests
+  - Slash command parsing and routing (14 tests: parse, unqualified, MCP, skill scope, edge cases)
+  - Hint discovery and loading (10 tests: project hints, multiple roots, empty content, imports, load_all)
+  - App registration and lifecycle (11 tests: register, launch, close, list, active app)
+  - ChatApp and ClockApp methods (9 tests: new, add_message, tick, set_label)
+  - Source root resolution (12 tests, pre-existing)
+  - Execution manager task lifecycle (7 tests, pre-existing)
   - _Requirements: 1-5_
+  - _writes: crates/agent/src/agent.rs, crates/agent/src/hints/loader.rs, crates/baymax_apps/src/app_registry.rs, crates/baymax_apps/src/chat_app.rs, crates/baymax_apps/src/clock_app.rs_
 
 ## Notes
 

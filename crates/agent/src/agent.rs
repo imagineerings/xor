@@ -1,6 +1,7 @@
 mod action_required_manager;
 mod builtin_extensions;
 mod db;
+pub mod execution_manager;
 mod extension_malware_check;
 mod hints;
 mod hooks;
@@ -25,6 +26,7 @@ pub use action_required_manager::*;
 pub use builtin_extensions::*;
 use context_server::ContextServerId;
 pub use db::*;
+pub use execution_manager::*;
 pub use extension_malware_check::*;
 pub use hints::*;
 pub use hooks::*;
@@ -671,10 +673,10 @@ impl NativeAgent {
         if let Ok(mut entries) = fs.read_dir(&skills_dir).await {
             while let Some(entry) = entries.next().await {
                 let Ok(path) = entry else { continue };
-                if let Ok(Some(metadata)) = fs.metadata(&path).await
-                    && metadata.is_dir
-                {
-                    watcher.add(&path).ok();
+                if let Ok(Some(metadata)) = fs.metadata(&path).await {
+                    if metadata.is_dir {
+                        watcher.add(&path).ok();
+                    }
                 }
             }
         }
@@ -1426,11 +1428,11 @@ impl NativeAgent {
 
         for session in self.sessions.values_mut() {
             session.thread.update(cx, |thread, cx| {
-                if thread.model().is_none()
-                    && let Some(model) = default_model.clone()
-                {
-                    thread.set_model(model, cx);
-                    cx.notify();
+                if thread.model().is_none() {
+                    if let Some(model) = default_model.clone() {
+                        thread.set_model(model, cx);
+                        cx.notify();
+                    }
                 }
                 if let Some(model) = summarization_model.clone() {
                     if thread.summarization_model().is_none()
@@ -2451,15 +2453,15 @@ impl<'a> Command<'a> {
         // An empty scope (`/:<name>`) is the qualified form for a
         // global skill — see `SkillSource::scope_prefix`. The name
         // must be non-empty for the colon to be meaningful.
-        if let Some((scope, prompt_name)) = command.rsplit_once(':')
-            && !prompt_name.is_empty()
-        {
-            return Some(Self {
-                prompt_name,
-                arg_value,
-                explicit_server_id: None,
-                skill_scope: Some(scope),
-            });
+        if let Some((scope, prompt_name)) = command.rsplit_once(':') {
+            if !prompt_name.is_empty() {
+                return Some(Self {
+                    prompt_name,
+                    arg_value,
+                    explicit_server_id: None,
+                    skill_scope: Some(scope),
+                });
+            }
         }
 
         if let Some((server_id, prompt_name)) = command.split_once('.') {
@@ -2823,15 +2825,21 @@ impl acp_thread::AgentConnection for NativeAgentConnection {
             // inserts a qualified form for every skill so picking the
             // global row unambiguously runs the global skill even when
             // a same-named project-local one exists.
-            if let Some(scope) = parsed_command.skill_scope
-                && let Some(skill) = project_state.skills.iter().find(|skill| {
+            if let Some(scope) = parsed_command.skill_scope {
+                if let Some(skill) = project_state.skills.iter().find(|skill| {
                     skill.name == parsed_command.prompt_name && skill.source.matches_scope(scope)
-                })
-            {
-                let skill = skill.clone();
-                return self.0.update(cx, |agent, cx| {
-                    agent.send_skill_invocation(id, session_id.clone(), skill, params.prompt, cx)
-                });
+                }) {
+                    let skill = skill.clone();
+                    return self.0.update(cx, |agent, cx| {
+                        agent.send_skill_invocation(
+                            id,
+                            session_id.clone(),
+                            skill,
+                            params.prompt,
+                            cx,
+                        )
+                    });
+                }
             }
 
             // MCP prompts and skills both register slash commands. MCP
@@ -2847,15 +2855,18 @@ impl acp_thread::AgentConnection for NativeAgentConnection {
             if let Some(prompt) =
                 registry.find_prompt(explicit_server_id.as_ref(), parsed_command.prompt_name)
             {
-                let arguments = if !parsed_command.arg_value.is_empty()
-                    && let Some(arg_name) = prompt
+                let arguments = if !parsed_command.arg_value.is_empty() {
+                    if let Some(arg_name) = prompt
                         .prompt
                         .arguments
                         .as_ref()
                         .and_then(|args| args.first())
                         .map(|arg| arg.name.clone())
-                {
-                    HashMap::from_iter([(arg_name, parsed_command.arg_value.to_string())])
+                    {
+                        HashMap::from_iter([(arg_name, parsed_command.arg_value.to_string())])
+                    } else {
+                        Default::default()
+                    }
                 } else {
                     Default::default()
                 };
@@ -6718,6 +6729,158 @@ mod internal_tests {
         // block, the safe behavior is to return it unchanged rather than
         // silently mangling unrelated user text.
         assert_eq!(strip_slash_command_prefix("hello world"), "hello world",);
+    }
+
+    // ── Command::parse unit tests ──────────────────────────────────────
+
+    /// Helper: wrap a text string in a single-element ContentBlock slice.
+    fn text_block(text: &str) -> Vec<acp::ContentBlock> {
+        vec![acp::ContentBlock::Text(acp::TextContent::new(text))]
+    }
+
+    #[test]
+    fn test_command_parse_simple() {
+        let block = text_block("/help");
+        let cmd = Command::parse(&block).unwrap();
+        assert_eq!(cmd.prompt_name, "help");
+        assert!(cmd.arg_value.is_empty());
+        assert!(cmd.explicit_server_id.is_none());
+        assert!(cmd.skill_scope.is_none());
+    }
+
+    #[test]
+    fn test_command_parse_with_arg() {
+        let block = text_block("/recipe release");
+        let cmd = Command::parse(&block).unwrap();
+        assert_eq!(cmd.prompt_name, "recipe");
+        assert_eq!(cmd.arg_value, "release");
+        assert!(cmd.explicit_server_id.is_none());
+    }
+
+    #[test]
+    fn test_command_parse_trailing_whitespace() {
+        let block = text_block("/compact ");
+        let cmd = Command::parse(&block).unwrap();
+        assert_eq!(cmd.prompt_name, "compact");
+    }
+
+    #[test]
+    fn test_command_parse_leading_whitespace() {
+        // Leading whitespace is allowed; stripped by Command::parse.
+        let block = text_block("  /help");
+        let cmd = Command::parse(&block).unwrap();
+        assert_eq!(cmd.prompt_name, "help");
+    }
+
+    #[test]
+    fn test_command_parse_not_a_command() {
+        let block = text_block("hello world");
+        assert!(Command::parse(&block).is_none());
+    }
+
+    #[test]
+    fn test_command_parse_only_slash_has_empty_name() {
+        // Just "/" yields a command with an empty prompt_name.
+        let block = text_block("/");
+        let cmd = Command::parse(&block).unwrap();
+        assert!(cmd.prompt_name.is_empty());
+        assert!(cmd.arg_value.is_empty());
+    }
+
+    #[test]
+    fn test_command_parse_non_text_block() {
+        // An image block should not be parsed as a command.
+        let blocks = vec![acp::ContentBlock::Image(acp::ImageContent::new(
+            "",
+            "image/png",
+        ))];
+        assert!(Command::parse(&blocks).is_none());
+    }
+
+    #[test]
+    fn test_command_parse_empty_slice() {
+        assert!(Command::parse(&[]).is_none());
+    }
+
+    #[test]
+    fn test_command_parse_mcp_qualified() {
+        // MCP server prefix: /<server>.<prompt>
+        let block = text_block("/filesystem.read");
+        let cmd = Command::parse(&block).unwrap();
+        assert_eq!(cmd.prompt_name, "read");
+        assert_eq!(cmd.explicit_server_id, Some("filesystem"));
+        assert!(cmd.skill_scope.is_none());
+    }
+
+    #[test]
+    fn test_command_parse_mcp_qualified_with_arg() {
+        let block = text_block("/server.prompt arg1");
+        let cmd = Command::parse(&block).unwrap();
+        assert_eq!(cmd.prompt_name, "prompt");
+        assert_eq!(cmd.explicit_server_id, Some("server"));
+        assert_eq!(cmd.arg_value, "arg1");
+    }
+
+    #[test]
+    fn test_command_parse_skill_scope_qualified() {
+        // Skill scope: /<scope>:<name>
+        let block = text_block("/global:my-skill");
+        let cmd = Command::parse(&block).unwrap();
+        assert_eq!(cmd.prompt_name, "my-skill");
+        assert_eq!(cmd.skill_scope, Some("global"));
+        assert!(cmd.explicit_server_id.is_none());
+    }
+
+    #[test]
+    fn test_command_parse_worktree_skill_scope() {
+        let block = text_block("/project-a:lint");
+        let cmd = Command::parse(&block).unwrap();
+        assert_eq!(cmd.prompt_name, "lint");
+        assert_eq!(cmd.skill_scope, Some("project-a"));
+    }
+
+    #[test]
+    fn test_command_parse_scope_colon_only_is_not_skill() {
+        // `/:foo` with an empty scope is the qualified global skill form.
+        let block = text_block("/:global-skill");
+        let cmd = Command::parse(&block).unwrap();
+        assert_eq!(cmd.prompt_name, "global-skill");
+        assert_eq!(cmd.skill_scope, Some(""));
+    }
+
+    #[test]
+    fn test_command_is_unqualified_matches() {
+        let block = text_block("/help");
+        let cmd = Command::parse(&block).unwrap();
+        assert!(cmd.is_unqualified("help"));
+        assert!(!cmd.is_unqualified("compact"));
+    }
+
+    #[test]
+    fn test_command_is_unqualified_rejects_qualified() {
+        let block = text_block("/server.prompt");
+        let cmd = Command::parse(&block).unwrap();
+        assert!(
+            !cmd.is_unqualified("prompt"),
+            "MCP-qualified commands are not unqualified"
+        );
+
+        let block = text_block("/global:skill");
+        let cmd = Command::parse(&block).unwrap();
+        assert!(
+            !cmd.is_unqualified("skill"),
+            "skill-qualified commands are not unqualified"
+        );
+    }
+
+    #[test]
+    fn test_command_parse_mcp_precedence_over_skill() {
+        // `server.name` is the MCP form; `name:name` is the skill form.
+        // A dot should always be parsed as MCP-qualified.
+        let block = text_block("/my.name");
+        let cmd = Command::parse(&block).unwrap();
+        assert_eq!(cmd.explicit_server_id, Some("my"));
+        assert!(cmd.skill_scope.is_none());
     }
 }
 

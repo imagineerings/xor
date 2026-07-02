@@ -125,36 +125,35 @@ impl EditFileTool {
 
                                     last_path = parsed.path.clone();
 
-                                    if session.is_none()
-                                        && path_complete
-                                        && let Some(path) = parsed.path.as_ref()
-                                    {
-                                        match EditSession::new(
-                                            PathBuf::from(path),
-                                            EditSessionMode::Edit,
-                                            Self::NAME,
-                                            self.session_context.clone(),
-                                            event_stream,
-                                            cx,
-                                        )
-                                        .await
-                                        {
-                                            Ok(created_session) => session = Some(created_session),
-                                            Err(error) => {
-                                                log::error!("Failed to create edit session: {}", error);
-                                                return EditSessionResult::Failed {
-                                                    error,
-                                                    session: None,
-                                                };
+                                    if session.is_none() && path_complete {
+                                        if let Some(path) = parsed.path.as_ref() {
+                                            match EditSession::new(
+                                                PathBuf::from(path),
+                                                EditSessionMode::Edit,
+                                                Self::NAME,
+                                                self.session_context.clone(),
+                                                event_stream,
+                                                cx,
+                                            )
+                                            .await
+                                            {
+                                                Ok(created_session) => session = Some(created_session),
+                                                Err(error) => {
+                                                    log::error!("Failed to create edit session: {}", error);
+                                                    return EditSessionResult::Failed {
+                                                        error,
+                                                        session: None,
+                                                    };
+                                                }
                                             }
                                         }
                                     }
 
-                                    if let Some(current_session) = &mut session
-                                        && let Err(error) = current_session.process_edit(parsed.edits.as_deref(), event_stream, cx)
-                                    {
-                                        log::error!("Failed to process edit: {}", error);
-                                        return EditSessionResult::Failed { error, session };
+                                    if let Some(current_session) = &mut session {
+                                        if let Err(error) = current_session.process_edit(parsed.edits.as_deref(), event_stream, cx) {
+                                            log::error!("Failed to process edit: {}", error);
+                                            return EditSessionResult::Failed { error, session };
+                                        }
                                     }
                                 }
                             }
