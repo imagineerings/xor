@@ -20,16 +20,13 @@ Never execute tasks without understanding full context.
    - If no task specified: Review task list and recommend next logical task
    - If task has sub-tasks: Always complete sub-tasks first
 
-2. **Pre-Implementation Consistency Pass**
-   - Tighten gates: ensure the task has concrete start, validation, handoff,
-     and completion gates. If gates are vague, update the spec before coding.
-   - Update dependency waves: verify the task is in the correct wave, its
-     prerequisites are done or intentionally deferred, and its `_writes:`
-     manifest does not conflict with parallel work.
-   - Check spec agreement: reconcile `requirements.md`, `design.md`, and
-     `tasks.md`; confirm referenced requirements exist, design properties cover
-     those requirements, and the current task does not contradict any spec doc.
-   - If the pass reveals blocking ambiguity, stop and ask for clarification or
+2. **Quick Start-Gate Consistency Check**
+   - Confirm the task is still valid to begin.
+   - Verify prerequisites and dependency wave placement.
+   - Check for obvious `_writes:` conflicts with parallel work.
+   - Scan `requirements.md`, `design.md`, and `tasks.md` for obvious
+     contradictions or missing requirement references that would block the task.
+   - If the check reveals blocking ambiguity, stop and ask for clarification or
      update the spec before implementation.
 
 3. **Implementation**
@@ -38,17 +35,21 @@ Never execute tasks without understanding full context.
    - **Follow the design** - Adhere to architecture decisions
    - **Verify requirements** - Ensure implementation meets specifications
 
-4. **Post-Validation Consistency Pass**
-   - After implementation and validation, repeat the consistency pass.
-   - Tighten gates based on the actual validation performed.
+4. **Full Completion-Gate Consistency Pass**
+   - After implementation and validation, run the full pass before marking the
+     task complete.
+   - Tighten start, validation, handoff, and completion gates based on the
+     actual validation performed.
    - Update dependency waves if implementation changed ordering, prerequisites,
      or parallel safety for later tasks.
    - Ensure requirements, design, and tasks still agree with the delivered
-     behavior; update spec documents before marking the task complete.
+     behavior, including requirement references, design properties, task
+     reads/writes, and done conditions.
+   - Update spec documents before marking the task complete.
 
 5. **Completion Protocol**
-   - Once task complete and the post-validation consistency pass is done, STOP
-     and inform user
+   - Once task complete and the full completion-gate pass is done, STOP and
+     inform user
    - DO NOT proceed to next task automatically
    - Wait for user review and approval
    - Only run tests if explicitly requested
@@ -65,9 +66,9 @@ Never execute tasks without understanding full context.
 **For implementation requests**:
 1. Read relevant spec files
 2. Identify the specific task
-3. Run the pre-implementation consistency pass
+3. Run the quick start-gate consistency check
 4. Implement with minimal code
-5. Validate and run the post-validation consistency pass
+5. Validate and run the full completion-gate consistency pass
 6. Stop and await review
 
 **For information requests**:

@@ -34,22 +34,15 @@ polling Linear for candidates.
    by non-terminal Linear issues, creates Linear for the first unclaimed task,
    and returns the rendered prompt. If every active task is claimed, report that
    instead of starting work.
-5. Before editing implementation files, perform a spec consistency pass for the
-   picked task's spec directory:
-   - Tighten gates: make start, validation, handoff, and completion gates
-     concrete enough for another agent to verify. Prefer explicit commands,
-     acceptance criteria, and done conditions over vague "verify" language.
-   - Update dependency waves: confirm task ordering, prerequisites, and safe
-     parallel groups still match the task text, `_writes:` manifests, and
-     design dependencies. Move or annotate tasks when the current task depends
-     on unfinished work.
-   - Check document agreement: reconcile `requirements.md`, `design.md`, and
-     `tasks.md` so referenced requirements exist, design properties validate
-     those requirements, task requirements/writes are accurate, and no task asks
-     for behavior the requirements or design contradict.
-   If the pass reveals blocking ambiguity, update the spec files or ask for
-   clarification before implementation. Do not proceed on a known inconsistent
-   task packet.
+5. Before editing implementation files, run a quick start-gate consistency
+   check for the picked task's spec directory:
+   - Confirm the task is still valid to begin.
+   - Check prerequisites, dependency wave placement, obvious `_writes:`
+     conflicts, and obvious contradictions between `requirements.md`,
+     `design.md`, and `tasks.md`.
+   - If the check reveals blocking ambiguity, update the spec files or ask for
+     clarification before implementation. Do not proceed on a known inconsistent
+     task packet.
 6. Do not launch the UI during ordinary `$workflow` invocation. Launch the UI
    only when the user explicitly asks for a visual/task board mode, such as
    `$workflow ui`, `$workflow begin-ui`, "workflow with UI", or "show workflow
@@ -69,9 +62,16 @@ polling Linear for candidates.
 10. When work changes phase, update Linear with
    `node .agents/skills/workflow/scripts/workflow.js move <task-or-linear-id> --state-name <state>`.
 11. When the agent determines the implementation is complete and validation is
-    passing, perform the spec consistency pass again. Update gates, dependency
-    waves, and requirements/design/tasks agreement to reflect what was actually
-    implemented and validated. Then execute
+    passing, run the full completion-gate consistency pass before marking the
+    task complete:
+    - Tighten start, validation, handoff, and completion gates based on the
+      actual validation performed.
+    - Update dependency waves for remaining work when ordering, prerequisites,
+      or parallel safety changed.
+    - Reconcile `requirements.md`, `design.md`, and `tasks.md` so requirement
+      references, design properties, task reads/writes, and done conditions
+      match the delivered behavior.
+    Then execute
     `node .agents/skills/workflow/scripts/workflow.js complete <task-id>`.
     This moves the linked Linear issue to `Done` by default and updates the
     local task checkbox to `[x]`. Pass `--state-name <state>` when the

@@ -128,20 +128,18 @@ Before editing, read the relevant parts of the codebase:
 - If the work touches behavior covered by `.agents/specs/`, read the matching
   `requirements.md` and `design.md`.
 
-### 3. Pre-Implementation Consistency Pass
+### 3. Quick Start-Gate Consistency Check
 
-Before editing implementation files, reconcile the spec pack for this task:
+Before editing implementation files, run a quick consistency check for this
+task:
 
-- Tighten gates: make the task's start, validation, handoff, and completion
-  gates concrete. Prefer exact commands, checks, and observable outcomes.
-- Update dependency waves: confirm the task is in the correct wave, its
-  prerequisites are complete or intentionally deferred, and its `_writes:`
-  manifest is compatible with any parallel work.
-- Check spec agreement: ensure `requirements.md`, `design.md`, and `tasks.md`
-  agree. Referenced requirements must exist, design properties must validate the
-  relevant requirements, and the task must not contradict the design.
+- Confirm the task is still valid to begin.
+- Check prerequisites, dependency wave placement, and obvious `_writes:`
+  conflicts with parallel work.
+- Scan `requirements.md`, `design.md`, and `tasks.md` for obvious
+  contradictions or missing requirement references that would block the task.
 
-If the pass reveals blocking ambiguity, update the spec files or ask for
+If the check reveals blocking ambiguity, update the spec files or ask for
 clarification before coding.
 
 ### 4. Implement
@@ -189,16 +187,18 @@ cargo nextest run -p <crate-name> --no-fail-fast
 
 Use the `gpui-test` skill for difficult GPUI test failures.
 
-### 7. Post-Validation Consistency Pass
+### 7. Full Completion-Gate Consistency Pass
 
-After implementation and validation, repeat the consistency pass before marking
-the task complete:
+After implementation and validation, run the full consistency pass before
+marking the task complete:
 
-- Tighten gates based on the actual validation performed.
+- Tighten start, validation, handoff, and completion gates based on the actual
+  validation performed.
 - Update dependency waves if implementation changed ordering, prerequisites, or
   safe parallel groups for later tasks.
 - Check that requirements, design, and tasks still agree with the delivered
-  behavior, including updated `_writes:` manifests and task status.
+  behavior, including requirement references, design properties, `_writes:`
+  manifests, and task status.
 
 ### 8. Keep Documentation in Sync
 
