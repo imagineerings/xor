@@ -101,7 +101,28 @@ Follow the repo PR hygiene rules:
   - `- N/A` for docs-only or other non-user-facing changes
 
 If `.github/pull_request_template.md` exists, use it as the starting point and
-fill in placeholders. Otherwise, write a concise temporary PR body with:
+fill in every item. Specifically:
+
+- Check off each self-review checklist item that applies (`[x]`) after
+  verifying it. Leave unchecked (`[ ]`) only items that genuinely do not
+  apply, with a comment explaining why.
+- Replace `#ISSUE` with the Linear issue identifier (e.g., `SIM-5`) or the
+  GitHub issue number when this PR closes a tracked issue.
+- Fill in the `Release Notes:` section with exactly one bullet.
+
+If no template exists, write a concise temporary PR body with:
+If `.github/pull_request_template.md` exists, use it as the starting point.
+Each checklist item must be honestly evaluated against the diff:
+
+- Check off items that are satisfied: `[x] I've reviewed my own diff...`
+- Leave items unchecked and explain why if they don't apply (e.g., no unsafe
+  blocks, no UI changes, no performance impact)
+- Replace `Closes #ISSUE` with `Closes #<PR-number>` if there is one, or
+  remove the line entirely
+
+The PR body must contain the full completed checklist, not a shortened version.
+
+Otherwise, write a concise temporary PR body with:
 
 ```markdown
 ## Summary

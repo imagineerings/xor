@@ -211,6 +211,10 @@ Use the `commit` skill to stage and commit your changes with a conventional
 multi-line message. Then use the `push` skill to push the branch and open a
 GitHub PR.
 
+The PR body **must** include the completed self-review checklist from
+`.github/pull_request_template.md` with each item evaluated and checked off
+honestly. Do not skip or abbreviate the checklist.
+
 PR conventions:
 - Use a clear, correctly capitalized, imperative title.
 - Avoid conventional commit prefixes in PR titles.
@@ -221,8 +225,19 @@ PR conventions:
 
 ### 10. Land
 
-Once the PR is approved and CI passes, use the `land` skill to monitor CI,
-address failures, and squash-merge the PR. After the PR is merged, switch back to `main`:
+**Before landing, verify the PR body contains the completed self-review
+checklist from `.github/pull_request_template.md`.** If it is missing or has
+incomplete items, update the PR body first:
+
+```bash
+git diff --stat main
+# Evaluate each checklist item against the diff
+gh pr edit --body-file <file-with-completed-checklist>
+```
+
+Once the PR body is complete, the PR is approved, and CI passes, use the
+`land` skill to monitor CI, address failures, and squash-merge the PR. After
+the PR is merged, switch back to `main`:
 
 ```bash
 git checkout main && git pull
