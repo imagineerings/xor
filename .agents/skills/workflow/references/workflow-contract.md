@@ -56,6 +56,16 @@ created by `workflow.js list --json` or `workflow.js next --count <n> --json`.
 The board shows local task state, Linear state, reserved batch membership,
 requirements, writes manifests, and task packets.
 
+Launch it with:
+
+```bash
+node .agents/skills/workflow/scripts/workflow.js ui
+```
+
+Use `workflow.js ui --json` or `workflow.js ui --no-open` in non-GUI
+environments to return the local HTML path and `file://` URL without opening a
+browser.
+
 ## Front Matter
 
 Supported front matter is intentionally small and compatible with the Symphony

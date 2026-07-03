@@ -69,6 +69,7 @@ Commands:
 - `pick <task-id>` — render a selected task and create or resume Linear.
 - `move <task-or-linear-id> --state-name <state>` — move a Linear issue from
   one workflow stage to another.
+- `ui` — launch the bundled local workflow task board.
 - `validate` — load and validate the `WORKFLOW.md` contract.
 
 The script reads JSON settings from `WORKFLOW_SETTINGS`. Values in
@@ -108,16 +109,20 @@ For parallel execution:
 
 Use `assets/ui/index.html` to visualize task state locally. The page is static
 and does not call Linear or read the repository by itself. Export workflow JSON,
-open the page, and load or paste the JSON:
+launch the page, and load or paste the JSON:
 
 ```bash
 node .agents/skills/workflow/scripts/workflow.js list --json > /tmp/workflow-tasks.json
 node .agents/skills/workflow/scripts/workflow.js next --count 4 --json > /tmp/workflow-batch.json
+node .agents/skills/workflow/scripts/workflow.js ui
 ```
 
 The UI groups tasks by local task state, Linear-linked state, reserved batch
 state, and done state. It also shows requirements, writes manifests, task
 packets, Linear URLs, and copyable stage-move commands.
+
+Use `node .agents/skills/workflow/scripts/workflow.js ui --json` or `--no-open`
+to resolve the local HTML path and `file://` URL without launching a GUI.
 
 `WORKFLOW.md` front matter may provide equivalent values under `tracker`:
 

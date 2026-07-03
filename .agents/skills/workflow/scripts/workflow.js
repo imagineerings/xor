@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
 const crypto = require("node:crypto");
+const childProcess = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { pathToFileURL } = require("node:url");
 
 const DEFAULT_LINEAR_ENDPOINT = "https://api.linear.app/graphql";
 
@@ -931,6 +933,10 @@ async function resolveLinearStateId(settings, stateName) {
 
 async function callTool(name, args) {
   const settings = parseSettings();
+  if (name === "workflow_launch_ui") {
+    return launchWorkflowUi(args);
+  }
+
   if (name === "workflow_validate_workflow") {
     const workflow = validateWorkflowContract(parseWorkflow(workflowPath(settings, args.workflow_path)));
     return {
@@ -991,6 +997,48 @@ async function callTool(name, args) {
   throw new Error(`Unknown tool: ${name}`);
 }
 
+function launchWorkflowUi(args = {}) {
+  const htmlPath = args.ui_path
+    ? path.resolve(String(args.ui_path))
+    : path.resolve(__dirname, "..", "assets", "ui", "index.html");
+  if (!fs.existsSync(htmlPath)) {
+    throw new Error(`Workflow UI not found: ${htmlPath}`);
+  }
+
+  const url = pathToFileURL(htmlPath).href;
+  const shouldOpen = args.open !== false && !args.no_open && !args.print && !args.json;
+  if (!shouldOpen) {
+    return {
+      action: "resolved",
+      launched: false,
+      ui: { path: htmlPath, url },
+    };
+  }
+
+  const launcher = platformLauncher(url);
+  const child = childProcess.spawn(launcher.command, launcher.args, {
+    detached: true,
+    stdio: "ignore",
+  });
+  child.unref();
+
+  return {
+    action: "opened",
+    launched: true,
+    ui: { path: htmlPath, url },
+  };
+}
+
+function platformLauncher(url) {
+  if (process.platform === "darwin") {
+    return { command: "open", args: [url] };
+  }
+  if (process.platform === "win32") {
+    return { command: "cmd", args: ["/c", "start", "", url] };
+  }
+  return { command: "xdg-open", args: [url] };
+}
+
 async function runCli(argv) {
   const { command, positional, args } = parseCliArgs(argv);
   let result;
@@ -1016,6 +1064,8 @@ async function runCli(argv) {
     });
   } else if (command === "validate") {
     result = await callTool("workflow_validate_workflow", args);
+  } else if (command === "ui" || command === "open-ui") {
+    result = await callTool("workflow_launch_ui", args);
   } else if (command === "help" || command === "--help" || command === "-h") {
     process.stdout.write(`${usage()}\n`);
     return;
@@ -1079,6 +1129,16 @@ function formatCliResult(command, result) {
     return `${JSON.stringify(result, null, 2)}\n`;
   }
 
+  if (command === "ui" || command === "open-ui") {
+    return [
+      `Action: ${result.action}`,
+      `Launched: ${result.launched ? "yes" : "no"}`,
+      `Path: ${result.ui.path}`,
+      `URL: ${result.ui.url}`,
+      "",
+    ].join("\n");
+  }
+
   return `${JSON.stringify(result, null, 2)}\n`;
 }
 
@@ -1092,6 +1152,7 @@ function usage() {
     "  pick <task-id>       Pick or resume a specific task",
     "  render <task-id>     Render a prompt for a specific task",
     "  move <id>            Move a Linear issue or task's issue to another state",
+    "  ui                   Open the local workflow task board",
     "  validate             Validate WORKFLOW.md",
     "",
     "Options:",
@@ -1101,6 +1162,8 @@ function usage() {
     "  --attempt <n>        Render with an attempt number",
     "  --state-name <name>  Target Linear state for move",
     "  --state-id <id>      Target Linear state ID for move",
+    "  --print              Resolve UI path without opening it",
+    "  --no-open            Resolve UI path without opening it",
   ].join("\n");
 }
 
@@ -1115,6 +1178,7 @@ module.exports = {
   activeTasks,
   callTool,
   findTaskFiles,
+  launchWorkflowUi,
   listTasks,
   parseTaskFile,
   parseWorkflow,
