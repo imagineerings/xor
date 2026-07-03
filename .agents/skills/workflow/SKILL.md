@@ -69,7 +69,7 @@ Commands:
 - `pick <task-id>` — render a selected task and create or resume Linear.
 - `move <task-or-linear-id> --state-name <state>` — move a Linear issue from
   one workflow stage to another.
-- `ui` — launch the bundled local workflow task board.
+- `ui` — launch the bundled local workflow task board with workflow data.
 - `validate` — load and validate the `WORKFLOW.md` contract.
 
 The script reads JSON settings from `WORKFLOW_SETTINGS`. Values in
@@ -107,22 +107,39 @@ For parallel execution:
 
 ## Local UI
 
-Use `assets/ui/index.html` to visualize task state locally. The page is static
-and does not call Linear or read the repository by itself. Export workflow JSON,
-launch the page, and load or paste the JSON:
+Use `node .agents/skills/workflow/scripts/workflow.js ui` to launch the local
+task board with a populated task payload. The command starts a localhost server,
+serves `assets/ui/index.html`, passes `?data=/workflow-data.json`, and opens the
+browser unless `--no-open` is passed.
+
+```bash
+node .agents/skills/workflow/scripts/workflow.js ui
+node .agents/skills/workflow/scripts/workflow.js ui --no-open --json
+```
+
+Required launch parameters are supplied by the command itself:
+
+- `--data list` is the default and loads active local tasks without Linear
+  writes.
+- `--data next --count <n>` reserves tasks and creates or resumes Linear issues
+  before showing the reserved batch.
+- `--data pick --task-id <task-id>` opens the UI for one explicit task after
+  creating or resuming its Linear issue.
+- `--host <host>` and `--port <port>` override the default localhost server
+  address when an agent runtime requires a specific endpoint.
+- `--static` resolves the bundled HTML file without serving workflow data.
+
+The page still accepts pasted or loaded JSON from these commands when a local
+server is not appropriate:
 
 ```bash
 node .agents/skills/workflow/scripts/workflow.js list --json > /tmp/workflow-tasks.json
 node .agents/skills/workflow/scripts/workflow.js next --count 4 --json > /tmp/workflow-batch.json
-node .agents/skills/workflow/scripts/workflow.js ui
 ```
 
 The UI groups tasks by local task state, Linear-linked state, reserved batch
 state, and done state. It also shows requirements, writes manifests, task
 packets, Linear URLs, and copyable stage-move commands.
-
-Use `node .agents/skills/workflow/scripts/workflow.js ui --json` or `--no-open`
-to resolve the local HTML path and `file://` URL without launching a GUI.
 
 `WORKFLOW.md` front matter may provide equivalent values under `tracker`:
 

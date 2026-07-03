@@ -305,7 +305,7 @@
           <button id="parseJson">Render JSON</button>
           <button id="clearJson" class="secondary">Clear</button>
         </div>
-        <div id="status" class="status">Load workflow JSON to render task state.</div>
+        <div id="status" class="status">Launch with workflow.js ui or load workflow JSON to render task state.</div>
       </section>
 
       <section class="stack">
@@ -643,6 +643,23 @@
       setStatus(`Loaded ${state.tasks.length} task${state.tasks.length === 1 ? "" : "s"} from ${sourceLabel}.`, "ok");
     }
 
+    async function loadLaunchPayload() {
+      if (typeof window === "undefined") return;
+      const params = new URLSearchParams(window.location.search);
+      const dataUrl = params.get("data");
+      if (!dataUrl) return;
+
+      try {
+        const response = await fetch(dataUrl, { cache: "no-store" });
+        if (!response.ok) throw new Error(`Failed to load ${dataUrl}: ${response.status}`);
+        const payload = await response.json();
+        elements.jsonInput.value = JSON.stringify(payload, null, 2);
+        loadPayload(payload, "workflow launcher");
+      } catch (error) {
+        setStatus(error.message || String(error), "error");
+      }
+    }
+
     function parseInput() {
       const text = elements.jsonInput.value.trim();
       if (!text) throw new Error("Paste workflow JSON or load a JSON file first.");
@@ -712,6 +729,7 @@
 
     bindCopyButtons();
     render();
+    loadLaunchPayload();
   </script>
 </body>
 </html>

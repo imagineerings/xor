@@ -3,6 +3,8 @@
 const crypto = require("node:crypto");
 const childProcess = require("node:child_process");
 const fs = require("node:fs");
+const http = require("node:http");
+const net = require("node:net");
 const os = require("node:os");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
@@ -934,7 +936,11 @@ async function resolveLinearStateId(settings, stateName) {
 async function callTool(name, args) {
   const settings = parseSettings();
   if (name === "workflow_launch_ui") {
-    return launchWorkflowUi(args);
+    return launchWorkflowUi(settings, args);
+  }
+
+  if (name === "workflow_serve_ui") {
+    return serveWorkflowUi(settings, args);
   }
 
   if (name === "workflow_validate_workflow") {
@@ -997,7 +1003,7 @@ async function callTool(name, args) {
   throw new Error(`Unknown tool: ${name}`);
 }
 
-function launchWorkflowUi(args = {}) {
+async function launchWorkflowUi(settings, args = {}) {
   const htmlPath = args.ui_path
     ? path.resolve(String(args.ui_path))
     : path.resolve(__dirname, "..", "assets", "ui", "index.html");
@@ -1005,13 +1011,54 @@ function launchWorkflowUi(args = {}) {
     throw new Error(`Workflow UI not found: ${htmlPath}`);
   }
 
-  const url = pathToFileURL(htmlPath).href;
-  const shouldOpen = args.open !== false && !args.no_open && !args.print && !args.json;
-  if (!shouldOpen) {
+  if (args.static || args.file || args.print) {
+    const url = pathToFileURL(htmlPath).href;
     return {
       action: "resolved",
       launched: false,
+      served: false,
       ui: { path: htmlPath, url },
+    };
+  }
+
+  const host = String(args.host || "127.0.0.1");
+  const port = await resolveUiPort(host, args.port);
+  const dataSource = String(args.data || args.source || "list");
+  const serverArgs = {
+    host,
+    port,
+    data: dataSource,
+    limit: args.limit,
+    count: args.count,
+    active_only: args.active_only,
+    task_id: args.task_id,
+    attempt: args.attempt,
+    ttl_ms: args.ttl_ms,
+    ui_path: htmlPath,
+  };
+  const serverProcess = childProcess.spawn(process.execPath, [
+    __filename,
+    "ui-server",
+    ...cliArgsFromObject(serverArgs),
+  ], {
+    cwd: repositoryRoot(settings),
+    detached: true,
+    env: process.env,
+    stdio: "ignore",
+  });
+  serverProcess.unref();
+
+  const url = `http://${host}:${port}/?data=/workflow-data.json`;
+  await waitForUiServer(url);
+
+  const shouldOpen = args.open !== false && !args.no_open && !args.json;
+  if (!shouldOpen) {
+    return {
+      action: "served",
+      launched: false,
+      served: true,
+      server: { host, port, pid: serverProcess.pid, data_source: dataSource },
+      ui: { path: htmlPath, url, data_url: `http://${host}:${port}/workflow-data.json` },
     };
   }
 
@@ -1025,8 +1072,170 @@ function launchWorkflowUi(args = {}) {
   return {
     action: "opened",
     launched: true,
-    ui: { path: htmlPath, url },
+    served: true,
+    server: { host, port, pid: serverProcess.pid, data_source: dataSource },
+    ui: { path: htmlPath, url, data_url: `http://${host}:${port}/workflow-data.json` },
   };
+}
+
+async function serveWorkflowUi(settings, args = {}) {
+  const htmlPath = args.ui_path
+    ? path.resolve(String(args.ui_path))
+    : path.resolve(__dirname, "..", "assets", "ui", "index.html");
+  if (!fs.existsSync(htmlPath)) {
+    throw new Error(`Workflow UI not found: ${htmlPath}`);
+  }
+
+  const host = String(args.host || "127.0.0.1");
+  const port = Number(args.port || 0);
+  const ttlMs = Number(args.ttl_ms || 4 * 60 * 60 * 1000);
+  const payload = await buildUiPayload(settings, args);
+  const payloadText = JSON.stringify(payload, null, 2);
+
+  const server = http.createServer((request, response) => {
+    const requestUrl = new URL(request.url || "/", `http://${host}:${port || 80}`);
+    if (requestUrl.pathname === "/" || requestUrl.pathname === "/index.html") {
+      respond(response, 200, "text/html; charset=utf-8", fs.readFileSync(htmlPath, "utf8"));
+    } else if (requestUrl.pathname === "/workflow-data.json") {
+      respond(response, 200, "application/json; charset=utf-8", payloadText);
+    } else if (requestUrl.pathname === "/health") {
+      respond(response, 200, "application/json; charset=utf-8", JSON.stringify({ ok: true }));
+    } else {
+      respond(response, 404, "text/plain; charset=utf-8", "Not found");
+    }
+  });
+
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(port, host, resolve);
+  });
+
+  const address = server.address();
+  const actualPort = typeof address === "object" && address ? address.port : port;
+  process.stdout.write(JSON.stringify({
+    action: "serving",
+    server: { host, port: actualPort, data_source: payload.ui?.data_source || "list" },
+    ui: {
+      path: htmlPath,
+      url: `http://${host}:${actualPort}/?data=/workflow-data.json`,
+      data_url: `http://${host}:${actualPort}/workflow-data.json`,
+    },
+  }, null, 2));
+  process.stdout.write("\n");
+
+  if (ttlMs > 0) {
+    setTimeout(() => {
+      server.close(() => process.exit(0));
+    }, ttlMs).unref();
+  }
+}
+
+async function buildUiPayload(settings, args = {}) {
+  const dataSource = String(args.data || args.source || "list");
+  if (dataSource === "none") {
+    return {
+      tasks: [],
+      total: 0,
+      ui: { data_source: dataSource, generated_at: new Date().toISOString() },
+    };
+  }
+
+  if (dataSource === "next") {
+    const workflow = validateWorkflowContract(parseWorkflow(workflowPath(settings)));
+    const tasks = activeTasks(settings, listTasks(settings)).slice(0, args.limit || 200);
+    const count = Math.max(1, args.count || 1);
+    const picked = count === 1
+      ? await pickNextTask(settings, workflow, tasks, args.attempt ?? null)
+      : await pickNextTasks(settings, workflow, tasks, args.attempt ?? null, count);
+    return {
+      ...picked,
+      ui: { data_source: dataSource, generated_at: new Date().toISOString() },
+      workflow: { path: workflow.path, config: workflow.config },
+    };
+  }
+
+  if (dataSource === "pick") {
+    const taskId = args.task_id;
+    if (!taskId) throw new Error("workflow ui --data pick requires --task-id <task-id>");
+    const task = findTask(settings, taskId);
+    const workflow = validateWorkflowContract(parseWorkflow(workflowPath(settings)));
+    const picked = await pickTask(settings, workflow, task, args.attempt ?? null);
+    return {
+      task: picked.task,
+      prompt: picked.prompt,
+      duplicate_prevented: picked.duplicate_prevented,
+      action: picked.action,
+      ui: { data_source: dataSource, generated_at: new Date().toISOString() },
+      workflow: { path: workflow.path, config: workflow.config },
+    };
+  }
+
+  if (dataSource !== "list") {
+    throw new Error(`Unsupported UI data source: ${dataSource}`);
+  }
+
+  const tasks = listTasks(settings);
+  const filtered = args.active_only === false ? tasks : activeTasks(settings, tasks);
+  return {
+    tasks: filtered.slice(0, args.limit || 500),
+    total: filtered.length,
+    ui: { data_source: dataSource, generated_at: new Date().toISOString() },
+  };
+}
+
+function respond(response, status, contentType, body) {
+  response.writeHead(status, {
+    "content-type": contentType,
+    "cache-control": "no-store",
+  });
+  response.end(body);
+}
+
+async function resolveUiPort(host, requestedPort) {
+  if (requestedPort) return Number(requestedPort);
+  for (let port = 47631; port < 47731; port += 1) {
+    if (await isPortAvailable(host, port)) return port;
+  }
+  throw new Error("No available workflow UI port found in range 47631-47730");
+}
+
+function isPortAvailable(host, port) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once("error", () => resolve(false));
+    server.once("listening", () => {
+      server.close(() => resolve(true));
+    });
+    server.listen(port, host);
+  });
+}
+
+async function waitForUiServer(url) {
+  const healthUrl = new URL("/health", url).href;
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < 5000) {
+    try {
+      const response = await fetch(healthUrl);
+      if (response.ok) return;
+    } catch (_error) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+  throw new Error(`Workflow UI server did not become ready: ${healthUrl}`);
+}
+
+function cliArgsFromObject(values) {
+  const args = [];
+  for (const [key, value] of Object.entries(values)) {
+    if (value === undefined || value === null || value === false) continue;
+    const cliKey = `--${key.replace(/_/g, "-")}`;
+    if (value === true) {
+      args.push(cliKey);
+    } else {
+      args.push(cliKey, String(value));
+    }
+  }
+  return args;
 }
 
 function platformLauncher(url) {
@@ -1066,6 +1275,9 @@ async function runCli(argv) {
     result = await callTool("workflow_validate_workflow", args);
   } else if (command === "ui" || command === "open-ui") {
     result = await callTool("workflow_launch_ui", args);
+  } else if (command === "ui-server") {
+    await callTool("workflow_serve_ui", args);
+    return;
   } else if (command === "help" || command === "--help" || command === "-h") {
     process.stdout.write(`${usage()}\n`);
     return;
@@ -1133,10 +1345,13 @@ function formatCliResult(command, result) {
     return [
       `Action: ${result.action}`,
       `Launched: ${result.launched ? "yes" : "no"}`,
+      `Served: ${result.served ? "yes" : "no"}`,
       `Path: ${result.ui.path}`,
       `URL: ${result.ui.url}`,
+      result.ui.data_url ? `Data: ${result.ui.data_url}` : null,
+      result.server ? `Server: ${result.server.host}:${result.server.port} pid ${result.server.pid}` : null,
       "",
-    ].join("\n");
+    ].filter((line) => line !== null).join("\n");
   }
 
   return `${JSON.stringify(result, null, 2)}\n`;
@@ -1152,7 +1367,7 @@ function usage() {
     "  pick <task-id>       Pick or resume a specific task",
     "  render <task-id>     Render a prompt for a specific task",
     "  move <id>            Move a Linear issue or task's issue to another state",
-    "  ui                   Open the local workflow task board",
+    "  ui                   Open the populated local workflow task board",
     "  validate             Validate WORKFLOW.md",
     "",
     "Options:",
@@ -1162,8 +1377,12 @@ function usage() {
     "  --attempt <n>        Render with an attempt number",
     "  --state-name <name>  Target Linear state for move",
     "  --state-id <id>      Target Linear state ID for move",
-    "  --print              Resolve UI path without opening it",
-    "  --no-open            Resolve UI path without opening it",
+    "  --data <source>      UI data source: list, next, pick, or none",
+    "  --host <host>        Host for the local UI server",
+    "  --port <port>        Port for the local UI server",
+    "  --task-id <id>       Task ID for --data pick",
+    "  --no-open            Serve UI and print URL without opening a browser",
+    "  --static             Resolve static UI file URL without serving data",
   ].join("\n");
 }
 
@@ -1178,6 +1397,7 @@ module.exports = {
   activeTasks,
   callTool,
   findTaskFiles,
+  buildUiPayload,
   launchWorkflowUi,
   listTasks,
   parseTaskFile,

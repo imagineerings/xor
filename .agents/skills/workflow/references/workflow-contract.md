@@ -50,11 +50,11 @@ team.
 
 ## Local UI
 
-`assets/ui/index.html` is a static task board for visualizing script output. It
-does not execute repository commands and does not call Linear directly. Load JSON
-created by `workflow.js list --json` or `workflow.js next --count <n> --json`.
-The board shows local task state, Linear state, reserved batch membership,
-requirements, writes manifests, and task packets.
+`assets/ui/index.html` is a task board for visualizing script output. The page
+does not execute repository commands and does not call Linear directly. The
+launcher supplies data through `?data=/workflow-data.json`, and the UI fetches
+that payload on load. The board shows local task state, Linear state, reserved
+batch membership, requirements, writes manifests, and task packets.
 
 Launch it with:
 
@@ -62,9 +62,23 @@ Launch it with:
 node .agents/skills/workflow/scripts/workflow.js ui
 ```
 
-Use `workflow.js ui --json` or `workflow.js ui --no-open` in non-GUI
-environments to return the local HTML path and `file://` URL without opening a
-browser.
+Launch modes:
+
+- `workflow.js ui` starts a localhost server, serves the UI with active local
+  tasks, and opens the browser.
+- `workflow.js ui --no-open --json` starts the server and returns the UI URL,
+  data URL, server host, port, and process ID for agent runtimes that open UIs
+  themselves.
+- `workflow.js ui --data next --count <n>` reserves tasks through Linear before
+  rendering the reserved batch. Use this only when the agent intends to claim
+  work.
+- `workflow.js ui --data pick --task-id <task-id>` opens the UI for one
+  explicit task after creating or resuming its Linear issue.
+- `workflow.js ui --static --json` resolves the bundled HTML file without
+  serving workflow data.
+
+The UI still supports manually loaded JSON created by `workflow.js list --json`
+or `workflow.js next --count <n> --json`.
 
 ## Front Matter
 
