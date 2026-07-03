@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "updated_at": null,
+  "repo_revision": null,
+  "recommendation": null,
+  "task_notes": [],
+  "dependency_notes": [],
+  "maintenance": {
+    "instructions": [
+      "Update this file while evaluating workflow.js next candidates.",
+      "Store concise conclusions, evidence, blockers, and dependency notes.",
+      "Do not store private chain-of-thought or long scratch reasoning.",
+      "Refresh recommendation after tasks.md, requirements.md, or design.md changes."
+    ],
+    "recommendation_shape": {
+      "task_id": "task:<stable-id>",
+      "task_identifier": ".agents/specs/example/tasks.md:12",
+      "title": "Task title",
+      "rationale": "Short reviewable reason this task is the best next step.",
+      "evidence": [
+        "Previous task 1 is complete and established the required API.",
+        "This task unlocks follow-up UI integration work."
+      ],
+      "stale_if_changed": [
+        ".agents/specs/example/tasks.md",
+        ".agents/specs/example/design.md"
+      ],
+      "updated_at": "YYYY-MM-DDTHH:MM:SSZ"
+    },
+    "task_note_shape": {
+      "task_identifier": ".agents/specs/example/tasks.md:20",
+      "status": "blocked | deprioritized | claimed | dependency | ready",
+      "summary": "Short note explaining the state or dependency.",
+      "updated_at": "YYYY-MM-DDTHH:MM:SSZ"
+    },
+    "dependency_note_shape": {
+      "scope": ".agents/specs/example",
+      "summary": "Server foundation should land before UI integration.",
+      "updated_at": "YYYY-MM-DDTHH:MM:SSZ"
+    }
+  }
+}

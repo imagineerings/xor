@@ -15,6 +15,7 @@ const DEFAULT_SETTINGS = {
   repository_path: "",
   workflow_path: "WORKFLOW.md",
   tasks_glob: ".agents/specs/**/tasks.md",
+  workflow_state_path: ".agents/workflow-state.json",
   linear_endpoint: DEFAULT_LINEAR_ENDPOINT,
   linear_api_key: "$LINEAR_API_KEY",
   linear_team_id: "",
@@ -64,6 +65,7 @@ function workflowSettings(settings) {
     if (Array.isArray(tracker.terminal_states)) mapped.terminal_states = tracker.terminal_states;
     if (typeof tracker.resume_existing === "boolean") mapped.resume_existing = tracker.resume_existing;
     if (tasks.glob) mapped.tasks_glob = tasks.glob;
+    if (workflow.config.workflow_state?.path) mapped.workflow_state_path = workflow.config.workflow_state.path;
 
     return mapped;
   } catch (_error) {
@@ -81,6 +83,12 @@ function repositoryRoot(settings) {
 
 function workflowPath(settings, override) {
   const configured = override || settings.workflow_path || "WORKFLOW.md";
+  if (path.isAbsolute(configured)) return configured;
+  return path.resolve(repositoryRoot(settings), configured);
+}
+
+function workflowStatePath(settings, override) {
+  const configured = override || settings.workflow_state_path || DEFAULT_SETTINGS.workflow_state_path;
   if (path.isAbsolute(configured)) return configured;
   return path.resolve(repositoryRoot(settings), configured);
 }
@@ -470,6 +478,110 @@ function activeTasks(settings, tasks) {
   });
 }
 
+function loadWorkflowState(settings, options = {}) {
+  const filePath = workflowStatePath(settings, options.workflow_state_path);
+  const relativePath = path.relative(repositoryRoot(settings), filePath).replace(/\\/g, "/");
+  if (!fs.existsSync(filePath)) {
+    return {
+      path: relativePath,
+      exists: false,
+      recommendation: null,
+      task_notes: [],
+      dependency_notes: [],
+    };
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch (error) {
+    return {
+      path: relativePath,
+      exists: true,
+      error: `workflow_state_parse_error: ${error.message}`,
+      recommendation: null,
+      task_notes: [],
+      dependency_notes: [],
+    };
+  }
+
+  return normalizeWorkflowState(parsed, relativePath);
+}
+
+function normalizeWorkflowState(state, relativePath) {
+  const taskNotes = Array.isArray(state.task_notes) ? state.task_notes : [];
+  const dependencyNotes = Array.isArray(state.dependency_notes) ? state.dependency_notes : [];
+  return {
+    path: relativePath,
+    exists: true,
+    version: state.version || 1,
+    updated_at: state.updated_at || null,
+    repo_revision: state.repo_revision || null,
+    recommendation: normalizeWorkflowStateRecommendation(state.recommendation),
+    task_notes: taskNotes.filter((note) => note && typeof note === "object"),
+    dependency_notes: dependencyNotes.filter((note) => note && typeof note === "object"),
+  };
+}
+
+function normalizeWorkflowStateRecommendation(recommendation) {
+  if (!recommendation || typeof recommendation !== "object") return null;
+  return {
+    task_id: recommendation.task_id || null,
+    task_identifier: recommendation.task_identifier || null,
+    title: recommendation.title || null,
+    rationale: recommendation.rationale || recommendation.reason || null,
+    evidence: Array.isArray(recommendation.evidence) ? recommendation.evidence : [],
+    stale_if_changed: Array.isArray(recommendation.stale_if_changed) ? recommendation.stale_if_changed : [],
+    updated_at: recommendation.updated_at || null,
+  };
+}
+
+function attachWorkflowState(settings, result, tasks) {
+  const state = loadWorkflowState(settings);
+  return {
+    ...result,
+    decision_state: summarizeWorkflowState(state, tasks),
+  };
+}
+
+function summarizeWorkflowState(state, tasks) {
+  const recommendation = state.recommendation;
+  const recommendedTask = recommendation ? findRecommendedTask(tasks, recommendation) : null;
+  const relevantTaskNotes = state.task_notes
+    .filter((note) => {
+      return tasks.some((task) => {
+        return task.id === note.task_id || task.identifier === note.task_identifier;
+      });
+    })
+    .slice(0, 12);
+
+  return {
+    path: state.path,
+    exists: state.exists,
+    error: state.error || null,
+    updated_at: state.updated_at || null,
+    repo_revision: state.repo_revision || null,
+    recommendation: recommendation
+      ? {
+          ...recommendation,
+          matches_active_task: Boolean(recommendedTask),
+          matched_task_id: recommendedTask?.id || null,
+          matched_task_identifier: recommendedTask?.identifier || null,
+        }
+      : null,
+    relevant_task_notes: relevantTaskNotes,
+    dependency_notes: state.dependency_notes.slice(0, 12),
+  };
+}
+
+function findRecommendedTask(tasks, recommendation) {
+  return (
+    tasks.find((task) => {
+      return task.id === recommendation.task_id || task.identifier === recommendation.task_identifier;
+    }) || null
+  );
+}
+
 function findTask(settings, taskId) {
   const task = listTasks(settings).find((candidate) => {
     return candidate.id === taskId || candidate.identifier === taskId;
@@ -725,7 +837,9 @@ async function pickNextTask(settings, workflow, tasks, attempt) {
     duplicate_prevented: false,
     candidates: tasks,
     skipped_claimed_tasks: [],
-    reason: `${tasks.length} active unclaimed tasks available. Evaluate each for immediate value and pick one with: node .agents/skills/workflow/scripts/workflow.js pick <task-id>`,
+    reason:
+      `${tasks.length} active unclaimed tasks available. Review decision_state, evaluate each for immediate value, ` +
+      "and pick one with: node .agents/skills/workflow/scripts/workflow.js pick <task-id>",
   };
 }
 
@@ -1123,7 +1237,7 @@ async function callTool(name, args) {
         ? await pickNextTask(settings, workflow, tasks, args.attempt ?? null)
         : await pickNextTasks(settings, workflow, tasks, args.attempt ?? null, count);
     return {
-      ...picked,
+      ...attachWorkflowState(settings, picked, tasks),
       workflow: { path: workflow.path, config: workflow.config },
     };
   }
@@ -1291,7 +1405,7 @@ async function buildUiPayload(settings, args = {}) {
         ? await pickNextTask(settings, workflow, tasks, args.attempt ?? null)
         : await pickNextTasks(settings, workflow, tasks, args.attempt ?? null, count);
     return {
-      ...picked,
+      ...attachWorkflowState(settings, picked, tasks),
       ui: { data_source: dataSource, generated_at: new Date().toISOString() },
       workflow: { path: workflow.path, config: workflow.config },
     };
@@ -1490,6 +1604,7 @@ function formatCliResult(command, result) {
 
   if (command === "next" && result.action === "evaluate" && Array.isArray(result.candidates)) {
     const skipped = result.duplicate_prevented ? `\nSkipped claimed tasks: ${result.skipped_claimed_tasks.length}` : "";
+    const stateLines = formatDecisionState(result.decision_state);
     const lines = [
       `Action: evaluate`,
       `${result.candidates.length} unclaimed tasks available.`,
@@ -1497,6 +1612,8 @@ function formatCliResult(command, result) {
       `  workflow.js pick <task-id>`,
       skipped,
       "",
+      ...stateLines,
+      stateLines.length > 0 ? "" : null,
       "---",
       "",
     ];
@@ -1557,6 +1674,46 @@ function formatCliResult(command, result) {
   }
 
   return `${JSON.stringify(result, null, 2)}\n`;
+}
+
+function formatDecisionState(state) {
+  if (!state) return [];
+  const lines = [`Decision state: ${state.path}${state.exists ? "" : " (missing)"}`];
+  if (state.error) {
+    lines.push(`State error: ${state.error}`);
+    return lines;
+  }
+  if (state.recommendation) {
+    const recommendation = state.recommendation;
+    const match = recommendation.matches_active_task ? "active candidate" : "not in active candidates";
+    lines.push(`Cached recommendation: ${recommendation.task_identifier || recommendation.task_id || "unspecified"} (${match})`);
+    if (recommendation.title) lines.push(`Title: ${recommendation.title}`);
+    if (recommendation.rationale) lines.push(`Rationale: ${recommendation.rationale}`);
+    if (recommendation.evidence.length > 0) {
+      lines.push("Evidence:");
+      for (const item of recommendation.evidence.slice(0, 5)) {
+        lines.push(`- ${item}`);
+      }
+    }
+  } else {
+    lines.push("Cached recommendation: none");
+  }
+  if (state.relevant_task_notes.length > 0) {
+    lines.push("Relevant task notes:");
+    for (const note of state.relevant_task_notes.slice(0, 5)) {
+      const key = note.task_identifier || note.task_id || "unknown task";
+      const status = note.status ? ` (${note.status})` : "";
+      const summary = note.summary || note.rationale || "";
+      lines.push(`- ${key}${status}: ${summary}`);
+    }
+  }
+  if (state.dependency_notes.length > 0) {
+    lines.push("Dependency notes:");
+    for (const note of state.dependency_notes.slice(0, 5)) {
+      lines.push(`- ${note.summary || note.note || JSON.stringify(note)}`);
+    }
+  }
+  return lines;
 }
 
 function usage() {

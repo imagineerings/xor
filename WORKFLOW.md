@@ -17,6 +17,9 @@ tracker:
 tasks:
   glob: .agents/specs/**/tasks.md
 
+workflow_state:
+  path: .agents/workflow-state.json
+
 polling:
   interval_ms: 30000
 
@@ -118,8 +121,12 @@ node .agents/skills/workflow/scripts/workflow.js next
 
 If multiple unclaimed tasks are available, the command will list them as
 candidates with their priority, title, requirements, and writes manifest.
-Evaluate each candidate for immediate value, and include the previous tasks in
-the same `tasks.md` file in that evaluation:
+Before re-deriving dependencies from scratch, read the decision state surfaced
+by `workflow.js next` from `.agents/workflow-state.json`. Use it as a cache, not
+as authority: validate the cached recommendation against current `tasks.md`,
+`requirements.md`, `design.md`, and Linear state. Then evaluate each candidate
+for immediate value, and include the previous tasks in the same `tasks.md` file
+in that evaluation:
 
 - Completed previous tasks show foundations that are already delivered.
 - Claimed previous tasks show work already in flight and should usually be
@@ -136,6 +143,12 @@ node .agents/skills/workflow/scripts/workflow.js pick <task-id>
 
 When the user explicitly specifies a task ID or topic, skip automatic
 selection and pick that task directly with the same command.
+
+After accepting or rejecting a cached recommendation, update
+`.agents/workflow-state.json` with concise conclusions: the chosen task,
+reviewable rationale, evidence, blocked or deprioritized task notes, and
+dependency notes. Do not store private chain-of-thought or long scratch
+reasoning.
 
 If only one unclaimed task exists, `next` will claim it automatically and
 render the full prompt. If every task is claimed, `next` will report that;

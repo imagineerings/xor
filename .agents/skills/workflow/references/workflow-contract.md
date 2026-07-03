@@ -25,11 +25,15 @@ It:
    tasks are unclaimed.
 
 When multiple candidates are returned, the agent should pick the next logical
-task that adds value by considering priority, dependencies, immediate utility,
-and previous tasks in the same `tasks.md` file. Previous tasks are evidence:
-completed tasks show delivered foundations, claimed tasks show work already in
-flight, and incomplete earlier tasks may indicate unmet prerequisites or a
-better next step. Use `workflow.js pick <task-id>` after choosing the candidate.
+task that adds value by first consulting `.agents/workflow-state.json` when it
+exists. This state is a cache of concise conclusions and dependency notes, not
+authority. Validate its cached recommendation against current `tasks.md`,
+`requirements.md`, `design.md`, and Linear state. Then consider priority,
+dependencies, immediate utility, and previous tasks in the same `tasks.md` file.
+Previous tasks are evidence: completed tasks show delivered foundations,
+claimed tasks show work already in flight, and incomplete earlier tasks may
+indicate unmet prerequisites or a better next step. Use
+`workflow.js pick <task-id>` after choosing the candidate.
 
 If all active local tasks already have non-terminal Linear issues, the script
 returns no task and includes `skipped_claimed_tasks` in JSON output for
@@ -43,6 +47,42 @@ task text, requirements, write manifests, likely code ownership, and previous
 tasks that may establish dependencies or ordering. Do not run tasks in parallel
 when they touch the same files, have explicit dependency ordering, or require a
 shared migration/schema step.
+
+## Decision State
+
+The optional structured decision-state file defaults to:
+
+```text
+.agents/workflow-state.json
+```
+
+`WORKFLOW.md` may override it with:
+
+```yaml
+workflow_state:
+  path: .agents/workflow-state.json
+```
+
+`workflow.js next` loads the file when present and includes a
+`decision_state` object in JSON output. Human-readable `next` output also shows
+the cached recommendation before the candidate list.
+
+Supported state fields:
+
+- `version`: state schema version, currently `1`
+- `updated_at`: ISO timestamp for the last state refresh
+- `repo_revision`: commit SHA or short revision used for the last state refresh
+- `recommendation`: object with `task_id`, `task_identifier`, `title`,
+  `rationale`, `evidence`, `stale_if_changed`, and `updated_at`
+- `task_notes`: array of task-specific notes with `task_id` or
+  `task_identifier`, `status`, `summary`, and `updated_at`
+- `dependency_notes`: array of reusable ordering notes with `scope`, `summary`,
+  and `updated_at`
+
+Agents should update the file after accepting, rejecting, blocking, or
+deprioritizing a candidate. Store concise reviewable rationale and evidence
+only. Do not store private chain-of-thought, long scratch reasoning, secrets, or
+unverified guesses.
 
 ## Task Boundary Consistency Gates
 
@@ -145,6 +185,8 @@ tracker:
   terminal_states: [Done, Closed, Canceled, Cancelled, Duplicate]
 tasks:
   glob: .agents/specs/**/tasks.md
+workflow_state:
+  path: .agents/workflow-state.json
 agent:
   max_turns: 20
 ---
