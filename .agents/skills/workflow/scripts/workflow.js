@@ -375,7 +375,7 @@ function parseTaskFile(filePath, root) {
       identifier: `${relativePath}:${current.line}`,
       title: current.title,
       description,
-      priority: null,
+      priority: extractPriority(current.title),
       state: markerState(current.marker),
       branch_name: null,
       url: null,
@@ -433,6 +433,12 @@ function extractMetadata(lines, prefix) {
     values.push(afterPrefix.replace(/^_+|_+$/g, "").trim());
   }
   return values;
+}
+
+function extractPriority(title) {
+  const match = title.match(/^(P[0-4])\.?\s*:?/);
+  if (match) return match[1];
+  return null;
 }
 
 function markerState(marker) {
@@ -678,40 +684,48 @@ async function pickNextTask(settings, workflow, tasks, attempt) {
     };
   }
 
-  const skippedClaimedTasks = [];
-  for (const task of tasks) {
-    const existing = await findExistingLinearIssue(settings, task);
+  if (tasks.length === 1) {
+    const existing = await findExistingLinearIssue(settings, tasks[0]);
     if (existing) {
-      skippedClaimedTasks.push({
-        task_id: task.id,
-        task_identifier: task.identifier,
-        task_title: task.title,
-        linear_identifier: existing.identifier || null,
-        linear_url: existing.url || null,
-        linear_state: typeof existing.state === "string" ? existing.state : existing.state?.name || null,
-      });
-      continue;
+      return {
+        task: null,
+        prompt: null,
+        action: "none",
+        duplicate_prevented: false,
+        skipped_claimed_tasks: [
+          {
+            task_id: tasks[0].id,
+            task_identifier: tasks[0].identifier,
+            task_title: tasks[0].title,
+            linear_identifier: existing.identifier || null,
+            linear_url: existing.url || null,
+            linear_state: typeof existing.state === "string" ? existing.state : existing.state?.name || null,
+          },
+        ],
+        reason: "The only active local task already has a non-terminal Linear issue.",
+      };
     }
-
-    const picked = await pickTask(settings, workflow, task, attempt, {
+    const picked = await pickTask(settings, workflow, tasks[0], attempt, {
       existingChecked: true,
     });
     return {
       task: picked.task,
       prompt: picked.prompt,
       action: picked.action,
-      duplicate_prevented: skippedClaimedTasks.length > 0,
-      skipped_claimed_tasks: skippedClaimedTasks,
+      duplicate_prevented: false,
+      candidates: null,
+      skipped_claimed_tasks: [],
     };
   }
 
   return {
     task: null,
     prompt: null,
-    action: "none",
-    duplicate_prevented: skippedClaimedTasks.length > 0,
-    skipped_claimed_tasks: skippedClaimedTasks,
-    reason: "All active local tasks already have non-terminal Linear issues.",
+    action: "evaluate",
+    duplicate_prevented: false,
+    candidates: tasks,
+    skipped_claimed_tasks: [],
+    reason: `${tasks.length} active unclaimed tasks available. Evaluate each for immediate value and pick one with: node .agents/skills/workflow/scripts/workflow.js pick <task-id>`,
   };
 }
 
@@ -1472,6 +1486,38 @@ function formatCliResult(command, result) {
     ]
       .filter((line) => line !== null)
       .join("\n");
+  }
+
+  if (command === "next" && result.action === "evaluate" && Array.isArray(result.candidates)) {
+    const skipped = result.duplicate_prevented ? `\nSkipped claimed tasks: ${result.skipped_claimed_tasks.length}` : "";
+    const lines = [
+      `Action: evaluate`,
+      `${result.candidates.length} unclaimed tasks available.`,
+      `Evaluate each for immediate value, then pick one with:`,
+      `  workflow.js pick <task-id>`,
+      skipped,
+      "",
+      "---",
+      "",
+    ];
+    for (const candidate of result.candidates) {
+      const priority = (candidate.priority || "").toUpperCase();
+      const prefix = priority ? `[${priority}] ` : "";
+      lines.push(`### ${prefix}${candidate.title}`);
+      lines.push(`ID: ${candidate.id}`);
+      lines.push(`Source: ${candidate.identifier}`);
+      if (candidate.requirements && candidate.requirements.length > 0) {
+        lines.push(`Requirements: ${candidate.requirements.join(", ")}`);
+      }
+      if (candidate.writes && candidate.writes.length > 0) {
+        lines.push(`Writes: ${candidate.writes.join(", ")}`);
+      }
+      if (candidate.description) {
+        lines.push("", candidate.description);
+      }
+      lines.push("");
+    }
+    return lines.join("\n");
   }
 
   if (command === "next" || command === "pick" || command === "render") {

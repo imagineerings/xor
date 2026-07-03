@@ -107,6 +107,32 @@ This repository provides agent skills you should use during the workflow:
 
 ## Workflow
 
+### 0. Evaluate and Pick the Most Valuable Task
+
+When starting work (or when the workflow says to begin a task), first list all
+unclaimed active tasks:
+
+```bash
+node .agents/skills/workflow/scripts/workflow.js next
+```
+
+If multiple unclaimed tasks are available, the command will list them as
+candidates with their priority, title, requirements, and writes manifest.
+**Evaluate each candidate for immediate value** — consider priority, blocking
+status for other tasks, dependencies, and what delivers the most useful
+outcome right now. Then explicitly pick the best one:
+
+```bash
+node .agents/skills/workflow/scripts/workflow.js pick <task-id>
+```
+
+If only one unclaimed task exists, `next` will claim it automatically and
+render the full prompt. If every task is claimed, `next` will report that;
+focus on completing claimed work before starting new tasks.
+
+When the user explicitly specifies a task ID or topic, skip evaluation and
+pick that task directly.
+
 ### 1. Pull and Branch
 
 Use the `pull` skill to fetch `origin/main` and merge it into your current
