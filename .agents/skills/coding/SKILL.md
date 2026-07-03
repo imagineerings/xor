@@ -37,6 +37,28 @@ guide.
 - **Explicit approval** — Get user approval after each document
 - **One task at a time** — During execution, focus on single task
 - **Correctness mandatory** — Every design MUST include properties from EARS
+- **Consistency passes mandatory** — Before executing a task and before marking
+  it complete, reconcile gates, dependency waves, and all relevant spec
+  documents.
+
+## Consistency Pass
+
+Run this pass at two points: before an agent begins a task, and after
+implementation is validated but before the task is marked complete.
+
+1. **Tighten gates** — Ensure requirements, design, and tasks have concrete
+   start gates, validation gates, handoff gates, and completion gates. Replace
+   vague checks such as "verify" with explicit commands, observable outcomes,
+   acceptance criteria, or done conditions where possible.
+2. **Update dependency waves** — Confirm the task order, prerequisites, and
+   parallel-safe groups match the current design and `_writes:` manifests.
+   Document dependencies between tasks and adjust waves when implementation
+   discoveries change ordering or parallel safety.
+3. **Check document agreement** — Read the relevant `requirements.md`,
+   `design.md`, and `tasks.md` together. Confirm every task references existing
+   requirements, design properties validate those requirements, task writes and
+   reads are accurate, and no document contradicts another. Update the spec
+   files or ask for clarification before proceeding on an inconsistency.
 
 ## Quick Reference
 

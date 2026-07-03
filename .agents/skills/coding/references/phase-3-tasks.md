@@ -37,7 +37,24 @@ Create `.agent/specs/{feature-name}/tasks.md` with:
 
 ## Overview
 
-[Brief description of the implementation approach. Explain the order of tasks and any key decisions about how work is structured.]
+[Brief description of the implementation approach. Explain the dependency
+waves, task order, parallel-safe groups, and key decisions about how work is
+structured.]
+
+## Gates
+
+- Start gate: [What must be true before implementation starts]
+- Validation gate: [Commands, tests, or observable checks required before
+  completion]
+- Handoff gate: [What evidence/status must be handed to the next agent or
+  reviewer]
+- Completion gate: [What makes this task safe to mark complete]
+
+## Dependency Waves
+
+- Wave 1: [Tasks that can run first; note which can run in parallel]
+- Wave 2: [Tasks that depend on Wave 1]
+- Wave N: [Continue as needed]
 
 ## Tasks
 
@@ -87,6 +104,10 @@ Create `.agent/specs/{feature-name}/tasks.md` with:
 - Clear objective involving code (writing, modifying, testing)
 - Additional info as sub-bullets
 - Specific requirement references (granular sub-requirements, not just user stories)
+- `_writes:` manifest for expected file edits when known
+- Dependency wave or prerequisite note when ordering matters
+- Validation gate for the task, especially the command or check that proves it
+  works
 
 **Quality Standards**:
 - Discrete, manageable coding steps
@@ -94,6 +115,22 @@ Create `.agent/specs/{feature-name}/tasks.md` with:
 - Test-driven development prioritized
 - Covers all design aspects implementable through code
 - Validates core functionality early
+- Requirements, design properties, and task references agree before approval
+
+### Consistency Pass Before Approval
+
+Before asking for task approval:
+
+1. Tighten gates so start, validation, handoff, and completion checks are
+   concrete and actionable.
+2. Update dependency waves so task order and parallel-safe groups reflect the
+   current design, requirements, and `_writes:` manifests.
+3. Check that `requirements.md`, `design.md`, and `tasks.md` agree:
+   - every `_Requirements:` reference exists,
+   - every design property validates one or more requirements,
+   - every design component has implementation coverage or an explicit reason it
+     needs no code task,
+   - no task asks for behavior contradicted by requirements or design.
 
 ### Review & Iteration
 

@@ -34,6 +34,23 @@ task text, requirements, write manifests, and likely code ownership. Do not run
 tasks in parallel when they touch the same files, have explicit dependency
 ordering, or require a shared migration/schema step.
 
+## Task Boundary Consistency Pass
+
+Agents must run a consistency pass before implementing a picked task and again
+after validation but before completion:
+
+1. Tighten gates: make start, validation, handoff, and completion gates concrete
+   enough for another agent to verify.
+2. Update dependency waves: ensure task ordering, prerequisites, and
+   parallel-safe groups match current requirements, design dependencies, and
+   `_writes:` manifests.
+3. Check document agreement: reconcile `requirements.md`, `design.md`, and
+   `tasks.md`; referenced requirements must exist, design properties must
+   validate those requirements, and tasks must not contradict the design.
+
+If the pass finds blocking ambiguity, update the spec files or ask for
+clarification before coding or before completing the task.
+
 ## Linear Stage Updates
 
 Use the executable script to move Linear issues between stages:

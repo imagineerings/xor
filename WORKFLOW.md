@@ -128,7 +128,23 @@ Before editing, read the relevant parts of the codebase:
 - If the work touches behavior covered by `.agents/specs/`, read the matching
   `requirements.md` and `design.md`.
 
-### 3. Implement
+### 3. Pre-Implementation Consistency Pass
+
+Before editing implementation files, reconcile the spec pack for this task:
+
+- Tighten gates: make the task's start, validation, handoff, and completion
+  gates concrete. Prefer exact commands, checks, and observable outcomes.
+- Update dependency waves: confirm the task is in the correct wave, its
+  prerequisites are complete or intentionally deferred, and its `_writes:`
+  manifest is compatible with any parallel work.
+- Check spec agreement: ensure `requirements.md`, `design.md`, and `tasks.md`
+  agree. Referenced requirements must exist, design properties must validate the
+  relevant requirements, and the task must not contradict the design.
+
+If the pass reveals blocking ambiguity, update the spec files or ask for
+clarification before coding.
+
+### 4. Implement
 
 Make the changes required by the local task. Follow the conventions in the
 steering docs and project rules. Key guidelines:
@@ -147,7 +163,7 @@ steering docs and project rules. Key guidelines:
 Use the `coding` skill if the task requires creating or updating feature specs
 before implementation.
 
-### 4. Lint
+### 5. Lint
 
 Before running tests, ensure the code compiles and passes clippy:
 
@@ -157,7 +173,7 @@ Before running tests, ensure the code compiles and passes clippy:
 
 Fix clippy warnings. They are treated as errors in CI.
 
-### 5. Test
+### 6. Test
 
 Run the relevant tests for the crate(s) you changed:
 
@@ -173,13 +189,24 @@ cargo nextest run -p <crate-name> --no-fail-fast
 
 Use the `gpui-test` skill for difficult GPUI test failures.
 
-### 6. Keep Documentation in Sync
+### 7. Post-Validation Consistency Pass
+
+After implementation and validation, repeat the consistency pass before marking
+the task complete:
+
+- Tighten gates based on the actual validation performed.
+- Update dependency waves if implementation changed ordering, prerequisites, or
+  safe parallel groups for later tasks.
+- Check that requirements, design, and tasks still agree with the delivered
+  behavior, including updated `_writes:` manifests and task status.
+
+### 8. Keep Documentation in Sync
 
 If your changes affect behavior documented in spec files under `.agents/specs/`,
 use the `living-documentation` skill to sync the `requirements.md` and
 `design.md` files with the updated code.
 
-### 7. Commit and Push
+### 9. Commit and Push
 
 Use the `commit` skill to stage and commit your changes with a conventional
 multi-line message. Then use the `push` skill to push the branch and open a
@@ -193,12 +220,12 @@ PR conventions:
 - Include a `Release Notes:` section as the final section in the PR body.
 - Link back to `{{ issue.linear.url }}` and `{{ issue.identifier }}`.
 
-### 8. Land
+### 10. Land
 
 Once the PR is approved and CI passes, use the `land` skill to monitor CI,
 address failures, and squash-merge the PR.
 
-### 9. Update Status
+### 11. Update Status
 
 When the task is implemented, validated, and working correctly, complete the
 workflow task. This updates the local task checkbox and moves the linked Linear
@@ -210,7 +237,7 @@ Use the workflow script:
 node .agents/skills/workflow/scripts/workflow.js complete {{ issue.id }} --state-name "Done"
 ```
 
-### 10. Done
+### 12. Done
 
 Your work is complete when:
 - The PR is merged into `main`.
