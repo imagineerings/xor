@@ -1,7 +1,7 @@
 mod action_required_manager;
 mod builtin_extensions;
 mod db;
-pub mod execution_manager;
+mod execution_manager;
 mod extension_malware_check;
 mod hints;
 mod hooks;
@@ -13,7 +13,8 @@ mod pattern_extraction;
 mod platform_extensions;
 mod sandboxing;
 mod snapshot;
-pub mod source_roots;
+mod source_roots;
+mod sources;
 mod templates;
 #[cfg(test)]
 mod tests;
@@ -36,6 +37,8 @@ pub use pattern_extraction::*;
 pub use platform_extensions::*;
 pub use shell_command_parser::extract_commands;
 pub use snapshot::*;
+pub use source_roots::*;
+pub use sources::*;
 pub use templates::*;
 pub use thread::*;
 pub use thread_store::*;

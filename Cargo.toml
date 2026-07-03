@@ -85,7 +85,8 @@ members = [
     "crates/fs_benchmarks",
     "crates/fuzzy",
     "crates/fuzzy_nucleo",
-    "crates/git",
+        "crates/gateway",
+        "crates/git",
     "crates/git_hosting_providers",
     "crates/git_ui",
     "crates/go_to_line",
@@ -346,6 +347,7 @@ file_icons = { path = "crates/file_icons" }
 fs = { path = "crates/fs" }
 fuzzy = { path = "crates/fuzzy" }
 fuzzy_nucleo = { path = "crates/fuzzy_nucleo" }
+gateway = { path = "crates/gateway" }
 git = { path = "crates/git" }
 git_hosting_providers = { path = "crates/git_hosting_providers" }
 git_ui = { path = "crates/git_ui" }
@@ -566,7 +568,7 @@ chardetng = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 ciborium = "0.2"
 circular-buffer = "1.0"
-clap = { version = "4.4", features = ["derive", "wrap_help"] }
+clap = { version = "4.4", features = ["derive", "env", "wrap_help"] }
 cocoa = "=0.26.0"
 cocoa-foundation = "=0.2.0"
 const_format = "0.2"

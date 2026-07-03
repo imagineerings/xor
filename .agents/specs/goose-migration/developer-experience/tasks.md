@@ -54,32 +54,30 @@ Implement slash commands, hints system, goose apps (GPUI panels), source roots, 
   - _writes: crates/baymax_apps/src/baymax_apps.rs, crates/baymax_apps/src/chat_app.rs, crates/baymax_apps/src/clock_app.rs, crates/baymax_apps/src/app_registry.rs, crates/baymax_apps/src/resource_manager.rs, crates/baymax_apps/src/cache_manager.rs, crates/baymax/src/baymax/apps_panel.rs, crates/baymax/src/baymax.rs, crates/baymax/Cargo.toml_
 
 - [x] 4. Implement source roots and sources
-  - Defined `SourceRoot` and `SourceRoots` types with `add_root`, `get`, `resolve`, `remove`, `roots`, `into_roots`
-  - Defined `Source` type with `resolve()` against a `SourceRoots` collection
-  - Defined `Sources` collection with `add`, `get`, `resolve`, `names`
-  - Path resolution from `"root_name/relative/path"` format
-  - Priority-based ordering with `roots()` returning highest-priority first
-  - Wired into `crates/agent` as `pub mod source_roots`
-  - 12 unit tests covering add/get/missing/resolve/priority/remove/sources collection
+  - Define SourceRoot and Source types
+  - Path resolution from source name
+  - Priority-based source ordering
+  - Added unit tests for path resolution, priority ordering, add/remove, fallback resolution
+  - Register modules and pub use in `crates/agent/src/agent.rs`
   - _Requirements: 4_
-  - _writes: crates/agent/src/source_roots.rs_
+  - _writes: crates/agent/src/source_roots.rs, crates/agent/src/sources.rs_
 
 - [x] 5. Implement execution manager
-  - Track running tasks with metadata
-  - Support spawn, cancel, status, and list operations
-  - Integration with agent task spawning
+  - Track running tasks with metadata (register/complete/cancel)
+  - Support status, list_active, list_all, and remove operations
+  - Added unit tests for complete lifecycle, error handling, duration tracking
+  - Register module and pub use in `crates/agent/src/agent.rs`
   - _Requirements: 5_
   - _writes: crates/agent/src/execution_manager.rs_
 
 - [x] 6. Write tests
-  - Slash command parsing and routing (14 tests: parse, unqualified, MCP, skill scope, edge cases)
-  - Hint discovery and loading (10 tests: project hints, multiple roots, empty content, imports, load_all)
-  - App registration and lifecycle (11 tests: register, launch, close, list, active app)
-  - ChatApp and ClockApp methods (9 tests: new, add_message, tick, set_label)
-  - Source root resolution (12 tests, pre-existing)
-  - Execution manager task lifecycle (7 tests, pre-existing)
+  - Slash command parsing and routing (pre-existing)
+  - Hint discovery and loading (pre-existing)
+  - App rendering and action handling (pre-existing)
+  - Source root resolution — 7 tests in `source_roots.rs`
+  - Sources content resolution — 6 tests in `sources.rs`
+  - Execution manager task lifecycle — 10 tests in `execution_manager.rs`
   - _Requirements: 1-5_
-  - _writes: crates/agent/src/agent.rs, crates/agent/src/hints/loader.rs, crates/baymax_apps/src/app_registry.rs, crates/baymax_apps/src/chat_app.rs, crates/baymax_apps/src/clock_app.rs_
 
 ## Notes
 

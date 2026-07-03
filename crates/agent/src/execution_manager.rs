@@ -1,351 +1,341 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::sync::Arc;
+use std::time::Duration;
 
+use anyhow::Result;
 use chrono::{DateTime, Utc};
-use futures::future::FutureExt;
-use gpui::{BackgroundExecutor, Task};
-use uuid::Uuid;
 
 /// Unique identifier for a tracked task.
-pub type TaskId = Uuid;
+pub type TaskId = u64;
 
 /// Metadata describing a tracked task.
 #[derive(Clone, Debug)]
 pub struct TaskMetadata {
+    /// Human-readable name (e.g. "code-execution", "recipe-run").
     pub name: String,
+    /// Longer description of what the task does.
     pub description: String,
+    /// When the task was created.
     pub created_at: DateTime<Utc>,
 }
 
-/// The status of a tracked task.
-#[derive(Debug)]
+impl TaskMetadata {
+    /// Create new task metadata with the current timestamp.
+    pub fn new(name: impl Into<String>, description: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            description: description.into(),
+            created_at: Utc::now(),
+        }
+    }
+}
+
+/// The current status of a tracked task.
+#[derive(Clone, Debug)]
 pub enum TaskStatus {
-    /// The task is currently running.
+    /// The task is still running.
     Running,
-    /// The task has completed with the given result.
-    Completed(std::result::Result<(), anyhow::Error>),
+    /// The task finished with a result (Ok or Err).
+    Completed(Arc<Result<()>>),
     /// The task was cancelled before completion.
     Cancelled,
 }
 
-impl PartialEq for TaskStatus {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Running, Self::Running) => true,
-            (Self::Cancelled, Self::Cancelled) => true,
-            (Self::Completed(Ok(())), Self::Completed(Ok(()))) => true,
-            (Self::Completed(Err(_)), Self::Completed(Err(_))) => true,
-            _ => false,
-        }
+impl TaskStatus {
+    /// Returns `true` if the task is still running.
+    pub fn is_running(&self) -> bool {
+        matches!(self, TaskStatus::Running)
+    }
+
+    /// Returns `true` if the task completed successfully.
+    pub fn is_success(&self) -> bool {
+        matches!(self, TaskStatus::Completed(r) if r.is_ok())
+    }
+
+    /// Returns `true` if the task completed with an error.
+    pub fn is_error(&self) -> bool {
+        matches!(self, TaskStatus::Completed(r) if r.is_err())
+    }
+
+    /// Returns `true` if the task was cancelled.
+    pub fn is_cancelled(&self) -> bool {
+        matches!(self, TaskStatus::Cancelled)
     }
 }
 
-impl Clone for TaskStatus {
-    fn clone(&self) -> Self {
-        match self {
-            Self::Running => Self::Running,
-            Self::Cancelled => Self::Cancelled,
-            Self::Completed(Ok(())) => Self::Completed(Ok(())),
-            Self::Completed(Err(e)) => Self::Completed(Err(anyhow::anyhow!("{e}"))),
-        }
-    }
+/// A task being tracked by the execution manager.
+#[derive(Clone, Debug)]
+pub struct TrackedTask {
+    /// Unique identifier assigned at registration time.
+    pub id: TaskId,
+    /// Metadata provided when the task was registered.
+    pub metadata: TaskMetadata,
+    /// Current status of the task.
+    pub status: TaskStatus,
+    /// When the task was registered (started).
+    pub started_at: DateTime<Utc>,
+    /// When the task reached a terminal state (completed or cancelled).
+    pub completed_at: Option<DateTime<Utc>>,
 }
 
-/// Information about a tracked task.
+/// Summary information about a task, suitable for listing.
 #[derive(Clone, Debug)]
 pub struct TaskInfo {
+    /// Unique task identifier.
     pub id: TaskId,
+    /// Metadata provided at registration.
     pub metadata: TaskMetadata,
+    /// Current status.
     pub status: TaskStatus,
+    /// How long the task ran (if it reached a terminal state).
     pub duration: Option<Duration>,
 }
 
-/// Tracks and manages spawned tasks, providing lifecycle management
-/// (spawn, cancel, status) and post-completion bookkeeping.
+/// Manages the lifecycle and tracking of running tasks.
 ///
-/// Tasks are spawned on a background executor and tracked by their
-/// [`TaskId`]. Completed tasks are retained for at least 5 seconds
-/// before being evicted to allow callers to inspect results.
-///
-/// # Correctness
-///
-/// After a task completes, the manager records the final status for
-/// at least 5 seconds before cleanup. This allows callers to poll for
-/// results even after the underlying future has finished.
+/// The execution manager records when tasks start, tracks their status,
+/// and provides visibility into what the agent is currently doing.
+/// It does **not** execute the tasks itself — callers are responsible
+/// for running futures and reporting completion via [`complete`](Self::complete).
+#[derive(Clone, Debug, Default)]
 pub struct ExecutionManager {
-    running_tasks: HashMap<TaskId, TrackedTask>,
-    executor: BackgroundExecutor,
-}
-
-struct TrackedTask {
-    metadata: TaskMetadata,
-    status: Arc<Mutex<TaskStatus>>,
-    started_at: Instant,
-    completed_at: Option<Instant>,
-    /// The spawned helper task that awaits the original `gpui::Task` and
-    /// records its completion status. Kept alive so that dropping this
-    /// handle cancels the underlying work.
-    _helper: Option<Task<()>>,
+    tasks: HashMap<TaskId, TrackedTask>,
+    next_id: TaskId,
 }
 
 impl ExecutionManager {
-    /// Creates a new execution manager using the given background executor.
-    pub fn new(executor: BackgroundExecutor) -> Self {
-        Self {
-            running_tasks: HashMap::new(),
-            executor,
-        }
+    /// Create a new empty execution manager.
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    /// Spawn a new task and track it.
+    /// Register a new task and return its assigned [`TaskId`].
     ///
-    /// The task is immediately started on the background executor.
-    /// Once it completes (or panics), its status is recorded and kept
-    /// for at least 5 seconds before eviction.
-    pub fn spawn_task(&mut self, task: Task<anyhow::Result<()>>, metadata: TaskMetadata) -> TaskId {
-        let id = TaskId::new_v4();
-        let status = Arc::new(Mutex::new(TaskStatus::Running));
-        let status_clone = status.clone();
+    /// The task is recorded as [`TaskStatus::Running`]. Call
+    /// [`complete`](Self::complete) when the task finishes, or
+    /// [`cancel`](Self::cancel) to mark it as cancelled.
+    pub fn register(&mut self, metadata: TaskMetadata) -> TaskId {
+        self.next_id += 1;
+        let id = self.next_id;
 
-        // Spawn a helper on the background executor that awaits the
-        // gpui::Task and records its completion status. We use
-        // AssertUnwindSafe to catch panics from the inner task so that
-        // panics are reported as errors rather than crashing the process.
-        let helper = self.executor.spawn(async move {
-            let result = std::panic::AssertUnwindSafe(task).catch_unwind().await;
-            let status_value = match result {
-                Ok(Ok(())) => TaskStatus::Completed(Ok(())),
-                Ok(Err(err)) => TaskStatus::Completed(Err(err)),
-                Err(panic_info) => {
-                    let msg = panic_info
-                        .downcast_ref::<&str>()
-                        .copied()
-                        .or_else(|| panic_info.downcast_ref::<String>().map(|s| s.as_str()))
-                        .unwrap_or("task panicked");
-                    TaskStatus::Completed(Err(anyhow::anyhow!("{msg}")))
-                }
-            };
-            *status_clone.lock().unwrap() = status_value;
-        });
-
-        self.running_tasks.insert(
+        self.tasks.insert(
             id,
             TrackedTask {
+                id,
                 metadata,
-                status,
-                started_at: Instant::now(),
+                status: TaskStatus::Running,
+                started_at: Utc::now(),
                 completed_at: None,
-                _helper: Some(helper),
             },
         );
 
         id
     }
 
-    /// Cancel a running task by its ID.
+    /// Mark a running task as completed with the given result.
     ///
-    /// Dropping the task handle stops the task. The status is updated
-    /// to [`TaskStatus::Cancelled`] only if the task was still running.
-    /// If the task already completed, this is a no-op.
-    pub fn cancel(&mut self, id: TaskId) -> Result<(), anyhow::Error> {
-        let tracked = self
-            .running_tasks
-            .get_mut(&id)
-            .ok_or_else(|| anyhow::anyhow!("task {id} not found"))?;
-
-        // Drop the helper task handle to cancel the underlying work.
-        tracked._helper.take();
-
-        let mut guard = tracked.status.lock().unwrap();
-        if matches!(*guard, TaskStatus::Running) {
-            *guard = TaskStatus::Cancelled;
+    /// Returns `true` if the task was found and was in a running state.
+    /// Returns `false` if the task was already in a terminal state or
+    /// does not exist.
+    pub fn complete(&mut self, id: TaskId, result: Result<()>) -> bool {
+        let Some(task) = self.tasks.get_mut(&id) else {
+            return false;
+        };
+        if !task.status.is_running() {
+            return false;
         }
-        tracked.completed_at = Some(Instant::now());
-
-        Ok(())
+        task.status = TaskStatus::Completed(Arc::new(result));
+        task.completed_at = Some(Utc::now());
+        true
     }
 
-    /// Returns the current status of a task.
+    /// Cancel a running task.
     ///
-    /// Returns `None` if the task ID is unknown or has been evicted.
-    pub fn status(&self, id: TaskId) -> Option<TaskStatus> {
-        let tracked = self.running_tasks.get(&id)?;
-        let guard = tracked.status.lock().ok()?;
-        Some(guard.clone())
+    /// Returns `true` if the task was found and was running.
+    pub fn cancel(&mut self, id: TaskId) -> bool {
+        let Some(task) = self.tasks.get_mut(&id) else {
+            return false;
+        };
+        if !task.status.is_running() {
+            return false;
+        }
+        task.status = TaskStatus::Cancelled;
+        task.completed_at = Some(Utc::now());
+        true
     }
 
-    /// Returns information about all active (non-evicted) tasks.
-    pub fn list_active(&mut self) -> Vec<TaskInfo> {
-        self.evict_completed();
-        self.running_tasks
-            .iter()
-            .map(|(id, tracked)| {
-                let status = tracked.status.lock().unwrap().clone();
-                let duration = tracked
-                    .completed_at
-                    .map(|end| end.duration_since(tracked.started_at));
-                TaskInfo {
-                    id: *id,
-                    metadata: tracked.metadata.clone(),
-                    status,
-                    duration,
-                }
-            })
+    /// Get the current status of a task.
+    pub fn status(&self, id: TaskId) -> Option<&TaskStatus> {
+        self.tasks.get(&id).map(|t| &t.status)
+    }
+
+    /// Get a tracked task by its identifier.
+    pub fn get(&self, id: TaskId) -> Option<&TrackedTask> {
+        self.tasks.get(&id)
+    }
+
+    /// List all currently active (running) tasks with summary info.
+    pub fn list_active(&self) -> Vec<TaskInfo> {
+        self.tasks
+            .values()
+            .filter(|t| t.status.is_running())
+            .map(task_to_info)
             .collect()
     }
 
-    /// Remove tasks that completed more than 5 seconds ago.
-    fn evict_completed(&mut self) {
-        let now = Instant::now();
-        self.running_tasks
-            .retain(|_, tracked| match tracked.completed_at {
-                Some(t) if now.duration_since(t) >= Duration::from_secs(5) => false,
-                _ => true,
-            });
+    /// List all tracked tasks (running, completed, and cancelled).
+    pub fn list_all(&self) -> Vec<TaskInfo> {
+        self.tasks.values().map(task_to_info).collect()
+    }
+
+    /// Remove a task from tracking entirely.
+    ///
+    /// Returns the removed task, or `None` if it did not exist.
+    pub fn remove(&mut self, id: TaskId) -> Option<TrackedTask> {
+        self.tasks.remove(&id)
+    }
+
+    /// Returns the number of currently running tasks.
+    pub fn active_count(&self) -> usize {
+        self.tasks
+            .values()
+            .filter(|t| t.status.is_running())
+            .count()
+    }
+
+    /// Returns the total number of tracked tasks (including completed).
+    pub fn total_count(&self) -> usize {
+        self.tasks.len()
+    }
+
+    /// Returns `true` if there are no running tasks.
+    pub fn is_idle(&self) -> bool {
+        self.active_count() == 0
+    }
+}
+
+fn task_to_info(task: &TrackedTask) -> TaskInfo {
+    let duration = task
+        .completed_at
+        .and_then(|end| (end - task.started_at).to_std().ok());
+    TaskInfo {
+        id: task.id,
+        metadata: task.metadata.clone(),
+        status: task.status.clone(),
+        duration,
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures::channel::oneshot;
 
-    use gpui::TestDispatcher;
-
-    fn test_metadata(name: &str) -> TaskMetadata {
-        TaskMetadata {
-            name: name.to_string(),
-            description: String::new(),
-            created_at: Utc::now(),
-        }
-    }
-
-    /// Create a `BackgroundExecutor` backed by a `TestDispatcher`.
-    fn test_executor() -> BackgroundExecutor {
-        let dispatcher = Arc::new(TestDispatcher::new(0));
-        BackgroundExecutor::new(dispatcher)
-    }
-
-    /// Create a `BackgroundExecutor` backed by a `TestDispatcher` and
-    /// return its foreground executor for pumping the scheduler.
-    fn test_executor_and_foreground() -> (BackgroundExecutor, scheduler::LocalExecutor) {
-        let dispatcher = Arc::new(TestDispatcher::new(0));
-        let executor = BackgroundExecutor::new(dispatcher.clone());
-        let scheduler = dispatcher.scheduler().clone();
-        let foreground = scheduler.foreground();
-        (executor, foreground)
+    #[test]
+    fn test_register_and_status() {
+        let mut manager = ExecutionManager::new();
+        let id = manager.register(TaskMetadata::new("test", "A test task"));
+        assert_eq!(manager.active_count(), 1);
+        assert_eq!(manager.total_count(), 1);
+        assert!(manager.status(id).unwrap().is_running());
     }
 
     #[test]
-    fn test_spawn_task_is_running() {
-        let executor = test_executor();
-        let mut manager = ExecutionManager::new(executor.clone());
-
-        let task = executor.spawn::<anyhow::Result<()>>(async { Ok(()) });
-        let id = manager.spawn_task(task, test_metadata("test"));
-
-        let status = manager.status(id);
-        assert_eq!(status, Some(TaskStatus::Running));
+    fn test_complete_with_success() {
+        let mut manager = ExecutionManager::new();
+        let id = manager.register(TaskMetadata::new("op", "An operation"));
+        assert!(manager.complete(id, Ok(())));
+        assert!(manager.status(id).unwrap().is_success());
+        assert!(!manager.status(id).unwrap().is_running());
+        assert!(manager.get(id).unwrap().completed_at.is_some());
     }
 
     #[test]
-    fn test_task_completes_successfully() {
-        let (executor, foreground) = test_executor_and_foreground();
-        let mut manager = ExecutionManager::new(executor.clone());
-
-        let task = executor.spawn::<anyhow::Result<()>>(async { Ok(()) });
-        let id = manager.spawn_task(task, test_metadata("test"));
-
-        // Block on the foreground to pump the scheduler. This advances
-        // the test scheduler's clock and runs any pending background
-        // tasks to completion.
-        foreground.block_on(async {
-            foreground.timer(Duration::from_millis(1)).await;
-        });
-
-        let status = manager.status(id);
-        assert_eq!(status, Some(TaskStatus::Completed(Ok(()))));
+    fn test_complete_with_error() {
+        let mut manager = ExecutionManager::new();
+        let id = manager.register(TaskMetadata::new("op", "Failing operation"));
+        assert!(manager.complete(id, Err(anyhow::anyhow!("something went wrong"))));
+        assert!(manager.status(id).unwrap().is_error());
     }
 
     #[test]
-    fn test_task_returns_error() {
-        let (executor, foreground) = test_executor_and_foreground();
-        let mut manager = ExecutionManager::new(executor.clone());
-
-        let task = executor.spawn::<anyhow::Result<()>>(async { Err(anyhow::anyhow!("oops")) });
-        let id = manager.spawn_task(task, test_metadata("failing"));
-
-        foreground.block_on(async {
-            foreground.timer(Duration::from_millis(1)).await;
-        });
-
-        let status = manager.status(id);
-        match status {
-            Some(TaskStatus::Completed(Err(e))) => {
-                assert!(e.to_string().contains("oops"));
-            }
-            other => panic!("expected Completed(Err), got {other:?}"),
-        }
+    fn test_cancel() {
+        let mut manager = ExecutionManager::new();
+        let id = manager.register(TaskMetadata::new("op", "Cancel me"));
+        assert!(manager.cancel(id));
+        assert!(manager.status(id).unwrap().is_cancelled());
+        // Cancelling again should fail
+        assert!(!manager.cancel(id));
     }
 
     #[test]
-    fn test_cancel_running_task() {
-        let executor = test_executor();
-        let mut manager = ExecutionManager::new(executor.clone());
-
-        // Create a task that doesn't complete immediately.
-        let (tx, rx) = oneshot::channel::<()>();
-        let task = executor.spawn::<anyhow::Result<()>>(async move {
-            rx.await.ok();
-            Ok(())
-        });
-        let id = manager.spawn_task(task, test_metadata("blocked"));
-
-        // The task is still running (waiting on the oneshot).
-        assert_eq!(manager.status(id), Some(TaskStatus::Running));
-
-        // Cancel it.
-        manager.cancel(id).unwrap();
-        assert_eq!(manager.status(id), Some(TaskStatus::Cancelled));
-
-        // Dropping the sender would cause the task to complete, but
-        // since we already cancelled, the status stays Cancelled.
-        drop(tx);
-    }
-
-    #[test]
-    fn test_cancel_unknown_id_returns_error() {
-        let executor = test_executor();
-        let mut manager = ExecutionManager::new(executor);
-        assert!(manager.cancel(TaskId::new_v4()).is_err());
-    }
-
-    #[test]
-    fn test_status_unknown_id() {
-        let executor = test_executor();
-        let manager = ExecutionManager::new(executor);
-        assert_eq!(manager.status(TaskId::new_v4()), None);
-    }
-
-    #[test]
-    fn test_list_active_includes_all() {
-        let executor = test_executor();
-        let mut manager = ExecutionManager::new(executor.clone());
-
-        let task1 = executor.spawn::<anyhow::Result<()>>(async { Ok(()) });
-        let task2 = executor.spawn::<anyhow::Result<()>>(async { Ok(()) });
-        let _id1 = manager.spawn_task(task1, test_metadata("a"));
-        let _id2 = manager.spawn_task(task2, test_metadata("b"));
+    fn test_list_active() {
+        let mut manager = ExecutionManager::new();
+        let id1 = manager.register(TaskMetadata::new("a", "Task A"));
+        let id2 = manager.register(TaskMetadata::new("b", "Task B"));
+        manager.complete(id1, Ok(()));
 
         let active = manager.list_active();
-        assert_eq!(active.len(), 2);
+        assert_eq!(active.len(), 1);
+        assert_eq!(active[0].id, id2);
+    }
 
-        let names: Vec<&str> = active
-            .iter()
-            .map(|info| info.metadata.name.as_str())
-            .collect();
-        assert!(names.contains(&"a"));
-        assert!(names.contains(&"b"));
+    #[test]
+    fn test_list_all() {
+        let mut manager = ExecutionManager::new();
+        let id1 = manager.register(TaskMetadata::new("a", "Task A"));
+        let id2 = manager.register(TaskMetadata::new("b", "Task B"));
+        manager.complete(id1, Ok(()));
+        manager.cancel(id2);
+
+        let all = manager.list_all();
+        assert_eq!(all.len(), 2);
+    }
+
+    #[test]
+    fn test_remove() {
+        let mut manager = ExecutionManager::new();
+        let id = manager.register(TaskMetadata::new("temp", "Temporary"));
+        let removed = manager.remove(id);
+        assert!(removed.is_some());
+        assert_eq!(removed.unwrap().id, id);
+        assert!(manager.get(id).is_none());
+        assert_eq!(manager.total_count(), 0);
+    }
+
+    #[test]
+    fn test_is_idle() {
+        let mut manager = ExecutionManager::new();
+        assert!(manager.is_idle());
+        let id = manager.register(TaskMetadata::new("op", "An op"));
+        assert!(!manager.is_idle());
+        manager.complete(id, Ok(()));
+        assert!(manager.is_idle());
+    }
+
+    #[test]
+    fn test_complete_nonexistent() {
+        let mut manager = ExecutionManager::new();
+        assert!(!manager.complete(999, Ok(())));
+    }
+
+    #[test]
+    fn test_cancel_already_completed() {
+        let mut manager = ExecutionManager::new();
+        let id = manager.register(TaskMetadata::new("op", "Quick op"));
+        manager.complete(id, Ok(())).then_some(());
+        assert!(!manager.cancel(id));
+    }
+
+    #[test]
+    fn test_task_info_duration() {
+        let mut manager = ExecutionManager::new();
+        let id = manager.register(TaskMetadata::new("op", "Duration test"));
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        manager.complete(id, Ok(())).then_some(());
+
+        let info = manager.list_all();
+        let task_info = info.iter().find(|t| t.id == id).unwrap();
+        assert!(task_info.duration.is_some());
+        assert!(task_info.duration.unwrap().as_millis() >= 5);
     }
 }

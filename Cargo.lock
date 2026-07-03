@@ -2233,6 +2233,7 @@ dependencies = [
  "file_finder",
  "fs",
  "futures 0.3.32",
+ "gateway",
  "git",
  "git_hosting_providers",
  "git_ui",
@@ -3451,6 +3452,7 @@ dependencies = [
  "dialoguer",
  "exec",
  "fork",
+ "gateway",
  "ipc-channel",
  "parking_lot",
  "paths",
@@ -7450,6 +7452,25 @@ dependencies = [
  "siphasher",
  "smallvec 2.0.0-alpha.12",
  "triomphe",
+]
+
+[[package]]
+name = "gateway"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "futures 0.3.32",
+ "gpui",
+ "log",
+ "pulldown-cmark 0.13.4",
+ "serde",
+ "serde_json",
+ "smol",
+ "tempfile",
+ "thiserror 2.0.18",
+ "uuid",
+ "zed-reqwest",
 ]
 
 [[package]]

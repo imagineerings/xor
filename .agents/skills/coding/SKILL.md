@@ -37,6 +37,24 @@ guide.
 - **Explicit approval** — Get user approval after each document
 - **One task at a time** — During execution, focus on single task
 - **Correctness mandatory** — Every design MUST include properties from EARS
+- **Consistency gates mandatory** — Run a quick consistency check before
+  executing a task, and a full consistency pass before marking it complete.
+
+## Consistency Gates
+
+Run consistency checks at two points:
+
+1. **Quick start-gate check, before implementation** — Confirm the task is still
+   valid to start. Check prerequisites, dependency wave placement, obvious
+   `_writes:` conflicts, and obvious contradictions between `requirements.md`,
+   `design.md`, and `tasks.md`. If the task is blocked or contradictory, update
+   the spec or ask for clarification before coding.
+2. **Full completion-gate pass, after validation but before marking complete** —
+   Tighten gates based on the actual validation performed, update dependency
+   waves for remaining work, and reconcile all relevant spec documents. Confirm
+   every task reference points to existing requirements, design properties
+   validate those requirements, task reads/writes are accurate, and no document
+   contradicts another. The task may be marked complete only after this pass.
 
 ## Quick Reference
 
