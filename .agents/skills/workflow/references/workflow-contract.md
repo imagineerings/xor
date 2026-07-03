@@ -34,6 +34,24 @@ task text, requirements, write manifests, and likely code ownership. Do not run
 tasks in parallel when they touch the same files, have explicit dependency
 ordering, or require a shared migration/schema step.
 
+## Task Boundary Consistency Gates
+
+Agents must run consistency checks at task boundaries:
+
+1. Quick start-gate check before implementation: confirm the task is still valid
+   to begin, prerequisites and dependency wave placement are sound, `_writes:`
+   manifests do not obviously conflict with parallel work, and the spec pack has
+   no obvious contradiction that blocks the task.
+2. Full completion-gate pass after validation but before completion: tighten
+   start, validation, handoff, and completion gates; update dependency waves for
+   remaining work; and reconcile `requirements.md`, `design.md`, and `tasks.md`
+   so requirement references, design properties, reads/writes, and done
+   conditions match the delivered behavior.
+
+If either gate finds blocking ambiguity, update the spec files or ask for
+clarification before coding or before completing the task. Mark the task
+complete only after the full completion-gate pass.
+
 ## Linear Stage Updates
 
 Use the executable script to move Linear issues between stages:

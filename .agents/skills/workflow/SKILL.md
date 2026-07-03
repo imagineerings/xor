@@ -34,26 +34,44 @@ polling Linear for candidates.
    by non-terminal Linear issues, creates Linear for the first unclaimed task,
    and returns the rendered prompt. If every active task is claimed, report that
    instead of starting work.
-5. Do not launch the UI during ordinary `$workflow` invocation. Launch the UI
+5. Before editing implementation files, run a quick start-gate consistency
+   check for the picked task's spec directory:
+   - Confirm the task is still valid to begin.
+   - Check prerequisites, dependency wave placement, obvious `_writes:`
+     conflicts, and obvious contradictions between `requirements.md`,
+     `design.md`, and `tasks.md`.
+   - If the check reveals blocking ambiguity, update the spec files or ask for
+     clarification before implementation. Do not proceed on a known inconsistent
+     task packet.
+6. Do not launch the UI during ordinary `$workflow` invocation. Launch the UI
    only when the user explicitly asks for a visual/task board mode, such as
    `$workflow ui`, `$workflow begin-ui`, "workflow with UI", or "show workflow
    UI".
-6. When independent tasks can safely run in parallel, execute
+7. When independent tasks can safely run in parallel, execute
    `node .agents/skills/workflow/scripts/workflow.js next --count <n> --json`,
    create one git worktree per returned task, and run one agent per worktree
    from that task's rendered prompt. Use parallel work only when the task write
    manifests, likely files, and dependencies do not overlap in a way that would
    cause conflicting edits.
-7. For explicit task IDs, execute `node .agents/skills/workflow/scripts/workflow.js pick <task-id>`;
+8. For explicit task IDs, execute `node .agents/skills/workflow/scripts/workflow.js pick <task-id>`;
    it resumes the existing Linear issue for that exact task when present
    instead of creating a duplicate.
-8. Work from the rendered prompt in the repository checkout or task-specific
+9. Work from the rendered prompt in the repository checkout or task-specific
    worktree. Do not treat Linear
    as the source of truth for dispatch eligibility in this local workflow.
-9. When work changes phase, update Linear with
+10. When work changes phase, update Linear with
    `node .agents/skills/workflow/scripts/workflow.js move <task-or-linear-id> --state-name <state>`.
-10. When the agent determines the implementation is complete and validation is
-    passing, execute
+11. When the agent determines the implementation is complete and validation is
+    passing, run the full completion-gate consistency pass before marking the
+    task complete:
+    - Tighten start, validation, handoff, and completion gates based on the
+      actual validation performed.
+    - Update dependency waves for remaining work when ordering, prerequisites,
+      or parallel safety changed.
+    - Reconcile `requirements.md`, `design.md`, and `tasks.md` so requirement
+      references, design properties, task reads/writes, and done conditions
+      match the delivered behavior.
+    Then execute
     `node .agents/skills/workflow/scripts/workflow.js complete <task-id>`.
     This moves the linked Linear issue to `Done` by default and updates the
     local task checkbox to `[x]`. Pass `--state-name <state>` when the
