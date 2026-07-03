@@ -1,12 +1,15 @@
+mod config;
 mod manager;
 mod pairing;
 mod telegram;
 mod telegram_format;
 mod types;
 
+pub use config::*;
 pub use manager::*;
 pub use pairing::*;
 pub use telegram::*;
+pub use telegram_format::*;
 pub use types::*;
 
 use anyhow::Result;

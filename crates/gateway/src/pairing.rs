@@ -86,6 +86,11 @@ impl PairingService {
         self.store.len()
     }
 
+    /// Iterate over all pairings (platform_id, baymax_user).
+    pub fn store(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.store.iter().map(|(k, v)| (k.as_str(), v.as_str()))
+    }
+
     // ------------------------------------------------------------------
     // Persistence helpers
     // ------------------------------------------------------------------
