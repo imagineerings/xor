@@ -27,6 +27,7 @@ use walkdir::WalkDir;
 
 use std::io::IsTerminal;
 
+mod commands;
 mod recipe_commands;
 
 const URL_PREFIX: [&'static str; 5] = ["baymax://", "http://", "https://", "file://", "ssh://"];
@@ -499,6 +500,11 @@ fn run() -> Result<()> {
 
     if std::env::args().nth(1).as_deref() == Some("recipe") {
         recipe_commands::run(std::env::args().skip(1))?;
+        return Ok(());
+    }
+
+    if std::env::args().nth(1).as_deref() == Some("gateway") {
+        commands::gateway::run(std::env::args().skip(1))?;
         return Ok(());
     }
 

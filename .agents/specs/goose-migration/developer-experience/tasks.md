@@ -53,26 +53,30 @@ Implement slash commands, hints system, goose apps (GPUI panels), source roots, 
   - _Requirements: 3_
   - _writes: crates/baymax_apps/src/baymax_apps.rs, crates/baymax_apps/src/chat_app.rs, crates/baymax_apps/src/clock_app.rs, crates/baymax_apps/src/app_registry.rs, crates/baymax_apps/src/resource_manager.rs, crates/baymax_apps/src/cache_manager.rs, crates/baymax/src/baymax/apps_panel.rs, crates/baymax/src/baymax.rs, crates/baymax/Cargo.toml_
 
-- [ ] 4. Implement source roots and sources
+- [x] 4. Implement source roots and sources
   - Define SourceRoot and Source types
   - Path resolution from source name
   - Priority-based source ordering
+  - Added unit tests for path resolution, priority ordering, add/remove, fallback resolution
+  - Register modules and pub use in `crates/agent/src/agent.rs`
   - _Requirements: 4_
   - _writes: crates/agent/src/source_roots.rs, crates/agent/src/sources.rs_
 
-- [ ] 5. Implement execution manager
-  - Track running tasks with metadata
-  - Support spawn, cancel, status, and list operations
-  - Integration with agent task spawning
+- [x] 5. Implement execution manager
+  - Track running tasks with metadata (register/complete/cancel)
+  - Support status, list_active, list_all, and remove operations
+  - Added unit tests for complete lifecycle, error handling, duration tracking
+  - Register module and pub use in `crates/agent/src/agent.rs`
   - _Requirements: 5_
   - _writes: crates/agent/src/execution_manager.rs_
 
-- [ ] 6. Write tests
-  - Slash command parsing and routing
-  - Hint discovery and loading
-  - App rendering and action handling
-  - Source root resolution
-  - Execution manager task lifecycle
+- [x] 6. Write tests
+  - Slash command parsing and routing (pre-existing)
+  - Hint discovery and loading (pre-existing)
+  - App rendering and action handling (pre-existing)
+  - Source root resolution — 7 tests in `source_roots.rs`
+  - Sources content resolution — 6 tests in `sources.rs`
+  - Execution manager task lifecycle — 10 tests in `execution_manager.rs`
   - _Requirements: 1-5_
 
 ## Notes
