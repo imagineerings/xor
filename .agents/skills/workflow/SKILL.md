@@ -52,8 +52,12 @@ polling Linear for candidates.
    as the source of truth for dispatch eligibility in this local workflow.
 9. When work changes phase, update Linear with
    `node .agents/skills/workflow/scripts/workflow.js move <task-or-linear-id> --state-name <state>`.
-   Also update the local task checkbox when the implementation is complete and
-   the workflow asks for that status change.
+10. When the agent determines the implementation is complete and validation is
+    passing, execute
+    `node .agents/skills/workflow/scripts/workflow.js complete <task-id>`.
+    This moves the linked Linear issue to `Done` by default and updates the
+    local task checkbox to `[x]`. Pass `--state-name <state>` when the
+    repository uses a non-`Done` terminal or review state.
 
 ## Executable Script
 
@@ -73,6 +77,9 @@ Commands:
 - `pick <task-id>` — render a selected task and create or resume Linear.
 - `move <task-or-linear-id> --state-name <state>` — move a Linear issue from
   one workflow stage to another.
+- `complete <task-id> --state-name <state>` — after the agent verifies the task
+  works correctly, move the linked Linear issue and mark the local task
+  checkbox complete. Defaults to `--state-name Done`.
 - `ui` — opt-in visual mode; launch the local workflow task board with active
   task data, without claiming work by default.
 - `begin-ui` — opt-in begin-and-visualize mode; begin the next task and launch
@@ -149,7 +156,7 @@ node .agents/skills/workflow/scripts/workflow.js next --count 4 --json > /tmp/wo
 
 The UI groups tasks by local task state, Linear-linked state, reserved batch
 state, and done state. It also shows requirements, writes manifests, task
-packets, Linear URLs, and copyable stage-move commands.
+packets, Linear URLs, and copyable stage-move and completion commands.
 
 `WORKFLOW.md` front matter may provide equivalent values under `tracker`:
 

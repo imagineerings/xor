@@ -933,6 +933,71 @@ async function resolveLinearStateId(settings, stateName) {
   return state.id;
 }
 
+async function completeTask(settings, args) {
+  const taskId = args.task_id || args.issue || args.issue_id;
+  if (!taskId) {
+    throw new Error("Missing task identifier. Pass complete <task-id>.");
+  }
+
+  const task = findTask(settings, taskId);
+  let linear = null;
+  if (!args.local_only) {
+    linear = await moveLinearIssue(settings, {
+      ...args,
+      issue: task.id,
+      state_name: args.state_name || args.state || "Done",
+    });
+  }
+
+  const local = args.no_local
+    ? { updated: false, reason: "Local checkbox update skipped by --no-local." }
+    : updateLocalTaskCheckbox(settings, task, "Done");
+
+  return {
+    action: "completed",
+    task: findTask(settings, task.id),
+    local,
+    linear,
+  };
+}
+
+function updateLocalTaskCheckbox(settings, task, stateName) {
+  const root = repositoryRoot(settings);
+  const filePath = path.resolve(root, task.task_file);
+  const text = fs.readFileSync(filePath, "utf8");
+  const newline = text.includes("\r\n") ? "\r\n" : "\n";
+  const lines = text.split(/\r?\n/);
+  const lineIndex = task.task_line - 1;
+  const line = lines[lineIndex];
+  if (line === undefined) {
+    throw new Error(`Task source line not found: ${task.identifier}`);
+  }
+
+  const marker = localMarkerForState(stateName);
+  const updatedLine = line.replace(/^- \[[ xX~-]\]/, `- [${marker}]`);
+  if (updatedLine === line) {
+    throw new Error(`Task source line is not a top-level checkbox: ${task.identifier}`);
+  }
+
+  lines[lineIndex] = updatedLine;
+  fs.writeFileSync(filePath, lines.join(newline), "utf8");
+  return {
+    updated: true,
+    state: stateName,
+    task_file: task.task_file,
+    task_line: task.task_line,
+    before: line,
+    after: updatedLine,
+  };
+}
+
+function localMarkerForState(stateName) {
+  const normalized = String(stateName || "").toLowerCase();
+  if (["done", "closed", "complete", "completed"].includes(normalized)) return "x";
+  if (["todo", "backlog", "open"].includes(normalized)) return " ";
+  return "~";
+}
+
 async function callTool(name, args) {
   const settings = parseSettings();
   if (name === "workflow_launch_ui") {
@@ -998,6 +1063,10 @@ async function callTool(name, args) {
 
   if (name === "workflow_move_linear") {
     return moveLinearIssue(settings, args);
+  }
+
+  if (name === "workflow_complete_task") {
+    return completeTask(settings, args);
   }
 
   throw new Error(`Unknown tool: ${name}`);
@@ -1259,6 +1328,11 @@ async function runCli(argv) {
       ...args,
       issue: args.issue || args.issue_id || args.task_id || positional[0],
     });
+  } else if (command === "complete") {
+    result = await callTool("workflow_complete_task", {
+      ...args,
+      task_id: args.task_id || args.issue || args.issue_id || positional[0],
+    });
   } else if (command === "list") {
     result = await callTool("workflow_list_tasks", args);
   } else if (command === "pick") {
@@ -1305,6 +1379,17 @@ function formatCliResult(command, result) {
       `Issue: ${result.issue.identifier}`,
       `State: ${result.issue.state}`,
       `URL: ${result.issue.url}`,
+      "",
+    ].join("\n");
+  }
+
+  if (command === "complete") {
+    return [
+      `Action: ${result.action}`,
+      `Task: ${result.task.title}`,
+      `Source: ${result.task.identifier}`,
+      `Local: ${result.local.updated ? result.local.state : result.local.reason}`,
+      result.linear ? `Linear: ${result.linear.issue.identifier} ${result.linear.issue.state}` : "Linear: skipped",
       "",
     ].join("\n");
   }
@@ -1372,6 +1457,7 @@ function usage() {
     "  pick <task-id>       Pick or resume a specific task",
     "  render <task-id>     Render a prompt for a specific task",
     "  move <id>            Move a Linear issue or task's issue to another state",
+    "  complete <task-id>   Mark a validated task complete locally and in Linear",
     "  ui                   Open the populated local workflow task board",
     "  begin-ui             Opt-in mode: begin work and open the task board",
     "  validate             Validate WORKFLOW.md",
@@ -1383,6 +1469,8 @@ function usage() {
     "  --attempt <n>        Render with an attempt number",
     "  --state-name <name>  Target Linear state for move",
     "  --state-id <id>      Target Linear state ID for move",
+    "  --local-only         Complete only the local task checkbox",
+    "  --no-local           Move Linear without editing the local task checkbox",
     "  --data <source>      UI data source: list, next, pick, or none",
     "  --host <host>        Host for the local UI server",
     "  --port <port>        Port for the local UI server",
@@ -1404,6 +1492,7 @@ module.exports = {
   callTool,
   findTaskFiles,
   buildUiPayload,
+  completeTask,
   launchWorkflowUi,
   listTasks,
   parseTaskFile,

@@ -594,10 +594,14 @@
       }
 
       const moveCommand = `node .agents/skills/workflow/scripts/workflow.js move ${task.id} --state-name "In Progress"`;
+      const completeCommand = `node .agents/skills/workflow/scripts/workflow.js complete ${task.id} --state-name "Done"`;
       elements.detail.innerHTML = `
         <div class="row between">
           <h2>${escapeHtml(task.title)}</h2>
-          <button class="secondary" data-copy="${escapeHtml(moveCommand)}">Copy move command</button>
+          <div class="row">
+            <button class="secondary" data-copy="${escapeHtml(moveCommand)}">Copy move command</button>
+            <button class="secondary" data-copy="${escapeHtml(completeCommand)}">Copy complete command</button>
+          </div>
         </div>
         <div class="pills">
           <span class="pill">${escapeHtml(task.state)}</span>

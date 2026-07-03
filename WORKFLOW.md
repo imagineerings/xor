@@ -200,20 +200,20 @@ address failures, and squash-merge the PR.
 
 ### 9. Update Status
 
-When the task is complete, update the local task checkbox and move the Linear
-issue to the workflow's review or terminal state only when the user or
-repository workflow asks for those status changes.
+When the task is implemented, validated, and working correctly, complete the
+workflow task. This updates the local task checkbox and moves the linked Linear
+issue to the workflow's terminal or handoff state.
 
-Use the workflow script for Linear stage moves:
+Use the workflow script:
 
 ```bash
-node .agents/skills/workflow/scripts/workflow.js move {{ issue.id }} --state-name "<target state>"
+node .agents/skills/workflow/scripts/workflow.js complete {{ issue.id }} --state-name "Done"
 ```
 
 ### 10. Done
 
 Your work is complete when:
 - The PR is merged into `main`.
-- The local task is checked off when appropriate.
+- The local task is checked off.
 - The Linear issue reflects the handoff or terminal status.
 - Spec documentation is synced if behavior changed.

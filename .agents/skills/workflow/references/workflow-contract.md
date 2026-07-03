@@ -48,6 +48,21 @@ Linear issue identifier, Linear issue ID, or Linear issue URL. Pass
 pass `--state-name` and the script resolves the state in the configured Linear
 team.
 
+## Completion Updates
+
+When an agent determines a task is implemented, validated, and working
+correctly, it should complete the workflow task with:
+
+```bash
+node .agents/skills/workflow/scripts/workflow.js complete <task-id>
+```
+
+`complete` defaults to moving the linked Linear issue to `Done` and updating the
+source `tasks.md` checkbox to `[x]`. Pass `--state-name <state>` when the Linear
+workflow uses another terminal or handoff state. Pass `--local-only` only when
+Linear is intentionally unavailable; pass `--no-local` only when the local task
+file should not be edited.
+
 ## Local UI
 
 `assets/ui/index.html` is a task board for visualizing script output. The page
