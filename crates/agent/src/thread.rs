@@ -3534,15 +3534,16 @@ impl Thread {
 
         let error_message = format!("Error parsing input JSON: {json_parse_error}");
 
-        if tool.supports_input_streaming()
-            && let Some(mut sender) = self
+        if tool.supports_input_streaming() {
+            if let Some(mut sender) = self
                 .running_turn
                 .as_mut()?
                 .streaming_tool_inputs
                 .remove(&tool_use.id)
-        {
-            sender.send_invalid_json(error_message);
-            return None;
+            {
+                sender.send_invalid_json(error_message);
+                return None;
+            }
         }
 
         log::debug!("Running tool {}. Received invalid JSON", tool_use.name);
@@ -4281,11 +4282,12 @@ impl Thread {
                 remaining_bytes = bytes;
                 retained_messages.push(request_message);
             } else {
-                if remaining_bytes > 0
-                    && let Some(request_message) =
+                if remaining_bytes > 0 {
+                    if let Some(request_message) =
                         truncate_user_message_to_byte_budget(request_message, remaining_bytes)
-                {
-                    retained_messages.push(request_message);
+                    {
+                        retained_messages.push(request_message);
+                    }
                 }
                 break;
             }
@@ -7221,18 +7223,20 @@ mod tests {
             let event = event.unwrap();
             if let ThreadEvent::ToolCallUpdate(acp_thread::ToolCallUpdate::UpdateFields(update)) =
                 event
-                && let Some(content) = &update.fields.content
-                && content.iter().any(|content| {
-                    matches!(
-                        content,
-                        acp::ToolCallContent::Content(acp::Content {
-                            content: acp::ContentBlock::Image(_),
-                            ..
-                        })
-                    )
-                })
             {
-                tool_use_ids_with_image_content.insert(update.tool_call_id.to_string());
+                if let Some(content) = &update.fields.content {
+                    if content.iter().any(|content| {
+                        matches!(
+                            content,
+                            acp::ToolCallContent::Content(acp::Content {
+                                content: acp::ContentBlock::Image(_),
+                                ..
+                            })
+                        )
+                    }) {
+                        tool_use_ids_with_image_content.insert(update.tool_call_id.to_string());
+                    }
+                }
             }
         }
 

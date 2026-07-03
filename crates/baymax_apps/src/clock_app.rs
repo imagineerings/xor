@@ -58,3 +58,38 @@ impl BaymaxApp for ClockApp {
 
     fn handle_action(&mut self, _action: &dyn gpui::Action, _cx: &mut App) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_clock_app() {
+        let app = ClockApp::new();
+        assert_eq!(app.id(), "clock");
+        assert_eq!(app.name(), SharedString::from("Clock"));
+    }
+
+    #[test]
+    fn test_tick_does_not_panic() {
+        let mut app = ClockApp::new();
+        // Tick should not panic and should update the label.
+        app.tick();
+        // After ticking, the label should still be a non-empty string.
+        assert!(!app.label.is_empty());
+    }
+
+    #[test]
+    fn test_set_label() {
+        let mut app = ClockApp::new();
+        app.set_label("custom-label");
+        assert_eq!(app.label, SharedString::from("custom-label"));
+    }
+
+    #[test]
+    fn test_clock_app_trait_methods() {
+        let app = ClockApp::new();
+        assert_eq!(app.id(), "clock");
+        assert_eq!(app.name(), SharedString::from("Clock"));
+    }
+}

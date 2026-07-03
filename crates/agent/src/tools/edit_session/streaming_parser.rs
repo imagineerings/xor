@@ -108,52 +108,51 @@ impl StreamingParser {
             }
 
             // Process old_text changes.
-            if let Some(old_text) = &partial.old_text
-                && !state.old_text_done
-            {
-                if partial.new_text.is_some() && !state.buffer_new_text_until_old_text_done {
-                    // new_text appeared after old_text, so old_text is done — emit everything.
-                    let start = find_char_boundary(old_text, state.old_text_emitted_len);
-                    let chunk = normalize_done_chunk(old_text[start..].to_string());
-                    state.old_text_done = true;
-                    state.old_text_emitted_len = old_text.len();
-                    events.push(EditEvent::OldTextChunk {
-                        edit_index: index,
-                        chunk,
-                        done: true,
-                    });
-                } else {
-                    let safe_end = safe_emit_end_for_edit_text(old_text);
-                    let safe_start = find_char_boundary(old_text, state.old_text_emitted_len);
-
-                    if safe_end > safe_start {
-                        let chunk = old_text[safe_start..safe_end].to_string();
-                        state.old_text_emitted_len = safe_end;
+            if let Some(old_text) = &partial.old_text {
+                if !state.old_text_done {
+                    if partial.new_text.is_some() && !state.buffer_new_text_until_old_text_done {
+                        // new_text appeared after old_text, so old_text is done — emit everything.
+                        let start = find_char_boundary(old_text, state.old_text_emitted_len);
+                        let chunk = normalize_done_chunk(old_text[start..].to_string());
+                        state.old_text_done = true;
+                        state.old_text_emitted_len = old_text.len();
                         events.push(EditEvent::OldTextChunk {
                             edit_index: index,
                             chunk,
-                            done: false,
+                            done: true,
                         });
+                    } else {
+                        let safe_end = safe_emit_end_for_edit_text(old_text);
+                        let safe_start = find_char_boundary(old_text, state.old_text_emitted_len);
+
+                        if safe_end > safe_start {
+                            let chunk = old_text[safe_start..safe_end].to_string();
+                            state.old_text_emitted_len = safe_end;
+                            events.push(EditEvent::OldTextChunk {
+                                edit_index: index,
+                                chunk,
+                                done: false,
+                            });
+                        }
                     }
                 }
             }
 
             // Process new_text changes.
-            if let Some(new_text) = &partial.new_text
-                && state.old_text_done
-                && !state.new_text_done
-            {
-                let safe_end = safe_emit_end_for_edit_text(new_text);
-                let safe_start = find_char_boundary(new_text, state.new_text_emitted_len);
+            if let Some(new_text) = &partial.new_text {
+                if state.old_text_done && !state.new_text_done {
+                    let safe_end = safe_emit_end_for_edit_text(new_text);
+                    let safe_start = find_char_boundary(new_text, state.new_text_emitted_len);
 
-                if safe_end > safe_start {
-                    let chunk = new_text[safe_start..safe_end].to_string();
-                    state.new_text_emitted_len = safe_end;
-                    events.push(EditEvent::NewTextChunk {
-                        edit_index: index,
-                        chunk,
-                        done: false,
-                    });
+                    if safe_end > safe_start {
+                        let chunk = new_text[safe_start..safe_end].to_string();
+                        state.new_text_emitted_len = safe_end;
+                        events.push(EditEvent::NewTextChunk {
+                            edit_index: index,
+                            chunk,
+                            done: false,
+                        });
+                    }
                 }
             }
         }

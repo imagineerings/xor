@@ -115,17 +115,18 @@ impl std::fmt::Display for EditSessionOutput {
                 input_path,
             } => {
                 write!(f, "{error}\n")?;
-                if let Some(input_path) = input_path
-                    && !diff.is_empty()
-                {
-                    write!(
-                        f,
-                        "Edited {}:\n\n```diff\n{diff}\n```",
-                        input_path.display()
-                    )
-                } else {
-                    write!(f, "No edits were made.")
+                if let Some(input_path) = input_path {
+                    if !diff.is_empty() {
+                        write!(
+                            f,
+                            "Edited {}:\n\n```diff\n{diff}\n```",
+                            input_path.display()
+                        )?;
+                    } else {
+                        write!(f, "No edits were made.")?;
+                    }
                 }
+                Ok(())
             }
         }
     }
@@ -225,10 +226,10 @@ impl EditSessionContext {
         cx: &App,
     ) -> SharedString {
         let project = self.project.read(cx);
-        if let Some(project_path) = project.find_project_path(path, cx)
-            && let Some(short) = project.short_full_path_for_project_path(&project_path, cx)
-        {
-            return short.into();
+        if let Some(project_path) = project.find_project_path(path, cx) {
+            if let Some(short) = project.short_full_path_for_project_path(&project_path, cx) {
+                return short.into();
+            }
         }
 
         let display = path.to_string_lossy();
@@ -341,12 +342,12 @@ pub(crate) fn initial_title_from_partial_path<P>(
 where
     P: DeserializeOwned,
 {
-    if let Ok(partial) = serde_json::from_value::<P>(raw_input)
-        && let Some(raw_path) = extract_path(&partial)
-    {
-        let trimmed = raw_path.trim();
-        if !trimmed.is_empty() {
-            return context.initial_title_from_path(std::path::Path::new(trimmed), default, cx);
+    if let Ok(partial) = serde_json::from_value::<P>(raw_input) {
+        if let Some(raw_path) = extract_path(&partial) {
+            let trimmed = raw_path.trim();
+            if !trimmed.is_empty() {
+                return context.initial_title_from_path(std::path::Path::new(trimmed), default, cx);
+            }
         }
     }
     default.into()
@@ -478,18 +479,19 @@ impl EditPipeline {
 
                 if let Some(EditPipelineEntry::ResolvingOldText { matcher }) =
                     &mut self.current_edit
-                    && !chunk.is_empty()
                 {
-                    if let Some(match_range) = matcher.push(chunk, None) {
-                        let anchor_range = buffer.read_with(cx, |buffer, _cx| {
-                            buffer.anchor_range_outside(match_range.clone())
-                        });
-                        diff.update(cx, |diff, cx| diff.reveal_range(anchor_range, cx));
+                    if !chunk.is_empty() {
+                        if let Some(match_range) = matcher.push(chunk, None) {
+                            let anchor_range = buffer.read_with(cx, |buffer, _cx| {
+                                buffer.anchor_range_outside(match_range.clone())
+                            });
+                            diff.update(cx, |diff, cx| diff.reveal_range(anchor_range, cx));
 
-                        cx.update(|cx| {
-                            let position = buffer.read(cx).anchor_before(match_range.end);
-                            context.set_agent_location(buffer.downgrade(), position, cx);
-                        });
+                            cx.update(|cx| {
+                                let position = buffer.read(cx).anchor_before(match_range.end);
+                                context.set_agent_location(buffer.downgrade(), position, cx);
+                            });
+                        }
                     }
                 }
             }

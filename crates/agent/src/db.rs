@@ -274,10 +274,10 @@ impl DbThread {
                         );
                     }
 
-                    if let Some(last_user_message_id) = &last_user_message_id
-                        && let Some(token_usage) = thread.request_token_usage.get(ix).copied()
-                    {
-                        request_token_usage.insert(last_user_message_id.clone(), token_usage);
+                    if let Some(last_user_message_id) = &last_user_message_id {
+                        if let Some(token_usage) = thread.request_token_usage.get(ix).copied() {
+                            request_token_usage.insert(last_user_message_id.clone(), token_usage);
+                        }
                     }
 
                     crate::Message::Agent(AgentMessage {

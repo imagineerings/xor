@@ -322,6 +322,7 @@ dependencies = [
  "regex",
  "reqwest_client",
  "rust-embed",
+ "scheduler",
  "schemars 1.2.1",
  "serde",
  "serde_json",

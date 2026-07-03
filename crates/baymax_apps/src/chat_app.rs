@@ -77,3 +77,42 @@ impl BaymaxApp for ChatApp {
 
     fn handle_action(&mut self, _action: &dyn gpui::Action, _cx: &mut App) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_chat_app() {
+        let app = ChatApp::new();
+        assert_eq!(app.id(), "chat");
+        assert_eq!(app.name(), SharedString::from("Chat"));
+        assert!(app.messages().is_empty());
+    }
+
+    #[test]
+    fn test_add_message() {
+        let mut app = ChatApp::new();
+        app.add_message("Alice", "Hello");
+        assert_eq!(app.messages().len(), 1);
+        assert_eq!(app.messages()[0].sender, SharedString::from("Alice"));
+        assert_eq!(app.messages()[0].text, SharedString::from("Hello"));
+    }
+
+    #[test]
+    fn test_multiple_messages() {
+        let mut app = ChatApp::new();
+        app.add_message("Alice", "First");
+        app.add_message("Bob", "Second");
+        assert_eq!(app.messages().len(), 2);
+        assert_eq!(app.messages()[0].sender, SharedString::from("Alice"));
+        assert_eq!(app.messages()[1].sender, SharedString::from("Bob"));
+    }
+
+    #[test]
+    fn test_chat_app_trait_methods() {
+        let app = ChatApp::new();
+        assert_eq!(app.id(), "chat");
+        assert_eq!(app.name(), SharedString::from("Chat"));
+    }
+}

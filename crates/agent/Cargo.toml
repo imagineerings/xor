@@ -102,6 +102,7 @@ project = { workspace = true, "features" = ["test-support"] }
 proptest.workspace = true
 rand.workspace = true
 reqwest_client.workspace = true
+scheduler.workspace = true
 settings = { workspace = true, "features" = ["test-support"] }
 
 theme = { workspace = true, "features" = ["test-support"] }
