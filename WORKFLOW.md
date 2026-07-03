@@ -189,8 +189,7 @@ Use the `gpui-test` skill for difficult GPUI test failures.
 
 ### 7. Full Completion-Gate Consistency Pass
 
-After implementation and validation, run the full consistency pass before
-marking the task complete:
+After implementation and validation, run the full consistency pass:
 
 - Tighten start, validation, handoff, and completion gates based on the actual
   validation performed.
@@ -223,13 +222,22 @@ PR conventions:
 ### 10. Land
 
 Once the PR is approved and CI passes, use the `land` skill to monitor CI,
-address failures, and squash-merge the PR.
+address failures, and squash-merge the PR. After the PR is merged, switch back to `main`:
 
-### 11. Update Status
+```bash
+git checkout main && git pull
+```
 
-When the task is implemented, validated, and working correctly, complete the
-workflow task. This updates the local task checkbox and moves the linked Linear
-issue to the workflow's terminal or handoff state.
+### 11. Complete (Final Step — Only After Merge)
+
+**Do not run this step before the PR is merged.** The `complete` command
+checks that the current branch HEAD has been merged into `main`. If it has not,
+the command will refuse to proceed.
+
+When the PR has been merged to `main` and you are on the `main` branch
+(or a merged feature branch), complete the workflow task. This updates the
+local task checkbox and moves the linked Linear issue to the terminal or
+handoff state.
 
 Use the workflow script:
 
@@ -237,10 +245,17 @@ Use the workflow script:
 node .agents/skills/workflow/scripts/workflow.js complete {{ issue.id }} --state-name "Done"
 ```
 
+To override the merge check (e.g., for no-code tasks), pass `--force`:
+
+```bash
+node .agents/skills/workflow/scripts/workflow.js complete {{ issue.id }} --state-name "Done" --force
+```
+
 ### 12. Done
 
 Your work is complete when:
 - The PR is merged into `main`.
+- You are on the `main` branch (or a branch that has been merged into `main`).
 - The local task is checked off.
 - The Linear issue reflects the handoff or terminal status.
 - Spec documentation is synced if behavior changed.

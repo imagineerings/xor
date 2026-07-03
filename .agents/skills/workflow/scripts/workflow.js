@@ -269,7 +269,9 @@ function validateWorkflowContract(workflow) {
 
   const template = workflow.prompt_template || "";
   if (/{%[\s\S]*?%}/.test(template)) {
-    throw new Error("workflow_validation_error: Liquid tag blocks are not supported; use {{ issue.field }} interpolation only");
+    throw new Error(
+      "workflow_validation_error: Liquid tag blocks are not supported; use {{ issue.field }} interpolation only",
+    );
   }
 
   const allowedIssueFields = new Set([
@@ -440,11 +442,7 @@ function markerState(marker) {
 }
 
 function stableTaskId(relativePath, line, title) {
-  const digest = crypto
-    .createHash("sha1")
-    .update(`${relativePath}:${line}:${title}`)
-    .digest("hex")
-    .slice(0, 12);
+  const digest = crypto.createHash("sha1").update(`${relativePath}:${line}:${title}`).digest("hex").slice(0, 12);
   return `task:${digest}`;
 }
 
@@ -800,8 +798,8 @@ function attachLinearIssue(task, issue) {
 async function findExistingLinearIssue(settings, task) {
   validateLinearSettings(settings);
   const query = `
-    query($query: String!) {
-      issueSearch(query: $query, first: 10) {
+    query($term: String!) {
+      searchIssues(term: $term, first: 10) {
         nodes {
           id
           identifier
@@ -813,17 +811,19 @@ async function findExistingLinearIssue(settings, task) {
         }
       }
     }`;
-  const data = await linear(settings, query, { query: task.id });
-  const issues = data.issueSearch?.nodes || [];
+  const data = await linear(settings, query, { term: task.id });
+  const issues = data.searchIssues?.nodes || [];
   const terminal = new Set((settings.terminal_states || []).map((state) => state.toLowerCase()));
   const sourceMarker = workflowSourceMarker(task);
 
-  return issues.find((issue) => {
-    const description = issue.description || "";
-    const state = (issue.state?.name || "").toLowerCase();
-    if (terminal.has(state)) return false;
-    return description.includes(workflowTaskMarker(task)) || description.includes(sourceMarker);
-  }) || null;
+  return (
+    issues.find((issue) => {
+      const description = issue.description || "";
+      const state = (issue.state?.name || "").toLowerCase();
+      if (terminal.has(state)) return false;
+      return description.includes(workflowTaskMarker(task)) || description.includes(sourceMarker);
+    }) || null
+  );
 }
 
 function workflowTaskMarker(task) {
@@ -836,7 +836,7 @@ function workflowSourceMarker(task) {
 
 async function moveLinearIssue(settings, args) {
   const issue = await resolveLinearIssueForMove(settings, args);
-  const stateId = args.state_id || await resolveLinearStateId(settings, args.state || args.state_name);
+  const stateId = args.state_id || (await resolveLinearStateId(settings, args.state || args.state_name));
   if (!stateId) {
     throw new Error("Missing target Linear state. Pass --state-id or --state-name.");
   }
@@ -894,8 +894,8 @@ async function resolveLinearIssueForMove(settings, args) {
   }
 
   const query = `
-    query($query: String!) {
-      issueSearch(query: $query, first: 10) {
+    query($term: String!) {
+      searchIssues(term: $term, first: 10) {
         nodes {
           id
           identifier
@@ -906,10 +906,11 @@ async function resolveLinearIssueForMove(settings, args) {
         }
       }
     }`;
-  const data = await linear(settings, query, { query: key });
-  const issue = (data.issueSearch?.nodes || []).find((candidate) => {
-    return candidate.id === key || candidate.identifier === key || candidate.url === key;
-  }) || data.issueSearch?.nodes?.[0];
+  const data = await linear(settings, query, { term: key });
+  const issue =
+    (data.searchIssues?.nodes || []).find((candidate) => {
+      return candidate.id === key || candidate.identifier === key || candidate.url === key;
+    }) || data.searchIssues?.nodes?.[0];
   if (!issue) {
     throw new Error(`Linear issue not found: ${key}`);
   }
@@ -933,6 +934,39 @@ async function resolveLinearStateId(settings, stateName) {
   return state.id;
 }
 
+function checkMergedToMain(settings) {
+  const root = repositoryRoot(settings);
+
+  try {
+    const currentBranch = childProcess
+      .execSync("git rev-parse --abbrev-ref HEAD", { cwd: root, encoding: "utf8", stdio: "pipe" })
+      .trim();
+    if (currentBranch === "main") return true;
+  } catch {
+    return null;
+  }
+
+  try {
+    childProcess.execSync("git rev-parse --verify origin/main", {
+      cwd: root,
+      encoding: "utf8",
+      stdio: "pipe",
+    });
+  } catch {
+    return null;
+  }
+
+  try {
+    childProcess.execSync("git merge-base --is-ancestor HEAD origin/main", {
+      cwd: root,
+      stdio: "pipe",
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function completeTask(settings, args) {
   const taskId = args.task_id || args.issue || args.issue_id;
   if (!taskId) {
@@ -940,6 +974,24 @@ async function completeTask(settings, args) {
   }
 
   const task = findTask(settings, taskId);
+
+  if (!args.force) {
+    const merged = checkMergedToMain(settings);
+    if (merged === false) {
+      throw new Error(
+        "Task cannot be completed: the current branch has not been merged into main. " +
+          "Complete the PR process first (commit → push → open PR → land/merge to main), " +
+          "then run complete again. To override this check, pass --force.",
+      );
+    }
+    if (merged === null) {
+      console.warn(
+        "Warning: could not verify merge status (not a git repository or no origin/main remote). " +
+          "Proceeding with completion. Pass --force to silence this warning.",
+      );
+    }
+  }
+
   let linear = null;
   if (!args.local_only) {
     linear = await moveLinearIssue(settings, {
@@ -1052,9 +1104,10 @@ async function callTool(name, args) {
     const workflow = validateWorkflowContract(parseWorkflow(workflowPath(settings)));
     const tasks = activeTasks(settings, listTasks(settings)).slice(0, args.limit || 200);
     const count = Math.max(1, args.count || 1);
-    const picked = count === 1
-      ? await pickNextTask(settings, workflow, tasks, args.attempt ?? null)
-      : await pickNextTasks(settings, workflow, tasks, args.attempt ?? null, count);
+    const picked =
+      count === 1
+        ? await pickNextTask(settings, workflow, tasks, args.attempt ?? null)
+        : await pickNextTasks(settings, workflow, tasks, args.attempt ?? null, count);
     return {
       ...picked,
       workflow: { path: workflow.path, config: workflow.config },
@@ -1105,16 +1158,16 @@ async function launchWorkflowUi(settings, args = {}) {
     ttl_ms: args.ttl_ms,
     ui_path: htmlPath,
   };
-  const serverProcess = childProcess.spawn(process.execPath, [
-    __filename,
-    "ui-server",
-    ...cliArgsFromObject(serverArgs),
-  ], {
-    cwd: repositoryRoot(settings),
-    detached: true,
-    env: process.env,
-    stdio: "ignore",
-  });
+  const serverProcess = childProcess.spawn(
+    process.execPath,
+    [__filename, "ui-server", ...cliArgsFromObject(serverArgs)],
+    {
+      cwd: repositoryRoot(settings),
+      detached: true,
+      env: process.env,
+      stdio: "ignore",
+    },
+  );
   serverProcess.unref();
 
   const url = `http://${host}:${port}/?data=/workflow-data.json`;
@@ -1181,15 +1234,21 @@ async function serveWorkflowUi(settings, args = {}) {
 
   const address = server.address();
   const actualPort = typeof address === "object" && address ? address.port : port;
-  process.stdout.write(JSON.stringify({
-    action: "serving",
-    server: { host, port: actualPort, data_source: payload.ui?.data_source || "list" },
-    ui: {
-      path: htmlPath,
-      url: `http://${host}:${actualPort}/?data=/workflow-data.json`,
-      data_url: `http://${host}:${actualPort}/workflow-data.json`,
-    },
-  }, null, 2));
+  process.stdout.write(
+    JSON.stringify(
+      {
+        action: "serving",
+        server: { host, port: actualPort, data_source: payload.ui?.data_source || "list" },
+        ui: {
+          path: htmlPath,
+          url: `http://${host}:${actualPort}/?data=/workflow-data.json`,
+          data_url: `http://${host}:${actualPort}/workflow-data.json`,
+        },
+      },
+      null,
+      2,
+    ),
+  );
   process.stdout.write("\n");
 
   if (ttlMs > 0) {
@@ -1213,9 +1272,10 @@ async function buildUiPayload(settings, args = {}) {
     const workflow = validateWorkflowContract(parseWorkflow(workflowPath(settings)));
     const tasks = activeTasks(settings, listTasks(settings)).slice(0, args.limit || 200);
     const count = Math.max(1, args.count || 1);
-    const picked = count === 1
-      ? await pickNextTask(settings, workflow, tasks, args.attempt ?? null)
-      : await pickNextTasks(settings, workflow, tasks, args.attempt ?? null, count);
+    const picked =
+      count === 1
+        ? await pickNextTask(settings, workflow, tasks, args.attempt ?? null)
+        : await pickNextTasks(settings, workflow, tasks, args.attempt ?? null, count);
     return {
       ...picked,
       ui: { data_source: dataSource, generated_at: new Date().toISOString() },
@@ -1409,7 +1469,9 @@ function formatCliResult(command, result) {
         picked.prompt || "",
         "",
       ]),
-    ].filter((line) => line !== null).join("\n");
+    ]
+      .filter((line) => line !== null)
+      .join("\n");
   }
 
   if (command === "next" || command === "pick" || command === "render") {
@@ -1424,7 +1486,9 @@ function formatCliResult(command, result) {
       result.duplicate_prevented ? "Duplicate prevention: skipped claimed tasks." : null,
       "",
       result.prompt || "",
-    ].filter((line) => line !== null).join("\n");
+    ]
+      .filter((line) => line !== null)
+      .join("\n");
   }
 
   if (command === "list") {
@@ -1441,7 +1505,9 @@ function formatCliResult(command, result) {
       result.ui.data_url ? `Data: ${result.ui.data_url}` : null,
       result.server ? `Server: ${result.server.host}:${result.server.port} pid ${result.server.pid}` : null,
       "",
-    ].filter((line) => line !== null).join("\n");
+    ]
+      .filter((line) => line !== null)
+      .join("\n");
   }
 
   return `${JSON.stringify(result, null, 2)}\n`;

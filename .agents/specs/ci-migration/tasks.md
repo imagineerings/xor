@@ -13,7 +13,7 @@ This plan covers restoring archived GitHub Actions workflows in priority order. 
 
 ## Pre-Migration Setup
 
-- [ ] P0: Create `.github/workflows/archive/README.md` documenting the archive structure and migration procedure
+- [x] P0: Create `.github/workflows/archive/README.md` documenting the archive structure and migration procedure
   - _Writes: `.github/workflows/archive/README.md`_
 
 ## Tasks
