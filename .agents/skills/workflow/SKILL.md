@@ -34,19 +34,23 @@ polling Linear for candidates.
    by non-terminal Linear issues, creates Linear for the first unclaimed task,
    and returns the rendered prompt. If every active task is claimed, report that
    instead of starting work.
-5. When independent tasks can safely run in parallel, execute
+5. Do not launch the UI during ordinary `$workflow` invocation. Launch the UI
+   only when the user explicitly asks for a visual/task board mode, such as
+   `$workflow ui`, `$workflow begin-ui`, "workflow with UI", or "show workflow
+   UI".
+6. When independent tasks can safely run in parallel, execute
    `node .agents/skills/workflow/scripts/workflow.js next --count <n> --json`,
    create one git worktree per returned task, and run one agent per worktree
    from that task's rendered prompt. Use parallel work only when the task write
    manifests, likely files, and dependencies do not overlap in a way that would
    cause conflicting edits.
-6. For explicit task IDs, execute `node .agents/skills/workflow/scripts/workflow.js pick <task-id>`;
+7. For explicit task IDs, execute `node .agents/skills/workflow/scripts/workflow.js pick <task-id>`;
    it resumes the existing Linear issue for that exact task when present
    instead of creating a duplicate.
-7. Work from the rendered prompt in the repository checkout or task-specific
+8. Work from the rendered prompt in the repository checkout or task-specific
    worktree. Do not treat Linear
    as the source of truth for dispatch eligibility in this local workflow.
-8. When work changes phase, update Linear with
+9. When work changes phase, update Linear with
    `node .agents/skills/workflow/scripts/workflow.js move <task-or-linear-id> --state-name <state>`.
    Also update the local task checkbox when the implementation is complete and
    the workflow asks for that status change.
@@ -69,7 +73,10 @@ Commands:
 - `pick <task-id>` — render a selected task and create or resume Linear.
 - `move <task-or-linear-id> --state-name <state>` — move a Linear issue from
   one workflow stage to another.
-- `ui` — launch the bundled local workflow task board with workflow data.
+- `ui` — opt-in visual mode; launch the local workflow task board with active
+  task data, without claiming work by default.
+- `begin-ui` — opt-in begin-and-visualize mode; begin the next task and launch
+  the UI with the claimed task payload.
 - `validate` — load and validate the `WORKFLOW.md` contract.
 
 The script reads JSON settings from `WORKFLOW_SETTINGS`. Values in
@@ -114,16 +121,19 @@ browser unless `--no-open` is passed.
 
 ```bash
 node .agents/skills/workflow/scripts/workflow.js ui
+node .agents/skills/workflow/scripts/workflow.js begin-ui
 node .agents/skills/workflow/scripts/workflow.js ui --no-open --json
 ```
 
-Required launch parameters are supplied by the command itself:
+UI launch is opt-in. Use these clear modes:
 
-- `--data list` is the default and loads active local tasks without Linear
+- `ui` or `ui --data list` loads active local tasks without Linear
   writes.
-- `--data next --count <n>` reserves tasks and creates or resumes Linear issues
-  before showing the reserved batch.
-- `--data pick --task-id <task-id>` opens the UI for one explicit task after
+- `begin-ui` is equivalent to `ui --data next`; it reserves the next task and
+  creates or resumes its Linear issue before showing the claimed task.
+- `ui --data next --count <n>` reserves tasks and creates or resumes Linear
+  issues before showing the reserved batch.
+- `ui --data pick --task-id <task-id>` opens the UI for one explicit task after
   creating or resuming its Linear issue.
 - `--host <host>` and `--port <port>` override the default localhost server
   address when an agent runtime requires a specific endpoint.

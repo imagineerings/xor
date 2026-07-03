@@ -1275,6 +1275,11 @@ async function runCli(argv) {
     result = await callTool("workflow_validate_workflow", args);
   } else if (command === "ui" || command === "open-ui") {
     result = await callTool("workflow_launch_ui", args);
+  } else if (command === "begin-ui") {
+    result = await callTool("workflow_launch_ui", {
+      ...args,
+      data: args.data || "next",
+    });
   } else if (command === "ui-server") {
     await callTool("workflow_serve_ui", args);
     return;
@@ -1341,7 +1346,7 @@ function formatCliResult(command, result) {
     return `${JSON.stringify(result, null, 2)}\n`;
   }
 
-  if (command === "ui" || command === "open-ui") {
+  if (command === "ui" || command === "open-ui" || command === "begin-ui") {
     return [
       `Action: ${result.action}`,
       `Launched: ${result.launched ? "yes" : "no"}`,
@@ -1368,6 +1373,7 @@ function usage() {
     "  render <task-id>     Render a prompt for a specific task",
     "  move <id>            Move a Linear issue or task's issue to another state",
     "  ui                   Open the populated local workflow task board",
+    "  begin-ui             Opt-in mode: begin work and open the task board",
     "  validate             Validate WORKFLOW.md",
     "",
     "Options:",

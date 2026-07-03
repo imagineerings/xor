@@ -64,8 +64,13 @@ node .agents/skills/workflow/scripts/workflow.js ui
 
 Launch modes:
 
+- Ordinary `workflow.js next` and ordinary `$workflow` invocations do not launch
+  the UI.
 - `workflow.js ui` starts a localhost server, serves the UI with active local
-  tasks, and opens the browser.
+  tasks, and opens the browser without claiming work by default.
+- `workflow.js begin-ui` is the explicit begin-and-visualize mode. It is
+  equivalent to `workflow.js ui --data next`, so it claims the next task and
+  launches the populated board.
 - `workflow.js ui --no-open --json` starts the server and returns the UI URL,
   data URL, server host, port, and process ID for agent runtimes that open UIs
   themselves.
