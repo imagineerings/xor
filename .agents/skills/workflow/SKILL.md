@@ -31,9 +31,15 @@ polling Linear for candidates.
    `_Requirements:` lines, and `_writes:` lines in the packet body.
 4. For automatic starts, execute `node .agents/skills/workflow/scripts/workflow.js next`.
    It scans active local tasks in source order, skips tasks already represented
-   by non-terminal Linear issues, creates Linear for the first unclaimed task,
-   and returns the rendered prompt. If every active task is claimed, report that
-   instead of starting work.
+   by non-terminal Linear issues, creates Linear for the first unclaimed task
+   when only one unclaimed task is active, and returns the rendered prompt. When
+   multiple unclaimed tasks are active, evaluate the candidates before picking:
+   account for priority, immediate value, dependencies, and the previous tasks
+   in the same `tasks.md` file. Treat previous tasks as context for what has
+   already been completed, claimed, or left incomplete; prefer the next task
+   whose prerequisites are satisfied and whose implementation adds the most
+   useful value now. If every active task is claimed, report that instead of
+   starting work.
 5. Before editing implementation files, run a quick start-gate consistency
    check for the picked task's spec directory:
    - Confirm the task is still valid to begin.
@@ -87,9 +93,10 @@ node .agents/skills/workflow/scripts/workflow.js next
 
 Commands:
 
-- `next` — automatically pick the next unclaimed active task, skipping tasks
-  that already have non-terminal Linear issues. Use `--count <n>` to reserve
-  multiple independent tasks for parallel worktrees.
+- `next` — automatically pick the next unclaimed active task when only one is
+  active; when multiple tasks are active, return candidates for value-based
+  selection that considers previous tasks and dependencies. Use `--count <n>`
+  to reserve multiple independent tasks for parallel worktrees.
 - `list` — list task packets from local task files.
 - `render <task-id>` — render a selected task through `WORKFLOW.md`.
 - `pick <task-id>` — render a selected task and create or resume Linear.

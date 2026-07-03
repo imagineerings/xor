@@ -1493,7 +1493,7 @@ function formatCliResult(command, result) {
     const lines = [
       `Action: evaluate`,
       `${result.candidates.length} unclaimed tasks available.`,
-      `Evaluate each for immediate value, then pick one with:`,
+      `Evaluate each for immediate value, including previous tasks in the same tasks.md file, then pick one with:`,
       `  workflow.js pick <task-id>`,
       skipped,
       "",

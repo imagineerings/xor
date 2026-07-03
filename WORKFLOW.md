@@ -118,20 +118,28 @@ node .agents/skills/workflow/scripts/workflow.js next
 
 If multiple unclaimed tasks are available, the command will list them as
 candidates with their priority, title, requirements, and writes manifest.
-**Evaluate each candidate for immediate value** — consider priority, blocking
-status for other tasks, dependencies, and what delivers the most useful
-outcome right now. Then explicitly pick the best one:
+Evaluate each candidate for immediate value, and include the previous tasks in
+the same `tasks.md` file in that evaluation:
+
+- Completed previous tasks show foundations that are already delivered.
+- Claimed previous tasks show work already in flight and should usually be
+  allowed to finish before dependent follow-up work starts.
+- Incomplete previous tasks may indicate unmet prerequisites, ordering risks, or
+  a more valuable next step.
+
+Pick the next logical task whose prerequisites are satisfied and whose
+implementation adds the most useful value right now:
 
 ```bash
 node .agents/skills/workflow/scripts/workflow.js pick <task-id>
 ```
 
+When the user explicitly specifies a task ID or topic, skip automatic
+selection and pick that task directly with the same command.
+
 If only one unclaimed task exists, `next` will claim it automatically and
 render the full prompt. If every task is claimed, `next` will report that;
 focus on completing claimed work before starting new tasks.
-
-When the user explicitly specifies a task ID or topic, skip evaluation and
-pick that task directly.
 
 ### 1. Pull and Branch
 

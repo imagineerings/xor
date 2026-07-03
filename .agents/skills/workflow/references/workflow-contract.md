@@ -20,19 +20,29 @@ It:
    - `workflow.local_task_id:<task-id>`
    - `workflow.local_task_source:<task-file>:<line>`
 3. Skips tasks that already have a non-terminal Linear issue.
-4. Creates Linear for the first unclaimed task and renders the prompt.
+4. Creates Linear for the only unclaimed task when exactly one active task is
+   unclaimed, or returns candidates for agent evaluation when multiple active
+   tasks are unclaimed.
 
-If all active local tasks already have non-terminal Linear issues,
-the script returns no task and includes `skipped_claimed_tasks` in JSON output
-for visibility. Use `workflow.js pick <task-id>` only when a user names a
-specific task; it may resume that exact task's existing Linear issue instead of
-creating a new one.
+When multiple candidates are returned, the agent should pick the next logical
+task that adds value by considering priority, dependencies, immediate utility,
+and previous tasks in the same `tasks.md` file. Previous tasks are evidence:
+completed tasks show delivered foundations, claimed tasks show work already in
+flight, and incomplete earlier tasks may indicate unmet prerequisites or a
+better next step. Use `workflow.js pick <task-id>` after choosing the candidate.
+
+If all active local tasks already have non-terminal Linear issues, the script
+returns no task and includes `skipped_claimed_tasks` in JSON output for
+visibility. Use `workflow.js pick <task-id>` only when a user names a specific
+task; it may resume that exact task's existing Linear issue instead of creating
+a new one.
 
 Use `workflow.js next --count <n> --json` to reserve multiple unclaimed tasks
 for parallel work. The agent decides whether this is appropriate by comparing
-task text, requirements, write manifests, and likely code ownership. Do not run
-tasks in parallel when they touch the same files, have explicit dependency
-ordering, or require a shared migration/schema step.
+task text, requirements, write manifests, likely code ownership, and previous
+tasks that may establish dependencies or ordering. Do not run tasks in parallel
+when they touch the same files, have explicit dependency ordering, or require a
+shared migration/schema step.
 
 ## Task Boundary Consistency Gates
 
