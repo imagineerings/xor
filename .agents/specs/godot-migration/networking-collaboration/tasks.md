@@ -1,10 +1,19 @@
 # Implementation Plan: Networking and Collaboration
 
-## Dependency Gates
+## Overview
 
-- **Primary wave**: W6 External execution hardening
-- **Prerequisite gates**: G0 Spec consistency, G1 Boundary policy, G2 Shared Godot metadata
-- **Dependency gate**: G7 Dependency review before adding any Godot-specific protocol adapter
+Keep Godot networking as boundary metadata and optional debug integration. Runtime networking remains excluded unless routed through explicit external task/debug integration.
+
+## Gates
+
+- Start gate: G0 spec consistency, G1 boundary policy, and G2 shared Godot metadata are satisfied.
+- Validation gate: networking boundary, debug metadata, and non-migration tests pass.
+- Handoff gate: unsupported runtime networking features produce explicit boundary diagnostics.
+- Completion gate: no Godot-specific network runtime or protocol adapter is added without G7 dependency review and an explicit external-command decision.
+
+## Dependency Waves
+
+- W6 External execution hardening: debug metadata and external task/debug hooks wait for boundary policy and metadata gates.
 
 ## Tasks
 

@@ -1,0 +1,118 @@
+# Design: Comfy Extension Ecosystem
+
+## Overview
+
+The extension ecosystem is a controlled harness extension layer. Baymax discovers node packs, extracts supported schemas and assets, and records diagnostics, but it does not run arbitrary extension code without policy gates. Python-backed execution and package installation are separate concerns.
+
+## Architecture
+
+```mermaid
+flowchart TD
+    Discovery[ExtensionDiscovery] --> Policy[ExtensionPolicy]
+    Policy --> Loader[ExtensionLoader]
+    Loader --> Nodes[NodeRegistrationBridge]
+    Loader --> Web[ExtensionAssetService]
+    Loader --> I18n[LocaleBundleMerger]
+    Loader --> Templates[ExtensionTemplateIndex]
+    Loader --> Diagnostics[ExtensionDiagnostics]
+```
+
+## Components and Interfaces
+
+### ExtensionDiscovery
+
+- **Purpose**: Find candidate node packs in configured roots.
+- **Responsibilities**: Directory and Python-file discovery, disabled suffix handling, whitelist filtering, manager blocklist integration, and deterministic order.
+
+### ExtensionPolicy
+
+- **Purpose**: Decide what each extension may do.
+- **Responsibilities**: Enable/disable, whitelist, script permission, network permission, package install permission, web asset serving, and developer mode.
+
+### ExtensionLoader
+
+- **Purpose**: Load allowed extension metadata and registration output.
+- **Responsibilities**: Run allowed prestartup scripts, call supported registration mechanisms, isolate diagnostics, and restore protected hooks.
+
+### NodeRegistrationBridge
+
+- **Purpose**: Register custom node schemas with `comfy-graph-node-runtime/`.
+- **Responsibilities**: V1 mapping support, modern extension entrypoint support, display names, relative module metadata, and import failure diagnostics.
+
+### ExtensionAssetService
+
+- **Purpose**: Serve extension web assets and workflow templates safely.
+- **Responsibilities**: Static asset path confinement, cache policy, deprecated path warnings, and content type safety.
+
+### LocaleBundleMerger
+
+- **Purpose**: Merge custom node translation bundles by language.
+
+## Data Models
+
+```rust
+pub struct ExtensionRecord {
+    pub id: ExtensionId,
+    pub source_path: PathBuf,
+    pub display_name: String,
+    pub policy: ExtensionPolicyDecision,
+    pub nodes: Vec<NodeTypeId>,
+    pub web_dir: Option<PathBuf>,
+    pub diagnostics: Vec<ExtensionDiagnostic>,
+}
+
+pub enum ExtensionPolicyDecision {
+    Enabled,
+    Disabled,
+    Whitelisted,
+    Blocked { reason: String },
+}
+```
+
+## Correctness Properties
+
+### Property 1: Disabled Extensions Do Not Register
+
+_For any_ disabled or non-whitelisted custom node pack, the system SHALL NOT execute scripts, import nodes, serve web assets, or expose translations from that pack.
+
+**Validates: Requirement 1.2, 1.3**
+
+### Property 2: Import Failure Isolation
+
+_For any_ extension import failure, the system SHALL record diagnostics and continue loading other allowed extensions.
+
+**Validates: Requirement 1.4, 2.4**
+
+### Property 3: Script Policy Enforcement
+
+_For any_ prestartup script, the system SHALL execute it only when extension policy explicitly allows scripts for that pack.
+
+**Validates: Requirement 3.1**
+
+### Property 4: Static Asset Confinement
+
+_For any_ extension web asset or workflow template request, the resolved file path SHALL remain inside the registered extension asset root.
+
+**Validates: Requirement 2.3, 4.2**
+
+### Property 5: No Silent Dependency Install
+
+_For any_ missing extension dependency or manager action that requires install/update, the system SHALL require explicit user approval before package or filesystem modification.
+
+**Validates: Requirement 3.3, 5.3**
+
+## Error Handling
+
+- Discovery errors are non-fatal and reported per root.
+- Unsupported registration mechanisms produce skipped-extension diagnostics.
+- Prestartup failures are logged as failed script diagnostics and do not stop unrelated extensions.
+- Translation JSON parse failures skip the broken file and include the path in diagnostics.
+- Manager actions denied by policy return explicit policy errors.
+
+## Testing Strategy
+
+- Unit tests for discovery order, disabled suffix, whitelist behavior, and policy decisions.
+- Loader tests for V1 mappings, modern entrypoint metadata, import failures, hook restoration, and missing dependencies.
+- Asset service tests for path confinement and deprecated path warnings.
+- Translation merge tests for locale bundle precedence.
+- Manager policy tests for install/update approval boundaries.

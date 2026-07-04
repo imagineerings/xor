@@ -1,10 +1,19 @@
 # Implementation Plan: Platform and Export
 
-## Dependency Gates
+## Overview
 
-- **Primary wave**: W6 External execution hardening
-- **Prerequisite gates**: G0 Spec consistency, G1 Boundary policy, G2 Shared Godot metadata
-- **Dependency gate**: G7 Dependency review for any platform packaging dependency beyond task invocation
+Integrate Godot executable settings and export presets as external tasks. Platform packaging remains external unless a reviewed Baymax dependency is explicitly accepted.
+
+## Gates
+
+- Start gate: G0 spec consistency, G1 boundary policy, and G2 shared Godot metadata are satisfied.
+- Validation gate: executable settings, export preset parsing, task template, and missing-setup diagnostic tests pass.
+- Handoff gate: missing executables, invalid presets, and unsupported target platforms produce actionable diagnostics.
+- Completion gate: export work uses explicit external task integration, and platform packaging dependencies beyond task invocation require G7 dependency review.
+
+## Dependency Waves
+
+- W6 External execution hardening: executable and export task integration waits for G1 boundary and G2 metadata.
 
 ## Tasks
 

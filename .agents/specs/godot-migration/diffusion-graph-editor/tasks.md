@@ -1,10 +1,19 @@
 # Implementation Plan: Diffusion Graph Editor
 
-## Dependency Gates
+## Overview
 
-- **Primary wave**: W4 Authoring and graph UX
-- **Prerequisite gates**: G0 Spec consistency, G3 Shared world-model foundations
-- **Graph gates**: G5 Graph safety before node execution; G6 Provenance before artifact import
+Build editor state and execution wiring on top of the shared world-model graph primitives. UI behavior stays in W4 and execution remains blocked until graph safety and provenance gates are satisfied.
+
+## Gates
+
+- Start gate: G0 spec consistency, G3 shared world-model foundations, and applicable G8 Comfy harness alignment decisions are satisfied.
+- Validation gate: graph model, graph validation, editor state, and execution-plan tests pass.
+- Handoff gate: invalid graphs, unavailable backends, and unsupported Comfy-compatible nodes are visible as diagnostics.
+- Completion gate: graph execution cannot enqueue without G5 graph safety, and artifact import cannot complete without G6 provenance.
+
+## Dependency Waves
+
+- W4 Authoring, graph UX, and Comfy workflows: editor state and graph execution planning depend on W1 world-model graph primitives.
 
 ## Tasks
 

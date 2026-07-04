@@ -1,10 +1,19 @@
 # Implementation Plan: Unified Authoring App
 
-## Dependency Gates
+## Overview
 
-- **Primary wave**: W4 Authoring and graph UX
-- **Prerequisite gates**: G0 Spec consistency, G2 Shared Godot metadata, G3 Shared world-model foundations
-- **Preview gates**: G4 Worker safety for interactive world-model previews; G6 Provenance for generated artifact views
+Build a unified authoring workspace over Godot metadata, graph workflows, world-model requests, generated artifacts, and external run/export tasks.
+
+## Gates
+
+- Start gate: G0 spec consistency, G2 shared Godot metadata, G3 shared world-model foundations, and applicable G8 Comfy workflow alignment decisions are satisfied.
+- Validation gate: app registration, authoring item routing, preview routing, and generated artifact tests pass.
+- Handoff gate: unsupported previews and unavailable workers produce actionable diagnostics in the workspace model.
+- Completion gate: interactive previews require G4 worker safety, generated artifact views require G6 provenance, and UI work delegates graph editing and workflow metadata to their owning specs.
+
+## Dependency Waves
+
+- W4 Authoring, graph UX, and Comfy workflows: authoring workspace routing depends on G2 and G3.
 
 ## Tasks
 

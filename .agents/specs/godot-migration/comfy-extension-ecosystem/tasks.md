@@ -1,0 +1,61 @@
+# Implementation Plan: Comfy Extension Ecosystem
+
+## Overview
+
+Build extension support with policy and diagnostics first. Only after disabled and unsafe behaviors are controlled should node registration, web assets, translations, templates, and manager actions be wired in.
+
+## Gates
+
+- Start gate: G0 spec consistency, G1 boundary policy, G7 dependency review for install/update behavior, and G8 Comfy harness alignment are satisfied.
+- Validation gate: discovery, policy, loader, asset path, translation, and manager-policy tests pass.
+- Handoff gate: every skipped, blocked, or failed extension has a visible diagnostic.
+- Completion gate: disabled extensions cannot execute or expose assets.
+
+## Dependency Waves
+
+- Global wave: W6 External execution hardening.
+- Local Wave 1: Tasks 1-2 implement discovery and policy.
+- Local Wave 2: Tasks 3-5 implement loading, node registration, and assets.
+- Local Wave 3: Tasks 6-7 implement translations, templates, subgraphs, and manager boundaries.
+
+## Tasks
+
+- [ ] 1. Implement extension discovery
+  - Find Python files and directories, skip disabled packs, apply whitelist filtering, and preserve deterministic load order.
+  - _Requirements: 1.1, 1.2_
+  - _writes: crates/world_model/src/comfy_extensions.rs, crates/world_model/src/comfy_extensions_tests.rs_
+
+- [ ] 2. Implement extension policy and diagnostics
+  - Add enable/disable/block/whitelist decisions, script permission, web asset permission, network/install permission, and diagnostic records.
+  - _Requirements: 1.2, 1.3, 1.4, 3.1, 5.3_
+  - _writes: crates/world_model/src/comfy_extension_policy.rs, crates/world_model/src/comfy_extension_diagnostics.rs, crates/world_model/src/comfy_extension_policy_tests.rs_
+
+- [ ] 3. Implement controlled extension loader
+  - Load allowed packs, run permitted prestartup scripts, restore protected hooks, and isolate import failures.
+  - _Requirements: 1.4, 3.1, 3.2, 3.3_
+  - _writes: crates/world_model/src/comfy_extension_loader.rs, crates/world_model/src/comfy_extension_loader_tests.rs_
+
+- [ ] 4. Implement custom node registration bridge
+  - Support V1 mappings and modern extension entrypoints, display names, module metadata, and unsupported registration diagnostics.
+  - _Requirements: 2.1, 2.2, 2.4_
+  - _writes: crates/world_model/src/comfy_custom_node_bridge.rs, crates/world_model/src/comfy_custom_node_bridge_tests.rs_
+
+- [ ] 5. Implement extension web asset service
+  - Serve registered web directories and templates with path confinement, cache policy, and safe content types.
+  - _Requirements: 2.3, 4.2_
+  - _writes: crates/world_model/src/comfy_extension_assets.rs, crates/world_model/src/comfy_extension_assets_tests.rs_
+
+- [ ] 6. Implement translations, templates, and subgraph indexing
+  - Merge locale bundles, expose template names/assets, and feed custom node subgraphs into workflow subgraph index.
+  - _Requirements: 4.1, 4.2, 4.3_
+  - _writes: crates/world_model/src/comfy_extension_i18n.rs, crates/world_model/src/comfy_extension_templates.rs, crates/world_model/src/comfy_extension_i18n_tests.rs_
+
+- [ ] 7. Implement manager compatibility boundary
+  - Add manager status/policy metadata and approval gates for install, update, disable, and background operations.
+  - _Requirements: 5.1, 5.2, 5.3_
+  - _writes: crates/world_model/src/comfy_manager.rs, crates/world_model/src/comfy_manager_tests.rs_
+
+## Notes
+
+- This spec does not grant arbitrary Python execution by default.
+- Package installation and downloads require explicit approval and dependency review.

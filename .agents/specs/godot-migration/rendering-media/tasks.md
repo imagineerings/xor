@@ -1,11 +1,20 @@
 # Implementation Plan: Rendering and Media
 
-## Dependency Gates
+## Overview
 
-- **Primary wave**: W3 World-model serving substrate for generated media; W5 Generation outputs and asset pipelines for generated-asset previews
-- **Prerequisite gates**: G0 Spec consistency, G1 Boundary policy
-- **Generated media gates**: G3 Shared world-model foundations, G4 Worker safety, G6 Provenance
-- **Dependency gate**: G7 Dependency review for any new codec, native media, or shader dependency
+Route Godot media and generated outputs through existing Baymax preview/media systems. Generated media diagnostics start in W3, while generated asset previews finish in W5.
+
+## Gates
+
+- Start gate: G0 spec consistency, G1 boundary policy, and applicable G3 shared world-model foundations are satisfied.
+- Validation gate: media classification, unsupported-preview, generated-output routing, and provenance tests pass.
+- Handoff gate: unsupported render/audio/text server features and missing previews produce explicit diagnostics.
+- Completion gate: generated media import waits for G4 worker safety and G6 provenance, new codecs/native media/shader dependencies require G7 dependency review, and Comfy media node behavior references G8 Comfy harness alignment.
+
+## Dependency Waves
+
+- W3 World-model and Comfy serving substrate: generated media diagnostics and routing depend on G3 and G4.
+- W5 Generation outputs and asset pipelines: generated-asset previews and artifact import depend on G6 provenance.
 
 ## Tasks
 

@@ -1,10 +1,19 @@
 # Implementation Plan: Engine Core and Runtime
 
-## Dependency Gates
+## Overview
 
-- **Primary wave**: W2 Godot compatibility substrate
-- **Prerequisite gates**: G0 Spec consistency, G1 Boundary policy
-- **Gate produced/extended**: G2 Shared Godot metadata
+Create the Godot metadata substrate without porting runtime execution. This spec produces the G2 shared metadata gate used by later Godot integrations.
+
+## Gates
+
+- Start gate: G0 spec consistency and G1 boundary policy are satisfied.
+- Validation gate: project detection, resource indexing, diagnostics, and boundary tests pass.
+- Handoff gate: parse failures and runtime-only source areas produce stable diagnostics and boundary decisions.
+- Completion gate: G2 shared Godot metadata is satisfied without adding scene-tree, renderer, physics, or platform runtime execution.
+
+## Dependency Waves
+
+- W2 Godot compatibility substrate: project descriptors and resource metadata start after W1 boundary policy primitives.
 
 ## Tasks
 

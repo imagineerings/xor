@@ -1,10 +1,19 @@
 # Implementation Plan: Language and Scripting
 
-## Dependency Gates
+## Overview
 
-- **Primary wave**: W2 Godot compatibility substrate
-- **Prerequisite gates**: G0 Spec consistency, G1 Boundary policy, G2 Shared Godot metadata
-- **Dependency gate**: G7 Dependency review before adding a new tree-sitter grammar, language server binary, or large fixture corpus
+Wire GDScript and Godot documentation support through existing Baymax language and docs infrastructure without adding a separate scripting runtime.
+
+## Gates
+
+- Start gate: G0 spec consistency, G1 boundary policy, and G2 shared Godot metadata are satisfied.
+- Validation gate: language detection, optional grammar/symbol extraction, LSP configuration, and docs lookup tests pass.
+- Handoff gate: unavailable grammar, LSP, or docs sources produce stable degraded-mode diagnostics.
+- Completion gate: new tree-sitter grammars, language server binaries, or large fixture corpora require G7 dependency review.
+
+## Dependency Waves
+
+- W2 Godot compatibility substrate: language registration and docs indexing depend on G2 shared metadata.
 
 ## Tasks
 

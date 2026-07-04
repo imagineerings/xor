@@ -1,10 +1,20 @@
 # Implementation Plan: Model Serving and Packaging
 
-## Dependency Gates
+## Overview
 
-- **Primary wave**: W3 World-model serving substrate; W6 External execution hardening for real worker launch paths
-- **Prerequisite gates**: G0 Spec consistency, G3 Shared world-model foundations
-- **Gate produced/extended**: G4 Worker safety
+Add diagnostics and launcher models in W3, then defer real local/remote worker launch hardening to W6 after safety and dependency gates are in place.
+
+## Gates
+
+- Start gate: G0 spec consistency, G3 shared world-model foundations, and applicable G8 Comfy model/runtime alignment decisions are satisfied.
+- Validation gate: local environment, checkpoint, GPU, persistent session, remote worker, and explicit-download tests pass.
+- Handoff gate: missing Python, packages, checkpoints, GPU, disk, endpoint, auth, quota, and model downloads produce stable diagnostic codes.
+- Completion gate: G4 worker safety is satisfied before any real model worker starts, and heavy setup or packaging dependencies require G7 dependency review.
+
+## Dependency Waves
+
+- W3 World-model and Comfy serving substrate: diagnostics and launcher models produce G4 worker safety.
+- W6 External execution hardening: real worker launch, remote execution, and packaging paths depend on G4 and G7.
 
 ## Tasks
 

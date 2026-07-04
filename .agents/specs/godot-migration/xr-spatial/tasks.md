@@ -1,10 +1,19 @@
 # Implementation Plan: XR and Spatial Tooling
 
-## Dependency Gates
+## Overview
 
-- **Primary wave**: W6 External execution hardening
-- **Prerequisite gates**: G0 Spec consistency, G1 Boundary policy, G2 Shared Godot metadata
-- **External execution gate**: XR task fallback work must wait for worker/task diagnostics appropriate to the execution target
+Keep XR runtime support out of Baymax and expose only spatial metadata, docs, preview routing, and explicit external fallback hooks.
+
+## Gates
+
+- Start gate: G0 spec consistency, G1 boundary policy, and G2 shared Godot metadata are satisfied.
+- Validation gate: XR runtime exclusion, spatial metadata, docs hook, and preview routing tests pass.
+- Handoff gate: unsupported XR runtime paths produce excluded or external-command diagnostics.
+- Completion gate: XR fallback work waits for W6 task diagnostics and does not embed OpenXR, WebXR, or VR runtime stacks.
+
+## Dependency Waves
+
+- W6 External execution hardening: spatial metadata and external fallback hooks wait for G1 and G2.
 
 ## Tasks
 

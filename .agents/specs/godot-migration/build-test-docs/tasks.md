@@ -1,10 +1,20 @@
 # Implementation Plan: Build, Test, and Documentation
 
-## Dependency Gates
+## Overview
 
-- **Primary wave**: W1 Shared foundations; W2 Godot compatibility substrate for docs and compatibility metadata
-- **Prerequisite gates**: G0 Spec consistency
-- **Gate produced/extended**: G7 Dependency review
+Add shared documentation, fixture attribution, and dependency review helpers before feature specs copy source fixtures or introduce heavy dependencies.
+
+## Gates
+
+- Start gate: G0 spec consistency passes for the umbrella and grouped specs.
+- Validation gate: docs metadata, fixture attribution, and dependency review helper tests pass.
+- Handoff gate: dependency review records include license, maintenance, security, binary-size, and platform-impact fields.
+- Completion gate: G7 dependency review is available before any task adds vendored, native, codec, model, media, or mesh dependencies.
+
+## Dependency Waves
+
+- W1 Shared foundations: fixture attribution and dependency review helpers land first.
+- W2 Godot compatibility substrate: docs and compatibility metadata integrations depend on W1 helpers.
 
 ## Tasks
 

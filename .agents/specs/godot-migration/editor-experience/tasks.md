@@ -1,10 +1,20 @@
 # Implementation Plan: Editor Experience
 
-## Dependency Gates
+## Overview
 
-- **Primary wave**: W4 Authoring and graph UX; W6 External execution hardening for run/debug tasks
-- **Prerequisite gates**: G0 Spec consistency, G1 Boundary policy, G2 Shared Godot metadata
-- **External execution gate**: run/debug task work must wait for the Godot external-command path in W6
+Add Godot-aware commands and project-panel affordances in W4, while run and debug templates remain W6 work because they require the external-command boundary.
+
+## Gates
+
+- Start gate: G0 spec consistency, G1 boundary policy, and G2 shared Godot metadata are satisfied.
+- Validation gate: command registration, project-panel classification, import-link, and run/debug template tests pass.
+- Handoff gate: missing Godot executable and unsupported runtime actions surface setup diagnostics.
+- Completion gate: no run/debug workflow bypasses the W6 external-command path or the G1 runtime boundary policy.
+
+## Dependency Waves
+
+- W4 Authoring, graph UX, and Comfy workflows: commands, labels, and import links can start after G2.
+- W6 External execution hardening: run/debug templates wait for external-command diagnostics and task integration.
 
 ## Tasks
 

@@ -1,10 +1,19 @@
 # Implementation Plan: Mesh Generation Pipeline
 
-## Dependency Gates
+## Overview
 
-- **Primary wave**: W5 Generation outputs and asset pipelines
-- **Prerequisite gates**: G0 Spec consistency, G3 Shared world-model foundations, G6 Provenance
-- **Dependency gate**: G7 Dependency review before adding real mesh-generation backends or native preview dependencies
+Model mesh requests and artifacts in W5 after shared world-model request and provenance primitives exist. Real generation backends remain blocked by dependency review.
+
+## Gates
+
+- Start gate: G0 spec consistency, G3 shared world-model foundations, and G6 provenance are satisfied.
+- Validation gate: mesh request, artifact metadata, preview/export, and provenance tests pass.
+- Handoff gate: unsupported backends and missing preview/export formats produce stable diagnostics.
+- Completion gate: real mesh-generation backends or native preview dependencies require G7 dependency review, and Comfy-backed 3D node behavior references G8 Comfy harness alignment.
+
+## Dependency Waves
+
+- W5 Generation outputs and asset pipelines: mesh request and artifact models depend on W3 world-model foundations and G6 provenance.
 
 ## Tasks
 

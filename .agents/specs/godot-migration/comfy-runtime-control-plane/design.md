@@ -1,0 +1,147 @@
+# Design: Comfy Runtime Control Plane
+
+## Overview
+
+The control plane is a Baymax harness layer for Comfy-compatible HTTP and WebSocket semantics. It defines the world-model harness prompt/job lifecycle while delegating execution, assets, and model work to existing Baymax subsystems and the adjacent Comfy migration specs. The key decision is to model Comfy endpoints as protocol adapters rather than porting `aiohttp` server code.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    Client[Comfy UI / API Client] --> Routes[ComfyRouteAdapter]
+    Client --> Ws[ComfyWebSocketAdapter]
+    Routes --> Jobs[BaymaxJobBridge]
+    Ws --> Events[ExecutionEventTranslator]
+    Jobs --> Graph[comfy-graph-node-runtime]
+    Routes --> Assets[comfy-asset-library]
+    Routes --> Models[comfy-model-memory-runtime]
+    Events --> Media[Baymax Media / Artifacts]
+```
+
+The adapter exposes legacy Comfy paths and `/api` aliases. Internally it converts requests into Baymax task/job operations and converts Baymax events back into Comfy-compatible payloads.
+
+## Components and Interfaces
+
+### ComfyRouteAdapter
+
+- **Purpose**: Register Comfy-compatible HTTP routes against Baymax HTTP infrastructure.
+- **Responsibilities**: Parse requests, validate prompt ids, map `/api` aliases, return Comfy-compatible JSON, and enforce route-level safety.
+- **Does not own**: Job execution, asset persistence, model loading, or frontend rendering.
+- **Interface contract**:
+
+```rust
+pub trait ComfyRouteAdapter {
+    fn register_routes(&self, router: &mut BaymaxRouter);
+    fn handle_prompt(&self, request: PromptSubmission) -> Result<PromptSubmissionResponse, ComfyApiError>;
+    fn handle_queue_action(&self, request: QueueAction) -> Result<(), ComfyApiError>;
+    fn handle_history_action(&self, request: HistoryAction) -> Result<(), ComfyApiError>;
+}
+```
+
+### BaymaxJobBridge
+
+- **Purpose**: Map Comfy prompt lifecycle operations onto Baymax tasks/jobs.
+- **Responsibilities**: Create jobs, expose queue snapshots, normalize job history, cancel pending or running jobs, and remove sensitive extra data from public responses.
+- **Dependencies**: Baymax task system, Comfy graph validator, generated artifact store.
+
+### ComfyWebSocketAdapter
+
+- **Purpose**: Maintain Comfy-compatible realtime sessions.
+- **Responsibilities**: Assign client ids, persist per-client feature flags, send initial queue status, and serialize execution events.
+- **Interface contract**:
+
+```rust
+pub trait ComfyWebSocketAdapter {
+    fn connect(&self, requested_client_id: Option<ClientId>) -> ClientSession;
+    fn receive_feature_flags(&self, session: ClientSessionId, flags: ClientFeatureFlags);
+    fn publish(&self, event: ComfyRuntimeEvent);
+}
+```
+
+### ExecutionEventTranslator
+
+- **Purpose**: Convert Baymax execution events into Comfy event names and binary preview event ids.
+- **Responsibilities**: Emit `status`, `executing`, `progress`, `feature_flags`, legacy preview image events, and metadata preview events.
+
+### ComfyHttpSafetyLayer
+
+- **Purpose**: Preserve Comfy's local-server safety behavior while using Baymax middleware.
+- **Responsibilities**: origin checks, CORS policy, CSP when API nodes are disabled, path confinement, safe content disposition, and cache-control classification.
+
+## Data Models
+
+```rust
+pub struct PromptSubmission {
+    pub prompt_id: Option<Uuid>,
+    pub prompt: ComfyPromptGraph,
+    pub number: Option<f64>,
+    pub front: bool,
+    pub client_id: Option<ClientId>,
+    pub extra_data: PromptExtraData,
+    pub partial_execution_targets: Vec<NodeId>,
+}
+
+pub enum JobStatus {
+    Pending,
+    InProgress,
+    Completed,
+    Failed,
+    Cancelled,
+}
+
+pub enum ComfyRuntimeEvent {
+    Status(QueueStatus),
+    Executing { prompt_id: Uuid, node_id: Option<NodeId> },
+    Progress { prompt_id: Uuid, node_id: NodeId, value: u64, max: u64 },
+    Preview(PreviewPayload),
+    FeatureFlags(ServerFeatureFlags),
+}
+```
+
+## Correctness Properties
+
+### Property 1: Canonical Job Identity
+
+_For any_ client-supplied prompt id, if it is not a canonical lowercase hyphenated UUID, the system SHALL reject the prompt before enqueueing it.
+
+**Validates: Requirement 2.1**
+
+### Property 2: Idempotent Cancellation
+
+_For any_ cancel request, the system SHALL cancel matching running or pending jobs and report terminal or unknown jobs as non-failing no-ops.
+
+**Validates: Requirement 2.3**
+
+### Property 3: Sensitive Data Redaction
+
+_For any_ queue, history, or job response, sensitive prompt extra data SHALL be omitted from public response payloads.
+
+**Validates: Requirement 2.5**
+
+### Property 4: Session-Scoped Events
+
+_For any_ execution event with a prompt id and client id, the WebSocket adapter SHALL deliver status and preview payloads to the intended session without rewriting the prompt id.
+
+**Validates: Requirement 3.3**
+
+### Property 5: Path Confinement
+
+_For any_ upload, view, or download request, the resolved filesystem path SHALL remain within the configured input, output, temp, or asset root.
+
+**Validates: Requirement 4.3**
+
+## Error Handling
+
+- Invalid prompt JSON returns a structured Comfy-style error with `node_errors` when validation can run.
+- Invalid prompt ids return a 400 error and do not create jobs.
+- Missing jobs return 404 for single-job reads and non-failing no-ops for cancellation.
+- Unsupported endpoint parity returns `UNSUPPORTED_COMFY_CAPABILITY` with the route and missing capability.
+- Origin, CSP, and path violations return 403 or 400 without exposing filesystem details.
+- Preview serialization failures downgrade to a logged job event and preserve the running job state.
+
+## Testing Strategy
+
+- Unit tests for prompt id validation, `/api` alias routing, queue redaction, cancel classification, and path confinement.
+- Integration tests for prompt submission through queue, job status transitions, WebSocket feature negotiation, progress events, and preview metadata negotiation.
+- Compatibility fixtures from `projects/comfy/script_examples` for basic HTTP prompt execution and WebSocket image retrieval.
+- Property tests for route alias equivalence and path traversal rejection.

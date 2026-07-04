@@ -8,16 +8,16 @@ Baymax should parse and index Godot scene/resource/import files and generated ga
 
 #### Acceptance Criteria
 
-1. WHEN `.tscn`, `.tres`, or `.godot` files are parsed THEN THE system SHALL extract references and diagnostics.
+1.1 WHEN `.tscn`, `.tres`, or `.godot` files are parsed THEN THE system SHALL extract references and diagnostics.
 
 ### Requirement 2: Import Metadata Linking
 
 #### Acceptance Criteria
 
-1. WHEN `.import` metadata exists THEN THE system SHALL link source and generated imported assets.
+2.1 WHEN `.import` metadata exists THEN THE system SHALL link source and generated imported assets.
 
 ### Requirement 3: Generated Asset Integration
 
 #### Acceptance Criteria
 
-1. WHEN generated mesh assets are imported THEN THE system SHALL register preview, export, and provenance metadata.
+3.1 WHEN generated mesh assets are imported THEN THE system SHALL register preview, export, and provenance metadata.
