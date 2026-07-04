@@ -1797,6 +1797,11 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_default_settings_parse() {
+        SettingsStore::parse_default_settings(&default_settings()).unwrap();
+    }
+
     #[gpui::test]
     fn test_default_settings_release_channel_overrides(cx: &mut App) {
         // The test deals with overrides and should ignore the other set-ups (Preview and Stable runs)

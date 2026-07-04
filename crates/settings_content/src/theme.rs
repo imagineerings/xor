@@ -191,6 +191,7 @@ pub struct ThemeSettingsContent {
     pub cursor_style: Option<CursorStyle>,
 
     /// Cursor blink style for the editor when this theme is active.
+    #[serde(rename = "cursor_blink_style")]
     pub cursor_blink: Option<CursorBlink>,
 }
 
