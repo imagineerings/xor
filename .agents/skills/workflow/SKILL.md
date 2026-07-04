@@ -33,16 +33,20 @@ polling Linear for candidates.
    It scans active local tasks in source order, skips tasks already represented
    by non-terminal Linear issues, creates Linear for the first unclaimed task
    when only one unclaimed task is active, and returns the rendered prompt. When
-   multiple unclaimed tasks are active, first consult the structured decision
-   state at `.agents/workflow-state.json` if present. Treat it as a cache of
-   concise conclusions and dependency notes, not authority. Validate any cached
-   recommendation against current task files and Linear state, then evaluate
-   the candidates before picking: account for priority, immediate value,
-   dependencies, and the previous tasks in the same `tasks.md` file. Treat
-   previous tasks as context for what has already been completed, claimed, or
-   left incomplete; prefer the next task whose prerequisites are satisfied and
-   whose implementation adds the most useful value now. If every active task is
-   claimed, report that instead of starting work.
+   multiple unclaimed tasks are active, `next` should return a
+   priority-ordered shortlist rather than a full dump of every task. First
+   consult the structured decision state at `.agents/workflow-state.json` if
+   present. Treat it as a cache of concise conclusions and dependency notes,
+   not authority. Validate any cached recommendation against current task files
+   and Linear state, then rank candidates before picking: account for priority,
+   immediate value, dependencies, and the previous tasks in the same `tasks.md`
+   file. Treat previous tasks as context for what has already been completed,
+   claimed, or left incomplete; prefer the next task whose prerequisites are
+   satisfied and whose implementation adds the most useful value now. After
+   accepting or rejecting a candidate, update `.agents/workflow-state.json`
+   with the decision, rationale, evidence, and stale-file dependencies so later
+   `next` runs can reuse the ranking signal. If every active task is claimed,
+   report that instead of starting work.
 5. Before editing implementation files, run a quick start-gate consistency
    check for the picked task's spec directory:
    - Confirm the task is still valid to begin.
@@ -97,10 +101,11 @@ node .agents/skills/workflow/scripts/workflow.js next
 Commands:
 
 - `next` — automatically pick the next unclaimed active task when only one is
-  active; when multiple tasks are active, return candidates and decision-state
-  context for value-based selection that considers previous tasks and
-  dependencies. Use `--count <n>` to reserve multiple independent tasks for
-  parallel worktrees.
+  active; when multiple tasks are active, return a priority-ordered shortlist
+  plus decision-state context for value-based selection that considers previous
+  tasks and dependencies. Avoid dumping every active task when the repository
+  has a large backlog. Use `--count <n>` to reserve multiple independent tasks
+  for parallel worktrees.
 - `list` — list task packets from local task files.
 - `render <task-id>` — render a selected task through `WORKFLOW.md`.
 - `pick <task-id>` — render a selected task and create or resume Linear.
@@ -145,11 +150,17 @@ file is a structured cache for reviewable conclusions only:
   or ready tasks.
 - `dependency_notes`: reusable ordering facts discovered while inspecting
   previous tasks, requirements, and design docs.
+- `ranked_candidates`: a recent priority-ordered shortlist with task IDs,
+  concise ranking rationales, blockers, and evidence used to choose or reject
+  each task.
 
 Agents should read the decision state before spending time re-evaluating all
 candidates, validate it against current repository state, and update it after
-accepting or rejecting a recommendation. Do not store private chain-of-thought,
-long scratch reasoning, secrets, or unverified guesses.
+accepting or rejecting a recommendation. When writing back, store the selected
+task, rejected higher-ranked candidates, short rationale, evidence, and
+stale-file dependencies so future `workflow.js next` runs can prefer smarter
+shortlists. Do not store private chain-of-thought, long scratch reasoning,
+secrets, or unverified guesses.
 
 ## Parallel Worktrees
 
