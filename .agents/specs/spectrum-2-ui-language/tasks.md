@@ -31,21 +31,21 @@ The work is divided into three workstreams:
   - _Requirements: 7.1, 7.5_
   - _writes: crates/settings_content/src/theme.rs, crates/theme_settings/src/theme_settings.rs, crates/editor/src/editor.rs_
 
-- [ ] 3. Create Spectrum 2 Inspired icon theme extension
-  - [ ] 3.1 Create extension directory structure
+- [x] 3. Create Spectrum 2 Inspired icon theme extension
+  - [x] 3.1 Create extension directory structure
     - Create `extensions/spectrum-2-icons/`
     - Create `extensions/spectrum-2-icons/extension.toml` with proper metadata
     - Create `extensions/spectrum-2-icons/themes/spectrum-2-inspired-icons.json`
     - Create `extensions/spectrum-2-icons/icons/file_icons/` directory
 
-  - [ ] 3.2 Create icon theme JSON
+  - [x] 3.2 Create icon theme JSON
     - Define `directory_icons` (folder.svg, folder_open.svg)
     - Define `chevron_icons` (chevron_right.svg, chevron_down.svg)
     - Define `file_suffixes` mapping for all ~30 file types
     - Define `file_icons` mapping with all SVG paths
     - Default fallback icon for unrecognized file types
 
-  - [ ] 3.3 Create SVG icons for core file types
+  - [x] 3.3 Create SVG icons for core file types
     - Create SVGs with: viewBox `0 0 16 16`, stroke `1.5`, stroke-linecap `round`, stroke-linejoin `round`, fill `none`, color `currentColor`
     - Core types (15 icons): rust, typescript, javascript, python, go, json, yaml, markdown, html, css, docker, git, toml, file (generic), folder, folder_open
     - _Requirements: 3, 4_

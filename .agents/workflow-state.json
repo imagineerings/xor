@@ -1,10 +1,39 @@
 {
   "version": 1,
-  "updated_at": null,
+  "updated_at": "2026-07-04T00:00:00Z",
   "repo_revision": null,
-  "recommendation": null,
-  "task_notes": [],
-  "dependency_notes": [],
+  "recommendation": {
+    "task_id": null,
+    "task_identifier": null,
+    "title": null,
+    "rationale": "Task 3 (icon theme extension) is complete - it was already implemented in PR #26 and just needed its task status updated. The next task should be picked by running: node .agents/skills/workflow/scripts/workflow.js next",
+    "evidence": [
+      "Task 3 was fully implemented in PR #26 (extension.toml, icon theme JSON, 32 SVG icons all present and correct)",
+      "The task was checked off locally and SIM-8 moved to Done in Linear",
+      "Tasks 4 (border radius), 5 (spacing), 6 (cursor blink), and 7 (docs) remain unclaimed"
+    ],
+    "stale_if_changed": [
+      ".agents/specs/spectrum-2-ui-language/tasks.md",
+      ".agents/specs/spectrum-2-ui-language/design.md",
+      ".agents/specs/spectrum-2-ui-language/requirements.md"
+    ],
+    "updated_at": "2026-07-04T00:00:00Z"
+  },
+  "task_notes": [
+    {
+      "task_identifier": ".agents/specs/spectrum-2-ui-language/tasks.md:34",
+      "status": "done",
+      "summary": "Task 3: Create icon theme extension. Completed in PR #26 (merged to main). All 32 SVG icons, extension.toml, and icon theme JSON created.",
+      "updated_at": "2026-07-04T00:00:00Z"
+    }
+  ],
+  "dependency_notes": [
+    {
+      "scope": ".agents/specs/spectrum-2-ui-language",
+      "summary": "Tasks 1-3 complete. Tasks 4-5 are independent of each other. Task 6 depends on task 2 (done). Task 7 depends on all previous tasks. All remaining tasks are ready to begin.",
+      "updated_at": "2026-07-04T00:00:00Z"
+    }
+  ],
   "maintenance": {
     "instructions": [
       "Update this file while evaluating workflow.js next candidates.",
@@ -21,10 +50,7 @@
         "Previous task 1 is complete and established the required API.",
         "This task unlocks follow-up UI integration work."
       ],
-      "stale_if_changed": [
-        ".agents/specs/example/tasks.md",
-        ".agents/specs/example/design.md"
-      ],
+      "stale_if_changed": [".agents/specs/example/tasks.md", ".agents/specs/example/design.md"],
       "updated_at": "YYYY-MM-DDTHH:MM:SSZ"
     },
     "task_note_shape": {
