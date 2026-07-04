@@ -1,43 +1,43 @@
 {
   "version": 1,
-  "updated_at": "2026-07-04T12:42:00Z"
-},
-"recommendation": {
-  "task_id": "task:f04c50fa6d2e",
-  "task_identifier": ".agents/specs/spectrum-2-ui-language/tasks.md:76",
-  "title": "Update spacing for Spectrum 2",
-  "rationale": "Task 5 (spacing) is the next logical task in the spectrum-2-ui-language workstream. It is independent of other remaining tasks (6, 7) and adds visible UI polish by adjusting list item padding and indent sizes.",
-  "evidence": [
-    "Task 4 (border radius) completed and merged to main in PR #28",
-    "Task 5 is independent and can be worked on without waiting for other tasks",
-    "Changes are scoped to list_item.rs with no external dependencies",
-    "Tasks 6 (cursor blink) and 7 (docs) remain but Task 5 is the highest-value next step"
-  ],
-  "stale_if_changed": [
-    ".agents/specs/spectrum-2-ui-language/tasks.md",
-    ".agents/specs/spectrum-2-ui-language/design.md",
-    ".agents/specs/spectrum-2-ui-language/requirements.md"
-  ],
-  "updated_at": "2026-07-04T12:42:00Z"
-},
-"task_notes": [
-  {
-    "task_identifier": ".agents/specs/spectrum-2-ui-language/tasks.md:34",
-    "status": "done",
-    "summary": "Task 3: Create icon theme extension. Completed in PR #26 (merged to main). All 32 SVG icons, extension.toml, and icon theme JSON created.",
-    "updated_at": "2026-07-04T00:00:00Z"
-  },
-  {
-    "task_identifier": ".agents/specs/spectrum-2-ui-language/tasks.md:54",
-    "status": "done",
-    "summary": "Task 4: Update border radius constants and add theme key. Completed in PR #28 (merged to main). BorderRadiusContent schema, theme JSON updates, button/modal/onboarding UI updates all merged.",
+  "updated_at": "2026-07-04T12:42:00Z",
+  "repo_revision": null,
+  "recommendation": {
+    "task_id": "task:f04c50fa6d2e",
+    "task_identifier": ".agents/specs/spectrum-2-ui-language/tasks.md:76",
+    "title": "Update spacing for Spectrum 2",
+    "rationale": "Task 5 (spacing) is the next logical task in the spectrum-2-ui-language workstream. It is independent of other remaining tasks (6, 7) and adds visible UI polish by adjusting list item padding and indent sizes.",
+    "evidence": [
+      "Task 4 (border radius) completed and merged to main in PR #28",
+      "Task 5 is independent and can be worked on without waiting for other tasks",
+      "Changes are scoped to list_item.rs with no external dependencies",
+      "Tasks 6 (cursor blink) and 7 (docs) remain but Task 5 is the highest-value next step"
+    ],
+    "stale_if_changed": [
+      ".agents/specs/spectrum-2-ui-language/tasks.md",
+      ".agents/specs/spectrum-2-ui-language/design.md",
+      ".agents/specs/spectrum-2-ui-language/requirements.md"
+    ],
     "updated_at": "2026-07-04T12:42:00Z"
-  }
-],
-"dependency_notes": [
-  {
-    "scope": ".agents/specs/spectrum-2-ui-language",
-    "summary": "Tasks 1-4 complete. Task 5 (spacing) is independent — ready to begin. Task 6 (cursor blink) depends on Task 2 (done). Task 7 (docs) depends on all previous tasks. Tasks 5 and 6 can be done in parallel.",
+  },
+  "task_notes": [
+    {
+      "task_identifier": ".agents/specs/spectrum-2-ui-language/tasks.md:34",
+      "status": "done",
+      "summary": "Task 3: Create icon theme extension. Completed in PR #26 (merged to main). All 32 SVG icons, extension.toml, and icon theme JSON created.",
+      "updated_at": "2026-07-04T00:00:00Z"
+    },
+    {
+      "task_identifier": ".agents/specs/spectrum-2-ui-language/tasks.md:54",
+      "status": "done",
+      "summary": "Task 4: Update border radius constants and add theme key. Completed in PR #28 (merged to main). BorderRadiusContent schema, theme JSON updates, button/modal/onboarding UI updates all merged.",
+      "updated_at": "2026-07-04T12:42:00Z"
+    }
+  ],
+  "dependency_notes": [
+    {
+      "scope": ".agents/specs/spectrum-2-ui-language",
+      "summary": "Tasks 1-4 complete. Task 5 (spacing) is independent — ready to begin. Task 6 (cursor blink) depends on Task 2 (done). Task 7 (docs) depends on all previous tasks. Tasks 5 and 6 can be done in parallel.",
       "updated_at": "2026-07-04T00:00:00Z"
     }
   ],

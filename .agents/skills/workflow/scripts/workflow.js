@@ -784,6 +784,113 @@ function formatList(values) {
   return values.map((value) => `- ${value}`).join("\n");
 }
 
+function groupLabel(dir) {
+  const name = dir.split("/").pop() || dir;
+  return name
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function groupReadinessLabel(groupInfo) {
+  if (groupInfo.previousDone) return "ready (previous tasks done)";
+  if (groupInfo.previousNone) return "ready (no dependencies)";
+  if (groupInfo.previousPartial)
+    return `waiting on ${groupInfo.totalPrevious - groupInfo.donePrevious} previous task${groupInfo.totalPrevious - groupInfo.donePrevious !== 1 ? "s" : ""}`;
+  return "unknown";
+}
+
+function rankCandidates(tasks, settings) {
+  if (tasks.length <= 1) return tasks;
+
+  const state = loadWorkflowState(settings);
+  const allTasks = listTasks(settings);
+  const priorityOrder = { P0: 0, P1: 1, P2: 2, P3: 3, P4: 4 };
+
+  const groups = {};
+  for (const task of tasks) {
+    const dir = path.dirname(task.task_file);
+    if (!groups[dir]) groups[dir] = [];
+    groups[dir].push(task);
+  }
+
+  const groupInfo = {};
+  for (const [dir, groupTasks] of Object.entries(groups)) {
+    const allInDir = allTasks
+      .filter((t) => path.dirname(t.task_file) === dir)
+      .sort((a, b) => a.task_line - b.task_line);
+
+    const firstLine = Math.min(...groupTasks.map((t) => t.task_line));
+    const previousTasks = allInDir.filter((t) => t.task_line < firstLine);
+    const doneCount = previousTasks.filter((t) => (t.state || "").toLowerCase() === "done").length;
+
+    let depNote = null;
+    if (state.dependency_notes) {
+      for (const note of state.dependency_notes) {
+        if (note.scope) {
+          const normalizedScope = note.scope.replace(/^\.[\\/]/, "");
+          if (dir === normalizedScope || dir.endsWith("/" + normalizedScope) || dir.includes(normalizedScope)) {
+            depNote = note;
+            break;
+          }
+        }
+      }
+    }
+
+    groupInfo[dir] = {
+      previousDone: previousTasks.length > 0 && doneCount === previousTasks.length,
+      previousPartial: doneCount > 0 && doneCount < previousTasks.length,
+      previousNone: previousTasks.length === 0,
+      totalPrevious: previousTasks.length,
+      donePrevious: doneCount,
+      depNote,
+    };
+  }
+
+  function groupScore(dir) {
+    const info = groupInfo[dir];
+    if (info.previousDone) return 0;
+    if (info.previousNone) return 20;
+    if (info.previousPartial) return 50;
+    return 100;
+  }
+
+  const sortedDirs = Object.keys(groups).sort((a, b) => {
+    const scoreA = groupScore(a);
+    const scoreB = groupScore(b);
+    if (scoreA !== scoreB) return scoreA - scoreB;
+
+    const bestPrioA = Math.min(...groups[a].map((t) => priorityOrder[t.priority] ?? 5));
+    const bestPrioB = Math.min(...groups[b].map((t) => priorityOrder[t.priority] ?? 5));
+    if (bestPrioA !== bestPrioB) return bestPrioA - bestPrioB;
+
+    return Math.min(...groups[a].map((t) => t.task_line)) - Math.min(...groups[b].map((t) => t.task_line));
+  });
+
+  const ranked = [];
+  let globalRank = 0;
+  for (const dir of sortedDirs) {
+    const dirTasks = [...groups[dir]].sort((a, b) => {
+      const aPrio = priorityOrder[a.priority] ?? 5;
+      const bPrio = priorityOrder[b.priority] ?? 5;
+      if (aPrio !== bPrio) return aPrio - bPrio;
+      return a.task_line - b.task_line;
+    });
+
+    for (const task of dirTasks) {
+      globalRank++;
+      ranked.push({
+        ...task,
+        rank: globalRank,
+        group: dir,
+        group_info: groupInfo[dir],
+      });
+    }
+  }
+
+  return ranked;
+}
+
 async function pickNextTask(settings, workflow, tasks, attempt) {
   if (tasks.length === 0) {
     return {
@@ -835,19 +942,21 @@ async function pickNextTask(settings, workflow, tasks, attempt) {
     prompt: null,
     action: "evaluate",
     duplicate_prevented: false,
-    candidates: tasks,
+    candidates: rankCandidates(tasks, settings),
     skipped_claimed_tasks: [],
     reason:
-      `${tasks.length} active unclaimed tasks available. Review decision_state, evaluate each for immediate value, ` +
-      "and pick one with: node .agents/skills/workflow/scripts/workflow.js pick <task-id>",
+      `${tasks.length} active unclaimed tasks available. ` +
+      "Top candidates ranked by priority and dependency order. " +
+      "Pick one with: node .agents/skills/workflow/scripts/workflow.js pick <task-id>",
   };
 }
 
 async function pickNextTasks(settings, workflow, tasks, attempt, count) {
+  const ranked = rankCandidates(tasks, settings);
   const pickedTasks = [];
   const skippedClaimedTasks = [];
 
-  for (const task of tasks) {
+  for (const task of ranked) {
     if (pickedTasks.length >= count) break;
     const existing = await findExistingLinearIssue(settings, task);
     if (existing) {
@@ -1605,11 +1714,15 @@ function formatCliResult(command, result) {
   if (command === "next" && result.action === "evaluate" && Array.isArray(result.candidates)) {
     const skipped = result.duplicate_prevented ? `\nSkipped claimed tasks: ${result.skipped_claimed_tasks.length}` : "";
     const stateLines = formatDecisionState(result.decision_state);
+    const displayLimit = 15;
+    const candidates = result.candidates;
+    const totalCandidates = candidates.length;
+    const shown = candidates.slice(0, displayLimit);
     const lines = [
       `Action: evaluate`,
-      `${result.candidates.length} unclaimed tasks available.`,
-      `Evaluate each for immediate value, including previous tasks in the same tasks.md file, then pick one with:`,
-      `  workflow.js pick <task-id>`,
+      `${totalCandidates} unclaimed tasks available. Top candidates ranked by priority and dependency order.`,
+      `Pick one with: node .agents/skills/workflow/scripts/workflow.js pick <task-id>`,
+      totalCandidates > displayLimit ? `Showing top ${displayLimit} of ${totalCandidates} candidates.` : null,
       skipped,
       "",
       ...stateLines,
@@ -1617,23 +1730,36 @@ function formatCliResult(command, result) {
       "---",
       "",
     ];
-    for (const candidate of result.candidates) {
+
+    let currentGroup = null;
+    for (const candidate of shown) {
+      const group = candidate.group || path.dirname(candidate.task_file);
+      if (group !== currentGroup) {
+        currentGroup = group;
+        const label = groupLabel(group);
+        const readiness = candidate.group_info ? groupReadinessLabel(candidate.group_info) : "";
+        lines.push(`### Group: ${label} ${readiness ? `— ${readiness}` : ""}`);
+      }
+
       const priority = (candidate.priority || "").toUpperCase();
       const prefix = priority ? `[${priority}] ` : "";
-      lines.push(`### ${prefix}${candidate.title}`);
-      lines.push(`ID: ${candidate.id}`);
-      lines.push(`Source: ${candidate.identifier}`);
+      lines.push(`Rank ${candidate.rank} | ${prefix}${candidate.title}`);
+      lines.push(`        ID: ${candidate.id}`);
+      lines.push(`        Source: ${candidate.identifier}`);
       if (candidate.requirements && candidate.requirements.length > 0) {
-        lines.push(`Requirements: ${candidate.requirements.join(", ")}`);
+        lines.push(`        Requirements: ${candidate.requirements.join(", ")}`);
       }
       if (candidate.writes && candidate.writes.length > 0) {
-        lines.push(`Writes: ${candidate.writes.join(", ")}`);
-      }
-      if (candidate.description) {
-        lines.push("", candidate.description);
+        lines.push(`        Writes: ${candidate.writes.join(", ")}`);
       }
       lines.push("");
     }
+
+    if (totalCandidates > displayLimit) {
+      lines.push(`... and ${totalCandidates - displayLimit} more candidates.`);
+      lines.push("");
+    }
+
     return lines.join("\n");
   }
 
@@ -1686,7 +1812,9 @@ function formatDecisionState(state) {
   if (state.recommendation) {
     const recommendation = state.recommendation;
     const match = recommendation.matches_active_task ? "active candidate" : "not in active candidates";
-    lines.push(`Cached recommendation: ${recommendation.task_identifier || recommendation.task_id || "unspecified"} (${match})`);
+    lines.push(
+      `Cached recommendation: ${recommendation.task_identifier || recommendation.task_id || "unspecified"} (${match})`,
+    );
     if (recommendation.title) lines.push(`Title: ${recommendation.title}`);
     if (recommendation.rationale) lines.push(`Rationale: ${recommendation.rationale}`);
     if (recommendation.evidence.length > 0) {
