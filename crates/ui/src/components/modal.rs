@@ -1,6 +1,6 @@
 use crate::{IconButtonShape, prelude::*};
 
-use gpui::{prelude::FluentBuilder, *};
+use gpui::{prelude::FluentBuilder, px, *};
 use smallvec::SmallVec;
 use theme::ActiveTheme;
 
@@ -63,11 +63,19 @@ impl ParentElement for Modal {
 
 impl RenderOnce for Modal {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let modal_radius = cx.theme().border_radius().modal;
+
         v_flex()
             .id(self.id.clone())
             .size_full()
             .flex_1()
             .overflow_hidden()
+            .when_some(modal_radius, |this, radius| {
+                this.rounded_tl(px(radius))
+                    .rounded_tr(px(radius))
+                    .rounded_br(px(radius))
+                    .rounded_bl(px(radius))
+            })
             .child(self.header)
             .child(
                 v_flex()

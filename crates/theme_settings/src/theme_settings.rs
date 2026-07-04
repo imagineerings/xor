@@ -394,6 +394,24 @@ pub fn refine_theme(theme: &ThemeContent) -> Theme {
         .map(|w| w.into_gpui())
         .unwrap_or_default();
 
+    let border_radius = theme::BorderRadiusContent {
+        button: theme.style.border_radius.as_ref().and_then(|br| br.button),
+        input: theme.style.border_radius.as_ref().and_then(|br| br.input),
+        panel: theme.style.border_radius.as_ref().and_then(|br| br.panel),
+        modal: theme.style.border_radius.as_ref().and_then(|br| br.modal),
+        tooltip: theme.style.border_radius.as_ref().and_then(|br| br.tooltip),
+        autocomplete: theme
+            .style
+            .border_radius
+            .as_ref()
+            .and_then(|br| br.autocomplete),
+        scrollbar_thumb: theme
+            .style
+            .border_radius
+            .as_ref()
+            .and_then(|br| br.scrollbar_thumb),
+    };
+
     Theme {
         id: uuid::Uuid::new_v4().to_string(),
         name: theme.name.clone().into(),
@@ -406,6 +424,7 @@ pub fn refine_theme(theme: &ThemeContent) -> Theme {
             status: refined_status_colors,
             player: refined_player_colors,
             syntax: syntax_theme,
+            border_radius,
         },
     }
 }

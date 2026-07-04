@@ -37,6 +37,7 @@ pub use crate::icon_theme::*;
 pub use crate::icon_theme_schema::*;
 pub use crate::registry::*;
 pub use crate::scale::*;
+pub use crate::schema::BorderRadiusContent;
 pub use crate::schema::*;
 pub use crate::styles::*;
 pub use crate::theme_settings_provider::*;
@@ -268,6 +269,12 @@ impl Theme {
     #[inline(always)]
     pub fn syntax(&self) -> &Arc<SyntaxTheme> {
         &self.styles.syntax
+    }
+
+    /// Returns the [`BorderRadiusContent`] for the theme.
+    #[inline(always)]
+    pub fn border_radius(&self) -> &BorderRadiusContent {
+        &self.styles.border_radius
     }
 
     /// Returns the [`StatusColors`] for the theme.

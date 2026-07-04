@@ -418,7 +418,7 @@ Provide "rounded-feeling" UI elements that feel approachable and modern, consist
 | Scrollbar thumb | 3px | CSS border-radius on thumb | No — hardcoded in GPUI |
 | Badges / Tags | 4px | `rounded()` | Yes — code change |
 | Autocomplete menu | 8px | `rounded_md()` | Yes — code change |
-| Onboarding tiles | 12px | `ROOT_RADIUS = px(8.0)` | Yes — already 8px, change to 12px |
+| Onboarding tiles | 12px | `ROOT_RADIUS = px(12.0)` | Done — changed from 8px to 12px |
 
 #### Adding `border_radius` to Theme JSON
 
@@ -446,12 +446,28 @@ When not specified, current defaults apply (backward compatible).
 
 | File | Change |
 |---|---|
-| `crates/theme/src/schema.rs` | Add `BorderRadiusContent` struct to theme schema |
-| `crates/theme/src/theme.rs` | Add `border_radius` field to `ThemeColors` or new `ShapeColors` |
-| `crates/ui/src/components/button/button_like.rs` | Use `border_radius` from theme for button rounding |
-| `crates/ui/src/components/modal.rs` | Use `border_radius` from theme for modal rounding |
+| `crates/theme/src/schema.rs` | Add `BorderRadiusContent` struct with optional fields for each element type |
+| `crates/settings_content/src/theme.rs` | Add `BorderRadiusContent` struct and `border_radius` field to `ThemeStyleContent` |
+| `crates/theme/src/styles/colors.rs` | Add `border_radius: BorderRadiusContent` to `ThemeStyles` |
+| `crates/theme/src/theme.rs` | Re-export `BorderRadiusContent` and add `border_radius()` getter on `Theme` |
+| `crates/theme_settings/src/theme_settings.rs` | Process `border_radius` in `refine_theme` |
+| `crates/ui/src/components/button/button_like.rs` | Read `border_radius.button` from theme with fallback |
+| `crates/ui/src/components/modal.rs` | Read `border_radius.modal` from theme |
 | `crates/onboarding/src/theme_preview.rs` | Change `ROOT_RADIUS` from 8px to 12px |
-| Various UI component files | Read `border_radius` from theme instead of hardcoded values |
+| `assets/themes/spectrum/spectrum-2-inspired.json` | Add `border_radius` block to both dark and light variants |
+| `crates/theme/src/fallback_themes.rs` | Set `border_radius: BorderRadiusContent::default()` in fallback dark theme |
+| `crates/theme_importer/src/vscode/converter.rs` | Set `border_radius: None` in converted theme styles |
+
+<!-- impl: crates/theme/src/schema.rs#BorderRadiusContent -->
+<!-- impl: crates/settings_content/src/theme.rs#BorderRadiusContent -->
+<!-- impl: crates/theme/src/styles/colors.rs#ThemeStyles -->
+<!-- impl: crates/theme/src/theme.rs#Theme::border_radius -->
+<!-- impl: crates/theme_settings/src/theme_settings.rs#refine_theme -->
+<!-- impl: crates/ui/src/components/button/button_like.rs#ButtonLike::render -->
+<!-- impl: crates/ui/src/components/modal.rs#Modal::render -->
+<!-- impl: crates/onboarding/src/theme_preview.rs#ThemePreviewTile::ROOT_RADIUS -->
+<!-- impl: crates/theme/src/fallback_themes.rs#baymax_default_dark -->
+<!-- impl: crates/theme_importer/src/vscode/converter.rs#VsCodeThemeConverter::convert -->
 
 ### 3.5 Editor UI Behavior
 
@@ -591,22 +607,25 @@ pub enum CursorBlink {
 /// Optional border radius overrides per element type.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema)]
 pub struct BorderRadiusContent {
-    /// Border radius for buttons (default: 6)
+    /// Border radius for buttons (default: 8)
     pub button: Option<f32>,
-    /// Border radius for inputs (default: 4)
+    /// Border radius for inputs (default: 6)
     pub input: Option<f32>,
-    /// Border radius for panels and sidebars (default: 8)
+    /// Border radius for panels and sidebars (default: 12)
     pub panel: Option<f32>,
-    /// Border radius for modal dialogs (default: 12)
+    /// Border radius for modal dialogs (default: 16)
     pub modal: Option<f32>,
-    /// Border radius for tooltips (default: 4)
+    /// Border radius for tooltips (default: 6)
     pub tooltip: Option<f32>,
-    /// Border radius for autocomplete menus (default: 6)
+    /// Border radius for autocomplete menus (default: 8)
     pub autocomplete: Option<f32>,
-    /// Border radius for scrollbar thumb (default: 2)
+    /// Border radius for scrollbar thumb (default: 3)
     pub scrollbar_thumb: Option<f32>,
 }
 ```
+
+<!-- impl: crates/theme/src/schema.rs#BorderRadiusContent -->
+<!-- impl: crates/settings_content/src/theme.rs#BorderRadiusContent -->
 
 ### 4.3 Typography Defaults Data
 

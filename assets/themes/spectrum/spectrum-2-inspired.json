@@ -7,6 +7,15 @@
       "name": "Spectrum 2 Inspired Dark",
       "appearance": "dark",
       "style": {
+        "border_radius": {
+          "button": 8,
+          "input": 6,
+          "panel": 12,
+          "modal": 16,
+          "tooltip": 6,
+          "scrollbar_thumb": 3,
+          "autocomplete": 8
+        },
         "border": "#343640ff",
         "border.variant": "#2a2c34ff",
         "border.focused": "#5ea0efff",
@@ -454,6 +463,15 @@
       "name": "Spectrum 2 Inspired Light",
       "appearance": "light",
       "style": {
+        "border_radius": {
+          "button": 8,
+          "input": 6,
+          "panel": 12,
+          "modal": 16,
+          "tooltip": 6,
+          "scrollbar_thumb": 3,
+          "autocomplete": 8
+        },
         "border": "#dcdde1ff",
         "border.variant": "#e6e7ebff",
         "border.focused": "#1473e6ff",

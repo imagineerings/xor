@@ -14,6 +14,28 @@ pub enum AppearanceContent {
 }
 
 /// Parses a color string into an [`Hsla`] value.
+/// Border radius values for UI element types.
+///
+/// When present in a theme, these override the default border radius
+/// for each element type. When absent, current defaults are used.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct BorderRadiusContent {
+    /// Border radius for buttons (default: 6)
+    pub button: Option<f32>,
+    /// Border radius for inputs (default: 4)
+    pub input: Option<f32>,
+    /// Border radius for panels and sidebars (default: 8)
+    pub panel: Option<f32>,
+    /// Border radius for modal dialogs (default: 12)
+    pub modal: Option<f32>,
+    /// Border radius for tooltips (default: 4)
+    pub tooltip: Option<f32>,
+    /// Border radius for autocomplete menus (default: 6)
+    pub autocomplete: Option<f32>,
+    /// Border radius for scrollbar thumb (default: 2)
+    pub scrollbar_thumb: Option<f32>,
+}
+
 pub fn try_parse_color(color: &str) -> anyhow::Result<Hsla> {
     let rgba = gpui::Rgba::try_from(color)?;
     let rgba = palette::rgb::Srgba::from_components((rgba.r, rgba.g, rgba.b, rgba.a));

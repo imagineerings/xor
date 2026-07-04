@@ -51,27 +51,27 @@ The work is divided into three workstreams:
     - _Requirements: 3, 4_
     - _writes: extensions/spectrum-2-icons/extension.toml, extensions/spectrum-2-icons/themes/spectrum-2-inspired-icons.json, extensions/spectrum-2-icons/icons/file_icons/*.svg_
 
-- [ ] 4. Update border radius constants and add theme key
-  - [ ] 4.1 Add `BorderRadiusContent` to theme schema
+- [x] 4. Update border radius constants and add theme key
+  - [x] 4.1 Add `BorderRadiusContent` to theme schema
     - Add struct `BorderRadiusContent` to `crates/theme/src/schema.rs`
     - Add optional `border_radius` field to theme style
     - Add fields: `button`, `input`, `panel`, `modal`, `tooltip`, `autocomplete`, `scrollbar_thumb`
 
-  - [ ] 4.2 Update Spectrum 2 theme JSON with border radius
+  - [x] 4.2 Update Spectrum 2 theme JSON with border radius
     - Add `border_radius` block to both light and dark variants in `assets/themes/spectrum/spectrum-2-inspired.json`
     - Values: button=8, input=6, panel=12, modal=16, tooltip=6, autocomplete=8, scrollbar_thumb=3
 
-  - [ ] 4.3 Update UI components to read border radius from theme
+  - [x] 4.3 Update UI components to read border radius from theme
     - Buttons: read `border_radius.button` in `crates/ui/src/components/button/button_like.rs`
     - Inputs: read `border_radius.input` in input component
     - Modals: read `border_radius.modal` in `crates/ui/src/components/modal.rs`
     - Add fallback to current defaults when `border_radius` key not present
 
-  - [ ] 4.4 Update onboarding preview tile radius
+  - [x] 4.4 Update onboarding preview tile radius
     - Change `ThemePreviewTile::ROOT_RADIUS` from `px(8.0)` to `px(12.0)` in `crates/onboarding/src/theme_preview.rs`
     - This makes the onboarding theme tiles feel more rounded and approachable
     - _Requirements: 6_
-    - _writes: crates/theme/src/schema.rs, assets/themes/spectrum/spectrum-2-inspired.json, crates/ui/src/components/button/button_like.rs, crates/ui/src/components/modal.rs, crates/onboarding/src/theme_preview.rs_
+    - _writes: crates/theme/src/schema.rs, crates/settings_content/src/theme.rs, crates/theme/src/styles/colors.rs, crates/theme/src/theme.rs, crates/theme_settings/src/theme_settings.rs, crates/ui/src/components/button/button_like.rs, crates/ui/src/components/modal.rs, crates/onboarding/src/theme_preview.rs, assets/themes/spectrum/spectrum-2-inspired.json, crates/theme/src/fallback_themes.rs, crates/theme_importer/src/vscode/converter.rs_
 
 - [ ] 5. Update spacing for Spectrum 2
   - Change `ListItem` default `indent_step_size` from `px(12.)` to `px(16.)` in `crates/ui/src/components/list/list_item.rs`

@@ -1,7 +1,7 @@
 use documented::Documented;
 use gpui::{
     AnyElement, AnyView, ClickEvent, CursorStyle, DefiniteLength, FocusHandle, Hsla, MouseButton,
-    MouseClickEvent, MouseDownEvent, MouseUpEvent, Rems, StyleRefinement, relative,
+    MouseClickEvent, MouseDownEvent, MouseUpEvent, Rems, StyleRefinement, px, relative,
     transparent_black,
 };
 use smallvec::SmallVec;
@@ -676,6 +676,8 @@ impl RenderOnce for ButtonLike {
             ButtonStyle::Outlined | ButtonStyle::OutlinedGhost | ButtonStyle::OutlinedCustom(_)
         );
 
+        let button_radius = cx.theme().border_radius().button;
+
         self.base
             .h_flex()
             .id(self.id.clone())
@@ -692,10 +694,34 @@ impl RenderOnce for ButtonLike {
             })
             .when(is_outlined, |this| this.border_1())
             .when_some(self.rounding, |this, rounding| {
-                this.when(rounding.top_left, |this| this.rounded_tl_sm())
-                    .when(rounding.top_right, |this| this.rounded_tr_sm())
-                    .when(rounding.bottom_right, |this| this.rounded_br_sm())
-                    .when(rounding.bottom_left, |this| this.rounded_bl_sm())
+                this.when(rounding.top_left, |this| {
+                    if let Some(radius) = button_radius {
+                        this.rounded_tl(px(radius))
+                    } else {
+                        this.rounded_tl_sm()
+                    }
+                })
+                .when(rounding.top_right, |this| {
+                    if let Some(radius) = button_radius {
+                        this.rounded_tr(px(radius))
+                    } else {
+                        this.rounded_tr_sm()
+                    }
+                })
+                .when(rounding.bottom_right, |this| {
+                    if let Some(radius) = button_radius {
+                        this.rounded_br(px(radius))
+                    } else {
+                        this.rounded_br_sm()
+                    }
+                })
+                .when(rounding.bottom_left, |this| {
+                    if let Some(radius) = button_radius {
+                        this.rounded_bl(px(radius))
+                    } else {
+                        this.rounded_bl_sm()
+                    }
+                })
             })
             .gap(DynamicSpacing::Base04.rems(cx))
             .map(|this| match self.size {

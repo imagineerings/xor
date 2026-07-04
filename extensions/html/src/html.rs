@@ -1,5 +1,5 @@
-use std::{env, fs};
 use baymax::settings::LspSettings;
+use std::{env, fs};
 use zed_extension_api::{self as baymax, LanguageServerId, Result, serde_json::json};
 
 const BINARY_NAME: &str = "vscode-html-language-server";

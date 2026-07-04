@@ -6,8 +6,8 @@ use std::sync::Arc;
 use strum::{AsRefStr, EnumIter, IntoEnumIterator};
 
 use crate::{
-    AccentColors, ActiveTheme, PlayerColors, StatusColors, StatusColorsRefinement, SyntaxTheme,
-    SystemColors,
+    AccentColors, ActiveTheme, BorderRadiusContent, PlayerColors, StatusColors,
+    StatusColorsRefinement, SyntaxTheme, SystemColors,
 };
 
 #[derive(Refineable, Clone, Debug, PartialEq)]
@@ -623,6 +623,9 @@ pub struct ThemeStyles {
     pub player: PlayerColors,
 
     pub syntax: Arc<SyntaxTheme>,
+
+    /// Optional border radius overrides per element type.
+    pub border_radius: BorderRadiusContent,
 }
 
 #[cfg(test)]

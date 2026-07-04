@@ -497,10 +497,31 @@ pub struct ThemeStyleContent {
     /// The styles for syntax nodes.
     #[serde(default)]
     pub syntax: IndexMap<String, HighlightStyleContent>,
+
+    /// Optional border radius overrides per element type.
+    pub border_radius: Option<BorderRadiusContent>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, MergeFrom, PartialEq)]
 pub struct AccentContent(pub Option<String>);
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, MergeFrom, PartialEq)]
+pub struct BorderRadiusContent {
+    /// Border radius for buttons (default: 6)
+    pub button: Option<f32>,
+    /// Border radius for inputs (default: 4)
+    pub input: Option<f32>,
+    /// Border radius for panels and sidebars (default: 8)
+    pub panel: Option<f32>,
+    /// Border radius for modal dialogs (default: 12)
+    pub modal: Option<f32>,
+    /// Border radius for tooltips (default: 4)
+    pub tooltip: Option<f32>,
+    /// Border radius for autocomplete menus (default: 6)
+    pub autocomplete: Option<f32>,
+    /// Border radius for scrollbar thumb (default: 2)
+    pub scrollbar_thumb: Option<f32>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, MergeFrom, PartialEq)]
 pub struct PlayerColorContent {
