@@ -73,7 +73,7 @@ The work is divided into three workstreams:
     - _Requirements: 6_
     - _writes: crates/theme/src/schema.rs, crates/settings_content/src/theme.rs, crates/theme/src/styles/colors.rs, crates/theme/src/theme.rs, crates/theme_settings/src/theme_settings.rs, crates/ui/src/components/button/button_like.rs, crates/ui/src/components/modal.rs, crates/onboarding/src/theme_preview.rs, assets/themes/spectrum/spectrum-2-inspired.json, crates/theme/src/fallback_themes.rs, crates/theme_importer/src/vscode/converter.rs_
 
-- [ ] 5. Update spacing for Spectrum 2
+- [x] 5. Update spacing for Spectrum 2
   - Change `ListItem` default `indent_step_size` from `px(12.)` to `px(16.)` in `crates/ui/src/components/list/list_item.rs`
   - Adjust `ListItem` dense spacing variant to use 4px vertical padding instead of 0px
   - Change project panel list item horizontal padding from `DynamicSpacing::Base04` to `DynamicSpacing::Base06`
