@@ -278,8 +278,6 @@ fn orchestrate_impl(rules: &[&PathCondition], target: OrchestrateTarget) -> Name
         ));
     }
 
-    if target == OrchestrateTarget::BaymaxRepo {}
-
     let job = Job::default()
         .runs_on(runners::LINUX_SMALL)
         .with_repository_owner_guard()

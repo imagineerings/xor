@@ -3,22 +3,22 @@
   "updated_at": "2026-07-04T12:42:00Z",
   "repo_revision": null,
   "recommendation": {
-    "task_id": "task:f04c50fa6d2e",
+    "task_id": "task:79554e2e33f4",
     "task_identifier": ".agents/specs/spectrum-2-ui-language/tasks.md:76",
     "title": "Update spacing for Spectrum 2",
-    "rationale": "Task 5 (spacing) is the next logical task in the spectrum-2-ui-language workstream. It is independent of other remaining tasks (6, 7) and adds visible UI polish by adjusting list item padding and indent sizes.",
+    "rationale": "Task 5 (spacing) was picked as the next logical task in the spectrum-2-ui-language workstream. It is independent of other remaining tasks (6, 7) and adds visible UI polish by adjusting list item padding and indent sizes.",
     "evidence": [
       "Task 4 (border radius) completed and merged to main in PR #28",
       "Task 5 is independent and can be worked on without waiting for other tasks",
       "Changes are scoped to list_item.rs with no external dependencies",
-      "Tasks 6 (cursor blink) and 7 (docs) remain but Task 5 is the highest-value next step"
+      "Task picked into Linear as SIM-12"
     ],
     "stale_if_changed": [
       ".agents/specs/spectrum-2-ui-language/tasks.md",
       ".agents/specs/spectrum-2-ui-language/design.md",
       ".agents/specs/spectrum-2-ui-language/requirements.md"
     ],
-    "updated_at": "2026-07-04T12:42:00Z"
+    "updated_at": "2026-07-04T13:41:00Z"
   },
   "task_notes": [
     {

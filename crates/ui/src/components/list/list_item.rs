@@ -64,7 +64,7 @@ impl ListItem {
             selected: false,
             spacing: ListItemSpacing::Dense,
             indent_level: 0,
-            indent_step_size: px(12.),
+            indent_step_size: px(16.),
             start_slot: None,
             end_slot: None,
             end_slot_visibility: EndSlotVisibility::default(),
@@ -276,7 +276,7 @@ impl RenderOnce for ListItem {
                     .gap_1()
                     .px(DynamicSpacing::Base06.rems(cx))
                     .map(|this| match self.spacing {
-                        ListItemSpacing::Dense => this,
+                        ListItemSpacing::Dense => this.py(DynamicSpacing::Base02.rems(cx)),
                         ListItemSpacing::ExtraDense => this.py_neg_px(),
                         ListItemSpacing::Sparse => this.py_1(),
                     })

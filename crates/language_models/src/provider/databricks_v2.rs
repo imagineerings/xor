@@ -28,8 +28,9 @@ pub struct DatabricksSettings {
 }
 
 /// Databricks chat model supported through the Foundation Model API.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Default, Clone, Debug, PartialEq)]
 pub enum DatabricksModel {
+    #[default]
     Default,
 }
 
@@ -58,12 +59,6 @@ impl DatabricksModel {
 
     pub fn supports_images(&self) -> bool {
         false
-    }
-}
-
-impl Default for DatabricksModel {
-    fn default() -> Self {
-        Self::Default
     }
 }
 

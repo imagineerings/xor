@@ -27,8 +27,9 @@ pub struct TetrateSettings {
     pub custom_headers: CustomHeaders,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Default, Clone, Debug, PartialEq)]
 pub enum TetrateModel {
+    #[default]
     Default,
 }
 
@@ -51,12 +52,6 @@ impl TetrateModel {
     }
     pub fn supports_images(&self) -> bool {
         true
-    }
-}
-
-impl Default for TetrateModel {
-    fn default() -> Self {
-        Self::Default
     }
 }
 

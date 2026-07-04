@@ -28,8 +28,9 @@ pub struct NanoGptSettings {
 }
 
 /// NanoGPT model.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Default, Clone, Debug, PartialEq)]
 pub enum NanoGptModel {
+    #[default]
     Default,
 }
 
@@ -56,12 +57,6 @@ impl NanoGptModel {
 
     pub fn supports_images(&self) -> bool {
         true
-    }
-}
-
-impl Default for NanoGptModel {
-    fn default() -> Self {
-        Self::Default
     }
 }
 

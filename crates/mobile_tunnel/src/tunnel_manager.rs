@@ -142,12 +142,16 @@ impl TunnelManager {
                         attempt + 1
                     );
                     // Give the tunnel a moment to stabilize
-                    smol::Timer::after(std::time::Duration::from_millis(500)).await;
+                    cx.background_executor()
+                        .timer(std::time::Duration::from_millis(500))
+                        .await;
                     break;
                 }
                 Err(_) => {
                     if attempt < max_attempts - 1 {
-                        smol::Timer::after(std::time::Duration::from_millis(100)).await;
+                        cx.background_executor()
+                            .timer(std::time::Duration::from_millis(100))
+                            .await;
                     }
                 }
             }
@@ -170,7 +174,7 @@ impl TunnelManager {
         let auth_token = generate_auth_token();
         let tunnel_info = TunnelInfo {
             endpoint_url: format!("127.0.0.1:{}", local_port),
-            auth_token: Some(auth_token.clone()),
+            auth_token: Some(auth_token),
             local_port,
         };
 

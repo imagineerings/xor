@@ -90,19 +90,14 @@ pub struct RecipeStep {
     pub wait_for_input: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ErrorPolicy {
+    #[default]
     Stop,
     Skip,
     Continue,
     Retry,
-}
-
-impl Default for ErrorPolicy {
-    fn default() -> Self {
-        Self::Stop
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -28,8 +28,9 @@ pub struct DatabricksV1Settings {
 }
 
 /// Databricks Legacy Serving Endpoint model.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Default, Clone, Debug, PartialEq)]
 pub enum DatabricksV1Model {
+    #[default]
     Default,
 }
 
@@ -62,12 +63,6 @@ impl DatabricksV1Model {
         match self {
             Self::Default => false,
         }
-    }
-}
-
-impl Default for DatabricksV1Model {
-    fn default() -> Self {
-        Self::Default
     }
 }
 

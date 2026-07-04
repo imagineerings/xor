@@ -70,7 +70,7 @@ impl HintLoader {
             }
         }
 
-        hints.sort_by(|a, b| b.priority.cmp(&a.priority));
+        hints.sort_by_key(|hint| std::cmp::Reverse(hint.priority));
         (hints, errors)
     }
 
@@ -112,7 +112,7 @@ impl HintLoader {
             }
         }
 
-        hints.sort_by(|a, b| b.priority.cmp(&a.priority));
+        hints.sort_by_key(|hint| std::cmp::Reverse(hint.priority));
         (hints, errors)
     }
 

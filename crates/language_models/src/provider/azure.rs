@@ -132,13 +132,6 @@ impl AzureLanguageModelProvider {
         SharedString::new(format!("https://{resource}.openai.azure.com"))
     }
 
-    fn api_version(cx: &App) -> SharedString {
-        Self::settings(cx)
-            .api_version
-            .unwrap_or_else(|| DEFAULT_API_VERSION.to_string())
-            .into()
-    }
-
     fn create_language_model(&self, deployment: &AzureDeployment) -> Arc<dyn LanguageModel> {
         Arc::new(AzureLanguageModel {
             id: LanguageModelId::from(deployment.model.clone()),
@@ -329,7 +322,7 @@ impl LanguageModel for AzureLanguageModel {
             let body = serde_json::to_string(&open_ai_request).map_err(|e| {
                 LanguageModelCompletionError::SerializeRequest {
                     provider: PROVIDER_NAME,
-                    error: e.into(),
+                    error: e,
                 }
             })?;
 
@@ -341,13 +334,13 @@ impl LanguageModel for AzureLanguageModel {
                 .body(AsyncBody::from(body))
                 .map_err(|e| LanguageModelCompletionError::BuildRequestBody {
                     provider: PROVIDER_NAME,
-                    error: e.into(),
+                    error: e,
                 })?;
 
             let response = http_client.send(http_request).await.map_err(|e| {
                 LanguageModelCompletionError::HttpSend {
                     provider: PROVIDER_NAME,
-                    error: e.into(),
+                    error: e,
                 }
             })?;
 

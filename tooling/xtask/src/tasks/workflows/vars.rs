@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::{cell::RefCell, ops::Not};
 
 use gh_workflow::{

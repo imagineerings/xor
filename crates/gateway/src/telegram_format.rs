@@ -60,7 +60,7 @@ impl TelegramFormatter {
                     Tag::Strikethrough => html.push_str("<s>"),
                     Tag::Link { dest_url, .. } => {
                         html.push_str("<a href=\"");
-                        html.push_str(&escape_html(&*dest_url));
+                        html.push_str(&escape_html(&dest_url));
                         html.push_str("\">");
                     }
                     _ => {}

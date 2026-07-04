@@ -27,8 +27,9 @@ pub struct KimiCodeSettings {
     pub custom_headers: CustomHeaders,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Default, Clone, Debug, PartialEq)]
 pub enum KimiCodeModel {
+    #[default]
     Default,
 }
 impl KimiCodeModel {
@@ -50,11 +51,6 @@ impl KimiCodeModel {
     }
     pub fn supports_images(&self) -> bool {
         true
-    }
-}
-impl Default for KimiCodeModel {
-    fn default() -> Self {
-        Self::Default
     }
 }
 

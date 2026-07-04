@@ -139,7 +139,7 @@ impl GatewayHandler for TelegramGateway {
                     }
                 }
 
-                smol::Timer::after(interval).await;
+                cx.background_executor().timer(interval).await;
             }
         })
     }

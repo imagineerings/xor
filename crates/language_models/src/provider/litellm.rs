@@ -28,8 +28,9 @@ pub struct LiteLlmSettings {
 }
 
 /// LiteLLM proxy model.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Default, Clone, Debug, PartialEq)]
 pub enum LiteLlmModel {
+    #[default]
     Default,
 }
 
@@ -56,12 +57,6 @@ impl LiteLlmModel {
 
     pub fn supports_images(&self) -> bool {
         true
-    }
-}
-
-impl Default for LiteLlmModel {
-    fn default() -> Self {
-        Self::Default
     }
 }
 

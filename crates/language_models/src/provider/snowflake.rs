@@ -29,8 +29,9 @@ pub struct SnowflakeSettings {
 }
 
 /// Snowflake Cortex AI chat model.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Default, Clone, Debug, PartialEq)]
 pub enum SnowflakeModel {
+    #[default]
     Default,
 }
 
@@ -61,12 +62,6 @@ impl SnowflakeModel {
 
     pub fn supports_images(&self) -> bool {
         false
-    }
-}
-
-impl Default for SnowflakeModel {
-    fn default() -> Self {
-        Self::Default
     }
 }
 

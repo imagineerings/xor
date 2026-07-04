@@ -959,6 +959,7 @@ mod tests {
             play_sound_when_agent_done: PlaySoundWhenAgentDone::Never,
             single_file_review: false,
             model_parameters: vec![],
+            baymax_mode: Default::default(),
             auto_compact: agent_settings::AutoCompactSettings {
                 enabled: false,
                 strategy: agent_settings::AutoCompactStrategy::default(),

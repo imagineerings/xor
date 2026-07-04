@@ -112,6 +112,7 @@ pub enum TestError {
     Other(anyhow::Error),
 }
 
+#[allow(non_camel_case_types)]
 #[async_trait(?Send)]
 pub trait randomizedTest: 'static + Sized {
     type Operation: Send + Clone + Serialize + DeserializeOwned;

@@ -27,8 +27,9 @@ pub struct AvianSettings {
     pub custom_headers: CustomHeaders,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Default, Clone, Debug, PartialEq)]
 pub enum AvianModel {
+    #[default]
     Default,
 }
 impl AvianModel {
@@ -50,11 +51,6 @@ impl AvianModel {
     }
     pub fn supports_images(&self) -> bool {
         true
-    }
-}
-impl Default for AvianModel {
-    fn default() -> Self {
-        Self::Default
     }
 }
 

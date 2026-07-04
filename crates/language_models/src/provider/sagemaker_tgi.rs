@@ -28,8 +28,9 @@ pub struct SageMakerTgiSettings {
 }
 
 /// SageMaker TGI model — represents a model deployed on a SageMaker endpoint.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Default, Clone, Debug, PartialEq)]
 pub enum SageMakerTgiModel {
+    #[default]
     Default,
 }
 
@@ -56,12 +57,6 @@ impl SageMakerTgiModel {
 
     pub fn supports_images(&self) -> bool {
         true
-    }
-}
-
-impl Default for SageMakerTgiModel {
-    fn default() -> Self {
-        Self::Default
     }
 }
 

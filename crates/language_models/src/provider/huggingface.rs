@@ -29,8 +29,9 @@ pub struct HuggingFaceSettings {
 }
 
 /// HuggingFace chat model supported through the Inference API.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Default, Clone, Debug, PartialEq)]
 pub enum HuggingFaceModel {
+    #[default]
     MetaLlama,
     Mistral,
     Qwen,
@@ -67,12 +68,6 @@ impl HuggingFaceModel {
 
     pub fn supports_images(&self) -> bool {
         matches!(self, Self::Qwen)
-    }
-}
-
-impl Default for HuggingFaceModel {
-    fn default() -> Self {
-        Self::MetaLlama
     }
 }
 

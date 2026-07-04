@@ -1051,7 +1051,7 @@ impl NativeAgent {
         // Load hints (global + project) concurrently with skills.
         let hints_task = {
             let hint_fs = fs.clone();
-            let roots = worktree_roots.clone();
+            let roots = worktree_roots;
             cx.background_spawn(async move {
                 let loader = HintLoader::new(hint_fs);
                 loader.load_all(&roots).await
