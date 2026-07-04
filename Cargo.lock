@@ -18867,6 +18867,7 @@ dependencies = [
  "collections",
  "gpui",
  "gpui_util",
+ "language",
  "log",
  "palette",
  "refineable",

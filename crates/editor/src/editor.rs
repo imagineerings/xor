@@ -2227,6 +2227,7 @@ impl Editor {
             searchable: !is_minimap,
             cursor_shape: EditorSettings::get_global(cx)
                 .cursor_shape
+                .or_else(|| ThemeSettings::get_global(cx).cursor_style)
                 .unwrap_or_default(),
             cursor_offset_on_selection: false,
             current_line_highlight: None,
@@ -9575,7 +9576,11 @@ impl Editor {
                 self.breadcrumbs_visibility =
                     BreadcrumbsVisibility::new(editor_settings.toolbar.breadcrumbs);
             }
-            self.cursor_shape = editor_settings.cursor_shape.unwrap_or_default();
+            // Only update cursor_shape from EditorSettings if user explicitly set it;
+            // otherwise let theme_changed handle theme-aware defaults
+            if let Some(cursor_shape) = editor_settings.cursor_shape {
+                self.cursor_shape = cursor_shape;
+            }
         }
 
         if old_cursor_shape != self.cursor_shape {
@@ -9689,6 +9694,18 @@ impl Editor {
     fn theme_changed(&mut self, _: &mut Window, cx: &mut Context<Self>) {
         if !self.mode.is_full() {
             return;
+        }
+
+        // Apply theme-aware cursor style if user hasn't explicitly set one
+        let editor_settings = EditorSettings::get_global(cx);
+        if editor_settings.cursor_shape.is_none() {
+            let theme_settings = ThemeSettings::get_global(cx);
+            if let Some(cursor_style) = theme_settings.cursor_style {
+                if self.cursor_shape != cursor_style {
+                    self.cursor_shape = cursor_style;
+                    cx.emit(EditorEvent::CursorShapeChanged);
+                }
+            }
         }
 
         let new_accents = self.fetch_accent_data(cx);

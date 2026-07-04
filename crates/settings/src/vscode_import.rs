@@ -988,6 +988,8 @@ impl VsCodeSettings {
             unnecessary_code_fade: None,
             experimental_theme_overrides: None,
             theme_overrides: Default::default(),
+            cursor_style: None,
+            cursor_blink: None,
         }
     }
 

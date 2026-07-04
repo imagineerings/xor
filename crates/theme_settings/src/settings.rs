@@ -7,6 +7,7 @@ use gpui::{
     App, Context, Font, FontFallbacks, FontStyle, Global, Pixels, SharedString, Subscription,
     Window, px,
 };
+use language::CursorShape;
 use refineable::Refineable;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -80,6 +81,8 @@ pub struct ThemeSettings {
     pub experimental_theme_overrides: Option<settings::ThemeStyleContent>,
     /// Manual overrides per theme
     pub theme_overrides: HashMap<String, settings::ThemeStyleContent>,
+    /// The cursor style for the editor when this theme is active.
+    pub cursor_style: Option<CursorShape>,
     /// The current icon theme selection.
     pub icon_theme: IconThemeSelection,
     /// The density of the UI.
@@ -708,6 +711,11 @@ impl settings::Settings for ThemeSettings {
             theme: theme_selection,
             experimental_theme_overrides: content.experimental_theme_overrides.clone(),
             theme_overrides: content.theme_overrides.clone(),
+            cursor_style: content.cursor_style.map(|s| match s {
+                settings::CursorStyle::Bar => CursorShape::Bar,
+                settings::CursorStyle::Block => CursorShape::Block,
+                settings::CursorStyle::Underline => CursorShape::Underline,
+            }),
             icon_theme: icon_theme_selection,
             ui_density: ui_density_from_settings(content.ui_density.unwrap_or_default()),
             unnecessary_code_fade: content.unnecessary_code_fade.unwrap().0.clamp(0.0, 0.9),

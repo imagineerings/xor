@@ -220,15 +220,17 @@ spectrum-2-icons/
 **`extension.toml`**:
 
 ```toml
-[id]
+id = "spectrum-2-icons"
 name = "Spectrum 2 Inspired Icons"
 version = "0.1.0"
+schema_version = 1
 description = "Spectrum 2-inspired file and folder icons for Baymax"
 authors = ["Ahmad Vegah"]
 
-[icon_themes]
-"themes/spectrum-2-inspired-icons.json" = true
+icon_themes = ["themes/spectrum-2-inspired-icons.json"]
 ```
+
+> **Note:** `[id]` table syntax is not used; fields are flat per `ExtensionManifest` struct deserialization. `icon_themes` is a `Vec<RelPathBuf>`, so the TOML uses an array rather than a key-value table.
 
 **`themes/spectrum-2-inspired-icons.json`**:
 

@@ -185,6 +185,13 @@ pub struct ThemeSettingsContent {
     /// These values will override the ones on the specified theme
     #[serde(default)]
     pub theme_overrides: HashMap<String, ThemeStyleContent>,
+
+    /// Cursor style for the editor when this theme is active.
+    #[schemars(default = "default_cursor_style")]
+    pub cursor_style: Option<CursorStyle>,
+
+    /// Cursor blink style for the editor when this theme is active.
+    pub cursor_blink: Option<CursorBlink>,
 }
 
 /// A font size value in pixels, wrapping around `f32` for custom settings UI rendering.
@@ -252,6 +259,10 @@ fn default_font_fallbacks() -> Option<Vec<FontFamilyName>> {
 
 fn default_buffer_font_weight() -> Option<FontWeightContent> {
     Some(FontWeightContent::NORMAL)
+}
+
+fn default_cursor_style() -> Option<CursorStyle> {
+    Some(CursorStyle::Bar)
 }
 
 /// Represents the selection of a theme, which can be either static or dynamic.
@@ -1352,6 +1363,34 @@ impl FontWeightContent {
     pub const BOLD: FontWeightContent = FontWeightContent(700.0);
     pub const EXTRA_BOLD: FontWeightContent = FontWeightContent(800.0);
     pub const BLACK: FontWeightContent = FontWeightContent(900.0);
+}
+
+/// Cursor style for the editor.
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema, MergeFrom, Default,
+)]
+#[serde(rename_all = "lowercase")]
+pub enum CursorStyle {
+    /// A vertical bar cursor.
+    #[default]
+    Bar,
+    /// A block cursor that surrounds the following character.
+    Block,
+    /// An underline cursor.
+    Underline,
+}
+
+/// Cursor blink style for the editor.
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema, MergeFrom, Default,
+)]
+#[serde(rename_all = "lowercase")]
+pub enum CursorBlink {
+    /// Smooth opacity transition.
+    #[default]
+    Smooth,
+    /// Phase-based blink (on/off).
+    Phase,
 }
 
 impl schemars::JsonSchema for FontWeightContent {

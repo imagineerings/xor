@@ -12,7 +12,7 @@ The work is divided into three workstreams:
 
 ## Tasks
 
-- [ ] 1. Add Spectrum 2 font defaults settings proxy
+- [x] 1. Add Spectrum 2 font defaults settings proxy
   - Add `spectrum2_defaults()` function to `crates/theme_settings/src/theme_settings.rs`
     - Detects if active theme name contains "Spectrum 2 Inspired"
     - Returns `ThemeSettingsContent` with Inter (UI), SF Mono/JetBrains Mono (buffer), 14px/15px sizes, 1.3 line height
@@ -22,7 +22,7 @@ The work is divided into three workstreams:
   - _Requirements: 1, 2_
   - _writes: crates/theme_settings/src/theme_settings.rs_
 
-- [ ] 2. Add cursor style setting and Spectrum 2 defaults
+- [x] 2. Add cursor style setting and Spectrum 2 defaults
   - Add `CursorStyle` enum to `crates/settings_content/src/theme.rs` with variants `Bar`, `Block`, `Underline`
   - Add `#[schemars(default = "default_cursor_style")] pub cursor_style: Option<CursorStyle>` to `ThemeSettingsContent`
   - Add defaults: `Block` when Spectrum 2 theme active, `Bar` otherwise (in `spectrum2_defaults()`)
