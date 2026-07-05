@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-05T20:02:37.896Z",
+  "updated_at": "2026-07-05T21:19:04.411Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": "task:75ba31ebd766",
@@ -26,10 +26,10 @@
       "title": "Create the shared Baymax game support crate",
       "linear_identifier": "SIM-15",
       "linear_url": "https://linear.app/simtropolis/issue/SIM-15/create-the-shared-baymax-game-support-crate",
-      "status": "active",
+      "status": "inactive",
       "owner": null,
-      "summary": "Currently being implemented in this workspace.",
-      "updated_at": "2026-07-05T20:02:37.895Z"
+      "summary": "Merged in PR #35.",
+      "updated_at": "2026-07-05T21:19:04.410Z"
     }
   ],
   "task_notes": [
@@ -90,7 +90,9 @@
       "rank": 2,
       "rationale": "Also ready, but less immediately useful than enabling dictation runtime foundations.",
       "blockers": [],
-      "evidence": ["workflow.js next listed documentation candidates as ready with no dependencies"]
+      "evidence": [
+        "workflow.js next listed documentation candidates as ready with no dependencies"
+      ]
     }
   ],
   "maintenance": {
@@ -110,7 +112,10 @@
         "Previous task 1 is complete and established the required API.",
         "This task unlocks follow-up UI integration work."
       ],
-      "stale_if_changed": [".agents/specs/example/tasks.md", ".agents/specs/example/design.md"],
+      "stale_if_changed": [
+        ".agents/specs/example/tasks.md",
+        ".agents/specs/example/design.md"
+      ],
       "updated_at": "YYYY-MM-DDTHH:MM:SSZ"
     },
     "task_activity_shape": {
