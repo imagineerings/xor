@@ -9,6 +9,12 @@ pub const CHANNEL_COUNT: ChannelCount = nz!(2);
 mod audio_settings;
 pub use audio_settings::AudioSettings;
 
+mod capture;
+pub use capture::{
+    ActiveCaptureConfig, CaptureConfig, CaptureSampleFormat, CaptureStream, CapturedAudio,
+    MicrophoneCapture,
+};
+
 mod audio_pipeline;
 pub use audio_pipeline::Audio;
 pub use audio_pipeline::{AudioDeviceInfo, AvailableAudioDevices};

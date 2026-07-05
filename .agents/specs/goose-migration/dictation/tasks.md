@@ -11,7 +11,7 @@ Implement the dictation system with microphone capture (extending `crates/audio/
   - Audio capture stream with configurable sample rate and format
   - Platform-specific audio capture backends
   - _Requirements: 1.1_
-  - _writes: crates/audio/src/capture.rs_
+  - _writes: crates/audio/src/capture.rs, crates/audio/src/audio.rs_
 
 - [ ] 2. Create dictation crate with provider trait
   - Define DictationProvider trait

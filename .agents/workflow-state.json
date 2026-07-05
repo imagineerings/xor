@@ -1,24 +1,27 @@
 {
   "version": 1,
-  "updated_at": "2026-07-04T12:42:00Z",
+  "updated_at": "2026-07-05T00:00:00Z",
   "repo_revision": null,
   "recommendation": {
-    "task_id": "task:79554e2e33f4",
-    "task_identifier": ".agents/specs/spectrum-2-ui-language/tasks.md:76",
-    "title": "Update spacing for Spectrum 2",
-    "rationale": "Task 5 (spacing) was picked as the next logical task in the spectrum-2-ui-language workstream. It is independent of other remaining tasks (6, 7) and adds visible UI polish by adjusting list item padding and indent sizes.",
+    "task_id": "task:a7e9cd415303",
+    "task_identifier": ".agents/specs/goose-migration/dictation/tasks.md:9",
+    "title": "Extend audio crate with microphone capture",
+    "rationale": "Picked as the first foundation task in the dictation migration. It is prerequisite infrastructure for later dictation provider and service work and has an isolated write manifest in the audio crate.",
     "evidence": [
-      "Task 4 (border radius) completed and merged to main in PR #28",
-      "Task 5 is independent and can be worked on without waiting for other tasks",
-      "Changes are scoped to list_item.rs with no external dependencies",
-      "Task picked into Linear as SIM-12"
+      "workflow.js next ranked the dictation audio capture task first among scoped goose-migration candidates",
+      "Task 1 has no previous incomplete prerequisites in .agents/specs/goose-migration/dictation/tasks.md",
+      "requirements.md requirement 1.1 requires microphone capture when dictation is activated",
+      "design.md places microphone capture in crates/audio/ and later dictation service work depends on it",
+      "Task picked into Linear as SIM-14"
     ],
     "stale_if_changed": [
-      ".agents/specs/spectrum-2-ui-language/tasks.md",
-      ".agents/specs/spectrum-2-ui-language/design.md",
-      ".agents/specs/spectrum-2-ui-language/requirements.md"
+      ".agents/specs/goose-migration/dictation/tasks.md",
+      ".agents/specs/goose-migration/dictation/design.md",
+      ".agents/specs/goose-migration/dictation/requirements.md",
+      "crates/audio/src/audio.rs",
+      "crates/audio/src/capture.rs"
     ],
-    "updated_at": "2026-07-04T13:41:00Z"
+    "updated_at": "2026-07-05T00:00:00Z"
   },
   "task_notes": [
     {
@@ -32,6 +35,18 @@
       "status": "done",
       "summary": "Task 4: Update border radius constants and add theme key. Completed in PR #28 (merged to main). BorderRadiusContent schema, theme JSON updates, button/modal/onboarding UI updates all merged.",
       "updated_at": "2026-07-04T12:42:00Z"
+    },
+    {
+      "task_identifier": ".agents/specs/goose-migration/dictation/tasks.md:9",
+      "status": "claimed",
+      "summary": "Task 1: Extend audio crate with microphone capture. Claimed as SIM-14 and implemented with a new audio::MicrophoneCapture API plus capture stream/config types in crates/audio/src/capture.rs.",
+      "updated_at": "2026-07-05T00:00:00Z"
+    },
+    {
+      "task_identifier": ".agents/specs/goose-migration/dictation/tasks.md:16",
+      "status": "ready",
+      "summary": "Task 2 can follow after audio capture API lands; it should consume the exported capture types from the audio crate when defining dictation audio formats and provider traits.",
+      "updated_at": "2026-07-05T00:00:00Z"
     }
   ],
   "dependency_notes": [
@@ -39,6 +54,34 @@
       "scope": ".agents/specs/spectrum-2-ui-language",
       "summary": "Tasks 1-4 complete. Task 5 (spacing) is independent — ready to begin. Task 6 (cursor blink) depends on Task 2 (done). Task 7 (docs) depends on all previous tasks. Tasks 5 and 6 can be done in parallel.",
       "updated_at": "2026-07-04T00:00:00Z"
+    },
+    {
+      "scope": ".agents/specs/goose-migration/dictation",
+      "summary": "Task 1 is the foundation for microphone capture and should land before dictation service integration. Tasks 2-4 define provider APIs and implementations; Task 5 should wait for Task 1 and provider traits; Task 6 should wait for service/provider work.",
+      "updated_at": "2026-07-05T00:00:00Z"
+    }
+  ],
+  "ranked_candidates": [
+    {
+      "task_id": "task:a7e9cd415303",
+      "task_identifier": ".agents/specs/goose-migration/dictation/tasks.md:9",
+      "title": "Extend audio crate with microphone capture",
+      "rank": 1,
+      "rationale": "Foundational, no prerequisites, isolated write manifest, unlocks later dictation tasks.",
+      "blockers": [],
+      "evidence": [
+        "workflow.js next scoped to .agents/specs/goose-migration/**/tasks.md ranked it first",
+        "requirements/design/task files agree that microphone capture belongs in crates/audio/"
+      ]
+    },
+    {
+      "task_id": "task:bad4897797ae",
+      "task_identifier": ".agents/specs/goose-migration/documentation/tasks.md:9",
+      "title": "Initialize Docusaurus project",
+      "rank": 2,
+      "rationale": "Also ready, but less immediately useful than enabling dictation runtime foundations.",
+      "blockers": [],
+      "evidence": ["workflow.js next listed documentation candidates as ready with no dependencies"]
     }
   ],
   "maintenance": {
