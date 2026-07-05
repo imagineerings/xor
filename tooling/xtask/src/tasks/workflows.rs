@@ -84,6 +84,29 @@ struct WorkflowFile {
     r#type: WorkflowType,
 }
 
+const ARCHIVED_BAYMAX_WORKFLOW_FILENAMES: &[&str] = &[
+    "after_release.yml",
+    "autofix_pr.yml",
+    "bump_baymax_version.yml",
+    "bump_patch_version.yml",
+    "cherry_pick.yml",
+    "compliance_check.yml",
+    "danger.yml",
+    "deploy_collab.yml",
+    "deploy_docs.yml",
+    "deploy_nightly_docs.yml",
+    "extension_auto_bump.yml",
+    "extension_bump.yml",
+    "extension_tests.yml",
+    "extension_workflow_rollout.yml",
+    "nix_build.yml",
+    "publish_extension_cli.yml",
+    "release.yml",
+    "release_nightly.yml",
+    "run_bundling.yml",
+    "run_tests.yml",
+];
+
 impl WorkflowFile {
     fn baymax(f: fn() -> Workflow) -> WorkflowFile {
         WorkflowFile {
@@ -125,6 +148,11 @@ impl WorkflowFile {
             "{}.yml",
             workflow_name.rsplit("::").next().unwrap_or(workflow_name)
         );
+
+        if self.r#type.should_skip_archived_workflow(&filename) {
+            println!("Skipping archived workflow: {filename}");
+            return Ok(());
+        }
 
         let workflow_path = workflow_folder.join(filename);
 
@@ -176,6 +204,10 @@ impl WorkflowType {
         }
     }
 
+    fn should_skip_archived_workflow(&self, filename: &str) -> bool {
+        *self == WorkflowType::Baymax && ARCHIVED_BAYMAX_WORKFLOW_FILENAMES.contains(&filename)
+    }
+
     fn remove_generated_workflows() -> Result<()> {
         for workflow_type in Self::iter() {
             for path in fs::read_dir(workflow_type.folder_path())? {
@@ -194,6 +226,29 @@ impl WorkflowType {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::WorkflowType;
+
+    #[test]
+    fn skips_archived_baymax_workflows() {
+        assert!(WorkflowType::Baymax.should_skip_archived_workflow("run_bundling.yml"));
+        assert!(WorkflowType::Baymax.should_skip_archived_workflow("release.yml"));
+        assert!(WorkflowType::Baymax.should_skip_archived_workflow("run_tests.yml"));
+    }
+
+    #[test]
+    fn does_not_skip_extension_repository_workflows() {
+        assert!(!WorkflowType::ExtensionCi.should_skip_archived_workflow("run_tests.yml"));
+        assert!(!WorkflowType::ExtensionsShared.should_skip_archived_workflow("bump_version.yml"));
+    }
+
+    #[test]
+    fn does_not_skip_unarchived_baymax_workflows() {
+        assert!(!WorkflowType::Baymax.should_skip_archived_workflow("mobile_android_ci.yml"));
     }
 }
 

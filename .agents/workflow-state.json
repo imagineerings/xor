@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-05T23:13:07.527Z",
+  "updated_at": "2026-07-05T23:16:25.136Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": "task:88d56f7c5fc2",
@@ -42,10 +42,10 @@
       "title": "Update xtask workflow generator to skip archived workflows",
       "linear_identifier": "SIM-10",
       "linear_url": "https://linear.app/simtropolis/issue/SIM-10/update-xtask-workflow-generator-to-skip-archived-workflows",
-      "status": "inactive",
+      "status": "active",
       "owner": null,
       "summary": null,
-      "updated_at": "2026-07-05T22:31:10.482Z"
+      "updated_at": "2026-07-05T22:56:22.132Z"
     },
     {
       "task_id": "task:88d56f7c5fc2",
