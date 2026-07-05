@@ -38,7 +38,7 @@
   - _Requirements: 2.1, 2.2, 3.1_
   - _writes: Cargo.toml, crates/baymax_game/Cargo.toml, crates/baymax_game/src/baymax_game.rs, crates/baymax_game/src/migration.rs, crates/baymax_game/src/tests.rs_
 
-- [ ] 2. Implement migration inventory validation
+- [x] 2. Implement migration inventory validation
   - Add validation for top-level source areas and grouped spec coverage.
   - _Requirements: 1.1, 1.2, 1.3, 12.4_
   - _writes: crates/baymax_game/src/inventory.rs, crates/baymax_game/src/inventory_tests.rs_

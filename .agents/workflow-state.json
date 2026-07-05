@@ -1,25 +1,24 @@
 {
   "version": 1,
-  "updated_at": "2026-07-05T22:45:12.282Z",
+  "updated_at": "2026-07-05T22:49:22.836Z",
   "repo_revision": null,
   "recommendation": {
-    "task_id": "task:569461ce4af3",
-    "task_identifier": ".agents/specs/godot-migration/tasks.md:41",
-    "title": "Implement migration inventory validation",
-    "rationale": "Task 2 is the active W1 Baymax game foundation after the shared crate landed; it adds spec-pack and source-area inventory validation needed by later gatekeeper tasks.",
+    "task_id": "task:b63c03dcd4cb",
+    "task_identifier": ".agents/specs/godot-migration/tasks.md:96",
+    "title": "Add migration gatekeeper validation",
+    "rationale": "Task 13 is the next serial inventory/gatekeeper follow-up after tasks 1 and 2; it can build on the Baymax game crate and migration inventory validation that have now landed.",
     "evidence": [
-      "Task 1 is complete locally and created crates/baymax_game",
-      "SIM-17 is the Linear issue for task 2 and is marked active",
-      "Task 2 writes are limited to the Baymax game inventory module and tests"
+      "Godot migration dependency wave lists task 2 -> 13 -> 14 serial for inventory/gatekeeper writes",
+      "Task 2 is complete locally and SIM-17 is Done",
+      "Task 13 writes new spec_gatekeeper files without overlapping the completed inventory implementation"
     ],
     "stale_if_changed": [
       ".agents/specs/godot-migration/tasks.md",
       ".agents/specs/godot-migration/design.md",
       ".agents/specs/godot-migration/requirements.md",
-      "crates/baymax_game/src/inventory.rs",
-      "crates/baymax_game/src/inventory_tests.rs"
+      "crates/baymax_game/src/inventory.rs"
     ],
-    "updated_at": "2026-07-05T22:45:12.282Z"
+    "updated_at": "2026-07-05T22:49:22.836Z"
   },
   "task_activity": [
     {
@@ -39,10 +38,10 @@
       "title": "Implement migration inventory validation",
       "linear_identifier": "SIM-17",
       "linear_url": "https://linear.app/simtropolis/issue/SIM-17/implement-migration-inventory-validation",
-      "status": "active",
+      "status": "inactive",
       "owner": null,
-      "summary": "Implementation in progress: Baymax game inventory validates grouped spec documents and source-area coverage.",
-      "updated_at": "2026-07-05T22:45:12.282Z"
+      "summary": "Completed by workflow command.",
+      "updated_at": "2026-07-05T22:48:15.385Z"
     }
   ],
   "task_notes": [
@@ -81,6 +80,11 @@
       "scope": ".agents/specs/goose-migration/dictation",
       "summary": "Task 1 is the foundation for microphone capture and should land before dictation service integration. Tasks 2-4 define provider APIs and implementations; Task 5 should wait for Task 1 and provider traits; Task 6 should wait for service/provider work.",
       "updated_at": "2026-07-05T00:00:00Z"
+    },
+    {
+      "scope": ".agents/specs/godot-migration",
+      "summary": "Tasks 1 and 2 are complete. For the inventory/gatekeeper serial path, task 13 should follow task 2 before task 14 extends Comfy-specific inventory validation.",
+      "updated_at": "2026-07-05T22:49:22.836Z"
     }
   ],
   "ranked_candidates": [
