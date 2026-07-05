@@ -6,7 +6,7 @@ Use metadata-only support for XR action maps, camera/spatial classes, and docs. 
 
 ## Components
 
-- `GodotXrBoundary`
+- `BaymaxGameXrBoundary`
 - `SpatialAssetMetadata`
 
 ## Correctness Properties

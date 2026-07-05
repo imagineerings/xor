@@ -6,7 +6,7 @@ Reuse Baymax media, image, shader-language, and preview infrastructure. Treat wo
 
 ## Components
 
-- `GodotMediaClassifier`
+- `BaymaxGameMediaClassifier`
 - `GeneratedMediaPreviewRoute`
 - `UnsupportedPreviewReason`
 

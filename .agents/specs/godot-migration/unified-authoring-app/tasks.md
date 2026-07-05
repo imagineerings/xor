@@ -6,7 +6,7 @@ Build a unified authoring workspace over Godot metadata, graph workflows, world-
 
 ## Gates
 
-- Start gate: G0 spec consistency, G2 shared Godot metadata, G3 shared world-model foundations, and applicable G8 Comfy workflow alignment decisions are satisfied.
+- Start gate: G0 spec consistency, G2 shared Baymax game metadata, G3 shared world-model foundations, and applicable G8 Comfy workflow alignment decisions are satisfied.
 - Validation gate: app registration, authoring item routing, preview routing, and generated artifact tests pass.
 - Handoff gate: unsupported previews and unavailable workers produce actionable diagnostics in the workspace model.
 - Completion gate: interactive previews require G4 worker safety, generated artifact views require G6 provenance, and UI work delegates graph editing and workflow metadata to their owning specs.

@@ -6,8 +6,8 @@ Use lightweight parsers for text project, scene, resource, and import metadata. 
 
 ## Components
 
-- `GodotFormatClassifier`
-- `GodotTextResourceParser`
+- `BaymaxGameFormatClassifier`
+- `BaymaxGameTextResourceParser`
 - `GeneratedAssetRegistry`
 
 ## Correctness Properties

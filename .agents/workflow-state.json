@@ -1,28 +1,37 @@
 {
   "version": 1,
-  "updated_at": "2026-07-05T00:00:00Z",
+  "updated_at": "2026-07-05T20:02:37.896Z",
   "repo_revision": null,
   "recommendation": {
-    "task_id": "task:a7e9cd415303",
-    "task_identifier": ".agents/specs/goose-migration/dictation/tasks.md:9",
-    "title": "Extend audio crate with microphone capture",
-    "rationale": "Picked as the first foundation task in the dictation migration. It is prerequisite infrastructure for later dictation provider and service work and has an isolated write manifest in the audio crate.",
+    "task_id": "task:75ba31ebd766",
+    "task_identifier": ".agents/specs/godot-migration/tasks.md:36",
+    "title": "Create the shared Baymax game support crate",
+    "rationale": "Task 1 is the first W1 shared foundation for the Godot-compatible migration. It creates the Baymax-owned game support crate needed before inventory, boundary, parser, fixture, and integration follow-up tasks can safely land.",
     "evidence": [
-      "workflow.js next ranked the dictation audio capture task first among scoped goose-migration candidates",
-      "Task 1 has no previous incomplete prerequisites in .agents/specs/goose-migration/dictation/tasks.md",
-      "requirements.md requirement 1.1 requires microphone capture when dictation is activated",
-      "design.md places microphone capture in crates/audio/ and later dictation service work depends on it",
-      "Task picked into Linear as SIM-14"
+      "Task 1 is first in the godot-migration dependency wave and has no earlier crate prerequisite",
+      "Design now names the Baymax-owned implementation crate as crates/baymax_game while retaining Godot-compatible source-project semantics",
+      "Task picked into Linear as SIM-15"
     ],
     "stale_if_changed": [
-      ".agents/specs/goose-migration/dictation/tasks.md",
-      ".agents/specs/goose-migration/dictation/design.md",
-      ".agents/specs/goose-migration/dictation/requirements.md",
-      "crates/audio/src/audio.rs",
-      "crates/audio/src/capture.rs"
+      ".agents/specs/godot-migration/tasks.md",
+      ".agents/specs/godot-migration/design.md",
+      ".agents/specs/godot-migration/requirements.md"
     ],
     "updated_at": "2026-07-05T00:00:00Z"
   },
+  "task_activity": [
+    {
+      "task_id": "task:75ba31ebd766",
+      "task_identifier": ".agents/specs/godot-migration/tasks.md:36",
+      "title": "Create the shared Baymax game support crate",
+      "linear_identifier": "SIM-15",
+      "linear_url": "https://linear.app/simtropolis/issue/SIM-15/create-the-shared-baymax-game-support-crate",
+      "status": "active",
+      "owner": null,
+      "summary": "Currently being implemented in this workspace.",
+      "updated_at": "2026-07-05T20:02:37.895Z"
+    }
+  ],
   "task_notes": [
     {
       "task_identifier": ".agents/specs/spectrum-2-ui-language/tasks.md:34",
@@ -87,6 +96,7 @@
   "maintenance": {
     "instructions": [
       "Update this file while evaluating workflow.js next candidates.",
+      "Use task_activity to distinguish active claimed Linear issues from inactive claimed issues that are available to resume.",
       "Store concise conclusions, evidence, blockers, and dependency notes.",
       "Do not store private chain-of-thought or long scratch reasoning.",
       "Refresh recommendation after tasks.md, requirements.md, or design.md changes."
@@ -101,6 +111,17 @@
         "This task unlocks follow-up UI integration work."
       ],
       "stale_if_changed": [".agents/specs/example/tasks.md", ".agents/specs/example/design.md"],
+      "updated_at": "YYYY-MM-DDTHH:MM:SSZ"
+    },
+    "task_activity_shape": {
+      "task_id": "task:<stable-id>",
+      "task_identifier": ".agents/specs/example/tasks.md:12",
+      "title": "Task title",
+      "linear_identifier": "SIM-123",
+      "linear_url": "https://linear.app/...",
+      "status": "active | inactive",
+      "owner": "optional human or agent label",
+      "summary": "Short handoff/status note.",
       "updated_at": "YYYY-MM-DDTHH:MM:SSZ"
     },
     "task_note_shape": {

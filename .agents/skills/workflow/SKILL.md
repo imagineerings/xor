@@ -111,6 +111,10 @@ Commands:
 - `pick <task-id>` — render a selected task and create or resume Linear.
 - `move <task-or-linear-id> --state-name <state>` — move a Linear issue from
   one workflow stage to another.
+- `activity <task-or-linear-id> --status active|inactive` — update Linear
+  activity markers and the local workflow-state cache for claimed work. Use
+  `active` when taking a task and `inactive` when pausing or handing off work
+  that should be resumed later.
 - `complete <task-id> --state-name <state>` — after the agent verifies the task
   works correctly, move the linked Linear issue and mark the local task
   checkbox complete. Defaults to `--state-name Done`.
@@ -146,6 +150,11 @@ file is a structured cache for reviewable conclusions only:
 
 - `recommendation`: the currently recommended task ID/source, short rationale,
   evidence, and files that should make the recommendation stale when changed.
+- `task_activity`: local cache of claimed Linear-backed tasks and whether they
+  are `active` (currently being worked by an agent/human and should be skipped
+  by `next`) or `inactive` (claimed but available to resume before creating new
+  work). Linear issue description markers are the cross-machine source of truth;
+  this file mirrors them for fast local decisions.
 - `task_notes`: concise notes for blocked, deprioritized, claimed, dependency,
   or ready tasks.
 - `dependency_notes`: reusable ordering facts discovered while inspecting
@@ -156,11 +165,16 @@ file is a structured cache for reviewable conclusions only:
 
 Agents should read the decision state before spending time re-evaluating all
 candidates, validate it against current repository state, and update it after
-accepting or rejecting a recommendation. When writing back, store the selected
-task, rejected higher-ranked candidates, short rationale, evidence, and
-stale-file dependencies so future `workflow.js next` runs can prefer smarter
-shortlists. Do not store private chain-of-thought, long scratch reasoning,
-secrets, or unverified guesses.
+accepting or rejecting a recommendation. Before picking new work, check Linear
+activity markers first, then the local `task_activity` cache: skip claimed tasks
+marked `active`, prefer resuming claimed tasks marked `inactive` when they are
+the next logical task, and mark a task `active` when taking it over. When
+pausing or handing off unmerged work, mark it `inactive` with a concise summary.
+When writing back, store the selected task,
+rejected higher-ranked candidates, short rationale, evidence, and stale-file
+dependencies so future `workflow.js next` runs can prefer smarter shortlists. Do
+not store private chain-of-thought, long scratch reasoning, secrets, or
+unverified guesses.
 
 ## Parallel Worktrees
 

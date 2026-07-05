@@ -511,6 +511,7 @@ function loadWorkflowState(settings, options = {}) {
 function normalizeWorkflowState(state, relativePath) {
   const taskNotes = Array.isArray(state.task_notes) ? state.task_notes : [];
   const dependencyNotes = Array.isArray(state.dependency_notes) ? state.dependency_notes : [];
+  const taskActivity = Array.isArray(state.task_activity) ? state.task_activity : [];
   return {
     path: relativePath,
     exists: true,
@@ -518,8 +519,159 @@ function normalizeWorkflowState(state, relativePath) {
     updated_at: state.updated_at || null,
     repo_revision: state.repo_revision || null,
     recommendation: normalizeWorkflowStateRecommendation(state.recommendation),
+    task_activity: taskActivity.map(normalizeTaskActivity).filter(Boolean),
     task_notes: taskNotes.filter((note) => note && typeof note === "object"),
     dependency_notes: dependencyNotes.filter((note) => note && typeof note === "object"),
+    ranked_candidates: Array.isArray(state.ranked_candidates) ? state.ranked_candidates : [],
+    maintenance: state.maintenance && typeof state.maintenance === "object" ? state.maintenance : null,
+  };
+}
+
+function normalizeTaskActivity(activity) {
+  if (!activity || typeof activity !== "object") return null;
+  const status = normalizeActivityStatus(activity.status || activity.activity || activity.state);
+  if (!status) return null;
+  return {
+    task_id: activity.task_id || null,
+    task_identifier: activity.task_identifier || null,
+    title: activity.title || null,
+    linear_identifier: activity.linear_identifier || null,
+    linear_url: activity.linear_url || null,
+    status,
+    owner: activity.owner || null,
+    summary: activity.summary || null,
+    updated_at: activity.updated_at || null,
+  };
+}
+
+function normalizeActivityStatus(status) {
+  const normalized = String(status || "").toLowerCase();
+  if (["active", "inactive"].includes(normalized)) return normalized;
+  return null;
+}
+
+function saveWorkflowState(settings, state) {
+  const filePath = workflowStatePath(settings);
+  const { path: _path, exists: _exists, error: _error, ...serializable } = state;
+  serializable.updated_at = new Date().toISOString();
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, `${JSON.stringify(serializable, null, 2)}\n`, "utf8");
+}
+
+function findTaskActivity(state, task, issue = null) {
+  const linearIdentifier = issue?.identifier || task.linear?.identifier || null;
+  return (state.task_activity || []).find((activity) => {
+    return (
+      (activity.task_id && activity.task_id === task.id) ||
+      (activity.task_identifier && activity.task_identifier === task.identifier) ||
+      (linearIdentifier && activity.linear_identifier === linearIdentifier)
+    );
+  });
+}
+
+function upsertTaskActivity(settings, task, issue, status, options = {}) {
+  const normalizedStatus = normalizeActivityStatus(status);
+  if (!normalizedStatus) {
+    throw new Error(`Unsupported task activity status: ${status}`);
+  }
+
+  const state = loadWorkflowState(settings);
+  if (state.error) {
+    throw new Error(state.error);
+  }
+
+  const existingIndex = (state.task_activity || []).findIndex((activity) => {
+    return (
+      (activity.task_id && activity.task_id === task.id) ||
+      (activity.task_identifier && activity.task_identifier === task.identifier) ||
+      (issue?.identifier && activity.linear_identifier === issue.identifier)
+    );
+  });
+
+  const record = {
+    task_id: task.id,
+    task_identifier: task.identifier,
+    title: task.title,
+    linear_identifier: issue?.identifier || task.linear?.identifier || null,
+    linear_url: issue?.url || task.linear?.url || null,
+    status: normalizedStatus,
+    owner: options.owner || null,
+    summary: options.summary || null,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (existingIndex >= 0) {
+    state.task_activity[existingIndex] = {
+      ...state.task_activity[existingIndex],
+      ...record,
+    };
+  } else {
+    state.task_activity = [...(state.task_activity || []), record];
+  }
+
+  saveWorkflowState(settings, state);
+  return record;
+}
+
+function claimedTaskStatus(settings, task, issue) {
+  const linearActivity = parseLinearWorkflowActivity(issue?.description || "");
+  if (linearActivity) {
+    return {
+      activity: linearActivity,
+      source: "linear",
+      is_active: linearActivity.status === "active",
+      is_inactive: linearActivity.status === "inactive",
+    };
+  }
+
+  const state = loadWorkflowState(settings);
+  const activity = state.error ? null : findTaskActivity(state, task, issue);
+  return {
+    activity,
+    source: activity ? "workflow_state" : "missing",
+    is_active: activity?.status === "active",
+    is_inactive: activity?.status === "inactive" || !activity,
+  };
+}
+
+function parseLinearWorkflowActivity(description) {
+  const lines = String(description || "").split(/\r?\n/);
+  const values = {};
+  for (const line of lines) {
+    const separator = line.indexOf(":");
+    if (separator === -1) continue;
+    const key = line.slice(0, separator).trim();
+    const value = line.slice(separator + 1).trim();
+    if (key === "workflow.activity") values.status = normalizeActivityStatus(value);
+    if (key === "workflow.activity_owner") values.owner = value || null;
+    if (key === "workflow.activity_summary") values.summary = value || null;
+    if (key === "workflow.activity_updated_at") values.updated_at = value || null;
+  }
+  if (!values.status) return null;
+  return {
+    task_id: null,
+    task_identifier: null,
+    title: null,
+    linear_identifier: null,
+    linear_url: null,
+    status: values.status,
+    owner: values.owner || null,
+    summary: values.summary || null,
+    updated_at: values.updated_at || null,
+  };
+}
+
+function syncTaskActivityRecord(task, issue, activity) {
+  return {
+    task_id: task.id,
+    task_identifier: task.identifier,
+    title: task.title,
+    linear_identifier: issue?.identifier || task.linear?.identifier || activity?.linear_identifier || null,
+    linear_url: issue?.url || task.linear?.url || activity?.linear_url || null,
+    status: activity.status,
+    owner: activity.owner || null,
+    summary: activity.summary || null,
+    updated_at: activity.updated_at || new Date().toISOString(),
   };
 }
 
@@ -555,12 +707,21 @@ function summarizeWorkflowState(state, tasks) {
     })
     .slice(0, 12);
 
+  const relevantTaskActivity = (state.task_activity || [])
+    .filter((activity) => {
+      return tasks.some((task) => {
+        return task.id === activity.task_id || task.identifier === activity.task_identifier;
+      });
+    })
+    .slice(0, 12);
+
   return {
     path: state.path,
     exists: state.exists,
     error: state.error || null,
     updated_at: state.updated_at || null,
     repo_revision: state.repo_revision || null,
+    task_activity: relevantTaskActivity,
     recommendation: recommendation
       ? {
           ...recommendation,
@@ -750,38 +911,99 @@ async function linear(settings, query, variables = {}) {
   return payload.data;
 }
 
-function linearIssueDescription(task, prompt) {
+function linearIssueDescription(task, _prompt) {
   return [
     "Workflow picked this local Baymax spec task.",
     "",
     workflowTaskMarker(task),
     workflowSourceMarker(task),
+    "workflow.activity:active",
+    `workflow.activity_updated_at:${new Date().toISOString()}`,
     "",
-    `Task ID: ${task.id}`,
+    `Task: ${task.title}`,
     `Source: ${task.task_file}:${task.task_line}`,
-    `Local state: ${task.state}`,
     "",
-    "Task body:",
-    "```markdown",
-    task.task_body,
-    "```",
+    "Summary:",
+    task.description || task.title,
     "",
     "Requirements:",
     formatList(task.requirements),
     "",
-    "Writes:",
+    "Expected writes:",
     formatList(task.writes),
-    "",
-    "Rendered prompt:",
-    "```markdown",
-    prompt,
-    "```",
   ].join("\n");
 }
 
 function formatList(values) {
   if (!values || values.length === 0) return "- N/A";
   return values.map((value) => `- ${value}`).join("\n");
+}
+
+function withLinearActivityMarkers(description, activity) {
+  const markers = {
+    "workflow.activity": activity.status,
+    "workflow.activity_updated_at": activity.updated_at || new Date().toISOString(),
+    "workflow.activity_owner": activity.owner || null,
+    "workflow.activity_summary": activity.summary || null,
+  };
+
+  let lines = String(description || "")
+    .split(/\r?\n/)
+    .filter((line) => {
+      return !Object.keys(markers).some((key) => line.startsWith(`${key}:`));
+    });
+
+  const sourceIndex = lines.findIndex((line) => line.startsWith("workflow.local_task_source:"));
+  const insertIndex = sourceIndex >= 0 ? sourceIndex + 1 : lines.findIndex((line) => line.trim() === "");
+  const markerLines = Object.entries(markers)
+    .filter(([_key, value]) => value)
+    .map(([key, value]) => `${key}:${value}`);
+
+  if (insertIndex >= 0) {
+    lines.splice(insertIndex, 0, ...markerLines);
+  } else {
+    lines = [...markerLines, "", ...lines];
+  }
+
+  return lines.join("\n");
+}
+
+async function updateLinearIssueActivity(settings, issue, activity) {
+  const query = `
+    query($id: String!) {
+      issue(id: $id) {
+        id
+        identifier
+        description
+      }
+    }`;
+  const fetched = await linear(settings, query, { id: issue.identifier || issue.id });
+  const currentDescription = fetched.issue?.description || "";
+  const description = withLinearActivityMarkers(currentDescription, activity);
+  const mutation = `
+    mutation($id: String!, $input: IssueUpdateInput!) {
+      issueUpdate(id: $id, input: $input) {
+        success
+        issue {
+          id
+          identifier
+          title
+          url
+          branchName
+          description
+          state { name }
+        }
+      }
+    }`;
+  const data = await linear(settings, mutation, {
+    id: issue.identifier || issue.id,
+    input: { description },
+  });
+  const updated = data.issueUpdate;
+  if (!updated?.success || !updated.issue) {
+    throw new Error("Linear issueUpdate did not return an updated issue");
+  }
+  return updated.issue;
 }
 
 function groupLabel(dir) {
@@ -903,37 +1125,62 @@ async function pickNextTask(settings, workflow, tasks, attempt) {
     };
   }
 
-  if (tasks.length === 1) {
-    const existing = await findExistingLinearIssue(settings, tasks[0]);
-    if (existing) {
-      return {
-        task: null,
-        prompt: null,
-        action: "none",
-        duplicate_prevented: false,
-        skipped_claimed_tasks: [
-          {
-            task_id: tasks[0].id,
-            task_identifier: tasks[0].identifier,
-            task_title: tasks[0].title,
-            linear_identifier: existing.identifier || null,
-            linear_url: existing.url || null,
-            linear_state: typeof existing.state === "string" ? existing.state : existing.state?.name || null,
-          },
-        ],
-        reason: "The only active local task already has a non-terminal Linear issue.",
-      };
+  const ranked = rankCandidates(tasks, settings);
+  const candidates = [];
+  const skippedClaimedTasks = [];
+
+  for (const task of ranked) {
+    const existing = await findExistingLinearIssue(settings, task);
+    if (!existing) {
+      candidates.push(task);
+      continue;
     }
-    const picked = await pickTask(settings, workflow, tasks[0], attempt, {
+
+    const claimed = claimedTaskStatus(settings, task, existing);
+    if (claimed.is_active) {
+      skippedClaimedTasks.push(skippedClaimedTask(task, existing, claimed.activity));
+      continue;
+    }
+
+    const picked = await pickTask(settings, workflow, task, attempt, {
+      existingIssue: existing,
       existingChecked: true,
+      markActive: true,
+    });
+    return {
+      task: picked.task,
+      prompt: picked.prompt,
+      action: "resumed_inactive",
+      duplicate_prevented: skippedClaimedTasks.length > 0,
+      candidates: null,
+      skipped_claimed_tasks: skippedClaimedTasks,
+      reason: "Resumed an inactive claimed task before starting new work.",
+    };
+  }
+
+  if (candidates.length === 1) {
+    const picked = await pickTask(settings, workflow, candidates[0], attempt, {
+      existingChecked: true,
+      markActive: true,
     });
     return {
       task: picked.task,
       prompt: picked.prompt,
       action: picked.action,
-      duplicate_prevented: false,
+      duplicate_prevented: skippedClaimedTasks.length > 0,
       candidates: null,
-      skipped_claimed_tasks: [],
+      skipped_claimed_tasks: skippedClaimedTasks,
+    };
+  }
+
+  if (candidates.length === 0) {
+    return {
+      task: null,
+      prompt: null,
+      action: "none",
+      duplicate_prevented: skippedClaimedTasks.length > 0,
+      skipped_claimed_tasks: skippedClaimedTasks,
+      reason: "All active local tasks are already claimed and marked active in workflow state.",
     };
   }
 
@@ -941,13 +1188,27 @@ async function pickNextTask(settings, workflow, tasks, attempt) {
     task: null,
     prompt: null,
     action: "evaluate",
-    duplicate_prevented: false,
-    candidates: rankCandidates(tasks, settings),
-    skipped_claimed_tasks: [],
+    duplicate_prevented: skippedClaimedTasks.length > 0,
+    candidates,
+    skipped_claimed_tasks: skippedClaimedTasks,
     reason:
-      `${tasks.length} active unclaimed tasks available. ` +
+      `${candidates.length} unclaimed tasks available. ` +
       "Top candidates ranked by priority and dependency order. " +
       "Pick one with: node .agents/skills/workflow/scripts/workflow.js pick <task-id>",
+  };
+}
+
+function skippedClaimedTask(task, issue, activity = null) {
+  return {
+    task_id: task.id,
+    task_identifier: task.identifier,
+    task_title: task.title,
+    linear_identifier: issue.identifier || null,
+    linear_url: issue.url || null,
+    linear_state: typeof issue.state === "string" ? issue.state : issue.state?.name || null,
+    activity_status: activity?.status || null,
+    activity_owner: activity?.owner || null,
+    activity_updated_at: activity?.updated_at || null,
   };
 }
 
@@ -959,20 +1220,16 @@ async function pickNextTasks(settings, workflow, tasks, attempt, count) {
   for (const task of ranked) {
     if (pickedTasks.length >= count) break;
     const existing = await findExistingLinearIssue(settings, task);
-    if (existing) {
-      skippedClaimedTasks.push({
-        task_id: task.id,
-        task_identifier: task.identifier,
-        task_title: task.title,
-        linear_identifier: existing.identifier || null,
-        linear_url: existing.url || null,
-        linear_state: typeof existing.state === "string" ? existing.state : existing.state?.name || null,
-      });
+    const claimed = existing ? claimedTaskStatus(settings, task, existing) : null;
+    if (existing && claimed?.is_active) {
+      skippedClaimedTasks.push(skippedClaimedTask(task, existing, claimed.activity));
       continue;
     }
 
     const picked = await pickTask(settings, workflow, task, attempt, {
+      existingIssue: existing,
       existingChecked: true,
+      markActive: true,
     });
     pickedTasks.push({
       task: picked.task,
@@ -996,21 +1253,53 @@ async function pickNextTasks(settings, workflow, tasks, attempt, count) {
 }
 
 async function pickTask(settings, workflow, task, attempt, options = {}) {
-  if (settings.resume_existing !== false && !options.existingChecked) {
-    const existing = await findExistingLinearIssue(settings, task);
-    if (existing) {
-      attachLinearIssue(task, existing);
+  const existing =
+    options.existingIssue ||
+    (settings.resume_existing !== false && !options.existingChecked
+      ? await findExistingLinearIssue(settings, task)
+      : null);
+
+  if (existing) {
+    const claimed = claimedTaskStatus(settings, task, existing);
+    if (claimed.is_active && !options.force) {
       return {
-        task,
-        prompt: renderTemplate(workflow.prompt_template, task, attempt),
-        action: "resumed",
+        task: null,
+        prompt: null,
+        action: "claimed_active",
         duplicate_prevented: true,
+        reason:
+          `Task ${task.identifier} is already claimed by ${existing.identifier || "a Linear issue"} ` +
+          "and marked active in workflow state. Pass --force to take it over.",
+        skipped_claimed_tasks: [skippedClaimedTask(task, existing, claimed.activity)],
       };
     }
+
+    attachLinearIssue(task, existing);
+    if (options.markActive !== false) {
+      const activity = upsertTaskActivity(settings, task, existing, "active", {
+        owner: options.owner || null,
+        summary: options.summary || null,
+      });
+      await updateLinearIssueActivity(settings, existing, activity);
+    }
+    return {
+      task,
+      prompt: renderTemplate(workflow.prompt_template, task, attempt),
+      action: claimed.is_inactive ? "resumed_inactive" : "resumed",
+      duplicate_prevented: true,
+    };
   }
 
   const preliminaryPrompt = renderTemplate(workflow.prompt_template, task, attempt);
-  attachLinearIssue(task, await populateLinear(settings, task, preliminaryPrompt));
+  const issue = await populateLinear(settings, task, preliminaryPrompt);
+  attachLinearIssue(task, issue);
+  if (options.markActive !== false) {
+    const activity = upsertTaskActivity(settings, task, issue, "active", {
+      owner: options.owner || null,
+      summary: options.summary || null,
+    });
+    await updateLinearIssueActivity(settings, issue, activity);
+  }
   return {
     task,
     prompt: renderTemplate(workflow.prompt_template, task, attempt),
@@ -1048,8 +1337,17 @@ async function findExistingLinearIssue(settings, task) {
         }
       }
     }`;
-  const data = await linear(settings, query, { term: task.id });
-  const issues = data.searchIssues?.nodes || [];
+  const issues = [];
+  const seen = new Set();
+  for (const term of [task.id, task.identifier]) {
+    const data = await linear(settings, query, { term });
+    for (const issue of data.searchIssues?.nodes || []) {
+      if (seen.has(issue.id)) continue;
+      seen.add(issue.id);
+      issues.push(issue);
+    }
+  }
+
   const terminal = new Set((settings.terminal_states || []).map((state) => state.toLowerCase()));
   const sourceMarker = workflowSourceMarker(task);
 
@@ -1204,6 +1502,68 @@ function checkMergedToMain(settings) {
   }
 }
 
+async function updateTaskActivity(settings, args) {
+  const key = args.task_id || args.issue || args.issue_id || args.task || args.id;
+  if (!key) {
+    throw new Error(
+      "Missing task or Linear issue identifier. Pass activity <task-id-or-linear-id> --status active|inactive.",
+    );
+  }
+
+  const status = normalizeActivityStatus(args.status || args.state || args.activity);
+  if (!status) {
+    throw new Error("Missing or unsupported activity status. Use --status active or --status inactive.");
+  }
+
+  const tasks = listTasks(settings);
+  let task = tasks.find((candidate) => candidate.id === key || candidate.identifier === key);
+  let issue = null;
+
+  if (task) {
+    issue = await findExistingLinearIssue(settings, task);
+    if (!issue) {
+      throw new Error(`No non-terminal Linear issue found for local task ${key}`);
+    }
+  } else {
+    issue = await resolveLinearIssueForMove(settings, { issue: key });
+    task = await findTaskForLinearIssue(settings, issue, tasks);
+    if (!task) {
+      throw new Error(`Could not match ${key} to a local workflow task.`);
+    }
+  }
+
+  attachLinearIssue(task, issue);
+  const activity = upsertTaskActivity(settings, task, issue, status, {
+    owner: args.owner || null,
+    summary: args.summary || null,
+  });
+  const updatedIssue = await updateLinearIssueActivity(settings, issue, activity);
+  attachLinearIssue(task, updatedIssue);
+
+  return {
+    action: "activity_updated",
+    task,
+    issue: task.linear,
+    activity,
+  };
+}
+
+async function findTaskForLinearIssue(settings, issue, tasks = listTasks(settings)) {
+  const query = `
+    query($id: String!) {
+      issue(id: $id) {
+        id
+        identifier
+        description
+      }
+    }`;
+  const data = await linear(settings, query, { id: issue.identifier || issue.id });
+  const description = data.issue?.description || "";
+  return tasks.find((task) => {
+    return description.includes(workflowTaskMarker(task)) || description.includes(workflowSourceMarker(task));
+  });
+}
+
 async function completeTask(settings, args) {
   const taskId = args.task_id || args.issue || args.issue_id;
   if (!taskId) {
@@ -1242,11 +1602,20 @@ async function completeTask(settings, args) {
     ? { updated: false, reason: "Local checkbox update skipped by --no-local." }
     : updateLocalTaskCheckbox(settings, task, "Done");
 
+  let activity = null;
+  if (linear?.issue) {
+    activity = upsertTaskActivity(settings, task, linear.issue, "inactive", {
+      summary: "Completed by workflow command.",
+    });
+    await updateLinearIssueActivity(settings, linear.issue, activity);
+  }
+
   return {
     action: "completed",
     task: findTask(settings, task.id),
     local,
     linear,
+    activity,
   };
 }
 
@@ -1327,12 +1696,18 @@ async function callTool(name, args) {
   if (name === "workflow_pick_task") {
     const task = findTask(settings, args.task_id);
     const workflow = validateWorkflowContract(parseWorkflow(workflowPath(settings)));
-    const picked = await pickTask(settings, workflow, task, args.attempt ?? null);
+    const picked = await pickTask(settings, workflow, task, args.attempt ?? null, {
+      force: Boolean(args.force),
+      owner: args.owner || null,
+      summary: args.summary || null,
+    });
     return {
       task: picked.task,
       prompt: picked.prompt,
       duplicate_prevented: picked.duplicate_prevented,
       action: picked.action,
+      reason: picked.reason || null,
+      skipped_claimed_tasks: picked.skipped_claimed_tasks || [],
       workflow: { path: workflow.path, config: workflow.config },
     };
   }
@@ -1357,6 +1732,10 @@ async function callTool(name, args) {
 
   if (name === "workflow_complete_task") {
     return completeTask(settings, args);
+  }
+
+  if (name === "workflow_update_activity") {
+    return updateTaskActivity(settings, args);
   }
 
   throw new Error(`Unknown tool: ${name}`);
@@ -1630,6 +2009,11 @@ async function runCli(argv) {
       ...args,
       task_id: args.task_id || args.issue || args.issue_id || positional[0],
     });
+  } else if (command === "activity") {
+    result = await callTool("workflow_update_activity", {
+      ...args,
+      task_id: args.task_id || args.issue || args.issue_id || args.task || positional[0],
+    });
   } else if (command === "list") {
     result = await callTool("workflow_list_tasks", args);
   } else if (command === "pick") {
@@ -1678,6 +2062,20 @@ function formatCliResult(command, result) {
       `URL: ${result.issue.url}`,
       "",
     ].join("\n");
+  }
+
+  if (command === "activity") {
+    return [
+      `Action: ${result.action}`,
+      `Task: ${result.task.title}`,
+      `Source: ${result.task.identifier}`,
+      `Linear: ${result.issue.identifier || "unknown"}`,
+      `Activity: ${result.activity.status}`,
+      result.activity.owner ? `Owner: ${result.activity.owner}` : null,
+      "",
+    ]
+      .filter((line) => line !== null)
+      .join("\n");
   }
 
   if (command === "complete") {
@@ -1826,6 +2224,14 @@ function formatDecisionState(state) {
   } else {
     lines.push("Cached recommendation: none");
   }
+  if (state.task_activity && state.task_activity.length > 0) {
+    lines.push("Task activity:");
+    for (const activity of state.task_activity.slice(0, 5)) {
+      const key = activity.task_identifier || activity.task_id || activity.linear_identifier || "unknown task";
+      const owner = activity.owner ? ` by ${activity.owner}` : "";
+      lines.push(`- ${key}: ${activity.status}${owner}`);
+    }
+  }
   if (state.relevant_task_notes.length > 0) {
     lines.push("Relevant task notes:");
     for (const note of state.relevant_task_notes.slice(0, 5)) {
@@ -1854,6 +2260,7 @@ function usage() {
     "  pick <task-id>       Pick or resume a specific task",
     "  render <task-id>     Render a prompt for a specific task",
     "  move <id>            Move a Linear issue or task's issue to another state",
+    "  activity <id>        Mark claimed work active or inactive locally",
     "  complete <task-id>   Mark a validated task complete locally and in Linear",
     "  ui                   Open the populated local workflow task board",
     "  begin-ui             Opt-in mode: begin work and open the task board",
@@ -1864,6 +2271,9 @@ function usage() {
     "  --limit <n>          Limit local tasks scanned",
     "  --count <n>          Pick multiple unclaimed tasks for parallel work",
     "  --attempt <n>        Render with an attempt number",
+    "  --status <state>     Activity status for activity command: active|inactive",
+    "  --owner <name>       Optional owner for activity records",
+    "  --force              Take over an active claimed task when picking",
     "  --state-name <name>  Target Linear state for move",
     "  --state-id <id>      Target Linear state ID for move",
     "  --local-only         Complete only the local task checkbox",

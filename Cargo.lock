@@ -2390,6 +2390,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "baymax_game"
+version = "0.1.0"
+dependencies = [
+ "pretty_assertions",
+ "serde",
+]
+
+[[package]]
 name = "baymax_glsl"
 version = "0.2.4"
 dependencies = [

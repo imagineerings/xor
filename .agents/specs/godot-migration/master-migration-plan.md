@@ -25,7 +25,7 @@ Duplication rule: prefer existing Baymax crates and extension points before addi
 |---|---|---|---|
 | G0 | Spec consistency | Any code task | Every grouped spec has `requirements.md`, `design.md`, and `tasks.md`; task items include `_Requirements:` and `_writes:` |
 | G1 | Boundary policy | Godot runtime-adjacent work | Excluded Godot runtime areas are encoded and tested |
-| G2 | Shared Godot metadata | Godot project, docs, asset, editor, and task integrations | Project descriptors, diagnostics, source references, fixture attribution, and parse status primitives exist |
+| G2 | Shared Baymax game metadata | Godot project, docs, asset, editor, and task integrations | Project descriptors, diagnostics, source references, fixture attribution, and parse status primitives exist |
 | G3 | World-model foundations | World-model runtime, graph, mesh, agent, generated media, and authoring app work | Request, control, worker, graph, mesh, artifact, and provenance primitives exist |
 | G4 | Worker safety | Python, GPU, remote, or persistent model execution | Serving diagnostics report setup problems without silent downloads |
 | G5 | Graph safety | Diffusion graph execution | Graph validator rejects missing inputs, incompatible ports, and cycles |
@@ -39,7 +39,7 @@ Duplication rule: prefer existing Baymax crates and extension points before addi
 |---|---|---|---|
 | W0 | Planning validation | Spec documents only; no code task starts until G0 passes | None |
 | W1 | Shared foundations | Umbrella tasks 1 -> 8 serially for `Cargo.toml`; after task 1, umbrella tasks 2, 3, 5, 6, 13, and 14 with 2 -> 13 -> 14 serial; after task 8, umbrella tasks 9, 10, 11, and 12; `build-test-docs/` task 1 foundation helpers | G0 |
-| W2 | Godot compatibility substrate | Umbrella tasks 4 and 7; `engine-core-runtime/`, `language-scripting/`, `game-formats-assets/` metadata tasks, `build-test-docs/` docs/compat work | G1, G2 |
+| W2 | Baymax game compatibility substrate | Umbrella tasks 4 and 7; `engine-core-runtime/`, `language-scripting/`, `game-formats-assets/` metadata tasks, `build-test-docs/` docs/compat work | G1, G2 |
 | W3 | World-model and Comfy serving substrate | `world-model-runtime/`, `model-serving-packaging/`, `comfy-model-memory-runtime/`, W3 portions of `comfy-packaging-quality/`, generated-media routing in `rendering-media/` | G3, G4, G8 |
 | W4 | Authoring, graph UX, and Comfy workflows | `diffusion-graph-editor/`, `unified-authoring-app/`, `comfy-runtime-control-plane/`, `comfy-graph-node-runtime/`, `comfy-diffusion-world-model-runtime/`, W4 portions of `comfy-workflows-blueprints/`, editor affordances, agent graph tools | G2, G3, G5, G8 |
 | W5 | Generation outputs and asset pipelines | `mesh-generation-pipeline/`, `comfy-asset-library/`, `comfy-media-node-pipelines/`, W5 portions of `comfy-workflows-blueprints/`, generated mesh asset integration, previews, export routing | G3, G5, G6, G8 |

@@ -6,9 +6,9 @@ Register Godot commands and project-panel metadata only when Godot project detec
 
 ## Components
 
-- `GodotCommandProvider`
-- `GodotProjectPanelMetadata`
-- `GodotRunDebugTemplate`
+- `BaymaxGameCommandProvider`
+- `BaymaxGameProjectPanelMetadata`
+- `BaymaxGameRunDebugTemplate`
 
 ## Correctness Properties
 

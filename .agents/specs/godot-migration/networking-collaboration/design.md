@@ -6,8 +6,8 @@ Keep Baymax collaboration, RPC, and debugger infrastructure authoritative. Add o
 
 ## Components
 
-- `GodotNetworkBoundary`
-- `GodotDebugMetadata`
+- `BaymaxGameNetworkBoundary`
+- `BaymaxGameDebugMetadata`
 
 ## Correctness Properties
 

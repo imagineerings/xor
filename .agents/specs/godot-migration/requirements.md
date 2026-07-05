@@ -2,11 +2,11 @@
 
 ## Introduction
 
-Baymax needs a Godot-, world-model-, and Comfy-aware game development surface without copying duplicate game-engine runtime infrastructure. The migration adds compatibility, authoring, generation, workflow orchestration, asset, node, provider, and serving primitives while preserving Baymax ownership of UI, platform, rendering, task execution, agents, media, storage, and project systems. Comfy provides core functionality for the world-model harness, so implementation decisions must evaluate Comfy workflow, graph, sampler, scheduler, conditioning, diffusion/world-model execution, node, model, asset, provider, and extension semantics before adding Baymax-only behavior.
+Baymax needs a Baymax-owned, Godot-compatible, world-model-, and Comfy-aware game development surface without copying duplicate game-engine runtime infrastructure. The migration adds compatibility, authoring, generation, workflow orchestration, asset, node, provider, and serving primitives while preserving Baymax ownership of UI, platform, rendering, task execution, agents, media, storage, and project systems. Comfy provides core functionality for the world-model harness, so implementation decisions must evaluate Comfy workflow, graph, sampler, scheduler, conditioning, diffusion/world-model execution, node, model, asset, provider, and extension semantics before adding Baymax-only behavior.
 
 ## Glossary
 
-- **Boundary policy**: the explicit rule set for what Baymax migrates, adapts, invokes externally, or refuses to duplicate.
+- **Boundary policy**: the explicit rule set for what Baymax adopts as native features, adapts, invokes externally, or refuses to duplicate.
 - **Execution gate**: a prerequisite validation checkpoint that blocks task execution until satisfied.
 - **Dependency wave**: the ordered implementation phase used to keep shared foundations ahead of dependent integrations.
 - **World-model engine harness**: Baymax-managed typed requests, controls, workers, artifacts, and provenance around `projects/world-model`.

@@ -21,4 +21,4 @@ Route Godot media and generated outputs through existing Baymax preview/media sy
 - [ ] 1. Add Godot media and generated-output preview routing
   - Classify media files, preserve unsupported reasons, and route generated media with provenance.
   - _Requirements: 1.1, 2.1, 2.2, 3.1_
-  - _writes: crates/godot/src/media.rs, crates/world_model/src/media_artifacts.rs, crates/godot/src/media_tests.rs_
+  - _writes: crates/baymax_game/src/media.rs, crates/world_model/src/media_artifacts.rs, crates/baymax_game/src/media_tests.rs_

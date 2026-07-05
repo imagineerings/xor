@@ -6,7 +6,7 @@ Add Godot-aware commands and project-panel affordances in W4, while run and debu
 
 ## Gates
 
-- Start gate: G0 spec consistency, G1 boundary policy, and G2 shared Godot metadata are satisfied.
+- Start gate: G0 spec consistency, G1 boundary policy, and G2 shared Baymax game metadata are satisfied.
 - Validation gate: command registration, project-panel classification, import-link, and run/debug template tests pass.
 - Handoff gate: missing Godot executable and unsupported runtime actions surface setup diagnostics.
 - Completion gate: no run/debug workflow bypasses the W6 external-command path or the G1 runtime boundary policy.
@@ -21,4 +21,4 @@ Add Godot-aware commands and project-panel affordances in W4, while run and debu
 - [ ] 1. Add Godot-aware editor affordances
   - Register commands, project-panel labels, import links, and external run/debug templates.
   - _Requirements: 1.1, 1.2, 2.1, 2.2, 3.1, 3.2_
-  - _writes: crates/godot/src/editor.rs, crates/godot/src/tasks.rs, crates/godot/src/editor_tests.rs_
+  - _writes: crates/baymax_game/src/editor.rs, crates/baymax_game/src/tasks.rs, crates/baymax_game/src/editor_tests.rs_

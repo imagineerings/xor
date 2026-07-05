@@ -6,9 +6,9 @@ Use existing Baymax task execution to invoke configured Godot CLI commands for r
 
 ## Components
 
-- `GodotExecutableSettings`
-- `GodotExportPresetParser`
-- `GodotExportTaskTemplate`
+- `BaymaxGameExecutableSettings`
+- `BaymaxGameExportPresetParser`
+- `BaymaxGameExportTaskTemplate`
 
 ## Correctness Properties
 

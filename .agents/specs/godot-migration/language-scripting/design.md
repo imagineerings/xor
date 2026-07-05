@@ -7,8 +7,8 @@ Register GDScript and Godot C# affordances through Baymax language and LSP regis
 ## Components
 
 - `GdScriptLanguageRegistration`
-- `GodotLspAdapter`
-- `GodotApiDocsIndex`
+- `BaymaxGameLspAdapter`
+- `BaymaxGameApiDocsIndex`
 
 ## Correctness Properties
 

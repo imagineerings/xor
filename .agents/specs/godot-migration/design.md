@@ -4,21 +4,21 @@
 
 The migration is organized as Baymax-native integration layers:
 
-- `crates/godot`: Godot-compatible metadata, boundary policy, parsing diagnostics, project descriptors, fixture attribution, and task/debug/export descriptors.
+- `crates/baymax_game`: Baymax-owned game authoring metadata, boundary policy, parsing diagnostics, project descriptors, fixture attribution, and task/debug/export descriptors for Godot-compatible source projects.
 - `crates/world_model`: world-model request/control/worker/graph/mesh/artifact/provenance primitives.
 - Comfy harness modules inside `crates/world_model`: core runtime control-plane adapters, Comfy graph/node schemas, sampler/scheduler execution semantics, conditioning, latent/VAE behavior, model patching, diffusion/world-model runner profiles, model folder and memory policy, asset APIs, workflow/blueprint catalogs, provider connectors, extension loading policy, and compatibility fixtures.
 - Existing Baymax crates: project, worktree, language, LSP, tasks, debugger, media, UI, agent, and app registry own their existing domains.
 
 ## Components
 
-### GodotMigrationInventory
+### BaymaxGameMigrationInventory
 
 Validates that grouped spec coverage exists for every accepted feature area and that excluded runtime areas have explicit boundary reasons.
 
 ```rust
-pub trait GodotMigrationInventory {
+pub trait BaymaxGameMigrationInventory {
     fn validate_spec_pack(&self) -> MigrationValidationReport;
-    fn classify_source_area(&self, path: &GodotSourcePath) -> MigrationDecision;
+    fn classify_source_area(&self, path: &BaymaxGameSourcePath) -> MigrationDecision;
 }
 ```
 
@@ -89,7 +89,7 @@ pub trait MigrationGatekeeper {
 pub enum ExecutionGate {
     SpecConsistency,
     BoundaryPolicy,
-    SharedGodotMetadata,
+    SharedBaymaxGameMetadata,
     SharedWorldModelFoundations,
     WorkerSafety,
     GraphSafety,
@@ -101,7 +101,7 @@ pub enum ExecutionGate {
 pub enum DependencyWave {
     PlanningValidation,
     SharedFoundations,
-    GodotCompatibilitySubstrate,
+    BaymaxGameCompatibilitySubstrate,
     WorldModelAndComfyServingSubstrate,
     AuthoringGraphUxAndComfyWorkflows,
     GenerationOutputsAndAssetPipelines,

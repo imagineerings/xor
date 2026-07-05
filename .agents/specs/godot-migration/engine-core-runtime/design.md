@@ -2,12 +2,12 @@
 
 ## Architecture
 
-Add `crates/godot` metadata primitives for project detection, resource references, parse diagnostics, and boundary decisions. Do not embed Godot runtime services.
+Add `crates/baymax_game` Baymax game metadata primitives for project detection, resource references, parse diagnostics, and boundary decisions. Do not embed Godot runtime services.
 
 ## Components
 
-- `GodotProjectDescriptor`: project root, project file, display name, engine version, and feature flags.
-- `GodotResourceIndex`: scene/resource references and parse state.
+- `BaymaxGameProjectDescriptor`: project root, project file, display name, engine version, and feature flags.
+- `BaymaxGameResourceIndex`: scene/resource references and parse state.
 - `RuntimeBoundaryPolicy`: blocks scene-tree, OS, rendering, input, and object runtime ports.
 
 ## Correctness Properties

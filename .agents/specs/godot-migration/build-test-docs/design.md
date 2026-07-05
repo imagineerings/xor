@@ -6,7 +6,7 @@ Add documentation ingestion and fixture attribution helpers while leaving Baymax
 
 ## Components
 
-- `GodotDocsIngestion`
+- `BaymaxGameDocsIngestion`
 - `FixtureAttributionValidator`
 - `DependencyReviewGate`
 
