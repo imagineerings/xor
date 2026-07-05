@@ -6,7 +6,7 @@ Implement the dictation system with microphone capture (extending `crates/audio/
 
 ## Tasks
 
-- [ ] 1. Extend audio crate with microphone capture
+- [x] 1. Extend audio crate with microphone capture
   - Microphone device enumeration
   - Audio capture stream with configurable sample rate and format
   - Platform-specific audio capture backends
