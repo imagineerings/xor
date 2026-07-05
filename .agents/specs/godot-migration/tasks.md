@@ -33,7 +33,7 @@
 
 ## Tasks
 
-- [ ] 1. Create the shared Baymax game support crate
+- [x] 1. Create the shared Baymax game support crate
   - Add metadata, source-reference, boundary-decision, and project descriptor types for Baymax-owned Godot-compatible features.
   - _Requirements: 2.1, 2.2, 3.1_
   - _writes: Cargo.toml, crates/baymax_game/Cargo.toml, crates/baymax_game/src/baymax_game.rs, crates/baymax_game/src/migration.rs, crates/baymax_game/src/tests.rs_

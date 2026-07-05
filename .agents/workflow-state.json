@@ -1,23 +1,25 @@
 {
   "version": 1,
-  "updated_at": "2026-07-05T21:19:04.411Z",
+  "updated_at": "2026-07-05T22:45:12.282Z",
   "repo_revision": null,
   "recommendation": {
-    "task_id": "task:75ba31ebd766",
-    "task_identifier": ".agents/specs/godot-migration/tasks.md:36",
-    "title": "Create the shared Baymax game support crate",
-    "rationale": "Task 1 is the first W1 shared foundation for the Godot-compatible migration. It creates the Baymax-owned game support crate needed before inventory, boundary, parser, fixture, and integration follow-up tasks can safely land.",
+    "task_id": "task:569461ce4af3",
+    "task_identifier": ".agents/specs/godot-migration/tasks.md:41",
+    "title": "Implement migration inventory validation",
+    "rationale": "Task 2 is the active W1 Baymax game foundation after the shared crate landed; it adds spec-pack and source-area inventory validation needed by later gatekeeper tasks.",
     "evidence": [
-      "Task 1 is first in the godot-migration dependency wave and has no earlier crate prerequisite",
-      "Design now names the Baymax-owned implementation crate as crates/baymax_game while retaining Godot-compatible source-project semantics",
-      "Task picked into Linear as SIM-15"
+      "Task 1 is complete locally and created crates/baymax_game",
+      "SIM-17 is the Linear issue for task 2 and is marked active",
+      "Task 2 writes are limited to the Baymax game inventory module and tests"
     ],
     "stale_if_changed": [
       ".agents/specs/godot-migration/tasks.md",
       ".agents/specs/godot-migration/design.md",
-      ".agents/specs/godot-migration/requirements.md"
+      ".agents/specs/godot-migration/requirements.md",
+      "crates/baymax_game/src/inventory.rs",
+      "crates/baymax_game/src/inventory_tests.rs"
     ],
-    "updated_at": "2026-07-05T00:00:00Z"
+    "updated_at": "2026-07-05T22:45:12.282Z"
   },
   "task_activity": [
     {
@@ -30,6 +32,17 @@
       "owner": null,
       "summary": "Merged in PR #35.",
       "updated_at": "2026-07-05T21:19:04.410Z"
+    },
+    {
+      "task_id": "task:569461ce4af3",
+      "task_identifier": ".agents/specs/godot-migration/tasks.md:41",
+      "title": "Implement migration inventory validation",
+      "linear_identifier": "SIM-17",
+      "linear_url": "https://linear.app/simtropolis/issue/SIM-17/implement-migration-inventory-validation",
+      "status": "active",
+      "owner": null,
+      "summary": "Implementation in progress: Baymax game inventory validates grouped spec documents and source-area coverage.",
+      "updated_at": "2026-07-05T22:45:12.282Z"
     }
   ],
   "task_notes": [
@@ -61,7 +74,7 @@
   "dependency_notes": [
     {
       "scope": ".agents/specs/spectrum-2-ui-language",
-      "summary": "Tasks 1-4 complete. Task 5 (spacing) is independent — ready to begin. Task 6 (cursor blink) depends on Task 2 (done). Task 7 (docs) depends on all previous tasks. Tasks 5 and 6 can be done in parallel.",
+      "summary": "Tasks 1-4 complete. Task 5 (spacing) is independent \u2014 ready to begin. Task 6 (cursor blink) depends on Task 2 (done). Task 7 (docs) depends on all previous tasks. Tasks 5 and 6 can be done in parallel.",
       "updated_at": "2026-07-04T00:00:00Z"
     },
     {
