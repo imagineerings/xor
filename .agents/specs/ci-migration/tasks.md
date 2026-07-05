@@ -20,7 +20,7 @@ This plan covers restoring archived GitHub Actions workflows in priority order. 
 
 ### Phase 1: XTask Regeneration Safety (P0)
 
-- [ ] 1. Update xtask workflow generator to skip archived workflows
+- [x] 1. Update xtask workflow generator to skip archived workflows
   - [ ] 1.1 Locate the workflow generation code in `tooling/xtask/src/tasks/workflows/`
   - [ ] 1.2 Add an exclusion list of archived workflow names
   - [ ] 1.3 Modify the output writer to skip excluded workflows (or redirect to `archive/`)
