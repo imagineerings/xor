@@ -17,7 +17,7 @@ Implement the dictation system with microphone capture (extending `crates/audio/
   - Define DictationProvider trait
   - Define AudioFormat enum, DictationConfig
   - _Requirements: 3_
-  - _writes: crates/dictation/src/lib.rs_
+  - _writes: crates/dictation/Cargo.toml, crates/dictation/src/dictation.rs, Cargo.toml, Cargo.lock_
 
 - [ ] 3. Implement Whisper local provider
   - Integrate with candle-core and candle-nn for Whisper inference

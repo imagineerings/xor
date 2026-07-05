@@ -5560,6 +5560,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "dictation"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "serde",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "diff"
 version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"

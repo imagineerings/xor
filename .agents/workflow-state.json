@@ -1,24 +1,28 @@
 {
   "version": 1,
-  "updated_at": "2026-07-05T22:49:22.836Z",
+  "updated_at": "2026-07-05T22:35:06.021Z",
   "repo_revision": null,
   "recommendation": {
-    "task_id": "task:b63c03dcd4cb",
-    "task_identifier": ".agents/specs/godot-migration/tasks.md:96",
-    "title": "Add migration gatekeeper validation",
-    "rationale": "Task 13 is the next serial inventory/gatekeeper follow-up after tasks 1 and 2; it can build on the Baymax game crate and migration inventory validation that have now landed.",
+    "task_id": "task:88d56f7c5fc2",
+    "task_identifier": ".agents/specs/goose-migration/dictation/tasks.md:16",
+    "title": "Create dictation crate with provider trait",
+    "rationale": "Picked as the next Goose migration task after microphone capture landed. It establishes the dictation provider abstraction and audio/config data models required before Whisper, cloud providers, and the dictation service can be implemented.",
     "evidence": [
-      "Godot migration dependency wave lists task 2 -> 13 -> 14 serial for inventory/gatekeeper writes",
-      "Task 2 is complete locally and SIM-17 is Done",
-      "Task 13 writes new spec_gatekeeper files without overlapping the completed inventory implementation"
+      "User asked to pause archived workflow work and choose a task from .agents/specs/goose-migration",
+      "Task 1 in dictation is complete and exported the audio capture foundation",
+      "Task 2 is marked ready in the existing dependency notes and writes an isolated new dictation crate",
+      "Task picked into Linear as SIM-16"
     ],
     "stale_if_changed": [
-      ".agents/specs/godot-migration/tasks.md",
-      ".agents/specs/godot-migration/design.md",
-      ".agents/specs/godot-migration/requirements.md",
-      "crates/baymax_game/src/inventory.rs"
+      ".agents/specs/goose-migration/dictation/tasks.md",
+      ".agents/specs/goose-migration/dictation/design.md",
+      ".agents/specs/goose-migration/dictation/requirements.md",
+      "Cargo.toml",
+      "Cargo.lock",
+      "crates/dictation/Cargo.toml",
+      "crates/dictation/src/dictation.rs"
     ],
-    "updated_at": "2026-07-05T22:49:22.836Z"
+    "updated_at": "2026-07-05T22:35:06.021Z"
   },
   "task_activity": [
     {
@@ -31,6 +35,28 @@
       "owner": null,
       "summary": "Merged in PR #35.",
       "updated_at": "2026-07-05T21:19:04.410Z"
+    },
+    {
+      "task_id": "task:b5d0b4a8be1b",
+      "task_identifier": ".agents/specs/ci-migration/tasks.md:23",
+      "title": "Update xtask workflow generator to skip archived workflows",
+      "linear_identifier": "SIM-10",
+      "linear_url": "https://linear.app/simtropolis/issue/SIM-10/update-xtask-workflow-generator-to-skip-archived-workflows",
+      "status": "inactive",
+      "owner": null,
+      "summary": null,
+      "updated_at": "2026-07-05T22:31:10.482Z"
+    },
+    {
+      "task_id": "task:88d56f7c5fc2",
+      "task_identifier": ".agents/specs/goose-migration/dictation/tasks.md:16",
+      "title": "Create dictation crate with provider trait",
+      "linear_identifier": "SIM-16",
+      "linear_url": "https://linear.app/simtropolis/issue/SIM-16/create-dictation-crate-with-provider-trait",
+      "status": "active",
+      "owner": null,
+      "summary": null,
+      "updated_at": "2026-07-05T22:35:06.021Z"
     },
     {
       "task_id": "task:569461ce4af3",
@@ -65,20 +91,20 @@
     },
     {
       "task_identifier": ".agents/specs/goose-migration/dictation/tasks.md:16",
-      "status": "ready",
-      "summary": "Task 2 can follow after audio capture API lands; it should consume the exported capture types from the audio crate when defining dictation audio formats and provider traits.",
-      "updated_at": "2026-07-05T00:00:00Z"
+      "status": "claimed",
+      "summary": "Task 2: Create dictation crate with provider trait. Claimed as SIM-16 and implemented with a new dictation crate, provider trait, AudioFormat, DictationConfig, cloud config, and provider error types.",
+      "updated_at": "2026-07-05T22:35:06.021Z"
     }
   ],
   "dependency_notes": [
     {
       "scope": ".agents/specs/spectrum-2-ui-language",
-      "summary": "Tasks 1-4 complete. Task 5 (spacing) is independent \u2014 ready to begin. Task 6 (cursor blink) depends on Task 2 (done). Task 7 (docs) depends on all previous tasks. Tasks 5 and 6 can be done in parallel.",
+      "summary": "Tasks 1-4 complete. Task 5 (spacing) is independent — ready to begin. Task 6 (cursor blink) depends on Task 2 (done). Task 7 (docs) depends on all previous tasks. Tasks 5 and 6 can be done in parallel.",
       "updated_at": "2026-07-04T00:00:00Z"
     },
     {
       "scope": ".agents/specs/goose-migration/dictation",
-      "summary": "Task 1 is the foundation for microphone capture and should land before dictation service integration. Tasks 2-4 define provider APIs and implementations; Task 5 should wait for Task 1 and provider traits; Task 6 should wait for service/provider work.",
+      "summary": "Task 1 is complete and provides microphone capture. Task 2 is claimed in SIM-16 and defines provider APIs and shared models. Tasks 3-4 should build on the provider trait; Task 5 should wait for Task 2 plus provider implementation work; Task 6 should wait for service/provider work.",
       "updated_at": "2026-07-05T00:00:00Z"
     },
     {
@@ -89,15 +115,16 @@
   ],
   "ranked_candidates": [
     {
-      "task_id": "task:a7e9cd415303",
-      "task_identifier": ".agents/specs/goose-migration/dictation/tasks.md:9",
-      "title": "Extend audio crate with microphone capture",
+      "task_id": "task:88d56f7c5fc2",
+      "task_identifier": ".agents/specs/goose-migration/dictation/tasks.md:16",
+      "title": "Create dictation crate with provider trait",
       "rank": 1,
-      "rationale": "Foundational, no prerequisites, isolated write manifest, unlocks later dictation tasks.",
+      "rationale": "Next dependency-unlocking Goose dictation task after microphone capture; creates provider APIs needed by Whisper, cloud, and service tasks.",
       "blockers": [],
       "evidence": [
-        "workflow.js next scoped to .agents/specs/goose-migration/**/tasks.md ranked it first",
-        "requirements/design/task files agree that microphone capture belongs in crates/audio/"
+        "Task 1 in .agents/specs/goose-migration/dictation/tasks.md is complete",
+        "requirements.md requirement 3 asks for a common provider abstraction",
+        "design.md places DictationProvider, AudioFormat, and DictationConfig in crates/dictation/"
       ]
     },
     {
@@ -107,9 +134,7 @@
       "rank": 2,
       "rationale": "Also ready, but less immediately useful than enabling dictation runtime foundations.",
       "blockers": [],
-      "evidence": [
-        "workflow.js next listed documentation candidates as ready with no dependencies"
-      ]
+      "evidence": ["workflow.js next listed documentation candidates as ready with no dependencies"]
     }
   ],
   "maintenance": {
@@ -129,10 +154,7 @@
         "Previous task 1 is complete and established the required API.",
         "This task unlocks follow-up UI integration work."
       ],
-      "stale_if_changed": [
-        ".agents/specs/example/tasks.md",
-        ".agents/specs/example/design.md"
-      ],
+      "stale_if_changed": [".agents/specs/example/tasks.md", ".agents/specs/example/design.md"],
       "updated_at": "YYYY-MM-DDTHH:MM:SSZ"
     },
     "task_activity_shape": {

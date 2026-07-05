@@ -54,6 +54,7 @@ members = [
     "crates/deepseek",
     "crates/dev_container",
     "crates/diagnostics",
+    "crates/dictation",
     "crates/docs_preprocessor",
     "crates/doctor",
     "crates/download_manager",
@@ -329,6 +330,7 @@ deepseek = { path = "crates/deepseek" }
 derive_refineable = { path = "crates/refineable/derive_refineable" }
 dev_container = { path = "crates/dev_container" }
 diagnostics = { path = "crates/diagnostics" }
+dictation = { path = "crates/dictation" }
 doctor = { path = "crates/doctor" }
 download_manager = { path = "crates/download_manager" }
 dialoguer = { version = "0.12", default-features = false }
