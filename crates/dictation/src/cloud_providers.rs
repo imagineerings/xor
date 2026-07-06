@@ -11,6 +11,7 @@ use crate::{AudioFormat, CloudDictationConfig, DictationError, DictationProvider
 /// text from the JSON response. Supports multiple authentication schemes and
 /// response formats to work with common providers (Deepgram, Google Cloud
 /// Speech-to-Text, Azure Speech, etc.).
+#[derive(Debug)]
 pub struct CloudDictationProvider {
     name: String,
     api_url: String,

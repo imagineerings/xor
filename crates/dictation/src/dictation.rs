@@ -8,13 +8,16 @@ use thiserror::Error;
 pub mod cloud_providers;
 pub use cloud_providers::CloudDictationProvider;
 
+pub mod service;
+pub use service::DictationService;
+
 pub mod whisper;
 pub use whisper::{
     WhisperConfig, WhisperLocalProvider, WhisperModel, WhisperModelDownload, WhisperModelManager,
 };
 
 #[async_trait]
-pub trait DictationProvider: Send + Sync {
+pub trait DictationProvider: std::fmt::Debug + Send + Sync {
     fn name(&self) -> &str;
     async fn transcribe(&self, audio: &[u8], format: AudioFormat) -> Result<String>;
     fn supported_formats(&self) -> Vec<AudioFormat>;

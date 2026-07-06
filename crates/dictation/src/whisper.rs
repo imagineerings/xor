@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use anyhow::{Result, bail};
 use async_trait::async_trait;
@@ -37,6 +38,21 @@ pub enum WhisperModel {
     Small,
     Medium,
     Large,
+}
+
+impl FromStr for WhisperModel {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        match s.to_lowercase().as_str() {
+            "tiny" => Ok(Self::Tiny),
+            "base" => Ok(Self::Base),
+            "small" => Ok(Self::Small),
+            "medium" => Ok(Self::Medium),
+            "large" => Ok(Self::Large),
+            other => bail!("unknown Whisper model: {other}"),
+        }
+    }
 }
 
 impl WhisperModel {
@@ -142,6 +158,7 @@ pub struct PreprocessedAudio {
     pub channels: u16,
 }
 
+#[derive(Debug)]
 pub struct WhisperLocalProvider {
     config: WhisperConfig,
     model_manager: WhisperModelManager,
