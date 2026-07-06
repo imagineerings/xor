@@ -5,6 +5,11 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+pub mod whisper;
+pub use whisper::{
+    WhisperConfig, WhisperLocalProvider, WhisperModel, WhisperModelDownload, WhisperModelManager,
+};
+
 #[async_trait]
 pub trait DictationProvider: Send + Sync {
     fn name(&self) -> &str;

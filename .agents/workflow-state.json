@@ -70,6 +70,17 @@
       "updated_at": "2026-07-05T22:48:15.385Z"
     },
     {
+      "task_id": "task:e14d6ee470ac",
+      "task_identifier": ".agents/specs/goose-migration/dictation/tasks.md:22",
+      "title": "Implement Whisper local provider",
+      "linear_identifier": "SIM-19",
+      "linear_url": "https://linear.app/simtropolis/issue/SIM-19/implement-whisper-local-provider",
+      "status": "active",
+      "owner": null,
+      "summary": null,
+      "updated_at": "2026-07-05T23:17:10.935Z"
+    },
+    {
       "task_id": "task:573a45986f78",
       "task_identifier": ".agents/specs/ci-migration/tasks.md:31",
       "title": "Create post-generation safety check in CI (optional, if xtask cannot be modified)",

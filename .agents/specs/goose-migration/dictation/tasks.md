@@ -24,7 +24,7 @@ Implement the dictation system with microphone capture (extending `crates/audio/
   - Model download management (tiny, base, small, medium, large)
   - Audio preprocessing (resampling, normalization)
   - _Requirements: 1_
-  - _writes: crates/dictation/src/whisper.rs_
+  - _writes: crates/dictation/src/whisper.rs, crates/dictation/src/dictation.rs_
 
 - [ ] 4. Implement cloud dictation providers
   - Generic HTTP-based cloud dictation provider
