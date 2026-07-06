@@ -15,6 +15,8 @@ mod inventory_tests;
 #[cfg(test)]
 mod parser_tests;
 #[cfg(test)]
+mod smoke_tests;
+#[cfg(test)]
 mod spec_gatekeeper_tests;
 #[cfg(test)]
 mod tests;
