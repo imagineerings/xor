@@ -5,6 +5,9 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+pub mod cloud_providers;
+pub use cloud_providers::CloudDictationProvider;
+
 pub mod whisper;
 pub use whisper::{
     WhisperConfig, WhisperLocalProvider, WhisperModel, WhisperModelDownload, WhisperModelManager,
@@ -40,6 +43,21 @@ pub enum DictationProviderName {
 pub struct CloudDictationConfig {
     pub provider: String,
     pub api_url: Option<String>,
+    pub api_key: Option<String>,
+    /// The HTTP header used to send the API key (e.g. "Authorization").
+    /// Defaults to "Authorization" when not set in the provider builder.
+    #[serde(default)]
+    pub api_key_header: Option<String>,
+    /// An optional prefix for the header value (e.g. "Bearer", "Token").
+    /// When `None`, the raw `api_key` is used as the header value.
+    #[serde(default)]
+    pub api_key_scheme: Option<String>,
+    #[serde(default)]
+    pub language: Option<String>,
+    /// Optional JSON field path for extracting transcription text from the
+    /// response body. Uses dot-separated keys and array indices.
+    #[serde(default)]
+    pub response_field: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]

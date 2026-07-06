@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-06T08:03:32.445Z",
+  "updated_at": "2026-07-06T08:11:52.694Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": "task:88d56f7c5fc2",
@@ -103,6 +103,17 @@
       "updated_at": "2026-07-05T23:03:07.902Z"
     },
     {
+      "task_id": "task:8f56d3703df9",
+      "task_identifier": ".agents/specs/goose-migration/dictation/tasks.md:29",
+      "title": "Implement cloud dictation providers",
+      "linear_identifier": "SIM-21",
+      "linear_url": "https://linear.app/simtropolis/issue/SIM-21/implement-cloud-dictation-providers",
+      "status": "active",
+      "owner": null,
+      "summary": null,
+      "updated_at": "2026-07-06T08:11:52.694Z"
+    },
+    {
       "task_id": "task:4e662ebfee10",
       "task_identifier": ".agents/specs/godot-migration/tasks.md:101",
       "title": "Extend migration inventory validation for Comfy specs",
@@ -178,9 +189,7 @@
       "rank": 2,
       "rationale": "Also ready, but less immediately useful than enabling dictation runtime foundations.",
       "blockers": [],
-      "evidence": [
-        "workflow.js next listed documentation candidates as ready with no dependencies"
-      ]
+      "evidence": ["workflow.js next listed documentation candidates as ready with no dependencies"]
     }
   ],
   "maintenance": {
@@ -200,10 +209,7 @@
         "Previous task 1 is complete and established the required API.",
         "This task unlocks follow-up UI integration work."
       ],
-      "stale_if_changed": [
-        ".agents/specs/example/tasks.md",
-        ".agents/specs/example/design.md"
-      ],
+      "stale_if_changed": [".agents/specs/example/tasks.md", ".agents/specs/example/design.md"],
       "updated_at": "YYYY-MM-DDTHH:MM:SSZ"
     },
     "task_activity_shape": {
