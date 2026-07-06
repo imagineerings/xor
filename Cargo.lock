@@ -22852,6 +22852,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "world_model"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "wprcontrol"
 version = "0.1.0"
 source = "git+https://github.com/simtropolis/wprcontrol?rev=cd811f7#cd811f7d744f65291e13131b1d907fda63ed91a1"

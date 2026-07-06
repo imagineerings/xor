@@ -231,6 +231,7 @@ members = [
     "crates/workspace",
     "crates/worktree",
     "crates/worktree_benchmarks",
+    "crates/world_model",
     "crates/x_ai",
     "crates/baymax",
     "crates/baymax_actions",
