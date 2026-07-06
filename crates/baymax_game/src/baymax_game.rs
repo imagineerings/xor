@@ -1,5 +1,6 @@
 pub mod boundary;
 pub mod diagnostics;
+pub mod fixtures;
 pub mod inventory;
 pub mod migration;
 pub mod parser;
@@ -7,6 +8,8 @@ pub mod spec_gatekeeper;
 
 #[cfg(test)]
 mod boundary_tests;
+#[cfg(test)]
+mod fixtures_tests;
 #[cfg(test)]
 mod inventory_tests;
 #[cfg(test)]
@@ -20,6 +23,7 @@ pub use boundary::{DefaultBoundaryPolicy, RuntimeBoundaryPolicy};
 pub use diagnostics::{
     DiagnosticCollection, DiagnosticSeverity, SourceDiagnostic, SourcePosition, SourceRange,
 };
+pub use fixtures::{FixtureAttribution, FixtureLicense, FixtureManifest, FixtureSource};
 pub use inventory::{
     BaymaxGameMigrationInventory, BaymaxGameSourcePath, MigrationDecision, MigrationInventory,
     MigrationSourceArea, MigrationSpecCoverage, MigrationValidationError,
