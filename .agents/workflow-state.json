@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-06T08:00:16.618Z",
+  "updated_at": "2026-07-06T08:03:32.445Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": "task:88d56f7c5fc2",
@@ -101,6 +101,17 @@
       "owner": null,
       "summary": "Spec gatekeeper module implemented (ExecutionGate/DependencyWave/MigrationTaskRef/SpecGatekeeper) with task-manifest validation and gate enforcement. Tests + clippy passing. Ready to commit/push.",
       "updated_at": "2026-07-05T23:03:07.902Z"
+    },
+    {
+      "task_id": "task:4e662ebfee10",
+      "task_identifier": ".agents/specs/godot-migration/tasks.md:101",
+      "title": "Extend migration inventory validation for Comfy specs",
+      "linear_identifier": "SIM-20",
+      "linear_url": "https://linear.app/simtropolis/issue/SIM-20/extend-migration-inventory-validation-for-comfy-specs",
+      "status": "active",
+      "owner": null,
+      "summary": null,
+      "updated_at": "2026-07-06T08:03:32.445Z"
     }
   ],
   "task_notes": [
@@ -167,7 +178,9 @@
       "rank": 2,
       "rationale": "Also ready, but less immediately useful than enabling dictation runtime foundations.",
       "blockers": [],
-      "evidence": ["workflow.js next listed documentation candidates as ready with no dependencies"]
+      "evidence": [
+        "workflow.js next listed documentation candidates as ready with no dependencies"
+      ]
     }
   ],
   "maintenance": {
@@ -187,7 +200,10 @@
         "Previous task 1 is complete and established the required API.",
         "This task unlocks follow-up UI integration work."
       ],
-      "stale_if_changed": [".agents/specs/example/tasks.md", ".agents/specs/example/design.md"],
+      "stale_if_changed": [
+        ".agents/specs/example/tasks.md",
+        ".agents/specs/example/design.md"
+      ],
       "updated_at": "YYYY-MM-DDTHH:MM:SSZ"
     },
     "task_activity_shape": {

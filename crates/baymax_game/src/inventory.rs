@@ -105,6 +105,23 @@ pub enum MigrationValidationError {
         task: String,
         spec: String,
     },
+    /// One of the ten expected Comfy harness spec directories is missing.
+    MissingComfySpecDirectory {
+        spec: String,
+    },
+    /// Two or more Comfy harness specs claim overlapping scope keywords.
+    ComfyHarnessSpecOverlap {
+        spec_a: String,
+        spec_b: String,
+        shared_keywords: String,
+    },
+    /// A world-model harness task uses Comfy-scope keywords without
+    /// referencing an applicable Comfy spec or documenting a divergence.
+    WorldModelHarnessTaskMissingComfyRef {
+        task: String,
+        spec: String,
+        keywords: String,
+    },
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Hash, Serialize, Deserialize)]

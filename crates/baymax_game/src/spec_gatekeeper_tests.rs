@@ -66,7 +66,7 @@ fn validates_complete_spec_pack_with_task_manifests() {
 
     write_tasks_with_manifests(&root_path.join("engine-core-runtime"), tasks_content);
 
-    let gatekeeper = SpecGatekeeper::new(vec![
+    let gatekeeper = SpecGatekeeper::without_comfy_checks(vec![
         "engine-core-runtime".into(),
         "language-scripting".into(),
     ]);
@@ -95,7 +95,7 @@ fn reports_missing_task_requirement_refs() {
 "#;
     write_tasks_with_manifests(&root_path.join("platform-export"), tasks_content);
 
-    let gatekeeper = SpecGatekeeper::new(vec!["platform-export".into()]);
+    let gatekeeper = SpecGatekeeper::without_comfy_checks(vec!["platform-export".into()]);
     let root = SpecRoot::new(&root_path);
     let report = gatekeeper.validate_spec_pack(&root);
 
@@ -136,7 +136,7 @@ fn reports_missing_task_write_targets() {
 "#;
     write_tasks_with_manifests(&root_path.join("mesh-generation"), tasks_content);
 
-    let gatekeeper = SpecGatekeeper::new(vec!["mesh-generation".into()]);
+    let gatekeeper = SpecGatekeeper::without_comfy_checks(vec!["mesh-generation".into()]);
     let root = SpecRoot::new(&root_path);
     let report = gatekeeper.validate_spec_pack(&root);
 
@@ -168,7 +168,7 @@ fn reports_missing_spec_file_with_gatekeeper() {
         .expect("failed to write requirements");
     fs::write(spec_path.join("tasks.md"), "# Tasks\n").expect("failed to write tasks");
 
-    let gatekeeper = SpecGatekeeper::new(vec!["physics-navigation".into()]);
+    let gatekeeper = SpecGatekeeper::without_comfy_checks(vec!["physics-navigation".into()]);
     let root = SpecRoot::new(&root_path);
     let report = gatekeeper.validate_spec_pack(&root);
 
@@ -199,7 +199,7 @@ fn auto_discovers_spec_directories() {
     write_tasks_with_manifests(&root_path.join("networking-collaboration"), tasks);
 
     // Empty spec_names triggers auto-discovery
-    let gatekeeper = SpecGatekeeper::default();
+    let gatekeeper = SpecGatekeeper::without_comfy_checks(Vec::new());
     let root = SpecRoot::new(&root_path);
     let report = gatekeeper.validate_spec_pack(&root);
 
@@ -231,7 +231,7 @@ fn parses_checkbox_task_formats() {
 "#;
     write_tasks_with_manifests(&root_path.join("world-model"), tasks_content);
 
-    let gatekeeper = SpecGatekeeper::new(vec!["world-model".into()]);
+    let gatekeeper = SpecGatekeeper::without_comfy_checks(vec!["world-model".into()]);
     let root = SpecRoot::new(&root_path);
     let report = gatekeeper.validate_spec_pack(&root);
 
@@ -436,4 +436,274 @@ fn handles_tasks_file_with_no_checkbox_lines() {
     let mut report = MigrationValidationReport::default();
     SpecGatekeeper::parse_task_manifests(content, "no-tasks", &mut report);
     assert!(report.is_valid());
+}
+
+// ---------------------------------------------------------------------------
+// Comfy harness validation tests  (Task 14, Requirements 13.x)
+// ---------------------------------------------------------------------------
+
+/// Create a single Comfy harness spec directory with all required files.
+fn create_comfy_spec_dir(root: &Path, name: &str) {
+    let spec_path = root.join(name);
+    fs::create_dir_all(&spec_path).expect("failed to create comfy spec directory");
+    for file in SpecGatekeeper::REQUIRED_SPEC_FILES {
+        fs::write(spec_path.join(file), format!("# {file}\n"))
+            .expect("failed to write comfy spec document");
+    }
+}
+
+/// Create all ten expected Comfy harness spec directories under the given root.
+fn create_all_comfy_specs(root: &Path) {
+    for dir in &[
+        "comfy-api-provider-nodes",
+        "comfy-asset-library",
+        "comfy-diffusion-world-model-runtime",
+        "comfy-extension-ecosystem",
+        "comfy-graph-node-runtime",
+        "comfy-media-node-pipelines",
+        "comfy-model-memory-runtime",
+        "comfy-packaging-quality",
+        "comfy-runtime-control-plane",
+        "comfy-workflows-blueprints",
+    ] {
+        create_comfy_spec_dir(root, dir);
+    }
+}
+
+// --- validate_comfy_harness_pack ---
+
+#[test]
+fn validates_all_comfy_harness_specs_present() {
+    let root_path = create_spec_root("comfy-all-present");
+    create_all_comfy_specs(&root_path);
+
+    let root = SpecRoot::new(&root_path);
+    let mut report = MigrationValidationReport::default();
+    SpecGatekeeper::validate_comfy_harness_pack(&root, &mut report);
+
+    assert!(
+        report.is_valid(),
+        "Expected no Comfy validation errors, got: {report:?}"
+    );
+}
+
+#[test]
+fn detects_missing_comfy_spec_directory() {
+    let root_path = create_spec_root("comfy-missing-dir");
+    // Create only 9 of the 10 Comfy dirs
+    for dir in &[
+        "comfy-api-provider-nodes",
+        "comfy-asset-library",
+        "comfy-diffusion-world-model-runtime",
+        "comfy-extension-ecosystem",
+        "comfy-graph-node-runtime",
+        "comfy-media-node-pipelines",
+        "comfy-model-memory-runtime",
+        "comfy-packaging-quality",
+        "comfy-runtime-control-plane",
+        // comfy-workflows-blueprints is intentionally missing
+    ] {
+        create_comfy_spec_dir(&root_path, dir);
+    }
+
+    let root = SpecRoot::new(&root_path);
+    let mut report = MigrationValidationReport::default();
+    SpecGatekeeper::validate_comfy_harness_pack(&root, &mut report);
+
+    assert!(
+        report
+            .errors
+            .contains(&MigrationValidationError::MissingComfySpecDirectory {
+                spec: "comfy-workflows-blueprints".to_string(),
+            }),
+        "Expected MissingComfySpecDirectory for comfy-workflows-blueprints, got: {report:?}"
+    );
+}
+
+#[test]
+fn detects_missing_file_in_comfy_spec() {
+    let root_path = create_spec_root("comfy-missing-file");
+    // Create one Comfy dir without design.md
+    let spec_path = root_path.join("comfy-runtime-control-plane");
+    fs::create_dir_all(&spec_path).expect("failed to create comfy spec dir");
+    fs::write(spec_path.join("requirements.md"), "# Requirements\n")
+        .expect("failed to write requirements");
+    fs::write(spec_path.join("tasks.md"), "# Tasks\n").expect("failed to write tasks");
+    // Create remaining nine dirs fully to avoid MissingComfySpecDirectory noise
+    for dir in &[
+        "comfy-api-provider-nodes",
+        "comfy-asset-library",
+        "comfy-diffusion-world-model-runtime",
+        "comfy-extension-ecosystem",
+        "comfy-graph-node-runtime",
+        "comfy-media-node-pipelines",
+        "comfy-model-memory-runtime",
+        "comfy-packaging-quality",
+        "comfy-workflows-blueprints",
+    ] {
+        create_comfy_spec_dir(&root_path, dir);
+    }
+
+    let root = SpecRoot::new(&root_path);
+    let mut report = MigrationValidationReport::default();
+    SpecGatekeeper::validate_comfy_harness_pack(&root, &mut report);
+
+    assert!(
+        report
+            .errors
+            .contains(&MigrationValidationError::MissingSpecFile {
+                spec: "comfy-runtime-control-plane".to_string(),
+                file: "design.md".to_string(),
+            }),
+        "Expected MissingSpecFile for design.md in comfy-runtime-control-plane, got: {report:?}"
+    );
+    // Should not get a directory-missing error for the incomplete spec
+    assert!(
+        !report
+            .errors
+            .contains(&MigrationValidationError::MissingComfySpecDirectory {
+                spec: "comfy-runtime-control-plane".to_string(),
+            }),
+        "Should not report MissingComfySpecDirectory when the dir exists"
+    );
+}
+
+// --- check_comfy_harness_alignment ---
+
+#[test]
+fn detects_comfy_keyword_without_ref_or_divergence() {
+    let content = r#"# Tasks
+
+- [ ] 1. Configure media pipeline
+  - Set up the media processing pipeline.
+"#;
+    let mut report = MigrationValidationReport::default();
+    SpecGatekeeper::check_comfy_harness_alignment(content, "world-model-runtime", &mut report);
+
+    assert!(
+        report.errors.contains(
+            &MigrationValidationError::WorldModelHarnessTaskMissingComfyRef {
+                task: "1. Configure media pipeline".to_string(),
+                spec: "world-model-runtime".to_string(),
+                keywords: "media".to_string(),
+            }
+        ),
+        "Expected WorldModelHarnessTaskMissingComfyRef, got: {report:?}"
+    );
+}
+
+#[test]
+fn accepts_comfy_keyword_with_explicit_comfy_ref() {
+    let content = r#"# Tasks
+
+- [ ] 1. Configure media pipeline
+  - Set up the media processing pipeline.
+  - _ComfyRef: comfy-media-node-pipelines
+"#;
+    let mut report = MigrationValidationReport::default();
+    SpecGatekeeper::check_comfy_harness_alignment(content, "world-model-runtime", &mut report);
+
+    assert!(
+        report.is_valid(),
+        "Expected no errors when _ComfyRef: is present, got: {report:?}"
+    );
+}
+
+#[test]
+fn accepts_comfy_keyword_with_divergence() {
+    let content = r#"# Tasks
+
+- [ ] 1. Configure media pipeline
+  - Set up the media processing pipeline.
+  - _Divergence: Custom implementation diverges from Comfy.
+"#;
+    let mut report = MigrationValidationReport::default();
+    SpecGatekeeper::check_comfy_harness_alignment(content, "world-model-runtime", &mut report);
+
+    assert!(
+        report.is_valid(),
+        "Expected no errors when _Divergence: is present, got: {report:?}"
+    );
+}
+
+#[test]
+fn accepts_comfy_keyword_with_safety_divergence() {
+    // The keyword "prompt" (in COMFY_HARNESS_KEYWORDS) appears only in a
+    // description line, but the task has _SafetyDivergence: which contains
+    // "_Divergence:" — so the check should accept it.
+    let content = r#"# Tasks
+
+- [ ] 1. Route generation prompts
+  - Dispatch generation prompts to the appropriate backend.
+  - _SafetyDivergence: Custom safety checks override Comfy defaults.
+"#;
+    let mut report = MigrationValidationReport::default();
+    SpecGatekeeper::check_comfy_harness_alignment(content, "world-model-runtime", &mut report);
+
+    assert!(
+        report.is_valid(),
+        "Expected no errors when _SafetyDivergence: is present, got: {report:?}"
+    );
+}
+
+#[test]
+fn ignores_task_with_no_comfy_keywords() {
+    let content = r#"# Tasks
+
+- [ ] 1. Add export preset parsing
+  - Parse export_presets.cfg.
+"#;
+    let mut report = MigrationValidationReport::default();
+    SpecGatekeeper::check_comfy_harness_alignment(content, "engine-core-runtime", &mut report);
+
+    assert!(
+        report.is_valid(),
+        "Expected no errors for non-Comfy task, got: {report:?}"
+    );
+}
+
+#[test]
+fn comfy_alignment_handles_empty_content() {
+    let mut report = MigrationValidationReport::default();
+    SpecGatekeeper::check_comfy_harness_alignment("", "empty-spec", &mut report);
+    assert!(report.is_valid());
+}
+
+// --- Integration: SpecGatekeeper::new with Comfy checks on ---
+
+#[test]
+fn validates_spec_pack_with_comfy_checks_enabled() {
+    let root_path = create_spec_root("comfy-integration");
+    // Create all ten Comfy specs + world-model-runtime (checked by
+    // check_world_model_harness_alignment).
+    create_all_comfy_specs(&root_path);
+
+    // Create world-model-runtime with a task that avoids Comfy keywords
+    // so alignment checks pass.
+    let wmr_path = root_path.join("world-model-runtime");
+    fs::create_dir_all(&wmr_path).expect("failed to create wmr dir");
+    for file in SpecGatekeeper::REQUIRED_SPEC_FILES {
+        fs::write(wmr_path.join(file), format!("# {file}\n"))
+            .expect("failed to write wmr spec document");
+    }
+    let tasks_content = r#"# Tasks
+
+- [ ] 1. Port rendering loop
+  - Translate the Godot rendering loop to the runtime.
+  - _Requirements: 12.1, 12.2_
+  - _writes: crates/world_model/src/render.rs
+"#;
+    write_tasks_with_manifests(&wmr_path, tasks_content);
+
+    let gatekeeper = SpecGatekeeper::new(vec![
+        "world-model-runtime".into(),
+        "comfy-runtime-control-plane".into(),
+    ]);
+    let root = SpecRoot::new(&root_path);
+    let report = gatekeeper.validate_spec_pack(&root);
+
+    assert!(
+        report.is_valid(),
+        "Expected no errors with all Comfy specs present, got: {report:?}"
+    );
 }

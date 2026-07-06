@@ -12,6 +12,85 @@ use crate::{
 };
 
 // ---------------------------------------------------------------------------
+// Comfy harness spec registry
+// ---------------------------------------------------------------------------
+
+/// Metadata about one of the ten required Comfy harness specs.
+struct ComfyHarnessSpec {
+    dir_name: &'static str,
+    /// The behavior areas this spec owns, used for overlap detection.
+    scope_keywords: &'static [&'static str],
+}
+
+/// The ten expected Comfy harness sub-specs, matching Requirement 13.1.
+const COMFY_HARNESS_SPECS: &[ComfyHarnessSpec] = &[
+    ComfyHarnessSpec {
+        dir_name: "comfy-runtime-control-plane",
+        scope_keywords: &["prompt", "job", "route"],
+    },
+    ComfyHarnessSpec {
+        dir_name: "comfy-graph-node-runtime",
+        scope_keywords: &["graph", "node"],
+    },
+    ComfyHarnessSpec {
+        dir_name: "comfy-model-memory-runtime",
+        scope_keywords: &["model", "memory"],
+    },
+    ComfyHarnessSpec {
+        dir_name: "comfy-diffusion-world-model-runtime",
+        scope_keywords: &[
+            "sampler",
+            "scheduler",
+            "conditioning",
+            "latent",
+            "vae",
+            "diffusion",
+        ],
+    },
+    ComfyHarnessSpec {
+        dir_name: "comfy-asset-library",
+        scope_keywords: &["asset"],
+    },
+    ComfyHarnessSpec {
+        dir_name: "comfy-workflows-blueprints",
+        scope_keywords: &["workflow", "blueprint"],
+    },
+    ComfyHarnessSpec {
+        dir_name: "comfy-media-node-pipelines",
+        scope_keywords: &["media", "video", "image"],
+    },
+    ComfyHarnessSpec {
+        dir_name: "comfy-api-provider-nodes",
+        scope_keywords: &["provider", "api"],
+    },
+    ComfyHarnessSpec {
+        dir_name: "comfy-extension-ecosystem",
+        scope_keywords: &["extension", "custom"],
+    },
+    ComfyHarnessSpec {
+        dir_name: "comfy-packaging-quality",
+        scope_keywords: &["packaging", "quality", "config"],
+    },
+];
+
+/// Comfy behavior keywords that trigger harness alignment checks when they
+/// appear in world-model harness task descriptions (Requirement 13.4).
+const COMFY_HARNESS_KEYWORDS: &[&str] = &[
+    "prompt",
+    "graph",
+    "sampler",
+    "scheduler",
+    "conditioning",
+    "diffusion",
+    "model",
+    "asset",
+    "media",
+    "provider",
+    "extension",
+    "packaging",
+];
+
+// ---------------------------------------------------------------------------
 // Execution gates (G0 – G8)
 // ---------------------------------------------------------------------------
 
@@ -225,17 +304,33 @@ pub trait MigrationGatekeeper {
 /// When `spec_names` is non-empty, validation checks only those specs.
 /// When empty, the gatekeeper auto-discovers subdirectories under the
 /// given `SpecRoot`.
+///
+/// When `check_comfy` is true (the default), `validate_spec_pack` also
+/// validates Comfy harness spec presence, overlap, and alignment.
 #[derive(Default)]
 pub struct SpecGatekeeper {
     /// Expected grouped spec directory names (relative to `SpecRoot`).
     spec_names: Vec<String>,
+    /// Whether to run Comfy harness validation checks.
+    check_comfy: bool,
 }
 
 impl SpecGatekeeper {
     pub const REQUIRED_SPEC_FILES: [&'static str; 3] = ["requirements.md", "design.md", "tasks.md"];
 
     pub fn new(spec_names: Vec<String>) -> Self {
-        Self { spec_names }
+        Self {
+            spec_names,
+            check_comfy: true,
+        }
+    }
+
+    /// Create a gatekeeper without Comfy harness validation.
+    pub fn without_comfy_checks(spec_names: Vec<String>) -> Self {
+        Self {
+            spec_names,
+            check_comfy: false,
+        }
     }
 
     /// Parse requirement references and write targets from an in-memory
@@ -305,6 +400,173 @@ impl SpecGatekeeper {
             }
 
             i += 1;
+        }
+    }
+
+    /// Parse a tasks.md and validate that any task touching Comfy-harness
+    /// keywords (Requirement 13.4) carries a `_ComfyRef:` or `_Divergence:`
+    /// annotation.
+    pub fn check_comfy_harness_alignment(
+        content: &str,
+        spec_name: &str,
+        report: &mut MigrationValidationReport,
+    ) {
+        let lines: Vec<&str> = content.lines().collect();
+        let mut i = 0;
+
+        while i < lines.len() {
+            let line = lines[i];
+            let trimmed = line.trim_start();
+            let task_marker = trimmed
+                .strip_prefix("- [ ] ")
+                .or_else(|| trimmed.strip_prefix("- [x] "));
+
+            if let Some(task_title) = task_marker {
+                let task_name = task_title.trim().to_string();
+                let base_indent = line.chars().position(|c| c != ' ').unwrap_or(0);
+                let mut j = i + 1;
+
+                let mut description_lines = Vec::new();
+                let mut has_comfy_ref = false;
+                let mut has_divergence = false;
+
+                while j < lines.len() {
+                    let next = lines[j];
+                    let indent = next.chars().position(|c| c != ' ').unwrap_or(0);
+                    if indent <= base_indent && !next.trim().is_empty() {
+                        break;
+                    }
+                    let stripped = next.trim();
+
+                    // Check for Comfy reference or divergence annotation.
+                    if stripped.contains("_ComfyRef:") {
+                        has_comfy_ref = true;
+                    }
+                    // Accept "_Divergence:" and variants like "_SafetyDivergence:" or
+                    // "_PerformanceDivergence:" by matching the suffix without the
+                    // single-underscore prefix.
+                    if stripped.contains("_Divergence:") || stripped.contains("Divergence:") {
+                        has_divergence = true;
+                    }
+
+                    // Collect non-annotation description lines for keyword
+                    // matching.
+                    if !stripped.starts_with("- _") && !stripped.starts_with("_- _") {
+                        description_lines.push(stripped);
+                    }
+                    j += 1;
+                }
+
+                // If the task already has a Comfy ref or divergence, skip
+                // keyword checks.
+                if has_comfy_ref || has_divergence {
+                    i = j;
+                    continue;
+                }
+
+                // Check for Comfy keywords in the description.
+                let description = description_lines.join(" ").to_lowercase();
+                let matched_keywords: Vec<&str> = COMFY_HARNESS_KEYWORDS
+                    .iter()
+                    .filter(|kw| description.contains(*kw))
+                    .copied()
+                    .collect();
+
+                if !matched_keywords.is_empty() {
+                    report.push(
+                        MigrationValidationError::WorldModelHarnessTaskMissingComfyRef {
+                            task: task_name.clone(),
+                            spec: spec_name.to_string(),
+                            keywords: matched_keywords.join(", "),
+                        },
+                    );
+                }
+
+                i = j;
+                continue;
+            }
+
+            i += 1;
+        }
+    }
+
+    /// Validate that all ten expected Comfy harness specs exist under the
+    /// root, have required files, and do not claim overlapping scope keywords.
+    pub fn validate_comfy_harness_pack(root: &SpecRoot, report: &mut MigrationValidationReport) {
+        // 1. Presence and completeness check.
+        for spec in COMFY_HARNESS_SPECS {
+            let spec_path = root.path.join(spec.dir_name);
+            if !spec_path.is_dir() {
+                report.push(MigrationValidationError::MissingComfySpecDirectory {
+                    spec: spec.dir_name.to_string(),
+                });
+                continue;
+            }
+            for file in Self::REQUIRED_SPEC_FILES {
+                if !spec_path.join(file).is_file() {
+                    report.push(MigrationValidationError::MissingSpecFile {
+                        spec: spec.dir_name.to_string(),
+                        file: file.to_string(),
+                    });
+                }
+            }
+        }
+
+        // 2. Scope non-overlap check.
+        for (i, spec_a) in COMFY_HARNESS_SPECS.iter().enumerate() {
+            for spec_b in COMFY_HARNESS_SPECS.iter().skip(i + 1) {
+                let overlapping: Vec<&str> = spec_a
+                    .scope_keywords
+                    .iter()
+                    .filter(|kw| spec_b.scope_keywords.contains(kw))
+                    .copied()
+                    .collect();
+                if !overlapping.is_empty() {
+                    report.push(MigrationValidationError::ComfyHarnessSpecOverlap {
+                        spec_a: spec_a.dir_name.to_string(),
+                        spec_b: spec_b.dir_name.to_string(),
+                        shared_keywords: overlapping.join(", "),
+                    });
+                }
+            }
+        }
+    }
+
+    /// Run Comfy harness alignment checks on every world-model-adjacent spec
+    /// under the given root.  A spec is considered world-model-adjacent when
+    /// its directory name starts with `comfy-` or matches the world-model
+    /// harness spec.
+    pub fn check_world_model_harness_alignment(
+        root: &SpecRoot,
+        report: &mut MigrationValidationReport,
+    ) {
+        let entries = match fs::read_dir(&root.path) {
+            Ok(e) => e,
+            Err(_) => return,
+        };
+
+        for entry in entries.flatten() {
+            if !entry.file_type().is_ok_and(|t| t.is_dir()) {
+                continue;
+            }
+            let dir_name = entry.file_name().to_string_lossy().to_string();
+
+            // Only check Comfy harness specs and the world-model spec.
+            let is_world_model_adjacent =
+                dir_name.starts_with("comfy-") || dir_name == "world-model-runtime";
+            if !is_world_model_adjacent {
+                continue;
+            }
+
+            let tasks_path = entry.path().join("tasks.md");
+            if !tasks_path.is_file() {
+                continue;
+            }
+            let content = match fs::read_to_string(&tasks_path) {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+            Self::check_comfy_harness_alignment(&content, &dir_name, report);
         }
     }
 
@@ -390,6 +652,16 @@ impl MigrationGatekeeper for SpecGatekeeper {
                     });
                 }
             }
+        }
+
+        // --- Comfy harness validation (Task 14, Requirements 13.x) ---
+        if self.check_comfy {
+            // Check that all ten Comfy harness specs are present and complete.
+            Self::validate_comfy_harness_pack(root, &mut report);
+
+            // Check that world-model harness tasks touching Comfy behaviors
+            // reference an applicable Comfy spec or document divergence.
+            Self::check_world_model_harness_alignment(root, &mut report);
         }
 
         report
