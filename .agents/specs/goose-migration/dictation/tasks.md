@@ -26,7 +26,7 @@ Implement the dictation system with microphone capture (extending `crates/audio/
   - _Requirements: 1_
   - _writes: crates/dictation/src/whisper.rs, crates/dictation/src/dictation.rs_
 
-- [ ] 4. Implement cloud dictation providers
+- [x] 4. Implement cloud dictation providers
   - Generic HTTP-based cloud dictation provider
   - Support for common cloud STT APIs
   - _Requirements: 2_
