@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-06T08:11:52.694Z",
+  "updated_at": "2026-07-06T08:15:53.307Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": "task:88d56f7c5fc2",
@@ -119,10 +119,10 @@
       "title": "Extend migration inventory validation for Comfy specs",
       "linear_identifier": "SIM-20",
       "linear_url": "https://linear.app/simtropolis/issue/SIM-20/extend-migration-inventory-validation-for-comfy-specs",
-      "status": "active",
+      "status": "inactive",
       "owner": null,
-      "summary": null,
-      "updated_at": "2026-07-06T08:03:32.445Z"
+      "summary": "Completed by workflow command.",
+      "updated_at": "2026-07-06T08:15:53.306Z"
     }
   ],
   "task_notes": [

@@ -98,7 +98,7 @@
   - _Requirements: 10.1, 10.2, 10.3, 12.1, 12.2, 12.3, 12.4_
   - _writes: crates/baymax_game/src/spec_gatekeeper.rs, crates/baymax_game/src/spec_gatekeeper_tests.rs_
 
-- [ ] 14. Extend migration inventory validation for Comfy specs
+- [x] 14. Extend migration inventory validation for Comfy specs
   - Validate the ten Comfy harness specs are present, non-overlapping, and treated as core world-model harness owners for prompt, graph, sampler, scheduler, conditioning, diffusion/world-model execution, model, asset, media-node, provider, extension, and packaging behavior.
   - Fail validation when a world-model harness task adds prompt, graph, sampler, scheduler, conditioning, diffusion/world-model execution, model, asset, media-node, provider, or extension behavior without an applicable Comfy spec reference or explicit safety/security/dependency divergence.
   - _Requirements: 1.1, 1.2, 2.1, 2.2, 13.1, 13.2, 13.3, 13.4, 13.5, 13.6_
