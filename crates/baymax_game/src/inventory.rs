@@ -79,11 +79,32 @@ impl MigrationSourceArea {
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum MigrationValidationError {
-    MissingSpecScope { spec: String },
-    MissingSpecFile { spec: String, file: String },
-    MissingSourceAreaScope { source_area: String },
-    MissingSourceAreaSpecCoverage { source_area: String },
-    ExcludedSourceAreaWithoutBoundaryReason { source_area: String },
+    MissingSpecScope {
+        spec: String,
+    },
+    MissingSpecFile {
+        spec: String,
+        file: String,
+    },
+    MissingSourceAreaScope {
+        source_area: String,
+    },
+    MissingSourceAreaSpecCoverage {
+        source_area: String,
+    },
+    ExcludedSourceAreaWithoutBoundaryReason {
+        source_area: String,
+    },
+    /// A task entry in a grouped spec's tasks.md is missing requirement references.
+    MissingTaskRequirementRefs {
+        task: String,
+        spec: String,
+    },
+    /// A task entry in a grouped spec's tasks.md is missing expected write targets.
+    MissingTaskWriteTargets {
+        task: String,
+        spec: String,
+    },
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Hash, Serialize, Deserialize)]

@@ -68,6 +68,28 @@
       "owner": null,
       "summary": "Completed by workflow command.",
       "updated_at": "2026-07-05T22:48:15.385Z"
+    },
+    {
+      "task_id": "task:573a45986f78",
+      "task_identifier": ".agents/specs/ci-migration/tasks.md:31",
+      "title": "Create post-generation safety check in CI (optional, if xtask cannot be modified)",
+      "linear_identifier": "SIM-11",
+      "linear_url": "https://linear.app/simtropolis/issue/SIM-11/create-post-generation-safety-check-in-ci-optional-if-xtask-cannot-be",
+      "status": "active",
+      "owner": null,
+      "summary": null,
+      "updated_at": "2026-07-05T23:02:37.640Z"
+    },
+    {
+      "task_id": "task:b63c03dcd4cb",
+      "task_identifier": ".agents/specs/godot-migration/tasks.md:96",
+      "title": "Add migration gatekeeper validation",
+      "linear_identifier": "SIM-18",
+      "linear_url": "https://linear.app/simtropolis/issue/SIM-18/add-migration-gatekeeper-validation",
+      "status": "active",
+      "owner": null,
+      "summary": "Spec gatekeeper module implemented (ExecutionGate/DependencyWave/MigrationTaskRef/SpecGatekeeper) with task-manifest validation and gate enforcement. Tests + clippy passing. Ready to commit/push.",
+      "updated_at": "2026-07-05T23:03:07.902Z"
     }
   ],
   "task_notes": [
@@ -134,9 +156,7 @@
       "rank": 2,
       "rationale": "Also ready, but less immediately useful than enabling dictation runtime foundations.",
       "blockers": [],
-      "evidence": [
-        "workflow.js next listed documentation candidates as ready with no dependencies"
-      ]
+      "evidence": ["workflow.js next listed documentation candidates as ready with no dependencies"]
     }
   ],
   "maintenance": {
@@ -156,10 +176,7 @@
         "Previous task 1 is complete and established the required API.",
         "This task unlocks follow-up UI integration work."
       ],
-      "stale_if_changed": [
-        ".agents/specs/example/tasks.md",
-        ".agents/specs/example/design.md"
-      ],
+      "stale_if_changed": [".agents/specs/example/tasks.md", ".agents/specs/example/design.md"],
       "updated_at": "YYYY-MM-DDTHH:MM:SSZ"
     },
     "task_activity_shape": {
