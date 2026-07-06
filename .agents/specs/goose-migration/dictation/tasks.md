@@ -19,7 +19,7 @@ Implement the dictation system with microphone capture (extending `crates/audio/
   - _Requirements: 3_
   - _writes: crates/dictation/Cargo.toml, crates/dictation/src/dictation.rs, Cargo.toml, Cargo.lock_
 
-- [ ] 3. Implement Whisper local provider
+- [x] 3. Implement Whisper local provider
   - Integrate with candle-core and candle-nn for Whisper inference
   - Model download management (tiny, base, small, medium, large)
   - Audio preprocessing (resampling, normalization)
