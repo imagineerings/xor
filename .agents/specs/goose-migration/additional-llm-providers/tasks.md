@@ -108,6 +108,13 @@ Implement the 18+ provider integrations from goose that don't yet exist in bayma
   - _Requirements: 1-8_
   - _writes: crates/language_models/src/provider/tests/_
 
+- [x] 10. Add local OpenAI-compatible provider configuration UI
+  - Add a local inference preset to the LLM provider configuration UI for Ollama and llama.cpp.
+  - Prefill `http://localhost:11434/v1` and allow saving local endpoints without a user-entered API key.
+  - Keep local inference on the existing OpenAI-compatible provider path so configured models are registered by `LanguageModelRegistry`.
+  - _Requirements: 5.1, 5.2, 6.3, 6.4_
+  - _writes: crates/agent_ui/src/agent_configuration.rs, crates/agent_ui/src/agent_configuration/add_llm_provider_modal.rs_
+
 ## Notes
 
 - Each provider implements the `LanguageModelProvider` trait from `crates/language_model_core/`

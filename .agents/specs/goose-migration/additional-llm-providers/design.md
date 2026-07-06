@@ -10,6 +10,7 @@ Integrate the 18+ LLM provider implementations from goose that do not yet have e
 - **Feature-gated crates**: Cloud providers (Azure, Vertex AI, etc.) that require heavy SDK dependencies get their own crates under `crates/`; simpler API-only providers (NanoGPT, Avian, etc.) can live in a single shared crate.
 - **ACP-based providers**: Claude ACP, Claude Code, ChatGPT/Codex, Cursor Agent communicate via spawning subprocesses or connecting via ACP — these follow the pattern of `crates/acp_thread/` rather than direct HTTP.
 - **Declarative providers**: Implemented entirely in configuration, no Rust code changes needed for new OpenAI-compatible endpoints.
+- **Local endpoint configuration**: Ollama and llama.cpp use the existing OpenAI-compatible provider path with a local `/v1` endpoint preset. The UI must not require a user-entered API key for these local endpoints, but Baymax may store an internal placeholder credential so provider authentication state remains compatible with the existing OpenAI-compatible runtime.
 
 ## 2. Architecture
 
@@ -113,6 +114,15 @@ pub struct DeclarativeProviderConfig {
 }
 ```
 
+### Component: LLM Provider Configuration UI
+
+The agent configuration UI exposes `Add Provider` flows for OpenAI-compatible providers:
+
+- `OpenAI` uses the standard OpenAI-compatible API flow and requires an API key.
+- `Local Inference (Ollama / llama.cpp)` uses the same OpenAI-compatible settings schema, prefills `http://localhost:11434/v1`, and allows a blank API key for local servers that ignore authentication.
+
+Both flows write `language_models.openai_compatible` settings so models appear in the existing `LanguageModelRegistry` without a separate local-inference runtime.
+
 ### Component: Provider Registry
 
 ```rust
@@ -168,7 +178,13 @@ _For any_ provider ID [registered in the provider registry], THE registry SHALL 
 
 _For any_ declarative provider config [with invalid fields], THE system SHALL reject the config and enumerate all validation errors.
 
-**Validates: Requirement 6.3**
+**Validates: Requirement 6.5**
+
+### Property 6: Local Endpoint Configuration
+
+_For any_ local OpenAI-compatible provider configured through the UI, THE system SHALL persist the provider with a local API URL, at least one model, and usable authentication state even when the local endpoint does not require a user-entered API key.
+
+**Validates: Requirement 5.1, 5.2, 6.3, 6.4**
 
 ### Property 5: Credential Safety
 

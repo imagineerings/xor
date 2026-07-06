@@ -40,23 +40,64 @@ fn single_line_input(
 #[derive(Clone, Copy)]
 pub enum LlmCompatibleProvider {
     OpenAi,
+    LocalInference,
 }
 
 impl LlmCompatibleProvider {
     fn name(&self) -> &'static str {
         match self {
             LlmCompatibleProvider::OpenAi => "OpenAI",
+            LlmCompatibleProvider::LocalInference => "Local Inference",
+        }
+    }
+
+    fn default_provider_name(&self) -> Option<&'static str> {
+        match self {
+            LlmCompatibleProvider::OpenAi => None,
+            LlmCompatibleProvider::LocalInference => Some("Local Ollama"),
         }
     }
 
     fn api_url(&self) -> &'static str {
         match self {
             LlmCompatibleProvider::OpenAi => "https://api.openai.com/v1",
+            LlmCompatibleProvider::LocalInference => "http://localhost:11434/v1",
+        }
+    }
+
+    fn api_key_label(&self) -> &'static str {
+        match self {
+            LlmCompatibleProvider::OpenAi => "API Key",
+            LlmCompatibleProvider::LocalInference => "API Key (optional)",
+        }
+    }
+
+    fn api_key_placeholder(&self) -> &'static str {
+        match self {
+            LlmCompatibleProvider::OpenAi => "000000000000000000000000000000000000000000000000",
+            LlmCompatibleProvider::LocalInference => "Leave blank for Ollama or llama.cpp",
+        }
+    }
+
+    fn requires_api_key(&self) -> bool {
+        match self {
+            LlmCompatibleProvider::OpenAi => true,
+            LlmCompatibleProvider::LocalInference => false,
+        }
+    }
+
+    fn description(&self) -> &'static str {
+        match self {
+            LlmCompatibleProvider::OpenAi => "This provider will use an OpenAI compatible API.",
+            LlmCompatibleProvider::LocalInference => {
+                "Connect to a local OpenAI-compatible endpoint such as Ollama or llama.cpp. Start the local server first, then set its /v1 URL and model name."
+            }
         }
     }
 }
 
 struct AddLlmProviderInput {
+    provider: LlmCompatibleProvider,
     provider_name: Entity<InputField>,
     api_url: Entity<InputField>,
     api_key: Entity<InputField>,
@@ -65,22 +106,32 @@ struct AddLlmProviderInput {
 
 impl AddLlmProviderInput {
     fn new(provider: LlmCompatibleProvider, window: &mut Window, cx: &mut App) -> Self {
-        let provider_name =
-            single_line_input("Provider Name", provider.name(), None, 1, window, cx);
-        let api_url = single_line_input("API URL", provider.api_url(), None, 2, window, cx);
+        let provider_name = single_line_input(
+            "Provider Name",
+            provider.name(),
+            provider.default_provider_name(),
+            1,
+            window,
+            cx,
+        );
+        let api_url = single_line_input(
+            "API URL",
+            provider.api_url(),
+            Some(provider.api_url()),
+            2,
+            window,
+            cx,
+        );
         let api_key = cx.new(|cx| {
-            InputField::new(
-                window,
-                cx,
-                "000000000000000000000000000000000000000000000000",
-            )
-            .label("API Key")
-            .tab_index(3)
-            .tab_stop(true)
-            .masked(true)
+            InputField::new(window, cx, provider.api_key_placeholder())
+                .label(provider.api_key_label())
+                .tab_index(3)
+                .tab_stop(true)
+                .masked(true)
         });
 
         Self {
+            provider,
             provider_name,
             api_url,
             api_key,
@@ -243,9 +294,12 @@ fn save_provider_to_settings(
         return Task::ready(Err("API URL cannot be empty".into()));
     }
 
-    let api_key = input.api_key.read(cx).text(cx);
+    let mut api_key = input.api_key.read(cx).text(cx);
     if api_key.is_empty() {
-        return Task::ready(Err("API Key cannot be empty".into()));
+        if input.provider.requires_api_key() {
+            return Task::ready(Err("API Key cannot be empty".into()));
+        }
+        api_key = "local-endpoint-no-api-key".into();
     }
 
     let mut models = Vec::new();
@@ -521,13 +575,11 @@ impl Render for AddLlmProviderModal {
             }))
             .child(
                 Modal::new("configure-context-server", None)
-                    .header(ModalHeader::new().headline("Add LLM Provider").description(
-                        match self.provider {
-                            LlmCompatibleProvider::OpenAi => {
-                                "This provider will use an OpenAI compatible API."
-                            }
-                        },
-                    ))
+                    .header(
+                        ModalHeader::new()
+                            .headline("Add LLM Provider")
+                            .description(self.provider.description()),
+                    )
                     .when_some(self.last_error.clone(), |this, error| {
                         this.section(
                             Section::new().child(
@@ -695,6 +747,24 @@ mod tests {
     }
 
     #[gpui::test]
+    async fn test_save_local_inference_provider_without_api_key(cx: &mut TestAppContext) {
+        let cx = setup_test(cx).await;
+
+        assert_eq!(
+            save_provider_validation_errors_for_provider(
+                LlmCompatibleProvider::LocalInference,
+                "Local Ollama",
+                "http://localhost:11434/v1",
+                "",
+                vec![("llama3.2", "200000", "200000", "32000")],
+                cx,
+            )
+            .await,
+            None
+        );
+    }
+
+    #[gpui::test]
     async fn test_save_provider_name_conflict(cx: &mut TestAppContext) {
         let cx = setup_test(cx).await;
 
@@ -840,6 +910,25 @@ mod tests {
         models: Vec<(&str, &str, &str, &str)>,
         cx: &mut VisualTestContext,
     ) -> Option<SharedString> {
+        save_provider_validation_errors_for_provider(
+            LlmCompatibleProvider::OpenAi,
+            provider_name,
+            api_url,
+            api_key,
+            models,
+            cx,
+        )
+        .await
+    }
+
+    async fn save_provider_validation_errors_for_provider(
+        provider: LlmCompatibleProvider,
+        provider_name: &str,
+        api_url: &str,
+        api_key: &str,
+        models: Vec<(&str, &str, &str, &str)>,
+        cx: &mut VisualTestContext,
+    ) -> Option<SharedString> {
         fn set_text(input: &Entity<InputField>, text: &str, window: &mut Window, cx: &mut App) {
             input.update(cx, |input, cx| {
                 input.set_text(text, window, cx);
@@ -847,7 +936,7 @@ mod tests {
         }
 
         let task = cx.update(|window, cx| {
-            let mut input = AddLlmProviderInput::new(LlmCompatibleProvider::OpenAi, window, cx);
+            let mut input = AddLlmProviderInput::new(provider, window, cx);
             set_text(&input.provider_name, provider_name, window, cx);
             set_text(&input.api_url, api_url, window, cx);
             set_text(&input.api_key, api_key, window, cx);

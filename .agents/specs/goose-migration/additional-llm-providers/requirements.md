@@ -70,20 +70,24 @@ Migrate the LLM provider integrations from goose that do not yet have equivalent
 
 #### Acceptance Criteria
 
-1. WHEN a user enables local inference THEN the system SHALL run models on the local machine
-2. THE local inference SHALL support loading models via candle (ML framework)
-3. IF local inference hardware is insufficient THEN the system SHALL display a clear error
-4. WHILE local inference is running THE system SHALL handle resource constraints gracefully
+1. WHEN a user enables local inference via an OpenAI-compatible local server THEN the system SHALL allow configuring the provider with a local `/v1` endpoint such as `http://localhost:11434/v1`
+2. WHEN a local Ollama or llama.cpp server does not require authentication THEN the system SHALL allow saving the provider without a user-entered API key
+3. IF a local inference provider is selected while its local server is not running THEN the system SHALL display a clear error that instructs the user to start Ollama or llama.cpp and configure the OpenAI-compatible endpoint
+4. THE local inference SHALL support loading models via candle (ML framework) when Baymax-owned in-process local inference is implemented
+5. IF local inference hardware is insufficient THEN the system SHALL display a clear error
+6. WHILE local inference is running THE system SHALL handle resource constraints gracefully
 
 ### Requirement 6: Declarative Providers
 
-**User Story:** As a baymax user, I want to define custom providers via configuration files, so that I can use any OpenAI-compatible API without writing code.
+**User Story:** As a baymax user, I want to define custom providers via configuration files or UI, so that I can use any OpenAI-compatible API without writing code.
 
 #### Acceptance Criteria
 
 1. WHEN a user creates a provider config file THEN the system SHALL register it as an available provider
 2. THE declarative provider SHALL support base URL, API key, model list, and custom headers configuration
-3. IF the declarative provider config is invalid THEN the system SHALL show validation errors
+3. WHEN a user opens the LLM provider configuration UI THEN the system SHALL provide an OpenAI-compatible provider flow and a local inference preset for Ollama or llama.cpp
+4. WHEN a user configures a local inference preset THEN the system SHALL prefill a local OpenAI-compatible API URL and allow editing the model list
+5. IF the declarative provider config is invalid THEN the system SHALL show validation errors
 
 ### Requirement 7: Provider Registry
 

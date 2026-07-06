@@ -448,21 +448,37 @@ impl AgentConfiguration {
                 let workspace = self.workspace.clone();
                 move |window, cx| {
                     Some(ContextMenu::build(window, cx, |menu, _window, _cx| {
-                        menu.header("Compatible APIs").entry("OpenAI", None, {
-                            let workspace = workspace.clone();
-                            move |window, cx| {
-                                workspace
-                                    .update(cx, |workspace, cx| {
-                                        AddLlmProviderModal::toggle(
-                                            LlmCompatibleProvider::OpenAi,
-                                            workspace,
-                                            window,
-                                            cx,
-                                        );
-                                    })
-                                    .log_err();
-                            }
-                        })
+                        menu.header("Compatible APIs")
+                            .entry("OpenAI", None, {
+                                let workspace = workspace.clone();
+                                move |window, cx| {
+                                    workspace
+                                        .update(cx, |workspace, cx| {
+                                            AddLlmProviderModal::toggle(
+                                                LlmCompatibleProvider::OpenAi,
+                                                workspace,
+                                                window,
+                                                cx,
+                                            );
+                                        })
+                                        .log_err();
+                                }
+                            })
+                            .entry("Local Inference (Ollama / llama.cpp)", None, {
+                                let workspace = workspace.clone();
+                                move |window, cx| {
+                                    workspace
+                                        .update(cx, |workspace, cx| {
+                                            AddLlmProviderModal::toggle(
+                                                LlmCompatibleProvider::LocalInference,
+                                                workspace,
+                                                window,
+                                                cx,
+                                            );
+                                        })
+                                        .log_err();
+                                }
+                            })
                     }))
                 }
             })
