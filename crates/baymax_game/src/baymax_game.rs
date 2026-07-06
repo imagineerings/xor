@@ -1,7 +1,10 @@
+pub mod boundary;
 pub mod inventory;
 pub mod migration;
 pub mod spec_gatekeeper;
 
+#[cfg(test)]
+mod boundary_tests;
 #[cfg(test)]
 mod inventory_tests;
 #[cfg(test)]
@@ -9,6 +12,7 @@ mod spec_gatekeeper_tests;
 #[cfg(test)]
 mod tests;
 
+pub use boundary::{DefaultBoundaryPolicy, RuntimeBoundaryPolicy};
 pub use inventory::{
     BaymaxGameMigrationInventory, BaymaxGameSourcePath, MigrationDecision, MigrationInventory,
     MigrationSourceArea, MigrationSpecCoverage, MigrationValidationError,
