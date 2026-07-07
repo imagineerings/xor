@@ -134,7 +134,28 @@
       "owner": null,
       "summary": null,
       "updated_at": "2026-07-06T09:03:44.729Z"
-    }
+    },
+    {
+      "task_id": "task:9f3d704a8eea",
+      "task_identifier": ".agents/specs/godot-migration/tasks.md:76",
+      "title": "Add world-model action/control compatibility",
+      "linear_identifier": "SIM-28",
+      "linear_url": "https://linear.app/simtropolis/issue/SIM-28/add-world-model-action-control-compatibility",
+      "status": "inactive",
+      "owner": null,
+      "summary": "Merged in PR #55.",
+      "updated_at": "2026-07-06T18:06:36Z"
+    },
+    {
+      "task_id": "task:a3b72dfc0ee5",
+      "task_identifier": ".agents/specs/godot-migration/tasks.md:81",
+      "title": "Add diffusion graph primitives",
+      "linear_identifier": "SIM-29",
+      "linear_url": "https://linear.app/simtropolis/issue/SIM-29/add-diffusion-graph-primitives",
+      "status": "inactive",
+      "owner": null,
+      "summary": "Merged in PR #57.",
+      "updated_at": "2026-07-07T00:00:00Z"
     }
   ],
   "task_notes": [
@@ -176,8 +197,8 @@
     },
     {
       "scope": ".agents/specs/godot-migration",
-      "summary": "Tasks 1 and 2 are complete. For the inventory/gatekeeper serial path, task 13 should follow task 2 before task 14 extends Comfy-specific inventory validation.",
-      "updated_at": "2026-07-05T22:49:22.836Z"
+      "summary": "Tasks 1-10 are complete (W0 planning + W1 shared foundations). Tasks 11 and 12 are independent W1 tasks remaining; task 4 starts W2 after W1. See individual task checkboxes.",
+      "updated_at": "2026-07-07T00:00:00Z"
     }
   ],
   "ranked_candidates": [

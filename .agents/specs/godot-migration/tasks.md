@@ -43,7 +43,7 @@
   - _Requirements: 1.1, 1.2, 1.3, 12.4_
   - _writes: crates/baymax_game/src/inventory.rs, crates/baymax_game/src/inventory_tests.rs_
 
-- [ ] 3. Implement the runtime boundary policy
+- [x] 3. Implement the runtime boundary policy
   - Encode metadata-only, Baymax-adapter, external-command, and excluded scopes.
   - _Requirements: 2.1, 2.2, 2.3_
   - _writes: crates/baymax_game/src/boundary.rs, crates/baymax_game/src/boundary_tests.rs_
@@ -53,32 +53,32 @@
   - _Requirements: 3.1, 3.2, 3.3, 4.1_
   - _writes: crates/baymax_game/src/integration.rs, crates/baymax/src/baymax.rs, crates/baymax_game/src/integration_tests.rs_
 
-- [ ] 5. Add shared parser and diagnostics primitives
+- [x] 5. Add shared parser and diagnostics primitives
   - Define diagnostics, source ranges, parse status, and recoverable-error helpers.
   - _Requirements: 3.2, 10.1_
   - _writes: crates/baymax_game/src/diagnostics.rs, crates/baymax_game/src/parser.rs, crates/baymax_game/src/parser_tests.rs_
 
-- [ ] 6. Add fixture attribution support
+- [x] 6. Add fixture attribution support
   - Implement fixture metadata records for copied or converted Godot and world-model fixtures.
   - _Requirements: 11.2_
   - _writes: crates/baymax_game/src/fixtures.rs, crates/baymax_game/src/fixtures_tests.rs_
 
-- [ ] 7. Add umbrella smoke tests
+- [x] 7. Add umbrella smoke tests
   - Exercise detection, metadata routing, boundary decisions, and registration together.
   - _Requirements: 3.1, 3.2, 3.3, 10.3_
   - _writes: crates/baymax_game/src/smoke_tests.rs_
 
-- [ ] 8. Create the shared world-model support crate
+- [x] 8. Create the shared world-model support crate
   - Add request, control, worker, graph, mesh, artifact, and provenance types.
   - _Requirements: 4.2, 5.1, 5.4, 7.2_
   - _writes: Cargo.toml, crates/world_model/Cargo.toml, crates/world_model/src/world_model.rs, crates/world_model/src/request.rs, crates/world_model/src/provenance.rs, crates/world_model/src/tests.rs_
 
-- [ ] 9. Add world-model action/control compatibility
+- [x] 9. Add world-model action/control compatibility
   - Port WASD/IJKL action-string parsing semantics from `projects/world-model`.
   - _Requirements: 5.1, 5.2_
   - _writes: crates/world_model/src/controls.rs, crates/world_model/src/controls_tests.rs_
 
-- [ ] 10. Add diffusion graph primitives
+- [x] 10. Add diffusion graph primitives
   - Define typed graph nodes, edges, validation errors, artifact outputs, and execution IDs.
   - _Requirements: 6.1, 6.2, 6.3_
   - _writes: crates/world_model/src/graph.rs, crates/world_model/src/graph_validation.rs, crates/world_model/src/graph_tests.rs_
@@ -93,7 +93,7 @@
   - _Requirements: 5.3, 9.1, 9.2, 9.3_
   - _writes: crates/world_model/src/serving.rs, crates/world_model/src/serving_diagnostics.rs, crates/world_model/src/serving_tests.rs_
 
-- [ ] 13. Add migration gatekeeper validation
+- [x] 13. Add migration gatekeeper validation
   - Validate spec completeness, task manifests, gate decisions, and wave progression.
   - _Requirements: 10.1, 10.2, 10.3, 12.1, 12.2, 12.3, 12.4_
   - _writes: crates/baymax_game/src/spec_gatekeeper.rs, crates/baymax_game/src/spec_gatekeeper_tests.rs_
