@@ -290,6 +290,7 @@ pub const FILE_HEADER_HEIGHT: u32 = 2;
 pub const BUFFER_HEADER_PADDING: Rems = rems(0.25);
 pub const MULTI_BUFFER_EXCERPT_HEADER_HEIGHT: u32 = 1;
 const CURSOR_BLINK_INTERVAL: Duration = Duration::from_millis(500);
+const SMOOTH_CURSOR_BLINK_DURATION: Duration = Duration::from_millis(530);
 const MAX_LINE_LEN: usize = 1024;
 const MIN_NAVIGATION_HISTORY_ROW_DELTA: i64 = 10;
 const MAX_SELECTION_HISTORY_LEN: usize = 1024;
@@ -1881,7 +1882,14 @@ impl Editor {
         let blink_manager = cx.new(|cx| {
             let mut blink_manager = BlinkManager::new(
                 CURSOR_BLINK_INTERVAL,
+                SMOOTH_CURSOR_BLINK_DURATION,
                 |cx| EditorSettings::get_global(cx).cursor_blink,
+                |cx| {
+                    matches!(
+                        ThemeSettings::get_global(cx).cursor_blink,
+                        Some(settings::CursorBlink::Smooth)
+                    )
+                },
                 cx,
             );
             if is_minimap {
@@ -9210,8 +9218,19 @@ impl Editor {
     }
 
     pub fn show_local_cursors(&self, window: &mut Window, cx: &mut App) -> bool {
-        (self.read_only(cx) || self.blink_manager.read(cx).visible())
-            && self.focus_handle.is_focused(window)
+        let focused = self.focus_handle.is_focused(window);
+        let visible = self.read_only(cx)
+            || self.blink_manager.read(cx).visible()
+            || (!focused && self.show_cursor_when_unfocused);
+        visible && (focused || self.show_cursor_when_unfocused)
+    }
+
+    pub fn local_cursor_opacity(&self, window: &mut Window, cx: &mut App) -> f32 {
+        if !self.focus_handle.is_focused(window) {
+            return 0.3;
+        }
+
+        self.blink_manager.read(cx).opacity(cx)
     }
 
     pub fn set_show_cursor_when_unfocused(&mut self, is_enabled: bool, cx: &mut Context<Self>) {

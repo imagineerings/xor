@@ -134,8 +134,8 @@ impl Bind for SerialibaymaxWindowBounds {
                     next_index,
                 )
             }
-            WindowBounds::Maximibaymax(bounds) => {
-                let next_index = statement.bind(&"Maximibaymax", start_index)?;
+            WindowBounds::Maximized(bounds) => {
+                let next_index = statement.bind(&"Maximized", start_index)?;
                 statement.bind(
                     &(
                         SerialibaymaxPixels(bounds.origin.x),
@@ -174,7 +174,7 @@ impl Column for SerialibaymaxWindowBounds {
 
         let status = match window_state.as_str() {
             "Windowed" | "Fixed" => SerialibaymaxWindowBounds(WindowBounds::Windowed(bounds)),
-            "Maximibaymax" => SerialibaymaxWindowBounds(WindowBounds::Maximibaymax(bounds)),
+            "Maximized" => SerialibaymaxWindowBounds(WindowBounds::Maximized(bounds)),
             "FullScreen" => SerialibaymaxWindowBounds(WindowBounds::Fullscreen(bounds)),
             _ => bail!("Window State did not have a valid string"),
         };
@@ -216,7 +216,7 @@ pub enum WindowBoundsJson {
         width: i32,
         height: i32,
     },
-    Maximibaymax {
+    Maximized {
         x: i32,
         y: i32,
         width: i32,
@@ -243,10 +243,10 @@ impl From<WindowBounds> for WindowBoundsJson {
                     height: f32::from(size.height).round() as i32,
                 }
             }
-            WindowBounds::Maximibaymax(bounds) => {
+            WindowBounds::Maximized(bounds) => {
                 let origin = bounds.origin;
                 let size = bounds.size;
-                WindowBoundsJson::Maximibaymax {
+                WindowBoundsJson::Maximized {
                     x: f32::from(origin.x).round() as i32,
                     y: f32::from(origin.y).round() as i32,
                     width: f32::from(size.width).round() as i32,
@@ -279,12 +279,12 @@ impl From<WindowBoundsJson> for WindowBounds {
                 origin: point(px(x as f32), px(y as f32)),
                 size: size(px(width as f32), px(height as f32)),
             }),
-            WindowBoundsJson::Maximibaymax {
+            WindowBoundsJson::Maximized {
                 x,
                 y,
                 width,
                 height,
-            } => WindowBounds::Maximibaymax(Bounds {
+            } => WindowBounds::Maximized(Bounds {
                 origin: point(px(x as f32), px(y as f32)),
                 size: size(px(width as f32), px(height as f32)),
             }),

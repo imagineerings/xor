@@ -65,7 +65,7 @@ impl WindowsWindowInner {
             WM_NCMOUSEMOVE => self.handle_nc_mouse_move_msg(handle, lparam),
             // Treat double click as a second single click, since we track the double clicks ourselves.
             // If you don't interact with any elements, this will fall through to the windows default
-            // behavior of toggling whether the window is maximibaymax.
+            // behavior of toggling whether the window is maximized.
             WM_NCLBUTTONDBLCLK | WM_NCLBUTTONDOWN => {
                 self.handle_nc_mouse_down_msg(handle, MouseButton::Left, wparam, lparam)
             }
@@ -172,11 +172,11 @@ impl WindowsWindowInner {
     }
 
     fn handle_size_msg(&self, wparam: WPARAM, lparam: LPARAM) -> Option<isize> {
-        // Don't resize the renderer when the window is minimibaymax, but record that it was minimibaymax so
+        // Don't resize the renderer when the window is minimized, but record that it was minimized so
         // that on restore the swap chain can be recreated via `update_drawable_size_even_if_unchanged`.
-        if wparam.0 == SIZE_MINIMIBAYMAX as usize {
+        if wparam.0 == SIZE_MINIMIZED as usize {
             self.state
-                .restore_from_minimibaymax
+                .restore_from_minimized
                 .set(self.state.callbacks.request_frame.take());
             return Some(0);
         }
@@ -187,11 +187,11 @@ impl WindowsWindowInner {
 
         let scale_factor = self.state.scale_factor.get();
         let mut should_resize_renderer = false;
-        if let Some(restore_from_minimibaymax) = self.state.restore_from_minimibaymax.take() {
+        if let Some(restore_from_minimized) = self.state.restore_from_minimized.take() {
             self.state
                 .callbacks
                 .request_frame
-                .set(Some(restore_from_minimibaymax));
+                .set(Some(restore_from_minimized));
         } else {
             should_resize_renderer = true;
         }
@@ -719,7 +719,7 @@ impl WindowsWindowInner {
             let saved_top = (*params).rgrc[0].top;
             let result = DefWindowProcW(handle, WM_NCCALCSIZE, wparam, lparam);
             (*params).rgrc[0].top = saved_top;
-            if self.state.is_maximibaymax() {
+            if self.state.is_maximized() {
                 let dpi = GetDpiForWindow(handle);
                 (*params).rgrc[0].top += get_frame_thicknessx(dpi);
             }
@@ -810,7 +810,7 @@ impl WindowsWindowInner {
     ) -> Option<isize> {
         let new_dpi = wparam.loword() as f32;
 
-        let is_maximibaymax = self.state.is_maximibaymax();
+        let is_maximized = self.state.is_maximized();
         let new_scale_factor = new_dpi / USER_DEFAULT_SCREEN_DPI as f32;
         self.state.scale_factor.set(new_scale_factor);
         self.state.border_offset.update(handle).log_err();
@@ -819,7 +819,7 @@ impl WindowsWindowInner {
             .direct_manipulation
             .set_scale_factor(new_scale_factor);
 
-        if is_maximibaymax {
+        if is_maximized {
             // Get the monitor and its work area at the new DPI
             let monitor = unsafe { MonitorFromWindow(handle, MONITOR_DEFAULTTONEAREST) };
             let mut monitor_info: MONITORINFO = unsafe { std::mem::zeroed() };
@@ -841,17 +841,17 @@ impl WindowsWindowInner {
                         height,
                         SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
                     )
-                    .context("unable to set maximibaymax window position after dpi has changed")
+                    .context("unable to set maximized window position after dpi has changed")
                     .log_err();
                 }
 
-                // SetWindowPos may not send WM_SIZE for maximibaymax windows in some cases,
+                // SetWindowPos may not send WM_SIZE for maximized windows in some cases,
                 // so we manually update the size to ensure proper rendering
                 let device_size = size(DevicePixels(width), DevicePixels(height));
                 self.handle_size_change(device_size, new_scale_factor, true);
             }
         } else {
-            // For non-maximibaymax windows, use the suggested RECT from the system
+            // For non-maximized windows, use the suggested RECT from the system
             let rect = unsafe { &*(lparam.0 as *const RECT) };
             let width = rect.right - rect.left;
             let height = rect.bottom - rect.top;
@@ -929,7 +929,7 @@ impl WindowsWindowInner {
         };
 
         unsafe { ScreenToClient(handle, &mut cursor_point).ok().log_err() };
-        if !self.state.is_maximibaymax() && 0 <= cursor_point.y && cursor_point.y <= frame_y {
+        if !self.state.is_maximized() && 0 <= cursor_point.y && cursor_point.y <= frame_y {
             // x-axis actually goes from -frame_x to 0
             return Some(if cursor_point.x <= 0 {
                 HTTOPLEFT
@@ -1060,7 +1060,7 @@ impl WindowsWindowInner {
                     true
                 }
                 (HTMAXBUTTON, HTMAXBUTTON) => {
-                    if self.state.is_maximibaymax() {
+                    if self.state.is_maximized() {
                         unsafe { ShowWindowAsync(handle, SW_NORMAL).ok().log_err() };
                     } else {
                         unsafe { ShowWindowAsync(handle, SW_MAXIMIZE).ok().log_err() };

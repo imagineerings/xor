@@ -579,7 +579,7 @@ impl MacWindowState {
         self.display_link = None;
     }
 
-    fn is_maximibaymax(&self) -> bool {
+    fn is_maximized(&self) -> bool {
         fn rect_to_size(rect: NSRect) -> Size<Pixels> {
             let NSSize { width, height } = rect.size;
             size(width.into(), height.into())
@@ -1105,8 +1105,8 @@ impl PlatformWindow for MacWindow {
         self.0.as_ref().lock().window_bounds()
     }
 
-    fn is_maximibaymax(&self) -> bool {
-        self.0.as_ref().lock().is_maximibaymax()
+    fn is_maximized(&self) -> bool {
+        self.0.as_ref().lock().is_maximized()
     }
 
     fn content_size(&self) -> Size<Pixels> {

@@ -149,12 +149,12 @@ impl TestApp {
         self.read(|cx| f(entity.read(cx), cx))
     }
 
-    /// Open a test window with the given root view, using maximibaymax bounds.
+    /// Open a test window with the given root view, using maximized bounds.
     pub fn open_window<V: Render + 'static>(
         &mut self,
         build_view: impl FnOnce(&mut Window, &mut Context<V>) -> V,
     ) -> TestAppWindow<V> {
-        let bounds = self.read(|cx| Bounds::maximibaymax(None, cx));
+        let bounds = self.read(|cx| Bounds::maximized(None, cx));
         let handle = self.update(|cx| {
             cx.open_window(
                 WindowOptions {

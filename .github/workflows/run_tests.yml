@@ -30,31 +30,73 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install Linux dependencies
+        run: ./script/linux
       - uses: dtolnay/rust-toolchain@stable
       - name: Run clippy
         run: cargo clippy --workspace -- -D warnings
 
   test_linux:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5]
+        total_shards: [6]
+    env:
+      CARGO_PROFILE_DEV_DEBUG: "0"
     steps:
       - uses: actions/checkout@v4
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/boost
+          sudo rm -rf /usr/local/.ghcup /usr/local/share/powershell /usr/share/swift /opt/hostedtoolcache/CodeQL
+          if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+            docker system prune -af
+          fi
+          df -h
+      - name: Install Linux dependencies
+        run: ./script/linux
       - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@nextest
       - name: Run tests
-        run: cargo nextest run --workspace --no-fail-fast
+        env:
+          SHARD: ${{ matrix.shard }}
+          TOTAL_SHARDS: ${{ matrix.total_shards }}
+        run: |
+          set -euo pipefail
+          cargo metadata --no-deps --format-version 1 |
+            jq -r --argjson shard "$SHARD" --argjson total_shards "$TOTAL_SHARDS" '.packages | to_entries[] | select((.key % $total_shards) == $shard) | .value.name' |
+            while read -r package; do
+              echo "::group::cargo nextest run -p ${package}"
+              cargo nextest run -p "${package}" --no-fail-fast --no-tests pass
+              echo "::endgroup::"
+            done
 
   test_macos:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@nextest
       - name: Run tests
         run: cargo nextest run --workspace --no-fail-fast
 
   test_windows:
     runs-on: windows-latest
+    env:
+      # Use a short CARGO_HOME so deeply-nested git checkouts (e.g. the `pet`
+      # crate's conda test fixtures) stay under Windows' MAX_PATH limit.
+      CARGO_HOME: C:\\ch
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      RUSTFLAGS: -C link-arg=/PDB:NONE
     steps:
       - uses: actions/checkout@v4
+      - name: Enable Windows long paths
+        run: |
+          reg add "HKLM\SYSTEM\CurrentControlSet\Control\FileSystem" /v LongPathsEnabled /t REG_DWORD /d 1 /f
       - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@nextest
       - name: Run tests
         run: cargo nextest run --workspace --no-fail-fast
 
@@ -85,16 +127,40 @@ jobs:
 
   doctests:
     runs-on: ubuntu-latest
+    env:
+      CARGO_PROFILE_DEV_DEBUG: "0"
     steps:
       - uses: actions/checkout@v4
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/boost
+          sudo rm -rf /usr/local/.ghcup /usr/local/share/powershell /usr/share/swift /opt/hostedtoolcache/CodeQL
+          if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+            docker system prune -af
+          fi
+          df -h
+      - name: Install Linux dependencies
+        run: ./script/linux
       - uses: dtolnay/rust-toolchain@stable
       - name: Run doctests
         run: cargo test --workspace --doc
 
   build_workspace_binaries:
     runs-on: ubuntu-latest
+    env:
+      CARGO_PROFILE_DEV_DEBUG: "0"
     steps:
       - uses: actions/checkout@v4
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/boost
+          sudo rm -rf /usr/local/.ghcup /usr/local/share/powershell /usr/share/swift /opt/hostedtoolcache/CodeQL
+          if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+            docker system prune -af
+          fi
+          df -h
+      - name: Install Linux dependencies
+        run: ./script/linux
       - uses: dtolnay/rust-toolchain@stable
       - name: Build all binaries
         run: cargo build --workspace --bins --examples

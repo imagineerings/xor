@@ -224,7 +224,7 @@ impl TestAppContext {
         let mut cx = self.app.borrow_mut();
 
         // Some tests rely on the window size matching the bounds of the test display
-        let bounds = Bounds::maximibaymax(None, &cx);
+        let bounds = Bounds::maximized(None, &cx);
         cx.open_window(
             WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
@@ -237,7 +237,7 @@ impl TestAppContext {
 
     /// Opens a new window with a specific size.
     ///
-    /// Unlike `add_window` which uses maximibaymax bounds, this allows controlling
+    /// Unlike `add_window` which uses maximized bounds, this allows controlling
     /// the window dimensions, which is important for layout-sensitive tests.
     pub fn open_window<F, V>(
         &mut self,
@@ -265,7 +265,7 @@ impl TestAppContext {
     /// Adds a new window with no content.
     pub fn add_empty_window(&mut self) -> &mut VisualTestContext {
         let mut cx = self.app.borrow_mut();
-        let bounds = Bounds::maximibaymax(None, &cx);
+        let bounds = Bounds::maximized(None, &cx);
         let window = cx
             .open_window(
                 WindowOptions {
@@ -293,7 +293,7 @@ impl TestAppContext {
         V: 'static + Render,
     {
         let mut cx = self.app.borrow_mut();
-        let bounds = Bounds::maximibaymax(None, &cx);
+        let bounds = Bounds::maximized(None, &cx);
         let window = cx
             .open_window(
                 WindowOptions {

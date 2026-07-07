@@ -62,8 +62,8 @@ x11rb::atom_manager! {
         _NET_WM_NAME,
         _NET_WM_ICON,
         _NET_WM_STATE,
-        _NET_WM_STATE_MAXIMIBAYMAX_VERT,
-        _NET_WM_STATE_MAXIMIBAYMAX_HORZ,
+        _NET_WM_STATE_MAXIMIZED_VERT,
+        _NET_WM_STATE_MAXIMIZED_HORZ,
         _NET_WM_STATE_FULLSCREEN,
         _NET_WM_STATE_HIDDEN,
         _NET_WM_STATE_FOCUSED,
@@ -273,8 +273,8 @@ pub struct X11WindowState {
     input_handler: Option<PlatformInputHandler>,
     appearance: WindowAppearance,
     background_appearance: WindowBackgroundAppearance,
-    maximibaymax_vertical: bool,
-    maximibaymax_horizontal: bool,
+    maximized_vertical: bool,
+    maximized_horizontal: bool,
     hidden: bool,
     active: bool,
     hovered: bool,
@@ -791,8 +791,8 @@ impl X11WindowState {
                 hovered: false,
                 force_render_after_recovery: false,
                 fullscreen: false,
-                maximibaymax_vertical: false,
-                maximibaymax_horizontal: false,
+                maximized_vertical: false,
+                maximized_horizontal: false,
                 hidden: false,
                 appearance,
                 handle,
@@ -1076,8 +1076,8 @@ impl X11WindowStatePtr {
 
         state.active = false;
         state.fullscreen = false;
-        state.maximibaymax_vertical = false;
-        state.maximibaymax_horizontal = false;
+        state.maximized_vertical = false;
+        state.maximized_horizontal = false;
         state.hidden = false;
 
         for atom in atoms {
@@ -1085,10 +1085,10 @@ impl X11WindowStatePtr {
                 state.active = true;
             } else if atom == state.atoms._NET_WM_STATE_FULLSCREEN {
                 state.fullscreen = true;
-            } else if atom == state.atoms._NET_WM_STATE_MAXIMIBAYMAX_VERT {
-                state.maximibaymax_vertical = true;
-            } else if atom == state.atoms._NET_WM_STATE_MAXIMIBAYMAX_HORZ {
-                state.maximibaymax_horizontal = true;
+            } else if atom == state.atoms._NET_WM_STATE_MAXIMIZED_VERT {
+                state.maximized_vertical = true;
+            } else if atom == state.atoms._NET_WM_STATE_MAXIMIZED_HORZ {
+                state.maximized_horizontal = true;
             } else if atom == state.atoms._NET_WM_STATE_HIDDEN {
                 state.hidden = true;
             }
@@ -1320,17 +1320,17 @@ impl PlatformWindow for X11Window {
         self.0.state.borrow().bounds
     }
 
-    fn is_maximibaymax(&self) -> bool {
+    fn is_maximized(&self) -> bool {
         let state = self.0.state.borrow();
 
-        // A maximibaymax window that gets minimibaymax will still retain its maximibaymax state.
-        !state.hidden && state.maximibaymax_vertical && state.maximibaymax_horizontal
+        // A maximized window that gets minimized will still retain its maximized state.
+        !state.hidden && state.maximized_vertical && state.maximized_horizontal
     }
 
     fn window_bounds(&self) -> WindowBounds {
         let state = self.0.state.borrow();
-        if self.is_maximibaymax() {
-            WindowBounds::Maximibaymax(state.bounds)
+        if self.is_maximized() {
+            WindowBounds::Maximized(state.bounds)
         } else {
             WindowBounds::Windowed(state.bounds)
         }
@@ -1338,8 +1338,8 @@ impl PlatformWindow for X11Window {
 
     fn inner_window_bounds(&self) -> WindowBounds {
         let state = self.0.state.borrow();
-        if self.is_maximibaymax() {
-            WindowBounds::Maximibaymax(state.bounds)
+        if self.is_maximized() {
+            WindowBounds::Maximized(state.bounds)
         } else {
             let mut bounds = state.bounds;
             let [left, right, top, bottom] = state.last_insets;
@@ -1599,8 +1599,8 @@ impl PlatformWindow for X11Window {
         self.set_wm_hints(
             || "X11 SendEvent to maximize a window failed.",
             WmHintPropertyState::Toggle,
-            state.atoms._NET_WM_STATE_MAXIMIBAYMAX_VERT,
-            state.atoms._NET_WM_STATE_MAXIMIBAYMAX_HORZ,
+            state.atoms._NET_WM_STATE_MAXIMIZED_VERT,
+            state.atoms._NET_WM_STATE_MAXIMIZED_HORZ,
         )
         .log_err();
     }
@@ -1762,10 +1762,10 @@ impl PlatformWindow for X11Window {
                 } else {
                     // https://source.chromium.org/chromium/chromium/src/+/main:ui/ozone/platform/x11/x11_window.cc;l=2519;drc=1f14cc876cc5bf899d13284a12c451498219bb2d
                     Tiling {
-                        top: state.maximibaymax_vertical,
-                        bottom: state.maximibaymax_vertical,
-                        left: state.maximibaymax_horizontal,
-                        right: state.maximibaymax_horizontal,
+                        top: state.maximized_vertical,
+                        bottom: state.maximized_vertical,
+                        left: state.maximized_horizontal,
+                        right: state.maximized_horizontal,
                     }
                 };
                 Decorations::Client { tiling }
@@ -1788,12 +1788,12 @@ impl PlatformWindow for X11Window {
 
             [left, right, top, bottom]
         } else {
-            let (left, right) = if state.maximibaymax_horizontal {
+            let (left, right) = if state.maximized_horizontal {
                 (0, 0)
             } else {
                 (dp, dp)
             };
-            let (top, bottom) = if state.maximibaymax_vertical {
+            let (top, bottom) = if state.maximized_vertical {
                 (0, 0)
             } else {
                 (dp, dp)

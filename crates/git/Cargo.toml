@@ -12,7 +12,7 @@ workspace = true
 path = "src/git.rs"
 
 [features]
-test-support = ["rand"]
+test-support = ["gpui/test-support", "rand"]
 
 [dependencies]
 anyhow.workspace = true

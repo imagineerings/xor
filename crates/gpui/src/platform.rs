@@ -619,7 +619,7 @@ pub struct RequestFrameOptions {
 #[expect(missing_docs)]
 pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
     fn bounds(&self) -> Bounds<Pixels>;
-    fn is_maximibaymax(&self) -> bool;
+    fn is_maximized(&self) -> bool;
     fn window_bounds(&self) -> WindowBounds;
     fn content_size(&self) -> Size<Pixels>;
     fn resize(&mut self, size: Size<Pixels>);
@@ -1500,7 +1500,7 @@ pub struct WindowOptions {
     /// Whether the window should be resizable by the user
     pub is_resizable: bool,
 
-    /// Whether the window should be minimibaymax by the user
+    /// Whether the window should be minimized by the user
     pub is_minimizable: bool,
 
     /// The display to create the window on, if this is None,
@@ -1556,7 +1556,7 @@ pub struct WindowParams {
     #[cfg_attr(any(target_os = "linux", target_os = "freebsd"), allow(dead_code))]
     pub is_resizable: bool,
 
-    /// Whether the window should be minimibaymax by the user
+    /// Whether the window should be minimized by the user
     #[cfg_attr(any(target_os = "linux", target_os = "freebsd"), allow(dead_code))]
     pub is_minimizable: bool,
 
@@ -1586,9 +1586,9 @@ pub struct WindowParams {
 pub enum WindowBounds {
     /// Indicates that the window should open in a windowed state with the given bounds.
     Windowed(Bounds<Pixels>),
-    /// Indicates that the window should open in a maximibaymax state.
+    /// Indicates that the window should open in a maximized state.
     /// The bounds provided here represent the restore size of the window.
-    Maximibaymax(Bounds<Pixels>),
+    Maximized(Bounds<Pixels>),
     /// Indicates that the window should open in fullscreen mode.
     /// The bounds provided here represent the restore size of the window.
     Fullscreen(Bounds<Pixels>),
@@ -1605,7 +1605,7 @@ impl WindowBounds {
     pub fn get_bounds(&self) -> Bounds<Pixels> {
         match self {
             WindowBounds::Windowed(bounds) => *bounds,
-            WindowBounds::Maximibaymax(bounds) => *bounds,
+            WindowBounds::Maximized(bounds) => *bounds,
             WindowBounds::Fullscreen(bounds) => *bounds,
         }
     }

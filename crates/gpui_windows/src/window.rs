@@ -51,7 +51,7 @@ pub struct WindowsWindowState {
     pub appearance: Cell<WindowAppearance>,
     pub background_appearance: Cell<WindowBackgroundAppearance>,
     pub scale_factor: Cell<f32>,
-    pub restore_from_minimibaymax: Cell<Option<Box<dyn FnMut(RequestFrameOptions)>>>,
+    pub restore_from_minimized: Cell<Option<Box<dyn FnMut(RequestFrameOptions)>>>,
 
     pub callbacks: Callbacks,
     pub input_handler: Cell<Option<PlatformInputHandler>>,
@@ -131,7 +131,7 @@ impl WindowsWindowState {
             size: logical_size,
         };
         let border_offset = WindowBorderOffset::default();
-        let restore_from_minimibaymax = None;
+        let restore_from_minimized = None;
         let renderer = DirectXRenderer::new(hwnd, directx_devices, disable_direct_composition)
             .context("Creating DirectX renderer")?;
         let callbacks = Callbacks::default();
@@ -156,7 +156,7 @@ impl WindowsWindowState {
             appearance: Cell::new(appearance),
             background_appearance: Cell::new(WindowBackgroundAppearance::Opaque),
             scale_factor: Cell::new(scale_factor),
-            restore_from_minimibaymax: Cell::new(restore_from_minimibaymax),
+            restore_from_minimized: Cell::new(restore_from_minimized),
             min_size,
             callbacks,
             input_handler: Cell::new(input_handler),
@@ -186,7 +186,7 @@ impl WindowsWindowState {
         self.fullscreen.get().is_some()
     }
 
-    pub(crate) fn is_maximibaymax(&self) -> bool {
+    pub(crate) fn is_maximized(&self) -> bool {
         !self.is_fullscreen() && unsafe { IsZoomed(self.hwnd) }.as_bool()
     }
 
@@ -197,7 +197,7 @@ impl WindowsWindowState {
         }
     }
 
-    // Calculate the bounds used for saving and whether the window is maximibaymax.
+    // Calculate the bounds used for saving and whether the window is maximized.
     fn calculate_window_bounds(&self) -> (Bounds<Pixels>, bool) {
         let placement = unsafe {
             let mut placement = WINDOWPLACEMENT {
@@ -215,17 +215,17 @@ impl WindowsWindowState {
                 &self.border_offset,
                 self.scale_factor.get(),
             ),
-            placement.showCmd == SW_SHOWMAXIMIBAYMAX.0 as u32,
+            placement.showCmd == SW_SHOWMAXIMIZED.0 as u32,
         )
     }
 
     fn window_bounds(&self) -> WindowBounds {
-        let (bounds, maximibaymax) = self.calculate_window_bounds();
+        let (bounds, maximized) = self.calculate_window_bounds();
 
         if self.is_fullscreen() {
             WindowBounds::Fullscreen(self.fullscreen_restore_bounds.get())
-        } else if maximibaymax {
-            WindowBounds::Maximibaymax(bounds)
+        } else if maximized {
+            WindowBounds::Maximized(bounds)
         } else {
             WindowBounds::Windowed(bounds)
         }
@@ -339,7 +339,7 @@ impl WindowsWindowInner {
             return Ok(());
         };
         match open_status.state {
-            WindowOpenState::Maximibaymax => unsafe {
+            WindowOpenState::Maximized => unsafe {
                 SetWindowPlacement(self.hwnd, &open_status.placement)
                     .context("failed to set window placement")?;
                 ShowWindowAsync(self.hwnd, SW_MAXIMIZE).ok()?;
@@ -586,8 +586,8 @@ impl PlatformWindow for WindowsWindow {
         self.state.bounds()
     }
 
-    fn is_maximibaymax(&self) -> bool {
-        self.state.is_maximibaymax()
+    fn is_maximized(&self) -> bool {
+        self.state.is_maximized()
     }
 
     fn window_bounds(&self) -> WindowBounds {
@@ -761,7 +761,7 @@ impl PlatformWindow for WindowsWindow {
                 this.set_window_placement().log_err();
 
                 unsafe {
-                    // If the window is minimibaymax, restore it.
+                    // If the window is minimized, restore it.
                     if IsIconic(hwnd).as_bool() {
                         ShowWindowAsync(hwnd, SW_RESTORE).ok().log_err();
                     }
@@ -864,7 +864,7 @@ impl PlatformWindow for WindowsWindow {
             if IsWindowVisible(self.0.hwnd).as_bool() {
                 ShowWindowAsync(self.0.hwnd, SW_MAXIMIZE).ok().log_err();
             } else if let Some(mut status) = self.state.initial_placement.take() {
-                status.state = WindowOpenState::Maximibaymax;
+                status.state = WindowOpenState::Maximized;
                 self.state.initial_placement.set(Some(status));
             }
         }
@@ -1314,7 +1314,7 @@ struct WindowOpenStatus {
 
 #[derive(Clone, Copy)]
 enum WindowOpenState {
-    Maximibaymax,
+    Maximized,
     Fullscreen,
     Windowed,
 }

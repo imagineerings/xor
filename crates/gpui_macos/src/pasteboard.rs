@@ -378,6 +378,9 @@ mod tests {
     #[test]
     fn test_string() {
         let pasteboard = Pasteboard::unique();
+        pasteboard.write(ClipboardItem {
+            entries: Vec::new(),
+        });
         assert_eq!(pasteboard.read(), None);
 
         let item = ClipboardItem::new_string("1".to_string());

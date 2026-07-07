@@ -3921,7 +3921,7 @@ mod tests {
             },
             cx,
         );
-        assert_eq!(rendered.text_for_range(0..26), "tags:\n  - baymax\nBody");
+        assert_eq!(rendered.text_for_range(0..29), "tags:\n  - baymax\nBody");
     }
 
     fn render_markdown_with_code_span_link(

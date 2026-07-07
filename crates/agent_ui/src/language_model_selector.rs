@@ -743,7 +743,7 @@ mod tests {
         // In the case below, `baymax/gpt-5-mini` and `openai/gpt-5-mini` have identical
         // similarity scores, but `baymax/gpt-5-mini` was higher in the models list,
         // so it should appear first in the results.
-        let results = matcher.fuzzy_search("mini");
+        let results = matcher.fuzzy_search("gptmini");
         assert_models_eq(results, vec!["baymax/gpt-5-mini", "openai/gpt-5-mini"]);
 
         // Model provider should be searchable as well

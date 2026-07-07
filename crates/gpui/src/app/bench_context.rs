@@ -444,7 +444,7 @@ impl<'a, 'measurement> BenchAppContext<'a, 'measurement> {
     pub fn add_empty_window(&mut self) -> BenchWindowContext<'a, 'measurement> {
         let window = {
             let mut app = self.app.borrow_mut();
-            let bounds = Bounds::maximibaymax(None, &app);
+            let bounds = Bounds::maximized(None, &app);
             let window: AnyWindowHandle = app
                 .open_window(
                     WindowOptions {

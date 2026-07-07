@@ -1244,6 +1244,7 @@ mod tests {
         let (dmg_tx, dmg_rx) = oneshot::channel::<String>();
 
         cx.update(|cx| {
+            cx.set_global(db::AppDatabase::test_new());
             settings::init(cx);
 
             let current_version = semver::Version::new(0, 100, 0);

@@ -11,8 +11,8 @@ mod settings;
 use std::sync::Arc;
 
 use ::settings::{
-    BufferLineHeight as SettingsBufferLineHeight, CursorStyle, FontFeaturesContent, FontSize,
-    IntoGpui, MergeFromTrait, Settings, SettingsStore, ThemeSettingsContent,
+    BufferLineHeight as SettingsBufferLineHeight, CursorBlink, CursorStyle, FontFeaturesContent,
+    FontSize, IntoGpui, MergeFromTrait, Settings, SettingsStore, ThemeSettingsContent,
 };
 use anyhow::{Context as _, Result};
 use gpui::{App, BorrowAppContext, Font, HighlightStyle, Pixels, Refineable, px};
@@ -196,6 +196,7 @@ pub fn spectrum2_defaults(cx: &App) -> Option<ThemeSettingsContent> {
         ui_font_features: Some(ui_font_features),
         buffer_font_features: Some(buffer_font_features),
         cursor_style: Some(CursorStyle::Block),
+        cursor_blink: Some(CursorBlink::Smooth),
         ..Default::default()
     })
 }

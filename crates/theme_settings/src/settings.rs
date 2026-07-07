@@ -83,6 +83,8 @@ pub struct ThemeSettings {
     pub theme_overrides: HashMap<String, settings::ThemeStyleContent>,
     /// The cursor style for the editor when this theme is active.
     pub cursor_style: Option<CursorShape>,
+    /// The cursor blink style for the editor when this theme is active.
+    pub cursor_blink: Option<settings::CursorBlink>,
     /// The current icon theme selection.
     pub icon_theme: IconThemeSelection,
     /// The density of the UI.
@@ -716,6 +718,7 @@ impl settings::Settings for ThemeSettings {
                 settings::CursorStyle::Block => CursorShape::Block,
                 settings::CursorStyle::Underline => CursorShape::Underline,
             }),
+            cursor_blink: content.cursor_blink,
             icon_theme: icon_theme_selection,
             ui_density: ui_density_from_settings(content.ui_density.unwrap_or_default()),
             unnecessary_code_fade: content.unnecessary_code_fade.unwrap().0.clamp(0.0, 0.9),

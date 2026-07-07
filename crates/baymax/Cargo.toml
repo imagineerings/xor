@@ -309,4 +309,4 @@ osx_info_plist_exts = ["resources/info/*"]
 osx_url_schemes = ["baymax"]
 
 [package.metadata.cargo-machete]
-ignored = ["profiling", "zstd", "tracing"]
+ignored = ["profiling", "zstd", "tracing", "gateway"]

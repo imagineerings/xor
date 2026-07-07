@@ -257,12 +257,14 @@ impl TerminalView {
         let blink_manager = cx.new(|cx| {
             BlinkManager::new(
                 CURSOR_BLINK_INTERVAL,
+                CURSOR_BLINK_INTERVAL,
                 |cx| {
                     !matches!(
                         TerminalSettings::get_global(cx).blinking,
                         TerminalBlink::Off
                     )
                 },
+                |_| false,
                 cx,
             )
         });

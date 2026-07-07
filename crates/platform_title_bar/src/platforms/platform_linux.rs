@@ -26,7 +26,7 @@ impl LinuxWindowControls {
 
 impl RenderOnce for LinuxWindowControls {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let is_maximibaymax = window.is_maximibaymax();
+        let is_maximized = window.is_maximized();
         let supported_controls = window.window_controls();
         let button_elements: Vec<AnyElement> = self
             .buttons
@@ -38,13 +38,7 @@ impl RenderOnce for LinuxWindowControls {
                 WindowButton::Close => true,
             })
             .map(|button| {
-                create_window_button(
-                    button,
-                    button.id(),
-                    is_maximibaymax,
-                    &*self.close_action,
-                    cx,
-                )
+                create_window_button(button, button.id(), is_maximized, &*self.close_action, cx)
             })
             .collect();
 
@@ -62,7 +56,7 @@ impl RenderOnce for LinuxWindowControls {
 fn create_window_button(
     button: WindowButton,
     id: &'static str,
-    is_maximibaymax: bool,
+    is_maximized: bool,
     close_action: &dyn Action,
     cx: &mut App,
 ) -> AnyElement {
@@ -72,7 +66,7 @@ fn create_window_button(
         }
         WindowButton::Maximize => WindowControl::new(
             id,
-            if is_maximibaymax {
+            if is_maximized {
                 WindowControlType::Restore
             } else {
                 WindowControlType::Maximize

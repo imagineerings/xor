@@ -1,185 +1,30 @@
 {
   "version": 1,
-  "updated_at": "2026-07-06T09:03:44.729Z",
+  "updated_at": "2026-07-04T13:55:00Z",
   "repo_revision": null,
   "recommendation": {
-    "task_id": "task:88d56f7c5fc2",
-    "task_identifier": ".agents/specs/goose-migration/dictation/tasks.md:16",
-    "title": "Create dictation crate with provider trait",
-    "rationale": "Picked as the next Goose migration task after microphone capture landed. It establishes the dictation provider abstraction and audio/config data models required before Whisper, cloud providers, and the dictation service can be implemented.",
+    "task_id": "task:60f6eee2706a",
+    "task_identifier": ".agents/specs/spectrum-2-ui-language/tasks.md:83",
+    "title": "Add smooth cursor blink animation",
+    "rationale": "Task 6 is the next Spectrum 2 UI Language task after spacing. Its prerequisite cursor settings work from task 2 is complete, and it delivers visible Spectrum 2 polish while leaving the final docs task for after code changes land.",
     "evidence": [
-      "User asked to pause archived workflow work and choose a task from .agents/specs/goose-migration",
-      "Task 1 in dictation is complete and exported the audio capture foundation",
-      "Task 2 is marked ready in the existing dependency notes and writes an isolated new dictation crate",
-      "Task picked into Linear as SIM-16"
+      "Spectrum 2 tasks 1 through 5 are complete or merged",
+      "Task 6 depends on cursor settings from task 2, which is complete",
+      "Work is claimed in Linear as SIM-13",
+      "User asked to avoid the ci-migration workstream for now"
     ],
     "stale_if_changed": [
-      ".agents/specs/goose-migration/dictation/tasks.md",
-      ".agents/specs/goose-migration/dictation/design.md",
-      ".agents/specs/goose-migration/dictation/requirements.md",
-      "Cargo.toml",
-      "Cargo.lock",
-      "crates/dictation/Cargo.toml",
-      "crates/dictation/src/dictation.rs"
+      ".agents/specs/spectrum-2-ui-language/tasks.md",
+      ".agents/specs/spectrum-2-ui-language/design.md",
+      ".agents/specs/spectrum-2-ui-language/requirements.md",
+      "crates/editor/src/blink_manager.rs",
+      "crates/editor/src/editor.rs",
+      "crates/editor/src/element.rs",
+      "crates/theme_settings/src/settings.rs",
+      "crates/theme_settings/src/theme_settings.rs"
     ],
-    "updated_at": "2026-07-05T22:35:06.021Z"
+    "updated_at": "2026-07-04T13:55:00Z"
   },
-  "task_activity": [
-    {
-      "task_id": "task:75ba31ebd766",
-      "task_identifier": ".agents/specs/godot-migration/tasks.md:36",
-      "title": "Create the shared Baymax game support crate",
-      "linear_identifier": "SIM-15",
-      "linear_url": "https://linear.app/simtropolis/issue/SIM-15/create-the-shared-baymax-game-support-crate",
-      "status": "inactive",
-      "owner": null,
-      "summary": "Merged in PR #35.",
-      "updated_at": "2026-07-05T21:19:04.410Z"
-    },
-    {
-      "task_id": "task:b5d0b4a8be1b",
-      "task_identifier": ".agents/specs/ci-migration/tasks.md:23",
-      "title": "Update xtask workflow generator to skip archived workflows",
-      "linear_identifier": "SIM-10",
-      "linear_url": "https://linear.app/simtropolis/issue/SIM-10/update-xtask-workflow-generator-to-skip-archived-workflows",
-      "status": "inactive",
-      "owner": null,
-      "summary": "Completed by workflow command.",
-      "updated_at": "2026-07-05T23:17:37.012Z"
-    },
-    {
-      "task_id": "task:88d56f7c5fc2",
-      "task_identifier": ".agents/specs/goose-migration/dictation/tasks.md:16",
-      "title": "Create dictation crate with provider trait",
-      "linear_identifier": "SIM-16",
-      "linear_url": "https://linear.app/simtropolis/issue/SIM-16/create-dictation-crate-with-provider-trait",
-      "status": "inactive",
-      "owner": null,
-      "summary": "Completed by workflow command.",
-      "updated_at": "2026-07-05T23:13:07.526Z"
-    },
-    {
-      "task_id": "task:569461ce4af3",
-      "task_identifier": ".agents/specs/godot-migration/tasks.md:41",
-      "title": "Implement migration inventory validation",
-      "linear_identifier": "SIM-17",
-      "linear_url": "https://linear.app/simtropolis/issue/SIM-17/implement-migration-inventory-validation",
-      "status": "inactive",
-      "owner": null,
-      "summary": "Completed by workflow command.",
-      "updated_at": "2026-07-05T22:48:15.385Z"
-    },
-    {
-      "task_id": "task:e14d6ee470ac",
-      "task_identifier": ".agents/specs/goose-migration/dictation/tasks.md:22",
-      "title": "Implement Whisper local provider",
-      "linear_identifier": "SIM-19",
-      "linear_url": "https://linear.app/simtropolis/issue/SIM-19/implement-whisper-local-provider",
-      "status": "inactive",
-      "owner": null,
-      "summary": "Completed by workflow command.",
-      "updated_at": "2026-07-06T08:00:16.614Z"
-    },
-    {
-      "task_id": "task:573a45986f78",
-      "task_identifier": ".agents/specs/ci-migration/tasks.md:31",
-      "title": "Create post-generation safety check in CI (optional, if xtask cannot be modified)",
-      "linear_identifier": "SIM-11",
-      "linear_url": "https://linear.app/simtropolis/issue/SIM-11/create-post-generation-safety-check-in-ci-optional-if-xtask-cannot-be",
-      "status": "active",
-      "owner": null,
-      "summary": null,
-      "updated_at": "2026-07-05T23:02:37.640Z"
-    },
-    {
-      "task_id": "task:b63c03dcd4cb",
-      "task_identifier": ".agents/specs/godot-migration/tasks.md:96",
-      "title": "Add migration gatekeeper validation",
-      "linear_identifier": "SIM-18",
-      "linear_url": "https://linear.app/simtropolis/issue/SIM-18/add-migration-gatekeeper-validation",
-      "status": "active",
-      "owner": null,
-      "summary": "Spec gatekeeper module implemented (ExecutionGate/DependencyWave/MigrationTaskRef/SpecGatekeeper) with task-manifest validation and gate enforcement. Tests + clippy passing. Ready to commit/push.",
-      "updated_at": "2026-07-05T23:03:07.902Z"
-    },
-    {
-      "task_id": "task:8f56d3703df9",
-      "task_identifier": ".agents/specs/goose-migration/dictation/tasks.md:29",
-      "title": "Implement cloud dictation providers",
-      "linear_identifier": "SIM-21",
-      "linear_url": "https://linear.app/simtropolis/issue/SIM-21/implement-cloud-dictation-providers",
-      "status": "active",
-      "owner": null,
-      "summary": null,
-      "updated_at": "2026-07-06T08:11:52.694Z"
-    },
-    {
-      "task_id": "task:4e662ebfee10",
-      "task_identifier": ".agents/specs/godot-migration/tasks.md:101",
-      "title": "Extend migration inventory validation for Comfy specs",
-      "linear_identifier": "SIM-20",
-      "linear_url": "https://linear.app/simtropolis/issue/SIM-20/extend-migration-inventory-validation-for-comfy-specs",
-      "status": "inactive",
-      "owner": null,
-      "summary": "Completed by workflow command.",
-      "updated_at": "2026-07-06T08:15:53.306Z"
-    },
-    {
-      "task_id": "task:b1b343137aaf",
-      "task_identifier": ".agents/specs/goose-migration/dictation/tasks.md:35",
-      "title": "Implement dictation service",
-      "linear_identifier": "SIM-22",
-      "linear_url": "https://linear.app/simtropolis/issue/SIM-22/implement-dictation-service",
-      "status": "active",
-      "owner": null,
-      "summary": null,
-      "updated_at": "2026-07-06T09:03:44.729Z"
-    },
-    {
-      "task_id": "task:9f3d704a8eea",
-      "task_identifier": ".agents/specs/godot-migration/tasks.md:76",
-      "title": "Add world-model action/control compatibility",
-      "linear_identifier": "SIM-28",
-      "linear_url": "https://linear.app/simtropolis/issue/SIM-28/add-world-model-action-control-compatibility",
-      "status": "inactive",
-      "owner": null,
-      "summary": "Merged in PR #55.",
-      "updated_at": "2026-07-06T18:06:36Z"
-    },
-    {
-      "task_id": "task:a3b72dfc0ee5",
-      "task_identifier": ".agents/specs/godot-migration/tasks.md:81",
-      "title": "Add diffusion graph primitives",
-      "linear_identifier": "SIM-29",
-      "linear_url": "https://linear.app/simtropolis/issue/SIM-29/add-diffusion-graph-primitives",
-      "status": "inactive",
-      "owner": null,
-      "summary": "Merged in PR #57.",
-      "updated_at": "2026-07-07T00:00:00Z"
-    },
-    {
-      "task_id": "task:c7d4e5f6a1b2",
-      "task_identifier": ".agents/specs/godot-migration/tasks.md:86",
-      "title": "Add mesh generation primitives",
-      "linear_identifier": "SIM-30",
-      "linear_url": "https://linear.app/simtropolis/issue/SIM-30/add-mesh-generation-primitives",
-      "status": "inactive",
-      "owner": null,
-      "summary": "Merged in PR #58.",
-      "updated_at": "2026-07-07T00:00:00Z"
-    },
-    {
-      "task_id": "task:d8e9f0a1b2c3",
-      "task_identifier": ".agents/specs/godot-migration/tasks.md:91",
-      "title": "Add model serving diagnostics",
-      "linear_identifier": "SIM-31",
-      "linear_url": "https://linear.app/simtropolis/issue/SIM-31/add-model-serving-diagnostics",
-      "status": "inactive",
-      "owner": null,
-      "summary": "Merged in PR #59.",
-      "updated_at": "2026-07-07T00:00:00Z"
-    }
-  ],
   "task_notes": [
     {
       "task_identifier": ".agents/specs/spectrum-2-ui-language/tasks.md:34",
@@ -194,63 +39,39 @@
       "updated_at": "2026-07-04T12:42:00Z"
     },
     {
-      "task_identifier": ".agents/specs/goose-migration/dictation/tasks.md:9",
-      "status": "claimed",
-      "summary": "Task 1: Extend audio crate with microphone capture. Claimed as SIM-14 and implemented with a new audio::MicrophoneCapture API plus capture stream/config types in crates/audio/src/capture.rs.",
-      "updated_at": "2026-07-05T00:00:00Z"
+      "task_identifier": ".agents/specs/spectrum-2-ui-language/tasks.md:76",
+      "status": "done",
+      "summary": "Task 5: Update spacing for Spectrum 2. Completed and merged in PR #31, then marked complete locally and in Linear as SIM-12.",
+      "updated_at": "2026-07-04T13:55:00Z"
     },
     {
-      "task_identifier": ".agents/specs/goose-migration/dictation/tasks.md:16",
+      "task_identifier": ".agents/specs/spectrum-2-ui-language/tasks.md:83",
       "status": "claimed",
-      "summary": "Task 2: Create dictation crate with provider trait. Claimed as SIM-16 and implemented with a new dictation crate, provider trait, AudioFormat, DictationConfig, cloud config, and provider error types.",
-      "updated_at": "2026-07-05T22:35:06.021Z"
+      "summary": "Task 6: Add smooth cursor blink animation. Claimed in Linear as SIM-13 on branch ahmadvegah/sim-13-add-smooth-cursor-blink-animation.",
+      "updated_at": "2026-07-04T13:55:00Z"
+    },
+    {
+      "task_identifier": ".agents/specs/ci-migration/tasks.md",
+      "status": "deprioritized",
+      "summary": "User requested not to start ci-migration tasks yet; choose another workstream until told otherwise.",
+      "updated_at": "2026-07-04T13:55:00Z"
     }
   ],
   "dependency_notes": [
     {
       "scope": ".agents/specs/spectrum-2-ui-language",
-      "summary": "Tasks 1-4 complete. Task 5 (spacing) is independent — ready to begin. Task 6 (cursor blink) depends on Task 2 (done). Task 7 (docs) depends on all previous tasks. Tasks 5 and 6 can be done in parallel.",
-      "updated_at": "2026-07-04T00:00:00Z"
+      "summary": "Tasks 1-5 are complete. Task 6 (cursor blink) depends on Task 2 (done) and is now claimed. Task 7 (docs) depends on all previous tasks and should wait until task 6 lands.",
+      "updated_at": "2026-07-04T13:55:00Z"
     },
     {
-      "scope": ".agents/specs/goose-migration/dictation",
-      "summary": "Task 1 is complete and provides microphone capture. Task 2 is claimed in SIM-16 and defines provider APIs and shared models. Tasks 3-4 should build on the provider trait; Task 5 should wait for Task 2 plus provider implementation work; Task 6 should wait for service/provider work.",
-      "updated_at": "2026-07-05T00:00:00Z"
-    },
-    {
-      "scope": ".agents/specs/godot-migration",
-      "summary": "W1 shared foundations complete (tasks 1-12). Next ready task is #4 (Godot workspace integration registration, W2). The sub-specs (agentic-game-tools, world-model-runtime, etc.) can be started after task 4 or in parallel where writes don't overlap.",
-      "updated_at": "2026-07-07T00:00:00Z"
-    }
-  ],
-  "ranked_candidates": [
-    {
-      "task_id": "task:88d56f7c5fc2",
-      "task_identifier": ".agents/specs/goose-migration/dictation/tasks.md:16",
-      "title": "Create dictation crate with provider trait",
-      "rank": 1,
-      "rationale": "Next dependency-unlocking Goose dictation task after microphone capture; creates provider APIs needed by Whisper, cloud, and service tasks.",
-      "blockers": [],
-      "evidence": [
-        "Task 1 in .agents/specs/goose-migration/dictation/tasks.md is complete",
-        "requirements.md requirement 3 asks for a common provider abstraction",
-        "design.md places DictationProvider, AudioFormat, and DictationConfig in crates/dictation/"
-      ]
-    },
-    {
-      "task_id": "task:bad4897797ae",
-      "task_identifier": ".agents/specs/goose-migration/documentation/tasks.md:9",
-      "title": "Initialize Docusaurus project",
-      "rank": 2,
-      "rationale": "Also ready, but less immediately useful than enabling dictation runtime foundations.",
-      "blockers": [],
-      "evidence": ["workflow.js next listed documentation candidates as ready with no dependencies"]
+      "scope": ".agents/specs/ci-migration",
+      "summary": "Do not pick ci-migration tasks until the user indicates that workstream is ready.",
+      "updated_at": "2026-07-04T13:55:00Z"
     }
   ],
   "maintenance": {
     "instructions": [
       "Update this file while evaluating workflow.js next candidates.",
-      "Use task_activity to distinguish active claimed Linear issues from inactive claimed issues that are available to resume.",
       "Store concise conclusions, evidence, blockers, and dependency notes.",
       "Do not store private chain-of-thought or long scratch reasoning.",
       "Refresh recommendation after tasks.md, requirements.md, or design.md changes."
@@ -265,17 +86,6 @@
         "This task unlocks follow-up UI integration work."
       ],
       "stale_if_changed": [".agents/specs/example/tasks.md", ".agents/specs/example/design.md"],
-      "updated_at": "YYYY-MM-DDTHH:MM:SSZ"
-    },
-    "task_activity_shape": {
-      "task_id": "task:<stable-id>",
-      "task_identifier": ".agents/specs/example/tasks.md:12",
-      "title": "Task title",
-      "linear_identifier": "SIM-123",
-      "linear_url": "https://linear.app/...",
-      "status": "active | inactive",
-      "owner": "optional human or agent label",
-      "summary": "Short handoff/status note.",
       "updated_at": "YYYY-MM-DDTHH:MM:SSZ"
     },
     "task_note_shape": {

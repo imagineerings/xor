@@ -5292,6 +5292,7 @@ mod tests {
                 "agent",
                 "agents_sidebar",
                 "app_menu",
+                "apps_panel",
                 "assistant",
                 "assistant2",
                 "auto_update",

@@ -84,7 +84,7 @@ impl rwh::HasDisplayHandle for RawWindow {
 struct InProgressConfigure {
     size: Option<Size<Pixels>>,
     fullscreen: bool,
-    maximibaymax: bool,
+    maximized: bool,
     resizing: bool,
     tiling: Tiling,
 }
@@ -109,7 +109,7 @@ pub struct WaylandWindowState {
     decorations: WindowDecorations,
     background_appearance: WindowBackgroundAppearance,
     fullscreen: bool,
-    maximibaymax: bool,
+    maximized: bool,
     tiling: Tiling,
     window_bounds: Bounds<Pixels>,
     client: WaylandClientStatePtr,
@@ -384,7 +384,7 @@ impl WaylandWindowState {
             decorations: WindowDecorations::Client,
             background_appearance: WindowBackgroundAppearance::Opaque,
             fullscreen: false,
-            maximibaymax: false,
+            maximized: false,
             tiling: Tiling::default(),
             window_bounds: options.bounds,
             in_progress_configure: None,
@@ -643,9 +643,9 @@ impl WaylandWindowStatePtr {
                 let mut state = self.state.borrow_mut();
 
                 if let Some(mut configure) = state.in_progress_configure.take() {
-                    let got_unmaximibaymax = state.maximibaymax && !configure.maximibaymax;
+                    let got_unmaximized = state.maximized && !configure.maximized;
                     state.fullscreen = configure.fullscreen;
-                    state.maximibaymax = configure.maximibaymax;
+                    state.maximized = configure.maximized;
                     state.tiling = configure.tiling;
                     // Limit interactive resizes to once per vblank
                     if configure.resizing && state.resize_throttle {
@@ -654,8 +654,8 @@ impl WaylandWindowStatePtr {
                     } else if configure.resizing {
                         state.resize_throttle = true;
                     }
-                    if !configure.fullscreen && !configure.maximibaymax {
-                        configure.size = if got_unmaximibaymax {
+                    if !configure.fullscreen && !configure.maximized {
+                        configure.size = if got_unmaximized {
                             Some(state.window_bounds.size)
                         } else {
                             compute_outer_size(state.inset(), configure.size, state.tiling)
@@ -753,13 +753,13 @@ impl WaylandWindowStatePtr {
 
                 let mut tiling = Tiling::default();
                 let mut fullscreen = false;
-                let mut maximibaymax = false;
+                let mut maximized = false;
                 let mut resizing = false;
 
                 for state in states {
                     match state {
-                        xdg_toplevel::State::Maximibaymax => {
-                            maximibaymax = true;
+                        xdg_toplevel::State::Maximized => {
+                            maximized = true;
                         }
                         xdg_toplevel::State::Fullscreen => {
                             fullscreen = true;
@@ -783,7 +783,7 @@ impl WaylandWindowStatePtr {
                     }
                 }
 
-                if fullscreen || maximibaymax {
+                if fullscreen || maximized {
                     tiling = Tiling::tiled();
                 }
 
@@ -791,7 +791,7 @@ impl WaylandWindowStatePtr {
                 state.in_progress_configure = Some(InProgressConfigure {
                     size,
                     fullscreen,
-                    maximibaymax,
+                    maximized,
                     resizing,
                     tiling,
                 });
@@ -865,7 +865,7 @@ impl WaylandWindowStatePtr {
                 state.in_progress_configure = Some(InProgressConfigure {
                     size,
                     fullscreen: false,
-                    maximibaymax: false,
+                    maximized: false,
                     resizing: false,
                     tiling: Tiling::default(),
                 });
@@ -1150,16 +1150,16 @@ impl PlatformWindow for WaylandWindow {
         self.borrow().bounds
     }
 
-    fn is_maximibaymax(&self) -> bool {
-        self.borrow().maximibaymax
+    fn is_maximized(&self) -> bool {
+        self.borrow().maximized
     }
 
     fn window_bounds(&self) -> WindowBounds {
         let state = self.borrow();
         if state.fullscreen {
             WindowBounds::Fullscreen(state.window_bounds)
-        } else if state.maximibaymax {
-            WindowBounds::Maximibaymax(state.window_bounds)
+        } else if state.maximized {
+            WindowBounds::Maximized(state.window_bounds)
         } else {
             drop(state);
             WindowBounds::Windowed(self.bounds())
@@ -1170,8 +1170,8 @@ impl PlatformWindow for WaylandWindow {
         let state = self.borrow();
         if state.fullscreen {
             WindowBounds::Fullscreen(state.window_bounds)
-        } else if state.maximibaymax {
-            WindowBounds::Maximibaymax(state.window_bounds)
+        } else if state.maximized {
+            WindowBounds::Maximized(state.window_bounds)
         } else {
             let inset = state.inset();
             drop(state);
@@ -1330,17 +1330,17 @@ impl PlatformWindow for WaylandWindow {
 
     fn minimize(&self) {
         if let Some(toplevel) = self.borrow().surface_state.toplevel() {
-            toplevel.set_minimibaymax();
+            toplevel.set_minimized();
         }
     }
 
     fn zoom(&self) {
         let state = self.borrow();
         if let Some(toplevel) = state.surface_state.toplevel() {
-            if !state.maximibaymax {
-                toplevel.set_maximibaymax();
+            if !state.maximized {
+                toplevel.set_maximized();
             } else {
-                toplevel.unset_maximibaymax();
+                toplevel.unset_maximized();
             }
         }
     }

@@ -65,7 +65,7 @@ function minimizeTestPlan(inputPlanPath, outputPlanPath, startIndex = 0) {
 
   fs.unlinkSync(tempPlanPath);
 
-  // Re-run the final minimibaymax plan to get the correct failing seed.
+  // Re-run the final minimized plan to get the correct failing seed.
   // This is a workaround for the fact that the execution order can
   // slightly change when replaying a test plan after it has been
   // saved and loaded.

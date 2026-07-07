@@ -750,8 +750,8 @@ impl Bounds<Pixels> {
             })
     }
 
-    /// Generate maximibaymax bounds for the given display or primary display if none is provided
-    pub fn maximibaymax(display_id: Option<DisplayId>, cx: &App) -> Self {
+    /// Generate maximized bounds for the given display or primary display if none is provided
+    pub fn maximized(display_id: Option<DisplayId>, cx: &App) -> Self {
         let display = display_id
             .and_then(|id| cx.find_display(id))
             .or_else(|| cx.primary_display());

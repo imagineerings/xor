@@ -1213,7 +1213,7 @@ fn default_bounds(display_id: Option<DisplayId>, cx: &mut App) -> WindowBounds {
     // TODO, BUG: if you open a window with the currently active window
     // on the stack, this will erroneously fallback to `None`
     //
-    // TODO these should be the initial window bounds not considering maximibaymax/fullscreen
+    // TODO these should be the initial window bounds not considering maximized/fullscreen
     let active_window_bounds = cx
         .active_window()
         .and_then(|w| w.update(cx, |_, window, _| window.window_bounds()).ok());
@@ -1241,7 +1241,7 @@ fn default_bounds(display_id: Option<DisplayId>, cx: &mut App) -> WindowBounds {
     ): (_, fn(Bounds<Pixels>) -> WindowBounds) = match active_window_bounds {
         Some(bounds) => match bounds {
             WindowBounds::Windowed(bounds) => (bounds, WindowBounds::Windowed),
-            WindowBounds::Maximibaymax(bounds) => (bounds, WindowBounds::Maximibaymax),
+            WindowBounds::Maximized(bounds) => (bounds, WindowBounds::Maximized),
             WindowBounds::Fullscreen(bounds) => (bounds, WindowBounds::Fullscreen),
         },
         None => (
@@ -1352,7 +1352,7 @@ impl Window {
 
         match window_bounds {
             WindowBounds::Fullscreen(_) => platform_window.toggle_fullscreen(),
-            WindowBounds::Maximibaymax(_) => platform_window.zoom(),
+            WindowBounds::Maximized(_) => platform_window.zoom(),
             WindowBounds::Windowed(_) => {}
         }
 
@@ -1959,11 +1959,11 @@ impl Window {
         style
     }
 
-    /// Check if the platform window is maximibaymax.
+    /// Check if the platform window is maximized.
     ///
     /// On some platforms (namely Windows) this is different than the bounds being the size of the display
-    pub fn is_maximibaymax(&self) -> bool {
-        self.platform_window.is_maximibaymax()
+    pub fn is_maximized(&self) -> bool {
+        self.platform_window.is_maximized()
     }
 
     /// request a certain window decoration (Wayland)

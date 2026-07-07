@@ -509,7 +509,7 @@ impl PlatformWindow for WebWindow {
         self.inner.state.borrow().bounds
     }
 
-    fn is_maximibaymax(&self) -> bool {
+    fn is_maximized(&self) -> bool {
         false
     }
 

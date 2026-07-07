@@ -111,3 +111,6 @@ theme_settings.workspace = true
 unindent = { workspace = true }
 
 zlog.workspace = true
+
+[package.metadata.cargo-machete]
+ignored = ["recipe"]

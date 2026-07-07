@@ -27,3 +27,6 @@ uuid.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+
+[package.metadata.cargo-machete]
+ignored = ["futures", "smol", "thiserror", "uuid"]

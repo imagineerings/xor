@@ -30,3 +30,6 @@ reqwest = { workspace = true, features = ["json"] }
 tiny_http.workspace = true
 tokio = { workspace = true, features = ["time", "rt", "macros"] }
 url.workspace = true
+
+[package.metadata.cargo-machete]
+ignored = ["base64"]

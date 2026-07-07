@@ -962,6 +962,7 @@ impl EditorElement {
             let mut cursors = Vec::new();
 
             let show_local_cursors = editor.show_local_cursors(window, cx);
+            let local_cursor_opacity = editor.local_cursor_opacity(window, cx);
 
             for (player_color, selections) in selections {
                 for selection in selections {
@@ -1036,6 +1037,12 @@ impl EditorElement {
                                 cx.theme().colors().editor_background
                             };
 
+                            let color = if selection.is_local {
+                                color.opacity(local_cursor_opacity)
+                            } else {
+                                color
+                            };
+
                             let shaped = window.text_system().shape_line(
                                 text,
                                 cursor_row_layout.font_size,
@@ -1093,8 +1100,14 @@ impl EditorElement {
                         }
                     }
 
+                    let color = if selection.is_local {
+                        player_color.cursor.opacity(local_cursor_opacity)
+                    } else {
+                        player_color.cursor
+                    };
+
                     let mut cursor = CursorLayout {
-                        color: player_color.cursor,
+                        color,
                         block_width,
                         origin: point(x, y),
                         line_height,

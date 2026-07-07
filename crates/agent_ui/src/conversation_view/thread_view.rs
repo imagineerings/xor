@@ -9266,7 +9266,7 @@ impl ThreadView {
                     )
                     .tooltip(Tooltip::text("Make Subagent Full Screen"))
                     .on_click(cx.listener(move |this, _event, window, cx| {
-                        telemetry::event!("Subagent Maximibaymax");
+                        telemetry::event!("Subagent Maximized");
                         this.server_view
                             .update(cx, |this, cx| {
                                 this.navigate_to_thread(nav_session_id.clone(), window, cx);

@@ -40,15 +40,15 @@ async function main() {
   }
 
   console.log("found failure at seed", failingSeed);
-  const minimibaymaxSeed = minimizeTestPlan(planPath, minPlanPath);
-  const minimibaymaxPlan = fs.readFileSync(minPlanPath, "utf8");
+  const minimizedSeed = minimizeTestPlan(planPath, minPlanPath);
+  const minimizedPlan = fs.readFileSync(minPlanPath, "utf8");
 
-  console.log("minimibaymax plan:\n", minimibaymaxPlan);
+  console.log("minimized plan:\n", minimizedPlan);
 
   const url = `${BAYMAX_SERVER_URL}/api/randomized_test_failure`;
   const body = {
-    seed: minimibaymaxSeed,
-    plan: JSON.parse(minimibaymaxPlan),
+    seed: minimizedSeed,
+    plan: JSON.parse(minimizedPlan),
     commit: commit,
   };
   await fetch(url, {
