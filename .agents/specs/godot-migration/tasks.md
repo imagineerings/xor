@@ -88,7 +88,7 @@
   - _Requirements: 7.1, 7.2, 7.3_
   - _writes: crates/world_model/src/mesh.rs, crates/world_model/src/mesh_tests.rs_
 
-- [ ] 12. Add model serving diagnostics
+- [x] 12. Add model serving diagnostics
   - Define Python environment, model weight, GPU, local worker, and remote worker diagnostics.
   - _Requirements: 5.3, 9.1, 9.2, 9.3_
   - _writes: crates/world_model/src/serving.rs, crates/world_model/src/serving_diagnostics.rs, crates/world_model/src/serving_tests.rs_

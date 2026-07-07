@@ -4,6 +4,8 @@ pub mod graph_validation;
 pub mod mesh;
 pub mod provenance;
 pub mod request;
+pub mod serving;
+pub mod serving_diagnostics;
 
 #[cfg(test)]
 mod controls_tests;
@@ -11,6 +13,8 @@ mod controls_tests;
 mod graph_tests;
 #[cfg(test)]
 mod mesh_tests;
+#[cfg(test)]
+mod serving_tests;
 #[cfg(test)]
 mod tests;
 
@@ -25,3 +29,10 @@ pub use mesh::{
 };
 pub use provenance::{ArtifactRecord, ArtifactType, GenerationProvenance, ProvenanceCollection};
 pub use request::{WorldActionControl, WorldControl, WorldGenerationRequest, WorldModelProfile};
+pub use serving::{
+    LocalServingConfig, ModelProfile, ModelServingTarget, RemoteServingConfig, ServingBackend,
+};
+pub use serving_diagnostics::{
+    DiagnosticCategory, DiagnosticSeverity, ServingDiagnostic, ServingDiagnosticReport,
+    ServingValidator,
+};

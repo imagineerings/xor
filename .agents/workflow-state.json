@@ -156,6 +156,28 @@
       "owner": null,
       "summary": "Merged in PR #57.",
       "updated_at": "2026-07-07T00:00:00Z"
+    },
+    {
+      "task_id": "task:c7d4e5f6a1b2",
+      "task_identifier": ".agents/specs/godot-migration/tasks.md:86",
+      "title": "Add mesh generation primitives",
+      "linear_identifier": "SIM-30",
+      "linear_url": "https://linear.app/simtropolis/issue/SIM-30/add-mesh-generation-primitives",
+      "status": "inactive",
+      "owner": null,
+      "summary": "Merged in PR #58.",
+      "updated_at": "2026-07-07T00:00:00Z"
+    },
+    {
+      "task_id": "task:d8e9f0a1b2c3",
+      "task_identifier": ".agents/specs/godot-migration/tasks.md:91",
+      "title": "Add model serving diagnostics",
+      "linear_identifier": "SIM-31",
+      "linear_url": "https://linear.app/simtropolis/issue/SIM-31/add-model-serving-diagnostics",
+      "status": "inactive",
+      "owner": null,
+      "summary": "Merged in PR #TTT.",
+      "updated_at": "2026-07-07T00:00:00Z"
     }
   ],
   "task_notes": [
@@ -197,7 +219,7 @@
     },
     {
       "scope": ".agents/specs/godot-migration",
-      "summary": "Tasks 1-10 are complete (W0 planning + W1 shared foundations). Tasks 11 and 12 are independent W1 tasks remaining; task 4 starts W2 after W1. See individual task checkboxes.",
+      "summary": "W1 shared foundations complete (tasks 1-12). Next ready task is #4 (Godot workspace integration registration, W2). The sub-specs (agentic-game-tools, world-model-runtime, etc.) can be started after task 4 or in parallel where writes don't overlap.",
       "updated_at": "2026-07-07T00:00:00Z"
     }
   ],
