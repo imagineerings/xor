@@ -6,8 +6,8 @@ Migrate goose's Docusaurus-based documentation site — a comprehensive document
 
 ### Key Architectural Decisions
 
-- **Keep Docusaurus**: Docusaurus is the industry standard for open-source documentation. Stick with it unless baymax already has a different documentation system.
-- **Separate directory**: The documentation lives in `docs/` at the repository root, not inside the goose directory. Follow baymax's existing docs structure if any.
+- **Keep Docusaurus**: Docusaurus is the industry standard for open-source documentation. Stick with it unless sim already has a different documentation system.
+- **Separate directory**: The documentation lives in `docs/` at the repository root, not inside the goose directory. Follow sim's existing docs structure if any.
 - **Automated builds**: CI pipeline builds and deploys the documentation site on merges to main.
 
 ## 2. Architecture
@@ -56,9 +56,9 @@ graph TD
 ```typescript
 // docs/docusaurus.config.ts
 export default {
-  title: 'Baymax Documentation',
+  title: 'Sim Documentation',
   tagline: 'The fast, collaborative AI-powered code editor',
-  url: 'https://baymax.dev',
+  url: 'https://sim.dev',
   baseUrl: '/docs/',
   // ... navigation, theme, plugins
 }

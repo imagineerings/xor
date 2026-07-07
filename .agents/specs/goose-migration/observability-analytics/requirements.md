@@ -20,7 +20,7 @@ Migrate goose's observability and analytics infrastructure: Langfuse tracing, Op
 
 ### Requirement 1: Langfuse Tracing
 
-**User Story:** As a baymax developer, I want to trace LLM calls and agent operations in Langfuse, so that I can debug and optimize agent behavior.
+**User Story:** As a sim developer, I want to trace LLM calls and agent operations in Langfuse, so that I can debug and optimize agent behavior.
 
 #### Acceptance Criteria
 
@@ -31,7 +31,7 @@ Migrate goose's observability and analytics infrastructure: Langfuse tracing, Op
 
 ### Requirement 2: OpenTelemetry OTLP Export
 
-**User Story:** As a baymax operator, I want to export telemetry data via OpenTelemetry OTLP, so that I can integrate with my existing observability infrastructure.
+**User Story:** As a sim operator, I want to export telemetry data via OpenTelemetry OTLP, so that I can integrate with my existing observability infrastructure.
 
 #### Acceptance Criteria
 
@@ -41,7 +41,7 @@ Migrate goose's observability and analytics infrastructure: Langfuse tracing, Op
 
 ### Requirement 3: Observation Layer
 
-**User Story:** As a baymax developer, I want detailed observations about agent operations, so that I can analyze performance, latency, and behavior.
+**User Story:** As a sim developer, I want detailed observations about agent operations, so that I can analyze performance, latency, and behavior.
 
 #### Acceptance Criteria
 
@@ -52,7 +52,7 @@ Migrate goose's observability and analytics infrastructure: Langfuse tracing, Op
 
 ### Requirement 4: Rate Limiter
 
-**User Story:** As a baymax user, I want the agent to respect rate limits when calling external APIs, so that I don't get throttled or exceed quota.
+**User Story:** As a sim user, I want the agent to respect rate limits when calling external APIs, so that I don't get throttled or exceed quota.
 
 #### Acceptance Criteria
 
@@ -63,7 +63,7 @@ Migrate goose's observability and analytics infrastructure: Langfuse tracing, Op
 
 ### Requirement 5: PostHog Analytics
 
-**User Story:** As a baymax developer, I want product analytics via PostHog, so that I can understand how users interact with the agent.
+**User Story:** As a sim developer, I want product analytics via PostHog, so that I can understand how users interact with the agent.
 
 #### Acceptance Criteria
 
@@ -74,7 +74,7 @@ Migrate goose's observability and analytics infrastructure: Langfuse tracing, Op
 
 ### Requirement 6: Token Counter
 
-**User Story:** As a baymax user, I want to track token usage across LLM requests, so that I can monitor costs and usage.
+**User Story:** As a sim user, I want to track token usage across LLM requests, so that I can monitor costs and usage.
 
 #### Acceptance Criteria
 
@@ -85,7 +85,7 @@ Migrate goose's observability and analytics infrastructure: Langfuse tracing, Op
 
 ### Requirement 7: Tool Monitoring
 
-**User Story:** As a baymax user, I want visibility into tool usage, so that I can see which tools are used most frequently and their performance.
+**User Story:** As a sim user, I want visibility into tool usage, so that I can see which tools are used most frequently and their performance.
 
 #### Acceptance Criteria
 
@@ -95,7 +95,7 @@ Migrate goose's observability and analytics infrastructure: Langfuse tracing, Op
 
 ### Requirement 8: Tool Inspection
 
-**User Story:** As a baymax user, I want to inspect available tools and their schemas, so that I can understand what the agent can do.
+**User Story:** As a sim user, I want to inspect available tools and their schemas, so that I can understand what the agent can do.
 
 #### Acceptance Criteria
 
@@ -111,4 +111,4 @@ Migrate goose's observability and analytics infrastructure: Langfuse tracing, Op
 - Source: `projects/goose/crates/goose/src/token_counter.rs`
 - Source: `projects/goose/crates/goose/src/tool_monitor.rs`
 - Source: `projects/goose/crates/goose/src/tool_inspection.rs`
-- Existing baymax: `crates/telemetry/`
+- Existing sim: `crates/telemetry/`

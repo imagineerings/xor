@@ -180,21 +180,21 @@ async fn test_channel_guest_promotion(cx_a: &mut TestAppContext, cx_b: &mut Test
 }
 
 #[gpui::test]
-async fn test_channel_requires_baymax_cla(cx_a: &mut TestAppContext, cx_b: &mut TestAppContext) {
+async fn test_channel_requires_sim_cla(cx_a: &mut TestAppContext, cx_b: &mut TestAppContext) {
     let mut server = TestServer::start(cx_a.executor()).await;
     let client_a = server.create_client(cx_a, "user_a").await;
     let client_b = server.create_client(cx_b, "user_b").await;
     let active_call_a = cx_a.read(ActiveCall::global);
     let active_call_b = cx_b.read(ActiveCall::global);
 
-    // Create a parent channel that requires the Baymax CLA
+    // Create a parent channel that requires the Sim CLA
     let parent_channel_id = server
         .make_channel("the-channel", None, (&client_a, cx_a), &mut [])
         .await;
     server
         .app_state
         .db
-        .set_channel_requires_baymax_cla(ChannelId::from_proto(parent_channel_id.0), true)
+        .set_channel_requires_sim_cla(ChannelId::from_proto(parent_channel_id.0), true)
         .await
         .unwrap();
 
@@ -239,7 +239,7 @@ async fn test_channel_requires_baymax_cla(cx_a: &mut TestAppContext, cx_b: &mut 
     });
 
     // A tries to grant write access to B, but cannot because B has not
-    // yet signed the baymax CLA.
+    // yet signed the sim CLA.
     active_call_a
         .update(cx_a, |call, cx| {
             call.room().unwrap().update(cx, |room, cx| {
@@ -259,7 +259,7 @@ async fn test_channel_requires_baymax_cla(cx_a: &mut TestAppContext, cx_b: &mut 
     });
 
     // A tries to grant write access to B, but cannot because B has not
-    // yet signed the baymax CLA.
+    // yet signed the sim CLA.
     active_call_a
         .update(cx_a, |call, cx| {
             call.room().unwrap().update(cx, |room, cx| {
@@ -278,7 +278,7 @@ async fn test_channel_requires_baymax_cla(cx_a: &mut TestAppContext, cx_b: &mut 
         assert!(room_b.read_with(cx_b, |room, _| room.can_use_microphone()));
     });
 
-    // User B signs the baymax CLA.
+    // User B signs the sim CLA.
     let user_b = server
         .app_state
         .user_service

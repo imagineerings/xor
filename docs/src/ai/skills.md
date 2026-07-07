@@ -1,11 +1,11 @@
 ---
-title: Agent Skills - Baymax
-description: Extend Baymax's AI agent with reusable, on-demand skill files for specialibaymax tasks.
+title: Agent Skills - Sim
+description: Extend Sim's AI agent with reusable, on-demand skill files for specialisim tasks.
 ---
 
 # Skills {#skills}
 
-Skills are reusable instruction packages that give the agent specialibaymax knowledge for specific tasks: test-driven development workflows, document processing, database integrations, or your team's internal coding standards.
+Skills are reusable instruction packages that give the agent specialisim knowledge for specific tasks: test-driven development workflows, document processing, database integrations, or your team's internal coding standards.
 
 A skill is a folder containing a `SKILL.md` file with metadata and instructions. The agent sees a catalog of all installed skills and can load one on demand, or you can invoke any skill directly from the message editor with a slash command.
 
@@ -13,11 +13,11 @@ A skill is a folder containing a `SKILL.md` file with metadata and instructions.
 
 ### Create your own {#create-your-own}
 
-Baymax includes a built-in `create-skill` skill — invoke it with `/create-skill` and the agent walks you through the process.
+Sim includes a built-in `create-skill` skill — invoke it with `/create-skill` and the agent walks you through the process.
 
 You can also open the Skills Manager from the Agent Panel using {#kb agent::ManageSkills}, or by clicking `...` and selecting **Skills**. Outside the panel, use the {#action agent::OpenSkillCreator} action from the command palette, or click **Create Skill** on the **AI > Skills** settings page. The creator opens as a page in the settings window where you fill in the skill's name, description, body, and optionally toggle `disable-model-invocation`. The skill is saved to the scope of the settings file selected in the settings window — the **User** tab creates a global skill, while a **Project** tab creates a project-local skill — and the form shows exactly where the file will be written.
 
-Lastly, it's also possible to add a skill through importing it from an existing GitHub Markdown file. Open the command palette and look for the {#action agent::CreateSkillFromUrl} action. If your clipboard contains a supported GitHub `.md` URL, Baymax pre-fills and fetches it automatically.
+Lastly, it's also possible to add a skill through importing it from an existing GitHub Markdown file. Open the command palette and look for the {#action agent::CreateSkillFromUrl} action. If your clipboard contains a supported GitHub `.md` URL, Sim pre-fills and fetches it automatically.
 
 See [Skill format](#skill-format) below for the full format reference.
 
@@ -33,13 +33,13 @@ To install a skill, copy the skill's folder into `~/.agents/skills/` for global 
 
 ## Managing Skills {#managing-skills}
 
-Open the Settings Editor (`Cmd+,` on macOS, `Ctrl+,` on Linux/Windows) and navigate to **AI > Skills**, or go directly to [agent.skills](baymax://settings/agent.skills).
+Open the Settings Editor (`Cmd+,` on macOS, `Ctrl+,` on Linux/Windows) and navigate to **AI > Skills**, or go directly to [agent.skills](sim://settings/agent.skills).
 
 The **User** tab shows your global skills, and each **Project** tab shows the skills for that project.
 
 For each skill you can:
 
-- **Copy Share Link** — copies a `baymax://skill` link that embeds the skill, ready to send to someone else (see [Sharing Skills](#sharing-skills))
+- **Copy Share Link** — copies a `sim://skill` link that embeds the skill, ready to send to someone else (see [Sharing Skills](#sharing-skills))
 - **Open** — opens the skill's `SKILL.md` file in the editor
 - **Delete** — removes the skill folder from disk
 
@@ -47,10 +47,10 @@ In the skills page, you'll see a **Create Skill** button that opens the settings
 
 ## Sharing Skills {#sharing-skills}
 
-You can hand a skill to a teammate without hosting it anywhere. In the Skills settings page, click the **link** icon on a skill row to copy a `baymax://skill?data=…` link to your clipboard.
+You can hand a skill to a teammate without hosting it anywhere. In the Skills settings page, click the **link** icon on a skill row to copy a `sim://skill?data=…` link to your clipboard.
 The link is self-contained: it embeds the full `SKILL.md` contents (base64url-encoded), so the recipient doesn't need access to your project or any registry.
 
-When someone opens that link (for example by pasting it into their browser or clicking it in a chat), Baymax opens the "Create Skill" page in the settings window, pre-filled with the shared skill.
+When someone opens that link (for example by pasting it into their browser or clicking it in a chat), Sim opens the "Create Skill" page in the settings window, pre-filled with the shared skill.
 The recipient can review the name, description, and full body, choose a scope by selecting the **User** tab (global) or a **Project** tab, and click **Save** to install it.
 Nothing is written to disk until they explicitly save, so a shared link can never silently install instructions into someone's agent.
 
@@ -58,7 +58,7 @@ Nothing is written to disk until they explicitly save, so a shared link can neve
 
 By default, the agent picks up skills autonomously. It sees a catalog of every installed skill (name and description) in its system prompt, and calls the `skill` tool when a task matches a skill's description.
 
-When the agent invokes a skill you created or installed, Baymax prompts you to allow or deny it, using the same permission flow as other tools. Skills built into Baymax do not prompt. You can set per-skill defaults in [Tool Permissions](./tool-permissions.md) so you're not prompted for skills you always trust.
+When the agent invokes a skill you created or installed, Sim prompts you to allow or deny it, using the same permission flow as other tools. Skills built into Sim do not prompt. You can set per-skill defaults in [Tool Permissions](./tool-permissions.md) so you're not prompted for skills you always trust.
 
 ### Manual Invocation {#manual-invocation}
 
@@ -165,7 +165,7 @@ See the [Agent Skills specification](https://agentskills.io/specification) for t
 
 ## Where Skills Live {#where-skills-live}
 
-Baymax loads skills from two locations:
+Sim loads skills from two locations:
 
 | Scope         | Path                         | When it applies          |
 | ------------- | ---------------------------- | ------------------------ |
@@ -190,13 +190,13 @@ The agent cannot edit `SKILL.md` files or their bundled resources without your e
 
 ## Agent Path Boundaries {#agent-path-boundaries}
 
-Baymax Skills apply to the Baymax Agent. External Agents and Terminal Threads may have their own native skills, prompts, or instruction systems. Configure those in the External Agent or CLI.
+Sim Skills apply to the Sim Agent. External Agents and Terminal Threads may have their own native skills, prompts, or instruction systems. Configure those in the External Agent or CLI.
 
 ## Limitations {#limitations}
 
 - **Flat layout only.** Skills must be direct children of the skills root. Nested folders like `~/.agents/skills/group/my-skill/` are not discovered.
 - **50KB catalog budget.** The total size of all skill names and descriptions is capped at 50KB. Skills that don't fit are dropped from the catalog with a warning in the UI. Keep descriptions concise.
-- **No remote registry.** Baymax does not discover or load skills from remote locations at runtime, and custom search paths are not supported. (You can still import a skill once from a GitHub URL — see [Create your own](#create-your-own).) Skills are loaded from `~/.agents/skills/` and `<worktree>/.agents/skills/` only. Use a symlink if you need to point at another location.
+- **No remote registry.** Sim does not discover or load skills from remote locations at runtime, and custom search paths are not supported. (You can still import a skill once from a GitHub URL — see [Create your own](#create-your-own).) Skills are loaded from `~/.agents/skills/` and `<worktree>/.agents/skills/` only. Use a symlink if you need to point at another location.
 - **Live reload.** Adding, removing, or editing a `SKILL.md` takes effect immediately without restarting your session. Changes to a skill's `name` or `description` invalidate the model's prompt cache for the current session.
 
 ## See also

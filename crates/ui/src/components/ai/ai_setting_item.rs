@@ -52,8 +52,8 @@ pub enum AiSettingItemSource {
 impl AiSettingItemSource {
     fn icon_name(&self) -> IconName {
         match self {
-            Self::Extension => IconName::BaymaxSrcExtension,
-            Self::Custom => IconName::BaymaxSrcCustom,
+            Self::Extension => IconName::SimSrcExtension,
+            Self::Custom => IconName::SimSrcCustom,
             Self::Registry => IconName::AcpRegistry,
         }
     }
@@ -374,7 +374,7 @@ impl Component for AiSettingItem {
                             AiSettingItemSource::Registry,
                         )
                         .icon(
-                            Icon::new(IconName::BaymaxAssistant)
+                            Icon::new(IconName::SimAssistant)
                                 .size(IconSize::Small)
                                 .color(Color::Muted),
                         ),

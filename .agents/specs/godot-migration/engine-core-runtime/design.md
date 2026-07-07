@@ -2,19 +2,19 @@
 
 ## Architecture
 
-Add `crates/baymax_game` Baymax game metadata primitives for project detection, resource references, parse diagnostics, and boundary decisions. Do not embed Godot runtime services.
+Add `crates/sim_game` Sim game metadata primitives for project detection, resource references, parse diagnostics, and boundary decisions. Do not embed Godot runtime services.
 
 ## Components
 
-- `BaymaxGameProjectDescriptor`: project root, project file, display name, engine version, and feature flags.
-- `BaymaxGameResourceIndex`: scene/resource references and parse state.
+- `SimGameProjectDescriptor`: project root, project file, display name, engine version, and feature flags.
+- `SimGameResourceIndex`: scene/resource references and parse state.
 - `RuntimeBoundaryPolicy`: blocks scene-tree, OS, rendering, input, and object runtime ports.
 
 ## Correctness Properties
 
 ### Property 1: Runtime Boundary
 
-_For any_ runtime-only Godot subsystem, the boundary policy SHALL not classify it as a Baymax runtime adapter.
+_For any_ runtime-only Godot subsystem, the boundary policy SHALL not classify it as a Sim runtime adapter.
 
 **Validates: Requirement 1.1**
 

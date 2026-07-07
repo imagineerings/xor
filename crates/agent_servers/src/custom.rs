@@ -240,7 +240,7 @@ impl AgentServer for CustomAgentServer {
                     }
                 }
                 GEMINI_ID => {
-                    extra_env.insert("SURFACE".to_owned(), "baymax".to_owned());
+                    extra_env.insert("SURFACE".to_owned(), "sim".to_owned());
                 }
                 _ => {}
             }
@@ -290,7 +290,7 @@ fn api_key_for_gemini_cli(cx: &mut App) -> Task<Result<String>> {
     if let Some(key) = env_var.value {
         return Task::ready(Ok(key));
     }
-    let credentials_provider = baymax_credentials_provider::global(cx);
+    let credentials_provider = sim_credentials_provider::global(cx);
     let api_url = google_ai::API_URL.to_string();
     cx.spawn(async move |cx| {
         Ok(

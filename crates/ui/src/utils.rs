@@ -38,7 +38,7 @@ pub fn reveal_in_file_manager_label(is_remote: bool) -> &'static str {
 /// Capitalizes the first character of a string.
 ///
 /// This function takes a string slice as input and returns a new `String` with the first character
-/// capitalibaymax.
+/// capitalisim.
 ///
 /// # Examples
 ///

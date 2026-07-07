@@ -1158,7 +1158,7 @@ impl RatePredictionsModal {
                         (IconName::Code, "LSP Completion Accepted")
                     }
                     PredictEditsRequestTrigger::PredictionAccepted => {
-                        (IconName::BaymaxPredict, "Prediction Accepted")
+                        (IconName::SimPredict, "Prediction Accepted")
                     }
                     PredictEditsRequestTrigger::PredictionPartiallyAccepted => {
                         (IconName::CheckDouble, "Prediction Partially Accepted")

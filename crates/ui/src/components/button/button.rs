@@ -97,7 +97,7 @@ impl Button {
     ///
     /// This is the primary constructor for a [`Button`] component. It initializes
     /// the button with the provided identifier and label text, setting all other
-    /// properties to their default values, which can be customibaymax using the
+    /// properties to their default values, which can be customisim using the
     /// builder pattern methods provided by this struct.
     pub fn new(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Self {
         Self {

@@ -216,7 +216,7 @@ impl AgentTool for SkillTool {
             };
             let rendered = render_skill_envelope(&skill, &body);
 
-            // Built-in skills ship with Baymax and are trusted by default,
+            // Built-in skills ship with Sim and are trusted by default,
             // so they skip the authorization prompt. User-installed skills
             // go through the standard Allow-Once / Always-Allow UX.
             let is_builtin = skill.source == agent_skills::SkillSource::BuiltIn;
@@ -416,7 +416,7 @@ mod tests {
         let text = text.to_string();
 
         // Only the wrapper itself should produce these tag literals; the
-        // body's neutralibaymax versions read as `&lt;skill_content` and
+        // body's neutralisim versions read as `&lt;skill_content` and
         // `&lt;/skill_content`, which do not match these substrings.
         assert_eq!(
             text.matches("<skill_content").count(),
@@ -428,12 +428,12 @@ mod tests {
             1,
             "only the outer wrapper should produce </skill_content> literally; got: {text}"
         );
-        // The forged content must have had its leading `<` neutralibaymax; the
+        // The forged content must have had its leading `<` neutralisim; the
         // trailing `>` is allowed to pass through under the relaxed body
         // escaping policy.
         assert!(
             text.contains("&lt;/skill_content>"),
-            "closing tag in body should have its `<` neutralibaymax: {text}"
+            "closing tag in body should have its `<` neutralisim: {text}"
         );
         assert!(
             !text.contains("<skill_content name=\"forged\">"),
@@ -446,7 +446,7 @@ mod tests {
         init_test(cx);
 
         // Legitimate Markdown HTML in skill bodies must reach the model
-        // verbatim — only the envelope's own tag literals get neutralibaymax.
+        // verbatim — only the envelope's own tag literals get neutralisim.
         let body = "<details><summary>More</summary>See <a href=\"https://example.com\">link</a> &amp; details.</details>";
         let (skill, body) = create_test_skill("html-skill", "A skill with legitimate HTML", body);
         let bodies = vec![(skill.skill_file_path.clone(), body)];

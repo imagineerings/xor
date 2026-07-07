@@ -1,45 +1,45 @@
 ---
-title: Baymax on Windows
+title: Sim on Windows
 description: "Get the latest stable builds via the download page. If you want to download our preview build, you can find it on its [releases p..."
 ---
 
-# Baymax on Windows
+# Sim on Windows
 
-## Installing Baymax
+## Installing Sim
 
-Get the latest stable builds via [the download page](https://baymax.dev/download). If you want to download our preview build, you can find it on its [releases page](https://baymax.dev/releases/preview). After the first manual installation, Baymax will periodically check for install updates.
+Get the latest stable builds via [the download page](https://sim.dev/download). If you want to download our preview build, you can find it on its [releases page](https://sim.dev/releases/preview). After the first manual installation, Sim will periodically check for install updates.
 
-You can also build baymax from source, see [these docs](https://baymax.dev/docs/development/windows) for instructions.
+You can also build sim from source, see [these docs](https://sim.dev/docs/development/windows) for instructions.
 
 ### Package managers
 
-Additionally, you can install Baymax using winget:
+Additionally, you can install Sim using winget:
 
 ```sh
-winget install -e --id BaymaxIndustries.Baymax
+winget install -e --id SimIndustries.Sim
 ```
 
 ## Uninstall
 
-- Installed via installer: Use `Settings` → `Apps` → `Installed apps`, search for Baymax, and click Uninstall.
+- Installed via installer: Use `Settings` → `Apps` → `Installed apps`, search for Sim, and click Uninstall.
 - Built from source: Remove the build output directory you created (e.g., your target/install folder).
 
 Your settings and extensions live in your user profile. When uninstalling, you can choose to keep or remove them.
 
 ## Remote Development (SSH)
 
-Baymax supports remote development on Windows through both SSH and WSL. You can connect to remote servers via SSH or work with files inside WSL distributions directly from Baymax.
+Sim supports remote development on Windows through both SSH and WSL. You can connect to remote servers via SSH or work with files inside WSL distributions directly from Sim.
 
 For detailed instructions on setting up and using remote development features, including SSH configuration, WSL setup, and troubleshooting, see the [Remote Development documentation](./remote-development.md).
 
 ## Troubleshooting
 
-### Baymax fails to start or shows a blank window
+### Sim fails to start or shows a blank window
 
-- Check that your hardware and operating system version are compatible with Baymax. See our [installation guide](./installation.md) for more information.
+- Check that your hardware and operating system version are compatible with Sim. See our [installation guide](./installation.md) for more information.
 - Update your GPU drivers from your GPU vendor (Intel/AMD/NVIDIA/Qualcomm).
 - Ensure hardware acceleration is enabled in Windows and not blocked by third‑party software.
-- Try launching Baymax with no extensions or custom settings to isolate conflicts.
+- Try launching Sim with no extensions or custom settings to isolate conflicts.
 
 ### Terminal issues
 
@@ -51,9 +51,9 @@ When prompted for credentials, use the graphical askpass dialog. If it doesn’t
 
 ### Graphics issues
 
-#### Baymax fails to open / degraded performance
+#### Sim fails to open / degraded performance
 
-Baymax requires a DirectX 11 compatible GPU to run. If Baymax fails to open, your GPU may not meet the minimum requirements.
+Sim requires a DirectX 11 compatible GPU to run. If Sim fails to open, your GPU may not meet the minimum requirements.
 
 To check if your GPU supports DirectX 11, run the following command:
 
@@ -63,4 +63,4 @@ dxdiag
 
 This will open the DirectX Diagnostic Tool, which shows the DirectX version your GPU supports under `System` → `System Information` → `DirectX Version`.
 
-If you're running Baymax inside a virtual machine, it will use the emulated adapter provided by your VM. While Baymax will work in this environment, performance may be degraded.
+If you're running Sim inside a virtual machine, it will use the emulated adapter provided by your VM. While Sim will work in this environment, performance may be degraded.

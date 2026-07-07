@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 pub const PLUGIN_MANIFEST_NAMES: &[&str] = &[
-    "baymax-plugin.json",
+    "sim-plugin.json",
     "plugin.json",
     ".codex-plugin/plugin.json",
 ];
@@ -239,7 +239,7 @@ mod tests {
         fs::create_dir(&good_dir).expect("create good plugin dir");
         fs::create_dir(&bad_dir).expect("create bad plugin dir");
         fs::write(
-            good_dir.join("baymax-plugin.json"),
+            good_dir.join("sim-plugin.json"),
             r#"{ "id": "good", "name": "Good", "version": "1.0.0" }"#,
         )
         .expect("write good manifest");

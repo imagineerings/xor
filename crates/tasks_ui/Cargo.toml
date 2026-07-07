@@ -28,7 +28,7 @@ ui.workspace = true
 util.workspace = true
 workspace.workspace = true
 language.workspace = true
-baymax_actions.workspace = true
+sim_actions.workspace = true
 
 [dev-dependencies]
 editor = { workspace = true, features = ["test-support"] }

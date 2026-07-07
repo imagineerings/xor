@@ -1,11 +1,11 @@
 ---
 title: Icon Themes
-description: "Baymax comes with a built-in icon theme, with more icon themes available as extensions."
+description: "Sim comes with a built-in icon theme, with more icon themes available as extensions."
 ---
 
 # Icon Themes
 
-Baymax comes with a built-in icon theme, with more icon themes available as extensions.
+Sim comes with a built-in icon theme, with more icon themes available as extensions.
 
 ## Selecting an Icon Theme
 
@@ -15,14 +15,14 @@ Navigating through the icon theme list by moving up and down will change the ico
 
 ## Installing more Icon Themes
 
-More icon themes are available from the Extensions page, which you can access via the command palette with {#action baymax::Extensions} or the [Baymax website](https://baymax.dev/extensions?filter=icon-themes).
+More icon themes are available from the Extensions page, which you can access via the command palette with {#action sim::Extensions} or the [Sim website](https://sim.dev/extensions?filter=icon-themes).
 
 ## Configuring Icon Themes
 
 Your selected icon theme is stored in your settings file.
-You can open your settings file from the command palette with {#action baymax::OpenSettingsFile} (bound to {#kb baymax::OpenSettingsFile}).
+You can open your settings file from the command palette with {#action sim::OpenSettingsFile} (bound to {#kb sim::OpenSettingsFile}).
 
-Just like with themes, Baymax allows for configuring different icon themes for light and dark mode.
+Just like with themes, Sim allows for configuring different icon themes for light and dark mode.
 You can set the mode to `"light"` or `"dark"` to ignore the current system mode.
 
 ```json [settings]
@@ -37,4 +37,4 @@ You can set the mode to `"light"` or `"dark"` to ignore the current system mode.
 
 ## Icon Theme Development
 
-See: [Developing Baymax Icon Themes](./extensions/icon-themes.md)
+See: [Developing Sim Icon Themes](./extensions/icon-themes.md)

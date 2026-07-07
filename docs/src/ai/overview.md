@@ -1,27 +1,27 @@
 ---
-title: AI in Baymax
-description: Understand Baymax's AI features, agent paths, model providers, and setup routes.
+title: AI in Sim
+description: Understand Sim's AI features, agent paths, model providers, and setup routes.
 ---
 
 # AI
 
-Baymax's AI docs are organibaymax around three areas:
+Sim's AI docs are organisim around three areas:
 
 | Area         | Use it to choose                    | Examples                                                             |
 | ------------ | ----------------------------------- | -------------------------------------------------------------------- |
-| Agents       | How agentic work runs in Baymax        | Baymax Agent, External Agents, Terminal Threads                         |
-| Model access | How Baymax connects to language models | Baymax-hosted models, API access, subscriptions, gateways, local models |
+| Agents       | How agentic work runs in Sim        | Sim Agent, External Agents, Terminal Threads                         |
+| Model access | How Sim connects to language models | Sim-hosted models, API access, subscriptions, gateways, local models |
 | Features     | Which AI workflow you want to use   | Agentic editing, inline edits, edit prediction, Git assistance       |
 
 Start with [AI Quick Start](./quick-start.md) if you know what you want to do. Use [AI by Company](./by-company.md) if you know the company, subscription, model provider, agent, or CLI you want to use.
 
 ## Agent Paths {#agent-paths}
 
-Agent paths decide how agentic work runs in Baymax.
+Agent paths decide how agentic work runs in Sim.
 
-- [Baymax Agent](./baymax-agent.md): Baymax's native agent. It can use models configured through [LLM Providers](./llm-providers.md), including Baymax-hosted models, provider API keys, supported subscriptions, gateways, and local models. It also uses built-in tools, profiles, skills, instructions, and MCP servers.
+- [Sim Agent](./sim-agent.md): Sim's native agent. It can use models configured through [LLM Providers](./llm-providers.md), including Sim-hosted models, provider API keys, supported subscriptions, gateways, and local models. It also uses built-in tools, profiles, skills, instructions, and MCP servers.
 - [External Agents](./external-agents.md): ACP-integrated agents that run through their own process and configuration.
-- [Terminal Threads](./terminal-threads.md): terminal-backed threads for running an agent CLI or TUI directly in Baymax.
+- [Terminal Threads](./terminal-threads.md): terminal-backed threads for running an agent CLI or TUI directly in Sim.
 
 The [Threads Sidebar](./parallel-agents.md#threads-sidebar) is where you organize agent work. You can run multiple agent threads and Terminal Threads at once, each using a different agent and working against different projects.
 
@@ -29,13 +29,13 @@ See [Agents](./agents.md) for a comparison.
 
 ## Model Access {#model-access}
 
-Model access controls which models power the Baymax Agent and other model-backed Baymax AI features. Baymax can use hosted models, provider API access, subscription sign-in, gateways, and local models.
+Model access controls which models power the Sim Agent and other model-backed Sim AI features. Sim can use hosted models, provider API access, subscription sign-in, gateways, and local models.
 
 See [LLM Providers](./llm-providers.md) to choose a model access path.
 
 ## AI Features {#ai-features}
 
-Baymax has several AI-powered workflows:
+Sim has several AI-powered workflows:
 
 - [Agent Panel](./agent-panel.md): prompt agents, add context, review changes, and manage active threads.
 - [Parallel Agents](./parallel-agents.md): run multiple threads across projects and worktrees.

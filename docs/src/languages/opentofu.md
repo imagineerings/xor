@@ -1,11 +1,11 @@
 ---
 title: OpenTofu
-description: "Configure OpenTofu language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure OpenTofu language support in Sim, including language servers, formatting, and debugging."
 ---
 
 # OpenTofu
 
-OpenTofu support is available through the [OpenTofu extension](https://github.com/ashpool37/baymax-extension-opentofu).
+OpenTofu support is available through the [OpenTofu extension](https://github.com/ashpool37/sim-extension-opentofu).
 
 - Tree-sitter: [tree-sitter-grammars/tree-sitter-hcl](https://github.com/tree-sitter-grammars/tree-sitter-hcl)
 - Language Server: [opentofu/tofu-ls](https://github.com/opentofu/tofu-ls)

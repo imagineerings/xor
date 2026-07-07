@@ -77,7 +77,7 @@ pub struct ThemeSettings {
     pub theme: ThemeSelection,
     /// Manual overrides for the active theme.
     ///
-    /// Note: This setting is still experimental. See [this tracking issue](https://github.com/simtropolis/baymax/issues/18078)
+    /// Note: This setting is still experimental. See [this tracking issue](https://github.com/simtropolis/sim/issues/18078)
     pub experimental_theme_overrides: Option<settings::ThemeStyleContent>,
     /// Manual overrides per theme
     pub theme_overrides: HashMap<String, settings::ThemeStyleContent>,

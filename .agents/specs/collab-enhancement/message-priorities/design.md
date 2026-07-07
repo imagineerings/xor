@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-Channel messages in Baymax currently have no urgency indicators. This design adds message priorities — a flag on channel messages indicating whether they are Normal, Important, or Urgent. Important messages receive a yellow/amber visual indicator. Urgent messages receive a red visual indicator and trigger special notification handling (persistent, dismissible notifications that respect DND configuration).
+Channel messages in Sim currently have no urgency indicators. This design adds message priorities — a flag on channel messages indicating whether they are Normal, Important, or Urgent. Important messages receive a yellow/amber visual indicator. Urgent messages receive a red visual indicator and trigger special notification handling (persistent, dismissible notifications that respect DND configuration).
 
 **Key decisions:**
 

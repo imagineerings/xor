@@ -4,7 +4,7 @@ use collections::HashMap;
 use serde::Deserialize;
 
 /// Configuration for a declarative (OpenAI-compatible) provider that users
-/// define in their baymax settings without writing any Rust code.
+/// define in their sim settings without writing any Rust code.
 ///
 /// Each entry creates an [`OpenAiCompatibleLanguageModelProvider`] instance
 /// at startup (or on settings reload).

@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The Baymax mobile client needs polished user experience features including user profiles, custom status, theming, and onboarding. These features make the app feel complete and help users manage their identity and preferences. This spec draws from `mobile-dev`'s profile management, custom status, theme settings, and tutorial flows.
+The Sim mobile client needs polished user experience features including user profiles, custom status, theming, and onboarding. These features make the app feel complete and help users manage their identity and preferences. This spec draws from `mobile-dev`'s profile management, custom status, theme settings, and tutorial flows.
 
 ## Glossary
 
@@ -58,7 +58,7 @@ The Baymax mobile client needs polished user experience features including user 
 
 **User Story:** As a new user, I want to be guided through the app's features, so I can quickly understand how to use it.
 
-4.1 WHEN the app is launched for the first time (no saved credentials) THEN THE app SHALL show a welcome screen introducing Baymax.
+4.1 WHEN the app is launched for the first time (no saved credentials) THEN THE app SHALL show a welcome screen introducing Sim.
 
 4.2 THE onboarding SHALL offer:
    - "Try Trial Mode" — connect to demo server

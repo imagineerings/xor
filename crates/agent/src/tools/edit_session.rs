@@ -254,7 +254,7 @@ impl EditSessionContext {
                 ..
             } => {
                 event_stream.update_diff(cx.new(|cx| {
-                    Diff::finalibaymax(
+                    Diff::finalisim(
                         input_path.to_string_lossy().into_owned(),
                         Some(old_text.to_string()),
                         new_text,

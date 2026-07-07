@@ -21,11 +21,11 @@ pub enum DetailedSummaryState {
 pub struct MessageId(pub usize);
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct SerialibaymaxThread {
+pub struct SerialisimThread {
     pub version: String,
     pub summary: SharedString,
     pub updated_at: DateTime<Utc>,
-    pub messages: Vec<SerialibaymaxMessage>,
+    pub messages: Vec<SerialisimMessage>,
     #[serde(default)]
     pub initial_project_snapshot: Option<Arc<ProjectSnapshot>>,
     #[serde(default)]
@@ -35,7 +35,7 @@ pub struct SerialibaymaxThread {
     #[serde(default)]
     pub detailed_summary_state: DetailedSummaryState,
     #[serde(default)]
-    pub model: Option<SerialibaymaxLanguageModel>,
+    pub model: Option<SerialisimLanguageModel>,
     #[serde(default)]
     pub tool_use_limit_reached: bool,
     #[serde(default)]
@@ -43,52 +43,52 @@ pub struct SerialibaymaxThread {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct SerialibaymaxLanguageModel {
+pub struct SerialisimLanguageModel {
     pub provider: String,
     pub model: String,
 }
 
-impl SerialibaymaxThread {
+impl SerialisimThread {
     pub const VERSION: &'static str = "0.2.0";
 
     pub fn from_json(json: &[u8]) -> Result<Self> {
         let saved_thread_json = serde_json::from_slice::<serde_json::Value>(json)?;
         match saved_thread_json.get("version") {
             Some(serde_json::Value::String(version)) => match version.as_str() {
-                SerialibaymaxThreadV0_1_0::VERSION => {
+                SerialisimThreadV0_1_0::VERSION => {
                     let saved_thread =
-                        serde_json::from_value::<SerialibaymaxThreadV0_1_0>(saved_thread_json)?;
+                        serde_json::from_value::<SerialisimThreadV0_1_0>(saved_thread_json)?;
                     Ok(saved_thread.upgrade())
                 }
-                SerialibaymaxThread::VERSION => Ok(serde_json::from_value::<SerialibaymaxThread>(
+                SerialisimThread::VERSION => Ok(serde_json::from_value::<SerialisimThread>(
                     saved_thread_json,
                 )?),
-                _ => anyhow::bail!("unrecognibaymax serialibaymax thread version: {version:?}"),
+                _ => anyhow::bail!("unrecognisim serialisim thread version: {version:?}"),
             },
             None => {
                 let saved_thread =
-                    serde_json::from_value::<LegacySerialibaymaxThread>(saved_thread_json)?;
+                    serde_json::from_value::<LegacySerialisimThread>(saved_thread_json)?;
                 Ok(saved_thread.upgrade())
             }
-            version => anyhow::bail!("unrecognibaymax serialibaymax thread version: {version:?}"),
+            version => anyhow::bail!("unrecognisim serialisim thread version: {version:?}"),
         }
     }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct SerialibaymaxThreadV0_1_0(
-    // The structure did not change, so we are reusing the latest SerialibaymaxThread.
-    // When making the next version, make sure this points to SerialibaymaxThreadV0_2_0
-    SerialibaymaxThread,
+pub struct SerialisimThreadV0_1_0(
+    // The structure did not change, so we are reusing the latest SerialisimThread.
+    // When making the next version, make sure this points to SerialisimThreadV0_2_0
+    SerialisimThread,
 );
 
-impl SerialibaymaxThreadV0_1_0 {
+impl SerialisimThreadV0_1_0 {
     pub const VERSION: &'static str = "0.1.0";
 
-    pub fn upgrade(self) -> SerialibaymaxThread {
-        debug_assert_eq!(SerialibaymaxThread::VERSION, "0.2.0");
+    pub fn upgrade(self) -> SerialisimThread {
+        debug_assert_eq!(SerialisimThread::VERSION, "0.2.0");
 
-        let mut messages: Vec<SerialibaymaxMessage> = Vec::with_capacity(self.0.messages.len());
+        let mut messages: Vec<SerialisimMessage> = Vec::with_capacity(self.0.messages.len());
 
         for message in self.0.messages {
             if message.role == Role::User && !message.tool_results.is_empty() {
@@ -103,35 +103,35 @@ impl SerialibaymaxThreadV0_1_0 {
             messages.push(message);
         }
 
-        SerialibaymaxThread {
+        SerialisimThread {
             messages,
-            version: SerialibaymaxThread::VERSION.to_string(),
+            version: SerialisimThread::VERSION.to_string(),
             ..self.0
         }
     }
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
-pub struct SerialibaymaxMessage {
+pub struct SerialisimMessage {
     pub id: MessageId,
     pub role: Role,
     #[serde(default)]
-    pub segments: Vec<SerialibaymaxMessageSegment>,
+    pub segments: Vec<SerialisimMessageSegment>,
     #[serde(default)]
-    pub tool_uses: Vec<SerialibaymaxToolUse>,
+    pub tool_uses: Vec<SerialisimToolUse>,
     #[serde(default)]
-    pub tool_results: Vec<SerialibaymaxToolResult>,
+    pub tool_results: Vec<SerialisimToolResult>,
     #[serde(default)]
     pub context: String,
     #[serde(default)]
-    pub creases: Vec<SerialibaymaxCrease>,
+    pub creases: Vec<SerialisimCrease>,
     #[serde(default)]
     pub is_hidden: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
-pub enum SerialibaymaxMessageSegment {
+pub enum SerialisimMessageSegment {
     #[serde(rename = "text")]
     Text {
         text: String,
@@ -148,14 +148,14 @@ pub enum SerialibaymaxMessageSegment {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
-pub struct SerialibaymaxToolUse {
+pub struct SerialisimToolUse {
     pub id: LanguageModelToolUseId,
     pub name: SharedString,
     pub input: serde_json::Value,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
-pub struct SerialibaymaxToolResult {
+pub struct SerialisimToolResult {
     pub tool_use_id: LanguageModelToolUseId,
     pub is_error: bool,
     pub content: LanguageModelToolResultContent,
@@ -163,18 +163,18 @@ pub struct SerialibaymaxToolResult {
 }
 
 #[derive(Serialize, Deserialize)]
-struct LegacySerialibaymaxThread {
+struct LegacySerialisimThread {
     pub summary: SharedString,
     pub updated_at: DateTime<Utc>,
-    pub messages: Vec<LegacySerialibaymaxMessage>,
+    pub messages: Vec<LegacySerialisimMessage>,
     #[serde(default)]
     pub initial_project_snapshot: Option<Arc<ProjectSnapshot>>,
 }
 
-impl LegacySerialibaymaxThread {
-    pub fn upgrade(self) -> SerialibaymaxThread {
-        SerialibaymaxThread {
-            version: SerialibaymaxThread::VERSION.to_string(),
+impl LegacySerialisimThread {
+    pub fn upgrade(self) -> SerialisimThread {
+        SerialisimThread {
+            version: SerialisimThread::VERSION.to_string(),
             summary: self.summary,
             updated_at: self.updated_at,
             messages: self.messages.into_iter().map(|msg| msg.upgrade()).collect(),
@@ -190,22 +190,22 @@ impl LegacySerialibaymaxThread {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct LegacySerialibaymaxMessage {
+struct LegacySerialisimMessage {
     pub id: MessageId,
     pub role: Role,
     pub text: String,
     #[serde(default)]
-    pub tool_uses: Vec<SerialibaymaxToolUse>,
+    pub tool_uses: Vec<SerialisimToolUse>,
     #[serde(default)]
-    pub tool_results: Vec<SerialibaymaxToolResult>,
+    pub tool_results: Vec<SerialisimToolResult>,
 }
 
-impl LegacySerialibaymaxMessage {
-    fn upgrade(self) -> SerialibaymaxMessage {
-        SerialibaymaxMessage {
+impl LegacySerialisimMessage {
+    fn upgrade(self) -> SerialisimMessage {
+        SerialisimMessage {
             id: self.id,
             role: self.role,
-            segments: vec![SerialibaymaxMessageSegment::Text { text: self.text }],
+            segments: vec![SerialisimMessageSegment::Text { text: self.text }],
             tool_uses: self.tool_uses,
             tool_results: self.tool_results,
             context: String::new(),
@@ -216,7 +216,7 @@ impl LegacySerialibaymaxMessage {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
-pub struct SerialibaymaxCrease {
+pub struct SerialisimCrease {
     pub start: usize,
     pub end: usize,
     pub icon_path: SharedString,
@@ -231,12 +231,12 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     #[test]
-    fn test_legacy_serialibaymax_thread_upgrade() {
+    fn test_legacy_serialisim_thread_upgrade() {
         let updated_at = Utc::now();
-        let legacy_thread = LegacySerialibaymaxThread {
+        let legacy_thread = LegacySerialisimThread {
             summary: "Test conversation".into(),
             updated_at,
-            messages: vec![LegacySerialibaymaxMessage {
+            messages: vec![LegacySerialisimMessage {
                 id: MessageId(1),
                 role: Role::User,
                 text: "Hello, world!".to_string(),
@@ -250,13 +250,13 @@ mod tests {
 
         assert_eq!(
             upgraded,
-            SerialibaymaxThread {
+            SerialisimThread {
                 summary: "Test conversation".into(),
                 updated_at,
-                messages: vec![SerialibaymaxMessage {
+                messages: vec![SerialisimMessage {
                     id: MessageId(1),
                     role: Role::User,
-                    segments: vec![SerialibaymaxMessageSegment::Text {
+                    segments: vec![SerialisimMessageSegment::Text {
                         text: "Hello, world!".to_string()
                     }],
                     tool_uses: vec![],
@@ -265,7 +265,7 @@ mod tests {
                     creases: vec![],
                     is_hidden: false
                 }],
-                version: SerialibaymaxThread::VERSION.to_string(),
+                version: SerialisimThread::VERSION.to_string(),
                 initial_project_snapshot: None,
                 cumulative_token_usage: TokenUsage::default(),
                 request_token_usage: vec![],
@@ -278,16 +278,16 @@ mod tests {
     }
 
     #[test]
-    fn test_serialibaymax_threadv0_1_0_upgrade() {
+    fn test_serialisim_threadv0_1_0_upgrade() {
         let updated_at = Utc::now();
-        let thread_v0_1_0 = SerialibaymaxThreadV0_1_0(SerialibaymaxThread {
+        let thread_v0_1_0 = SerialisimThreadV0_1_0(SerialisimThread {
             summary: "Test conversation".into(),
             updated_at,
             messages: vec![
-                SerialibaymaxMessage {
+                SerialisimMessage {
                     id: MessageId(1),
                     role: Role::User,
-                    segments: vec![SerialibaymaxMessageSegment::Text {
+                    segments: vec![SerialisimMessageSegment::Text {
                         text: "Use tool_1".to_string(),
                     }],
                     tool_uses: vec![],
@@ -296,13 +296,13 @@ mod tests {
                     creases: vec![],
                     is_hidden: false,
                 },
-                SerialibaymaxMessage {
+                SerialisimMessage {
                     id: MessageId(2),
                     role: Role::Assistant,
-                    segments: vec![SerialibaymaxMessageSegment::Text {
+                    segments: vec![SerialisimMessageSegment::Text {
                         text: "I want to use a tool".to_string(),
                     }],
-                    tool_uses: vec![SerialibaymaxToolUse {
+                    tool_uses: vec![SerialisimToolUse {
                         id: "abc".into(),
                         name: "tool_1".into(),
                         input: serde_json::Value::Null,
@@ -312,14 +312,14 @@ mod tests {
                     creases: vec![],
                     is_hidden: false,
                 },
-                SerialibaymaxMessage {
+                SerialisimMessage {
                     id: MessageId(1),
                     role: Role::User,
-                    segments: vec![SerialibaymaxMessageSegment::Text {
+                    segments: vec![SerialisimMessageSegment::Text {
                         text: "Here is the tool result".to_string(),
                     }],
                     tool_uses: vec![],
-                    tool_results: vec![SerialibaymaxToolResult {
+                    tool_results: vec![SerialisimToolResult {
                         tool_use_id: "abc".into(),
                         is_error: false,
                         content: LanguageModelToolResultContent::Text("abcdef".into()),
@@ -330,7 +330,7 @@ mod tests {
                     is_hidden: false,
                 },
             ],
-            version: SerialibaymaxThreadV0_1_0::VERSION.to_string(),
+            version: SerialisimThreadV0_1_0::VERSION.to_string(),
             initial_project_snapshot: None,
             cumulative_token_usage: TokenUsage::default(),
             request_token_usage: vec![],
@@ -343,14 +343,14 @@ mod tests {
 
         assert_eq!(
             upgraded,
-            SerialibaymaxThread {
+            SerialisimThread {
                 summary: "Test conversation".into(),
                 updated_at,
                 messages: vec![
-                    SerialibaymaxMessage {
+                    SerialisimMessage {
                         id: MessageId(1),
                         role: Role::User,
-                        segments: vec![SerialibaymaxMessageSegment::Text {
+                        segments: vec![SerialisimMessageSegment::Text {
                             text: "Use tool_1".to_string()
                         }],
                         tool_uses: vec![],
@@ -359,18 +359,18 @@ mod tests {
                         creases: vec![],
                         is_hidden: false
                     },
-                    SerialibaymaxMessage {
+                    SerialisimMessage {
                         id: MessageId(2),
                         role: Role::Assistant,
-                        segments: vec![SerialibaymaxMessageSegment::Text {
+                        segments: vec![SerialisimMessageSegment::Text {
                             text: "I want to use a tool".to_string(),
                         }],
-                        tool_uses: vec![SerialibaymaxToolUse {
+                        tool_uses: vec![SerialisimToolUse {
                             id: "abc".into(),
                             name: "tool_1".into(),
                             input: serde_json::Value::Null,
                         }],
-                        tool_results: vec![SerialibaymaxToolResult {
+                        tool_results: vec![SerialisimToolResult {
                             tool_use_id: "abc".into(),
                             is_error: false,
                             content: LanguageModelToolResultContent::Text("abcdef".into()),
@@ -381,7 +381,7 @@ mod tests {
                         is_hidden: false,
                     },
                 ],
-                version: SerialibaymaxThread::VERSION.to_string(),
+                version: SerialisimThread::VERSION.to_string(),
                 initial_project_snapshot: None,
                 cumulative_token_usage: TokenUsage::default(),
                 request_token_usage: vec![],

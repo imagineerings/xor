@@ -23,7 +23,7 @@ use std::{
     str::FromStr,
     sync::{Arc, OnceLock},
 };
-use task::{BaymaxDebugConfig, SpawnInTerminal};
+use task::{SimDebugConfig, SpawnInTerminal};
 use url::Url;
 use util::{
     archive::extract_zip, fs::make_file_executable, maybe, paths::PathStyle, rel_path::RelPath,
@@ -45,11 +45,11 @@ wasmtime::component::bindgen!({
          "worktree": ExtensionWorktree,
          "project": ExtensionProject,
          "key-value-store": ExtensionKeyValueStore,
-         "baymax:extension/http-client/http-response-stream": ExtensionHttpResponseStream
+         "sim:extension/http-client/http-response-stream": ExtensionHttpResponseStream
     },
 });
 
-pub use self::baymax::extension::*;
+pub use self::sim::extension::*;
 
 mod settings {
     #![allow(dead_code)]
@@ -231,8 +231,8 @@ impl From<AttachRequest> for task::AttachRequest {
     }
 }
 
-impl From<BaymaxDebugConfig> for DebugConfig {
-    fn from(value: BaymaxDebugConfig) -> Self {
+impl From<SimDebugConfig> for DebugConfig {
+    fn from(value: SimDebugConfig) -> Self {
         Self {
             label: value.label.into(),
             adapter: value.adapter.into(),

@@ -14,7 +14,7 @@ use gpui::BackgroundExecutor;
 use language::LanguageName;
 use lsp::LanguageServerName;
 use release_channel::ReleaseChannel;
-use task::{BaymaxDebugConfig, DebugScenario, SpawnInTerminal, TaskTemplate};
+use task::{SimDebugConfig, DebugScenario, SpawnInTerminal, TaskTemplate};
 
 use latest::dap::StartDebuggingRequestArgumentsRequest;
 
@@ -32,11 +32,11 @@ use wasmtime::{
 pub use latest::CodeLabelSpanLiteral;
 pub use latest::{
     CodeLabel, CodeLabelSpan, Command, DebugAdapterBinary, ExtensionProject, Range, SlashCommand,
-    baymax::extension::context_server::ContextServerConfiguration,
-    baymax::extension::lsp::{
+    sim::extension::context_server::ContextServerConfiguration,
+    sim::extension::lsp::{
         Completion, CompletionKind, CompletionLabelDetails, InsertTextFormat, Symbol, SymbolKind,
     },
-    baymax::extension::slash_command::{SlashCommandArgumentCompletion, SlashCommandOutput},
+    sim::extension::slash_command::{SlashCommandArgumentCompletion, SlashCommandOutput},
 };
 pub use since_v0_0_4::LanguageServerConfig;
 
@@ -85,7 +85,7 @@ pub fn authorize_access_to_unreleased_wasm_api_version(
 
     anyhow::ensure!(
         allow_unreleased_version,
-        "unreleased versions of the extension API can only be used on development builds of Baymax"
+        "unreleased versions of the extension API can only be used on development builds of Sim"
     );
 
     Ok(())
@@ -1142,7 +1142,7 @@ impl Extension {
     pub async fn call_dap_config_to_scenario(
         &self,
         store: &mut Store<WasmState>,
-        config: BaymaxDebugConfig,
+        config: SimDebugConfig,
     ) -> Result<Result<DebugScenario, String>> {
         match self {
             Extension::V0_8_0(ext) => {

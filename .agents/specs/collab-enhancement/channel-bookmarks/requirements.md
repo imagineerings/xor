@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Baymax channels lack a mechanism to permanently pin important links or references. Mattermost supports channel bookmarks (`bookmarks.yaml` API) — a dedicated section in the channel header where users can save important links, files, and messages for easy access by all members. This is a simple but high-value enhancement for team channels.
+Sim channels lack a mechanism to permanently pin important links or references. Mattermost supports channel bookmarks (`bookmarks.yaml` API) — a dedicated section in the channel header where users can save important links, files, and messages for easy access by all members. This is a simple but high-value enhancement for team channels.
 
 ## Glossary
 
@@ -32,7 +32,7 @@ Baymax channels lack a mechanism to permanently pin important links or reference
 
 1. THE bookmarks section SHALL be visible at the top of the channel, above the message list
 2. Each bookmark SHALL display: an icon (based on type), label, and a brief description if provided
-3. WHEN the user clicks a bookmark link THEN THE system SHALL open the URL in the default browser (external) or the relevant file/message in Baymax
+3. WHEN the user clicks a bookmark link THEN THE system SHALL open the URL in the default browser (external) or the relevant file/message in Sim
 4. WHEN a channel has more than 5 bookmarks THEN THE system SHALL show a "Show all" expand/collapse toggle
 5. THE bookmarks SHALL persist across sessions for all channel members
 

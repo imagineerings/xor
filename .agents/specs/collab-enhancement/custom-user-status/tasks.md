@@ -7,11 +7,11 @@ This plan implements custom user status — emoji + short text labels with optio
 ## Tasks
 
 - [ ] 1. Define protobuf messages and register in proto layer
-  - Add `UserCustomStatus`, `SetStatus`, `SetStatusResponse`, `ClearStatus`, `UpdateUserStatus`, and `UpdateUserStatuses` messages in `crates/proto/proto/baymax.proto` with `oneof payload` entries (field numbers 250–254)
+  - Add `UserCustomStatus`, `SetStatus`, `SetStatusResponse`, `ClearStatus`, `UpdateUserStatus`, and `UpdateUserStatuses` messages in `crates/proto/proto/sim.proto` with `oneof payload` entries (field numbers 250–254)
   - Register all messages in `messages!()` macro in `crates/proto/src/proto.rs`
   - Register `SetStatus` and `ClearStatus` in `request_messages!()` macro
   - _Requirements: 8.1, 8.2_
-  - _writes: crates/proto/proto/baymax.proto, crates/proto/src/proto.rs_
+  - _writes: crates/proto/proto/sim.proto, crates/proto/src/proto.rs_
 
 - [ ] 2. Create database migration for `user_custom_statuses` table
   - Write SQL migration creating the table with `user_id` (PK, FK `users(id)` ON DELETE CASCADE), `emoji` (nullable VARCHAR), `status_text` (NOT NULL VARCHAR), `expires_at` (nullable TIMESTAMP), `updated_at` (TIMESTAMP DEFAULT NOW())

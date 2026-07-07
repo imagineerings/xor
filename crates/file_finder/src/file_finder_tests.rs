@@ -4645,7 +4645,7 @@ async fn test_filename_precedence(cx: &mut TestAppContext) {
                 rel_path("layout/app.html").into(),
                 rel_path("layout/+page.svelte").into(),
             ],
-            "File with 'layout' in filename should be prioritibaymax over files in 'layout' directory"
+            "File with 'layout' in filename should be prioritisim over files in 'layout' directory"
         );
     });
 }
@@ -4965,7 +4965,7 @@ async fn test_exact_filename_stem_preferred(cx: &mut TestAppContext) {
                     }
                 },
                 "crates": {
-                    "baymax": {
+                    "sim": {
                         "resources": {
                             "app-icon-nightly@2x.png": "",
                             "app-icon-preview@2x.png": "",

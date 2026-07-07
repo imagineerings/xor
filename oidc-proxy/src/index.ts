@@ -1,8 +1,8 @@
 /**
- * Baymax OIDC Proxy — Cloudflare Worker
+ * Sim OIDC Proxy — Cloudflare Worker
  *
  * Routes OIDC (OpenID Connect) authentication flows through a proxy so that
- * the client (baymax) never needs to hold the provider's client secret.
+ * the client (sim) never needs to hold the provider's client secret.
  *
  * ## Routes
  *

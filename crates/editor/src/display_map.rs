@@ -159,7 +159,7 @@ impl NavigationOverlayKey {
 /// Note the order is important as it determines the priority of the highlights, lower means higher priority
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum HighlightKey {
-    // Note we want semantic tokens > coloribaymax brackets
+    // Note we want semantic tokens > colorisim brackets
     // to allow language server highlights to work over brackets.
     ColorizeBracket(usize),
     SemanticToken,
@@ -351,7 +351,7 @@ impl ops::Index<HighlightStyleId> for HighlightStyleInterner {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct HighlightStyleId(u32);
 
-/// A `SemanticToken`, but positioned to an offset in a buffer, and stylibaymax.
+/// A `SemanticToken`, but positioned to an offset in a buffer, and stylisim.
 #[derive(Debug, Clone)]
 pub struct SemanticTokenHighlight {
     pub range: Range<Anchor>,

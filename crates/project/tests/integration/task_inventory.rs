@@ -445,16 +445,16 @@ async fn test_inventory_static_task_filters(cx: &mut TestAppContext) {
         (
             TaskSourceKind::Worktree {
                 id: worktree_1,
-                directory_in_worktree: rel_path(".baymax").into(),
-                id_base: "local worktree tasks from directory \".baymax\"".into(),
+                directory_in_worktree: rel_path(".sim").into(),
+                id_base: "local worktree tasks from directory \".sim\"".into(),
             },
             common_name.to_string(),
         ),
         (
             TaskSourceKind::Worktree {
                 id: worktree_1,
-                directory_in_worktree: rel_path(".baymax").into(),
-                id_base: "local worktree tasks from directory \".baymax\"".into(),
+                directory_in_worktree: rel_path(".sim").into(),
+                id_base: "local worktree tasks from directory \".sim\"".into(),
             },
             "worktree_1".to_string(),
         ),
@@ -463,16 +463,16 @@ async fn test_inventory_static_task_filters(cx: &mut TestAppContext) {
         (
             TaskSourceKind::Worktree {
                 id: worktree_2,
-                directory_in_worktree: rel_path(".baymax").into(),
-                id_base: "local worktree tasks from directory \".baymax\"".into(),
+                directory_in_worktree: rel_path(".sim").into(),
+                id_base: "local worktree tasks from directory \".sim\"".into(),
             },
             common_name.to_string(),
         ),
         (
             TaskSourceKind::Worktree {
                 id: worktree_2,
-                directory_in_worktree: rel_path(".baymax").into(),
-                id_base: "local worktree tasks from directory \".baymax\"".into(),
+                directory_in_worktree: rel_path(".sim").into(),
+                id_base: "local worktree tasks from directory \".sim\"".into(),
             },
             "worktree_2".to_string(),
         ),
@@ -493,7 +493,7 @@ async fn test_inventory_static_task_filters(cx: &mut TestAppContext) {
             .update_file_based_tasks(
                 TaskSettingsLocation::Worktree(SettingsLocation {
                     worktree_id: worktree_1,
-                    path: rel_path(".baymax"),
+                    path: rel_path(".sim"),
                 }),
                 Some(&mock_tasks_from_names(
                     worktree_1_tasks.iter().map(|(_, name)| name.as_str()),
@@ -504,7 +504,7 @@ async fn test_inventory_static_task_filters(cx: &mut TestAppContext) {
             .update_file_based_tasks(
                 TaskSettingsLocation::Worktree(SettingsLocation {
                     worktree_id: worktree_2,
-                    path: rel_path(".baymax"),
+                    path: rel_path(".sim"),
                 }),
                 Some(&mock_tasks_from_names(
                     worktree_2_tasks.iter().map(|(_, name)| name.as_str()),
@@ -561,7 +561,7 @@ async fn test_inventory_static_task_filters(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
-async fn test_baymax_tasks_take_precedence_over_vscode(cx: &mut TestAppContext) {
+async fn test_sim_tasks_take_precedence_over_vscode(cx: &mut TestAppContext) {
     init_test(cx);
     let inventory = cx.update(|cx| Inventory::new(cx));
     let worktree_id = WorktreeId::from_usize(0);
@@ -588,23 +588,23 @@ async fn test_baymax_tasks_take_precedence_over_vscode(cx: &mut TestAppContext) 
             .update_file_based_tasks(
                 TaskSettingsLocation::Worktree(SettingsLocation {
                     worktree_id,
-                    path: rel_path(".baymax"),
+                    path: rel_path(".sim"),
                 }),
-                Some(&mock_tasks_from_names(["baymax_task"])),
+                Some(&mock_tasks_from_names(["sim_task"])),
             )
             .unwrap();
     });
     assert_eq!(
         task_template_names(&inventory, Some(worktree_id), cx).await,
-        vec!["baymax_task"],
-        "With both .baymax and .vscode tasks, only .baymax tasks should appear"
+        vec!["sim_task"],
+        "With both .sim and .vscode tasks, only .sim tasks should appear"
     );
 
-    register_worktree_task_used(&inventory, worktree_id, "baymax_task", cx).await;
+    register_worktree_task_used(&inventory, worktree_id, "sim_task", cx).await;
     let resolved = resolved_task_names(&inventory, Some(worktree_id), cx).await;
     assert!(
         !resolved.iter().any(|name| name == "vscode_task"),
-        "Previously used .vscode tasks should not appear when .baymax tasks exist, got: {resolved:?}"
+        "Previously used .vscode tasks should not appear when .sim tasks exist, got: {resolved:?}"
     );
 }
 

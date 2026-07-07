@@ -854,7 +854,7 @@ impl Render for ConfigurationView {
             v_flex()
                 .size_full()
                 .on_action(cx.listener(Self::save_api_key))
-                .child(Label::new("To use Baymax's agent with OpenRouter, you need to add an API key. Follow these steps:"))
+                .child(Label::new("To use Sim's agent with OpenRouter, you need to add an API key. Follow these steps:"))
                 .child(
                     List::new()
                         .child(
@@ -870,7 +870,7 @@ impl Render for ConfigurationView {
                 .child(self.api_key_editor.clone())
                 .child(
                     Label::new(
-                        format!("You can also set the {API_KEY_ENV_VAR_NAME} environment variable and restart Baymax."),
+                        format!("You can also set the {API_KEY_ENV_VAR_NAME} environment variable and restart Sim."),
                     )
                     .size(LabelSize::Small).color(Color::Muted),
                 )

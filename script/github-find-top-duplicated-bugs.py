@@ -29,7 +29,7 @@ from collections import Counter, defaultdict
 import requests
 
 OWNER = "simtropolis"
-REPO = "baymax"
+REPO = "sim"
 
 GRAPHQL_URL = "https://api.github.com/graphql"
 REST_API_URL = "https://api.github.com"

@@ -1,6 +1,6 @@
-use baymax::settings::LspSettings;
+use sim::settings::LspSettings;
 use std::{env, fs};
-use zed_extension_api::{self as baymax, LanguageServerId, Result, serde_json::json};
+use zed_extension_api::{self as sim, LanguageServerId, Result, serde_json::json};
 
 const BINARY_NAME: &str = "vscode-html-language-server";
 const SERVER_PATH: &str =
@@ -22,20 +22,20 @@ impl HtmlExtension {
             return Ok(SERVER_PATH.to_string());
         }
 
-        baymax::set_language_server_installation_status(
+        sim::set_language_server_installation_status(
             language_server_id,
-            &baymax::LanguageServerInstallationStatus::CheckingForUpdate,
+            &sim::LanguageServerInstallationStatus::CheckingForUpdate,
         );
-        let version = baymax::npm_package_latest_version(PACKAGE_NAME)?;
+        let version = sim::npm_package_latest_version(PACKAGE_NAME)?;
 
         if !server_exists
-            || baymax::npm_package_installed_version(PACKAGE_NAME)?.as_ref() != Some(&version)
+            || sim::npm_package_installed_version(PACKAGE_NAME)?.as_ref() != Some(&version)
         {
-            baymax::set_language_server_installation_status(
+            sim::set_language_server_installation_status(
                 language_server_id,
-                &baymax::LanguageServerInstallationStatus::Downloading,
+                &sim::LanguageServerInstallationStatus::Downloading,
             );
-            let result = baymax::npm_install_package(PACKAGE_NAME, &version);
+            let result = sim::npm_install_package(PACKAGE_NAME, &version);
             match result {
                 Ok(()) => {
                     if !self.server_exists() {
@@ -55,7 +55,7 @@ impl HtmlExtension {
     }
 }
 
-impl baymax::Extension for HtmlExtension {
+impl sim::Extension for HtmlExtension {
     fn new() -> Self {
         Self {
             cached_binary_path: None,
@@ -65,10 +65,10 @@ impl baymax::Extension for HtmlExtension {
     fn language_server_command(
         &mut self,
         language_server_id: &LanguageServerId,
-        worktree: &baymax::Worktree,
-    ) -> Result<baymax::Command> {
+        worktree: &sim::Worktree,
+    ) -> Result<sim::Command> {
         let server_path = if let Some(path) = worktree.which(BINARY_NAME) {
-            return Ok(baymax::Command {
+            return Ok(sim::Command {
                 command: path,
                 args: vec!["--stdio".to_string()],
                 env: Default::default(),
@@ -83,8 +83,8 @@ impl baymax::Extension for HtmlExtension {
         };
         self.cached_binary_path = Some(server_path.clone());
 
-        Ok(baymax::Command {
-            command: baymax::node_binary_path()?,
+        Ok(sim::Command {
+            command: sim::node_binary_path()?,
             args: vec![server_path, "--stdio".to_string()],
             env: Default::default(),
         })
@@ -93,8 +93,8 @@ impl baymax::Extension for HtmlExtension {
     fn language_server_workspace_configuration(
         &mut self,
         server_id: &LanguageServerId,
-        worktree: &baymax::Worktree,
-    ) -> Result<Option<baymax::serde_json::Value>> {
+        worktree: &sim::Worktree,
+    ) -> Result<Option<sim::serde_json::Value>> {
         LspSettings::for_worktree(server_id.as_ref(), worktree)
             .map(|lsp_settings| lsp_settings.settings)
     }
@@ -109,4 +109,4 @@ impl baymax::Extension for HtmlExtension {
     }
 }
 
-baymax::register_extension!(HtmlExtension);
+sim::register_extension!(HtmlExtension);

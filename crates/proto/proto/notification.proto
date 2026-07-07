@@ -1,5 +1,5 @@
 syntax = "proto3";
-package baymax.messages;
+package sim.messages;
 
 message GetNotifications {
   optional uint64 before_id = 1;

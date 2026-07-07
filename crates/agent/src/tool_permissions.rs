@@ -317,7 +317,7 @@ impl ToolPermissionDecision {
                     // hidden sub-commands that bypass the allow patterns.
                     return ToolPermissionDecision::Deny(format!(
                         "The {} shell does not support \"always allow\" patterns for the terminal \
-                         tool because Baymax cannot parse its command chaining syntax. Please remove \
+                         tool because Sim cannot parse its command chaining syntax. Please remove \
                          the always_allow patterns from your tool_permissions settings, or switch \
                          to a POSIX-conforming shell.",
                         shell_kind
@@ -509,7 +509,7 @@ pub fn normalize_path(raw: &str) -> String {
     }
 }
 
-/// Decides permission by checking both the raw input path and a simplified/canonicalibaymax
+/// Decides permission by checking both the raw input path and a simplified/canonicalisim
 /// version. Returns the most restrictive decision (Deny > Confirm > Allow).
 pub fn decide_permission_for_paths(
     tool_name: &str,
@@ -562,7 +562,7 @@ mod tests {
     use crate::tools::{DeletePathTool, FetchTool, TerminalTool};
     use crate::{AgentTool, EditFileTool};
     use agent_settings::{
-        AgentProfileId, BaymaxMode, CompiledRegex, InvalidRegexPattern, ToolRules,
+        AgentProfileId, SimMode, CompiledRegex, InvalidRegexPattern, ToolRules,
     };
     use gpui::px;
     use settings::{DockPosition, NotifyWhenAgentWaiting, PlaySoundWhenAgentDone};
@@ -592,7 +592,7 @@ mod tests {
             play_sound_when_agent_done: PlaySoundWhenAgentDone::default(),
             single_file_review: false,
             model_parameters: vec![],
-            baymax_mode: BaymaxMode::default(),
+            sim_mode: SimMode::default(),
             auto_compact: agent_settings::AutoCompactSettings {
                 enabled: false,
                 strategy: agent_settings::AutoCompactStrategy::default(),
@@ -2269,15 +2269,15 @@ mod tests {
     #[test]
     fn normalize_path_collapses_dot_segments() {
         assert_eq!(
-            normalize_path("src/../.baymax/settings.json"),
-            ".baymax/settings.json"
+            normalize_path("src/../.sim/settings.json"),
+            ".sim/settings.json"
         );
         assert_eq!(normalize_path("a/b/../c"), "a/c");
         assert_eq!(normalize_path("a/./b/c"), "a/b/c");
         assert_eq!(normalize_path("a/b/./c/../d"), "a/b/d");
         assert_eq!(
-            normalize_path(".baymax/settings.json"),
-            ".baymax/settings.json"
+            normalize_path(".sim/settings.json"),
+            ".sim/settings.json"
         );
         assert_eq!(normalize_path("a/b/c"), "a/b/c");
     }
@@ -2350,8 +2350,8 @@ mod tests {
     fn decide_permission_for_path_denies_traversal_to_denied_dir() {
         let decision = path_perm(
             "copy_path",
-            "src/../.baymax/settings.json",
-            &["^\\.baymax/"],
+            "src/../.sim/settings.json",
+            &["^\\.sim/"],
             &[],
             &[],
         );
@@ -2362,10 +2362,10 @@ mod tests {
     fn decide_permission_for_path_confirms_traversal_to_confirmed_dir() {
         let decision = path_perm(
             "copy_path",
-            "src/../.baymax/settings.json",
+            "src/../.sim/settings.json",
             &[],
             &[],
-            &["^\\.baymax/"],
+            &["^\\.sim/"],
         );
         assert!(matches!(decision, ToolPermissionDecision::Confirm));
     }
@@ -2380,8 +2380,8 @@ mod tests {
     fn decide_permission_for_path_most_restrictive_wins() {
         let decision = path_perm(
             "copy_path",
-            "allowed/../.baymax/settings.json",
-            &["^\\.baymax/"],
+            "allowed/../.sim/settings.json",
+            &["^\\.sim/"],
             &["^allowed/"],
             &[],
         );
@@ -2392,8 +2392,8 @@ mod tests {
     fn decide_permission_for_path_dot_segment_only() {
         let decision = path_perm(
             "delete_path",
-            "./.baymax/settings.json",
-            &["^\\.baymax/"],
+            "./.sim/settings.json",
+            &["^\\.sim/"],
             &[],
             &[],
         );
@@ -2405,8 +2405,8 @@ mod tests {
         // When path has no `.` or `..` segments, behavior matches decide_permission_from_settings
         let decision = path_perm(
             "copy_path",
-            ".baymax/settings.json",
-            &["^\\.baymax/"],
+            ".sim/settings.json",
+            &["^\\.sim/"],
             &[],
             &[],
         );

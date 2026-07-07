@@ -6,8 +6,8 @@ use crate::{
     actions::{Format, FormatSelections},
     selections_collection::SelectionsCollection,
 };
-use baymax_actions::agent::AddSelectionToThread;
-use baymax_actions::preview::{
+use sim_actions::agent::AddSelectionToThread;
+use sim_actions::preview::{
     markdown::OpenPreview as OpenMarkdownPreview, svg::OpenPreview as OpenSvgPreview,
 };
 use gpui::prelude::FluentBuilder;

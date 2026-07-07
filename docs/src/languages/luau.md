@@ -1,21 +1,21 @@
 ---
 title: Luau
-description: "Configure Luau language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure Luau language support in Sim, including language servers, formatting, and debugging."
 ---
 
 # Luau
 
 [Luau](https://luau.org/) is a fast, small, safe, gradually typed, embeddable scripting language derived from Lua. Luau was developed by Roblox and is available under the MIT license.
 
-Luau language support in Baymax is provided by the community-maintained [Luau extension](https://github.com/4teapo/baymax-luau).
-Report issues to: [https://github.com/4teapo/baymax-luau/issues](https://github.com/4teapo/baymax-luau/issues)
+Luau language support in Sim is provided by the community-maintained [Luau extension](https://github.com/4teapo/sim-luau).
+Report issues to: [https://github.com/4teapo/sim-luau/issues](https://github.com/4teapo/sim-luau/issues)
 
 - Tree-sitter: [4teapo/tree-sitter-luau](https://github.com/4teapo/tree-sitter-luau)
 - Language Server: [JohnnyMorganz/luau-lsp](https://github.com/JohnnyMorganz/luau-lsp)
 
 ## Configuration
 
-Configuration instructions are available in the [Luau Baymax Extension README](https://github.com/4teapo/baymax-luau).
+Configuration instructions are available in the [Luau Sim Extension README](https://github.com/4teapo/sim-luau).
 
 ## Formatting
 
@@ -30,7 +30,7 @@ brew install stylua
 cargo install stylua --features lua52,lua53,lua54,luau
 ```
 
-Configure formatting in Settings ({#kb baymax::OpenSettings}) under Languages > Luau, or add to your settings file:
+Configure formatting in Settings ({#kb sim::OpenSettings}) under Languages > Luau, or add to your settings file:
 
 ```json [settings]
   "languages": {

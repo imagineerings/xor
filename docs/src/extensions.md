@@ -1,11 +1,11 @@
 ---
 title: Extensions
-description: "Extend Baymax with themes, language support, AI tools, and more through the extension system."
+description: "Extend Sim with themes, language support, AI tools, and more through the extension system."
 ---
 
 # Extensions
 
-Baymax lets you add new functionality using user-defined extensions.
+Sim lets you add new functionality using user-defined extensions.
 
 - [Installing Extensions](./extensions/installing-extensions.md)
 - [Extension Capabilities](./extensions/capabilities.md)

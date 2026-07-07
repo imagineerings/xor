@@ -2,7 +2,7 @@
 
 ## Overview
 
-Implement the OIDC proxy (Cloudflare Worker), OAuth token persistence via keyring, and OAuth device flow support, extending baymax's existing `crates/oauth_callback_server/`.
+Implement the OIDC proxy (Cloudflare Worker), OAuth token persistence via keyring, and OAuth device flow support, extending sim's existing `crates/oauth_callback_server/`.
 
 ## Tasks
 
@@ -54,6 +54,6 @@ Implement the OIDC proxy (Cloudflare Worker), OAuth token persistence via keyrin
 
 ## Notes
 
-- The OIDC proxy is a separate deployment (Cloudflare Worker), not compiled into baymax
+- The OIDC proxy is a separate deployment (Cloudflare Worker), not compiled into sim
 - OAuth device flow is the primary auth method for CLI/TUI users
 - Token persistence ensures users don't re-authenticate on every app restart

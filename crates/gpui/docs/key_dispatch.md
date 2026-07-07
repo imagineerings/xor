@@ -85,7 +85,7 @@ Now you can target your context in the keymap. Note how actions are identified i
 }
 ```
 
-If you had opted for the more complex type definition, you'd provide the serialibaymax representation of the action alongside the name:
+If you had opted for the more complex type definition, you'd provide the serialisim representation of the action alongside the name:
 
 ```json
 {

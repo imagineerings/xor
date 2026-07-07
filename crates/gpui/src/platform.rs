@@ -92,7 +92,7 @@ pub use visual_test::VisualTestPlatform;
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
 #[inline]
 pub fn guess_compositor() -> &'static str {
-    if std::env::var_os("BAYMAX_HEADLESS").is_some() {
+    if std::env::var_os("SIM_HEADLESS").is_some() {
         return "Headless";
     }
 
@@ -476,7 +476,7 @@ pub struct WindowButtonLayout {
 
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
 impl WindowButtonLayout {
-    /// Returns Baymax's built-in fallback button layout for Linux titlebars.
+    /// Returns Sim's built-in fallback button layout for Linux titlebars.
     pub fn linux_default() -> Self {
         Self {
             left: [None; MAX_BUTTONS_PER_SIDE],
@@ -493,7 +493,7 @@ impl WindowButtonLayout {
         fn parse_side(
             s: &str,
             seen_buttons: &mut [bool; MAX_BUTTONS_PER_SIDE],
-            unrecognibaymax: &mut Vec<String>,
+            unrecognisim: &mut Vec<String>,
         ) -> [Option<WindowButton>; MAX_BUTTONS_PER_SIDE] {
             let mut result = [None; MAX_BUTTONS_PER_SIDE];
             let mut i = 0;
@@ -507,7 +507,7 @@ impl WindowButtonLayout {
                     "maximize" => Some(WindowButton::Maximize),
                     "close" => Some(WindowButton::Close),
                     other => {
-                        unrecognibaymax.push(other.to_string());
+                        unrecognisim.push(other.to_string());
                         None
                     }
                 };
@@ -526,21 +526,21 @@ impl WindowButtonLayout {
         }
 
         let (left_str, right_str) = layout_string.split_once(':').unwrap_or(("", layout_string));
-        let mut unrecognibaymax = Vec::new();
+        let mut unrecognisim = Vec::new();
         let mut seen_buttons = [false; MAX_BUTTONS_PER_SIDE];
         let layout = Self {
-            left: parse_side(left_str, &mut seen_buttons, &mut unrecognibaymax),
-            right: parse_side(right_str, &mut seen_buttons, &mut unrecognibaymax),
+            left: parse_side(left_str, &mut seen_buttons, &mut unrecognisim),
+            right: parse_side(right_str, &mut seen_buttons, &mut unrecognisim),
         };
 
-        if !unrecognibaymax.is_empty()
+        if !unrecognisim.is_empty()
             && layout.left.iter().all(Option::is_none)
             && layout.right.iter().all(Option::is_none)
         {
             bail!(
-                "button layout string {:?} contains no valid buttons (unrecognibaymax: {})",
+                "button layout string {:?} contains no valid buttons (unrecognisim: {})",
                 layout_string,
-                unrecognibaymax.join(", ")
+                unrecognisim.join(", ")
             );
         }
 
@@ -1361,7 +1361,7 @@ pub struct UTF16Selection {
     pub reversed: bool,
 }
 
-/// Baymax's interface for handling text input from the platform's IME system
+/// Sim's interface for handling text input from the platform's IME system
 /// This is currently a 1:1 exposure of the NSTextInputClient API:
 ///
 /// <https://developer.apple.com/documentation/appkit/nstextinputclient>

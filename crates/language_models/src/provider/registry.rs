@@ -100,7 +100,7 @@ impl ProviderRegistry {
             credentials_provider: self.credentials_provider.clone(),
         };
 
-        // ── Cloud (baymax.dev) ──────────────────────────────────────────
+        // ── Cloud (sim.dev) ──────────────────────────────────────────
         // (needs user_store, done separately in language_models::init)
         //
         // ── NanoGPT ────────────────────────────────────────────────────

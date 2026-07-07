@@ -12,7 +12,7 @@ pub(crate) fn use_clang(job: Job) -> Job {
         .add_env(Env::new("CXX", "clang++"))
 }
 
-const SCCACHE_R2_BUCKET: &str = "sccache-baymax";
+const SCCACHE_R2_BUCKET: &str = "sccache-sim";
 
 pub(crate) const BASH_SHELL: &str = "bash -euxo pipefail {0}";
 // https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idstepsshell
@@ -345,7 +345,7 @@ pub struct NamedJob<J: JobType = RunJob> {
 // }
 
 pub(crate) const DEFAULT_REPOSITORY_OWNER_GUARD: &str =
-    "(github.repository_owner == 'simtropolis' || github.repository_owner == 'baymax-extensions')";
+    "(github.repository_owner == 'simtropolis' || github.repository_owner == 'sim-extensions')";
 
 pub fn repository_owner_guard_expression(trigger_always: bool) -> Expression {
     Expression::new(format!(
@@ -531,8 +531,8 @@ pub mod named {
     }
 }
 
-const BAYMAX_ZIPPY_GIT_USER_NAME: &str = "baymax-zippy[bot]";
-const BAYMAX_ZIPPY_GIT_USER_EMAIL: &str = "234243425+baymax-zippy[bot]@users.noreply.github.com";
+const SIM_ZIPPY_GIT_USER_NAME: &str = "sim-zippy[bot]";
+const SIM_ZIPPY_GIT_USER_EMAIL: &str = "234243425+sim-zippy[bot]@users.noreply.github.com";
 
 pub(crate) trait ZippyGitIdentity {
     fn with_zippy_git_identity(self) -> Self;
@@ -540,10 +540,10 @@ pub(crate) trait ZippyGitIdentity {
 
 impl ZippyGitIdentity for Step<Run> {
     fn with_zippy_git_identity(self) -> Self {
-        self.add_env(("GIT_AUTHOR_NAME", BAYMAX_ZIPPY_GIT_USER_NAME))
-            .add_env(("GIT_AUTHOR_EMAIL", BAYMAX_ZIPPY_GIT_USER_EMAIL))
-            .add_env(("GIT_COMMITTER_NAME", BAYMAX_ZIPPY_GIT_USER_NAME))
-            .add_env(("GIT_COMMITTER_EMAIL", BAYMAX_ZIPPY_GIT_USER_EMAIL))
+        self.add_env(("GIT_AUTHOR_NAME", SIM_ZIPPY_GIT_USER_NAME))
+            .add_env(("GIT_AUTHOR_EMAIL", SIM_ZIPPY_GIT_USER_EMAIL))
+            .add_env(("GIT_COMMITTER_NAME", SIM_ZIPPY_GIT_USER_NAME))
+            .add_env(("GIT_COMMITTER_EMAIL", SIM_ZIPPY_GIT_USER_EMAIL))
     }
 }
 
@@ -875,8 +875,8 @@ pub(crate) fn generate_token<'a>(
 
 pub fn authenticate_as_zippy() -> GenerateAppToken<'static> {
     generate_token_with_job_name(
-        vars::BAYMAX_ZIPPY_APP_ID,
-        vars::BAYMAX_ZIPPY_APP_PRIVATE_KEY,
+        vars::SIM_ZIPPY_APP_ID,
+        vars::SIM_ZIPPY_APP_PRIVATE_KEY,
     )
 }
 
@@ -1054,8 +1054,8 @@ pub(crate) fn update_ref(
     }
 }
 
-const BAYMAX_ZIPPY_COMMITTER: &str =
-    "baymax-zippy[bot] <234243425+baymax-zippy[bot]@users.noreply.github.com>";
+const SIM_ZIPPY_COMMITTER: &str =
+    "sim-zippy[bot] <234243425+sim-zippy[bot]@users.noreply.github.com>";
 
 pub(crate) struct CreatePrStep {
     title: String,
@@ -1123,8 +1123,8 @@ impl From<CreatePrStep> for Step<Use> {
             .add_with(("body", step.body))
             .add_with(("commit-message", step.title))
             .add_with(("branch", step.branch))
-            .add_with(("committer", BAYMAX_ZIPPY_COMMITTER))
-            .add_with(("author", BAYMAX_ZIPPY_COMMITTER))
+            .add_with(("committer", SIM_ZIPPY_COMMITTER))
+            .add_with(("author", SIM_ZIPPY_COMMITTER))
             .add_with(("base", step.base))
             .add_with(("delete-branch", true))
             .add_with(("token", step.token))

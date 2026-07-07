@@ -1,6 +1,6 @@
 pub mod running;
 
-use crate::{persistence::SerialibaymaxLayout, session::running::DebugTerminal};
+use crate::{persistence::SerialisimLayout, session::running::DebugTerminal};
 use dap::client::SessionId;
 use gpui::{App, Axis, Entity, EventEmitter, FocusHandle, Focusable, Task, WeakEntity};
 use project::debugger::session::Session;
@@ -26,7 +26,7 @@ impl DebugSession {
         workspace: WeakEntity<Workspace>,
         parent_terminal: Option<Entity<DebugTerminal>>,
         session: Entity<Session>,
-        serialibaymax_layout: Option<SerialibaymaxLayout>,
+        serialisim_layout: Option<SerialisimLayout>,
         dock_axis: Axis,
         window: &mut Window,
         cx: &mut App,
@@ -37,7 +37,7 @@ impl DebugSession {
                 project.clone(),
                 workspace.clone(),
                 parent_terminal,
-                serialibaymax_layout,
+                serialisim_layout,
                 dock_axis,
                 window,
                 cx,

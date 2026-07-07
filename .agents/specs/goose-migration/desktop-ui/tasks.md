@@ -2,7 +2,7 @@
 
 ## Overview
 
-Build GPUI-native views for recipe browsing, scheduling, diagnostics, shared sessions, and ACP connection status within baymax's existing desktop UI architecture. No Electron/React code is ported — all UI is native GPUI.
+Build GPUI-native views for recipe browsing, scheduling, diagnostics, shared sessions, and ACP connection status within sim's existing desktop UI architecture. No Electron/React code is ported — all UI is native GPUI.
 
 ## Repo Reconciliation
 
@@ -48,9 +48,9 @@ Build GPUI-native views for recipe browsing, scheduling, diagnostics, shared ses
 - [ ] 5. Implement shared session support
   - Export session as shareable data (serialized JSON)
   - Import session from deeplink or file
-  - Deeplink handler integration with `parse_baymax_link`
+  - Deeplink handler integration with `parse_sim_link`
   - _Requirements: 5_
-  - _writes: crates/agent/src/shared_session.rs, crates/baymax/src/baymax/shared_session_handler.rs_
+  - _writes: crates/agent/src/shared_session.rs, crates/sim/src/sim/shared_session_handler.rs_
 
 - [ ] 6. Integrate desktop UI features into the agent panel
   - Add recipe browser button/tab to agent panel header
@@ -61,7 +61,7 @@ Build GPUI-native views for recipe browsing, scheduling, diagnostics, shared ses
   - _writes: crates/agent_ui/src/agent_panel.rs (modifications)_
 
 - [ ] 7. Implement i18n support (if not already present)
-  - Evaluate baymax's existing i18n state
+  - Evaluate sim's existing i18n state
   - If absent, introduce lightweight i18n system
   - Mark user-facing strings for translation
   - _Requirements: 9_

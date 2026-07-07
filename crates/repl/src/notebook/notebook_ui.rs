@@ -38,8 +38,8 @@ use crate::kernels::{
 use crate::notebook::MovementDirection;
 use crate::repl_store::ReplStore;
 
-use baymax_actions::editor::{MoveDown, MoveUp};
-use baymax_actions::notebook::{
+use sim_actions::editor::{MoveDown, MoveUp};
+use sim_actions::notebook::{
     AddCodeBlock, AddMarkdownBlock, ClearOutputs, EnterCommandMode, EnterEditMode, InterruptKernel,
     MoveCellDown, MoveCellUp, NotebookMoveDown, NotebookMoveUp, OpenNotebook, RestartKernel, Run,
     RunAll, RunAndAdvance,
@@ -80,7 +80,7 @@ pub fn init(cx: &mut App) {
                 workspace::register_project_item::<NotebookEditor>(cx);
             } else {
                 // todo: there is no way to unregister a project item, so if the feature flag
-                // gets turned off they need to restart Baymax.
+                // gets turned off they need to restart Sim.
             }
         }
     })

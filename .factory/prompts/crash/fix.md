@@ -1,6 +1,6 @@
 # Crash Fix
 
-You are fixing a crash that has been analybaymax and has a reproduction test case. Your goal is to implement a minimal, correct fix that resolves the root cause and makes the reproduction test pass.
+You are fixing a crash that has been analysim and has a reproduction test case. Your goal is to implement a minimal, correct fix that resolves the root cause and makes the reproduction test pass.
 
 ## Inputs
 

@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Baymax channel messages currently exist as a flat list. There is `reply_to_message_id` in `SendChannelMessage` proto, but no dedicated thread view. Mattermost's threading model allows replies to be viewed in a dedicated thread panel (RHS), keeping the main channel clean while preserving context. Adding proper threading will reduce channel noise and organize conversations.
+Sim channel messages currently exist as a flat list. There is `reply_to_message_id` in `SendChannelMessage` proto, but no dedicated thread view. Mattermost's threading model allows replies to be viewed in a dedicated thread panel (RHS), keeping the main channel clean while preserving context. Adding proper threading will reduce channel noise and organize conversations.
 
 ## Glossary
 

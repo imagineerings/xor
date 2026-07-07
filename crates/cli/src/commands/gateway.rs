@@ -23,7 +23,7 @@ enum GatewayCommand {
         #[arg(long = "token", env = "TELEGRAM_BOT_TOKEN")]
         token: String,
     },
-    /// Manage user pairings (link platform users to baymax users).
+    /// Manage user pairings (link platform users to sim users).
     Pair {
         #[command(subcommand)]
         subcmd: PairCommand,
@@ -36,8 +36,8 @@ enum PairCommand {
     Add {
         /// Platform user ID (e.g., tg:123456789)
         platform_id: String,
-        /// Baymax user identity
-        baymax_user: String,
+        /// Sim user identity
+        sim_user: String,
     },
     /// Remove an existing pairing.
     Remove {
@@ -81,11 +81,11 @@ fn cmd_help() -> Result<()> {
     println!("  TELEGRAM_BOT_TOKEN  Telegram bot token (required for Telegram gateway)");
     println!();
     println!("Commands:");
-    println!("  baymax gateway status           Show configuration status");
-    println!("  baymax gateway start --token <token>  Start Telegram gateway");
-    println!("  baymax gateway pair add <platform_id> <baymax_user>   Link platform user");
-    println!("  baymax gateway pair remove <platform_id>               Unlink platform user");
-    println!("  baymax gateway pair list         List all pairings");
+    println!("  sim gateway status           Show configuration status");
+    println!("  sim gateway start --token <token>  Start Telegram gateway");
+    println!("  sim gateway pair add <platform_id> <sim_user>   Link platform user");
+    println!("  sim gateway pair remove <platform_id>               Unlink platform user");
+    println!("  sim gateway pair list         List all pairings");
     Ok(())
 }
 
@@ -97,7 +97,7 @@ fn cmd_start(token: &str) -> Result<()> {
     println!("Gateway running in foreground. Press Ctrl+C to stop.");
     println!();
     println!("NOTE: Full gateway startup requires integration with the");
-    println!("baymax app. This command validates the configuration.");
+    println!("sim app. This command validates the configuration.");
     Ok(())
 }
 
@@ -107,11 +107,11 @@ fn cmd_pair(subcmd: PairCommand) -> Result<()> {
     match subcmd {
         PairCommand::Add {
             platform_id,
-            baymax_user,
+            sim_user,
         } => {
             let mut service = PairingService::with_storage(&pairing_path);
-            service.pair_platform_user(&platform_id, &baymax_user)?;
-            println!("✓ Paired {} -> {}", platform_id, baymax_user);
+            service.pair_platform_user(&platform_id, &sim_user)?;
+            println!("✓ Paired {} -> {}", platform_id, sim_user);
         }
         PairCommand::Remove { platform_id } => {
             let mut service = PairingService::with_storage(&pairing_path);
@@ -128,8 +128,8 @@ fn cmd_pair(subcmd: PairCommand) -> Result<()> {
                 println!("No active pairings");
             } else {
                 println!("Active pairings ({}):", service.count());
-                for (platform_id, baymax_user) in service.store() {
-                    println!("  {} -> {}", platform_id, baymax_user);
+                for (platform_id, sim_user) in service.store() {
+                    println!("  {} -> {}", platform_id, sim_user);
                 }
             }
         }

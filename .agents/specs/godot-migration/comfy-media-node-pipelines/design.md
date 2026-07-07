@@ -2,7 +2,7 @@
 
 ## Overview
 
-Media node support is organized as harness capability groups rather than one-off ports of every Python file. Each group maps Comfy node IDs to Baymax media, artifact, model, and graph interfaces. This avoids duplicating preview, mesh, codec, and graph-editor infrastructure while preserving node-level workflow compatibility.
+Media node support is organized as harness capability groups rather than one-off ports of every Python file. Each group maps Comfy node IDs to Sim media, artifact, model, and graph interfaces. This avoids duplicating preview, mesh, codec, and graph-editor infrastructure while preserving node-level workflow compatibility.
 
 ## Architecture
 
@@ -14,7 +14,7 @@ flowchart TD
     Registry --> ThreeD[ThreeDGeometryOps]
     Registry --> Analysis[AnalysisControlOps]
     Registry --> Utilities[UtilityOps]
-    Images --> Media[Baymax Media Services]
+    Images --> Media[Sim Media Services]
     Video --> Media
     Audio --> Media
     ThreeD --> Mesh[mesh-generation-pipeline]
@@ -25,7 +25,7 @@ flowchart TD
 
 ### MediaNodeCapabilityRegistry
 
-- **Purpose**: Map Comfy media nodes to Baymax capability groups and backend requirements.
+- **Purpose**: Map Comfy media nodes to Sim capability groups and backend requirements.
 - **Responsibilities**: Capability metadata, unsupported diagnostics, dependency review flags, developer-only flags, and node schema linkage.
 
 ### ImageMaskOps
@@ -45,7 +45,7 @@ flowchart TD
 
 ### ThreeDGeometryOps
 
-- **Purpose**: Bridge 3D, geometry, point cloud, and Gaussian splat nodes to Baymax 3D artifacts.
+- **Purpose**: Bridge 3D, geometry, point cloud, and Gaussian splat nodes to Sim 3D artifacts.
 - **Responsibilities**: Artifact registration, preview metadata, mesh delegation, and format diagnostics.
 
 ### AnalysisControlOps

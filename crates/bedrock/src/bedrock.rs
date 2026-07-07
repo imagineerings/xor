@@ -61,7 +61,7 @@ pub async fn stream_completion(
                 ("type".to_string(), Document::String("adaptive".to_string())),
                 (
                     "display".to_string(),
-                    Document::String("summaribaymax".to_string()),
+                    Document::String("summarisim".to_string()),
                 ),
             ]);
             additional_fields.insert("thinking".to_string(), Document::from(thinking_config));

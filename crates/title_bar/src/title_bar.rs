@@ -23,7 +23,7 @@ use crate::application_menu::{
 
 use auto_update::AutoUpdateStatus;
 use call::ActiveCall;
-use client::{Client, UserStore, baymax_urls};
+use client::{Client, UserStore, sim_urls};
 use command_palette_hooks::CommandPaletteFilter;
 
 use gpui::{
@@ -56,7 +56,7 @@ use workspace::{
     notifications::{NotifyResultExt, NotifyTaskExt as _},
 };
 
-use baymax_actions::OpenRemote;
+use sim_actions::OpenRemote;
 
 pub use onboarding_banner::restore_banner;
 
@@ -445,7 +445,7 @@ impl TitleBar {
         let platform_style = PlatformStyle::platform();
         let application_menu = match platform_style {
             PlatformStyle::Mac => {
-                if option_env!("BAYMAX_USE_CROSS_PLATFORM_MENU").is_some() {
+                if option_env!("SIM_USE_CROSS_PLATFORM_MENU").is_some() {
                     Some(cx.new(|cx| ApplicationMenu::new(window, cx)))
                 } else {
                     None
@@ -834,7 +834,7 @@ impl TitleBar {
                 move |_window, cx| {
                     Tooltip::for_action(
                         "Recent Projects",
-                        &baymax_actions::OpenRecent::default(),
+                        &sim_actions::OpenRecent::default(),
                         cx,
                     )
                 },
@@ -889,7 +889,7 @@ impl TitleBar {
                 move |_window, cx| {
                     Tooltip::for_action(
                         "Recent Projects",
-                        &baymax_actions::OpenRecent::default(),
+                        &sim_actions::OpenRecent::default(),
                         cx,
                     )
                 },
@@ -993,7 +993,7 @@ impl TitleBar {
                     move |_window, cx| {
                         Tooltip::with_meta(
                             "Worktree",
-                            Some(&baymax_actions::git::Worktree),
+                            Some(&sim_actions::git::Worktree),
                             format!("Currently In Use: {}", worktree_label),
                             cx,
                         )
@@ -1051,7 +1051,7 @@ impl TitleBar {
                         };
                         Tooltip::with_meta(
                             "Branch & Stash",
-                            Some(&baymax_actions::git::Branch),
+                            Some(&sim_actions::git::Branch),
                             meta,
                             cx,
                         )
@@ -1149,14 +1149,14 @@ impl TitleBar {
                 let auto_updater = auto_update::AutoUpdater::get(cx);
                 let label = match auto_updater.map(|auto_update| auto_update.read(cx).status()) {
                     Some(AutoUpdateStatus::Updated { .. }) => {
-                        "Please restart Baymax to Collaborate"
+                        "Please restart Sim to Collaborate"
                     }
                     Some(AutoUpdateStatus::Installing { .. })
                     | Some(AutoUpdateStatus::Downloading { .. })
                     | Some(AutoUpdateStatus::Checking) => "Updating...",
                     Some(AutoUpdateStatus::Idle)
                     | Some(AutoUpdateStatus::Errored { .. })
-                    | None => "Please update Baymax to Collaborate",
+                    | None => "Please update Sim to Collaborate",
                 };
 
                 Some(
@@ -1282,7 +1282,7 @@ impl TitleBar {
                                     .into_any_element()
                             },
                             move |_, cx| {
-                                cx.open_url(&baymax_urls::account_url(cx));
+                                cx.open_url(&sim_urls::account_url(cx));
                             },
                         )
                         .separator()
@@ -1295,7 +1295,7 @@ impl TitleBar {
                                     .gap_1()
                                     .justify_between()
                                     .child(
-                                        Label::new("Restart to update Baymax").color(Color::Accent),
+                                        Label::new("Restart to update Sim").color(Color::Accent),
                                     )
                                     .child(
                                         Icon::new(IconName::Download)
@@ -1364,19 +1364,19 @@ impl TitleBar {
 
                         this.separator()
                     })
-                    .action("Settings", baymax_actions::OpenSettings.boxed_clone())
-                    .action("Keymap", Box::new(baymax_actions::OpenKeymap))
+                    .action("Settings", sim_actions::OpenSettings.boxed_clone())
+                    .action("Keymap", Box::new(sim_actions::OpenKeymap))
                     .action(
                         "Themes…",
-                        baymax_actions::theme_selector::Toggle::default().boxed_clone(),
+                        sim_actions::theme_selector::Toggle::default().boxed_clone(),
                     )
                     .action(
                         "Icon Themes…",
-                        baymax_actions::icon_theme_selector::Toggle::default().boxed_clone(),
+                        sim_actions::icon_theme_selector::Toggle::default().boxed_clone(),
                     )
                     .action(
                         "Extensions",
-                        baymax_actions::Extensions::default().boxed_clone(),
+                        sim_actions::Extensions::default().boxed_clone(),
                     )
                     .when(ai_enabled, |menu| {
                         menu.separator()

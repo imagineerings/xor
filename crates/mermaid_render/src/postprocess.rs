@@ -1,4 +1,4 @@
-//! Baymax-specific post-processing of [`merman`]-produced SVGs.
+//! Sim-specific post-processing of [`merman`]-produced SVGs.
 //!
 //! Each submodule is a specific pass that tweaks the SVG event iterator in a particular way.
 //!
@@ -25,7 +25,7 @@ use crate::MermaidTheme;
 
 pub(super) fn postprocess(svg: &str, theme: &MermaidTheme) -> Result<String> {
     // merman 0.6 already applies the generic resvg-safe cleanup before this point.
-    // The remaining passes are Baymax-specific theme and accent adjustments.
+    // The remaining passes are Sim-specific theme and accent adjustments.
     let svg_id = extract_svg_id(svg);
 
     let mut reader = Reader::from_str(svg);

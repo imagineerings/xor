@@ -82,11 +82,11 @@ pub fn meta_with_tool_name(tool_name: &str) -> acp::Meta {
 pub const COMMAND_CATEGORY_META_KEY: &str = "command_category";
 
 /// The source category of a slash command, used to group commands in the
-/// completion popup. Only the native Baymax agent annotates its commands; commands
+/// completion popup. Only the native Sim agent annotates its commands; commands
 /// from external ACP agents carry no category and are grouped on their own.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CommandCategory {
-    /// Built-in Baymax agent commands (e.g. `/compact`).
+    /// Built-in Sim agent commands (e.g. `/compact`).
     Native,
     /// Commands sourced from MCP server prompts.
     Mcp,
@@ -1063,7 +1063,7 @@ impl ToolCallContent {
                 ))))
             }
             acp::ToolCallContent::Diff(diff) => Ok(Some(Self::Diff(cx.new(|cx| {
-                Diff::finalibaymax(
+                Diff::finalisim(
                     diff.path.to_string_lossy().into_owned(),
                     diff.old_text,
                     diff.new_text,
@@ -1264,7 +1264,7 @@ pub const TOKEN_USAGE_WARNING_THRESHOLD: f32 = 0.8;
 impl TokenUsage {
     pub fn ratio(&self) -> TokenUsageRatio {
         #[cfg(debug_assertions)]
-        let warning_threshold: f32 = std::env::var("BAYMAX_THREAD_WARNING_THRESHOLD")
+        let warning_threshold: f32 = std::env::var("SIM_THREAD_WARNING_THRESHOLD")
             .unwrap_or(TOKEN_USAGE_WARNING_THRESHOLD.to_string())
             .parse()
             .unwrap();
@@ -4045,7 +4045,7 @@ mod tests {
             .unwrap();
 
         thread
-            .update(cx, |thread, cx| thread.send_raw("Hello from Baymax!", cx))
+            .update(cx, |thread, cx| thread.send_raw("Hello from Sim!", cx))
             .await
             .unwrap();
 
@@ -4055,7 +4055,7 @@ mod tests {
             indoc! {r#"
             ## User
 
-            Hello from Baymax!
+            Hello from Sim!
 
             ## Assistant
 
@@ -4179,12 +4179,12 @@ mod tests {
             .unwrap();
 
         thread
-            .update(cx, |thread, cx| thread.send_raw("Hello from Baymax!", cx))
+            .update(cx, |thread, cx| thread.send_raw("Hello from Sim!", cx))
             .await
             .unwrap();
 
         let output = thread.read_with(cx, |thread, cx| thread.to_markdown(cx));
-        assert_eq!(output.matches("Hello from Baymax!").count(), 1);
+        assert_eq!(output.matches("Hello from Sim!").count(), 1);
     }
 
     #[gpui::test]
@@ -6474,7 +6474,7 @@ mod tests {
     /// the outer task observes `rx.await` returning `Err(Cancelled)` and
     /// must still clear `running_turn` so the panel transitions out of
     /// `Generating`. Without this, the agent thread is wedged in the
-    /// loading state until Baymax restarts.
+    /// loading state until Sim restarts.
     #[gpui::test]
     async fn test_running_turn_cleared_when_send_task_dropped(cx: &mut TestAppContext) {
         init_test(cx);

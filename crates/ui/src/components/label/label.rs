@@ -328,8 +328,8 @@ mod tests {
 
     #[test]
     fn test_parse_backtick_spans_single_span() {
-        let (text, ranges) = parse_backtick_spans("use `baymax` to open").unwrap();
-        assert_eq!(text.as_ref(), "use baymax to open");
+        let (text, ranges) = parse_backtick_spans("use `sim` to open").unwrap();
+        assert_eq!(text.as_ref(), "use sim to open");
         assert_eq!(ranges, vec![4..10]);
     }
 
@@ -373,7 +373,7 @@ impl Component for Label {
                         vec![
                             single_example("Default", Label::new("Project Explorer").into_any_element()),
                             single_example("Small", Label::new("File: main.rs").size(LabelSize::Small).into_any_element()),
-                            single_example("Large", Label::new("Welcome to Baymax").size(LabelSize::Large).into_any_element()),
+                            single_example("Large", Label::new("Welcome to Sim").size(LabelSize::Large).into_any_element()),
                         ],
                     ),
                     example_group_with_title(
@@ -407,7 +407,7 @@ impl Component for Label {
                         vec![
                             single_example("Single Line", Label::new("Line 1\nLine 2\nLine 3").single_line().into_any_element()),
                             single_example("Regular Truncation", div().max_w_24().child(Label::new("This is a very long file name that should be truncated: very_long_file_name_with_many_words.rs").truncate()).into_any_element()),
-                            single_example("Start Truncation", div().max_w_24().child(Label::new("baymax/crates/ui/src/components/label/truncate/label/label.rs").truncate_start()).into_any_element()),
+                            single_example("Start Truncation", div().max_w_24().child(Label::new("sim/crates/ui/src/components/label/truncate/label/label.rs").truncate_start()).into_any_element()),
                         ],
                     ),
                 ])

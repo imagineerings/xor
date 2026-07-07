@@ -1,6 +1,6 @@
 use crate::{Channel, ChannelStore};
 use anyhow::Result;
-use client::{BAYMAX_ALWAYS_ACTIVE, ChannelId, Client, Collaborator, UserStore};
+use client::{SIM_ALWAYS_ACTIVE, ChannelId, Client, Collaborator, UserStore};
 use collections::HashMap;
 use gpui::{App, AppContext as _, AsyncApp, Context, Entity, EventEmitter, Task};
 use language::proto::serialize_version;
@@ -204,7 +204,7 @@ impl ChannelBuffer {
                 operation,
                 is_local: true,
             } => {
-                if *BAYMAX_ALWAYS_ACTIVE
+                if *SIM_ALWAYS_ACTIVE
                     && let language::Operation::UpdateSelections { selections, .. } = operation
                     && selections.is_empty()
                 {

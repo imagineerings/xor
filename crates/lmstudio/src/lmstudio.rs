@@ -370,10 +370,10 @@ pub async fn complete(
         request_builder = request_builder.header("Authorization", format!("Bearer {}", api_key));
     }
 
-    let serialibaymax_request = serde_json::to_string(&request)?;
+    let serialisim_request = serde_json::to_string(&request)?;
     let request = request_builder
         .extra_headers(extra_headers)
-        .body(AsyncBody::from(serialibaymax_request))?;
+        .body(AsyncBody::from(serialisim_request))?;
 
     let mut response = client.send(request).await?;
     if response.status().is_success() {
@@ -500,7 +500,7 @@ mod tests {
         };
 
         let json = serde_json::to_string(&image_part).unwrap();
-        println!("Serialibaymax image part: {}", json);
+        println!("Serialisim image part: {}", json);
 
         // Verify the structure matches what LM Studio expects
         let expected_structure = r#"{"type":"image_url","image_url":{"url":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="}}"#;
@@ -514,7 +514,7 @@ mod tests {
         };
 
         let json = serde_json::to_string(&text_part).unwrap();
-        println!("Serialibaymax text part: {}", json);
+        println!("Serialisim text part: {}", json);
 
         let expected_structure = r#"{"type":"text","text":"Hello, world!"}"#;
         assert_eq!(json, expected_structure);

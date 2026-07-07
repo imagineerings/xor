@@ -255,7 +255,7 @@ pub fn make_get_authenticated_user_response(
         plans_by_organization: BTreeMap::new(),
         configuration_by_organization: BTreeMap::new(),
         plan: PlanInfo {
-            plan: KnownOrUnknown::Known(Plan::BaymaxPro),
+            plan: KnownOrUnknown::Known(Plan::SimPro),
             subscription_period: None,
             usage: CurrentUsage {
                 edit_predictions: UsageData {

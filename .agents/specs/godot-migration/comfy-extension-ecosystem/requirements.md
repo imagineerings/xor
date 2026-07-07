@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Baymax needs a controlled harness extension path for Comfy custom nodes, extension web assets, translations, example workflows, prestartup scripts, and ComfyUI-Manager-like package metadata. Custom node discovery is part of the world-model harness feature surface, but execution remains policy-gated. This spec owns extension discovery and policy. It delegates executable node runtime to `comfy-graph-node-runtime/`, provider calls to `comfy-api-provider-nodes/`, and packaging/dependency installation to `comfy-packaging-quality/`.
+Sim needs a controlled harness extension path for Comfy custom nodes, extension web assets, translations, example workflows, prestartup scripts, and ComfyUI-Manager-like package metadata. Custom node discovery is part of the world-model harness feature surface, but execution remains policy-gated. This spec owns extension discovery and policy. It delegates executable node runtime to `comfy-graph-node-runtime/`, provider calls to `comfy-api-provider-nodes/`, and packaging/dependency installation to `comfy-packaging-quality/`.
 
 ## Glossary
 
@@ -16,7 +16,7 @@ Baymax needs a controlled harness extension path for Comfy custom nodes, extensi
 
 ### Requirement 1: Extension Discovery
 
-**User Story:** As a user, I want Baymax to discover installed Comfy custom node packs while keeping them isolated and diagnosable.
+**User Story:** As a user, I want Sim to discover installed Comfy custom node packs while keeping them isolated and diagnosable.
 
 #### Acceptance Criteria
 
@@ -33,7 +33,7 @@ Baymax needs a controlled harness extension path for Comfy custom nodes, extensi
 
 2.1 WHEN a node pack exposes `NODE_CLASS_MAPPINGS` THEN THE system SHALL register supported node classes and display names.
 2.2 WHEN a node pack exposes a modern extension entrypoint THEN THE system SHALL call it through the approved runtime boundary and register returned node schemas.
-2.3 WHEN a node pack declares a web directory THEN THE system SHALL serve static assets through Baymax's extension asset service with safe path confinement.
+2.3 WHEN a node pack declares a web directory THEN THE system SHALL serve static assets through Sim's extension asset service with safe path confinement.
 2.4 IF a node pack lacks a supported registration mechanism THEN THE system SHALL skip it with a diagnostic.
 
 ### Requirement 3: Startup Scripts and Dependency Policy
@@ -43,12 +43,12 @@ Baymax needs a controlled harness extension path for Comfy custom nodes, extensi
 #### Acceptance Criteria
 
 3.1 WHEN a prestartup script exists THEN THE system SHALL execute it only if extension policy allows scripts for that pack.
-3.2 WHEN a prestartup or import script changes global hooks or runtime state THEN THE system SHALL restore protected Baymax hooks after loading.
+3.2 WHEN a prestartup or import script changes global hooks or runtime state THEN THE system SHALL restore protected Sim hooks after loading.
 3.3 IF an extension requires missing dependencies THEN THE system SHALL report installation instructions without silently installing packages.
 
 ### Requirement 4: Translations, Templates, and Subgraphs
 
-**User Story:** As a frontend user, I want custom node translations, templates, and subgraphs available in Baymax.
+**User Story:** As a frontend user, I want custom node translations, templates, and subgraphs available in Sim.
 
 #### Acceptance Criteria
 
@@ -62,6 +62,6 @@ Baymax needs a controlled harness extension path for Comfy custom nodes, extensi
 
 #### Acceptance Criteria
 
-5.1 WHEN manager integration is enabled THEN THE system SHALL expose manager status and policy metadata through Baymax-approved routes or tools.
+5.1 WHEN manager integration is enabled THEN THE system SHALL expose manager status and policy metadata through Sim-approved routes or tools.
 5.2 IF manager UI or endpoints are disabled THEN THE system SHALL still honor scheduled background operations only when policy permits them.
 5.3 WHEN install, update, or disable actions require network or filesystem writes THEN THE system SHALL require explicit user approval and dependency review.

@@ -2,7 +2,7 @@
 
 ## Architecture
 
-Expose graph editing, world generation, and mesh generation through existing Baymax agent tool registration. Tools produce diffs and typed requests, not direct unvalidated filesystem mutations.
+Expose graph editing, world generation, and mesh generation through existing Sim agent tool registration. Tools produce diffs and typed requests, not direct unvalidated filesystem mutations.
 
 ## Components
 

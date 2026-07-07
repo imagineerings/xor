@@ -1,5 +1,5 @@
 [package]
-description = "Shared protocol for communication between the Baymax app and the baymax.dev server"
+description = "Shared protocol for communication between the Sim app and the sim.dev server"
 edition.workspace = true
 name = "proto"
 version = "0.1.0"

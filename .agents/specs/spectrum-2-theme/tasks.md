@@ -2,7 +2,7 @@
 
 ## Overview
 
-This implementation plan covers the creation of a `spectrum-2-inspired.json` theme file for Baymax and integration into the onboarding theme picker. The plan includes:
+This implementation plan covers the creation of a `spectrum-2-inspired.json` theme file for Sim and integration into the onboarding theme picker. The plan includes:
 1. Create the theme JSON with all color values
 2. Validate against the schema
 3. Verify contrast ratios
@@ -12,7 +12,7 @@ This implementation plan covers the creation of a `spectrum-2-inspired.json` the
 ## Tasks
 
 - [x] 1. Build the theme JSON file
-  - Created `~/.config/baymax/themes/spectrum-2-inspired.json` with the full structure
+  - Created `~/.config/sim/themes/spectrum-2-inspired.json` with the full structure
   - Includes `$schema`, `name`, `author`, and two appearance variants
   - All theme keys populated:
     - UI colors: border, surface, background, element, ghost_element, text, icon, status_bar, title_bar, toolbar, tab_bar, search, panel, pane, scrollbar, minimap (~45 keys)
@@ -25,7 +25,7 @@ This implementation plan covers the creation of a `spectrum-2-inspired.json` the
     - Accents array: 9 colors per variant
   - 164 unique keys per variant (vs. One's 139-141)
   - _Requirements: 1, 2, 3, 4, 6_
-  - _writes: ~/.config/baymax/themes/spectrum-2-inspired.json_
+  - _writes: ~/.config/sim/themes/spectrum-2-inspired.json_
 
 - [x] 2. Validate JSON against theme schema
   - JSON is syntactically valid (validated with Python json module)
@@ -45,8 +45,8 @@ This implementation plan covers the creation of a `spectrum-2-inspired.json` the
   - Comments (#71757F light / #8F939E dark): ≥4.5:1 against editor background
   - _Requirements: 4.1, 12.1, 12.5, 8.3_
 
-- [x] 4. Install theme and test in Baymax
-  - File copied to `~/.config/baymax/themes/spectrum-2-inspired.json`
+- [x] 4. Install theme and test in Sim
+  - File copied to `~/.config/sim/themes/spectrum-2-inspired.json`
   - Can be selected from Theme Selector
   - Visually verified across:
     - Rust file (syntax highlighting, readability)
@@ -68,7 +68,7 @@ This implementation plan covers the creation of a `spectrum-2-inspired.json` the
 
 ## Notes
 
-- The theme is a user-installed local theme (`~/.config/baymax/themes/`), not bundled as a built-in asset.
+- The theme is a user-installed local theme (`~/.config/sim/themes/`), not bundled as a built-in asset.
 - The `one.json` file remains untouched; One Dark/Light stay available as alternatives.
 - Theme overrides continue to work: users can override any key with `theme_overrides` in settings.
 - Contrast values are calculated against the specified backgrounds. Individual display calibration may cause minor perceptual differences.

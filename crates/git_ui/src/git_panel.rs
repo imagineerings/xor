@@ -13,7 +13,7 @@ use crate::{
 use agent_settings::{AgentSettings, UserAgentsMd};
 use anyhow::Context as _;
 use askpass::AskPassDelegate;
-use baymax_actions::{DecreaseBufferFontSize, IncreaseBufferFontSize, ResetBufferFontSize};
+use sim_actions::{DecreaseBufferFontSize, IncreaseBufferFontSize, ResetBufferFontSize};
 use collections::{BTreeMap, HashMap, HashSet};
 use db::kvp::KeyValueStore;
 use editor::{Editor, EditorElement, EditorMode, MultiBuffer, MultiBufferOffset, SizingBehavior};
@@ -190,7 +190,7 @@ fn git_panel_context_menu(
                 StashAll.boxed_clone(),
             )
             .action_disabled_when(!state.has_stash_items, "Stash Pop", StashPop.boxed_clone())
-            .action("View Stash", baymax_actions::git::ViewStash.boxed_clone())
+            .action("View Stash", sim_actions::git::ViewStash.boxed_clone())
             .separator()
             .action("Open Diff", project_diff::Diff.boxed_clone())
             .separator()
@@ -273,7 +273,7 @@ pub enum Event {
 }
 
 #[derive(Serialize, Deserialize)]
-struct SerialibaymaxGitPanel {
+struct SerialisimGitPanel {
     #[serde(default)]
     amend_pending: bool,
     #[serde(default)]
@@ -993,7 +993,7 @@ impl GitPanel {
                 async move {
                     kvp.write_kvp(
                         serialization_key,
-                        serde_json::to_string(&SerialibaymaxGitPanel {
+                        serde_json::to_string(&SerialisimGitPanel {
                             amend_pending,
                             signoff_enabled,
                         })?,
@@ -4776,10 +4776,10 @@ impl GitPanel {
                                 this.flex_1().min_h_0().pb(footer_size)
                             })
                             .pr_2p5()
-                            .on_action(|&baymax_actions::editor::MoveUp, _, cx| {
+                            .on_action(|&sim_actions::editor::MoveUp, _, cx| {
                                 cx.stop_propagation();
                             })
-                            .on_action(|&baymax_actions::editor::MoveDown, _, cx| {
+                            .on_action(|&sim_actions::editor::MoveDown, _, cx| {
                                 cx.stop_propagation();
                             })
                             .child(EditorElement::new(&self.commit_editor, panel_editor_style)),
@@ -6570,7 +6570,7 @@ impl GitPanel {
         workspace: WeakEntity<Workspace>,
         mut cx: AsyncWindowContext,
     ) -> anyhow::Result<Entity<Self>> {
-        let serialibaymax_panel = match workspace
+        let serialisim_panel = match workspace
             .read_with(&cx, |workspace, cx| {
                 Self::serialization_key(workspace).map(|key| (key, KeyValueStore::global(cx)))
             })
@@ -6583,7 +6583,7 @@ impl GitPanel {
                 .context("loading git panel")
                 .log_err()
                 .flatten()
-                .map(|panel| serde_json::from_str::<SerialibaymaxGitPanel>(&panel))
+                .map(|panel| serde_json::from_str::<SerialisimGitPanel>(&panel))
                 .transpose()
                 .log_err()
                 .flatten(),
@@ -6593,10 +6593,10 @@ impl GitPanel {
         workspace.update_in(&mut cx, |workspace, window, cx| {
             let panel = GitPanel::new(workspace, window, cx);
 
-            if let Some(serialibaymax_panel) = serialibaymax_panel {
+            if let Some(serialisim_panel) = serialisim_panel {
                 panel.update(cx, |panel, cx| {
-                    panel.amend_pending = serialibaymax_panel.amend_pending;
-                    panel.signoff_enabled = serialibaymax_panel.signoff_enabled;
+                    panel.amend_pending = serialisim_panel.amend_pending;
+                    panel.signoff_enabled = serialisim_panel.signoff_enabled;
                     cx.notify();
                 })
             }
@@ -7104,7 +7104,7 @@ impl RenderOnce for PanelRepoFooter {
             .label_size(LabelSize::Small)
             .truncate(true)
             .on_click(|_, window, cx| {
-                window.dispatch_action(baymax_actions::git::Switch.boxed_clone(), cx);
+                window.dispatch_action(sim_actions::git::Switch.boxed_clone(), cx);
             });
 
         let branch_selector = PopoverMenu::new("popover-button")
@@ -7115,7 +7115,7 @@ impl RenderOnce for PanelRepoFooter {
             })
             .trigger_with_tooltip(
                 branch_selector_button,
-                Tooltip::for_action_title("Switch Branch", &baymax_actions::git::Switch),
+                Tooltip::for_action_title("Switch Branch", &sim_actions::git::Switch),
             )
             .anchor(Anchor::BottomLeft)
             .offset(gpui::Point {
@@ -7226,7 +7226,7 @@ impl Component for PanelRepoFooter {
                 is_head: true,
                 ref_name: branch_name.to_string().into(),
                 upstream: upstream.map(|tracking| Upstream {
-                    ref_name: format!("baymax/{}", branch_name).into(),
+                    ref_name: format!("sim/{}", branch_name).into(),
                     tracking,
                 }),
                 most_recent_commit: Some(CommitSummary {
@@ -7342,7 +7342,7 @@ impl Component for PanelRepoFooter {
                                 .w(example_width)
                                 .overflow_hidden()
                                 .child(PanelRepoFooter::new_preview(
-                                    SharedString::from("baymax"),
+                                    SharedString::from("sim"),
                                     Some(custom("main", behind_upstream)),
                                 ))
                                 .into_any_element(),
@@ -7353,7 +7353,7 @@ impl Component for PanelRepoFooter {
                                 .w(example_width)
                                 .overflow_hidden()
                                 .child(PanelRepoFooter::new_preview(
-                                    SharedString::from("baymax"),
+                                    SharedString::from("sim"),
                                     Some(custom(
                                         "redesign-and-update-git-ui-list-entry-style",
                                         behind_upstream,
@@ -7403,7 +7403,7 @@ impl Component for PanelRepoFooter {
                                 .w(example_width)
                                 .overflow_hidden()
                                 .child(PanelRepoFooter::new_preview(
-                                    SharedString::from("baymax"),
+                                    SharedString::from("sim"),
                                     Some(custom("update-README", behind_upstream)),
                                 ))
                                 .into_any_element(),
@@ -7580,7 +7580,7 @@ mod tests {
         fs.insert_tree(
             "/root",
             json!({
-                "baymax": {
+                "sim": {
                     ".git": {},
                     "crates": {
                         "gpui": {
@@ -7596,7 +7596,7 @@ mod tests {
         .await;
 
         fs.set_status_for_repo(
-            Path::new(path!("/root/baymax/.git")),
+            Path::new(path!("/root/sim/.git")),
             &[
                 ("crates/gpui/gpui.rs", StatusCode::Modified.worktree()),
                 ("crates/util/util.rs", StatusCode::Modified.worktree()),
@@ -7604,7 +7604,7 @@ mod tests {
         );
 
         let project =
-            Project::test(fs.clone(), [path!("/root/baymax/crates/gpui").as_ref()], cx).await;
+            Project::test(fs.clone(), [path!("/root/sim/crates/gpui").as_ref()], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle

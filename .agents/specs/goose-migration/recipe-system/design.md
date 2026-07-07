@@ -7,9 +7,9 @@ Migrate goose's recipe engine — a YAML-based system for defining, templating, 
 ### Key Architectural Decisions
 
 - **New `crates/recipe/` crate**: The recipe engine is large enough to warrant its own crate, following goose's separation. It will be used by `crates/agent/`, `crates/cli/`, and potentially the server.
-- **YAML format retained**: YAML is already used in baymax for settings; recipes follow a similar approach.
+- **YAML format retained**: YAML is already used in sim for settings; recipes follow a similar approach.
 - **Recipe + skill integration**: Recipes are conceptually related to skills (both are reusable agent instructions). Recipes are multi-step workflows; skills are single-purpose instructions. They share discovery paths.
-- **Deeplinks via existing mechanism**: Use baymax's existing `parse_baymax_link` for recipe deeplinks.
+- **Deeplinks via existing mechanism**: Use sim's existing `parse_sim_link` for recipe deeplinks.
 
 ## 2. Architecture
 

@@ -34,13 +34,13 @@ Implement the multi-channel gateway system as a new `crates/gateway/` crate, sta
   - _writes: crates/gateway/src/telegram_format.rs_
 
 - [ ] 5. Implement pairing service
-  - Link external platform user IDs to baymax user identities
+  - Link external platform user IDs to sim user identities
   - Persistent storage for pairings
   - Unlink support
   - _Requirements: 3_
   - _writes: crates/gateway/src/pairing.rs_
 
-- [ ] 6. Integrate gateway into baymax application
+- [ ] 6. Integrate gateway into sim application
   - Gateway manager initialization during app startup
   - CLI command for gateway configuration
   - Configuration via settings files

@@ -145,7 +145,7 @@ struct PatternPart {
 /// 1..10`. `-- 1..10 optional:` additionally specifies `optional: true`. It's a parse error for a
 /// line to start with `--` without matching this format.
 ///
-/// Text that does not have `--` prefixes participate in the `text` field and are canonicalibaymax by
+/// Text that does not have `--` prefixes participate in the `text` field and are canonicalisim by
 /// lowercasing, replacing all runs of whitespace with a single space, and otherwise only keeping
 /// ascii alphanumeric characters.
 fn parse_pattern(pattern_source: &str) -> Result<(Vec<PatternPart>, usize)> {
@@ -429,7 +429,7 @@ mod tests {
     #[test]
     fn test_check_all_licenses_in_home_dir() {
         let mut detected = Vec::new();
-        let mut unrecognibaymax = Vec::new();
+        let mut unrecognisim = Vec::new();
         let mut walked_entries = 0;
         let homedir = std::env::home_dir().unwrap();
         for entry in walkdir::WalkDir::new(&homedir) {
@@ -454,7 +454,7 @@ mod tests {
             let license = detect_license(&contents);
             match license {
                 Some(license) => detected.push((license, path_string)),
-                None => unrecognibaymax.push(path_string),
+                None => unrecognisim.push(path_string),
             }
         }
         println!("\nDetected licenses:\n");
@@ -462,14 +462,14 @@ mod tests {
         for (license, path) in &detected {
             println!("{}: {}", license.spdx_identifier(), path);
         }
-        println!("\nUnrecognibaymax licenses:\n");
-        for path in &unrecognibaymax {
+        println!("\nUnrecognisim licenses:\n");
+        for path in &unrecognisim {
             println!("{}", path);
         }
         panic!(
-            "{} licenses detected, {} unrecognibaymax",
+            "{} licenses detected, {} unrecognisim",
             detected.len(),
-            unrecognibaymax.len()
+            unrecognisim.len()
         );
         println!("This line has a warning to make sure this test is always commented out");
     }

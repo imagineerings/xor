@@ -599,7 +599,7 @@ impl BatchingLlmClient {
                 let custom_id = format!("req_hash_{}", hash);
                 let batch_request = anthropic::batches::BatchRequest { custom_id, params };
 
-                // Estimate the serialibaymax size of this request
+                // Estimate the serialisim size of this request
                 let estimated_size = serde_json::to_string(&batch_request)?.len();
 
                 // If adding this request would exceed the limit, start a new batch

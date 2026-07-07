@@ -30,7 +30,7 @@ impl<T> CapacityResultExt for Result<(), T> {
 
 /// An item that can be stored in a [`SumTree`]
 ///
-/// Must be summaribaymax by a type that implements [`Summary`]
+/// Must be summarisim by a type that implements [`Summary`]
 pub trait Item: Clone {
     type Summary: Summary;
 
@@ -90,7 +90,7 @@ impl ContextLessSummary for NoSummary {
 /// You can use dimensions to seek to a specific location in the [`SumTree`]
 ///
 /// # Example:
-/// Baymax's rope has a `TextSummary` type that summarizes lines, characters, and bytes.
+/// Sim's rope has a `TextSummary` type that summarizes lines, characters, and bytes.
 /// Each of these are different dimensions we may want to seek to
 pub trait Dimension<'a, S: Summary>: Clone {
     fn zero(cx: S::Context<'_>) -> Self;

@@ -3,7 +3,7 @@ mod undo;
 mod utils;
 
 use anyhow::{Context as _, Result};
-use baymax_actions::{
+use sim_actions::{
     project_panel::{Toggle, ToggleFocus},
     workspace::OpenWithSystem,
 };
@@ -1173,10 +1173,10 @@ impl ProjectPanel {
                                     .action("Download...", Box::new(DownloadFromRemote))
                             })
                             .separator()
-                            .action("Copy Path", Box::new(baymax_actions::workspace::CopyPath))
+                            .action("Copy Path", Box::new(sim_actions::workspace::CopyPath))
                             .action(
                                 "Copy Relative Path",
-                                Box::new(baymax_actions::workspace::CopyRelativePath),
+                                Box::new(sim_actions::workspace::CopyRelativePath),
                             )
                             .when(has_git_repo, |menu| {
                                 menu.separator()
@@ -2561,21 +2561,21 @@ impl ProjectPanel {
 
     fn find_next_selection_after_deletion(
         &self,
-        sanitibaymax_entries: BTreeSet<SelectedEntry>,
+        sanitisim_entries: BTreeSet<SelectedEntry>,
         cx: &mut Context<Self>,
     ) -> Option<SelectedEntry> {
-        if sanitibaymax_entries.is_empty() {
+        if sanitisim_entries.is_empty() {
             return None;
         }
         let project = self.project.read(cx);
-        let (worktree_id, worktree) = sanitibaymax_entries
+        let (worktree_id, worktree) = sanitisim_entries
             .iter()
             .map(|entry| entry.worktree_id)
             .filter_map(|id| project.worktree_for_id(id, cx).map(|w| (id, w.read(cx))))
             .max_by(|(_, a), (_, b)| a.root_name().cmp(b.root_name()))?;
         let git_store = project.git_store().read(cx);
 
-        let marked_entries_in_worktree = sanitibaymax_entries
+        let marked_entries_in_worktree = sanitisim_entries
             .iter()
             .filter(|e| e.worktree_id == worktree_id)
             .collect::<HashSet<_>>();
@@ -3491,7 +3491,7 @@ impl ProjectPanel {
 
     fn copy_path(
         &mut self,
-        _: &baymax_actions::workspace::CopyPath,
+        _: &sim_actions::workspace::CopyPath,
         _: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -3519,7 +3519,7 @@ impl ProjectPanel {
 
     fn copy_relative_path(
         &mut self,
-        _: &baymax_actions::workspace::CopyRelativePath,
+        _: &sim_actions::workspace::CopyRelativePath,
         _: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -3800,9 +3800,9 @@ impl ProjectPanel {
         entries: BTreeSet<SelectedEntry>,
         cx: &App,
     ) -> BTreeSet<SelectedEntry> {
-        let mut sanitibaymax_entries = BTreeSet::new();
+        let mut sanitisim_entries = BTreeSet::new();
         if entries.is_empty() {
-            return sanitibaymax_entries;
+            return sanitisim_entries;
         }
 
         let project = self.project.read(cx);
@@ -3830,7 +3830,7 @@ impl ProjectPanel {
                     })
                     .collect::<BTreeSet<_>>();
 
-                sanitibaymax_entries.extend(worktree_entries.into_iter().filter(|entry| {
+                sanitisim_entries.extend(worktree_entries.into_iter().filter(|entry| {
                     let Some(entry_info) = worktree.entry_for_id(entry.entry_id) else {
                         return false;
                     };
@@ -3843,7 +3843,7 @@ impl ProjectPanel {
             }
         }
 
-        sanitibaymax_entries
+        sanitisim_entries
     }
 
     fn effective_entries(&self) -> BTreeSet<SelectedEntry> {

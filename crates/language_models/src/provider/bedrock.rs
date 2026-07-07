@@ -191,15 +191,15 @@ impl From<BedrockModelMode> for ModelMode {
 /// under in the keychain.
 const AMAZON_AWS_URL: &str = "https://amazonaws.com";
 
-// These environment variables all use a `BAYMAX_` prefix because we don't want to overwrite the user's AWS credentials.
-static BAYMAX_BEDROCK_ACCESS_KEY_ID_VAR: LazyLock<EnvVar> = env_var!("BAYMAX_ACCESS_KEY_ID");
-static BAYMAX_BEDROCK_SECRET_ACCESS_KEY_VAR: LazyLock<EnvVar> =
-    env_var!("BAYMAX_SECRET_ACCESS_KEY");
-static BAYMAX_BEDROCK_SESSION_TOKEN_VAR: LazyLock<EnvVar> = env_var!("BAYMAX_SESSION_TOKEN");
-static BAYMAX_AWS_PROFILE_VAR: LazyLock<EnvVar> = env_var!("BAYMAX_AWS_PROFILE");
-static BAYMAX_BEDROCK_REGION_VAR: LazyLock<EnvVar> = env_var!("BAYMAX_AWS_REGION");
-static BAYMAX_AWS_ENDPOINT_VAR: LazyLock<EnvVar> = env_var!("BAYMAX_AWS_ENDPOINT");
-static BAYMAX_BEDROCK_BEARER_TOKEN_VAR: LazyLock<EnvVar> = env_var!("BAYMAX_BEDROCK_BEARER_TOKEN");
+// These environment variables all use a `SIM_` prefix because we don't want to overwrite the user's AWS credentials.
+static SIM_BEDROCK_ACCESS_KEY_ID_VAR: LazyLock<EnvVar> = env_var!("SIM_ACCESS_KEY_ID");
+static SIM_BEDROCK_SECRET_ACCESS_KEY_VAR: LazyLock<EnvVar> =
+    env_var!("SIM_SECRET_ACCESS_KEY");
+static SIM_BEDROCK_SESSION_TOKEN_VAR: LazyLock<EnvVar> = env_var!("SIM_SESSION_TOKEN");
+static SIM_AWS_PROFILE_VAR: LazyLock<EnvVar> = env_var!("SIM_AWS_PROFILE");
+static SIM_BEDROCK_REGION_VAR: LazyLock<EnvVar> = env_var!("SIM_AWS_REGION");
+static SIM_AWS_ENDPOINT_VAR: LazyLock<EnvVar> = env_var!("SIM_AWS_ENDPOINT");
+static SIM_BEDROCK_BEARER_TOKEN_VAR: LazyLock<EnvVar> = env_var!("SIM_BEDROCK_BEARER_TOKEN");
 
 pub struct State {
     /// The resolved authentication method. Settings take priority over UX credentials.
@@ -305,7 +305,7 @@ impl State {
         cx.spawn(async move |this, cx| {
             // Try environment variables first
             let (auth, from_env) =
-                if let Some(bearer_token) = &BAYMAX_BEDROCK_BEARER_TOKEN_VAR.value {
+                if let Some(bearer_token) = &SIM_BEDROCK_BEARER_TOKEN_VAR.value {
                     if !bearer_token.is_empty() {
                         (
                             Some(BedrockAuth::ApiKey {
@@ -316,10 +316,10 @@ impl State {
                     } else {
                         (None, false)
                     }
-                } else if let Some(access_key_id) = &BAYMAX_BEDROCK_ACCESS_KEY_ID_VAR.value {
-                    if let Some(secret_access_key) = &BAYMAX_BEDROCK_SECRET_ACCESS_KEY_VAR.value {
+                } else if let Some(access_key_id) = &SIM_BEDROCK_ACCESS_KEY_ID_VAR.value {
+                    if let Some(secret_access_key) = &SIM_BEDROCK_SECRET_ACCESS_KEY_VAR.value {
                         if !access_key_id.is_empty() && !secret_access_key.is_empty() {
-                            let session_token = BAYMAX_BEDROCK_SESSION_TOKEN_VAR
+                            let session_token = SIM_BEDROCK_SESSION_TOKEN_VAR
                                 .value
                                 .as_deref()
                                 .filter(|s| !s.is_empty())
@@ -381,7 +381,7 @@ impl State {
     /// Get the resolved region. Checks env var, then settings, then defaults to us-east-1.
     fn get_region(&self) -> String {
         // Priority: env var > settings > default
-        if let Some(region) = BAYMAX_BEDROCK_REGION_VAR.value.as_deref() {
+        if let Some(region) = SIM_BEDROCK_REGION_VAR.value.as_deref() {
             if !region.is_empty() {
                 return region.to_string();
             }
@@ -593,7 +593,7 @@ impl BedrockModel {
                             secret_access_key,
                             session_token,
                             None,
-                            "baymax-bedrock-provider",
+                            "sim-bedrock-provider",
                         );
                         config_builder = config_builder.credentials_provider(aws_creds);
                     }
@@ -1538,15 +1538,15 @@ impl Render for ConfigurationView {
             Some(BedrockAuth::IamCredentials { .. }) if env_var_set => {
                 format!(
                     "Using IAM credentials from {} and {} environment variables",
-                    BAYMAX_BEDROCK_ACCESS_KEY_ID_VAR.name,
-                    BAYMAX_BEDROCK_SECRET_ACCESS_KEY_VAR.name
+                    SIM_BEDROCK_ACCESS_KEY_ID_VAR.name,
+                    SIM_BEDROCK_SECRET_ACCESS_KEY_VAR.name
                 )
             }
             Some(BedrockAuth::IamCredentials { .. }) => "Using IAM credentials".into(),
             Some(BedrockAuth::ApiKey { .. }) if env_var_set => {
                 format!(
                     "Using Bedrock API Key from {} environment variable",
-                    BAYMAX_BEDROCK_BEARER_TOKEN_VAR.name
+                    SIM_BEDROCK_BEARER_TOKEN_VAR.name
                 )
             }
             Some(BedrockAuth::ApiKey { .. }) => "Using Bedrock API Key".into(),
@@ -1565,10 +1565,10 @@ impl Render for ConfigurationView {
         let tooltip_label = if env_var_set {
             Some(format!(
                 "To reset your credentials, unset the {}, {}, and {} or {} environment variables.",
-                BAYMAX_BEDROCK_ACCESS_KEY_ID_VAR.name,
-                BAYMAX_BEDROCK_SECRET_ACCESS_KEY_VAR.name,
-                BAYMAX_BEDROCK_SESSION_TOKEN_VAR.name,
-                BAYMAX_BEDROCK_BEARER_TOKEN_VAR.name
+                SIM_BEDROCK_ACCESS_KEY_ID_VAR.name,
+                SIM_BEDROCK_SECRET_ACCESS_KEY_VAR.name,
+                SIM_BEDROCK_SESSION_TOKEN_VAR.name,
+                SIM_BEDROCK_BEARER_TOKEN_VAR.name
             ))
         } else if is_settings_derived {
             Some(
@@ -1594,7 +1594,7 @@ impl Render for ConfigurationView {
             .on_action(cx.listener(Self::on_tab))
             .on_action(cx.listener(Self::on_tab_prev))
             .on_action(cx.listener(ConfigurationView::save_credentials))
-            .child(Label::new("To use Baymax's agent with Bedrock, you can set a custom authentication strategy through your settings file or use static credentials."))
+            .child(Label::new("To use Sim's agent with Bedrock, you can set a custom authentication strategy through your settings file or use static credentials."))
             .child(Label::new("But first, to access models on AWS, you need to:").mt_1())
             .child(
                 List::new()
@@ -1676,11 +1676,11 @@ impl ConfigurationView {
             .child(self.session_token_editor.clone())
             .child(
                 Label::new(format!(
-                    "You can also set the {}, {} and {} environment variables (or {} for Bedrock API Key authentication) and restart Baymax.",
-                    BAYMAX_BEDROCK_ACCESS_KEY_ID_VAR.name,
-                    BAYMAX_BEDROCK_SECRET_ACCESS_KEY_VAR.name,
-                    BAYMAX_BEDROCK_REGION_VAR.name,
-                    BAYMAX_BEDROCK_BEARER_TOKEN_VAR.name
+                    "You can also set the {}, {} and {} environment variables (or {} for Bedrock API Key authentication) and restart Sim.",
+                    SIM_BEDROCK_ACCESS_KEY_ID_VAR.name,
+                    SIM_BEDROCK_SECRET_ACCESS_KEY_VAR.name,
+                    SIM_BEDROCK_REGION_VAR.name,
+                    SIM_BEDROCK_BEARER_TOKEN_VAR.name
                 ))
                 .size(LabelSize::Small)
                 .color(Color::Muted),
@@ -1688,9 +1688,9 @@ impl ConfigurationView {
             .child(
                 Label::new(format!(
                     "Optionally, if your environment uses AWS CLI profiles, you can set {}; if it requires a custom endpoint, you can set {}; and if it requires a Session Token, you can set {}.",
-                    BAYMAX_AWS_PROFILE_VAR.name,
-                    BAYMAX_AWS_ENDPOINT_VAR.name,
-                    BAYMAX_BEDROCK_SESSION_TOKEN_VAR.name
+                    SIM_AWS_PROFILE_VAR.name,
+                    SIM_AWS_ENDPOINT_VAR.name,
+                    SIM_BEDROCK_SESSION_TOKEN_VAR.name
                 ))
                 .size(LabelSize::Small)
                 .color(Color::Muted)
@@ -1702,7 +1702,7 @@ impl ConfigurationView {
             .child(
                 Label::new(format!(
                     "Region is configured via {} environment variable or settings.json (defaults to us-east-1).",
-                    BAYMAX_BEDROCK_REGION_VAR.name
+                    SIM_BEDROCK_REGION_VAR.name
                 ))
                 .size(LabelSize::Small)
                 .color(Color::Muted)

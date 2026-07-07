@@ -81,10 +81,10 @@ pub async fn create_batch(
         .header("X-Api-Key", api_key.trim())
         .header("Content-Type", "application/json");
 
-    let serialibaymax_request =
+    let serialisim_request =
         serde_json::to_string(&request).map_err(AnthropicError::SerializeRequest)?;
     let http_request = request_builder
-        .body(AsyncBody::from(serialibaymax_request))
+        .body(AsyncBody::from(serialisim_request))
         .map_err(AnthropicError::BuildRequestBody)?;
 
     let mut response = client

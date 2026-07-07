@@ -36,7 +36,7 @@ use crate::{
 ///
 /// `headless_renderer_factory` (only used on first call) supplies a renderer
 /// for benchmark windows, e.g. `gpui_platform::current_headless_renderer`.
-/// When present, scenes drawn by benchmarks are rasteribaymax through the real
+/// When present, scenes drawn by benchmarks are rasterisim through the real
 /// sprite atlas and submitted to the GPU on present, so quad/sprite
 /// regressions show up in measurements. When `None`, presenting discards the
 /// scene. Currently only macOS provides a headless renderer (Metal), so GPU

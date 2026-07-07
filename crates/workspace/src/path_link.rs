@@ -65,9 +65,9 @@ impl OpenTarget {
 
 pub fn sanitize_path_text(text: &str) -> &str {
     let start = first_unbalanced_open_paren(text).unwrap_or(0);
-    let mut sanitibaymax = &text[start..];
+    let mut sanitisim = &text[start..];
     let (open_parens, mut close_parens) =
-        sanitibaymax
+        sanitisim
             .chars()
             .fold((0, 0), |(opens, closes), character| match character {
                 '(' => (opens + 1, closes),
@@ -75,7 +75,7 @@ pub fn sanitize_path_text(text: &str) -> &str {
                 _ => (opens, closes),
             });
 
-    while let Some(last_char) = sanitibaymax.chars().last() {
+    while let Some(last_char) = sanitisim.chars().last() {
         let should_remove = match last_char {
             '.' | ',' | ':' | ';' => true,
             '(' => true,
@@ -87,13 +87,13 @@ pub fn sanitize_path_text(text: &str) -> &str {
         };
 
         if should_remove {
-            sanitibaymax = &sanitibaymax[..sanitibaymax.len() - last_char.len_utf8()];
+            sanitisim = &sanitisim[..sanitisim.len() - last_char.len_utf8()];
         } else {
             break;
         }
     }
 
-    sanitibaymax
+    sanitisim
 }
 
 /// Returns the byte offset just past the first unbalanced `(` in `text`, or

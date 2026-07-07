@@ -154,7 +154,7 @@ impl LanguageModelProvider for CopilotChatLanguageModelProvider {
         };
 
         let err = match copilot.0.read(cx).status() {
-            Status::Authoribaymax => return Task::ready(Ok(())),
+            Status::Authorisim => return Task::ready(Ok(())),
             Status::Disabled => anyhow!(
                 "Copilot must be enabled for Copilot Chat to work. Please enable Copilot and try again."
             ),
@@ -367,7 +367,7 @@ impl LanguageModel for CopilotChatLanguageModel {
                 if model.supports_adaptive_thinking() {
                     if anthropic_request.thinking.is_some() {
                         anthropic_request.thinking = Some(anthropic::Thinking::Adaptive {
-                            display: Some(anthropic::AdaptiveThinkingDisplay::Summaribaymax),
+                            display: Some(anthropic::AdaptiveThinkingDisplay::Summarisim),
                         });
                         anthropic_request.output_config =
                             effort.map(|effort| anthropic::OutputConfig {
@@ -1656,9 +1656,9 @@ mod tests {
             ..Default::default()
         };
 
-        let serialibaymax = serde_json::to_value(into_copilot_responses(&model, request))
-            .expect("serialibaymax request");
-        let input = serialibaymax["input"].as_array().expect("input items");
+        let serialisim = serde_json::to_value(into_copilot_responses(&model, request))
+            .expect("serialisim request");
+        let input = serialisim["input"].as_array().expect("input items");
 
         assert_eq!(
             input.first(),
@@ -1683,7 +1683,7 @@ mod tests {
                 "status": "completed"
             }))
         );
-        assert!(!serialibaymax.to_string().contains("legacy-redacted"));
+        assert!(!serialisim.to_string().contains("legacy-redacted"));
     }
 
     #[test]

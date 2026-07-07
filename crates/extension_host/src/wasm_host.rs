@@ -36,8 +36,8 @@ use std::{
     sync::{Arc, LazyLock, OnceLock},
     time::Duration,
 };
-use task::{BaymaxDebugConfig, DebugScenario, SpawnInTerminal, TaskTemplate};
-use util::paths::SanitibaymaxPath;
+use task::{SimDebugConfig, DebugScenario, SpawnInTerminal, TaskTemplate};
+use util::paths::SanitisimPath;
 use wasmtime::{
     CacheStore, Engine, Store,
     component::{Component, ResourceTable},
@@ -65,7 +65,7 @@ pub struct WasmExtension {
     pub manifest: Arc<ExtensionManifest>,
     pub work_dir: Arc<Path>,
     #[allow(unused)]
-    pub baymax_api_version: Version,
+    pub sim_api_version: Version,
     _task: Arc<Task<Result<(), gpui_tokio::JoinError>>>,
 }
 
@@ -474,7 +474,7 @@ impl extension::Extension for WasmExtension {
         .await?
     }
 
-    async fn dap_config_to_scenario(&self, config: BaymaxDebugConfig) -> Result<DebugScenario> {
+    async fn dap_config_to_scenario(&self, config: SimDebugConfig) -> Result<DebugScenario> {
         self.call(|extension, store| {
             async move {
                 let kind = extension
@@ -647,15 +647,15 @@ impl WasmHost {
             let engine = this.engine.clone();
 
             executor.spawn(async move {
-                let baymax_api_version = parse_wasm_extension_version(&manifest_id, &wasm_bytes)?;
+                let sim_api_version = parse_wasm_extension_version(&manifest_id, &wasm_bytes)?;
                 let component = Component::from_binary(&engine, &wasm_bytes)
                     .context("failed to compile wasm component")?;
 
-                anyhow::Ok((baymax_api_version, component))
+                anyhow::Ok((sim_api_version, component))
             })
         };
 
-        let load_extension = |baymax_api_version: Version, component| async move {
+        let load_extension = |sim_api_version: Version, component| async move {
             let wasi_ctx = this.build_wasi_ctx(&manifest).await?;
             let mut store = wasmtime::Store::new(
                 &this.engine,
@@ -678,7 +678,7 @@ impl WasmHost {
                 &executor,
                 &mut store,
                 this.release_channel,
-                baymax_api_version.clone(),
+                sim_api_version.clone(),
                 &component,
             )
             .await?;
@@ -700,17 +700,17 @@ impl WasmHost {
                 manifest.clone(),
                 this.work_dir.join(manifest.id.as_ref()).into(),
                 tx,
-                baymax_api_version,
+                sim_api_version,
             ))
         };
 
         cx.spawn(async move |cx| {
-            let (baymax_api_version, component) = compile_task.await?;
+            let (sim_api_version, component) = compile_task.await?;
 
             // Run wasi-dependent operations on tokio.
             // wasmtime_wasi internally uses tokio for I/O operations.
-            let (extension_task, manifest, work_dir, tx, baymax_api_version) =
-                gpui_tokio::Tokio::spawn(cx, load_extension(baymax_api_version, component))
+            let (extension_task, manifest, work_dir, tx, sim_api_version) =
+                gpui_tokio::Tokio::spawn(cx, load_extension(sim_api_version, component))
                     .await??;
 
             // Run the extension message loop on tokio since extension
@@ -721,7 +721,7 @@ impl WasmHost {
                 manifest,
                 work_dir,
                 tx,
-                baymax_api_version,
+                sim_api_version,
                 _task: task,
             })
         })
@@ -736,7 +736,7 @@ impl WasmHost {
 
         let file_perms = wasmtime_wasi::FilePerms::all();
         let dir_perms = wasmtime_wasi::DirPerms::all();
-        let path = SanitibaymaxPath::new(&extension_work_dir).to_string();
+        let path = SanitisimPath::new(&extension_work_dir).to_string();
         #[cfg(target_os = "windows")]
         let path = path.replace('\\', "/");
 
@@ -811,12 +811,12 @@ pub fn parse_wasm_extension_version(extension_id: &str, wasm_bytes: &[u8]) -> Re
     for part in wasmparser::Parser::new(0).parse_all(wasm_bytes) {
         if let wasmparser::Payload::CustomSection(s) =
             part.context("error parsing wasm extension")?
-            && s.name() == "baymax:api-version"
+            && s.name() == "sim:api-version"
         {
             version = parse_wasm_extension_version_custom_section(s.data());
             if version.is_none() {
                 bail!(
-                    "extension {} has invalid baymax:api-version section: {:?}",
+                    "extension {} has invalid sim:api-version section: {:?}",
                     extension_id,
                     s.data()
                 );
@@ -829,7 +829,7 @@ pub fn parse_wasm_extension_version(extension_id: &str, wasm_bytes: &[u8]) -> Re
     //
     // By parsing the entirety of the Wasm bytes before we return, we're able to detect this problem
     // earlier as an `Err` rather than as a panic.
-    version.with_context(|| format!("extension {extension_id} has no baymax:api-version section"))
+    version.with_context(|| format!("extension {extension_id} has no sim:api-version section"))
 }
 
 fn parse_wasm_extension_version_custom_section(data: &[u8]) -> Option<Version> {

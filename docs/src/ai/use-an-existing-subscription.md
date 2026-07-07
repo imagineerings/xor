@@ -1,26 +1,26 @@
 ---
-title: Use an Existing Subscription - Baymax
-description: Use ChatGPT, Claude, Copilot, OpenCode, Cursor, and other existing AI subscriptions in Baymax.
+title: Use an Existing Subscription - Sim
+description: Use ChatGPT, Claude, Copilot, OpenCode, Cursor, and other existing AI subscriptions in Sim.
 ---
 
 # Use an Existing Subscription
 
-Use this page when you already pay for an AI product and want to know how it fits into Baymax.
+Use this page when you already pay for an AI product and want to know how it fits into Sim.
 
-Some subscriptions work as Baymax model providers. Others are used through an External Agent or terminal CLI.
+Some subscriptions work as Sim model providers. Others are used through an External Agent or terminal CLI.
 
-| Subscription                  | Baymax AI features                                      | External Agent via ACP                | Terminal Thread                | Notes                                                            |
+| Subscription                  | Sim AI features                                      | External Agent via ACP                | Terminal Thread                | Notes                                                            |
 | ----------------------------- | ---------------------------------------------------- | ------------------------------------- | ------------------------------ | ---------------------------------------------------------------- |
-| Baymax Pro, Business, or Student | [Baymax-hosted models](../account/baymax-hosted-models.md) | No                                    | No                             | Billed through Baymax                                               |
-| ChatGPT Plus / Pro            | ChatGPT Subscription                                 | Codex where supported                 | Codex CLI                      | Sign in with OpenAI in Baymax; separate from OpenAI API keys        |
-| Claude Pro / Max              | No direct Baymax LLM provider path                      | Claude Agent                          | Claude Code                    | Separate from Anthropic API keys                                 |
+| Sim Pro, Business, or Student | [Sim-hosted models](../account/sim-hosted-models.md) | No                                    | No                             | Billed through Sim                                               |
+| ChatGPT Plus / Pro            | ChatGPT Subscription                                 | Codex where supported                 | Codex CLI                      | Sign in with OpenAI in Sim; separate from OpenAI API keys        |
+| Claude Pro / Max              | No direct Sim LLM provider path                      | Claude Agent                          | Claude Code                    | Separate from Anthropic API keys                                 |
 | GitHub Copilot                | GitHub Copilot Chat; Copilot edit prediction         | Copilot agent where available         | CLI where available            | Requires Copilot/Copilot Chat auth                               |
 | OpenCode Zen / Go             | OpenCode provider                                    | OpenCode agent where available        | `opencode` CLI                 | Requires OpenCode API key; subscription affects available models |
-| Cursor subscription           | No Baymax LLM provider path                             | Cursor External Agent where available | Cursor CLI/TUI where available | Use agent/CLI paths instead of Baymax LLM provider settings         |
+| Cursor subscription           | No Sim LLM provider path                             | Cursor External Agent where available | Cursor CLI/TUI where available | Use agent/CLI paths instead of Sim LLM provider settings         |
 
 ## ChatGPT Plus / Pro {#chatgpt}
 
-ChatGPT Plus and Pro can be used through Baymax's ChatGPT Subscription provider. Sign in with OpenAI in Baymax; no separate OpenAI API key is required.
+ChatGPT Plus and Pro can be used through Sim's ChatGPT Subscription provider. Sign in with OpenAI in Sim; no separate OpenAI API key is required.
 
 OpenAI API access is separate. If you have OpenAI API credits or API billing, use [Use API Access](./use-api-access.md#openai).
 
@@ -30,28 +30,28 @@ Claude Pro and Max subscriptions are separate from Anthropic API credits. Use Cl
 
 For Anthropic API access, use [Use API Access](./use-api-access.md#anthropic).
 
-See [What Anthropic's New Claude Billing Means for Baymax Users](https://baymax.dev/blog/anthropic-subscription-changes) for more context.
+See [What Anthropic's New Claude Billing Means for Sim Users](https://sim.dev/blog/anthropic-subscription-changes) for more context.
 
 ## GitHub Copilot {#github-copilot}
 
-GitHub Copilot can be used as a Copilot Chat model provider for Baymax AI features where supported. Copilot can also be used for [Edit Prediction](./edit-prediction.md).
+GitHub Copilot can be used as a Copilot Chat model provider for Sim AI features where supported. Copilot can also be used for [Edit Prediction](./edit-prediction.md).
 
 If you use a Copilot agent or CLI, that setup is owned by Copilot. See [External Agents](./external-agents.md) and [Terminal Threads](./terminal-threads.md).
 
 ## OpenCode Zen / Go {#opencode}
 
-OpenCode is a first-class language model provider in Baymax. If you think of Zen or Go as your OpenCode subscription, the Baymax setup path is still [Use API Access](./use-api-access.md#opencode): enter an OpenCode API key, then choose which OpenCode models to show. Baymax does not sign in to OpenCode with OAuth or detect your subscription directly.
+OpenCode is a first-class language model provider in Sim. If you think of Zen or Go as your OpenCode subscription, the Sim setup path is still [Use API Access](./use-api-access.md#opencode): enter an OpenCode API key, then choose which OpenCode models to show. Sim does not sign in to OpenCode with OAuth or detect your subscription directly.
 
 ## Cursor {#cursor}
 
-Cursor subscriptions do not configure Baymax's LLM provider settings. Use a Cursor External Agent or Cursor CLI/TUI where available.
+Cursor subscriptions do not configure Sim's LLM provider settings. Use a Cursor External Agent or Cursor CLI/TUI where available.
 
 ## Subscriptions Used Through Agent Harnesses {#agent-harnesses}
 
-Some harnesses, CLIs, and External Agents can authenticate to ChatGPT, Claude, Copilot, or other subscriptions through their own flows. In those cases, Baymax hosts the External Agent or Terminal Thread, but the harness owns auth and model behavior.
+Some harnesses, CLIs, and External Agents can authenticate to ChatGPT, Claude, Copilot, or other subscriptions through their own flows. In those cases, Sim hosts the External Agent or Terminal Thread, but the harness owns auth and model behavior.
 
 Pi Coding Agent is an example: Pi is a harness, not the subscription. Configure provider auth in Pi.
 
 ## DeepSeek {#deepseek}
 
-DeepSeek paid usage, top-ups, and API billing are API access in Baymax, not subscription sign-in. Use [Use API Access](./use-api-access.md#deepseek).
+DeepSeek paid usage, top-ups, and API billing are API access in Sim, not subscription sign-in. Use [Use API Access](./use-api-access.md#deepseek).

@@ -25,7 +25,7 @@ use text::ReplicaId;
 use util::{
     ResultExt,
     path_list::PathList,
-    paths::{PathStyle, RemotePathBuf, SanitibaymaxPath},
+    paths::{PathStyle, RemotePathBuf, SanitisimPath},
     rel_path::RelPath,
 };
 use worktree::{
@@ -191,7 +191,7 @@ pub struct WorktreeStore {
     scanning_enabled: bool,
     #[allow(clippy::type_complexity)]
     loading_worktrees:
-        HashMap<Arc<SanitibaymaxPath>, Shared<Task<Result<Entity<Worktree>, Arc<anyhow::Error>>>>>,
+        HashMap<Arc<SanitisimPath>, Shared<Task<Result<Entity<Worktree>, Arc<anyhow::Error>>>>>,
     initial_scan_complete: (watch::Sender<bool>, watch::Receiver<bool>),
     state: WorktreeStoreState,
 }
@@ -272,7 +272,7 @@ impl WorktreeStore {
             (WorktreeStoreState::Local { .. }, Some((client, REMOTE_SERVER_PROJECT_ID))) => {
                 Either::Left(client.clone())
             }
-            // we are just a local baymax project, we can assign ids
+            // we are just a local sim project, we can assign ids
             (WorktreeStoreState::Local { .. }, _) => Either::Right(self.next_worktree_id.next()),
             // we are connected to a remote server, we are in charge of assigning worktree ids
             (WorktreeStoreState::Remote { .. }, _) => Either::Right(self.next_worktree_id.next()),
@@ -390,7 +390,7 @@ impl WorktreeStore {
         abs_path: impl AsRef<Path>,
         cx: &App,
     ) -> Option<(Entity<Worktree>, Arc<RelPath>)> {
-        let abs_path = SanitibaymaxPath::new(abs_path.as_ref());
+        let abs_path = SanitisimPath::new(abs_path.as_ref());
         for tree in self.worktrees() {
             let path_style = tree.read(cx).path_style();
             if let Some(relative_path) =
@@ -636,7 +636,7 @@ impl WorktreeStore {
                                 // Otherwise, the FS watcher would do it on the `RootUpdated` event,
                                 // but with a noticeable delay, so we handle it proactively.
                                 local.update_abs_path_and_refresh(
-                                    SanitibaymaxPath::new_arc(&abs_new_path),
+                                    SanitisimPath::new_arc(&abs_new_path),
                                     cx,
                                 );
                                 Task::ready(Ok(this.root_entry().cloned()))
@@ -701,7 +701,7 @@ impl WorktreeStore {
         visible: bool,
         cx: &mut Context<Self>,
     ) -> Task<Result<Entity<Worktree>>> {
-        let abs_path: Arc<SanitibaymaxPath> = SanitibaymaxPath::new_arc(&abs_path);
+        let abs_path: Arc<SanitisimPath> = SanitisimPath::new_arc(&abs_path);
         let is_via_collab = matches!(&self.state, WorktreeStoreState::Remote { upstream_client, .. } if upstream_client.is_via_collab());
         if !self.loading_worktrees.contains_key(&abs_path) {
             let task = match &self.state {
@@ -811,7 +811,7 @@ impl WorktreeStore {
                 return Ok(existing_worktree);
             }
 
-            let root_path_buf = PathBuf::from(response.canonicalibaymax_path.clone());
+            let root_path_buf = PathBuf::from(response.canonicalisim_path.clone());
             let root_name = root_path_buf
                 .file_name()
                 .map(|n| n.to_string_lossy().into_owned())
@@ -825,7 +825,7 @@ impl WorktreeStore {
                         id: response.worktree_id,
                         root_name,
                         visible,
-                        abs_path: response.canonicalibaymax_path,
+                        abs_path: response.canonicalisim_path,
                         root_repo_common_dir: response.root_repo_common_dir,
                     },
                     client,
@@ -844,7 +844,7 @@ impl WorktreeStore {
     fn create_local_worktree(
         &mut self,
         fs: Arc<dyn Fs>,
-        abs_path: Arc<SanitibaymaxPath>,
+        abs_path: Arc<SanitisimPath>,
         visible: bool,
         cx: &mut Context<Self>,
     ) -> Task<Result<Entity<Worktree>, Arc<anyhow::Error>>> {
@@ -856,7 +856,7 @@ impl WorktreeStore {
         cx.spawn(async move |this, cx| {
             let worktree_id = next_worktree_id.await?;
             let worktree = Worktree::local(
-                SanitibaymaxPath::cast_arc(abs_path.clone()),
+                SanitisimPath::cast_arc(abs_path.clone()),
                 visible,
                 fs,
                 next_entry_id,

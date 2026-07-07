@@ -1,57 +1,57 @@
 ---
-title: Model Context Protocol (MCP) in Baymax
-description: Install and configure MCP servers in Baymax to extend your AI agent with external tools, data sources, and integrations.
+title: Model Context Protocol (MCP) in Sim
+description: Install and configure MCP servers in Sim to extend your AI agent with external tools, data sources, and integrations.
 ---
 
 # Model Context Protocol
 
-Baymax uses the [Model Context Protocol](https://modelcontextprotocol.io/) to interact with context servers.
+Sim uses the [Model Context Protocol](https://modelcontextprotocol.io/) to interact with context servers.
 
 > The Model Context Protocol (MCP) is an open protocol for connecting LLM applications to external tools and data sources through a standard interface.
 
 ## Supported Features
 
-Baymax currently supports MCP's [Tools](https://modelcontextprotocol.io/specification/2025-11-25/server/tools) and [Prompts](https://modelcontextprotocol.io/specification/2025-11-25/server/prompts) features.
-We welcome contributions that help advance Baymax's MCP feature coverage (Discovery, Sampling, Elicitation, etc).
+Sim currently supports MCP's [Tools](https://modelcontextprotocol.io/specification/2025-11-25/server/tools) and [Prompts](https://modelcontextprotocol.io/specification/2025-11-25/server/prompts) features.
+We welcome contributions that help advance Sim's MCP feature coverage (Discovery, Sampling, Elicitation, etc).
 
-Baymax also handles the `notifications/tools/list_changed` notification from MCP servers. When a server adds, removes, or modifies its available tools at runtime, Baymax automatically reloads the tool list without requiring a server restart.
+Sim also handles the `notifications/tools/list_changed` notification from MCP servers. When a server adds, removes, or modifies its available tools at runtime, Sim automatically reloads the tool list without requiring a server restart.
 
 ## Agent Path Support {#agent-path-support}
 
 | Agent path                                | MCP behavior                                                                            |
 | ----------------------------------------- | --------------------------------------------------------------------------------------- |
-| [Baymax Agent](./baymax-agent.md)               | Uses Baymax-configured MCP servers directly                                                |
-| [External Agents](./external-agents.md)   | Baymax can forward configured MCP servers over ACP; agents may also read native MCP config |
+| [Sim Agent](./sim-agent.md)               | Uses Sim-configured MCP servers directly                                                |
+| [External Agents](./external-agents.md)   | Sim can forward configured MCP servers over ACP; agents may also read native MCP config |
 | [Terminal Threads](./terminal-threads.md) | Native CLIs/TUIs read their own MCP configuration                                       |
 
 ## Installing MCP Servers
 
 ### As Extensions
 
-One of the ways you can use MCP servers in Baymax is by exposing them as an extension.
+One of the ways you can use MCP servers in Sim is by exposing them as an extension.
 Check out the [MCP Server Extensions](../extensions/mcp-extensions.md) page to learn how to create your own.
 
 Many MCP servers are available as extensions. Find them via:
 
-1. [the Baymax website](https://baymax.dev/extensions?filter=context-servers)
-2. in the app, open the Command Palette and run the {#action baymax::Extensions} action
+1. [the Sim website](https://sim.dev/extensions?filter=context-servers)
+2. in the app, open the Command Palette and run the {#action sim::Extensions} action
 3. in the app, go to the Agent Panel's top-right menu and look for the "Install New Servers…" menu item under the "MCP Servers" section
 
 Popular servers available as an extension include:
 
-- [Context7](https://baymax.dev/extensions/mcp-server-context7)
-- [GitHub](https://baymax.dev/extensions/mcp-server-github)
-- [Puppeteer](https://baymax.dev/extensions/mcp-server-puppeteer)
-- [Gem](https://baymax.dev/extensions/gem)
-- [Brave Search](https://baymax.dev/extensions/mcp-server-brave-search)
-- [Prisma](https://github.com/aqrln/prisma-mcp-baymax)
-- [Framelink Figma](https://baymax.dev/extensions/mcp-server-figma)
-- [Resend](https://baymax.dev/extensions/mcp-server-resend)
+- [Context7](https://sim.dev/extensions/mcp-server-context7)
+- [GitHub](https://sim.dev/extensions/mcp-server-github)
+- [Puppeteer](https://sim.dev/extensions/mcp-server-puppeteer)
+- [Gem](https://sim.dev/extensions/gem)
+- [Brave Search](https://sim.dev/extensions/mcp-server-brave-search)
+- [Prisma](https://github.com/aqrln/prisma-mcp-sim)
+- [Framelink Figma](https://sim.dev/extensions/mcp-server-figma)
+- [Resend](https://sim.dev/extensions/mcp-server-resend)
 
 ### As Custom Servers
 
-Creating an extension is not the only way to use MCP servers in Baymax.
-You can connect them by adding their commands directly to your settings file ([how to edit](../configuring-baymax.md#settings-files)), like so:
+Creating an extension is not the only way to use MCP servers in Sim.
+You can connect them by adding their commands directly to your settings file ([how to edit](../configuring-sim.md#settings-files)), like so:
 
 ```json [settings]
 {
@@ -75,7 +75,7 @@ You can connect them by adding their commands directly to your settings file ([h
 Alternatively, you can also add a custom server by accessing the Agent Panel's Settings view (also accessible via the {#action agent::OpenSettings} action).
 From there, you can add it through the modal that appears when you click the "Add Custom Server" button.
 
-> Note: When a remote MCP server has no configured `"Authorization"` header, Baymax will prompt you to authenticate yourself against the MCP server using the standard MCP OAuth flow.
+> Note: When a remote MCP server has no configured `"Authorization"` header, Sim will prompt you to authenticate yourself against the MCP server using the standard MCP OAuth flow.
 
 ## Using MCP Servers
 
@@ -83,7 +83,7 @@ From there, you can add it through the modal that appears when you click the "Ad
 
 Most MCP servers require configuration after installation.
 
-In the case of extensions, after installing it, Baymax will pop up a modal displaying what is required for you to properly set it up.
+In the case of extensions, after installing it, Sim will pop up a modal displaying what is required for you to properly set it up.
 For example, the GitHub MCP extension requires you to add a [Personal Access Token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens).
 
 In the case of custom servers, make sure you check the provider documentation to determine what type of command, arguments, and environment variables need to be added to the JSON.
@@ -101,7 +101,7 @@ Mentioning the MCP server by name can help the model pick tools from that server
 
 However, if you want to _ensure_ a given MCP server will be used, you can create [a custom profile](./agent-profiles.md) where all built-in tools (or the ones that could cause conflicts with the server's tools) are turned off and only the tools coming from the MCP server are turned on.
 
-As an example, [the Dagger team suggests](https://container-use.com/agent-integrations#baymax) doing that with their [Container Use MCP server](https://baymax.dev/extensions/mcp-server-container-use):
+As an example, [the Dagger team suggests](https://container-use.com/agent-integrations#sim) doing that with their [Container Use MCP server](https://sim.dev/extensions/mcp-server-container-use):
 
 ```json [settings]
 "agent": {
@@ -146,10 +146,10 @@ As an example, [the Dagger team suggests](https://container-use.com/agent-integr
 
 ### Tool Permissions
 
-> **Note:** In Baymax v0.224.0 and above, tool approval is controlled by `agent.tool_permissions.default`.
+> **Note:** In Sim v0.224.0 and above, tool approval is controlled by `agent.tool_permissions.default`.
 > In earlier versions, it was controlled by the `agent.always_allow_tool_actions` boolean (default `false`).
 
-Baymax's Agent Panel provides the `agent.tool_permissions.default` setting to control tool approval behavior for the native Baymax agent:
+Sim's Agent Panel provides the `agent.tool_permissions.default` setting to control tool approval behavior for the native Sim agent:
 
 - `"confirm"` (default) — Prompts for approval before running any tool action, including MCP tool calls
 - `"allow"` — Auto-approves tool actions without prompting
@@ -163,9 +163,9 @@ Learn more about [how tool permissions work](./tool-permissions.md), how to furt
 
 ### External Agents
 
-MCP servers configured in Baymax are forwarded to [External Agents](./external-agents.md) via the [Agent Client Protocol](https://agentclientprotocol.com/). External Agents can also access MCP servers from their own native configuration files.
+MCP servers configured in Sim are forwarded to [External Agents](./external-agents.md) via the [Agent Client Protocol](https://agentclientprotocol.com/). External Agents can also access MCP servers from their own native configuration files.
 
-For details on what configuration is shared between Baymax and External Agents, see [Configuration Boundaries](./external-agents.md#configuration-boundaries).
+For details on what configuration is shared between Sim and External Agents, see [Configuration Boundaries](./external-agents.md#configuration-boundaries).
 
 ### Error Handling
 

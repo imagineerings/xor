@@ -2,34 +2,34 @@
 
 ## Introduction
 
-The Baymax mobile client (Swift iOS / Jetpack Compose Android) needs a robust infrastructure layer that handles server connections, tunnel management, real-time communication, session lifecycle, and authentication. This foundation enables all higher-level features (chat, collaboration, calls, etc.) to function reliably across both platforms.
+The Sim mobile client (Swift iOS / Jetpack Compose Android) needs a robust infrastructure layer that handles server connections, tunnel management, real-time communication, session lifecycle, and authentication. This foundation enables all higher-level features (chat, collaboration, calls, etc.) to function reliably across both platforms.
 
-Currently, both iOS and Android have basic implementations of some infrastructure (REST API service, basic auth via secret key, simple session fetch, QR-based configuration). This spec formalizes, consolidates, and extends those into a **shared cross-platform infrastructure design** that also connects to the Baymax desktop editor's existing remote and tunnel systems (`mobile_tunnel`, `remote`, `rpc` crates).
+Currently, both iOS and Android have basic implementations of some infrastructure (REST API service, basic auth via secret key, simple session fetch, QR-based configuration). This spec formalizes, consolidates, and extends those into a **shared cross-platform infrastructure design** that also connects to the Sim desktop editor's existing remote and tunnel systems (`mobile_tunnel`, `remote`, `rpc` crates).
 
 ## Glossary
 
 | Term | Definition |
 |------|------------|
-| **Baymax Agent** | The AI coding assistant running locally or remotely. Exposes an HTTP/SSE API for chat and tool calls. |
-| **Baymax Collab Server** | The multi-user collaboration server providing channels, calls, project sharing, and presence. Connected via gRPC/RPC. |
-| **Tunnel** | A secure network forwarding channel (SSH, Tailscale, or Cloudflare) that exposes a remote Baymax agent behind NAT/firewall to the mobile app. |
-| **SSE (Server-Sent Events)** | Unidirectional streaming protocol used by the Baymax agent to stream AI responses in real-time. |
+| **Sim Agent** | The AI coding assistant running locally or remotely. Exposes an HTTP/SSE API for chat and tool calls. |
+| **Sim Collab Server** | The multi-user collaboration server providing channels, calls, project sharing, and presence. Connected via gRPC/RPC. |
+| **Tunnel** | A secure network forwarding channel (SSH, Tailscale, or Cloudflare) that exposes a remote Sim agent behind NAT/firewall to the mobile app. |
+| **SSE (Server-Sent Events)** | Unidirectional streaming protocol used by the Sim agent to stream AI responses in real-time. |
 | **WebSocket** | Bidirectional streaming protocol used for real-time collab features (presence, location sharing, etc.). |
 | **Session** | A single agent conversation, identified by a UUID. Contains a sequence of messages (user messages + assistant responses + tool calls). Session history is stored on the agent server. |
-| **Auth Token** | A secret key used to authenticate the mobile app to the Baymax agent. Also called "secret key" in the existing codebase. |
+| **Auth Token** | A secret key used to authenticate the mobile app to the Sim agent. Also called "secret key" in the existing codebase. |
 | **Enhanced Auth** | Context-aware authentication that tracks connection provenance (tunnel, tailscale, direct LAN, collab server) and may use different credential types for each. |
 | **Connection Provenance** | The network path used to reach the server: direct LAN, Tailscale tunnel, SSH tunnel, Cloudflare tunnel, or collab server relay. |
-| **Trial Mode** | A demo mode connecting to a hosted instance at `demo-baymaxed.fly.dev` with limited functionality. |
+| **Trial Mode** | A demo mode connecting to a hosted instance at `demo-simed.fly.dev` with limited functionality. |
 
 ## Requirements
 
 ### Requirement 1: Server Connection
 
-**User Story:** As a mobile user, I want the app to establish and maintain a connection to my Baymax agent or collab server, so that I can interact with my agent and collaborators.
+**User Story:** As a mobile user, I want the app to establish and maintain a connection to my Sim agent or collab server, so that I can interact with my agent and collaborators.
 
 #### Acceptance Criteria
 
-1.1 THE app SHALL support connecting to a Baymax agent via a configured base URL and secret key.
+1.1 THE app SHALL support connecting to a Sim agent via a configured base URL and secret key.
 
 1.2 WHEN the app starts with a saved configuration THEN it SHALL automatically attempt to connect without user intervention.
 
@@ -53,13 +53,13 @@ Currently, both iOS and Android have basic implementations of some infrastructur
 
 1.12 WHERE the app detects a Cloudflare tunnel URL AND the connection fails THEN THE app SHALL display a tunnel-specific error message.
 
-1.13 THE app SHALL support a **Trial Mode** that defaults to `https://demo-baymaxed.fly.dev` with secret key `test` when no configuration is saved.
+1.13 THE app SHALL support a **Trial Mode** that defaults to `https://demo-simed.fly.dev` with secret key `test` when no configuration is saved.
 
 1.14 WHEN the app successfully connects to an agent THEN THE app SHALL display the assigned **server version** in the settings UI.
 
 ### Requirement 2: Tunnel Management
 
-**User Story:** As a developer using Baymax on a remote machine, I want the mobile app to recognize and manage tunnel-based connections so I can access my agent through NAT/firewall.
+**User Story:** As a developer using Sim on a remote machine, I want the mobile app to recognize and manage tunnel-based connections so I can access my agent through NAT/firewall.
 
 #### Acceptance Criteria
 
@@ -73,13 +73,13 @@ Currently, both iOS and Android have basic implementations of some infrastructur
 
 2.3 WHEN connecting through a Tailscale tunnel AND the connection succeeds THEN THE app SHALL display "Tailscale" as the connection method in the UI.
 
-2.4 WHERE the desktop Baymax editor has an active `TunnelManager` (SSH tunnel) THEN the mobile app SHALL be able to connect via the SSH tunnel endpoint.
+2.4 WHERE the desktop Sim editor has an active `TunnelManager` (SSH tunnel) THEN the mobile app SHALL be able to connect via the SSH tunnel endpoint.
 
 2.5 WHEN an SSH tunnel endpoint is provided via QR code configuration THEN THE app SHALL connect using the tunnel's local port and auth token.
 
 2.6 THE mobile app SHALL NOT manage tunnel lifecycle (start/stop) itself — tunnel start/stop is the desktop's responsibility via the `mobile_tunnel` crate's `TunnelManager`.
 
-2.7 WHERE the desktop Baymax exposes a QR code for a running tunnel THEN THE mobile app SHALL scan and configure itself automatically.
+2.7 WHERE the desktop Sim exposes a QR code for a running tunnel THEN THE mobile app SHALL scan and configure itself automatically.
 
 2.8 THE app SHALL handle tunnel connection errors gracefully, distinguishing between:
    - Tunnel not running (connection refused)
@@ -126,7 +126,7 @@ Currently, both iOS and Android have basic implementations of some infrastructur
 
 ### Requirement 4: Session Management
 
-**User Story:** As a mobile user, I want to view, create, and resume chat sessions with my Baymax agent, so I can continue conversations across time and devices.
+**User Story:** As a mobile user, I want to view, create, and resume chat sessions with my Sim agent, so I can continue conversations across time and devices.
 
 #### Acceptance Criteria
 
@@ -195,7 +195,7 @@ Currently, both iOS and Android have basic implementations of some infrastructur
     - Delete
 
 5.7 THE app SHALL support **QR code configuration** that deep-links into the app:
-    - URL scheme: `baymaxchat://configure?data=<url-encoded-json>`
+    - URL scheme: `simchat://configure?data=<url-encoded-json>`
     - JSON format: `{"url": "https://...", "secret": "..."}`
     - On receipt, parse, validate, test connection, and save as new agent
 
@@ -206,7 +206,7 @@ Currently, both iOS and Android have basic implementations of some infrastructur
     - IF biometrics are not available on the device THEN the option SHALL be hidden
     - THE biometric lock SHALL use a grace period of 5 minutes after the app goes to background before re-locking
 
-5.10 WHERE the app connects to a **Baymax Collab Server** (not just an agent) THEN authentication SHALL extend to include collab server credentials (OAuth token, session cookie) in addition to the agent secret key.
+5.10 WHERE the app connects to a **Sim Collab Server** (not just an agent) THEN authentication SHALL extend to include collab server credentials (OAuth token, session cookie) in addition to the agent secret key.
 
 5.11 WHILE in Trial Mode THE app SHALL limit functionality:
     - One session per device
@@ -220,14 +220,14 @@ The following implementations already exist and must be reused (not rebuilt):
 
 | Platform | Feature | File(s) |
 |----------|---------|---------|
-| iOS | Agent API Service | `BaymaxAPIService.swift` — HTTP client, retry, connection testing |
+| iOS | Agent API Service | `SimAPIService.swift` — HTTP client, retry, connection testing |
 | iOS | Agent Storage | `ConfigurationHandler.swift` — Multiple agents, switch, save, delete |
-| iOS | QR Config | `ConfigurationHandler.swift` — Parse `baymaxchat://configure` URL |
+| iOS | QR Config | `ConfigurationHandler.swift` — Parse `simchat://configure` URL |
 | iOS | Tunnel Detection | `ConfigurationHandler.swift` — Tailscale URL detection, Tailscale app deep link |
 | iOS | Session Fetch | `ContentView.swift` — Session list with pagination |
 | iOS | Settings UI | `SettingsView.swift` — Server URL/secret, connection test, agent list |
 | iOS | Trial Mode | `TrialMode.swift`, `TrialModeBanner.swift` — Trial detection and banner |
-| Android | API Service | `BaymaxApiService.kt` — OkHttp client, retry, SSE streaming |
+| Android | API Service | `SimApiService.kt` — OkHttp client, retry, SSE streaming |
 | Android | Settings/Storage | `SettingsRepository.kt`, `SettingsScreen.kt`, `SettingsViewModel.kt` |
 | Android | Agent Config | `AgentConfiguration.kt`, `AgentRepository.kt` |
 | Android | QR Config | `QRConfigHandler.kt` — QR scan and URL handling |
@@ -237,4 +237,4 @@ The following implementations already exist and must be reused (not rebuilt):
 | Rust (desktop) | Tunnel Manager | `mobile_tunnel/crates/tunnel_manager.rs` — SSH tunnel lifecycle |
 | Rust (desktop) | QR Generation | `mobile_tunnel/crates/qr_code.rs` — QR code PNG generation |
 | Rust (desktop) | Global Tunnel State | `mobile_tunnel/crates/lib.rs` — GlobalTunnelManager for settings UI |
-| Go (desktop) | Tailscale Tunnel | `baymax-tunnel/main.go` — Tailscale-based tunnel service |
+| Go (desktop) | Tailscale Tunnel | `sim-tunnel/main.go` — Tailscale-based tunnel service |

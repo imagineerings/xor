@@ -2,7 +2,7 @@
 
 ## Overview
 
-Implement the 18+ provider integrations from goose that don't yet exist in baymax, following the patterns established in `crates/language_models/src/provider/`. Work is grouped: first the shared infrastructure (registry, declarative providers, ACP adapter), then individual providers by category.
+Implement the 18+ provider integrations from goose that don't yet exist in sim, following the patterns established in `crates/language_models/src/provider/`. Work is grouped: first the shared infrastructure (registry, declarative providers, ACP adapter), then individual providers by category.
 
 ## Tasks
 

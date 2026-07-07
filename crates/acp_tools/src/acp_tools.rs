@@ -552,7 +552,7 @@ fn push_stream_message_for_connection(
             } else {
                 (
                     Some(id),
-                    "[unrecognibaymax response]".into(),
+                    "[unrecognisim response]".into(),
                     MessageType::Response,
                     result,
                 )

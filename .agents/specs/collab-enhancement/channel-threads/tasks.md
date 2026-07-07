@@ -2,7 +2,7 @@
 
 ## Overview
 
-Add threaded replies to channel messages in Baymax. This feature reuses the existing `reply_to_message_id` proto field and introduces a thread panel (right sidebar) for viewing and composing replies, along with server endpoints for fetching threads and real-time reply delivery via WebSocket.
+Add threaded replies to channel messages in Sim. This feature reuses the existing `reply_to_message_id` proto field and introduces a thread panel (right sidebar) for viewing and composing replies, along with server endpoints for fetching threads and real-time reply delivery via WebSocket.
 
 **Scope**: `proto` (new RPC messages), `collab` (server endpoints + ThreadStore queries), `collab_ui` (thread panel, thread indicator, compose input), `client` (thread types + RPC dispatch), `rpc` (WebSocket event handling).
 

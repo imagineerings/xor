@@ -262,12 +262,12 @@ impl HttpClientWithUrl {
         format!("{}{}", self.base_url(), path)
     }
 
-    /// Builds a Baymax API URL using the given path.
-    pub fn build_baymax_api_url(&self, path: &str, query: &[(&str, &str)]) -> Result<Url> {
+    /// Builds a Sim API URL using the given path.
+    pub fn build_sim_api_url(&self, path: &str, query: &[(&str, &str)]) -> Result<Url> {
         let base_url = self.base_url();
         let base_api_url = match base_url.as_ref() {
-            "https://baymax.dev" => "https://api.baymax.dev",
-            "https://staging.baymax.dev" => "https://api-staging.baymax.dev",
+            "https://sim.dev" => "https://api.sim.dev",
+            "https://staging.sim.dev" => "https://api-staging.sim.dev",
             "http://localhost:3000" => "http://localhost:8080",
             other => other,
         };
@@ -278,12 +278,12 @@ impl HttpClientWithUrl {
         )?)
     }
 
-    /// Builds a Baymax Cloud URL using the given path.
-    pub fn build_baymax_cloud_url(&self, path: &str) -> Result<Url> {
+    /// Builds a Sim Cloud URL using the given path.
+    pub fn build_sim_cloud_url(&self, path: &str) -> Result<Url> {
         let base_url = self.base_url();
         let base_api_url = match base_url.as_ref() {
-            "https://baymax.dev" => "https://cloud.baymax.dev",
-            "https://staging.baymax.dev" => "https://cloud.baymax.dev",
+            "https://sim.dev" => "https://cloud.sim.dev",
+            "https://staging.sim.dev" => "https://cloud.sim.dev",
             "http://localhost:3000" => "http://localhost:8787",
             other => other,
         };
@@ -291,16 +291,16 @@ impl HttpClientWithUrl {
         Ok(Url::parse(&format!("{}{}", base_api_url, path))?)
     }
 
-    /// Builds a Baymax Cloud URL using the given path and query params.
-    pub fn build_baymax_cloud_url_with_query(
+    /// Builds a Sim Cloud URL using the given path and query params.
+    pub fn build_sim_cloud_url_with_query(
         &self,
         path: &str,
         query: impl Serialize,
     ) -> Result<Url> {
         let base_url = self.base_url();
         let base_api_url = match base_url.as_ref() {
-            "https://baymax.dev" => "https://cloud.baymax.dev",
-            "https://staging.baymax.dev" => "https://cloud.baymax.dev",
+            "https://sim.dev" => "https://cloud.sim.dev",
+            "https://staging.sim.dev" => "https://cloud.sim.dev",
             "http://localhost:3000" => "http://localhost:8787",
             other => other,
         };
@@ -308,12 +308,12 @@ impl HttpClientWithUrl {
         Ok(Url::parse(&format!("{}{}?{}", base_api_url, path, query))?)
     }
 
-    /// Builds a Baymax LLM URL using the given path.
-    pub fn build_baymax_llm_url(&self, path: &str, query: &[(&str, &str)]) -> Result<Url> {
+    /// Builds a Sim LLM URL using the given path.
+    pub fn build_sim_llm_url(&self, path: &str, query: &[(&str, &str)]) -> Result<Url> {
         let base_url = self.base_url();
         let base_api_url = match base_url.as_ref() {
-            "https://baymax.dev" => "https://cloud.baymax.dev",
-            "https://staging.baymax.dev" => "https://llm-staging.baymax.dev",
+            "https://sim.dev" => "https://cloud.sim.dev",
+            "https://staging.sim.dev" => "https://llm-staging.sim.dev",
             "http://localhost:3000" => "http://localhost:8787",
             other => other,
         };

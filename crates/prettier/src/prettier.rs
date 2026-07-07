@@ -714,7 +714,7 @@ mod tests {
             "/root",
             json!({
                 ".config": {
-                    "baymax": {
+                    "sim": {
                         "settings.json": r#"{ "formatter": "auto" }"#,
                     },
                 },
@@ -749,7 +749,7 @@ mod tests {
             Prettier::locate_prettier_installation(
                 fs.as_ref(),
                 &HashSet::default(),
-                Path::new("/root/.config/baymax/settings.json"),
+                Path::new("/root/.config/sim/settings.json"),
             )
             .await
             .unwrap(),

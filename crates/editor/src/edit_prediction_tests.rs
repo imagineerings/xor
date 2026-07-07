@@ -479,14 +479,14 @@ async fn test_edit_prediction_invalidation_range(cx: &mut gpui::TestAppContext) 
 }
 
 #[gpui::test]
-async fn test_edit_prediction_jump_disabled_for_non_baymax_providers(
+async fn test_edit_prediction_jump_disabled_for_non_sim_providers(
     cx: &mut gpui::TestAppContext,
 ) {
     init_test(cx, |_| {});
 
     let mut cx = EditorTestContext::new(cx).await;
-    let provider = cx.new(|_| FakeNonBaymaxEditPredictionDelegate::default());
-    assign_editor_completion_provider_non_baymax(provider.clone(), &mut cx);
+    let provider = cx.new(|_| FakeNonSimEditPredictionDelegate::default());
+    assign_editor_completion_provider_non_sim(provider.clone(), &mut cx);
 
     // Cursor is 2+ lines above the proposed edit
     cx.set_state(indoc! {"
@@ -497,7 +497,7 @@ async fn test_edit_prediction_jump_disabled_for_non_baymax_providers(
         line
     "});
 
-    propose_edits_non_baymax(
+    propose_edits_non_sim(
         &provider,
         vec![(Point::new(4, 3)..Point::new(4, 3), " 4")],
         &mut cx,
@@ -505,17 +505,17 @@ async fn test_edit_prediction_jump_disabled_for_non_baymax_providers(
 
     cx.update_editor(|editor, window, cx| editor.update_visible_edit_prediction(window, cx));
 
-    // For non-Baymax providers, there should be no move completion (jump functionality disabled)
+    // For non-Sim providers, there should be no move completion (jump functionality disabled)
     cx.editor(|editor, _, _| {
         if let Some(completion_state) = &editor.active_edit_prediction {
             // Should be an Edit prediction, not a Move prediction
             match &completion_state.completion {
                 EditPrediction::Edit { .. } => {
-                    // This is expected for non-Baymax providers
+                    // This is expected for non-Sim providers
                 }
                 EditPrediction::MoveWithin { .. } | EditPrediction::MoveOutside { .. } => {
                     panic!(
-                        "Non-Baymax providers should not show Move predictions (jump functionality)"
+                        "Non-Sim providers should not show Move predictions (jump functionality)"
                     );
                 }
             }
@@ -1646,8 +1646,8 @@ fn assign_editor_completion_menu_provider(cx: &mut EditorTestContext) {
     });
 }
 
-fn propose_edits_non_baymax<T: ToOffset>(
-    provider: &Entity<FakeNonBaymaxEditPredictionDelegate>,
+fn propose_edits_non_sim<T: ToOffset>(
+    provider: &Entity<FakeNonSimEditPredictionDelegate>,
     edits: Vec<(Range<T>, &str)>,
     cx: &mut EditorTestContext,
 ) {
@@ -1669,8 +1669,8 @@ fn propose_edits_non_baymax<T: ToOffset>(
     });
 }
 
-fn assign_editor_completion_provider_non_baymax(
-    provider: Entity<FakeNonBaymaxEditPredictionDelegate>,
+fn assign_editor_completion_provider_non_sim(
+    provider: Entity<FakeNonSimEditPredictionDelegate>,
     cx: &mut EditorTestContext,
 ) {
     cx.update_editor(|editor, window, cx| {
@@ -1764,7 +1764,7 @@ impl EditPredictionDelegate for FakeEditPredictionDelegate {
     }
 
     fn icons(&self, _cx: &gpui::App) -> EditPredictionIconSet {
-        EditPredictionIconSet::new(IconName::BaymaxPredict)
+        EditPredictionIconSet::new(IconName::SimPredict)
     }
 
     fn is_enabled(
@@ -1812,11 +1812,11 @@ impl EditPredictionDelegate for FakeEditPredictionDelegate {
 }
 
 #[derive(Default, Clone)]
-pub struct FakeNonBaymaxEditPredictionDelegate {
+pub struct FakeNonSimEditPredictionDelegate {
     pub completion: Option<edit_prediction_types::EditPrediction>,
 }
 
-impl FakeNonBaymaxEditPredictionDelegate {
+impl FakeNonSimEditPredictionDelegate {
     pub fn set_edit_prediction(
         &mut self,
         completion: Option<edit_prediction_types::EditPrediction>,
@@ -1825,13 +1825,13 @@ impl FakeNonBaymaxEditPredictionDelegate {
     }
 }
 
-impl EditPredictionDelegate for FakeNonBaymaxEditPredictionDelegate {
+impl EditPredictionDelegate for FakeNonSimEditPredictionDelegate {
     fn name() -> &'static str {
-        "fake-non-baymax-provider"
+        "fake-non-sim-provider"
     }
 
     fn display_name() -> &'static str {
-        "Fake Non-Baymax Provider"
+        "Fake Non-Sim Provider"
     }
 
     fn show_predictions_in_menu() -> bool {
@@ -1843,7 +1843,7 @@ impl EditPredictionDelegate for FakeNonBaymaxEditPredictionDelegate {
     }
 
     fn icons(&self, _cx: &gpui::App) -> EditPredictionIconSet {
-        EditPredictionIconSet::new(IconName::BaymaxPredict)
+        EditPredictionIconSet::new(IconName::SimPredict)
     }
 
     fn is_enabled(

@@ -66,7 +66,7 @@ async fn check_compliance_impl(args: ComplianceArgs) -> Result<()> {
         OctocrabClient::new(
             app_id.parse().context("Failed to parse app ID as int")?,
             key.as_ref(),
-            Repository::BAYMAX.owner(),
+            Repository::SIM.owner(),
         )
         .await?,
     );
@@ -144,7 +144,7 @@ async fn check_compliance_impl(args: ComplianceArgs) -> Result<()> {
     for report in report.errors() {
         if let Some(pr_number) = report.commit.pr_number()
             && let Ok(pull_request) = client
-                .get_pull_request(&Repository::BAYMAX, pr_number)
+                .get_pull_request(&Repository::SIM, pr_number)
                 .await
             && pull_request.labels.is_none_or(|labels| {
                 labels
@@ -156,7 +156,7 @@ async fn check_compliance_impl(args: ComplianceArgs) -> Result<()> {
 
             client
                 .add_label_to_issue(
-                    &Repository::BAYMAX,
+                    &Repository::SIM,
                     compliance::github::PR_REVIEW_LABEL,
                     pr_number,
                 )

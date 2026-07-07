@@ -1,6 +1,6 @@
 #![allow(rustdoc::private_intra_doc_links)]
 //! This is the place where everything editor-related is stored (data-wise) and displayed (ui-wise).
-//! The main point of interest in this crate is [`Editor`] type, which is used in every other Baymax part as a user input element.
+//! The main point of interest in this crate is [`Editor`] type, which is used in every other Sim part as a user input element.
 //! It comes in different flavors: single line, multiline and a fixed height one.
 //!
 //! Editor contains of multiple large submodules:
@@ -131,10 +131,10 @@ pub use text::Bias;
 use ::git::status::FileStatus;
 use aho_corasick::{AhoCorasick, AhoCorasickBuilder, BuildError};
 use anyhow::{Context as _, Result, anyhow, bail};
-pub use baymax_actions::editor::RevealInFileManager;
-use baymax_actions::editor::{MoveDown, MoveUp};
+pub use sim_actions::editor::RevealInFileManager;
+use sim_actions::editor::{MoveDown, MoveUp};
 use blink_manager::BlinkManager;
-use client::{Collaborator, ParticipantIndex, parse_baymax_link};
+use client::{Collaborator, ParticipantIndex, parse_sim_link};
 use clock::ReplicaId;
 use code_context_menus::{
     AvailableCodeAction, CodeActionContents, CodeActionsItem, CodeActionsMenu, CodeContextMenu,
@@ -917,7 +917,7 @@ struct ActionFetchReady {
     actions: Rc<[AvailableCodeAction]>,
 }
 
-/// Baymax's primary implementation of text input, allowing users to edit a [`MultiBuffer`].
+/// Sim's primary implementation of text input, allowing users to edit a [`MultiBuffer`].
 ///
 /// See the [module level documentation](self) for more information.
 pub struct Editor {
@@ -2738,7 +2738,7 @@ impl Editor {
             cx,
             |e, _, _| match e.error_code() {
                 ErrorCode::RemoteUpgradeRequired => Some(format!(
-                "The remote instance of Baymax does not support this yet. It must be upgraded to {}",
+                "The remote instance of Sim does not support this yet. It must be upgraded to {}",
                 e.error_tag("required").unwrap_or("the latest version")
             )),
                 _ => None,
@@ -2818,7 +2818,7 @@ impl Editor {
         .detach_and_prompt_err("Failed to create buffer", window, cx, |e, _, _| {
             match e.error_code() {
                 ErrorCode::RemoteUpgradeRequired => Some(format!(
-                "The remote instance of Baymax does not support this yet. It must be upgraded to {}",
+                "The remote instance of Sim does not support this yet. It must be upgraded to {}",
                 e.error_tag("required").unwrap_or("the latest version")
             )),
                 _ => None,
@@ -2860,7 +2860,7 @@ impl Editor {
         }
     }
 
-    /// Returns the workspace serialization ID if this editor should be serialibaymax.
+    /// Returns the workspace serialization ID if this editor should be serialisim.
     fn workspace_serialization_id(&self, _cx: &App) -> Option<WorkspaceId> {
         self.workspace
             .as_ref()
@@ -7381,7 +7381,7 @@ impl Editor {
                     "No entry in selection_history found for undo. \
                      This may correspond to a bug where undo does not update the selection. \
                      If this is occurring, please add details to \
-                     https://github.com/simtropolis/baymax/issues/22692"
+                     https://github.com/simtropolis/sim/issues/22692"
                 );
             }
             self.request_autoscroll(Autoscroll::fit(), cx);
@@ -7415,7 +7415,7 @@ impl Editor {
                     "No entry in selection_history found for redo. \
                      This may correspond to a bug where undo does not update the selection. \
                      If this is occurring, please add details to \
-                     https://github.com/simtropolis/baymax/issues/22692"
+                     https://github.com/simtropolis/sim/issues/22692"
                 );
             }
             self.request_autoscroll(Autoscroll::fit(), cx);
@@ -8347,7 +8347,7 @@ impl Editor {
         cx: &mut Context<Self>,
     ) -> Entity<Self> {
         const MINIMAP_FONT_WEIGHT: gpui::FontWeight = gpui::FontWeight::BLACK;
-        const MINIMAP_FONT_FAMILY: SharedString = SharedString::new_static(".BaymaxMono");
+        const MINIMAP_FONT_FAMILY: SharedString = SharedString::new_static(".SimMono");
 
         let mut minimap = Editor::new_internal(
             EditorMode::Minimap {
@@ -8421,7 +8421,7 @@ impl Editor {
 
     fn copy_path(
         &mut self,
-        _: &baymax_actions::workspace::CopyPath,
+        _: &sim_actions::workspace::CopyPath,
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -8436,7 +8436,7 @@ impl Editor {
 
     fn copy_relative_path(
         &mut self,
-        _: &baymax_actions::workspace::CopyRelativePath,
+        _: &sim_actions::workspace::CopyRelativePath,
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {

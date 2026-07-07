@@ -825,7 +825,7 @@ mod tests {
         .concat();
 
         // Fold newline fn — collapsed text that itself contains \n
-        // (newlines are sanitibaymax to spaces to keep folds single-line).
+        // (newlines are sanitisim to spaces to keep folds single-line).
         cx.update_editor(|editor, window, cx| {
             editor.fold_at(MultiBufferRow(24), window, cx);
         });

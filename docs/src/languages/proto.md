@@ -1,11 +1,11 @@
 ---
 title: Proto
-description: "Configure Proto language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure Proto language support in Sim, including language servers, formatting, and debugging."
 ---
 
 # Proto
 
-Proto/proto3 (Protocol Buffers definition language) support is available through the [Proto extension](https://github.com/simtropolis/baymax/tree/main/extensions/proto).
+Proto/proto3 (Protocol Buffers definition language) support is available through the [Proto extension](https://github.com/simtropolis/sim/tree/main/extensions/proto).
 
 - Tree-sitter: [coder3101/tree-sitter-proto](https://github.com/coder3101/tree-sitter-proto)
 - Language Servers: [protobuf-language-server](https://github.com/lasorda/protobuf-language-server)
@@ -65,7 +65,7 @@ IndentWidth: 4
 ColumnLimit: 120
 ```
 
-Or you can have baymax directly invoke `clang-format` by specifying it as a [formatter](https://baymax.dev/docs/reference/all-settings#formatter) in your settings:
+Or you can have sim directly invoke `clang-format` by specifying it as a [formatter](https://sim.dev/docs/reference/all-settings#formatter) in your settings:
 
 ```json [settings]
   "languages": {

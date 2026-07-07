@@ -483,20 +483,20 @@ impl TerminalThreadMetadataDb {
             .working_directory
             .as_ref()
             .map(|path| path.to_string_lossy().into_owned());
-        let serialibaymax = row.folder_paths().serialize();
+        let serialisim = row.folder_paths().serialize();
         let (folder_paths, folder_paths_order) = if row.folder_paths().is_empty() {
             (None, None)
         } else {
-            (Some(serialibaymax.paths), Some(serialibaymax.order))
+            (Some(serialisim.paths), Some(serialisim.order))
         };
-        let main_serialibaymax = row.main_worktree_paths().serialize();
+        let main_serialisim = row.main_worktree_paths().serialize();
         let (main_worktree_paths, main_worktree_paths_order) =
             if row.main_worktree_paths().is_empty() {
                 (None, None)
             } else {
                 (
-                    Some(main_serialibaymax.paths),
-                    Some(main_serialibaymax.order),
+                    Some(main_serialisim.paths),
+                    Some(main_serialisim.order),
                 )
             };
         let remote_connection = row
@@ -568,7 +568,7 @@ impl Column for TerminalThreadMetadata {
 
         let folder_paths = folder_paths_str
             .map(|paths| {
-                PathList::deserialize(&util::path_list::SerialibaymaxPathList {
+                PathList::deserialize(&util::path_list::SerialisimPathList {
                     paths,
                     order: folder_paths_order_str.unwrap_or_default(),
                 })
@@ -577,7 +577,7 @@ impl Column for TerminalThreadMetadata {
 
         let main_worktree_paths = main_worktree_paths_str
             .map(|paths| {
-                PathList::deserialize(&util::path_list::SerialibaymaxPathList {
+                PathList::deserialize(&util::path_list::SerialisimPathList {
                     paths,
                     order: main_worktree_paths_order_str.unwrap_or_default(),
                 })

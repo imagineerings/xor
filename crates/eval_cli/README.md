@@ -1,11 +1,11 @@
 # eval-cli
 
-Headless CLI binary for running Baymax's agent in evaluation/benchmark
-environments. Designed to work inside containeribaymax environments like
+Headless CLI binary for running Sim's agent in evaluation/benchmark
+environments. Designed to work inside containerisim environments like
 [Harbor](https://harborframework.com/) where the repository is already
 checked out and API keys are provided via environment variables.
 
-Uses the same `NativeAgent` + `AcpThread` pipeline as the production Baymax
+Uses the same `NativeAgent` + `AcpThread` pipeline as the production Sim
 editor — full agentic loop with tool calls, subagents, and retries, just
 without a GUI.
 
@@ -58,7 +58,7 @@ Reads API keys from environment variables (`ANTHROPIC_API_KEY`,
 
 ## Harbor integration
 
-The `baymax_eval/` directory contains a Python package that
+The `sim_eval/` directory contains a Python package that
 implements Harbor's `BaseInstalledAgent` interface, allowing eval-cli to
 be used with `--agent-import-path` without modifying Harbor's source code.
 
@@ -76,7 +76,7 @@ Build for Linux first, then pass the binary path:
 crates/eval_cli/script/build-linux
 
 harbor run -d "swebench_verified@latest" \
-  --agent-import-path baymax_eval.agent:BaymaxAgent \
+  --agent-import-path sim_eval.agent:SimAgent \
   --ae binary_path=target/eval-cli \
   -m anthropic/claude-sonnet-4-6-latest
 ```
@@ -90,7 +90,7 @@ For CI or when the binary is hosted somewhere:
 
 ```
 harbor run -d "swebench_verified@latest" \
-  --agent-import-path baymax_eval.agent:BaymaxAgent \
+  --agent-import-path sim_eval.agent:SimAgent \
   --ak download_url=https://example.com/eval-cli \
   -m anthropic/claude-sonnet-4-6-latest
 ```
@@ -101,7 +101,7 @@ Pass `EVAL_CLI_TIMEOUT` via `--ae`:
 
 ```
 harbor run -d "swebench_verified@latest" \
-  --agent-import-path baymax_eval.agent:BaymaxAgent \
+  --agent-import-path sim_eval.agent:SimAgent \
   --ak binary_path=target/eval-cli \
   --ae EVAL_CLI_TIMEOUT=600 \
   -m anthropic/claude-sonnet-4-6-latest

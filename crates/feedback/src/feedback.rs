@@ -1,4 +1,4 @@
-use baymax_actions::feedback::{EmailBaymax, FileBugReport, RequestFeature};
+use sim_actions::feedback::{EmailSim, FileBugReport, RequestFeature};
 use client::telemetry;
 use extension_host::ExtensionStore;
 use gpui::{App, ClipboardItem, PromptLevel, actions};
@@ -7,23 +7,23 @@ use util::ResultExt;
 use workspace::Workspace;
 
 actions!(
-    baymax,
+    sim,
     [
-        /// Opens the Baymax repository on GitHub.
-        OpenBaymaxRepo,
+        /// Opens the Sim repository on GitHub.
+        OpenSimRepo,
         /// Copies installed extensions to the clipboard for bug reports.
         CopyInstalledExtensionsIntoClipboard
     ]
 );
 
-const BAYMAX_REPO_URL: &str = "https://github.com/simtropolis/baymax";
+const SIM_REPO_URL: &str = "https://github.com/simtropolis/sim";
 
-const REQUEST_FEATURE_URL: &str = "https://github.com/simtropolis/baymax/discussions/new/choose";
+const REQUEST_FEATURE_URL: &str = "https://github.com/simtropolis/sim/discussions/new/choose";
 
 fn file_bug_report_url(specs: &SystemSpecs) -> String {
     format!(
         concat!(
-            "https://github.com/simtropolis/baymax/issues/new",
+            "https://github.com/simtropolis/sim/issues/new",
             "?",
             "template=10_bug_report.yml",
             "&",
@@ -33,9 +33,9 @@ fn file_bug_report_url(specs: &SystemSpecs) -> String {
     )
 }
 
-fn email_baymax_url(specs: &SystemSpecs) -> String {
+fn email_sim_url(specs: &SystemSpecs) -> String {
     format!(
-        concat!("mailto:hi@baymax.dev", "?", "body={}"),
+        concat!("mailto:hi@sim.dev", "?", "body={}"),
         email_body(specs)
     )
 }
@@ -96,20 +96,20 @@ pub fn init(cx: &mut App) {
                 })
                 .detach();
             })
-            .register_action(move |_, _: &EmailBaymax, window, cx| {
+            .register_action(move |_, _: &EmailSim, window, cx| {
                 let specs =
                     SystemSpecs::new(window, cx, telemetry::os_name(), telemetry::os_version());
                 cx.spawn_in(window, async move |_, cx| {
                     let specs = specs.await;
                     cx.update(|_, cx| {
-                        cx.open_url(&email_baymax_url(&specs));
+                        cx.open_url(&email_sim_url(&specs));
                     })
                     .log_err();
                 })
                 .detach();
             })
-            .register_action(move |_, _: &OpenBaymaxRepo, _, cx| {
-                cx.open_url(BAYMAX_REPO_URL);
+            .register_action(move |_, _: &OpenSimRepo, _, cx| {
+                cx.open_url(SIM_REPO_URL);
             });
     })
     .detach();

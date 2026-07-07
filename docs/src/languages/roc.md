@@ -1,14 +1,14 @@
 ---
 title: Roc
-description: "Configure Roc language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure Roc language support in Sim, including language servers, formatting, and debugging."
 ---
 
 # Roc
 
 [Roc](https://www.roc-lang.org/) is a fast, friendly, functional language.
 
-Roc language support in Baymax is provided by the community-maintained [Roc extension](https://github.com/h2000/baymax-roc).
-Report issues to: [https://github.com/h2000/baymax-roc/issues](https://github.com/h2000/baymax-roc/issues)
+Roc language support in Sim is provided by the community-maintained [Roc extension](https://github.com/h2000/sim-roc).
+Report issues to: [https://github.com/h2000/sim-roc/issues](https://github.com/h2000/sim-roc/issues)
 
 - Tree-sitter: [faldor20/tree-sitter-roc](https://github.com/faldor20/tree-sitter-roc)
 - Language Server: [roc-lang/roc/tree/main/crates/language_server](https://github.com/roc-lang/roc/tree/main/crates/language_server)

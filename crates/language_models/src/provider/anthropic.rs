@@ -30,7 +30,7 @@ const PROVIDER_NAME: LanguageModelProviderName = ANTHROPIC_PROVIDER_NAME;
 #[derive(Default, Clone, Debug, PartialEq)]
 pub struct AnthropicSettings {
     pub api_url: String,
-    /// Extend Baymax's list of Anthropic models.
+    /// Extend Sim's list of Anthropic models.
     pub available_models: Vec<AvailableModel>,
     /// User-configured headers added to every Anthropic request.
     pub custom_headers: CustomHeaders,
@@ -648,7 +648,7 @@ impl Render for ConfigurationView {
                 .size_full()
                 .on_action(cx.listener(Self::save_api_key))
                 .child(Label::new(format!("To use {}, you need to add an API key. Follow these steps:", match &self.target_agent {
-                    ConfigurationViewTargetAgent::BaymaxAgent => "Baymax's agent with Anthropic".into(),
+                    ConfigurationViewTargetAgent::SimAgent => "Sim's agent with Anthropic".into(),
                     ConfigurationViewTargetAgent::Other(agent) => agent.clone(),
                 })))
                 .child(
@@ -665,7 +665,7 @@ impl Render for ConfigurationView {
                 .child(self.api_key_editor.clone())
                 .child(
                     Label::new(
-                        format!("You can also set the {API_KEY_ENV_VAR_NAME} environment variable and restart Baymax."),
+                        format!("You can also set the {API_KEY_ENV_VAR_NAME} environment variable and restart Sim."),
                     )
                     .size(LabelSize::Small)
                     .color(Color::Muted)

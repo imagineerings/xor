@@ -104,9 +104,9 @@ impl ApplicationMenu {
         ContextMenu::build(window, cx, |menu, window, cx| {
             // Grab current focus handle so menu can shown items in context with the focused element
             let menu = menu.when_some(window.focused(cx), |menu, focused| menu.context(focused));
-            let sanitibaymax_items = Self::sanitize_menu_items(entry.menu.items);
+            let sanitisim_items = Self::sanitize_menu_items(entry.menu.items);
 
-            sanitibaymax_items
+            sanitisim_items
                 .into_iter()
                 .fold(menu, |menu, item| match item {
                     OwnedMenuItem::Separator => menu.separator(),
@@ -274,7 +274,7 @@ impl ApplicationMenu {
 pub(crate) fn show_menus(cx: &mut App) -> bool {
     TitleBarSettings::get_global(cx).show_menus
         && (cfg!(not(target_os = "macos"))
-            || option_env!("BAYMAX_USE_CROSS_PLATFORM_MENU").is_some())
+            || option_env!("SIM_USE_CROSS_PLATFORM_MENU").is_some())
 }
 
 impl Render for ApplicationMenu {

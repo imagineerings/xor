@@ -10,7 +10,7 @@ on:
     - extension-cli
 jobs:
   publish_job:
-    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'baymax-extensions')
+    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'sim-extensions')
     runs-on: namespace-profile-16x32-ubuntu-2204
     steps:
     - name: steps::checkout_repo
@@ -31,18 +31,18 @@ jobs:
       env:
         DIGITALOCEAN_SPACES_ACCESS_KEY: ${{ secrets.DIGITALOCEAN_SPACES_ACCESS_KEY }}
         DIGITALOCEAN_SPACES_SECRET_KEY: ${{ secrets.DIGITALOCEAN_SPACES_SECRET_KEY }}
-  update_sha_in_baymax:
+  update_sha_in_sim:
     needs:
     - publish_job
-    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'baymax-extensions')
+    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'sim-extensions')
     runs-on: namespace-profile-8x16-ubuntu-2204
     steps:
     - id: generate-token
       name: steps::generate_token
       uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859
       with:
-        app-id: ${{ secrets.BAYMAX_ZIPPY_APP_ID }}
-        private-key: ${{ secrets.BAYMAX_ZIPPY_APP_PRIVATE_KEY }}
+        app-id: ${{ secrets.SIM_ZIPPY_APP_ID }}
+        private-key: ${{ secrets.SIM_ZIPPY_APP_PRIVATE_KEY }}
     - name: steps::checkout_repo
       uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
       with:
@@ -56,11 +56,11 @@ jobs:
       name: publish_extension_cli::get_short_sha
       run: |
         echo "sha_short=$(echo "$GITHUB_SHA" | cut -c1-7)" >> "$GITHUB_OUTPUT"
-    - name: publish_extension_cli::update_sha_in_baymax::replace_sha
+    - name: publish_extension_cli::update_sha_in_sim::replace_sha
       run: |
-        sed -i "s/BAYMAX_EXTENSION_CLI_SHA: &str = \"[a-f0-9]*\"/BAYMAX_EXTENSION_CLI_SHA: \&str = \"$GITHUB_SHA\"/" \
+        sed -i "s/SIM_EXTENSION_CLI_SHA: &str = \"[a-f0-9]*\"/SIM_EXTENSION_CLI_SHA: \&str = \"$GITHUB_SHA\"/" \
             tooling/xtask/src/tasks/workflows/extension_tests.rs
-    - name: publish_extension_cli::update_sha_in_baymax::regenerate_workflows
+    - name: publish_extension_cli::update_sha_in_sim::regenerate_workflows
       run: cargo xtask workflows
     - name: steps::create_pull_request
       uses: peter-evans/create-pull-request@98357b18bf14b5342f975ff684046ec3b2a07725
@@ -74,8 +74,8 @@ jobs:
           - N/A
         commit-message: 'extension_ci: Bump extension CLI version to `${{ steps.short-sha.outputs.sha_short }}`'
         branch: update-extension-cli-sha
-        committer: baymax-zippy[bot] <234243425+baymax-zippy[bot]@users.noreply.github.com>
-        author: baymax-zippy[bot] <234243425+baymax-zippy[bot]@users.noreply.github.com>
+        committer: sim-zippy[bot] <234243425+sim-zippy[bot]@users.noreply.github.com>
+        author: sim-zippy[bot] <234243425+sim-zippy[bot]@users.noreply.github.com>
         base: main
         delete-branch: true
         token: ${{ steps.generate-token.outputs.token }}
@@ -84,15 +84,15 @@ jobs:
   update_sha_in_extensions:
     needs:
     - publish_job
-    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'baymax-extensions')
+    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'sim-extensions')
     runs-on: namespace-profile-2x4-ubuntu-2404
     steps:
     - id: generate-token
       name: steps::generate_token
       uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859
       with:
-        app-id: ${{ secrets.BAYMAX_ZIPPY_APP_ID }}
-        private-key: ${{ secrets.BAYMAX_ZIPPY_APP_PRIVATE_KEY }}
+        app-id: ${{ secrets.SIM_ZIPPY_APP_ID }}
+        private-key: ${{ secrets.SIM_ZIPPY_APP_PRIVATE_KEY }}
         owner: simtropolis
         repositories: extensions
     - id: short-sha
@@ -106,18 +106,18 @@ jobs:
         token: ${{ steps.generate-token.outputs.token }}
     - name: publish_extension_cli::update_sha_in_extensions::replace_sha
       run: |
-        sed -i "s/BAYMAX_EXTENSION_CLI_SHA: [a-f0-9]*/BAYMAX_EXTENSION_CLI_SHA: $GITHUB_SHA/" \
+        sed -i "s/SIM_EXTENSION_CLI_SHA: [a-f0-9]*/SIM_EXTENSION_CLI_SHA: $GITHUB_SHA/" \
             .github/workflows/ci.yml
     - name: steps::create_pull_request
       uses: peter-evans/create-pull-request@98357b18bf14b5342f975ff684046ec3b2a07725
       with:
         title: Bump extension CLI version to `${{ steps.short-sha.outputs.sha_short }}`
         body: |
-          This PR bumps the extension CLI version to https://github.com/simtropolis/baymax/commit/${{ github.sha }}.
+          This PR bumps the extension CLI version to https://github.com/simtropolis/sim/commit/${{ github.sha }}.
         commit-message: Bump extension CLI version to `${{ steps.short-sha.outputs.sha_short }}`
         branch: update-extension-cli-sha
-        committer: baymax-zippy[bot] <234243425+baymax-zippy[bot]@users.noreply.github.com>
-        author: baymax-zippy[bot] <234243425+baymax-zippy[bot]@users.noreply.github.com>
+        committer: sim-zippy[bot] <234243425+sim-zippy[bot]@users.noreply.github.com>
+        author: sim-zippy[bot] <234243425+sim-zippy[bot]@users.noreply.github.com>
         base: main
         delete-branch: true
         token: ${{ steps.generate-token.outputs.token }}

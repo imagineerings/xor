@@ -5,7 +5,7 @@ slug: acceptable-use-policies
 
 **Last Updated:** March 2, 2026
 
-Some third-party services accessible through Baymax have their own acceptable use policies. These apply whether Baymax hosts the service on your behalf or you connect your own account. The applicable policies are listed below and apply alongside the [Baymax End User Terms](/terms) and [Baymax Privacy Policy](/privacy-policy).
+Some third-party services accessible through Sim have their own acceptable use policies. These apply whether Sim hosts the service on your behalf or you connect your own account. The applicable policies are listed below and apply alongside the [Sim End User Terms](/terms) and [Sim Privacy Policy](/privacy-policy).
 
 These policies may be updated from time to time by the applicable provider.
 

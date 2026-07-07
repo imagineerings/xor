@@ -33,7 +33,7 @@ pub async fn validate_header<B>(mut req: Request<B>, next: Next<B>) -> impl Into
     if first == "dev-server-token" {
         Err(Error::http(
             StatusCode::UNAUTHORIZED,
-            "Dev servers were removed in Baymax 0.157 please upgrade to SSH remoting".to_string(),
+            "Dev servers were removed in Sim 0.157 please upgrade to SSH remoting".to_string(),
         ))?;
     }
 
@@ -56,7 +56,7 @@ pub async fn validate_header<B>(mut req: Request<B>, next: Next<B>) -> impl Into
     let response = http_client
         .get(format!(
             "{}/client/users/me",
-            state.config.baymax_cloud_url()
+            state.config.sim_cloud_url()
         ))
         .header("Content-Type", "application/json")
         .header("Authorization", format!("{user_id} {access_token}"))

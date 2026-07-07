@@ -1,22 +1,22 @@
 ---
-title: Use a Local Model - Baymax
-description: Configure Ollama, LM Studio, local OpenAI-compatible servers, and local edit prediction in Baymax.
+title: Use a Local Model - Sim
+description: Configure Ollama, LM Studio, local OpenAI-compatible servers, and local edit prediction in Sim.
 ---
 
 # Use a Local Model
 
 Use local models when you run the model on your machine or on infrastructure you control.
 
-| Local path                        | Baymax AI features      | External Agents | Terminal Threads | Notes                                              |
+| Local path                        | Sim AI features      | External Agents | Terminal Threads | Notes                                              |
 | --------------------------------- | -------------------- | --------------- | ---------------- | -------------------------------------------------- |
-| Ollama                            | Yes                  | Separate config | Separate config  | Configure Ollama for Baymax AI features               |
-| LM Studio                         | Yes                  | Separate config | Separate config  | Configure LM Studio for Baymax AI features            |
+| Ollama                            | Yes                  | Separate config | Separate config  | Configure Ollama for Sim AI features               |
+| LM Studio                         | Yes                  | Separate config | Separate config  | Configure LM Studio for Sim AI features            |
 | Local OpenAI-compatible server    | Yes                  | Separate config | Separate config  | Configure base URL, model, and key if needed       |
 | Local/self-hosted edit prediction | Edit Prediction only | No              | No               | Uses [Edit Prediction](./edit-prediction.md) setup |
 
 ## Ollama {#ollama}
 
-Use Ollama for local models with Baymax Agent, Inline Assistant, and similar model-backed Baymax AI features.
+Use Ollama for local models with Sim Agent, Inline Assistant, and similar model-backed Sim AI features.
 
 1. Download and install Ollama from [ollama.com/download](https://ollama.com/download).
 2. Pull a model:
@@ -31,9 +31,9 @@ Use Ollama for local models with Baymax Agent, Inline Assistant, and similar mod
    ollama serve
    ```
 
-4. In Baymax, select an Ollama model from the model dropdown.
+4. In Sim, select an Ollama model from the model dropdown.
 
-Baymax automatically discovers models that Ollama has pulled. To disable autodiscovery and list models yourself, configure `auto_discover`:
+Sim automatically discovers models that Ollama has pulled. To disable autodiscovery and list models yourself, configure `auto_discover`:
 
 ```json [settings]
 {
@@ -58,7 +58,7 @@ Baymax automatically discovers models that Ollama has pulled. To disable autodis
 
 ### Ollama Context Length {#ollama-context}
 
-Baymax requests to Ollama include context length as the `num_ctx` parameter. By default, Baymax uses `4096` tokens.
+Sim requests to Ollama include context length as the `num_ctx` parameter. By default, Sim uses `4096` tokens.
 
 Set a context length for all Ollama models:
 
@@ -78,7 +78,7 @@ If your Ollama server requires a key, enter the key in the provider UI or set `O
 
 ## LM Studio {#lm-studio}
 
-Use LM Studio for local models with Baymax Agent, Inline Assistant, and similar model-backed Baymax AI features.
+Use LM Studio for local models with Sim Agent, Inline Assistant, and similar model-backed Sim AI features.
 
 1. Download and install [LM Studio](https://lmstudio.ai/download).
 2. Download at least one model in LM Studio, or use the LM Studio CLI:
@@ -93,7 +93,7 @@ Use LM Studio for local models with Baymax Agent, Inline Assistant, and similar 
    lms server start
    ```
 
-4. In Baymax, select an LM Studio model from the model dropdown.
+4. In Sim, select an LM Studio model from the model dropdown.
 
 If your LM Studio server requires a key, enter the key in the provider UI or set `LMSTUDIO_API_KEY`.
 
@@ -107,4 +107,4 @@ Edit Prediction has its own provider setup. See [Edit Prediction](./edit-predict
 
 ## Agent Path Boundaries {#agent-path-boundaries}
 
-This page covers local models configured in Baymax. External Agents and terminal CLIs may have their own local-model setup; configure those in the agent or CLI.
+This page covers local models configured in Sim. External Agents and terminal CLIs may have their own local-model setup; configure those in the agent or CLI.

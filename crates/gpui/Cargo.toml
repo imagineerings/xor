@@ -2,9 +2,9 @@
 name = "gpui"
 version = "0.2.2"
 edition.workspace = true
-authors = ["Nathan Sobo <nathan@baymax.dev>"]
-description = "Baymax's GPU-accelerated UI framework"
-repository = "https://github.com/simtropolis/baymax"
+authors = ["Nathan Sobo <nathan@sim.dev>"]
+description = "Sim's GPU-accelerated UI framework"
+repository = "https://github.com/simtropolis/sim"
 publish = true
 license = "Apache-2.0"
 homepage = "https://gpui.rs"

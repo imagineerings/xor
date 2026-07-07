@@ -64,7 +64,7 @@ pub struct SystemPromptTemplate<'a> {
     pub available_tools: Vec<SharedString>,
     pub model_name: Option<String>,
     pub date: String,
-    /// Contents of the user-global `~/.config/baymax/AGENTS.md` file (or the
+    /// Contents of the user-global `~/.config/sim/AGENTS.md` file (or the
     /// platform equivalent), if present and non-empty.
     pub user_agents_md: Option<SharedString>,
     /// Whether agent-run terminal commands are wrapped in an OS-level
@@ -122,7 +122,7 @@ mod tests {
         };
         let templates = Templates::new();
         let rendered = template.render(&templates).unwrap();
-        assert!(rendered.contains("You are the Baymax coding agent"));
+        assert!(rendered.contains("You are the Sim coding agent"));
         assert!(rendered.contains("Today's Date: 2026-01-01"));
         assert!(rendered.contains("## Fixing Diagnostics"));
         assert!(rendered.contains("test-model"));
@@ -134,12 +134,12 @@ mod tests {
             "Run {{command}} in {{worktree}}.",
             &json!({
                 "command": "cargo check",
-                "worktree": "baymax",
+                "worktree": "sim",
             }),
         )
         .unwrap();
 
-        assert_eq!(rendered, "Run cargo check in baymax.");
+        assert_eq!(rendered, "Run cargo check in sim.");
     }
 
     #[test]
@@ -290,7 +290,7 @@ mod tests {
     }
 
     #[test]
-    fn test_system_prompt_does_not_render_legacy_baymax_rules_section() {
+    fn test_system_prompt_does_not_render_legacy_sim_rules_section() {
         let project = prompt_store::ProjectContext::default();
         let template = SystemPromptTemplate {
             project: &project,

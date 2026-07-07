@@ -1,20 +1,20 @@
 ---
-title: AI Coding Agent - Baymax Agent Panel
-description: Use Baymax's AI coding agent to generate, refactor, and debug code with tool calling, checkpoints, and multi-model support.
+title: AI Coding Agent - Sim Agent Panel
+description: Use Sim's AI coding agent to generate, refactor, and debug code with tool calling, checkpoints, and multi-model support.
 ---
 
 # Agent Panel
 
 The Agent Panel is where you interact with AI agents that can read, write, and run code in your project.
-It's the core of Baymax's AI code editing experience — use it for code generation, refactoring, debugging, documentation, and general questions.
+It's the core of Sim's AI code editing experience — use it for code generation, refactoring, debugging, documentation, and general questions.
 
 Open it with {#action agent::NewThread} from [the Command Palette](../command-palette.md) or click the ✨ icon in the status bar.
 
 ## Getting Started {#getting-started}
 
-If you're using the Agent Panel for the first time, configure either a model for the [Baymax Agent](./baymax-agent.md) or an [External Agent](./external-agents.md).
+If you're using the Agent Panel for the first time, configure either a model for the [Sim Agent](./sim-agent.md) or an [External Agent](./external-agents.md).
 
-- Use [LLM Providers](./llm-providers.md) for Baymax-hosted models, API access, subscriptions, gateways, and local models.
+- Use [LLM Providers](./llm-providers.md) for Sim-hosted models, API access, subscriptions, gateways, and local models.
 - Use [External Agents](./external-agents.md) for ACP-integrated agents.
 - Use [AI Quick Start](./quick-start.md) if you are not sure which path to choose.
 
@@ -31,14 +31,14 @@ The sections below cover what you can do from here.
 
 ### Creating New Threads {#new-thread}
 
-By default, the Agent Panel uses Baymax's first-party agent.
+By default, the Agent Panel uses Sim's first-party agent.
 
 Start a new thread with {#kb agent::NewThread}, or open the "New Thread…" menu using the agent selector button on the left (in the empty state) or the `+` icon in the top-right of the panel toolbar. You can also open that menu with {#kb agent::ToggleNewThreadMenu}.
 
 From the "New Thread…" menu you can:
 
-- Pick **Baymax Agent** or any installed [External Agent](./external-agents.md) to start a new thread with that agent.
-- Choose **New From Summary** to start a fresh Baymax Agent thread seeded with a summary of the current conversation — useful for compacting long threads as you approach the context window limit.
+- Pick **Sim Agent** or any installed [External Agent](./external-agents.md) to start a new thread with that agent.
+- Choose **New From Summary** to start a fresh Sim Agent thread seeded with a summary of the current conversation — useful for compacting long threads as you approach the context window limit.
 - Choose **Terminal** to open a terminal thread directly in the Agent Panel — see [Terminal Threads](#terminal-threads) for details.
 
 {#action agent::NewExternalAgentThread} creates a new thread with the specified External Agent id.
@@ -64,7 +64,7 @@ You can click on the card that contains your message and re-submit it with an ad
 
 Messages sent while the agent is in the generating state get, by default, queued.
 
-For the Baymax Agent, queued messages get sent at the next turn boundary, which is usually between a tool call and a response, whereas for External Agents, the message gets sent at the end of the generation.
+For the Sim Agent, queued messages get sent at the next turn boundary, which is usually between a tool call and a response, whereas for External Agents, the message gets sent at the end of the generation.
 
 You can edit or remove (an individual or all) queued messages.
 You can also still interrupt the agent immediately if you want by either clicking on the stop button or by clicking the "Send Now" (double-enter) on a queued message.
@@ -104,7 +104,7 @@ You can also hold `cmd`/`ctrl` when submitting a message to automatically follow
 
 ### Get Notified {#get-notified}
 
-If you send a prompt to the Agent and then put Baymax in the background, you can choose to be notified when its generation wraps up via:
+If you send a prompt to the Agent and then put Sim in the background, you can choose to be notified when its generation wraps up via:
 
 - a visual notification that appears in the top right of your screen
 - a sound notification
@@ -133,7 +133,7 @@ The agent can search your codebase to find relevant context, but providing it ex
 Add context by typing `@` in the message editor.
 You can mention files, directories, symbols, previous threads, skills, diagnostics, branch diffs, and URLs to fetch.
 
-When you paste multi-line code selections copied from a buffer, Baymax automatically formats them as @-mentions with the file context.
+When you paste multi-line code selections copied from a buffer, Sim automatically formats them as @-mentions with the file context.
 To paste content without this automatic formatting, use {#kb agent::PasteRaw} to paste raw text directly.
 
 ### Selection as Context
@@ -150,9 +150,9 @@ Copying an image and pasting it is also supported.
 
 ## Token Usage and Compaction {#token-usage}
 
-Baymax surfaces how many tokens you are consuming for your currently active thread near the profile selector in the panel's message editor.
+Sim surfaces how many tokens you are consuming for your currently active thread near the profile selector in the panel's message editor.
 
-Baymax automatically compacts long Baymax Agent threads as they approach the configured token threshold. Compaction summarizes earlier messages and replaces them in the model context with that summary, leaving more room for the next turn. The thread shows a **Context Compacted** entry that you can expand to inspect the summary. You can compact manually by typing `/compact` in the message editor.
+Sim automatically compacts long Sim Agent threads as they approach the configured token threshold. Compaction summarizes earlier messages and replaces them in the model context with that summary, leaving more room for the next turn. The thread shows a **Context Compacted** entry that you can expand to inspect the summary. You can compact manually by typing `/compact` in the message editor.
 
 If the selected model's context window is too small for automatic compaction (less than 80000 tokens), a banner appears above the message editor as you approach the token limit. Use **Start New Thread** from that banner, or choose **New From Summary** from the New Thread menu (the `+` button on the top right), to continue in a new thread seeded with a summary. You can also @-mention a past thread in a new one.
 
@@ -160,9 +160,9 @@ Configure automatic compaction with `agent.auto_compact`. See [Agent Settings](.
 
 ## Changing Models {#changing-models}
 
-After you've configured your LLM providers—either via [API access](./use-api-access.md) or through [Baymax-hosted models](../account/baymax-hosted-models.md)—you can switch between their models by clicking on the model selector on the message editor or by using the {#kb agent::ToggleModelSelector} keybinding.
+After you've configured your LLM providers—either via [API access](./use-api-access.md) or through [Sim-hosted models](../account/sim-hosted-models.md)—you can switch between their models by clicking on the model selector on the message editor or by using the {#kb agent::ToggleModelSelector} keybinding.
 
-> The same model can be offered via multiple providers - for example, Claude Sonnet 4.5 is available via Baymax Pro, OpenRouter, Anthropic directly, and more.
+> The same model can be offered via multiple providers - for example, Claude Sonnet 4.5 is available via Sim Pro, OpenRouter, Anthropic directly, and more.
 > Make sure you've selected the correct model **_provider_** for the model you'd like to use, delineated by the logo to the left of the model in the model selector.
 
 ### Favoriting Models
@@ -173,9 +173,9 @@ Cycle through your favorites with {#kb agent::CycleFavoriteModels} without openi
 
 ## Using Tools and Profiles {#using-tools}
 
-The Agent Panel supports tool calling, which enables agentic editing. Baymax includes [built-in tools](./tools.md) for searching your codebase, editing files, running terminal commands, and more.
+The Agent Panel supports tool calling, which enables agentic editing. Sim includes [built-in tools](./tools.md) for searching your codebase, editing files, running terminal commands, and more.
 
-Use [Agent Profiles](./agent-profiles.md) to choose which built-in tools and MCP tools are available in a Baymax Agent thread. Use [Tool Permissions](./tool-permissions.md) to control whether permission-gated tool calls are allowed, denied, or confirmed.
+Use [Agent Profiles](./agent-profiles.md) to choose which built-in tools and MCP tools are available in a Sim Agent thread. Use [Tool Permissions](./tool-permissions.md) to control whether permission-gated tool calls are allowed, denied, or confirmed.
 
 You can add external tools with [MCP Servers](./mcp.md).
 
@@ -185,12 +185,12 @@ Tool calling needs to be individually supported by each model and model provider
 Therefore, despite the presence of built-in tools, some models may not have the ability to pick them up.
 You should see a "No tools" label if you select a model that falls into this case.
 
-All [Baymax-hosted models](../account/baymax-hosted-models.md) support tool calling out-of-the-box.
+All [Sim-hosted models](../account/sim-hosted-models.md) support tool calling out-of-the-box.
 
 ### MCP Servers {#mcp-servers}
 
 Similarly to the built-in tools, some models may not support all tools included in a given MCP Server.
-Baymax's UI will inform you about this via a warning icon that appears close to the model selector.
+Sim's UI will inform you about this via a warning icon that appears close to the model selector.
 
 ## Errors and Debugging {#errors-and-debugging}
 
@@ -200,17 +200,17 @@ You can also open threads as Markdown by clicking on the file icon button, to th
 
 ## Feedback {#feedback}
 
-You can rate agent responses to help improve Baymax's system prompt and tools.
+You can rate agent responses to help improve Sim's system prompt and tools.
 
-> **Warning:** Rating an AI response sends the conversation thread to Baymax. The
+> **Warning:** Rating an AI response sends the conversation thread to Sim. The
 > conversation thread includes your messages, AI responses, and thread metadata.
 > See [Feedback and Training Data](./ai-improvement.md) and
 > [AI Privacy](./privacy-and-security.md) for more information.
-> **_If you don't want data persisted on Baymax's servers, don't rate_**.
-> We will not collect data for improving Baymax's agent experience without you
+> **_If you don't want data persisted on Sim's servers, don't rate_**.
+> We will not collect data for improving Sim's agent experience without you
 > explicitly rating responses.
 
-To help improve Baymax's system prompt and tools, rate responses with the thumbs up/down controls at the end of each response.
+To help improve Sim's system prompt and tools, rate responses with the thumbs up/down controls at the end of each response.
 In case of a thumbs down, a new text area will show up where you can add more specifics about what happened.
 
 You can provide feedback on the thread at any point after the agent responds, and multiple times within the same thread.

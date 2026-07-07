@@ -1,5 +1,5 @@
 use anyhow::{Result, anyhow};
-use baymax_actions::{OpenDocs, RevealTarget};
+use sim_actions::{OpenDocs, RevealTarget};
 use collections::{HashMap, HashSet};
 use command_palette_hooks::{CommandInterceptItem, CommandInterceptResult};
 use editor::{
@@ -1626,7 +1626,7 @@ fn generate_commands(_: &App) -> Vec<VimCommand> {
         .bang(workspace::CloseAllItemsAndPanes {
             save_intent: Some(SaveIntent::Overwrite),
         }),
-        VimCommand::new(("cq", "uit"), baymax_actions::Quit),
+        VimCommand::new(("cq", "uit"), sim_actions::Quit),
         VimCommand::new(
             ("bd", "elete"),
             workspace::CloseItemInAllPanes {
@@ -1792,7 +1792,7 @@ fn generate_commands(_: &App) -> Vec<VimCommand> {
         VimCommand::new(("0", ""), StartOfDocument),
         VimCommand::new(("ex", ""), editor::actions::ReloadFile).bang(editor::actions::ReloadFile),
         VimCommand::new(("cpp", "link"), editor::actions::CopyPermalinkToLine).range(act_on_range),
-        VimCommand::str(("opt", "ions"), "baymax::OpenDefaultSettings"),
+        VimCommand::str(("opt", "ions"), "sim::OpenDefaultSettings"),
         VimCommand::str(("map", ""), "vim::OpenDefaultKeymap"),
         VimCommand::new(("h", "elp"), OpenDocs),
     ]
@@ -2080,7 +2080,7 @@ pub(crate) struct OnMatchingLines {
 }
 
 impl OnMatchingLines {
-    // convert a vim query into something more usable by baymax.
+    // convert a vim query into something more usable by sim.
     // we don't attempt to fully convert between the two regex syntaxes,
     // but we do flip \( and \) to ( and ) (and vice-versa) in the pattern,
     // and convert \0..\9 to $0..$9 in the replacement so that common idioms work.

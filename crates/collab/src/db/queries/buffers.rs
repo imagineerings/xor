@@ -156,7 +156,7 @@ impl Database {
                     .await?;
 
                 // If the buffer epoch hasn't changed since the client lost
-                // connection, then the client's buffer can be synchronibaymax with
+                // connection, then the client's buffer can be synchronisim with
                 // the server's buffer.
                 if buffer.epoch as u64 != client_buffer.epoch {
                     log::info!("can't rejoin buffer, epoch has changed");

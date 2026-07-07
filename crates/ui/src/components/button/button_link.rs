@@ -3,7 +3,7 @@ use gpui::{IntoElement, Window, prelude::*};
 use crate::{ButtonLike, prelude::*};
 
 /// A button that takes an underline to look like a regular web link.
-/// It also contains an arrow icon to communicate the link takes you out of Baymax.
+/// It also contains an arrow icon to communicate the link takes you out of Sim.
 ///
 /// # Usage Example
 ///
@@ -91,7 +91,7 @@ impl Component for ButtonLink {
             .child(
                 example_group(vec![single_example(
                     "Simple",
-                    ButtonLink::new("baymax.dev", "https://baymax.dev").into_any_element(),
+                    ButtonLink::new("sim.dev", "https://sim.dev").into_any_element(),
                 )])
                 .vertical(),
             )

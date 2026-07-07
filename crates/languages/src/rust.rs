@@ -328,8 +328,8 @@ impl LspAdapter for RustLspAdapter {
                 .map(|info| &mut info.message)
                 .chain([&mut diagnostic.message])
             {
-                if let Cow::Owned(sanitibaymax) = REGEX.replace_all(message, "`$1`") {
-                    *message = sanitibaymax;
+                if let Cow::Owned(sanitisim) = REGEX.replace_all(message, "`$1`") {
+                    *message = sanitisim;
                 }
             }
         }
@@ -1042,14 +1042,14 @@ impl ContextProvider for RustContextProvider {
                     "-p".into(),
                     RUST_PACKAGE_TASK_VARIABLE.template_value(),
                 ],
-                cwd: Some("$BAYMAX_DIRNAME".to_owned()),
+                cwd: Some("$SIM_DIRNAME".to_owned()),
                 ..TaskTemplate::default()
             },
             TaskTemplate {
                 label: "Check all targets (workspace)".into(),
                 command: "cargo".into(),
                 args: vec!["check".into(), "--workspace".into(), "--all-targets".into()],
-                cwd: Some("$BAYMAX_DIRNAME".to_owned()),
+                cwd: Some("$SIM_DIRNAME".to_owned()),
                 ..TaskTemplate::default()
             },
             TaskTemplate {
@@ -1346,10 +1346,10 @@ async fn human_readable_package_name(
 }
 
 // For providing local `cargo check -p $pkgid` task, we do not need most of the information we have returned.
-// Output example in the root of Baymax project:
+// Output example in the root of Sim project:
 // ```sh
-// ❯ cargo pkgid baymax
-// path+file:///absolute/path/to/project/baymax/crates/baymax#0.131.0
+// ❯ cargo pkgid sim
+// path+file:///absolute/path/to/project/sim/crates/sim#0.131.0
 // ```
 // Another variant, if a project has a custom package name or hyphen in the name:
 // ```
@@ -1880,7 +1880,7 @@ mod tests {
             "filter range text '{filter_text}' should contain 'ref' for filtering to work",
         );
 
-        // Test for correct range calculation with mixed empty and non-empty tabstops.(See https://github.com/simtropolis/baymax/issues/44825)
+        // Test for correct range calculation with mixed empty and non-empty tabstops.(See https://github.com/simtropolis/sim/issues/44825)
         let res = adapter
             .label_for_completion(
                 &lsp::CompletionItem {
@@ -1977,7 +1977,7 @@ mod tests {
             adapter
                 .label_for_symbol(
                     &language::Symbol {
-                        name: "baymax".to_string(),
+                        name: "sim".to_string(),
                         kind: lsp::SymbolKind::PACKAGE,
                         container_name: None,
                     },
@@ -1985,7 +1985,7 @@ mod tests {
                 )
                 .await,
             Some(CodeLabel::new(
-                "extern crate baymax".to_string(),
+                "extern crate sim".to_string(),
                 13..19,
                 vec![(0..6, highlight_keyword), (7..12, highlight_keyword),],
             ))
@@ -2086,8 +2086,8 @@ mod tests {
     fn test_package_name_from_pkgid() {
         for (input, expected) in [
             (
-                "path+file:///absolute/path/to/project/baymax/crates/baymax#0.131.0",
-                "baymax",
+                "path+file:///absolute/path/to/project/sim/crates/sim#0.131.0",
+                "sim",
             ),
             (
                 "path+file:///absolute/path/to/project/custom-package#my-custom-package@0.1.0",
@@ -2102,16 +2102,16 @@ mod tests {
     fn test_target_info_from_metadata() {
         for (input, absolute_path, expected) in [
             (
-                r#"{"packages":[{"id":"path+file:///absolute/path/to/project/baymax/crates/baymax#0.131.0","manifest_path":"/path/to/baymax/Cargo.toml","targets":[{"name":"baymax","kind":["bin"],"src_path":"/path/to/baymax/src/main.rs"}]}]}"#,
-                "/path/to/baymax/src/main.rs",
+                r#"{"packages":[{"id":"path+file:///absolute/path/to/project/sim/crates/sim#0.131.0","manifest_path":"/path/to/sim/Cargo.toml","targets":[{"name":"sim","kind":["bin"],"src_path":"/path/to/sim/src/main.rs"}]}]}"#,
+                "/path/to/sim/src/main.rs",
                 Some((
                     Some(TargetInfo {
-                        package_name: "baymax".into(),
-                        target_name: "baymax".into(),
+                        package_name: "sim".into(),
+                        target_name: "sim".into(),
                         required_features: Vec::new(),
                         target_kind: TargetKind::Bin,
                     }),
-                    Arc::from("/path/to/baymax".as_ref()),
+                    Arc::from("/path/to/sim".as_ref()),
                 )),
             ),
             (

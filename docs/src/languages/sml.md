@@ -1,11 +1,11 @@
 ---
 title: Standard ML
-description: "Configure Standard ML language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure Standard ML language support in Sim, including language servers, formatting, and debugging."
 ---
 
 # Standard ML
 
-Standard ML support is available through the community-maintained [Standard ML extension](https://github.com/omarjatoi/baymax-sml).
+Standard ML support is available through the community-maintained [Standard ML extension](https://github.com/omarjatoi/sim-sml).
 
 - Tree-sitter: [MatthewFluet/tree-sitter-sml](https://github.com/MatthewFluet/tree-sitter-sml)
 - Language Server: [Millet](https://github.com/azdavis/millet)
@@ -17,7 +17,7 @@ Standard ML support is available through the community-maintained [Standard ML e
 
 ## Project setup
 
-For projects with more than one source file, Millet expects a single root group file. Create a `millet.toml` in the directory you open in Baymax:
+For projects with more than one source file, Millet expects a single root group file. Create a `millet.toml` in the directory you open in Sim:
 
 ```toml
 version = 1
@@ -25,4 +25,4 @@ version = 1
 root = "sources.mlb"
 ```
 
-The root must be either an [ML Basis (MLB)](http://mlton.org/MLBasis) file (`.mlb`, used with MLton) or an [SML/NJ Compilation Manager (CM)](https://www.smlnj.org/doc/CM/new.pdf) file (`.cm`, used with SML/NJ). Files not transitively reachable from the root are not analybaymax. See the [Millet manual](https://github.com/azdavis/millet/blob/main/docs/manual.md) for more options.
+The root must be either an [ML Basis (MLB)](http://mlton.org/MLBasis) file (`.mlb`, used with MLton) or an [SML/NJ Compilation Manager (CM)](https://www.smlnj.org/doc/CM/new.pdf) file (`.cm`, used with SML/NJ). Files not transitively reachable from the root are not analysim. See the [Millet manual](https://github.com/azdavis/millet/blob/main/docs/manual.md) for more options.

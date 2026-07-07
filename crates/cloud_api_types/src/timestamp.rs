@@ -1,7 +1,7 @@
 use chrono::{DateTime, NaiveDateTime, SecondsFormat, Utc};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-/// A timestamp with a serialibaymax representation in RFC 3339 format.
+/// A timestamp with a serialisim representation in RFC 3339 format.
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct Timestamp(pub DateTime<Utc>);
 
@@ -84,9 +84,9 @@ mod tests {
 
         let timestamp = Timestamp::new(original);
         let json = serde_json::to_string(&timestamp).unwrap();
-        let deserialibaymax: Timestamp = serde_json::from_str(&json).unwrap();
+        let deserialisim: Timestamp = serde_json::from_str(&json).unwrap();
 
-        assert_eq!(deserialibaymax.0, original);
+        assert_eq!(deserialisim.0, original);
     }
 
     #[test]

@@ -7,7 +7,7 @@ use serde_json::json;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use task::{
-    BaymaxDebugConfig, DebugRequest, DebugScenario, LaunchRequest, SharedTaskContext, TaskContext,
+    SimDebugConfig, DebugRequest, DebugScenario, LaunchRequest, SharedTaskContext, TaskContext,
     VariableName,
 };
 use text::Point;
@@ -54,7 +54,7 @@ async fn test_debug_session_substitutes_variables_and_relativizes_paths(
     let home_dir = paths::home_dir();
 
     let test_cases: Vec<(&'static str, &'static str)> = vec![
-        // Absolute path - should not be relativibaymax
+        // Absolute path - should not be relativisim
         (
             path!("/absolute/path/to/program"),
             path!("/absolute/path/to/program"),
@@ -74,10 +74,10 @@ async fn test_debug_session_substitutes_variables_and_relativizes_paths(
                 .to_string()
                 .leak(),
         ),
-        // Path with $BAYMAX_WORKTREE_ROOT - should be substituted without double appending
+        // Path with $SIM_WORKTREE_ROOT - should be substituted without double appending
         (
             format!(
-                "$BAYMAX_WORKTREE_ROOT{0}src{0}program",
+                "$SIM_WORKTREE_ROOT{0}src{0}program",
                 std::path::MAIN_SEPARATOR
             )
             .leak(),
@@ -111,9 +111,9 @@ async fn test_debug_session_substitutes_variables_and_relativizes_paths(
                             input_path
                         );
 
-                        let expected_other_field = if input_path.contains("$BAYMAX_WORKTREE_ROOT") {
+                        let expected_other_field = if input_path.contains("$SIM_WORKTREE_ROOT") {
                             input_path
-                                .replace("$BAYMAX_WORKTREE_ROOT", path!("/test/worktree/path"))
+                                .replace("$SIM_WORKTREE_ROOT", path!("/test/worktree/path"))
                         } else {
                             input_path.to_string()
                         };
@@ -216,7 +216,7 @@ async fn test_save_debug_scenario_to_file(executor: BackgroundExecutor, cx: &mut
         .unwrap();
 
     let debug_json_content = fs
-        .load(path!("/project/.baymax/debug.json").as_ref())
+        .load(path!("/project/.sim/debug.json").as_ref())
         .await
         .expect("debug.json should exist")
         .lines()
@@ -279,7 +279,7 @@ async fn test_save_debug_scenario_to_file(executor: BackgroundExecutor, cx: &mut
         ]"#};
 
     let debug_json_content = fs
-        .load(path!("/project/.baymax/debug.json").as_ref())
+        .load(path!("/project/.sim/debug.json").as_ref())
         .await
         .expect("debug.json should exist")
         .lines()
@@ -301,7 +301,7 @@ async fn test_debug_modal_subtitles_with_multiple_worktrees(
     fs.insert_tree(
         path!("/workspace1"),
         json!({
-            ".baymax": {
+            ".sim": {
                 "debug.json": r#"[
                     {
                         "adapter": "fake-adapter",
@@ -354,7 +354,7 @@ async fn test_debug_modal_subtitles_with_multiple_worktrees(
 
     assert_eq!(
         subtitles.as_slice(),
-        [path!(".baymax/debug.json"), path!(".baymax/debug.json")]
+        [path!(".sim/debug.json"), path!(".sim/debug.json")]
     );
 }
 
@@ -376,7 +376,7 @@ async fn test_dap_adapter_config_conversion_and_validation(cx: &mut TestAppConte
         registry.enumerate_adapters::<Vec<_>>()
     });
 
-    let baymax_config = BaymaxDebugConfig {
+    let sim_config = SimDebugConfig {
         label: "test_debug_session".into(),
         adapter: "test_adapter".into(),
         request: DebugRequest::Launch(LaunchRequest {
@@ -401,15 +401,15 @@ async fn test_dap_adapter_config_conversion_and_validation(cx: &mut TestAppConte
             })
             .unwrap_or_else(|| panic!("Adapter {} should exist", adapter_name));
 
-        let mut adapter_specific_config = baymax_config.clone();
+        let mut adapter_specific_config = sim_config.clone();
         adapter_specific_config.adapter = adapter_name.to_string().into();
 
         let debug_scenario = adapter
-            .config_from_baymax_format(adapter_specific_config)
+            .config_from_sim_format(adapter_specific_config)
             .await
             .unwrap_or_else(|_| {
                 panic!(
-                    "Adapter {} should successfully convert from Baymax format",
+                    "Adapter {} should successfully convert from Sim format",
                     adapter_name
                 )
             });

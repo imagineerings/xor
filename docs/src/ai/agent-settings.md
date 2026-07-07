@@ -1,6 +1,6 @@
 ---
-title: Agent Settings - Baymax
-description: Map the Agent Settings panel to Baymax AI setup pages for LLM providers, External Agents, MCP servers, and related settings.
+title: Agent Settings - Sim
+description: Map the Agent Settings panel to Sim AI setup pages for LLM providers, External Agents, MCP servers, and related settings.
 ---
 
 # Agent Settings
@@ -12,14 +12,14 @@ Agent Settings is different from the Settings Editor.
 | Surface              | Opens with                      | Use it for                                                                           |
 | -------------------- | ------------------------------- | ------------------------------------------------------------------------------------ |
 | Agent Settings panel | {#action agent::OpenSettings}   | LLM providers, External Agents, MCP servers                                          |
-| Settings Editor      | {#action baymax::OpenSettings}     | General Baymax settings, `disable_ai`, tool permissions, edit prediction provider setup |
-| Settings file        | {#action baymax::OpenSettingsFile} | Direct JSON edits and settings not exposed in UI                                     |
+| Settings Editor      | {#action sim::OpenSettings}     | General Sim settings, `disable_ai`, tool permissions, edit prediction provider setup |
+| Settings file        | {#action sim::OpenSettingsFile} | Direct JSON edits and settings not exposed in UI                                     |
 
-For general settings mechanics, see [Configuring Baymax](../configuring-baymax.md).
+For general settings mechanics, see [Configuring Sim](../configuring-sim.md).
 
 ## LLM Providers {#llm-providers}
 
-The `LLM Providers` section configures model providers for Baymax AI features, including Baymax Agent, Inline Assistant, Git commit generation, thread summaries, and similar model-backed features.
+The `LLM Providers` section configures model providers for Sim AI features, including Sim Agent, Inline Assistant, Git commit generation, thread summaries, and similar model-backed features.
 
 Use this section to:
 
@@ -32,7 +32,7 @@ For the model-access paths and provider-specific setup, see [LLM Providers](./ll
 
 ## Feature-Specific Settings {#feature-specific-settings}
 
-Some Baymax AI features have their own model or prompt settings in `settings.json`, including:
+Some Sim AI features have their own model or prompt settings in `settings.json`, including:
 
 - `agent.inline_assistant_model`
 - `agent.commit_message_model`
@@ -55,7 +55,7 @@ For feature-specific model examples, see [Feature-specific Models](#feature-spec
 
 ## Automatic Compaction {#automatic-compaction}
 
-Baymax Agent can automatically compact long threads before they reach the selected model's context window. By default, compaction summarizes earlier messages and keeps the conversation usable without starting a new thread.
+Sim Agent can automatically compact long threads before they reach the selected model's context window. By default, compaction summarizes earlier messages and keeps the conversation usable without starting a new thread.
 
 Automatic compaction is enabled by default and runs when the thread reaches `90%` of the model's context window. You can change the strategy, change the threshold, or disable automatic compaction in `settings.json`:
 
@@ -86,9 +86,9 @@ The `threshold` value can be one of:
 | Positive integer, like `100000` | Compact after that many tokens have been used.                                 |
 | Negative integer, like `-20000` | Compact once fewer than that many tokens remain in the model's context window. |
 
-`0` is not a valid threshold. If the threshold is invalid, Baymax falls back to `90%`.
+`0` is not a valid threshold. If the threshold is invalid, Sim falls back to `90%`.
 
-You can compact a Baymax Agent thread manually at any time by typing `/compact` in the Agent Panel message editor. For more on thread token usage and compaction behavior, see [Token Usage and Compaction](./agent-panel.md#token-usage).
+You can compact a Sim Agent thread manually at any time by typing `/compact` in the Agent Panel message editor. For more on thread token usage and compaction behavior, see [Token Usage and Compaction](./agent-panel.md#token-usage).
 
 ## External Agents {#external-agents}
 
@@ -103,7 +103,7 @@ For setup details and support boundaries, see [External Agents](./external-agent
 
 ## MCP Servers {#mcp-servers}
 
-The `Model Context Protocol (MCP) Servers` section configures MCP servers connected to Baymax.
+The `Model Context Protocol (MCP) Servers` section configures MCP servers connected to Sim.
 
 Use `Add Server` to:
 
@@ -123,23 +123,23 @@ Some AI settings are not configured in the Agent Settings panel:
 
 | Task                                                         | Go to                                          |
 | ------------------------------------------------------------ | ---------------------------------------------- |
-| Choose which tools are available in a Baymax Agent thread       | [Agent Profiles](./agent-profiles.md)          |
+| Choose which tools are available in a Sim Agent thread       | [Agent Profiles](./agent-profiles.md)          |
 | Control whether tool calls are allowed, denied, or confirmed | [Tool Permissions](./tool-permissions.md)      |
 | Configure reusable task instructions                         | [Skills](./skills.md)                          |
 | Configure always-on personal or project instructions         | [Instructions](./instructions.md)              |
 | Configure edit prediction providers                          | [Edit Prediction](./edit-prediction.md)        |
 | Turn AI off                                                  | [AI Quick Start](./quick-start.md#turn-ai-off) |
-| Edit raw settings JSON                                       | [Configuring Baymax](../configuring-baymax.md)       |
+| Edit raw settings JSON                                       | [Configuring Sim](../configuring-sim.md)       |
 
 ## Feature-Specific Models {#feature-specific-models}
 
-Baymax supports feature-specific model settings for Inline Assistant, Git commit generation, thread summaries, and subagents. Configure these in settings when you need a different model for a specific workflow.
+Sim supports feature-specific model settings for Inline Assistant, Git commit generation, thread summaries, and subagents. Configure these in settings when you need a different model for a specific workflow.
 
 See [LLM Providers](./llm-providers.md) for model access, and [All Settings](../reference/all-settings.md) for the complete settings reference.
 
 ## Model Temperature {#model-temperature}
 
-Most Baymax AI features use the selected model's default generation behavior.
+Most Sim AI features use the selected model's default generation behavior.
 Use `agent.model_parameters` when you need to set a temperature for a provider,
 a model, or a specific provider/model pair.
 
@@ -157,7 +157,7 @@ a model, or a specific provider/model pair.
 }
 ```
 
-Baymax checks matching entries from last to first. An entry can omit `provider` or
+Sim checks matching entries from last to first. An entry can omit `provider` or
 `model` to apply more broadly. For provider-specific model configuration such as
 custom model entries, context windows, or gateway routing, see
 [LLM Providers](./llm-providers.md) and the provider setup pages.

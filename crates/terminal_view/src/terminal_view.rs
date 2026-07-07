@@ -4,7 +4,7 @@ pub mod terminal_panel;
 mod terminal_path_like_target;
 pub mod terminal_scrollbar;
 
-use baymax_actions::{agent::AddSelectionToThread, assistant::InlineAssist};
+use sim_actions::{agent::AddSelectionToThread, assistant::InlineAssist};
 use editor::{
     Editor, EditorSettings, actions::SelectAll, blink_manager::BlinkManager,
     ui_scrollbar_settings_from_raw,
@@ -1070,8 +1070,8 @@ impl TerminalView {
     }
 }
 
-fn terminal_rerun_override(task: &TaskId) -> baymax_actions::Rerun {
-    baymax_actions::Rerun {
+fn terminal_rerun_override(task: &TaskId) -> sim_actions::Rerun {
+    sim_actions::Rerun {
         task_id: Some(task.0.clone()),
         allow_concurrent_runs: Some(true),
         use_new_terminal: Some(false),
@@ -1810,7 +1810,7 @@ impl Item for TerminalView {
 }
 
 impl SerializableItem for TerminalView {
-    fn serialibaymax_item_kind() -> &'static str {
+    fn serialisim_item_kind() -> &'static str {
         "Terminal"
     }
 

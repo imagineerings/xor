@@ -3,7 +3,7 @@ use std::{cmp, path::PathBuf, process::ExitStatus, sync::Arc, time::Duration};
 use crate::{
     TerminalView, default_working_directory,
     persistence::{
-        SerialibaymaxItems, SerialibaymaxTerminalPanel, deserialize_terminal_panel,
+        SerialisimItems, SerialisimTerminalPanel, deserialize_terminal_panel,
         serialize_pane_group,
     },
 };
@@ -39,7 +39,7 @@ use workspace::{
 };
 
 use anyhow::{Result, anyhow};
-use baymax_actions::assistant::InlineAssist;
+use sim_actions::assistant::InlineAssist;
 
 const TERMINAL_PANEL_KEY: &str = "TerminalPanel";
 
@@ -176,7 +176,7 @@ impl TerminalPanel {
                                         // context menu will be gone the moment we spawn the modal.
                                         .action(
                                             "Spawn Task",
-                                            baymax_actions::Spawn::modal().boxed_clone(),
+                                            sim_actions::Spawn::modal().boxed_clone(),
                                         )
                                 });
 
@@ -256,29 +256,29 @@ impl TerminalPanel {
             })
             .ok()
             .flatten()
-            && let Some(serialibaymax_panel) = cx
+            && let Some(serialisim_panel) = cx
                 .background_spawn(async move { kvp.read_kvp(&serialization_key) })
                 .await
                 .log_err()
                 .flatten()
-                .map(|panel| serde_json::from_str::<SerialibaymaxTerminalPanel>(&panel))
+                .map(|panel| serde_json::from_str::<SerialisimTerminalPanel>(&panel))
                 .transpose()
                 .log_err()
                 .flatten()
-            && let Ok(serialibaymax) = workspace
+            && let Ok(serialisim) = workspace
                 .update_in(&mut cx, |workspace, window, cx| {
                     deserialize_terminal_panel(
                         workspace.weak_handle(),
                         workspace.project().clone(),
                         database_id,
-                        serialibaymax_panel,
+                        serialisim_panel,
                         window,
                         cx,
                     )
                 })?
                 .await
         {
-            terminal_panel = Some(serialibaymax);
+            terminal_panel = Some(serialisim);
         }
 
         let terminal_panel = if let Some(panel) = terminal_panel {
@@ -963,7 +963,7 @@ impl TerminalPanel {
                 .await;
             let terminal_panel = terminal_panel.upgrade()?;
             let items = terminal_panel.update(cx, |terminal_panel, cx| {
-                SerialibaymaxItems::WithSplits(serialize_pane_group(
+                SerialisimItems::WithSplits(serialize_pane_group(
                     &terminal_panel.center,
                     &terminal_panel.active_pane,
                     cx,
@@ -973,7 +973,7 @@ impl TerminalPanel {
                 async move {
                     kvp.write_kvp(
                         serialization_key,
-                        serde_json::to_string(&SerialibaymaxTerminalPanel {
+                        serde_json::to_string(&SerialisimTerminalPanel {
                             items,
                             active_item_id: None,
                         })?,
@@ -1308,10 +1308,10 @@ impl Render for FailedToSpawnTerminal {
             .menu(move |window, cx| {
                 Some(ContextMenu::build(window, cx, |context_menu, _, _| {
                     context_menu
-                        .action("Open Settings", baymax_actions::OpenSettings.boxed_clone())
+                        .action("Open Settings", sim_actions::OpenSettings.boxed_clone())
                         .action(
                             "Edit settings.json",
-                            baymax_actions::OpenSettingsFile.boxed_clone(),
+                            sim_actions::OpenSettingsFile.boxed_clone(),
                         )
                 }))
             })
@@ -1346,7 +1346,7 @@ impl Render for FailedToSpawnTerminal {
                             .child(Label::new("Edit Settings").size(LabelSize::Small))
                             .on_click(|_, window, cx| {
                                 window.dispatch_action(
-                                    baymax_actions::OpenSettings.boxed_clone(),
+                                    sim_actions::OpenSettings.boxed_clone(),
                                     cx,
                                 );
                             }),
@@ -1716,7 +1716,7 @@ struct InlineAssistTabBarButton {
 impl Render for InlineAssistTabBarButton {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let focus_handle = self.focus_handle.clone();
-        IconButton::new("terminal_inline_assistant", IconName::BaymaxAssistant)
+        IconButton::new("terminal_inline_assistant", IconName::SimAssistant)
             .icon_size(IconSize::Small)
             .on_click(cx.listener(|_, _, window, cx| {
                 window.dispatch_action(InlineAssist::default().boxed_clone(), cx);
@@ -1806,7 +1806,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn test_prepare_script_like_task() {
-        let user_command = r#"REPO_URL=$(git remote get-url origin | sed -e \"s/^git@\\(.*\\):\\(.*\\)\\.git$/https:\\/\\/\\1\\/\\2/\"); COMMIT_SHA=$(git log -1 --format=\"%H\" -- \"${BAYMAX_RELATIVE_FILE}\"); echo \"${REPO_URL}/blob/${COMMIT_SHA}/${BAYMAX_RELATIVE_FILE}#L${BAYMAX_ROW}-$(echo $(($(wc -l <<< \"$BAYMAX_SELECTED_TEXT\") + $BAYMAX_ROW - 1)))\" | xclip -selection clipboard"#.to_string();
+        let user_command = r#"REPO_URL=$(git remote get-url origin | sed -e \"s/^git@\\(.*\\):\\(.*\\)\\.git$/https:\\/\\/\\1\\/\\2/\"); COMMIT_SHA=$(git log -1 --format=\"%H\" -- \"${SIM_RELATIVE_FILE}\"); echo \"${REPO_URL}/blob/${COMMIT_SHA}/${SIM_RELATIVE_FILE}#L${SIM_ROW}-$(echo $(($(wc -l <<< \"$SIM_SELECTED_TEXT\") + $SIM_ROW - 1)))\" | xclip -selection clipboard"#.to_string();
         let expected_cwd = PathBuf::from("/some/work");
 
         let input = SpawnInTerminal {

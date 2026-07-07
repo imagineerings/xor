@@ -4,7 +4,7 @@ use futures::StreamExt;
 use itertools::Itertools as _;
 
 use crate::{
-    git::{AutomatedChangeKind, BAYMAX_ZIPPY_LOGIN, CommitDetails, CommitList},
+    git::{AutomatedChangeKind, SIM_ZIPPY_LOGIN, CommitDetails, CommitList},
     github::{
         Approvable, CommitAuthor, CommitFileChange, CommitMetadata, GithubApiClient, GithubLogin,
         PullRequestComment, PullRequestData, PullRequestReview, Repository, ReviewState,
@@ -12,15 +12,15 @@ use crate::{
     report::{Report, ReportEntry},
 };
 
-const BAYMAX_ZIPPY_COMMENT_APPROVAL_PATTERN: &str = "@baymax-zippy approve";
-const BAYMAX_ZIPPY_GROUP_APPROVAL: &str = "@simtropolis/approved";
+const SIM_ZIPPY_COMMENT_APPROVAL_PATTERN: &str = "@sim-zippy approve";
+const SIM_ZIPPY_GROUP_APPROVAL: &str = "@simtropolis/approved";
 
 #[derive(Debug)]
 pub enum ReviewSuccess {
     ApprovingComment(Vec<PullRequestComment>),
     CoAuthored(Vec<CommitAuthor>),
     PullRequestReviewed(Vec<PullRequestReview>),
-    BaymaxZippyCommit(AutomatedChangeKind, GithubLogin),
+    SimZippyCommit(AutomatedChangeKind, GithubLogin),
 }
 
 impl ReviewSuccess {
@@ -36,7 +36,7 @@ impl ReviewSuccess {
                 .iter()
                 .map(|comment| format!("@{}", comment.user.login))
                 .collect_vec(),
-            Self::BaymaxZippyCommit(_, login) => vec![login.to_string()],
+            Self::SimZippyCommit(_, login) => vec![login.to_string()],
         };
 
         let reviewers = reviewers.into_iter().unique().collect_vec();
@@ -59,7 +59,7 @@ impl fmt::Display for ReviewSuccess {
             Self::ApprovingComment(_) => {
                 formatter.write_str("Approved by an organization approval comment")
             }
-            Self::BaymaxZippyCommit(kind, _) => {
+            Self::SimZippyCommit(kind, _) => {
                 write!(formatter, "Fully untampered automated {kind}")
             }
         }
@@ -84,7 +84,7 @@ impl fmt::Display for ReviewFailure {
             Self::UnexpectedZippyAction(failure) => {
                 write!(
                     formatter,
-                    "Validating Baymax Zippy change failed: {failure}"
+                    "Validating Sim Zippy change failed: {failure}"
                 )
             }
             Self::Other(error) => write!(formatter, "Failed to inspect review state: {error}"),
@@ -215,7 +215,7 @@ impl Reporter {
         commit: &CommitDetails,
     ) -> Result<ReviewSuccess, ReviewFailure> {
         let Some(pr_number) = commit.pr_number() else {
-            if commit.author().is_baymax_zippy() {
+            if commit.author().is_sim_zippy() {
                 return self.check_zippy_automated_change(commit).await;
             } else {
                 return Err(ReviewFailure::NoPullRequestFound);
@@ -224,7 +224,7 @@ impl Reporter {
 
         let pull_request = self
             .github_client
-            .get_pull_request(&Repository::BAYMAX, pr_number)
+            .get_pull_request(&Repository::SIM, pr_number)
             .await?;
 
         if let Some(approval) = self
@@ -261,7 +261,7 @@ impl Reporter {
 
         let commit_data = self
             .github_client
-            .get_commit_metadata(&Repository::BAYMAX, &[commit.sha()])
+            .get_commit_metadata(&Repository::SIM, &[commit.sha()])
             .await?;
 
         let metadata =
@@ -274,7 +274,7 @@ impl Reporter {
         if !metadata
             .primary_author()
             .user()
-            .is_some_and(|login| login.as_str() == BAYMAX_ZIPPY_LOGIN)
+            .is_some_and(|login| login.as_str() == SIM_ZIPPY_LOGIN)
         {
             return Err(ReviewFailure::UnexpectedZippyAction(
                 AutomatedChangeFailure::AuthorMismatch,
@@ -301,14 +301,14 @@ impl Reporter {
 
         let files = self
             .github_client
-            .get_commit_files(&Repository::BAYMAX, commit.sha())
+            .get_commit_files(&Repository::SIM, commit.sha())
             .await?;
 
         change_kind
             .validate_changes(metadata, &files)
             .map_err(ReviewFailure::UnexpectedZippyAction)?;
 
-        Ok(ReviewSuccess::BaymaxZippyCommit(
+        Ok(ReviewSuccess::SimZippyCommit(
             change_kind,
             GithubLogin::new(responsible_actor.to_owned()),
         ))
@@ -321,7 +321,7 @@ impl Reporter {
         if commit.co_authors().is_some()
             && let Some(commit_authors) = self
                 .github_client
-                .get_commit_metadata(&Repository::BAYMAX, &[commit.sha()])
+                .get_commit_metadata(&Repository::SIM, &[commit.sha()])
                 .await?
                 .get(commit.sha())
                 .and_then(|authors| authors.co_authors())
@@ -331,7 +331,7 @@ impl Reporter {
                 if let Some(github_login) = co_author.user()
                     && self
                         .github_client
-                        .check_repo_write_permission(&Repository::BAYMAX, github_login)
+                        .check_repo_write_permission(&Repository::SIM, github_login)
                         .await?
                 {
                     org_co_authors.push(co_author.clone());
@@ -353,7 +353,7 @@ impl Reporter {
     ) -> Result<Option<ReviewSuccess>, ReviewFailure> {
         let reviews = self
             .github_client
-            .get_pull_request_reviews(&Repository::BAYMAX, pull_request.number)
+            .get_pull_request_reviews(&Repository::SIM, pull_request.number)
             .await?;
 
         let qualifying_reviews = reviews
@@ -373,7 +373,7 @@ impl Reporter {
     ) -> Result<Option<ReviewSuccess>, ReviewFailure> {
         let comments = self
             .github_client
-            .get_pull_request_comments(&Repository::BAYMAX, pull_request.number)
+            .get_pull_request_comments(&Repository::SIM, pull_request.number)
             .await?;
 
         let qualifying_comments = comments
@@ -402,16 +402,16 @@ impl Reporter {
             .is_some_and(|state| state == ReviewState::Approved)
             || item.body().is_some_and(Self::contains_approving_pattern);
 
-        let actor_is_authoribaymax = item
+        let actor_is_authorisim = item
             .author_association()
             .is_some_and(|association| association.has_write_access());
 
-        distinct_actor && approving_pattern && actor_is_authoribaymax
+        distinct_actor && approving_pattern && actor_is_authorisim
     }
 
     fn contains_approving_pattern(body: &str) -> bool {
-        body.contains(BAYMAX_ZIPPY_COMMENT_APPROVAL_PATTERN)
-            || body.contains(BAYMAX_ZIPPY_GROUP_APPROVAL)
+        body.contains(SIM_ZIPPY_COMMENT_APPROVAL_PATTERN)
+            || body.contains(SIM_ZIPPY_GROUP_APPROVAL)
     }
 
     pub async fn generate_report(mut self, max_concurrent_checks: usize) -> Report {
@@ -454,7 +454,7 @@ mod tests {
     use std::str::FromStr;
 
     use crate::git::{
-        AutomatedChangeKind, BAYMAX_ZIPPY_EMAIL, BAYMAX_ZIPPY_LOGIN, CommitDetails, CommitList,
+        AutomatedChangeKind, SIM_ZIPPY_EMAIL, SIM_ZIPPY_LOGIN, CommitDetails, CommitList,
         CommitSha,
     };
     use crate::github::{
@@ -610,9 +610,9 @@ mod tests {
 
     fn zippy_author() -> serde_json::Value {
         serde_json::json!({
-            "name": "Baymax Zippy",
-            "email": BAYMAX_ZIPPY_EMAIL,
-            "user": { "login": BAYMAX_ZIPPY_LOGIN }
+            "name": "Sim Zippy",
+            "email": SIM_ZIPPY_EMAIL,
+            "user": { "login": SIM_ZIPPY_LOGIN }
         })
     }
 
@@ -703,7 +703,7 @@ mod tests {
                         "authors": { "nodes": [] },
                         "signature": {
                             "isValid": true,
-                            "signer": { "login": BAYMAX_ZIPPY_LOGIN }
+                            "signer": { "login": SIM_ZIPPY_LOGIN }
                         },
                         "additions": 2,
                         "deletions": 2
@@ -714,14 +714,14 @@ mod tests {
                         filename: "Cargo.lock".to_owned(),
                     },
                     CommitFileChange {
-                        filename: "crates/baymax/Cargo.toml".to_owned(),
+                        filename: "crates/sim/Cargo.toml".to_owned(),
                     },
                 ],
                 org_members: vec![],
                 commit: make_commit(
                     "abc12345abc12345",
-                    "Baymax Zippy",
-                    BAYMAX_ZIPPY_EMAIL,
+                    "Sim Zippy",
+                    SIM_ZIPPY_EMAIL,
                     "Bump to 0.230.2 for @cole-miller",
                     "",
                 ),
@@ -744,20 +744,20 @@ mod tests {
                         "authors": { "nodes": [] },
                         "signature": {
                             "isValid": true,
-                            "signer": { "login": BAYMAX_ZIPPY_LOGIN }
+                            "signer": { "login": SIM_ZIPPY_LOGIN }
                         },
                         "additions": 1,
                         "deletions": 1
                     }
                 }),
                 commit_files: vec![CommitFileChange {
-                    filename: "crates/baymax/RELEASE_CHANNEL".to_owned(),
+                    filename: "crates/sim/RELEASE_CHANNEL".to_owned(),
                 }],
                 org_members: vec![],
                 commit: make_commit(
                     "abc12345abc12345",
-                    "Baymax Zippy",
-                    BAYMAX_ZIPPY_EMAIL,
+                    "Sim Zippy",
+                    SIM_ZIPPY_EMAIL,
                     "v0.233.x stable for @cole-miller",
                     "",
                 ),
@@ -836,7 +836,7 @@ mod tests {
         let result = TestScenario::single_commit()
             .with_comments(vec![comment(
                 "alice",
-                "@baymax-zippy approve",
+                "@sim-zippy approve",
                 AuthorAssociation::Member,
             )])
             .run_scenario()
@@ -849,7 +849,7 @@ mod tests {
         let result = TestScenario::single_commit()
             .with_comments(vec![comment(
                 "bob",
-                "@baymax-zippy approve",
+                "@sim-zippy approve",
                 AuthorAssociation::Member,
             )])
             .run_scenario()
@@ -908,7 +908,7 @@ mod tests {
             )])
             .with_comments(vec![comment(
                 "charlie",
-                "@baymax-zippy approve",
+                "@sim-zippy approve",
                 AuthorAssociation::Member,
             )])
             .run_scenario()
@@ -921,7 +921,7 @@ mod tests {
         let result = TestScenario::single_commit()
             .with_comments(vec![comment(
                 "bob",
-                "@baymax-zippy approve",
+                "@sim-zippy approve",
                 AuthorAssociation::Member,
             )])
             .with_commit_metadata_json(serde_json::json!({
@@ -975,7 +975,7 @@ mod tests {
         let result = TestScenario::single_commit()
             .with_reviews(vec![
                 review("bob", ReviewState::Other, AuthorAssociation::Member)
-                    .with_body("@baymax-zippy approve"),
+                    .with_body("@sim-zippy approve"),
             ])
             .run_scenario()
             .await;
@@ -1011,7 +1011,7 @@ mod tests {
         let result = TestScenario::single_commit()
             .with_reviews(vec![
                 review("bob", ReviewState::Other, AuthorAssociation::None)
-                    .with_body("@baymax-zippy approve"),
+                    .with_body("@sim-zippy approve"),
             ])
             .run_scenario()
             .await;
@@ -1023,7 +1023,7 @@ mod tests {
         let result = TestScenario::single_commit()
             .with_reviews(vec![
                 review("alice", ReviewState::Other, AuthorAssociation::Member)
-                    .with_body("@baymax-zippy approve"),
+                    .with_body("@sim-zippy approve"),
             ])
             .run_scenario()
             .await;
@@ -1035,12 +1035,12 @@ mod tests {
         let result = TestScenario::zippy_version_bump().run_scenario().await;
         assert!(matches!(
             result,
-            Ok(ReviewSuccess::BaymaxZippyCommit(
+            Ok(ReviewSuccess::SimZippyCommit(
                 AutomatedChangeKind::VersionBump,
                 _
             ))
         ));
-        if let Ok(ReviewSuccess::BaymaxZippyCommit(_, login)) = &result {
+        if let Ok(ReviewSuccess::SimZippyCommit(_, login)) = &result {
             assert_eq!(login.as_str(), "cole-miller");
         }
     }
@@ -1050,8 +1050,8 @@ mod tests {
         let result = TestScenario::zippy_version_bump()
             .with_commit(make_commit(
                 "abc12345abc12345",
-                "Baymax Zippy",
-                BAYMAX_ZIPPY_EMAIL,
+                "Sim Zippy",
+                SIM_ZIPPY_EMAIL,
                 "Bump to 0.230.2",
                 "",
             ))
@@ -1095,7 +1095,7 @@ mod tests {
                     "authors": { "nodes": [] },
                     "signature": {
                         "isValid": false,
-                        "signer": { "login": BAYMAX_ZIPPY_LOGIN }
+                        "signer": { "login": SIM_ZIPPY_LOGIN }
                     },
                     "additions": 2,
                     "deletions": 2
@@ -1120,7 +1120,7 @@ mod tests {
                     "authors": { "nodes": [] },
                     "signature": {
                         "isValid": true,
-                        "signer": { "login": BAYMAX_ZIPPY_LOGIN }
+                        "signer": { "login": SIM_ZIPPY_LOGIN }
                     },
                     "additions": 5,
                     "deletions": 2
@@ -1170,7 +1170,7 @@ mod tests {
                     "authors": { "nodes": [alice_author()] },
                     "signature": {
                         "isValid": true,
-                        "signer": { "login": BAYMAX_ZIPPY_LOGIN }
+                        "signer": { "login": SIM_ZIPPY_LOGIN }
                     },
                     "additions": 2,
                     "deletions": 2
@@ -1189,7 +1189,7 @@ mod tests {
     #[tokio::test]
     async fn zippy_version_bump_with_wrong_files_fails() {
         let result = TestScenario::zippy_version_bump()
-            .with_commit_files(vec!["crates/baymax/RELEASE_CHANNEL"])
+            .with_commit_files(vec!["crates/sim/RELEASE_CHANNEL"])
             .run_scenario()
             .await;
         assert!(matches!(
@@ -1207,12 +1207,12 @@ mod tests {
             .await;
         assert!(matches!(
             result,
-            Ok(ReviewSuccess::BaymaxZippyCommit(
+            Ok(ReviewSuccess::SimZippyCommit(
                 AutomatedChangeKind::ReleaseChannelUpdate,
                 _
             ))
         ));
-        if let Ok(ReviewSuccess::BaymaxZippyCommit(_, login)) = &result {
+        if let Ok(ReviewSuccess::SimZippyCommit(_, login)) = &result {
             assert_eq!(login.as_str(), "cole-miller");
         }
     }
@@ -1237,8 +1237,8 @@ mod tests {
         let result = TestScenario::single_commit()
             .with_commit(make_commit(
                 "abc12345abc12345",
-                "Baymax Zippy",
-                BAYMAX_ZIPPY_EMAIL,
+                "Sim Zippy",
+                SIM_ZIPPY_EMAIL,
                 "Some change (#1234)",
                 "",
             ))

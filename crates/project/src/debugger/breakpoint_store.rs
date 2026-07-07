@@ -819,7 +819,7 @@ impl BreakpointStore {
             .collect()
     }
 
-    pub fn with_serialibaymax_breakpoints(
+    pub fn with_serialisim_breakpoints(
         &self,
         breakpoints: BTreeMap<Arc<Path>, Vec<SourceBreakpoint>>,
         cx: &mut Context<BreakpointStore>,
@@ -849,7 +849,7 @@ impl BreakpointStore {
                         .await;
                     let Ok(buffer) = buffer else {
                         log::error!(
-                            "Todo: Serialibaymax breakpoints which do not have buffer (yet)"
+                            "Todo: Serialisim breakpoints which do not have buffer (yet)"
                         );
                         continue;
                     };
@@ -863,7 +863,7 @@ impl BreakpointStore {
                         let point = PointUtf16::new(bp.row, 0);
                         if point > max_point {
                             log::error!(
-                                "skipping a deserialibaymax breakpoint that's out of range"
+                                "skipping a deserialisim breakpoint that's out of range"
                             );
                             continue;
                         }
@@ -891,7 +891,7 @@ impl BreakpointStore {
                         } else {
                             "breakpoint"
                         };
-                        log::debug!("Deserialibaymax {count} {breakpoint_str} at path: {path}");
+                        log::debug!("Deserialisim {count} {breakpoint_str} at path: {path}");
                     }
 
                     this.breakpoints = new_breakpoints;

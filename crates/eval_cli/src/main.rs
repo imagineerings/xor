@@ -1,6 +1,6 @@
-//! Headless CLI binary for running Baymax's agent in evaluation/benchmark environments.
+//! Headless CLI binary for running Sim's agent in evaluation/benchmark environments.
 //!
-//! Designed to work inside containeribaymax environments (like Harbor/termbench) where:
+//! Designed to work inside containerisim environments (like Harbor/termbench) where:
 //! - The repository is already checked out at the working directory
 //! - The model API key is provided via environment variables
 //! - Results are written to an output directory (default: `/logs/agent/`)
@@ -60,11 +60,11 @@ use crate::headless::AgentCliAppState;
 #[derive(Parser, Debug)]
 #[command(
     name = "eval-cli",
-    about = "Run Baymax's agent headlessly in evaluation/benchmark environments"
+    about = "Run Sim's agent headlessly in evaluation/benchmark environments"
 )]
 struct Args {
     /// Output current environment variables as JSON to stdout.
-    /// Used internally by Baymax's shell environment capture.
+    /// Used internally by Sim's shell environment capture.
     #[arg(long, hide = true)]
     printenv: bool,
 

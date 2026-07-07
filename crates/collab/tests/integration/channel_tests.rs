@@ -378,9 +378,9 @@ async fn test_channel_room(
     let client_b = server.create_client(cx_b, "user_b").await;
     let client_c = server.create_client(cx_c, "user_c").await;
 
-    let baymax_id = server
+    let sim_id = server
         .make_channel(
-            "baymax",
+            "sim",
             None,
             (&client_a, cx_a),
             &mut [(&client_b, cx_b), (&client_c, cx_c)],
@@ -392,7 +392,7 @@ async fn test_channel_room(
 
     active_call_a
         .update(cx_a, |active_call, cx| {
-            active_call.join_channel(baymax_id, cx)
+            active_call.join_channel(sim_id, cx)
         })
         .await
         .unwrap();
@@ -406,7 +406,7 @@ async fn test_channel_room(
     cx_a.read(|cx| {
         client_a.channel_store().read_with(cx, |channels, _| {
             assert_participants_eq(
-                channels.channel_participants(baymax_id),
+                channels.channel_participants(sim_id),
                 &[client_a.user_id().unwrap()],
             );
         })
@@ -416,15 +416,15 @@ async fn test_channel_room(
         client_b.channel_store(),
         cx_b,
         &[ExpectedChannel {
-            id: baymax_id,
-            name: "baymax".into(),
+            id: sim_id,
+            name: "sim".into(),
             depth: 0,
         }],
     );
     cx_b.read(|cx| {
         client_b.channel_store().read_with(cx, |channels, _| {
             assert_participants_eq(
-                channels.channel_participants(baymax_id),
+                channels.channel_participants(sim_id),
                 &[client_a.user_id().unwrap()],
             );
         })
@@ -433,7 +433,7 @@ async fn test_channel_room(
     cx_c.read(|cx| {
         client_c.channel_store().read_with(cx, |channels, _| {
             assert_participants_eq(
-                channels.channel_participants(baymax_id),
+                channels.channel_participants(sim_id),
                 &[client_a.user_id().unwrap()],
             );
         })
@@ -441,7 +441,7 @@ async fn test_channel_room(
 
     active_call_b
         .update(cx_b, |active_call, cx| {
-            active_call.join_channel(baymax_id, cx)
+            active_call.join_channel(sim_id, cx)
         })
         .await
         .unwrap();
@@ -451,7 +451,7 @@ async fn test_channel_room(
     cx_a.read(|cx| {
         client_a.channel_store().read_with(cx, |channels, _| {
             assert_participants_eq(
-                channels.channel_participants(baymax_id),
+                channels.channel_participants(sim_id),
                 &[client_a.user_id().unwrap(), client_b.user_id().unwrap()],
             );
         })
@@ -460,7 +460,7 @@ async fn test_channel_room(
     cx_b.read(|cx| {
         client_b.channel_store().read_with(cx, |channels, _| {
             assert_participants_eq(
-                channels.channel_participants(baymax_id),
+                channels.channel_participants(sim_id),
                 &[client_a.user_id().unwrap(), client_b.user_id().unwrap()],
             );
         })
@@ -469,7 +469,7 @@ async fn test_channel_room(
     cx_c.read(|cx| {
         client_c.channel_store().read_with(cx, |channels, _| {
             assert_participants_eq(
-                channels.channel_participants(baymax_id),
+                channels.channel_participants(sim_id),
                 &[client_a.user_id().unwrap(), client_b.user_id().unwrap()],
             );
         })
@@ -509,7 +509,7 @@ async fn test_channel_room(
     cx_a.read(|cx| {
         client_a.channel_store().read_with(cx, |channels, _| {
             assert_participants_eq(
-                channels.channel_participants(baymax_id),
+                channels.channel_participants(sim_id),
                 &[client_b.user_id().unwrap()],
             );
         })
@@ -518,7 +518,7 @@ async fn test_channel_room(
     cx_b.read(|cx| {
         client_b.channel_store().read_with(cx, |channels, _| {
             assert_participants_eq(
-                channels.channel_participants(baymax_id),
+                channels.channel_participants(sim_id),
                 &[client_b.user_id().unwrap()],
             );
         })
@@ -527,7 +527,7 @@ async fn test_channel_room(
     cx_c.read(|cx| {
         client_c.channel_store().read_with(cx, |channels, _| {
             assert_participants_eq(
-                channels.channel_participants(baymax_id),
+                channels.channel_participants(sim_id),
                 &[client_b.user_id().unwrap()],
             );
         })
@@ -542,32 +542,32 @@ async fn test_channel_room(
 
     cx_a.read(|cx| {
         client_a.channel_store().read_with(cx, |channels, _| {
-            assert_participants_eq(channels.channel_participants(baymax_id), &[]);
+            assert_participants_eq(channels.channel_participants(sim_id), &[]);
         })
     });
 
     cx_b.read(|cx| {
         client_b.channel_store().read_with(cx, |channels, _| {
-            assert_participants_eq(channels.channel_participants(baymax_id), &[]);
+            assert_participants_eq(channels.channel_participants(sim_id), &[]);
         })
     });
 
     cx_c.read(|cx| {
         client_c.channel_store().read_with(cx, |channels, _| {
-            assert_participants_eq(channels.channel_participants(baymax_id), &[]);
+            assert_participants_eq(channels.channel_participants(sim_id), &[]);
         })
     });
 
     active_call_a
         .update(cx_a, |active_call, cx| {
-            active_call.join_channel(baymax_id, cx)
+            active_call.join_channel(sim_id, cx)
         })
         .await
         .unwrap();
 
     active_call_b
         .update(cx_b, |active_call, cx| {
-            active_call.join_channel(baymax_id, cx)
+            active_call.join_channel(sim_id, cx)
         })
         .await
         .unwrap();
@@ -602,8 +602,8 @@ async fn test_channel_jumping(executor: BackgroundExecutor, cx_a: &mut TestAppCo
     let mut server = TestServer::start(executor.clone()).await;
     let client_a = server.create_client(cx_a, "user_a").await;
 
-    let baymax_id = server
-        .make_channel("baymax", None, (&client_a, cx_a), &mut [])
+    let sim_id = server
+        .make_channel("sim", None, (&client_a, cx_a), &mut [])
         .await;
     let rust_id = server
         .make_channel("rust", None, (&client_a, cx_a), &mut [])
@@ -613,7 +613,7 @@ async fn test_channel_jumping(executor: BackgroundExecutor, cx_a: &mut TestAppCo
 
     active_call_a
         .update(cx_a, |active_call, cx| {
-            active_call.join_channel(baymax_id, cx)
+            active_call.join_channel(sim_id, cx)
         })
         .await
         .unwrap();
@@ -624,7 +624,7 @@ async fn test_channel_jumping(executor: BackgroundExecutor, cx_a: &mut TestAppCo
     cx_a.read(|cx| {
         client_a.channel_store().read_with(cx, |channels, _| {
             assert_participants_eq(
-                channels.channel_participants(baymax_id),
+                channels.channel_participants(sim_id),
                 &[client_a.user_id().unwrap()],
             );
             assert_participants_eq(channels.channel_participants(rust_id), &[]);
@@ -642,7 +642,7 @@ async fn test_channel_jumping(executor: BackgroundExecutor, cx_a: &mut TestAppCo
 
     cx_a.read(|cx| {
         client_a.channel_store().read_with(cx, |channels, _| {
-            assert_participants_eq(channels.channel_participants(baymax_id), &[]);
+            assert_participants_eq(channels.channel_participants(sim_id), &[]);
             assert_participants_eq(
                 channels.channel_participants(rust_id),
                 &[client_a.user_id().unwrap()],
@@ -969,19 +969,19 @@ async fn test_channel_link_notifications(
     let user_c = client_c.user_id().unwrap();
 
     let channels = server
-        .make_channel_tree(&[("baymax", None)], (&client_a, cx_a))
+        .make_channel_tree(&[("sim", None)], (&client_a, cx_a))
         .await;
-    let baymax_channel = channels[0];
+    let sim_channel = channels[0];
 
     try_join_all(client_a.channel_store().update(cx_a, |channel_store, cx| {
         [
             channel_store.set_channel_visibility(
-                baymax_channel,
+                sim_channel,
                 proto::ChannelVisibility::Public,
                 cx,
             ),
-            channel_store.invite_member(baymax_channel, user_b, proto::ChannelRole::Member, cx),
-            channel_store.invite_member(baymax_channel, user_c, proto::ChannelRole::Guest, cx),
+            channel_store.invite_member(sim_channel, user_b, proto::ChannelRole::Member, cx),
+            channel_store.invite_member(sim_channel, user_c, proto::ChannelRole::Guest, cx),
         ]
     }))
     .await
@@ -992,7 +992,7 @@ async fn test_channel_link_notifications(
     client_b
         .channel_store()
         .update(cx_b, |channel_store, cx| {
-            channel_store.respond_to_channel_invite(baymax_channel, true, cx)
+            channel_store.respond_to_channel_invite(sim_channel, true, cx)
         })
         .await
         .unwrap();
@@ -1000,20 +1000,20 @@ async fn test_channel_link_notifications(
     client_c
         .channel_store()
         .update(cx_c, |channel_store, cx| {
-            channel_store.respond_to_channel_invite(baymax_channel, true, cx)
+            channel_store.respond_to_channel_invite(sim_channel, true, cx)
         })
         .await
         .unwrap();
 
     executor.run_until_parked();
 
-    // we have an admin (a), member (b) and guest (c) all part of the baymax channel.
+    // we have an admin (a), member (b) and guest (c) all part of the sim channel.
 
     // create a new private channel, make it public, and move it under the previous one, and verify it shows for b and not c
     let active_channel = client_a
         .channel_store()
         .update(cx_a, |channel_store, cx| {
-            channel_store.create_channel("active", Some(baymax_channel), cx)
+            channel_store.create_channel("active", Some(sim_channel), cx)
         })
         .await
         .unwrap();
@@ -1024,19 +1024,19 @@ async fn test_channel_link_notifications(
     assert_channels_list_shape(
         client_a.channel_store(),
         cx_a,
-        &[(baymax_channel, 0), (active_channel, 1)],
+        &[(sim_channel, 0), (active_channel, 1)],
     );
     assert_channels_list_shape(
         client_b.channel_store(),
         cx_b,
-        &[(baymax_channel, 0), (active_channel, 1)],
+        &[(sim_channel, 0), (active_channel, 1)],
     );
-    assert_channels_list_shape(client_c.channel_store(), cx_c, &[(baymax_channel, 0)]);
+    assert_channels_list_shape(client_c.channel_store(), cx_c, &[(sim_channel, 0)]);
 
     let vim_channel = client_a
         .channel_store()
         .update(cx_a, |channel_store, cx| {
-            channel_store.create_channel("vim", Some(baymax_channel), cx)
+            channel_store.create_channel("vim", Some(sim_channel), cx)
         })
         .await
         .unwrap();
@@ -1055,23 +1055,23 @@ async fn test_channel_link_notifications(
     assert_channels_list_shape(
         client_a.channel_store(),
         cx_a,
-        &[(baymax_channel, 0), (active_channel, 1), (vim_channel, 1)],
+        &[(sim_channel, 0), (active_channel, 1), (vim_channel, 1)],
     );
     assert_channels_list_shape(
         client_b.channel_store(),
         cx_b,
-        &[(baymax_channel, 0), (active_channel, 1), (vim_channel, 1)],
+        &[(sim_channel, 0), (active_channel, 1), (vim_channel, 1)],
     );
     assert_channels_list_shape(
         client_c.channel_store(),
         cx_c,
-        &[(baymax_channel, 0), (vim_channel, 1)],
+        &[(sim_channel, 0), (vim_channel, 1)],
     );
 
     let helix_channel = client_a
         .channel_store()
         .update(cx_a, |channel_store, cx| {
-            channel_store.create_channel("helix", Some(baymax_channel), cx)
+            channel_store.create_channel("helix", Some(sim_channel), cx)
         })
         .await
         .unwrap();
@@ -1102,7 +1102,7 @@ async fn test_channel_link_notifications(
         client_b.channel_store(),
         cx_b,
         &[
-            (baymax_channel, 0),
+            (sim_channel, 0),
             (active_channel, 1),
             (vim_channel, 1),
             (helix_channel, 2),
@@ -1111,7 +1111,7 @@ async fn test_channel_link_notifications(
     assert_channels_list_shape(
         client_c.channel_store(),
         cx_c,
-        &[(baymax_channel, 0), (vim_channel, 1), (helix_channel, 2)],
+        &[(sim_channel, 0), (vim_channel, 1), (helix_channel, 2)],
     );
 }
 
@@ -1130,26 +1130,26 @@ async fn test_channel_membership_notifications(
     let channels = server
         .make_channel_tree(
             &[
-                ("baymax", None),
-                ("vim", Some("baymax")),
+                ("sim", None),
+                ("vim", Some("sim")),
                 ("opensource", None),
             ],
             (&client_a, cx_a),
         )
         .await;
-    let baymax_channel = channels[0];
+    let sim_channel = channels[0];
     let vim_channel = channels[1];
     let opensource_channel = channels[2];
 
     try_join_all(client_a.channel_store().update(cx_a, |channel_store, cx| {
         [
             channel_store.set_channel_visibility(
-                baymax_channel,
+                sim_channel,
                 proto::ChannelVisibility::Public,
                 cx,
             ),
             channel_store.set_channel_visibility(vim_channel, proto::ChannelVisibility::Public, cx),
-            channel_store.invite_member(baymax_channel, user_b, proto::ChannelRole::Admin, cx),
+            channel_store.invite_member(sim_channel, user_b, proto::ChannelRole::Admin, cx),
             channel_store.invite_member(opensource_channel, user_b, proto::ChannelRole::Member, cx),
         ]
     }))
@@ -1161,22 +1161,22 @@ async fn test_channel_membership_notifications(
     client_b
         .channel_store()
         .update(cx_b, |channel_store, cx| {
-            channel_store.respond_to_channel_invite(baymax_channel, true, cx)
+            channel_store.respond_to_channel_invite(sim_channel, true, cx)
         })
         .await
         .unwrap();
 
     executor.run_until_parked();
 
-    // we have an admin (a), and a guest (b) with access to all of baymax, and membership in vim.
+    // we have an admin (a), and a guest (b) with access to all of sim, and membership in vim.
     assert_channels(
         client_b.channel_store(),
         cx_b,
         &[
             ExpectedChannel {
                 depth: 0,
-                id: baymax_channel,
-                name: "baymax".into(),
+                id: sim_channel,
+                name: "sim".into(),
             },
             ExpectedChannel {
                 depth: 1,
@@ -1187,7 +1187,7 @@ async fn test_channel_membership_notifications(
     );
 
     client_b.channel_store().update(cx_b, |channel_store, _| {
-        channel_store.is_channel_admin(baymax_channel)
+        channel_store.is_channel_admin(sim_channel)
     });
 
     client_b

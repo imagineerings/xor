@@ -80,27 +80,27 @@ pub(crate) fn parse_path_half_height(e: &BytesStart<'_>) -> Option<f64> {
     Some(y.abs())
 }
 
-// These arrays are basically just optimized versions of `format!("baymax-accent-{i}")`
+// These arrays are basically just optimized versions of `format!("sim-accent-{i}")`
 const ACCENT_CLASSES: [&str; 8] = [
-    "baymax-accent-0",
-    "baymax-accent-1",
-    "baymax-accent-2",
-    "baymax-accent-3",
-    "baymax-accent-4",
-    "baymax-accent-5",
-    "baymax-accent-6",
-    "baymax-accent-7",
+    "sim-accent-0",
+    "sim-accent-1",
+    "sim-accent-2",
+    "sim-accent-3",
+    "sim-accent-4",
+    "sim-accent-5",
+    "sim-accent-6",
+    "sim-accent-7",
 ];
 
 const CHART_COLOR_CLASSES: [&str; 8] = [
-    "baymax-chart-0",
-    "baymax-chart-1",
-    "baymax-chart-2",
-    "baymax-chart-3",
-    "baymax-chart-4",
-    "baymax-chart-5",
-    "baymax-chart-6",
-    "baymax-chart-7",
+    "sim-chart-0",
+    "sim-chart-1",
+    "sim-chart-2",
+    "sim-chart-3",
+    "sim-chart-4",
+    "sim-chart-5",
+    "sim-chart-6",
+    "sim-chart-7",
 ];
 
 pub(crate) fn accent_class_name(index: usize) -> &'static str {

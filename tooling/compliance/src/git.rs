@@ -15,8 +15,8 @@ use regex::Regex;
 use semver::Version;
 use serde::Deserialize;
 
-pub(crate) const BAYMAX_ZIPPY_LOGIN: &str = "baymax-zippy[bot]";
-pub(crate) const BAYMAX_ZIPPY_EMAIL: &str = "234243425+baymax-zippy[bot]@users.noreply.github.com";
+pub(crate) const SIM_ZIPPY_LOGIN: &str = "sim-zippy[bot]";
+pub(crate) const SIM_ZIPPY_EMAIL: &str = "234243425+sim-zippy[bot]@users.noreply.github.com";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AutomatedChangeKind {
@@ -27,8 +27,8 @@ pub enum AutomatedChangeKind {
 impl AutomatedChangeKind {
     pub(crate) fn expected_files(&self) -> &'static [&'static str] {
         match self {
-            Self::VersionBump => &["Cargo.lock", "crates/baymax/Cargo.toml"],
-            Self::ReleaseChannelUpdate => &["crates/baymax/RELEASE_CHANNEL"],
+            Self::VersionBump => &["Cargo.lock", "crates/sim/Cargo.toml"],
+            Self::ReleaseChannelUpdate => &["crates/sim/RELEASE_CHANNEL"],
         }
     }
 
@@ -198,8 +198,8 @@ impl Committer {
         }
     }
 
-    pub(crate) fn is_baymax_zippy(&self) -> bool {
-        self.email == BAYMAX_ZIPPY_EMAIL
+    pub(crate) fn is_sim_zippy(&self) -> bool {
+        self.email == SIM_ZIPPY_EMAIL
     }
 }
 
@@ -673,7 +673,7 @@ mod tests {
     #[test]
     fn automated_change_detects_version_bump() {
         let line = format!(
-            "abc123{d}Baymax Zippy{d}bot@test.com{d}Bump to 0.230.2 for @cole-miller",
+            "abc123{d}Sim Zippy{d}bot@test.com{d}Bump to 0.230.2 for @cole-miller",
             d = CommitDetails::FIELD_DELIMITER
         );
         let commit = CommitDetails::parse(&line, "").unwrap();
@@ -685,7 +685,7 @@ mod tests {
     #[test]
     fn automated_change_detects_stable_release_channel() {
         let line = format!(
-            "abc123{d}Baymax Zippy{d}bot@test.com{d}v0.233.x stable for @cole-miller",
+            "abc123{d}Sim Zippy{d}bot@test.com{d}v0.233.x stable for @cole-miller",
             d = CommitDetails::FIELD_DELIMITER
         );
         let commit = CommitDetails::parse(&line, "").unwrap();
@@ -697,7 +697,7 @@ mod tests {
     #[test]
     fn automated_change_detects_preview_release_channel() {
         let line = format!(
-            "abc123{d}Baymax Zippy{d}bot@test.com{d}v0.234.x preview for @cole-miller",
+            "abc123{d}Sim Zippy{d}bot@test.com{d}v0.234.x preview for @cole-miller",
             d = CommitDetails::FIELD_DELIMITER
         );
         let commit = CommitDetails::parse(&line, "").unwrap();
@@ -719,7 +719,7 @@ mod tests {
     #[test]
     fn automated_change_rejects_wrong_prefix() {
         let line = format!(
-            "abc123{d}Baymax Zippy{d}bot@test.com{d}Fix thing for @cole-miller",
+            "abc123{d}Sim Zippy{d}bot@test.com{d}Fix thing for @cole-miller",
             d = CommitDetails::FIELD_DELIMITER
         );
         let commit = CommitDetails::parse(&line, "").unwrap();
@@ -729,7 +729,7 @@ mod tests {
     #[test]
     fn automated_change_rejects_trailing_text() {
         let line = format!(
-            "abc123{d}Baymax Zippy{d}bot@test.com{d}Bump to 0.230.2 for @cole-miller extra",
+            "abc123{d}Sim Zippy{d}bot@test.com{d}Bump to 0.230.2 for @cole-miller extra",
             d = CommitDetails::FIELD_DELIMITER
         );
         let commit = CommitDetails::parse(&line, "").unwrap();
@@ -737,15 +737,15 @@ mod tests {
     }
 
     #[test]
-    fn committer_is_baymax_zippy() {
-        let committer = Committer::new("Baymax Zippy", BAYMAX_ZIPPY_EMAIL);
-        assert!(committer.is_baymax_zippy());
+    fn committer_is_sim_zippy() {
+        let committer = Committer::new("Sim Zippy", SIM_ZIPPY_EMAIL);
+        assert!(committer.is_sim_zippy());
     }
 
     #[test]
-    fn committer_is_not_baymax_zippy() {
+    fn committer_is_not_sim_zippy() {
         let committer = Committer::new("Alice", "alice@test.com");
-        assert!(!committer.is_baymax_zippy());
+        assert!(!committer.is_sim_zippy());
     }
 
     #[test]

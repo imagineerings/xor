@@ -14,12 +14,12 @@ use crate::tasks::workflows::{
     vars::{PathCondition, StepOutput, WorkflowInput, one_workflow_per_non_main_branch_and_token},
 };
 
-pub(crate) const BAYMAX_EXTENSION_CLI_SHA: &str = "9ee3c503a4bbbc6b4a0f8a789acca4871d773223";
+pub(crate) const SIM_EXTENSION_CLI_SHA: &str = "9ee3c503a4bbbc6b4a0f8a789acca4871d773223";
 
 // This should follow the set target in crates/extension/src/extension_builder.rs
 const EXTENSION_RUST_TARGET: &str = "wasm32-wasip2";
 
-// This is used by various extensions repos in the baymax-extensions org to run automated tests.
+// This is used by various extensions repos in the sim-extensions org to run automated tests.
 pub(crate) fn extension_tests() -> Workflow {
     let should_check_rust = PathCondition::new("check_rust", r"^(Cargo.lock|Cargo.toml|.*\.rs)$");
     let should_check_extension =
@@ -53,7 +53,7 @@ pub(crate) fn extension_tests() -> Workflow {
         .add_env(("CARGO_TERM_COLOR", "always"))
         .add_env(("RUST_BACKTRACE", 1))
         .add_env(("CARGO_INCREMENTAL", 0))
-        .add_env(("BAYMAX_EXTENSION_CLI_SHA", BAYMAX_EXTENSION_CLI_SHA))
+        .add_env(("SIM_EXTENSION_CLI_SHA", SIM_EXTENSION_CLI_SHA))
         .add_env(("RUSTUP_TOOLCHAIN", "stable"))
         .add_env(("CARGO_BUILD_TARGET", EXTENSION_RUST_TARGET))
         .map(|workflow| {
@@ -134,7 +134,7 @@ fn check_rust() -> NamedJob {
 }
 
 pub(crate) fn check_extension() -> NamedJob {
-    let (cache_download, cache_hit) = cache_baymax_extension_cli();
+    let (cache_download, cache_hit) = cache_sim_extension_cli();
     let (check_version_job, version_changed, _) = compare_versions();
 
     let job = Job::default()
@@ -144,7 +144,7 @@ pub(crate) fn check_extension() -> NamedJob {
         .timeout_minutes(6u32)
         .add_step(steps::checkout_repo().with_full_history())
         .add_step(cache_download)
-        .add_step(download_baymax_extension_cli(cache_hit))
+        .add_step(download_sim_extension_cli(cache_hit))
         .add_step(cache_rust_dependencies_namespace()) // Extensions can compile Rust, so provide the cache if needed.
         .add_step(check())
         .add_step(fetch_ts_query_ls())
@@ -155,28 +155,28 @@ pub(crate) fn check_extension() -> NamedJob {
     named::job(job)
 }
 
-pub fn cache_baymax_extension_cli() -> (Step<Use>, StepOutput) {
+pub fn cache_sim_extension_cli() -> (Step<Use>, StepOutput) {
     let step = named::uses(
         "actions",
         "cache",
         "0057852bfaa89a56745cba8c7296529d2fc39830",
     )
-    .id("cache-baymax-extension-cli")
+    .id("cache-sim-extension-cli")
     .with(
         Input::default()
-            .add("path", "baymax-extension")
-            .add("key", "baymax-extension-${{ env.BAYMAX_EXTENSION_CLI_SHA }}"),
+            .add("path", "sim-extension")
+            .add("key", "sim-extension-${{ env.SIM_EXTENSION_CLI_SHA }}"),
     );
     let output = StepOutput::new(&step, "cache-hit");
     (step, output)
 }
 
-pub fn download_baymax_extension_cli(cache_hit: StepOutput) -> Step<Run> {
+pub fn download_sim_extension_cli(cache_hit: StepOutput) -> Step<Run> {
     named::bash(
     indoc! {
         r#"
-        wget --quiet "https://baymax-extension-cli.nyc3.digitaloceanspaces.com/$BAYMAX_EXTENSION_CLI_SHA/x86_64-unknown-linux-gnu/baymax-extension" -O "$GITHUB_WORKSPACE/baymax-extension"
-        chmod +x "$GITHUB_WORKSPACE/baymax-extension"
+        wget --quiet "https://sim-extension-cli.nyc3.digitaloceanspaces.com/$SIM_EXTENSION_CLI_SHA/x86_64-unknown-linux-gnu/sim-extension" -O "$GITHUB_WORKSPACE/sim-extension"
+        chmod +x "$GITHUB_WORKSPACE/sim-extension"
         "#,
     }
     ).if_condition(Expression::new(format!("{} != 'true'", cache_hit.expr())))
@@ -187,16 +187,16 @@ pub fn check() -> Step<Run> {
         r#"
         mkdir -p /tmp/ext-scratch
         mkdir -p /tmp/ext-output
-        "$GITHUB_WORKSPACE/baymax-extension" --source-dir . --scratch-dir /tmp/ext-scratch --output-dir /tmp/ext-output
+        "$GITHUB_WORKSPACE/sim-extension" --source-dir . --scratch-dir /tmp/ext-scratch --output-dir /tmp/ext-output
         "#
     })
 }
 
 fn verify_version_did_not_change(version_changed: StepOutput) -> Step<Run> {
     named::bash(indoc! {r#"
-        if [[ "$VERSION_CHANGED" == "true" && "$GITHUB_EVENT_NAME" == "pull_request" && "$PR_USER_LOGIN" != "baymax-zippy[bot]" ]] ; then
+        if [[ "$VERSION_CHANGED" == "true" && "$GITHUB_EVENT_NAME" == "pull_request" && "$PR_USER_LOGIN" != "sim-zippy[bot]" ]] ; then
             echo "Version change detected in your change!"
-            echo "Version changes happen in separate PRs and will be performed by the baymax-zippy bot"
+            echo "Version changes happen in separate PRs and will be performed by the sim-zippy bot"
             exit 42
         fi
         "#

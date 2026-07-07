@@ -253,7 +253,7 @@ pub struct EditorSettingsContent {
     /// of each entry in the completions menu.
     ///
     /// - "off": do not display item kinds (default).
-    /// - "symbol": display a single-letter badge, coloribaymax based on the
+    /// - "symbol": display a single-letter badge, colorisim based on the
     ///   active syntax theme.
     ///
     /// Default: off

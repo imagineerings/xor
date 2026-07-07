@@ -117,7 +117,7 @@ Use bold labels for callouts:
 Images are hosted externally. Reference format:
 
 ```markdown
-![Alt text description](https://baymax.dev/img/path/to/image.webp)
+![Alt text description](https://sim.dev/img/path/to/image.webp)
 ```
 
 ### Cross-Linking
@@ -130,11 +130,11 @@ Images are hosted externally. Reference format:
 
 ### Core Principles
 
-- **Practical over promotional**: Focus on what users can do, not on selling Baymax. Avoid marketing language like "powerful," "revolutionary," or "best-in-class."
-- **Honest about limitations**: When Baymax lacks a feature or doesn't match another tool's depth, say so directly. Pair limitations with workarounds or alternative workflows.
+- **Practical over promotional**: Focus on what users can do, not on selling Sim. Avoid marketing language like "powerful," "revolutionary," or "best-in-class."
+- **Honest about limitations**: When Sim lacks a feature or doesn't match another tool's depth, say so directly. Pair limitations with workarounds or alternative workflows.
 - **Direct and concise**: Use short sentences. Get to the point. Developers are scanning, not reading novels.
 - **Second person**: Address the reader as "you." Avoid "the user" or "one."
-- **Present tense**: "Baymax opens the file" not "Baymax will open the file."
+- **Present tense**: "Sim opens the file" not "Sim will open the file."
 
 ### What to Avoid
 
@@ -160,13 +160,13 @@ Or add this to your settings.json:
 ### Bad: Wordy and promotional
 
 ```
-Baymax provides a powerful and seamless formatting experience. Simply navigate to the settings and you'll find the format_on_save option which enables Baymax's incredible auto-formatting capabilities.
+Sim provides a powerful and seamless formatting experience. Simply navigate to the settings and you'll find the format_on_save option which enables Sim's incredible auto-formatting capabilities.
 ```
 
 ### Good: Honest about limitations
 
 ```
-Baymax doesn't index your project like IntelliJ does. You open a folder and start working immediately—no waiting. The trade-off: cross-project analysis relies on language servers, which may not go as deep.
+Sim doesn't index your project like IntelliJ does. You open a folder and start working immediately—no waiting. The trade-off: cross-project analysis relies on language servers, which may not go as deep.
 
 **How to adapt:**
 - Use `Cmd+Shift+F` for project-wide text search
@@ -176,7 +176,7 @@ Baymax doesn't index your project like IntelliJ does. You open a folder and star
 ### Bad: Defensive or dismissive
 
 ```
-While some users might miss indexing, Baymax's approach is actually better because it's faster.
+While some users might miss indexing, Sim's approach is actually better because it's faster.
 ```
 
 ## Scope
@@ -205,7 +205,7 @@ Most documentation pages follow this structure:
 1. **Title** (H1) - Single sentence or phrase
 2. **Overview/Introduction** - 1-3 paragraphs explaining what this is
 3. **Getting Started** `{#getting-started}` - Prerequisites and first steps
-4. **Main Content** - Feature details, organibaymax by topic
+4. **Main Content** - Feature details, organisim by topic
 5. **Advanced/Configuration** - Power user options
 6. **See Also** (optional) - Related documentation links
 
@@ -266,11 +266,11 @@ Inherit all conventions from `docs/.rules`. Key points:
 | panel           | tool window, sidebar (be specific: "Project Panel," "Terminal Panel") |
 | language server | LSP (spell out first use, then LSP is fine)                           |
 
-## Baymax-Specific Conventions
+## Sim-Specific Conventions
 
-### Recognibaymax Rules Files
+### Recognisim Rules Files
 
-When documenting rules/instructions for AI, note that Baymax recognizes these files (in priority order):
+When documenting rules/instructions for AI, note that Sim recognizes these files (in priority order):
 
 - `.rules`
 - `.cursorrules`
@@ -284,15 +284,15 @@ When documenting rules/instructions for AI, note that Baymax recognizes these fi
 
 ### Settings File Locations
 
-- macOS: `~/.config/baymax/settings.json`
-- Linux: `~/.config/baymax/settings.json`
-- Windows: `%AppData%\Baymax\settings.json`
+- macOS: `~/.config/sim/settings.json`
+- Linux: `~/.config/sim/settings.json`
+- Windows: `%AppData%\Sim\settings.json`
 
 ### Keymap File Locations
 
-- macOS: `~/.config/baymax/keymap.json`
-- Linux: `~/.config/baymax/keymap.json`
-- Windows: `%AppData%\Baymax\keymap.json`
+- macOS: `~/.config/sim/keymap.json`
+- Linux: `~/.config/sim/keymap.json`
+- Windows: `%AppData%\Sim\keymap.json`
 
 ## Safety Constraints
 
@@ -341,7 +341,7 @@ When generating a documentation plan, use this structure:
 
 ### Summary
 
-Brief description of code changes analybaymax.
+Brief description of code changes analysim.
 
 ### Documentation Updates Required: [Yes/No]
 

@@ -1158,7 +1158,7 @@ impl DirectWriteState {
             }?;
             mapped_data
         };
-        let mut rasteribaymax =
+        let mut rasterisim =
             vec![0u8; (bitmap_size.width.0 as u32 * bitmap_size.height.0 as u32 * 4) as usize];
 
         for y in 0..bitmap_size.height.0 as usize {
@@ -1166,7 +1166,7 @@ impl DirectWriteState {
             unsafe {
                 std::ptr::copy_nonoverlapping::<u8>(
                     (mapped_data.pData as *const u8).byte_add(mapped_data.RowPitch as usize * y),
-                    rasteribaymax
+                    rasterisim
                         .as_mut_ptr()
                         .byte_add(width * y * std::mem::size_of::<u32>()),
                     width * std::mem::size_of::<u32>(),
@@ -1175,7 +1175,7 @@ impl DirectWriteState {
         }
 
         // Convert from premultiplied to straight alpha
-        for chunk in rasteribaymax.chunks_exact_mut(4) {
+        for chunk in rasterisim.chunks_exact_mut(4) {
             let b = chunk[0] as f32;
             let g = chunk[1] as f32;
             let r = chunk[2] as f32;
@@ -1188,7 +1188,7 @@ impl DirectWriteState {
             }
         }
 
-        Ok(rasteribaymax)
+        Ok(rasterisim)
     }
 
     fn get_typographic_bounds(&self, font_id: FontId, glyph_id: GlyphId) -> Result<Bounds<f32>> {

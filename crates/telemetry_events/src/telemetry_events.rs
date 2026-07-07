@@ -1,4 +1,4 @@
-//! See [Telemetry in Baymax](https://baymax.dev/docs/telemetry) for additional information.
+//! See [Telemetry in Sim](https://sim.dev/docs/telemetry) for additional information.
 
 use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -6,23 +6,23 @@ use std::{collections::HashMap, fmt::Display, time::Duration};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EventRequestBody {
-    /// Identifier unique to each system Baymax is installed on
+    /// Identifier unique to each system Sim is installed on
     pub system_id: Option<String>,
-    /// Identifier unique to each Baymax installation (differs for stable, preview, dev)
+    /// Identifier unique to each Sim installation (differs for stable, preview, dev)
     pub installation_id: Option<String>,
-    /// Identifier unique to each logged in Baymax user (randomly generated on first sign in)
-    /// Identifier unique to each Baymax session (differs for each time you open Baymax)
+    /// Identifier unique to each logged in Sim user (randomly generated on first sign in)
+    /// Identifier unique to each Sim session (differs for each time you open Sim)
     pub session_id: Option<String>,
     pub metrics_id: Option<String>,
-    /// True for Baymax staff, otherwise false
+    /// True for Sim staff, otherwise false
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_staff: Option<bool>,
-    /// Baymax version number
+    /// Sim version number
     pub app_version: String,
     pub os_name: String,
     pub os_version: Option<String>,
     pub architecture: String,
-    /// Baymax release channel (stable, preview, dev)
+    /// Sim release channel (stable, preview, dev)
     pub release_channel: Option<String>,
     pub events: Vec<EventWrapper>,
 }

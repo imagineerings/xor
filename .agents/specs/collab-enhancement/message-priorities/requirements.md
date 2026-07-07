@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Baymax channel messages have no urgency indicators. Mattermost supports message priorities (`post_priority.go`) — users can mark messages as "Urgent" or "Important" with visual indicators and special notification handling. This helps critical communications stand out in busy channels.
+Sim channel messages have no urgency indicators. Mattermost supports message priorities (`post_priority.go`) — users can mark messages as "Urgent" or "Important" with visual indicators and special notification handling. This helps critical communications stand out in busy channels.
 
 ## Glossary
 

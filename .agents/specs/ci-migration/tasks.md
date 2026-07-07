@@ -55,7 +55,7 @@ This plan covers restoring archived GitHub Actions workflows in priority order. 
 - [ ] 5. Restore post-release workflows
   - [ ] 5.1 Move `archive/after_release.yml` to `.github/workflows/after_release.yml`
   - [ ] 5.2 Move `archive/deploy_docs.yml` to `.github/workflows/deploy_docs.yml`
-  - [ ] 5.3 Verify the composite reference `uses: simtropolis/baymax/.github/workflows/deploy_docs.yml@...` in `after_release.yml` points to the restored file (or update the commit SHA)
+  - [ ] 5.3 Verify the composite reference `uses: simtropolis/sim/.github/workflows/deploy_docs.yml@...` in `after_release.yml` points to the restored file (or update the commit SHA)
   - [ ] 5.4 Verify secrets are configured (Discord webhook, Winget token, Sentry, Vercel, Cloudflare, Amplitude)
   - _Requirements: R3, R5_
   - _Reads: `.github/workflows/archive/after_release.yml`, `.github/workflows/archive/deploy_docs.yml`_
@@ -72,7 +72,7 @@ This plan covers restoring archived GitHub Actions workflows in priority order. 
 
 - [ ] 7. Restore `deploy_nightly_docs.yml`
   - [ ] 7.1 Move `archive/deploy_nightly_docs.yml` to `.github/workflows/deploy_nightly_docs.yml`
-  - [ ] 7.2 Verify the composite reference `uses: simtropolis/baymax/.github/workflows/deploy_docs.yml@...` points to the restored file
+  - [ ] 7.2 Verify the composite reference `uses: simtropolis/sim/.github/workflows/deploy_docs.yml@...` points to the restored file
   - _Requirements: R5_
   - _Reads: `.github/workflows/archive/deploy_nightly_docs.yml`_
 
@@ -144,12 +144,12 @@ This plan covers restoring archived GitHub Actions workflows in priority order. 
 ### Phase 14: Version Bumping (P2)
 
 - [ ] 15. Restore version bumping workflows
-  - [ ] 15.1 Move `archive/bump_baymax_version.yml` to `.github/workflows/bump_baymax_version.yml`
+  - [ ] 15.1 Move `archive/bump_sim_version.yml` to `.github/workflows/bump_sim_version.yml`
   - [ ] 15.2 Move `archive/bump_patch_version.yml` to `.github/workflows/bump_patch_version.yml`
   - [ ] 15.3 Move `archive/bump_collab_staging.yml` to `.github/workflows/bump_collab_staging.yml`
   - [ ] 15.4 Verify GitHub app token secrets are configured
   - _Requirements: R13_
-  - _Reads: `.github/workflows/archive/bump_baymax_version.yml`_
+  - _Reads: `.github/workflows/archive/bump_sim_version.yml`_
 
 ### Phase 15: Community Management (P3)
 

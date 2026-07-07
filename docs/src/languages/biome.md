@@ -1,12 +1,12 @@
 ---
 title: Biome
-description: "Configure Biome language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure Biome language support in Sim, including language servers, formatting, and debugging."
 ---
 
 # Biome
 
-[Biome](https://biomejs.dev/) support in Baymax is provided by the community-maintained [Biome extension](https://github.com/biomejs/biome-baymax).
-Report issues to: [https://github.com/biomejs/biome-baymax/issues](https://github.com/biomejs/biome-baymax/issues)
+[Biome](https://biomejs.dev/) support in Sim is provided by the community-maintained [Biome extension](https://github.com/biomejs/biome-sim).
+Report issues to: [https://github.com/biomejs/biome-sim/issues](https://github.com/biomejs/biome-sim/issues)
 
 - Language Server: [biomejs/biome](https://github.com/biomejs/biome)
 
@@ -37,4 +37,4 @@ By default, the `biome.json` file is required to be in the root of the workspace
 
 For a full list of `biome.json` options see [Biome Configuration](https://biomejs.dev/reference/configuration/) documentation.
 
-See the [Biome Baymax Extension README](https://github.com/biomejs/biome-baymax) for a complete list of features and configuration options.
+See the [Biome Sim Extension README](https://github.com/biomejs/biome-sim) for a complete list of features and configuration options.

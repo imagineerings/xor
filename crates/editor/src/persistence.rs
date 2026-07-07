@@ -18,20 +18,20 @@ use std::{
 use workspace::{ItemId, WorkspaceDb, WorkspaceId};
 
 #[derive(Clone, Debug, PartialEq, Default)]
-pub(crate) struct SerialibaymaxEditor {
+pub(crate) struct SerialisimEditor {
     pub(crate) abs_path: Option<PathBuf>,
     pub(crate) contents: Option<String>,
     pub(crate) language: Option<String>,
     pub(crate) mtime: Option<MTime>,
 }
 
-impl StaticColumnCount for SerialibaymaxEditor {
+impl StaticColumnCount for SerialisimEditor {
     fn column_count() -> usize {
         6
     }
 }
 
-impl Bind for SerialibaymaxEditor {
+impl Bind for SerialisimEditor {
     fn bind(&self, statement: &Statement, start_index: i32) -> Result<i32> {
         let start_index = statement.bind(&self.abs_path, start_index)?;
         let start_index = statement.bind(
@@ -61,7 +61,7 @@ impl Bind for SerialibaymaxEditor {
     }
 }
 
-impl Column for SerialibaymaxEditor {
+impl Column for SerialisimEditor {
     fn column(statement: &mut Statement, start_index: i32) -> Result<(Self, i32)> {
         let (abs_path, start_index): (Option<PathBuf>, i32) =
             Column::column(statement, start_index)?;
@@ -235,14 +235,14 @@ const MAX_QUERY_PLACEHOLDERS: usize = 32000;
 
 impl EditorDb {
     query! {
-        pub fn get_serialibaymax_editor(item_id: ItemId, workspace_id: WorkspaceId) -> Result<Option<SerialibaymaxEditor>> {
+        pub fn get_serialisim_editor(item_id: ItemId, workspace_id: WorkspaceId) -> Result<Option<SerialisimEditor>> {
             SELECT path, buffer_path, contents, language, mtime_seconds, mtime_nanos FROM editors
             WHERE item_id = ? AND workspace_id = ?
         }
     }
 
     query! {
-        pub async fn save_serialibaymax_editor(item_id: ItemId, workspace_id: WorkspaceId, serialibaymax_editor: SerialibaymaxEditor) -> Result<()> {
+        pub async fn save_serialisim_editor(item_id: ItemId, workspace_id: WorkspaceId, serialisim_editor: SerialisimEditor) -> Result<()> {
             INSERT INTO editors
                 (item_id, workspace_id, path, buffer_path, contents, language, mtime_seconds, mtime_nanos)
             VALUES
@@ -415,12 +415,12 @@ mod tests {
     use super::*;
 
     #[gpui::test]
-    async fn test_save_and_get_serialibaymax_editor(cx: &mut gpui::TestAppContext) {
+    async fn test_save_and_get_serialisim_editor(cx: &mut gpui::TestAppContext) {
         let db = cx.update(|cx| workspace::WorkspaceDb::global(cx));
         let workspace_id = db.next_id().await.unwrap();
         let editor_db = cx.update(|cx| EditorDb::global(cx));
 
-        let serialibaymax_editor = SerialibaymaxEditor {
+        let serialisim_editor = SerialisimEditor {
             abs_path: Some(PathBuf::from("testing.txt")),
             contents: None,
             language: None,
@@ -428,18 +428,18 @@ mod tests {
         };
 
         editor_db
-            .save_serialibaymax_editor(1234, workspace_id, serialibaymax_editor.clone())
+            .save_serialisim_editor(1234, workspace_id, serialisim_editor.clone())
             .await
             .unwrap();
 
         let have = editor_db
-            .get_serialibaymax_editor(1234, workspace_id)
+            .get_serialisim_editor(1234, workspace_id)
             .unwrap()
             .unwrap();
-        assert_eq!(have, serialibaymax_editor);
+        assert_eq!(have, serialisim_editor);
 
         // Now update contents and language
-        let serialibaymax_editor = SerialibaymaxEditor {
+        let serialisim_editor = SerialisimEditor {
             abs_path: Some(PathBuf::from("testing.txt")),
             contents: Some("Test".to_owned()),
             language: Some("Go".to_owned()),
@@ -447,18 +447,18 @@ mod tests {
         };
 
         editor_db
-            .save_serialibaymax_editor(1234, workspace_id, serialibaymax_editor.clone())
+            .save_serialisim_editor(1234, workspace_id, serialisim_editor.clone())
             .await
             .unwrap();
 
         let have = editor_db
-            .get_serialibaymax_editor(1234, workspace_id)
+            .get_serialisim_editor(1234, workspace_id)
             .unwrap()
             .unwrap();
-        assert_eq!(have, serialibaymax_editor);
+        assert_eq!(have, serialisim_editor);
 
         // Now set all the fields to NULL
-        let serialibaymax_editor = SerialibaymaxEditor {
+        let serialisim_editor = SerialisimEditor {
             abs_path: None,
             contents: None,
             language: None,
@@ -466,18 +466,18 @@ mod tests {
         };
 
         editor_db
-            .save_serialibaymax_editor(1234, workspace_id, serialibaymax_editor.clone())
+            .save_serialisim_editor(1234, workspace_id, serialisim_editor.clone())
             .await
             .unwrap();
 
         let have = editor_db
-            .get_serialibaymax_editor(1234, workspace_id)
+            .get_serialisim_editor(1234, workspace_id)
             .unwrap()
             .unwrap();
-        assert_eq!(have, serialibaymax_editor);
+        assert_eq!(have, serialisim_editor);
 
         // Storing and retrieving mtime
-        let serialibaymax_editor = SerialibaymaxEditor {
+        let serialisim_editor = SerialisimEditor {
             abs_path: None,
             contents: None,
             language: None,
@@ -485,23 +485,23 @@ mod tests {
         };
 
         editor_db
-            .save_serialibaymax_editor(1234, workspace_id, serialibaymax_editor.clone())
+            .save_serialisim_editor(1234, workspace_id, serialisim_editor.clone())
             .await
             .unwrap();
 
         let have = editor_db
-            .get_serialibaymax_editor(1234, workspace_id)
+            .get_serialisim_editor(1234, workspace_id)
             .unwrap()
             .unwrap();
-        assert_eq!(have, serialibaymax_editor);
+        assert_eq!(have, serialisim_editor);
     }
 
     // NOTE: The fingerprint search logic (finding content at new offsets when file
     // is modified externally) is in editor.rs:restore_from_db and requires a full
     // Editor context to test. Manual testing procedure:
-    // 1. Open a file, fold some sections, close Baymax
+    // 1. Open a file, fold some sections, close Sim
     // 2. Add text at the START of the file externally (shifts all offsets)
-    // 3. Reopen Baymax - folds should be restored at their NEW correct positions
+    // 3. Reopen Sim - folds should be restored at their NEW correct positions
     // The search uses contains_str_at() to find fingerprints in the buffer.
 
     #[gpui::test]

@@ -36,7 +36,7 @@ pub trait ComfyNodeRegistry {
 
 ### NodeSchemaAdapter
 
-- **Purpose**: Convert Comfy node input/output declarations into Baymax graph schemas.
+- **Purpose**: Convert Comfy node input/output declarations into Sim graph schemas.
 - **Responsibilities**: Normalize required, optional, hidden, lazy, list, combo, and primitive inputs; preserve descriptions and display names.
 
 ### NodeReplacementEngine

@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Baymax should not port XR runtimes. It may index XR/spatial metadata and docs where useful for authoring.
+Sim should not port XR runtimes. It may index XR/spatial metadata and docs where useful for authoring.
 
 ### Requirement 1: XR Runtime Boundary
 

@@ -32,7 +32,7 @@ use crate::{
 };
 
 enum ConfigStatus {
-    Deserialibaymax(DevContainer),
+    Deserialisim(DevContainer),
     VariableParsed(DevContainer),
 }
 
@@ -94,7 +94,7 @@ impl DevContainerManifest {
             docker_client,
             command_runner,
             raw_config: devcontainer_contents,
-            config: ConfigStatus::Deserialibaymax(devcontainer),
+            config: ConfigStatus::Deserialisim(devcontainer),
             local_project_directory: local_project_path.to_path_buf(),
             local_environment: environment,
             config_directory: devcontainer_directory.to_path_buf(),
@@ -261,7 +261,7 @@ impl DevContainerManifest {
 
     fn dev_container(&self) -> &DevContainer {
         match &self.config {
-            ConfigStatus::Deserialibaymax(dev_container) => dev_container,
+            ConfigStatus::Deserialisim(dev_container) => dev_container,
             ConfigStatus::VariableParsed(dev_container) => dev_container,
         }
     }
@@ -298,7 +298,7 @@ impl DevContainerManifest {
         let mut hasher = DefaultHasher::new();
         let prefix = match &self.dev_container().name {
             Some(name) => &safe_id_lower(name),
-            None => "baymax-dc",
+            None => "sim-dc",
         };
         let prefix = prefix.get(..6).unwrap_or(prefix);
         let prefix = prefix.trim_matches(|c: char| !c.is_alphanumeric());
@@ -417,7 +417,7 @@ impl DevContainerManifest {
 
     async fn download_feature_and_dockerfile_resources(&mut self) -> Result<(), DevContainerError> {
         let dev_container = match &self.config {
-            ConfigStatus::Deserialibaymax(_) => {
+            ConfigStatus::Deserialisim(_) => {
                 log::error!(
                     "Dev container has not yet been parsed for variable expansion. Cannot yet download resources"
                 );
@@ -428,7 +428,7 @@ impl DevContainerManifest {
         let root_image_tag = self.get_base_image_from_config().await?;
         let root_image = self.docker_client.inspect(&root_image_tag).await?;
 
-        let temp_base = std::env::temp_dir().join("devcontainer-baymax");
+        let temp_base = std::env::temp_dir().join("devcontainer-sim");
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_millis())
@@ -777,7 +777,7 @@ RUN sed -i -E 's/((^|\s)PATH=)([^\$]*)$/\1\${{PATH:-\3}}/g' /etc/profile || true
         base_image: DockerInspect,
     ) -> Result<DockerBuildResources, DevContainerError> {
         let dev_container = match &self.config {
-            ConfigStatus::Deserialibaymax(_) => {
+            ConfigStatus::Deserialisim(_) => {
                 log::error!(
                     "Dev container has not yet been parsed for variable expansion. Cannot yet merge resources"
                 );
@@ -822,7 +822,7 @@ RUN sed -i -E 's/((^|\s)PATH=)([^\$]*)$/\1\${{PATH:-\3}}/g' /etc/profile || true
     }
 
     async fn build_resources(&self) -> Result<DevContainerBuildResources, DevContainerError> {
-        if let ConfigStatus::Deserialibaymax(_) = &self.config {
+        if let ConfigStatus::Deserialisim(_) = &self.config {
             log::error!(
                 "Dev container has not yet been parsed for variable expansion. Cannot yet build resources"
             );
@@ -904,7 +904,7 @@ RUN sed -i -E 's/((^|\s)PATH=)([^\$]*)$/\1\${{PATH:-\3}}/g' /etc/profile || true
 
     async fn docker_compose_manifest(&self) -> Result<DockerComposeResources, DevContainerError> {
         let dev_container = match &self.config {
-            ConfigStatus::Deserialibaymax(_) => {
+            ConfigStatus::Deserialisim(_) => {
                 log::error!(
                     "Dev container has not yet been parsed for variable expansion. Cannot yet get docker compose files"
                 );
@@ -943,7 +943,7 @@ RUN sed -i -E 's/((^|\s)PATH=)([^\$]*)$/\1\${{PATH:-\3}}/g' /etc/profile || true
         &self,
     ) -> Result<DockerComposeResources, DevContainerError> {
         let dev_container = match &self.config {
-            ConfigStatus::Deserialibaymax(_) => {
+            ConfigStatus::Deserialisim(_) => {
                 log::error!(
                     "Dev container has not yet been parsed for variable expansion. Cannot yet build from compose files"
                 );
@@ -1038,7 +1038,7 @@ RUN sed -i -E 's/((^|\s)PATH=)([^\$]*)$/\1\${{PATH:-\3}}/g' /etc/profile || true
                 volumes: HashMap::new(),
             };
 
-            let temp_base = std::env::temp_dir().join("devcontainer-baymax");
+            let temp_base = std::env::temp_dir().join("devcontainer-sim");
             let config_location = temp_base.join("docker_compose_build.json");
 
             let config_json = serde_json_lenient::to_string(&build_override).map_err(|e| {
@@ -1135,7 +1135,7 @@ RUN sed -i -E 's/((^|\s)PATH=)([^\$]*)$/\1\${{PATH:-\3}}/g' /etc/profile || true
                     volumes: HashMap::new(),
                 };
 
-                let temp_base = std::env::temp_dir().join("devcontainer-baymax");
+                let temp_base = std::env::temp_dir().join("devcontainer-sim");
                 let config_location = temp_base.join("docker_compose_build.json");
 
                 let config_json = serde_json_lenient::to_string(&build_override).map_err(|e| {
@@ -1199,7 +1199,7 @@ RUN sed -i -E 's/((^|\s)PATH=)([^\$]*)$/\1\${{PATH:-\3}}/g' /etc/profile || true
     ) -> Result<PathBuf, DevContainerError> {
         let config =
             self.build_runtime_override(main_service_name, network_mode_service, resources)?;
-        let temp_base = std::env::temp_dir().join("devcontainer-baymax");
+        let temp_base = std::env::temp_dir().join("devcontainer-sim");
         let config_location = temp_base.join("docker_compose_runtime.json");
 
         let config_json = serde_json_lenient::to_string(&config).map_err(|e| {
@@ -1227,12 +1227,12 @@ RUN sed -i -E 's/((^|\s)PATH=)([^\$]*)$/\1\${{PATH:-\3}}/g' /etc/profile || true
         let mut runtime_labels = HashMap::new();
 
         if let Some(metadata) = &resources.image.config.labels.metadata {
-            let serialibaymax_metadata = serde_json_lenient::to_string(metadata).map_err(|e| {
+            let serialisim_metadata = serde_json_lenient::to_string(metadata).map_err(|e| {
                 log::error!("Error serializing docker image metadata: {e}");
                 DevContainerError::ContainerNotValid(resources.image.id.clone())
             })?;
 
-            runtime_labels.insert("devcontainer.metadata".to_string(), serialibaymax_metadata);
+            runtime_labels.insert("devcontainer.metadata".to_string(), serialisim_metadata);
         }
 
         for (k, v) in self.identifying_labels() {
@@ -1393,7 +1393,7 @@ RUN sed -i -E 's/((^|\s)PATH=)([^\$]*)$/\1\${{PATH:-\3}}/g' /etc/profile || true
 
     async fn build_docker_image(&self) -> Result<DockerInspect, DevContainerError> {
         let dev_container = match &self.config {
-            ConfigStatus::Deserialibaymax(_) => {
+            ConfigStatus::Deserialisim(_) => {
                 log::error!(
                     "Dev container has not yet been parsed for variable expansion. Cannot yet build image"
                 );
@@ -1675,7 +1675,7 @@ RUN sed -i -E 's/((^|\s)PATH=)([^\$]*)$/\1\${PATH:-\3}/g' /etc/profile || true
 
     fn create_docker_build(&self) -> Result<Command, DevContainerError> {
         let dev_container = match &self.config {
-            ConfigStatus::Deserialibaymax(_) => {
+            ConfigStatus::Deserialisim(_) => {
                 log::error!(
                     "Dev container has not yet been parsed for variable expansion. Cannot yet proceed with docker build"
                 );
@@ -1974,14 +1974,14 @@ RUN sed -i -E 's/((^|\s)PATH=)([^\$]*)$/\1\${PATH:-\3}/g' /etc/profile || true
         }
 
         if let Some(metadata) = &build_resources.image.config.labels.metadata {
-            let serialibaymax_metadata = serde_json_lenient::to_string(metadata).map_err(|e| {
+            let serialisim_metadata = serde_json_lenient::to_string(metadata).map_err(|e| {
                 log::error!("Problem serializing image metadata: {e}");
                 DevContainerError::ContainerNotValid(build_resources.image.id.clone())
             })?;
             command.arg("-l");
             command.arg(format!(
                 "{}={}",
-                "devcontainer.metadata", serialibaymax_metadata
+                "devcontainer.metadata", serialisim_metadata
             ));
         }
 
@@ -2016,7 +2016,7 @@ RUN sed -i -E 's/((^|\s)PATH=)([^\$]*)$/\1\${PATH:-\3}/g' /etc/profile || true
         self.dev_container()
             .customizations
             .as_ref()
-            .map(|c| c.baymax.extensions.clone())
+            .map(|c| c.sim.extensions.clone())
             .unwrap_or_default()
     }
 
@@ -2912,7 +2912,7 @@ mod test {
         worktree_store::{WorktreeIdCounter, WorktreeStore},
     };
     use serde_json_lenient::Value;
-    use util::{command::Command, paths::SanitibaymaxPath};
+    use util::{command::Command, paths::SanitisimPath};
 
     #[cfg(not(target_os = "windows"))]
     use crate::docker::DockerComposeServicePort;
@@ -3029,14 +3029,14 @@ mod test {
         devcontainer_contents: &str,
     ) -> Result<(TestDependencies, DevContainerManifest), DevContainerError> {
         let local_config = init_devcontainer_config(&fs, devcontainer_contents).await;
-        let project_path = SanitibaymaxPath::new_arc(&PathBuf::from(TEST_PROJECT_PATH));
+        let project_path = SanitisimPath::new_arc(&PathBuf::from(TEST_PROJECT_PATH));
         let worktree_store =
             cx.new(|_cx| WorktreeStore::local(false, fs.clone(), WorktreeIdCounter::default()));
         let project_environment =
             cx.new(|cx| ProjectEnvironment::new(None, worktree_store.downgrade(), None, false, cx));
 
         let context = DevContainerContext {
-            project_directory: SanitibaymaxPath::cast_arc(project_path),
+            project_directory: SanitisimPath::cast_arc(project_path),
             use_podman: false,
             fs: fs.clone(),
             http_client: http_client.clone(),
@@ -3669,7 +3669,7 @@ mod test {
                     "GitHub.vscode-pull-request-github",
                   ],
                 },
-                "baymax": {
+                "sim": {
                   "extensions": ["vue", "ruby"],
                 },
                 "codespaces": {
@@ -4400,7 +4400,7 @@ ENV DOCKER_BUILDKIT=1
         // that directory IS `<config>/.devcontainer`. A compose file at the
         // workspace root (as `"dockerComposeFile": "../docker-compose.yml"`
         // produces) must derive to the plain dir basename, not
-        // `project_devcontainer` — otherwise Baymax diverges from the CLI.
+        // `project_devcontainer` — otherwise Sim diverges from the CLI.
         use crate::devcontainer_manifest::derive_project_name;
 
         let got = derive_project_name(
@@ -5199,7 +5199,7 @@ ENV DOCKER_BUILDKIT=1
                     "GitHub.vscode-pull-request-github",
                   ],
                 },
-                "baymax": {
+                "sim": {
                   "extensions": ["vue", "ruby"],
                 },
                 "codespaces": {
@@ -8230,7 +8230,7 @@ FROM docker.io/hexpm/elixir:1.21-erlang-28.4.1-debian-trixie-20260316-slim AS de
                     ZMLhENaG0bYatdrKP+3H91lvK050pXwnO/R7fB/FSTouki4ciIx5OuLlnJZIxSzx
                     PqGl0mkxImLNbGWoi6Lto0LYxqHN2iQtzlwTVmq9733zd3XfcXrZ3+LblHAgEt5G
                     TfNxEKJ8soPLyWmwDH6HWCnjZ/aIQRBTIQ05uVeEoYxSh6wOai7ss/KveoSNBbYz
-                    gbdzoqI2Y8cgH2nbfgp3DSasaLBaymaxCSsIsK1u05CinE7k2qZ7KgKAUIcT/cR/grk
+                    gbdzoqI2Y8cgH2nbfgp3DSasaLSimCSsIsK1u05CinE7k2qZ7KgKAUIcT/cR/grk
                     C6VwsnDU0OUCideXcQ8WeHutqvgZH1JgKDbznoIzeQHJD238GEu+eKhRHcz8/jeG
                     94zkcgJOz3KbZGYMiTh277Fvj9zzvZsbMBCedV1BTg3TqgvdX4bdkhf5cH+7NtWO
                     lrFj6UwAsGukBTAOxC0l/dnSmZhJ7Z1KmEWilro/gOrjtOxqRQutlIqG22TaqoPG

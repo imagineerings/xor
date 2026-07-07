@@ -10,27 +10,27 @@
 //! - The style matches the provided theme
 //! - Nodes are given accent colors, even if none are provided in the mermaid
 //!   source.
-//! - The SVG has been tweaked based on the assumption that it will be rasteribaymax
+//! - The SVG has been tweaked based on the assumption that it will be rasterisim
 //!   using `usvg`/`resvg`. Some bugs/quirks of `usvg`/`resvg` are accounted for
 //!   in this crate.
 //!
 //! This module uses the [`merman`] crate for rendering, rather than
 //! `mermaid-rs`, which was used in the previous implementation of mermaid
-//! rendering in Baymax.
+//! rendering in Sim.
 //!
 //! Historically, this crate also carried generic `usvg`/`resvg` cleanup for SVG
 //! constructs that merman's parity output could emit, such as HTML labels in
 //! `<foreignObject>` and CSS/attribute forms that rasterizers do not handle.
 //! Since merman 0.6, that generic cleanup is exposed as merman's raster-safe SVG
-//! pipeline. Baymax opts into that pipeline during rendering, then keeps
+//! pipeline. Sim opts into that pipeline during rendering, then keeps
 //! editor-specific theme and accent color rules in this crate. The [`gpui`]
 //! dependency is only needed for the [`Hsla`] and [`Rgba`] color types.
 //!
 //! The [`render_to_svg`] function operates in two stages:
 //! - [`render`] the mermaid text to raster-safe SVG using [`merman`].
-//! - [`postprocess`] the SVG to add Baymax theme and accent styling.
+//! - [`postprocess`] the SVG to add Sim theme and accent styling.
 //!
-//! Baymax's postprocessing is split up into stages. We parse the generated SVG
+//! Sim's postprocessing is split up into stages. We parse the generated SVG
 //! using [`quick_xml`], which produces an iterator of
 //! [`Event<'_>`](quick_xml::events::Event)s. This iterator is then repeatedly
 //! transformed, and finally collected back into an SVG string.
@@ -49,7 +49,7 @@
 //!
 //! We try to match the users theme, and also apply accent colors to diagrams to
 //! make them more visually interesting. Accent colors are derived from the
-//! `player_colors` in the Baymax theme.
+//! `player_colors` in the Sim theme.
 //!
 //! There are three parts to color handling:
 //!
@@ -58,7 +58,7 @@
 //!    it's not possible to color nodes individually, and not all parts of the
 //!    diagrams are correctly themed.
 //! 2. `postprocess::accent_colors` injects custom CSS classes (e.g.
-//!    `baymax-accent-0`) to specific elements, based on the diagram type and
+//!    `sim-accent-0`) to specific elements, based on the diagram type and
 //!    node.
 //! 3. `postprocess::inject_css` injects CSS rules for the classes applied by
 //!    `accent_colors`
@@ -158,7 +158,7 @@ impl Default for MermaidTheme {
 ///
 /// Emits `#rrggbb` for fully opaque colors and `#rrggbbaa` when the input
 /// has any transparency, so translucent theme colors (e.g. `ghost_element_hover`
-/// from Baymax's UI palette) round-trip without silently losing their alpha.
+/// from Sim's UI palette) round-trip without silently losing their alpha.
 pub(crate) fn css_color(color: Hsla) -> String {
     let rgba = Rgba::from(color);
     let r = (rgba.r.clamp(0.0, 1.0) * 255.0).round() as u8;

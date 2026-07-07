@@ -14,25 +14,25 @@
 
 ---
 
-title: Configuring Baymax - Settings and Preferences
-description: Configure Baymax with the Settings Editor, JSON files, and project-specific overrides. Covers all settings options.
+title: Configuring Sim - Settings and Preferences
+description: Configure Sim with the Settings Editor, JSON files, and project-specific overrides. Covers all settings options.
 
 ---
 
-# Configuring Baymax
+# Configuring Sim
 
-This guide explains how Baymax's settings system works, including the Settings Editor, JSON configuration files, and project-specific settings.
+This guide explains how Sim's settings system works, including the Settings Editor, JSON configuration files, and project-specific settings.
 
 For visual customization (themes, fonts, icons), see [Appearance](./appearance.md).
 
 ## Settings Editor {#settings-editor}
 
-The **Settings Editor** ({#kb baymax::OpenSettings}) is the primary way to configure Baymax. It provides a searchable interface where you can browse available settings, see their current values, and make changes.
+The **Settings Editor** ({#kb sim::OpenSettings}) is the primary way to configure Sim. It provides a searchable interface where you can browse available settings, see their current values, and make changes.
 
 To open it:
 
-- Press {#kb baymax::OpenSettings}
-- Or run {#action baymax::OpenSettings} from the command palette
+- Press {#kb sim::OpenSettings}
+- Or run {#action sim::OpenSettings} from the command palette
 
 As you type in the search box, matching settings appear with descriptions and controls to modify them. Changes save automatically to your settings file.
 
@@ -42,28 +42,28 @@ As you type in the search box, matching settings appear with descriptions and co
 
 ### User Settings {#user-settings}
 
-Your user settings apply globally across all projects. Open the file with {#kb baymax::OpenSettingsFile} or run {#action baymax::OpenSettingsFile} from the command palette.
+Your user settings apply globally across all projects. Open the file with {#kb sim::OpenSettingsFile} or run {#action sim::OpenSettingsFile} from the command palette.
 
 The file is located at:
 
-- macOS: `~/.config/baymax/settings.json`
-- Linux: `~/.config/baymax/settings.json` (or `$XDG_CONFIG_HOME/baymax/settings.json`)
-- Windows: `%APPDATA%\Baymax\settings.json`
+- macOS: `~/.config/sim/settings.json`
+- Linux: `~/.config/sim/settings.json` (or `$XDG_CONFIG_HOME/sim/settings.json`)
+- Windows: `%APPDATA%\Sim\settings.json`
 
 The syntax is JSON with support for `//` comments.
 
 ### Default Settings {#default-settings}
 
-To see all available settings with their default values, run {#action baymax::OpenDefaultSettings} from the command palette. This opens a read-only reference you can use when editing your own settings.
+To see all available settings with their default values, run {#action sim::OpenDefaultSettings} from the command palette. This opens a read-only reference you can use when editing your own settings.
 
 ### Project Settings {#project-settings}
 
-Override user settings for a specific project by creating a `.baymax/settings.json` file in your project root. Run {#action baymax::OpenProjectSettings} to create this file.
+Override user settings for a specific project by creating a `.sim/settings.json` file in your project root. Run {#action sim::OpenProjectSettings} to create this file.
 
 Project settings take precedence over user settings for that project only.
 
 ```json [settings]
-// .baymax/settings.json
+// .sim/settings.json
 {
   "tab_size": 2,
   "formatter": "prettier",
@@ -79,7 +79,7 @@ You can also add settings files in subdirectories for more granular control.
 
 Settings are applied in layers:
 
-1. **Default settings** — Baymax's built-in defaults
+1. **Default settings** — Sim's built-in defaults
 2. **User settings** — Your global preferences
 3. **Project settings** — Project-specific overrides
 
@@ -113,12 +113,12 @@ Changes made in the Settings Editor apply across all channels.
 
 ## Settings Deep Links {#deep-links}
 
-Baymax supports deep links that open specific settings directly:
+Sim supports deep links that open specific settings directly:
 
 ```
-baymax://settings/theme
-baymax://settings/vim_mode
-baymax://settings/buffer_font_size
+sim://settings/theme
+sim://settings/vim_mode
+sim://settings/buffer_font_size
 ```
 
 These are useful for sharing configuration tips or linking from documentation.

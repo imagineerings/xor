@@ -16,7 +16,7 @@ Migrate the goose gateway system — a multi-channel communication layer that al
 
 ### Requirement 1: Gateway Manager
 
-**User Story:** As a baymax user, I want a central gateway manager, so that I can manage multiple communication channels for the agent.
+**User Story:** As a sim user, I want a central gateway manager, so that I can manage multiple communication channels for the agent.
 
 #### Acceptance Criteria
 
@@ -27,7 +27,7 @@ Migrate the goose gateway system — a multi-channel communication layer that al
 
 ### Requirement 2: Telegram Gateway
 
-**User Story:** As a baymax user, I want to interact with the agent through Telegram, so that I can use goose from my phone or any device with Telegram.
+**User Story:** As a sim user, I want to interact with the agent through Telegram, so that I can use goose from my phone or any device with Telegram.
 
 #### Acceptance Criteria
 

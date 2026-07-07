@@ -1,6 +1,6 @@
-# The Baymax Rust Extension API
+# The Sim Rust Extension API
 
-This crate lets you write extensions for Baymax in Rust.
+This crate lets you write extensions for Sim in Rust.
 
 ## Extension Manifest
 
@@ -18,7 +18,7 @@ repository = "https://github.com/your/extension-repository"
 
 ## Cargo metadata
 
-Baymax extensions are packaged as WebAssembly files. In your Cargo.toml, you'll
+Sim extensions are packaged as WebAssembly files. In your Cargo.toml, you'll
 need to set your `crate-type` accordingly:
 
 ```toml
@@ -34,36 +34,36 @@ crate-type = ["cdylib"]
 To define your extension, create a type that implements the `Extension` trait, and register it.
 
 ```rust
-use zed_extension_api as baymax;
+use zed_extension_api as sim;
 
 struct MyExtension {
     // ... state
 }
 
-impl baymax::Extension for MyExtension {
+impl sim::Extension for MyExtension {
     // ...
 }
 
-baymax::register_extension!(MyExtension);
+sim::register_extension!(MyExtension);
 ```
 
 ## Testing your extension
 
-To run your extension in Baymax as you're developing it:
+To run your extension in Sim as you're developing it:
 
 - Make sure you have [Rust installed](https://www.rust-lang.org/learn/get-started)
 - Have the `wasm32-wasip2` target installed (`rustup target add wasm32-wasip2`)
-- Open the extensions view using the `baymax: extensions` action in the command palette.
+- Open the extensions view using the `sim: extensions` action in the command palette.
 - Click the `Install Dev Extension` button in the top right
 - Choose the path to your extension directory.
 
-## Compatible Baymax versions
+## Compatible Sim versions
 
-Extensions created using newer versions of the Baymax extension API won't be compatible with older versions of Baymax.
+Extensions created using newer versions of the Sim extension API won't be compatible with older versions of Sim.
 
-Here is the compatibility of the `zed_extension_api` with versions of Baymax:
+Here is the compatibility of the `zed_extension_api` with versions of Sim:
 
-| Baymax version | `zed_extension_api` version |
+| Sim version | `zed_extension_api` version |
 | ----------- | --------------------------- |
 | `0.192.x`   | `0.0.1` - `0.6.0`           |
 | `0.186.x`   | `0.0.1` - `0.5.0`           |

@@ -1,4 +1,4 @@
-//! Provides access to Baymax settings.
+//! Provides access to Sim settings.
 
 #[path = "../wit/since_v0.8.0/settings.rs"]
 mod types;

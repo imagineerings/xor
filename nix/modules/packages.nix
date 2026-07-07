@@ -8,13 +8,13 @@
       ...
     }:
     let
-      mkBaymax = import ../toolchain.nix { inherit inputs; };
-      baymax-editor = mkBaymax pkgs;
+      mkSim = import ../toolchain.nix { inherit inputs; };
+      sim-editor = mkSim pkgs;
     in
     {
       packages = {
-        default = baymax-editor;
-        debug = baymax-editor.override { profile = "dev"; };
+        default = sim-editor;
+        debug = sim-editor.override { profile = "dev"; };
       };
     }
     // lib.optionalAttrs (lib.hasSuffix "linux" system) {

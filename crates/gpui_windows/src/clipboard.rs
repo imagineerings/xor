@@ -204,7 +204,7 @@ fn write_image(item: &Image) -> Result<()> {
     }
 
     // Also provide a PNG copy for broad compatibility.
-    // SVG can't be rasteribaymax by the image crate, so skip it.
+    // SVG can't be rasterisim by the image crate, so skip it.
     if item.format != ImageFormat::Svg && native_format != Some(*CLIPBOARD_PNG_FORMAT) {
         if let Some(png_bytes) = convert_to_png(item.bytes(), item.format) {
             set_clipboard_bytes(&png_bytes, *CLIPBOARD_PNG_FORMAT)?;

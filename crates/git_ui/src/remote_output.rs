@@ -43,8 +43,8 @@ pub fn format_output(action: &RemoteAction, output: RemoteCommandOutput) -> Succ
                 }
             } else {
                 let message = match remote {
-                    Some(remote) => format!("Synchronibaymax with {}", remote.name),
-                    None => "Synchronibaymax with remotes".into(),
+                    Some(remote) => format!("Synchronisim with {}", remote.name),
+                    None => "Synchronisim with remotes".into(),
                 };
                 SuccessMessage {
                     message,

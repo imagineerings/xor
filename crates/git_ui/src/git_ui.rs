@@ -11,7 +11,7 @@ use workspace::{Toast, notifications::NotificationId};
 mod blame_ui;
 pub mod clone;
 
-use baymax_actions;
+use sim_actions;
 use git::{
     repository::{Branch, CommitDetails, Upstream, UpstreamTracking, UpstreamTrackingStatus},
     status::{FileStatus, StatusCode, UnmergedStatus, UnmergedStatusCode},
@@ -87,17 +87,17 @@ pub fn init(cx: &mut App) {
         git_picker::register(workspace);
 
         workspace.register_action(
-            |workspace, action: &baymax_actions::CreateWorktree, window, cx| {
+            |workspace, action: &sim_actions::CreateWorktree, window, cx| {
                 worktree_service::handle_create_worktree(workspace, action, window, None, cx);
             },
         );
         workspace.register_action(
-            |workspace, action: &baymax_actions::SwitchWorktree, window, cx| {
+            |workspace, action: &sim_actions::SwitchWorktree, window, cx| {
                 worktree_service::handle_switch_worktree(workspace, action, window, None, cx);
             },
         );
 
-        workspace.register_action(|workspace, _: &baymax_actions::git::Worktree, window, cx| {
+        workspace.register_action(|workspace, _: &sim_actions::git::Worktree, window, cx| {
             let focused_dock = workspace.focused_dock_position(window, cx);
             let project = workspace.project().clone();
             let workspace_handle = workspace.weak_handle();
@@ -113,7 +113,7 @@ pub fn init(cx: &mut App) {
         });
 
         workspace.register_action(
-            |workspace, action: &baymax_actions::OpenWorktreeInNewWindow, window, cx| {
+            |workspace, action: &sim_actions::OpenWorktreeInNewWindow, window, cx| {
                 let path = action.path.clone();
                 let is_remote = !workspace.project().read(cx).is_local();
 
@@ -150,7 +150,7 @@ pub fn init(cx: &mut App) {
         }
         if !project.is_via_collab() {
             workspace.register_action(
-                |workspace, _: &baymax_actions::git::CreatePullRequest, window, cx| {
+                |workspace, _: &sim_actions::git::CreatePullRequest, window, cx| {
                     if let Some(panel) = workspace.panel::<git_panel::GitPanel>(cx) {
                         panel.update(cx, |panel, cx| {
                             panel.create_pull_request(window, cx);

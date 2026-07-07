@@ -1698,21 +1698,21 @@ impl BufferStore {
         peer_id: proto::PeerId,
         cx: &mut Context<Self>,
     ) -> proto::ProjectTransaction {
-        let mut serialibaymax_transaction = proto::ProjectTransaction {
+        let mut serialisim_transaction = proto::ProjectTransaction {
             buffer_ids: Default::default(),
             transactions: Default::default(),
         };
         for (buffer, transaction) in project_transaction.0 {
             self.create_buffer_for_peer(&buffer, peer_id, cx)
                 .detach_and_log_err(cx);
-            serialibaymax_transaction
+            serialisim_transaction
                 .buffer_ids
                 .push(buffer.read(cx).remote_id().into());
-            serialibaymax_transaction
+            serialisim_transaction
                 .transactions
                 .push(language::proto::serialize_transaction(&transaction));
         }
-        serialibaymax_transaction
+        serialisim_transaction
     }
 
     pub(crate) fn register_project_search_result_handle(

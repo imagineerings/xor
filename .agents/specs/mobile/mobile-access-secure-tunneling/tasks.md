@@ -2,10 +2,10 @@
 
 ## Overview
 
-This plan migrates the tunnel management logic from `goose-server` into Baymax and builds a settings panel with QR code display. The work is ordered to establish the core tunnel manager first (porting the goose-server SSH tunnel logic), then build the settings UI on top, then add QR code generation, and finally wire up persistence and tests. Each step produces a compilable, testable increment.
+This plan migrates the tunnel management logic from `goose-server` into Sim and builds a settings panel with QR code display. The work is ordered to establish the core tunnel manager first (porting the goose-server SSH tunnel logic), then build the settings UI on top, then add QR code generation, and finally wire up persistence and tests. Each step produces a compilable, testable increment.
 
 **Key decisions:**
-- The migrated tunnel logic lives in a new `mobile_tunnel` crate within Baymax
+- The migrated tunnel logic lives in a new `mobile_tunnel` crate within Sim
 - The settings page is added to the existing `settings_ui` crate following its established patterns
 - QR code generation uses the `qrcode` crate (to be added as a workspace dependency)
 - SSH subprocess management reuses `util::command` patterns already present in `remote` and `repl`
@@ -21,7 +21,7 @@ This plan migrates the tunnel management logic from `goose-server` into Baymax a
   - _Requirements: 1.1_
   - _writes: Cargo.toml, crates/mobile_tunnel/Cargo.toml, crates/mobile_tunnel/src/lib.rs_
 
-- [x] 2. Port SSH tunnel start logic from goose-server (reusing existing Baymax SSH infrastructure)
+- [x] 2. Port SSH tunnel start logic from goose-server (reusing existing Sim SSH infrastructure)
   - [x] 2.1 Implement `TunnelManager::start()`
     - Port the SSH tunnel creation, port allocation, and retry logic from goose-server's `/tunnel/start` handler
     - Use `std::net::TcpListener::bind("127.0.0.1:0")` for local port allocation (pattern already used in `ssh_kernel.rs`)
@@ -45,17 +45,17 @@ This plan migrates the tunnel management logic from `goose-server` into Baymax a
     - Create `crates/mobile_tunnel/src/qr_code.rs`
     - Use the `qrcode` crate to encode a connection string into a QR code bitmap
     - Render the bitmap as a PNG `Vec<u8>` using the `image` crate
-    - Define the connection string format: `baymax-tunnel://{host}:{port}?token={token}`
+    - Define the connection string format: `sim-tunnel://{host}:{port}?token={token}`
     - Write unit tests verifying the QR code output is valid PNG and the connection string round-trips
     - _Requirements: 3.1_
     - _writes: crates/mobile_tunnel/src/qr_code.rs, crates/mobile_tunnel/Cargo.toml_
 
-- [x] 4. Register the `mobile_tunnel` crate with Baymax's init
-  - [x] 4.1 Initialize `TunnelManager` during Baymax startup
-    - Add a global or app-level `TunnelManager` instance in `crates/baymax/src/main.rs` (or in `settings_ui::init`)
+- [x] 4. Register the `mobile_tunnel` crate with Sim's init
+  - [x] 4.1 Initialize `TunnelManager` during Sim startup
+    - Add a global or app-level `TunnelManager` instance in `crates/sim/src/main.rs` (or in `settings_ui::init`)
     - Wire it to detect an existing SSH remote connection from the `remote` crate — hold a `WeakEntity<RemoteClient>` so the tunnel can access the active `SshRemoteConnection`'s ControlMaster socket
     - _Requirements: 4.1, 4.3_
-    - _writes: crates/baymax/src/main.rs_ (or appropriate init location)
+    - _writes: crates/sim/src/main.rs_ (or appropriate init location)
 
 - [x] 5. Build the Mobile Access settings page
   - [x] 5.1 Create the page module

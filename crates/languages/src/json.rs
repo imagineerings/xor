@@ -84,7 +84,7 @@ impl ContextProvider for JsonTaskProvider {
                         ..TaskTemplate::default()
                     })
                     .chain([TaskTemplate {
-                        label: "package script $BAYMAX_CUSTOM_script".to_owned(),
+                        label: "package script $SIM_CUSTOM_script".to_owned(),
                         command: command.clone(),
                         args: vec![
                             "run".into(),
@@ -104,15 +104,15 @@ impl ContextProvider for JsonTaskProvider {
                     .map(|key| TaskTemplate {
                         label: format!("run {key}"),
                         command: "composer".to_owned(),
-                        args: vec!["-d".into(), "$BAYMAX_DIRNAME".into(), key.into()],
+                        args: vec!["-d".into(), "$SIM_DIRNAME".into(), key.into()],
                         ..TaskTemplate::default()
                     })
                     .chain([TaskTemplate {
-                        label: "composer script $BAYMAX_CUSTOM_script".to_owned(),
+                        label: "composer script $SIM_CUSTOM_script".to_owned(),
                         command: "composer".to_owned(),
                         args: vec![
                             "-d".into(),
-                            "$BAYMAX_DIRNAME".into(),
+                            "$SIM_DIRNAME".into(),
                             VariableName::Custom("script".into()).template_value(),
                         ],
                         tags: vec!["composer-script".into()],
@@ -329,7 +329,7 @@ impl LspAdapter for JsonLspAdapter {
         .collect()
     }
 
-    fn is_primary_baymax_json_schema_adapter(&self) -> bool {
+    fn is_primary_sim_json_schema_adapter(&self) -> bool {
         true
     }
 }

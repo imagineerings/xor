@@ -51,7 +51,7 @@ pub(crate) fn call_bump_version(
         )
         .uses(
             "simtropolis",
-            "baymax",
+            "sim",
             ".github/workflows/extension_bump.yml",
             target_ref.map_or("main", AsRef::as_ref),
         )

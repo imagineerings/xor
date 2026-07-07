@@ -9,7 +9,7 @@ API provider nodes are normalized as policy-gated world-model harness remote exe
 ```mermaid
 flowchart TD
     Registry[ProviderNodeRegistry] --> Connector[ProviderConnector]
-    Connector --> Secrets[Baymax Secrets]
+    Connector --> Secrets[Sim Secrets]
     Connector --> Upload[ProviderUploadService]
     Connector --> Remote[RemoteTaskTracker]
     Remote --> Download[ProviderDownloadService]
@@ -51,7 +51,7 @@ pub trait ProviderConnector {
 
 ### RemoteTaskTracker
 
-- **Purpose**: Track provider async task ids inside Baymax job node state.
+- **Purpose**: Track provider async task ids inside Sim job node state.
 - **Responsibilities**: Status polling, timeout, cancellation, provider progress, and terminal state mapping.
 
 ## Data Models
@@ -96,7 +96,7 @@ _For any_ provider request, response, log, history entry, or job status payload,
 
 ### Property 3: Remote Task Provenance
 
-_For any_ successful provider task, every imported output SHALL include provider id, model id, remote task id, source assets, request parameters, and Baymax job/node ids in provenance.
+_For any_ successful provider task, every imported output SHALL include provider id, model id, remote task id, source assets, request parameters, and Sim job/node ids in provenance.
 
 **Validates: Requirement 3.1, 3.3, 4.1, 4.2, 4.3, 4.4, 4.5**
 
@@ -118,7 +118,7 @@ _For any_ provider call that may incur cost or transmit project media externally
 - Disabled provider nodes fail validation before graph execution.
 - Provider rate limits include retry-after information when available.
 - Provider malformed responses include provider, endpoint, and response-shape diagnostics without logging secrets.
-- Cancellation maps unsupported provider cancellation to a Baymax-local cancelled/abandoned state with explanation.
+- Cancellation maps unsupported provider cancellation to a Sim-local cancelled/abandoned state with explanation.
 
 ## Testing Strategy
 

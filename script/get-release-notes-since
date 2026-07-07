@@ -82,7 +82,7 @@ async function getReleases(startDate, endDate) {
       },
       body: JSON.stringify({
         query,
-        variables: { owner: "simtropolis", repo: "baymax", cursor },
+        variables: { owner: "simtropolis", repo: "sim", cursor },
       }),
     });
 

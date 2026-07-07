@@ -61,7 +61,7 @@ tokio.workspace = true
 url.workspace = true
 util.workspace = true
 worktree.workspace = true
-baymax_credentials_provider.workspace = true
+sim_credentials_provider.workspace = true
 
 [dev-dependencies]
 clock = { workspace = true, features = ["test-support"] }

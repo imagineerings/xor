@@ -30,9 +30,9 @@ use util::{paths::PathExt, shell::ShellKind};
 /// Path to the program used for askpass
 ///
 /// On Unix and remote servers, this defaults to the current executable.
-/// On Windows, this must be set to the CLI variant of baymax via set_askpass_program(),
+/// On Windows, this must be set to the CLI variant of sim via set_askpass_program(),
 /// because SSH_ASKPASS must point to a directly executable binary. The CLI binary
-/// handles the BAYMAX_ASKPASS_SOCKET env var to communicate with Baymax over a Unix socket
+/// handles the SIM_ASKPASS_SOCKET env var to communicate with Sim over a Unix socket
 /// without needing a wrapper script.
 static ASKPASS_PROGRAM: OnceLock<std::path::PathBuf> = OnceLock::new();
 
@@ -189,12 +189,12 @@ impl AskPassSession {
         self.askpass_task.script_path()
     }
 
-    /// Returns the socket path to set as BAYMAX_ASKPASS_SOCKET.
+    /// Returns the socket path to set as SIM_ASKPASS_SOCKET.
     ///
     /// On Windows, SSH_ASKPASS points directly to cli.exe. SSH passes only
     /// the prompt string as argv[1] with no mechanism for extra arguments,
     /// so the socket path is communicated via this environment variable instead.
-    /// cli.exe must check BAYMAX_ASKPASS_SOCKET before clap parses args.
+    /// cli.exe must check SIM_ASKPASS_SOCKET before clap parses args.
     #[cfg(target_os = "windows")]
     pub fn socket_path(&self) -> impl AsRef<OsStr> {
         self.askpass_task.socket_path()
@@ -206,7 +206,7 @@ pub struct PasswordProxy {
     /// On Unix: path to the generated .sh askpass script (set as SSH_ASKPASS).
     /// On Windows: path to cli.exe (set as SSH_ASKPASS directly — no script needed).
     askpass_script_path: std::path::PathBuf,
-    /// On Windows only: path to the Unix socket, passed as BAYMAX_ASKPASS_SOCKET
+    /// On Windows only: path to the Unix socket, passed as SIM_ASKPASS_SOCKET
     /// so cli.exe can find it without --askpass argument parsing.
     #[cfg(target_os = "windows")]
     askpass_socket_path: std::path::PathBuf,
@@ -223,11 +223,11 @@ impl PasswordProxy {
         executor: BackgroundExecutor,
     ) -> Result<Self> {
         let temp_dir = tempfile::Builder::new()
-            .prefix("baymax-askpass")
+            .prefix("sim-askpass")
             .tempdir()?;
         let askpass_socket = temp_dir.path().join("askpass.sock");
         let current_exec = std::env::current_exe()
-            .context("Failed to determine current baymax executable path.")?;
+            .context("Failed to determine current sim executable path.")?;
 
         let askpass_program = ASKPASS_PROGRAM.get_or_init(|| current_exec);
 
@@ -311,7 +311,7 @@ impl PasswordProxy {
     }
 }
 
-/// Runs Baymax in netcat mode for use in askpass.
+/// Runs Sim in netcat mode for use in askpass.
 pub fn main(socket: &str) {
     use std::io::{self, Read};
     use std::process::exit;
@@ -325,7 +325,7 @@ pub fn main(socket: &str) {
     connect_and_write_prompt(socket, buffer)
 }
 
-/// Runs Baymax in askpass mode using prompts passed as arguments.
+/// Runs Sim in askpass mode using prompts passed as arguments.
 pub fn main_from_args(socket: &str, args: impl IntoIterator<Item = String>) {
     let prompt = args.into_iter().collect::<Vec<_>>().join("\0");
     connect_and_write_prompt(socket, prompt.into_bytes())

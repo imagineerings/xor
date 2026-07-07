@@ -857,7 +857,7 @@ mod tests {
             &Example {
                 spec: edit_prediction::example_spec::ExampleSpec {
                     name: "test".to_string(),
-                    repository_url: "https://github.com/simtropolis/baymax.git".to_string(),
+                    repository_url: "https://github.com/simtropolis/sim.git".to_string(),
                     revision: "HEAD".to_string(),
                     tags: Vec::new(),
                     reasoning: None,
@@ -879,7 +879,7 @@ mod tests {
                 predictions: Vec::new(),
                 score: Vec::new(),
                 qa: Vec::new(),
-                baymax_version: None,
+                sim_version: None,
                 state: None,
             },
             response,
@@ -939,7 +939,7 @@ mod tests {
             &Example {
                 spec: edit_prediction::example_spec::ExampleSpec {
                     name: "test".to_string(),
-                    repository_url: "https://github.com/simtropolis/baymax.git".to_string(),
+                    repository_url: "https://github.com/simtropolis/sim.git".to_string(),
                     revision: "HEAD".to_string(),
                     tags: Vec::new(),
                     reasoning: None,
@@ -961,7 +961,7 @@ mod tests {
                 predictions: Vec::new(),
                 score: Vec::new(),
                 qa: Vec::new(),
-                baymax_version: None,
+                sim_version: None,
                 state: None,
             },
             editable_range,

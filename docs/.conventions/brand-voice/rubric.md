@@ -53,7 +53,7 @@ Does the copy state facts without hype or emotional manipulation?
 
 **Examples:**
 
-- ✅ "Baymax renders every frame on the GPU. You'll notice the difference when you scroll."
+- ✅ "Sim renders every frame on the GPU. You'll notice the difference when you scroll."
 - ❌ "Experience the revolutionary speed that will absolutely transform how you code!"
 
 ---

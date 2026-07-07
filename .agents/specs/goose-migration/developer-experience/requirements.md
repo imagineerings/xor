@@ -8,7 +8,7 @@ Migrate several goose developer-experience features: slash commands, hints syste
 
 - **Slash Command**: A text command starting with `/` that the agent can interpret (e.g., `/help`, `/recipe`)
 - **Hint**: Contextual information loaded into the agent's prompt based on the current project or task
-- **Baymax App**: An embedded mini-application within baymax (chat app, clock app, etc.)
+- **Sim App**: An embedded mini-application within sim (chat app, clock app, etc.)
 - **Source Root**: A directory root for source code or content that the agent can reference
 - **Source**: A named source of information for the agent (files, directories, snippets)
 - **Execution Manager**: Coordinates task execution and manages running processes
@@ -17,7 +17,7 @@ Migrate several goose developer-experience features: slash commands, hints syste
 
 ### Requirement 1: Slash Command System
 
-**User Story:** As a baymax user, I want to use slash commands to quickly invoke common actions, so that I can interact with the agent efficiently.
+**User Story:** As a sim user, I want to use slash commands to quickly invoke common actions, so that I can interact with the agent efficiently.
 
 #### Acceptance Criteria
 
@@ -29,7 +29,7 @@ Migrate several goose developer-experience features: slash commands, hints syste
 
 ### Requirement 2: Hints System
 
-**User Story:** As a baymax user, I want the agent to automatically load relevant context about my project, so that it has better context without manual setup.
+**User Story:** As a sim user, I want the agent to automatically load relevant context about my project, so that it has better context without manual setup.
 
 #### Acceptance Criteria
 
@@ -38,9 +38,9 @@ Migrate several goose developer-experience features: slash commands, hints syste
 3. WHEN a hint file matches the current context THEN the system SHALL include it in the agent's prompt
 4. THE hints SHALL support importing content from referenced files
 
-### Requirement 3: Baymax Apps
+### Requirement 3: Sim Apps
 
-**User Story:** As a baymax user, I want embedded mini-applications within the agent (chat, clock, etc.), so that I can access utility functions without leaving the agent interface.
+**User Story:** As a sim user, I want embedded mini-applications within the agent (chat, clock, etc.), so that I can access utility functions without leaving the agent interface.
 
 #### Acceptance Criteria
 
@@ -52,7 +52,7 @@ Migrate several goose developer-experience features: slash commands, hints syste
 
 ### Requirement 4: Source Roots and Sources
 
-**User Story:** As a baymax user, I want the agent to know about project source roots and named sources, so that it can reference the right code and content.
+**User Story:** As a sim user, I want the agent to know about project source roots and named sources, so that it can reference the right code and content.
 
 #### Acceptance Criteria
 
@@ -62,7 +62,7 @@ Migrate several goose developer-experience features: slash commands, hints syste
 
 ### Requirement 5: Execution Manager
 
-**User Story:** As a baymax user, I want the system to manage concurrent task execution, so that multiple agent operations can be coordinated.
+**User Story:** As a sim user, I want the system to manage concurrent task execution, so that multiple agent operations can be coordinated.
 
 #### Acceptance Criteria
 

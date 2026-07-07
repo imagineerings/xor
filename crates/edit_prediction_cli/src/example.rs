@@ -45,8 +45,8 @@ pub struct Example {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub qa: Vec<Option<QaResult>>,
 
-    /// The Baymax version used to generate this example.
-    pub baymax_version: Option<String>,
+    /// The Sim version used to generate this example.
+    pub sim_version: Option<String>,
 
     /// The application state used to process this example.
     #[serde(skip)]
@@ -312,6 +312,6 @@ fn parse_markdown_example(input: &str) -> Result<Example> {
         score: Vec::new(),
         qa: Vec::new(),
         state: None,
-        baymax_version: None,
+        sim_version: None,
     })
 }

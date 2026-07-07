@@ -2,11 +2,11 @@
 
 ## Introduction
 
-The Baymax repository previously contained 40 GitHub Actions workflows in `.github/workflows/`. Most of these were auxiliary workflows for community management, release automation, extension CI, issue triage, deployment, and project maintenance. As part of reducing the CI surface to a bare minimum (build, test, publish to GitHub Releases), 38 of those workflows have been archived to `.github/workflows/archive/`. This document specifies the requirements for re-implementing those workflows when needed.
+The Sim repository previously contained 40 GitHub Actions workflows in `.github/workflows/`. Most of these were auxiliary workflows for community management, release automation, extension CI, issue triage, deployment, and project maintenance. As part of reducing the CI surface to a bare minimum (build, test, publish to GitHub Releases), 38 of those workflows have been archived to `.github/workflows/archive/`. This document specifies the requirements for re-implementing those workflows when needed.
 
 ## Glossary
 
-- **CI/CD pipeline**: The set of GitHub Actions workflows that build, test, and publish the Baymax editor.
+- **CI/CD pipeline**: The set of GitHub Actions workflows that build, test, and publish the Sim editor.
 - **Archived workflow**: A workflow file moved to `.github/workflows/archive/` but not currently active (GitHub Actions does not scan subdirectories).
 - **Core workflow**: One of the two retained workflows (`run_tests.yml`, `release.yml`) that constitute the bare-minimum CI/CD.
 - **Auto-generated workflow**: A workflow with the header `# Generated from xtask::workflows::...`, meaning it is produced by `cargo xtask workflows` and would be regenerated if that command is run.
@@ -134,7 +134,7 @@ The Baymax repository previously contained 40 GitHub Actions workflows in `.gith
 
 1. WHEN the workflow is dispatched with a commit SHA, branch, and channel THEN THE system SHALL cherry-pick the commit and push to the target branch.
 
-### R13: Restore Version Bumping (`bump_baymax_version.yml`, `bump_patch_version.yml`, `bump_collab_staging.yml`)
+### R13: Restore Version Bumping (`bump_sim_version.yml`, `bump_patch_version.yml`, `bump_collab_staging.yml`)
 
 **User Story:** As a release manager, I want version bumps to be automated, so that releases follow a consistent process.
 

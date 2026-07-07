@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Baymax should support GDScript, Godot C# affordances, and Godot API documentation using existing language infrastructure.
+Sim should support GDScript, Godot C# affordances, and Godot API documentation using existing language infrastructure.
 
 ### Requirement 1: GDScript Recognition
 

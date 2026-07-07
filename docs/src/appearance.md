@@ -1,17 +1,17 @@
 ---
-title: Appearance and Visual Customization - Baymax
-description: Customize Baymax's themes, fonts, icons, UI density, and other visual settings to match your preferences.
+title: Appearance and Visual Customization - Sim
+description: Customize Sim's themes, fonts, icons, UI density, and other visual settings to match your preferences.
 ---
 
 # Appearance
 
-Customize Baymax's visual appearance to match your preferences. This guide covers themes, fonts, icons, and other visual settings.
+Customize Sim's visual appearance to match your preferences. This guide covers themes, fonts, icons, and other visual settings.
 
 For information on how the settings system works, see [All Settings](./reference/all-settings.md).
 
-## Customize Baymax in 5 Minutes
+## Customize Sim in 5 Minutes
 
-Here's how to make Baymax feel like home:
+Here's how to make Sim feel like home:
 
 1. **Pick a theme**: Press {#kb theme_selector::Toggle} to open the Theme Selector. Arrow through the list to preview themes in real time, and press Enter to apply.
 
@@ -19,17 +19,17 @@ Here's how to make Baymax feel like home:
 
 3. **Choose an icon theme**: Run {#action icon_theme_selector::Toggle} from the command palette to browse icon themes.
 
-4. **Set your font**: Open the Settings Editor with {#kb baymax::OpenSettings} and search for `buffer_font_family`. Set it to your preferred coding font.
+4. **Set your font**: Open the Settings Editor with {#kb sim::OpenSettings} and search for `buffer_font_family`. Set it to your preferred coding font.
 
 5. **Adjust font size**: In the same Settings Editor, search for `buffer_font_size` and `ui_font_size` to tweak the editor and interface text sizes.
 
-That's it. You now have a personalibaymax Baymax setup.
+That's it. You now have a personalisim Sim setup.
 
 ## Themes
 
-Install themes from the Extensions page ({#action baymax::Extensions}), then switch between them with the Theme Selector ({#kb theme_selector::Toggle}).
+Install themes from the Extensions page ({#action sim::Extensions}), then switch between them with the Theme Selector ({#kb theme_selector::Toggle}).
 
-Baymax supports separate themes for light and dark mode with automatic switching based on your system preference:
+Sim supports separate themes for light and dark mode with automatic switching based on your system preference:
 
 ```json [settings]
 {
@@ -49,7 +49,7 @@ A community theme inspired by [Adobe's Spectrum 2](https://adobe.design/ideas/in
 - **Dark variant**: `Spectrum 2 Inspired Dark`
 - **Author**: Ahmad Vegah
 
-To install, copy the theme file to `~/.config/baymax/themes/` and select it from the Theme Selector ({#kb theme_selector::Toggle}).
+To install, copy the theme file to `~/.config/sim/themes/` and select it from the Theme Selector ({#kb theme_selector::Toggle}).
 
 You can also override specific theme attributes for fine-grained control.
 
@@ -65,8 +65,8 @@ Like color themes, icon themes support separate light and dark variants:
 {
   "icon_theme": {
     "mode": "system",
-    "light": "Baymax (Default)",
-    "dark": "Baymax (Default)"
+    "light": "Sim (Default)",
+    "dark": "Sim (Default)"
   }
 }
 ```
@@ -75,7 +75,7 @@ Like color themes, icon themes support separate light and dark variants:
 
 ## Fonts
 
-Baymax uses three font settings for different contexts:
+Sim uses three font settings for different contexts:
 
 | Setting                | Used for                  |
 | ---------------------- | ------------------------- |
@@ -120,7 +120,7 @@ Adjust line spacing with `buffer_line_height`:
 
 ## UI Elements
 
-Baymax provides extensive control over UI elements including:
+Sim provides extensive control over UI elements including:
 
 - **Tab bar** — Show/hide, navigation buttons, file icons, git status
 - **Status bar** — Language selector, cursor position, line endings

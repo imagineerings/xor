@@ -11,10 +11,10 @@
 -keepclasseswithmembers class kotlinx.serialization.json.** {
     kotlinx.serialization.KSerializer serializer(...);
 }
--keep,includedescriptorclasses class com.simtropolis.baymax.**$$serializer { *; }
--keepclassmembers class com.simtropolis.baymax.** {
+-keep,includedescriptorclasses class com.simtropolis.sim.**$$serializer { *; }
+-keepclassmembers class com.simtropolis.sim.** {
     *** Companion;
 }
--keepclasseswithmembers class com.simtropolis.baymax.** {
+-keepclasseswithmembers class com.simtropolis.sim.** {
     kotlinx.serialization.KSerializer serializer(...);
 }

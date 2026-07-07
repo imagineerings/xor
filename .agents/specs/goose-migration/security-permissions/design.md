@@ -2,11 +2,11 @@
 
 ## 1. Overview
 
-Migrate goose's security and permission systems into baymax's existing security infrastructure (`crates/sandbox/`). The security system provides adversarial input inspection, egress data inspection, content classification, and pattern-based threat detection. The permission system provides user-in-the-loop confirmation, intelligent judging, and persistent permission storage.
+Migrate goose's security and permission systems into sim's existing security infrastructure (`crates/sandbox/`). The security system provides adversarial input inspection, egress data inspection, content classification, and pattern-based threat detection. The permission system provides user-in-the-loop confirmation, intelligent judging, and persistent permission storage.
 
 ### Key Architectural Decisions
 
-- **Layer on top of `crates/sandbox/`**: Baymax already has sandbox primitives. The goose security system adds content-level inspection (not just OS-level sandboxing).
+- **Layer on top of `crates/sandbox/`**: Sim already has sandbox primitives. The goose security system adds content-level inspection (not just OS-level sandboxing).
 - **`crates/security/` new crate**: A dedicated crate for content security inspection, keeping it separate from the OS-level sandbox.
 - **`crates/permission/` new crate**: Separates the permission confirmation UI and storage from the agent's tool permission logic (which partially exists in `crates/agent/src/tool_permissions.rs`).
 - **Pluggable inspectors**: The security scanner supports registering multiple inspectors, making it extensible.
@@ -30,7 +30,7 @@ graph TD
         Store[PermissionStore]
     end
 
-    subgraph "Existing baymax"
+    subgraph "Existing sim"
         Sandbox[crates/sandbox/]
         AgentTools[crates/agent/src/tool_permissions.rs]
         Agent[crates/agent/]
@@ -205,5 +205,5 @@ _For any_ blocked action [by security or permission systems], THE system SHALL i
 
 - Source: `projects/goose/crates/goose/src/security/`
 - Source: `projects/goose/crates/goose/src/permission/`
-- Baymax: `crates/sandbox/`
-- Baymax: `crates/agent/src/tool_permissions.rs`
+- Sim: `crates/sandbox/`
+- Sim: `crates/agent/src/tool_permissions.rs`

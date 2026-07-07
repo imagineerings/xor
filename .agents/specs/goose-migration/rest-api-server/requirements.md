@@ -17,7 +17,7 @@ Migrate goose's HTTP REST API server (`goose-server`), which provides a full HTT
 
 ### Requirement 1: HTTP API Server
 
-**User Story:** As a baymax developer, I want an HTTP API server, so that I can integrate baymax into other applications and services.
+**User Story:** As a sim developer, I want an HTTP API server, so that I can integrate sim into other applications and services.
 
 #### Acceptance Criteria
 
@@ -125,7 +125,7 @@ Migrate goose's HTTP REST API server (`goose-server`), which provides a full HTT
 
 ### Requirement 11: Tunnel
 
-**User Story:** As a baymax user, I want to expose the API server securely through a tunnel, so that I can access it from outside my local network.
+**User Story:** As a sim user, I want to expose the API server securely through a tunnel, so that I can access it from outside my local network.
 
 #### Acceptance Criteria
 
@@ -145,7 +145,7 @@ Migrate goose's HTTP REST API server (`goose-server`), which provides a full HTT
 
 ### Requirement 13: Authentication and Authorization
 
-**User Story:** As a baymax operator, I want the API server to require authentication, so that unauthorized users cannot access it.
+**User Story:** As a sim operator, I want the API server to require authentication, so that unauthorized users cannot access it.
 
 #### Acceptance Criteria
 
@@ -156,7 +156,7 @@ Migrate goose's HTTP REST API server (`goose-server`), which provides a full HTT
 
 ### Requirement 14: Setup Route
 
-**User Story:** As a baymax user, I want a first-time setup endpoint, so that I can configure the server from a client application.
+**User Story:** As a sim user, I want a first-time setup endpoint, so that I can configure the server from a client application.
 
 #### Acceptance Criteria
 

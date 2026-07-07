@@ -1,40 +1,40 @@
 ---
-title: Authenticate with Baymax
-description: "Sign in to Baymax to access collaboration features and AI services."
+title: Authenticate with Sim
+description: "Sign in to Sim to access collaboration features and AI services."
 ---
 
-# Authenticate with Baymax
+# Authenticate with Sim
 
-Signing in to Baymax is not required. You can use most features you'd expect in a code editor without ever doing so. We'll outline the few features that do require signing in, and how to do so, here.
+Signing in to Sim is not required. You can use most features you'd expect in a code editor without ever doing so. We'll outline the few features that do require signing in, and how to do so, here.
 
 ## What Features Require Signing In?
 
 1. All real-time [collaboration features](./collaboration/overview.md).
-2. [LLM-powered features](./ai/overview.md), if you are using Baymax as the provider of your LLM models. To use AI without signing in, you can [bring and configure your own API keys](./ai/use-api-access.md).
+2. [LLM-powered features](./ai/overview.md), if you are using Sim as the provider of your LLM models. To use AI without signing in, you can [bring and configure your own API keys](./ai/use-api-access.md).
 
 ## Signing In
 
-Baymax uses GitHub's OAuth flow to authenticate users, requiring only the `read:user` GitHub scope, which grants read-only access to your GitHub profile information.
+Sim uses GitHub's OAuth flow to authenticate users, requiring only the `read:user` GitHub scope, which grants read-only access to your GitHub profile information.
 
-1. Open Baymax and click the `Sign In` button in the top-right corner of the window, or run the {#action client::SignIn} command from the command palette (`cmd-shift-p` on macOS or `ctrl-shift-p` on Windows/Linux).
-2. Your default web browser will open to the Baymax sign-in page.
+1. Open Sim and click the `Sign In` button in the top-right corner of the window, or run the {#action client::SignIn} command from the command palette (`cmd-shift-p` on macOS or `ctrl-shift-p` on Windows/Linux).
+2. Your default web browser will open to the Sim sign-in page.
 3. Authenticate with your GitHub account when prompted.
-4. After successful authentication, your browser will display a confirmation, and you'll be automatically signed in to Baymax.
+4. After successful authentication, your browser will display a confirmation, and you'll be automatically signed in to Sim.
 
-**Note**: If you're behind a corporate firewall, ensure that connections to `baymax.dev` and `collab.baymax.dev` are allowed.
+**Note**: If you're behind a corporate firewall, ensure that connections to `sim.dev` and `collab.sim.dev` are allowed.
 
 ## Signing Out
 
-To sign out of Baymax, you can use either of these methods:
+To sign out of Sim, you can use either of these methods:
 
 - Click on the profile icon in the upper right corner and select `Sign Out` from the dropdown menu.
 - Open the command palette and run the {#action client::SignOut} command.
 
 ## Email Addresses {#email}
 
-Your Baymax account's email address is the address provided by GitHub OAuth. If you have a public email address then it will be used, otherwise your primary GitHub email address will be used. Changes to your email address on GitHub can be synced to your Baymax account by [signing in to baymax.dev](https://baymax.dev/sign_in).
+Your Sim account's email address is the address provided by GitHub OAuth. If you have a public email address then it will be used, otherwise your primary GitHub email address will be used. Changes to your email address on GitHub can be synced to your Sim account by [signing in to sim.dev](https://sim.dev/sign_in).
 
-Stripe is used for billing, and will use your Baymax account's email address when starting a subscription. Changes to your Baymax account email address do not currently update the email address used in Stripe. See [Updating Billing Information](./account/billing.md#updating-billing-info) for how to change this email address.
+Stripe is used for billing, and will use your Sim account's email address when starting a subscription. Changes to your Sim account email address do not currently update the email address used in Stripe. See [Updating Billing Information](./account/billing.md#updating-billing-info) for how to change this email address.
 
 ## Hiding Sign In button from the interface
 

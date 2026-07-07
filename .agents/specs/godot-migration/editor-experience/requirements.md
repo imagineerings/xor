@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Baymax should expose Godot-aware editor affordances through existing Baymax UI, project, task, command, and debug systems.
+Sim should expose Godot-aware editor affordances through existing Sim UI, project, task, command, and debug systems.
 
 ### Requirement 1: Command Integration
 

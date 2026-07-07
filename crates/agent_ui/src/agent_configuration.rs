@@ -8,7 +8,7 @@ use std::{ops::Range, rc::Rc, sync::Arc};
 
 use agent::ContextServerRegistry;
 use anyhow::Result;
-use baymax_actions::{ExtensionCategoryFilter, OpenBrowser};
+use sim_actions::{ExtensionCategoryFilter, OpenBrowser};
 use cloud_api_types::Plan;
 use collections::HashMap;
 use context_server::ContextServerId;
@@ -23,7 +23,7 @@ use gpui::{
 use itertools::Itertools;
 use language::LanguageRegistry;
 use language_model::{
-    BAYMAX_CLOUD_PROVIDER_ID, IconOrSvg, LanguageModelProvider, LanguageModelProviderId,
+    SIM_CLOUD_PROVIDER_ID, IconOrSvg, LanguageModelProvider, LanguageModelProviderId,
     LanguageModelRegistry,
 };
 use language_models::AllLanguageModelSettings;
@@ -140,7 +140,7 @@ impl AgentConfiguration {
         cx: &mut Context<Self>,
     ) {
         let configuration_view = provider.configuration_view(
-            language_model::ConfigurationViewTargetAgent::BaymaxAgent,
+            language_model::ConfigurationViewTargetAgent::SimAgent,
             window,
             cx,
         );
@@ -217,8 +217,8 @@ impl AgentConfiguration {
             .copied()
             .unwrap_or(false);
 
-        let is_baymax_provider = provider.id() == BAYMAX_CLOUD_PROVIDER_ID;
-        let current_plan = if is_baymax_provider {
+        let is_sim_provider = provider.id() == SIM_CLOUD_PROVIDER_ID;
+        let current_plan = if is_sim_provider {
             self.workspace
                 .upgrade()
                 .and_then(|workspace| workspace.read(cx).user_store().read(cx).plan())
@@ -280,9 +280,9 @@ impl AgentConfiguration {
                                             .gap_1()
                                             .child(Label::new(provider_name.clone()))
                                             .map(|this| {
-                                                if is_baymax_provider && is_signed_in {
+                                                if is_sim_provider && is_signed_in {
                                                     this.child(
-                                                        self.render_baymax_plan_info(
+                                                        self.render_sim_plan_info(
                                                             current_plan,
                                                             cx,
                                                         ),
@@ -493,7 +493,7 @@ impl AgentConfiguration {
             .w_full()
             .child(self.render_section_title(
                 "LLM Providers",
-                "Add at least one provider to use AI-powered features with Baymax's native agent.",
+                "Add at least one provider to use AI-powered features with Sim's native agent.",
                 popover_menu.into_any_element(),
             ))
             .child(
@@ -509,7 +509,7 @@ impl AgentConfiguration {
             )
     }
 
-    fn render_baymax_plan_info(
+    fn render_sim_plan_info(
         &self,
         plan: Option<Plan>,
         cx: &mut Context<Self>,
@@ -530,11 +530,11 @@ impl AgentConfiguration {
                 .blend(cx.theme().colors().text_accent.opacity(0.2));
 
             let (plan_name, label_color, bg_color) = match plan {
-                Plan::BaymaxFree => ("Free", Color::Default, free_chip_bg),
-                Plan::BaymaxProTrial => ("Pro Trial", Color::Accent, pro_chip_bg),
-                Plan::BaymaxPro => ("Pro", Color::Accent, pro_chip_bg),
-                Plan::BaymaxBusiness => ("Business", Color::Accent, pro_chip_bg),
-                Plan::BaymaxStudent => ("Student", Color::Accent, pro_chip_bg),
+                Plan::SimFree => ("Free", Color::Default, free_chip_bg),
+                Plan::SimProTrial => ("Pro Trial", Color::Accent, pro_chip_bg),
+                Plan::SimPro => ("Pro", Color::Accent, pro_chip_bg),
+                Plan::SimBusiness => ("Business", Color::Accent, pro_chip_bg),
+                Plan::SimStudent => ("Student", Color::Accent, pro_chip_bg),
             };
 
             Chip::new(plan_name.to_string())
@@ -571,7 +571,7 @@ impl AgentConfiguration {
                         .entry("Install from Extensions", None, {
                             |window, cx| {
                                 window.dispatch_action(
-                                    baymax_actions::Extensions {
+                                    sim_actions::Extensions {
                                         category_filter: Some(
                                             ExtensionCategoryFilter::ContextServers,
                                         ),
@@ -597,7 +597,7 @@ impl AgentConfiguration {
             .border_color(cx.theme().colors().border)
             .child(self.render_section_title(
                 "Model Context Protocol (MCP) Servers",
-                "All MCP servers connected directly or via a Baymax extension.",
+                "All MCP servers connected directly or via a Sim extension.",
                 add_server_popover.into_any_element(),
             ))
             .child(
@@ -1092,7 +1092,7 @@ impl AgentConfiguration {
                     Some(ContextMenu::build(window, cx, |menu, _window, _cx| {
                         menu.entry("Install from Registry", None, {
                             |window, cx| {
-                                window.dispatch_action(Box::new(baymax_actions::AcpRegistry), cx)
+                                window.dispatch_action(Box::new(sim_actions::AcpRegistry), cx)
                             }
                         })
                         .entry("Add Custom Agent", None, {

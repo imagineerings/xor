@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The Baymax mobile client needs to handle file attachments, media viewing, and code visualization. Users need to share files with the agent as context, view documents shared by collaborators, and examine code snippets with proper syntax highlighting. This spec draws from `mobile-dev`'s file management, document picker, media viewer, and code viewer features.
+The Sim mobile client needs to handle file attachments, media viewing, and code visualization. Users need to share files with the agent as context, view documents shared by collaborators, and examine code snippets with proper syntax highlighting. This spec draws from `mobile-dev`'s file management, document picker, media viewer, and code viewer features.
 
 ## Glossary
 

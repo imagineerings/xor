@@ -299,7 +299,7 @@ dependencies = [
  "uuid",
  "watch",
  "web_search",
- "baymax_env_vars",
+ "sim_env_vars",
  "zlog",
  "zstd",
 ]
@@ -392,7 +392,7 @@ dependencies = [
  "util",
  "uuid",
  "watch",
- "baymax_credentials_provider",
+ "sim_credentials_provider",
 ]
 
 [[package]]
@@ -538,7 +538,7 @@ dependencies = [
  "vim",
  "watch",
  "workspace",
- "baymax_actions",
+ "sim_actions",
 ]
 
 [[package]]
@@ -589,7 +589,7 @@ dependencies = [
  "smallvec",
  "telemetry",
  "ui",
- "baymax_actions",
+ "sim_actions",
 ]
 
 [[package]]
@@ -1442,7 +1442,7 @@ dependencies = [
  "ui",
  "util",
  "workspace",
- "baymax_actions",
+ "sim_actions",
 ]
 
 [[package]]
@@ -2150,7 +2150,7 @@ dependencies = [
  "theme_settings",
  "ui",
  "util",
- "baymax_actions",
+ "sim_actions",
 ]
 
 [[package]]
@@ -3199,7 +3199,7 @@ dependencies = [
  "util",
  "windows 0.61.3",
  "worktree",
- "baymax_credentials_provider",
+ "sim_credentials_provider",
 ]
 
 [[package]]
@@ -3363,7 +3363,7 @@ dependencies = [
  "serde",
  "serde_json",
  "text",
- "baymax_credentials_provider",
+ "sim_credentials_provider",
  "zeta_prompt",
 ]
 
@@ -3462,7 +3462,7 @@ dependencies = [
  "uuid",
  "workspace",
  "worktree",
- "baymax_actions",
+ "sim_actions",
  "zlog",
 ]
 
@@ -3500,7 +3500,7 @@ dependencies = [
  "ui",
  "util",
  "workspace",
- "baymax_actions",
+ "sim_actions",
 ]
 
 [[package]]
@@ -3572,7 +3572,7 @@ dependencies = [
  "ui",
  "util",
  "workspace",
- "baymax_actions",
+ "sim_actions",
 ]
 
 [[package]]
@@ -4895,7 +4895,7 @@ dependencies = [
  "tempfile",
  "util",
  "uuid",
- "baymax_env_vars",
+ "sim_env_vars",
 ]
 
 [[package]]
@@ -4995,7 +4995,7 @@ dependencies = [
  "unindent",
  "util",
  "workspace",
- "baymax_actions",
+ "sim_actions",
  "zlog",
 ]
 
@@ -5197,7 +5197,7 @@ dependencies = [
  "unindent",
  "util",
  "workspace",
- "baymax_actions",
+ "sim_actions",
  "zlog",
 ]
 
@@ -5532,8 +5532,8 @@ dependencies = [
  "uuid",
  "workspace",
  "worktree",
- "baymax_actions",
- "baymax_credentials_provider",
+ "sim_actions",
+ "sim_credentials_provider",
  "zeta_prompt",
  "zlog",
  "zstd",
@@ -5694,7 +5694,7 @@ dependencies = [
  "ui",
  "util",
  "workspace",
- "baymax_actions",
+ "sim_actions",
  "zeta_prompt",
 ]
 
@@ -5781,7 +5781,7 @@ dependencies = [
  "uuid",
  "vim_mode_setting",
  "workspace",
- "baymax_actions",
+ "sim_actions",
  "zlog",
  "ztracing",
 ]
@@ -6401,7 +6401,7 @@ dependencies = [
  "util",
  "vim_mode_setting",
  "workspace",
- "baymax_actions",
+ "sim_actions",
 ]
 
 [[package]]
@@ -6533,7 +6533,7 @@ dependencies = [
  "urlencoding",
  "util",
  "workspace",
- "baymax_actions",
+ "sim_actions",
 ]
 
 [[package]]
@@ -6578,7 +6578,7 @@ dependencies = [
  "ui_input",
  "util",
  "workspace",
- "baymax_actions",
+ "sim_actions",
  "zlog",
 ]
 
@@ -7399,7 +7399,7 @@ dependencies = [
  "watch",
  "windows 0.61.3",
  "workspace",
- "baymax_actions",
+ "sim_actions",
  "zeroize",
  "zlog",
  "ztracing",
@@ -7802,8 +7802,8 @@ dependencies = [
  "wasm-bindgen",
  "web-time",
  "windows 0.61.3",
- "baymax-font-kit",
- "baymax-scap",
+ "sim-font-kit",
+ "sim-scap",
 ]
 
 [[package]]
@@ -7897,7 +7897,7 @@ dependencies = [
  "strum 0.27.2",
  "util",
  "uuid",
- "baymax-font-kit",
+ "sim-font-kit",
 ]
 
 [[package]]
@@ -7999,7 +7999,7 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "wgpu",
- "baymax-font-kit",
+ "sim-font-kit",
 ]
 
 [[package]]
@@ -8026,7 +8026,7 @@ dependencies = [
  "windows-core 0.61.2",
  "windows-numerics 0.2.0",
  "windows-registry 0.5.3",
- "baymax-scap",
+ "sim-scap",
 ]
 
 [[package]]
@@ -9051,7 +9051,7 @@ dependencies = [
  "util",
  "util_macros",
  "workspace",
- "baymax_actions",
+ "sim_actions",
 ]
 
 [[package]]
@@ -9501,7 +9501,7 @@ dependencies = [
  "ui_input",
  "util",
  "workspace",
- "baymax_actions",
+ "sim_actions",
 ]
 
 [[package]]
@@ -9900,7 +9900,7 @@ dependencies = [
  "ui",
  "util",
  "workspace",
- "baymax_actions",
+ "sim_actions",
  "zlog",
 ]
 
@@ -10276,7 +10276,7 @@ dependencies = [
  "prost-build 0.9.0",
  "prost-types 0.9.0",
  "serde",
- "baymax-reqwest",
+ "sim-reqwest",
 ]
 
 [[package]]
@@ -10317,7 +10317,7 @@ dependencies = [
  "ui",
  "util",
  "webrtc-sys",
- "baymax-scap",
+ "sim-scap",
 ]
 
 [[package]]
@@ -10652,7 +10652,7 @@ dependencies = [
  "urlencoding",
  "util",
  "workspace",
- "baymax_actions",
+ "sim_actions",
 ]
 
 [[package]]
@@ -11077,7 +11077,7 @@ dependencies = [
  "theme_settings",
  "util",
  "workspace",
- "baymax_actions",
+ "sim_actions",
 ]
 
 [[package]]
@@ -11475,7 +11475,7 @@ dependencies = [
  "ui",
  "util",
  "workspace",
- "baymax_actions",
+ "sim_actions",
 ]
 
 [[package]]
@@ -12153,7 +12153,7 @@ dependencies = [
  "util",
  "vim_mode_setting",
  "workspace",
- "baymax_actions",
+ "sim_actions",
  "zlog",
 ]
 
@@ -12446,7 +12446,7 @@ dependencies = [
  "ui",
  "util",
  "workspace",
- "baymax_actions",
+ "sim_actions",
 ]
 
 [[package]]
@@ -12481,7 +12481,7 @@ dependencies = [
  "util",
  "workspace",
  "worktree",
- "baymax_actions",
+ "sim_actions",
 ]
 
 [[package]]
@@ -13407,7 +13407,7 @@ dependencies = [
  "ui",
  "ui_input",
  "workspace",
- "baymax_actions",
+ "sim_actions",
 ]
 
 [[package]]
@@ -13515,7 +13515,7 @@ dependencies = [
  "ui",
  "windows 0.61.3",
  "workspace",
- "baymax_actions",
+ "sim_actions",
 ]
 
 [[package]]
@@ -13952,7 +13952,7 @@ dependencies = [
  "wax",
  "which 6.0.3",
  "worktree",
- "baymax_credentials_provider",
+ "sim_credentials_provider",
  "zeroize",
  "zlog",
  "ztracing",
@@ -14020,7 +14020,7 @@ dependencies = [
  "util",
  "workspace",
  "worktree",
- "baymax_actions",
+ "sim_actions",
 ]
 
 [[package]]
@@ -14833,7 +14833,7 @@ dependencies = [
  "windows-registry 0.6.1",
  "workspace",
  "worktree",
- "baymax_actions",
+ "sim_actions",
 ]
 
 [[package]]
@@ -15174,7 +15174,7 @@ dependencies = [
  "util",
  "uuid",
  "workspace",
- "baymax_actions",
+ "sim_actions",
 ]
 
 [[package]]
@@ -15271,7 +15271,7 @@ dependencies = [
  "regex",
  "serde",
  "tokio",
- "baymax-reqwest",
+ "sim-reqwest",
 ]
 
 [[package]]
@@ -16150,7 +16150,7 @@ dependencies = [
  "util",
  "util_macros",
  "workspace",
- "baymax_actions",
+ "sim_actions",
  "ztracing",
 ]
 
@@ -16568,7 +16568,7 @@ dependencies = [
  "theme_settings",
  "ui",
  "workspace",
- "baymax_actions",
+ "sim_actions",
 ]
 
 [[package]]
@@ -16624,8 +16624,8 @@ dependencies = [
  "ui_input",
  "util",
  "workspace",
- "baymax_actions",
- "baymax_credentials_provider",
+ "sim_actions",
+ "sim_credentials_provider",
 ]
 
 [[package]]
@@ -16770,7 +16770,7 @@ dependencies = [
  "unicode-segmentation",
  "util",
  "workspace",
- "baymax_actions",
+ "sim_actions",
 ]
 
 [[package]]
@@ -17660,7 +17660,7 @@ dependencies = [
  "multi_buffer",
  "ui",
  "workspace",
- "baymax_actions",
+ "sim_actions",
 ]
 
 [[package]]
@@ -18121,7 +18121,7 @@ dependencies = [
  "sha2",
  "shellexpand",
  "util",
- "baymax_actions",
+ "sim_actions",
 ]
 
 [[package]]
@@ -18147,7 +18147,7 @@ dependencies = [
  "ui",
  "util",
  "workspace",
- "baymax_actions",
+ "sim_actions",
 ]
 
 [[package]]
@@ -18294,7 +18294,7 @@ dependencies = [
  "ui",
  "util",
  "workspace",
- "baymax_actions",
+ "sim_actions",
 ]
 
 [[package]]
@@ -18391,7 +18391,7 @@ dependencies = [
  "ui",
  "util",
  "workspace",
- "baymax_actions",
+ "sim_actions",
 ]
 
 [[package]]
@@ -18642,7 +18642,7 @@ dependencies = [
  "util",
  "windows 0.61.3",
  "workspace",
- "baymax_actions",
+ "sim_actions",
 ]
 
 [[package]]
@@ -19946,7 +19946,7 @@ dependencies = [
  "util_macros",
  "vim_mode_setting",
  "workspace",
- "baymax_actions",
+ "sim_actions",
 ]
 
 [[package]]
@@ -22390,7 +22390,7 @@ dependencies = [
  "util",
  "uuid",
  "windows 0.61.3",
- "baymax_actions",
+ "sim_actions",
  "zlog",
 ]
 
@@ -22830,7 +22830,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "baymax"
+name = "sim"
 version = "1.7.2"
 dependencies = [
  "acp_thread",
@@ -22994,17 +22994,17 @@ dependencies = [
  "windows 0.61.3",
  "windows_resources",
  "workspace",
- "baymax-reqwest",
- "baymax_actions",
- "baymax_env_vars",
+ "sim-reqwest",
+ "sim_actions",
+ "sim_env_vars",
  "zlog",
  "zlog_settings",
  "ztracing",
 ]
 
 [[package]]
-name = "baymax-font-kit"
-version = "0.14.1-baymax"
+name = "sim-font-kit"
+version = "0.14.1-sim"
 source = "git+https://github.com/simtropolis/font-kit?rev=94b0f28166665e8fd2f53ff6d268a14955c82269#94b0f28166665e8fd2f53ff6d268a14955c82269"
 dependencies = [
  "bitflags 2.10.0",
@@ -23027,8 +23027,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "baymax-reqwest"
-version = "0.12.15-baymax"
+name = "sim-reqwest"
+version = "0.12.15-sim"
 source = "git+https://github.com/simtropolis/reqwest.git?rev=c15662463bda39148ba154100dd44d3fba5873a4#c15662463bda39148ba154100dd44d3fba5873a4"
 dependencies = [
  "base64 0.22.1",
@@ -23110,7 +23110,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "baymax_actions"
+name = "sim_actions"
 version = "0.1.0"
 dependencies = [
  "gpui",
@@ -23120,7 +23120,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "baymax_credentials_provider"
+name = "sim_credentials_provider"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -23134,7 +23134,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "baymax_env_vars"
+name = "sim_env_vars"
 version = "0.1.0"
 dependencies = [
  "env_var",
@@ -23172,28 +23172,28 @@ dependencies = [
 ]
 
 [[package]]
-name = "baymax_glsl"
+name = "sim_glsl"
 version = "0.2.4"
 dependencies = [
  "zed_extension_api 0.1.0",
 ]
 
 [[package]]
-name = "baymax_html"
+name = "sim_html"
 version = "0.3.1"
 dependencies = [
  "zed_extension_api 0.7.0",
 ]
 
 [[package]]
-name = "baymax_proto"
+name = "sim_proto"
 version = "0.3.2"
 dependencies = [
  "zed_extension_api 0.7.0",
 ]
 
 [[package]]
-name = "baymax_test_extension"
+name = "sim_test_extension"
 version = "0.1.0"
 dependencies = [
  "zed_extension_api 0.8.0",

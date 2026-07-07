@@ -25,12 +25,12 @@ pub fn router() -> Router {
         .route("/telemetry/hangs", post(post_panic))
 }
 
-pub struct BaymaxChecksumHeader(Vec<u8>);
+pub struct SimChecksumHeader(Vec<u8>);
 
-impl Header for BaymaxChecksumHeader {
+impl Header for SimChecksumHeader {
     fn name() -> &'static HeaderName {
-        static BAYMAX_CHECKSUM_HEADER: OnceLock<HeaderName> = OnceLock::new();
-        BAYMAX_CHECKSUM_HEADER.get_or_init(|| HeaderName::from_static("x-baymax-checksum"))
+        static SIM_CHECKSUM_HEADER: OnceLock<HeaderName> = OnceLock::new();
+        SIM_CHECKSUM_HEADER.get_or_init(|| HeaderName::from_static("x-sim-checksum"))
     }
 
     fn decode<'i, I>(values: &mut I) -> Result<Self, axum::headers::Error>
@@ -61,7 +61,7 @@ pub async fn post_panic() -> Result<()> {
 
 pub async fn post_events(
     Extension(app): Extension<Arc<AppState>>,
-    TypedHeader(BaymaxChecksumHeader(checksum)): TypedHeader<BaymaxChecksumHeader>,
+    TypedHeader(SimChecksumHeader(checksum)): TypedHeader<SimChecksumHeader>,
     country_code_header: Option<TypedHeader<CloudflareIpCountryHeader>>,
     body: Bytes,
 ) -> Result<()> {
@@ -119,7 +119,7 @@ pub async fn post_events(
 }
 
 pub fn calculate_json_checksum(app: Arc<AppState>, json: &impl AsRef<[u8]>) -> Option<Vec<u8>> {
-    let checksum_seed = app.config.baymax_client_checksum_seed.as_ref()?;
+    let checksum_seed = app.config.sim_client_checksum_seed.as_ref()?;
 
     let mut summer = Sha256::new();
     summer.update(checksum_seed);
@@ -161,7 +161,7 @@ fn for_snowflake(
         }
 
         // NOTE: most amplitude user properties are read out of our event_properties
-        // dictionary. See https://app.amplitude.com/data/baymax/Baymax/sources/detail/production/falcon%3A159998
+        // dictionary. See https://app.amplitude.com/data/sim/Sim/sources/detail/production/falcon%3A159998
         // for how that is configured.
         let user_properties = body.is_staff.map(|is_staff| {
             serde_json::json!({

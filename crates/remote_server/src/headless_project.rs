@@ -486,7 +486,7 @@ impl HeadlessProject {
         let fs = this.read_with(&cx, |this, _| this.fs.clone());
         let path = PathBuf::from(shellexpand::tilde(&message.payload.path).to_string());
 
-        let canonicalibaymax = match fs.canonicalize(&path).await {
+        let canonicalisim = match fs.canonicalize(&path).await {
             Ok(path) => path,
             Err(e) => {
                 let mut parent = path
@@ -518,7 +518,7 @@ impl HeadlessProject {
         let worktree = this
             .read_with(&cx.clone(), |this, _| {
                 Worktree::local(
-                    Arc::from(canonicalibaymax.as_path()),
+                    Arc::from(canonicalisim.as_path()),
                     message.payload.visible,
                     this.fs.clone(),
                     this.next_entry_id.clone(),
@@ -533,7 +533,7 @@ impl HeadlessProject {
             let worktree = worktree.read(cx);
             proto::AddWorktreeResponse {
                 worktree_id: worktree.id().to_proto(),
-                canonicalibaymax_path: canonicalibaymax.to_string_lossy().into_owned(),
+                canonicalisim_path: canonicalisim.to_string_lossy().into_owned(),
                 root_repo_common_dir: worktree
                     .root_repo_common_dir()
                     .map(|p| p.to_string_lossy().into_owned()),

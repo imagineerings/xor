@@ -2,7 +2,7 @@
 
 ## Overview
 
-Implement the security inspection system (`crates/security/`) and permission system (`crates/permission/`) as new crates that layer on top of baymax's existing `crates/sandbox/` and `crates/agent/src/tool_permissions.rs`.
+Implement the security inspection system (`crates/security/`) and permission system (`crates/permission/`) as new crates that layer on top of sim's existing `crates/sandbox/` and `crates/agent/src/tool_permissions.rs`.
 
 ## Tasks
 

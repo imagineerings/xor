@@ -45,10 +45,10 @@ async fn test_extension_store(cx: &mut TestAppContext) {
         "/the-extension-dir",
         json!({
             "installed": {
-                "baymax-monokai": {
+                "sim-monokai": {
                     "extension.json": r#"{
-                        "id": "baymax-monokai",
-                        "name": "Baymax Monokai",
+                        "id": "sim-monokai",
+                        "name": "Sim Monokai",
                         "version": "2.0.0",
                         "themes": {
                             "Monokai Dark": "themes/monokai.json",
@@ -92,10 +92,10 @@ async fn test_extension_store(cx: &mut TestAppContext) {
                         }"#,
                     }
                 },
-                "baymax-ruby": {
+                "sim-ruby": {
                     "extension.json": r#"{
-                        "id": "baymax-ruby",
-                        "name": "Baymax Ruby",
+                        "id": "sim-ruby",
+                        "name": "Sim Ruby",
                         "version": "1.0.0",
                         "grammars": {
                             "ruby": "grammars/ruby.wasm",
@@ -137,11 +137,11 @@ async fn test_extension_store(cx: &mut TestAppContext) {
     let mut expected_index = ExtensionIndex {
         extensions: [
             (
-                "baymax-ruby".into(),
+                "sim-ruby".into(),
                 ExtensionIndexEntry {
                     manifest: Arc::new(ExtensionManifest {
-                        id: "baymax-ruby".into(),
-                        name: "Baymax Ruby".into(),
+                        id: "sim-ruby".into(),
+                        name: "Sim Ruby".into(),
                         version: "1.0.0".into(),
                         schema_version: SchemaVersion::ZERO,
                         description: None,
@@ -173,11 +173,11 @@ async fn test_extension_store(cx: &mut TestAppContext) {
                 },
             ),
             (
-                "baymax-monokai".into(),
+                "sim-monokai".into(),
                 ExtensionIndexEntry {
                     manifest: Arc::new(ExtensionManifest {
-                        id: "baymax-monokai".into(),
-                        name: "Baymax Monokai".into(),
+                        id: "sim-monokai".into(),
+                        name: "Sim Monokai".into(),
                         version: "2.0.0".into(),
                         schema_version: SchemaVersion::ZERO,
                         description: None,
@@ -210,7 +210,7 @@ async fn test_extension_store(cx: &mut TestAppContext) {
             (
                 "ERB".into(),
                 ExtensionIndexLanguageEntry {
-                    extension: "baymax-ruby".into(),
+                    extension: "sim-ruby".into(),
                     path: "languages/erb".into(),
                     grammar: Some("embedded_template".into()),
                     hidden: false,
@@ -224,7 +224,7 @@ async fn test_extension_store(cx: &mut TestAppContext) {
             (
                 "Ruby".into(),
                 ExtensionIndexLanguageEntry {
-                    extension: "baymax-ruby".into(),
+                    extension: "sim-ruby".into(),
                     path: "languages/ruby".into(),
                     grammar: Some("ruby".into()),
                     hidden: false,
@@ -242,28 +242,28 @@ async fn test_extension_store(cx: &mut TestAppContext) {
             (
                 "Monokai Dark".into(),
                 ExtensionIndexThemeEntry {
-                    extension: "baymax-monokai".into(),
+                    extension: "sim-monokai".into(),
                     path: "themes/monokai.json".into(),
                 },
             ),
             (
                 "Monokai Light".into(),
                 ExtensionIndexThemeEntry {
-                    extension: "baymax-monokai".into(),
+                    extension: "sim-monokai".into(),
                     path: "themes/monokai.json".into(),
                 },
             ),
             (
                 "Monokai Pro Dark".into(),
                 ExtensionIndexThemeEntry {
-                    extension: "baymax-monokai".into(),
+                    extension: "sim-monokai".into(),
                     path: "themes/monokai-pro.json".into(),
                 },
             ),
             (
                 "Monokai Pro Light".into(),
                 ExtensionIndexThemeEntry {
-                    extension: "baymax-monokai".into(),
+                    extension: "sim-monokai".into(),
                     path: "themes/monokai-pro.json".into(),
                 },
             ),
@@ -330,11 +330,11 @@ async fn test_extension_store(cx: &mut TestAppContext) {
     });
 
     fs.insert_tree(
-        "/the-extension-dir/installed/baymax-gruvbox",
+        "/the-extension-dir/installed/sim-gruvbox",
         json!({
             "extension.json": r#"{
-                "id": "baymax-gruvbox",
-                "name": "Baymax Gruvbox",
+                "id": "sim-gruvbox",
+                "name": "Sim Gruvbox",
                 "version": "1.0.0",
                 "themes": {
                     "Gruvbox": "themes/gruvbox.json"
@@ -358,11 +358,11 @@ async fn test_extension_store(cx: &mut TestAppContext) {
     .await;
 
     expected_index.extensions.insert(
-        "baymax-gruvbox".into(),
+        "sim-gruvbox".into(),
         ExtensionIndexEntry {
             manifest: Arc::new(ExtensionManifest {
-                id: "baymax-gruvbox".into(),
-                name: "Baymax Gruvbox".into(),
+                id: "sim-gruvbox".into(),
+                name: "Sim Gruvbox".into(),
                 version: "1.0.0".into(),
                 schema_version: SchemaVersion::ZERO,
                 description: None,
@@ -388,7 +388,7 @@ async fn test_extension_store(cx: &mut TestAppContext) {
     expected_index.themes.insert(
         "Gruvbox".into(),
         ExtensionIndexThemeEntry {
-            extension: "baymax-gruvbox".into(),
+            extension: "sim-gruvbox".into(),
             path: "themes/gruvbox.json".into(),
         },
     );
@@ -428,7 +428,7 @@ async fn test_extension_store(cx: &mut TestAppContext) {
     let prev_fs_metadata_call_count = fs.metadata_call_count();
     let prev_fs_read_dir_call_count = fs.read_dir_call_count();
 
-    // Create new extension store, as if Baymax were restarting.
+    // Create new extension store, as if Sim were restarting.
     drop(store);
     let store = cx.new(|cx| {
         ExtensionStore::new(
@@ -497,12 +497,12 @@ async fn test_extension_store(cx: &mut TestAppContext) {
 
     store.update(cx, |store, cx| {
         store
-            .uninstall_extension("baymax-ruby".into(), cx)
+            .uninstall_extension("sim-ruby".into(), cx)
             .detach_and_log_err(cx);
     });
 
     cx.executor().advance_clock(RELOAD_DEBOUNCE_DURATION);
-    expected_index.extensions.remove("baymax-ruby");
+    expected_index.extensions.remove("sim-ruby");
     expected_index.languages.remove("Ruby");
     expected_index.languages.remove("ERB");
 
@@ -678,7 +678,7 @@ async fn test_extension_store_with_test_extension(cx: &mut TestAppContext) {
     });
     let user_agent = cx.update(|cx| {
         format!(
-            "Baymax/{} ({}; {})",
+            "Sim/{} ({}; {})",
             AppVersion::global(cx),
             std::env::consts::OS,
             std::env::consts::ARCH

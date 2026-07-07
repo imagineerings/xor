@@ -5,10 +5,10 @@ use fs::Fs;
 use futures::StreamExt;
 use util::paths::home_dir;
 
-use super::{BAYMAX_HINTS_FILE_NAMES, GLOBAL_HINTS_DIR_NAME, Hint, HintLoadError, HintSource};
+use super::{SIM_HINTS_FILE_NAMES, GLOBAL_HINTS_DIR_NAME, Hint, HintLoadError, HintSource};
 
-/// Discovers and loads `.baymaxhints` files from global
-/// (`~/.config/baymax/hints/`) and project locations.
+/// Discovers and loads `.simhints` files from global
+/// (`~/.config/sim/hints/`) and project locations.
 pub struct HintLoader {
     fs: Arc<dyn Fs>,
 }
@@ -21,7 +21,7 @@ impl HintLoader {
     /// Returns the path to the global hints directory, if it exists.
     fn global_hints_dir(&self) -> Option<PathBuf> {
         let config_dir = home_dir()
-            .join(".config/baymax")
+            .join(".config/sim")
             .join(GLOBAL_HINTS_DIR_NAME);
         if config_dir.exists() {
             Some(config_dir)
@@ -74,7 +74,7 @@ impl HintLoader {
         (hints, errors)
     }
 
-    /// Loads hints from `.baymaxhints` files in the given worktree roots.
+    /// Loads hints from `.simhints` files in the given worktree roots.
     pub async fn load_project_hints(
         &self,
         worktree_roots: &[(String, PathBuf)],
@@ -83,7 +83,7 @@ impl HintLoader {
         let mut errors = Vec::new();
 
         for (root_name, root_path) in worktree_roots {
-            for file_name in BAYMAX_HINTS_FILE_NAMES {
+            for file_name in SIM_HINTS_FILE_NAMES {
                 let hint_path = root_path.join(file_name);
                 if self.fs.is_file(&hint_path).await {
                     match self.fs.load(&hint_path).await {
@@ -184,10 +184,10 @@ fn strip_quotes(s: &str) -> Option<&str> {
 /// Returns true if the file extension indicates it could contain hint text.
 fn is_hint_file(path: &Path) -> bool {
     let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
-        // No extension — could be a dotfile like `.baymaxhints` itself.
+        // No extension — could be a dotfile like `.simhints` itself.
         return true;
     };
-    matches!(ext, "md" | "txt" | "hbs" | "mdx" | "baymaxhints")
+    matches!(ext, "md" | "txt" | "hbs" | "mdx" | "simhints")
 }
 
 #[cfg(test)]
@@ -214,8 +214,8 @@ mod tests {
     fn test_is_hint_file_by_extension() {
         assert!(is_hint_file(Path::new("test.md")));
         assert!(is_hint_file(Path::new("test.txt")));
-        assert!(is_hint_file(Path::new("test.baymaxhints")));
-        assert!(is_hint_file(Path::new(".baymaxhints")));
+        assert!(is_hint_file(Path::new("test.simhints")));
+        assert!(is_hint_file(Path::new(".simhints")));
         assert!(!is_hint_file(Path::new("test.rs")));
         assert!(!is_hint_file(Path::new("test.py")));
     }
@@ -255,7 +255,7 @@ mod tests {
         let (loader, fs) = test_loader(cx);
         fs.create_dir(Path::new("/test")).await.unwrap();
         fs.insert_file(
-            Path::new("/test/.baymaxhints"),
+            Path::new("/test/.simhints"),
             b"use rust edition 2021".to_vec(),
         )
         .await;
@@ -284,9 +284,9 @@ mod tests {
         let (loader, fs) = test_loader(cx);
         fs.create_dir(Path::new("/a")).await.unwrap();
         fs.create_dir(Path::new("/b")).await.unwrap();
-        fs.insert_file(Path::new("/a/.baymaxhints"), b"hint from a".to_vec())
+        fs.insert_file(Path::new("/a/.simhints"), b"hint from a".to_vec())
             .await;
-        fs.insert_file(Path::new("/b/.baymaxhints"), b"hint from b".to_vec())
+        fs.insert_file(Path::new("/b/.simhints"), b"hint from b".to_vec())
             .await;
 
         let (hints, errors) = loader
@@ -304,7 +304,7 @@ mod tests {
     async fn test_load_project_hints_skips_empty_content(cx: &mut TestAppContext) {
         let (loader, fs) = test_loader(cx);
         fs.create_dir(Path::new("/test")).await.unwrap();
-        fs.insert_file(Path::new("/test/.baymaxhints"), b"   ".to_vec())
+        fs.insert_file(Path::new("/test/.simhints"), b"   ".to_vec())
             .await;
 
         let (hints, errors) = loader
@@ -354,7 +354,7 @@ mod tests {
     async fn test_load_all_merges_hints(cx: &mut TestAppContext) {
         let (loader, fs) = test_loader(cx);
         fs.create_dir(Path::new("/p1")).await.unwrap();
-        fs.insert_file(Path::new("/p1/.baymaxhints"), b"project-hint".to_vec())
+        fs.insert_file(Path::new("/p1/.simhints"), b"project-hint".to_vec())
             .await;
 
         let (hints, errors) = loader

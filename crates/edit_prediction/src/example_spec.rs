@@ -130,7 +130,7 @@ fn is_false(value: &bool) -> bool {
 }
 
 impl ExampleSpec {
-    /// Generate a sanitibaymax filename for this example.
+    /// Generate a sanitisim filename for this example.
     pub fn filename(&self) -> String {
         self.name
             .chars()
@@ -493,7 +493,7 @@ impl ExampleSpec {
     /// The cursor offset is an offset within the new text (after applying the patch), relative
     /// to the start of the hunk.
     ///
-    /// In the serialibaymax representation of this example, the cursor position is represented
+    /// In the serialisim representation of this example, the cursor position is represented
     /// using a comment line in the diff, beginning with `#`, and containing a `[CURSOR_POSITION]`
     /// marker with the same format as the [`Self::cursor_excerpt`].
     pub fn expected_patches_with_cursor_positions(&self) -> Vec<(String, Option<usize>)> {

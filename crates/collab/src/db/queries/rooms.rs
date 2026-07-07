@@ -1182,24 +1182,24 @@ impl Database {
             .await?;
 
         if let Some(channel) = channel {
-            let requires_baymax_cla = channel.requires_baymax_cla
+            let requires_sim_cla = channel.requires_sim_cla
                 || channel::Entity::find()
                     .filter(
                         channel::Column::Id
                             .is_in(channel.ancestors())
-                            .and(channel::Column::RequiresBaymaxCla.eq(true)),
+                            .and(channel::Column::RequiresSimCla.eq(true)),
                     )
                     .count(tx)
                     .await?
                     > 0;
-            if requires_baymax_cla
+            if requires_sim_cla
                 && contributor::Entity::find()
                     .filter(contributor::Column::UserId.eq(user_id))
                     .one(tx)
                     .await?
                     .is_none()
             {
-                Err(anyhow!("user has not signed the Baymax CLA"))?;
+                Err(anyhow!("user has not signed the Sim CLA"))?;
             }
         }
         Ok(())

@@ -1,6 +1,6 @@
 ---
 title: MCP Server Extensions
-description: "MCP Server Extensions for Baymax extensions."
+description: "MCP Server Extensions for Sim extensions."
 ---
 
 # MCP Server Extensions
@@ -19,13 +19,13 @@ Each MCP server must be registered in the `extension.toml`:
 Then, in the Rust code for your extension, implement the `context_server_command` method on your extension:
 
 ```rust
-impl baymax::Extension for MyExtension {
+impl sim::Extension for MyExtension {
     fn context_server_command(
         &mut self,
         context_server_id: &ContextServerId,
-        project: &baymax::Project,
-    ) -> Result<baymax::Command> {
-        Ok(baymax::Command {
+        project: &sim::Project,
+    ) -> Result<sim::Command> {
+        Ok(sim::Command {
             command: get_path_to_context_server_executable()?,
             args: get_args_for_context_server()?,
             env: get_env_for_context_server()?,
@@ -40,7 +40,7 @@ If you need to download the MCP server from an external source (GitHub Releases,
 
 ## Available Extensions
 
-See MCP servers published as extensions [on Baymax's site](https://baymax.dev/extensions?filter=context-servers).
+See MCP servers published as extensions [on Sim's site](https://sim.dev/extensions?filter=context-servers).
 
 Review their repositories to see common implementation patterns and structure.
 

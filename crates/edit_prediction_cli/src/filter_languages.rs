@@ -289,7 +289,7 @@ pub fn run_filter_languages(
         for lang in &allowed_languages {
             if !language_name_lower_map.contains_key(lang) {
                 eprintln!(
-                    "Warning: '{}' is not a recognibaymax language name. Use --list to see available languages.",
+                    "Warning: '{}' is not a recognisim language name. Use --list to see available languages.",
                     lang
                 );
             }

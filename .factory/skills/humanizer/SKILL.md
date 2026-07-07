@@ -319,7 +319,7 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
    - Varies sentence structure
    - Uses specific details over vague claims
    - Uses simple constructions (is/are/has) where appropriate
-5. **Draft humanibaymax version**
+5. **Draft humanisim version**
 6. **Ask:** "What makes this still obviously AI generated?"
 7. **List** remaining tells (if any)
 8. **Revise** based on the audit
@@ -330,7 +330,7 @@ Avoiding AI patterns is only half the job. Sterile, voiceless writing is just as
 ```
 ## Draft Rewrite
 
-[First pass at humanibaymax text]
+[First pass at humanisim text]
 
 ## AI Audit
 

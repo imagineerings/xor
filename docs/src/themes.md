@@ -1,11 +1,11 @@
 ---
-title: Themes - Baymax
-description: Browse, install, and create themes for Baymax. Includes built-in themes and community theme extensions.
+title: Themes - Sim
+description: Browse, install, and create themes for Sim. Includes built-in themes and community theme extensions.
 ---
 
 # Themes
 
-Baymax comes with a number of built-in themes, with more themes available as extensions.
+Sim comes with a number of built-in themes, with more themes available as extensions.
 
 ## Selecting a Theme
 
@@ -15,23 +15,23 @@ Navigating through the theme list by moving up and down will change the theme in
 
 ## Installing New Themes
 
-You can find hundreds of different theme options in Baymax's extensions store, which you can access via the command palette with {#action baymax::Extensions} or the [Baymax website](https://baymax.dev/extensions?filter=themes).
+You can find hundreds of different theme options in Sim's extensions store, which you can access via the command palette with {#action sim::Extensions} or the [Sim website](https://sim.dev/extensions?filter=themes).
 
-Many popular themes have been ported to Baymax, and if you're struggling to choose one, visit [baymax-themes.com](https://baymax-themes.com), a third-party gallery with visible previews for many of them.
+Many popular themes have been ported to Sim, and if you're struggling to choose one, visit [sim-themes.com](https://sim-themes.com), a third-party gallery with visible previews for many of them.
 
 ## Build Your Theme
 
-You can use [Baymax's Theme Builder](https://baymax.dev/theme-builder) to design your own custom theme based on an existing one.
+You can use [Sim's Theme Builder](https://sim.dev/theme-builder) to design your own custom theme based on an existing one.
 
-This tool lets you fine-tune and preview how every surface in the Baymax app will look.
-You can then export the JSON for [local use](./themes.md#local-themes) or for [publishing in Baymax's extension store](./extensions/themes.md).
+This tool lets you fine-tune and preview how every surface in the Sim app will look.
+You can then export the JSON for [local use](./themes.md#local-themes) or for [publishing in Sim's extension store](./extensions/themes.md).
 
 ## Configuring a Theme
 
 Your selected theme is stored in your settings file.
-You can open your settings file from the command palette with {#action baymax::OpenSettingsFile} (bound to {#kb baymax::OpenSettingsFile}).
+You can open your settings file from the command palette with {#action sim::OpenSettingsFile} (bound to {#kb sim::OpenSettingsFile}).
 
-By default, Baymax maintains two themes: one for light mode and one for dark mode.
+By default, Sim maintains two themes: one for light mode and one for dark mode.
 You can set the mode to `"dark"` or `"light"` to ignore the current system mode.
 
 ```json [settings]
@@ -109,11 +109,11 @@ For example, add the following to your `settings.json` if you wish to override t
 To see a comprehensive list of captures (like `comment` and `comment.doc`) see [Language Extensions: Syntax highlighting](./extensions/languages.md#syntax-highlighting).
 
 To see a list of available theme attributes look at the JSON file for your theme.
-For example, [assets/themes/one/one.json](https://github.com/simtropolis/baymax/blob/main/assets/themes/one/one.json) for the default One Dark and One Light themes.
+For example, [assets/themes/one/one.json](https://github.com/simtropolis/sim/blob/main/assets/themes/one/one.json) for the default One Dark and One Light themes.
 
 ## Local Themes {#local-themes}
 
-Store new themes locally by placing them in the `~/.config/baymax/themes` directory (macOS and Linux) or `%USERPROFILE%\AppData\Roaming\Baymax\themes\` (Windows).
+Store new themes locally by placing them in the `~/.config/sim/themes` directory (macOS and Linux) or `%USERPROFILE%\AppData\Roaming\Sim\themes\` (Windows).
 
 For example, to create a new theme called `my-cool-theme`, create a file called `my-cool-theme.json` in that directory.
-It will be available in the theme selector the next time Baymax loads.
+It will be available in the theme selector the next time Sim loads.

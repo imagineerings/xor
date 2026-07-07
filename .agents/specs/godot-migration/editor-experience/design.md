@@ -2,13 +2,13 @@
 
 ## Architecture
 
-Register Godot commands and project-panel metadata only when Godot project detection succeeds. Run/debug workflows use existing Baymax task and debugger surfaces.
+Register Godot commands and project-panel metadata only when Godot project detection succeeds. Run/debug workflows use existing Sim task and debugger surfaces.
 
 ## Components
 
-- `BaymaxGameCommandProvider`
-- `BaymaxGameProjectPanelMetadata`
-- `BaymaxGameRunDebugTemplate`
+- `SimGameCommandProvider`
+- `SimGameProjectPanelMetadata`
+- `SimGameRunDebugTemplate`
 
 ## Correctness Properties
 
@@ -20,6 +20,6 @@ _For any_ non-Godot workspace, Godot commands SHALL remain unregistered.
 
 ### Property 2: External Execution
 
-_For any_ run/debug operation, Baymax SHALL invoke configured external Godot tooling rather than embedding the Godot runtime.
+_For any_ run/debug operation, Sim SHALL invoke configured external Godot tooling rather than embedding the Godot runtime.
 
 **Validates: Requirement 3.1**

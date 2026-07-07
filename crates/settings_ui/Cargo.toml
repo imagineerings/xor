@@ -66,8 +66,8 @@ ui.workspace = true
 ui_input.workspace = true
 util.workspace = true
 workspace.workspace = true
-baymax_actions.workspace = true
-baymax_credentials_provider.workspace = true
+sim_actions.workspace = true
+sim_credentials_provider.workspace = true
 
 [dev-dependencies]
 fs = { workspace = true, features = ["test-support"] }

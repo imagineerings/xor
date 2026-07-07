@@ -136,30 +136,30 @@ pub struct Config {
     pub kinesis_stream: Option<String>,
     pub kinesis_access_key: Option<String>,
     pub kinesis_secret_key: Option<String>,
-    pub baymax_environment: Arc<str>,
-    pub baymax_cloud_internal_api_key: String,
-    pub baymax_client_checksum_seed: Option<String>,
+    pub sim_environment: Arc<str>,
+    pub sim_cloud_internal_api_key: String,
+    pub sim_client_checksum_seed: Option<String>,
 }
 
 impl Config {
     pub fn is_development(&self) -> bool {
-        self.baymax_environment == "development".into()
+        self.sim_environment == "development".into()
     }
 
-    /// Returns the base `baymax.dev` URL.
-    pub fn baymax_dot_dev_url(&self) -> &str {
-        match self.baymax_environment.as_ref() {
+    /// Returns the base `sim.dev` URL.
+    pub fn sim_dot_dev_url(&self) -> &str {
+        match self.sim_environment.as_ref() {
             "development" => "http://localhost:3000",
-            "staging" => "https://staging.baymax.dev",
-            _ => "https://baymax.dev",
+            "staging" => "https://staging.sim.dev",
+            _ => "https://sim.dev",
         }
     }
 
-    /// Returns the base Baymax Cloud URL.
-    pub fn baymax_cloud_url(&self) -> &str {
-        match self.baymax_environment.as_ref() {
+    /// Returns the base Sim Cloud URL.
+    pub fn sim_cloud_url(&self) -> &str {
+        match self.sim_environment.as_ref() {
             "development" => "http://localhost:8787",
-            _ => "https://cloud.baymax.dev",
+            _ => "https://cloud.sim.dev",
         }
     }
 
@@ -174,14 +174,14 @@ impl Config {
             livekit_secret: None,
             rust_log: None,
             log_json: None,
-            baymax_environment: "test".into(),
-            baymax_cloud_internal_api_key: "test-internal-api-key".into(),
+            sim_environment: "test".into(),
+            sim_cloud_internal_api_key: "test-internal-api-key".into(),
             blob_store_url: None,
             blob_store_region: None,
             blob_store_access_key: None,
             blob_store_secret_key: None,
             blob_store_bucket: None,
-            baymax_client_checksum_seed: None,
+            sim_client_checksum_seed: None,
             kinesis_region: None,
             kinesis_access_key: None,
             kinesis_secret_key: None,
@@ -262,8 +262,8 @@ impl AppState {
             },
             user_service: Arc::new(CloudUserService::new(
                 http_client,
-                config.baymax_cloud_url().to_string(),
-                config.baymax_cloud_internal_api_key.clone(),
+                config.sim_cloud_url().to_string(),
+                config.sim_cloud_internal_api_key.clone(),
             )),
             config,
         };

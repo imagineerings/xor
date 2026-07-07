@@ -233,14 +233,14 @@ members = [
     "crates/worktree_benchmarks",
     "crates/world_model",
     "crates/x_ai",
-    "crates/baymax",
-    "crates/baymax_actions",
-    "crates/baymax_game",
-    "crates/baymax_apps",
-    "crates/baymax-server",
+    "crates/sim",
+    "crates/sim_actions",
+    "crates/sim_game",
+    "crates/sim_apps",
+    "crates/sim-server",
     "crates/windows_resources",
-    "crates/baymax_credentials_provider",
-    "crates/baymax_env_vars",
+    "crates/sim_credentials_provider",
+    "crates/sim_env_vars",
     "crates/zeta_prompt",
     "crates/zlog",
     "crates/zlog_settings",
@@ -264,7 +264,7 @@ members = [
     "tooling/perf",
     "tooling/xtask",
 ]
-default-members = ["crates/baymax"]
+default-members = ["crates/sim"]
 
 [workspace.package]
 publish = false
@@ -499,13 +499,13 @@ web_search_providers = { path = "crates/web_search_providers" }
 workspace = { path = "crates/workspace" }
 worktree = { path = "crates/worktree" }
 x_ai = { path = "crates/x_ai" }
-baymax = { path = "crates/baymax" }
-baymax_actions = { path = "crates/baymax_actions" }
-baymax_game = { path = "crates/baymax_game" }
-baymax_apps = { path = "crates/baymax_apps" }
-baymax_server = { path = "crates/baymax-server" }
-baymax_credentials_provider = { path = "crates/baymax_credentials_provider" }
-baymax_env_vars = { path = "crates/baymax_env_vars" }
+sim = { path = "crates/sim" }
+sim_actions = { path = "crates/sim_actions" }
+sim_game = { path = "crates/sim_game" }
+sim_apps = { path = "crates/sim_apps" }
+sim_server = { path = "crates/sim-server" }
+sim_credentials_provider = { path = "crates/sim_credentials_provider" }
+sim_env_vars = { path = "crates/sim_env_vars" }
 edit_prediction = { path = "crates/edit_prediction" }
 edit_prediction_metrics = { path = "crates/edit_prediction_metrics" }
 zeta_prompt = { path = "crates/zeta_prompt" }
@@ -994,7 +994,7 @@ telemetry_events = { codegen-units = 1 }
 theme_selector = { codegen-units = 1 }
 time_format = { codegen-units = 1 }
 ui_input = { codegen-units = 1 }
-baymax_actions = { codegen-units = 1 }
+sim_actions = { codegen-units = 1 }
 
 [profile.release]
 debug = "limited"
@@ -1002,7 +1002,7 @@ lto = "thin"
 codegen-units = 1
 
 [profile.release.package]
-baymax = { codegen-units = 16 }
+sim = { codegen-units = 16 }
 
 [profile.release-fast]
 inherits = "release"
@@ -1023,7 +1023,7 @@ redundant_clone = "deny"
 disallowed_methods = "deny"
 
 # We currently do not restrict any style rules
-# as it slows down shipping code to Baymax.
+# as it slows down shipping code to Sim.
 #
 # Running ./script/clippy can take several minutes, and so it's
 # common to skip that step and let CI do it. Any unexpected failures
@@ -1031,7 +1031,7 @@ disallowed_methods = "deny"
 # to an old branch, manual fixing, and re-pushing.
 #
 # In the future we could improve this by either making sure
-# Baymax can surface clippy errors in diagnostics (in addition to the
+# Sim can surface clippy errors in diagnostics (in addition to the
 # rust-analyzer errors), or by having CI fix style nits automatically.
 style = { level = "allow", priority = -1 }
 

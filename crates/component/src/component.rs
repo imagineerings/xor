@@ -178,7 +178,7 @@ pub trait Component {
     /// Returns the scope of the component.
     ///
     /// This scope is used to determine how components and
-    /// their previews are displayed and organibaymax.
+    /// their previews are displayed and organisim.
     fn scope() -> ComponentScope {
         ComponentScope::None
     }

@@ -46,7 +46,7 @@ pub struct ProjectContext {
     // fields in sync.
     pub(crate) skills: Vec<SkillSummary>,
     pub(crate) has_skills: bool,
-    /// Merged content from `.baymaxhints` files (global + project), or
+    /// Merged content from `.simhints` files (global + project), or
     /// `None` if no hints were found.
     pub(crate) hints_content: Option<String>,
     /// Derived flag — `true` when `hints_content` is `Some` and non-empty.

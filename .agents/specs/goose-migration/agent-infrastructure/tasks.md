@@ -113,13 +113,13 @@ Implement ~17 agent infrastructure features across existing and new crates. Most
   - [x] 12.5 Built-in extensions registry
     - _Requirements: implicit_
     - _writes: crates/agent/src/builtin_extensions.rs_
-  - [x] 12.6 Configuration migration and Baymax mode
+  - [x] 12.6 Configuration migration and Sim mode
     - [x] 12.6.1 Config migrator — version detection, migration steps, rollback
       - _Requirements: 16_
       - _writes: crates/settings/src/migrations.rs_
-    - [x] 12.6.2 Baymax mode — Focus, Creative, Balanced modes
+    - [x] 12.6.2 Sim mode — Focus, Creative, Balanced modes
       - _Requirements: 17_
-      - _writes: crates/agent_settings/src/baymax_mode.rs_
+      - _writes: crates/agent_settings/src/sim_mode.rs_
 
 - [x] 13. Write tests
   - Context manager compaction accuracy
@@ -135,4 +135,4 @@ Implement ~17 agent infrastructure features across existing and new crates. Most
 - Many of these features are small enough to implement in a single session
 - Platform extensions build on the existing tool registration pattern in `crates/agent/src/tools/`
 - Config migration runs automatically on settings load
-- Baymax mode settings are consumed by the agent's prompt builder
+- Sim mode settings are consumed by the agent's prompt builder

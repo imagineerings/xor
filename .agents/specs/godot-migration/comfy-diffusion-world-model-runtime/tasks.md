@@ -8,7 +8,7 @@ Implement Comfy model-execution semantics after model catalogs and graph validat
 
 - Start gate: G0 spec consistency, G3 shared world-model foundations, G4 worker safety, G5 graph safety, G7 dependency review for native/heavy runtimes, and G8 Comfy harness alignment are satisfied.
 - Validation gate: sampler registry tests, sampling request tests, conditioning tests, latent/VAE tests, patch-order tests, mock worker tests, and compatibility fixture snapshots pass.
-- Handoff gate: unsupported samplers, schedulers, model families, and Baymax divergences are visible in machine-readable catalogs.
+- Handoff gate: unsupported samplers, schedulers, model families, and Sim divergences are visible in machine-readable catalogs.
 - Completion gate: no local diffusion or world-model execution can start without model-family validation, worker capability checks, and provenance wiring.
 
 ## Dependency Waves
@@ -51,7 +51,7 @@ Implement Comfy model-execution semantics after model catalogs and graph validat
   - _writes: crates/world_model/src/comfy_runner_profiles.rs, crates/world_model/src/comfy_world_model_profiles.rs, crates/world_model/src/comfy_runner_profiles_tests.rs_
 
 - [ ] 7. Implement worker execution adapter
-  - Send validated sampling requests through Baymax worker boundaries with capability checks, progress, previews, cancellation, terminal state mapping, output collection, and provenance updates.
+  - Send validated sampling requests through Sim worker boundaries with capability checks, progress, previews, cancellation, terminal state mapping, output collection, and provenance updates.
   - _Requirements: 5.1, 5.2, 5.3, 5.4_
   - _writes: crates/world_model/src/comfy_worker_execution.rs, crates/world_model/src/comfy_worker_execution_tests.rs_
 

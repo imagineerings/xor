@@ -12,7 +12,7 @@ on:
     - '!extensions/*.md'
 jobs:
   detect_changed_extensions:
-    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'baymax-extensions')
+    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'sim-extensions')
     runs-on: namespace-profile-2x4-ubuntu-2404
     steps:
     - name: steps::checkout_repo
@@ -67,8 +67,8 @@ jobs:
       max-parallel: 1
     uses: ./.github/workflows/extension_bump.yml
     secrets:
-      app-id: ${{ secrets.BAYMAX_ZIPPY_APP_ID }}
-      app-secret: ${{ secrets.BAYMAX_ZIPPY_APP_PRIVATE_KEY }}
+      app-id: ${{ secrets.SIM_ZIPPY_APP_ID }}
+      app-secret: ${{ secrets.SIM_ZIPPY_APP_PRIVATE_KEY }}
     with:
       working-directory: ${{ matrix.extension }}
       force-bump: false

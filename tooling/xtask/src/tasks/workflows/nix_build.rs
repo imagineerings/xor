@@ -37,7 +37,7 @@ fn nix_pr_jobs(labels: &[&str]) -> [NamedJob; 2] {
         .map(|label| format!("github.event.label.name == '{label}'"))
         .collect::<Vec<_>>()
         .join(" || ");
-    let synchronibaymax = labels
+    let synchronisim = labels
         .iter()
         .map(|label| format!("contains(github.event.pull_request.labels.*.name, '{label}')"))
         .collect::<Vec<_>>()
@@ -52,13 +52,13 @@ fn nix_pr_jobs(labels: &[&str]) -> [NamedJob; 2] {
             arch,
             "default",
             // don't push PR builds to the cache
-            Some("-baymax-editor-[0-9.]*"),
+            Some("-sim-editor-[0-9.]*"),
             &[],
         );
         job.job = job.job.cond(Expression::new(format!(
             "{DEFAULT_REPOSITORY_OWNER_GUARD} && \
             ((github.event.action == 'labeled' && ({labeled})) || \
-            (github.event.action == 'synchronize' && ({synchronibaymax})))"
+            (github.event.action == 'synchronize' && ({synchronisim})))"
         )));
         job
     })
@@ -86,7 +86,7 @@ pub(crate) fn build_nix(
             "cachix-action",
             "0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad", // v16
         )
-        .add_with(("name", "baymax"))
+        .add_with(("name", "sim"))
         .add_with(("authToken", vars::CACHIX_AUTH_TOKEN))
         .add_with(("cachixArgs", "-v"));
         if let Some(cachix_filter) = cachix_filter {
@@ -138,11 +138,11 @@ pub(crate) fn build_nix(
         .continue_on_error(true)
         .with_repository_owner_guard()
         .runs_on(runner)
-        .add_env(("BAYMAX_CLIENT_CHECKSUM_SEED", vars::BAYMAX_CLIENT_CHECKSUM_SEED))
-        .add_env(("BAYMAX_MINIDUMP_ENDPOINT", vars::BAYMAX_SENTRY_MINIDUMP_ENDPOINT))
+        .add_env(("SIM_CLIENT_CHECKSUM_SEED", vars::SIM_CLIENT_CHECKSUM_SEED))
+        .add_env(("SIM_MINIDUMP_ENDPOINT", vars::SIM_SENTRY_MINIDUMP_ENDPOINT))
         .add_env((
-            "BAYMAX_CLOUD_PROVIDER_ADDITIONAL_MODELS_JSON",
-            vars::BAYMAX_CLOUD_PROVIDER_ADDITIONAL_MODELS_JSON,
+            "SIM_CLOUD_PROVIDER_ADDITIONAL_MODELS_JSON",
+            vars::SIM_CLOUD_PROVIDER_ADDITIONAL_MODELS_JSON,
         ))
         .add_env(("GIT_LFS_SKIP_SMUDGE", "1")) // breaks the livekit rust sdk examples which we don't actually depend on
         .add_step(steps::checkout_repo());

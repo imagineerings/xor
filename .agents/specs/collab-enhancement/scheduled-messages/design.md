@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-Baymax channel messages are sent immediately upon composition. This design adds the ability to compose a message now and schedule it for future delivery (1 minute to 30 days ahead). Scheduled messages are persisted server-side, delivered by a background executor loop, and surfaced in a dedicated management view on the client.
+Sim channel messages are sent immediately upon composition. This design adds the ability to compose a message now and schedule it for future delivery (1 minute to 30 days ahead). Scheduled messages are persisted server-side, delivered by a background executor loop, and surfaced in a dedicated management view on the client.
 
 **Key decisions:**
 

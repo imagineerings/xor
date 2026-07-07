@@ -1,4 +1,4 @@
-use super::register_baymax_scheme;
+use super::register_sim_scheme;
 use anyhow::{Context as _, Result};
 use gpui::{AppContext as _, AsyncApp, Context, PromptLevel, Window, actions};
 use release_channel::ReleaseChannel;
@@ -11,14 +11,14 @@ use workspace::{Toast, Workspace};
 actions!(
     cli,
     [
-        /// Installs the Baymax CLI tool to the system PATH.
+        /// Installs the Sim CLI tool to the system PATH.
         InstallCliBinary,
     ]
 );
 
 async fn install_script(cx: &AsyncApp) -> Result<PathBuf> {
     let cli_path = cx.update(|cx| cx.path_for_auxiliary_executable("cli"))?;
-    let link_path = Path::new("/usr/local/bin/baymax");
+    let link_path = Path::new("/usr/local/bin/sim");
     let bin_dir_path = link_path.parent().unwrap();
 
     // Don't re-create symlink if it points to the same CLI binary.
@@ -62,7 +62,7 @@ async fn install_script(cx: &AsyncApp) -> Result<PathBuf> {
 }
 
 pub fn install_cli_binary(window: &mut Window, cx: &mut Context<Workspace>) {
-    const LINUX_PROMPT_DETAIL: &str = "If you installed Baymax from our official release add ~/.local/bin to your PATH.\n\nIf you installed Baymax from a different source like your package manager, then you may need to create an alias/symlink manually.\n\nDepending on your package manager, the CLI might be named baymaxitor, baymaxit, baymax-editor or something else.";
+    const LINUX_PROMPT_DETAIL: &str = "If you installed Sim from our official release add ~/.local/bin to your PATH.\n\nIf you installed Sim from a different source like your package manager, then you may need to create an alias/symlink manually.\n\nDepending on your package manager, the CLI might be named simitor, simit, sim-editor or something else.";
 
     cx.spawn_in(window, async move |workspace, cx| {
         if cfg!(any(target_os = "linux", target_os = "freebsd")) {
@@ -80,13 +80,13 @@ pub fn install_cli_binary(window: &mut Window, cx: &mut Context<Workspace>) {
             .context("error creating CLI symlink")?;
 
         workspace.update_in(cx, |workspace, _, cx| {
-            struct InstalledBaymaxCli;
+            struct InstalledSimCli;
 
             workspace.show_toast(
                 Toast::new(
-                    NotificationId::unique::<InstalledBaymaxCli>(),
+                    NotificationId::unique::<InstalledSimCli>(),
                     format!(
-                        "Installed `baymax` to {}. You can launch {} from your terminal.",
+                        "Installed `sim` to {}. You can launch {} from your terminal.",
                         path.to_string_lossy(),
                         ReleaseChannel::global(cx).display_name()
                     ),
@@ -94,8 +94,8 @@ pub fn install_cli_binary(window: &mut Window, cx: &mut Context<Workspace>) {
                 cx,
             )
         })?;
-        register_baymax_scheme(cx).await.log_err();
+        register_sim_scheme(cx).await.log_err();
         Ok(())
     })
-    .detach_and_prompt_err("Error installing baymax cli", window, cx, |_, _, _| None);
+    .detach_and_prompt_err("Error installing sim cli", window, cx, |_, _, _| None);
 }

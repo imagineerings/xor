@@ -1,4 +1,4 @@
-use baymax_actions::ShowCallStats;
+use sim_actions::ShowCallStats;
 use call::{ActiveCall, Room, room};
 use gpui::{
     DismissEvent, Entity, EventEmitter, FocusHandle, Focusable, FontWeight, Render, Subscription,

@@ -42,15 +42,15 @@ These constructions reveal AI authorship:
 ### Em Dash Chains
 
 ```
-❌ "Baymax is fast — really fast — and it shows in every interaction."
-✅ "Baymax is fast. You'll feel it in every interaction."
+❌ "Sim is fast — really fast — and it shows in every interaction."
+✅ "Sim is fast. You'll feel it in every interaction."
 ```
 
 ### "It's not X, it's Y"
 
 ```
 ❌ "It's not just an editor — it's a complete development environment."
-✅ "Baymax combines editing, collaboration, and AI assistance in one workspace."
+✅ "Sim combines editing, collaboration, and AI assistance in one workspace."
 ```
 
 ### Triple Parallel Lists
@@ -58,21 +58,21 @@ These constructions reveal AI authorship:
 ```
 ❌ "Fast. Focused. Collaborative."
 ❌ "Write code. Ship faster. Stay in flow."
-✅ "Baymax is built for speed and collaboration."
+✅ "Sim is built for speed and collaboration."
 ```
 
 ### Colon-Introduced Lists in Prose
 
 ```
-❌ "Three things make Baymax different: speed, collaboration, and AI."
-✅ "Baymax prioritizes speed, real-time collaboration, and AI integration."
+❌ "Three things make Sim different: speed, collaboration, and AI."
+✅ "Sim prioritizes speed, real-time collaboration, and AI integration."
 ```
 
 ### Rhetorical Questions as Openers
 
 ```
 ❌ "What if your editor could keep up with your thinking?"
-✅ "Baymax renders every keystroke instantly."
+✅ "Sim renders every keystroke instantly."
 ```
 
 ---

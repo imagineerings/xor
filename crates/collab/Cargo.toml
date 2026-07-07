@@ -1,5 +1,5 @@
 [package]
-authors = ["Nathan Sobo <nathan@baymax.dev>"]
+authors = ["Nathan Sobo <nathan@sim.dev>"]
 default-run = "collab"
 edition.workspace = true
 name = "collab"
@@ -133,5 +133,5 @@ unindent.workspace = true
 util.workspace = true
 workspace = { workspace = true, features = ["test-support"] }
 worktree = { workspace = true, features = ["test-support"] }
-baymax_actions.workspace = true
+sim_actions.workspace = true
 zlog.workspace = true

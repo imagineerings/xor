@@ -4,7 +4,7 @@ use std::{num::NonZeroU32, sync::LazyLock};
 /// The settings extracted from an emacs/vim modelines.
 ///
 /// The parsing tries to best match the modeline directives and
-/// variables to Baymax, matching LanguageSettings fields.
+/// variables to Sim, matching LanguageSettings fields.
 /// The mode mapping is done later thanks to the LanguageRegistry.
 ///
 /// It is not exhaustive, but covers the most common settings.
@@ -28,10 +28,10 @@ pub struct ModelineSettings {
     /// Whether to show trailing whitespace on the editor.
     pub show_trailing_whitespace: Option<bool>,
 
-    /// Emacs modeline variables that were parsed but not mapped to Baymax settings.
+    /// Emacs modeline variables that were parsed but not mapped to Sim settings.
     /// Stored as (variable-name, value) pairs.
     pub emacs_extra_variables: Vec<(String, String)>,
-    /// Vim modeline options that were parsed but not mapped to Baymax settings.
+    /// Vim modeline options that were parsed but not mapped to Sim settings.
     /// Stored as (option-name, value) pairs.
     pub vim_extra_variables: Vec<(String, Option<String>)>,
 }
@@ -688,7 +688,7 @@ mod tests {
         let result = parse_modeline(&[content], &[]).unwrap();
 
         // The modeline should parse fdm=expr and fde=getline(v:lnum)=~'{'?'>1':'1'
-        // as extra variables since they're not recognibaymax settings
+        // as extra variables since they're not recognisim settings
         assert_eq!(result.vim_extra_variables.len(), 2);
         assert_eq!(
             result.vim_extra_variables[0],

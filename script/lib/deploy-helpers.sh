@@ -8,9 +8,9 @@ function export_vars_for_environment {
   export $(grep -v '^#' $env_file | grep -v '^[[:space:]]*$')
 }
 
-function target_baymax_kube_cluster {
-  if [[ $(kubectl config current-context 2> /dev/null) != do-nyc1-baymax-1 ]]; then
-    doctl kubernetes cluster kubeconfig save baymax-1
+function target_sim_kube_cluster {
+  if [[ $(kubectl config current-context 2> /dev/null) != do-nyc1-sim-1 ]]; then
+    doctl kubernetes cluster kubeconfig save sim-1
   fi
 }
 
@@ -27,9 +27,9 @@ function tag_for_environment {
 
 function url_for_environment {
   if [[ "$1" == "production" ]]; then
-    echo "https://collab.baymax.dev"
+    echo "https://collab.sim.dev"
   elif [[ "$1" == "staging" ]]; then
-    echo "https://collab-staging.baymax.dev"
+    echo "https://collab-staging.sim.dev"
   else
     echo "Invalid environment name '${environment}'" >&2
     exit 1

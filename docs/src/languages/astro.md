@@ -1,11 +1,11 @@
 ---
 title: Astro
-description: "Configure Astro language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure Astro language support in Sim, including language servers, formatting, and debugging."
 ---
 
 # Astro
 
-Astro support is available through the [Astro extension](https://github.com/baymax-extensions/astro).
+Astro support is available through the [Astro extension](https://github.com/sim-extensions/astro).
 
 - Tree-sitter: [virchau13/tree-sitter-astro](https://github.com/virchau13/tree-sitter-astro)
 - Language Server: [withastro/language-tools](https://github.com/withastro/astro/tree/main/packages/language-tools/language-server)

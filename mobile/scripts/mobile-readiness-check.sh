@@ -128,30 +128,30 @@ fail_with("Unknown automated checks: #{unknown_checks.join(", ")}") unless unkno
 
 if automated_checks.include?("android_deeplink_manifest")
   manifest = read_required(File.join(repo_root, "mobile/android/app/src/main/AndroidManifest.xml"))
-  fail_with("Android manifest is missing baymax deep-link scheme") unless manifest.include?('android:scheme="baymax"')
-  fail_with("Android manifest is missing baymaxchat scheme") unless manifest.include?('android:scheme="baymaxchat"')
+  fail_with("Android manifest is missing sim deep-link scheme") unless manifest.include?('android:scheme="sim"')
+  fail_with("Android manifest is missing simchat scheme") unless manifest.include?('android:scheme="simchat"')
   fail_with("Android manifest is missing configure host") unless manifest.include?('android:host="configure"')
 end
 
 if automated_checks.include?("ios_deeplink_plist")
-  plist = read_required(File.join(repo_root, "mobile/ios/BaymaxInfo.plist"))
+  plist = read_required(File.join(repo_root, "mobile/ios/SimInfo.plist"))
   fail_with("iOS Info.plist is missing CFBundleURLSchemes") unless plist.include?("CFBundleURLSchemes")
-  fail_with("iOS Info.plist is missing baymaxchat scheme") unless plist.include?("<string>baymaxchat</string>")
+  fail_with("iOS Info.plist is missing simchat scheme") unless plist.include?("<string>simchat</string>")
 end
 
 if automated_checks.include?("qr_configuration_handlers")
-  android_handler = read_required(File.join(repo_root, "mobile/android/app/src/main/java/com/simtropolis/baymax/util/QRConfigHandler.kt"))
-  ios_handler = read_required(File.join(repo_root, "mobile/ios/Baymax/ConfigurationHandler.swift"))
+  android_handler = read_required(File.join(repo_root, "mobile/android/app/src/main/java/com/simtropolis/sim/util/QRConfigHandler.kt"))
+  ios_handler = read_required(File.join(repo_root, "mobile/ios/Sim/ConfigurationHandler.swift"))
   fixture = JSON.parse(read_required(File.join(repo_root, "mobile/readiness-fixtures/configuration-deeplink.json")))
 
-  fail_with("Readiness fixture deep_link must use baymaxchat://configure") unless fixture.fetch("deep_link").start_with?("baymaxchat://configure?")
+  fail_with("Readiness fixture deep_link must use simchat://configure") unless fixture.fetch("deep_link").start_with?("simchat://configure?")
   payload = fixture.fetch("payload")
   fail_with("Readiness fixture payload must include url and secret") unless payload["url"].to_s.start_with?("https://") && !payload["secret"].to_s.empty?
 
   %w[getQueryParameter JSONObject saveSettings testConnection].each do |needle|
     fail_with("Android QR handler missing #{needle}") unless android_handler.include?(needle)
   end
-  %w[handleURL baymaxchat configure baymax_base_url baymax_secret_key testConnection].each do |needle|
+  %w[handleURL simchat configure sim_base_url sim_secret_key testConnection].each do |needle|
     fail_with("iOS configuration handler missing #{needle}") unless ios_handler.include?(needle)
   end
 end

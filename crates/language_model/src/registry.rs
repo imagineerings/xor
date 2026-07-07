@@ -1,5 +1,5 @@
 use crate::{
-    BAYMAX_CLOUD_PROVIDER_ID, LanguageModel, LanguageModelId, LanguageModelProvider,
+    SIM_CLOUD_PROVIDER_ID, LanguageModel, LanguageModelId, LanguageModelProvider,
     LanguageModelProviderId, LanguageModelProviderState,
 };
 use collections::{BTreeMap, HashSet};
@@ -101,8 +101,8 @@ impl ConfiguredModel {
         self.model.id() == other.model.id() && self.provider.id() == other.provider.id()
     }
 
-    pub fn is_provided_by_baymax(&self) -> bool {
-        self.provider.id() == BAYMAX_CLOUD_PROVIDER_ID
+    pub fn is_provided_by_sim(&self) -> bool {
+        self.provider.id() == SIM_CLOUD_PROVIDER_ID
     }
 }
 
@@ -180,13 +180,13 @@ impl LanguageModelRegistry {
     }
 
     pub fn providers(&self) -> Vec<Arc<dyn LanguageModelProvider>> {
-        let baymax_provider_id = LanguageModelProviderId("baymax.dev".into());
+        let sim_provider_id = LanguageModelProviderId("sim.dev".into());
         let mut providers = Vec::with_capacity(self.providers.len());
-        if let Some(provider) = self.providers.get(&baymax_provider_id) {
+        if let Some(provider) = self.providers.get(&sim_provider_id) {
             providers.push(provider.clone());
         }
         providers.extend(self.providers.values().filter_map(|p| {
-            if p.id() != baymax_provider_id {
+            if p.id() != sim_provider_id {
                 Some(p.clone())
             } else {
                 None
@@ -414,7 +414,7 @@ impl LanguageModelRegistry {
 
     pub fn default_model(&self) -> Option<ConfiguredModel> {
         #[cfg(debug_assertions)]
-        if std::env::var("BAYMAX_SIMULATE_NO_LLM_PROVIDER").is_ok() {
+        if std::env::var("SIM_SIMULATE_NO_LLM_PROVIDER").is_ok() {
             return None;
         }
 
@@ -434,7 +434,7 @@ impl LanguageModelRegistry {
 
     pub fn inline_assistant_model(&self) -> Option<ConfiguredModel> {
         #[cfg(debug_assertions)]
-        if std::env::var("BAYMAX_SIMULATE_NO_LLM_PROVIDER").is_ok() {
+        if std::env::var("SIM_SIMULATE_NO_LLM_PROVIDER").is_ok() {
             return None;
         }
 
@@ -445,7 +445,7 @@ impl LanguageModelRegistry {
 
     pub fn commit_message_model(&self, cx: &App) -> Option<ConfiguredModel> {
         #[cfg(debug_assertions)]
-        if std::env::var("BAYMAX_SIMULATE_NO_LLM_PROVIDER").is_ok() {
+        if std::env::var("SIM_SIMULATE_NO_LLM_PROVIDER").is_ok() {
             return None;
         }
 
@@ -457,7 +457,7 @@ impl LanguageModelRegistry {
 
     pub fn thread_summary_model(&self, cx: &App) -> Option<ConfiguredModel> {
         #[cfg(debug_assertions)]
-        if std::env::var("BAYMAX_SIMULATE_NO_LLM_PROVIDER").is_ok() {
+        if std::env::var("SIM_SIMULATE_NO_LLM_PROVIDER").is_ok() {
             return None;
         }
 

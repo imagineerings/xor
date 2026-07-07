@@ -10,7 +10,7 @@
   - Parse push payload (agent response, channel message, call)
   - On tap: deep link to session, channel, or call UI
   - _Requirements: 1.1–1.4_
-  - _writes: iOS: `BaymaxApp.swift` (modify for UNUserNotificationCenter); Android: `BaymaxApplication.kt` (modify for FCM)_
+  - _writes: iOS: `SimApp.swift` (modify for UNUserNotificationCenter); Android: `SimApplication.kt` (modify for FCM)_
 
 - [ ] 3. Implement in-app notification toasts and overlays
   - Toast for channel messages, overlay for incoming calls

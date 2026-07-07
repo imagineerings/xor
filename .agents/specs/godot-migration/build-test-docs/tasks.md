@@ -14,11 +14,11 @@ Add shared documentation, fixture attribution, and dependency review helpers bef
 ## Dependency Waves
 
 - W1 Shared foundations: fixture attribution and dependency review helpers land first.
-- W2 Baymax game compatibility substrate: docs and compatibility metadata integrations depend on W1 helpers.
+- W2 Sim game compatibility substrate: docs and compatibility metadata integrations depend on W1 helpers.
 
 ## Tasks
 
 - [ ] 1. Add docs, fixture attribution, and dependency review helpers
   - Implement docs metadata ingestion, fixture attribution validation, and dependency review records.
   - _Requirements: 1.1, 2.1, 2.2, 3.1_
-  - _writes: crates/baymax_game/src/docs_ingestion.rs, crates/baymax_game/src/fixtures.rs, crates/baymax_game/src/dependency_review.rs_
+  - _writes: crates/sim_game/src/docs_ingestion.rs, crates/sim_game/src/fixtures.rs, crates/sim_game/src/dependency_review.rs_

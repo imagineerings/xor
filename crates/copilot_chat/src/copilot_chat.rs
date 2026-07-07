@@ -155,7 +155,7 @@ pub struct Model {
     vendor: ModelVendor,
     is_chat_default: bool,
     // The model with this value true is selected by VSCode copilot if a premium request limit is
-    // reached. Baymax does not currently implement this behaviour
+    // reached. Sim does not currently implement this behaviour
     is_chat_fallback: bool,
     model_picker_enabled: bool,
     #[serde(default)]
@@ -910,7 +910,7 @@ pub(crate) fn copilot_request_headers(
         .header(
             "Editor-Version",
             format!(
-                "Baymax/{}",
+                "Sim/{}",
                 option_env!("CARGO_PKG_VERSION").unwrap_or("unknown")
             ),
         )
@@ -1380,7 +1380,7 @@ mod tests {
     #[test]
     fn test_models_with_pending_policy_deserialize() {
         // This test verifies that models with policy states other than "enabled"
-        // (such as "pending" or "requires_consent") are properly deserialibaymax.
+        // (such as "pending" or "requires_consent") are properly deserialisim.
         // Note: These models will be filtered out by get_models() and won't appear
         // in the model picker until the user enables them on GitHub.
         let json = r#"{

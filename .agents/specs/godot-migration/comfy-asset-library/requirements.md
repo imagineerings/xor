@@ -2,14 +2,14 @@
 
 ## Introduction
 
-Baymax needs Comfy's asset library behavior for generated outputs, uploads, model references, user files, tags, metadata, previews, and filesystem scans. This asset behavior is core world-model harness functionality because generated outputs, model references, and workflow files must be discoverable and reusable across harness jobs. This spec owns asset indexing and API semantics. It delegates media preview rendering to `rendering-media/`, model folder registration to `comfy-model-memory-runtime/`, and generated artifact provenance to shared world-model artifact models.
+Sim needs Comfy's asset library behavior for generated outputs, uploads, model references, user files, tags, metadata, previews, and filesystem scans. This asset behavior is core world-model harness functionality because generated outputs, model references, and workflow files must be discoverable and reusable across harness jobs. This spec owns asset indexing and API semantics. It delegates media preview rendering to `rendering-media/`, model folder registration to `comfy-model-memory-runtime/`, and generated artifact provenance to shared world-model artifact models.
 
 ## Glossary
 
 - **Asset**: Content identified by a hash, size, MIME type, and creation timestamp.
 - **Asset Reference**: A user-facing or filesystem-facing record that points to asset content and carries name, tags, preview id, metadata, owner, and cache state.
 - **Asset Seed Scan**: Background synchronization of model, input, and output roots into the asset database.
-- **User Data**: Per-user settings, workflow files, and UI state stored under Baymax user storage.
+- **User Data**: Per-user settings, workflow files, and UI state stored under Sim user storage.
 - **Cache State**: File path, mtime, missing status, verify flag, and enrichment level for filesystem-backed references.
 
 ## Requirements
@@ -49,7 +49,7 @@ Baymax needs Comfy's asset library behavior for generated outputs, uploads, mode
 
 ### Requirement 4: Asset Seeding and Enrichment
 
-**User Story:** As a maintainer, I want Baymax to synchronize filesystem roots into assets without blocking normal generation.
+**User Story:** As a maintainer, I want Sim to synchronize filesystem roots into assets without blocking normal generation.
 
 #### Acceptance Criteria
 
@@ -70,12 +70,12 @@ Baymax needs Comfy's asset library behavior for generated outputs, uploads, mode
 5.3 WHEN user data is created, read, moved, or deleted THEN THE system SHALL confine paths to that user's public storage root.
 5.4 WHEN settings are read or written THEN THE system SHALL store them in the user's server-side settings file.
 
-### Requirement 6: Baymax Integration Boundary
+### Requirement 6: Sim Integration Boundary
 
-**User Story:** As a Baymax developer, I want the Comfy asset library to reuse Baymax's storage and media systems.
+**User Story:** As a Sim developer, I want the Comfy asset library to reuse Sim's storage and media systems.
 
 #### Acceptance Criteria
 
-6.1 IF Baymax already has artifact, media preview, user storage, or secret infrastructure THEN THE asset library SHALL adapt those systems rather than adding a parallel storage stack.
+6.1 IF Sim already has artifact, media preview, user storage, or secret infrastructure THEN THE asset library SHALL adapt those systems rather than adding a parallel storage stack.
 6.2 WHEN asset records reference generated outputs THEN THE system SHALL include shared provenance identifiers.
 6.3 IF the asset database is unavailable while assets are required THEN THE system SHALL fail startup with actionable diagnostics.

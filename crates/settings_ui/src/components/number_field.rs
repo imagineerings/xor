@@ -11,7 +11,7 @@ use gpui::{
     TextStyleRefinement, WeakEntity,
 };
 
-use baymax_actions::editor::{MoveDown, MoveUp};
+use sim_actions::editor::{MoveDown, MoveUp};
 use settings::{
     CenteredPaddingSettings, CodeFade, DelayMs, FontSize, FontWeightContent, InactiveOpacity,
     MinimumContrast,

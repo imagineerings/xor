@@ -2746,7 +2746,7 @@ fn image_fallback_element(dest_url: SharedString, alt_text: Option<SharedString>
         .min_w_0()
         .child(Label::new(label).color(Color::Warning).underline())
         .tooltip(Tooltip::text(
-            "Image failed to load. Open `baymax: log` for more details.",
+            "Image failed to load. Open `sim: log` for more details.",
         ))
         .on_click(move |_, _, cx| cx.open_url(&dest_url))
         .into_any_element()
@@ -3913,7 +3913,7 @@ mod tests {
     #[gpui::test]
     fn test_frontmatter_falls_back_to_code_block_for_nested_yaml(cx: &mut TestAppContext) {
         let rendered = render_markdown_with_options(
-            "---\ntags:\n  - baymax\n---\nBody",
+            "---\ntags:\n  - sim\n---\nBody",
             None,
             MarkdownOptions {
                 render_metadata_blocks: true,
@@ -3921,7 +3921,7 @@ mod tests {
             },
             cx,
         );
-        assert_eq!(rendered.text_for_range(0..29), "tags:\n  - baymax\nBody");
+        assert_eq!(rendered.text_for_range(0..29), "tags:\n  - sim\nBody");
     }
 
     fn render_markdown_with_code_span_link(

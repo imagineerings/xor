@@ -231,7 +231,7 @@ pub(crate) fn open_migrated_rule(
             "Rules have been migrated to Skills.",
         )
         .on_click("View docs", |_, cx| {
-            cx.open_url("https://baymax.dev/docs/ai/skills");
+            cx.open_url("https://sim.dev/docs/ai/skills");
         })
         .autohide(),
         cx,

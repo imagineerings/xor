@@ -99,23 +99,23 @@ impl From<DebuggerPaneItem> for SharedString {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct SerialibaymaxLayout {
-    pub(crate) panes: SerialibaymaxPaneLayout,
+pub(crate) struct SerialisimLayout {
+    pub(crate) panes: SerialisimPaneLayout,
     pub(crate) dock_axis: Axis,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub(crate) enum SerialibaymaxPaneLayout {
-    Pane(SerialibaymaxPane),
+pub(crate) enum SerialisimPaneLayout {
+    Pane(SerialisimPane),
     Group {
         axis: Axis,
         flexes: Option<Vec<f32>>,
-        children: Vec<SerialibaymaxPaneLayout>,
+        children: Vec<SerialisimPaneLayout>,
     },
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub(crate) struct SerialibaymaxPane {
+pub(crate) struct SerialisimPane {
     pub children: Vec<DebuggerPaneItem>,
     pub active_item: Option<DebuggerPaneItem>,
 }
@@ -124,52 +124,52 @@ const DEBUGGER_PANEL_PREFIX: &str = "debugger_panel_";
 
 pub(crate) async fn serialize_pane_layout(
     adapter_name: DebugAdapterName,
-    pane_group: SerialibaymaxLayout,
+    pane_group: SerialisimLayout,
     kvp: KeyValueStore,
 ) -> anyhow::Result<()> {
-    let serialibaymax_pane_group = serde_json::to_string(&pane_group)
+    let serialisim_pane_group = serde_json::to_string(&pane_group)
         .context("Serializing pane group with serde_json as a string")?;
     kvp.write_kvp(
         format!("{DEBUGGER_PANEL_PREFIX}-{adapter_name}"),
-        serialibaymax_pane_group,
+        serialisim_pane_group,
     )
     .await
 }
 
-pub(crate) fn build_serialibaymax_layout(
+pub(crate) fn build_serialisim_layout(
     pane_group: &Member,
     dock_axis: Axis,
     cx: &App,
-) -> SerialibaymaxLayout {
-    SerialibaymaxLayout {
+) -> SerialisimLayout {
+    SerialisimLayout {
         dock_axis,
-        panes: build_serialibaymax_pane_layout(pane_group, cx),
+        panes: build_serialisim_pane_layout(pane_group, cx),
     }
 }
 
-pub(crate) fn build_serialibaymax_pane_layout(
+pub(crate) fn build_serialisim_pane_layout(
     pane_group: &Member,
     cx: &App,
-) -> SerialibaymaxPaneLayout {
+) -> SerialisimPaneLayout {
     match pane_group {
         Member::Axis(PaneAxis {
             axis,
             members,
             flexes,
             bounding_boxes: _,
-        }) => SerialibaymaxPaneLayout::Group {
+        }) => SerialisimPaneLayout::Group {
             axis: *axis,
             children: members
                 .iter()
-                .map(|member| build_serialibaymax_pane_layout(member, cx))
+                .map(|member| build_serialisim_pane_layout(member, cx))
                 .collect::<Vec<_>>(),
             flexes: Some(flexes.lock().clone()),
         },
-        Member::Pane(pane_handle) => SerialibaymaxPaneLayout::Pane(serialize_pane(pane_handle, cx)),
+        Member::Pane(pane_handle) => SerialisimPaneLayout::Pane(serialize_pane(pane_handle, cx)),
     }
 }
 
-fn serialize_pane(pane: &Entity<Pane>, cx: &App) -> SerialibaymaxPane {
+fn serialize_pane(pane: &Entity<Pane>, cx: &App) -> SerialisimPane {
     let pane = pane.read(cx);
     let children = pane
         .items()
@@ -184,26 +184,26 @@ fn serialize_pane(pane: &Entity<Pane>, cx: &App) -> SerialibaymaxPane {
         .and_then(|item| item.act_as::<SubView>(cx))
         .map(|view| view.read(cx).view_kind());
 
-    SerialibaymaxPane {
+    SerialisimPane {
         children,
         active_item,
     }
 }
 
-pub(crate) fn get_serialibaymax_layout(
+pub(crate) fn get_serialisim_layout(
     adapter_name: impl AsRef<str>,
     kvp: &KeyValueStore,
-) -> Option<SerialibaymaxLayout> {
+) -> Option<SerialisimLayout> {
     let key = format!("{DEBUGGER_PANEL_PREFIX}-{}", adapter_name.as_ref());
 
     kvp.read_kvp(&key)
         .log_err()
         .flatten()
-        .and_then(|value| serde_json::from_str::<SerialibaymaxLayout>(&value).ok())
+        .and_then(|value| serde_json::from_str::<SerialisimLayout>(&value).ok())
 }
 
 pub(crate) fn deserialize_pane_layout(
-    serialibaymax: SerialibaymaxPaneLayout,
+    serialisim: SerialisimPaneLayout,
     should_invert: bool,
     workspace: &WeakEntity<Workspace>,
     project: &Entity<Project>,
@@ -219,8 +219,8 @@ pub(crate) fn deserialize_pane_layout(
     window: &mut Window,
     cx: &mut Context<RunningState>,
 ) -> Option<Member> {
-    match serialibaymax {
-        SerialibaymaxPaneLayout::Group {
+    match serialisim {
+        SerialisimPaneLayout::Group {
             axis,
             flexes,
             children,
@@ -262,7 +262,7 @@ pub(crate) fn deserialize_pane_layout(
                 flexes,
             )))
         }
-        SerialibaymaxPaneLayout::Pane(serialibaymax_pane) => {
+        SerialisimPaneLayout::Pane(serialisim_pane) => {
             let pane = running::new_debugger_pane(workspace.clone(), project.clone(), window, cx);
             subscriptions.insert(
                 pane.entity_id(),
@@ -271,7 +271,7 @@ pub(crate) fn deserialize_pane_layout(
             let running_state = cx.weak_entity();
             let pane_handle = pane.downgrade();
 
-            let sub_views: Vec<_> = serialibaymax_pane
+            let sub_views: Vec<_> = serialisim_pane
                 .children
                 .iter()
                 .map(|child| match child {
@@ -342,7 +342,7 @@ pub(crate) fn deserialize_pane_layout(
             pane.update(cx, |pane, cx| {
                 let mut active_idx = 0;
                 for (idx, sub_view) in sub_views.into_iter().enumerate() {
-                    if serialibaymax_pane
+                    if serialisim_pane
                         .active_item
                         .is_some_and(|active| active == sub_view.read(cx).view_kind())
                     {
@@ -360,18 +360,18 @@ pub(crate) fn deserialize_pane_layout(
 }
 
 #[cfg(test)]
-impl SerialibaymaxPaneLayout {
-    pub(crate) fn in_order(&self) -> Vec<SerialibaymaxPaneLayout> {
+impl SerialisimPaneLayout {
+    pub(crate) fn in_order(&self) -> Vec<SerialisimPaneLayout> {
         let mut panes = vec![];
 
         Self::inner_in_order(self, &mut panes);
         panes
     }
 
-    fn inner_in_order(&self, panes: &mut Vec<SerialibaymaxPaneLayout>) {
+    fn inner_in_order(&self, panes: &mut Vec<SerialisimPaneLayout>) {
         match self {
-            SerialibaymaxPaneLayout::Pane(_) => panes.push((*self).clone()),
-            SerialibaymaxPaneLayout::Group {
+            SerialisimPaneLayout::Pane(_) => panes.push((*self).clone()),
+            SerialisimPaneLayout::Group {
                 axis: _,
                 flexes: _,
                 children,

@@ -1,43 +1,43 @@
 ---
-title: How to Migrate from WebStorm to Baymax
-description: "Guide for migrating from WebStorm to Baymax, including settings and keybindings."
+title: How to Migrate from WebStorm to Sim
+description: "Guide for migrating from WebStorm to Sim, including settings and keybindings."
 ---
 
-# How to Migrate from WebStorm to Baymax
+# How to Migrate from WebStorm to Sim
 
-This guide covers how to set up Baymax if you're coming from WebStorm, including keybindings, settings, and the differences you should expect as a JavaScript/TypeScript developer.
+This guide covers how to set up Sim if you're coming from WebStorm, including keybindings, settings, and the differences you should expect as a JavaScript/TypeScript developer.
 
-## Install Baymax
+## Install Sim
 
-Baymax is available on macOS, Windows, and Linux.
+Sim is available on macOS, Windows, and Linux.
 
-For macOS, you can download it from baymax.dev/download, or install via Homebrew:
-
-```sh
-brew install --cask baymax
-```
-
-For Windows, download the installer from baymax.dev/download, or install via winget:
+For macOS, you can download it from sim.dev/download, or install via Homebrew:
 
 ```sh
-winget install Baymax.Baymax
+brew install --cask sim
 ```
 
-For most Linux users, the easiest way to install Baymax is through our installation script:
+For Windows, download the installer from sim.dev/download, or install via winget:
 
 ```sh
-curl -f https://baymax.dev/install.sh | sh
+winget install Sim.Sim
 ```
 
-After installation, you can launch Baymax from your Applications folder (macOS), Start menu (Windows), or directly from the terminal using:
-`baymax .`
-This opens the current directory in Baymax.
+For most Linux users, the easiest way to install Sim is through our installation script:
+
+```sh
+curl -f https://sim.dev/install.sh | sh
+```
+
+After installation, you can launch Sim from your Applications folder (macOS), Start menu (Windows), or directly from the terminal using:
+`sim .`
+This opens the current directory in Sim.
 
 ## Set Up the JetBrains Keymap
 
 If you're coming from WebStorm, the fastest way to feel at home is to use the JetBrains keymap. During onboarding, you can select it as your base keymap. If you missed that step, you can change it anytime:
 
-1. Open Settings with {#kb baymax::OpenSettings}
+1. Open Settings with {#kb sim::OpenSettings}
 2. Search for `Base Keymap`
 3. Select `JetBrains`
 
@@ -45,11 +45,11 @@ This maps familiar shortcuts like {#kb:jetbrains project_symbols::Toggle} for Go
 
 ## Set Up Editor Preferences
 
-You can configure most settings in the Settings Editor ({#kb baymax::OpenSettings}). For advanced settings, run {#action baymax::OpenSettingsFile} from the Command Palette to edit your settings file directly.
+You can configure most settings in the Settings Editor ({#kb sim::OpenSettings}). For advanced settings, run {#action sim::OpenSettingsFile} from the Command Palette to edit your settings file directly.
 
 Settings WebStorm users typically configure first:
 
-| Baymax Setting             | What it does                                                                    |
+| Sim Setting             | What it does                                                                    |
 | ----------------------- | ------------------------------------------------------------------------------- |
 | `format_on_save`        | Auto-format when saving. Set to `"on"` to enable.                               |
 | `soft_wrap`             | Wrap long lines. Options: `"none"`, `"editor_width"`, `"preferred_line_length"` |
@@ -57,18 +57,18 @@ Settings WebStorm users typically configure first:
 | `inlay_hints`           | Show parameter names and type hints inline, like WebStorm's hints.              |
 | `relative_line_numbers` | Useful if you're coming from IdeaVim.                                           |
 
-Baymax also supports per-project settings. Create a `.baymax/settings.json` file in your project root to override global settings for that project, similar to how you might use `.idea` folders in WebStorm.
+Sim also supports per-project settings. Create a `.sim/settings.json` file in your project root to override global settings for that project, similar to how you might use `.idea` folders in WebStorm.
 
 > **Tip:** If you're joining an existing project, check `format_on_save` before making your first commit. Otherwise you might accidentally reformat an entire file when you only meant to change one line.
 
 ## Open or Create a Project
 
-After setup, use {#kb:jetbrains file_finder::Toggle} to open a folder. This becomes your workspace in Baymax. Unlike WebStorm, there's no project configuration wizard, no framework selection dialog, and no project structure setup required.
+After setup, use {#kb:jetbrains file_finder::Toggle} to open a folder. This becomes your workspace in Sim. Unlike WebStorm, there's no project configuration wizard, no framework selection dialog, and no project structure setup required.
 
-To start a new project, create a directory using your terminal or file manager, then open it in Baymax. The editor will treat that folder as the root of your project. For new projects, you'd typically run `npm init`, `pnpm create`, or your framework's CLI tool first, then open the resulting folder in Baymax.
+To start a new project, create a directory using your terminal or file manager, then open it in Sim. The editor will treat that folder as the root of your project. For new projects, you'd typically run `npm init`, `pnpm create`, or your framework's CLI tool first, then open the resulting folder in Sim.
 
-You can also launch Baymax from the terminal inside any folder with:
-`baymax .`
+You can also launch Sim from the terminal inside any folder with:
+`sim .`
 
 Once inside a project:
 
@@ -84,7 +84,7 @@ If you chose the JetBrains keymap during onboarding, most of your shortcuts shou
 
 ### Common Keybindings
 
-| Action                 | Baymax Keybinding                                  |
+| Action                 | Sim Keybinding                                  |
 | ---------------------- | ----------------------------------------------- |
 | Command Palette        | {#kb:jetbrains command_palette::Toggle}         |
 | Go to File             | {#kb:jetbrains file_finder::Toggle}             |
@@ -108,7 +108,7 @@ If you chose the JetBrains keymap during onboarding, most of your shortcuts shou
 | Toggle Breakpoint      | {#kb:jetbrains editor::ToggleBreakpoint}        |
 | Navigate to Next Error | {#kb:jetbrains editor::GoToDiagnostic}          |
 
-### Unique to Baymax
+### Unique to Sim
 
 | Action            | Keybinding                       | Notes                                                         |
 | ----------------- | -------------------------------- | ------------------------------------------------------------- |
@@ -118,11 +118,11 @@ If you chose the JetBrains keymap during onboarding, most of your shortcuts shou
 ### How to Customize Keybindings
 
 - Open the Command Palette ({#kb:jetbrains command_palette::Toggle})
-- Run {#action baymax::OpenKeymap}
+- Run {#action sim::OpenKeymap}
 
 This opens a list of all available bindings. You can override individual shortcuts or remove conflicts.
 
-Baymax also supports key sequences (multi-key shortcuts).
+Sim also supports key sequences (multi-key shortcuts).
 
 ## Differences in User Interfaces
 
@@ -130,9 +130,9 @@ Baymax also supports key sequences (multi-key shortcuts).
 
 If you've used WebStorm on large projects, you know the wait. Opening a project with many dependencies can mean watching "Indexing..." for anywhere from 30 seconds to several minutes. WebStorm indexes your entire codebase and `node_modules` to power its code intelligence, and re-indexes when dependencies change.
 
-Baymax doesn't index. You open a folder and start coding immediately—no progress bars, no "Indexing paused" banners. File search and navigation stay fast regardless of project size or how many `node_modules` dependencies you have.
+Sim doesn't index. You open a folder and start coding immediately—no progress bars, no "Indexing paused" banners. File search and navigation stay fast regardless of project size or how many `node_modules` dependencies you have.
 
-WebStorm's index enables features like finding all usages across your entire codebase, tracking import hierarchies, and flagging unused exports project-wide. Baymax relies on language servers for this analysis, which may not cover as much ground.
+WebStorm's index enables features like finding all usages across your entire codebase, tracking import hierarchies, and flagging unused exports project-wide. Sim relies on language servers for this analysis, which may not cover as much ground.
 
 **How to adapt:**
 
@@ -143,9 +143,9 @@ WebStorm's index enables features like finding all usages across your entire cod
 
 ### LSP vs. Native Language Intelligence
 
-WebStorm has its own JavaScript and TypeScript analysis engine built by JetBrains. This engine understands your code deeply: it resolves types, tracks data flow, knows about framework-specific patterns, and offers specialibaymax refactorings.
+WebStorm has its own JavaScript and TypeScript analysis engine built by JetBrains. This engine understands your code deeply: it resolves types, tracks data flow, knows about framework-specific patterns, and offers specialisim refactorings.
 
-Baymax uses the Language Server Protocol (LSP) for code intelligence. For JavaScript and TypeScript, Baymax supports:
+Sim uses the Language Server Protocol (LSP) for code intelligence. For JavaScript and TypeScript, Sim supports:
 
 - **vtsls** (default) — Fast TypeScript language server with excellent performance
 - **typescript-language-server** — The standard TypeScript LSP implementation
@@ -171,18 +171,18 @@ Where you might notice differences:
 
 WebStorm manages projects through `.idea` folders containing XML configuration files, framework detection, and run configurations. This model lets WebStorm remember your project settings, manage npm scripts through the UI, and persist run/debug setups.
 
-Baymax takes a different approach: a project is just a folder. There's no setup wizard, no framework detection dialog, no project structure to configure.
+Sim takes a different approach: a project is just a folder. There's no setup wizard, no framework detection dialog, no project structure to configure.
 
 What this means in practice:
 
 - Run configurations aren't a thing. Define reusable commands in `tasks.json` instead. Note that your existing `.idea/` configurations won't carry over—you'll set up the ones you need fresh.
 - npm scripts live in the terminal. Run `npm run dev`, `pnpm build`, or `yarn test` directly—there's no dedicated npm panel.
-- No framework detection. Baymax treats React, Angular, Vue, and vanilla JS/TS the same way.
+- No framework detection. Sim treats React, Angular, Vue, and vanilla JS/TS the same way.
 
 **How to adapt:**
 
-- Create a `.baymax/settings.json` in your project root for project-specific settings
-- Define common commands in `tasks.json` (open via Command Palette: {#action baymax::OpenTasks}):
+- Create a `.sim/settings.json` in your project root for project-specific settings
+- Define common commands in `tasks.json` (open via Command Palette: {#action sim::OpenTasks}):
 
 ```json
 [
@@ -200,7 +200,7 @@ What this means in practice:
   },
   {
     "label": "test current file",
-    "command": "npm test -- $BAYMAX_FILE"
+    "command": "npm test -- $SIM_FILE"
   }
 ]
 ```
@@ -212,22 +212,22 @@ What this means in practice:
 
 WebStorm's value for web development comes largely from its framework integration. React components get special treatment. Angular has dedicated tooling. Vue single-file components are fully understood. The npm tool window shows all your scripts.
 
-Baymax has none of this built-in. The TypeScript language server sees your code as TypeScript—it doesn't understand that a function is a React component or that a file is an Angular service.
+Sim has none of this built-in. The TypeScript language server sees your code as TypeScript—it doesn't understand that a function is a React component or that a file is an Angular service.
 
 **How to adapt:**
 
 - Use grep and file search liberally. {#kb pane::DeploySearch} with a regex can find component definitions, route configurations, or API endpoints.
 - Rely on your language server's "find references" ({#kb:jetbrains editor::FindAllReferences}) for navigation—it works, just without framework context
-- Consider using framework-specific CLI tools (`ng`, `next`, `vite`) from Baymax's terminal
+- Consider using framework-specific CLI tools (`ng`, `next`, `vite`) from Sim's terminal
 - For React, JSX/TSX syntax and TypeScript types still provide good intelligence
 
-> **Tip:** For projects with complex configurations, keep your framework's documentation handy. Baymax's speed comes with less hand-holding for framework-specific features.
+> **Tip:** For projects with complex configurations, keep your framework's documentation handy. Sim's speed comes with less hand-holding for framework-specific features.
 
 ### Tool Windows vs. Docks
 
-WebStorm organizes auxiliary views into numbered tool windows. Baymax uses a similar concept called "docks":
+WebStorm organizes auxiliary views into numbered tool windows. Sim uses a similar concept called "docks":
 
-| WebStorm Tool Window | Baymax Equivalent | Baymax Keybinding                             |
+| WebStorm Tool Window | Sim Equivalent | Sim Keybinding                             |
 | -------------------- | -------------- | ------------------------------------------ |
 | Project              | Project Panel  | {#kb:jetbrains project_panel::ToggleFocus} |
 | Git                  | Git Panel      | {#kb:jetbrains git_panel::ToggleFocus}     |
@@ -236,35 +236,35 @@ WebStorm organizes auxiliary views into numbered tool windows. Baymax uses a sim
 | Problems             | Diagnostics    | {#kb:jetbrains diagnostics::Deploy}        |
 | Debug                | Debug Panel    | {#kb:jetbrains debug_panel::ToggleFocus}   |
 
-Baymax has three dock positions: left, bottom, and right. Panels can be moved between docks by dragging or through settings.
+Sim has three dock positions: left, bottom, and right. Panels can be moved between docks by dragging or through settings.
 
-Note that there's no dedicated npm tool window in Baymax. Use the terminal or define tasks for your common npm scripts.
+Note that there's no dedicated npm tool window in Sim. Use the terminal or define tasks for your common npm scripts.
 
 ### Debugging
 
-Both WebStorm and Baymax offer integrated debugging for JavaScript and TypeScript:
+Both WebStorm and Sim offer integrated debugging for JavaScript and TypeScript:
 
-- Baymax uses `vscode-js-debug` (the same debug adapter that VS Code uses)
+- Sim uses `vscode-js-debug` (the same debug adapter that VS Code uses)
 - Set breakpoints with {#kb:jetbrains editor::ToggleBreakpoint}
 - Start debugging with {#kb:jetbrains debugger::Start}
 - Step through code with {#kb:jetbrains debugger::StepInto} (step into), {#kb:jetbrains debugger::StepOver} (step over), {#kb:jetbrains debugger::StepOut} (step out)
 - Continue execution with {#kb:jetbrains debugger::Continue}
 
-Baymax can debug:
+Sim can debug:
 
 - Node.js applications and scripts
 - Chrome/browser JavaScript
 - Jest, Mocha, Vitest, and other test frameworks
 - Next.js (both server and client-side)
 
-For more control, create a `.baymax/debug.json` file:
+For more control, create a `.sim/debug.json` file:
 
 ```json
 [
   {
     "label": "Debug Current File",
     "adapter": "JavaScript",
-    "program": "$BAYMAX_FILE",
+    "program": "$SIM_FILE",
     "request": "launch"
   },
   {
@@ -282,17 +282,17 @@ For more control, create a `.baymax/debug.json` file:
 ]
 ```
 
-Baymax also recognizes `.vscode/launch.json` configurations, so existing VS Code debug setups often work out of the box.
+Sim also recognizes `.vscode/launch.json` configurations, so existing VS Code debug setups often work out of the box.
 
 ### Running Tests
 
-WebStorm has a dedicated test runner with a visual interface showing pass/fail status for each test. Baymax provides test running through:
+WebStorm has a dedicated test runner with a visual interface showing pass/fail status for each test. Sim provides test running through:
 
 - **Gutter icons** — Click the play button next to test functions or describe blocks
 - **Tasks** — Define test commands in `tasks.json`
 - **Terminal** — Run `npm test`, `jest`, `vitest`, etc. directly
 
-Baymax supports auto-detection for common test frameworks:
+Sim supports auto-detection for common test frameworks:
 
 - Jest
 - Mocha
@@ -307,13 +307,13 @@ The test output appears in the terminal panel. For Jest, use `--verbose` for det
 
 WebStorm has a plugin catalog covering additional language support, themes, and tool integrations.
 
-Baymax's extension catalog is smaller and more focused:
+Sim's extension catalog is smaller and more focused:
 
 - Language support and syntax highlighting
 - Themes
 - Context servers
 
-Several features that require plugins in WebStorm are built into Baymax:
+Several features that require plugins in WebStorm are built into Sim:
 
 - Real-time collaboration with voice chat
 - AI coding assistance
@@ -323,9 +323,9 @@ Several features that require plugins in WebStorm are built into Baymax:
 - Prettier formatting
 - ESLint integration
 
-### What's Not in Baymax
+### What's Not in Sim
 
-To set expectations clearly, here's what WebStorm offers that Baymax doesn't have:
+To set expectations clearly, here's what WebStorm offers that Sim doesn't have:
 
 - **npm tool window** — Use the terminal or tasks instead
 - **HTTP Client** — Use tools like Postman, Insomnia, or curl
@@ -335,40 +335,40 @@ To set expectations clearly, here's what WebStorm offers that Baymax doesn't hav
 - **Built-in REST client** — Use external tools or extensions
 - **Profiler integration** — Use Chrome DevTools or Node.js profiling tools
 
-## Collaboration in Baymax vs. WebStorm
+## Collaboration in Sim vs. WebStorm
 
-WebStorm offers Code With Me as a separate feature for collaboration. Baymax has collaboration built into the core experience.
+WebStorm offers Code With Me as a separate feature for collaboration. Sim has collaboration built into the core experience.
 
 - Open the Collab Panel in the left dock
-- Create a channel and [invite your collaborators](https://baymax.dev/docs/collaboration#inviting-a-collaborator) to join
-- [Share your screen or your codebase](https://baymax.dev/docs/collaboration#share-a-project) directly
+- Create a channel and [invite your collaborators](https://sim.dev/docs/collaboration#inviting-a-collaborator) to join
+- [Share your screen or your codebase](https://sim.dev/docs/collaboration#share-a-project) directly
 
 Once connected, you'll see each other's cursors, selections, and edits in real time. Voice chat is included. There's no need for separate tools or third-party logins.
 
-## Using AI in Baymax
+## Using AI in Sim
 
-If you're used to AI assistants in WebStorm (like GitHub Copilot, JetBrains AI Assistant, or Junie), Baymax offers similar capabilities with more flexibility.
+If you're used to AI assistants in WebStorm (like GitHub Copilot, JetBrains AI Assistant, or Junie), Sim offers similar capabilities with more flexibility.
 
 ### Configuring GitHub Copilot
 
-1. Open Settings with {#kb baymax::OpenSettings}
+1. Open Settings with {#kb sim::OpenSettings}
 2. Navigate to **AI → Edit Predictions**
 3. Click **Configure** next to "Configure Providers"
 4. Under **GitHub Copilot**, click **Sign in to GitHub**
 
-Once signed in, just start typing. Baymax will offer suggestions inline for you to accept.
+Once signed in, just start typing. Sim will offer suggestions inline for you to accept.
 
 ### Additional AI Options
 
-To use other AI models in Baymax, you have several options:
+To use other AI models in Sim, you have several options:
 
-- Use Baymax's hosted models, with higher rate limits. Requires [authentication](https://baymax.dev/docs/authentication) and access through [Baymax Pro](https://baymax.dev/docs/account/baymax-hosted-models.html).
-- Bring your own [API keys](https://baymax.dev/docs/ai/use-api-access.html), no authentication needed
-- Use [External Agents like Claude Agent](https://baymax.dev/docs/ai/external-agents.html)
+- Use Sim's hosted models, with higher rate limits. Requires [authentication](https://sim.dev/docs/authentication) and access through [Sim Pro](https://sim.dev/docs/account/sim-hosted-models.html).
+- Bring your own [API keys](https://sim.dev/docs/ai/use-api-access.html), no authentication needed
+- Use [External Agents like Claude Agent](https://sim.dev/docs/ai/external-agents.html)
 
 ## Advanced Config and Productivity Tweaks
 
-Baymax exposes advanced settings for power users who want to fine-tune their environment.
+Sim exposes advanced settings for power users who want to fine-tune their environment.
 
 Here are a few useful tweaks for JavaScript/TypeScript developers:
 
@@ -428,12 +428,12 @@ In your `tsconfig.json`, enable strict mode for better type checking:
 
 ## Next Steps
 
-Now that you're set up, here are some resources to help you get the most out of Baymax:
+Now that you're set up, here are some resources to help you get the most out of Sim:
 
 - [All Settings](../reference/all-settings.md) — Customize settings, themes, and editor behavior
 - [Key Bindings](../key-bindings.md) — Learn how to customize and extend your keymap
 - [Tasks](../tasks.md) — Set up build and run commands for your projects
-- [AI Features](../ai/overview.md) — Explore Baymax's AI capabilities beyond code completion
+- [AI Features](../ai/overview.md) — Explore Sim's AI capabilities beyond code completion
 - [Collaboration](../collaboration/overview.md) — Share your projects and code together in real time
-- [JavaScript in Baymax](../languages/javascript.md) — JavaScript-specific setup and configuration
-- [TypeScript in Baymax](../languages/typescript.md) — TypeScript-specific setup and configuration
+- [JavaScript in Sim](../languages/javascript.md) — JavaScript-specific setup and configuration
+- [TypeScript in Sim](../languages/typescript.md) — TypeScript-specific setup and configuration

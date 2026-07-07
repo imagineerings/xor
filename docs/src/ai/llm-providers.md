@@ -1,12 +1,12 @@
 ---
-title: LLM Providers - Baymax
-description: Choose how Baymax gets language models: Baymax-hosted models, API access, subscriptions, gateways, or local models.
+title: LLM Providers - Sim
+description: Choose how Sim gets language models: Sim-hosted models, API access, subscriptions, gateways, or local models.
 ---
 
 # LLM Providers
 
-Use this page to choose which models power [the Baymax Agent](./baymax-agent.md) and
-other Baymax-owned AI features, including [Inline Assistant](./inline-assistant.md),
+Use this page to choose which models power [the Sim Agent](./sim-agent.md) and
+other Sim-owned AI features, including [Inline Assistant](./inline-assistant.md),
 Git commit generation, thread summaries, and similar model-backed features.
 
 Model access paths do not configure [External Agents](./external-agents.md) or
@@ -17,18 +17,18 @@ usually own their own model access, auth, and configuration.
 
 | Model access path                                                 | Best when                                                             | Source of truth                       |
 | ----------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------- |
-| [Use Baymax-Hosted Models](../account/baymax-hosted-models.md)          | You want models billed through Baymax                                    | Account & Billing > Baymax-Hosted Models |
+| [Use Sim-Hosted Models](../account/sim-hosted-models.md)          | You want models billed through Sim                                    | Account & Billing > Sim-Hosted Models |
 | [Use API Access](./use-api-access.md)                             | You have provider API access, credits, or usage billing               | Use API Access                        |
 | [Use an Existing Subscription](./use-an-existing-subscription.md) | You already pay for ChatGPT, Claude, Copilot, or another subscription | Use an Existing Subscription          |
 | [Use a Gateway](./use-a-gateway.md)                               | You route through OpenRouter, Bedrock, Vercel, or a similar platform  | Use a Gateway                         |
 | [Use a Local Model](./use-a-local-model.md)                       | You run models locally or self-hosted                                 | Use a Local Model                     |
 
 Use the setup pages for provider-specific details. See [Agents](./agents.md) for
-the difference between the Baymax Agent, External Agents, and Terminal Threads.
+the difference between the Sim Agent, External Agents, and Terminal Threads.
 
 ## Edit Prediction {#edit-prediction}
 
-[Edit Prediction](./edit-prediction.md) has its own provider setup under `edit_predictions`. LLM providers on this page apply to model-backed Baymax AI features such as Baymax Agent, Inline Assistant, Git commit generation, and thread summaries.
+[Edit Prediction](./edit-prediction.md) has its own provider setup under `edit_predictions`. LLM providers on this page apply to model-backed Sim AI features such as Sim Agent, Inline Assistant, Git commit generation, and thread summaries.
 
 ## OpenAI-Compatible Providers {#openai-api-compatible}
 

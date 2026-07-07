@@ -398,7 +398,7 @@ jobs:
             const suggestionsRaw = fs.readFileSync(process.env.SUGGESTIONS_FILE, 'utf8');
 
             // Sanitize AI-generated content
-            let sanitibaymax = suggestionsRaw
+            let sanitisim = suggestionsRaw
               // Strip HTML tags
               .replace(/<[^>]*>/g, '')
               // Strip markdown links but keep display text
@@ -413,8 +413,8 @@ jobs:
               .replace(/[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+#\d+/g, '[ref removed]');
 
             // Truncate to 20,000 characters
-            if (sanitibaymax.length > 20000) {
-              sanitibaymax = sanitibaymax.substring(0, 20000) + '\n\n…(truncated)';
+            if (sanitisim.length > 20000) {
+              sanitisim = sanitisim.substring(0, 20000) + '\n\n…(truncated)';
             }
 
             // Parse and validate PR number
@@ -428,7 +428,7 @@ jobs:
 
             This cherry-pick contains changes that may need documentation updates.
 
-            ${sanitibaymax}
+            ${sanitisim}
 
             ---
             > **Note:** This comment was generated automatically by an AI model analyzing

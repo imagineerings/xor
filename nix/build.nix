@@ -83,13 +83,13 @@ let
   gpu-lib = if withGLES then libglvnd else vulkan-loader;
   commonArgs =
     let
-      baymaxCargoLock = builtins.fromTOML (builtins.readFile ../crates/baymax/Cargo.toml);
+      simCargoLock = builtins.fromTOML (builtins.readFile ../crates/sim/Cargo.toml);
       stdenv' = stdenv;
     in
     rec {
-      pname = "baymax-editor";
+      pname = "sim-editor";
       version =
-        baymaxCargoLock.package.version
+        simCargoLock.package.version
         + "-nightly"
         + lib.optionalString (commitSha != null) "+${builtins.substring 0 7 commitSha}";
       src = builtins.path {
@@ -108,7 +108,7 @@ let
         pkg-config
         protobuf
         # Pin cargo-about to 0.8.2. Newer versions don't work with the current license identifiers
-        # See https://github.com/simtropolis/baymax/pull/44012
+        # See https://github.com/simtropolis/sim/pull/44012
         (cargo-about.overrideAttrs (
           new: old: rec {
             version = "0.8.2";
@@ -142,7 +142,7 @@ let
         lld
         (cargo-bundle.overrideAttrs (
           new: old: {
-            version = "0.6.1-baymax";
+            version = "0.6.1-sim";
             src = fetchFromGitHub {
               owner = "simtropolis";
               repo = "cargo-bundle";
@@ -202,7 +202,7 @@ let
         (darwinMinVersionHook "10.15")
       ];
 
-      cargoExtraArgs = "-p baymax -p cli --locked --features=gpui_platform/runtime_shaders";
+      cargoExtraArgs = "-p sim -p cli --locked --features=gpui_platform/runtime_shaders";
 
       stdenv =
         pkgs:
@@ -228,9 +228,9 @@ let
             ../assets/fonts/ibm-plex-sans
           ];
         };
-        BAYMAX_UPDATE_EXPLANATION = "Baymax has been installed using Nix. Auto-updates have thus been disabled.";
+        SIM_UPDATE_EXPLANATION = "Sim has been installed using Nix. Auto-updates have thus been disabled.";
         RELEASE_VERSION = version;
-        BAYMAX_COMMIT_SHA = lib.optionalString (commitSha != null) "${commitSha}";
+        SIM_COMMIT_SHA = lib.optionalString (commitSha != null) "${commitSha}";
         LK_CUSTOM_WEBRTC = pkgs.callPackage ./livekit-libwebrtc/package.nix { };
         PROTOC = "${protobuf}/bin/protoc";
 
@@ -314,11 +314,11 @@ craneLib.buildPackage (
     dontUseCmakeConfigure = true;
 
     # without the env var generate-licenses fails due to crane's fetchCargoVendor, see:
-    # https://github.com/simtropolis/baymax/issues/19971#issuecomment-2688455390
+    # https://github.com/simtropolis/sim/issues/19971#issuecomment-2688455390
     # TODO: put this in a separate derivation that depends on src to avoid running it on every build
     preBuild = ''
       ALLOW_MISSING_LICENSES=yes bash script/generate-licenses
-      echo nightly > crates/baymax/RELEASE_CHANNEL
+      echo nightly > crates/sim/RELEASE_CHANNEL
     '';
 
     installPhase =
@@ -326,21 +326,21 @@ craneLib.buildPackage (
         ''
           runHook preInstall
 
-          pushd crates/baymax
+          pushd crates/sim
           sed -i "s/package.metadata.bundle-nightly/package.metadata.bundle/" Cargo.toml
           export CARGO_BUNDLE_SKIP_BUILD=true
           app_path="$(cargo bundle --profile $CARGO_PROFILE | xargs)"
           popd
 
           mkdir -p $out/Applications $out/bin
-          # Baymax expects git next to its own binary
+          # Sim expects git next to its own binary
           ln -s ${git}/bin/git "$app_path/Contents/MacOS/git"
           mv $TARGET_DIR/cli "$app_path/Contents/MacOS/cli"
           mv "$app_path" $out/Applications/
 
           # Physical location of the CLI must be inside the app bundle as this is used
           # to determine which app to start
-          ln -s "$out/Applications/Baymax Nightly.app/Contents/MacOS/cli" $out/bin/baymax
+          ln -s "$out/Applications/Sim Nightly.app/Contents/MacOS/cli" $out/bin/sim
 
           runHook postInstall
         ''
@@ -349,26 +349,26 @@ craneLib.buildPackage (
           runHook preInstall
 
           mkdir -p $out/bin $out/libexec
-          cp $TARGET_DIR/baymax $out/libexec/baymax-editor
-          cp $TARGET_DIR/cli  $out/bin/baymax
-          ln -s $out/bin/baymax $out/bin/baymaxitor  # home-manager expects the CLI binary to be here
+          cp $TARGET_DIR/sim $out/libexec/sim-editor
+          cp $TARGET_DIR/cli  $out/bin/sim
+          ln -s $out/bin/sim $out/bin/simitor  # home-manager expects the CLI binary to be here
 
 
-          install -D "crates/baymax/resources/app-icon-nightly@2x.png" \
-            "$out/share/icons/hicolor/1024x1024@2x/apps/baymax.png"
-          install -D crates/baymax/resources/app-icon-nightly.png \
-            $out/share/icons/hicolor/512x512/apps/baymax.png
+          install -D "crates/sim/resources/app-icon-nightly@2x.png" \
+            "$out/share/icons/hicolor/1024x1024@2x/apps/sim.png"
+          install -D crates/sim/resources/app-icon-nightly.png \
+            $out/share/icons/hicolor/512x512/apps/sim.png
 
-          # TODO: icons should probably be named "baymax-nightly"
+          # TODO: icons should probably be named "sim-nightly"
           (
             export DO_STARTUP_NOTIFY="true"
-            export APP_CLI="baymax"
-            export APP_ICON="baymax"
-            export APP_NAME="Baymax Nightly"
+            export APP_CLI="sim"
+            export APP_ICON="sim"
+            export APP_NAME="Sim Nightly"
             export APP_ARGS="%U"
             mkdir -p "$out/share/applications"
-            ${lib.getExe envsubst} < "crates/baymax/resources/baymax.desktop.in" > "$out/share/applications/dev.baymax.Baymax-Nightly.desktop"
-            chmod +x "$out/share/applications/dev.baymax.Baymax-Nightly.desktop"
+            ${lib.getExe envsubst} < "crates/sim/resources/sim.desktop.in" > "$out/share/applications/dev.sim.Sim-Nightly.desktop"
+            chmod +x "$out/share/applications/dev.sim.Sim-Nightly.desktop"
           )
 
           runHook postInstall
@@ -376,15 +376,15 @@ craneLib.buildPackage (
 
     # TODO: why isn't this also done on macOS?
     postFixup = lib.optionalString stdenv.hostPlatform.isLinux ''
-      wrapProgram $out/libexec/baymax-editor --suffix PATH : ${lib.makeBinPath [ nodejs_22 ]}
+      wrapProgram $out/libexec/sim-editor --suffix PATH : ${lib.makeBinPath [ nodejs_22 ]}
     '';
 
     meta = {
       description = "High-performance, multiplayer code editor from the creators of Atom and Tree-sitter";
-      homepage = "https://baymax.dev";
-      changelog = "https://baymax.dev/releases/preview";
+      homepage = "https://sim.dev";
+      changelog = "https://sim.dev/releases/preview";
       license = lib.licenses.gpl3Only;
-      mainProgram = "baymax";
+      mainProgram = "sim";
       platforms = lib.platforms.linux ++ lib.platforms.darwin;
     };
   }

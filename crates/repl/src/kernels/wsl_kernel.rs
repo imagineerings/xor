@@ -100,14 +100,14 @@ impl WslRunningKernel {
                 iopub_port: ports[4],
                 signature_scheme: "hmac-sha256".to_string(),
                 key: uuid::Uuid::new_v4().to_string(),
-                kernel_name: Some(format!("baymax-wsl-{}", kernel_specification.name)),
+                kernel_name: Some(format!("sim-wsl-{}", kernel_specification.name)),
             };
 
             let runtime_dir = dirs::runtime_dir();
             fs.create_dir(&runtime_dir)
                 .await
                 .with_context(|| format!("Failed to create jupyter runtime dir {runtime_dir:?}"))?;
-            let connection_path = runtime_dir.join(format!("kernel-baymax-wsl-{entity_id}.json"));
+            let connection_path = runtime_dir.join(format!("kernel-sim-wsl-{entity_id}.json"));
             let content = serde_json::to_string(&connection_info)?;
             fs.atomic_write(connection_path.clone(), content).await?;
 

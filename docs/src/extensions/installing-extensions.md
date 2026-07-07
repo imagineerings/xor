@@ -1,19 +1,19 @@
 ---
 title: Installing Extensions
-description: "Browse, install, and manage extensions from the Baymax Extension Gallery."
+description: "Browse, install, and manage extensions from the Sim Extension Gallery."
 ---
 
 # Installing Extensions {#installing-extensions}
 
-Extensions add functionality to Baymax, including languages, themes, and AI tools. Browse and install them from the Extension Gallery.
+Extensions add functionality to Sim, including languages, themes, and AI tools. Browse and install them from the Extension Gallery.
 
-Open the Extension Gallery with {#kb baymax::Extensions}, or select "Baymax > Extensions" from the menu bar.
+Open the Extension Gallery with {#kb sim::Extensions}, or select "Sim > Extensions" from the menu bar.
 
 ## Installation Location
 
-- On macOS, extensions are installed in `~/Library/Application Support/Baymax/extensions`.
-- On Linux, they are installed in either `$XDG_DATA_HOME/baymax/extensions` or `~/.local/share/baymax/extensions`.
-- On Windows, the directory is `%LOCALAPPDATA%\Baymax\extensions`.
+- On macOS, extensions are installed in `~/Library/Application Support/Sim/extensions`.
+- On Linux, they are installed in either `$XDG_DATA_HOME/sim/extensions` or `~/.local/share/sim/extensions`.
+- On Windows, the directory is `%LOCALAPPDATA%\Sim\extensions`.
 
 This directory contains two subdirectories:
 

@@ -16,7 +16,7 @@ use crate::{
     ToggleExpandItem,
     attach_modal::{AttachModal, ModalIntent},
     new_process_modal::resolve_path,
-    persistence::{self, DebuggerPaneItem, SerialibaymaxLayout},
+    persistence::{self, DebuggerPaneItem, SerialisimLayout},
     session::running::memory_view::MemoryView,
 };
 
@@ -47,7 +47,7 @@ use serde_json::Value;
 use settings::Settings;
 use stack_frame_list::StackFrameList;
 use task::{
-    BaymaxDebugConfig, BuildTaskDefinition, DebugScenario, SharedTaskContext, Shell, ShellBuilder,
+    SimDebugConfig, BuildTaskDefinition, DebugScenario, SharedTaskContext, Shell, ShellBuilder,
     SpawnInTerminal, TaskContext, substitute_variables_in_str,
 };
 use terminal_view::TerminalView;
@@ -679,8 +679,8 @@ impl RunningState {
                     .for_each(|value| Self::substitute_variables_in_config(value, context));
             }
             serde_json::Value::String(s) => {
-                // Some built-in baymax tasks wrap their arguments in quotes as they might contain spaces.
-                if s.starts_with("\"$BAYMAX_") && s.ends_with('"') {
+                // Some built-in sim tasks wrap their arguments in quotes as they might contain spaces.
+                if s.starts_with("\"$SIM_") && s.ends_with('"') {
                     *s = s[1..s.len() - 1].to_string();
                 }
                 if let Some(substituted) = substitute_variables_in_str(s, context) {
@@ -741,8 +741,8 @@ impl RunningState {
                     .for_each(|value| Self::relativize_paths(None, value, context));
             }
             serde_json::Value::String(s) if key == Some("program") || key == Some("cwd") => {
-                // Some built-in baymax tasks wrap their arguments in quotes as they might contain spaces.
-                if s.starts_with("\"$BAYMAX_") && s.ends_with('"') {
+                // Some built-in sim tasks wrap their arguments in quotes as they might contain spaces.
+                if s.starts_with("\"$SIM_") && s.ends_with('"') {
                     *s = s[1..s.len() - 1].to_string();
                 }
                 resolve_path(s);
@@ -760,7 +760,7 @@ impl RunningState {
         project: Entity<Project>,
         workspace: WeakEntity<Workspace>,
         parent_terminal: Option<Entity<DebugTerminal>>,
-        serialibaymax_pane_layout: Option<SerialibaymaxLayout>,
+        serialisim_pane_layout: Option<SerialisimLayout>,
         dock_axis: Axis,
         window: &mut Window,
         cx: &mut Context<Self>,
@@ -898,10 +898,10 @@ impl RunningState {
         ];
 
         let mut pane_close_subscriptions = HashMap::default();
-        let panes = if let Some(root) = serialibaymax_pane_layout.and_then(|serialibaymax_layout| {
+        let panes = if let Some(root) = serialisim_pane_layout.and_then(|serialisim_layout| {
             persistence::deserialize_pane_layout(
-                serialibaymax_layout.panes,
-                dock_axis != serialibaymax_layout.dock_axis,
+                serialisim_layout.panes,
+                dock_axis != serialisim_layout.dock_axis,
                 &workspace,
                 &project,
                 &stack_frame_list,
@@ -1197,7 +1197,7 @@ impl RunningState {
                     })?
                     .await?;
 
-                let baymax_config = BaymaxDebugConfig {
+                let sim_config = SimDebugConfig {
                     label: label.clone(),
                     adapter: adapter.clone(),
                     request,
@@ -1206,7 +1206,7 @@ impl RunningState {
 
                 let scenario = dap_registry
                     .adapter(&adapter)
-                    .with_context(|| anyhow!("{}: is not a valid adapter name", &adapter))?.config_from_baymax_format(baymax_config)
+                    .with_context(|| anyhow!("{}: is not a valid adapter name", &adapter))?.config_from_sim_format(sim_config)
                     .await?;
                 config = scenario.config;
                 util::merge_non_null_json_value_into(extra_config, &mut config);
@@ -1216,7 +1216,7 @@ impl RunningState {
                 let Err(e) = request_type else {
                     unreachable!();
                 };
-                anyhow::bail!("Baymax cannot determine how to run this debug scenario. `build` field was not provided and Debug Adapter won't accept provided configuration because: {e}");
+                anyhow::bail!("Sim cannot determine how to run this debug scenario. `build` field was not provided and Debug Adapter won't accept provided configuration because: {e}");
             };
 
             Ok(DebugTaskDefinition {
@@ -1488,7 +1488,7 @@ impl RunningState {
                         let adapter_name = this.session.read(cx).adapter();
                         (
                             adapter_name,
-                            persistence::build_serialibaymax_layout(
+                            persistence::build_serialisim_layout(
                                 &this.panes.root,
                                 this.dock_axis,
                                 cx,
@@ -1642,8 +1642,8 @@ impl RunningState {
     }
 
     #[cfg(test)]
-    pub(crate) fn serialibaymax_layout(&self, cx: &App) -> SerialibaymaxLayout {
-        persistence::build_serialibaymax_layout(&self.panes.root, self.dock_axis, cx)
+    pub(crate) fn serialisim_layout(&self, cx: &App) -> SerialisimLayout {
+        persistence::build_serialisim_layout(&self.panes.root, self.dock_axis, cx)
     }
 
     pub fn capabilities(&self, cx: &App) -> Capabilities {

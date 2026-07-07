@@ -21,7 +21,7 @@ export default {
     let res = await fetch(url, request);
 
     if (res.status === 404) {
-      res = await fetch("https://baymax.dev/404");
+      res = await fetch("https://sim.dev/404");
     }
 
     return res;

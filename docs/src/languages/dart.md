@@ -1,11 +1,11 @@
 ---
 title: Dart
-description: "Configure Dart language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure Dart language support in Sim, including language servers, formatting, and debugging."
 ---
 
 # Dart
 
-Dart support is available through the [Dart extension](https://github.com/baymax-extensions/dart).
+Dart support is available through the [Dart extension](https://github.com/sim-extensions/dart).
 
 - Tree-sitter: [UserNobody14/tree-sitter-dart](https://github.com/UserNobody14/tree-sitter-dart)
 - Language Server: [dart language-server](https://github.com/dart-lang/sdk)
@@ -25,7 +25,7 @@ which dart
 dart --version
 ```
 
-If you would like to use a specific dart binary or use dart via FVM you can specify the `dart` binary in your Baymax settings.jsons file:
+If you would like to use a specific dart binary or use dart via FVM you can specify the `dart` binary in your Sim settings.jsons file:
 
 ```json [settings]
 {
@@ -42,7 +42,7 @@ If you would like to use a specific dart binary or use dart via FVM you can spec
 
 ### Formatting
 
-Dart by-default uses a very conservative maximum line length (80). If you would like the dart LSP to permit a longer line length when auto-formatting, add the following to your Baymax settings.json:
+Dart by-default uses a very conservative maximum line length (80). If you would like the dart LSP to permit a longer line length when auto-formatting, add the following to your Sim settings.json:
 
 ```json [settings]
 {

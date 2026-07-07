@@ -1,12 +1,12 @@
 ---
 title: Scala
-description: "Configure Scala language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure Scala language support in Sim, including language servers, formatting, and debugging."
 ---
 
 # Scala
 
-Scala language support in Baymax is provided by the community-maintained [Scala extension](https://github.com/scalameta/metals-baymax).
-Report issues to: [https://github.com/scalameta/metals-baymax/issues](https://github.com/scalameta/metals-baymax/issues)
+Scala language support in Sim is provided by the community-maintained [Scala extension](https://github.com/scalameta/metals-sim).
+Report issues to: [https://github.com/scalameta/metals-sim/issues](https://github.com/scalameta/metals-sim/issues)
 
 - Tree-sitter: [tree-sitter/tree-sitter-scala](https://github.com/tree-sitter/tree-sitter-scala)
 - Language Server: [scalameta/metals](https://github.com/scalameta/metals)
@@ -30,5 +30,5 @@ Behavior of the Metals language server can be controlled with:
 You can place these files in the root of your project or specify their location in the Metals configuration. See [Metals User Configuration](https://scalameta.org/metals/docs/editors/user-configuration) for more.
 
 <!--
-TBD: Provide LSP configuration example for metals in Baymax settings.json. metals.{javaHome,excludedPackages,customProjectRoot} etc.
+TBD: Provide LSP configuration example for metals in Sim settings.json. metals.{javaHome,excludedPackages,customProjectRoot} etc.
 -->

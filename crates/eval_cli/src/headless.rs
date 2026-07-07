@@ -27,11 +27,11 @@ pub struct AgentCliAppState {
 }
 
 pub fn init(cx: &mut App) -> Arc<AgentCliAppState> {
-    let app_commit_sha = option_env!("BAYMAX_COMMIT_SHA").map(|s| AppCommitSha::new(s.to_owned()));
+    let app_commit_sha = option_env!("SIM_COMMIT_SHA").map(|s| AppCommitSha::new(s.to_owned()));
 
     let app_version = AppVersion::load(
-        env!("BAYMAX_PKG_VERSION"),
-        option_env!("BAYMAX_BUILD_ID"),
+        env!("SIM_PKG_VERSION"),
+        option_env!("SIM_BUILD_ID"),
         app_commit_sha,
     );
 
@@ -43,7 +43,7 @@ pub fn init(cx: &mut App) -> Arc<AgentCliAppState> {
     theme_settings::init(theme::LoadThemes::JustBase, cx);
 
     let user_agent = format!(
-        "Baymax Agent CLI/{} ({}; {})",
+        "Sim Agent CLI/{} ({}; {})",
         app_version,
         std::env::consts::OS,
         std::env::consts::ARCH

@@ -36,7 +36,7 @@ Import shipped blueprints first, then add workflow persistence and API export, t
   - _writes: crates/world_model/src/comfy_subgraphs.rs, crates/world_model/src/comfy_subgraphs_tests.rs_
 
 - [ ] 4. Implement workflow template adapter
-  - Expose custom node workflow templates and static template assets through Baymax template services.
+  - Expose custom node workflow templates and static template assets through Sim template services.
   - _Requirements: 3.3_
   - _writes: crates/world_model/src/comfy_workflow_templates.rs, crates/world_model/src/comfy_workflow_templates_tests.rs_
 

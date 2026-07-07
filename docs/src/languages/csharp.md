@@ -1,11 +1,11 @@
 ---
 title: C#
-description: "Configure C# language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure C# language support in Sim, including language servers, formatting, and debugging."
 ---
 
 # C#
 
-C# support is available through the [C# extension](https://github.com/baymax-extensions/csharp).
+C# support is available through the [C# extension](https://github.com/sim-extensions/csharp).
 
 - Tree-sitter: [tree-sitter/tree-sitter-c-sharp](https://github.com/tree-sitter/tree-sitter-c-sharp)
 - Language Servers:
@@ -13,7 +13,7 @@ C# support is available through the [C# extension](https://github.com/baymax-ext
   - [csharp-ls](https://github.com/razzmatazz/csharp-language-server)
   - [OmniSharp/omnisharp-roslyn](https://github.com/OmniSharp/omnisharp-roslyn)
 
-Roslyn is enabled by default. To switch to csharp-ls or OmniSharp, add the following to your Baymax settings file:
+Roslyn is enabled by default. To switch to csharp-ls or OmniSharp, add the following to your Sim settings file:
 
 ```json [settings]
 {
@@ -115,7 +115,7 @@ Roslyn can be configured with the following language server settings:
 }
 ```
 
-csharp-ls can be configured in a Baymax settings file with:
+csharp-ls can be configured in a Sim settings file with:
 
 ```json [settings]
 {
@@ -146,7 +146,7 @@ csharp-ls can be configured in a Baymax settings file with:
 }
 ```
 
-OmniSharp can be configured in a Baymax settings file with:
+OmniSharp can be configured in a Sim settings file with:
 
 ```json [settings]
 {

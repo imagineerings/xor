@@ -1,15 +1,15 @@
-# Contributing to Baymax
+# Contributing to Sim
 
-Thank you for helping us make Baymax better!
+Thank you for helping us make Sim better!
 
-All activity in Baymax forums is subject to our [Code of
-Conduct](https://baymax.dev/code-of-conduct). Additionally, contributors must sign
-our [Contributor License Agreement](https://baymax.dev/cla) before their
+All activity in Sim forums is subject to our [Code of
+Conduct](https://sim.dev/code-of-conduct). Additionally, contributors must sign
+our [Contributor License Agreement](https://sim.dev/cla) before their
 contributions can be merged.
 
 ## Contribution ideas
 
-Baymax is a large project with a number of priorities. We spend most of
+Sim is a large project with a number of priorities. We spend most of
 our time working on what we believe the product needs, but we also love working
 with the community to improve the product in ways we haven't thought of (or had time to get to yet!)
 
@@ -19,18 +19,18 @@ In particular we love PRs that are:
 - Fixing bugs.
 - Small enhancements to existing features to make them work for more people (making things work on more platforms/modes/whatever).
 - Small extra features, like keybindings or actions you miss from other editors or extensions.
-- Part of a Community Program like [Let's Git Together](https://github.com/simtropolis/baymax/issues/41541).
+- Part of a Community Program like [Let's Git Together](https://github.com/simtropolis/sim/issues/41541).
 
 If you're looking for concrete ideas:
 
-- [Triaged bugs with confirmed steps to reproduce](https://github.com/simtropolis/baymax/issues?q=is%3Aissue%20state%3Aopen%20type%3ABug%20label%3Astate%3Areproducible).
-- [Area labels](https://github.com/simtropolis/baymax/labels?q=area%3A*) to browse bugs in a specific part of the product you care about (after clicking on an area label, add type:Bug to the search).
+- [Triaged bugs with confirmed steps to reproduce](https://github.com/simtropolis/sim/issues?q=is%3Aissue%20state%3Aopen%20type%3ABug%20label%3Astate%3Areproducible).
+- [Area labels](https://github.com/simtropolis/sim/labels?q=area%3A*) to browse bugs in a specific part of the product you care about (after clicking on an area label, add type:Bug to the search).
 
-If you're thinking about proposing or building a larger feature, read the [Baymax Feature Process](./docs/src/development/feature-process.md) for how we think about feature design — what context to provide, what integration points to consider, and how to put together a strong proposal.
+If you're thinking about proposing or building a larger feature, read the [Sim Feature Process](./docs/src/development/feature-process.md) for how we think about feature design — what context to provide, what integration points to consider, and how to put together a strong proposal.
 
 ## Sending changes
 
-The Baymax culture values working code and synchronous conversations over long
+The Sim culture values working code and synchronous conversations over long
 discussion threads.
 
 The best way to get us to take a look at a proposed change is to send a pull
@@ -44,9 +44,9 @@ submitted. If you'd like your PR to have the best chance of being merged:
   but features should be confirmed with us first if you aim to avoid wasted
   effort. If there isn't already a GitHub issue for your feature with staff
   confirmation that we want it, start with a GitHub discussion rather than a PR.
-  - This especially applies to any changes proposed to the Baymax Extension API.
+  - This especially applies to any changes proposed to the Sim Extension API.
 - Include a clear description of **what you're solving**, and why it's important.
-- Include **tests**. For UI changes, consider updating visual regression tests (see [Building Baymax for macOS](./docs/src/development/macos.md#visual-regression-tests)).
+- Include **tests**. For UI changes, consider updating visual regression tests (see [Building Sim for macOS](./docs/src/development/macos.md#visual-regression-tests)).
 - If it changes the UI, attach **screenshots** or screen recordings.
 - Make the PR about **one thing only**, e.g. if it's a bugfix, don't add two
   features and a refactoring on top of that.
@@ -112,15 +112,15 @@ When your changes affect UI, consult this checklist:
 
 **Consistency**
 
-- Does it match Baymax’s design language (spacing, typography, icons)?
-  - Make sure to visit [the icon design guidelines](https://github.com/simtropolis/baymax/blob/main/crates/icons/README.md)
-- Are terminology, labels, and tone consistent with the rest of Baymax?
+- Does it match Sim’s design language (spacing, typography, icons)?
+  - Make sure to visit [the icon design guidelines](https://github.com/simtropolis/sim/blob/main/crates/icons/README.md)
+- Are terminology, labels, and tone consistent with the rest of Sim?
 - Are interactions consistent (e.g., how tabs close, how modals dismiss, how errors show)?
 
 **Internationalization & Text**
 
 - Are strings concise, clear, and unambiguous?
-- Do we avoid internal Baymax jargon that only insiders would know?
+- Do we avoid internal Sim jargon that only insiders would know?
 
 **User Paths & Edge Cases**
 
@@ -129,7 +129,7 @@ When your changes affect UI, consult this checklist:
 - How does it work in offline vs. online states?
 - How does it work in unauthenticated vs. authenticated states?
 - How does it behave if data is missing, corrupted, or delayed?
-- Are error messages actionable and consistent with Baymax’s voice?
+- Are error messages actionable and consistent with Sim’s voice?
 
 **Discoverability & Learning**
 
@@ -142,24 +142,24 @@ When your changes affect UI, consult this checklist:
 
 Although there are few hard and fast rules, typically we don't merge:
 
-- Anything that can be provided by an extension. For example a new language, or theme. For adding themes or support for a new language to Baymax, check out our [docs on developing extensions](https://baymax.dev/docs/extensions/developing-extensions).
-- Changes to the Baymax Extension API submitted without prior discussion involving Baymax staff.
-- New file icons. Baymax's default icon theme consists of icons that are hand-designed to fit together in a cohesive manner, please don't submit PRs with off-the-shelf SVGs.
+- Anything that can be provided by an extension. For example a new language, or theme. For adding themes or support for a new language to Sim, check out our [docs on developing extensions](https://sim.dev/docs/extensions/developing-extensions).
+- Changes to the Sim Extension API submitted without prior discussion involving Sim staff.
+- New file icons. Sim's default icon theme consists of icons that are hand-designed to fit together in a cohesive manner, please don't submit PRs with off-the-shelf SVGs.
 - Features where (in our subjective opinion) the extra complexity isn't worth it for the number of people who will benefit.
 - Giant refactorings.
 - Non-trivial changes with no tests.
 - Stylistic code changes that do not alter any app logic. Reducing allocations, removing `.unwrap()`s, fixing typos is great; making code "more readable" — maybe not so much.
 - Anything that seems AI-generated without understanding the output.
 
-## Bird's-eye view of Baymax
+## Bird's-eye view of Sim
 
-We suggest you keep the [Baymax glossary](docs/src/development/glossary.md) at your side when starting out. It lists and explains some of the structures and terms you will see throughout the codebase.
+We suggest you keep the [Sim glossary](docs/src/development/glossary.md) at your side when starting out. It lists and explains some of the structures and terms you will see throughout the codebase.
 
-Baymax is made up of several smaller crates - let's go over those you're most likely to interact with:
+Sim is made up of several smaller crates - let's go over those you're most likely to interact with:
 
-- [`gpui`](/crates/gpui) is a GPU-accelerated UI framework which provides all of the building blocks for Baymax. **We recommend familiarizing yourself with the root level GPUI documentation.**
-- [`editor`](/crates/editor) contains the core `Editor` type that drives both the code editor and all various input fields within Baymax. It also handles a display layer for LSP features such as Inlay Hints or code completions.
-- [`project`](/crates/project) manages files and navigation within the filetree. It is also Baymax's side of communication with LSP.
+- [`gpui`](/crates/gpui) is a GPU-accelerated UI framework which provides all of the building blocks for Sim. **We recommend familiarizing yourself with the root level GPUI documentation.**
+- [`editor`](/crates/editor) contains the core `Editor` type that drives both the code editor and all various input fields within Sim. It also handles a display layer for LSP features such as Inlay Hints or code completions.
+- [`project`](/crates/project) manages files and navigation within the filetree. It is also Sim's side of communication with LSP.
 - [`workspace`](/crates/workspace) handles local state serialization and groups projects together.
 - [`vim`](/crates/vim) is a thin implementation of Vim workflow over `editor`.
 - [`lsp`](/crates/lsp) handles communication with external LSP server.
@@ -167,10 +167,10 @@ Baymax is made up of several smaller crates - let's go over those you're most li
 - [`collab`](/crates/collab) is the collaboration server itself, driving the collaboration features such as project sharing.
 - [`rpc`](/crates/rpc) defines messages to be exchanged with collaboration server.
 - [`theme`](/crates/theme) defines the theme system and provides a default theme.
-- [`ui`](/crates/ui) is a collection of UI components and common patterns used throughout Baymax.
-- [`cli`](/crates/cli) is the CLI crate which invokes the Baymax binary.
-- [`baymax`](/crates/baymax) is where all things come together, and the `main` entry point for Baymax.
+- [`ui`](/crates/ui) is a collection of UI components and common patterns used throughout Sim.
+- [`cli`](/crates/cli) is the CLI crate which invokes the Sim binary.
+- [`sim`](/crates/sim) is where all things come together, and the `main` entry point for Sim.
 
-## Packaging Baymax
+## Packaging Sim
 
-Check our [notes for packaging Baymax](https://baymax.dev/docs/development/linux#notes-for-packaging-baymax).
+Check our [notes for packaging Sim](https://sim.dev/docs/development/linux#notes-for-packaging-sim).

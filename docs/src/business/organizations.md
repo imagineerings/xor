@@ -1,35 +1,35 @@
 ---
-title: Organizations - Baymax Business
-description: Create and manage a Baymax Business organization, invite members, and control access for your team.
+title: Organizations - Sim Business
+description: Create and manage a Sim Business organization, invite members, and control access for your team.
 ---
 
 # Organizations
 
-A Baymax organization is your team's Baymax Business subscription, with members, billing, and admin controls in one place.
+A Sim organization is your team's Sim Business subscription, with members, billing, and admin controls in one place.
 
 ## Personal Organizations
 
-Every Baymax account gets a personal organization at sign-up. It has its own subscription, billing, and settings, separate from any team you belong to.
+Every Sim account gets a personal organization at sign-up. It has its own subscription, billing, and settings, separate from any team you belong to.
 
-Your personal organization always stays active. Joining a Baymax Business organization doesn't replace or affect it.
+Your personal organization always stays active. Joining a Sim Business organization doesn't replace or affect it.
 
-In the Baymax editor, an organization menu in the title bar shows your current organization by name. Click it to see all your organizations and switch between them.
+In the Sim editor, an organization menu in the title bar shows your current organization by name. Click it to see all your organizations and switch between them.
 
 ## Multiple Organizations
 
-A Baymax account can belong to more than one organization at the same time. If you're invited to a second organization while already a member of one, you join both. Each organization has its own subscription, billing, and admin controls.
+A Sim account can belong to more than one organization at the same time. If you're invited to a second organization while already a member of one, you join both. Each organization has its own subscription, billing, and admin controls.
 
-To switch organizations in the dashboard, use the org switcher in the top-left corner. In the Baymax editor, click the organization name in the title bar to see all your organizations and move between them.
+To switch organizations in the dashboard, use the org switcher in the top-left corner. In the Sim editor, click the organization name in the title bar to see all your organizations and move between them.
 
 ## Creating an organization
 
-To create an organization, go to [dashboard.baymax.dev/create-organization](https://dashboard.baymax.dev/create-organization). The person who creates the organization becomes its owner.
+To create an organization, go to [dashboard.sim.dev/create-organization](https://dashboard.sim.dev/create-organization). The person who creates the organization becomes its owner.
 
 If you don't have a payment method on file, you'll be taken through a checkout flow. If one is already on file, that step is skipped. After that, you'll land on an invite page to add your first members.
 
 ## Inviting members
 
-Members are invited by email address. When an invite is accepted, the member's Baymax account joins the organization. Owners, admins, and members count toward paid Business seats. Billing Managers can access billing without a paid Business seat.
+Members are invited by email address. When an invite is accepted, the member's Sim account joins the organization. Owners, admins, and members count toward paid Business seats. Billing Managers can access billing without a paid Business seat.
 
 To invite a member:
 
@@ -54,7 +54,7 @@ Owners and admins can manage members from the Members page in the dashboard.
 1. On the Members page, find the member.
 2. Select **Remove** and confirm.
 
-Removing a member ends their access to the organization's subscription, billing, and admin-managed settings for that organization. Their personal Baymax account and any other organization memberships are unaffected.
+Removing a member ends their access to the organization's subscription, billing, and admin-managed settings for that organization. Their personal Sim account and any other organization memberships are unaffected.
 
 ## Organization Dashboard
 

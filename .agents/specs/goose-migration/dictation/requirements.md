@@ -14,7 +14,7 @@ Migrate goose's dictation system, which provides speech-to-text capabilities usi
 
 ### Requirement 1: Local Whisper Dictation
 
-**User Story:** As a baymax user, I want to use local Whisper models for speech-to-text, so that I can dictate to the agent without sending audio to external services.
+**User Story:** As a sim user, I want to use local Whisper models for speech-to-text, so that I can dictate to the agent without sending audio to external services.
 
 #### Acceptance Criteria
 
@@ -25,7 +25,7 @@ Migrate goose's dictation system, which provides speech-to-text capabilities usi
 
 ### Requirement 2: Cloud Dictation Providers
 
-**User Story:** As a baymax user, I want to use cloud-based dictation providers, so that I can get higher accuracy speech recognition.
+**User Story:** As a sim user, I want to use cloud-based dictation providers, so that I can get higher accuracy speech recognition.
 
 #### Acceptance Criteria
 
@@ -36,7 +36,7 @@ Migrate goose's dictation system, which provides speech-to-text capabilities usi
 
 ### Requirement 3: Dictation Provider Abstraction
 
-**User Story:** As a baymax developer, I want a common interface for dictation providers, so that new providers can be added without changing the core dictation system.
+**User Story:** As a sim developer, I want a common interface for dictation providers, so that new providers can be added without changing the core dictation system.
 
 #### Acceptance Criteria
 

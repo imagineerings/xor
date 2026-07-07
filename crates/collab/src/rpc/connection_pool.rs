@@ -20,15 +20,15 @@ struct ConnectedPrincipal {
 }
 
 #[derive(Clone, Debug, Serialize, PartialOrd, PartialEq, Eq, Ord)]
-pub struct BaymaxVersion(pub Version);
+pub struct SimVersion(pub Version);
 
-impl fmt::Display for BaymaxVersion {
+impl fmt::Display for SimVersion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl BaymaxVersion {
+impl SimVersion {
     pub fn can_collaborate(&self) -> bool {
         // v0.204.1 was the first version after the auto-update bug.
         // We reject any clients older than that to hope we can persuade them to upgrade.
@@ -44,7 +44,7 @@ impl BaymaxVersion {
 pub struct Connection {
     pub user_id: UserId,
     pub admin: bool,
-    pub baymax_version: BaymaxVersion,
+    pub sim_version: SimVersion,
 }
 
 impl ConnectionPool {
@@ -64,14 +64,14 @@ impl ConnectionPool {
         connection_id: ConnectionId,
         user_id: UserId,
         admin: bool,
-        baymax_version: BaymaxVersion,
+        sim_version: SimVersion,
     ) {
         self.connections.insert(
             connection_id,
             Connection {
                 user_id,
                 admin,
-                baymax_version,
+                sim_version,
             },
         );
         let connected_user = self.connected_users.entry(user_id).or_default();

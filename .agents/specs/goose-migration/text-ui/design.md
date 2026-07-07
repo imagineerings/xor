@@ -2,14 +2,14 @@
 
 ## 1. Overview
 
-Migrate goose's text-based terminal UI features into baymax's existing CLI (`crates/cli/`) and terminal infrastructure (`crates/terminal/`, `crates/terminal_view/`). Goose's React-based TUI becomes a new interactive CLI mode with rich terminal output — markdown rendering, configuration wizard, extension management, onboarding, and slash commands.
+Migrate goose's text-based terminal UI features into sim's existing CLI (`crates/cli/`) and terminal infrastructure (`crates/terminal/`, `crates/terminal_view/`). Goose's React-based TUI becomes a new interactive CLI mode with rich terminal output — markdown rendering, configuration wizard, extension management, onboarding, and slash commands.
 
 ### Key Architectural Decisions
 
 - **Interactive CLI mode**: A new `goose interactive` subcommand (or `goose tui`) that opens an interactive session in the terminal.
-- **Terminal rendering via `crossterm` + `ratatui`**: Lightweight TUI rendering without requiring a full GPUI context. Baymax's GPUI is for the desktop app; a terminal UI should use standard terminal libraries.
+- **Terminal rendering via `crossterm` + `ratatui`**: Lightweight TUI rendering without requiring a full GPUI context. Sim's GPUI is for the desktop app; a terminal UI should use standard terminal libraries.
 - **CLI crate extension**: Add interactive mode to `crates/cli/` rather than creating a new crate. The CLI crate already handles subcommands.
-- **Markdown via `crates/markdown/`**: Use baymax's existing markdown parser, adding ANSI terminal rendering on top.
+- **Markdown via `crates/markdown/`**: Use sim's existing markdown parser, adding ANSI terminal rendering on top.
 - **Configuration wizard uses existing settings**: The wizard reads/writes the same settings files as the desktop UI and GPUI settings panels.
 
 ## 2. Architecture
@@ -256,7 +256,7 @@ _For any_ input [submitted in the interactive session], [when the user presses u
 ## References
 
 - Source: `projects/goose/ui/text/` — React TUI (design reference)
-- Baymax: `crates/cli/` — CLI framework
-- Baymax: `crates/terminal/`, `crates/terminal_view/` — terminal emulator
-- Baymax: `crates/markdown/` — markdown parsing
-- Baymax: `crates/agent_ui/src/terminal_inline_assistant.rs` — terminal inline agent
+- Sim: `crates/cli/` — CLI framework
+- Sim: `crates/terminal/`, `crates/terminal_view/` — terminal emulator
+- Sim: `crates/markdown/` — markdown parsing
+- Sim: `crates/agent_ui/src/terminal_inline_assistant.rs` — terminal inline agent

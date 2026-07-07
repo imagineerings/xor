@@ -18,7 +18,7 @@ use anyhow::{Result, anyhow};
 #[cfg(feature = "audio")]
 use audio::{Audio, Sound};
 use buffer_diff::BufferDiff;
-use client::baymax_urls;
+use client::sim_urls;
 use collections::{HashMap, HashSet, IndexMap};
 use editor::scroll::Autoscroll;
 use editor::{
@@ -45,7 +45,7 @@ use project::{AgentId, AgentServerStore, Project, ProjectEntryId, ProjectPath};
 
 use crate::message_editor::SessionCapabilities;
 use crate::{AgentThreadSource, DEFAULT_THREAD_TITLE, resolve_agent_image};
-use baymax_actions::agent::{Chat, ToggleModelSelector};
+use sim_actions::agent::{Chat, ToggleModelSelector};
 use lru::LruCache;
 use rope::Point;
 use settings::{NotifyWhenAgentWaiting, Settings as _, SettingsStore, ThinkingBlockDisplay};
@@ -429,7 +429,7 @@ impl Conversation {
         let session_id = thread.read(cx).session_id().clone();
 
         telemetry::event!(
-            "Agent Tool Call Authoribaymax",
+            "Agent Tool Call Authorisim",
             agent = agent_telemetry_id,
             session = session_id,
             option = outcome.option_kind
@@ -1643,7 +1643,7 @@ impl ConversationView {
                         } else {
                             "New message"
                         },
-                        IconName::BaymaxAssistant,
+                        IconName::SimAssistant,
                         window,
                         cx,
                     );
@@ -2041,7 +2041,7 @@ impl ConversationView {
         window.spawn(cx, async move |cx| {
             let mut task = login.clone();
             if let Some(cmd) = &task.command {
-                // Have "node" command use Baymax's managed Node runtime by default
+                // Have "node" command use Sim's managed Node runtime by default
                 if cmd == "node" {
                     let resolved_node_runtime = project.update(cx, |project, cx| {
                         let agent_server_store = project.agent_server_store().clone();
@@ -2353,7 +2353,7 @@ impl ConversationView {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let (heading_label, description_label) = (
-            format!("Upgrade {} to work with Baymax", self.agent.agent_id()),
+            format!("Upgrade {} to work with Sim", self.agent.agent_id()),
             if version.is_empty() {
                 format!(
                     "Currently using {}, which does not report a valid --version",
@@ -2970,7 +2970,7 @@ impl ConversationView {
     }
 
     fn current_model_name(&self, cx: &App) -> SharedString {
-        // For native agent (Baymax Agent), use the specific model name (e.g., "Claude 3.5 Sonnet")
+        // For native agent (Sim Agent), use the specific model name (e.g., "Claude 3.5 Sonnet")
         // For ACP agents, use the agent name (e.g., "Claude Agent", "Gemini CLI")
         // This provides better clarity about what refused the request
         if self.as_native_connection(cx).is_some() {
@@ -3083,7 +3083,7 @@ fn native_available_skills(
 }
 
 fn placeholder_text(agent_name: &str, has_commands: bool) -> String {
-    if agent_name == agent::BAYMAX_AGENT_ID.as_ref() {
+    if agent_name == agent::SIM_AGENT_ID.as_ref() {
         format!(
             "Message the {}, @ to include context, / for commands",
             agent_name
@@ -3234,7 +3234,7 @@ pub(crate) struct AgentCodeSpanResolver {
     inner: Arc<AgentCodeSpanResolverInner>,
 }
 
-/// Maximum number of memoibaymax code-span resolutions kept in the cache.
+/// Maximum number of memoisim code-span resolutions kept in the cache.
 const CODE_SPAN_CACHE_CAPACITY: NonZeroUsize = match NonZeroUsize::new(2048) {
     Some(n) => n,
     None => unreachable!(),
@@ -5123,7 +5123,7 @@ pub(crate) mod tests {
         C: 'static + AgentConnection + Send + Clone,
     {
         fn logo(&self) -> ui::IconName {
-            ui::IconName::BaymaxAgent
+            ui::IconName::SimAgent
         }
 
         fn agent_id(&self) -> AgentId {
@@ -5199,7 +5199,7 @@ pub(crate) mod tests {
 
     impl AgentServer for FlakyAgentServer {
         fn logo(&self) -> ui::IconName {
-            ui::IconName::BaymaxAgent
+            ui::IconName::SimAgent
         }
 
         fn agent_id(&self) -> AgentId {
@@ -7179,7 +7179,7 @@ pub(crate) mod tests {
 
         cx.run_until_parked();
 
-        // Verify tool call is no longer waiting for confirmation (was authoribaymax)
+        // Verify tool call is no longer waiting for confirmation (was authorisim)
         conversation_view.read_with(cx, |conversation_view, cx| {
             let tool_call = conversation_view.pending_tool_call(cx);
             assert!(
@@ -7258,12 +7258,12 @@ pub(crate) mod tests {
 
         cx.run_until_parked();
 
-        // Verify tool call was authoribaymax
+        // Verify tool call was authorisim
         conversation_view.read_with(cx, |conversation_view, cx| {
             let tool_call = conversation_view.pending_tool_call(cx);
             assert!(
                 tool_call.is_none(),
-                "Tool call should be authoribaymax after selecting pattern option"
+                "Tool call should be authorisim after selecting pattern option"
             );
         });
     }
@@ -7433,12 +7433,12 @@ pub(crate) mod tests {
 
         cx.run_until_parked();
 
-        // Verify tool call was authoribaymax
+        // Verify tool call was authorisim
         thread_view.read_with(cx, |thread_view, cx| {
             let tool_call = thread_view.pending_tool_call(cx);
             assert!(
                 tool_call.is_none(),
-                "Tool call should be authoribaymax after Allow with pattern granularity"
+                "Tool call should be authorisim after Allow with pattern granularity"
             );
         });
     }
@@ -7914,7 +7914,7 @@ pub(crate) mod tests {
             let (_, tool_call_id, _) = conversation
                 .read(cx)
                 .pending_tool_call(&session_id, cx)
-                .expect("Expected tc-2 to be pending after tc-1 was authoribaymax");
+                .expect("Expected tc-2 to be pending after tc-1 was authorisim");
             assert_eq!(tool_call_id, acp::ToolCallId::new("tc-2"));
         });
 
@@ -7940,7 +7940,7 @@ pub(crate) mod tests {
                     .read(cx)
                     .pending_tool_call(&session_id, cx)
                     .is_none(),
-                "Expected no pending tool calls after both were authoribaymax"
+                "Expected no pending tool calls after both were authorisim"
             );
         });
     }
@@ -8077,7 +8077,7 @@ pub(crate) mod tests {
             let (returned_session_id, tool_call_id, _) = conversation
                 .read(cx)
                 .pending_tool_call(&session_id_b, cx)
-                .expect("Expected thread-b's tool call after thread-a's was authoribaymax");
+                .expect("Expected thread-b's tool call after thread-a's was authorisim");
             assert_eq!(returned_session_id, session_id_b);
             assert_eq!(tool_call_id, acp::ToolCallId::new("tc-b"));
         });
@@ -8434,7 +8434,7 @@ pub(crate) mod tests {
     }
 
     #[gpui::test]
-    async fn test_permission_row_disappears_when_authoribaymax(cx: &mut TestAppContext) {
+    async fn test_permission_row_disappears_when_authorisim(cx: &mut TestAppContext) {
         init_test(cx);
 
         let (conversation_view, thread_view, _entry_ix, cx) =

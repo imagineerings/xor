@@ -137,7 +137,7 @@ copy_artifact() {
     local commit_sha
     commit_sha="$(current_commit_sha)"
     local short_sha="${commit_sha:0:12}"
-    local target_file="${output_dir}/baymax-android-${variant}-${signing_label}-${version}-${build_number}-${short_sha}.${extension}"
+    local target_file="${output_dir}/sim-android-${variant}-${signing_label}-${version}-${build_number}-${short_sha}.${extension}"
 
     [[ -f "${source_file}" ]] || die "Expected Android ${extension} artifact was not produced at ${source_file}"
     cp "${source_file}" "${target_file}"
@@ -178,7 +178,7 @@ trap cleanup EXIT
 
 if [[ "${variant}" == "release" && "${signed}" == "true" ]]; then
     require_android_signing_material
-    keystore_file="$(mktemp "${TMPDIR:-/tmp}/baymax-android-keystore.XXXXXX")"
+    keystore_file="$(mktemp "${TMPDIR:-/tmp}/sim-android-keystore.XXXXXX")"
     cleanup_files+=("${keystore_file}")
     printf '%s' "${ANDROID_KEYSTORE_BASE64}" | decode_base64_file "${keystore_file}"
     export ANDROID_KEYSTORE_PATH="${keystore_file}"
@@ -186,8 +186,8 @@ fi
 
 log "building Android ${variant} ${artifact}"
 gradle_version_args=(
-    "-Pbaymax.versionName=${version}"
-    "-Pbaymax.versionCode=${build_number}"
+    "-Psim.versionName=${version}"
+    "-Psim.versionCode=${build_number}"
 )
 (
     cd "${android_root}"

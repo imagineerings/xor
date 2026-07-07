@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use baymax_actions::OpenBrowser;
+use sim_actions::OpenBrowser;
 use gpui::{Action, SharedString};
 use ui::{IconName, IconPosition};
 
@@ -198,7 +198,7 @@ impl WorkspaceError for PortalError {
     fn primary_action(&self) -> ErrorAction {
         ErrorAction::link(
             "See docs",
-            "https://baymax.dev/docs/linux#i-cant-open-any-files",
+            "https://sim.dev/docs/linux#i-cant-open-any-files",
         )
     }
 }

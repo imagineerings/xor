@@ -186,7 +186,7 @@ impl Database {
 
     /// room_transaction runs the block in a transaction. It returns a RoomGuard, that keeps
     /// the database locked until it is dropped. This ensures that updates sent to clients are
-    /// properly serialibaymax with respect to database changes.
+    /// properly serialisim with respect to database changes.
     async fn room_transaction<F, Fut, T>(
         &self,
         room_id: RoomId,

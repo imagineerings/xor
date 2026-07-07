@@ -194,7 +194,7 @@
       (identifier) @name
     ]))) @item
 
-; Add support for parameteribaymax tests
+; Add support for parameterisim tests
 ((call_expression
   function: (call_expression
     function: (member_expression

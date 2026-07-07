@@ -65,7 +65,7 @@ pub(crate) fn resolve_custom_headers(
                 .any(|reserved| reserved.eq_ignore_ascii_case(name))
             {
                 log::warn!(
-                    "ignoring custom {provider_name} header `{name}`: managed by Baymax and cannot be overridden"
+                    "ignoring custom {provider_name} header `{name}`: managed by Sim and cannot be overridden"
                 );
                 return None;
             }

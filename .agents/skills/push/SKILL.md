@@ -1,6 +1,6 @@
 ---
 name: push
-description: Push the current Baymax branch to origin and create or update a GitHub PR using gh, with repo-appropriate validation and PR hygiene.
+description: Push the current Sim branch to origin and create or update a GitHub PR using gh, with repo-appropriate validation and PR hygiene.
 ---
 
 # push skill

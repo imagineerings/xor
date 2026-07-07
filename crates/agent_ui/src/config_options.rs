@@ -4,7 +4,7 @@ use acp_thread::AgentSessionConfigOptions;
 use agent_client_protocol::schema as acp;
 use agent_servers::AgentServer;
 
-use baymax_actions::agent::ToggleModelSelector;
+use sim_actions::agent::ToggleModelSelector;
 use collections::HashSet;
 use fs::Fs;
 use fuzzy::StringMatchCandidate;
@@ -990,7 +990,7 @@ mod tests {
 
     impl AgentServer for TestAgentServer {
         fn logo(&self) -> IconName {
-            IconName::BaymaxAssistant
+            IconName::SimAssistant
         }
 
         fn agent_id(&self) -> AgentId {

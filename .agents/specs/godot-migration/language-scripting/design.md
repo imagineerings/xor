@@ -2,18 +2,18 @@
 
 ## Architecture
 
-Register GDScript and Godot C# affordances through Baymax language and LSP registries. Godot API docs are indexed as documentation metadata.
+Register GDScript and Godot C# affordances through Sim language and LSP registries. Godot API docs are indexed as documentation metadata.
 
 ## Components
 
 - `GdScriptLanguageRegistration`
-- `BaymaxGameLspAdapter`
-- `BaymaxGameApiDocsIndex`
+- `SimGameLspAdapter`
+- `SimGameApiDocsIndex`
 
 ## Correctness Properties
 
 ### Property 1: Existing LSP Reuse
 
-_For any_ configured Godot language server, Baymax SHALL use existing LSP client infrastructure.
+_For any_ configured Godot language server, Sim SHALL use existing LSP client infrastructure.
 
 **Validates: Requirement 2.1**

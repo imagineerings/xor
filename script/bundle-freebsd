@@ -23,12 +23,12 @@ while getopts 'h' flag; do
     esac
 done
 
-export BAYMAX_BUNDLE=true
+export SIM_BUNDLE=true
 
-channel=$(<crates/baymax/RELEASE_CHANNEL)
+channel=$(<crates/sim/RELEASE_CHANNEL)
 target_dir="${CARGO_TARGET_DIR:-target}"
 
-version="$(script/get-crate-version baymax)"
+version="$(script/get-crate-version sim)"
 # Set RELEASE_VERSION so it's compiled into GPUI and it knows about the version.
 export RELEASE_VERSION="${version}"
 
@@ -54,7 +54,7 @@ remote_server_triple=${REMOTE_SERVER_TARGET:-"${target_triple}"}
 
 # Build binary in release mode
 export RUSTFLAGS="${RUSTFLAGS:-} -C link-args=-Wl,--disable-new-dtags,-rpath,\$ORIGIN/../lib"
-# cargo build --release --target "${target_triple}" --package baymax --package cli
+# cargo build --release --target "${target_triple}" --package sim --package cli
 
 # Build remote_server in separate invocation to prevent feature unification from other crates
 # from influencing dynamic libraries required by it.
@@ -64,22 +64,22 @@ export RUSTFLAGS="${RUSTFLAGS:-} -C link-args=-Wl,--disable-new-dtags,-rpath,\$O
 cargo build --release --target "${remote_server_triple}" --package remote_server
 
 # Strip debug symbols and save them for upload to DigitalOcean
-# objcopy --only-keep-debug "${target_dir}/${target_triple}/release/baymax" "${target_dir}/${target_triple}/release/baymax.dbg"
+# objcopy --only-keep-debug "${target_dir}/${target_triple}/release/sim" "${target_dir}/${target_triple}/release/sim.dbg"
 # objcopy --only-keep-debug "${target_dir}/${remote_server_triple}/release/remote_server" "${target_dir}/${remote_server_triple}/release/remote_server.dbg"
-# objcopy --strip-debug "${target_dir}/${target_triple}/release/baymax"
+# objcopy --strip-debug "${target_dir}/${target_triple}/release/sim"
 # objcopy --strip-debug "${target_dir}/${target_triple}/release/cli"
 # objcopy --strip-debug "${target_dir}/${remote_server_triple}/release/remote_server"
 
-# gzip -f "${target_dir}/${target_triple}/release/baymax.dbg"
+# gzip -f "${target_dir}/${target_triple}/release/sim.dbg"
 # gzip -f "${target_dir}/${remote_server_triple}/release/remote_server.dbg"
 
 # if [[ -n "${DIGITALOCEAN_SPACES_SECRET_KEY:-}" && -n "${DIGITALOCEAN_SPACES_ACCESS_KEY:-}" ]]; then
 #     upload_to_blob_store_public \
-#         "baymax-debug-symbols" \
-#         "${target_dir}/${target_triple}/release/baymax.dbg.gz" \
-#         "$channel/baymax-$version-${target_triple}.dbg.gz"
+#         "sim-debug-symbols" \
+#         "${target_dir}/${target_triple}/release/sim.dbg.gz" \
+#         "$channel/sim-$version-${target_triple}.dbg.gz"
 #     upload_to_blob_store_public \
-#         "baymax-debug-symbols" \
+#         "sim-debug-symbols" \
 #         "${target_dir}/${remote_server_triple}/release/remote_server.dbg.gz" \
 #         "$channel/remote_server-$version-${remote_server_triple}.dbg.gz"
 # fi
@@ -97,65 +97,65 @@ fi
 # Move everything that should end up in the final package
 # into a temp directory.
 # temp_dir=$(mktemp -d)
-# baymax_dir="${temp_dir}/baymax$suffix.app"
+# sim_dir="${temp_dir}/sim$suffix.app"
 
 # Binary
-# mkdir -p "${baymax_dir}/bin" "${baymax_dir}/libexec"
-# cp "${target_dir}/${target_triple}/release/baymax" "${baymax_dir}/libexec/baymax-editor"
-# cp "${target_dir}/${target_triple}/release/cli" "${baymax_dir}/bin/baymax"
+# mkdir -p "${sim_dir}/bin" "${sim_dir}/libexec"
+# cp "${target_dir}/${target_triple}/release/sim" "${sim_dir}/libexec/sim-editor"
+# cp "${target_dir}/${target_triple}/release/cli" "${sim_dir}/bin/sim"
 
 # Libs
 # find_libs() {
-#     ldd ${target_dir}/${target_triple}/release/baymax |
+#     ldd ${target_dir}/${target_triple}/release/sim |
 #         cut -d' ' -f3 |
 #         grep -v '\<\(libstdc++.so\|libc.so\|libgcc_s.so\|libm.so\|libpthread.so\|libdl.so\|libasound.so\)'
 # }
 
-# mkdir -p "${baymax_dir}/lib"
-# rm -rf "${baymax_dir}/lib/*"
-# cp $(find_libs) "${baymax_dir}/lib"
+# mkdir -p "${sim_dir}/lib"
+# rm -rf "${sim_dir}/lib/*"
+# cp $(find_libs) "${sim_dir}/lib"
 
 # Icons
-# mkdir -p "${baymax_dir}/share/icons/hicolor/512x512/apps"
-# cp "crates/baymax/resources/app-icon$suffix.png" "${baymax_dir}/share/icons/hicolor/512x512/apps/baymax.png"
-# mkdir -p "${baymax_dir}/share/icons/hicolor/1024x1024/apps"
-# cp "crates/baymax/resources/app-icon$suffix@2x.png" "${baymax_dir}/share/icons/hicolor/1024x1024/apps/baymax.png"
+# mkdir -p "${sim_dir}/share/icons/hicolor/512x512/apps"
+# cp "crates/sim/resources/app-icon$suffix.png" "${sim_dir}/share/icons/hicolor/512x512/apps/sim.png"
+# mkdir -p "${sim_dir}/share/icons/hicolor/1024x1024/apps"
+# cp "crates/sim/resources/app-icon$suffix@2x.png" "${sim_dir}/share/icons/hicolor/1024x1024/apps/sim.png"
 
 # .desktop
 # export DO_STARTUP_NOTIFY="true"
-# export APP_CLI="baymax"
-# export APP_ICON="baymax"
+# export APP_CLI="sim"
+# export APP_ICON="sim"
 # export APP_ARGS="%U"
 # if [[ "$channel" == "preview" ]]; then
-#     export APP_NAME="Baymax Preview"
+#     export APP_NAME="Sim Preview"
 # elif [[ "$channel" == "nightly" ]]; then
-#     export APP_NAME="Baymax Nightly"
+#     export APP_NAME="Sim Nightly"
 # elif [[ "$channel" == "dev" ]]; then
-#     export APP_NAME="Baymax Devel"
+#     export APP_NAME="Sim Devel"
 # else
-#     export APP_NAME="Baymax"
+#     export APP_NAME="Sim"
 # fi
 
-# mkdir -p "${baymax_dir}/share/applications"
-# envsubst <"crates/baymax/resources/baymax.desktop.in" >"${baymax_dir}/share/applications/baymax$suffix.desktop"
-# chmod +x "${baymax_dir}/share/applications/baymax$suffix.desktop"
+# mkdir -p "${sim_dir}/share/applications"
+# envsubst <"crates/sim/resources/sim.desktop.in" >"${sim_dir}/share/applications/sim$suffix.desktop"
+# chmod +x "${sim_dir}/share/applications/sim$suffix.desktop"
 
 # Copy generated licenses so they'll end up in archive too
-# cp "assets/licenses.md" "${baymax_dir}/licenses.md"
+# cp "assets/licenses.md" "${sim_dir}/licenses.md"
 
 # Create archive out of everything that's in the temp directory
 arch=$(uname -m)
 # target="freebsd-${arch}"
 # if [[ "$channel" == "dev" ]]; then
-#     archive="baymax-${commit}-${target}.tar.gz"
+#     archive="sim-${commit}-${target}.tar.gz"
 # else
-#     archive="baymax-${target}.tar.gz"
+#     archive="sim-${target}.tar.gz"
 # fi
 
 # rm -rf "${archive}"
-# remove_match="baymax(-[a-zA-Z0-9]+)?-linux-$(uname -m)\.tar\.gz"
+# remove_match="sim(-[a-zA-Z0-9]+)?-linux-$(uname -m)\.tar\.gz"
 # ls "${target_dir}/release" | grep -E ${remove_match} | xargs -d "\n" -I {} rm -f "${target_dir}/release/{}" || true
-# tar -czvf "${target_dir}/release/$archive" -C ${temp_dir} "baymax$suffix.app"
+# tar -czvf "${target_dir}/release/$archive" -C ${temp_dir} "sim$suffix.app"
 
 gzip -f --stdout --best "${target_dir}/${remote_server_triple}/release/remote_server" \
-    > "${target_dir}/baymax-remote-server-freebsd-x86_64.gz"
+    > "${target_dir}/sim-remote-server-freebsd-x86_64.gz"

@@ -2,12 +2,12 @@
 
 ## Introduction
 
-Currently, Baymax channel chat supports only plain text messages (sent via the `body` string field in `SendChannelMessage`). Mattermost supports full Markdown formatting including bold, italic, inline code, code blocks with syntax highlighting, blockquotes, lists (ordered/unordered), headings, links, and LaTeX math. Adding rich text rendering to channel messages will bring the chat experience on par with modern collaboration tools and is the highest-impact enhancement to existing channel functionality.
+Currently, Sim channel chat supports only plain text messages (sent via the `body` string field in `SendChannelMessage`). Mattermost supports full Markdown formatting including bold, italic, inline code, code blocks with syntax highlighting, blockquotes, lists (ordered/unordered), headings, links, and LaTeX math. Adding rich text rendering to channel messages will bring the chat experience on par with modern collaboration tools and is the highest-impact enhancement to existing channel functionality.
 
 ## Glossary
 
 - **Markdown**: Lightweight markup language for adding formatting to plain text
-- **Channel Message**: A chat message sent within a Baymax channel
+- **Channel Message**: A chat message sent within a Sim channel
 - **WYSIWYG**: "What You See Is What You Get" — a rich editing mode showing formatted content as it will appear
 - **Source Mode**: Raw Markdown editing mode showing the unformatted source text
 

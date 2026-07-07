@@ -24,4 +24,4 @@ serde.workspace = true
 smallvec.workspace = true
 telemetry.workspace = true
 ui.workspace = true
-baymax_actions.workspace = true
+sim_actions.workspace = true

@@ -1,6 +1,6 @@
-# Baymax Schema Generator
+# Sim Schema Generator
 
-Prints various Baymax schemas to stdout.
+Prints various Sim schemas to stdout.
 
 ## Usage
 

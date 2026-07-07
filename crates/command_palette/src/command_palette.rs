@@ -7,13 +7,13 @@ use std::{
     time::Duration,
 };
 
-use client::parse_baymax_link;
+use client::parse_sim_link;
 use command_palette_hooks::{
     CommandInterceptItem, CommandInterceptResult, CommandPaletteFilter,
     GlobalCommandPaletteInterceptor,
 };
 
-use baymax_actions::{OpenBaymaxUrl, command_palette::Toggle};
+use sim_actions::{OpenSimUrl, command_palette::Toggle};
 use fuzzy_nucleo::{StringMatch, StringMatchCandidate};
 use gpui::{
     Action, App, Context, DismissEvent, Entity, EventEmitter, FocusHandle, Focusable,
@@ -42,7 +42,7 @@ pub struct CommandPalette {
 /// Removes subsequent whitespace characters and double colons from the query, and converts
 /// underscores to spaces.
 ///
-/// This improves the likelihood of a match by either humanibaymax name or keymap-style name.
+/// This improves the likelihood of a match by either humanisim name or keymap-style name.
 /// Underscores are converted to spaces because `humanize_action_name` converts them to spaces
 /// when building the search candidates (e.g. `terminal_panel::Toggle` -> `terminal panel: toggle`).
 pub fn normalize_action_query(input: &str) -> String {
@@ -451,7 +451,7 @@ impl PickerDelegate for CommandPaletteDelegate {
         let (mut tx, mut rx) = postage::dispatch::channel(1);
 
         let query_str = query.as_str();
-        let is_baymax_link = parse_baymax_link(query_str, cx).is_some();
+        let is_sim_link = parse_sim_link(query_str, cx).is_some();
 
         let task = cx.background_spawn({
             let mut commands = self.all_commands.clone();
@@ -484,10 +484,10 @@ impl PickerDelegate for CommandPaletteDelegate {
                 )
                 .await;
 
-                let intercept_result = if is_baymax_link {
+                let intercept_result = if is_sim_link {
                     CommandInterceptResult {
                         results: vec![CommandInterceptItem {
-                            action: OpenBaymaxUrl {
+                            action: OpenSimUrl {
                                 url: query_for_link.clone().into(),
                             }
                             .boxed_clone(),
@@ -566,7 +566,7 @@ impl PickerDelegate for CommandPaletteDelegate {
                 return;
             };
             let action_name = selected_command.action.name();
-            let open_keymap = Box::new(baymax_actions::ChangeKeybinding {
+            let open_keymap = Box::new(sim_actions::ChangeKeybinding {
                 action: action_name.to_string(),
             });
             window.dispatch_action(open_keymap, cx);

@@ -781,7 +781,7 @@ function renderTemplate(template, issue, attempt) {
 
 function defaultPromptTemplate() {
   return [
-    "You are working on a local Baymax spec task.",
+    "You are working on a local Sim spec task.",
     "",
     "Task: {{ issue.title }}",
     "Source: {{ issue.task_file }}:{{ issue.task_line }}",
@@ -899,7 +899,7 @@ async function linear(settings, query, variables = {}) {
     headers: {
       authorization: token,
       "content-type": "application/json",
-      "user-agent": "baymax-workflow-skill",
+      "user-agent": "sim-workflow-skill",
     },
     body: JSON.stringify({ query, variables }),
   });
@@ -913,7 +913,7 @@ async function linear(settings, query, variables = {}) {
 
 function linearIssueDescription(task, _prompt) {
   return [
-    "Workflow picked this local Baymax spec task.",
+    "Workflow picked this local Sim spec task.",
     "",
     workflowTaskMarker(task),
     workflowSourceMarker(task),

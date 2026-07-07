@@ -10,7 +10,7 @@ on:
   workflow_dispatch: {}
 jobs:
   check_nightly_tag:
-    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'baymax-extensions')
+    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'sim-extensions')
     runs-on: namespace-profile-2x4-ubuntu-2404
     steps:
     - name: steps::checkout_repo
@@ -34,7 +34,7 @@ jobs:
   run_tests_linux:
     needs:
     - check_nightly_tag
-    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'baymax-extensions') && needs.check_nightly_tag.outputs.skip != 'true'
+    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'sim-extensions') && needs.check_nightly_tag.outputs.skip != 'true'
     runs-on: namespace-profile-16x32-ubuntu-2204
     env:
       CC: clang
@@ -71,7 +71,7 @@ jobs:
         R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
         R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
         R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-        SCCACHE_BUCKET: sccache-baymax
+        SCCACHE_BUCKET: sccache-sim
     - name: steps::cargo_nextest
       run: cargo nextest run --workspace --no-fail-fast --no-tests=warn
     - name: steps::show_sccache_stats
@@ -95,8 +95,8 @@ jobs:
     runs-on: namespace-profile-8x32-ubuntu-2004-arm-m4
     env:
       CARGO_INCREMENTAL: 0
-      BAYMAX_CLIENT_CHECKSUM_SEED: ${{ secrets.BAYMAX_CLIENT_CHECKSUM_SEED }}
-      BAYMAX_MINIDUMP_ENDPOINT: ${{ secrets.BAYMAX_SENTRY_MINIDUMP_ENDPOINT }}
+      SIM_CLIENT_CHECKSUM_SEED: ${{ secrets.SIM_CLIENT_CHECKSUM_SEED }}
+      SIM_MINIDUMP_ENDPOINT: ${{ secrets.SIM_SENTRY_MINIDUMP_ENDPOINT }}
       CC: clang-18
       CXX: clang++-18
     steps:
@@ -109,7 +109,7 @@ jobs:
         set -eu
         version=$(git rev-parse --short HEAD)
         echo "Publishing version: ${version} on release channel nightly"
-        echo "nightly" > crates/baymax/RELEASE_CHANNEL
+        echo "nightly" > crates/sim/RELEASE_CHANNEL
     - name: steps::setup_sentry
       uses: matbour/setup-sentry-cli@3e938c54b3018bdd019973689ef984e033b0454b
       with:
@@ -123,14 +123,14 @@ jobs:
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: baymax-linux-aarch64.tar.gz
-        path: target/release/baymax-linux-aarch64.tar.gz
+        name: sim-linux-aarch64.tar.gz
+        path: target/release/sim-linux-aarch64.tar.gz
         if-no-files-found: error
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: baymax-remote-server-linux-aarch64.gz
-        path: target/baymax-remote-server-linux-aarch64.gz
+        name: sim-remote-server-linux-aarch64.gz
+        path: target/sim-remote-server-linux-aarch64.gz
         if-no-files-found: error
     timeout-minutes: 60
   bundle_linux_x86_64:
@@ -139,8 +139,8 @@ jobs:
     runs-on: namespace-profile-32x64-ubuntu-2004
     env:
       CARGO_INCREMENTAL: 0
-      BAYMAX_CLIENT_CHECKSUM_SEED: ${{ secrets.BAYMAX_CLIENT_CHECKSUM_SEED }}
-      BAYMAX_MINIDUMP_ENDPOINT: ${{ secrets.BAYMAX_SENTRY_MINIDUMP_ENDPOINT }}
+      SIM_CLIENT_CHECKSUM_SEED: ${{ secrets.SIM_CLIENT_CHECKSUM_SEED }}
+      SIM_MINIDUMP_ENDPOINT: ${{ secrets.SIM_SENTRY_MINIDUMP_ENDPOINT }}
       CC: clang-18
       CXX: clang++-18
     steps:
@@ -153,7 +153,7 @@ jobs:
         set -eu
         version=$(git rev-parse --short HEAD)
         echo "Publishing version: ${version} on release channel nightly"
-        echo "nightly" > crates/baymax/RELEASE_CHANNEL
+        echo "nightly" > crates/sim/RELEASE_CHANNEL
     - name: steps::setup_sentry
       uses: matbour/setup-sentry-cli@3e938c54b3018bdd019973689ef984e033b0454b
       with:
@@ -167,14 +167,14 @@ jobs:
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: baymax-linux-x86_64.tar.gz
-        path: target/release/baymax-linux-x86_64.tar.gz
+        name: sim-linux-x86_64.tar.gz
+        path: target/release/sim-linux-x86_64.tar.gz
         if-no-files-found: error
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: baymax-remote-server-linux-x86_64.gz
-        path: target/baymax-remote-server-linux-x86_64.gz
+        name: sim-remote-server-linux-x86_64.gz
+        path: target/sim-remote-server-linux-x86_64.gz
         if-no-files-found: error
     timeout-minutes: 60
   bundle_mac_aarch64:
@@ -183,8 +183,8 @@ jobs:
     runs-on: namespace-profile-mac-large
     env:
       CARGO_INCREMENTAL: 0
-      BAYMAX_CLIENT_CHECKSUM_SEED: ${{ secrets.BAYMAX_CLIENT_CHECKSUM_SEED }}
-      BAYMAX_MINIDUMP_ENDPOINT: ${{ secrets.BAYMAX_SENTRY_MINIDUMP_ENDPOINT }}
+      SIM_CLIENT_CHECKSUM_SEED: ${{ secrets.SIM_CLIENT_CHECKSUM_SEED }}
+      SIM_MINIDUMP_ENDPOINT: ${{ secrets.SIM_SENTRY_MINIDUMP_ENDPOINT }}
       MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
       MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
       APPLE_NOTARIZATION_KEY: ${{ secrets.APPLE_NOTARIZATION_KEY }}
@@ -200,7 +200,7 @@ jobs:
         set -eu
         version=$(git rev-parse --short HEAD)
         echo "Publishing version: ${version} on release channel nightly"
-        echo "nightly" > crates/baymax/RELEASE_CHANNEL
+        echo "nightly" > crates/sim/RELEASE_CHANNEL
     - name: steps::setup_node
       uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
       with:
@@ -216,14 +216,14 @@ jobs:
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: Baymax-aarch64.dmg
-        path: target/aarch64-apple-darwin/release/Baymax-aarch64.dmg
+        name: Sim-aarch64.dmg
+        path: target/aarch64-apple-darwin/release/Sim-aarch64.dmg
         if-no-files-found: error
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: baymax-remote-server-macos-aarch64.gz
-        path: target/baymax-remote-server-macos-aarch64.gz
+        name: sim-remote-server-macos-aarch64.gz
+        path: target/sim-remote-server-macos-aarch64.gz
         if-no-files-found: error
     timeout-minutes: 60
   bundle_mac_x86_64:
@@ -232,8 +232,8 @@ jobs:
     runs-on: namespace-profile-mac-large
     env:
       CARGO_INCREMENTAL: 0
-      BAYMAX_CLIENT_CHECKSUM_SEED: ${{ secrets.BAYMAX_CLIENT_CHECKSUM_SEED }}
-      BAYMAX_MINIDUMP_ENDPOINT: ${{ secrets.BAYMAX_SENTRY_MINIDUMP_ENDPOINT }}
+      SIM_CLIENT_CHECKSUM_SEED: ${{ secrets.SIM_CLIENT_CHECKSUM_SEED }}
+      SIM_MINIDUMP_ENDPOINT: ${{ secrets.SIM_SENTRY_MINIDUMP_ENDPOINT }}
       MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
       MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
       APPLE_NOTARIZATION_KEY: ${{ secrets.APPLE_NOTARIZATION_KEY }}
@@ -249,7 +249,7 @@ jobs:
         set -eu
         version=$(git rev-parse --short HEAD)
         echo "Publishing version: ${version} on release channel nightly"
-        echo "nightly" > crates/baymax/RELEASE_CHANNEL
+        echo "nightly" > crates/sim/RELEASE_CHANNEL
     - name: steps::setup_node
       uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
       with:
@@ -265,14 +265,14 @@ jobs:
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: Baymax-x86_64.dmg
-        path: target/x86_64-apple-darwin/release/Baymax-x86_64.dmg
+        name: Sim-x86_64.dmg
+        path: target/x86_64-apple-darwin/release/Sim-x86_64.dmg
         if-no-files-found: error
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: baymax-remote-server-macos-x86_64.gz
-        path: target/baymax-remote-server-macos-x86_64.gz
+        name: sim-remote-server-macos-x86_64.gz
+        path: target/sim-remote-server-macos-x86_64.gz
         if-no-files-found: error
     timeout-minutes: 60
   bundle_windows_aarch64:
@@ -281,8 +281,8 @@ jobs:
     runs-on: self-32vcpu-windows-2022
     env:
       CARGO_INCREMENTAL: 0
-      BAYMAX_CLIENT_CHECKSUM_SEED: ${{ secrets.BAYMAX_CLIENT_CHECKSUM_SEED }}
-      BAYMAX_MINIDUMP_ENDPOINT: ${{ secrets.BAYMAX_SENTRY_MINIDUMP_ENDPOINT }}
+      SIM_CLIENT_CHECKSUM_SEED: ${{ secrets.SIM_CLIENT_CHECKSUM_SEED }}
+      SIM_MINIDUMP_ENDPOINT: ${{ secrets.SIM_SENTRY_MINIDUMP_ENDPOINT }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_SIGNING_TENANT_ID }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_SIGNING_CLIENT_ID }}
       AZURE_CLIENT_SECRET: ${{ secrets.AZURE_SIGNING_CLIENT_SECRET }}
@@ -302,9 +302,9 @@ jobs:
         $ErrorActionPreference = "Stop"
         $version = git rev-parse --short HEAD
         Write-Host "Publishing version: $version on release channel nightly"
-        "nightly" | Set-Content -Path "crates/baymax/RELEASE_CHANNEL"
+        "nightly" | Set-Content -Path "crates/sim/RELEASE_CHANNEL"
       shell: pwsh
-      working-directory: ${{ env.BAYMAX_WORKSPACE }}
+      working-directory: ${{ env.SIM_WORKSPACE }}
     - name: steps::setup_sentry
       uses: matbour/setup-sentry-cli@3e938c54b3018bdd019973689ef984e033b0454b
       with:
@@ -312,18 +312,18 @@ jobs:
     - name: run_bundling::bundle_windows::bundle_windows
       run: script/bundle-windows.ps1 -Architecture aarch64
       shell: pwsh
-      working-directory: ${{ env.BAYMAX_WORKSPACE }}
+      working-directory: ${{ env.SIM_WORKSPACE }}
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: Baymax-aarch64.exe
-        path: target/Baymax-aarch64.exe
+        name: Sim-aarch64.exe
+        path: target/Sim-aarch64.exe
         if-no-files-found: error
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: baymax-remote-server-windows-aarch64.zip
-        path: target/baymax-remote-server-windows-aarch64.zip
+        name: sim-remote-server-windows-aarch64.zip
+        path: target/sim-remote-server-windows-aarch64.zip
         if-no-files-found: error
     timeout-minutes: 60
   bundle_windows_x86_64:
@@ -332,8 +332,8 @@ jobs:
     runs-on: self-32vcpu-windows-2022
     env:
       CARGO_INCREMENTAL: 0
-      BAYMAX_CLIENT_CHECKSUM_SEED: ${{ secrets.BAYMAX_CLIENT_CHECKSUM_SEED }}
-      BAYMAX_MINIDUMP_ENDPOINT: ${{ secrets.BAYMAX_SENTRY_MINIDUMP_ENDPOINT }}
+      SIM_CLIENT_CHECKSUM_SEED: ${{ secrets.SIM_CLIENT_CHECKSUM_SEED }}
+      SIM_MINIDUMP_ENDPOINT: ${{ secrets.SIM_SENTRY_MINIDUMP_ENDPOINT }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_SIGNING_TENANT_ID }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_SIGNING_CLIENT_ID }}
       AZURE_CLIENT_SECRET: ${{ secrets.AZURE_SIGNING_CLIENT_SECRET }}
@@ -353,9 +353,9 @@ jobs:
         $ErrorActionPreference = "Stop"
         $version = git rev-parse --short HEAD
         Write-Host "Publishing version: $version on release channel nightly"
-        "nightly" | Set-Content -Path "crates/baymax/RELEASE_CHANNEL"
+        "nightly" | Set-Content -Path "crates/sim/RELEASE_CHANNEL"
       shell: pwsh
-      working-directory: ${{ env.BAYMAX_WORKSPACE }}
+      working-directory: ${{ env.SIM_WORKSPACE }}
     - name: steps::setup_sentry
       uses: matbour/setup-sentry-cli@3e938c54b3018bdd019973689ef984e033b0454b
       with:
@@ -363,29 +363,29 @@ jobs:
     - name: run_bundling::bundle_windows::bundle_windows
       run: script/bundle-windows.ps1 -Architecture x86_64
       shell: pwsh
-      working-directory: ${{ env.BAYMAX_WORKSPACE }}
+      working-directory: ${{ env.SIM_WORKSPACE }}
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: Baymax-x86_64.exe
-        path: target/Baymax-x86_64.exe
+        name: Sim-x86_64.exe
+        path: target/Sim-x86_64.exe
         if-no-files-found: error
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: baymax-remote-server-windows-x86_64.zip
-        path: target/baymax-remote-server-windows-x86_64.zip
+        name: sim-remote-server-windows-x86_64.zip
+        path: target/sim-remote-server-windows-x86_64.zip
         if-no-files-found: error
     timeout-minutes: 60
   build_nix_linux_x86_64:
     needs:
     - run_tests_linux
-    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'baymax-extensions')
+    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'sim-extensions')
     runs-on: namespace-profile-32x64-ubuntu-2004
     env:
-      BAYMAX_CLIENT_CHECKSUM_SEED: ${{ secrets.BAYMAX_CLIENT_CHECKSUM_SEED }}
-      BAYMAX_MINIDUMP_ENDPOINT: ${{ secrets.BAYMAX_SENTRY_MINIDUMP_ENDPOINT }}
-      BAYMAX_CLOUD_PROVIDER_ADDITIONAL_MODELS_JSON: ${{ secrets.BAYMAX_CLOUD_PROVIDER_ADDITIONAL_MODELS_JSON }}
+      SIM_CLIENT_CHECKSUM_SEED: ${{ secrets.SIM_CLIENT_CHECKSUM_SEED }}
+      SIM_MINIDUMP_ENDPOINT: ${{ secrets.SIM_SENTRY_MINIDUMP_ENDPOINT }}
+      SIM_CLOUD_PROVIDER_ADDITIONAL_MODELS_JSON: ${{ secrets.SIM_CLOUD_PROVIDER_ADDITIONAL_MODELS_JSON }}
       GIT_LFS_SKIP_SMUDGE: '1'
     steps:
     - name: steps::checkout_repo
@@ -403,7 +403,7 @@ jobs:
     - name: nix_build::build_nix::cachix_action
       uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad
       with:
-        name: baymax
+        name: sim
         authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
         cachixArgs: -v
     - name: nix_build::build_nix::build
@@ -413,12 +413,12 @@ jobs:
   build_nix_mac_aarch64:
     needs:
     - run_tests_linux
-    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'baymax-extensions')
+    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'sim-extensions')
     runs-on: namespace-profile-mac-large
     env:
-      BAYMAX_CLIENT_CHECKSUM_SEED: ${{ secrets.BAYMAX_CLIENT_CHECKSUM_SEED }}
-      BAYMAX_MINIDUMP_ENDPOINT: ${{ secrets.BAYMAX_SENTRY_MINIDUMP_ENDPOINT }}
-      BAYMAX_CLOUD_PROVIDER_ADDITIONAL_MODELS_JSON: ${{ secrets.BAYMAX_CLOUD_PROVIDER_ADDITIONAL_MODELS_JSON }}
+      SIM_CLIENT_CHECKSUM_SEED: ${{ secrets.SIM_CLIENT_CHECKSUM_SEED }}
+      SIM_MINIDUMP_ENDPOINT: ${{ secrets.SIM_SENTRY_MINIDUMP_ENDPOINT }}
+      SIM_CLOUD_PROVIDER_ADDITIONAL_MODELS_JSON: ${{ secrets.SIM_CLOUD_PROVIDER_ADDITIONAL_MODELS_JSON }}
       GIT_LFS_SKIP_SMUDGE: '1'
     steps:
     - name: steps::checkout_repo
@@ -442,7 +442,7 @@ jobs:
     - name: nix_build::build_nix::cachix_action
       uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad
       with:
-        name: baymax
+        name: sim
         authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
         cachixArgs: -v
     - name: nix_build::build_nix::build
@@ -466,15 +466,15 @@ jobs:
     - bundle_mac_x86_64
     - bundle_windows_aarch64
     - bundle_windows_x86_64
-    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'baymax-extensions')
+    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'sim-extensions')
     runs-on: namespace-profile-4x8-ubuntu-2204
     steps:
     - id: generate-token
       name: steps::authenticate_as_zippy
       uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859
       with:
-        app-id: ${{ secrets.BAYMAX_ZIPPY_APP_ID }}
-        private-key: ${{ secrets.BAYMAX_ZIPPY_APP_PRIVATE_KEY }}
+        app-id: ${{ secrets.SIM_ZIPPY_APP_ID }}
+        private-key: ${{ secrets.SIM_ZIPPY_APP_PRIVATE_KEY }}
         permission-contents: write
     - name: steps::checkout_repo
       uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
@@ -491,18 +491,18 @@ jobs:
       run: |-
         mkdir -p release-artifacts/
 
-        mv ./artifacts/Baymax-aarch64.dmg/Baymax-aarch64.dmg release-artifacts/Baymax-aarch64.dmg
-        mv ./artifacts/Baymax-x86_64.dmg/Baymax-x86_64.dmg release-artifacts/Baymax-x86_64.dmg
-        mv ./artifacts/baymax-linux-aarch64.tar.gz/baymax-linux-aarch64.tar.gz release-artifacts/baymax-linux-aarch64.tar.gz
-        mv ./artifacts/baymax-linux-x86_64.tar.gz/baymax-linux-x86_64.tar.gz release-artifacts/baymax-linux-x86_64.tar.gz
-        mv ./artifacts/Baymax-x86_64.exe/Baymax-x86_64.exe release-artifacts/Baymax-x86_64.exe
-        mv ./artifacts/Baymax-aarch64.exe/Baymax-aarch64.exe release-artifacts/Baymax-aarch64.exe
-        mv ./artifacts/baymax-remote-server-macos-aarch64.gz/baymax-remote-server-macos-aarch64.gz release-artifacts/baymax-remote-server-macos-aarch64.gz
-        mv ./artifacts/baymax-remote-server-macos-x86_64.gz/baymax-remote-server-macos-x86_64.gz release-artifacts/baymax-remote-server-macos-x86_64.gz
-        mv ./artifacts/baymax-remote-server-linux-aarch64.gz/baymax-remote-server-linux-aarch64.gz release-artifacts/baymax-remote-server-linux-aarch64.gz
-        mv ./artifacts/baymax-remote-server-linux-x86_64.gz/baymax-remote-server-linux-x86_64.gz release-artifacts/baymax-remote-server-linux-x86_64.gz
-        mv ./artifacts/baymax-remote-server-windows-aarch64.zip/baymax-remote-server-windows-aarch64.zip release-artifacts/baymax-remote-server-windows-aarch64.zip
-        mv ./artifacts/baymax-remote-server-windows-x86_64.zip/baymax-remote-server-windows-x86_64.zip release-artifacts/baymax-remote-server-windows-x86_64.zip
+        mv ./artifacts/Sim-aarch64.dmg/Sim-aarch64.dmg release-artifacts/Sim-aarch64.dmg
+        mv ./artifacts/Sim-x86_64.dmg/Sim-x86_64.dmg release-artifacts/Sim-x86_64.dmg
+        mv ./artifacts/sim-linux-aarch64.tar.gz/sim-linux-aarch64.tar.gz release-artifacts/sim-linux-aarch64.tar.gz
+        mv ./artifacts/sim-linux-x86_64.tar.gz/sim-linux-x86_64.tar.gz release-artifacts/sim-linux-x86_64.tar.gz
+        mv ./artifacts/Sim-x86_64.exe/Sim-x86_64.exe release-artifacts/Sim-x86_64.exe
+        mv ./artifacts/Sim-aarch64.exe/Sim-aarch64.exe release-artifacts/Sim-aarch64.exe
+        mv ./artifacts/sim-remote-server-macos-aarch64.gz/sim-remote-server-macos-aarch64.gz release-artifacts/sim-remote-server-macos-aarch64.gz
+        mv ./artifacts/sim-remote-server-macos-x86_64.gz/sim-remote-server-macos-x86_64.gz release-artifacts/sim-remote-server-macos-x86_64.gz
+        mv ./artifacts/sim-remote-server-linux-aarch64.gz/sim-remote-server-linux-aarch64.gz release-artifacts/sim-remote-server-linux-aarch64.gz
+        mv ./artifacts/sim-remote-server-linux-x86_64.gz/sim-remote-server-linux-x86_64.gz release-artifacts/sim-remote-server-linux-x86_64.gz
+        mv ./artifacts/sim-remote-server-windows-aarch64.zip/sim-remote-server-windows-aarch64.zip release-artifacts/sim-remote-server-windows-aarch64.zip
+        mv ./artifacts/sim-remote-server-windows-x86_64.zip/sim-remote-server-windows-x86_64.zip release-artifacts/sim-remote-server-windows-x86_64.zip
     - name: ./script/upload-nightly
       run: ./script/upload-nightly
       env:
@@ -525,8 +525,8 @@ jobs:
       with:
         environment: production
       env:
-        SENTRY_ORG: baymax-dev
-        SENTRY_PROJECT: baymax
+        SENTRY_ORG: sim-dev
+        SENTRY_PROJECT: sim
         SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
     timeout-minutes: 60
   notify_on_failure:

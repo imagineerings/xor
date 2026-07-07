@@ -29,8 +29,8 @@ async function main() {
   // Fetch the pull requests from the GitHub API.
   console.log("Merged pull requests:");
   for (const pullRequestNumber of pullRequestNumbers) {
-    const webURL = `https://github.com/simtropolis/baymax/pull/${pullRequestNumber}`;
-    const apiURL = `https://api.github.com/repos/simtropolis/baymax/pulls/${pullRequestNumber}`;
+    const webURL = `https://github.com/simtropolis/sim/pull/${pullRequestNumber}`;
+    const apiURL = `https://api.github.com/repos/simtropolis/sim/pulls/${pullRequestNumber}`;
 
     const response = await fetch(apiURL, {
       headers: {

@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The Baymax mobile client needs to support tools, slash commands, and integrations that extend the agent's capabilities. Users should be able to browse available tools, invoke them via slash commands, and manage tool configurations. This spec draws from the `mobile-dev` integrations framework (apps, slash commands, webhooks) and Baymax's agent tool system (`acp_tools`, `agent` crates).
+The Sim mobile client needs to support tools, slash commands, and integrations that extend the agent's capabilities. Users should be able to browse available tools, invoke them via slash commands, and manage tool configurations. This spec draws from the `mobile-dev` integrations framework (apps, slash commands, webhooks) and Sim's agent tool system (`acp_tools`, `agent` crates).
 
 ## Glossary
 
@@ -12,7 +12,7 @@ The Baymax mobile client needs to support tools, slash commands, and integration
 | **Tool** | A capability the agent can use, such as reading files, searching code, running commands, or accessing external APIs. |
 | **ACP (Agent Client Protocol)** | The protocol for agent-to-tool communication. Tools are discovered via the agent's tool list API. |
 | **Context Server** | An MCP (Model Context Protocol) server that provides additional context/tools to the agent. |
-| **Integration** | An external service connected to Baymax (e.g., GitHub, Slack, Jira) via webhooks or OAuth. |
+| **Integration** | An external service connected to Sim (e.g., GitHub, Slack, Jira) via webhooks or OAuth. |
 
 ## Requirements
 
@@ -67,4 +67,4 @@ The Baymax mobile client needs to support tools, slash commands, and integration
 - iOS: `ToolViews.swift`, `StackedToolCallsView.swift`, `TaskDetailView.swift`
 - Android: `ToolCallCard.kt`, `StackedToolCallsView.kt`, `ToolCallDetailScreen.kt`, `TaskDetailScreen.kt`
 - mobile-dev: `app/managers/apps_manager.ts`, `app/managers/integrations_manager.ts`, `app/screens/integration_selector/`, `app/screens/interactive_dialog/`, `app/constants/integrations.ts`
-- Baymax desktop: `crates/agent/` (agent + tools), `crates/acp_tools/` (tool protocol), `crates/context_server/` (MCP server)
+- Sim desktop: `crates/agent/` (agent + tools), `crates/acp_tools/` (tool protocol), `crates/context_server/` (MCP server)

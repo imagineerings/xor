@@ -2,7 +2,7 @@
 
 ## Overview
 
-Workflows and blueprints are treated as first-class world-model harness project resources backed by Baymax project storage. This spec adds import, export, catalog, subgraph, node replacement, and embedded metadata services while relying on graph runtime validation and graph UI rendering elsewhere.
+Workflows and blueprints are treated as first-class world-model harness project resources backed by Sim project storage. This spec adds import, export, catalog, subgraph, node replacement, and embedded metadata services while relying on graph runtime validation and graph UI rendering elsewhere.
 
 ## Architecture
 
@@ -26,7 +26,7 @@ flowchart LR
 
 ### WorkflowStore
 
-- **Purpose**: Persist workflows and versions in Baymax project storage.
+- **Purpose**: Persist workflows and versions in Sim project storage.
 - **Responsibilities**: Load, save, API export, metadata preservation, provenance links, and default view handling.
 
 ```rust

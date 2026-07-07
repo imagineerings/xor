@@ -2,12 +2,12 @@
 
 ## 1. Overview
 
-Migrate goose's authentication features: the OIDC proxy (Cloudflare Worker), OAuth token persistence, and OAuth device flow authentication. These extend baymax's existing `crates/oauth_callback_server/` with more flexible authentication patterns.
+Migrate goose's authentication features: the OIDC proxy (Cloudflare Worker), OAuth token persistence, and OAuth device flow authentication. These extend sim's existing `crates/oauth_callback_server/` with more flexible authentication patterns.
 
 ### Key Architectural Decisions
 
-- **OIDC proxy as standalone deployment**: The Cloudflare Worker is a separate deployment artifact, not integrated into the baymax binary. Document how to deploy it.
-- **OAuth persistence in `crates/credentials_provider/`**: Baymax already has `crates/credentials_provider/` for storing credentials. Extend it to handle OAuth tokens.
+- **OIDC proxy as standalone deployment**: The Cloudflare Worker is a separate deployment artifact, not integrated into the sim binary. Document how to deploy it.
+- **OAuth persistence in `crates/credentials_provider/`**: Sim already has `crates/credentials_provider/` for storing credentials. Extend it to handle OAuth tokens.
 - **OAuth device flow in `crates/oauth_callback_server/`**: Add device flow support alongside the existing callback server. They share the same token management logic.
 - **Encrypted token storage**: Use the existing keyring integration (already a workspace dependency) for OS-level encrypted storage.
 
@@ -209,5 +209,5 @@ _For any_ device flow initiation, THE system SHALL display the user code and ver
 - Source: `projects/goose/oidc-proxy/` — Cloudflare Worker
 - Source: `projects/goose/crates/goose/src/oauth/persist.rs`
 - Source: `projects/goose/crates/goose/src/providers/oauth_device_flow.rs`
-- Baymax: `crates/oauth_callback_server/`
-- Baymax: `crates/credentials_provider/`
+- Sim: `crates/oauth_callback_server/`
+- Sim: `crates/credentials_provider/`

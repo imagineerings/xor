@@ -4,7 +4,7 @@ use std::{
 };
 
 pub static DATA_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
-    let dir = dirs::home_dir().unwrap().join(".baymax_ep");
+    let dir = dirs::home_dir().unwrap().join(".sim_ep");
     ensure_dir(&dir)
 });
 pub static CACHE_DIR: LazyLock<PathBuf> = LazyLock::new(|| ensure_dir(&DATA_DIR.join("cache")));

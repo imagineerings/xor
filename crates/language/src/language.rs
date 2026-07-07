@@ -1,4 +1,4 @@
-//! The `language` crate provides a large chunk of Baymax's language-related
+//! The `language` crate provides a large chunk of Sim's language-related
 //! features (the other big contributors being project and lsp crates that revolve around LSP features).
 //! Namely, this crate:
 //! - Provides [`Language`], [`Grammar`] and [`LanguageRegistry`] types that
@@ -589,9 +589,9 @@ pub trait LspAdapter: 'static + Send + Sync + DynLspInstaller {
 
     /// Method only implemented by the default JSON language server adapter.
     /// Used to provide dynamic reloading of the JSON schemas used to
-    /// provide autocompletion and diagnostics in Baymax setting and keybind
+    /// provide autocompletion and diagnostics in Sim setting and keybind
     /// files
-    fn is_primary_baymax_json_schema_adapter(&self) -> bool {
+    fn is_primary_sim_json_schema_adapter(&self) -> bool {
         false
     }
 
@@ -602,7 +602,7 @@ pub trait LspAdapter: 'static + Send + Sync + DynLspInstaller {
 
     /// Called when a user responds to a ShowMessageRequest from this language server.
     /// This allows adapters to intercept preference selections (like "Always" or "Never")
-    /// for settings that should be persisted to Baymax's settings file.
+    /// for settings that should be persisted to Sim's settings file.
     fn process_prompt_response(&self, _context: &PromptResponseContext, _cx: &mut AsyncApp) {}
 }
 
@@ -725,7 +725,7 @@ where
             //
             //      worktree 1: user-installed at `.bin/gopls`
             //      worktree 2: user-installed at `~/bin/gopls`
-            //      worktree 3: no gopls found in PATH -> fallback to Baymax installation
+            //      worktree 3: no gopls found in PATH -> fallback to Sim installation
             //
             // We only want to cache when we fall back to the global one,
             // because we don't want to download and overwrite our global one
@@ -1159,14 +1159,14 @@ impl LanguageScope {
     /// Returns additional regex patterns that act as prefix markers for creating
     /// boundaries during rewrapping.
     ///
-    /// By default, Baymax treats as paragraph and comment prefixes as boundaries.
+    /// By default, Sim treats as paragraph and comment prefixes as boundaries.
     pub fn rewrap_prefixes(&self) -> &[Regex] {
         &self.language.config.rewrap_prefixes
     }
 
     /// Returns a list of language-specific word characters.
     ///
-    /// By default, Baymax treats alphanumeric characters (and '_') as word characters for
+    /// By default, Sim treats alphanumeric characters (and '_') as word characters for
     /// the purpose of actions like 'move to next word end` or whole-word search.
     /// It additionally accounts for language's additional word characters.
     pub fn word_characters(&self) -> Option<&HashSet<char>> {

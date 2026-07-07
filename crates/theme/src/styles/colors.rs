@@ -228,13 +228,13 @@ pub struct ThemeColors {
     /// Read-access of a symbol, like reading a variable.
     ///
     /// A document highlight is a range inside a text document which deserves
-    /// special attention. Usually a document highlight is visualibaymax by changing
+    /// special attention. Usually a document highlight is visualisim by changing
     /// the background color of its range.
     pub editor_document_highlight_read_background: Hsla,
     /// Read-access of a symbol, like reading a variable.
     ///
     /// A document highlight is a range inside a text document which deserves
-    /// special attention. Usually a document highlight is visualibaymax by changing
+    /// special attention. Usually a document highlight is visualisim by changing
     /// the background color of its range.
     pub editor_document_highlight_write_background: Hsla,
     /// Highlighted brackets background color.

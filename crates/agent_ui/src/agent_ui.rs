@@ -78,8 +78,8 @@ pub use crate::inline_assistant::InlineAssistant;
 pub use crate::message_editor::MessageEditorEvent;
 pub use crate::thread_metadata_store::ThreadId;
 pub use agent_diff::{AgentDiffPane, AgentDiffToolbar};
-use baymax_actions;
-pub use baymax_actions::{CreateWorktree, NewWorktreeBranchTarget, SwitchWorktree};
+use sim_actions;
+pub use sim_actions::{CreateWorktree, NewWorktreeBranchTarget, SwitchWorktree};
 pub use conversation_view::open_markdown_in_workspace;
 pub use conversation_view::{ConversationView, StateChange};
 pub use external_source_prompt::ExternalSourcePrompt;
@@ -290,7 +290,7 @@ actions!(
         ScrollOutputToPreviousMessage,
         /// Scroll the output to the next user message.
         ScrollOutputToNextMessage,
-        /// Import agent threads from other Baymax release channels (e.g. Preview, Nightly).
+        /// Import agent threads from other Sim release channels (e.g. Preview, Nightly).
         ImportThreadsFromOtherChannels,
         /// Starts a new terminal thread.
         NewTerminalThread,
@@ -317,7 +317,7 @@ pub struct AuthorizeToolCall {
     pub tool_call_id: String,
     /// The permission option ID to use.
     pub option_id: String,
-    /// The kind of permission option (serialibaymax as string).
+    /// The kind of permission option (serialisim as string).
     pub option_kind: String,
 }
 
@@ -405,7 +405,7 @@ pub enum Agent {
 
 impl From<AgentId> for Agent {
     fn from(id: AgentId) -> Self {
-        if id.as_ref() == agent::BAYMAX_AGENT_ID.as_ref() {
+        if id.as_ref() == agent::SIM_AGENT_ID.as_ref() {
             return Self::NativeAgent;
         }
         #[cfg(any(test, feature = "test-support"))]
@@ -419,7 +419,7 @@ impl From<AgentId> for Agent {
 impl Agent {
     pub fn id(&self) -> AgentId {
         match self {
-            Self::NativeAgent => agent::BAYMAX_AGENT_ID.clone(),
+            Self::NativeAgent => agent::SIM_AGENT_ID.clone(),
             Self::Custom { id } => id.clone(),
             #[cfg(any(test, feature = "test-support"))]
             Self::Stub => "stub".into(),
@@ -432,7 +432,7 @@ impl Agent {
 
     pub fn label(&self) -> SharedString {
         match self {
-            Self::NativeAgent => "Baymax Agent".into(),
+            Self::NativeAgent => "Sim Agent".into(),
             Self::Custom { id, .. } => id.0.clone(),
             #[cfg(any(test, feature = "test-support"))]
             Self::Stub => "Stub Agent".into(),
@@ -595,7 +595,7 @@ pub fn init(
     cx.observe_new(|workspace: &mut Workspace, _window, _cx| {
         workspace.register_action(
             move |workspace: &mut Workspace,
-                  _: &baymax_actions::AcpRegistry,
+                  _: &sim_actions::AcpRegistry,
                   window: &mut Window,
                   cx: &mut Context<Workspace>| {
                 let existing = workspace
@@ -782,10 +782,10 @@ fn update_command_palette_filter(cx: &mut App) {
             TypeId::of::<ToggleEditPrediction>(),
         ];
 
-        let manage_skills_action = [TypeId::of::<baymax_actions::assistant::ManageSkills>()];
+        let manage_skills_action = [TypeId::of::<sim_actions::assistant::ManageSkills>()];
         let skill_creator_actions = [
-            TypeId::of::<baymax_actions::assistant::OpenSkillCreator>(),
-            TypeId::of::<baymax_actions::assistant::CreateSkillFromUrl>(),
+            TypeId::of::<sim_actions::assistant::OpenSkillCreator>(),
+            TypeId::of::<sim_actions::assistant::CreateSkillFromUrl>(),
         ];
 
         if disable_ai {
@@ -793,12 +793,12 @@ fn update_command_palette_filter(cx: &mut App) {
             filter.hide_namespace("agents");
             filter.hide_namespace("assistant");
             filter.hide_namespace("copilot");
-            filter.hide_namespace("baymax_predict_onboarding");
+            filter.hide_namespace("sim_predict_onboarding");
             filter.hide_namespace("edit_prediction");
 
             filter.hide_action_types(&edit_prediction_actions);
             filter
-                .hide_action_types(&[TypeId::of::<baymax_actions::OpenBaymaxPredictOnboarding>()]);
+                .hide_action_types(&[TypeId::of::<sim_actions::OpenSimPredictOnboarding>()]);
         } else {
             if agent_enabled {
                 filter.show_namespace("agent");
@@ -821,7 +821,7 @@ fn update_command_palette_filter(cx: &mut App) {
                     filter.show_namespace("copilot");
                     filter.show_action_types(edit_prediction_actions.iter());
                 }
-                EditPredictionProvider::Baymax
+                EditPredictionProvider::Sim
                 | EditPredictionProvider::Codestral
                 | EditPredictionProvider::Ollama
                 | EditPredictionProvider::OpenAiCompatibleApi
@@ -832,9 +832,9 @@ fn update_command_palette_filter(cx: &mut App) {
                 }
             }
 
-            filter.show_namespace("baymax_predict_onboarding");
+            filter.show_namespace("sim_predict_onboarding");
             filter
-                .show_action_types(&[TypeId::of::<baymax_actions::OpenBaymaxPredictOnboarding>()]);
+                .show_action_types(&[TypeId::of::<sim_actions::OpenSimPredictOnboarding>()]);
 
             filter.show_namespace("multi_workspace");
         }
@@ -959,7 +959,7 @@ mod tests {
             play_sound_when_agent_done: PlaySoundWhenAgentDone::Never,
             single_file_review: false,
             model_parameters: vec![],
-            baymax_mode: Default::default(),
+            sim_mode: Default::default(),
             auto_compact: agent_settings::AutoCompactSettings {
                 enabled: false,
                 strategy: agent_settings::AutoCompactStrategy::default(),
@@ -999,19 +999,19 @@ mod tests {
                 "NewTerminalThread should be visible by default"
             );
             assert!(
-                !filter.is_hidden(&baymax_actions::assistant::OpenSkillCreator),
+                !filter.is_hidden(&sim_actions::assistant::OpenSkillCreator),
                 "OpenSkillCreator should be visible by default"
             );
             assert!(
-                !filter.is_hidden(&baymax_actions::assistant::CreateSkillFromUrl),
+                !filter.is_hidden(&sim_actions::assistant::CreateSkillFromUrl),
                 "CreateSkillFromUrl should be visible by default"
             );
             assert!(
-                !filter.is_hidden(&baymax_actions::assistant::OpenGlobalAgentsMdRules),
+                !filter.is_hidden(&sim_actions::assistant::OpenGlobalAgentsMdRules),
                 "OpenGlobalAgentsMdRules should be visible by default"
             );
             assert!(
-                !filter.is_hidden(&baymax_actions::assistant::OpenProjectAgentsMdRules),
+                !filter.is_hidden(&sim_actions::assistant::OpenProjectAgentsMdRules),
                 "OpenProjectAgentsMdRules should be visible by default"
             );
         });
@@ -1038,11 +1038,11 @@ mod tests {
                 "NewTerminalThread should be hidden when agent is disabled"
             );
             assert!(
-                filter.is_hidden(&baymax_actions::assistant::OpenGlobalAgentsMdRules),
+                filter.is_hidden(&sim_actions::assistant::OpenGlobalAgentsMdRules),
                 "OpenGlobalAgentsMdRules should be hidden when agent is disabled"
             );
             assert!(
-                filter.is_hidden(&baymax_actions::assistant::OpenProjectAgentsMdRules),
+                filter.is_hidden(&sim_actions::assistant::OpenProjectAgentsMdRules),
                 "OpenProjectAgentsMdRules should be hidden when agent is disabled"
             );
         });

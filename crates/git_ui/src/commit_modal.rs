@@ -3,7 +3,7 @@ use crate::git_panel::{
     GitPanel, commit_message_editor, commit_title_exceeds_limit, git_commit_editor_style,
 };
 use crate::git_panel_settings::GitPanelSettings;
-use baymax_actions::{DecreaseBufferFontSize, IncreaseBufferFontSize, ResetBufferFontSize};
+use sim_actions::{DecreaseBufferFontSize, IncreaseBufferFontSize, ResetBufferFontSize};
 use git::repository::CommitOptions;
 use git::{Amend, Commit, GenerateCommitMessage, Signoff};
 use project::DisableAiSettings;
@@ -378,7 +378,7 @@ impl CommitModal {
             .style(ButtonStyle::Transparent)
             .color(Color::Muted)
             .on_click(cx.listener(|_, _, window, cx| {
-                window.dispatch_action(baymax_actions::git::Branch.boxed_clone(), cx);
+                window.dispatch_action(sim_actions::git::Branch.boxed_clone(), cx);
             }));
 
         let branch_picker = PopoverMenu::new("popover-button")
@@ -394,7 +394,7 @@ impl CommitModal {
             .with_handle(self.branch_list_handle.clone())
             .trigger_with_tooltip(
                 branch_picker_button,
-                Tooltip::for_action_title("Switch Branch", &baymax_actions::git::Branch),
+                Tooltip::for_action_title("Switch Branch", &sim_actions::git::Branch),
             )
             .anchor(Anchor::BottomLeft)
             .offset(gpui::Point {
@@ -607,17 +607,17 @@ impl Render for CommitModal {
                 }))
             })
             .on_action(
-                cx.listener(|this, _: &baymax_actions::git::Branch, window, cx| {
+                cx.listener(|this, _: &sim_actions::git::Branch, window, cx| {
                     this.toggle_branch_selector(window, cx);
                 }),
             )
             .on_action(
-                cx.listener(|this, _: &baymax_actions::git::CheckoutBranch, window, cx| {
+                cx.listener(|this, _: &sim_actions::git::CheckoutBranch, window, cx| {
                     this.toggle_branch_selector(window, cx);
                 }),
             )
             .on_action(
-                cx.listener(|this, _: &baymax_actions::git::Switch, window, cx| {
+                cx.listener(|this, _: &sim_actions::git::Switch, window, cx| {
                     this.toggle_branch_selector(window, cx);
                 }),
             )

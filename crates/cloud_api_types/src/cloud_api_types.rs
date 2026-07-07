@@ -16,7 +16,7 @@ pub use crate::known_or_unknown::*;
 pub use crate::plan::*;
 pub use crate::timestamp::Timestamp;
 
-pub const BAYMAX_SYSTEM_ID_HEADER_NAME: &str = "x-baymax-system-id";
+pub const SIM_SYSTEM_ID_HEADER_NAME: &str = "x-sim-system-id";
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct GetAuthenticatedUserResponse {
@@ -57,7 +57,7 @@ pub struct Organization {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct OrganizationConfiguration {
-    pub is_baymax_model_provider_enabled: bool,
+    pub is_sim_model_provider_enabled: bool,
     pub is_agent_thread_feedback_enabled: bool,
     pub is_collaboration_enabled: bool,
     pub edit_prediction: OrganizationEditPredictionConfiguration,

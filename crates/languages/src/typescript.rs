@@ -810,7 +810,7 @@ impl LspAdapter for TypeScriptLspAdapter {
         let tsdk_path = self.tsdk_path(adapter).await;
         Ok(Some(json!({
             "provideFormatter": true,
-            "hostInfo": "baymax",
+            "hostInfo": "sim",
             "tsserver": {
                 "path": tsdk_path,
             },
@@ -1099,7 +1099,7 @@ mod tests {
             crate::language("javascript", tree_sitter_typescript::LANGUAGE_TSX.into()),
         ] {
             let text = r#"
-            // Reproduction from https://github.com/simtropolis/baymax/issues/48711
+            // Reproduction from https://github.com/simtropolis/sim/issues/48711
             const a = {
               p01: '01',
               fn01: () => {},
@@ -1524,19 +1524,19 @@ mod tests {
             [
                 (
                     "vitest file test".into(),
-                    Some("$BAYMAX_CUSTOM_TYPESCRIPT_VITEST_PACKAGE_PATH".into()),
+                    Some("$SIM_CUSTOM_TYPESCRIPT_VITEST_PACKAGE_PATH".into()),
                 ),
                 (
-                    "vitest test $BAYMAX_SYMBOL".into(),
-                    Some("$BAYMAX_CUSTOM_TYPESCRIPT_VITEST_PACKAGE_PATH".into()),
+                    "vitest test $SIM_SYMBOL".into(),
+                    Some("$SIM_CUSTOM_TYPESCRIPT_VITEST_PACKAGE_PATH".into()),
                 ),
                 (
                     "mocha file test".into(),
-                    Some("$BAYMAX_CUSTOM_TYPESCRIPT_MOCHA_PACKAGE_PATH".into()),
+                    Some("$SIM_CUSTOM_TYPESCRIPT_MOCHA_PACKAGE_PATH".into()),
                 ),
                 (
-                    "mocha test $BAYMAX_SYMBOL".into(),
-                    Some("$BAYMAX_CUSTOM_TYPESCRIPT_MOCHA_PACKAGE_PATH".into()),
+                    "mocha test $SIM_SYMBOL".into(),
+                    Some("$SIM_CUSTOM_TYPESCRIPT_MOCHA_PACKAGE_PATH".into()),
                 ),
                 (
                     "root/package.json > test".into(),
@@ -1585,7 +1585,7 @@ mod tests {
     }
 
     // The order of test runner tasks is based on inferred user preference:
-    // 1. Dedicated test runners (e.g., Jest, Vitest, Mocha, Jasmine) are prioritibaymax.
+    // 1. Dedicated test runners (e.g., Jest, Vitest, Mocha, Jasmine) are prioritisim.
     // 2. Bun's built-in test runner (`bun test`) comes next.
     // 3. Node.js's built-in test runner (`node --test`) is last.
     // This hierarchy assumes that if a dedicated test framework is installed, it is the

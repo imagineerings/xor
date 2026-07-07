@@ -1,53 +1,53 @@
 ---
-title: Environment Variables - Baymax
-description: How Baymax detects and uses environment variables. Shell integration, dotenv support, and troubleshooting.
+title: Environment Variables - Sim
+description: How Sim detects and uses environment variables. Shell integration, dotenv support, and troubleshooting.
 ---
 
 # Environment Variables
 
-_**Note**: The following only applies to Baymax 0.152.0 and later._
+_**Note**: The following only applies to Sim 0.152.0 and later._
 
-Multiple features in Baymax are affected by environment variables:
+Multiple features in Sim are affected by environment variables:
 
 - [Tasks](./tasks.md)
 - [Built-in terminal](./terminal.md)
 - Look-up of language servers
 - Language servers
 
-To make the best use of these features, it helps to understand where Baymax gets environment variables and how it uses them.
+To make the best use of these features, it helps to understand where Sim gets environment variables and how it uses them.
 
-## Where does Baymax get its environment variables from?
+## Where does Sim get its environment variables from?
 
-How Baymax starts affects which environment variables it can use. That includes launching from the macOS Dock, a Linux window manager, or the `baymax` CLI.
+How Sim starts affects which environment variables it can use. That includes launching from the macOS Dock, a Linux window manager, or the `sim` CLI.
 
 ### Launched from the CLI
 
-If Baymax is opened via the CLI (`baymax`), it will inherit the environment variables from the surrounding shell session.
+If Sim is opened via the CLI (`sim`), it will inherit the environment variables from the surrounding shell session.
 
 That means if you do
 
 ```
 $ export MY_ENV_VAR=hello
-$ baymax .
+$ sim .
 ```
 
-the environment variable `MY_ENV_VAR` is now available inside Baymax. For example, in the built-in terminal.
+the environment variable `MY_ENV_VAR` is now available inside Sim. For example, in the built-in terminal.
 
-Starting with Baymax 0.152.0, the CLI `baymax` will _always_ pass along its environment to Baymax, regardless of whether a Baymax instance was previously running or not. Prior to Baymax 0.152.0 this was not the case and only the first Baymax instance would inherit the environment variables.
+Starting with Sim 0.152.0, the CLI `sim` will _always_ pass along its environment to Sim, regardless of whether a Sim instance was previously running or not. Prior to Sim 0.152.0 this was not the case and only the first Sim instance would inherit the environment variables.
 
 ### Launched via window manager, Dock, or launcher
 
-When Baymax has been launched via the macOS Dock, or a GNOME or KDE icon on Linux, or an application launcher like Alfred or Raycast, it has no surrounding shell environment from which to inherit its environment variables.
+When Sim has been launched via the macOS Dock, or a GNOME or KDE icon on Linux, or an application launcher like Alfred or Raycast, it has no surrounding shell environment from which to inherit its environment variables.
 
-To still have a useful environment, Baymax spawns a login shell in the user's home directory and reads its environment. This environment is then set on the Baymax _process_, so all Baymax windows and projects inherit it.
+To still have a useful environment, Sim spawns a login shell in the user's home directory and reads its environment. This environment is then set on the Sim _process_, so all Sim windows and projects inherit it.
 
-Since that can lead to problems for users who need different environment variables per project (for example with `direnv`, `asdf`, or `mise`), Baymax spawns another login shell when opening a project. This second shell runs in the project's directory. The environment from that shell is _not_ set on the process, because opening a new project would otherwise change the environment for all Baymax windows. Instead, that environment is stored and passed along when running tasks, opening terminals, or spawning language servers.
+Since that can lead to problems for users who need different environment variables per project (for example with `direnv`, `asdf`, or `mise`), Sim spawns another login shell when opening a project. This second shell runs in the project's directory. The environment from that shell is _not_ set on the process, because opening a new project would otherwise change the environment for all Sim windows. Instead, that environment is stored and passed along when running tasks, opening terminals, or spawning language servers.
 
 ## Where and how are environment variables used?
 
 There are two sets of environment variables:
 
-1. Environment variables of the Baymax process
+1. Environment variables of the Sim process
 2. Environment variables stored per project
 
 The variables from (1) are always used, since they are stored on the process itself and every spawned process (tasks, terminals, language servers, ...) will inherit them by default.
@@ -58,7 +58,7 @@ The variables from (2) are used explicitly, depending on the feature.
 
 Tasks are spawned with a combined environment. In order of precedence (low to high, with the last overwriting the first):
 
-- the Baymax process environment
+- the Sim process environment
 - if the project was opened from the CLI: the CLI environment
 - if the project was not opened from the CLI: the project environment variables obtained by running a login shell in the project's root folder
 - optional, explicitly configured environment in settings
@@ -67,7 +67,7 @@ Tasks are spawned with a combined environment. In order of precedence (low to hi
 
 Built-in terminals, like tasks, are spawned with a combined environment. In order of precedence (low to high):
 
-- the Baymax process environment
+- the Sim process environment
 - if the project was opened from the CLI: the CLI environment
 - if the project was not opened from the CLI: the project environment variables obtained by running a login shell in the project's root folder
 - optional, explicitly configured environment in settings
@@ -82,16 +82,16 @@ For some languages the language server adapters lookup the binary in the user's 
 - C
 - TypeScript
 
-For this look-up, Baymax uses the following environment:
+For this look-up, Sim uses the following environment:
 
 - if the project was opened from the CLI: the CLI environment
 - if the project was not opened from the CLI: the project environment variables obtained by running a login shell in the project's root folder
 
 ### Language servers
 
-After looking up a language server, Baymax starts them.
+After looking up a language server, Sim starts them.
 
-These language server processes always inherit Baymax's process environment. But, depending on the language server look-up, additional environment variables might be set or overwrite the process environment.
+These language server processes always inherit Sim's process environment. But, depending on the language server look-up, additional environment variables might be set or overwrite the process environment.
 
 - If the language server was found in the project environment's `$PATH`, then that project environment is passed along to the language server process. Where the project environment comes from depends on how the project was opened (via CLI or not). See the previous section on language server look-up.
-- If the language server was not found in the project environment, Baymax tries to install and start it globally. In that case, the process inherits Baymax's process environment and, if the project was opened via CLI, the CLI environment.
+- If the language server was not found in the project environment, Sim tries to install and start it globally. In that case, the process inherits Sim's process environment and, if the project was opened via CLI, the CLI environment.

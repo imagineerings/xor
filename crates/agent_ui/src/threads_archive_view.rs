@@ -40,12 +40,12 @@ use ui_input::ErasedEditor;
 use util::ResultExt;
 use util::paths::PathExt;
 use workspace::{
-    CloseWindow, ModalView, PathList, RecentWorkspace, SerialibaymaxWorkspaceLocation, Workspace,
+    CloseWindow, ModalView, PathList, RecentWorkspace, SerialisimWorkspaceLocation, Workspace,
     WorkspaceDb, WorkspaceId,
 };
 
-use baymax_actions::agents_sidebar::FocusSidebarFilter;
-use baymax_actions::editor::{MoveDown, MoveUp};
+use sim_actions::agents_sidebar::FocusSidebarFilter;
+use sim_actions::editor::{MoveDown, MoveUp};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum ThreadFilter {
@@ -621,8 +621,8 @@ impl ThreadsArchiveView {
                     .upgrade()
                     .and_then(|store| store.read(cx).agent_icon(&thread.agent_id));
 
-                let icon = if thread.agent_id.as_ref() == agent::BAYMAX_AGENT_ID.as_ref() {
-                    IconName::BaymaxAgent
+                let icon = if thread.agent_id.as_ref() == agent::SIM_AGENT_ID.as_ref() {
+                    IconName::SimAgent
                 } else {
                     IconName::Sparkle
                 };
@@ -1562,7 +1562,7 @@ impl PickerDelegate for ProjectPickerDelegate {
 
                 let highlighted_match = HighlightedMatchWithPaths {
                     prefix: match location {
-                        SerialibaymaxWorkspaceLocation::Remote(options) => {
+                        SerialisimWorkspaceLocation::Remote(options) => {
                             Some(SharedString::from(options.display_name()))
                         }
                         _ => None,

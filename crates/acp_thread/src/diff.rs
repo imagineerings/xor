@@ -11,11 +11,11 @@ use util::ResultExt;
 
 pub enum Diff {
     Pending(PendingDiff),
-    Finalibaymax(FinalibaymaxDiff),
+    Finalisim(FinalisimDiff),
 }
 
 impl Diff {
-    pub fn finalibaymax(
+    pub fn finalisim(
         path: String,
         old_text: Option<String>,
         new_text: String,
@@ -75,7 +75,7 @@ impl Diff {
             }
         });
 
-        Self::Finalibaymax(FinalibaymaxDiff {
+        Self::Finalisim(FinalisimDiff {
             multibuffer,
             path,
             base_text,
@@ -121,7 +121,7 @@ impl Diff {
 
     pub fn finalize(&mut self, cx: &mut Context<Self>) {
         if let Self::Pending(diff) = self {
-            *self = Self::Finalibaymax(diff.finalize(cx));
+            *self = Self::Finalisim(diff.finalize(cx));
         }
     }
 
@@ -129,15 +129,15 @@ impl Diff {
     pub fn base_text(&self) -> &Arc<str> {
         match self {
             Self::Pending(PendingDiff { base_text, .. }) => base_text,
-            Self::Finalibaymax(FinalibaymaxDiff { base_text, .. }) => base_text,
+            Self::Finalisim(FinalisimDiff { base_text, .. }) => base_text,
         }
     }
 
-    /// Returns the buffer being edited (for pending diffs) or the snapshot buffer (for finalibaymax diffs).
+    /// Returns the buffer being edited (for pending diffs) or the snapshot buffer (for finalisim diffs).
     pub fn buffer(&self) -> &Entity<Buffer> {
         match self {
             Self::Pending(PendingDiff { new_buffer, .. }) => new_buffer,
-            Self::Finalibaymax(FinalibaymaxDiff { new_buffer, .. }) => new_buffer,
+            Self::Finalisim(FinalisimDiff { new_buffer, .. }) => new_buffer,
         }
     }
 
@@ -147,14 +147,14 @@ impl Diff {
                 .read(cx)
                 .file()
                 .map(|file| file.full_path(cx).to_string_lossy().into_owned()),
-            Self::Finalibaymax(FinalibaymaxDiff { path, .. }) => Some(path.clone()),
+            Self::Finalisim(FinalisimDiff { path, .. }) => Some(path.clone()),
         }
     }
 
     pub fn multibuffer(&self) -> &Entity<MultiBuffer> {
         match self {
             Self::Pending(PendingDiff { multibuffer, .. }) => multibuffer,
-            Self::Finalibaymax(FinalibaymaxDiff { multibuffer, .. }) => multibuffer,
+            Self::Finalisim(FinalisimDiff { multibuffer, .. }) => multibuffer,
         }
     }
 
@@ -173,7 +173,7 @@ impl Diff {
                 .read(cx)
                 .file()
                 .map(|file| file.path().display(file.path_style(cx))),
-            Diff::Finalibaymax(FinalibaymaxDiff { path, .. }) => Some(path.as_str().into()),
+            Diff::Finalisim(FinalisimDiff { path, .. }) => Some(path.as_str().into()),
         };
         format!(
             "Diff: {}\n```\n{}\n```\n",
@@ -196,7 +196,7 @@ impl Diff {
                 base_text.as_ref() != old_text
                     || !new_buffer.read(cx).as_rope().chunks().equals_str(new_text)
             }
-            Diff::Finalibaymax(FinalibaymaxDiff {
+            Diff::Finalisim(FinalisimDiff {
                 base_text,
                 new_buffer,
                 ..
@@ -252,7 +252,7 @@ impl PendingDiff {
         self.update_visible_ranges(cx);
     }
 
-    fn finalize(&self, cx: &mut Context<Diff>) -> FinalibaymaxDiff {
+    fn finalize(&self, cx: &mut Context<Diff>) -> FinalisimDiff {
         let ranges = self.excerpt_ranges(cx);
         let base_text = self.base_text.clone();
         let new_buffer = self.new_buffer.read(cx);
@@ -306,7 +306,7 @@ impl PendingDiff {
             })
         });
 
-        FinalibaymaxDiff {
+        FinalisimDiff {
             path,
             base_text: self.base_text.clone(),
             multibuffer: self.multibuffer.clone(),
@@ -370,7 +370,7 @@ impl PendingDiff {
     }
 }
 
-pub struct FinalibaymaxDiff {
+pub struct FinalisimDiff {
     path: String,
     base_text: Arc<str>,
     new_buffer: Entity<Buffer>,

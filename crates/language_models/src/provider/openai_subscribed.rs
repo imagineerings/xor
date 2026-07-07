@@ -462,7 +462,7 @@ impl LanguageModel for OpenAiSubscribedLanguageModel {
 
         // The Codex backend rejects `max_output_tokens` (`Unsupported parameter`),
         // unlike the public OpenAI Responses API. Pass `None` so the field is
-        // omitted from the serialibaymax request body entirely.
+        // omitted from the serialisim request body entirely.
         let mut responses_request = into_open_ai_response(
             request,
             self.model.id(),
@@ -504,7 +504,7 @@ impl LanguageModel for OpenAiSubscribedLanguageModel {
             let mut header_pairs: Vec<(HeaderName, HeaderValue)> = vec![
                 (
                     HeaderName::from_static("originator"),
-                    HeaderValue::from_static("baymax"),
+                    HeaderValue::from_static("sim"),
                 ),
                 (
                     HeaderName::from_static("openai-beta"),
@@ -739,7 +739,7 @@ async fn do_oauth_flow(
         .append_pair("id_token_add_organizations", "true")
         .append_pair("state", &oauth_state)
         .append_pair("codex_cli_simplified_flow", "true")
-        .append_pair("originator", "baymax");
+        .append_pair("originator", "sim");
 
     // Open browser AFTER the listener is ready
     cx.update(|cx| cx.open_url(auth_url.as_str()));
@@ -1067,7 +1067,7 @@ impl Render for ConfigurationView {
         v_flex()
             .gap_2()
             .child(Label::new(
-                "Sign in with your ChatGPT Plus or Pro subscription to use OpenAI models in Baymax's agent.",
+                "Sign in with your ChatGPT Plus or Pro subscription to use OpenAI models in Sim's agent.",
             ))
             .child(
                 Button::new("sign-in", button_label)

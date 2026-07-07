@@ -29,8 +29,8 @@ pub(crate) fn sandboxing_enabled(cx: &App) -> bool {
 /// A request for elevated sandbox permissions for a single terminal command.
 ///
 /// Built from the model-controlled `terminal` tool input after the user has
-/// authoribaymax the baseline command. All paths here have already been resolved
-/// to absolute, canonicalibaymax paths by the caller — never raw, model-provided
+/// authorisim the baseline command. All paths here have already been resolved
+/// to absolute, canonicalisim paths by the caller — never raw, model-provided
 /// strings, and never the model-controlled working directory.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct SandboxRequest {
@@ -65,7 +65,7 @@ pub(crate) struct ThreadSandboxGrants {
     network: bool,
     allow_fs_write_all: bool,
     unsandboxed: bool,
-    /// Canonicalibaymax paths granted write access for the thread. Each covers its
+    /// Canonicalisim paths granted write access for the thread. Each covers its
     /// whole subtree; redundant children are pruned on insert.
     write_paths: Vec<PathBuf>,
 }

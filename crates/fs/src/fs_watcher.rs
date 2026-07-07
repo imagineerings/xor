@@ -8,7 +8,7 @@ use std::{
     sync::{Arc, LazyLock, OnceLock},
     time::{Duration, Instant},
 };
-use util::{ResultExt, paths::SanitibaymaxPath};
+use util::{ResultExt, paths::SanitisimPath};
 
 use crate::{PathEvent, PathEventKind, Watcher};
 
@@ -154,12 +154,12 @@ impl Watcher for FsWatcher {
 /// Returns `true` for filesystem types where inotify/FSEvents/ReadDirectoryChanges
 /// silently fail to deliver events: 9P (WSL drvfs), NFS, CIFS/SMB, FUSE (sshfs), etc.
 ///
-/// Can be overridden with the `BAYMAX_FILE_WATCHER_MODE` environment variable:
+/// Can be overridden with the `SIM_FILE_WATCHER_MODE` environment variable:
 /// - `native` — always use native OS watcher
 /// - `poll` — always use polling
 /// - `auto` (default) — auto-detect based on filesystem type
 pub fn requires_poll_watcher(path: &Path) -> bool {
-    match std::env::var("BAYMAX_FILE_WATCHER_MODE")
+    match std::env::var("SIM_FILE_WATCHER_MODE")
         .as_deref()
         .unwrap_or("auto")
     {
@@ -196,7 +196,7 @@ fn register_existing_path(
     } else {
         WatcherMode::Native
     };
-    let root_path = SanitibaymaxPath::new_arc(path.as_ref());
+    let root_path = SanitisimPath::new_arc(path.as_ref());
     let path_for_callback = path.clone();
     let Some(registration_id) =
         global_watcher().add(path, mode, move |event: &notify::Event| {
@@ -407,7 +407,7 @@ fn enqueue_path_events(
 fn push_notify_event(
     tx: &smol::channel::Sender<()>,
     pending_path_events: &Arc<Mutex<Vec<PathEvent>>>,
-    root_path: &SanitibaymaxPath,
+    root_path: &SanitisimPath,
     watched_root: &Path,
     event: &notify::Event,
 ) {
@@ -421,7 +421,7 @@ fn push_notify_event(
         .paths
         .iter()
         .filter_map(|event_path| {
-            let event_path = SanitibaymaxPath::new(event_path);
+            let event_path = SanitisimPath::new(event_path);
             event_path.starts_with(root_path).then(|| PathEvent {
                 path: event_path.as_path().to_path_buf(),
                 kind,
@@ -726,7 +726,7 @@ impl GlobalWatcher {
             return Ok(());
         }
 
-        // CORE excludes Access events, which Baymax discards anyway. Without this,
+        // CORE excludes Access events, which Sim discards anyway. Without this,
         // the default mask subscribes to inotify OPEN/CLOSE_* on Linux, so every
         // file read in a watched directory would queue events, increasing the
         // risk of queue overflows (and thus full rescans) under read-heavy
@@ -769,7 +769,7 @@ fn is_max_files_watch_error(error: &anyhow::Error) -> bool {
 }
 
 static POLL_INTERVAL: LazyLock<Duration> = LazyLock::new(|| {
-    let poll_ms: u64 = std::env::var("BAYMAX_FILE_WATCHER_POLL_MS")
+    let poll_ms: u64 = std::env::var("SIM_FILE_WATCHER_POLL_MS")
         .ok()
         .and_then(|value| value.parse().ok())
         .unwrap_or(2000)
@@ -778,7 +778,7 @@ static POLL_INTERVAL: LazyLock<Duration> = LazyLock::new(|| {
 });
 
 static NATIVE_WATCH_LIMIT_COOLDOWN: LazyLock<Duration> = LazyLock::new(|| {
-    let cooldown_seconds: u64 = std::env::var("BAYMAX_NATIVE_WATCH_LIMIT_COOLDOWN_SECONDS")
+    let cooldown_seconds: u64 = std::env::var("SIM_NATIVE_WATCH_LIMIT_COOLDOWN_SECONDS")
         .ok()
         .and_then(|value| value.parse().ok())
         .unwrap_or(5)

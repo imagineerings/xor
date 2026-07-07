@@ -56,7 +56,7 @@ fn fetch_extension_repos(filter_repos_input: &WorkflowInput) -> (NamedJob, JobOu
     fn get_repositories(filter_repos_input: &WorkflowInput) -> (Step<Use>, StepOutput) {
         let step: Step<Use> = steps::github_script(formatdoc! {r#"
                 const repos = await github.paginate(github.rest.repos.listForOrg, {{
-                    org: 'baymax-extensions',
+                    org: 'sim-extensions',
                     type: 'public',
                     per_page: 100,
                 }});
@@ -85,10 +85,10 @@ fn fetch_extension_repos(filter_repos_input: &WorkflowInput) -> (NamedJob, JobOu
         (step, filtered_repos)
     }
 
-    fn checkout_baymax_repo() -> CheckoutStep {
+    fn checkout_sim_repo() -> CheckoutStep {
         steps::checkout_repo()
             .with_full_history()
-            .with_custom_name("checkout_baymax_repo")
+            .with_custom_name("checkout_sim_repo")
     }
 
     fn get_previous_tag_commit() -> (Step<Run>, StepOutput) {
@@ -165,7 +165,7 @@ fn fetch_extension_repos(filter_repos_input: &WorkflowInput) -> (NamedJob, JobOu
             ("removed_ci".to_owned(), removed_ci.to_string()),
             ("removed_shared".to_owned(), removed_shared.to_string()),
         ])
-        .add_step(checkout_baymax_repo())
+        .add_step(checkout_sim_repo())
         .add_step(get_prev_tag)
         .add_step(calc_changes)
         .add_step(get_org_repositories)
@@ -193,7 +193,7 @@ fn rollout_workflows_to_extension(
         steps::checkout_repo()
             .with_custom_name("checkout_extension_repo")
             .with_token(token)
-            .with_repository("baymax-extensions/${{ matrix.repo }}")
+            .with_repository("sim-extensions/${{ matrix.repo }}")
             .with_path("extension")
     }
 
@@ -256,8 +256,8 @@ fn rollout_workflows_to_extension(
         let title = format!("Update CI workflows to `{short_sha}`");
 
         let body = formatdoc! {r#"
-            This PR updates the CI workflow files from the main Baymax repository
-            based on the commit simtropolis/baymax@${{{{ github.sha }}}}
+            This PR updates the CI workflow files from the main Sim repository
+            based on the commit simtropolis/sim@${{{{ github.sha }}}}
 
             {context_input}
         "#,
@@ -290,9 +290,9 @@ fn rollout_workflows_to_extension(
     }
 
     let (authenticate, token) =
-        generate_token(vars::BAYMAX_ZIPPY_APP_ID, vars::BAYMAX_ZIPPY_APP_PRIVATE_KEY)
+        generate_token(vars::SIM_ZIPPY_APP_ID, vars::SIM_ZIPPY_APP_PRIVATE_KEY)
             .for_repository(RepositoryTarget::new(
-                "baymax-extensions",
+                "sim-extensions",
                 &["${{ matrix.repo }}"],
             ))
             .with_permissions([
@@ -332,7 +332,7 @@ fn rollout_workflows_to_extension(
 }
 
 fn create_rollout_tag(rollout_job: &NamedJob, filter_repos_input: &WorkflowInput) -> NamedJob {
-    fn checkout_baymax_repo(token: &StepOutput) -> CheckoutStep {
+    fn checkout_sim_repo(token: &StepOutput) -> CheckoutStep {
         steps::checkout_repo().with_full_history().with_token(token)
     }
 
@@ -350,7 +350,7 @@ fn create_rollout_tag(rollout_job: &NamedJob, filter_repos_input: &WorkflowInput
     }
 
     let (authenticate, token) =
-        generate_token(vars::BAYMAX_ZIPPY_APP_ID, vars::BAYMAX_ZIPPY_APP_PRIVATE_KEY)
+        generate_token(vars::SIM_ZIPPY_APP_ID, vars::SIM_ZIPPY_APP_PRIVATE_KEY)
             .for_repository(RepositoryTarget::current())
             .with_permissions([(TokenPermissions::Contents, Level::Write)])
             .into();
@@ -364,7 +364,7 @@ fn create_rollout_tag(rollout_job: &NamedJob, filter_repos_input: &WorkflowInput
         .runs_on(runners::LINUX_SMALL)
         .timeout_minutes(1u32)
         .add_step(authenticate)
-        .add_step(checkout_baymax_repo(&token))
+        .add_step(checkout_sim_repo(&token))
         .add_step(update_rollout_tag().with_zippy_git_identity());
 
     named::job(job)

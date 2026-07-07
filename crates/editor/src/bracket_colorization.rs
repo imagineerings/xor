@@ -334,7 +334,7 @@ where
                     editor_bracket_colors_markup(&editor.snapshot(window, cx))
                 })
                 .unwrap(),
-            "File-less buffer should still have its brackets coloribaymax"
+            "File-less buffer should still have its brackets colorisim"
         );
     }
 
@@ -499,7 +499,7 @@ where
 2 hsla(29.00, 54.00%, 65.88%, 1.00)
 "#,
             &bracket_colors_markup(&mut cx),
-            "After switching to Rust, <> brackets are now coloribaymax"
+            "After switching to Rust, <> brackets are now colorisim"
         );
     }
 
@@ -759,7 +759,7 @@ mod foo «1{
                 comment_lines,
             ),
             &bracket_colors_markup(&mut cx),
-            "First chunk's brackets are invalidated after an edit, and only 2nd (visible) chunk is re-coloribaymax"
+            "First chunk's brackets are invalidated after an edit, and only 2nd (visible) chunk is re-colorisim"
         );
 
         cx.update_editor(|editor, window, cx| {

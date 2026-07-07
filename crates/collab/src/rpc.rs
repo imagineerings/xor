@@ -31,7 +31,7 @@ use axum::{
     routing::get,
 };
 use collections::{HashSet, TypeIdHashMap};
-pub use connection_pool::{BaymaxVersion, ConnectionPool};
+pub use connection_pool::{SimVersion, ConnectionPool};
 use core::fmt::{self, Debug, Formatter};
 use futures::TryFutureExt as _;
 use rpc::proto::split_repository_update;
@@ -536,7 +536,7 @@ impl Server {
                 app_state
                     .db
                     .delete_stale_channel_chat_participants(
-                        &app_state.config.baymax_environment,
+                        &app_state.config.sim_environment,
                         server_id,
                     )
                     .await
@@ -544,7 +544,7 @@ impl Server {
 
                 if let Some((room_ids, channel_ids)) = app_state
                     .db
-                    .stale_server_resource_ids(&app_state.config.baymax_environment, server_id)
+                    .stale_server_resource_ids(&app_state.config.sim_environment, server_id)
                     .await
                     .trace_err()
                 {
@@ -666,7 +666,7 @@ impl Server {
                 app_state
                     .db
                     .delete_stale_channel_chat_participants(
-                        &app_state.config.baymax_environment,
+                        &app_state.config.sim_environment,
                         server_id,
                     )
                     .await
@@ -680,7 +680,7 @@ impl Server {
 
                 app_state
                     .db
-                    .delete_stale_servers(&app_state.config.baymax_environment, server_id)
+                    .delete_stale_servers(&app_state.config.sim_environment, server_id)
                     .await
                     .trace_err();
             }
@@ -853,7 +853,7 @@ impl Server {
         connection: Connection,
         address: String,
         principal: Principal,
-        baymax_version: BaymaxVersion,
+        sim_version: SimVersion,
         release_channel: Option<String>,
         user_agent: Option<String>,
         geoip_country_code: Option<String>,
@@ -914,7 +914,7 @@ impl Server {
             if let Err(error) = this
                 .send_initial_client_update(
                     connection_id,
-                    baymax_version,
+                    sim_version,
                     send_connection_id,
                     &session,
                 )
@@ -1022,7 +1022,7 @@ impl Server {
     async fn send_initial_client_update(
         &self,
         connection_id: ConnectionId,
-        baymax_version: BaymaxVersion,
+        sim_version: SimVersion,
         mut send_connection_id: Option<oneshot::Sender<ConnectionId>>,
         session: &Session,
     ) -> Result<()> {
@@ -1051,7 +1051,7 @@ impl Server {
 
                 {
                     let mut pool = self.connection_pool.lock();
-                    pool.add_connection(connection_id, user.id, user.admin, baymax_version.clone());
+                    pool.add_connection(connection_id, user.id, user.admin, sim_version.clone());
                     self.peer.send(
                         connection_id,
                         build_initial_contacts_update(contacts, &pool),
@@ -1113,8 +1113,8 @@ pub struct ProtocolVersion(u32);
 
 impl Header for ProtocolVersion {
     fn name() -> &'static HeaderName {
-        static BAYMAX_PROTOCOL_VERSION: OnceLock<HeaderName> = OnceLock::new();
-        BAYMAX_PROTOCOL_VERSION.get_or_init(|| HeaderName::from_static("x-baymax-protocol-version"))
+        static SIM_PROTOCOL_VERSION: OnceLock<HeaderName> = OnceLock::new();
+        SIM_PROTOCOL_VERSION.get_or_init(|| HeaderName::from_static("x-sim-protocol-version"))
     }
 
     fn decode<'i, I>(values: &mut I) -> Result<Self, axum::headers::Error>
@@ -1140,8 +1140,8 @@ impl Header for ProtocolVersion {
 pub struct AppVersionHeader(Version);
 impl Header for AppVersionHeader {
     fn name() -> &'static HeaderName {
-        static BAYMAX_APP_VERSION: OnceLock<HeaderName> = OnceLock::new();
-        BAYMAX_APP_VERSION.get_or_init(|| HeaderName::from_static("x-baymax-app-version"))
+        static SIM_APP_VERSION: OnceLock<HeaderName> = OnceLock::new();
+        SIM_APP_VERSION.get_or_init(|| HeaderName::from_static("x-sim-app-version"))
     }
 
     fn decode<'i, I>(values: &mut I) -> Result<Self, axum::headers::Error>
@@ -1169,8 +1169,8 @@ pub struct ReleaseChannelHeader(String);
 
 impl Header for ReleaseChannelHeader {
     fn name() -> &'static HeaderName {
-        static BAYMAX_RELEASE_CHANNEL: OnceLock<HeaderName> = OnceLock::new();
-        BAYMAX_RELEASE_CHANNEL.get_or_init(|| HeaderName::from_static("x-baymax-release-channel"))
+        static SIM_RELEASE_CHANNEL: OnceLock<HeaderName> = OnceLock::new();
+        SIM_RELEASE_CHANNEL.get_or_init(|| HeaderName::from_static("x-sim-release-channel"))
     }
 
     fn decode<'i, I>(values: &mut I) -> Result<Self, axum::headers::Error>
@@ -1225,7 +1225,7 @@ pub async fn handle_websocket_request(
             .into_response();
     }
 
-    let Some(version) = app_version_header.map(|header| BaymaxVersion(header.0.0)) else {
+    let Some(version) = app_version_header.map(|header| SimVersion(header.0.0)) else {
         return (
             StatusCode::UPGRADE_REQUIRED,
             "no version header found".to_string(),
@@ -1965,13 +1965,13 @@ async fn join_project(
         let mut pool = session.connection_pool().await;
         let host_version = pool
             .connection(host_connection_id)
-            .map(|c| c.baymax_version.to_string());
+            .map(|c| c.sim_version.to_string());
         let guest_version = pool
             .connection(session.connection_id)
-            .map(|c| c.baymax_version.to_string());
+            .map(|c| c.sim_version.to_string());
         drop(pool);
         Err(anyhow!(
-            "The host (v{}) and guest (v{}) are using incompatible versions of Baymax. The peer with the older version must update to collaborate.",
+            "The host (v{}) and guest (v{}) are using incompatible versions of Sim. The peer with the older version must update to collaborate.",
             host_version.as_deref().unwrap_or("unknown"),
             guest_version.as_deref().unwrap_or("unknown"),
         ))?;
@@ -3389,7 +3389,7 @@ async fn join_channel_internal(
 ) -> Result<()> {
     let joined_room = {
         let mut db = session.db().await;
-        // If baymax quits without leaving the room, and the user re-opens baymax before the
+        // If sim quits without leaving the room, and the user re-opens sim before the
         // RECONNECT_TIMEOUT, we need to make sure that we kick the user out of the previous
         // room they were in.
         if let Some(connection) = db.stale_room_connection(session.user_id()).await? {
@@ -3662,7 +3662,7 @@ async fn send_channel_message(
     _response: Response<proto::SendChannelMessage>,
     _session: MessageContext,
 ) -> Result<()> {
-    Err(anyhow!("chat has been removed in the latest version of Baymax").into())
+    Err(anyhow!("chat has been removed in the latest version of Sim").into())
 }
 
 /// Delete a channel message
@@ -3671,7 +3671,7 @@ async fn remove_channel_message(
     _response: Response<proto::RemoveChannelMessage>,
     _session: MessageContext,
 ) -> Result<()> {
-    Err(anyhow!("chat has been removed in the latest version of Baymax").into())
+    Err(anyhow!("chat has been removed in the latest version of Sim").into())
 }
 
 async fn update_channel_message(
@@ -3679,7 +3679,7 @@ async fn update_channel_message(
     _response: Response<proto::UpdateChannelMessage>,
     _session: MessageContext,
 ) -> Result<()> {
-    Err(anyhow!("chat has been removed in the latest version of Baymax").into())
+    Err(anyhow!("chat has been removed in the latest version of Sim").into())
 }
 
 /// Mark a channel message as read
@@ -3687,7 +3687,7 @@ async fn acknowledge_channel_message(
     _request: proto::AckChannelMessage,
     _session: MessageContext,
 ) -> Result<()> {
-    Err(anyhow!("chat has been removed in the latest version of Baymax").into())
+    Err(anyhow!("chat has been removed in the latest version of Sim").into())
 }
 
 /// Mark a buffer version as synced
@@ -3715,7 +3715,7 @@ async fn join_channel_chat(
     _response: Response<proto::JoinChannelChat>,
     _session: MessageContext,
 ) -> Result<()> {
-    Err(anyhow!("chat has been removed in the latest version of Baymax").into())
+    Err(anyhow!("chat has been removed in the latest version of Sim").into())
 }
 
 /// Stop receiving chat updates for a channel
@@ -3723,7 +3723,7 @@ async fn leave_channel_chat(
     _request: proto::LeaveChannelChat,
     _session: MessageContext,
 ) -> Result<()> {
-    Err(anyhow!("chat has been removed in the latest version of Baymax").into())
+    Err(anyhow!("chat has been removed in the latest version of Sim").into())
 }
 
 /// Retrieve the chat history for a channel
@@ -3732,7 +3732,7 @@ async fn get_channel_messages(
     _response: Response<proto::GetChannelMessages>,
     _session: MessageContext,
 ) -> Result<()> {
-    Err(anyhow!("chat has been removed in the latest version of Baymax").into())
+    Err(anyhow!("chat has been removed in the latest version of Sim").into())
 }
 
 /// Retrieve specific chat messages
@@ -3741,7 +3741,7 @@ async fn get_channel_messages_by_id(
     _response: Response<proto::GetChannelMessagesById>,
     _session: MessageContext,
 ) -> Result<()> {
-    Err(anyhow!("chat has been removed in the latest version of Baymax").into())
+    Err(anyhow!("chat has been removed in the latest version of Sim").into())
 }
 
 /// Retrieve the current users notifications

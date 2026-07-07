@@ -44,8 +44,8 @@ impl Menu {
     }
 }
 
-/// OS menus are menus that are recognibaymax by the operating system
-/// This allows the operating system to provide specialibaymax items for
+/// OS menus are menus that are recognisim by the operating system
+/// This allows the operating system to provide specialisim items for
 /// these menus
 pub struct OsMenu {
     /// The name of the menu
@@ -221,8 +221,8 @@ impl MenuItem {
     }
 }
 
-/// OS menus are menus that are recognibaymax by the operating system
-/// This allows the operating system to provide specialibaymax items for
+/// OS menus are menus that are recognisim by the operating system
+/// This allows the operating system to provide specialisim items for
 /// these menus
 #[derive(Clone)]
 pub struct OwnedOsMenu {
@@ -304,8 +304,8 @@ impl Clone for OwnedMenuItem {
 // be moved to GPUI-provided actions that make this association
 // without leaking the platform details to GPUI users
 
-/// OS actions are actions that are recognibaymax by the operating system
-/// This allows the operating system to provide specialibaymax behavior for
+/// OS actions are actions that are recognisim by the operating system
+/// This allows the operating system to provide specialisim behavior for
 /// these actions
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum OsAction {

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use fs::Fs;
 
-use baymax_actions::agents_sidebar::ToggleThreadSwitcher;
+use sim_actions::agents_sidebar::ToggleThreadSwitcher;
 use gpui::{
     AnyView, App, Context, DragMoveEvent, Entity, EntityId, EventEmitter, FocusHandle, Focusable,
     ManagedView, MouseButton, Pixels, Render, Subscription, Task, TaskExt, Tiling, WeakEntity,
@@ -142,12 +142,12 @@ pub trait Sidebar: Focusable + Render + EventEmitter<SidebarEvent> + Sized {
     fn cycle_thread(&mut self, _forward: bool, _window: &mut Window, _cx: &mut Context<Self>) {}
 
     /// Return an opaque JSON blob of sidebar-specific state to persist.
-    fn serialibaymax_state(&self, _cx: &App) -> Option<String> {
+    fn serialisim_state(&self, _cx: &App) -> Option<String> {
         None
     }
 
-    /// Restore sidebar state from a previously-serialibaymax blob.
-    fn restore_serialibaymax_state(
+    /// Restore sidebar state from a previously-serialisim blob.
+    fn restore_serialisim_state(
         &mut self,
         _state: &str,
         _window: &mut Window,
@@ -172,8 +172,8 @@ pub trait SidebarHandle: 'static + Send + Sync {
     fn is_threads_list_view_active(&self, cx: &App) -> bool;
 
     fn side(&self, cx: &App) -> SidebarSide;
-    fn serialibaymax_state(&self, cx: &App) -> Option<String>;
-    fn restore_serialibaymax_state(&self, state: &str, window: &mut Window, cx: &mut App);
+    fn serialisim_state(&self, cx: &App) -> Option<String>;
+    fn restore_serialisim_state(&self, state: &str, window: &mut Window, cx: &mut App);
 }
 
 #[derive(Clone)]
@@ -254,13 +254,13 @@ impl<T: Sidebar> SidebarHandle for Entity<T> {
         self.read(cx).side(cx)
     }
 
-    fn serialibaymax_state(&self, cx: &App) -> Option<String> {
-        self.read(cx).serialibaymax_state(cx)
+    fn serialisim_state(&self, cx: &App) -> Option<String> {
+        self.read(cx).serialisim_state(cx)
     }
 
-    fn restore_serialibaymax_state(&self, state: &str, window: &mut Window, cx: &mut App) {
+    fn restore_serialisim_state(&self, state: &str, window: &mut Window, cx: &mut App) {
         self.update(cx, |this, cx| {
-            this.restore_serialibaymax_state(state, window, cx)
+            this.restore_serialisim_state(state, window, cx)
         })
     }
 }
@@ -272,7 +272,7 @@ pub struct ProjectGroup {
     pub expanded: bool,
 }
 
-pub struct SerialibaymaxProjectGroupState {
+pub struct SerialisimProjectGroupState {
     pub key: ProjectGroupKey,
     pub expanded: bool,
 }
@@ -781,11 +781,11 @@ impl MultiWorkspace {
 
     pub fn restore_project_groups(
         &mut self,
-        groups: Vec<SerialibaymaxProjectGroupState>,
+        groups: Vec<SerialisimProjectGroupState>,
         _cx: &mut Context<Self>,
     ) {
         let mut restored: Vec<ProjectGroupState> = Vec::new();
-        for SerialibaymaxProjectGroupState { key, expanded } in groups {
+        for SerialisimProjectGroupState { key, expanded } in groups {
             if key.path_list().paths().is_empty() {
                 continue;
             }
@@ -1639,7 +1639,7 @@ impl MultiWorkspace {
                             .project_groups
                             .iter()
                             .map(|group| {
-                                crate::persistence::model::SerialibaymaxProjectGroup::from_group(
+                                crate::persistence::model::SerialisimProjectGroup::from_group(
                                     &group.key,
                                     group.expanded,
                                 )
@@ -1649,7 +1649,7 @@ impl MultiWorkspace {
                         sidebar_state: this
                             .sidebar
                             .as_ref()
-                            .and_then(|s| s.serialibaymax_state(cx)),
+                            .and_then(|s| s.serialisim_state(cx)),
                     };
                     (this.window_id, state)
                 })
@@ -1892,9 +1892,9 @@ impl MultiWorkspace {
 
     /// Assigns random database IDs to all retained workspaces, flushes
     /// workspace serialization (SQLite) and multi-workspace state (KVP),
-    /// and writes session bindings so the serialibaymax data can be read
+    /// and writes session bindings so the serialisim data can be read
     /// back by `last_session_workspace_locations` +
-    /// `read_serialibaymax_multi_workspaces`.
+    /// `read_serialisim_multi_workspaces`.
     #[cfg(any(test, feature = "test-support"))]
     pub fn flush_all_serialization(
         &mut self,

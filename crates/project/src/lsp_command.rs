@@ -1850,25 +1850,25 @@ impl LspCommand for GetDocumentSymbols {
         _: AsyncApp,
     ) -> Result<Vec<DocumentSymbol>> {
         let mut symbols = Vec::with_capacity(message.symbols.len());
-        for serialibaymax_symbol in message.symbols {
+        for serialisim_symbol in message.symbols {
             fn deserialize_symbol_with_children(
-                serialibaymax_symbol: proto::DocumentSymbol,
+                serialisim_symbol: proto::DocumentSymbol,
             ) -> Result<DocumentSymbol> {
                 let kind =
-                    unsafe { mem::transmute::<i32, lsp::SymbolKind>(serialibaymax_symbol.kind) };
+                    unsafe { mem::transmute::<i32, lsp::SymbolKind>(serialisim_symbol.kind) };
 
-                let start = serialibaymax_symbol.start.context("invalid start")?;
-                let end = serialibaymax_symbol.end.context("invalid end")?;
+                let start = serialisim_symbol.start.context("invalid start")?;
+                let end = serialisim_symbol.end.context("invalid end")?;
 
-                let selection_start = serialibaymax_symbol
+                let selection_start = serialisim_symbol
                     .selection_start
                     .context("invalid selection start")?;
-                let selection_end = serialibaymax_symbol
+                let selection_end = serialisim_symbol
                     .selection_end
                     .context("invalid selection end")?;
 
                 Ok(DocumentSymbol {
-                    name: serialibaymax_symbol.name,
+                    name: serialisim_symbol.name,
                     kind,
                     range: Unclipped(PointUtf16::new(start.row, start.column))
                         ..Unclipped(PointUtf16::new(end.row, end.column)),
@@ -1877,7 +1877,7 @@ impl LspCommand for GetDocumentSymbols {
                         selection_start.column,
                     ))
                         ..Unclipped(PointUtf16::new(selection_end.row, selection_end.column)),
-                    children: serialibaymax_symbol
+                    children: serialisim_symbol
                         .children
                         .into_iter()
                         .filter_map(|symbol| deserialize_symbol_with_children(symbol).ok())
@@ -1885,7 +1885,7 @@ impl LspCommand for GetDocumentSymbols {
                 })
             }
 
-            symbols.push(deserialize_symbol_with_children(serialibaymax_symbol)?);
+            symbols.push(deserialize_symbol_with_children(serialisim_symbol)?);
         }
 
         Ok(symbols)

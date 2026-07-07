@@ -99,7 +99,7 @@ impl AgentProfile {
     }
 }
 
-/// A profile for the Baymax Agent that controls its behavior.
+/// A profile for the Sim Agent that controls its behavior.
 #[derive(Debug, Clone)]
 pub struct AgentProfileSettings {
     /// The name of the profile.

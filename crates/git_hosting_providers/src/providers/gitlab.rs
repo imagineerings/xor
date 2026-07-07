@@ -63,7 +63,7 @@ impl Gitlab {
         }
 
         // TODO: detecting self hosted instances by checking whether "gitlab" is in the url or not
-        // is not very reliable. See https://github.com/simtropolis/baymax/issues/26393 for more
+        // is not very reliable. See https://github.com/simtropolis/sim/issues/26393 for more
         // information.
         if !host.contains("gitlab") {
             bail!("not a GitLab URL");
@@ -306,7 +306,7 @@ mod tests {
 
     #[test]
     fn test_invalid_self_hosted_remote_url() {
-        let remote_url = "https://gitlab.com/simtropolis/baymax.git";
+        let remote_url = "https://gitlab.com/simtropolis/sim.git";
         let gitlab = Gitlab::from_remote_url(remote_url);
         assert!(gitlab.is_err());
     }
@@ -314,14 +314,14 @@ mod tests {
     #[test]
     fn test_parse_remote_url_given_ssh_url() {
         let parsed_remote = Gitlab::public_instance()
-            .parse_remote_url("git@gitlab.com:simtropolis/baymax.git")
+            .parse_remote_url("git@gitlab.com:simtropolis/sim.git")
             .unwrap();
 
         assert_eq!(
             parsed_remote,
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "baymax".into(),
+                repo: "sim".into(),
             }
         );
     }
@@ -329,21 +329,21 @@ mod tests {
     #[test]
     fn test_parse_remote_url_given_https_url() {
         let parsed_remote = Gitlab::public_instance()
-            .parse_remote_url("https://gitlab.com/simtropolis/baymax.git")
+            .parse_remote_url("https://gitlab.com/simtropolis/sim.git")
             .unwrap();
 
         assert_eq!(
             parsed_remote,
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "baymax".into(),
+                repo: "sim".into(),
             }
         );
     }
 
     #[test]
     fn test_parse_remote_url_given_self_hosted_ssh_url() {
-        let remote_url = "git@gitlab.my-enterprise.com:simtropolis/baymax.git";
+        let remote_url = "git@gitlab.my-enterprise.com:simtropolis/sim.git";
 
         let parsed_remote = Gitlab::from_remote_url(remote_url)
             .unwrap()
@@ -354,14 +354,14 @@ mod tests {
             parsed_remote,
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "baymax".into(),
+                repo: "sim".into(),
             }
         );
     }
 
     #[test]
     fn test_parse_remote_url_given_self_hosted_https_url_with_subgroup() {
-        let remote_url = "https://gitlab.my-enterprise.com/group/subgroup/baymax.git";
+        let remote_url = "https://gitlab.my-enterprise.com/group/subgroup/sim.git";
         let parsed_remote = Gitlab::from_remote_url(remote_url)
             .unwrap()
             .parse_remote_url(remote_url)
@@ -371,7 +371,7 @@ mod tests {
             parsed_remote,
             ParsedGitRemote {
                 owner: "group/subgroup".into(),
-                repo: "baymax".into(),
+                repo: "sim".into(),
             }
         );
     }
@@ -381,7 +381,7 @@ mod tests {
         let permalink = Gitlab::public_instance().build_permalink(
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "baymax".into(),
+                repo: "sim".into(),
             },
             BuildPermalinkParams::new(
                 "e6ebe7974deb6bb6cc0e2595c8ec31f0c71084b7",
@@ -390,7 +390,7 @@ mod tests {
             ),
         );
 
-        let expected_url = "https://gitlab.com/simtropolis/baymax/-/blob/e6ebe7974deb6bb6cc0e2595c8ec31f0c71084b7/crates/editor/src/git/permalink.rs";
+        let expected_url = "https://gitlab.com/simtropolis/sim/-/blob/e6ebe7974deb6bb6cc0e2595c8ec31f0c71084b7/crates/editor/src/git/permalink.rs";
         assert_eq!(permalink.to_string(), expected_url.to_string())
     }
 
@@ -399,7 +399,7 @@ mod tests {
         let permalink = Gitlab::public_instance().build_permalink(
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "baymax".into(),
+                repo: "sim".into(),
             },
             BuildPermalinkParams::new(
                 "e6ebe7974deb6bb6cc0e2595c8ec31f0c71084b7",
@@ -408,7 +408,7 @@ mod tests {
             ),
         );
 
-        let expected_url = "https://gitlab.com/simtropolis/baymax/-/blob/e6ebe7974deb6bb6cc0e2595c8ec31f0c71084b7/crates/editor/src/git/permalink.rs#L7";
+        let expected_url = "https://gitlab.com/simtropolis/sim/-/blob/e6ebe7974deb6bb6cc0e2595c8ec31f0c71084b7/crates/editor/src/git/permalink.rs#L7";
         assert_eq!(permalink.to_string(), expected_url.to_string())
     }
 
@@ -417,7 +417,7 @@ mod tests {
         let permalink = Gitlab::public_instance().build_permalink(
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "baymax".into(),
+                repo: "sim".into(),
             },
             BuildPermalinkParams::new(
                 "e6ebe7974deb6bb6cc0e2595c8ec31f0c71084b7",
@@ -426,7 +426,7 @@ mod tests {
             ),
         );
 
-        let expected_url = "https://gitlab.com/simtropolis/baymax/-/blob/e6ebe7974deb6bb6cc0e2595c8ec31f0c71084b7/crates/editor/src/git/permalink.rs#L24-48";
+        let expected_url = "https://gitlab.com/simtropolis/sim/-/blob/e6ebe7974deb6bb6cc0e2595c8ec31f0c71084b7/crates/editor/src/git/permalink.rs#L24-48";
         assert_eq!(permalink.to_string(), expected_url.to_string())
     }
 
@@ -434,7 +434,7 @@ mod tests {
     fn test_build_gitlab_create_pr_url() {
         let remote = ParsedGitRemote {
             owner: "simtropolis".into(),
-            repo: "baymax".into(),
+            repo: "sim".into(),
         };
 
         let provider = Gitlab::public_instance();
@@ -445,19 +445,19 @@ mod tests {
 
         assert_eq!(
             url.as_str(),
-            "https://gitlab.com/simtropolis/baymax/-/merge_requests/new?merge_request%5Bsource_branch%5D=feature%2Fcool%20stuff"
+            "https://gitlab.com/simtropolis/sim/-/merge_requests/new?merge_request%5Bsource_branch%5D=feature%2Fcool%20stuff"
         );
     }
 
     #[test]
     fn test_build_gitlab_self_hosted_permalink_from_ssh_url() {
         let gitlab =
-            Gitlab::from_remote_url("git@gitlab.some-enterprise.com:simtropolis/baymax.git")
+            Gitlab::from_remote_url("git@gitlab.some-enterprise.com:simtropolis/sim.git")
                 .unwrap();
         let permalink = gitlab.build_permalink(
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "baymax".into(),
+                repo: "sim".into(),
             },
             BuildPermalinkParams::new(
                 "e6ebe7974deb6bb6cc0e2595c8ec31f0c71084b7",
@@ -466,28 +466,28 @@ mod tests {
             ),
         );
 
-        let expected_url = "https://gitlab.some-enterprise.com/simtropolis/baymax/-/blob/e6ebe7974deb6bb6cc0e2595c8ec31f0c71084b7/crates/editor/src/git/permalink.rs";
+        let expected_url = "https://gitlab.some-enterprise.com/simtropolis/sim/-/blob/e6ebe7974deb6bb6cc0e2595c8ec31f0c71084b7/crates/editor/src/git/permalink.rs";
         assert_eq!(permalink.to_string(), expected_url.to_string())
     }
 
     #[test]
     fn test_build_gitlab_self_hosted_permalink_from_https_url() {
         let gitlab =
-            Gitlab::from_remote_url("https://gitlab-instance.big-co.com/simtropolis/baymax.git")
+            Gitlab::from_remote_url("https://gitlab-instance.big-co.com/simtropolis/sim.git")
                 .unwrap();
         let permalink = gitlab.build_permalink(
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "baymax".into(),
+                repo: "sim".into(),
             },
             BuildPermalinkParams::new(
                 "b2efec9824c45fcc90c9a7eb107a50d1772a60aa",
-                &repo_path("crates/baymax/src/main.rs"),
+                &repo_path("crates/sim/src/main.rs"),
                 None,
             ),
         );
 
-        let expected_url = "https://gitlab-instance.big-co.com/simtropolis/baymax/-/blob/b2efec9824c45fcc90c9a7eb107a50d1772a60aa/crates/baymax/src/main.rs";
+        let expected_url = "https://gitlab-instance.big-co.com/simtropolis/sim/-/blob/b2efec9824c45fcc90c9a7eb107a50d1772a60aa/crates/sim/src/main.rs";
         assert_eq!(permalink.to_string(), expected_url.to_string())
     }
 
@@ -495,7 +495,7 @@ mod tests {
     fn test_build_create_pull_request_url() {
         let remote = ParsedGitRemote {
             owner: "simtropolis".into(),
-            repo: "baymax".into(),
+            repo: "sim".into(),
         };
 
         let github = Gitlab::public_instance();
@@ -505,10 +505,10 @@ mod tests {
 
         assert_eq!(
             url.as_str(),
-            "https://gitlab.com/simtropolis/baymax/-/merge_requests/new?merge_request%5Bsource_branch%5D=feature%2Fnew-feature"
+            "https://gitlab.com/simtropolis/sim/-/merge_requests/new?merge_request%5Bsource_branch%5D=feature%2Fnew-feature"
         );
 
-        let base_url = Url::parse("https://gitlab.baymax.com").unwrap();
+        let base_url = Url::parse("https://gitlab.sim.com").unwrap();
         let github = Gitlab::new("GitLab Self-Hosted", base_url);
         let url = github
             .build_create_pull_request_url(&remote, "feature/new-feature")
@@ -516,7 +516,7 @@ mod tests {
 
         assert_eq!(
             url.as_str(),
-            "https://gitlab.baymax.com/simtropolis/baymax/-/merge_requests/new?merge_request%5Bsource_branch%5D=feature%2Fnew-feature"
+            "https://gitlab.sim.com/simtropolis/sim/-/merge_requests/new?merge_request%5Bsource_branch%5D=feature%2Fnew-feature"
         );
     }
 
@@ -524,7 +524,7 @@ mod tests {
     fn test_extract_merge_request_from_squash_commit() {
         let remote = ParsedGitRemote {
             owner: "simtropolis".into(),
-            repo: "baymax".into(),
+            repo: "sim".into(),
         };
 
         let provider = Gitlab::public_instance();
@@ -536,7 +536,7 @@ mod tests {
         assert_eq!(pull_request.number, 456);
         assert_eq!(
             pull_request.url.as_str(),
-            "https://gitlab.com/simtropolis/baymax/-/merge_requests/456"
+            "https://gitlab.com/simtropolis/sim/-/merge_requests/456"
         );
     }
 
@@ -544,20 +544,20 @@ mod tests {
     fn test_extract_merge_request_from_merge_commit() {
         let remote = ParsedGitRemote {
             owner: "simtropolis".into(),
-            repo: "baymax".into(),
+            repo: "sim".into(),
         };
 
         let provider = Gitlab::public_instance();
 
         // Test standard merge commit pattern: "See merge request group/project!123"
         let message =
-            "Merge branch 'feature' into 'main'\n\nSee merge request simtropolis/baymax!789";
+            "Merge branch 'feature' into 'main'\n\nSee merge request simtropolis/sim!789";
         let pull_request = provider.extract_pull_request(&remote, message).unwrap();
 
         assert_eq!(pull_request.number, 789);
         assert_eq!(
             pull_request.url.as_str(),
-            "https://gitlab.com/simtropolis/baymax/-/merge_requests/789"
+            "https://gitlab.com/simtropolis/sim/-/merge_requests/789"
         );
     }
 
@@ -585,7 +585,7 @@ mod tests {
     fn test_extract_merge_request_no_match() {
         let remote = ParsedGitRemote {
             owner: "simtropolis".into(),
-            repo: "baymax".into(),
+            repo: "sim".into(),
         };
 
         let provider = Gitlab::public_instance();

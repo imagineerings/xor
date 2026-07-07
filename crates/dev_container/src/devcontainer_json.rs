@@ -127,12 +127,12 @@ impl std::fmt::Display for FeatureOptionValue {
 }
 
 #[derive(Clone, Debug, Serialize, Eq, PartialEq, Default)]
-pub(crate) struct BaymaxCustomizationsWrapper {
-    pub(crate) baymax: BaymaxCustomization,
+pub(crate) struct SimCustomizationsWrapper {
+    pub(crate) sim: SimCustomization,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq, Default)]
-pub(crate) struct BaymaxCustomization {
+pub(crate) struct SimCustomization {
     #[serde(default)]
     pub(crate) extensions: Vec<String>,
 }
@@ -221,7 +221,7 @@ pub(crate) struct DevContainer {
     pub(crate) mounts: Option<Vec<MountDefinition>>,
     pub(crate) features: Option<HashMap<String, FeatureOptions>>,
     pub(crate) override_feature_install_order: Option<Vec<String>>,
-    pub(crate) customizations: Option<BaymaxCustomizationsWrapper>,
+    pub(crate) customizations: Option<SimCustomizationsWrapper>,
     pub(crate) build: Option<ContainerBuild>,
     #[serde(default, deserialize_with = "deserialize_app_port")]
     pub(crate) app_port: Vec<String>,
@@ -306,24 +306,24 @@ impl DevContainer {
 }
 
 // Custom deserializer that parses the entire customizations object as a
-// serde_json_lenient::Value first, then extracts the "baymax" portion.
+// serde_json_lenient::Value first, then extracts the "sim" portion.
 // This avoids a bug in serde_json_lenient's `ignore_value` codepath which
 // does not handle trailing commas in skipped values.
-impl<'de> Deserialize<'de> for BaymaxCustomizationsWrapper {
+impl<'de> Deserialize<'de> for SimCustomizationsWrapper {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
         let value = Value::deserialize(deserializer)?;
-        let baymax = value
-            .get("baymax")
-            .map(|baymax_value| {
-                serde_json_lenient::from_value::<BaymaxCustomization>(baymax_value.clone())
+        let sim = value
+            .get("sim")
+            .map(|sim_value| {
+                serde_json_lenient::from_value::<SimCustomization>(sim_value.clone())
             })
             .transpose()
             .map_err(serde::de::Error::custom)?
             .unwrap_or_default();
-        Ok(BaymaxCustomizationsWrapper { baymax })
+        Ok(SimCustomizationsWrapper { sim })
     }
 }
 
@@ -629,7 +629,7 @@ mod test {
     use crate::{
         devcontainer_api::DevContainerError,
         devcontainer_json::{
-            BaymaxCustomization, BaymaxCustomizationsWrapper, ContainerBuild, DevContainer,
+            SimCustomization, SimCustomizationsWrapper, ContainerBuild, DevContainer,
             DevContainerBuildType, FeatureOptions, ForwardPort, HostRequirements, LifecycleCommand,
             LifecycleScript, MountDefinition, OnAutoForward, PortAttributeProtocol, PortAttributes,
             ShutdownAction, UserEnvProbe, deserialize_devcontainer_json,
@@ -648,7 +648,7 @@ mod test {
                       "GitHub.vscode-pull-request-github",
                     ],
                   },
-                  "baymax": {
+                  "sim": {
                     "extensions": ["vue", "ruby"],
                   },
                   "codespaces": {
@@ -675,8 +675,8 @@ mod test {
         let devcontainer = result.expect("ok");
         assert_eq!(
             devcontainer.customizations,
-            Some(BaymaxCustomizationsWrapper {
-                baymax: BaymaxCustomization {
+            Some(SimCustomizationsWrapper {
+                sim: SimCustomization {
                     extensions: vec!["vue".to_string(), "ruby".to_string()]
                 }
             })
@@ -684,8 +684,8 @@ mod test {
     }
 
     #[test]
-    fn should_deserialize_customizations_without_baymax_key() {
-        let json_without_baymax = r#"
+    fn should_deserialize_customizations_without_sim_key() {
+        let json_without_sim = r#"
             {
                 "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
                 "customizations": {
@@ -696,18 +696,18 @@ mod test {
             }
         "#;
 
-        let result = deserialize_devcontainer_json(json_without_baymax);
+        let result = deserialize_devcontainer_json(json_without_sim);
 
         assert!(
             result.is_ok(),
-            "Should handle missing baymax key in customizations, but got: {:?}",
+            "Should handle missing sim key in customizations, but got: {:?}",
             result.err()
         );
         let devcontainer = result.expect("ok");
         assert_eq!(
             devcontainer.customizations,
-            Some(BaymaxCustomizationsWrapper {
-                baymax: BaymaxCustomization { extensions: vec![] }
+            Some(SimCustomizationsWrapper {
+                sim: SimCustomization { extensions: vec![] }
             })
         );
     }
@@ -817,7 +817,7 @@ mod test {
                     "vscode": {
                         // Just confirm that this can be included and ignored
                     },
-                    "baymax": {
+                    "sim": {
                         "extensions": [
                             "html"
                         ]
@@ -949,8 +949,8 @@ mod test {
                     target: "/workspaces/app".to_string(),
                     mount_type: Some("bind".to_string())
                 }),
-                customizations: Some(BaymaxCustomizationsWrapper {
-                    baymax: BaymaxCustomization {
+                customizations: Some(SimCustomizationsWrapper {
+                    sim: SimCustomization {
                         extensions: vec!["html".to_string()]
                     }
                 }),
@@ -1593,7 +1593,7 @@ mod test {
                     "vscode": {
                         // Just confirm that this can be included and ignored
                     },
-                    "baymax": {
+                    "sim": {
                         "extensions": [
                             "html"
                         ]
@@ -1631,7 +1631,7 @@ mod test {
                     "vscode": {
                         // Just confirm that this can be included and ignored
                     },
-                    "baymax": {
+                    "sim": {
                         "extensions": [
                             "html"
                         ]
@@ -1668,7 +1668,7 @@ mod test {
                     "vscode": {
                         // Just confirm that this can be included and ignored
                     },
-                    "baymax": {
+                    "sim": {
                         "extensions": [
                             "html"
                         ]

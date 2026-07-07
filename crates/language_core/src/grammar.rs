@@ -229,7 +229,7 @@ fn populate_capture_indices(
                 .any(|&prefix| name.starts_with(prefix))
         {
             log::warn!(
-                "unrecognibaymax capture name '{}' in {} {} TreeSitter query \
+                "unrecognisim capture name '{}' in {} {} TreeSitter query \
                 (suppress this warning by prefixing with '_')",
                 name,
                 language_name,
@@ -471,7 +471,7 @@ impl Grammar {
                 text_objects_by_capture_ix.push((ix as u32, text_object));
             } else {
                 log::warn!(
-                    "unrecognibaymax capture name '{}' in {} textobjects TreeSitter query",
+                    "unrecognisim capture name '{}' in {} textobjects TreeSitter query",
                     name,
                     language_name,
                 );
@@ -498,7 +498,7 @@ impl Grammar {
                 objects_by_capture_ix.push((ix as u32, text_object));
             } else {
                 log::warn!(
-                    "unrecognibaymax capture name '{}' in {} debugger TreeSitter query",
+                    "unrecognisim capture name '{}' in {} debugger TreeSitter query",
                     name,
                     language_name,
                 );

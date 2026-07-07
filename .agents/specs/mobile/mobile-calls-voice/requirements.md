@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The Baymax mobile client needs voice and calling capabilities. This includes voice input for the agent (dictation, voice mode) and audio/video calls with collaborators. The iOS app already has `VoiceInputManager`, `VoiceOutputManager`, `ContinuousVoiceManager`, and `EnhancedVoiceManager` — these need to be unified and extended. The `mobile-dev` app has WebRTC-based calls via `react-native-webrtc` and `react-native-incall-manager`. The Baymax desktop has calls via the `call` crate with LiveKit integration.
+The Sim mobile client needs voice and calling capabilities. This includes voice input for the agent (dictation, voice mode) and audio/video calls with collaborators. The iOS app already has `VoiceInputManager`, `VoiceOutputManager`, `ContinuousVoiceManager`, and `EnhancedVoiceManager` — these need to be unified and extended. The `mobile-dev` app has WebRTC-based calls via `react-native-webrtc` and `react-native-incall-manager`. The Sim desktop has calls via the `call` crate with LiveKit integration.
 
 ## Glossary
 
@@ -11,7 +11,7 @@ The Baymax mobile client needs voice and calling capabilities. This includes voi
 | **Voice Input** | Speech-to-text for sending messages to the agent. Supports Normal mode (tap to speak), Transcribe mode (streaming transcription), and Continuous mode (always-listening). |
 | **Voice Output** | Text-to-speech for hearing agent responses aloud. |
 | **Call** | A real-time audio/video connection with one or more participants via LiveKit/WebRTC. |
-| **LiveKit** | The open-source WebRTC SFU (Selective Forwarding Unit) used by Baymax for multi-party calls. |
+| **LiveKit** | The open-source WebRTC SFU (Selective Forwarding Unit) used by Sim for multi-party calls. |
 | **Room** | A virtual space where call participants connect. Manages participants, screen sharing, and mute state. |
 | **DTMF** | Dual-tone multi-frequency signaling for in-call actions. |
 
@@ -19,7 +19,7 @@ The Baymax mobile client needs voice and calling capabilities. This includes voi
 
 ### Requirement 1: Voice Input for Agent
 
-**User Story:** As a mobile user, I want to speak to my Baymax agent instead of typing, so I can use it hands-free.
+**User Story:** As a mobile user, I want to speak to my Sim agent instead of typing, so I can use it hands-free.
 
 1.1 THE app SHALL provide a microphone button in the chat input area.
 
@@ -79,4 +79,4 @@ The Baymax mobile client needs voice and calling capabilities. This includes voi
 - iOS: `VoiceInputManager.swift`, `VoiceOutputManager.swift`, `ContinuousVoiceManager.swift`, `EnhancedVoiceManager.swift`
 - Android: `VoiceManager.kt`, `ContinuousVoiceManager.kt`, `data/model/VoiceState.kt`
 - mobile-dev: `app/products/calls/` (full calls product with WebRTC, signaling, connection management)
-- Baymax desktop: `crates/call/` (LiveKit-based calls, room management, participant handling)
+- Sim desktop: `crates/call/` (LiveKit-based calls, room management, participant handling)

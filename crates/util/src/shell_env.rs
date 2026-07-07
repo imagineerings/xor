@@ -41,7 +41,7 @@ pub async fn capture(
 /// Try to parse the environment output before checking the exit status.
 /// The user's shell rc files may contain commands that fail (e.g. editor
 /// integrations that call posix_spawnp outside a real PTY), causing a
-/// non-zero exit status even though `baymax --printenv` ran successfully and
+/// non-zero exit status even though `sim --printenv` ran successfully and
 /// produced valid output on its separate fd.
 fn parse_env_output(
     env_output: &str,
@@ -82,14 +82,14 @@ async fn capture_unix(
     use crate::command::new_std_command;
 
     let shell_kind = ShellKind::new(shell_path, false);
-    let quoted_baymax_path = super::get_shell_safe_baymax_path(shell_kind)?;
+    let quoted_sim_path = super::get_shell_safe_sim_path(shell_kind)?;
 
     let mut command_string = String::new();
     let mut command = new_std_command(shell_path);
     command.args(args);
     // In some shells, file descriptors greater than 2 cannot be used in interactive mode,
     // so file descriptor 0 (stdin) is used instead. This impacts zsh, old bash; perhaps others.
-    // See: https://github.com/simtropolis/baymax/pull/32136#issuecomment-2999645482
+    // See: https://github.com/simtropolis/sim/pull/32136#issuecomment-2999645482
     const FD_STDIN: std::os::fd::RawFd = 0;
     const FD_STDOUT: std::os::fd::RawFd = 1;
     const FD_STDERR: std::os::fd::RawFd = 2;
@@ -143,7 +143,7 @@ async fn capture_unix(
     if let Some(prefix) = shell_kind.command_prefix() {
         command_string.push(prefix);
     }
-    command_string.push_str(&format!("{} --printenv {}", quoted_baymax_path, redir));
+    command_string.push_str(&format!("{} --printenv {}", quoted_sim_path, redir));
 
     if let ShellKind::Nushell = shell_kind {
         command_string.push_str("; exit");
@@ -212,8 +212,8 @@ async fn capture_windows(
 ) -> Result<collections::HashMap<String, String>> {
     use std::process::Stdio;
 
-    let baymax_path =
-        std::env::current_exe().context("Failed to determine current baymax executable path.")?;
+    let sim_path =
+        std::env::current_exe().context("Failed to determine current sim executable path.")?;
 
     let shell_kind = ShellKind::new(shell_path, true);
     // Prefix with "./" if the path starts with "-" to prevent cd from interpreting it as a flag
@@ -223,7 +223,7 @@ async fn capture_windows(
     } else {
         directory_string
     };
-    let baymax_path_string = baymax_path.display().to_string();
+    let sim_path_string = sim_path.display().to_string();
     let quote_for_shell = |value: &str| {
         shell_kind
             .try_quote(value)
@@ -233,7 +233,7 @@ async fn capture_windows(
     let mut cmd = crate::command::new_command(shell_path);
     cmd.args(args);
     let quoted_directory = quote_for_shell(&directory_string)?;
-    let quoted_baymax_path = quote_for_shell(&baymax_path_string)?;
+    let quoted_sim_path = quote_for_shell(&sim_path_string)?;
     let cmd = match shell_kind {
         ShellKind::Csh
         | ShellKind::Tcsh
@@ -244,7 +244,7 @@ async fn capture_windows(
             "-l",
             "-i",
             "-c",
-            &format!("cd {}; {} --printenv", quoted_directory, quoted_baymax_path),
+            &format!("cd {}; {} --printenv", quoted_directory, quoted_sim_path),
         ]),
         ShellKind::PowerShell | ShellKind::Pwsh => cmd.args([
             "-NonInteractive",
@@ -252,20 +252,20 @@ async fn capture_windows(
             "-Command",
             &format!(
                 "Set-Location {}; & {} --printenv",
-                quoted_directory, quoted_baymax_path
+                quoted_directory, quoted_sim_path
             ),
         ]),
         ShellKind::Elvish => cmd.args([
             "-c",
-            &format!("cd {}; {} --printenv", quoted_directory, quoted_baymax_path),
+            &format!("cd {}; {} --printenv", quoted_directory, quoted_sim_path),
         ]),
         ShellKind::Nushell => {
-            let baymax_command = shell_kind
-                .prepend_command_prefix(&quoted_baymax_path)
+            let sim_command = shell_kind
+                .prepend_command_prefix(&quoted_sim_path)
                 .into_owned();
             cmd.args([
                 "-c",
-                &format!("cd {}; {} --printenv", quoted_directory, baymax_command),
+                &format!("cd {}; {} --printenv", quoted_directory, sim_command),
             ])
         }
         ShellKind::Cmd => {
@@ -276,7 +276,7 @@ async fn capture_windows(
                 "cd",
                 dir,
                 "&&",
-                &baymax_path_string,
+                &sim_path_string,
                 "--printenv",
             ])
         }

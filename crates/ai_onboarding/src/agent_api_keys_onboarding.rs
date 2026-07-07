@@ -1,5 +1,5 @@
 use gpui::{Action, IntoElement, ParentElement, RenderOnce, point};
-use language_model::{BAYMAX_CLOUD_PROVIDER_ID, IconOrSvg, LanguageModelRegistry};
+use language_model::{SIM_CLOUD_PROVIDER_ID, IconOrSvg, LanguageModelRegistry};
 use ui::{Divider, List, ListBulletItem, prelude::*};
 
 pub struct ApiKeysWithProviders {
@@ -32,7 +32,7 @@ impl ApiKeysWithProviders {
             .visible_providers()
             .iter()
             .filter(|provider| {
-                provider.is_authenticated(cx) && provider.id() != BAYMAX_CLOUD_PROVIDER_ID
+                provider.is_authenticated(cx) && provider.id() != SIM_CLOUD_PROVIDER_ID
             })
             .map(|provider| (provider.icon(), provider.name().0))
             .collect()
@@ -144,7 +144,7 @@ impl RenderOnce for ApiKeysWithoutProviders {
                     .style(ButtonStyle::Outlined)
                     .on_click(move |_, window, cx| {
                         window
-                            .dispatch_action(baymax_actions::agent::OpenSettings.boxed_clone(), cx);
+                            .dispatch_action(sim_actions::agent::OpenSettings.boxed_clone(), cx);
                     }),
             )
     }

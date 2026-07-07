@@ -1,13 +1,13 @@
 ---
-title: Building Baymax for Linux
-description: "Guide to building baymax for linux for Baymax development."
+title: Building Sim for Linux
+description: "Guide to building sim for linux for Sim development."
 ---
 
-# Building Baymax for Linux
+# Building Sim for Linux
 
 ## Repository
 
-Clone the [Baymax repository](https://github.com/simtropolis/baymax).
+Clone the [Sim repository](https://github.com/simtropolis/sim).
 
 ## Dependencies
 
@@ -23,7 +23,7 @@ Clone the [Baymax repository](https://github.com/simtropolis/baymax).
 
 ## Building from source
 
-Once the dependencies are installed, you can build Baymax using [Cargo](https://doc.rust-lang.org/cargo/).
+Once the dependencies are installed, you can build Sim using [Cargo](https://doc.rust-lang.org/cargo/).
 
 For a debug build of the editor:
 
@@ -51,7 +51,7 @@ You can install a local build on your machine with:
 ./script/install-linux
 ```
 
-This builds `baymax` and the `cli` in release mode, installs the binary at `~/.local/bin/baymax`, and installs `.desktop` files to `~/.local/share`.
+This builds `sim` and the `cli` in release mode, installs the binary at `~/.local/bin/sim`, and installs `.desktop` files to `~/.local/share`.
 
 > **_Note_**: If you encounter linker errors similar to the following:
 >
@@ -73,45 +73,45 @@ This builds `baymax` and the `cli` in release mode, installs the binary at `~/.l
 > This is caused by known bugs in aws-lc-rs (no GCC >= 14 support): [FIPS fails to build with GCC >= 14](https://github.com/aws/aws-lc-rs/issues/569)
 > & [GCC-14 - build failure for FIPS module](https://github.com/aws/aws-lc/issues/2010)
 >
-> You can refer to [linux: Linker error for remote_server when using script/install-linux](https://github.com/simtropolis/baymax/issues/24880) for more information.
+> You can refer to [linux: Linker error for remote_server when using script/install-linux](https://github.com/simtropolis/sim/issues/24880) for more information.
 >
 > **Workaround**:
 > Set the remote server target to `x86_64-unknown-linux-gnu` like so `export REMOTE_SERVER_TARGET=x86_64-unknown-linux-gnu; script/install-linux`
 
 ## Wayland & X11
 
-Baymax supports both X11 and Wayland. By default, we pick whichever we can find at runtime. If you're on Wayland and want to run in X11 mode, use the environment variable `WAYLAND_DISPLAY=''`.
+Sim supports both X11 and Wayland. By default, we pick whichever we can find at runtime. If you're on Wayland and want to run in X11 mode, use the environment variable `WAYLAND_DISPLAY=''`.
 
-## Notes for packaging Baymax
+## Notes for packaging Sim
 
-This section is for distribution maintainers packaging Baymax.
+This section is for distribution maintainers packaging Sim.
 
 ### Technical requirements
 
-Baymax has two main binaries:
+Sim has two main binaries:
 
-- You will need to build `crates/cli` and make its binary available in `$PATH` with the name `baymax`.
-- You will need to build `crates/baymax` and put it at `$PATH/to/cli/../../libexec/baymax-editor`. For example, if you are going to put the cli at `~/.local/bin/baymax` put baymax at `~/.local/libexec/baymax-editor`. As some linux distributions (notably Arch) discourage the use of `libexec`, you can also put this binary at `$PATH/to/cli/../../lib/baymax/baymax-editor` (e.g. `~/.local/lib/baymax/baymax-editor`) instead.
-- If you are going to provide a `.desktop` file you can find a template in `crates/baymax/resources/baymax.desktop.in`, and use `envsubst` to populate it with the values required. This file should also be renamed to `$APP_ID.desktop` so that the file [follows the FreeDesktop standards](https://github.com/simtropolis/baymax/issues/12707#issuecomment-2168742761). You should also make this desktop file executable (`chmod 755`).
-- You will need to ensure that the necessary libraries are installed. You can get the current list by [inspecting the built binary](https://github.com/simtropolis/baymax/blob/935cf542aebf55122ce6ed1c91d0fe8711970c82/script/bundle-linux#L65-L67) on your system.
-- For an example of a complete build script, see [script/bundle-linux](https://github.com/simtropolis/baymax/blob/935cf542aebf55122ce6ed1c91d0fe8711970c82/script/bundle-linux).
-- You can disable Baymax's auto updates and provide instructions for users who try to update Baymax manually by building (or running) Baymax with the environment variable `BAYMAX_UPDATE_EXPLANATION`. For example: `BAYMAX_UPDATE_EXPLANATION="Please use flatpak to update baymax."`.
-- Make sure to update the contents of the `crates/baymax/RELEASE_CHANNEL` file to 'nightly', 'preview', or 'stable', with no newline. This will cause Baymax to use the credentials manager to remember a user's login.
+- You will need to build `crates/cli` and make its binary available in `$PATH` with the name `sim`.
+- You will need to build `crates/sim` and put it at `$PATH/to/cli/../../libexec/sim-editor`. For example, if you are going to put the cli at `~/.local/bin/sim` put sim at `~/.local/libexec/sim-editor`. As some linux distributions (notably Arch) discourage the use of `libexec`, you can also put this binary at `$PATH/to/cli/../../lib/sim/sim-editor` (e.g. `~/.local/lib/sim/sim-editor`) instead.
+- If you are going to provide a `.desktop` file you can find a template in `crates/sim/resources/sim.desktop.in`, and use `envsubst` to populate it with the values required. This file should also be renamed to `$APP_ID.desktop` so that the file [follows the FreeDesktop standards](https://github.com/simtropolis/sim/issues/12707#issuecomment-2168742761). You should also make this desktop file executable (`chmod 755`).
+- You will need to ensure that the necessary libraries are installed. You can get the current list by [inspecting the built binary](https://github.com/simtropolis/sim/blob/935cf542aebf55122ce6ed1c91d0fe8711970c82/script/bundle-linux#L65-L67) on your system.
+- For an example of a complete build script, see [script/bundle-linux](https://github.com/simtropolis/sim/blob/935cf542aebf55122ce6ed1c91d0fe8711970c82/script/bundle-linux).
+- You can disable Sim's auto updates and provide instructions for users who try to update Sim manually by building (or running) Sim with the environment variable `SIM_UPDATE_EXPLANATION`. For example: `SIM_UPDATE_EXPLANATION="Please use flatpak to update sim."`.
+- Make sure to update the contents of the `crates/sim/RELEASE_CHANNEL` file to 'nightly', 'preview', or 'stable', with no newline. This will cause Sim to use the credentials manager to remember a user's login.
 
 ### Other things to note
 
-Baymax moves quickly, and distribution maintainers often have different constraints and priorities. The points below describe current trade-offs:
+Sim moves quickly, and distribution maintainers often have different constraints and priorities. The points below describe current trade-offs:
 
-- Baymax is a fast-moving project. We typically publish 2-3 builds per week to address reported issues and ship larger changes.
-- There are a couple of other `baymax` binaries that may be present on Linux systems ([1](https://openzfs.github.io/openzfs-docs/man/v2.2/8/baymax.8.html), [2](https://baymax.brimdata.io/docs/commands/baymax)). If you want to rename our CLI binary because of these issues, we suggest `baymaxit`, `baymaxitor`, or `baymax-cli`.
-- Baymax automatically installs versions of common developer tools, similar to rustup/rbenv/pyenv. This behavior is discussed [here](https://github.com/simtropolis/baymax/issues/12589).
-- Users can install extensions locally and from [simtropolis/extensions](https://github.com/simtropolis/extensions). Extensions may install additional tools such as language servers. Planned safety improvements are tracked [here](https://github.com/simtropolis/baymax/issues/12358).
-- Baymax connects to several online services by default (AI, telemetry, collaboration). AI and our telemetry can be disabled by your users with their baymax settings or by patching our [default settings file](https://github.com/simtropolis/baymax/blob/main/assets/settings/default.json).
-- Because of the points above, Baymax currently does not work well with sandboxes. See [this discussion](https://github.com/simtropolis/baymax/pull/12006#issuecomment-2130421220).
+- Sim is a fast-moving project. We typically publish 2-3 builds per week to address reported issues and ship larger changes.
+- There are a couple of other `sim` binaries that may be present on Linux systems ([1](https://openzfs.github.io/openzfs-docs/man/v2.2/8/sim.8.html), [2](https://sim.brimdata.io/docs/commands/sim)). If you want to rename our CLI binary because of these issues, we suggest `simit`, `simitor`, or `sim-cli`.
+- Sim automatically installs versions of common developer tools, similar to rustup/rbenv/pyenv. This behavior is discussed [here](https://github.com/simtropolis/sim/issues/12589).
+- Users can install extensions locally and from [simtropolis/extensions](https://github.com/simtropolis/extensions). Extensions may install additional tools such as language servers. Planned safety improvements are tracked [here](https://github.com/simtropolis/sim/issues/12358).
+- Sim connects to several online services by default (AI, telemetry, collaboration). AI and our telemetry can be disabled by your users with their sim settings or by patching our [default settings file](https://github.com/simtropolis/sim/blob/main/assets/settings/default.json).
+- Because of the points above, Sim currently does not work well with sandboxes. See [this discussion](https://github.com/simtropolis/sim/pull/12006#issuecomment-2130421220).
 
 ## Flatpak
 
-> Baymax's current Flatpak integration exits the sandbox on startup. Workflows that rely on Flatpak's sandboxing may not work as expected.
+> Sim's current Flatpak integration exits the sandbox on startup. Workflows that rely on Flatpak's sandboxing may not work as expected.
 
 To build & install the Flatpak package locally follow the steps below:
 
@@ -129,24 +129,24 @@ $ sudo apt install heaptrack heaptrack-gui
 $ cargo install cargo-heaptrack
 ```
 
-Then, to build and run Baymax with the profiler attached:
+Then, to build and run Sim with the profiler attached:
 
 ```sh
-$ cargo heaptrack -b baymax
+$ cargo heaptrack -b sim
 ```
 
-When this baymax instance is exited, terminal output will include a command to run `heaptrack_interpret` to convert the `*.raw.zst` profile to a `*.zst` file which can be passed to `heaptrack_gui` for viewing.
+When this sim instance is exited, terminal output will include a command to run `heaptrack_interpret` to convert the `*.raw.zst` profile to a `*.zst` file which can be passed to `heaptrack_gui` for viewing.
 
 ## Perf recording
 
-How to get a flamegraph with resolved symbols from a running Baymax instance.
-Use this when Baymax is using a lot of CPU. It is not useful for hangs.
+How to get a flamegraph with resolved symbols from a running Sim instance.
+Use this when Sim is using a lot of CPU. It is not useful for hangs.
 
 ### During the incident
 
 - Find the PID (process ID) using:
-  `ps -eo size,pid,comm | grep baymax | sort | head -n 1 | cut -d ' ' -f 2`
-  Or find the PID of `baymax-editor` with the highest RAM usage in something
+  `ps -eo size,pid,comm | grep sim | sort | head -n 1 | cut -d ' ' -f 2`
+  Or find the PID of `sim-editor` with the highest RAM usage in something
   like htop/btop/top.
 
 - Install perf:
@@ -159,15 +159,15 @@ Use this when Baymax is using a lot of CPU. It is not useful for hangs.
   run `sudo chown $USER:$USER perf.data`
 
 - Get build info:
-  Run baymax again and type {#action baymax::About} in the command pallet to get the exact commit.
+  Run sim again and type {#action sim::About} in the command pallet to get the exact commit.
 
-The `perf.data` file can be sent to Baymax together with the exact commit.
+The `perf.data` file can be sent to Sim together with the exact commit.
 
 ### Later
 
-This can be done by Baymax staff.
+This can be done by Sim staff.
 
-- Build Baymax with symbols:
+- Build Sim with symbols:
   Check out the commit found previously and modify `Cargo.toml`.
   Apply the following diff, then make a release build.
 
@@ -178,7 +178,7 @@ This can be done by Baymax staff.
 ```
 
 - Add the symbols to the perf database:
-  `perf buildid-cache -v -a <path to release baymax binary>`
+  `perf buildid-cache -v -a <path to release sim binary>`
 
 - Resolve the symbols from the db:
   `perf inject -i perf.data -o perf_with_symbols.data`

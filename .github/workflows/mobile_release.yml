@@ -94,7 +94,7 @@ jobs:
       - name: Upload mobile readiness summary
         uses: actions/upload-artifact@v4
         with:
-          name: baymax-mobile-readiness-${{ inputs.channel }}-${{ inputs.version }}-${{ inputs.build_number }}-${{ github.sha }}
+          name: sim-mobile-readiness-${{ inputs.channel }}-${{ inputs.version }}-${{ inputs.build_number }}-${{ github.sha }}
           path: mobile/build/readiness/manual-summary.md
           if-no-files-found: error
 
@@ -196,7 +196,7 @@ jobs:
       - name: Upload Android release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: baymax-android-${{ needs.validate.outputs.channel }}-${{ needs.validate.outputs.version }}-${{ needs.validate.outputs.build_number }}-${{ github.sha }}
+          name: sim-android-${{ needs.validate.outputs.channel }}-${{ needs.validate.outputs.version }}-${{ needs.validate.outputs.build_number }}-${{ github.sha }}
           path: |
             ${{ steps.build.outputs.artifact_path }}
             ${{ steps.downloadable_apk.outputs.apk_path }}
@@ -207,7 +207,7 @@ jobs:
         if: ${{ needs.validate.outputs.publish == 'false' }}
         uses: actions/upload-artifact@v4
         with:
-          name: baymax-android-apk-${{ needs.validate.outputs.version }}-${{ needs.validate.outputs.build_number }}-${{ github.sha }}
+          name: sim-android-apk-${{ needs.validate.outputs.version }}-${{ needs.validate.outputs.build_number }}-${{ github.sha }}
           path: ${{ steps.downloadable_apk.outputs.apk_path }}
           if-no-files-found: error
 
@@ -275,7 +275,7 @@ jobs:
       - name: Upload iOS release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: baymax-ios-${{ needs.validate.outputs.channel }}-${{ needs.validate.outputs.version }}-${{ needs.validate.outputs.build_number }}-${{ github.sha }}
+          name: sim-ios-${{ needs.validate.outputs.channel }}-${{ needs.validate.outputs.version }}-${{ needs.validate.outputs.build_number }}-${{ github.sha }}
           path: |
             ${{ steps.build.outputs.artifact_path }}
             ${{ steps.metadata.outputs.metadata_path }}

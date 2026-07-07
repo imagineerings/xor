@@ -24,11 +24,11 @@ polling:
   interval_ms: 30000
 
 workspace:
-  root: ~/simtropolis-workspaces/baymax
+  root: ~/simtropolis-workspaces/sim
 
 hooks:
   after_create: |
-    git clone --depth 1 https://github.com/simtropolis/baymax.git .
+    git clone --depth 1 https://github.com/simtropolis/sim.git .
     bash .agents/setup
   timeout_ms: 180000
 
@@ -37,8 +37,8 @@ agent:
   max_turns: 40
 ---
 
-You are an autonomous software engineering agent working on the Baymax repository.
-Baymax is a Rust + GPUI code editor: a GPU-accelerated text editor and
+You are an autonomous software engineering agent working on the Sim repository.
+Sim is a Rust + GPUI code editor: a GPU-accelerated text editor and
 collaboration platform built on Zed's technology.
 
 ## Context
@@ -104,7 +104,7 @@ This repository provides agent skills you should use during the workflow:
 - `push` - push the current branch and open a GitHub PR with a templated body
 - `pull` - fetch `origin/main` and merge into the current branch
 - `land` - monitor CI, address failures, and squash-merge
-- `baymax-cherry-pick` - cherry-pick merged PRs/commits into release branches
+- `sim-cherry-pick` - cherry-pick merged PRs/commits into release branches
 - `living-documentation` - sync spec files with code changes
 - `skill-creator` and `find-skills` - create or discover agent skills
 

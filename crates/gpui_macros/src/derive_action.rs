@@ -74,7 +74,7 @@ pub(crate) fn derive_action(input: TokenStream) -> TokenStream {
                     deprecated = Some(lit.value());
                 } else {
                     return Err(meta.error(format!(
-                        "'{:?}' argument not recognibaymax, expected \
+                        "'{:?}' argument not recognisim, expected \
                         'namespace', 'no_json', 'no_register, 'deprecated_aliases', or 'deprecated'",
                         meta.path
                     )));

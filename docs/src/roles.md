@@ -1,11 +1,11 @@
 ---
-title: Roles - Baymax
-description: Understand Baymax's organization roles and what each role can access, manage, and configure.
+title: Roles - Sim
+description: Understand Sim's organization roles and what each role can access, manage, and configure.
 ---
 
 # Roles
 
-Every member of a Baymax organization is assigned a role that determines what they
+Every member of a Sim organization is assigned a role that determines what they
 can access and configure.
 
 ## Role Types {#roles}
@@ -33,8 +33,8 @@ An owner has full control over the organization, including:
 - Assign and change member roles
 - Manage billing, payment methods, and invoices
 - Configure data-sharing policies
-- Disable Baymax's collaborative features
-- Control whether members can use Baymax-hosted models and Baymax's edit predictions
+- Disable Sim's collaborative features
+- Control whether members can use Sim-hosted models and Sim's edit predictions
 - Transfer ownership to another member
 
 ### Admin {#role-admin}
@@ -54,19 +54,19 @@ Billing Managers can view subscription usage, update billing details and tax ID
 information, update payment methods, and access invoice history.
 
 This role does not count toward paid Business seats. It also does not include
-Baymax-hosted AI models or Edit Predictions through the Business subscription.
+Sim-hosted AI models or Edit Predictions through the Business subscription.
 Billing Managers cannot invite or remove members, change member roles, configure
 organization settings or data controls, cancel the subscription, or transfer
 ownership.
 
 ### Member {#role-member}
 
-Members have standard access to Baymax through the Business subscription. They
+Members have standard access to Sim through the Business subscription. They
 cannot access billing or organization settings.
 
 ## Managing User Roles {#managing-users}
 
-Owners and Admins can manage organization members from the Baymax dashboard within
+Owners and Admins can manage organization members from the Sim dashboard within
 the Members page.
 
 ### Inviting Members {#inviting-members}
@@ -87,4 +87,4 @@ the Members page.
 1. On the Members page, find the member.
 2. Select **Remove** and confirm.
 
-Removing a member removes their access to organization settings and any organization-managed features. They can continue using Baymax on their own.
+Removing a member removes their access to organization settings and any organization-managed features. They can continue using Sim on their own.

@@ -1,61 +1,61 @@
 ---
 title: Troubleshooting
-description: "Common issues and solutions for Baymax on all platforms."
+description: "Common issues and solutions for Sim on all platforms."
 ---
 
 # Troubleshooting
 
-This guide covers common troubleshooting techniques for Baymax.
+This guide covers common troubleshooting techniques for Sim.
 Sometimes you'll be able to identify and resolve issues on your own using this information.
 Other times, troubleshooting means gathering the right information (logs, profiles, or reproduction steps) to help us diagnose and fix the problem.
 
 > **Note**: To open the command palette, use `cmd-shift-p` on macOS or `ctrl-shift-p` on Windows / Linux.
 
-## Retrieve Baymax and System Information
+## Retrieve Sim and System Information
 
-When reporting issues or seeking help, it's useful to know your Baymax version and system specifications. You can retrieve this information using the following actions from the command palette:
+When reporting issues or seeking help, it's useful to know your Sim version and system specifications. You can retrieve this information using the following actions from the command palette:
 
-- {#action baymax::About}: Find your Baymax version number
-- {#action baymax::CopySystemSpecsIntoClipboard}: Populate your clipboard with Baymax version number, operating system version, and hardware specs
-- {#action baymax::CopyInstalledExtensionsIntoClipboard}: Populate your clipboard with a list of your installed extensions and versions
+- {#action sim::About}: Find your Sim version number
+- {#action sim::CopySystemSpecsIntoClipboard}: Populate your clipboard with Sim version number, operating system version, and hardware specs
+- {#action sim::CopyInstalledExtensionsIntoClipboard}: Populate your clipboard with a list of your installed extensions and versions
 
-## Baymax Log
+## Sim Log
 
-Often, a good first place to look when troubleshooting any issue in Baymax is the Baymax log, which might contain clues about what's going wrong.
-You can review the most recent 1000 lines of the log by running the {#action baymax::OpenLog} action from the command palette.
-If you want to view the full file, you can reveal it in your operating system's native file manager via {#action baymax::RevealLogInFileManager} from the command palette.
+Often, a good first place to look when troubleshooting any issue in Sim is the Sim log, which might contain clues about what's going wrong.
+You can review the most recent 1000 lines of the log by running the {#action sim::OpenLog} action from the command palette.
+If you want to view the full file, you can reveal it in your operating system's native file manager via {#action sim::RevealLogInFileManager} from the command palette.
 
-You'll find the Baymax log in the respective location on each operating system:
+You'll find the Sim log in the respective location on each operating system:
 
-- macOS: `~/Library/Logs/Baymax/Baymax.log`
-- Windows: `C:\Users\YOU\AppData\Local\Baymax\logs\Baymax.log`
-- Linux: `~/.local/share/baymax/logs/Baymax.log` or `$XDG_DATA_HOME`
+- macOS: `~/Library/Logs/Sim/Sim.log`
+- Windows: `C:\Users\YOU\AppData\Local\Sim\logs\Sim.log`
+- Linux: `~/.local/share/sim/logs/Sim.log` or `$XDG_DATA_HOME`
 
-> **Note:** In some cases, it might be useful to monitor the log live, such as when [developing a Baymax extension](https://baymax.dev/docs/extensions/developing-extensions).
-> Example: `tail -f ~/Library/Logs/Baymax/Baymax.log`
+> **Note:** In some cases, it might be useful to monitor the log live, such as when [developing a Sim extension](https://sim.dev/docs/extensions/developing-extensions).
+> Example: `tail -f ~/Library/Logs/Sim/Sim.log`
 
-The log may contain enough context to help you debug the issue yourself, or you may find specific errors that are useful when filing a [GitHub issue](https://github.com/simtropolis/baymax/issues/new/choose) or when talking to Baymax staff in our [Discord server](https://baymax.dev/community-links#forums-and-discussions).
+The log may contain enough context to help you debug the issue yourself, or you may find specific errors that are useful when filing a [GitHub issue](https://github.com/simtropolis/sim/issues/new/choose) or when talking to Sim staff in our [Discord server](https://sim.dev/community-links#forums-and-discussions).
 
 ## Performance Issues (Profiling)
 
-If you're running into performance issues in Baymax (hitches, hangs, or general unresponsiveness), having a performance profile attached to your issue will help us zero in on what is getting stuck.
+If you're running into performance issues in Sim (hitches, hangs, or general unresponsiveness), having a performance profile attached to your issue will help us zero in on what is getting stuck.
 
 ### macOS
 
 Xcode Instruments (which comes bundled with your [Xcode](https://apps.apple.com/us/app/xcode/id497799835) download) is the standard tool for profiling on macOS.
 
-1. With Baymax running, open Instruments
+1. With Sim running, open Instruments
 1. Select `Time Profiler` as the profiling template
-   ![Instruments template picker with Time Profiler selected](https://images.baymax.dev/docs/troubleshooting/instruments-template-picker.webp)
-1. In the `Time Profiler` configuration, set the target to the running Baymax process
+   ![Instruments template picker with Time Profiler selected](https://images.sim.dev/docs/troubleshooting/instruments-template-picker.webp)
+1. In the `Time Profiler` configuration, set the target to the running Sim process
 1. Start recording
-   ![Time Profiler configuration showing the target dropdown and record button](https://images.baymax.dev/docs/troubleshooting/instruments-target-and-record.webp)
-1. Perform the action in Baymax that causes performance issues
+   ![Time Profiler configuration showing the target dropdown and record button](https://images.sim.dev/docs/troubleshooting/instruments-target-and-record.webp)
+1. Perform the action in Sim that causes performance issues
 1. Stop recording
-   ![A completed Time Profiler recording in Instruments](https://images.baymax.dev/docs/troubleshooting/instruments-recording.webp)
+   ![A completed Time Profiler recording in Instruments](https://images.sim.dev/docs/troubleshooting/instruments-recording.webp)
 1. Save the trace file
 1. Compress the trace file into a zip archive
-1. File a [GitHub issue](https://github.com/simtropolis/baymax/issues/new/choose) with the trace zip attached
+1. File a [GitHub issue](https://github.com/simtropolis/sim/issues/new/choose) with the trace zip attached
 
 <!--### Windows-->
 
@@ -63,26 +63,26 @@ Xcode Instruments (which comes bundled with your [Xcode](https://apps.apple.com/
 
 ## Startup and Workspace Issues
 
-Baymax creates local SQLite databases to persist data relating to its workspace and your projects. These databases store, for instance, the tabs and panes you have open in a project, the scroll position of each open file, the list of all projects you've opened (for the recent projects modal picker), etc. You can find and explore these databases in the following locations:
+Sim creates local SQLite databases to persist data relating to its workspace and your projects. These databases store, for instance, the tabs and panes you have open in a project, the scroll position of each open file, the list of all projects you've opened (for the recent projects modal picker), etc. You can find and explore these databases in the following locations:
 
-- macOS: `~/Library/Application Support/Baymax/db`
-- Linux and FreeBSD: `~/.local/share/baymax/db` (or within `XDG_DATA_HOME` or `FLATPAK_XDG_DATA_HOME`)
-- Windows: `%LOCALAPPDATA%\Baymax\db`
+- macOS: `~/Library/Application Support/Sim/db`
+- Linux and FreeBSD: `~/.local/share/sim/db` (or within `XDG_DATA_HOME` or `FLATPAK_XDG_DATA_HOME`)
+- Windows: `%LOCALAPPDATA%\Sim\db`
 
-The naming convention of these databases takes on the form of `0-<baymax_channel>`:
+The naming convention of these databases takes on the form of `0-<sim_channel>`:
 
 - Stable: `0-stable`
 - Preview: `0-preview`
 - Nightly: `0-nightly`
 - Dev: `0-dev`
 
-While rare, we've seen a few cases where workspace databases became corrupted, which prevented Baymax from starting.
-If you're experiencing startup issues, you can test whether it's workspace-related by temporarily moving the database from its location, then trying to start Baymax again.
+While rare, we've seen a few cases where workspace databases became corrupted, which prevented Sim from starting.
+If you're experiencing startup issues, you can test whether it's workspace-related by temporarily moving the database from its location, then trying to start Sim again.
 
-> **Note**: Moving the workspace database will cause Baymax to create a fresh one.
+> **Note**: Moving the workspace database will cause Sim to create a fresh one.
 > Your recent projects, open tabs, etc. will be reset to "factory".
 
-If your issue persists after regenerating the database, please [file an issue](https://github.com/simtropolis/baymax/issues/new/choose).
+If your issue persists after regenerating the database, please [file an issue](https://github.com/simtropolis/sim/issues/new/choose).
 
 ## Language Server Issues
 

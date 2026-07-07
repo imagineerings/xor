@@ -87,7 +87,7 @@ pub(crate) unsafe fn set_window_long(
 }
 
 pub(crate) fn windows_credentials_target_name(url: &str) -> String {
-    format!("baymax:url={}", url)
+    format!("sim:url={}", url)
 }
 
 pub(crate) fn load_cursor(style: CursorStyle) -> Option<HCURSOR> {

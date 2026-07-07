@@ -1,17 +1,17 @@
 ---
 title: Shell Script
-description: "Configure Shell Script language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure Shell Script language support in Sim, including language servers, formatting, and debugging."
 ---
 
 # Shell Scripts
 
-Shell Scripts (bash, zsh, dash, sh) are supported natively by Baymax.
+Shell Scripts (bash, zsh, dash, sh) are supported natively by Sim.
 
 - Tree-sitter: [tree-sitter/tree-sitter-bash](https://github.com/tree-sitter/tree-sitter-bash)
 
 ## Settings
 
-Configure settings in Settings ({#kb baymax::OpenSettings}) under Languages > Shell Script, or add to your settings file:
+Configure settings in Settings ({#kb sim::OpenSettings}) under Languages > Shell Script, or add to your settings file:
 
 ```json [settings]
   "languages": {
@@ -24,7 +24,7 @@ Configure settings in Settings ({#kb baymax::OpenSettings}) under Languages > Sh
 
 ### Formatting
 
-Baymax supports auto-formatting Shell Scripts using external tools like [`shfmt`](https://github.com/mvdan/sh).
+Sim supports auto-formatting Shell Scripts using external tools like [`shfmt`](https://github.com/mvdan/sh).
 
 1. Install `shfmt`:
 
@@ -44,7 +44,7 @@ which shfmt
 shfmt --version
 ```
 
-3. Configure formatting in Settings ({#kb baymax::OpenSettings}) under Languages > Shell Script, or add to your settings file:
+3. Configure formatting in Settings ({#kb sim::OpenSettings}) under Languages > Shell Script, or add to your settings file:
 
 ```json [settings]
   "languages": {
@@ -63,5 +63,5 @@ shfmt --version
 
 ## See also:
 
-- [Baymax Docs: Language Support: Bash](./bash.md)
-- [Baymax Docs: Language Support: Fish](./fish.md)
+- [Sim Docs: Language Support: Bash](./bash.md)
+- [Sim Docs: Language Support: Fish](./fish.md)

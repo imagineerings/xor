@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Baymax should generate textured 3D meshes with topology, geometry detail, high-fidelity textures, preview metadata, and export routing.
+Sim should generate textured 3D meshes with topology, geometry detail, high-fidelity textures, preview metadata, and export routing.
 
 ### Requirement 1: Mesh Requests
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The control plane is a Baymax harness layer for Comfy-compatible HTTP and WebSocket semantics. It defines the world-model harness prompt/job lifecycle while delegating execution, assets, and model work to existing Baymax subsystems and the adjacent Comfy migration specs. The key decision is to model Comfy endpoints as protocol adapters rather than porting `aiohttp` server code.
+The control plane is a Sim harness layer for Comfy-compatible HTTP and WebSocket semantics. It defines the world-model harness prompt/job lifecycle while delegating execution, assets, and model work to existing Sim subsystems and the adjacent Comfy migration specs. The key decision is to model Comfy endpoints as protocol adapters rather than porting `aiohttp` server code.
 
 ## Architecture
 
@@ -10,39 +10,39 @@ The control plane is a Baymax harness layer for Comfy-compatible HTTP and WebSoc
 flowchart LR
     Client[Comfy UI / API Client] --> Routes[ComfyRouteAdapter]
     Client --> Ws[ComfyWebSocketAdapter]
-    Routes --> Jobs[BaymaxJobBridge]
+    Routes --> Jobs[SimJobBridge]
     Ws --> Events[ExecutionEventTranslator]
     Jobs --> Graph[comfy-graph-node-runtime]
     Routes --> Assets[comfy-asset-library]
     Routes --> Models[comfy-model-memory-runtime]
-    Events --> Media[Baymax Media / Artifacts]
+    Events --> Media[Sim Media / Artifacts]
 ```
 
-The adapter exposes legacy Comfy paths and `/api` aliases. Internally it converts requests into Baymax task/job operations and converts Baymax events back into Comfy-compatible payloads.
+The adapter exposes legacy Comfy paths and `/api` aliases. Internally it converts requests into Sim task/job operations and converts Sim events back into Comfy-compatible payloads.
 
 ## Components and Interfaces
 
 ### ComfyRouteAdapter
 
-- **Purpose**: Register Comfy-compatible HTTP routes against Baymax HTTP infrastructure.
+- **Purpose**: Register Comfy-compatible HTTP routes against Sim HTTP infrastructure.
 - **Responsibilities**: Parse requests, validate prompt ids, map `/api` aliases, return Comfy-compatible JSON, and enforce route-level safety.
 - **Does not own**: Job execution, asset persistence, model loading, or frontend rendering.
 - **Interface contract**:
 
 ```rust
 pub trait ComfyRouteAdapter {
-    fn register_routes(&self, router: &mut BaymaxRouter);
+    fn register_routes(&self, router: &mut SimRouter);
     fn handle_prompt(&self, request: PromptSubmission) -> Result<PromptSubmissionResponse, ComfyApiError>;
     fn handle_queue_action(&self, request: QueueAction) -> Result<(), ComfyApiError>;
     fn handle_history_action(&self, request: HistoryAction) -> Result<(), ComfyApiError>;
 }
 ```
 
-### BaymaxJobBridge
+### SimJobBridge
 
-- **Purpose**: Map Comfy prompt lifecycle operations onto Baymax tasks/jobs.
+- **Purpose**: Map Comfy prompt lifecycle operations onto Sim tasks/jobs.
 - **Responsibilities**: Create jobs, expose queue snapshots, normalize job history, cancel pending or running jobs, and remove sensitive extra data from public responses.
-- **Dependencies**: Baymax task system, Comfy graph validator, generated artifact store.
+- **Dependencies**: Sim task system, Comfy graph validator, generated artifact store.
 
 ### ComfyWebSocketAdapter
 
@@ -60,12 +60,12 @@ pub trait ComfyWebSocketAdapter {
 
 ### ExecutionEventTranslator
 
-- **Purpose**: Convert Baymax execution events into Comfy event names and binary preview event ids.
+- **Purpose**: Convert Sim execution events into Comfy event names and binary preview event ids.
 - **Responsibilities**: Emit `status`, `executing`, `progress`, `feature_flags`, legacy preview image events, and metadata preview events.
 
 ### ComfyHttpSafetyLayer
 
-- **Purpose**: Preserve Comfy's local-server safety behavior while using Baymax middleware.
+- **Purpose**: Preserve Comfy's local-server safety behavior while using Sim middleware.
 - **Responsibilities**: origin checks, CORS policy, CSP when API nodes are disabled, path confinement, safe content disposition, and cache-control classification.
 
 ## Data Models

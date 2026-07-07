@@ -39,7 +39,7 @@ use settings::{DefaultOpenBehavior, Settings, WorktreeId};
 use ui_input::ErasedEditor;
 use workspace::ProjectGroupKey;
 
-use baymax_actions::{OpenDevContainer, OpenRecent, OpenRemote};
+use sim_actions::{OpenDevContainer, OpenRecent, OpenRemote};
 use dev_container::{DevContainerContext, find_devcontainer_configs};
 use ui::{
     ButtonLike, ContextMenu, Divider, HighlightedLabel, KeyBinding, ListItem, ListItemSpacing,
@@ -48,7 +48,7 @@ use ui::{
 use util::{ResultExt, paths::PathExt};
 use workspace::{
     HistoryManager, ModalView, MultiWorkspace, OpenMode, OpenOptions, OpenVisible, PathList,
-    RecentWorkspace, SerialibaymaxWorkspaceLocation, Workspace, WorkspaceDb, WorkspaceId,
+    RecentWorkspace, SerialisimWorkspaceLocation, Workspace, WorkspaceDb, WorkspaceId,
     notifications::DetachAndPromptErr, with_active_or_new_workspace,
 };
 
@@ -133,7 +133,7 @@ pub async fn get_recent_projects(
     let filtered: Vec<_> = workspaces
         .into_iter()
         .filter(|workspace| Some(workspace.workspace_id) != current_workspace_id)
-        .filter(|workspace| matches!(workspace.location, SerialibaymaxWorkspaceLocation::Local))
+        .filter(|workspace| matches!(workspace.location, SerialisimWorkspaceLocation::Local))
         .collect();
 
     let mut all_paths: Vec<PathBuf> = filtered
@@ -286,7 +286,7 @@ pub(crate) fn default_open_in_new_window(cx: &App) -> bool {
 
 pub fn init(cx: &mut App) {
     #[cfg(target_os = "windows")]
-    cx.on_action(|open_wsl: &baymax_actions::wsl_actions::OpenFolderInWsl, cx| {
+    cx.on_action(|open_wsl: &sim_actions::wsl_actions::OpenFolderInWsl, cx| {
         let create_new_window = open_wsl
             .create_new_window
             .unwrap_or_else(|| default_open_in_new_window(cx));
@@ -313,7 +313,7 @@ pub fn init(cx: &mut App) {
             let window_handle = window.window_handle().downcast::<MultiWorkspace>();
 
             cx.spawn_in(window, async move |workspace, cx| {
-                use util::paths::SanitibaymaxPath;
+                use util::paths::SanitisimPath;
 
                 let Some(paths) = paths.await.log_err().flatten() else {
                     return;
@@ -347,14 +347,14 @@ pub fn init(cx: &mut App) {
 
                 let paths = paths
                     .into_iter()
-                    .filter_map(|path| SanitibaymaxPath::new(&path).local_to_wsl())
+                    .filter_map(|path| SanitisimPath::new(&path).local_to_wsl())
                     .collect::<Vec<_>>();
 
                 if paths.is_empty() {
                     let message = indoc::indoc! { r#"
                         Invalid path specified when trying to open a folder inside WSL.
 
-                        Please note that Baymax currently does not support opening network share folders inside wsl.
+                        Please note that Sim currently does not support opening network share folders inside wsl.
                     "#};
 
                     let _ = cx.prompt(gpui::PromptLevel::Critical, "Invalid path", Some(&message), &["OK"]).await;
@@ -372,7 +372,7 @@ pub fn init(cx: &mut App) {
     });
 
     #[cfg(target_os = "windows")]
-    cx.on_action(|open_wsl: &baymax_actions::wsl_actions::OpenWsl, cx| {
+    cx.on_action(|open_wsl: &sim_actions::wsl_actions::OpenWsl, cx| {
         let create_new_window = open_wsl
             .create_new_window
             .unwrap_or_else(|| default_open_in_new_window(cx));
@@ -825,7 +825,7 @@ impl RecentProjects {
                 picker.delegate.filtered_entries.get(ix)
             {
                 if let Some(workspace) = picker.delegate.workspaces.get(hit.candidate_id) {
-                    if matches!(workspace.location, SerialibaymaxWorkspaceLocation::Local) {
+                    if matches!(workspace.location, SerialisimWorkspaceLocation::Local) {
                         let paths_to_add = workspace.paths.paths().to_vec();
                         picker
                             .delegate
@@ -925,7 +925,7 @@ impl RecentProjectsDelegate {
                 .is_some_and(|workspace| {
                     matches!(
                         workspace.location,
-                        SerialibaymaxWorkspaceLocation::Remote(_)
+                        SerialisimWorkspaceLocation::Remote(_)
                     )
                 }),
         }
@@ -1480,14 +1480,14 @@ impl PickerDelegate for RecentProjectsDelegate {
                 let location = &workspace.location;
                 let raw_paths = &workspace.paths;
                 let identity_paths = &workspace.identity_paths;
-                let is_local = matches!(location, SerialibaymaxWorkspaceLocation::Local);
+                let is_local = matches!(location, SerialisimWorkspaceLocation::Local);
                 let paths_to_add = raw_paths.paths().to_vec();
                 let ordered_paths: Vec<_> = identity_paths
                     .ordered_paths()
                     .map(|p| p.compact().to_string_lossy().to_string())
                     .collect();
                 let tooltip_path: SharedString = match &location {
-                    SerialibaymaxWorkspaceLocation::Remote(options) => {
+                    SerialisimWorkspaceLocation::Remote(options) => {
                         let host = options.display_name();
                         if ordered_paths.len() == 1 {
                             format!("{} ({})", ordered_paths[0], host).into()
@@ -1517,7 +1517,7 @@ impl PickerDelegate for RecentProjectsDelegate {
                 };
 
                 let prefix = match &location {
-                    SerialibaymaxWorkspaceLocation::Remote(options) => {
+                    SerialisimWorkspaceLocation::Remote(options) => {
                         Some(SharedString::from(options.display_name()))
                     }
                     _ => None,
@@ -1608,8 +1608,8 @@ impl PickerDelegate for RecentProjectsDelegate {
                     .into_any_element();
 
                 let icon = icon_for_remote_connection(match location {
-                    SerialibaymaxWorkspaceLocation::Local => None,
-                    SerialibaymaxWorkspaceLocation::Remote(options) => Some(options),
+                    SerialisimWorkspaceLocation::Local => None,
+                    SerialisimWorkspaceLocation::Remote(options) => Some(options),
                 });
                 let show_icon = self.filtered_entries_include_remote_project();
 
@@ -1922,7 +1922,7 @@ impl PickerDelegate for RecentProjectsDelegate {
                                     .map(|workspace| {
                                         matches!(
                                             workspace.location,
-                                            SerialibaymaxWorkspaceLocation::Local
+                                            SerialisimWorkspaceLocation::Local
                                         )
                                     })
                                     .unwrap_or(false),
@@ -2143,7 +2143,7 @@ impl RecentProjectsDelegate {
                 return;
             }
             match candidate_workspace_location {
-                SerialibaymaxWorkspaceLocation::Local => {
+                SerialisimWorkspaceLocation::Local => {
                     let paths = candidate_workspace_paths.paths().to_vec();
                     if replace_current_window {
                         if let Some(handle) = window.window_handle().downcast::<MultiWorkspace>() {
@@ -2175,7 +2175,7 @@ impl RecentProjectsDelegate {
                             );
                     }
                 }
-                SerialibaymaxWorkspaceLocation::Remote(mut connection) => {
+                SerialisimWorkspaceLocation::Remote(mut connection) => {
                     let app_state = workspace.app_state().clone();
                     let replace_window = if replace_current_window {
                         window.window_handle().downcast::<MultiWorkspace>()
@@ -2492,7 +2492,7 @@ mod tests {
         let paths = PathList::new(&[PathBuf::from(format!("/recent/project-{index:02}"))]);
         RecentWorkspace {
             workspace_id: WorkspaceId::from_i64(index as i64),
-            location: SerialibaymaxWorkspaceLocation::Local,
+            location: SerialisimWorkspaceLocation::Local,
             paths: paths.clone(),
             identity_paths: paths,
             timestamp: Utc::now(),

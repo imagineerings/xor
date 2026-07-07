@@ -2,7 +2,7 @@
 
 ## Overview
 
-Add message priority levels (Normal, Important, Urgent) to channel messages in Baymax. This spans protobuf definitions, a database migration, server-side priority handling with DND-aware urgent notification dispatch, client-side priority UI (selector, badge, toast), and settings integration. The implementation follows an incremental bottom-up order: proto → DB → server → client types → client UI → settings → integration wiring → tests.
+Add message priority levels (Normal, Important, Urgent) to channel messages in Sim. This spans protobuf definitions, a database migration, server-side priority handling with DND-aware urgent notification dispatch, client-side priority UI (selector, badge, toast), and settings integration. The implementation follows an incremental bottom-up order: proto → DB → server → client types → client UI → settings → integration wiring → tests.
 
 ## Tasks
 

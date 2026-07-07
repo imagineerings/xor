@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-Baymax channels provide no mechanism to search past messages. This design adds full-text search across channel messages with filtering by channel, user, and date range. It uses PostgreSQL full-text search (tsvector/tsquery) or Elasticsearch if available, with a search index maintained in near-real-time.
+Sim channels provide no mechanism to search past messages. This design adds full-text search across channel messages with filtering by channel, user, and date range. It uses PostgreSQL full-text search (tsvector/tsquery) or Elasticsearch if available, with a search index maintained in near-real-time.
 
 **Key decisions:**
 

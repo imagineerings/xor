@@ -196,7 +196,7 @@ pub async fn create_batch(
 ) -> Result<Batch, RequestError> {
     let uri = format!("{api_url}/batches");
 
-    let serialibaymax =
+    let serialisim =
         serde_json::to_string(&request).map_err(|e| RequestError::Other(e.into()))?;
 
     let request = HttpRequest::builder()
@@ -204,7 +204,7 @@ pub async fn create_batch(
         .uri(uri)
         .header("Authorization", format!("Bearer {}", api_key.trim()))
         .header("Content-Type", "application/json")
-        .body(AsyncBody::from(serialibaymax))
+        .body(AsyncBody::from(serialisim))
         .map_err(|e| RequestError::Other(e.into()))?;
 
     let mut response = client.send(request).await?;

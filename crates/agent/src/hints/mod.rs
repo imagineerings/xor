@@ -4,7 +4,7 @@ pub use loader::*;
 
 use std::path::PathBuf;
 
-/// A hint loaded from a `.baymaxhints` file.
+/// A hint loaded from a `.simhints` file.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Hint {
     /// The source of the hint (global or project path).
@@ -20,9 +20,9 @@ pub struct Hint {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum HintSource {
     /// A file in the global hints directory
-    /// (`~/.config/baymax/hints/`).
+    /// (`~/.config/sim/hints/`).
     Global { path: PathBuf },
-    /// A `.baymaxhints` file inside a project worktree.
+    /// A `.simhints` file inside a project worktree.
     Project {
         worktree_root: String,
         path: PathBuf,
@@ -37,8 +37,8 @@ pub struct HintLoadError {
 }
 
 /// Directories (relative to a worktree root) scanned for
-/// `.baymaxhints` files.
-pub(crate) const BAYMAX_HINTS_FILE_NAMES: &[&str] = &[".baymaxhints"];
+/// `.simhints` files.
+pub(crate) const SIM_HINTS_FILE_NAMES: &[&str] = &[".simhints"];
 
-/// Name of the global hints directory inside the baymax config dir.
+/// Name of the global hints directory inside the sim config dir.
 pub(crate) const GLOBAL_HINTS_DIR_NAME: &str = "hints";

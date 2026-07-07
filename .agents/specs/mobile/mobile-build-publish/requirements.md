@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Baymax mobile tunneling work needs installable Android and iOS builds so remote connection flows can be tested on real devices and distributed to testers. Today the mobile tree contains Android Gradle project files, iOS Swift sources, and some deployment notes, but there is no active repo-level mobile build/publish specification that defines signed release artifacts, CI validation, or store/TestFlight publishing.
+Sim mobile tunneling work needs installable Android and iOS builds so remote connection flows can be tested on real devices and distributed to testers. Today the mobile tree contains Android Gradle project files, iOS Swift sources, and some deployment notes, but there is no active repo-level mobile build/publish specification that defines signed release artifacts, CI validation, or store/TestFlight publishing.
 
 This feature establishes the build and distribution foundation for both mobile clients. It covers local build commands, CI workflows, release signing, versioning, artifact publication, and the minimum project metadata needed to produce Android and iOS installable builds.
 
@@ -21,7 +21,7 @@ This feature establishes the build and distribution foundation for both mobile c
 
 ### Requirement 1: Android Release Build
 
-**User Story:** As a Baymax developer, I want Android release builds to be reproducible from the repository, so that I can publish the mobile app for device testing and distribution.
+**User Story:** As a Sim developer, I want Android release builds to be reproducible from the repository, so that I can publish the mobile app for device testing and distribution.
 
 #### Acceptance Criteria
 
@@ -37,7 +37,7 @@ This feature establishes the build and distribution foundation for both mobile c
 
 ### Requirement 2: iOS Archive Build
 
-**User Story:** As a Baymax developer, I want the iOS app to archive from this repository, so that I can upload builds to TestFlight.
+**User Story:** As a Sim developer, I want the iOS app to archive from this repository, so that I can upload builds to TestFlight.
 
 #### Acceptance Criteria
 
@@ -53,7 +53,7 @@ This feature establishes the build and distribution foundation for both mobile c
 
 ### Requirement 3: CI Build and Artifact Workflows
 
-**User Story:** As a Baymax maintainer, I want active root-level CI workflows for mobile builds, so that mobile regressions are caught and release artifacts are consistently produced.
+**User Story:** As a Sim maintainer, I want active root-level CI workflows for mobile builds, so that mobile regressions are caught and release artifacts are consistently produced.
 
 #### Acceptance Criteria
 
@@ -121,7 +121,7 @@ This feature establishes the build and distribution foundation for both mobile c
 
 ### Requirement 7: Documentation and Developer Entry Points
 
-**User Story:** As a Baymax developer, I want clear mobile build commands and CI entry points, so that I can build and publish without reverse-engineering platform setup.
+**User Story:** As a Sim developer, I want clear mobile build commands and CI entry points, so that I can build and publish without reverse-engineering platform setup.
 
 #### Acceptance Criteria
 

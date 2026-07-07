@@ -1,11 +1,11 @@
 ---
 title: CSS
-description: "Configure CSS language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure CSS language support in Sim, including language servers, formatting, and debugging."
 ---
 
 # CSS
 
-Baymax has built-in support for CSS.
+Sim has built-in support for CSS.
 
 - Tree-sitter: [tree-sitter/tree-sitter-css](https://github.com/tree-sitter/tree-sitter-css)
 - Language Servers:
@@ -14,7 +14,7 @@ Baymax has built-in support for CSS.
 
 ## Tailwind CSS
 
-Baymax also supports [Tailwind CSS](./tailwindcss.md) out-of-the-box for languages and frameworks like JavaScript, Astro, Svelte, and more.
+Sim also supports [Tailwind CSS](./tailwindcss.md) out-of-the-box for languages and frameworks like JavaScript, Astro, Svelte, and more.
 
 <!-- TBD: Document CS -->
 

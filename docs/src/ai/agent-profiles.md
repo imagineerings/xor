@@ -1,17 +1,17 @@
 ---
-title: Agent Profiles - Baymax
-description: Configure Baymax Agent profiles for model selection, built-in tool availability, and MCP tool availability.
+title: Agent Profiles - Sim
+description: Configure Sim Agent profiles for model selection, built-in tool availability, and MCP tool availability.
 ---
 
 # Agent Profiles
 
-Agent profiles control how the [Baymax Agent](./baymax-agent.md) behaves in a thread. A profile can set a default model and choose which built-in tools and MCP tools are available.
+Agent profiles control how the [Sim Agent](./sim-agent.md) behaves in a thread. A profile can set a default model and choose which built-in tools and MCP tools are available.
 
 Profiles do not decide whether a tool call is allowed automatically. Use [Tool Permissions](./tool-permissions.md) to control allow, deny, and confirm behavior.
 
 ## Built-in Profiles {#built-in-profiles}
 
-Baymax includes three built-in profiles:
+Sim includes three built-in profiles:
 
 - `Write`: enables tools for reading, editing, and running commands.
 - `Ask`: focuses on read-only codebase questions.
@@ -51,7 +51,7 @@ Profiles are stored under `agent.profiles` in your settings.
         "enable_all_context_servers": false,
         "context_servers": {},
         "default_model": {
-          "provider": "baymax.dev",
+          "provider": "sim.dev",
           "model": "claude-sonnet-4-5"
         }
       }
@@ -69,8 +69,8 @@ The exact model IDs and provider IDs depend on your configured [LLM Providers](.
 | Agent profile    | Whether a tool is available in a profile                              | Disable `terminal` in a read-only profile |
 | Tool permissions | Whether a permission-gated tool call is allowed, denied, or confirmed | Always confirm `terminal` commands        |
 
-If a tool is not available in the active profile, the Baymax Agent cannot use it. If the tool is available and permission-gated, [Tool Permissions](./tool-permissions.md) still controls whether the tool call requires approval.
+If a tool is not available in the active profile, the Sim Agent cannot use it. If the tool is available and permission-gated, [Tool Permissions](./tool-permissions.md) still controls whether the tool call requires approval.
 
 ## Agent Path Boundaries {#agent-path-boundaries}
 
-Agent profiles apply to the Baymax Agent. External Agents and Terminal Threads do not use Baymax Agent profiles unless their integration explicitly supports similar behavior.
+Agent profiles apply to the Sim Agent. External Agents and Terminal Threads do not use Sim Agent profiles unless their integration explicitly supports similar behavior.

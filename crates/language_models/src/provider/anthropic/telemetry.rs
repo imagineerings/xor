@@ -99,14 +99,14 @@ async fn send_anthropic_event(
     client: Arc<dyn HttpClient>,
     api_key: String,
 ) -> anyhow::Result<()> {
-    let uri = format!("{ANTHROPIC_API_URL}/v1/log/baymax");
+    let uri = format!("{ANTHROPIC_API_URL}/v1/log/sim");
     let request_builder = HttpRequest::builder()
         .method(Method::POST)
         .uri(uri)
         .header("X-Api-Key", api_key)
         .header("Content-Type", "application/json");
 
-    let serialibaymax_event = serde_json::json!({
+    let serialisim_event = serde_json::json!({
         "completion_type": event.completion_type.as_str(),
         "event": event.event.as_str(),
         "metadata": {
@@ -117,7 +117,7 @@ async fn send_anthropic_event(
     });
 
     let request = request_builder
-        .body(AsyncBody::from(serialibaymax_event.to_string()))
+        .body(AsyncBody::from(serialisim_event.to_string()))
         .context("Failed to construct Anthropic telemetry HTTP request body")?;
 
     let response = client

@@ -1,7 +1,7 @@
 //! A module for working with processes.
 
-use crate::wit::baymax::extension::process;
-pub use crate::wit::baymax::extension::process::{Command, Output};
+use crate::wit::sim::extension::process;
+pub use crate::wit::sim::extension::process::{Command, Output};
 
 impl Command {
     pub fn new(program: impl Into<String>) -> Self {

@@ -1,4 +1,4 @@
-# ✅ Baymax iOS - Ready for App Store Submission
+# ✅ Sim iOS - Ready for App Store Submission
 
 ## Summary
 
@@ -18,7 +18,7 @@ Your app is **production-ready** and can be submitted to the App Store as an **u
 - ✅ 3 TODO comments (minor, won't block approval)
 
 ### Configuration - Good
-- Bundle ID: `com.baymax.chat`
+- Bundle ID: `com.sim.chat`
 - Version: `1.1.1`
 - Build: `1`
 - TestFlight: Already working
@@ -41,7 +41,7 @@ Your app is **production-ready** and can be submitted to the App Store as an **u
 2. **Write App Store text** (30 minutes)
    - App name (30 chars)
    - Subtitle (30 chars) 
-   - Description (explain it connects to baymaxed)
+   - Description (explain it connects to simed)
    - Keywords for search
 
 3. **Fill App Store Connect metadata** (30 minutes)
@@ -105,7 +105,7 @@ open -a Simulator
 # Run app, navigate screens, Cmd+S to save
 
 # 2. Validate build (optional but recommended)
-xcodebuild -scheme Baymax -destination 'generic/platform=iOS' \
+xcodebuild -scheme Sim -destination 'generic/platform=iOS' \
   -configuration Release clean archive
 
 # 3. Open Xcode Organizer

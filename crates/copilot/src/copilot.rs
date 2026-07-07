@@ -74,7 +74,7 @@ impl CopilotServer {
     fn as_authenticated(&mut self) -> Result<&mut RunningCopilotServer> {
         let server = self.as_running()?;
         anyhow::ensure!(
-            matches!(server.sign_in_status, SignInStatus::Authoribaymax),
+            matches!(server.sign_in_status, SignInStatus::Authorisim),
             "must sign in before using copilot"
         );
         Ok(server)
@@ -100,7 +100,7 @@ struct RunningCopilotServer {
 
 #[derive(Clone, Debug)]
 enum SignInStatus {
-    Authoribaymax,
+    Authorisim,
     Unauthorized,
     SigningIn {
         prompt: Option<request::PromptUserDeviceFlow>,
@@ -125,12 +125,12 @@ pub enum Status {
         prompt: Option<request::PromptUserDeviceFlow>,
     },
     Unauthorized,
-    Authoribaymax,
+    Authorisim,
 }
 
 impl Status {
-    pub fn is_authoribaymax(&self) -> bool {
-        matches!(self, Status::Authoribaymax)
+    pub fn is_authorisim(&self) -> bool {
+        matches!(self, Status::Authorisim)
     }
 
     pub fn is_configured(&self) -> bool {
@@ -139,7 +139,7 @@ impl Status {
             Status::Starting { .. }
                 | Status::Error(_)
                 | Status::SigningIn { .. }
-                | Status::Authoribaymax
+                | Status::Authorisim
         )
     }
 }
@@ -550,7 +550,7 @@ impl Copilot {
             node_runtime,
             server: CopilotServer::Running(RunningCopilotServer {
                 lsp: Arc::new(server),
-                sign_in_status: SignInStatus::Authoribaymax,
+                sign_in_status: SignInStatus::Authorisim,
                 registered_buffers: Default::default(),
             }),
             _subscriptions: vec![
@@ -661,11 +661,11 @@ impl Copilot {
 
             let editor_info = request::SetEditorInfoParams {
                 editor_info: request::EditorInfo {
-                    name: "baymax".into(),
+                    name: "sim".into(),
                     version: env!("CARGO_PKG_VERSION").into(),
                 },
                 editor_plugin_info: request::EditorPluginInfo {
-                    name: "baymax-copilot".into(),
+                    name: "sim-copilot".into(),
                     version: "0.0.1".into(),
                 },
             };
@@ -712,9 +712,9 @@ impl Copilot {
         this.update(cx, |this, cx| {
             cx.notify();
 
-            if env::var("BAYMAX_FORCE_COPILOT_ERROR").is_ok() {
+            if env::var("SIM_FORCE_COPILOT_ERROR").is_ok() {
                 this.server = CopilotServer::Error(
-                    "Forced error for testing (BAYMAX_FORCE_COPILOT_ERROR)".into(),
+                    "Forced error for testing (SIM_FORCE_COPILOT_ERROR)".into(),
                 );
                 return;
             }
@@ -743,7 +743,7 @@ impl Copilot {
         return matches!(
             self.server,
             CopilotServer::Running(RunningCopilotServer {
-                sign_in_status: SignInStatus::Authoribaymax,
+                sign_in_status: SignInStatus::Authorisim,
                 ..
             })
         );
@@ -752,7 +752,7 @@ impl Copilot {
     pub fn sign_in(&mut self, cx: &mut Context<Self>) -> Task<Result<()>> {
         if let CopilotServer::Running(server) = &mut self.server {
             let task = match &server.sign_in_status {
-                SignInStatus::Authoribaymax => Task::ready(Ok(())).shared(),
+                SignInStatus::Authorisim => Task::ready(Ok(())).shared(),
                 SignInStatus::SigningIn { task, .. } => {
                     cx.notify();
                     task.clone()
@@ -894,7 +894,7 @@ impl Copilot {
             ..
         }) = &mut self.server
         {
-            if !matches!(status, SignInStatus::Authoribaymax) {
+            if !matches!(status, SignInStatus::Authorisim) {
                 return;
             }
 
@@ -1236,7 +1236,7 @@ impl Copilot {
             CopilotServer::Error(error) => Status::Error(error.clone()),
             CopilotServer::Running(RunningCopilotServer { sign_in_status, .. }) => {
                 match sign_in_status {
-                    SignInStatus::Authoribaymax => Status::Authoribaymax,
+                    SignInStatus::Authorisim => Status::Authorisim,
                     SignInStatus::Unauthorized => Status::Unauthorized,
                     SignInStatus::SigningIn { prompt, .. } => Status::SigningIn {
                         prompt: prompt.clone(),
@@ -1263,7 +1263,7 @@ impl Copilot {
                 request::SignInStatus::Ok { user: Some(_) }
                 | request::SignInStatus::MaybeOk { .. }
                 | request::SignInStatus::AlreadySignedIn { .. } => {
-                    server.sign_in_status = SignInStatus::Authoribaymax;
+                    server.sign_in_status = SignInStatus::Authorisim;
                     cx.emit(Event::CopilotAuthSignedIn);
                     notify_copilot_chat_auth_changed(cx);
                     for buffer in self.buffers.iter().cloned().collect::<Vec<_>>() {
@@ -1272,7 +1272,7 @@ impl Copilot {
                         }
                     }
                 }
-                request::SignInStatus::NotAuthoribaymax { .. } => {
+                request::SignInStatus::NotAuthorisim { .. } => {
                     server.sign_in_status = SignInStatus::Unauthorized;
                     for buffer in self.buffers.iter().cloned().collect::<Vec<_>>() {
                         self.unregister_buffer(&buffer);
@@ -1321,7 +1321,7 @@ impl Copilot {
                     filter.hide_action_types(&auth_actions);
                     filter.hide_action_types(&no_auth_actions);
                 }
-                Status::Authoribaymax => {
+                Status::Authorisim => {
                     filter.hide_action_types(&no_auth_actions);
                     filter.show_action_types(signed_in_actions.iter().chain(&auth_actions));
                 }

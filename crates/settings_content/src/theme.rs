@@ -159,7 +159,7 @@ pub struct ThemeSettingsContent {
     /// The theme to use for the markdown preview.
     /// Falls back to the main editor theme if unset.
     pub markdown_preview_theme: Option<ThemeSelection>,
-    /// The name of the Baymax theme to use.
+    /// The name of the Sim theme to use.
     pub theme: Option<ThemeSelection>,
     /// The name of the icon theme to use.
     pub icon_theme: Option<IconThemeSelection>,
@@ -370,7 +370,7 @@ pub enum ThemeAppearanceMode {
 }
 
 /// Specifies the density of the UI.
-/// Note: This setting is still experimental. See [this tracking issue](https://github.com/simtropolis/baymax/issues/18078)
+/// Note: This setting is still experimental. See [this tracking issue](https://github.com/simtropolis/sim/issues/18078)
 #[derive(
     Debug,
     Default,
@@ -475,7 +475,7 @@ where
     Ok(value)
 }
 
-/// The content of a serialibaymax theme.
+/// The content of a serialisim theme.
 #[with_fallible_options]
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema, MergeFrom, PartialEq)]
 #[serde(default)]
@@ -872,7 +872,7 @@ pub struct ThemeColorsContent {
     /// Read-access of a symbol, like reading a variable.
     ///
     /// A document highlight is a range inside a text document which deserves
-    /// special attention. Usually a document highlight is visualibaymax by changing
+    /// special attention. Usually a document highlight is visualisim by changing
     /// the background color of its range.
     #[serde(rename = "editor.document_highlight.read_background")]
     pub editor_document_highlight_read_background: Option<String>,
@@ -880,7 +880,7 @@ pub struct ThemeColorsContent {
     /// Read-access of a symbol, like reading a variable.
     ///
     /// A document highlight is a range inside a text document which deserves
-    /// special attention. Usually a document highlight is visualibaymax by changing
+    /// special attention. Usually a document highlight is visualisim by changing
     /// the background color of its range.
     #[serde(rename = "editor.document_highlight.write_background")]
     pub editor_document_highlight_write_background: Option<String>,

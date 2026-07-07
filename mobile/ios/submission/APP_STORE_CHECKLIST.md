@@ -1,4 +1,4 @@
-# App Store Submission Checklist - Baymax iOS
+# App Store Submission Checklist - Sim iOS
 
 ## Status: Ready for Unlisted App Store Submission ✅
 
@@ -20,7 +20,7 @@ This checklist covers everything needed to move from TestFlight to an unlisted A
 - ✅ App Transport Security configured for local networking
 
 ### 3. Project Configuration
-- ✅ Bundle ID: `com.baymax.chat`
+- ✅ Bundle ID: `com.sim.chat`
 - ✅ Version: 1.1.1
 - ✅ Build number: 1
 - ✅ Code signing configured
@@ -40,7 +40,7 @@ This checklist covers everything needed to move from TestFlight to an unlisted A
 
 #### App Information
 - [ ] **App Name** (30 chars max)
-  - Current: "Baymax" or "Baymax Chat"
+  - Current: "Sim" or "Sim Chat"
   - Recommendation: Keep it short and clear
   
 - [ ] **Subtitle** (30 chars max)
@@ -48,8 +48,8 @@ This checklist covers everything needed to move from TestFlight to an unlisted A
   - This appears under app name in search
 
 - [ ] **Description** (4000 chars max)
-  - Explain what Baymax does
-  - Mention it connects to baymaxed server
+  - Explain what Sim does
+  - Mention it connects to simed server
   - Highlight key features (voice input, markdown, tool calls)
   - Note: Can be updated anytime without new build
 
@@ -63,7 +63,7 @@ This checklist covers everything needed to move from TestFlight to an unlisted A
 
 - [ ] **Support URL** (Required)
   - GitHub repo or support page
-  - Suggestion: `https://github.com/block/baymax`
+  - Suggestion: `https://github.com/block/sim`
 
 - [ ] **Marketing URL** (Optional)
   - Project website if you have one
@@ -103,15 +103,15 @@ You need screenshots for at least one device size:
   - For unlisted app, reviewers need to test it
   - Options:
     1. Provide trial mode credentials (already works)
-    2. Provide test baymaxed server URL + secret
+    2. Provide test simed server URL + secret
     3. Explain app requires personal server setup
   
 - [ ] **Notes for Reviewer**
   ```
   Example:
-  "Baymax is a client app that connects to a self-hosted baymaxed server.
+  "Sim is a client app that connects to a self-hosted simed server.
   The app includes a trial mode that connects to our demo server at
-  https://demo-baymaxed.fly.dev with limited functionality for testing purposes.
+  https://demo-simed.fly.dev with limited functionality for testing purposes.
   
   To test:
   1. Launch app (defaults to trial mode)
@@ -119,7 +119,7 @@ You need screenshots for at least one device size:
   3. Ask questions or give tasks
   4. Try voice input (microphone icon)
   
-  The app is designed for developers who run their own baymaxed instance,
+  The app is designed for developers who run their own simed instance,
   typically accessed via Tailscale or Cloudflare tunnel."
   ```
 
@@ -168,7 +168,7 @@ You need screenshots for at least one device size:
 
 4. **First Launch Experience**
    - ✅ Defaults to trial mode (good)
-   - Consider: Add onboarding screen explaining what Baymax is
+   - Consider: Add onboarding screen explaining what Sim is
    - Consider: Help text for connecting to personal server
 
 5. **Error Messages**
@@ -192,12 +192,12 @@ You need screenshots for at least one device size:
    - ✅ No analytics SDKs
    - ✅ No advertising
    - ✅ Data stays on user's server
-   - ✅ Only connects to user-specified baymaxed instance
+   - ✅ Only connects to user-specified simed instance
 
 8. **Third-Party Content**
-   - App generates AI responses via baymaxed
+   - App generates AI responses via simed
    - Apple may ask: How do you handle inappropriate content?
-   - Answer: "Content moderation is handled by the underlying LLM provider and baymaxed server configuration"
+   - Answer: "Content moderation is handled by the underlying LLM provider and simed server configuration"
 
 ---
 
@@ -209,7 +209,7 @@ You need screenshots for at least one device size:
 # In Xcode: Target → General → Build = 2 (or next number)
 
 # Clean and archive
-xcodebuild -scheme Baymax -destination 'generic/platform=iOS' clean archive
+xcodebuild -scheme Sim -destination 'generic/platform=iOS' clean archive
 ```
 
 ### Step 2: Upload to App Store Connect
@@ -219,7 +219,7 @@ xcodebuild -scheme Baymax -destination 'generic/platform=iOS' clean archive
 4. **Distribute App** → App Store Connect → Upload
 
 ### Step 3: Complete App Store Connect
-1. Go to App Store Connect → My Apps → Baymax
+1. Go to App Store Connect → My Apps → Sim
 2. Click **App Store** tab (not TestFlight)
 3. Create new version or use existing
 4. Fill in ALL required metadata above
@@ -279,7 +279,7 @@ Suggested screenshots to capture (use iPhone 15 Pro Max simulator):
 
 2. **Tool Execution** - Show tool being used
    - Expanded tool request/response
-   - Demonstrates power of Baymax
+   - Demonstrates power of Sim
 
 3. **Voice Input** - Voice recording UI
    - Shows accessibility feature
@@ -323,14 +323,14 @@ If you want to submit ASAP with minimum effort:
    - Tool execution or voice input
 
 2. **Write Descriptions** (30 min)
-   - App name: "Baymax"
+   - App name: "Sim"
    - Subtitle: "AI Assistant Client"
-   - Description: 2-3 paragraphs explaining it's a client for baymaxed
+   - Description: 2-3 paragraphs explaining it's a client for simed
    - Keywords: "AI,assistant,developer,chat"
 
 3. **Review Notes** (10 min)
    - Explain trial mode works for testing
-   - Provide demo-baymaxed.fly.dev info
+   - Provide demo-simed.fly.dev info
 
 4. **Privacy** (5 min)
    - No data collection
@@ -361,7 +361,7 @@ If you want to submit ASAP with minimum effort:
 ### 3. Confusing Description
 - **Issue**: Reviewers don't understand purpose
 - **Solution**: Clear, simple description
-- **Action**: Explain it's a client app for baymaxed server
+- **Action**: Explain it's a client app for simed server
 
 ### 4. Privacy Policy (if collecting data)
 - **Issue**: Required if you collect/transmit data

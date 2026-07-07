@@ -141,7 +141,7 @@ use text::{Anchor, BufferId, LineEnding, OffsetRangeExt, ToPoint as _};
 
 use util::{
     ConnectionResult, ResultExt as _, debug_panic, defer, maybe, merge_json_value_into,
-    paths::{PathStyle, SanitibaymaxPath, UrlExt},
+    paths::{PathStyle, SanitisimPath, UrlExt},
     post_inc,
     redact::redact_command,
     rel_path::RelPath,
@@ -2742,7 +2742,7 @@ impl LocalLspStore {
             Patch::new(snapshot.edits_since::<PointUtf16>(saved_version).collect())
         });
 
-        let mut sanitibaymax_diagnostics = Vec::with_capacity(diagnostics.len());
+        let mut sanitisim_diagnostics = Vec::with_capacity(diagnostics.len());
 
         for (new_diagnostic, entry) in diagnostics {
             let start;
@@ -2774,14 +2774,14 @@ impl LocalLspStore {
                 }
             }
 
-            sanitibaymax_diagnostics.push(DiagnosticEntry {
+            sanitisim_diagnostics.push(DiagnosticEntry {
                 range,
                 diagnostic: entry.diagnostic,
             });
         }
         drop(edits_since_save);
 
-        let set = DiagnosticSet::new(sanitibaymax_diagnostics, &snapshot);
+        let set = DiagnosticSet::new(sanitisim_diagnostics, &snapshot);
         buffer.update(cx, |buffer, cx| {
             if let Some(registration_id) = registration_id {
                 if let Some(abs_path) = File::from_dyn(buffer.file()).map(|f| f.abs_path(cx)) {
@@ -3720,7 +3720,7 @@ impl LocalLspStore {
             } else {
                 let (path, pattern) = match &watcher.glob_pattern {
                     lsp::GlobPattern::String(s) => {
-                        let watcher_path = SanitibaymaxPath::new(s);
+                        let watcher_path = SanitisimPath::new(s);
                         let path = glob_literal_prefix(watcher_path.as_path());
                         let pattern = watcher_path
                             .as_path()
@@ -3812,7 +3812,7 @@ impl LocalLspStore {
             let path_style = tree.path_style();
             match &watcher.glob_pattern {
                 lsp::GlobPattern::String(s) => {
-                    let watcher_path = SanitibaymaxPath::new(s);
+                    let watcher_path = SanitisimPath::new(s);
                     let relative = watcher_path
                         .as_path()
                         .strip_prefix(&worktree_root_path)
@@ -6919,7 +6919,7 @@ impl LspStore {
         let mut new_label = match completion_item {
             Some(completion_item) => {
                 // Some language servers always return `detail` lazily via resolve, regardless of
-                // the resolvable properties Baymax advertises. Regenerate labels here to handle this.
+                // the resolvable properties Sim advertises. Regenerate labels here to handle this.
                 // See: https://github.com/yioneko/vtsls/issues/213
                 let language = snapshot.language();
                 match language {
@@ -7169,7 +7169,7 @@ impl LspStore {
                             // Special case: if both ranges start at the very beginning of the file (line 0, column 0),
                             // and the primary completion is just an insertion (empty range), then this is likely
                             // an auto-import scenario and should not be considered overlapping
-                            // https://github.com/simtropolis/baymax/issues/26136
+                            // https://github.com/simtropolis/sim/issues/26136
                             let is_file_start_auto_import = {
                                 let snapshot = buffer.snapshot();
                                 let primary_start_point = primary.start.to_point(&snapshot);
@@ -7198,7 +7198,7 @@ impl LspStore {
                             };
 
                             //Skip additional edits which overlap with the primary completion edit
-                            //https://github.com/simtropolis/baymax/pull/1871
+                            //https://github.com/simtropolis/sim/pull/1871
                             if !has_overlap {
                                 buffer.edit([(range, text)], None, cx);
                             }
@@ -12368,48 +12368,48 @@ impl LspStore {
         result
     }
 
-    fn deserialize_symbol(serialibaymax_symbol: proto::Symbol) -> Result<CoreSymbol> {
-        let source_worktree_id = WorktreeId::from_proto(serialibaymax_symbol.source_worktree_id);
-        let worktree_id = WorktreeId::from_proto(serialibaymax_symbol.worktree_id);
-        let kind = unsafe { mem::transmute::<i32, lsp::SymbolKind>(serialibaymax_symbol.kind) };
+    fn deserialize_symbol(serialisim_symbol: proto::Symbol) -> Result<CoreSymbol> {
+        let source_worktree_id = WorktreeId::from_proto(serialisim_symbol.source_worktree_id);
+        let worktree_id = WorktreeId::from_proto(serialisim_symbol.worktree_id);
+        let kind = unsafe { mem::transmute::<i32, lsp::SymbolKind>(serialisim_symbol.kind) };
 
-        let path = if serialibaymax_symbol.signature.is_empty() {
+        let path = if serialisim_symbol.signature.is_empty() {
             SymbolLocation::InProject(ProjectPath {
                 worktree_id,
-                path: RelPath::from_proto(&serialibaymax_symbol.path)
+                path: RelPath::from_proto(&serialisim_symbol.path)
                     .context("invalid symbol path")?,
             })
         } else {
             SymbolLocation::OutsideProject {
-                abs_path: Path::new(&serialibaymax_symbol.path).into(),
-                signature: serialibaymax_symbol
+                abs_path: Path::new(&serialisim_symbol.path).into(),
+                signature: serialisim_symbol
                     .signature
                     .try_into()
                     .map_err(|_| anyhow!("invalid signature"))?,
             }
         };
 
-        let start = serialibaymax_symbol.start.context("invalid start")?;
-        let end = serialibaymax_symbol.end.context("invalid end")?;
+        let start = serialisim_symbol.start.context("invalid start")?;
+        let end = serialisim_symbol.end.context("invalid end")?;
         Ok(CoreSymbol {
             language_server_name: LanguageServerName(
-                serialibaymax_symbol.language_server_name.into(),
+                serialisim_symbol.language_server_name.into(),
             ),
             source_worktree_id,
             source_language_server_id: LanguageServerId::from_proto(
-                serialibaymax_symbol.language_server_id,
+                serialisim_symbol.language_server_id,
             ),
             path,
-            name: serialibaymax_symbol.name,
+            name: serialisim_symbol.name,
             range: Unclipped(PointUtf16::new(start.row, start.column))
                 ..Unclipped(PointUtf16::new(end.row, end.column)),
             kind,
-            container_name: serialibaymax_symbol.container_name,
+            container_name: serialisim_symbol.container_name,
         })
     }
 
     pub(crate) fn serialize_completion(completion: &CoreCompletion) -> proto::Completion {
-        let mut serialibaymax_completion = proto::Completion {
+        let mut serialisim_completion = proto::Completion {
             old_replace_start: Some(serialize_anchor(&completion.replace_range.start)),
             old_replace_end: Some(serialize_anchor(&completion.replace_range.end)),
             new_text: completion.new_text.clone(),
@@ -12428,38 +12428,38 @@ impl LspStore {
                     .map(|range| (serialize_anchor(&range.start), serialize_anchor(&range.end)))
                     .unzip();
 
-                serialibaymax_completion.old_insert_start = old_insert_start;
-                serialibaymax_completion.old_insert_end = old_insert_end;
-                serialibaymax_completion.source = proto::completion::Source::Lsp as i32;
-                serialibaymax_completion.server_id = server_id.0 as u64;
-                serialibaymax_completion.lsp_completion =
+                serialisim_completion.old_insert_start = old_insert_start;
+                serialisim_completion.old_insert_end = old_insert_end;
+                serialisim_completion.source = proto::completion::Source::Lsp as i32;
+                serialisim_completion.server_id = server_id.0 as u64;
+                serialisim_completion.lsp_completion =
                     serde_json::to_vec(lsp_completion).unwrap();
-                serialibaymax_completion.lsp_defaults = lsp_defaults
+                serialisim_completion.lsp_defaults = lsp_defaults
                     .as_deref()
                     .map(|lsp_defaults| serde_json::to_vec(lsp_defaults).unwrap());
-                serialibaymax_completion.resolved = *resolved;
+                serialisim_completion.resolved = *resolved;
             }
             CompletionSource::BufferWord {
                 word_range,
                 resolved,
             } => {
-                serialibaymax_completion.source = proto::completion::Source::BufferWord as i32;
-                serialibaymax_completion.buffer_word_start =
+                serialisim_completion.source = proto::completion::Source::BufferWord as i32;
+                serialisim_completion.buffer_word_start =
                     Some(serialize_anchor(&word_range.start));
-                serialibaymax_completion.buffer_word_end = Some(serialize_anchor(&word_range.end));
-                serialibaymax_completion.resolved = *resolved;
+                serialisim_completion.buffer_word_end = Some(serialize_anchor(&word_range.end));
+                serialisim_completion.resolved = *resolved;
             }
             CompletionSource::Custom => {
-                serialibaymax_completion.source = proto::completion::Source::Custom as i32;
-                serialibaymax_completion.resolved = true;
+                serialisim_completion.source = proto::completion::Source::Custom as i32;
+                serialisim_completion.resolved = true;
             }
             CompletionSource::Dap { sort_text } => {
-                serialibaymax_completion.source = proto::completion::Source::Dap as i32;
-                serialibaymax_completion.sort_text = Some(sort_text.clone());
+                serialisim_completion.source = proto::completion::Source::Dap as i32;
+                serialisim_completion.sort_text = Some(sort_text.clone());
             }
         }
 
-        serialibaymax_completion
+        serialisim_completion
     }
 
     pub(crate) fn deserialize_completion(completion: proto::Completion) -> Result<CoreCompletion> {

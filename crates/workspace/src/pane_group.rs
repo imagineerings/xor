@@ -416,11 +416,11 @@ impl PaneLeaderDecorator for PaneRenderContext<'_> {
                         }
                     }
                     ParticipantLocation::UnsharedProject => Some(Label::new(format!(
-                        "{} is viewing an unshared Baymax project",
+                        "{} is viewing an unshared Sim project",
                         leader.user.github_login
                     ))),
                     ParticipantLocation::External => Some(Label::new(format!(
-                        "{} is viewing a window outside of Baymax",
+                        "{} is viewing a window outside of Sim",
                         leader.user.github_login
                     ))),
                 };

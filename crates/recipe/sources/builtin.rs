@@ -26,7 +26,7 @@ impl BuiltinRecipeSource {
         Self::new(Vec::new())
     }
 
-    pub fn baymax_defaults() -> Self {
+    pub fn sim_defaults() -> Self {
         Self::new(vec![BuiltinRecipe {
             name: "release-risk-check",
             content: include_str!("../builtin_recipes/release_risk_check.yaml"),
@@ -103,7 +103,7 @@ prompt: Check release
 
     #[test]
     fn default_builtins_include_release_risk_check() {
-        let source = BuiltinRecipeSource::baymax_defaults();
+        let source = BuiltinRecipeSource::sim_defaults();
 
         let recipe = source.load("release-risk-check").unwrap();
 

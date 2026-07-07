@@ -8,17 +8,17 @@ use project::{self, CompletionDisplayOptions};
 
 pub struct ActionCompletionProvider {
     action_names: Vec<&'static str>,
-    humanibaymax_names: HashMap<&'static str, SharedString>,
+    humanisim_names: HashMap<&'static str, SharedString>,
 }
 
 impl ActionCompletionProvider {
     pub fn new(
         action_names: Vec<&'static str>,
-        humanibaymax_names: HashMap<&'static str, SharedString>,
+        humanisim_names: HashMap<&'static str, SharedString>,
     ) -> Self {
         Self {
             action_names,
-            humanibaymax_names,
+            humanisim_names,
         }
     }
 }
@@ -59,19 +59,19 @@ impl CompletionProvider for ActionCompletionProvider {
             .iter()
             .enumerate()
             .map(|(ix, &name)| {
-                let humanibaymax = self
-                    .humanibaymax_names
+                let humanisim = self
+                    .humanisim_names
                     .get(name)
                     .cloned()
                     .unwrap_or_else(|| name.into());
-                StringMatchCandidate::new(ix, &humanibaymax)
+                StringMatchCandidate::new(ix, &humanisim)
             })
             .collect();
 
         let executor = cx.background_executor().clone();
         let executor_for_fuzzy = executor.clone();
         let action_names = self.action_names.clone();
-        let humanibaymax_names = self.humanibaymax_names.clone();
+        let humanisim_names = self.humanisim_names.clone();
 
         executor.spawn(async move {
             let matches = fuzzy::match_strings(
@@ -90,14 +90,14 @@ impl CompletionProvider for ActionCompletionProvider {
                 .take(50)
                 .map(|m| {
                     let action_name = action_names[m.candidate_id];
-                    let humanibaymax = humanibaymax_names
+                    let humanisim = humanisim_names
                         .get(action_name)
                         .cloned()
                         .unwrap_or_else(|| action_name.into());
 
                     project::Completion {
                         replace_range: replace_range.clone(),
-                        label: language::CodeLabel::plain(humanibaymax.to_string(), None),
+                        label: language::CodeLabel::plain(humanisim.to_string(), None),
                         new_text: action_name.to_string(),
                         documentation: None,
                         source: project::CompletionSource::Custom,

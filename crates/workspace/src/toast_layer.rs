@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use baymax_actions::toast;
+use sim_actions::toast;
 use gpui::{
     AnyView, DismissEvent, Entity, EntityId, FocusHandle, ManagedView, MouseButton, Subscription,
     Task,

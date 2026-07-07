@@ -2,7 +2,7 @@
 
 ## Overview
 
-Extend baymax's observability infrastructure with Langfuse tracing, OpenTelemetry OTLP export, an observation layer, rate limiter, PostHog analytics, token counter, and tool monitoring.
+Extend sim's observability infrastructure with Langfuse tracing, OpenTelemetry OTLP export, an observation layer, rate limiter, PostHog analytics, token counter, and tool monitoring.
 
 ## Repo Reconciliation
 

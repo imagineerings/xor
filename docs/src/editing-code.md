@@ -1,11 +1,11 @@
 ---
-title: Editing Code in Baymax
-description: Core code editing features in Baymax including multi-cursor, refactoring, code actions, and language server integration.
+title: Editing Code in Sim
+description: Core code editing features in Sim including multi-cursor, refactoring, code actions, and language server integration.
 ---
 
 # Editing Code
 
-Baymax provides tools to help you write and modify code efficiently. This section covers the core editing features that work alongside your language server.
+Sim provides tools to help you write and modify code efficiently. This section covers the core editing features that work alongside your language server.
 
 ## What's in This Section
 
@@ -17,7 +17,7 @@ Baymax provides tools to help you write and modify code efficiently. This sectio
 
 ## How These Features Work Together
 
-When you're editing code, Baymax combines input from multiple sources:
+When you're editing code, Sim combines input from multiple sources:
 
 1. **Language servers** provide completions, diagnostics, and quick fixes based on your project's types and structure
 2. **Edit predictions** suggest multi-character or multi-line changes as you type

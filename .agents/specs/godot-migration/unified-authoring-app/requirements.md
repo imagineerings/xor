@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Baymax should provide a unified cross-platform game authoring application for Godot-compatible project assets, diffusion graphs, world-model runtime previews, and generated artifacts.
+Sim should provide a unified cross-platform game authoring application for Godot-compatible project assets, diffusion graphs, world-model runtime previews, and generated artifacts.
 
 ### Requirement 1: Unified Workspace
 

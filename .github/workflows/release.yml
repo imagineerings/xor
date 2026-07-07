@@ -46,12 +46,12 @@ jobs:
       - name: Create linux tarball
         run: |
           cd target/release
-          tar czf ../../baymax-linux-${RUNNER_ARCH}.tar.gz baymax baymax-remote-server
+          tar czf ../../sim-linux-${RUNNER_ARCH}.tar.gz sim sim-remote-server
       - name: Upload linux artifact
         uses: actions/upload-artifact@v4
         with:
-          name: baymax-linux-${{ runner.arch }}.tar.gz
-          path: baymax-linux-${{ env.RUNNER_ARCH }}.tar.gz
+          name: sim-linux-${{ runner.arch }}.tar.gz
+          path: sim-linux-${{ env.RUNNER_ARCH }}.tar.gz
 
   bundle_macos:
     runs-on: macos-latest
@@ -65,12 +65,12 @@ jobs:
       - name: Create macOS tarball
         run: |
           cd target/release
-          tar czf ../../baymax-macos-${RUNNER_ARCH}.tar.gz baymax baymax-remote-server
+          tar czf ../../sim-macos-${RUNNER_ARCH}.tar.gz sim sim-remote-server
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
-          name: baymax-macos-${{ runner.arch }}.tar.gz
-          path: baymax-macos-${{ env.RUNNER_ARCH }}.tar.gz
+          name: sim-macos-${{ runner.arch }}.tar.gz
+          path: sim-macos-${{ env.RUNNER_ARCH }}.tar.gz
 
   bundle_windows:
     runs-on: windows-latest
@@ -85,12 +85,12 @@ jobs:
         shell: pwsh
         run: |
           $arch = $env:RUNNER_ARCH
-          Compress-Archive -Path target/release/baymax.exe, target/release/baymax-remote-server.exe -DestinationPath baymax-windows-$arch.zip
+          Compress-Archive -Path target/release/sim.exe, target/release/sim-remote-server.exe -DestinationPath sim-windows-$arch.zip
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
-          name: baymax-windows-${{ runner.arch }}.zip
-          path: baymax-windows-${{ env.RUNNER_ARCH }}.zip
+          name: sim-windows-${{ runner.arch }}.zip
+          path: sim-windows-${{ env.RUNNER_ARCH }}.zip
 
   create_release:
     needs:
@@ -127,12 +127,12 @@ jobs:
       - name: Prepare release assets
         run: |
           mkdir -p release-assets
-          cp artifacts/baymax-linux-x86_64.tar.gz release-assets/ 2>/dev/null || true
-          cp artifacts/baymax-linux-aarch64.tar.gz release-assets/ 2>/dev/null || true
-          cp artifacts/baymax-macos-x86_64.tar.gz release-assets/ 2>/dev/null || true
-          cp artifacts/baymax-macos-aarch64.tar.gz release-assets/ 2>/dev/null || true
-          cp artifacts/baymax-windows-x86_64.zip release-assets/ 2>/dev/null || true
-          cp artifacts/baymax-windows-aarch64.zip release-assets/ 2>/dev/null || true
+          cp artifacts/sim-linux-x86_64.tar.gz release-assets/ 2>/dev/null || true
+          cp artifacts/sim-linux-aarch64.tar.gz release-assets/ 2>/dev/null || true
+          cp artifacts/sim-macos-x86_64.tar.gz release-assets/ 2>/dev/null || true
+          cp artifacts/sim-macos-aarch64.tar.gz release-assets/ 2>/dev/null || true
+          cp artifacts/sim-windows-x86_64.zip release-assets/ 2>/dev/null || true
+          cp artifacts/sim-windows-aarch64.zip release-assets/ 2>/dev/null || true
           ls -la release-assets/
 
       - name: Create GitHub Release

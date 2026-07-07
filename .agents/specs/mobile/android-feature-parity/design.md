@@ -28,7 +28,7 @@ graph TD
     end
 
     subgraph "Service Layer"
-        BaymaxApiService
+        SimApiService
         SettingsRepository
         AgentRepository
         TunnelDetector
@@ -59,12 +59,12 @@ graph TD
     ChatScreen --> ChatViewModel
     SettingsScreen --> SettingsViewModel
     
-    ChatViewModel --> BaymaxApiService
+    ChatViewModel --> SimApiService
     ChatViewModel --> VoiceManager
     ChatViewModel --> SessionPoller
     ChatViewModel --> ContinuousVoiceManager
     
-    HomeViewModel --> BaymaxApiService
+    HomeViewModel --> SimApiService
     HomeViewModel --> AgentRepository
     HomeViewModel --> TrialModeManager
     HomeViewModel --> FavoriteSessionsStorage
@@ -86,10 +86,10 @@ graph TD
 ### Package Structure
 
 ```
-com.simtropolis.baymax/
+com.simtropolis.sim/
 ├── data/
 │   ├── api/
-│   │   ├── BaymaxApiService.kt          # Existing + G.1 API extensions
+│   │   ├── SimApiService.kt          # Existing + G.1 API extensions
 │   │   ├── SettingsRepository.kt         # Existing
 │   │   └── AgentRepository.kt            # Existing
 │   ├── model/
@@ -137,7 +137,7 @@ com.simtropolis.baymax/
 │   ├── TunnelDetector.kt                # Existing
 │   ├── NoticeManager.kt                 # Existing
 │   └── TunnelType.kt                    # Existing
-├── BaymaxApplication.kt                 # Existing
+├── SimApplication.kt                 # Existing
 └── MainActivity.kt                      # Extended: D.1 splash, routes
 ```
 
@@ -190,7 +190,7 @@ fun SplashScreen(
 - First launch or 24h+ gap: 0.4s fade in, 1.0s display, 0.4s fade out
 - Otherwise: 0.2s fade in, 0.3s display, 0.2s fade out
 
-**Integration**: Show in `MainActivity.kt` as overlay before `BaymaxNavigation()`.
+**Integration**: Show in `MainActivity.kt` as overlay before `SimNavigation()`.
 
 ---
 
@@ -297,7 +297,7 @@ data class NotificationMessage(
 )
 ```
 
-**Extend `parseSSEEvent()` in `BaymaxApiService.kt`**:
+**Extend `parseSSEEvent()` in `SimApiService.kt`**:
 ```kotlin
 "Notification" -> json.decodeFromString<SSEEvent.NotificationEvent>(data)
 ```
@@ -358,7 +358,7 @@ object ThemeManager {
 
 **UI Changes**:
 - Add `Switch` to `SettingsScreen` with "Dark Mode" label
-- Modify `BaymaxTheme` in `Theme.kt` to observe `ThemeManager.isDarkMode`
+- Modify `SimTheme` in `Theme.kt` to observe `ThemeManager.isDarkMode`
 - Update `WelcomeCard` and other components using `isSystemInDarkTheme()` to use `ThemeManager.isDarkMode`
 
 ---
@@ -416,7 +416,7 @@ fun Modifier.liquidGlassBackground(
 
 ### 12. API Extensions — G.1
 
-**Add to `BaymaxApiService.kt`**:
+**Add to `SimApiService.kt`**:
 ```kotlin
 // Session Insights
 suspend fun fetchInsights(): ApiResult<SessionInsights>

@@ -13,6 +13,6 @@ Represent physics/navigation files and docs as metadata. Use external tasks for 
 
 ### Property 1: Runtime Exclusion
 
-_For any_ Godot physics or navigation runtime feature, Baymax SHALL not embed the runtime implementation.
+_For any_ Godot physics or navigation runtime feature, Sim SHALL not embed the runtime implementation.
 
 **Validates: Requirement 1.1**

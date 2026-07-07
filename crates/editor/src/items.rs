@@ -4,11 +4,11 @@ use crate::{
     ReportEditorEvent, SelectionEffects, ToPoint as _,
     display_map::HighlightKey,
     editor_settings::SeedQuerySetting,
-    persistence::{EditorDb, SerialibaymaxEditor},
+    persistence::{EditorDb, SerialisimEditor},
     scroll::{ScrollAnchor, ScrollOffset},
 };
 use anyhow::{Context as _, Result, anyhow};
-use baymax_actions::preview::{
+use sim_actions::preview::{
     markdown::OpenPreview as OpenMarkdownPreview, svg::OpenPreview as OpenSvgPreview,
 };
 use collections::{HashMap, HashSet};
@@ -1189,7 +1189,7 @@ impl Item for Editor {
 }
 
 impl SerializableItem for Editor {
-    fn serialibaymax_item_kind() -> &'static str {
+    fn serialisim_item_kind() -> &'static str {
         "Editor"
     }
 
@@ -1216,19 +1216,19 @@ impl SerializableItem for Editor {
         window: &mut Window,
         cx: &mut App,
     ) -> Task<Result<Entity<Self>>> {
-        let serialibaymax_editor = match EditorDb::global(cx)
-            .get_serialibaymax_editor(item_id, workspace_id)
+        let serialisim_editor = match EditorDb::global(cx)
+            .get_serialisim_editor(item_id, workspace_id)
             .context("Failed to query editor state")
         {
-            Ok(Some(serialibaymax_editor)) => {
+            Ok(Some(serialisim_editor)) => {
                 if ProjectSettings::get_global(cx)
                     .session
                     .restore_unsaved_buffers
                 {
-                    serialibaymax_editor
+                    serialisim_editor
                 } else {
-                    SerialibaymaxEditor {
-                        abs_path: serialibaymax_editor.abs_path,
+                    SerialisimEditor {
+                        abs_path: serialisim_editor.abs_path,
                         contents: None,
                         language: None,
                         mtime: None,
@@ -1245,11 +1245,11 @@ impl SerializableItem for Editor {
             }
         };
         log::debug!(
-            "Deserialibaymax editor {item_id:?} in workspace {workspace_id:?}, {serialibaymax_editor:?}"
+            "Deserialisim editor {item_id:?} in workspace {workspace_id:?}, {serialisim_editor:?}"
         );
 
-        match serialibaymax_editor {
-            SerialibaymaxEditor {
+        match serialisim_editor {
+            SerialisimEditor {
                 abs_path: None,
                 contents: Some(contents),
                 language,
@@ -1296,7 +1296,7 @@ impl SerializableItem for Editor {
                     })
                 }
             }),
-            SerialibaymaxEditor {
+            SerialisimEditor {
                 abs_path: Some(abs_path),
                 contents,
                 mtime,
@@ -1319,7 +1319,7 @@ impl SerializableItem for Editor {
 
                         if let Some(contents) = contents {
                             buffer.update(cx, |buffer, cx| {
-                                restore_serialibaymax_buffer_contents(buffer, contents, mtime, cx);
+                                restore_serialisim_buffer_contents(buffer, contents, mtime, cx);
                             });
                         }
 
@@ -1349,7 +1349,7 @@ impl SerializableItem for Editor {
 
                             if let Some(contents) = contents {
                                 buffer.update(cx, |buffer, cx| {
-                                    restore_serialibaymax_buffer_contents(
+                                    restore_serialisim_buffer_contents(
                                         buffer, contents, mtime, cx,
                                     );
                                 });
@@ -1367,7 +1367,7 @@ impl SerializableItem for Editor {
                     }
                 }
             }
-            SerialibaymaxEditor {
+            SerialisimEditor {
                 abs_path: None,
                 contents: None,
                 ..
@@ -1444,16 +1444,16 @@ impl SerializableItem for Editor {
                     (None, None)
                 };
 
-                let editor = SerialibaymaxEditor {
+                let editor = SerialisimEditor {
                     abs_path,
                     contents,
                     language,
                     mtime,
                 };
                 log::debug!("Serializing editor {item_id:?} in workspace {workspace_id:?}");
-                db.save_serialibaymax_editor(item_id, workspace_id, editor)
+                db.save_serialisim_editor(item_id, workspace_id, editor)
                     .await
-                    .context("failed to save serialibaymax editor")
+                    .context("failed to save serialisim editor")
             })
             .await
             .context("failed to save contents of buffer")?;
@@ -2150,11 +2150,11 @@ fn path_for_file<'a>(
     }
 }
 
-/// Restores serialibaymax buffer contents by overwriting the buffer with saved text.
+/// Restores serialisim buffer contents by overwriting the buffer with saved text.
 /// This is somewhat wasteful since we load the whole buffer from disk then overwrite it,
 /// but keeps implementation simple as we don't need to persist all metadata from loading
 /// (git diff base, etc.).
-fn restore_serialibaymax_buffer_contents(
+fn restore_serialisim_buffer_contents(
     buffer: &mut Buffer,
     contents: String,
     mtime: Option<MTime>,
@@ -2411,7 +2411,7 @@ mod tests {
                 .unwrap()
                 .mtime;
 
-            let serialibaymax_editor = SerialibaymaxEditor {
+            let serialisim_editor = SerialisimEditor {
                 abs_path: Some(PathBuf::from(path!("/file.rs"))),
                 contents: Some("fn main() {}".to_string()),
                 language: Some("Rust".to_string()),
@@ -2419,14 +2419,14 @@ mod tests {
             };
 
             editor_db
-                .save_serialibaymax_editor(item_id, workspace_id, serialibaymax_editor.clone())
+                .save_serialisim_editor(item_id, workspace_id, serialisim_editor.clone())
                 .await
                 .unwrap();
 
-            let deserialibaymax =
+            let deserialisim =
                 deserialize_editor(item_id, workspace_id, workspace, project, cx).await;
 
-            deserialibaymax.update(cx, |editor, cx| {
+            deserialisim.update(cx, |editor, cx| {
                 assert_eq!(editor.text(cx), "fn main() {}");
                 assert!(editor.is_dirty(cx));
                 assert!(!editor.has_conflict(cx));
@@ -2448,7 +2448,7 @@ mod tests {
             let workspace_id = db.next_id().await.unwrap();
 
             let item_id = 5678 as ItemId;
-            let serialibaymax_editor = SerialibaymaxEditor {
+            let serialisim_editor = SerialisimEditor {
                 abs_path: Some(PathBuf::from(path!("/file.rs"))),
                 contents: None,
                 language: None,
@@ -2456,14 +2456,14 @@ mod tests {
             };
 
             editor_db
-                .save_serialibaymax_editor(item_id, workspace_id, serialibaymax_editor)
+                .save_serialisim_editor(item_id, workspace_id, serialisim_editor)
                 .await
                 .unwrap();
 
-            let deserialibaymax =
+            let deserialisim =
                 deserialize_editor(item_id, workspace_id, workspace, project, cx).await;
 
-            deserialibaymax.update(cx, |editor, cx| {
+            deserialisim.update(cx, |editor, cx| {
                 assert_eq!(editor.text(cx), ""); // The file should be empty as per our initial setup
                 assert!(!editor.is_dirty(cx));
                 assert!(!editor.has_conflict(cx));
@@ -2491,7 +2491,7 @@ mod tests {
             let workspace_id = db.next_id().await.unwrap();
 
             let item_id = 9012 as ItemId;
-            let serialibaymax_editor = SerialibaymaxEditor {
+            let serialisim_editor = SerialisimEditor {
                 abs_path: None,
                 contents: Some("hello".to_string()),
                 language: Some("Rust".to_string()),
@@ -2499,14 +2499,14 @@ mod tests {
             };
 
             editor_db
-                .save_serialibaymax_editor(item_id, workspace_id, serialibaymax_editor)
+                .save_serialisim_editor(item_id, workspace_id, serialisim_editor)
                 .await
                 .unwrap();
 
-            let deserialibaymax =
+            let deserialisim =
                 deserialize_editor(item_id, workspace_id, workspace, project, cx).await;
 
-            deserialibaymax.update(cx, |editor, cx| {
+            deserialisim.update(cx, |editor, cx| {
                 assert_eq!(editor.text(cx), "hello");
                 assert!(editor.is_dirty(cx)); // The editor should be dirty for an untitled buffer
 
@@ -2533,7 +2533,7 @@ mod tests {
 
             let item_id = 9345 as ItemId;
             let old_mtime = MTime::from_seconds_and_nanos(0, 50);
-            let serialibaymax_editor = SerialibaymaxEditor {
+            let serialisim_editor = SerialisimEditor {
                 abs_path: Some(PathBuf::from(path!("/file.rs"))),
                 contents: Some("fn main() {}".to_string()),
                 language: Some("Rust".to_string()),
@@ -2541,14 +2541,14 @@ mod tests {
             };
 
             editor_db
-                .save_serialibaymax_editor(item_id, workspace_id, serialibaymax_editor)
+                .save_serialisim_editor(item_id, workspace_id, serialisim_editor)
                 .await
                 .unwrap();
 
-            let deserialibaymax =
+            let deserialisim =
                 deserialize_editor(item_id, workspace_id, workspace, project, cx).await;
 
-            deserialibaymax.update(cx, |editor, cx| {
+            deserialisim.update(cx, |editor, cx| {
                 assert_eq!(editor.text(cx), "fn main() {}");
                 assert!(editor.has_conflict(cx)); // The editor should have a conflict
             });
@@ -2567,7 +2567,7 @@ mod tests {
             let workspace_id = db.next_id().await.unwrap();
 
             let item_id = 10000 as ItemId;
-            let serialibaymax_editor = SerialibaymaxEditor {
+            let serialisim_editor = SerialisimEditor {
                 abs_path: None,
                 contents: None,
                 language: None,
@@ -2575,14 +2575,14 @@ mod tests {
             };
 
             editor_db
-                .save_serialibaymax_editor(item_id, workspace_id, serialibaymax_editor)
+                .save_serialisim_editor(item_id, workspace_id, serialisim_editor)
                 .await
                 .unwrap();
 
-            let deserialibaymax =
+            let deserialisim =
                 deserialize_editor(item_id, workspace_id, workspace, project, cx).await;
 
-            deserialibaymax.update(cx, |editor, cx| {
+            deserialisim.update(cx, |editor, cx| {
                 assert_eq!(editor.text(cx), "");
                 assert!(!editor.is_dirty(cx));
                 assert!(!editor.has_conflict(cx));
@@ -2619,8 +2619,8 @@ mod tests {
                 .unwrap()
                 .mtime;
 
-            // Simulate serialibaymax state: file with unsaved changes
-            let serialibaymax_editor = SerialibaymaxEditor {
+            // Simulate serialisim state: file with unsaved changes
+            let serialisim_editor = SerialisimEditor {
                 abs_path: Some(PathBuf::from(path!("/standalone.rs"))),
                 contents: Some("modified content".to_string()),
                 language: Some("Rust".to_string()),
@@ -2628,15 +2628,15 @@ mod tests {
             };
 
             editor_db
-                .save_serialibaymax_editor(item_id, workspace_id, serialibaymax_editor)
+                .save_serialisim_editor(item_id, workspace_id, serialisim_editor)
                 .await
                 .unwrap();
 
-            let deserialibaymax =
+            let deserialisim =
                 deserialize_editor(item_id, workspace_id, workspace, project, cx).await;
 
-            deserialibaymax.update(cx, |editor, cx| {
-                // The editor should have the serialibaymax contents, not the disk contents
+            deserialisim.update(cx, |editor, cx| {
+                // The editor should have the serialisim contents, not the disk contents
                 assert_eq!(editor.text(cx), "modified content");
                 assert!(editor.is_dirty(cx));
                 assert!(!editor.has_conflict(cx));
@@ -2722,7 +2722,7 @@ mod tests {
         });
     }
 
-    // Regression test for https://github.com/simtropolis/baymax/issues/35947
+    // Regression test for https://github.com/simtropolis/sim/issues/35947
     // Verifies that deserializing a non-worktree editor does not add the item
     // to any pane as a side effect.
     #[gpui::test]
@@ -2746,7 +2746,7 @@ mod tests {
         let workspace_id = db.next_id().await.unwrap();
         let item_id = 99999 as ItemId;
 
-        let serialibaymax_editor = SerialibaymaxEditor {
+        let serialisim_editor = SerialisimEditor {
             abs_path: Some(PathBuf::from(path!("/outside/settings.json"))),
             contents: None,
             language: None,
@@ -2754,7 +2754,7 @@ mod tests {
         };
 
         editor_db
-            .save_serialibaymax_editor(item_id, workspace_id, serialibaymax_editor)
+            .save_serialisim_editor(item_id, workspace_id, serialisim_editor)
             .await
             .unwrap();
 
@@ -2767,13 +2767,13 @@ mod tests {
                 .sum::<usize>()
         });
 
-        let deserialibaymax =
+        let deserialisim =
             deserialize_editor(item_id, workspace_id, workspace.clone(), project, cx).await;
 
         cx.run_until_parked();
 
         // The editor should exist and have the file
-        deserialibaymax.update(cx, |editor, cx| {
+        deserialisim.update(cx, |editor, cx| {
             let buffer = editor.buffer().read(cx).as_singleton().unwrap().read(cx);
             assert!(buffer.file().is_some());
         });

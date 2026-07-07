@@ -57,7 +57,7 @@ impl PromptMetadata {
     }
 }
 
-/// Built-in prompts that have default content and can be customibaymax by users.
+/// Built-in prompts that have default content and can be customisim by users.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, EnumIter)]
 pub enum BuiltInPrompt {
     CommitMessage,
@@ -186,7 +186,7 @@ impl MetadataCache {
             cache.metadata_by_id.insert(prompt_id, metadata);
         }
 
-        // Insert all the built-in prompts that were not customibaymax by the user
+        // Insert all the built-in prompts that were not customisim by the user
         for builtin in BuiltInPrompt::iter() {
             let builtin_id = PromptId::BuiltIn(builtin);
             if !cache.metadata_by_id.contains_key(&builtin_id) {

@@ -3,7 +3,7 @@
 
 Usage:
     script/sentry-fetch <issue-short-id-or-numeric-id>
-    script/sentry-fetch BAYMAX-4VS
+    script/sentry-fetch SIM-4VS
     script/sentry-fetch 7243282041
 
 Authentication (checked in order):
@@ -22,7 +22,7 @@ import urllib.error
 import urllib.request
 
 SENTRY_BASE_URL = "https://sentry.io/api/0"
-DEFAULT_SENTRY_ORG = "baymax-dev"
+DEFAULT_SENTRY_ORG = "sim-dev"
 
 
 def main():
@@ -31,7 +31,7 @@ def main():
     )
     parser.add_argument(
         "issue",
-        help="Sentry issue short ID (e.g. BAYMAX-4VS) or numeric issue ID",
+        help="Sentry issue short ID (e.g. SIM-4VS) or numeric issue ID",
     )
     args = parser.parse_args()
 

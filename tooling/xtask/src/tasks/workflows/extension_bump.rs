@@ -18,7 +18,7 @@ use crate::tasks::workflows::{
 const VERSION_CHECK: &str =
     r#"sed -n 's/^version = \"\(.*\)\"/\1/p' < extension.toml | tr -d '[:space:]'"#;
 
-// This is used by various extensions repos in the baymax-extensions org to bump extension versions.
+// This is used by various extensions repos in the sim-extensions org to bump extension versions.
 pub(crate) fn extension_bump() -> Workflow {
     let bump_type = WorkflowInput::string("bump-type", Some("patch".to_owned()));
     // TODO: Ideally, this would have a default of `false`, but this is currently not
@@ -78,8 +78,8 @@ pub(crate) fn extension_bump() -> Workflow {
         .add_env(("RUST_BACKTRACE", 1))
         .add_env(("CARGO_INCREMENTAL", 0))
         .add_env((
-            "BAYMAX_EXTENSION_CLI_SHA",
-            extension_tests::BAYMAX_EXTENSION_CLI_SHA,
+            "SIM_EXTENSION_CLI_SHA",
+            extension_tests::SIM_EXTENSION_CLI_SHA,
         ))
         .add_job(check_version_changed.name, check_version_changed.job)
         .add_job(bump_version.name, bump_version.job)
@@ -276,7 +276,7 @@ fn bump_version(
             {{
                 echo "title=Bump version to ${{NEW_VERSION}}";
                 echo "body=This PR bumps the version of this extension to v${{NEW_VERSION}}";
-                echo "branch_name=baymax-zippy-autobump";
+                echo "branch_name=sim-zippy-autobump";
             }} >> "$GITHUB_OUTPUT"
         else
             {{
@@ -288,7 +288,7 @@ fn bump_version(
                 echo "";
                 echo "- N/A";
                 echo "EOF";
-                echo "branch_name=baymax-zippy-${{EXTENSION_ID}}-autobump";
+                echo "branch_name=sim-zippy-${{EXTENSION_ID}}-autobump";
             }} >> "$GITHUB_OUTPUT"
         fi
 
@@ -369,7 +369,7 @@ fn release_action(
 ) -> (Step<Use>, StepOutput) {
     let step = named::uses(
         "huacnlee",
-        "baymax-extension-action",
+        "sim-extension-action",
         "82920ff0876879f65ffbcfa3403589114a8919c6",
     )
     .id("extension-update")

@@ -21,7 +21,7 @@ Migrate the comprehensive security and permission systems from goose. The securi
 
 ### Requirement 1: Adversary Inspector
 
-**User Story:** As a baymax user, I want protection against prompt injection and adversarial inputs, so that malicious instructions cannot hijack the agent.
+**User Story:** As a sim user, I want protection against prompt injection and adversarial inputs, so that malicious instructions cannot hijack the agent.
 
 #### Acceptance Criteria
 
@@ -31,7 +31,7 @@ Migrate the comprehensive security and permission systems from goose. The securi
 
 ### Requirement 2: Egress Inspector
 
-**User Story:** As a baymax user, I want protection against sensitive data leakage in agent outputs, so that confidential information is not accidentally sent to external services.
+**User Story:** As a sim user, I want protection against sensitive data leakage in agent outputs, so that confidential information is not accidentally sent to external services.
 
 #### Acceptance Criteria
 
@@ -41,7 +41,7 @@ Migrate the comprehensive security and permission systems from goose. The securi
 
 ### Requirement 3: Classification Client
 
-**User Story:** As a baymax user, I want content classification for safety, so that harmful content can be identified and blocked.
+**User Story:** As a sim user, I want content classification for safety, so that harmful content can be identified and blocked.
 
 #### Acceptance Criteria
 
@@ -51,7 +51,7 @@ Migrate the comprehensive security and permission systems from goose. The securi
 
 ### Requirement 4: Security Scanner
 
-**User Story:** As a baymax user, I want a unified security scanner that coordinates all security checks, so that security is consistently applied.
+**User Story:** As a sim user, I want a unified security scanner that coordinates all security checks, so that security is consistently applied.
 
 #### Acceptance Criteria
 
@@ -61,7 +61,7 @@ Migrate the comprehensive security and permission systems from goose. The securi
 
 ### Requirement 5: Security Patterns
 
-**User Story:** As a baymax developer, I want a pattern system for threat detection, so that I can define and update security patterns without code changes.
+**User Story:** As a sim developer, I want a pattern system for threat detection, so that I can define and update security patterns without code changes.
 
 #### Acceptance Criteria
 
@@ -71,7 +71,7 @@ Migrate the comprehensive security and permission systems from goose. The securi
 
 ### Requirement 6: Permission Confirmation
 
-**User Story:** As a baymax user, I want to confirm sensitive actions before the agent performs them, so that I maintain control over critical operations.
+**User Story:** As a sim user, I want to confirm sensitive actions before the agent performs them, so that I maintain control over critical operations.
 
 #### Acceptance Criteria
 
@@ -81,7 +81,7 @@ Migrate the comprehensive security and permission systems from goose. The securi
 
 ### Requirement 7: Permission Inspector
 
-**User Story:** As a baymax user, I want the system to examine tool calls against permission policies, so that actions are automatically classified by risk level.
+**User Story:** As a sim user, I want the system to examine tool calls against permission policies, so that actions are automatically classified by risk level.
 
 #### Acceptance Criteria
 
@@ -91,7 +91,7 @@ Migrate the comprehensive security and permission systems from goose. The securi
 
 ### Requirement 8: Permission Judge
 
-**User Story:** As a baymax user, I want an intelligent permission judge that can make automatic decisions for low-risk actions, so that I am not bothered with unnecessary confirmations.
+**User Story:** As a sim user, I want an intelligent permission judge that can make automatic decisions for low-risk actions, so that I am not bothered with unnecessary confirmations.
 
 #### Acceptance Criteria
 
@@ -102,7 +102,7 @@ Migrate the comprehensive security and permission systems from goose. The securi
 
 ### Requirement 9: Permission Store
 
-**User Story:** As a baymax user, I want permission decisions to be remembered, so that I am not repeatedly asked about the same action.
+**User Story:** As a sim user, I want permission decisions to be remembered, so that I am not repeatedly asked about the same action.
 
 #### Acceptance Criteria
 
@@ -115,4 +115,4 @@ Migrate the comprehensive security and permission systems from goose. The securi
 
 - Source: `projects/goose/crates/goose/src/security/` — adversary_inspector.rs, egress_inspector.rs, classification_client.rs, scanner.rs, patterns.rs, security_inspector.rs
 - Source: `projects/goose/crates/goose/src/permission/` — permission_confirmation.rs, permission_inspector.rs, permission_judge.rs, permission_store.rs
-- Existing baymax: `crates/agent/src/tool_permissions.rs`, `crates/sandbox/`
+- Existing sim: `crates/agent/src/tool_permissions.rs`, `crates/sandbox/`

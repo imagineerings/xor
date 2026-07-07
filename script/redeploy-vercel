@@ -11,7 +11,7 @@ fi
 MAX_ATTEMPTS="60"
 SLEEP_SECONDS="10"
 VERCEL_SCOPE="simtropolis"
-VERCEL_URL="https://baymax.dev"
+VERCEL_URL="https://sim.dev"
 
 echo "Checking for in-progress deployments..."
 

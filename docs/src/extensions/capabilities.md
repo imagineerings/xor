@@ -1,11 +1,11 @@
 ---
 title: Extension Capabilities
-description: "Extension Capabilities for Baymax extensions."
+description: "Extension Capabilities for Sim extensions."
 ---
 
 # Extension Capabilities
 
-The operations that Baymax extensions are able to perform are governed by a capability system.
+The operations that Sim extensions are able to perform are governed by a capability system.
 
 ## Restricting capabilities
 
@@ -79,7 +79,7 @@ To allow any file to be downloaded from `github.com`:
 To allow any file to be downloaded from a specific GitHub repository:
 
 ```toml
-{ kind = "download_file", host = "github.com", path = ["simtropolis", "baymax", "**"] }
+{ kind = "download_file", host = "github.com", path = ["simtropolis", "sim", "**"] }
 ```
 
 ### `npm:install`

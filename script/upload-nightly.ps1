@@ -8,14 +8,14 @@ $ErrorActionPreference = "Stop"
 . "$PSScriptRoot\lib\blob-store.ps1"
 . "$PSScriptRoot\lib\workspace.ps1"
 
-ParseBaymaxWorkspace
+ParseSimWorkspace
 Write-Host "Uploading nightly for target: $target"
 
-$bucketName = "baymax-nightly-host"
-$releaseVersion = & "$PSScriptRoot\get-crate-version.ps1" baymax
+$bucketName = "sim-nightly-host"
+$releaseVersion = & "$PSScriptRoot\get-crate-version.ps1" sim
 $version = "$releaseVersion+nightly.$env:GITHUB_RUN_NUMBER.$env:GITHUB_SHA"
 
-$remoteServerFiles = Get-ChildItem -Path "target" -Filter "baymax-remote-server-windows-*.zip" -Recurse -File -ErrorAction SilentlyContinue
+$remoteServerFiles = Get-ChildItem -Path "target" -Filter "sim-remote-server-windows-*.zip" -Recurse -File -ErrorAction SilentlyContinue
 
 foreach ($file in $remoteServerFiles) {
     UploadToBlobStore -BucketName $bucketName -FileToUpload $file.FullName -BlobStoreKey "nightly/$($file.Name)"
@@ -23,10 +23,10 @@ foreach ($file in $remoteServerFiles) {
     Remove-Item -Path $file.FullName -ErrorAction SilentlyContinue
 }
 
-UploadToBlobStore -BucketName $bucketName -FileToUpload "target/Baymax-$Architecture.exe" -BlobStoreKey "nightly/Baymax-$Architecture.exe"
-UploadToBlobStore -BucketName $bucketName -FileToUpload "target/Baymax-$Architecture.exe" -BlobStoreKey "$version/Baymax-$Architecture.exe"
+UploadToBlobStore -BucketName $bucketName -FileToUpload "target/Sim-$Architecture.exe" -BlobStoreKey "nightly/Sim-$Architecture.exe"
+UploadToBlobStore -BucketName $bucketName -FileToUpload "target/Sim-$Architecture.exe" -BlobStoreKey "$version/Sim-$Architecture.exe"
 
-Remove-Item -Path "target/Baymax-$Architecture.exe" -ErrorAction SilentlyContinue
+Remove-Item -Path "target/Sim-$Architecture.exe" -ErrorAction SilentlyContinue
 
 $version | Out-File -FilePath "target/latest-sha" -NoNewline
 UploadToBlobStore -BucketName $bucketName -FileToUpload "target/latest-sha" -BlobStoreKey "nightly/latest-sha-windows"

@@ -21,7 +21,7 @@ pub(crate) fn call_extension_tests(target_ref: Option<&GitSha>) -> NamedJob<Uses
         .permissions(Permissions::default().contents(Level::Read))
         .uses(
             "simtropolis",
-            "baymax",
+            "sim",
             ".github/workflows/extension_tests.yml",
             target_ref.map_or("main", AsRef::as_ref),
         );

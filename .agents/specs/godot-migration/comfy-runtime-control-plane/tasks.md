@@ -2,14 +2,14 @@
 
 ## Overview
 
-Build the control plane as a protocol adapter over Baymax task, HTTP, WebSocket, media, and project systems. Wave 1 defines protocol models and safety checks. Wave 2 wires queue/job behavior. Wave 3 adds realtime events and compatibility fixtures.
+Build the control plane as a protocol adapter over Sim task, HTTP, WebSocket, media, and project systems. Wave 1 defines protocol models and safety checks. Wave 2 wires queue/job behavior. Wave 3 adds realtime events and compatibility fixtures.
 
 ## Gates
 
 - Start gate: G0 spec consistency, G3 shared world-model foundations for artifact references, G8 Comfy harness alignment, and no pending contradiction with `diffusion-graph-editor/`.
 - Validation gate: route unit tests, WebSocket integration tests, and Comfy script fixture compatibility tests pass.
 - Handoff gate: document unsupported Comfy routes and response-shape gaps in test snapshots.
-- Completion gate: every public response is redacted, path confined, and backed by Baymax-owned task or artifact state.
+- Completion gate: every public response is redacted, path confined, and backed by Sim-owned task or artifact state.
 
 ## Dependency Waves
 
@@ -33,10 +33,10 @@ Build the control plane as a protocol adapter over Baymax task, HTTP, WebSocket,
 - [ ] 3. Register Comfy-compatible route aliases
   - Register legacy and `/api` paths for prompt, queue, history, jobs, features, model catalog, object info, upload, and view handlers.
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 5.1_
-  - _writes: crates/world_model/src/comfy_routes.rs, crates/baymax/src/baymax.rs, crates/world_model/src/comfy_routes_tests.rs_
+  - _writes: crates/world_model/src/comfy_routes.rs, crates/sim/src/sim.rs, crates/world_model/src/comfy_routes_tests.rs_
 
-- [ ] 4. Implement the Baymax job bridge
-  - Map prompt submission, queue snapshots, history reads, job listing, sorting, filtering, and sensitive-data redaction onto Baymax jobs.
+- [ ] 4. Implement the Sim job bridge
+  - Map prompt submission, queue snapshots, history reads, job listing, sorting, filtering, and sensitive-data redaction onto Sim jobs.
   - _Requirements: 2.2, 2.5, 5.2_
   - _writes: crates/world_model/src/comfy_jobs.rs, crates/world_model/src/comfy_jobs_tests.rs_
 
@@ -57,5 +57,5 @@ Build the control plane as a protocol adapter over Baymax task, HTTP, WebSocket,
 
 ## Notes
 
-- Do not fork `aiohttp`; this is a protocol adapter over Baymax runtime services.
+- Do not fork `aiohttp`; this is a protocol adapter over Sim runtime services.
 - Do not implement graph validation here; call the graph/node runtime validator.

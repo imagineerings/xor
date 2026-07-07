@@ -2,17 +2,17 @@
 
 ## Introduction
 
-The Baymax mobile client will connect to the Baymax Collaboration Server (the same `collab` server used by the desktop editor) to provide channels, chat, contacts, shared documents, project sharing, and agent thread sharing. These features transform the app from a solo agent chat into a multi-user collaborative platform. This spec adapts the collaboration features from both `mobile-dev` (channels, channel chat, channel management) and the Baymax `collab` crate (channels, channel buffers, contacts, project sharing).
+The Sim mobile client will connect to the Sim Collaboration Server (the same `collab` server used by the desktop editor) to provide channels, chat, contacts, shared documents, project sharing, and agent thread sharing. These features transform the app from a solo agent chat into a multi-user collaborative platform. This spec adapts the collaboration features from both `mobile-dev` (channels, channel chat, channel management) and the Sim `collab` crate (channels, channel buffers, contacts, project sharing).
 
 ## Glossary
 
 | Term | Definition |
 |------|------------|
-| **Collab Server** | The Baymax multi-user server providing channels, calls, presence, and project sharing. Connected via WebSocket/RPC. |
+| **Collab Server** | The Sim multi-user server providing channels, calls, presence, and project sharing. Connected via WebSocket/RPC. |
 | **Channel** | A persistent collaboration space with chat messages and optionally a shared document (channel buffer). |
 | **Channel Buffer** | A collaborative document within a channel that multiple users can edit in real-time. |
 | **Channel Chat** | Asynchronous messaging within a channel. Distinct from the agent chat session. |
-| **Contact** | Another Baymax user in your contacts list. Supports presence (online/offline). |
+| **Contact** | Another Sim user in your contacts list. Supports presence (online/offline). |
 | **Presence** | Real-time indicator of whether a contact is online, idle, or offline. |
 | **Project Sharing** | Inviting collaborators to view/edit your current project remotely. |
 | **Agent Thread Sharing** | Sharing an AI agent conversation thread with channel members. |
@@ -108,4 +108,4 @@ The Baymax mobile client will connect to the Baymax Collaboration Server (the sa
 ## Existing Assets
 
 - mobile-dev: `app/products/channels/` (browse, create, members, settings), `app/screens/channel/`, `app/screens/find_channels/`, `app/screens/create_direct_message/`, `app/components/channel_list_row/`, `app/components/channel_item/`, `app/components/team_sidebar/`, `app/components/user_list/`
-- Baymax collab: `crates/collab_ui/src/collab_panel.rs` (channel browser UI), `crates/collab_ui/src/channel_view.rs` (channel buffer viewer), `crates/channel/src/channel_store.rs` (channel data model), `crates/collab_ui/src/notifications/project_shared_notification.rs`
+- Sim collab: `crates/collab_ui/src/collab_panel.rs` (channel browser UI), `crates/collab_ui/src/channel_view.rs` (channel buffer viewer), `crates/channel/src/channel_store.rs` (channel data model), `crates/collab_ui/src/notifications/project_shared_notification.rs`

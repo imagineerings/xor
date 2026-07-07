@@ -800,7 +800,7 @@ impl Fs for RealFs {
 
     async fn trash(&self, path: &Path, _options: RemoveOptions) -> Result<TrashedEntry> {
         // We must make the path absolute or trash will make a weird abomination
-        // of the baymax working directory (not usually the worktree) and whatever
+        // of the sim working directory (not usually the worktree) and whatever
         // the path variable holds.
         // We deliberately use `std::path::absolute` instead of `canonicalize`
         // to avoid resolving symlinks. Otherwise trashing a symlink would trash
@@ -859,7 +859,7 @@ impl Fs for RealFs {
         smol::unblock(move || {
             // Use the directory of the destination as temp dir to avoid
             // invalid cross-device link error, and XDG_CACHE_DIR for fallback.
-            // See https://github.com/simtropolis/baymax/pull/8437 for more details.
+            // See https://github.com/simtropolis/sim/pull/8437 for more details.
             let mut tmp_file =
                 tempfile::NamedTempFile::new_in(path.parent().unwrap_or(paths::temp_dir()))?;
             tmp_file.write_all(data.as_bytes())?;
@@ -885,7 +885,7 @@ impl Fs for RealFs {
             // https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-replacefilew#remarks
             //
             // So we use the directory of the destination as a temp dir to avoid it.
-            // https://github.com/simtropolis/baymax/issues/16571
+            // https://github.com/simtropolis/sim/issues/16571
             let temp_dir = TempDir::new_in(path.parent().unwrap_or(paths::temp_dir()))?;
             let temp_file = {
                 let temp_file_path = temp_dir.path().join("temp_file");
@@ -1069,7 +1069,7 @@ impl Fs for RealFs {
         Pin<Box<dyn Send + Stream<Item = Vec<PathEvent>>>>,
         Arc<dyn Watcher>,
     ) {
-        use util::{ResultExt as _, paths::SanitibaymaxPath};
+        use util::{ResultExt as _, paths::SanitisimPath};
         let executor = self.executor.clone();
 
         let (tx, rx) = async_channel::unbounded();
@@ -1094,7 +1094,7 @@ impl Fs for RealFs {
             {
                 target = parent.join(target);
                 if let Ok(canonical) = self.canonicalize(&target).await {
-                    target = SanitibaymaxPath::new(&canonical).as_path().to_path_buf();
+                    target = SanitisimPath::new(&canonical).as_path().to_path_buf();
                 }
             }
             watcher.add(&target).ok();
@@ -1538,7 +1538,7 @@ impl FakeFsState {
             .skip_while(|component| matches!(component, Component::Prefix(_)));
         let Some(Component::RootDir) = components.next() else {
             panic!(
-                "the path {:?} was not canonicalibaymax properly {:?}",
+                "the path {:?} was not canonicalisim properly {:?}",
                 target, canonical_path
             )
         };
@@ -1555,7 +1555,7 @@ impl FakeFsState {
                 }
                 _ => {
                     panic!(
-                        "the path {:?} was not canonicalibaymax properly {:?}",
+                        "the path {:?} was not canonicalisim properly {:?}",
                         target, canonical_path
                     )
                 }

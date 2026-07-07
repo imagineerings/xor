@@ -1,32 +1,32 @@
 ---
-title: Baymax on Linux
-description: "The installation script on the download page is the fastest way to install Baymax:"
+title: Sim on Linux
+description: "The installation script on the download page is the fastest way to install Sim:"
 ---
 
-# Baymax on Linux
+# Sim on Linux
 
 ## Standard Installation
 
-The installation script on the [download](https://baymax.dev/download) page is the fastest way to install Baymax:
+The installation script on the [download](https://sim.dev/download) page is the fastest way to install Sim:
 
 ```sh
-curl -f https://baymax.dev/install.sh | sh
+curl -f https://sim.dev/install.sh | sh
 ```
 
-We also offer a preview build of Baymax which receives updates about a week ahead of stable. You can install it with:
+We also offer a preview build of Sim which receives updates about a week ahead of stable. You can install it with:
 
 ```sh
-curl -f https://baymax.dev/install.sh | BAYMAX_CHANNEL=preview sh
+curl -f https://sim.dev/install.sh | SIM_CHANNEL=preview sh
 ```
 
-The Baymax installed by the script works best on systems that:
+The Sim installed by the script works best on systems that:
 
 - have a Vulkan compatible GPU available (for example Linux on an M-series macBook)
 - have a system-wide glibc (NixOS and Alpine do not by default)
   - x86_64 (Intel/AMD): glibc version >= 2.31 (Ubuntu 20 and newer)
   - aarch64 (ARM): glibc version >= 2.35 (Ubuntu 22 and newer)
 
-Both Nix and Alpine have third-party Baymax packages available (though they are currently a few weeks out of date). If you'd like to use our builds they do work if you install a glibc compatibility layer. On NixOS you can try [nix-ld](https://github.com/Mic92/nix-ld), and on Alpine [gcompat](https://wiki.alpinelinux.org/wiki/Running_glibc_programs).
+Both Nix and Alpine have third-party Sim packages available (though they are currently a few weeks out of date). If you'd like to use our builds they do work if you install a glibc compatibility layer. On NixOS you can try [nix-ld](https://github.com/Mic92/nix-ld), and on Alpine [gcompat](https://wiki.alpinelinux.org/wiki/Running_glibc_programs).
 
 You will need to build from source for:
 
@@ -34,120 +34,120 @@ You will need to build from source for:
 - Redhat Enterprise Linux 8.x, Rocky Linux 8, AlmaLinux 8, Amazon Linux 2 on all architectures
 - Redhat Enterprise Linux 9.x, Rocky Linux 9.3, AlmaLinux 8, Amazon Linux 2023 on aarch64 (x86_x64 OK)
 
-## Other ways to install Baymax on Linux
+## Other ways to install Sim on Linux
 
-Baymax is open source, and [you can install from source](./development/linux.md).
+Sim is open source, and [you can install from source](./development/linux.md).
 
 ### Installing via a package manager
 
-There are several third-party Baymax packages for various Linux distributions and package managers, sometimes under `baymax-editor`. You may be able to install Baymax using these packages:
+There are several third-party Sim packages for various Linux distributions and package managers, sometimes under `sim-editor`. You may be able to install Sim using these packages:
 
-- Arch: [`baymax`](https://archlinux.org/packages/extra/x86_64/baymax/)
-- Arch (AUR): [`baymax-git`](https://aur.archlinux.org/packages/baymax-git), [`baymax-preview`](https://aur.archlinux.org/packages/baymax-preview), [`baymax-preview-bin`](https://aur.archlinux.org/packages/baymax-preview-bin)
-- Alpine: `baymax` ([aarch64](https://pkgs.alpinelinux.org/package/edge/testing/aarch64/baymax)) ([x86_64](https://pkgs.alpinelinux.org/package/edge/testing/x86_64/baymax))
-- Fedora/Ultramarine (Terra): [`baymax`](https://github.com/terrapkg/packages/tree/frawhide/anda/devs/baymax/stable), [`baymax-preview`](https://github.com/terrapkg/packages/tree/frawhide/anda/devs/baymax/preview), [`baymax-nightly`](https://github.com/terrapkg/packages/tree/frawhide/anda/devs/baymax/nightly)
-- Manjaro: [`baymax`](https://manjaristas.org/branch_compare?q=baymax)
-- Conda: [`baymax`](https://anaconda.org/conda-forge/baymax)
-- Nix: `baymax-editor` ([unstable](https://search.nixos.org/packages?channel=unstable&show=baymax-editor))
-- Solus: [`baymax`](https://github.com/getsolus/packages/tree/main/packages/z/baymax)
-- Parabola: [`baymax`](https://www.parabola.nu/packages/extra/x86_64/baymax/)
-- ALT Linux (Sisyphus): [`baymax`](https://packages.altlinux.org/en/sisyphus/srpms/baymax/)
-- AOSC OS: [`baymax`](https://packages.aosc.io/packages/baymax)
-- Flathub: [`dev.baymax.Baymax`](https://flathub.org/apps/dev.baymax.Baymax)
+- Arch: [`sim`](https://archlinux.org/packages/extra/x86_64/sim/)
+- Arch (AUR): [`sim-git`](https://aur.archlinux.org/packages/sim-git), [`sim-preview`](https://aur.archlinux.org/packages/sim-preview), [`sim-preview-bin`](https://aur.archlinux.org/packages/sim-preview-bin)
+- Alpine: `sim` ([aarch64](https://pkgs.alpinelinux.org/package/edge/testing/aarch64/sim)) ([x86_64](https://pkgs.alpinelinux.org/package/edge/testing/x86_64/sim))
+- Fedora/Ultramarine (Terra): [`sim`](https://github.com/terrapkg/packages/tree/frawhide/anda/devs/sim/stable), [`sim-preview`](https://github.com/terrapkg/packages/tree/frawhide/anda/devs/sim/preview), [`sim-nightly`](https://github.com/terrapkg/packages/tree/frawhide/anda/devs/sim/nightly)
+- Manjaro: [`sim`](https://manjaristas.org/branch_compare?q=sim)
+- Conda: [`sim`](https://anaconda.org/conda-forge/sim)
+- Nix: `sim-editor` ([unstable](https://search.nixos.org/packages?channel=unstable&show=sim-editor))
+- Solus: [`sim`](https://github.com/getsolus/packages/tree/main/packages/z/sim)
+- Parabola: [`sim`](https://www.parabola.nu/packages/extra/x86_64/sim/)
+- ALT Linux (Sisyphus): [`sim`](https://packages.altlinux.org/en/sisyphus/srpms/sim/)
+- AOSC OS: [`sim`](https://packages.aosc.io/packages/sim)
+- Flathub: [`dev.sim.Sim`](https://flathub.org/apps/dev.sim.Sim)
 
-See [Repology](https://repology.org/project/baymax-editor/versions) for a list of Baymax packages in various repositories.
+See [Repology](https://repology.org/project/sim-editor/versions) for a list of Sim packages in various repositories.
 
 ### Community
 
-When installing a third-party package please be aware that it may not be completely up to date and may be slightly different from the Baymax we package (a common change is to rename the binary to `baymaxit` or `baymaxitor` to avoid conflicting with other packages).
+When installing a third-party package please be aware that it may not be completely up to date and may be slightly different from the Sim we package (a common change is to rename the binary to `simit` or `simitor` to avoid conflicting with other packages).
 
-We'd love your help making Baymax available for everyone. If Baymax is not yet available for your package manager, and you would like to fix that, we have some notes on [how to do it](./development/linux.md#notes-for-packaging-baymax).
+We'd love your help making Sim available for everyone. If Sim is not yet available for your package manager, and you would like to fix that, we have some notes on [how to do it](./development/linux.md#notes-for-packaging-sim).
 
-The packages in this section provide binary installs for Baymax but are not official packages within the associated distributions. These packages are maintained by community members and as such a higher level of caution should be taken when installing them.
+The packages in this section provide binary installs for Sim but are not official packages within the associated distributions. These packages are maintained by community members and as such a higher level of caution should be taken when installing them.
 
 #### Debian and Ubuntu
 
-Baymax is available in [this community-maintained repository](https://debian.griffo.io/).
+Sim is available in [this community-maintained repository](https://debian.griffo.io/).
 
 Instructions for each version are available in the README of the repository where packages are built.
-Build, packaging and instructions for each version are available in the README of the [repository](https://github.com/dariogriffo/baymax-debian)
+Build, packaging and instructions for each version are available in the README of the [repository](https://github.com/dariogriffo/sim-debian)
 
 ### Downloading manually
 
-If you'd prefer, you can install Baymax by downloading our pre-built .tar.gz. This is the same artifact that our install script uses, but you can customize the location of your installation by modifying the instructions below:
+If you'd prefer, you can install Sim by downloading our pre-built .tar.gz. This is the same artifact that our install script uses, but you can customize the location of your installation by modifying the instructions below:
 
 Download the `.tar.gz` file:
 
-- [baymax-linux-x86_64.tar.gz](https://cloud.baymax.dev/releases/stable/latest/download?asset=baymax&arch=x86_64&os=linux&source=docs)
-  ([preview](https://cloud.baymax.dev/releases/preview/latest/download?asset=baymax&arch=x86_64&os=linux&source=docs))
-- [baymax-linux-aarch64.tar.gz](https://cloud.baymax.dev/releases/stable/latest/download?asset=baymax&arch=aarch64&os=linux&source=docs)
-  ([preview](https://cloud.baymax.dev/releases/preview/latest/download?asset=baymax&arch=aarch64&os=linux&source=docs))
+- [sim-linux-x86_64.tar.gz](https://cloud.sim.dev/releases/stable/latest/download?asset=sim&arch=x86_64&os=linux&source=docs)
+  ([preview](https://cloud.sim.dev/releases/preview/latest/download?asset=sim&arch=x86_64&os=linux&source=docs))
+- [sim-linux-aarch64.tar.gz](https://cloud.sim.dev/releases/stable/latest/download?asset=sim&arch=aarch64&os=linux&source=docs)
+  ([preview](https://cloud.sim.dev/releases/preview/latest/download?asset=sim&arch=aarch64&os=linux&source=docs))
 
-Then ensure that the `baymax` binary in the tarball is on your path. The easiest way is to unpack the tarball and create a symlink:
+Then ensure that the `sim` binary in the tarball is on your path. The easiest way is to unpack the tarball and create a symlink:
 
 ```sh
 mkdir -p ~/.local
-# extract baymax to ~/.local/baymax.app/
+# extract sim to ~/.local/sim.app/
 tar -xvf <path/to/download>.tar.gz -C ~/.local
-# link the baymax binary to ~/.local/bin (or another directory in your $PATH)
-ln -sf ~/.local/baymax.app/bin/baymax ~/.local/bin/baymax
+# link the sim binary to ~/.local/bin (or another directory in your $PATH)
+ln -sf ~/.local/sim.app/bin/sim ~/.local/bin/sim
 ```
 
 If you'd like integration with an XDG-compatible desktop environment, you will also need to install the `.desktop` file:
 
 ```sh
-install -D ~/.local/baymax.app/share/applications/dev.baymax.Baymax.desktop -t ~/.local/share/applications
-sed -i "s|Icon=baymax|Icon=$HOME/.local/baymax.app/share/icons/hicolor/512x512/apps/baymax.png|g" ~/.local/share/applications/dev.baymax.Baymax.desktop
-sed -i "s|Exec=baymax|Exec=$HOME/.local/baymax.app/bin/baymax|g" ~/.local/share/applications/dev.baymax.Baymax.desktop
+install -D ~/.local/sim.app/share/applications/dev.sim.Sim.desktop -t ~/.local/share/applications
+sed -i "s|Icon=sim|Icon=$HOME/.local/sim.app/share/icons/hicolor/512x512/apps/sim.png|g" ~/.local/share/applications/dev.sim.Sim.desktop
+sed -i "s|Exec=sim|Exec=$HOME/.local/sim.app/bin/sim|g" ~/.local/share/applications/dev.sim.Sim.desktop
 ```
 
-## Uninstalling Baymax
+## Uninstalling Sim
 
 ### Standard Uninstall
 
-If Baymax was installed using the default installation script, it can be uninstalled by supplying the `--uninstall` flag to the `baymax` shell command
+If Sim was installed using the default installation script, it can be uninstalled by supplying the `--uninstall` flag to the `sim` shell command
 
 ```sh
-baymax --uninstall
+sim --uninstall
 ```
 
-If there are no errors, the shell will then prompt you whether you'd like to keep your preferences or delete them. After making a choice, you should see a message that Baymax was successfully uninstalled.
+If there are no errors, the shell will then prompt you whether you'd like to keep your preferences or delete them. After making a choice, you should see a message that Sim was successfully uninstalled.
 
-In the case that the `baymax` shell command was not found in your PATH, you can try one of the following commands
+In the case that the `sim` shell command was not found in your PATH, you can try one of the following commands
 
 ```sh
-$HOME/.local/bin/baymax --uninstall
+$HOME/.local/bin/sim --uninstall
 ```
 
 or
 
 ```sh
-$HOME/.local/baymax.app/bin.baymax --uninstall
+$HOME/.local/sim.app/bin.sim --uninstall
 ```
 
-The first case might fail if a symlink was not properly established between `$HOME/.local/bin/baymax` and `$HOME/.local/baymax.app/bin.baymax`. But the second case should work as long as Baymax was installed to its default location.
+The first case might fail if a symlink was not properly established between `$HOME/.local/bin/sim` and `$HOME/.local/sim.app/bin.sim`. But the second case should work as long as Sim was installed to its default location.
 
-If Baymax was installed to a different location, you must invoke the `baymax` binary stored in that installation directory and pass the `--uninstall` flag to it in the same format as the previous commands.
+If Sim was installed to a different location, you must invoke the `sim` binary stored in that installation directory and pass the `--uninstall` flag to it in the same format as the previous commands.
 
 ### Package Manager
 
-If Baymax was installed using a package manager, please consult the documentation for that package manager on how to uninstall a package.
+If Sim was installed using a package manager, please consult the documentation for that package manager on how to uninstall a package.
 
 ## Troubleshooting
 
-Linux works on a large variety of systems configured in many different ways. We primarily test Baymax on a vanilla Ubuntu setup, as it is the most common distribution our users use, that said we do expect it to work on a wide variety of machines.
+Linux works on a large variety of systems configured in many different ways. We primarily test Sim on a vanilla Ubuntu setup, as it is the most common distribution our users use, that said we do expect it to work on a wide variety of machines.
 
-### Baymax fails to start
+### Sim fails to start
 
-If you see an error like "/lib64/libc.so.6: version 'GLIBC_2.29' not found" it means that your distribution's version of glibc is too old. You can either upgrade your system, or [install Baymax from source](./development/linux.md).
+If you see an error like "/lib64/libc.so.6: version 'GLIBC_2.29' not found" it means that your distribution's version of glibc is too old. You can either upgrade your system, or [install Sim from source](./development/linux.md).
 
 ### Graphics issues
 
-#### Baymax fails to open windows
+#### Sim fails to open windows
 
-Baymax requires a GPU to run effectively. Under the hood, we use [Vulkan](https://www.vulkan.org/) to communicate with your GPU. If you are seeing problems with performance, or Baymax fails to load, it is possible that Vulkan is the culprit.
+Sim requires a GPU to run effectively. Under the hood, we use [Vulkan](https://www.vulkan.org/) to communicate with your GPU. If you are seeing problems with performance, or Sim fails to load, it is possible that Vulkan is the culprit.
 
-If you see a notification saying `Baymax failed to open a window: NoSupportedDeviceFound` this means that Vulkan cannot find a compatible GPU. You can try running [vkcube](https://github.com/krh/vkcube) (usually available as part of the `vulkaninfo` or `vulkan-tools` package on various distributions) to try to troubleshoot where the issue is coming from like so:
+If you see a notification saying `Sim failed to open a window: NoSupportedDeviceFound` this means that Vulkan cannot find a compatible GPU. You can try running [vkcube](https://github.com/krh/vkcube) (usually available as part of the `vulkaninfo` or `vulkan-tools` package on various distributions) to try to troubleshoot where the issue is coming from like so:
 
 ```
 vkcube
@@ -157,27 +157,27 @@ vkcube
 
 This should output a line describing your current graphics setup and show a rotating cube. If this does not work, you should be able to fix it by installing Vulkan compatible GPU drivers, however in some cases there is no Vulkan support yet.
 
-You can find out which graphics card Baymax is using by looking in the Baymax log (`~/.local/share/baymax/logs/Baymax.log`) for `Using GPU: ...`.
+You can find out which graphics card Sim is using by looking in the Sim log (`~/.local/share/sim/logs/Sim.log`) for `Using GPU: ...`.
 
-If you see errors like `ERROR_INITIALIZATION_FAILED` or `GPU Crashed` or `ERROR_SURFACE_LOST_KHR` then you may be able to work around this by installing different drivers for your GPU, or by selecting a different GPU to run on. (See [#14225](https://github.com/simtropolis/baymax/issues/14225))
+If you see errors like `ERROR_INITIALIZATION_FAILED` or `GPU Crashed` or `ERROR_SURFACE_LOST_KHR` then you may be able to work around this by installing different drivers for your GPU, or by selecting a different GPU to run on. (See [#14225](https://github.com/simtropolis/sim/issues/14225))
 
 On some systems the file `/etc/prime-discrete` can be used to enforce the use of a discrete GPU using [PRIME](https://wiki.archlinux.org/title/PRIME). Depending on the details of your setup, you may need to change the contents of this file to "on" (to force discrete graphics) or "off" (to force integrated graphics).
 
-On others, you may be able to set the environment variable `DRI_PRIME=1` when running Baymax to force the use of the discrete GPU.
+On others, you may be able to set the environment variable `DRI_PRIME=1` when running Sim to force the use of the discrete GPU.
 
-If you're using an AMD GPU, you might get a 'Broken Pipe' error. Try using the RADV or Mesa drivers. (See [#13880](https://github.com/simtropolis/baymax/issues/13880))
+If you're using an AMD GPU, you might get a 'Broken Pipe' error. Try using the RADV or Mesa drivers. (See [#13880](https://github.com/simtropolis/sim/issues/13880))
 
-If you are using `amdvlk`, the default open-source AMD graphics driver, you may find that Baymax consistently fails to launch. This is a known issue for some users, for example on Omarchy (see issue [#28851](https://github.com/simtropolis/baymax/issues/28851)). To fix this, you will need to use a different driver. We recommend removing the `amdvlk` and `lib32-amdvlk` packages and installing `vulkan-radeon` instead (see issue [#14141](https://github.com/simtropolis/baymax/issues/14141)).
+If you are using `amdvlk`, the default open-source AMD graphics driver, you may find that Sim consistently fails to launch. This is a known issue for some users, for example on Omarchy (see issue [#28851](https://github.com/simtropolis/sim/issues/28851)). To fix this, you will need to use a different driver. We recommend removing the `amdvlk` and `lib32-amdvlk` packages and installing `vulkan-radeon` instead (see issue [#14141](https://github.com/simtropolis/sim/issues/14141)).
 
 For more information, the [Arch guide to Vulkan](https://wiki.archlinux.org/title/Vulkan) has some good steps that translate well to most distributions.
 
-#### Forcing Baymax to use a specific GPU
+#### Forcing Sim to use a specific GPU
 
-There are a few different ways to force Baymax to use a specific GPU:
+There are a few different ways to force Sim to use a specific GPU:
 
 ##### Option A
 
-You can use the `BAYMAX_DEVICE_ID={device_id}` environment variable to specify the device ID of the GPU you wish to have Baymax use.
+You can use the `SIM_DEVICE_ID={device_id}` environment variable to specify the device ID of the GPU you wish to have Sim use.
 
 You can obtain the device ID of your GPU by running `lspci -nn | grep VGA` which will output each GPU on one line like:
 
@@ -185,17 +185,17 @@ You can obtain the device ID of your GPU by running `lspci -nn | grep VGA` which
 08:00.0 VGA compatible controller [0300]: NVIDIA Corporation GA104 [GeForce RTX 3070] [10de:2484] (rev a1)
 ```
 
-where the device ID here is `2484`. This value is in hexadecimal, so to force Baymax to use this specific GPU you would set the environment variable like so:
+where the device ID here is `2484`. This value is in hexadecimal, so to force Sim to use this specific GPU you would set the environment variable like so:
 
 ```
-BAYMAX_DEVICE_ID=0x2484 baymax
+SIM_DEVICE_ID=0x2484 sim
 ```
 
 Make sure to export the variable if you choose to define it globally in a `.bashrc` or similar.
 
 ##### Option B
 
-If you are using Mesa, you can run `MESA_VK_DEVICE_SELECT=list baymax --foreground` to get a list of available GPUs and then export `MESA_VK_DEVICE_SELECT=xxxx:yyyy` to choose a specific device. Furthermore, you can fallback to xwayland with an additional export of `WAYLAND_DISPLAY=""`.
+If you are using Mesa, you can run `MESA_VK_DEVICE_SELECT=list sim --foreground` to get a list of available GPUs and then export `MESA_VK_DEVICE_SELECT=xxxx:yyyy` to choose a specific device. Furthermore, you can fallback to xwayland with an additional export of `WAYLAND_DISPLAY=""`.
 
 ##### Option C
 
@@ -203,31 +203,31 @@ Using [vkdevicechooser](https://github.com/jiriks74/vkdevicechooser).
 
 #### Reporting graphics issues
 
-If Vulkan is configured correctly, and Baymax is still not working for you, please [file an issue](https://github.com/simtropolis/baymax) with as much information as possible.
+If Vulkan is configured correctly, and Sim is still not working for you, please [file an issue](https://github.com/simtropolis/sim) with as much information as possible.
 
-When reporting issues where Baymax fails to start due to graphics initialization errors on GitHub, it can be impossible to run the {#action baymax::CopySystemSpecsIntoClipboard} command like we instruct you to in our issue template. We provide an alternative way to collect the system specs specifically for this situation.
+When reporting issues where Sim fails to start due to graphics initialization errors on GitHub, it can be impossible to run the {#action sim::CopySystemSpecsIntoClipboard} command like we instruct you to in our issue template. We provide an alternative way to collect the system specs specifically for this situation.
 
-Passing the `--system-specs` flag to Baymax like
+Passing the `--system-specs` flag to Sim like
 
 ```sh
-baymax --system-specs
+sim --system-specs
 ```
 
 will print the system specs to the terminal like so. It is strongly recommended to copy the output verbatim into the issue on GitHub, as it uses markdown formatting to ensure the output is readable.
 
-Additionally, it is extremely beneficial to provide the contents of your Baymax log when reporting such issues. The log is usually located at `~/.local/share/baymax/logs/Baymax.log`. The recommended process for producing a helpful log file is as follows:
+Additionally, it is extremely beneficial to provide the contents of your Sim log when reporting such issues. The log is usually located at `~/.local/share/sim/logs/Sim.log`. The recommended process for producing a helpful log file is as follows:
 
 ```sh
-truncate -s 0 ~/.local/share/baymax/logs/Baymax.log # Clear the log file
-BAYMAX_LOG=wgpu=info baymax .
-cat ~/.local/share/baymax/logs/Baymax.log
+truncate -s 0 ~/.local/share/sim/logs/Sim.log # Clear the log file
+SIM_LOG=wgpu=info sim .
+cat ~/.local/share/sim/logs/Sim.log
 # copy the output
 ```
 
-Or, if you have the Baymax cli setup, you can do
+Or, if you have the Sim cli setup, you can do
 
 ```sh
-BAYMAX_LOG=wgpu=info /path/to/baymax/cli --foreground .
+SIM_LOG=wgpu=info /path/to/sim/cli --foreground .
 # copy the output
 ```
 
@@ -236,10 +236,10 @@ It is also highly recommended when pasting the log into a github issue, to do so
 > **_Note_**: The whitespace in the template is important, and will cause incorrect formatting if not preserved.
 
 ````
-<details><summary>Baymax Log</summary>
+<details><summary>Sim Log</summary>
 
 ```
-{baymax log contents}
+{sim log contents}
 ```
 
 </details>
@@ -258,31 +258,31 @@ These features are provided by XDG desktop portals, specifically:
 
 Some window managers, such as `Hyprland`, don't provide a file picker by default. See [this list](https://wiki.archlinux.org/title/XDG_Desktop_Portal#List_of_backends_and_interfaces) as a starting point for alternatives.
 
-### Baymax isn't remembering my API keys
+### Sim isn't remembering my API keys
 
-### Baymax isn't remembering my login
+### Sim isn't remembering my login
 
 This feature also requires XDG desktop portals, specifically:
 
 - `org.freedesktop.portal.Secret` or
 - `org.freedesktop.Secrets`
 
-Baymax needs a place to securely store secrets such as your Baymax login cookie or your OpenAI API Keys and we use a system provided keychain to do this. Examples of packages that provide this are `gnome-keyring`, `KWallet` and `keepassxc` among others.
+Sim needs a place to securely store secrets such as your Sim login cookie or your OpenAI API Keys and we use a system provided keychain to do this. Examples of packages that provide this are `gnome-keyring`, `KWallet` and `keepassxc` among others.
 
 ### Could not start inotify
 
-Baymax relies on inotify to watch your filesystem for changes. If you cannot start inotify then Baymax will not work reliably.
+Sim relies on inotify to watch your filesystem for changes. If you cannot start inotify then Sim will not work reliably.
 
 If you are seeing "too many open files" then first try `sysctl fs.inotify`.
 
-- You should see that max_user_instances is 128 or higher (you can change the limit with `sudo sysctl fs.inotify.max_user_instances=1024`). Baymax needs only 1 inotify instance.
-- You should see that `max_user_watches` is 8000 or higher (you can change the limit with `sudo sysctl fs.inotify.max_user_watches=64000`). Baymax needs one watch per directory in all your open projects + one per git repository + a handful more for settings, themes, keymaps, extensions.
+- You should see that max_user_instances is 128 or higher (you can change the limit with `sudo sysctl fs.inotify.max_user_instances=1024`). Sim needs only 1 inotify instance.
+- You should see that `max_user_watches` is 8000 or higher (you can change the limit with `sudo sysctl fs.inotify.max_user_watches=64000`). Sim needs one watch per directory in all your open projects + one per git repository + a handful more for settings, themes, keymaps, extensions.
 
 It is also possible that you are running out of file descriptors. You can check the limits with `ulimit` and update them by editing `/etc/security/limits.conf`.
 
 ### No sound or wrong output device
 
-If you're not hearing any sound in Baymax or the audio is routed to the wrong device, it could be due to a mismatch between audio systems. Baymax relies on ALSA, while your system may be using PipeWire or PulseAudio. To resolve this, you need to configure ALSA to route audio through PipeWire/PulseAudio.
+If you're not hearing any sound in Sim or the audio is routed to the wrong device, it could be due to a mismatch between audio systems. Sim relies on ALSA, while your system may be using PipeWire or PulseAudio. To resolve this, you need to configure ALSA to route audio through PipeWire/PulseAudio.
 
 If your system uses PipeWire:
 
@@ -312,13 +312,13 @@ If your system uses PipeWire:
 
 ### Forcing X11 scale factor
 
-On X11 systems, Baymax automatically detects the appropriate scale factor for high-DPI displays. The scale factor is determined using the following priority order:
+On X11 systems, Sim automatically detects the appropriate scale factor for high-DPI displays. The scale factor is determined using the following priority order:
 
 1. `GPUI_X11_SCALE_FACTOR` environment variable (if set)
 2. `Xft.dpi` from X resources database (xrdb)
 3. Automatic detection via RandR based on monitor resolution and physical size
 
-If you want to customize the scale factor beyond what Baymax detects automatically, you have several options:
+If you want to customize the scale factor beyond what Sim detects automatically, you have several options:
 
 #### Check your current scale factor
 
@@ -328,11 +328,11 @@ You can verify if you have `Xft.dpi` set:
 xrdb -query | grep Xft.dpi
 ```
 
-If this command returns no output, Baymax is using RandR (X11's monitor management extension) to automatically calculate the scale factor based on your monitor's reported resolution and physical dimensions.
+If this command returns no output, Sim is using RandR (X11's monitor management extension) to automatically calculate the scale factor based on your monitor's reported resolution and physical dimensions.
 
 #### Option 1: Set Xft.dpi (X Resources Database)
 
-`Xft.dpi` is a standard X11 setting that many applications use for consistent font and UI scaling. Setting this ensures Baymax scales the same way as other X11 applications that respect this setting.
+`Xft.dpi` is a standard X11 setting that many applications use for consistent font and UI scaling. Setting this ensures Sim scales the same way as other X11 applications that respect this setting.
 
 Edit or create the `~/.Xresources` file:
 
@@ -359,14 +359,14 @@ Load the configuration:
 xrdb -merge ~/.Xresources
 ```
 
-Restart Baymax for the changes to take effect.
+Restart Sim for the changes to take effect.
 
 #### Option 2: Use the GPUI_X11_SCALE_FACTOR environment variable
 
-This Baymax-specific environment variable directly sets the scale factor, bypassing all automatic detection.
+This Sim-specific environment variable directly sets the scale factor, bypassing all automatic detection.
 
 ```sh
-GPUI_X11_SCALE_FACTOR=1.5 baymax
+GPUI_X11_SCALE_FACTOR=1.5 sim
 ```
 
 You can use decimal values (e.g., `1.25`, `1.5`, `2.0`) or set `GPUI_X11_SCALE_FACTOR=randr` to force RandR-based detection even when `Xft.dpi` is set.
@@ -383,16 +383,16 @@ Add this to your `.xprofile` or `.xinitrc`:
 xrandr --dpi 192
 ```
 
-Replace `192` with your desired DPI value. This affects the system globally and will be used by Baymax's automatic RandR detection when `Xft.dpi` is not set.
+Replace `192` with your desired DPI value. This affects the system globally and will be used by Sim's automatic RandR detection when `Xft.dpi` is not set.
 
 ### Font rendering parameters
 
-On Linux, Baymax reads `BAYMAX_FONTS_GAMMA` and `BAYMAX_FONTS_GRAYSCALE_ENHANCED_CONTRAST` environment variables for the values to use for font rendering.
+On Linux, Sim reads `SIM_FONTS_GAMMA` and `SIM_FONTS_GRAYSCALE_ENHANCED_CONTRAST` environment variables for the values to use for font rendering.
 
-`BAYMAX_FONTS_GAMMA` corresponds to [getgamma](https://learn.microsoft.com/en-us/windows/win32/api/dwrite/nf-dwrite-idwriterenderingparams-getgamma) values.
+`SIM_FONTS_GAMMA` corresponds to [getgamma](https://learn.microsoft.com/en-us/windows/win32/api/dwrite/nf-dwrite-idwriterenderingparams-getgamma) values.
 Allowed range [1.0, 2.2], other values are clipped.
 Default: 1.8
 
-`BAYMAX_FONTS_GRAYSCALE_ENHANCED_CONTRAST` corresponds to [getgrayscaleenhancedcontrast](https://learn.microsoft.com/en-us/windows/win32/api/dwrite_1/nf-dwrite_1-idwriterenderingparams1-getgrayscaleenhancedcontrast) values.
+`SIM_FONTS_GRAYSCALE_ENHANCED_CONTRAST` corresponds to [getgrayscaleenhancedcontrast](https://learn.microsoft.com/en-us/windows/win32/api/dwrite_1/nf-dwrite_1-idwriterenderingparams1-getgrayscaleenhancedcontrast) values.
 Allowed range: [0.0, ..), other values are clipped.
 Default: 1.0

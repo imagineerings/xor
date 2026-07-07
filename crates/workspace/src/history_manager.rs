@@ -7,7 +7,7 @@ use ui::{App, Context};
 use util::{ResultExt, paths::PathExt};
 
 use crate::{
-    NewWindow, SerialibaymaxWorkspaceLocation, WorkspaceId, path_list::PathList,
+    NewWindow, SerialisimWorkspaceLocation, WorkspaceId, path_list::PathList,
     persistence::WorkspaceDb,
 };
 
@@ -50,7 +50,7 @@ impl HistoryManager {
                 .into_iter()
                 .rev()
                 .filter_map(|workspace| {
-                    if matches!(workspace.location, SerialibaymaxWorkspaceLocation::Local) {
+                    if matches!(workspace.location, SerialisimWorkspaceLocation::Local) {
                         Some(HistoryManagerEntry::new(
                             workspace.workspace_id,
                             &workspace.paths,

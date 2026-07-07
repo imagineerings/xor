@@ -6,11 +6,11 @@ Migrate the remaining goose components: Ask AI bot service, Nostr session sharin
 
 ### Key Architectural Decisions
 
-- **Ask AI bot as a standalone service**: Separate from the core baymax application. Document its deployment but don't integrate into the main binary.
-- **Session import in `crates/session/`**: Extend baymax's existing `crates/session/` with import functionality.
+- **Ask AI bot as a standalone service**: Separate from the core sim application. Document its deployment but don't integrate into the main binary.
+- **Session import in `crates/session/`**: Extend sim's existing `crates/session/` with import functionality.
 - **Nostr sharing as optional crate**: A small `crates/nostr_sharing/` crate with an optional Nostr dependency.
-- **Scripts in `scripts/`**: Migrate to baymax's existing scripts directory.
-- **Examples in `examples/`**: Migrate to baymax's existing examples directory.
+- **Scripts in `scripts/`**: Migrate to sim's existing scripts directory.
+- **Examples in `examples/`**: Migrate to sim's existing examples directory.
 - **Provider error proxy as dev tool**: Keep as a development/debugging tool, not part of production.
 
 ## 2. Architecture

@@ -109,7 +109,7 @@ impl Component for CollabNotification {
                             Button::new("decline", "Dismiss"),
                         )
                         .child(Label::new("the user is sharing a project"))
-                        .child(Label::new("baymax").color(Color::Muted)),
+                        .child(Label::new("sim").color(Color::Muted)),
                     )
                     .into_any_element(),
             ),
@@ -123,10 +123,10 @@ impl Component for CollabNotification {
                             Button::new("decline", "Decline"),
                         )
                         .child(Label::new(
-                            "a_very_long_username_that_might_overflow is sharing a project in Baymax:",
+                            "a_very_long_username_that_might_overflow is sharing a project in Sim:",
                         ))
                         .child(
-                            Label::new("baymax-cloud, baymax, edit-prediction-bench, baymax.dev")
+                            Label::new("sim-cloud, sim, edit-prediction-bench, sim.dev")
                                 .color(Color::Muted),
                         ),
                     )
@@ -171,7 +171,7 @@ impl Component for CollabNotification {
                             Button::new("decline", "Decline"),
                         )
                         .child(Label::new(
-                            "maxbrunsfeld invited you to join the #baymax channel",
+                            "maxbrunsfeld invited you to join the #sim channel",
                         )),
                     )
                     .into_any_element(),

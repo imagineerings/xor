@@ -3552,11 +3552,11 @@ async fn test_local_settings(
         .insert_tree(
             "/dir",
             json!({
-                ".baymax": {
+                ".sim": {
                     "settings.json": r#"{ "tab_size": 2 }"#
                 },
                 "a": {
-                    ".baymax": {
+                    ".sim": {
                         "settings.json": r#"{ "tab_size": 8 }"#
                     },
                     "a.txt": "a-contents",
@@ -3600,7 +3600,7 @@ async fn test_local_settings(
     // As client A, update a settings file. As Client B, see the changed settings.
     client_a
         .fs()
-        .insert_file("/dir/.baymax/settings.json", r#"{}"#.into())
+        .insert_file("/dir/.sim/settings.json", r#"{}"#.into())
         .await;
     executor.run_until_parked();
     cx_b.read(|cx| {
@@ -3620,17 +3620,17 @@ async fn test_local_settings(
     // As client A, create and remove some settings files. As client B, see the changed settings.
     client_a
         .fs()
-        .remove_file("/dir/.baymax/settings.json".as_ref(), Default::default())
+        .remove_file("/dir/.sim/settings.json".as_ref(), Default::default())
         .await
         .unwrap();
     client_a
         .fs()
-        .create_dir("/dir/b/.baymax".as_ref())
+        .create_dir("/dir/b/.sim".as_ref())
         .await
         .unwrap();
     client_a
         .fs()
-        .insert_file("/dir/b/.baymax/settings.json", r#"{"tab_size": 4}"#.into())
+        .insert_file("/dir/b/.sim/settings.json", r#"{"tab_size": 4}"#.into())
         .await;
     executor.run_until_parked();
     cx_b.read(|cx| {
@@ -3658,13 +3658,13 @@ async fn test_local_settings(
     client_a
         .fs()
         .insert_file(
-            "/dir/a/.baymax/settings.json",
+            "/dir/a/.sim/settings.json",
             r#"{"hard_tabs":true}"#.into(),
         )
         .await;
     client_a
         .fs()
-        .remove_file("/dir/b/.baymax/settings.json".as_ref(), Default::default())
+        .remove_file("/dir/b/.sim/settings.json".as_ref(), Default::default())
         .await
         .unwrap();
     executor.run_until_parked();

@@ -1,17 +1,17 @@
 ---
 title: XML
-description: "Configure XML language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure XML language support in Sim, including language servers, formatting, and debugging."
 ---
 
 # XML
 
-XML support is available through the [XML extension](https://github.com/sweetppro/baymax-xml/).
+XML support is available through the [XML extension](https://github.com/sweetppro/sim-xml/).
 
 - Tree-sitter: [tree-sitter-grammars/tree-sitter-xml](https://github.com/tree-sitter-grammars/tree-sitter-xml)
 
 ## Configuration
 
-If you have additional file extensions that are not being automatically recognibaymax as XML just add them to [file_types](../reference/all-settings.md#file-types) in your Baymax settings:
+If you have additional file extensions that are not being automatically recognisim as XML just add them to [file_types](../reference/all-settings.md#file-types) in your Sim settings:
 
 ```json [settings]
   "file_types": {

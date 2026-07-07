@@ -2,7 +2,7 @@
 
 ## Overview
 
-Set up a Docusaurus-based documentation site for baymax with installation guides, configuration docs, usage tutorials, blog, and automated build/deploy pipeline.
+Set up a Docusaurus-based documentation site for sim with installation guides, configuration docs, usage tutorials, blog, and automated build/deploy pipeline.
 
 ## Tasks
 

@@ -627,17 +627,17 @@ mod tests {
     }
 
     #[test]
-    fn test_mermaid_font_family_resolves_baymax_virtual_fonts() {
+    fn test_mermaid_font_family_resolves_sim_virtual_fonts() {
         assert_eq!(
-            super::mermaid_font_family(".BaymaxSans"),
+            super::mermaid_font_family(".SimSans"),
             "IBM Plex Sans, sans-serif"
         );
         assert_eq!(
-            super::mermaid_font_family("Baymax Plex Sans"),
+            super::mermaid_font_family("Sim Plex Sans"),
             "IBM Plex Sans, sans-serif"
         );
         assert_eq!(
-            super::mermaid_font_family(".BaymaxMono"),
+            super::mermaid_font_family(".SimMono"),
             "Lilex, sans-serif"
         );
         assert_eq!(

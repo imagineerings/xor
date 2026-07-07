@@ -89,10 +89,10 @@ impl CloudApiClient {
 
     fn cloud_host(&self) -> String {
         self.http_client
-            .build_baymax_cloud_url("/")
+            .build_sim_cloud_url("/")
             .ok()
             .and_then(|url| url.host_str().map(String::from))
-            .unwrap_or_else(|| "cloud.baymax.dev".into())
+            .unwrap_or_else(|| "cloud.sim.dev".into())
     }
 
     fn build_request(
@@ -113,12 +113,12 @@ impl CloudApiClient {
             .method(Method::GET)
             .uri(
                 self.http_client
-                    .build_baymax_cloud_url("/client/users/me")
+                    .build_sim_cloud_url("/client/users/me")
                     .map_err(ClientApiError::RequestBuildFailed)?
                     .as_ref(),
             )
             .when_some(system_id, |builder, system_id| {
-                builder.header(BAYMAX_SYSTEM_ID_HEADER_NAME, system_id)
+                builder.header(SIM_SYSTEM_ID_HEADER_NAME, system_id)
             });
 
         let request = self.build_request(request_builder, AsyncBody::default())?;
@@ -128,7 +128,7 @@ impl CloudApiClient {
     pub fn connect(&self, cx: &App) -> Result<Task<Result<Connection>>> {
         let mut connect_url = self
             .http_client
-            .build_baymax_cloud_url("/client/users/connect")?;
+            .build_sim_cloud_url("/client/users/connect")?;
         connect_url
             .set_scheme(match connect_url.scheme() {
                 "https" => "wss",
@@ -163,12 +163,12 @@ impl CloudApiClient {
             .method(Method::POST)
             .uri(
                 self.http_client
-                    .build_baymax_cloud_url("/client/llm_tokens")
+                    .build_sim_cloud_url("/client/llm_tokens")
                     .map_err(ClientApiError::RequestBuildFailed)?
                     .as_ref(),
             )
             .when_some(system_id, |builder, system_id| {
-                builder.header(BAYMAX_SYSTEM_ID_HEADER_NAME, system_id)
+                builder.header(SIM_SYSTEM_ID_HEADER_NAME, system_id)
             });
 
         let request = self.build_request(
@@ -187,11 +187,11 @@ impl CloudApiClient {
             .method(Method::PATCH)
             .uri(
                 self.http_client
-                    .build_baymax_cloud_url("/client/system_settings")
+                    .build_sim_cloud_url("/client/system_settings")
                     .map_err(ClientApiError::RequestBuildFailed)?
                     .as_ref(),
             )
-            .header(BAYMAX_SYSTEM_ID_HEADER_NAME, system_id);
+            .header(SIM_SYSTEM_ID_HEADER_NAME, system_id);
 
         let request = self.build_request(request_builder, Json(body))?;
         self.send_authenticated_json_request(request).await
@@ -256,7 +256,7 @@ impl CloudApiClient {
         let request = build_request(
             Request::builder().method(Method::GET).uri(
                 self.http_client
-                    .build_baymax_cloud_url("/client/users/me")?
+                    .build_sim_cloud_url("/client/users/me")?
                     .as_ref(),
             ),
             AsyncBody::default(),
@@ -288,7 +288,7 @@ impl CloudApiClient {
         let request = self.build_request(
             Request::builder().method(Method::POST).uri(
                 self.http_client
-                    .build_baymax_cloud_url("/client/feedback/agent_thread")?
+                    .build_sim_cloud_url("/client/feedback/agent_thread")?
                     .as_ref(),
             ),
             AsyncBody::from(serde_json::to_string(&body)?),
@@ -305,7 +305,7 @@ impl CloudApiClient {
         let request = self.build_request(
             Request::builder().method(Method::POST).uri(
                 self.http_client
-                    .build_baymax_cloud_url("/client/feedback/agent_thread_comments")?
+                    .build_sim_cloud_url("/client/feedback/agent_thread_comments")?
                     .as_ref(),
             ),
             AsyncBody::from(serde_json::to_string(&body)?),
@@ -322,7 +322,7 @@ impl CloudApiClient {
         let request = self.build_request(
             Request::builder().method(Method::POST).uri(
                 self.http_client
-                    .build_baymax_cloud_url("/client/feedback/edit_prediction")?
+                    .build_sim_cloud_url("/client/feedback/edit_prediction")?
                     .as_ref(),
             ),
             AsyncBody::from(serde_json::to_string(&body)?),

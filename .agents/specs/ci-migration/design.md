@@ -66,7 +66,7 @@ _For any_ developer running `cargo xtask workflows` from the `main` branch, the 
     ├── danger.yml             # R10: Danger checks
     ├── pr_issue_labeler.yml   # R11: PR/issue labeling
     ├── cherry_pick.yml        # R12: Cherry-pick workflow
-    ├── bump_baymax_version.yml# R13: Version bumping
+    ├── bump_sim_version.yml# R13: Version bumping
     ├── bump_patch_version.yml # R13: Patch version bump
     ├── bump_collab_staging.yml# R13: Collab staging bump
     ├── community_close_stale_issues.yml  # R14: Stale issue closing
@@ -128,8 +128,8 @@ Archived workflows fall into six groups by restoration complexity:
 |----------|----------------|
 | `deploy_collab.yml` | DigitalOcean token, Kubernetes config |
 | `publish_extension_cli.yml` | DigitalOcean Spaces keys, GitHub app tokens |
-| `autofix_pr.yml` | GitHub app token for baymax-zippy |
-| `bump_baymax_version.yml` | GitHub app token for baymax-zippy |
+| `autofix_pr.yml` | GitHub app token for sim-zippy |
+| `bump_sim_version.yml` | GitHub app token for sim-zippy |
 | `bump_patch_version.yml` | GitHub app token |
 | `bump_collab_staging.yml` | GitHub app token |
 | `extension_bump.yml` | GitHub app token |
@@ -192,7 +192,7 @@ fn is_archived(workflow_name: &str) -> bool {
         "nix_build",
         "publish_extension_cli",
         "cherry_pick",
-        "bump_baymax_version",
+        "bump_sim_version",
         "bump_collab_staging",
         "bump_patch_version",
         "docs_suggestions",

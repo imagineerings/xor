@@ -2,13 +2,13 @@
 
 ## 1. Overview
 
-Migrate goose's evaluation infrastructure — Harbor eval framework, Open Model Gym, scenario tests, and benchmark scripts — into baymax's existing evaluation tools (`crates/eval_cli/`, `crates/eval_utils/`).
+Migrate goose's evaluation infrastructure — Harbor eval framework, Open Model Gym, scenario tests, and benchmark scripts — into sim's existing evaluation tools (`crates/eval_cli/`, `crates/eval_utils/`).
 
 ### Key Architectural Decisions
 
 - **Harbor as `crates/eval_harbor/`**: A dedicated crate for structured agent evaluations, building on the patterns in `crates/eval_utils/`.
 - **Scenario tests in `crates/agent/`**: Enhance the existing test infrastructure to support scenario-based testing with mock providers.
-- **Benchmarks in `crates/benchmarks/`**: Baymax already has `crates/benchmarks/`. Extend it with agent-specific benchmarks.
+- **Benchmarks in `crates/benchmarks/`**: Sim already has `crates/benchmarks/`. Extend it with agent-specific benchmarks.
 
 ## 2. Architecture
 
@@ -248,4 +248,4 @@ _For any_ model comparison run, [for each model], THE metrics SHALL include late
 - Source: `projects/goose/evals/open-model-gym/`
 - Source: `projects/goose/crates/goose-cli/src/scenario_tests/`
 - Source: `projects/goose/scripts/bench-*`
-- Baymax: `crates/eval_cli/`, `crates/eval_utils/`, `crates/benchmarks/`
+- Sim: `crates/eval_cli/`, `crates/eval_utils/`, `crates/benchmarks/`

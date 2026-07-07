@@ -81,7 +81,7 @@ metadata_path="$("${scripts_dir}/write-release-metadata.sh" \
     --version 1.2.3 \
     --build-number 42 \
     --commit-sha abcdef1234567890 \
-    --artifact "${repo_root}/mobile/build/android/baymax-android-artifact-1.2.3-abcdef123456.aab" \
+    --artifact "${repo_root}/mobile/build/android/sim-android-artifact-1.2.3-abcdef123456.aab" \
     --output-dir "${tmp_dir}" \
     | tail -n 1)"
 
@@ -92,7 +92,7 @@ assert_contains "${metadata_path}" '"version": "1.2.3"'
 assert_contains "${metadata_path}" '"build_number": "42"'
 assert_contains "${metadata_path}" '"commit_sha": "abcdef1234567890"'
 assert_contains "${metadata_path}" '"published": false'
-assert_contains "${metadata_path}" 'baymax-android-artifact-1.2.3-abcdef123456.aab'
+assert_contains "${metadata_path}" 'sim-android-artifact-1.2.3-abcdef123456.aab'
 
 assert_failure "metadata rejects all platform" \
     "${scripts_dir}/write-release-metadata.sh" \

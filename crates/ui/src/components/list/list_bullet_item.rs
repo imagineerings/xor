@@ -99,10 +99,10 @@ impl Component for ListBulletItem {
             single_example(
                 "With Link",
                 ListBulletItem::new("")
-                    .child(Label::new("Create a Baymax account by"))
+                    .child(Label::new("Create a Sim account by"))
                     .child(ButtonLink::new(
                         "visiting the website",
-                        "https://baymax.dev",
+                        "https://sim.dev",
                     ))
                     .into_any_element(),
             ),

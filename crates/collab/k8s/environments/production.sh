@@ -1,2 +1,2 @@
-BAYMAX_ENVIRONMENT=production
+SIM_ENVIRONMENT=production
 RUST_LOG=info

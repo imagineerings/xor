@@ -41,7 +41,7 @@ pub(crate) async fn get_oci_token(
         "https://{registry}/token?service={registry}&scope=repository:{repository_path}:pull",
     );
     log::debug!("Fetching OCI token from: {}", url);
-    get_deserialibaymax_response("", &url, client)
+    get_deserialisim_response("", &url, client)
         .await
         .map_err(|e| {
             log::error!("OCI token request failed for {}: {e}", url);
@@ -72,7 +72,7 @@ pub(crate) async fn get_oci_manifest(
         None => format!("https://{registry}/v2/{repository_path}/manifests/{version}"),
     };
 
-    get_deserialibaymax_response(token, &url, client).await
+    get_deserialisim_response(token, &url, client).await
 }
 
 pub(crate) async fn get_deserializable_oci_blob<T>(
@@ -86,7 +86,7 @@ where
     T: for<'a> Deserialize<'a>,
 {
     let url = format!("https://{registry}/v2/{repository_path}/blobs/{blob_digest}");
-    get_deserialibaymax_response(token, &url, client).await
+    get_deserialisim_response(token, &url, client).await
 }
 
 pub(crate) async fn download_oci_tarball(
@@ -143,7 +143,7 @@ pub(crate) async fn download_oci_tarball(
     Ok(())
 }
 
-pub(crate) async fn get_deserialibaymax_response<T>(
+pub(crate) async fn get_deserialisim_response<T>(
     token: &str,
     url: &str,
     client: &Arc<dyn HttpClient>,
@@ -203,7 +203,7 @@ mod test {
     use serde::Deserialize;
 
     use crate::oci::{
-        TokenResponse, download_oci_tarball, get_deserialibaymax_response,
+        TokenResponse, download_oci_tarball, get_deserialisim_response,
         get_deserializable_oci_blob, get_latest_oci_manifest, get_oci_token,
     };
 
@@ -261,7 +261,7 @@ mod test {
     }
 
     #[gpui::test]
-    async fn test_get_deserialibaymax_response(_cx: &mut TestAppContext) {
+    async fn test_get_deserialisim_response(_cx: &mut TestAppContext) {
         let client = FakeHttpClient::create(|_request| async move {
             Ok(http_client::Response::builder()
                 .status(200)
@@ -270,7 +270,7 @@ mod test {
         });
 
         let response =
-            get_deserialibaymax_response::<TokenResponse>("", "https://ghcr.io/token", &client)
+            get_deserialisim_response::<TokenResponse>("", "https://ghcr.io/token", &client)
                 .await;
         assert!(response.is_ok());
         assert_eq!(response.unwrap().token, "thisisatoken".to_string())

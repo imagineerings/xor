@@ -1,23 +1,23 @@
 ---
 title: JSON
-description: "Configure JSON language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure JSON language support in Sim, including language servers, formatting, and debugging."
 ---
 
 # JSON
 
-JSON support is available natively in Baymax.
+JSON support is available natively in Sim.
 
 - Tree-sitter: [tree-sitter/tree-sitter-json](https://github.com/tree-sitter/tree-sitter-json)
 - Language Server: [simtropolis/json-language-server](https://github.com/simtropolis/json-language-server)
 
 ## JSONC
 
-Baymax also supports a super-set of JSON called JSONC, which allows single line comments (`//`) in JSON files.
+Sim also supports a super-set of JSON called JSONC, which allows single line comments (`//`) in JSON files.
 While editing these files you can use `cmd-/` (macOS) or `ctrl-/` (Linux) to toggle comments on the current line or selection.
 
 ## JSONC Prettier Formatting
 
-If you use files with the `*.jsonc` extension when using `Format Document` or have `format_on_save` enabled, Baymax invokes Prettier as the formatter. Prettier has an [outstanding issue](https://github.com/prettier/prettier/issues/15956) where it will add trailing commas to files with a `jsonc` extension. JSONC files which have a `.json` extension are unaffected.
+If you use files with the `*.jsonc` extension when using `Format Document` or have `format_on_save` enabled, Sim invokes Prettier as the formatter. Prettier has an [outstanding issue](https://github.com/prettier/prettier/issues/15956) where it will add trailing commas to files with a `jsonc` extension. JSONC files which have a `.json` extension are unaffected.
 
 To workaround this behavior you can add the following to your `.prettierrc` configuration file:
 
@@ -37,7 +37,7 @@ To workaround this behavior you can add the following to your `.prettierrc` conf
 
 ## JSON Language Server
 
-Baymax automatically out of the box supports JSON Schema validation of `package.json` and `tsconfig.json` files, but `json-language-server` can use JSON Schema definitions in project files, from the [JSON Schema Store](https://www.schemastore.org) or other publicly available URLs for JSON validation.
+Sim automatically out of the box supports JSON Schema validation of `package.json` and `tsconfig.json` files, but `json-language-server` can use JSON Schema definitions in project files, from the [JSON Schema Store](https://www.schemastore.org) or other publicly available URLs for JSON validation.
 
 ### Inline Schema Specification
 
@@ -54,7 +54,7 @@ For example to for a `.luarc.json` for use with [lua-language-server](https://gi
 
 ### Schema Specification via Settings
 
-You can associate JSON Schemas with file paths using relative paths in your language server settings. Baymax resolves paths relative to your project root:
+You can associate JSON Schemas with file paths using relative paths in your language server settings. Sim resolves paths relative to your project root:
 
 ```json [settings]
 "lsp": {
@@ -83,7 +83,7 @@ You can associate JSON Schemas with file paths using relative paths in your lang
 
 Paths starting with `./` resolve relative to the worktree root. Paths starting with `~/` expand to your home directory.
 
-You can also pass any of the [supported settings](https://github.com/Microsoft/vscode/blob/main/extensions/json-language-features/server/README.md#settings) to json-language-server by specifying them in your Baymax settings.json:
+You can also pass any of the [supported settings](https://github.com/Microsoft/vscode/blob/main/extensions/json-language-features/server/README.md#settings) to json-language-server by specifying them in your Sim settings.json:
 
 <!--
 TBD: Add formatter (prettier) settings (autoformat, tab_size, etc)

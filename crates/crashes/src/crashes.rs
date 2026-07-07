@@ -188,7 +188,7 @@ pub struct CrashInfo {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct InitCrashHandler {
     pub session_id: String,
-    pub baymax_version: String,
+    pub sim_version: String,
     pub binary: String,
     pub release_channel: String,
     pub commit_sha: String,

@@ -1,7 +1,7 @@
 use anthropic::AnthropicModelMode;
 use anyhow::{Context as _, Result};
 use cloud_llm_client::{
-    BAYMAX_VERSION_HEADER_NAME, CLIENT_SUPPORTS_STATUS_MESSAGES_HEADER_NAME,
+    SIM_VERSION_HEADER_NAME, CLIENT_SUPPORTS_STATUS_MESSAGES_HEADER_NAME,
     CLIENT_SUPPORTS_STATUS_STREAM_ENDED_HEADER_NAME, CLIENT_SUPPORTS_X_AI_HEADER_NAME,
     CompletionBody, CompletionEvent, CompletionRequestStatus, EXPIRED_LLM_TOKEN_HEADER_NAME,
     ListModelsResponse, OUTDATED_LLM_TOKEN_HEADER_NAME,
@@ -20,8 +20,8 @@ use http_client::{
     AsyncBody, HttpClient, HttpClientWithUrl, HttpRequestExt, Method, Response, StatusCode,
 };
 use language_model::{
-    ANTHROPIC_PROVIDER_ID, ANTHROPIC_PROVIDER_NAME, BAYMAX_CLOUD_PROVIDER_ID,
-    BAYMAX_CLOUD_PROVIDER_NAME, GOOGLE_PROVIDER_ID, GOOGLE_PROVIDER_NAME, LanguageModel,
+    ANTHROPIC_PROVIDER_ID, ANTHROPIC_PROVIDER_NAME, SIM_CLOUD_PROVIDER_ID,
+    SIM_CLOUD_PROVIDER_NAME, GOOGLE_PROVIDER_ID, GOOGLE_PROVIDER_NAME, LanguageModel,
     LanguageModelCompletionError, LanguageModelCompletionEvent, LanguageModelEffortLevel,
     LanguageModelId, LanguageModelName, LanguageModelProviderId, LanguageModelProviderName,
     LanguageModelRequest, LanguageModelToolChoice, LanguageModelToolSchemaFormat,
@@ -45,8 +45,8 @@ use open_ai::completion::{
     OpenAiEventMapper, OpenAiResponseEventMapper, into_open_ai, into_open_ai_response,
 };
 
-const PROVIDER_ID: LanguageModelProviderId = BAYMAX_CLOUD_PROVIDER_ID;
-const PROVIDER_NAME: LanguageModelProviderName = BAYMAX_CLOUD_PROVIDER_NAME;
+const PROVIDER_ID: LanguageModelProviderId = SIM_CLOUD_PROVIDER_ID;
+const PROVIDER_NAME: LanguageModelProviderName = SIM_CLOUD_PROVIDER_NAME;
 
 /// Trait for acquiring and refreshing LLM authentication tokens.
 pub trait CloudLlmTokenProvider: Send + Sync {
@@ -62,7 +62,7 @@ pub trait CloudLlmTokenProvider: Send + Sync {
     fn has_data_retention_consent(&self, cx: &impl AppContext) -> bool;
 }
 
-/// Sends an authenticated request to the Baymax LLM service, retrying once with
+/// Sends an authenticated request to the Sim LLM service, retrying once with
 /// a refreshed token if the server signals that the cached LLM token is
 /// expired or otherwise rejected. Returns the raw response so callers can
 /// inspect headers and stream the body.
@@ -125,7 +125,7 @@ impl<TP: CloudLlmTokenProvider> CloudLanguageModel<TP> {
         body: CompletionBody,
     ) -> Result<PerformLlmCompletionResponse, LanguageModelCompletionError> {
         let url = http_client
-            .build_baymax_llm_url("/completions", &[])
+            .build_sim_llm_url("/completions", &[])
             .map_err(LanguageModelCompletionError::Other)?;
         let body = serde_json::to_string(&body).map_err(|error| {
             LanguageModelCompletionError::SerializeRequest {
@@ -139,7 +139,7 @@ impl<TP: CloudLlmTokenProvider> CloudLanguageModel<TP> {
                     .method(Method::POST)
                     .uri(url.as_ref())
                     .when_some(app_version.as_ref(), |builder, app_version| {
-                        builder.header(BAYMAX_VERSION_HEADER_NAME, app_version.to_string())
+                        builder.header(SIM_VERSION_HEADER_NAME, app_version.to_string())
                     })
                     .header("Content-Type", "application/json")
                     .header("Authorization", format!("Bearer {token}"))
@@ -208,7 +208,7 @@ struct ApiError {
     headers: HeaderMap<HeaderValue>,
 }
 
-/// Represents error responses from Baymax's cloud API.
+/// Represents error responses from Sim's cloud API.
 ///
 /// Example JSON for an upstream HTTP error:
 /// ```json
@@ -389,7 +389,7 @@ impl<TP: CloudLlmTokenProvider + 'static> LanguageModel for CloudLanguageModel<T
     }
 
     fn telemetry_id(&self) -> String {
-        format!("baymax.dev/{}", self.model.id)
+        format!("sim.dev/{}", self.model.id)
     }
 
     fn tool_input_format(&self) -> LanguageModelToolSchemaFormat {
@@ -462,7 +462,7 @@ impl<TP: CloudLlmTokenProvider + 'static> LanguageModel for CloudLanguageModel<T
 
                 if enable_thinking && effort.is_some() {
                     request.thinking = Some(anthropic::Thinking::Adaptive {
-                        display: Some(anthropic::AdaptiveThinkingDisplay::Summaribaymax),
+                        display: Some(anthropic::AdaptiveThinkingDisplay::Summarisim),
                     });
                     request.output_config = Some(anthropic::OutputConfig { effort });
                 }
@@ -707,7 +707,7 @@ impl<TP: CloudLlmTokenProvider + 'static> CloudModelProvider<TP> {
         token_provider: &TP,
         auth_context: TP::AuthContext,
     ) -> Result<ListModelsResponse> {
-        let url = http_client.build_baymax_llm_url("/models", &[])?;
+        let url = http_client.build_sim_llm_url("/models", &[])?;
         let mut response =
             authenticated_llm_request(http_client, token_provider, auth_context, |token| {
                 Ok(http_client::Request::builder()
@@ -1018,7 +1018,7 @@ mod tests {
             ),
         }
 
-        // Regular 500 error without upstream_http_error should remain ApiInternalServerError for Baymax
+        // Regular 500 error without upstream_http_error should remain ApiInternalServerError for Sim
         let error_body = "Regular internal server error";
 
         let api_error = ApiError {

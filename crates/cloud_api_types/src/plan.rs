@@ -6,11 +6,11 @@ use crate::{KnownOrUnknown, Timestamp};
 #[serde(rename_all = "snake_case")]
 pub enum Plan {
     #[default]
-    BaymaxFree,
-    BaymaxPro,
-    BaymaxProTrial,
-    BaymaxBusiness,
-    BaymaxStudent,
+    SimFree,
+    SimPro,
+    SimProTrial,
+    SimBusiness,
+    SimStudent,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -31,7 +31,7 @@ impl PlanInfo {
             KnownOrUnknown::Known(plan) => *plan,
             KnownOrUnknown::Unknown(_) => {
                 // If we get a plan that we don't recognize, fall back to the Free plan.
-                Plan::BaymaxFree
+                Plan::SimFree
             }
         }
     }
@@ -52,16 +52,16 @@ mod tests {
 
     #[test]
     fn test_plan_deserialize_snake_case() {
-        let plan = serde_json::from_value::<Plan>(json!("baymax_free")).unwrap();
-        assert_eq!(plan, Plan::BaymaxFree);
+        let plan = serde_json::from_value::<Plan>(json!("sim_free")).unwrap();
+        assert_eq!(plan, Plan::SimFree);
 
-        let plan = serde_json::from_value::<Plan>(json!("baymax_pro")).unwrap();
-        assert_eq!(plan, Plan::BaymaxPro);
+        let plan = serde_json::from_value::<Plan>(json!("sim_pro")).unwrap();
+        assert_eq!(plan, Plan::SimPro);
 
-        let plan = serde_json::from_value::<Plan>(json!("baymax_pro_trial")).unwrap();
-        assert_eq!(plan, Plan::BaymaxProTrial);
+        let plan = serde_json::from_value::<Plan>(json!("sim_pro_trial")).unwrap();
+        assert_eq!(plan, Plan::SimProTrial);
 
-        let plan = serde_json::from_value::<Plan>(json!("baymax_student")).unwrap();
-        assert_eq!(plan, Plan::BaymaxStudent);
+        let plan = serde_json::from_value::<Plan>(json!("sim_student")).unwrap();
+        assert_eq!(plan, Plan::SimStudent);
     }
 }

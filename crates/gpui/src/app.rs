@@ -1328,7 +1328,7 @@ impl App {
         self.platform.open_url(url);
     }
 
-    /// Registers the given URL scheme (e.g. `baymax` for `baymax://` urls) to be
+    /// Registers the given URL scheme (e.g. `sim` for `sim://` urls) to be
     /// opened by the current app.
     ///
     /// On some platforms (e.g. macOS) you may be able to register URL schemes

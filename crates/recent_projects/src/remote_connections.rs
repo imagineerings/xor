@@ -19,7 +19,7 @@ pub use settings::SshConnection;
 use settings::{DevContainerConnection, ExtendingVec, RegisterSetting, Settings, WslConnection};
 use util::paths::PathWithPosition;
 use workspace::{
-    AppState, MultiWorkspace, OpenOptions, SerialibaymaxWorkspaceLocation, Workspace,
+    AppState, MultiWorkspace, OpenOptions, SerialisimWorkspaceLocation, Workspace,
     find_existing_workspace,
 };
 
@@ -138,7 +138,7 @@ pub async fn open_remote_project(
     let (existing, open_visible) = find_existing_workspace(
         &paths,
         &open_options,
-        &SerialibaymaxWorkspaceLocation::Remote(connection_options.clone()),
+        &SerialisimWorkspaceLocation::Remote(connection_options.clone()),
         cx,
     )
     .await;
@@ -691,7 +691,7 @@ mod tests {
         let (found, _open_visible) = find_existing_workspace(
             &search_paths,
             &workspace::OpenOptions::default(),
-            &SerialibaymaxWorkspaceLocation::Remote(opts.clone()),
+            &SerialisimWorkspaceLocation::Remote(opts.clone()),
             &mut async_cx,
         )
         .await;

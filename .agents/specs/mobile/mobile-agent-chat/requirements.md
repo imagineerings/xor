@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The core experience of the Baymax mobile app is chatting with the AI agent. Users need a rich, responsive chat interface that displays streaming responses with markdown, code blocks, tool calls, and supports message actions, threading, and search. This spec builds on the existing chat implementations (iOS: `ChatView.swift`, Android: `ChatScreen.kt`) and extends them with features from the `mobile-dev` messaging app.
+The core experience of the Sim mobile app is chatting with the AI agent. Users need a rich, responsive chat interface that displays streaming responses with markdown, code blocks, tool calls, and supports message actions, threading, and search. This spec builds on the existing chat implementations (iOS: `ChatView.swift`, Android: `ChatScreen.kt`) and extends them with features from the `mobile-dev` messaging app.
 
 ## Glossary
 

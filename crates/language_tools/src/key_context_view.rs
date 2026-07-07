@@ -82,7 +82,7 @@ impl KeyContextView {
                         "".to_string()
                     };
                     let mut name = binding.action().name();
-                    if name == "baymax::NoAction" {
+                    if name == "sim::NoAction" {
                         name = "(null)"
                     }
 
@@ -135,7 +135,7 @@ impl KeyContextView {
         if let Some(last_action) = a {
             last_action.partial_eq(b)
         } else {
-            b.name() == "baymax::NoAction"
+            b.name() == "sim::NoAction"
         }
     }
 }
@@ -201,7 +201,7 @@ impl Render for KeyContextView {
                 }),
             )
             .child(Label::new("Keyboard Context").size(LabelSize::Large))
-            .child(Label::new("This view lets you determine the current context stack for creating custom key bindings in Baymax. When a keyboard shortcut is triggered, it also shows all the possible contexts it could have triggered in, and which one matched."))
+            .child(Label::new("This view lets you determine the current context stack for creating custom key bindings in Sim. When a keyboard shortcut is triggered, it also shows all the possible contexts it could have triggered in, and which one matched."))
             .child(
                 h_flex()
                     .mt_4()
@@ -209,25 +209,25 @@ impl Render for KeyContextView {
                     .child(
                         Button::new("open_documentation", "Open Documentation")
                             .style(ButtonStyle::Filled)
-                            .on_click(|_, _, cx| cx.open_url("https://baymax.dev/docs/key-bindings")),
+                            .on_click(|_, _, cx| cx.open_url("https://sim.dev/docs/key-bindings")),
                     )
                     .child(
                         Button::new("view_default_keymap", "View Default Keymap")
                             .style(ButtonStyle::Filled)
                             .key_binding(ui::KeyBinding::for_action(
-                                &baymax_actions::OpenDefaultKeymap,
+                                &sim_actions::OpenDefaultKeymap,
                                 cx
                             ))
                             .on_click(|_, window, cx| {
-                                window.dispatch_action(baymax_actions::OpenDefaultKeymap.boxed_clone(), cx);
+                                window.dispatch_action(sim_actions::OpenDefaultKeymap.boxed_clone(), cx);
                             }),
                     )
                     .child(
                         Button::new("edit_your_keymap", "Edit Keymap File")
                             .style(ButtonStyle::Filled)
-                            .key_binding(ui::KeyBinding::for_action(&baymax_actions::OpenKeymapFile, cx))
+                            .key_binding(ui::KeyBinding::for_action(&sim_actions::OpenKeymapFile, cx))
                             .on_click(|_, window, cx| {
-                                window.dispatch_action(baymax_actions::OpenKeymapFile.boxed_clone(), cx);
+                                window.dispatch_action(sim_actions::OpenKeymapFile.boxed_clone(), cx);
                             }),
                     ),
             )

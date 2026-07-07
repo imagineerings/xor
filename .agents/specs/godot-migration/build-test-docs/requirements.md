@@ -2,13 +2,13 @@
 
 ## Introduction
 
-Baymax should reuse existing build/test infrastructure while adding Godot/world-model docs ingestion, fixture attribution, compatibility metadata, and dependency review gates.
+Sim should reuse existing build/test infrastructure while adding Godot/world-model docs ingestion, fixture attribution, compatibility metadata, and dependency review gates.
 
 ### Requirement 1: Build Boundary
 
 #### Acceptance Criteria
 
-1.1 IF a build feature duplicates Baymax build or CI systems THEN THE system SHALL not port it.
+1.1 IF a build feature duplicates Sim build or CI systems THEN THE system SHALL not port it.
 
 ### Requirement 2: Docs and Fixtures
 

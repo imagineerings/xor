@@ -2,11 +2,11 @@
 
 ## Architecture
 
-Reuse Baymax media, image, shader-language, and preview infrastructure. Treat world-model outputs as generated artifacts with provenance.
+Reuse Sim media, image, shader-language, and preview infrastructure. Treat world-model outputs as generated artifacts with provenance.
 
 ## Components
 
-- `BaymaxGameMediaClassifier`
+- `SimGameMediaClassifier`
 - `GeneratedMediaPreviewRoute`
 - `UnsupportedPreviewReason`
 

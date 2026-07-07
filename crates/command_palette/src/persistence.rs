@@ -12,20 +12,20 @@ use time::OffsetDateTime;
 
 #[cfg(test)]
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
-pub(crate) struct SerialibaymaxCommandInvocation {
+pub(crate) struct SerialisimCommandInvocation {
     pub(crate) command_name: String,
     pub(crate) user_query: String,
     pub(crate) last_invoked: OffsetDateTime,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
-pub(crate) struct SerialibaymaxCommandUsage {
+pub(crate) struct SerialisimCommandUsage {
     pub(crate) command_name: String,
     pub(crate) invocations: u16,
     pub(crate) last_invoked: OffsetDateTime,
 }
 
-impl Column for SerialibaymaxCommandUsage {
+impl Column for SerialisimCommandUsage {
     fn column(statement: &mut Statement, start_index: i32) -> Result<(Self, i32)> {
         let (command_name, next_index): (String, i32) = Column::column(statement, start_index)?;
         let (invocations, next_index): (u16, i32) = Column::column(statement, next_index)?;
@@ -41,7 +41,7 @@ impl Column for SerialibaymaxCommandUsage {
 }
 
 #[cfg(test)]
-impl Column for SerialibaymaxCommandInvocation {
+impl Column for SerialisimCommandInvocation {
     fn column(statement: &mut Statement, start_index: i32) -> Result<(Self, i32)> {
         let (command_name, next_index): (String, i32) = Column::column(statement, start_index)?;
         let (user_query, next_index): (String, i32) = Column::column(statement, next_index)?;
@@ -88,7 +88,7 @@ impl CommandPaletteDB {
 
     #[cfg(test)]
     query! {
-        pub(crate) fn get_last_invoked(command: &str) -> Result<Option<SerialibaymaxCommandInvocation>> {
+        pub(crate) fn get_last_invoked(command: &str) -> Result<Option<SerialisimCommandInvocation>> {
             SELECT
             command_name,
             user_query,
@@ -107,7 +107,7 @@ impl CommandPaletteDB {
     }
 
     query! {
-        pub fn get_command_usage(command: &str) -> Result<Option<SerialibaymaxCommandUsage>> {
+        pub fn get_command_usage(command: &str) -> Result<Option<SerialisimCommandUsage>> {
             SELECT command_name, COUNT(1), MAX(last_invoked)
             FROM command_invocations
             WHERE command_name=(?)
@@ -123,7 +123,7 @@ impl CommandPaletteDB {
     }
 
     query! {
-        pub fn list_commands_used() -> Result<Vec<SerialibaymaxCommandUsage>> {
+        pub fn list_commands_used() -> Result<Vec<SerialisimCommandUsage>> {
             SELECT command_name, COUNT(1), MAX(last_invoked)
             FROM command_invocations
             GROUP BY command_name
@@ -145,7 +145,7 @@ impl CommandPaletteDB {
 #[cfg(test)]
 mod tests {
 
-    use crate::persistence::{CommandPaletteDB, SerialibaymaxCommandUsage};
+    use crate::persistence::{CommandPaletteDB, SerialisimCommandUsage};
 
     #[gpui::test]
     async fn test_saves_and_retrieves_command_invocation() {
@@ -186,7 +186,7 @@ mod tests {
         let command_usage = db.get_command_usage("go to line: toggle").unwrap();
 
         assert!(command_usage.is_some());
-        let command_usage: SerialibaymaxCommandUsage = command_usage.expect("is some");
+        let command_usage: SerialisimCommandUsage = command_usage.expect("is some");
 
         assert_eq!(command_usage.command_name, "go to line: toggle");
         assert_eq!(command_usage.invocations, 2);

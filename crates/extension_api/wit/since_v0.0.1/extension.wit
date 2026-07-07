@@ -1,4 +1,4 @@
-package baymax:extension;
+package sim:extension;
 
 world extension {
     use github.{github-release, github-release-options};
@@ -24,7 +24,7 @@ world extension {
     /// Gets the current operating system and architecture
     import current-platform: func() -> tuple<os, architecture>;
 
-    /// Get the path to the node binary used by Baymax.
+    /// Get the path to the node binary used by Sim.
     import node-binary-path: func() -> result<string, string>;
 
     /// Gets the latest version of the given NPM package.

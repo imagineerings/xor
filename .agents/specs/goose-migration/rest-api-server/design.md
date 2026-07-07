@@ -2,12 +2,12 @@
 
 ## 1. Overview
 
-Migrate goose's HTTP REST API server (`goose-server`) into baymax. This server provides a full HTTP API for interacting with the agent, managing sessions, recipes, schedules, and more — enabling embedding baymax into other applications and services.
+Migrate goose's HTTP REST API server (`goose-server`) into sim. This server provides a full HTTP API for interacting with the agent, managing sessions, recipes, schedules, and more — enabling embedding sim into other applications and services.
 
 ### Key Architectural Decisions
 
-- **New `crates/baymax-server/` crate**: Separate from the desktop app binary. Optional feature, not compiled by default.
-- **Axum-based**: Goose already uses axum (which is a workspace dependency in baymax). Continue with axum for the HTTP layer.
+- **New `crates/sim-server/` crate**: Separate from the desktop app binary. Optional feature, not compiled by default.
+- **Axum-based**: Goose already uses axum (which is a workspace dependency in sim). Continue with axum for the HTTP layer.
 - **Shared state from `crates/agent/`**: The server instantiates an agent and exposes it via HTTP, reusing the same agent infrastructure.
 - **SSE for streaming**: Server-Sent Events for streaming responses, consistent with goose and ACP patterns.
 - **OpenAPI via `utoipa`**: Use `utoipa` for OpenAPI documentation generation from Rust types.
@@ -17,7 +17,7 @@ Migrate goose's HTTP REST API server (`goose-server`) into baymax. This server p
 
 ```mermaid
 graph TD
-    subgraph "HTTP Server (crates/baymax-server/)"
+    subgraph "HTTP Server (crates/sim-server/)"
         Router[Axum Router]
         Middleware[Auth / TLS / CORS]
         Routes[Route Handlers]
@@ -38,7 +38,7 @@ graph TD
         SetupR[Setup Routes]
     end
 
-    subgraph "baymax Core"
+    subgraph "sim Core"
         Agent[crates/agent/ Agent]
         Sessions[crates/session/ SessionManager]
         Recipes[crates/recipe/ RecipeEngine]
@@ -243,4 +243,4 @@ _For any_ config update request [with invalid values], THE server SHALL return 4
 ## References
 
 - Source: `projects/goose/crates/goose-server/`
-- Baymax: `crates/agent/`, `crates/session/`, `crates/settings/`, `crates/scheduler/`
+- Sim: `crates/agent/`, `crates/session/`, `crates/settings/`, `crates/scheduler/`

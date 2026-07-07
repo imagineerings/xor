@@ -66,7 +66,7 @@ impl ProjectEnvironment {
         }
     }
 
-    /// Returns the inherited CLI environment, if this project was opened from the Baymax CLI.
+    /// Returns the inherited CLI environment, if this project was opened from the Sim CLI.
     pub(crate) fn get_cli_environment(&self) -> Option<HashMap<String, String>> {
         if cfg!(any(test, feature = "test-support")) {
             return Some(HashMap::default());
@@ -291,10 +291,10 @@ impl ProjectEnvironment {
 }
 
 fn set_origin_marker(env: &mut HashMap<String, String>, origin: EnvironmentOrigin) {
-    env.insert(BAYMAX_ENVIRONMENT_ORIGIN_MARKER.to_string(), origin.into());
+    env.insert(SIM_ENVIRONMENT_ORIGIN_MARKER.to_string(), origin.into());
 }
 
-const BAYMAX_ENVIRONMENT_ORIGIN_MARKER: &str = "BAYMAX_ENVIRONMENT";
+const SIM_ENVIRONMENT_ORIGIN_MARKER: &str = "SIM_ENVIRONMENT";
 
 enum EnvironmentOrigin {
     Cli,

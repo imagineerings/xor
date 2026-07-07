@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-Baymax channel messages currently exist as a flat list. The `SendChannelMessage` proto already has a `reply_to_message_id` field, but there is no dedicated thread view or UI for browsing replies. This design adds a thread panel (right sidebar) that aggregates replies to a root message, with real-time updates and unread indicators.
+Sim channel messages currently exist as a flat list. The `SendChannelMessage` proto already has a `reply_to_message_id` field, but there is no dedicated thread view or UI for browsing replies. This design adds a thread panel (right sidebar) that aggregates replies to a root message, with real-time updates and unread indicators.
 
 **Key decisions:**
 

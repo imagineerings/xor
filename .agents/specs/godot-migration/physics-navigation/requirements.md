@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Baymax should not port Godot physics or navigation runtimes. It may index metadata and provide external simulation task fallbacks.
+Sim should not port Godot physics or navigation runtimes. It may index metadata and provide external simulation task fallbacks.
 
 ### Requirement 1: Physics Runtime Boundary
 

@@ -9,7 +9,7 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use session::DebugSession;
 
-use baymax_actions::debug_panel::{Toggle, ToggleFocus};
+use sim_actions::debug_panel::{Toggle, ToggleFocus};
 use tasks_ui::{Spawn, TaskOverrides};
 use ui::{FluentBuilder, InteractiveElement};
 use util::maybe;

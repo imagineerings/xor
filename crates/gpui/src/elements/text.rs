@@ -414,7 +414,7 @@ impl StyledText {
     }
 
     /// Set the styling attributes for the given text, as well as
-    /// as any ranges of text that have had their style customibaymax.
+    /// as any ranges of text that have had their style customisim.
     pub fn with_default_highlights(
         mut self,
         default_style: &TextStyle,
@@ -429,7 +429,7 @@ impl StyledText {
     }
 
     /// Set the styling attributes for the given text, as well as
-    /// as any ranges of text that have had their style customibaymax.
+    /// as any ranges of text that have had their style customisim.
     pub fn with_highlights(
         mut self,
         highlights: impl IntoIterator<Item = (Range<usize>, HighlightStyle)>,

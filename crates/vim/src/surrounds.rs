@@ -510,14 +510,14 @@ impl Vim {
             // below could be done.
             //
             // ```
-            // (< name:ˇ'Baymax' >)
+            // (< name:ˇ'Sim' >)
             // <[ name:ˇ'DeltaDB' ]>
             // ```
             //
             // After using `csb{`:
             //
             // ```
-            // (ˇ{ name:'Baymax' })
+            // (ˇ{ name:'Sim' })
             // <ˇ{ name:'DeltaDB' }>
             // ```
             if let Some(selection) = selections.first() {
@@ -1354,13 +1354,13 @@ mod test {
         cx.simulate_keystrokes("c s b [");
         cx.assert_state(indoc! {"ˇ[ bracketed ]"}, Mode::Normal);
 
-        cx.set_state(indoc! {"(< name: ˇ'Baymax' >)"}, Mode::Normal);
+        cx.set_state(indoc! {"(< name: ˇ'Sim' >)"}, Mode::Normal);
         cx.simulate_keystrokes("c s b }");
-        cx.assert_state(indoc! {"(ˇ{ name: 'Baymax' })"}, Mode::Normal);
+        cx.assert_state(indoc! {"(ˇ{ name: 'Sim' })"}, Mode::Normal);
 
         cx.set_state(
             indoc! {"
-            (< name: ˇ'Baymax' >)
+            (< name: ˇ'Sim' >)
             (< nˇame: 'DeltaDB' >)
         "},
             Mode::Normal,
@@ -1368,7 +1368,7 @@ mod test {
         cx.simulate_keystrokes("c s b {");
         cx.set_state(
             indoc! {"
-            (ˇ{ name: 'Baymax' })
+            (ˇ{ name: 'Sim' })
             (ˇ{ name: 'DeltaDB' })
         "},
             Mode::Normal,
@@ -1404,13 +1404,13 @@ mod test {
         cx.simulate_keystrokes("c s b [");
         cx.assert_state(indoc! {"ˇ[ bracketed ]"}, Mode::Normal);
 
-        cx.set_state(indoc! {"(<ˇBaymax>)"}, Mode::Normal);
+        cx.set_state(indoc! {"(<ˇSim>)"}, Mode::Normal);
         cx.simulate_keystrokes("c s b )");
-        cx.assert_state(indoc! {"(ˇ(Baymax))"}, Mode::Normal);
+        cx.assert_state(indoc! {"(ˇ(Sim))"}, Mode::Normal);
 
         cx.set_state(
             indoc! {"
-                (<ˇBaymax>)
+                (<ˇSim>)
                 (<ˇDeltaDB>)
             "},
             Mode::Normal,
@@ -1418,7 +1418,7 @@ mod test {
         cx.simulate_keystrokes("c s b (");
         cx.assert_state(
             indoc! {"
-                (ˇ( Baymax ))
+                (ˇ( Sim ))
                 (ˇ( DeltaDB ))
             "},
             Mode::Normal,

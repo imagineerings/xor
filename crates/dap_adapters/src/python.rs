@@ -95,7 +95,7 @@ impl PythonDebugAdapter {
 
         let mut configuration = task_definition.config.clone();
         if let Ok(console) = configuration.dot_get_mut("console") {
-            // Use built-in Baymax terminal if user did not explicitly provide a setting for console.
+            // Use built-in Sim terminal if user did not explicitly provide a setting for console.
             if console.is_null() {
                 *console = Value::String("integratedTerminal".into());
             }
@@ -271,7 +271,7 @@ impl PythonDebugAdapter {
 
                 let debug_adapter_path = paths::debug_adapters_dir().join(Self::DEBUG_ADAPTER_NAME.as_ref());
                 let output = util::command::new_command(&base_python)
-                    .args(["-m", "venv", "baymax_base_venv"])
+                    .args(["-m", "venv", "sim_base_venv"])
                     .current_dir(
                         &debug_adapter_path,
                     )
@@ -296,7 +296,7 @@ impl PythonDebugAdapter {
                 Ok(Arc::from(
                     paths::debug_adapters_dir()
                         .join(Self::DEBUG_ADAPTER_NAME.as_ref())
-                        .join("baymax_base_venv")
+                        .join("sim_base_venv")
                         .join(PYTHON_PATH)
                         .as_ref(),
                 ))
@@ -439,12 +439,12 @@ impl DebugAdapter for PythonDebugAdapter {
         Some(SharedString::new_static("Python").into())
     }
 
-    async fn config_from_baymax_format(
+    async fn config_from_sim_format(
         &self,
-        baymax_scenario: BaymaxDebugConfig,
+        sim_scenario: SimDebugConfig,
     ) -> Result<DebugScenario> {
         let mut args = json!({
-            "request": match baymax_scenario.request {
+            "request": match sim_scenario.request {
                 DebugRequest::Launch(_) => "launch",
                 DebugRequest::Attach(_) => "attach",
             },
@@ -453,7 +453,7 @@ impl DebugAdapter for PythonDebugAdapter {
         });
 
         let map = args.as_object_mut().unwrap();
-        match &baymax_scenario.request {
+        match &sim_scenario.request {
             DebugRequest::Attach(attach) => {
                 map.insert("processId".into(), attach.process_id.into());
             }
@@ -464,7 +464,7 @@ impl DebugAdapter for PythonDebugAdapter {
                     map.insert("env".into(), launch.env_json());
                 }
 
-                if let Some(stop_on_entry) = baymax_scenario.stop_on_entry {
+                if let Some(stop_on_entry) = sim_scenario.stop_on_entry {
                     map.insert("stopOnEntry".into(), stop_on_entry.into());
                 }
                 if let Some(cwd) = launch.cwd.as_ref() {
@@ -474,8 +474,8 @@ impl DebugAdapter for PythonDebugAdapter {
         }
 
         Ok(DebugScenario {
-            adapter: baymax_scenario.adapter,
-            label: baymax_scenario.label,
+            adapter: sim_scenario.adapter,
+            label: sim_scenario.label,
             config: args,
             build: None,
             tcp_connection: None,
@@ -561,7 +561,7 @@ impl DebugAdapter for PythonDebugAdapter {
                         "label": "Path mapping",
                         "properties": {
                             "localRoot": {
-                                "default": "${BAYMAX_WORKTREE_ROOT}",
+                                "default": "${SIM_WORKTREE_ROOT}",
                                 "label": "Local source root.",
                                 "type": "string"
                             },
@@ -723,7 +723,7 @@ impl DebugAdapter for PythonDebugAdapter {
                                 ]
                             },
                             "cwd": {
-                                "default": "${BAYMAX_WORKTREE_ROOT}",
+                                "default": "${SIM_WORKTREE_ROOT}",
                                 "description": "Absolute path to the working directory of the program being debugged. Default is the root directory of the file (leave empty).",
                                 "type": "string"
                             },
@@ -741,7 +741,7 @@ impl DebugAdapter for PythonDebugAdapter {
                                 "type": "object"
                             },
                             "envFile": {
-                                "default": "${BAYMAX_WORKTREE_ROOT}/.env",
+                                "default": "${SIM_WORKTREE_ROOT}/.env",
                                 "description": "Absolute path to a file containing environment variable definitions.",
                                 "type": "string"
                             },
@@ -756,7 +756,7 @@ impl DebugAdapter for PythonDebugAdapter {
                                 "type": "string"
                             },
                             "program": {
-                                "default": "${BAYMAX_FILE}",
+                                "default": "${SIM_FILE}",
                                 "description": "Absolute path to the program.",
                                 "type": "string"
                             },
@@ -857,7 +857,7 @@ impl DebugAdapter for PythonDebugAdapter {
             })
             .chain(
                 // While Debugpy's wiki saids absolute paths are required, but it actually supports relative paths when cwd is passed in.
-                // (Which should always be the case because Baymax defaults to the cwd worktree root)
+                // (Which should always be the case because Sim defaults to the cwd worktree root)
                 // So we want to check that these relative paths find toolchains as well. Otherwise, they won't be checked
                 // because the strip prefix in the iteration above will return an error
                 config

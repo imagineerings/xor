@@ -85,7 +85,7 @@ use task::Shell;
 use text::{Bias, BufferId};
 use util::{
     ResultExt, debug_panic,
-    paths::{PathStyle, SanitibaymaxPath},
+    paths::{PathStyle, SanitisimPath},
     post_inc,
     rel_path::RelPath,
 };
@@ -348,7 +348,7 @@ struct CommitDataHandler {
     pending_requests: HashSet<Oid>,
 }
 
-/// Represents the handler of a git cat-file --batch process within Baymax
+/// Represents the handler of a git cat-file --batch process within Sim
 /// It's used to lazily fetch commit data as needed (whatever a user is viewing)
 enum CommitDataHandlerState {
     /// The handler is open and processing requests
@@ -4725,8 +4725,8 @@ impl RepositorySnapshot {
     /// The main worktree is the original checkout that other worktrees were
     /// created from.
     ///
-    /// For example, if you had both `~/code/baymax` and `~/code/worktrees/baymax-2`,
-    /// then `~/code/baymax` is the main worktree and `~/code/worktrees/baymax-2` is a linked worktree.
+    /// For example, if you had both `~/code/sim` and `~/code/worktrees/sim-2`,
+    /// then `~/code/sim` is the main worktree and `~/code/worktrees/sim-2` is a linked worktree.
     ///
     /// Submodules also return `true` here, since they are not linked worktrees.
     pub fn is_main_worktree(&self) -> bool {
@@ -5370,7 +5370,7 @@ impl Repository {
         let git_store = self.git_store.upgrade()?;
         let worktree_store = git_store.read(cx).worktree_store.read(cx);
         let abs_path = self.snapshot.repo_path_to_abs_path(path);
-        let abs_path = SanitibaymaxPath::new(&abs_path);
+        let abs_path = SanitisimPath::new(&abs_path);
         let (worktree, relative_path) = worktree_store.find_worktree(abs_path, cx)?;
         Some(ProjectPath {
             worktree_id: worktree.read(cx).id(),
@@ -8739,7 +8739,7 @@ impl Repository {
         self.send_job("access", None, move |git_repo, _cx| async move {
             match git_repo {
                 // TODO: Correctly handle remote repositories, where the user
-                // that's running the Baymax remote may not own the `.git/`
+                // that's running the Sim remote may not own the `.git/`
                 // directory. For now we just return `GitAccess::Yes` so that
                 // remoting continues working as expected.
                 RepositoryState::Remote(..) => GitAccess::Yes,
@@ -8922,7 +8922,7 @@ async fn remove_empty_managed_worktree_ancestors(fs: &dyn Fs, child_path: &Path,
 ///   normal checkout, or `.bare` for a bare clone), the parent directory is
 ///   returned. Both of these are internal Git directories; the parent is the
 ///   meaningful project root.
-/// - Otherwise (e.g. `baymax.git` for a bare clone), `common_dir` itself is
+/// - Otherwise (e.g. `sim.git` for a bare clone), `common_dir` itself is
 ///   returned — it is already a meaningful on-disk path.
 pub fn repo_identity_path(common_dir: &Path) -> &Path {
     let is_dot_entry = common_dir

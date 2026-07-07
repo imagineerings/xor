@@ -266,7 +266,7 @@ impl std::fmt::Debug for dyn LanguageModel {
 /// Either a built-in icon name or a path to an external SVG.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IconOrSvg {
-    /// A built-in icon from Baymax's icon set.
+    /// A built-in icon from Sim's icon set.
     Icon(IconName),
     /// Path to a custom SVG icon file.
     Svg(SharedString),
@@ -274,7 +274,7 @@ pub enum IconOrSvg {
 
 impl Default for IconOrSvg {
     fn default() -> Self {
-        Self::Icon(IconName::BaymaxAssistant)
+        Self::Icon(IconName::SimAssistant)
     }
 }
 
@@ -318,7 +318,7 @@ pub struct FastModeConfirmation {
 #[derive(Default, Clone, PartialEq, Eq)]
 pub enum ConfigurationViewTargetAgent {
     #[default]
-    BaymaxAgent,
+    SimAgent,
     Other(SharedString),
 }
 

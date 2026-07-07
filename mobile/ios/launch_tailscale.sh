@@ -11,8 +11,8 @@ NC='\033[0m' # No Color
 # Configuration
 PREFERRED_PORT=62997
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BAYMAXED_URL="https://github.com/michaelneale/baymax-tunnel/releases/download/test/baymaxed"
-BAYMAXED_LOCAL_PATH="${SCRIPT_DIR}/baymaxed"
+SIMED_URL="https://github.com/michaelneale/sim-tunnel/releases/download/test/simed"
+SIMED_LOCAL_PATH="${SCRIPT_DIR}/simed"
 
 # Function to find an available port starting from the preferred port
 find_available_port() {
@@ -47,38 +47,38 @@ else
     echo -e "${YELLOW}✓ Using available port $PORT (preferred $PREFERRED_PORT was in use)${NC}"
 fi
 
-# Function to download baymaxed binary
-download_baymaxd() {
-    echo -e "${YELLOW}Downloading baymaxed binary...${NC}"
-    if curl -L -o "$BAYMAXED_LOCAL_PATH" "$BAYMAXED_URL"; then
-        chmod +x "$BAYMAXED_LOCAL_PATH"
-        echo -e "${GREEN}✓ Downloaded baymaxed to: $BAYMAXED_LOCAL_PATH${NC}"
+# Function to download simed binary
+download_simd() {
+    echo -e "${YELLOW}Downloading simed binary...${NC}"
+    if curl -L -o "$SIMED_LOCAL_PATH" "$SIMED_URL"; then
+        chmod +x "$SIMED_LOCAL_PATH"
+        echo -e "${GREEN}✓ Downloaded simed to: $SIMED_LOCAL_PATH${NC}"
         return 0
     else
-        echo -e "${RED}Error: Failed to download baymaxed${NC}"
+        echo -e "${RED}Error: Failed to download simed${NC}"
         return 1
     fi
 }
 
 # Parse command line arguments
-BAYMAXED_PATH=""
+SIMED_PATH=""
 if [ $# -gt 0 ]; then
     # Path provided as argument
-    BAYMAXED_PATH="$1"
-    if [ ! -f "$BAYMAXED_PATH" ]; then
-        echo -e "${RED}Error: baymaxed not found at: $BAYMAXED_PATH${NC}"
+    SIMED_PATH="$1"
+    if [ ! -f "$SIMED_PATH" ]; then
+        echo -e "${RED}Error: simed not found at: $SIMED_PATH${NC}"
         exit 1
     fi
-    echo -e "${GREEN}Using baymaxed from: $BAYMAXED_PATH${NC}"
+    echo -e "${GREEN}Using simed from: $SIMED_PATH${NC}"
 else
     # No argument provided, check if we have a local copy
-    if [ -f "$BAYMAXED_LOCAL_PATH" ]; then
-        echo -e "${GREEN}Using local baymaxed from: $BAYMAXED_LOCAL_PATH${NC}"
-        BAYMAXED_PATH="$BAYMAXED_LOCAL_PATH"
+    if [ -f "$SIMED_LOCAL_PATH" ]; then
+        echo -e "${GREEN}Using local simed from: $SIMED_LOCAL_PATH${NC}"
+        SIMED_PATH="$SIMED_LOCAL_PATH"
     else
-        # Download baymaxed automatically
-        if download_baymaxd; then
-            BAYMAXED_PATH="$BAYMAXED_LOCAL_PATH"
+        # Download simed automatically
+        if download_simd; then
+            SIMED_PATH="$SIMED_LOCAL_PATH"
         else
             exit 1
         fi
@@ -88,27 +88,27 @@ fi
 SECRET="temp_cIo0W4vH0EdxMkOC3gD0M1O0vEwcXo"
 
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║                   Baymax Tailscale Remote Access                    ║${NC}"
+echo -e "${BLUE}║                   Sim Tailscale Remote Access                    ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
-# Check if baymaxed is available (either from provided path or PATH)
-if [ -n "$BAYMAXED_PATH" ]; then
+# Check if simed is available (either from provided path or PATH)
+if [ -n "$SIMED_PATH" ]; then
     # Use the provided path
-    if [ ! -f "$BAYMAXED_PATH" ]; then
-        echo -e "${RED}Error: baymaxed not found at: $BAYMAXED_PATH${NC}"
+    if [ ! -f "$SIMED_PATH" ]; then
+        echo -e "${RED}Error: simed not found at: $SIMED_PATH${NC}"
         exit 1
     fi
-    BAYMAXED_CMD="$BAYMAXED_PATH"
-elif command -v baymaxed &> /dev/null; then
-    # Use baymaxed from PATH
-    BAYMAXED_CMD="baymaxed"
+    SIMED_CMD="$SIMED_PATH"
+elif command -v simed &> /dev/null; then
+    # Use simed from PATH
+    SIMED_CMD="simed"
 else
-    echo -e "${RED}Error: baymaxed not found${NC}"
+    echo -e "${RED}Error: simed not found${NC}"
     echo -e "${YELLOW}Either:${NC}"
-    echo -e "${YELLOW}  1. Provide path to baymaxed as first argument${NC}"
-    echo -e "${YELLOW}  2. Add baymax/target/release to your PATH${NC}"
-    echo -e "${YELLOW}Example: export PATH=\$PATH:${SCRIPT_DIR}/../baymax/target/release${NC}"
+    echo -e "${YELLOW}  1. Provide path to simed as first argument${NC}"
+    echo -e "${YELLOW}  2. Add sim/target/release to your PATH${NC}"
+    echo -e "${YELLOW}Example: export PATH=\$PATH:${SCRIPT_DIR}/../sim/target/release${NC}"
     exit 1
 fi
 
@@ -151,9 +151,9 @@ fi
 # Cleanup function
 cleanup() {
     echo -e "\n${YELLOW}Shutting down...${NC}"
-    if [ ! -z "$BAYMAXED_PID" ]; then
-        echo "Stopping baymaxed (PID: $BAYMAXED_PID)"
-        kill $BAYMAXED_PID 2>/dev/null || true
+    if [ ! -z "$SIMED_PID" ]; then
+        echo "Stopping simed (PID: $SIMED_PID)"
+        kill $SIMED_PID 2>/dev/null || true
     fi
     if [ ! -z "$TAILSCALE_SERVE_PID" ]; then
         echo "Stopping Tailscale serve (PID: $TAILSCALE_SERVE_PID)"
@@ -166,22 +166,22 @@ cleanup() {
 
 trap cleanup SIGINT SIGTERM EXIT
 
-# Start baymaxed in the background
-echo -e "${GREEN}Starting baymaxed on port ${PORT}...${NC}"
-export BAYMAX_PORT=$PORT
-export BAYMAX_SERVER__SECRET_KEY="$SECRET"
-$BAYMAXED_CMD agent > /dev/null 2>&1 &
-BAYMAXED_PID=$!
+# Start simed in the background
+echo -e "${GREEN}Starting simed on port ${PORT}...${NC}"
+export SIM_PORT=$PORT
+export SIM_SERVER__SECRET_KEY="$SECRET"
+$SIMED_CMD agent > /dev/null 2>&1 &
+SIMED_PID=$!
 
-# Wait for baymaxed to be ready
-echo "Waiting for baymaxed to start..."
+# Wait for simed to be ready
+echo "Waiting for simed to start..."
 for i in {1..30}; do
     if curl -s "http://localhost:${PORT}/health" > /dev/null 2>&1; then
-        echo -e "${GREEN}✓ Baymaxed is running (PID: $BAYMAXED_PID)${NC}"
+        echo -e "${GREEN}✓ Simed is running (PID: $SIMED_PID)${NC}"
         break
     fi
     if [ $i -eq 30 ]; then
-        echo -e "${RED}Error: baymaxed failed to start${NC}"
+        echo -e "${RED}Error: simed failed to start${NC}"
         exit 1
     fi
     sleep 0.5
@@ -247,7 +247,7 @@ HOST=$(tailscale --socket $TS_SOCK status --json | jq -r '.Self.DNSName' | sed '
 V4=$(tailscale --socket "$TS_SOCK" ip -4 2>/dev/null | head -n1)
 V6=$(tailscale --socket "$TS_SOCK" ip -6 2>/dev/null | head -n1)
 
-# Setup Tailscale serve to map port 80 to our local baymaxed
+# Setup Tailscale serve to map port 80 to our local simed
 echo -e "${GREEN}Setting up Tailscale serve (port 80 → localhost:${PORT})...${NC}"
 tailscale --socket "$TS_SOCK" serve reset >/dev/null 2>&1 || true
 tailscale --socket "$TS_SOCK" serve --tcp=80 127.0.0.1:$PORT >/dev/null &
@@ -276,7 +276,7 @@ CONFIG_JSON="{\"url\":\"http://${V4}\",\"secret\":\"${SECRET}\"}"
 URL_ENCODED_CONFIG=$(printf %s "$CONFIG_JSON" | jq -sRr @uri)
 
 # Create the app URL for deep linking (matching tunnel.ts format)
-APP_URL="baymaxchat://configure?data=${URL_ENCODED_CONFIG}"
+APP_URL="simchat://configure?data=${URL_ENCODED_CONFIG}"
 
 echo ""
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════════════╗${NC}"

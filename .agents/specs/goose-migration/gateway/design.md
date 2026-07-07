@@ -7,9 +7,9 @@ Migrate goose's multi-channel gateway system, which allows the agent to operate 
 ### Key Architectural Decisions
 
 - **New `crates/gateway/` crate**: The gateway system is self-contained with its own lifecycle. It can optionally depend on the agent but should not be required by it.
-- **Telegram via `teligram-rs` or raw HTTP**: Use the Telegram Bot API directly over HTTP rather than a heavy framework, consistent with baymax's dependency philosophy.
-- **Gateway manager as an Entity**: Following baymax's GPUI patterns, the gateway manager is an `Entity<GatewayManager>` that can be observed.
-- **Optional dependency**: The gateway crate is an optional feature of the baymax application, not a core dependency.
+- **Telegram via `teligram-rs` or raw HTTP**: Use the Telegram Bot API directly over HTTP rather than a heavy framework, consistent with sim's dependency philosophy.
+- **Gateway manager as an Entity**: Following sim's GPUI patterns, the gateway manager is an `Entity<GatewayManager>` that can be observed.
+- **Optional dependency**: The gateway crate is an optional feature of the sim application, not a core dependency.
 
 ## 2. Architecture
 
@@ -28,7 +28,7 @@ graph TD
         User[Telegram User]
     end
 
-    subgraph "baymax Core"
+    subgraph "sim Core"
         Agent[Agent Core]
         Config[Configuration]
     end
@@ -98,8 +98,8 @@ pub struct PairingService {
 }
 
 impl PairingService {
-    pub fn pair_platform_user(&mut self, platform_id: &str, baymax_user: &str) -> Result<()>;
-    pub fn lookup_baymax_user(&self, platform_id: &str) -> Option<String>;
+    pub fn pair_platform_user(&mut self, platform_id: &str, sim_user: &str) -> Result<()>;
+    pub fn lookup_sim_user(&self, platform_id: &str) -> Option<String>;
     pub fn unlink(&mut self, platform_id: &str) -> Result<()>;
 }
 ```

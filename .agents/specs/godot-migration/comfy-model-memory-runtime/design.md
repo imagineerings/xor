@@ -2,7 +2,7 @@
 
 ## Overview
 
-The model runtime is a core harness policy layer around Baymax model and worker services. It preserves Comfy folder names and model-family concepts while reusing Baymax asset indexing, worker diagnostics, and artifact provenance. The model runtime does not own Python environment creation, remote worker launch, sampler/scheduler behavior, or model-family execution semantics; it supplies the model policy and diagnostics consumed by `model-serving-packaging/` and `comfy-diffusion-world-model-runtime/`.
+The model runtime is a core harness policy layer around Sim model and worker services. It preserves Comfy folder names and model-family concepts while reusing Sim asset indexing, worker diagnostics, and artifact provenance. The model runtime does not own Python environment creation, remote worker launch, sampler/scheduler behavior, or model-family execution semantics; it supplies the model policy and diagnostics consumed by `model-serving-packaging/` and `comfy-diffusion-world-model-runtime/`.
 
 ## Architecture
 

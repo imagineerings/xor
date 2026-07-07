@@ -1,11 +1,11 @@
 ---
 title: Terraform
-description: "Configure Terraform language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure Terraform language support in Sim, including language servers, formatting, and debugging."
 ---
 
 # Terraform
 
-Terraform support is available through the [Terraform extension](https://github.com/baymax-extensions/terraform).
+Terraform support is available through the [Terraform extension](https://github.com/sim-extensions/terraform).
 
 - Tree-sitter: [tree-sitter-grammars/tree-sitter-hcl](https://github.com/tree-sitter-grammars/tree-sitter-hcl)
 - Language Server: [hashicorp/terraform-ls](https://github.com/hashicorp/terraform-ls)

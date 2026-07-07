@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Baymax channel chat currently sends only text messages. There is no mechanism to attach, upload, or preview files within channels. Mattermost provides comprehensive file support: upload via drag-and-drop or file picker, inline previews for images/PDFs/video, file metadata display, and file search. Adding file sharing will enable developers to share screenshots, logs, patches, and documents within collaborative channels.
+Sim channel chat currently sends only text messages. There is no mechanism to attach, upload, or preview files within channels. Mattermost provides comprehensive file support: upload via drag-and-drop or file picker, inline previews for images/PDFs/video, file metadata display, and file search. Adding file sharing will enable developers to share screenshots, logs, patches, and documents within collaborative channels.
 
 ## Glossary
 

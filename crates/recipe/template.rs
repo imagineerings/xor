@@ -75,12 +75,12 @@ mod tests {
     fn renders_simple_variables() {
         let variables = HashMap::from([
             ("greeting".to_string(), "Hello".to_string()),
-            ("name".to_string(), "Baymax".to_string()),
+            ("name".to_string(), "Sim".to_string()),
         ]);
 
         let rendered = TemplateEngine::render("{{ greeting }}, {{name}}!", &variables).unwrap();
 
-        assert_eq!(rendered, "Hello, Baymax!");
+        assert_eq!(rendered, "Hello, Sim!");
     }
 
     #[test]
@@ -92,9 +92,9 @@ mod tests {
 
     #[test]
     fn extracts_unique_variables_in_stable_order() {
-        let variables = TemplateEngine::extract_variables("{{ zed }} {{ baymax }} {{ zed }}");
+        let variables = TemplateEngine::extract_variables("{{ zed }} {{ sim }} {{ zed }}");
 
-        assert_eq!(variables, vec!["baymax".to_string(), "zed".to_string()]);
+        assert_eq!(variables, vec!["sim".to_string(), "zed".to_string()]);
     }
 
     #[test]

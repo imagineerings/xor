@@ -16,12 +16,12 @@
 //!   heading containing the rule's title. See
 //!   [`migrate_default_rules_to_agents_md`].
 //!
-//!   **Customibaymax built-in prompts** (currently just
+//!   **Customisim built-in prompts** (currently just
 //!   [`BuiltInPrompt::CommitMessage`]) are treated the same as Default
 //!   user Rules — if the user has edited the body away from the
 //!   built-in's `default_content()`, the edited body is appended to
-//!   AGENTS.md ahead of any user Default Rules. Uncustomibaymax built-ins
-//!   (still using Baymax's shipped default content) are skipped so we don't
+//!   AGENTS.md ahead of any user Default Rules. Uncustomisim built-ins
+//!   (still using Sim's shipped default content) are skipped so we don't
 //!   pollute AGENTS.md with text the user never wrote.
 //!
 //! Both migrations are gated by a single global "migration already ran"
@@ -32,7 +32,7 @@
 //! The migration is intentionally non-destructive: rule rows in the LMDB
 //! database are left in place after the migration. That way users can
 //! still see and edit their Rules via the existing UI, and a user who
-//! downgrades to a Baymax build without skills support won't lose anything.
+//! downgrades to a Sim build without skills support won't lose anything.
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -59,7 +59,7 @@ use strum::IntoEnumIterator as _;
 /// launch.
 pub const MIGRATION_DONE_KEY: &str = "rules_to_skills_migration_done";
 
-/// Global KVP key for the JSON-serialibaymax [`MigrationResult`] produced by
+/// Global KVP key for the JSON-serialisim [`MigrationResult`] produced by
 /// the most recent migration run — the lists of source-Rule titles that
 /// were migrated to each destination. The skills announcement toast
 /// reads this to decide whether to mention the migration in its copy.
@@ -83,10 +83,10 @@ pub struct MigrationResult {
     /// Default Rules that were appended to the global AGENTS.md.
     #[serde(default)]
     pub agents_md_names: Vec<String>,
-    /// Customibaymax built-in prompts whose edited bodies were appended to
+    /// Customisim built-in prompts whose edited bodies were appended to
     /// the top of the global AGENTS.md.
     #[serde(default)]
-    pub customibaymax_builtins: Vec<String>,
+    pub customisim_builtins: Vec<String>,
 }
 
 impl MigrationResult {
@@ -97,7 +97,7 @@ impl MigrationResult {
     pub fn is_empty(&self) -> bool {
         self.skill_names.is_empty()
             && self.agents_md_names.is_empty()
-            && self.customibaymax_builtins.is_empty()
+            && self.customisim_builtins.is_empty()
     }
 }
 
@@ -232,7 +232,7 @@ async fn run_rules_to_skills_migration(
     result.skill_names =
         migrate_non_default_rules_to_skills(fs, prompt_store, cx, non_default_rules).await;
 
-    let (agents_md_names, customibaymax_builtins) = migrate_default_rules_to_agents_md(
+    let (agents_md_names, customisim_builtins) = migrate_default_rules_to_agents_md(
         fs,
         paths::agents_file(),
         prompt_store,
@@ -241,7 +241,7 @@ async fn run_rules_to_skills_migration(
     )
     .await;
     result.agents_md_names = agents_md_names;
-    result.customibaymax_builtins = customibaymax_builtins;
+    result.customisim_builtins = customisim_builtins;
 
     // Persist the result BEFORE the done flag: if we crash between
     // these two writes the next launch will see `done == false` and
@@ -251,10 +251,10 @@ async fn run_rules_to_skills_migration(
     write_migration_result(&result).await;
     mark_migration_done().await;
     log::info!(
-        "Finished rules-to-skills migration; skill_names={}, agents_md_names={}, customibaymax_builtins={}",
+        "Finished rules-to-skills migration; skill_names={}, agents_md_names={}, customisim_builtins={}",
         result.skill_names.len(),
         result.agents_md_names.len(),
-        result.customibaymax_builtins.len()
+        result.customisim_builtins.len()
     );
     Ok(result)
 }
@@ -264,7 +264,7 @@ async fn run_rules_to_skills_migration(
 /// Customization detection is done by trimmed-string comparison so that
 /// whitespace-only differences (e.g. trailing newlines) don't count as a
 /// customization.
-fn is_customibaymax_builtin_body(builtin: BuiltInPrompt, body: &str) -> bool {
+fn is_customisim_builtin_body(builtin: BuiltInPrompt, body: &str) -> bool {
     body.trim() != builtin.default_content().trim()
 }
 
@@ -310,7 +310,7 @@ async fn migrate_non_default_rules_to_skills(
 
 #[derive(Clone, Copy)]
 enum AgentsMdMigrationEntryKind {
-    CustomibaymaxBuiltin,
+    CustomisimBuiltin,
     DefaultUserRule,
 }
 
@@ -320,12 +320,12 @@ enum AgentsMdMigrationEntryKind {
 ///
 /// The appended block contains, in order:
 ///
-/// 1. Each [`BuiltInPrompt`] the user has customibaymax (uncustomibaymax
-///    built-ins are skipped so we don't write Baymax's shipped default text
+/// 1. Each [`BuiltInPrompt`] the user has customisim (uncustomisim
+///    built-ins are skipped so we don't write Sim's shipped default text
 ///    into the user's personal AGENTS.md).
 /// 2. Each user Default Rule, in the order given.
 ///
-/// Returns `(default_user_rule_titles, customibaymax_builtin_titles)` of
+/// Returns `(default_user_rule_titles, customisim_builtin_titles)` of
 /// what actually got appended, for the announcement modal to surface.
 async fn migrate_default_rules_to_agents_md(
     fs: &dyn Fs,
@@ -336,20 +336,20 @@ async fn migrate_default_rules_to_agents_md(
 ) -> (Vec<String>, Vec<String>) {
     let mut entries: Vec<(String, String, AgentsMdMigrationEntryKind)> = Vec::new();
 
-    // Customibaymax built-ins come first.
+    // Customisim built-ins come first.
     for builtin in BuiltInPrompt::iter() {
         let id = PromptId::BuiltIn(builtin);
         let title = builtin.title().to_string();
         let Some(body) = load_rule_body(prompt_store, cx, id, &title).await else {
             continue;
         };
-        if !is_customibaymax_builtin_body(builtin, &body) {
+        if !is_customisim_builtin_body(builtin, &body) {
             continue;
         }
         entries.push((
             title,
             body,
-            AgentsMdMigrationEntryKind::CustomibaymaxBuiltin,
+            AgentsMdMigrationEntryKind::CustomisimBuiltin,
         ));
     }
 
@@ -381,12 +381,12 @@ async fn migrate_default_rules_to_agents_md(
         };
 
     let mut default_user_titles = Vec::new();
-    let mut customibaymax_builtin_titles = Vec::new();
+    let mut customisim_builtin_titles = Vec::new();
     for index in appended_indices {
         let (title, _, kind) = &entries[index];
         match kind {
-            AgentsMdMigrationEntryKind::CustomibaymaxBuiltin => {
-                customibaymax_builtin_titles.push(title.clone());
+            AgentsMdMigrationEntryKind::CustomisimBuiltin => {
+                customisim_builtin_titles.push(title.clone());
             }
             AgentsMdMigrationEntryKind::DefaultUserRule => {
                 default_user_titles.push(title.clone());
@@ -394,7 +394,7 @@ async fn migrate_default_rules_to_agents_md(
         }
     }
 
-    (default_user_titles, customibaymax_builtin_titles)
+    (default_user_titles, customisim_builtin_titles)
 }
 
 async fn load_rule_body(
@@ -878,38 +878,38 @@ mod tests {
     }
 
     #[test]
-    fn is_customibaymax_builtin_body_returns_false_for_exact_default() {
+    fn is_customisim_builtin_body_returns_false_for_exact_default() {
         let default = BuiltInPrompt::CommitMessage.default_content();
-        assert!(!is_customibaymax_builtin_body(
+        assert!(!is_customisim_builtin_body(
             BuiltInPrompt::CommitMessage,
             default,
         ));
     }
 
     #[test]
-    fn is_customibaymax_builtin_body_ignores_surrounding_whitespace() {
+    fn is_customisim_builtin_body_ignores_surrounding_whitespace() {
         // Trailing/leading whitespace doesn't count as a real edit.
         let default = BuiltInPrompt::CommitMessage.default_content();
         let padded = format!("\n\n  {}  \n\n", default.trim());
-        assert!(!is_customibaymax_builtin_body(
+        assert!(!is_customisim_builtin_body(
             BuiltInPrompt::CommitMessage,
             &padded,
         ));
     }
 
     #[test]
-    fn is_customibaymax_builtin_body_returns_true_for_real_edit() {
+    fn is_customisim_builtin_body_returns_true_for_real_edit() {
         let mut edited = BuiltInPrompt::CommitMessage.default_content().to_string();
         edited.push_str("\n\nAlways mention the ticket number.");
-        assert!(is_customibaymax_builtin_body(
+        assert!(is_customisim_builtin_body(
             BuiltInPrompt::CommitMessage,
             &edited,
         ));
     }
 
     #[test]
-    fn is_customibaymax_builtin_body_returns_true_for_completely_different_body() {
-        assert!(is_customibaymax_builtin_body(
+    fn is_customisim_builtin_body_returns_true_for_completely_different_body() {
+        assert!(is_customisim_builtin_body(
             BuiltInPrompt::CommitMessage,
             "Use emoji and rhyming couplets.",
         ));

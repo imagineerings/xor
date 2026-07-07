@@ -9,7 +9,7 @@ on:
   workflow_dispatch: {}
 jobs:
   scheduled_compliance_check:
-    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'baymax-extensions')
+    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'sim-extensions')
     runs-on: namespace-profile-2x4-ubuntu-2404
     steps:
     - name: steps::checkout_repo
@@ -25,9 +25,9 @@ jobs:
     - id: determine-version
       name: compliance_check::scheduled_compliance_check
       run: |
-        VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' crates/baymax/Cargo.toml | tr -d '[:space:]')
+        VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' crates/sim/Cargo.toml | tr -d '[:space:]')
         if [ -z "$VERSION" ]; then
-            echo "Could not determine version from crates/baymax/Cargo.toml"
+            echo "Could not determine version from crates/sim/Cargo.toml"
             exit 1
         fi
         TAG="v${VERSION}-pre"
@@ -38,8 +38,8 @@ jobs:
       run: |
         cargo xtask compliance version "$LATEST_TAG" --branch main --report-path "compliance-report-${GITHUB_REF_NAME}.md"
       env:
-        GITHUB_APP_ID: ${{ secrets.BAYMAX_ZIPPY_APP_ID }}
-        GITHUB_APP_KEY: ${{ secrets.BAYMAX_ZIPPY_APP_PRIVATE_KEY }}
+        GITHUB_APP_ID: ${{ secrets.SIM_ZIPPY_APP_ID }}
+        GITHUB_APP_KEY: ${{ secrets.SIM_ZIPPY_APP_PRIVATE_KEY }}
         LATEST_TAG: ${{ steps.determine-version.outputs.tag }}
       continue-on-error: true
     - name: run_bundling::upload_artifact
@@ -57,7 +57,7 @@ jobs:
             MESSAGE=$(printf "%s\n\nReport: %s" "$STATUS" "$ARTIFACT_URL")
         else
             STATUS="⚠️ Scheduled compliance check failed for $COMPLIANCE_TAG"
-            MESSAGE=$(printf "%s\n\nReport: %s\nPRs needing review: %s" "$STATUS" "$ARTIFACT_URL" "https://github.com/simtropolis/baymax/pulls?q=is%3Apr+is%3Aclosed+label%3A%22PR+state%3Aneeds+review%22")
+            MESSAGE=$(printf "%s\n\nReport: %s\nPRs needing review: %s" "$STATUS" "$ARTIFACT_URL" "https://github.com/simtropolis/sim/pulls?q=is%3Apr+is%3Aclosed+label%3A%22PR+state%3Aneeds+review%22")
         fi
 
         curl -X POST -H 'Content-type: application/json' \

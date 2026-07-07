@@ -1,12 +1,12 @@
 ---
 title: GDScript
-description: "Configure GDScript language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure GDScript language support in Sim, including language servers, formatting, and debugging."
 ---
 
 # GDScript
 
-Godot [GDScript](https://gdscript.com/) language support in Baymax is provided by the community-maintained [GDScript extension](https://github.com/GDQuest/baymax-gdscript).
-Report issues to: [https://github.com/GDQuest/baymax-gdscript/issues](https://github.com/GDQuest/baymax-gdscript/issues)
+Godot [GDScript](https://gdscript.com/) language support in Sim is provided by the community-maintained [GDScript extension](https://github.com/GDQuest/sim-gdscript).
+Report issues to: [https://github.com/GDQuest/sim-gdscript/issues](https://github.com/GDQuest/sim-gdscript/issues)
 
 - Tree-sitter: [PrestonKnopp/tree-sitter-gdscript](https://github.com/PrestonKnopp/tree-sitter-gdscript) and [PrestonKnopp/tree-sitter-godot-resource](https://github.com/PrestonKnopp/tree-sitter-godot-resource)
 - Language Server: [gdscript-language-server](https://github.com/godotengine/godot)
@@ -21,10 +21,10 @@ You will need:
 ## Setup
 
 1. Inside your Godot editor, open Editor Settings, look for `Text Editor -> External` and set the following options:
-   - Exec Path: `/path/to/baymax`
+   - Exec Path: `/path/to/sim`
    - Exec Flags: `{project} {file}:{line}:{col}`
    - Use External Editor: "✅ On"
-2. Open any \*.gd file through Godot and Baymax will launch.
+2. Open any \*.gd file through Godot and Sim will launch.
 
 ## Usage
 

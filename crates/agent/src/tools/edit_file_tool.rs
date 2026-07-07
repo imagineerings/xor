@@ -1213,16 +1213,16 @@ mod tests {
     async fn test_streaming_authorize(cx: &mut TestAppContext) {
         let (edit_tool, _project, _action_log, _fs, _thread) = setup_test(cx, json!({})).await;
 
-        // Test 1: Path with .baymax component should require confirmation
+        // Test 1: Path with .sim component should require confirmation
         let (stream_tx, mut stream_rx) = ToolCallEventStream::test();
         let _auth = cx.update(|cx| {
-            edit_tool.authorize(&PathBuf::from(".baymax/settings.json"), &stream_tx, cx)
+            edit_tool.authorize(&PathBuf::from(".sim/settings.json"), &stream_tx, cx)
         });
 
         let event = stream_rx.expect_authorization().await;
         assert_eq!(
             event.tool_call.fields.title,
-            Some("Edit `.baymax/settings.json` (local settings)".into())
+            Some("Edit `.sim/settings.json` (local settings)".into())
         );
 
         // Test 2: Path outside project should require confirmation
@@ -1236,22 +1236,22 @@ mod tests {
             Some("Edit `/etc/hosts`".into())
         );
 
-        // Test 3: Relative path without .baymax should not require confirmation
+        // Test 3: Relative path without .sim should not require confirmation
         let (stream_tx, mut stream_rx) = ToolCallEventStream::test();
         cx.update(|cx| edit_tool.authorize(&PathBuf::from("root/src/main.rs"), &stream_tx, cx))
             .await
             .unwrap();
         assert!(stream_rx.try_recv().is_err());
 
-        // Test 4: Path with .baymax in the middle should require confirmation
+        // Test 4: Path with .sim in the middle should require confirmation
         let (stream_tx, mut stream_rx) = ToolCallEventStream::test();
         let _auth = cx.update(|cx| {
-            edit_tool.authorize(&PathBuf::from("root/.baymax/tasks.json"), &stream_tx, cx)
+            edit_tool.authorize(&PathBuf::from("root/.sim/tasks.json"), &stream_tx, cx)
         });
         let event = stream_rx.expect_authorization().await;
         assert_eq!(
             event.tool_call.fields.title,
-            Some("Edit `root/.baymax/tasks.json` (local settings)".into())
+            Some("Edit `root/.sim/tasks.json` (local settings)".into())
         );
 
         // Test 5: When global default is allow, sensitive and outside-project
@@ -1262,15 +1262,15 @@ mod tests {
             agent_settings::AgentSettings::override_global(settings, cx);
         });
 
-        // 5.1: .baymax/settings.json is a sensitive path — still prompts
+        // 5.1: .sim/settings.json is a sensitive path — still prompts
         let (stream_tx, mut stream_rx) = ToolCallEventStream::test();
         let _auth = cx.update(|cx| {
-            edit_tool.authorize(&PathBuf::from(".baymax/settings.json"), &stream_tx, cx)
+            edit_tool.authorize(&PathBuf::from(".sim/settings.json"), &stream_tx, cx)
         });
         let event = stream_rx.expect_authorization().await;
         assert_eq!(
             event.tool_call.fields.title,
-            Some("Edit `.baymax/settings.json` (local settings)".into())
+            Some("Edit `.sim/settings.json` (local settings)".into())
         );
 
         // 5.2: /etc/hosts is outside the project, but Allow auto-approves
@@ -1307,7 +1307,7 @@ mod tests {
         // 5.5: .agents/skills is a sensitive path — still prompts. The
         // sensitive-path classifier runs regardless of the default mode, so
         // it doesn't matter that we're now in Confirm mode — we're checking
-        // that the path is recognibaymax and gets the "(agent skills)" tag.
+        // that the path is recognisim and gets the "(agent skills)" tag.
         let (stream_tx, mut stream_rx) = ToolCallEventStream::test();
         let _auth = cx.update(|cx| {
             edit_tool.authorize(
@@ -1396,9 +1396,9 @@ mod tests {
         );
     }
 
-    /// `.baymax/foo/../../safe.json` similarly sidesteps the consecutive-
-    /// component scan for `.baymax/`, so the canonical-path recheck has to
-    /// catch it. (We escape *out* of `.baymax/` here and back in via `..`,
+    /// `.sim/foo/../../safe.json` similarly sidesteps the consecutive-
+    /// component scan for `.sim/`, so the canonical-path recheck has to
+    /// catch it. (We escape *out* of `.sim/` here and back in via `..`,
     /// just to confirm the recheck doesn't naively trust the raw scan.)
     #[gpui::test]
     async fn test_streaming_authorize_blocks_dotdot_settings_bypass(cx: &mut TestAppContext) {
@@ -1407,7 +1407,7 @@ mod tests {
         fs.insert_tree(
             path!("/root"),
             json!({
-                ".baymax": { "foo": {}, "settings.json": "{}" },
+                ".sim": { "foo": {}, "settings.json": "{}" },
             }),
         )
         .await;
@@ -1417,7 +1417,7 @@ mod tests {
         let (stream_tx, mut stream_rx) = ToolCallEventStream::test();
         let _auth = cx.update(|cx| {
             edit_tool.authorize(
-                &PathBuf::from(path!("/root/.baymax/foo/../settings.json")),
+                &PathBuf::from(path!("/root/.sim/foo/../settings.json")),
                 &stream_tx,
                 cx,
             )
@@ -1430,13 +1430,13 @@ mod tests {
                 .title
                 .as_deref()
                 .is_some_and(|title| title.ends_with("(local settings)")),
-            "`..` traversal into .baymax must still prompt: {:?}",
+            "`..` traversal into .sim must still prompt: {:?}",
             event.tool_call.fields.title,
         );
     }
 
-    /// An intra-project symlink like `safe -> .baymax` keeps a path's
-    /// raw components clean of `.baymax`, and `resolve_project_path`
+    /// An intra-project symlink like `safe -> .sim` keeps a path's
+    /// raw components clean of `.sim`, and `resolve_project_path`
     /// (correctly) doesn't flag the symlink as an escape because the
     /// target stays inside the worktree. The canonical-path recheck is
     /// the only thing standing between the agent and a silent settings
@@ -1448,11 +1448,11 @@ mod tests {
         fs.insert_tree(
             path!("/root"),
             json!({
-                ".baymax": { "settings.json": "{}" },
+                ".sim": { "settings.json": "{}" },
             }),
         )
         .await;
-        fs.insert_symlink(path!("/root/safe"), PathBuf::from(".baymax"))
+        fs.insert_symlink(path!("/root/safe"), PathBuf::from(".sim"))
             .await;
         let (edit_tool, _project, _action_log, _fs, _thread) =
             setup_test_with_fs(cx, fs, &[path!("/root").as_ref()]).await;
@@ -1473,7 +1473,7 @@ mod tests {
                 .title
                 .as_deref()
                 .is_some_and(|title| title.ends_with("(local settings)")),
-            "Intra-project symlink to .baymax must still prompt: {:?}",
+            "Intra-project symlink to .sim must still prompt: {:?}",
             event.tool_call.fields.title,
         );
     }
@@ -1784,7 +1784,7 @@ mod tests {
         fs.insert_tree(
             "/workspace/shared",
             json!({
-                ".baymax": {
+                ".sim": {
                     "settings.json": "{}"
                 }
             }),
@@ -1805,9 +1805,9 @@ mod tests {
             ("frontend/src/main.js", false, "File in first worktree"),
             ("backend/src/main.rs", false, "File in second worktree"),
             (
-                "shared/.baymax/settings.json",
+                "shared/.sim/settings.json",
                 true,
-                ".baymax file in third worktree",
+                ".sim file in third worktree",
             ),
             ("/etc/hosts", true, "Absolute path outside all worktrees"),
             (
@@ -1842,11 +1842,11 @@ mod tests {
         fs.insert_tree(
             "/project",
             json!({
-                ".baymax": {
+                ".sim": {
                     "settings.json": "{}"
                 },
                 "src": {
-                    ".baymax": {
+                    ".sim": {
                         "local.json": "{}"
                     }
                 }
@@ -1903,7 +1903,7 @@ mod tests {
             "/project",
             json!({
                 "existing.txt": "content",
-                ".baymax": {
+                ".sim": {
                     "settings.json": "{}"
                 }
             }),
@@ -1915,11 +1915,11 @@ mod tests {
         let modes = vec![EditSessionMode::Edit, EditSessionMode::Write];
 
         for _mode in modes {
-            // Test .baymax path with different modes
+            // Test .sim path with different modes
             let (stream_tx, mut stream_rx) = ToolCallEventStream::test();
             let _auth = cx.update(|cx| {
                 edit_tool.authorize(
-                    &PathBuf::from("project/.baymax/settings.json"),
+                    &PathBuf::from("project/.sim/settings.json"),
                     &stream_tx,
                     cx,
                 )

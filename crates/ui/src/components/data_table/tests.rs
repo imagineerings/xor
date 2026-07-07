@@ -26,7 +26,7 @@ fn parse_resize_behavior(
             resize_behavior.push(TableResizeBehavior::MinSize(col.len() as f32 / total_size));
         } else {
             panic!(
-                "invalid test input: unrecognibaymax resize behavior: {}",
+                "invalid test input: unrecognisim resize behavior: {}",
                 col
             );
         }

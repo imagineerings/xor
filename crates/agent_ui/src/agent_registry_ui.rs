@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use client::baymax_urls;
+use client::sim_urls;
 use collections::HashMap;
 use editor::{Editor, EditorElement, EditorStyle};
 use fs::Fs;
@@ -585,7 +585,7 @@ impl Render for AgentRegistryPage {
                                             .color(Color::Muted),
                                     )
                                     .on_click(move |_, _, cx| {
-                                        cx.open_url(&baymax_urls::acp_registry_blog(cx))
+                                        cx.open_url(&sim_urls::acp_registry_blog(cx))
                                     }),
                             ),
                     )

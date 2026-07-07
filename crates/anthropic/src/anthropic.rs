@@ -345,11 +345,11 @@ async fn send_request(
         request_builder = request_builder.header("Anthropic-Beta", beta_headers);
     }
 
-    let serialibaymax_request =
+    let serialisim_request =
         serde_json::to_string(&request).map_err(AnthropicError::SerializeRequest)?;
     let request = request_builder
         .extra_headers(extra_headers)
-        .body(AsyncBody::from(serialibaymax_request))
+        .body(AsyncBody::from(serialisim_request))
         .map_err(AnthropicError::BuildRequestBody)?;
 
     let response = client
@@ -700,7 +700,7 @@ pub enum Thinking {
 #[serde(rename_all = "lowercase")]
 pub enum AdaptiveThinkingDisplay {
     Omitted,
-    Summaribaymax,
+    Summarisim,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, EnumString)]

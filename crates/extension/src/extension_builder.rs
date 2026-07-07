@@ -276,7 +276,7 @@ impl ExtensionBuilder {
 
         let wasm_extension_api_version =
             parse_wasm_extension_version(&manifest.id, &component_bytes)
-                .context("compiled wasm did not contain a valid baymax extension api version")?;
+                .context("compiled wasm did not contain a valid sim extension api version")?;
         wasm_extension_api_version_tx
             .send(wasm_extension_api_version)
             .map_err(|_| anyhow::anyhow!("Failed to send API version"))?;
@@ -566,7 +566,7 @@ impl ExtensionBuilder {
             name != "name"
                 && !name.starts_with("component-type:")
                 && name != "dylink.0"
-                && name != "baymax:api-version"
+                && name != "sim:api-version"
         };
 
         let mut output = Vec::new();

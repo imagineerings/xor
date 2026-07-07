@@ -716,7 +716,7 @@ impl ContextServerStore {
             let server_url = url.clone();
             let id = id.clone();
             cx.spawn(async move |_this, cx| {
-                let credentials_provider = cx.update(|cx| baymax_credentials_provider::global(cx));
+                let credentials_provider = cx.update(|cx| sim_credentials_provider::global(cx));
                 if let Err(err) = Self::clear_session(&credentials_provider, &server_url, &cx).await
                 {
                     log::warn!("{} failed to clear OAuth session on removal: {}", id, err);
@@ -831,7 +831,7 @@ impl ContextServerStore {
                     None
                 } else {
                     let credentials_provider =
-                        cx.update(|cx| baymax_credentials_provider::global(cx));
+                        cx.update(|cx| sim_credentials_provider::global(cx));
                     let http_client = cx.update(|cx| cx.http_client());
 
                     match Self::load_session(&credentials_provider, url, &cx).await {
@@ -1051,7 +1051,7 @@ impl ContextServerStore {
             async move |this, cx| {
                 if let Some(server_url) = needs_keychain_check {
                     let credentials_provider =
-                        cx.update(|cx| baymax_credentials_provider::global(cx));
+                        cx.update(|cx| sim_credentials_provider::global(cx));
                     let has_keychain_secret =
                         Self::load_client_secret(&credentials_provider, &server_url, cx)
                             .await
@@ -1151,7 +1151,7 @@ impl ContextServerStore {
                 // Store the secret if non-empty (empty means public client / skip).
                 if !secret.is_empty() {
                     let credentials_provider =
-                        cx.update(|cx| baymax_credentials_provider::global(cx));
+                        cx.update(|cx| sim_credentials_provider::global(cx));
                     if let Err(err) =
                         Self::store_client_secret(&credentials_provider, &server_url, &secret, cx)
                             .await
@@ -1184,7 +1184,7 @@ impl ContextServerStore {
                         // Clear the bad secret from the keychain so the user
                         // gets a fresh prompt.
                         let credentials_provider =
-                            cx.update(|cx| baymax_credentials_provider::global(cx));
+                            cx.update(|cx| sim_credentials_provider::global(cx));
                         Self::clear_client_secret(&credentials_provider, &server_url, cx)
                             .await
                             .log_err();
@@ -1254,7 +1254,7 @@ impl ContextServerStore {
             oauth::start_callback_server().context("Failed to start OAuth callback server")?;
 
         let http_client = cx.update(|cx| cx.http_client());
-        let credentials_provider = cx.update(|cx| baymax_credentials_provider::global(cx));
+        let credentials_provider = cx.update(|cx| sim_credentials_provider::global(cx));
         let server_url = match configuration.as_ref() {
             ContextServerConfiguration::Http { url, .. } => url.clone(),
             _ => anyhow::bail!("OAuth authentication only supported for HTTP servers"),
@@ -1476,7 +1476,7 @@ impl ContextServerStore {
         self.stop_server(&id, cx)?;
 
         cx.spawn(async move |this, cx| {
-            let credentials_provider = cx.update(|cx| baymax_credentials_provider::global(cx));
+            let credentials_provider = cx.update(|cx| sim_credentials_provider::global(cx));
             if let Err(err) = Self::clear_session(&credentials_provider, &server_url, &cx).await {
                 log::error!("{} failed to clear OAuth session: {}", id, err);
             }
@@ -1699,7 +1699,7 @@ async fn resolve_start_failure(
     // (e.g. timeout because the server rejected the token silently). Clear it
     // so the next start attempt can get a clean 401 and trigger the auth flow.
     if www_authenticate.is_none() {
-        let credentials_provider = cx.update(|cx| baymax_credentials_provider::global(cx));
+        let credentials_provider = cx.update(|cx| sim_credentials_provider::global(cx));
         match ContextServerStore::load_session(&credentials_provider, &server_url, cx).await {
             Ok(Some(_)) => {
                 log::info!("{id} start failed with a cached OAuth session present; clearing it");

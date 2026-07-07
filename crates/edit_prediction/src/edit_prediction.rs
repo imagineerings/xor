@@ -12,7 +12,7 @@ use cloud_llm_client::predict_edits_v3::{
     PredictEditsV3Response, RawCompletionRequest, RawCompletionResponse,
 };
 use cloud_llm_client::{
-    BAYMAX_VERSION_HEADER_NAME, EditPredictionRejectReason, EditPredictionRejection,
+    SIM_VERSION_HEADER_NAME, EditPredictionRejectReason, EditPredictionRejection,
     MAX_EDIT_PREDICTION_REJECTIONS_PER_REQUEST, MINIMUM_REQUIRED_VERSION_HEADER_NAME,
     PREFERRED_EXPERIMENT_HEADER_NAME, PredictEditsRequestTrigger, RejectEditPredictionsBodyRef,
 };
@@ -84,7 +84,7 @@ mod prediction;
 
 pub mod udiff;
 
-mod baymax_edit_prediction_delegate;
+mod sim_edit_prediction_delegate;
 mod capture_example;
 pub mod open_ai_compatible;
 pub mod zeta;
@@ -103,11 +103,11 @@ use crate::jump_example::{
 use crate::license_detection::LicenseDetectionWatcher;
 use crate::mercury::Mercury;
 pub use crate::metrics::{KeptRateResult, compute_kept_rate};
-use crate::onboarding_modal::BaymaxPredictModal;
+use crate::onboarding_modal::SimPredictModal;
 pub use crate::prediction::EditPrediction;
 pub use crate::prediction::EditPredictionId;
 use crate::prediction::EditPredictionResult;
-pub use baymax_edit_prediction_delegate::BaymaxEditPredictionDelegate;
+pub use sim_edit_prediction_delegate::SimEditPredictionDelegate;
 pub use language_model::ApiKeyState;
 pub use telemetry_events::EditPredictionRating;
 
@@ -129,7 +129,7 @@ const EDIT_HISTORY_DIFF_SIZE_LIMIT: usize = 2048 * 3; // ~2048 tokens or ~50% of
 const COLLABORATOR_EDIT_LOCALITY_CONTEXT_TOKENS: usize = 512;
 const GIT_CHANGED_FILE_SETS_COMMIT_LIMIT: usize = 100;
 const LAST_CHANGE_GROUPING_TIME: Duration = Duration::from_secs(1);
-const BAYMAX_PREDICT_DATA_COLLECTION_CHOICE: &str = "baymax_predict_data_collection_choice";
+const SIM_PREDICT_DATA_COLLECTION_CHOICE: &str = "sim_predict_data_collection_choice";
 const REJECT_REQUEST_DEBOUNCE: Duration = Duration::from_secs(15);
 const REQUEST_TIMEOUT_BACKOFF: Duration = Duration::from_secs(10);
 
@@ -944,7 +944,7 @@ impl EditPredictionStore {
             .log_err();
         });
 
-        let credentials_provider = baymax_credentials_provider::global(cx);
+        let credentials_provider = sim_credentials_provider::global(cx);
 
         let this = Self {
             projects: HashMap::default(),
@@ -975,10 +975,10 @@ impl EditPredictionStore {
     }
 
     fn zeta2_raw_config_from_env() -> Option<Zeta2RawConfig> {
-        let version_str = env::var("BAYMAX_ZETA_FORMAT").ok()?;
+        let version_str = env::var("SIM_ZETA_FORMAT").ok()?;
         let format = ZetaFormat::parse(&version_str).ok()?;
-        let model_id = env::var("BAYMAX_ZETA_MODEL").ok();
-        let environment = env::var("BAYMAX_ZETA_ENVIRONMENT").ok();
+        let model_id = env::var("SIM_ZETA_MODEL").ok();
+        let environment = env::var("SIM_ZETA_ENVIRONMENT").ok();
         Some(Zeta2RawConfig {
             model_id,
             environment,
@@ -1057,14 +1057,14 @@ impl EditPredictionStore {
                         organization_id.ok_or_else(|| anyhow!("No organization selected."))?;
                     let url = client
                         .http_client()
-                        .build_baymax_llm_url("/edit_prediction_experiments", &[])?;
+                        .build_sim_llm_url("/edit_prediction_experiments", &[])?;
                     let mut response = client
                         .authenticated_llm_request(&llm_token, organization_id, |token| {
                             Ok(http_client::Request::builder()
                                 .method(Method::GET)
                                 .uri(url.as_ref())
                                 .header("Authorization", format!("Bearer {token}"))
-                                .header(BAYMAX_VERSION_HEADER_NAME, app_version.to_string())
+                                .header(SIM_VERSION_HEADER_NAME, app_version.to_string())
                                 .body(Default::default())?)
                         })
                         .await?;
@@ -1100,11 +1100,11 @@ impl EditPredictionStore {
                 edit_prediction_types::EditPredictionIconSet::new(IconName::Inception)
             }
             EditPredictionModel::Zeta => {
-                edit_prediction_types::EditPredictionIconSet::new(IconName::BaymaxPredict)
-                    .with_disabled(IconName::BaymaxPredictDisabled)
-                    .with_up(IconName::BaymaxPredictUp)
-                    .with_down(IconName::BaymaxPredictDown)
-                    .with_error(IconName::BaymaxPredictError)
+                edit_prediction_types::EditPredictionIconSet::new(IconName::SimPredict)
+                    .with_disabled(IconName::SimPredictDisabled)
+                    .with_up(IconName::SimPredictUp)
+                    .with_down(IconName::SimPredictDown)
+                    .with_error(IconName::SimPredictError)
             }
             EditPredictionModel::Fim { .. } => {
                 let settings = &all_language_settings(None, cx).edit_predictions;
@@ -1834,7 +1834,7 @@ impl EditPredictionStore {
 
             let url = client
                 .http_client()
-                .build_baymax_llm_url("/predict_edits/reject", &[])
+                .build_sim_llm_url("/predict_edits/reject", &[])
                 .unwrap();
 
             let flush_count = batched
@@ -2014,7 +2014,7 @@ impl EditPredictionStore {
 
                             let url = client
                                 .http_client()
-                                .build_baymax_llm_url("/predict_edits/settled", &[])?;
+                                .build_sim_llm_url("/predict_edits/settled", &[])?;
                             Self::send_api_request::<serde_json::Value>(
                                 |builder| {
                                     Ok(builder
@@ -2459,7 +2459,7 @@ fn currently_following(project: &Entity<Project>, cx: &App) -> bool {
 
 fn is_ep_store_provider(provider: EditPredictionProvider) -> bool {
     match provider {
-        EditPredictionProvider::Baymax
+        EditPredictionProvider::Sim
         | EditPredictionProvider::Mercury
         | EditPredictionProvider::Ollama
         | EditPredictionProvider::OpenAiCompatibleApi => true,
@@ -2498,7 +2498,7 @@ impl EditPredictionStore {
 
         let (needs_acceptance_tracking, max_pending_predictions) =
             match all_language_settings(None, cx).edit_predictions.provider {
-                EditPredictionProvider::Baymax | EditPredictionProvider::Mercury => (true, 2),
+                EditPredictionProvider::Sim | EditPredictionProvider::Mercury => (true, 2),
                 EditPredictionProvider::Ollama => (false, 1),
                 EditPredictionProvider::OpenAiCompatibleApi => (false, 2),
                 EditPredictionProvider::None
@@ -2781,11 +2781,11 @@ impl EditPredictionStore {
             .repository_and_path_for_buffer_id(buffer_id, cx)
             .and_then(|(repo, _)| repo.read(cx).default_remote_url());
 
-        let is_staff_baymax_repo = cx.is_staff()
+        let is_staff_sim_repo = cx.is_staff()
             && repo_url
                 .as_ref()
-                .is_some_and(|url| is_baymax_industries_repo(url));
-        let is_open_source = is_staff_baymax_repo
+                .is_some_and(|url| is_sim_industries_repo(url));
+        let is_open_source = is_staff_sim_repo
             || (snapshot
                 .file()
                 .map_or(false, |file| self.is_file_open_source(&project, file, cx))
@@ -3015,7 +3015,7 @@ impl EditPredictionStore {
         } else {
             client
                 .http_client()
-                .build_baymax_llm_url("/predict_edits/raw", &[])?
+                .build_sim_llm_url("/predict_edits/raw", &[])?
         };
 
         Self::send_api_request(
@@ -3045,7 +3045,7 @@ impl EditPredictionStore {
     ) -> Result<(PredictEditsV3Response, Option<EditPredictionUsage>)> {
         let url = client
             .http_client()
-            .build_baymax_llm_url("/predict_edits/v3", &[])?;
+            .build_sim_llm_url("/predict_edits/v3", &[])?;
 
         let request = PredictEditsV3Request { input };
         let request_id = uuid::Uuid::new_v4().to_string();
@@ -3096,7 +3096,7 @@ impl EditPredictionStore {
                     http_client::Request::builder()
                         .method(Method::POST)
                         .header("Content-Type", "application/json")
-                        .header(BAYMAX_VERSION_HEADER_NAME, app_version.to_string())
+                        .header(SIM_VERSION_HEADER_NAME, app_version.to_string())
                         .header("Authorization", format!("Bearer {token}")),
                 )
             })
@@ -3119,7 +3119,7 @@ impl EditPredictionStore {
         {
             anyhow::ensure!(
                 *app_version >= minimum_required_version,
-                BaymaxUpdateRequiredError {
+                SimUpdateRequiredError {
                     minimum_version: minimum_required_version
                 }
             );
@@ -3300,7 +3300,7 @@ impl EditPredictionStore {
 
     fn load_legacy_data_collection_enabled(cx: &App) -> bool {
         KeyValueStore::global(cx)
-            .read_kvp(BAYMAX_PREDICT_DATA_COLLECTION_CHOICE)
+            .read_kvp(SIM_PREDICT_DATA_COLLECTION_CHOICE)
             .log_err()
             .flatten()
             .as_deref()
@@ -3505,9 +3505,9 @@ fn merge_anchor_ranges(
 
 #[derive(Error, Debug)]
 #[error(
-    "You must update to Baymax version {minimum_version} or higher to continue using edit predictions."
+    "You must update to Sim version {minimum_version} or higher to continue using edit predictions."
 )]
-pub struct BaymaxUpdateRequiredError {
+pub struct SimUpdateRequiredError {
     minimum_version: Version,
 }
 
@@ -3515,28 +3515,28 @@ pub struct BaymaxUpdateRequiredError {
 #[error("Cloud request timed out")]
 pub(crate) struct CloudRequestTimeoutError;
 
-struct BaymaxPredictUpsell;
+struct SimPredictUpsell;
 
 fn is_upsell_dismissed(cx: &App) -> bool {
-    // To make this backwards compatible with older versions of Baymax, we
+    // To make this backwards compatible with older versions of Sim, we
     // check if the user has seen the previous Edit Prediction Onboarding
     // before, by checking the data collection choice which was written to
     // the database once the user clicked on "Accept and Enable"
     let kvp = KeyValueStore::global(cx);
     if kvp
-        .read_kvp(BAYMAX_PREDICT_DATA_COLLECTION_CHOICE)
+        .read_kvp(SIM_PREDICT_DATA_COLLECTION_CHOICE)
         .log_err()
         .is_some_and(|s| s.is_some())
     {
         return true;
     }
 
-    kvp.read_kvp(BaymaxPredictUpsell::KEY)
+    kvp.read_kvp(SimPredictUpsell::KEY)
         .log_err()
         .is_some_and(|s| s.is_some())
 }
 
-impl Dismissable for BaymaxPredictUpsell {
+impl Dismissable for SimPredictUpsell {
     const KEY: &'static str = "dismissed-edit-predict-upsell";
 
     fn dismissed(cx: &App) -> bool {
@@ -3551,8 +3551,8 @@ pub fn should_show_upsell_modal(cx: &App) -> bool {
 pub fn init(cx: &mut App) {
     cx.observe_new(move |workspace: &mut Workspace, _, _cx| {
         workspace.register_action(
-            move |workspace, _: &baymax_actions::OpenBaymaxPredictOnboarding, window, cx| {
-                BaymaxPredictModal::toggle(
+            move |workspace, _: &sim_actions::OpenSimPredictOnboarding, window, cx| {
+                SimPredictModal::toggle(
                     workspace,
                     workspace.user_store().clone(),
                     workspace.client().clone(),
@@ -3597,7 +3597,7 @@ pub fn init(cx: &mut App) {
     .detach();
 }
 
-fn is_baymax_industries_repo(url: &str) -> bool {
+fn is_sim_industries_repo(url: &str) -> bool {
     url.strip_prefix("https://github.com/simtropolis/")
         .or_else(|| url.strip_prefix("http://github.com/simtropolis/"))
         .or_else(|| url.strip_prefix("git@github.com:simtropolis/"))

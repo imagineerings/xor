@@ -12,7 +12,7 @@ use project::{LspStore, lsp_store::LocalLspAdapterDelegate};
 use settings::{LSP_SETTINGS_SCHEMA_URL_PREFIX, Settings as _, SettingsLocation};
 use util::schemars::{AllowTrailingCommas, DefaultDenyUnknownFields};
 
-const SCHEMA_URI_PREFIX: &str = "baymax://schemas/";
+const SCHEMA_URI_PREFIX: &str = "sim://schemas/";
 
 const TSCONFIG_SCHEMA: &str = include_str!("schemas/tsconfig.json");
 const PACKAGE_JSON_SCHEMA: &str = include_str!("schemas/package.json");
@@ -179,7 +179,7 @@ fn resolve_static_schema(path: &str) -> Option<String> {
         "snippets" => Some(SNIPPETS_SCHEMA.clone()),
         "jsonc" => Some(JSONC_SCHEMA.clone()),
         "keymap" => Some(KEYMAP_SCHEMA.clone()),
-        "baymax_inspector_style" => {
+        "sim_inspector_style" => {
             #[cfg(debug_assertions)]
             {
                 Some(INSPECTOR_STYLE_SCHEMA.clone())
@@ -422,7 +422,7 @@ async fn resolve_dynamic_schema(
         }
         "tasks" => task::TaskTemplates::generate_json_schema(),
         _ => {
-            anyhow::bail!("Unrecognibaymax schema: {schema_name}");
+            anyhow::bail!("Unrecognisim schema: {schema_name}");
         }
     };
     Ok(schema)
@@ -511,9 +511,9 @@ pub fn all_schema_file_associations(
             .unwrap()
             .push(serde_json::json!({
                 "fileMatch": [
-                    "baymax-inspector-style.json"
+                    "sim-inspector-style.json"
                 ],
-                "url": format!("{SCHEMA_URI_PREFIX}baymax_inspector_style")
+                "url": format!("{SCHEMA_URI_PREFIX}sim_inspector_style")
             }));
     }
 

@@ -79,9 +79,9 @@ impl Render for SecurityModal {
 
         let restricted_count = self.restricted_paths.len();
         let header_label: SharedString = if restricted_count == 1 {
-            "Unrecognibaymax Project".into()
+            "Unrecognisim Project".into()
         } else {
-            format!("Unrecognibaymax Projects ({})", restricted_count).into()
+            format!("Unrecognisim Projects ({})", restricted_count).into()
         };
 
         let trust_label = self.build_trust_label();
@@ -180,7 +180,7 @@ impl Render for SecurityModal {
                             )
                             .child(
                                 Label::new(
-                                    "Review .baymax/settings.json for any extensions or commands configured by this project.",
+                                    "Review .sim/settings.json for any extensions or commands configured by this project.",
                                 )
                                 .color(Color::Muted),
                             ),

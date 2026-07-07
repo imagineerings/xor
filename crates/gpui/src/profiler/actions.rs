@@ -145,7 +145,7 @@ impl ActionStatistics {
 }
 
 #[doc(hidden)]
-/// UNSTABLE only for use in the profiler and baymax-reliability
+/// UNSTABLE only for use in the profiler and sim-reliability
 #[derive(Copy, Clone)]
 pub struct ActionTiming {
     pub name: &'static str,

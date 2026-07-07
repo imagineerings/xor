@@ -1,11 +1,11 @@
 ---
 title: Go
-description: "Configure Go language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure Go language support in Sim, including language servers, formatting, and debugging."
 ---
 
 # Go
 
-Go support is available natively in Baymax.
+Go support is available natively in Sim.
 
 - Tree-sitter: [tree-sitter/tree-sitter-go](https://github.com/tree-sitter/tree-sitter-go)
 - Language Server: [golang/tools/tree/master/gopls](https://github.com/golang/tools/tree/master/gopls)
@@ -44,7 +44,7 @@ If `gopls` is not found you will likely need to add `export PATH="$PATH:$HOME/go
 
 ## Inlay Hints
 
-Baymax sets the following initialization options for inlay hints:
+Sim sets the following initialization options for inlay hints:
 
 ```json
 "hints": {
@@ -58,7 +58,7 @@ Baymax sets the following initialization options for inlay hints:
 }
 ```
 
-to make the language server send back inlay hints when Baymax has them enabled in the settings.
+to make the language server send back inlay hints when Sim has them enabled in the settings.
 
 Use
 
@@ -80,7 +80,7 @@ See [gopls inlayHints documentation](https://github.com/golang/tools/blob/master
 
 ## Code Lens
 
-Baymax enables the `test` code lens for `gopls` by default. This shows "run test" and "run benchmark" links above `Test` and `Benchmark` functions in `*_test.go` files. To use them, enable the `code_lens` setting:
+Sim enables the `test` code lens for `gopls` by default. This shows "run test" and "run benchmark" links above `Test` and `Benchmark` functions in `*_test.go` files. To use them, enable the `code_lens` setting:
 
 ```json [settings]
 {
@@ -113,9 +113,9 @@ See [gopls code lenses documentation](https://go.dev/gopls/codelenses) for more 
 
 ## Debugging
 
-Baymax supports zero-configuration debugging of Go tests and entry points (`func main`) using Delve. Run {#action debugger::Start} ({#kb debugger::Start}) to see a contextual list of these preconfigured debug tasks.
+Sim supports zero-configuration debugging of Go tests and entry points (`func main`) using Delve. Run {#action debugger::Start} ({#kb debugger::Start}) to see a contextual list of these preconfigured debug tasks.
 
-For more control, you can add debug configurations to `.baymax/debug.json`. See below for examples.
+For more control, you can add debug configurations to `.sim/debug.json`. See below for examples.
 
 - [Delve configuration documentation](https://github.com/go-delve/delve/blob/master/Documentation/api/dap/README.md#launch-and-attach-configurations)
 
@@ -128,7 +128,7 @@ To debug a specific package, you can do so by setting the Delve mode to "debug".
   {
     "label": "Go (Delve)",
     "adapter": "Delve",
-    "program": "$BAYMAX_FILE",
+    "program": "$SIM_FILE",
     "request": "launch",
     "mode": "debug"
   },
@@ -160,7 +160,7 @@ The "program" is still the package name, and you can use the "buildFlags" to do 
     "program": ".",
     "buildFlags": ["-tags", "integration"]
     // To filter down to just the test your cursor is in:
-    // "args": ["-test.run", "$BAYMAX_SYMBOL"]
+    // "args": ["-test.run", "$SIM_SYMBOL"]
   }
 ]
 ```
@@ -177,8 +177,8 @@ and the "build" command should build that.
     "adapter": "Delve",
     "request": "launch",
     "mode": "exec",
-    "program": "${BAYMAX_WORKTREE_ROOT}/__debug_unit",
-    "args": ["-test.v", "-test.run=${BAYMAX_SYMBOL}"],
+    "program": "${SIM_WORKTREE_ROOT}/__debug_unit",
+    "args": ["-test.v", "-test.run=${SIM_SYMBOL}"],
     "build": {
       "command": "go",
       "args": [
@@ -198,15 +198,15 @@ and the "build" command should build that.
 
 ### Attaching to an existing instance of Delve
 
-You might find yourself needing to connect to an existing instance of Delve that's not necessarily running on your machine; in such case, you can use `tcp_arguments` to instrument Baymax's connection to Delve.
+You might find yourself needing to connect to an existing instance of Delve that's not necessarily running on your machine; in such case, you can use `tcp_arguments` to instrument Sim's connection to Delve.
 
 ```json [debug]
 [
   {
     "adapter": "Delve",
     "label": "Connect to a running Delve instance",
-    "program": "/Users/baymax/Projects/language_repositories/golang/hello/hello",
-    "cwd": "/Users/baymax/Projects/language_repositories/golang/hello",
+    "program": "/Users/sim/Projects/language_repositories/golang/hello/hello",
+    "cwd": "/Users/sim/Projects/language_repositories/golang/hello",
     "args": [],
     "env": {},
     "request": "launch",
@@ -217,7 +217,7 @@ You might find yourself needing to connect to an existing instance of Delve that
 ]
 ```
 
-In such case Baymax won't spawn a new instance of Delve, as it opts to use an existing one. The consequence of this is that _there will be no terminal_ in Baymax; you have to interact with the Delve instance directly, as it handles stdin/stdout of the debuggee.
+In such case Sim won't spawn a new instance of Delve, as it opts to use an existing one. The consequence of this is that _there will be no terminal_ in Sim; you have to interact with the Delve instance directly, as it handles stdin/stdout of the debuggee.
 
 ## Go Mod
 

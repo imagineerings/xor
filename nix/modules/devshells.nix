@@ -5,14 +5,14 @@
     let
       # NOTE: Duplicated because this is in a separate flake-parts partition
       # than ./packages.nix
-      mkBaymax = import ../toolchain.nix { inherit inputs; };
-      baymax-editor = mkBaymax pkgs;
+      mkSim = import ../toolchain.nix { inherit inputs; };
+      sim-editor = mkSim pkgs;
 
       rustBin = inputs.rust-overlay.lib.mkRustBin { } pkgs;
       rustToolchain = rustBin.fromRustupToolchainFile ../../rust-toolchain.toml;
 
       baseEnv =
-        (baymax-editor.overrideAttrs (attrs: {
+        (sim-editor.overrideAttrs (attrs: {
           passthru.env = attrs.env;
         })).env; # exfil `env`; it's not in drvAttrs
 
@@ -33,9 +33,9 @@
       };
     in
     {
-      devShells.default = (pkgs.mkShell.override { inherit (baymax-editor) stdenv; }) {
-        name = "baymax-editor-dev";
-        inputsFrom = [ baymax-editor ];
+      devShells.default = (pkgs.mkShell.override { inherit (sim-editor) stdenv; }) {
+        name = "sim-editor-dev";
+        inputsFrom = [ sim-editor ];
 
         packages =
           with pkgs;
@@ -46,10 +46,10 @@
             cargo-hakari
             cargo-machete
             cargo-zigbuild
-            # TODO: package protobuf-language-server for editing baymax.proto
+            # TODO: package protobuf-language-server for editing sim.proto
             # TODO: add other tools used in our scripts
 
-            # `build.nix` adds this to the `baymax-editor` wrapper (see `postFixup`)
+            # `build.nix` adds this to the `sim-editor` wrapper (see `postFixup`)
             # we'll just put it on `$PATH`:
             nodejs_22
             zig
@@ -67,7 +67,7 @@
         env =
           (removeAttrs baseEnv [
             "LK_CUSTOM_WEBRTC" # download the staticlib during the build as usual
-            "BAYMAX_UPDATE_EXPLANATION" # allow auto-updates
+            "SIM_UPDATE_EXPLANATION" # allow auto-updates
             "CARGO_PROFILE" # let you specify the profile
             "TARGET_DIR"
           ])
@@ -81,7 +81,7 @@
               ];
             };
             PROTOC = "${pkgs.protobuf}/bin/protoc";
-            BAYMAX_ZSTD_MUSL_LIB = "${pkgs.pkgsCross.musl64.pkgsStatic.zstd.out}/lib";
+            SIM_ZSTD_MUSL_LIB = "${pkgs.pkgsCross.musl64.pkgsStatic.zstd.out}/lib";
             # For aws-lc-sys musl cross-compilation
             CC_x86_64_unknown_linux_musl = "${muslCross.stdenv.cc}/bin/x86_64-unknown-linux-musl-gcc";
           };

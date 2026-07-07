@@ -1,6 +1,6 @@
 ---
-title: Semantic Tokens and Syntax Highlighting - Baymax
-description: Enable and configure semantic token highlighting in Baymax for richer, language-server-aware syntax coloring.
+title: Semantic Tokens and Syntax Highlighting - Sim
+description: Enable and configure semantic token highlighting in Sim for richer, language-server-aware syntax coloring.
 ---
 
 # Semantic Tokens
@@ -45,10 +45,10 @@ You can configure this globally or per-language:
 
 ## Customizing Token Colors
 
-Semantic tokens are styled using rules that map LSP token types and modifiers to theme styles or custom colors. Baymax provides sensible defaults, but you can customize these in your settings.json: add rules under `global_lsp_settings.semantic_token_rules` key.
+Semantic tokens are styled using rules that map LSP token types and modifiers to theme styles or custom colors. Sim provides sensible defaults, but you can customize these in your settings.json: add rules under `global_lsp_settings.semantic_token_rules` key.
 
 Rules are matched in order, and the first matching rule wins.
-User-defined rules take highest precedence, followed by extension-provided language rules, then Baymax defaults.
+User-defined rules take highest precedence, followed by extension-provided language rules, then Sim defaults.
 
 ### Rule Structure
 
@@ -143,18 +143,18 @@ Since user rules take highest precedence and the first match wins, this empty ru
 
 ## Default Rules
 
-Baymax's default semantic token rules map standard LSP token types to common theme styles. For example:
+Sim's default semantic token rules map standard LSP token types to common theme styles. For example:
 
 - `function` → `function` style
 - `variable` with `constant` modifier → `constant` style
 - `class` → `type.class`, `class`, or `type` style (first found)
 - `comment` with `documentation` modifier → `comment.documentation` or `comment.doc` style
 
-The full default configuration can be shown in Baymax with the {#action baymax::ShowDefaultSemanticTokenRules} command.
+The full default configuration can be shown in Sim with the {#action sim::ShowDefaultSemanticTokenRules} command.
 
 ## Standard Token Types
 
-Language servers report tokens using standardibaymax types. Common types include:
+Language servers report tokens using standardisim types. Common types include:
 
 | Type            | Description                        |
 | --------------- | ---------------------------------- |
@@ -201,4 +201,4 @@ Changes to `semantic_tokens` mode may require a language server restart. Use {#a
 
 ### Theme styles not being applied
 
-Ensure the style names in your rules match styles defined in your theme. The `style` array provides fallback options—if the first style isn't found, Baymax tries the next one.
+Ensure the style names in your rules match styles defined in your theme. The `style` array provides fallback options—if the first style isn't found, Sim tries the next one.

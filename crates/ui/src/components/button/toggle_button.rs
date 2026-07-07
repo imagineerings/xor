@@ -455,17 +455,17 @@ impl<T: ButtonBuilder, const COLS: usize, const ROWS: usize> Component
                             [
                                 ToggleButtonWithIcon::new(
                                     "First",
-                                    IconName::AiBaymax,
+                                    IconName::AiSim,
                                     |_, _, _| {},
                                 ),
                                 ToggleButtonWithIcon::new(
                                     "Second",
-                                    IconName::AiBaymax,
+                                    IconName::AiSim,
                                     |_, _, _| {},
                                 ),
                                 ToggleButtonWithIcon::new(
                                     "Third",
-                                    IconName::AiBaymax,
+                                    IconName::AiSim,
                                     |_, _, _| {},
                                 ),
                             ],
@@ -498,34 +498,34 @@ impl<T: ButtonBuilder, const COLS: usize, const ROWS: usize> Component
                             [
                                 ToggleButtonWithIcon::new(
                                     "First",
-                                    IconName::AiBaymax,
+                                    IconName::AiSim,
                                     |_, _, _| {},
                                 ),
                                 ToggleButtonWithIcon::new(
                                     "Second",
-                                    IconName::AiBaymax,
+                                    IconName::AiSim,
                                     |_, _, _| {},
                                 ),
                                 ToggleButtonWithIcon::new(
                                     "Third",
-                                    IconName::AiBaymax,
+                                    IconName::AiSim,
                                     |_, _, _| {},
                                 ),
                             ],
                             [
                                 ToggleButtonWithIcon::new(
                                     "Fourth",
-                                    IconName::AiBaymax,
+                                    IconName::AiSim,
                                     |_, _, _| {},
                                 ),
                                 ToggleButtonWithIcon::new(
                                     "Fifth",
-                                    IconName::AiBaymax,
+                                    IconName::AiSim,
                                     |_, _, _| {},
                                 ),
                                 ToggleButtonWithIcon::new(
                                     "Sixth",
-                                    IconName::AiBaymax,
+                                    IconName::AiSim,
                                     |_, _, _| {},
                                 ),
                             ],
@@ -559,17 +559,17 @@ impl<T: ButtonBuilder, const COLS: usize, const ROWS: usize> Component
                             [
                                 ToggleButtonWithIcon::new(
                                     "First",
-                                    IconName::AiBaymax,
+                                    IconName::AiSim,
                                     |_, _, _| {},
                                 ),
                                 ToggleButtonWithIcon::new(
                                     "Second",
-                                    IconName::AiBaymax,
+                                    IconName::AiSim,
                                     |_, _, _| {},
                                 ),
                                 ToggleButtonWithIcon::new(
                                     "Third",
-                                    IconName::AiBaymax,
+                                    IconName::AiSim,
                                     |_, _, _| {},
                                 ),
                             ],
@@ -604,34 +604,34 @@ impl<T: ButtonBuilder, const COLS: usize, const ROWS: usize> Component
                             [
                                 ToggleButtonWithIcon::new(
                                     "First",
-                                    IconName::AiBaymax,
+                                    IconName::AiSim,
                                     |_, _, _| {},
                                 ),
                                 ToggleButtonWithIcon::new(
                                     "Second",
-                                    IconName::AiBaymax,
+                                    IconName::AiSim,
                                     |_, _, _| {},
                                 ),
                                 ToggleButtonWithIcon::new(
                                     "Third",
-                                    IconName::AiBaymax,
+                                    IconName::AiSim,
                                     |_, _, _| {},
                                 ),
                             ],
                             [
                                 ToggleButtonWithIcon::new(
                                     "Fourth",
-                                    IconName::AiBaymax,
+                                    IconName::AiSim,
                                     |_, _, _| {},
                                 ),
                                 ToggleButtonWithIcon::new(
                                     "Fifth",
-                                    IconName::AiBaymax,
+                                    IconName::AiSim,
                                     |_, _, _| {},
                                 ),
                                 ToggleButtonWithIcon::new(
                                     "Sixth",
-                                    IconName::AiBaymax,
+                                    IconName::AiSim,
                                     |_, _, _| {},
                                 ),
                             ],
@@ -666,17 +666,17 @@ impl<T: ButtonBuilder, const COLS: usize, const ROWS: usize> Component
                             [
                                 ToggleButtonWithIcon::new(
                                     "First",
-                                    IconName::AiBaymax,
+                                    IconName::AiSim,
                                     |_, _, _| {},
                                 ),
                                 ToggleButtonWithIcon::new(
                                     "Second",
-                                    IconName::AiBaymax,
+                                    IconName::AiSim,
                                     |_, _, _| {},
                                 ),
                                 ToggleButtonWithIcon::new(
                                     "Third",
-                                    IconName::AiBaymax,
+                                    IconName::AiSim,
                                     |_, _, _| {},
                                 ),
                             ],
@@ -712,34 +712,34 @@ impl<T: ButtonBuilder, const COLS: usize, const ROWS: usize> Component
                             [
                                 ToggleButtonWithIcon::new(
                                     "First",
-                                    IconName::AiBaymax,
+                                    IconName::AiSim,
                                     |_, _, _| {},
                                 ),
                                 ToggleButtonWithIcon::new(
                                     "Second",
-                                    IconName::AiBaymax,
+                                    IconName::AiSim,
                                     |_, _, _| {},
                                 ),
                                 ToggleButtonWithIcon::new(
                                     "Third",
-                                    IconName::AiBaymax,
+                                    IconName::AiSim,
                                     |_, _, _| {},
                                 ),
                             ],
                             [
                                 ToggleButtonWithIcon::new(
                                     "Fourth",
-                                    IconName::AiBaymax,
+                                    IconName::AiSim,
                                     |_, _, _| {},
                                 ),
                                 ToggleButtonWithIcon::new(
                                     "Fifth",
-                                    IconName::AiBaymax,
+                                    IconName::AiSim,
                                     |_, _, _| {},
                                 ),
                                 ToggleButtonWithIcon::new(
                                     "Sixth",
-                                    IconName::AiBaymax,
+                                    IconName::AiSim,
                                     |_, _, _| {},
                                 ),
                             ],

@@ -280,7 +280,6 @@ dependencies = [
  "assets",
  "async-channel 2.5.0",
  "async-io",
- "baymax_env_vars",
  "chrono",
  "client",
  "clock",
@@ -328,6 +327,7 @@ dependencies = [
  "serde_json",
  "settings",
  "shell_command_parser",
+ "sim_env_vars",
  "smallvec 1.15.2",
  "sqlez",
  "streaming_diff",
@@ -407,7 +407,6 @@ dependencies = [
  "agent-client-protocol",
  "anyhow",
  "async-channel 2.5.0",
- "baymax_credentials_provider",
  "chrono",
  "client",
  "collections",
@@ -431,6 +430,7 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
+ "sim_credentials_provider",
  "task",
  "tempfile",
  "terminal",
@@ -498,7 +498,6 @@ dependencies = [
  "async-channel 2.5.0",
  "audio",
  "base64 0.22.1",
- "baymax_actions",
  "buffer_diff",
  "chrono",
  "client",
@@ -565,6 +564,7 @@ dependencies = [
  "serde_json",
  "serde_json_lenient",
  "settings",
+ "sim_actions",
  "streaming_diff",
  "task",
  "telemetry",
@@ -626,13 +626,13 @@ dependencies = [
 name = "ai_onboarding"
 version = "0.1.0"
 dependencies = [
- "baymax_actions",
  "client",
  "cloud_api_types",
  "component",
  "gpui",
  "language_model",
  "serde",
+ "sim_actions",
  "smallvec 1.15.2",
  "telemetry",
  "ui",
@@ -1462,7 +1462,6 @@ dependencies = [
  "agent_skills",
  "anyhow",
  "auto_update",
- "baymax_actions",
  "client",
  "db",
  "editor",
@@ -1474,6 +1473,7 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
+ "sim_actions",
  "smol",
  "telemetry",
  "ui",
@@ -2170,278 +2170,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
 
 [[package]]
-name = "baymax"
-version = "1.7.2"
-dependencies = [
- "acp_thread",
- "acp_tools",
- "action_log",
- "activity_indicator",
- "agent",
- "agent-client-protocol",
- "agent_servers",
- "agent_settings",
- "agent_skills",
- "agent_ui",
- "anyhow",
- "ashpd",
- "askpass",
- "assets",
- "audio",
- "auto_update",
- "auto_update_ui",
- "baymax_actions",
- "baymax_apps",
- "baymax_env_vars",
- "breadcrumbs",
- "call",
- "channel",
- "chrono",
- "clap",
- "cli",
- "client",
- "clock",
- "codestral",
- "collab_ui",
- "collections",
- "command_palette",
- "component",
- "component_preview",
- "copilot",
- "copilot_chat",
- "copilot_ui",
- "crashes",
- "csv_preview",
- "dap_adapters",
- "db",
- "debug_adapter_extension",
- "debugger_tools",
- "debugger_ui",
- "dev_container",
- "diagnostics",
- "edit_prediction",
- "edit_prediction_ui",
- "editor",
- "encoding_selector",
- "env_logger 0.11.10",
- "etw_tracing",
- "extension",
- "extension_host",
- "extensions_ui",
- "feature_flags",
- "feedback",
- "file_finder",
- "fs",
- "futures 0.3.32",
- "gateway",
- "git",
- "git_hosting_providers",
- "git_ui",
- "go_to_line",
- "gpui",
- "gpui_platform",
- "gpui_tokio",
- "hdrhistogram",
- "http_client",
- "image",
- "image_viewer",
- "input_latency_ui",
- "inspector_ui",
- "install_cli",
- "itertools 0.14.0",
- "journal",
- "json_schema_store",
- "keymap_editor",
- "language",
- "language_extension",
- "language_model",
- "language_models",
- "language_onboarding",
- "language_selector",
- "language_tools",
- "languages",
- "line_ending_selector",
- "log",
- "markdown",
- "markdown_preview",
- "menu",
- "migrator",
- "mimalloc",
- "miniprofiler_ui",
- "mobile_tunnel",
- "node_runtime",
- "notifications",
- "onboarding",
- "outline",
- "outline_panel",
- "parking_lot",
- "paths",
- "picker",
- "pkg-config",
- "pretty_assertions",
- "profiling",
- "project",
- "project_panel",
- "project_symbols",
- "prompt_store",
- "proto",
- "rayon",
- "recent_projects",
- "release_channel",
- "remote",
- "repl",
- "reqwest_client",
- "rope",
- "search",
- "semver",
- "serde",
- "serde_json",
- "session",
- "settings",
- "settings_profile_selector",
- "settings_ui",
- "shellexpand",
- "sidebar",
- "smol",
- "snippet_provider",
- "snippets_ui",
- "svg_preview",
- "sysinfo 0.37.2",
- "system_specs",
- "tab_switcher",
- "task",
- "tasks_ui",
- "telemetry",
- "telemetry_events",
- "tempfile",
- "terminal_view",
- "theme",
- "theme_extension",
- "theme_selector",
- "theme_settings",
- "time",
- "time_format",
- "title_bar",
- "toolchain_selector",
- "tracing",
- "ui",
- "ui_prompt",
- "url",
- "urlencoding",
- "util",
- "uuid",
- "vim",
- "vim_mode_setting",
- "watch",
- "web_search",
- "web_search_providers",
- "which_key",
- "windows 0.61.3",
- "windows_resources",
- "workspace",
- "zed-reqwest",
- "zlog",
- "zlog_settings",
- "ztracing",
-]
-
-[[package]]
-name = "baymax_actions"
-version = "0.1.0"
-dependencies = [
- "gpui",
- "schemars 1.2.1",
- "serde",
- "util",
-]
-
-[[package]]
-name = "baymax_apps"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "gpui",
- "serde",
- "serde_json",
- "ui",
- "util",
-]
-
-[[package]]
-name = "baymax_credentials_provider"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "credentials_provider",
- "futures 0.3.32",
- "gpui",
- "paths",
- "release_channel",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "baymax_env_vars"
-version = "0.1.0"
-dependencies = [
- "env_var",
-]
-
-[[package]]
-name = "baymax_game"
-version = "0.1.0"
-dependencies = [
- "pretty_assertions",
- "serde",
-]
-
-[[package]]
-name = "baymax_glsl"
-version = "0.2.4"
-dependencies = [
- "zed_extension_api 0.1.0",
-]
-
-[[package]]
-name = "baymax_html"
-version = "0.3.1"
-dependencies = [
- "zed_extension_api 0.7.0",
-]
-
-[[package]]
-name = "baymax_proto"
-version = "0.3.2"
-dependencies = [
- "zed_extension_api 0.7.0",
-]
-
-[[package]]
-name = "baymax_server"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "futures 0.3.32",
- "recipe",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "tokio",
- "tower 0.4.13",
- "tower-http 0.4.4",
-]
-
-[[package]]
-name = "baymax_test_extension"
-version = "0.1.0"
-dependencies = [
- "zed_extension_api 0.8.0",
-]
-
-[[package]]
 name = "bedrock"
 version = "0.1.0"
 dependencies = [
@@ -2465,7 +2193,6 @@ dependencies = [
  "agent",
  "agent_settings",
  "assets",
- "baymax_actions",
  "criterion",
  "editor",
  "futures 0.3.32",
@@ -2481,6 +2208,7 @@ dependencies = [
  "rand 0.9.4",
  "serde_json",
  "settings",
+ "sim_actions",
  "text",
  "theme",
  "theme_settings",
@@ -3485,7 +3213,6 @@ dependencies = [
  "async-channel 2.5.0",
  "async-tungstenite",
  "base64 0.22.1",
- "baymax_credentials_provider",
  "chrono",
  "clock",
  "cloud_api_client",
@@ -3518,6 +3245,7 @@ dependencies = [
  "serde_urlencoded",
  "settings",
  "sha2 0.10.9",
+ "sim_credentials_provider",
  "smol",
  "telemetry",
  "telemetry_events",
@@ -3690,7 +3418,6 @@ name = "codestral"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "baymax_credentials_provider",
  "edit_prediction",
  "edit_prediction_types",
  "futures 0.3.32",
@@ -3702,6 +3429,7 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
+ "sim_credentials_provider",
  "text",
  "zeta_prompt",
 ]
@@ -3719,7 +3447,6 @@ dependencies = [
  "aws-sdk-kinesis",
  "aws-sdk-s3",
  "axum",
- "baymax_actions",
  "buffer_diff",
  "call",
  "channel",
@@ -3782,6 +3509,7 @@ dependencies = [
  "session",
  "settings",
  "sha2 0.10.9",
+ "sim_actions",
  "smol",
  "sqlx",
  "strum 0.27.2",
@@ -3810,7 +3538,6 @@ name = "collab_ui"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "baymax_actions",
  "call",
  "channel",
  "client",
@@ -3831,6 +3558,7 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
+ "sim_actions",
  "smallvec 1.15.2",
  "telemetry",
  "theme",
@@ -3888,7 +3616,6 @@ name = "command_palette"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "baymax_actions",
  "client",
  "collections",
  "command_palette_hooks",
@@ -3905,6 +3632,7 @@ dependencies = [
  "project",
  "serde",
  "settings",
+ "sim_actions",
  "telemetry",
  "theme",
  "theme_settings",
@@ -5211,13 +4939,13 @@ name = "db"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "baymax_env_vars",
  "gpui",
  "indoc",
  "inventory",
  "log",
  "paths",
  "release_channel",
+ "sim_env_vars",
  "sqlez",
  "sqlez_macros",
  "tempfile",
@@ -5273,7 +5001,6 @@ name = "debugger_ui"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "baymax_actions",
  "bitflags 2.13.0",
  "client",
  "collections",
@@ -5307,6 +5034,7 @@ dependencies = [
  "serde_json",
  "serde_json_lenient",
  "settings",
+ "sim_actions",
  "sysinfo 0.37.2",
  "task",
  "tasks_ui",
@@ -5520,7 +5248,6 @@ version = "0.1.0"
 dependencies = [
  "agent_settings",
  "anyhow",
- "baymax_actions",
  "collections",
  "component",
  "ctor",
@@ -5539,6 +5266,7 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
+ "sim_actions",
  "text",
  "theme",
  "theme_settings",
@@ -5856,8 +5584,6 @@ version = "0.1.0"
 dependencies = [
  "ai_onboarding",
  "anyhow",
- "baymax_actions",
- "baymax_credentials_provider",
  "buffer_diff",
  "client",
  "clock",
@@ -5902,6 +5628,8 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
+ "sim_actions",
+ "sim_credentials_provider",
  "strum 0.27.2",
  "telemetry",
  "telemetry_events",
@@ -6041,7 +5769,6 @@ name = "edit_prediction_ui"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "baymax_actions",
  "buffer_diff",
  "client",
  "cloud_llm_client",
@@ -6067,6 +5794,7 @@ dependencies = [
  "project",
  "regex",
  "settings",
+ "sim_actions",
  "telemetry",
  "text",
  "theme",
@@ -6086,7 +5814,6 @@ dependencies = [
  "anyhow",
  "assets",
  "base64 0.22.1",
- "baymax_actions",
  "breadcrumbs",
  "buffer_diff",
  "client",
@@ -6132,6 +5859,7 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
+ "sim_actions",
  "smallvec 1.15.2",
  "snippet",
  "sum_tree",
@@ -6755,7 +6483,6 @@ name = "extensions_ui"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "baymax_actions",
  "cloud_api_types",
  "collections",
  "db",
@@ -6774,6 +6501,7 @@ dependencies = [
  "semver",
  "serde",
  "settings",
+ "sim_actions",
  "smallvec 1.15.2",
  "strum 0.27.2",
  "telemetry",
@@ -6892,10 +6620,10 @@ dependencies = [
 name = "feedback"
 version = "0.1.0"
 dependencies = [
- "baymax_actions",
  "client",
  "extension_host",
  "gpui",
+ "sim_actions",
  "system_specs",
  "urlencoding",
  "util",
@@ -6917,7 +6645,6 @@ name = "file_finder"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "baymax_actions",
  "channel",
  "client",
  "collections",
@@ -6939,6 +6666,7 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
+ "sim_actions",
  "theme",
  "theme_settings",
  "ui",
@@ -7728,7 +7456,6 @@ dependencies = [
  "anyhow",
  "askpass",
  "async-channel 2.5.0",
- "baymax_actions",
  "buffer_diff",
  "call",
  "collections",
@@ -7769,6 +7496,7 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
+ "sim_actions",
  "smallvec 1.15.2",
  "strum 0.27.2",
  "sysinfo 0.37.2",
@@ -9366,7 +9094,6 @@ name = "inspector_ui"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "baymax_actions",
  "command_palette_hooks",
  "editor",
  "fuzzy",
@@ -9375,6 +9102,7 @@ dependencies = [
  "project",
  "serde_json",
  "serde_json_lenient",
+ "sim_actions",
  "theme_settings",
  "ui",
  "util",
@@ -9839,7 +9567,6 @@ name = "keymap_editor"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "baymax_actions",
  "collections",
  "command_palette",
  "component",
@@ -9860,6 +9587,7 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
+ "sim_actions",
  "telemetry",
  "tempfile",
  "theme",
@@ -10273,7 +10001,6 @@ name = "language_tools"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "baymax_actions",
  "client",
  "collections",
  "command_palette_hooks",
@@ -10291,6 +10018,7 @@ dependencies = [
  "semver",
  "serde_json",
  "settings",
+ "sim_actions",
  "sysinfo 0.37.2",
  "telemetry",
  "theme",
@@ -11001,7 +10729,6 @@ name = "markdown_preview"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "baymax_actions",
  "editor",
  "fs",
  "gpui",
@@ -11011,6 +10738,7 @@ dependencies = [
  "project",
  "serde_json",
  "settings",
+ "sim_actions",
  "tempfile",
  "theme",
  "theme_settings",
@@ -11440,12 +11168,12 @@ checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
 name = "miniprofiler_ui"
 version = "0.1.0"
 dependencies = [
- "baymax_actions",
  "command_palette_hooks",
  "gpui",
  "rpc",
  "serde_json",
  "settings",
+ "sim_actions",
  "smol",
  "theme_settings",
  "util",
@@ -11855,13 +11583,13 @@ name = "notifications"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "baymax_actions",
  "channel",
  "client",
  "component",
  "futures-lite 1.13.0",
  "gpui",
  "rpc",
+ "sim_actions",
  "sum_tree",
  "time",
  "ui",
@@ -12530,7 +12258,6 @@ name = "onboarding"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "baymax_actions",
  "client",
  "cloud_api_types",
  "collections",
@@ -12547,6 +12274,7 @@ dependencies = [
  "schemars 1.2.1",
  "serde",
  "settings",
+ "sim_actions",
  "telemetry",
  "theme",
  "theme_settings",
@@ -12843,7 +12571,6 @@ dependencies = [
 name = "outline"
 version = "0.1.0"
 dependencies = [
- "baymax_actions",
  "editor",
  "futures 0.3.32",
  "fuzzy_nucleo",
@@ -12857,6 +12584,7 @@ dependencies = [
  "rope",
  "serde_json",
  "settings",
+ "sim_actions",
  "theme",
  "theme_settings",
  "ui",
@@ -12870,7 +12598,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-channel 2.5.0",
- "baymax_actions",
  "collections",
  "db",
  "editor",
@@ -12890,6 +12617,7 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
+ "sim_actions",
  "smallvec 1.15.2",
  "theme",
  "theme_settings",
@@ -13822,13 +13550,13 @@ name = "picker"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "baymax_actions",
  "editor",
  "gpui",
  "menu",
  "schemars 1.2.1",
  "serde",
  "settings",
+ "sim_actions",
  "theme",
  "theme_settings",
  "ui",
@@ -13922,10 +13650,10 @@ checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
 name = "platform_title_bar"
 version = "0.1.0"
 dependencies = [
- "baymax_actions",
  "gpui",
  "project",
  "settings",
+ "sim_actions",
  "smallvec 1.15.2",
  "theme",
  "theme_settings",
@@ -14334,7 +14062,6 @@ dependencies = [
  "async-channel 2.5.0",
  "async-trait",
  "base64 0.22.1",
- "baymax_credentials_provider",
  "buffer_diff",
  "circular-buffer",
  "client",
@@ -14382,6 +14109,7 @@ dependencies = [
  "settings",
  "sha2 0.10.9",
  "shellexpand",
+ "sim_credentials_provider",
  "smallvec 1.15.2",
  "smol",
  "snippet",
@@ -14433,7 +14161,6 @@ name = "project_panel"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "baymax_actions",
  "client",
  "collections",
  "command_palette_hooks",
@@ -14459,6 +14186,7 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
+ "sim_actions",
  "smallvec 1.15.2",
  "telemetry",
  "tempfile",
@@ -15252,7 +14980,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "askpass",
- "baymax_actions",
  "chrono",
  "db",
  "dev_container",
@@ -15282,6 +15009,7 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
+ "sim_actions",
  "task",
  "telemetry",
  "ui",
@@ -15600,7 +15328,6 @@ dependencies = [
  "async-trait",
  "async-tungstenite",
  "base64 0.22.1",
- "baymax_actions",
  "client",
  "collections",
  "command_palette_hooks",
@@ -15630,6 +15357,7 @@ dependencies = [
  "serde_json",
  "settings",
  "shlex 1.3.0",
+ "sim_actions",
  "smol",
  "task",
  "telemetry",
@@ -16593,7 +16321,6 @@ version = "0.1.0"
 dependencies = [
  "any_vec",
  "anyhow",
- "baymax_actions",
  "bitflags 2.13.0",
  "collections",
  "editor",
@@ -16611,6 +16338,7 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
+ "sim_actions",
  "theme",
  "theme_settings",
  "tracing",
@@ -17024,7 +16752,6 @@ dependencies = [
 name = "settings_profile_selector"
 version = "0.1.0"
 dependencies = [
- "baymax_actions",
  "editor",
  "fuzzy",
  "gpui",
@@ -17033,6 +16760,7 @@ dependencies = [
  "project",
  "serde_json",
  "settings",
+ "sim_actions",
  "theme",
  "theme_settings",
  "ui",
@@ -17048,8 +16776,6 @@ dependencies = [
  "agent_skills",
  "anyhow",
  "audio",
- "baymax_actions",
- "baymax_credentials_provider",
  "cloud_api_types",
  "codestral",
  "component",
@@ -17088,6 +16814,8 @@ dependencies = [
  "serde_yaml_ng",
  "settings",
  "shell_command_parser",
+ "sim_actions",
+ "sim_credentials_provider",
  "strum 0.27.2",
  "telemetry",
  "theme",
@@ -17241,7 +16969,6 @@ dependencies = [
  "agent_ui",
  "anyhow",
  "async-channel 2.5.0",
- "baymax_actions",
  "chrono",
  "client",
  "clock",
@@ -17273,6 +17000,7 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
+ "sim_actions",
  "telemetry",
  "theme",
  "theme_settings",
@@ -17310,6 +17038,278 @@ checksum = "77549399552de45a898a580c1b41d445bf730df867cc44e6c0233bbc4b8329de"
 dependencies = [
  "digest 0.10.7",
  "rand_core 0.6.4",
+]
+
+[[package]]
+name = "sim"
+version = "1.7.2"
+dependencies = [
+ "acp_thread",
+ "acp_tools",
+ "action_log",
+ "activity_indicator",
+ "agent",
+ "agent-client-protocol",
+ "agent_servers",
+ "agent_settings",
+ "agent_skills",
+ "agent_ui",
+ "anyhow",
+ "ashpd",
+ "askpass",
+ "assets",
+ "audio",
+ "auto_update",
+ "auto_update_ui",
+ "breadcrumbs",
+ "call",
+ "channel",
+ "chrono",
+ "clap",
+ "cli",
+ "client",
+ "clock",
+ "codestral",
+ "collab_ui",
+ "collections",
+ "command_palette",
+ "component",
+ "component_preview",
+ "copilot",
+ "copilot_chat",
+ "copilot_ui",
+ "crashes",
+ "csv_preview",
+ "dap_adapters",
+ "db",
+ "debug_adapter_extension",
+ "debugger_tools",
+ "debugger_ui",
+ "dev_container",
+ "diagnostics",
+ "edit_prediction",
+ "edit_prediction_ui",
+ "editor",
+ "encoding_selector",
+ "env_logger 0.11.10",
+ "etw_tracing",
+ "extension",
+ "extension_host",
+ "extensions_ui",
+ "feature_flags",
+ "feedback",
+ "file_finder",
+ "fs",
+ "futures 0.3.32",
+ "gateway",
+ "git",
+ "git_hosting_providers",
+ "git_ui",
+ "go_to_line",
+ "gpui",
+ "gpui_platform",
+ "gpui_tokio",
+ "hdrhistogram",
+ "http_client",
+ "image",
+ "image_viewer",
+ "input_latency_ui",
+ "inspector_ui",
+ "install_cli",
+ "itertools 0.14.0",
+ "journal",
+ "json_schema_store",
+ "keymap_editor",
+ "language",
+ "language_extension",
+ "language_model",
+ "language_models",
+ "language_onboarding",
+ "language_selector",
+ "language_tools",
+ "languages",
+ "line_ending_selector",
+ "log",
+ "markdown",
+ "markdown_preview",
+ "menu",
+ "migrator",
+ "mimalloc",
+ "miniprofiler_ui",
+ "mobile_tunnel",
+ "node_runtime",
+ "notifications",
+ "onboarding",
+ "outline",
+ "outline_panel",
+ "parking_lot",
+ "paths",
+ "picker",
+ "pkg-config",
+ "pretty_assertions",
+ "profiling",
+ "project",
+ "project_panel",
+ "project_symbols",
+ "prompt_store",
+ "proto",
+ "rayon",
+ "recent_projects",
+ "release_channel",
+ "remote",
+ "repl",
+ "reqwest_client",
+ "rope",
+ "search",
+ "semver",
+ "serde",
+ "serde_json",
+ "session",
+ "settings",
+ "settings_profile_selector",
+ "settings_ui",
+ "shellexpand",
+ "sidebar",
+ "sim_actions",
+ "sim_apps",
+ "sim_env_vars",
+ "smol",
+ "snippet_provider",
+ "snippets_ui",
+ "svg_preview",
+ "sysinfo 0.37.2",
+ "system_specs",
+ "tab_switcher",
+ "task",
+ "tasks_ui",
+ "telemetry",
+ "telemetry_events",
+ "tempfile",
+ "terminal_view",
+ "theme",
+ "theme_extension",
+ "theme_selector",
+ "theme_settings",
+ "time",
+ "time_format",
+ "title_bar",
+ "toolchain_selector",
+ "tracing",
+ "ui",
+ "ui_prompt",
+ "url",
+ "urlencoding",
+ "util",
+ "uuid",
+ "vim",
+ "vim_mode_setting",
+ "watch",
+ "web_search",
+ "web_search_providers",
+ "which_key",
+ "windows 0.61.3",
+ "windows_resources",
+ "workspace",
+ "zed-reqwest",
+ "zlog",
+ "zlog_settings",
+ "ztracing",
+]
+
+[[package]]
+name = "sim_actions"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "schemars 1.2.1",
+ "serde",
+ "util",
+]
+
+[[package]]
+name = "sim_apps"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "gpui",
+ "serde",
+ "serde_json",
+ "ui",
+ "util",
+]
+
+[[package]]
+name = "sim_credentials_provider"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "credentials_provider",
+ "futures 0.3.32",
+ "gpui",
+ "paths",
+ "release_channel",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "sim_env_vars"
+version = "0.1.0"
+dependencies = [
+ "env_var",
+]
+
+[[package]]
+name = "sim_game"
+version = "0.1.0"
+dependencies = [
+ "pretty_assertions",
+ "serde",
+]
+
+[[package]]
+name = "sim_glsl"
+version = "0.2.4"
+dependencies = [
+ "zed_extension_api 0.1.0",
+]
+
+[[package]]
+name = "sim_html"
+version = "0.3.1"
+dependencies = [
+ "zed_extension_api 0.7.0",
+]
+
+[[package]]
+name = "sim_proto"
+version = "0.3.2"
+dependencies = [
+ "zed_extension_api 0.7.0",
+]
+
+[[package]]
+name = "sim_server"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "futures 0.3.32",
+ "recipe",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tower 0.4.13",
+ "tower-http 0.4.4",
+]
+
+[[package]]
+name = "sim_test_extension"
+version = "0.1.0"
+dependencies = [
+ "zed_extension_api 0.8.0",
 ]
 
 [[package]]
@@ -18142,11 +18142,11 @@ checksum = "0193cc4331cfd2f3d2011ef287590868599a2f33c3e69bc22c1a3d3acf9e02fb"
 name = "svg_preview"
 version = "0.1.0"
 dependencies = [
- "baymax_actions",
  "file_icons",
  "gpui",
  "language",
  "multi_buffer",
+ "sim_actions",
  "ui",
  "workspace",
 ]
@@ -18594,7 +18594,6 @@ name = "task"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "baymax_actions",
  "collections",
  "futures 0.3.32",
  "gpui",
@@ -18609,6 +18608,7 @@ dependencies = [
  "serde_json_lenient",
  "sha2 0.10.9",
  "shellexpand",
+ "sim_actions",
  "util",
 ]
 
@@ -18617,7 +18617,6 @@ name = "tasks_ui"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "baymax_actions",
  "collections",
  "editor",
  "file_icons",
@@ -18630,6 +18629,7 @@ dependencies = [
  "project",
  "serde",
  "serde_json",
+ "sim_actions",
  "task",
  "tree-sitter-rust",
  "tree-sitter-typescript",
@@ -18750,7 +18750,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-recursion",
- "baymax_actions",
  "breadcrumbs",
  "collections",
  "db",
@@ -18774,6 +18773,7 @@ dependencies = [
  "serde_json",
  "settings",
  "shellexpand",
+ "sim_actions",
  "task",
  "terminal",
  "theme",
@@ -18861,7 +18861,6 @@ dependencies = [
 name = "theme_selector"
 version = "0.1.0"
 dependencies = [
- "baymax_actions",
  "editor",
  "fs",
  "fuzzy",
@@ -18872,6 +18871,7 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
+ "sim_actions",
  "telemetry",
  "theme",
  "theme_settings",
@@ -19097,7 +19097,6 @@ dependencies = [
  "anyhow",
  "arrayvec",
  "auto_update",
- "baymax_actions",
  "call",
  "channel",
  "chrono",
@@ -19122,6 +19121,7 @@ dependencies = [
  "semver",
  "serde",
  "settings",
+ "sim_actions",
  "smallvec 1.15.2",
  "telemetry",
  "theme",
@@ -20424,7 +20424,6 @@ dependencies = [
  "anyhow",
  "async-compat",
  "async-trait",
- "baymax_actions",
  "collections",
  "command_palette",
  "command_palette_hooks",
@@ -20459,6 +20458,7 @@ dependencies = [
  "serde_json",
  "settings",
  "settings_ui",
+ "sim_actions",
  "task",
  "text",
  "theme",
@@ -22756,7 +22756,6 @@ dependencies = [
  "any_vec",
  "anyhow",
  "async-recursion",
- "baymax_actions",
  "chrono",
  "client",
  "clock",
@@ -22788,6 +22787,7 @@ dependencies = [
  "serde_json",
  "session",
  "settings",
+ "sim_actions",
  "smallvec 1.15.2",
  "sqlez",
  "strum 0.27.2",

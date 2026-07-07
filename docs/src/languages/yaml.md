@@ -1,20 +1,20 @@
 ---
 title: YAML
-description: "Configure YAML language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure YAML language support in Sim, including language servers, formatting, and debugging."
 ---
 
 # YAML
 
-YAML support is available natively in Baymax.
+YAML support is available natively in Sim.
 
 - Tree-sitter: [simtropolis/tree-sitter-yaml](https://github.com/simtropolis/tree-sitter-yaml)
 - Language Server: [redhat-developer/yaml-language-server](https://github.com/redhat-developer/yaml-language-server)
 
 ## Configuration
 
-You can configure various [yaml-language-server settings](https://github.com/redhat-developer/yaml-language-server?tab=readme-ov-file#language-server-settings) by adding them to your Baymax settings.json in a `yaml-language-server` block under the `lsp` key.
+You can configure various [yaml-language-server settings](https://github.com/redhat-developer/yaml-language-server?tab=readme-ov-file#language-server-settings) by adding them to your Sim settings.json in a `yaml-language-server` block under the `lsp` key.
 
-You can configure custom YAML schemas using relative paths. Baymax resolves paths relative to your project root:
+You can configure custom YAML schemas using relative paths. Sim resolves paths relative to your project root:
 
 ```json [settings]
   "lsp": {
@@ -42,7 +42,7 @@ Note, settings keys must be nested, so `yaml.keyOrdering` becomes `{"yaml": { "k
 
 ## Formatting
 
-By default, Baymax uses Prettier for formatting YAML files.
+By default, Sim uses Prettier for formatting YAML files.
 
 ### Prettier Formatting
 
@@ -63,7 +63,7 @@ You can customize the formatting behavior of Prettier. For example to use single
 
 ### yaml-language-server Formatting
 
-To use `yaml-language-server` instead of Prettier for YAML formatting, configure in Settings ({#kb baymax::OpenSettings}) under Languages > YAML, or add to your settings file:
+To use `yaml-language-server` instead of Prettier for YAML formatting, configure in Settings ({#kb sim::OpenSettings}) under Languages > YAML, or add to your settings file:
 
 ```json [settings]
   "languages": {

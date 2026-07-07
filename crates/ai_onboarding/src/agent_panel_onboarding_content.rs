@@ -3,23 +3,23 @@ use std::sync::Arc;
 use client::{Client, UserStore};
 use cloud_api_types::Plan;
 use gpui::{Entity, IntoElement, ParentElement};
-use language_model::{BAYMAX_CLOUD_PROVIDER_ID, LanguageModelRegistry};
+use language_model::{SIM_CLOUD_PROVIDER_ID, LanguageModelRegistry};
 use ui::prelude::*;
 
-use crate::{AgentPanelOnboardingCard, ApiKeysWithoutProviders, BaymaxAiOnboarding};
+use crate::{AgentPanelOnboardingCard, ApiKeysWithoutProviders, SimAiOnboarding};
 
 pub struct AgentPanelOnboarding {
     user_store: Entity<UserStore>,
     client: Arc<Client>,
     has_configured_providers: bool,
-    continue_with_baymax_ai: Arc<dyn Fn(&mut Window, &mut App)>,
+    continue_with_sim_ai: Arc<dyn Fn(&mut Window, &mut App)>,
 }
 
 impl AgentPanelOnboarding {
     pub fn new(
         user_store: Entity<UserStore>,
         client: Arc<Client>,
-        continue_with_baymax_ai: impl Fn(&mut Window, &mut App) + 'static,
+        continue_with_sim_ai: impl Fn(&mut Window, &mut App) + 'static,
         cx: &mut Context<Self>,
     ) -> Self {
         cx.subscribe(
@@ -40,7 +40,7 @@ impl AgentPanelOnboarding {
             user_store,
             client,
             has_configured_providers: Self::has_configured_providers(cx),
-            continue_with_baymax_ai: Arc::new(continue_with_baymax_ai),
+            continue_with_sim_ai: Arc::new(continue_with_sim_ai),
         }
     }
 
@@ -49,7 +49,7 @@ impl AgentPanelOnboarding {
             .visible_providers()
             .iter()
             .any(|provider| {
-                provider.is_authenticated(cx) && provider.id() != BAYMAX_CLOUD_PROVIDER_ID
+                provider.is_authenticated(cx) && provider.id() != SIM_CLOUD_PROVIDER_ID
             })
     }
 }
@@ -60,22 +60,22 @@ impl Render for AgentPanelOnboarding {
             .user_store
             .read(cx)
             .plan()
-            .is_some_and(|plan| plan == Plan::BaymaxProTrial);
+            .is_some_and(|plan| plan == Plan::SimProTrial);
 
         let is_pro_user = self
             .user_store
             .read(cx)
             .plan()
-            .is_some_and(|plan| plan == Plan::BaymaxPro);
+            .is_some_and(|plan| plan == Plan::SimPro);
 
-        let onboarding = BaymaxAiOnboarding::new(
+        let onboarding = SimAiOnboarding::new(
             self.client.clone(),
             &self.user_store,
-            self.continue_with_baymax_ai.clone(),
+            self.continue_with_sim_ai.clone(),
             cx,
         )
         .with_dismiss({
-            let callback = self.continue_with_baymax_ai.clone();
+            let callback = self.continue_with_sim_ai.clone();
             move |window, cx| callback(window, cx)
         });
 

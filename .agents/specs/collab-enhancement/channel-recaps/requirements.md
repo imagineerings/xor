@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Baymax channels provide no summary or digest of activity. Mattermost supports recaps (`recaps.yaml` API, `recap.go`) — automated daily summaries of channel activity that help users catch up on missed messages. This is especially valuable for channels with high message volume.
+Sim channels provide no summary or digest of activity. Mattermost supports recaps (`recaps.yaml` API, `recap.go`) — automated daily summaries of channel activity that help users catch up on missed messages. This is especially valuable for channels with high message volume.
 
 ## Glossary
 

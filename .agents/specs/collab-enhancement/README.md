@@ -1,10 +1,10 @@
 # Collaboration Enhancement Suite
 
-Migration of Mattermost collaboration features into Baymax.
+Migration of Mattermost collaboration features into Sim.
 
 ## Overview
 
-This spec suite defines the migration of select Mattermost features into Baymax's existing collaboration system. Baymax already has a strong foundation: channels, calls (LiveKit), real-time collaborative editing (CRDT), contacts, notifications, rooms, project sharing, and basic roles. These specs enhance that foundation with rich messaging, file sharing, and team collaboration features that Mattermost pioneered.
+This spec suite defines the migration of select Mattermost features into Sim's existing collaboration system. Sim already has a strong foundation: channels, calls (LiveKit), real-time collaborative editing (CRDT), contacts, notifications, rooms, project sharing, and basic roles. These specs enhance that foundation with rich messaging, file sharing, and team collaboration features that Mattermost pioneered.
 
 ## Priority Matrix
 
@@ -26,7 +26,7 @@ This spec suite defines the migration of select Mattermost features into Baymax'
 
 ## Architecture Impact Areas
 
-These features touch the following Baymax components:
+These features touch the following Sim components:
 
 | Component | Features Affected |
 |---|---|

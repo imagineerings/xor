@@ -16,7 +16,7 @@ Migrate goose's evaluation infrastructure: the Harbor eval framework, Open Model
 
 ### Requirement 1: Harbor Evaluation Framework
 
-**User Story:** As a baymax developer, I want a structured eval framework (Harbor), so that I can systematically evaluate agent performance.
+**User Story:** As a sim developer, I want a structured eval framework (Harbor), so that I can systematically evaluate agent performance.
 
 #### Acceptance Criteria
 
@@ -27,7 +27,7 @@ Migrate goose's evaluation infrastructure: the Harbor eval framework, Open Model
 
 ### Requirement 2: Open Model Gym
 
-**User Story:** As a baymax developer, I want to compare model performance across different providers, so that I can choose the best model for each task.
+**User Story:** As a sim developer, I want to compare model performance across different providers, so that I can choose the best model for each task.
 
 #### Acceptance Criteria
 
@@ -37,7 +37,7 @@ Migrate goose's evaluation infrastructure: the Harbor eval framework, Open Model
 
 ### Requirement 3: Scenario Tests
 
-**User Story:** As a baymax developer, I want scenario-based tests that simulate real user interactions, so that I can validate agent behavior in realistic situations.
+**User Story:** As a sim developer, I want scenario-based tests that simulate real user interactions, so that I can validate agent behavior in realistic situations.
 
 #### Acceptance Criteria
 
@@ -48,7 +48,7 @@ Migrate goose's evaluation infrastructure: the Harbor eval framework, Open Model
 
 ### Requirement 4: Benchmark Scripts
 
-**User Story:** As a baymax developer, I want benchmark scripts for measuring performance, so that I can track and compare performance over time.
+**User Story:** As a sim developer, I want benchmark scripts for measuring performance, so that I can track and compare performance over time.
 
 #### Acceptance Criteria
 

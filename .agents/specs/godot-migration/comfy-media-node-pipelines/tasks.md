@@ -9,7 +9,7 @@ Represent media functionality as capability groups and implement deterministic o
 - Start gate: G0 spec consistency, G5 graph safety, G6 provenance, G7 dependency review for native/heavy backends, and G8 Comfy harness alignment are satisfied.
 - Validation gate: capability snapshots, media operation unit tests, and artifact registration integration tests pass.
 - Handoff gate: unsupported media nodes have stable diagnostics rather than missing registry entries.
-- Completion gate: no media node bypasses Baymax preview, asset, graph, or mesh ownership boundaries.
+- Completion gate: no media node bypasses Sim preview, asset, graph, or mesh ownership boundaries.
 
 ## Dependency Waves
 

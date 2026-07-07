@@ -5,7 +5,7 @@ if [[ $# -ne 1 ]]; then
   exit 1
 fi
 
-export BAYMAX_KUBE_NAMESPACE=$1
+export SIM_KUBE_NAMESPACE=$1
 
-pod=$(kubectl --namespace=${BAYMAX_KUBE_NAMESPACE} get pods --selector=app=baymax --output=jsonpath='{.items[*].metadata.name}')
-exec kubectl --namespace $BAYMAX_KUBE_NAMESPACE exec --tty --stdin $pod -- /bin/bash
+pod=$(kubectl --namespace=${SIM_KUBE_NAMESPACE} get pods --selector=app=sim --output=jsonpath='{.items[*].metadata.name}')
+exec kubectl --namespace $SIM_KUBE_NAMESPACE exec --tty --stdin $pod -- /bin/bash

@@ -6,7 +6,7 @@ Migrate goose's observability and analytics infrastructure: Langfuse tracing, Op
 
 ### Key Architectural Decisions
 
-- **Integrate with `crates/telemetry/`**: Baymax already has `crates/telemetry/`. Extend it with new tracing backends (Langfuse, OTel OTLP) rather than creating parallel systems.
+- **Integrate with `crates/telemetry/`**: Sim already has `crates/telemetry/`. Extend it with new tracing backends (Langfuse, OTel OTLP) rather than creating parallel systems.
 - **Langfuse as optional backend**: Implement Langfuse as a `TelemetryBackend` that wraps the Langfuse SDK. When enabled, all telemetry events are also sent to Langfuse.
 - **OTel via `opentelemetry` crate**: Use the Rust OpenTelemetry SDK with OTLP exporter. This is a new dependency but aligns with industry standards.
 - **Rate limiter in `crates/language_models/`**: Rate limiting is provider-specific. Integrate it into the provider request path.
@@ -265,4 +265,4 @@ _For any_ text [of known token count for a given model], THE token counter SHALL
 - Source: `projects/goose/crates/goose/src/token_counter.rs`
 - Source: `projects/goose/crates/goose/src/tool_monitor.rs`
 - Source: `projects/goose/crates/goose/src/tool_inspection.rs`
-- Baymax: `crates/telemetry/`
+- Sim: `crates/telemetry/`

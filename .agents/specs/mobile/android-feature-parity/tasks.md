@@ -45,8 +45,8 @@ All 34 tasks in the initial parity effort are implemented.
     - Timing logic:
       - First launch or >24h gap: 0.4s fade in, 1.0s display, 0.4s fade out
       - Otherwise: 0.2s fade in, 0.3s display, 0.2s fade out
-    - Baymax logo centered (use `R.drawable.ic_baymax_logo`)
-  - Integrate into `MainActivity.kt` as overlay before `BaymaxNavigation()`
+    - Sim logo centered (use `R.drawable.ic_sim_logo`)
+  - Integrate into `MainActivity.kt` as overlay before `SimNavigation()`
   - When `isActive` becomes `false`, show main navigation
   - Mirror iOS `SplashScreenView.swift`
   - _Writes: ui/screens/SplashScreen.kt, MainActivity.kt_
@@ -61,7 +61,7 @@ All 34 tasks in the initial parity effort are implemented.
   - _Writes: WelcomeCard.kt_
 
 - [x] **D.3: Add token progress bar and session density to WelcomeCard**
-  - Add `fetchInsights()` method to `BaymaxApiService` (see G.1)
+  - Add `fetchInsights()` method to `SimApiService` (see G.1)
   - Add `fetchInsights()` call to `HomeViewModel`:
     - Fetch on init, store in UI state
     - Return mock data (5 sessions, 450M tokens) in trial mode or on error
@@ -73,7 +73,7 @@ All 34 tasks in the initial parity effort are implemented.
     - Accept `sessions: List<ChatSession>`, `daysOffset: Int`
     - Compute density: quiet (≤2), light (3-5), busy (>5)
     - Adjust greeting: "Quiet yesterday", "Light yesterday", "Busy yesterday"
-  - _Writes: BaymaxApiService.kt, HomeViewModel.kt, WelcomeCard.kt, HomeScreen.kt_
+  - _Writes: SimApiService.kt, HomeViewModel.kt, WelcomeCard.kt, HomeScreen.kt_
 
 ### Phase 12: Rich Markdown Rendering (2 tasks)
 
@@ -103,7 +103,7 @@ All 34 tasks in the initial parity effort are implemented.
 
 - [x] **G.1: Add remaining API methods and retry logic**
   - `SessionInsights` data class ✅ ALREADY EXISTS in `ChatSession.kt`
-  - Add methods to `BaymaxApiService.kt`:
+  - Add methods to `SimApiService.kt`:
     - `fetchInsights(): ApiResult<SessionInsights>` — `GET /sessions/insights`
     - `updateProvider(sessionId, provider, model): ApiResult<Unit>` — `POST /agent/update_provider`
     - `loadEnabledExtensions(): ApiResult<List<String>>` — `GET /config/extensions`
@@ -111,7 +111,7 @@ All 34 tasks in the initial parity effort are implemented.
     - `fetchWithRetry(maxAttempts: Int = 2, operation: suspend () -> ApiResult<T>): ApiResult<T>`
     - Transient errors to retry: timeout, connection lost, DNS failure, HTTP 502/503/504
     - 1-second delay between attempts
-  - _Writes: BaymaxApiService.kt_
+  - _Writes: SimApiService.kt_
 
 ### Phase 14: Visual Session Navigation (2 tasks)
 
@@ -152,13 +152,13 @@ All 34 tasks in the initial parity effort are implemented.
         val params: Map<String, JsonElement> = emptyMap()
     )
     ```
-  - Extend `parseSSEEvent()` in `BaymaxApiService.kt`:
+  - Extend `parseSSEEvent()` in `SimApiService.kt`:
     ```kotlin
     "Notification" -> json.decodeFromString<SSEEvent.NotificationEvent>(data)
     ```
   - Dispatch notification via `NoticeManager` when received in SSE stream
   - Mirror iOS `Message.swift` lines 475-493
-  - _Writes: SSEEvent.kt, BaymaxApiService.kt_
+  - _Writes: SSEEvent.kt, SimApiService.kt_
 
 ### Phase 15: UX Polish (5 tasks)
 
@@ -184,13 +184,13 @@ All 34 tasks in the initial parity effort are implemented.
   - _Writes: QRConfigHandler.kt, MainActivity.kt_
 
 - [x] **I.3: Add dark mode toggle to settings**
-  - Create `ThemeManager` object (or extend existing `BaymaxColors` infrastructure):
+  - Create `ThemeManager` object (or extend existing `SimColors` infrastructure):
     - `isDarkMode: MutableState<Boolean>` with persistence to `SharedPreferences`
     - `toggle()` function
   - Add dark mode toggle to `SettingsScreen`:
     - `Switch` with "Dark Mode" label
     - On toggle, call `ThemeManager.toggle()`
-  - Modify `BaymaxTheme` composable in `Theme.kt` to observe `ThemeManager.isDarkMode`
+  - Modify `SimTheme` composable in `Theme.kt` to observe `ThemeManager.isDarkMode`
   - Update `WelcomeCard` and other components that call `isSystemInDarkTheme()` to use `ThemeManager.isDarkMode` instead
   - Mirror iOS `ThemeManager.swift`
   - _Writes: Theme.kt (or new ThemeManager.kt), SettingsScreen.kt, WelcomeCard.kt_

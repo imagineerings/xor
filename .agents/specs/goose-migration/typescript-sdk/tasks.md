@@ -2,7 +2,7 @@
 
 ## Overview
 
-Implement a TypeScript SDK as an npm package that provides programmatic access to the baymax agent. The SDK supports both HTTP connections (to a remote baymax-server) and local ACP connections.
+Implement a TypeScript SDK as an npm package that provides programmatic access to the sim agent. The SDK supports both HTTP connections (to a remote sim-server) and local ACP connections.
 
 ## Tasks
 
@@ -51,14 +51,14 @@ Implement a TypeScript SDK as an npm package that provides programmatic access t
   - _writes: ui/sdk/src/client-capabilities.ts_
 
 - [ ] 7. Implement binary resolver
-  - Find baymax binary for current platform
+  - Find sim binary for current platform
   - Support custom binary paths
   - Version detection
   - _Requirements: 5_
   - _writes: ui/sdk/src/resolve-binary.ts_
 
 - [ ] 8. Implement ACP transport (stdio)
-  - Spawn baymax binary as subprocess
+  - Spawn sim binary as subprocess
   - ACP protocol communication over stdio
   - Process lifecycle management
   - _Requirements: 1_
@@ -73,7 +73,7 @@ Implement a TypeScript SDK as an npm package that provides programmatic access t
 
 ## Notes
 
-- Published as `@baymax/sdk` npm package
-- HTTP mode is for remote baymax-server connections
-- ACP mode is for local processes (spawns baymax binary)
-- Generated types stay in sync with the OpenAPI schema from baymax-server
+- Published as `@sim/sdk` npm package
+- HTTP mode is for remote sim-server connections
+- ACP mode is for local processes (spawns sim binary)
+- Generated types stay in sync with the OpenAPI schema from sim-server

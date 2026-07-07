@@ -296,9 +296,9 @@ impl RunningMode {
         cx.spawn(async move |cx| match cx.background_spawn(task).await {
             Ok(breakpoints) => {
                 let breakpoints = breakpoints.into_iter().zip(raw_breakpoints).filter_map(
-                    |(dap_bp, baymax_bp)| {
+                    |(dap_bp, sim_bp)| {
                         Some((
-                            baymax_bp,
+                            sim_bp,
                             BreakpointSessionState {
                                 id: dap_bp.id?,
                                 verified: dap_bp.verified,
@@ -382,9 +382,9 @@ impl RunningMode {
                     let breakpoints = cx.background_spawn(send_request).await?;
 
                     let breakpoints = breakpoints.into_iter().zip(raw_breakpoints).filter_map(
-                        |(dap_bp, baymax_bp)| {
+                        |(dap_bp, sim_bp)| {
                             Some((
-                                baymax_bp,
+                                sim_bp,
                                 BreakpointSessionState {
                                     id: dap_bp.id?,
                                     verified: dap_bp.verified,

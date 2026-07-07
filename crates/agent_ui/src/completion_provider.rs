@@ -2017,7 +2017,7 @@ impl MentionCompletion {
             match rest_of_line[mode_text.len()..].find(|c: char| !c.is_whitespace()) {
                 Some(whitespace_count) => {
                     if let Some(argument_text) = parts.next() {
-                        // If mode wasn't recognibaymax but we have an argument, don't suggest completions
+                        // If mode wasn't recognisim but we have an argument, don't suggest completions
                         // (e.g. '@something word')
                         if mode.is_none() && !argument_text.is_empty() {
                             return None;
@@ -2316,7 +2316,7 @@ fn collect_session_matches(cx: &App) -> Vec<SessionMatch> {
     let mut entries: Vec<&ThreadMetadata> = store
         .read(cx)
         .entries()
-        .filter(|t| !t.archived && t.agent_id == *agent::BAYMAX_AGENT_ID)
+        .filter(|t| !t.archived && t.agent_id == *agent::SIM_AGENT_ID)
         .collect();
     entries.sort_by_key(|t| Reverse(t.updated_at));
     entries

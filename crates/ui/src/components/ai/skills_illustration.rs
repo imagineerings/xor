@@ -54,7 +54,7 @@ impl RenderOnce for SkillsIllustration {
                     .child(skill_crease("brainstorming".into(), "global".into()))
                     .child(skill_crease(
                         "borrow-checker-expert".into(),
-                        "baymax".into(),
+                        "sim".into(),
                     )),
             )
             .child(

@@ -1003,7 +1003,7 @@ fn github_release_archive_from_url(archive_url: &str) -> Option<GithubReleaseArc
 }
 
 fn sanitize_path_component(input: &str) -> String {
-    let sanitibaymax = input
+    let sanitisim = input
         .chars()
         .map(|character| match character {
             'a'..='z' | 'A'..='Z' | '0'..='9' | '.' | '_' | '-' => character,
@@ -1011,10 +1011,10 @@ fn sanitize_path_component(input: &str) -> String {
         })
         .collect::<String>();
 
-    if sanitibaymax.is_empty() {
+    if sanitisim.is_empty() {
         "unknown".to_string()
     } else {
-        sanitibaymax
+        sanitisim
     }
 }
 
@@ -1024,7 +1024,7 @@ fn versioned_archive_cache_dir(
     archive_url: &str,
 ) -> PathBuf {
     let version = version.unwrap_or_default();
-    let sanitibaymax_version = sanitize_path_component(version);
+    let sanitisim_version = sanitize_path_component(version);
 
     let mut version_hasher = Sha256::new();
     version_hasher.update(version.as_bytes());
@@ -1035,7 +1035,7 @@ fn versioned_archive_cache_dir(
     let url_hash = format!("{:x}", url_hasher.finalize());
 
     base_dir.join(format!(
-        "v_{sanitibaymax_version}_{}_{}",
+        "v_{sanitisim_version}_{}_{}",
         &version_hash[..16],
         &url_hash[..16],
     ))
@@ -1438,7 +1438,7 @@ impl ExternalAgentServer for LocalRegistryNpxAgent {
 /// cmd.exe), and the quotes our shell builder emits are PowerShell string-literal syntax that PS
 /// strips during parsing. PS only re-adds CRT-style transport quotes around native command args
 /// containing whitespace, so `package@<=0.25.3` reaches cmd.exe bare and the unquoted `<` is
-/// interpreted as input redirection. See simtropolis/baymax#55921.
+/// interpreted as input redirection. See simtropolis/sim#55921.
 fn bounded_npm_package_spec(package_spec: &str) -> String {
     let Some((package_name, version)) = package_spec.rsplit_once('@') else {
         return package_spec.to_string();

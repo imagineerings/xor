@@ -1,7 +1,7 @@
 use std::rc::Rc;
 use std::sync::Arc;
 
-use baymax_actions::ShowCallStats;
+use sim_actions::ShowCallStats;
 use call::{ActiveCall, Room};
 use channel::ChannelStore;
 use client::{User, proto::PeerId};
@@ -87,7 +87,7 @@ pub fn toggle_screen_sharing(
         }
         Err(e) => Task::ready(Err(e)),
     };
-    toggle_screen_sharing.detach_and_prompt_err("Sharing Screen Failed", window, cx, |e, _, _| Some(format!("{:?}\n\nPlease check that you have given Baymax permissions to record your screen in Settings.", e)));
+    toggle_screen_sharing.detach_and_prompt_err("Sharing Screen Failed", window, cx, |e, _, _| Some(format!("{:?}\n\nPlease check that you have given Sim permissions to record your screen in Settings.", e)));
 }
 
 pub fn toggle_mute(cx: &mut App) {

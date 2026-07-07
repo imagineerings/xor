@@ -5,7 +5,7 @@ use settings::RegisterSetting;
 
 use crate::provider::{
     anthropic, anthropic::AnthropicSettings, avian::AvianSettings, azure::AzureSettings, bedrock,
-    bedrock::AmazonBedrockSettings, cloud::BaymaxDotDevSettings, databricks::DatabricksV1Settings,
+    bedrock::AmazonBedrockSettings, cloud::SimDotDevSettings, databricks::DatabricksV1Settings,
     databricks_v2::DatabricksSettings, deepseek::DeepSeekSettings,
     gcp_vertex_ai::GcpVertexAiSettings, google::GoogleSettings, huggingface::HuggingFaceSettings,
     kimicode::KimiCodeSettings, litellm::LiteLlmSettings, lmstudio::LmStudioSettings, mistral,
@@ -32,7 +32,7 @@ pub struct AllLanguageModelSettings {
     pub vercel_ai_gateway: VercelAiGatewaySettings,
     pub x_ai: XAiSettings,
     pub azure: AzureSettings,
-    pub baymax_dot_dev: BaymaxDotDevSettings,
+    pub sim_dot_dev: SimDotDevSettings,
     pub gcp_vertex_ai: GcpVertexAiSettings,
     pub huggingface: HuggingFaceSettings,
     pub litellm: LiteLlmSettings,
@@ -76,7 +76,7 @@ impl settings::Settings for AllLanguageModelSettings {
         let vercel_ai_gateway = language_models.vercel_ai_gateway.unwrap();
         let x_ai = language_models.x_ai.unwrap();
         let azure = language_models.azure.unwrap_or_default();
-        let baymax_dot_dev = language_models.baymax_dot_dev.unwrap_or_default();
+        let sim_dot_dev = language_models.sim_dot_dev.unwrap_or_default();
         let gcp_vertex_ai = language_models.gcp_vertex_ai.unwrap_or_default();
         let huggingface = language_models.huggingface.unwrap_or_default();
         let litellm = language_models.litellm.unwrap_or_default();
@@ -210,8 +210,8 @@ impl settings::Settings for AllLanguageModelSettings {
                 available_models: x_ai.available_models.unwrap_or_default(),
                 custom_headers: custom_headers_from("xAI", x_ai.custom_headers, &[]),
             },
-            baymax_dot_dev: BaymaxDotDevSettings {
-                available_models: baymax_dot_dev.available_models.unwrap_or_default(),
+            sim_dot_dev: SimDotDevSettings {
+                available_models: sim_dot_dev.available_models.unwrap_or_default(),
             },
             gcp_vertex_ai: GcpVertexAiSettings {
                 api_url: gcp_vertex_ai.api_url.unwrap_or_default(),

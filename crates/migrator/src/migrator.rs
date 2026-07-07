@@ -691,7 +691,7 @@ mod tests {
             &r#"
             {
                 "features": {
-                    "inline_completion_provider": "baymax"
+                    "inline_completion_provider": "sim"
                 },
             }
             "#
@@ -700,7 +700,7 @@ mod tests {
                 &r#"
                 {
                     "edit_predictions": {
-                        "provider": "baymax"
+                        "provider": "sim"
                     }
                 }
                 "#
@@ -1275,7 +1275,7 @@ mod tests {
         "default_width": 640,
         "default_height": 320,
         "default_model": {
-            "provider": "baymax.dev",
+            "provider": "sim.dev",
             "model": "claude-sonnet-4"
         }
     }
@@ -1297,7 +1297,7 @@ mod tests {
         "default_width": 640,
         "default_height": 320,
         "default_model": {
-            "provider": "baymax.dev",
+            "provider": "sim.dev",
             "model": "claude-sonnet-4"
         }
     }
@@ -2890,7 +2890,7 @@ mod tests {
             &r#"
             {
                 "features": {
-                    "edit_prediction_provider": "baymax"
+                    "edit_prediction_provider": "sim"
                 },
                 "edit_predictions": {
                     "mode": "eager"
@@ -2902,7 +2902,7 @@ mod tests {
                 &r#"
                 {
                     "edit_predictions": {
-                        "provider": "baymax",
+                        "provider": "sim",
                         "mode": "eager"
                     }
                 }
@@ -2945,7 +2945,7 @@ mod tests {
             &r#"
             {
                 "edit_predictions": {
-                    "provider": "baymax"
+                    "provider": "sim"
                 }
             }
             "#
@@ -3052,7 +3052,7 @@ mod tests {
                 },
                 "macos": {
                     "features": {
-                        "edit_prediction_provider": "baymax"
+                        "edit_prediction_provider": "sim"
                     }
                 },
                 "profiles": {
@@ -3073,7 +3073,7 @@ mod tests {
                     },
                     "macos": {
                         "edit_predictions": {
-                            "provider": "baymax"
+                            "provider": "sim"
                         }
                     },
                     "profiles": {
@@ -3185,7 +3185,7 @@ mod tests {
             &r#"
             {
                 "edit_predictions": {
-                    "provider": "baymax"
+                    "provider": "sim"
                 }
             }
             "#
@@ -3211,7 +3211,7 @@ mod tests {
                 &r#"
                 {
                     "edit_predictions": {
-                        "provider": "baymax"
+                        "provider": "sim"
                     }
                 }
                 "#
@@ -3886,7 +3886,7 @@ mod tests {
             Some(&"{\n    \"agent\": {\n        \n    }\n}\n"),
         );
 
-        // Project-local settings (.baymax/settings.json) with always_allow_tool_actions
+        // Project-local settings (.sim/settings.json) with always_allow_tool_actions
         // These files have no platform/channel overrides or root-level profiles.
         assert_migrate_with_migrations(
             &[MigrationType::Json(

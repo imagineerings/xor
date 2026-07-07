@@ -1,11 +1,11 @@
 ---
 title: Zig
-description: "Configure Zig language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure Zig language support in Sim, including language servers, formatting, and debugging."
 ---
 
 # Zig
 
-Zig support is available through the [Zig extension](https://github.com/baymax-extensions/zig).
+Zig support is available through the [Zig extension](https://github.com/sim-extensions/zig).
 
 - Tree-sitter: [tree-sitter-zig](https://github.com/tree-sitter-grammars/tree-sitter-zig)
 - Language Server: [zls](https://github.com/zigtools/zls)

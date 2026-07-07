@@ -28,9 +28,9 @@
     {
       "task_id": "task:75ba31ebd766",
       "task_identifier": ".agents/specs/godot-migration/tasks.md:36",
-      "title": "Create the shared Baymax game support crate",
+      "title": "Create the shared Sim game support crate",
       "linear_identifier": "SIM-15",
-      "linear_url": "https://linear.app/simtropolis/issue/SIM-15/create-the-shared-baymax-game-support-crate",
+      "linear_url": "https://linear.app/simtropolis/issue/SIM-15/create-the-shared-sim-game-support-crate",
       "status": "inactive",
       "owner": null,
       "summary": "Merged in PR #35.",

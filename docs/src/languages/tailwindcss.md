@@ -1,15 +1,15 @@
 ---
 title: Tailwind CSS
-description: "Configure Tailwind CSS language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure Tailwind CSS language support in Sim, including language servers, formatting, and debugging."
 ---
 
 # Tailwind CSS
 
-Baymax has built-in support for Tailwind CSS autocomplete, linting, and hover previews.
+Sim has built-in support for Tailwind CSS autocomplete, linting, and hover previews.
 
 - Language Server: [tailwindlabs/tailwindcss-intellisense](https://github.com/tailwindlabs/tailwindcss-intellisense)
 
-Languages which can be used with Tailwind CSS in Baymax:
+Languages which can be used with Tailwind CSS in Sim:
 
 - [Astro](./astro.md#using-the-tailwind-css-language-server-with-astro)
 - [CSS](./css.md)
@@ -46,8 +46,8 @@ Refer to [the Tailwind CSS language server settings docs](https://github.com/tai
 
 ### Using Tailwind CSS Mode in CSS Files
 
-Baymax includes support for the Tailwind CSS language mode, which provides full CSS IntelliSense support even when using Tailwind-specific at-rules like `@apply`, `@layer`, and `@theme`.
-Configure language servers in Settings ({#kb baymax::OpenSettings}) under Languages > CSS, or add to your settings file:
+Sim includes support for the Tailwind CSS language mode, which provides full CSS IntelliSense support even when using Tailwind-specific at-rules like `@apply`, `@layer`, and `@theme`.
+Configure language servers in Settings ({#kb sim::OpenSettings}) under Languages > CSS, or add to your settings file:
 
 ```json [settings]
 {
@@ -67,7 +67,7 @@ The `tailwindcss-intellisense-css` language server serves as an alternative to t
 
 ### Prettier Plugin
 
-Baymax supports Prettier out of the box, which means that if you have the [Tailwind CSS Prettier plugin](https://github.com/tailwindlabs/prettier-plugin-tailwindcss) installed, adding it to your Prettier configuration will make it work automatically:
+Sim supports Prettier out of the box, which means that if you have the [Tailwind CSS Prettier plugin](https://github.com/tailwindlabs/prettier-plugin-tailwindcss) installed, adding it to your Prettier configuration will make it work automatically:
 
 ```json
 // .prettierrc

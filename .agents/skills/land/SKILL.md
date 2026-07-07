@@ -1,6 +1,6 @@
 ---
 name: land
-description: Monitor Baymax PR checks, address CI failures with up to 3 fix-and-push cycles, and squash-merge the PR once checks pass.
+description: Monitor Sim PR checks, address CI failures with up to 3 fix-and-push cycles, and squash-merge the PR once checks pass.
 ---
 
 # land skill
@@ -47,7 +47,7 @@ Note the PR number and head SHA.
 
 ## 2. Wait for PR checks
 
-Baymax uses root GitHub workflows such as `run_tests.yml`, `release.yml`, and
+Sim uses root GitHub workflows such as `run_tests.yml`, `release.yml`, and
 mobile workflows when relevant. Do not hard-code the obsolete `server-ci`
 workflow. Monitor the PR's actual checks:
 

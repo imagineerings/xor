@@ -432,7 +432,7 @@ async fn test_copy_recursive_with_ignoring(executor: BackgroundExecutor) {
 #[gpui::test]
 async fn test_realfs_atomic_write(executor: BackgroundExecutor) {
     // With the file handle still open, the file should be replaced
-    // https://github.com/simtropolis/baymax/issues/30054
+    // https://github.com/simtropolis/sim/issues/30054
     let fs = RealFs::new(None, executor);
     let temp_dir = TempDir::new().unwrap();
     let file_to_be_replaced = temp_dir.path().join("file.txt");
@@ -459,16 +459,16 @@ async fn test_realfs_atomic_write_non_existing_file(executor: BackgroundExecutor
 #[gpui::test]
 #[cfg(target_os = "windows")]
 async fn test_realfs_canonicalize(executor: BackgroundExecutor) {
-    use util::paths::SanitibaymaxPath;
+    use util::paths::SanitisimPath;
 
     let fs = RealFs::new(None, executor);
     let temp_dir = TempDir::new().unwrap();
     let file = temp_dir.path().join("test (1).txt");
-    let file = SanitibaymaxPath::new(&file);
+    let file = SanitisimPath::new(&file);
     std::fs::write(&file, "test").unwrap();
 
-    let canonicalibaymax = fs.canonicalize(file.as_path()).await;
-    assert!(canonicalibaymax.is_ok());
+    let canonicalisim = fs.canonicalize(file.as_path()).await;
+    assert!(canonicalisim.is_ok());
 }
 
 #[gpui::test]

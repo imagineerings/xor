@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Baymax should provide a graph/node/flowchart interface for designing and executing advanced diffusion pipelines.
+Sim should provide a graph/node/flowchart interface for designing and executing advanced diffusion pipelines.
 
 ### Requirement 1: Typed Graph Model
 

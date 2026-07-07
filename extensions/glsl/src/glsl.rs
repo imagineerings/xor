@@ -1,6 +1,6 @@
-use baymax::settings::LspSettings;
+use sim::settings::LspSettings;
 use std::fs;
-use zed_extension_api::{self as baymax, LanguageServerId, Result, serde_json};
+use zed_extension_api::{self as sim, LanguageServerId, Result, serde_json};
 
 struct GlslExtension {
     cached_binary_path: Option<String>,
@@ -10,7 +10,7 @@ impl GlslExtension {
     fn language_server_binary_path(
         &mut self,
         language_server_id: &LanguageServerId,
-        worktree: &baymax::Worktree,
+        worktree: &sim::Worktree,
     ) -> Result<String> {
         if let Some(path) = worktree.which("glsl_analyzer") {
             return Ok(path);
@@ -22,30 +22,30 @@ impl GlslExtension {
             return Ok(path.clone());
         }
 
-        baymax::set_language_server_installation_status(
+        sim::set_language_server_installation_status(
             language_server_id,
-            &baymax::LanguageServerInstallationStatus::CheckingForUpdate,
+            &sim::LanguageServerInstallationStatus::CheckingForUpdate,
         );
-        let release = baymax::latest_github_release(
+        let release = sim::latest_github_release(
             "nolanderc/glsl_analyzer",
-            baymax::GithubReleaseOptions {
+            sim::GithubReleaseOptions {
                 require_assets: true,
                 pre_release: false,
             },
         )?;
 
-        let (platform, arch) = baymax::current_platform();
+        let (platform, arch) = sim::current_platform();
         let asset_name = format!(
             "{arch}-{os}.zip",
             arch = match arch {
-                baymax::Architecture::Aarch64 => "aarch64",
-                baymax::Architecture::X86 => "x86",
-                baymax::Architecture::X8664 => "x86_64",
+                sim::Architecture::Aarch64 => "aarch64",
+                sim::Architecture::X86 => "x86",
+                sim::Architecture::X8664 => "x86_64",
             },
             os = match platform {
-                baymax::Os::Mac => "macos",
-                baymax::Os::Linux => "linux-musl",
-                baymax::Os::Windows => "windows",
+                sim::Os::Mac => "macos",
+                sim::Os::Linux => "linux-musl",
+                sim::Os::Windows => "windows",
             }
         );
 
@@ -61,22 +61,22 @@ impl GlslExtension {
         let binary_path = format!("{version_dir}/bin/glsl_analyzer");
 
         if !fs::metadata(&binary_path).is_ok_and(|stat| stat.is_file()) {
-            baymax::set_language_server_installation_status(
+            sim::set_language_server_installation_status(
                 language_server_id,
-                &baymax::LanguageServerInstallationStatus::Downloading,
+                &sim::LanguageServerInstallationStatus::Downloading,
             );
 
-            baymax::download_file(
+            sim::download_file(
                 &asset.download_url,
                 &version_dir,
                 match platform {
-                    baymax::Os::Mac | baymax::Os::Linux => baymax::DownloadedFileType::Zip,
-                    baymax::Os::Windows => baymax::DownloadedFileType::Zip,
+                    sim::Os::Mac | sim::Os::Linux => sim::DownloadedFileType::Zip,
+                    sim::Os::Windows => sim::DownloadedFileType::Zip,
                 },
             )
             .map_err(|e| format!("failed to download file: {e}"))?;
 
-            baymax::make_file_executable(&binary_path)?;
+            sim::make_file_executable(&binary_path)?;
 
             let entries =
                 fs::read_dir(".").map_err(|e| format!("failed to list working directory {e}"))?;
@@ -93,7 +93,7 @@ impl GlslExtension {
     }
 }
 
-impl baymax::Extension for GlslExtension {
+impl sim::Extension for GlslExtension {
     fn new() -> Self {
         Self {
             cached_binary_path: None,
@@ -102,10 +102,10 @@ impl baymax::Extension for GlslExtension {
 
     fn language_server_command(
         &mut self,
-        language_server_id: &baymax::LanguageServerId,
-        worktree: &baymax::Worktree,
-    ) -> Result<baymax::Command> {
-        Ok(baymax::Command {
+        language_server_id: &sim::LanguageServerId,
+        worktree: &sim::Worktree,
+    ) -> Result<sim::Command> {
+        Ok(sim::Command {
             command: self.language_server_binary_path(language_server_id, worktree)?,
             args: vec![],
             env: Default::default(),
@@ -114,8 +114,8 @@ impl baymax::Extension for GlslExtension {
 
     fn language_server_workspace_configuration(
         &mut self,
-        _language_server_id: &baymax::LanguageServerId,
-        worktree: &baymax::Worktree,
+        _language_server_id: &sim::LanguageServerId,
+        worktree: &sim::Worktree,
     ) -> Result<Option<serde_json::Value>> {
         let settings = LspSettings::for_worktree("glsl_analyzer", worktree)
             .ok()
@@ -128,4 +128,4 @@ impl baymax::Extension for GlslExtension {
     }
 }
 
-baymax::register_extension!(GlslExtension);
+sim::register_extension!(GlslExtension);

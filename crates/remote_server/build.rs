@@ -1,14 +1,14 @@
 #![allow(clippy::disallowed_methods, reason = "build scripts are exempt")]
 use std::process::Command;
 
-const BAYMAX_MANIFEST: &str = include_str!("../baymax/Cargo.toml");
+const SIM_MANIFEST: &str = include_str!("../sim/Cargo.toml");
 
 fn main() {
-    let baymax_cargo_toml: cargo_toml::Manifest =
-        toml::from_str(BAYMAX_MANIFEST).expect("failed to parse baymax Cargo.toml");
+    let sim_cargo_toml: cargo_toml::Manifest =
+        toml::from_str(SIM_MANIFEST).expect("failed to parse sim Cargo.toml");
     println!(
-        "cargo:rustc-env=BAYMAX_PKG_VERSION={}",
-        baymax_cargo_toml.package.unwrap().version.unwrap()
+        "cargo:rustc-env=SIM_PKG_VERSION={}",
+        sim_cargo_toml.package.unwrap().version.unwrap()
     );
     println!(
         "cargo:rustc-env=TARGET={}",
@@ -26,9 +26,9 @@ fn main() {
         let git_sha = String::from_utf8_lossy(&output.stdout);
         let git_sha = git_sha.trim();
 
-        println!("cargo:rustc-env=BAYMAX_COMMIT_SHA={git_sha}");
+        println!("cargo:rustc-env=SIM_COMMIT_SHA={git_sha}");
     }
     if let Some(build_identifier) = option_env!("GITHUB_RUN_NUMBER") {
-        println!("cargo:rustc-env=BAYMAX_BUILD_ID={build_identifier}");
+        println!("cargo:rustc-env=SIM_BUILD_ID={build_identifier}");
     }
 }

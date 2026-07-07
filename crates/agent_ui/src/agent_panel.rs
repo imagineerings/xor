@@ -22,7 +22,7 @@ use project::{AgentId, ProjectItem};
 use serde::{Deserialize, Serialize};
 use settings::{LanguageModelProviderSetting, LanguageModelSelection};
 
-use baymax_actions::{
+use sim_actions::{
     DecreaseBufferFontSize, IncreaseBufferFontSize, ResetBufferFontSize,
     agent::{
         AddSelectionToThread, ConflictContent, LogoutAgent, OpenSettings, ReauthenticateAgent,
@@ -96,7 +96,7 @@ use ui::{
 };
 use util::ResultExt as _;
 use workspace::{
-    CollaboratorId, DraggedSelection, DraggedTab, MultiWorkspace, PathList, SerialibaymaxPathList,
+    CollaboratorId, DraggedSelection, DraggedTab, MultiWorkspace, PathList, SerialisimPathList,
     ToggleWorkspaceSidebar, ToggleZoom, Workspace, WorkspaceId,
     dock::{DockPosition, Panel, PanelEvent},
     item::ItemEvent,
@@ -294,22 +294,22 @@ async fn write_global_last_created_entry_kind(kvp: KeyValueStore, entry_kind: Ag
     }
 }
 
-fn read_serialibaymax_panel(
+fn read_serialisim_panel(
     workspace_id: workspace::WorkspaceId,
     kvp: &KeyValueStore,
-) -> Option<SerialibaymaxAgentPanel> {
+) -> Option<SerialisimAgentPanel> {
     let scope = kvp.scoped(AGENT_PANEL_KEY);
     let key = i64::from(workspace_id).to_string();
     scope
         .read(&key)
         .log_err()
         .flatten()
-        .and_then(|json| serde_json::from_str::<SerialibaymaxAgentPanel>(&json).log_err())
+        .and_then(|json| serde_json::from_str::<SerialisimAgentPanel>(&json).log_err())
 }
 
-async fn save_serialibaymax_panel(
+async fn save_serialisim_panel(
     workspace_id: workspace::WorkspaceId,
-    panel: SerialibaymaxAgentPanel,
+    panel: SerialisimAgentPanel,
     kvp: KeyValueStore,
 ) -> Result<()> {
     let scope = kvp.scoped(AGENT_PANEL_KEY);
@@ -320,11 +320,11 @@ async fn save_serialibaymax_panel(
 
 /// Migration: reads the original single-panel format stored under the
 /// `"agent_panel"` KVP key before per-workspace keying was introduced.
-fn read_legacy_serialibaymax_panel(kvp: &KeyValueStore) -> Option<SerialibaymaxAgentPanel> {
+fn read_legacy_serialisim_panel(kvp: &KeyValueStore) -> Option<SerialisimAgentPanel> {
     kvp.read_kvp(AGENT_PANEL_KEY)
         .log_err()
         .flatten()
-        .and_then(|json| serde_json::from_str::<SerialibaymaxAgentPanel>(&json).log_err())
+        .and_then(|json| serde_json::from_str::<SerialisimAgentPanel>(&json).log_err())
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -343,12 +343,12 @@ enum AgentPanelEntryKind {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct SerialibaymaxAgentPanel {
+struct SerialisimAgentPanel {
     selected_agent: Option<Agent>,
     #[serde(default)]
     last_created_entry_kind: AgentPanelEntryKind,
     #[serde(default)]
-    last_active_thread: Option<SerialibaymaxActiveThread>,
+    last_active_thread: Option<SerialisimActiveThread>,
     #[serde(default)]
     last_active_terminal_id: Option<String>,
     #[serde(default)]
@@ -356,15 +356,15 @@ struct SerialibaymaxAgentPanel {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct SerialibaymaxActiveThread {
+struct SerialisimActiveThread {
     /// For drafts this is `None`; use `thread_id` to address them instead.
     session_id: Option<String>,
-    /// Optional for back-compat with older serialibaymax payloads that only carried `session_id`.
+    /// Optional for back-compat with older serialisim payloads that only carried `session_id`.
     #[serde(default)]
     thread_id: Option<ThreadId>,
     agent_type: Agent,
     title: Option<String>,
-    work_dirs: Option<SerialibaymaxPathList>,
+    work_dirs: Option<SerialisimPathList>,
 }
 
 pub fn init(cx: &mut App) {
@@ -958,7 +958,7 @@ pub struct CreateThreadOptions {
     /// Agent to use. Defaults to the panel's selected agent.
     pub agent: Option<Agent>,
     /// Model override, as `provider/model-id`. Only applied when the thread
-    /// uses the native Baymax agent.
+    /// uses the native Sim agent.
     pub model: Option<String>,
     /// Working directories to attach to the new thread (e.g., the path of a
     /// freshly-created sibling worktree). When `None`, the thread inherits
@@ -1211,7 +1211,7 @@ impl AgentPanel {
 
                     let title = thread.title();
                     let work_dirs = thread.work_dirs().cloned();
-                    SerialibaymaxActiveThread {
+                    SerialisimActiveThread {
                         session_id: (!is_draft_active).then(|| thread.session_id().0.to_string()),
                         thread_id: active_thread_id,
                         agent_type: active_thread_agent.clone(),
@@ -1232,7 +1232,7 @@ impl AgentPanel {
                     let session_id = conversation_view.read(cx).root_session_id.clone()?;
                     let metadata = ThreadMetadataStore::try_global(cx)
                         .and_then(|store| store.read(cx).entry_by_session(&session_id).cloned());
-                    Some(SerialibaymaxActiveThread {
+                    Some(SerialisimActiveThread {
                         session_id: Some(session_id.0.to_string()),
                         thread_id: active_thread_id,
                         agent_type: active_thread_agent.clone(),
@@ -1252,9 +1252,9 @@ impl AgentPanel {
 
         let kvp = KeyValueStore::global(cx);
         self.pending_serialization = Some(cx.background_spawn(async move {
-            save_serialibaymax_panel(
+            save_serialisim_panel(
                 workspace_id,
-                SerialibaymaxAgentPanel {
+                SerialisimAgentPanel {
                     selected_agent: Some(selected_agent),
                     last_created_entry_kind,
                     last_active_thread,
@@ -1279,13 +1279,13 @@ impl AgentPanel {
                 .ok()
                 .flatten();
 
-            let (serialibaymax_panel, global_last_used_agent, global_last_created_entry_kind) = cx
+            let (serialisim_panel, global_last_used_agent, global_last_created_entry_kind) = cx
                 .background_spawn(async move {
                     match kvp {
                         Some(kvp) => {
                             let panel = workspace_id
-                                .and_then(|id| read_serialibaymax_panel(id, &kvp))
-                                .or_else(|| read_legacy_serialibaymax_panel(&kvp));
+                                .and_then(|id| read_serialisim_panel(id, &kvp))
+                                .or_else(|| read_legacy_serialisim_panel(&kvp));
                             let global_agent = read_global_last_used_agent(&kvp);
                             let global_entry_kind = read_global_last_created_entry_kind(&kvp);
                             (panel, global_agent, global_entry_kind)
@@ -1299,7 +1299,7 @@ impl AgentPanel {
                 .read_with(cx, |workspace, cx| !workspace.root_paths(cx).is_empty())
                 .unwrap_or(false);
             let terminal_id_to_restore = if has_open_project {
-                serialibaymax_panel
+                serialisim_panel
                     .as_ref()
                     .and_then(|panel| panel.last_active_terminal_id.as_deref())
                     .and_then(|terminal_id| {
@@ -1349,7 +1349,7 @@ impl AgentPanel {
             };
 
             let thread_to_restore = if has_open_project && terminal_to_restore.is_none() {
-                if let Some(info) = serialibaymax_panel
+                if let Some(info) = serialisim_panel
                     .as_ref()
                     .and_then(|panel| panel.last_active_thread.as_ref())
                 {
@@ -1415,8 +1415,8 @@ impl AgentPanel {
                     let global_fallback =
                         global_last_used_agent.filter(|agent| !is_via_collab || agent.is_native());
 
-                    if let Some(serialibaymax_panel) = &serialibaymax_panel {
-                        panel.last_created_entry_kind = serialibaymax_panel.last_created_entry_kind;
+                    if let Some(serialisim_panel) = &serialisim_panel {
+                        panel.last_created_entry_kind = serialisim_panel.last_created_entry_kind;
                     } else if let Some(entry_kind) = global_last_created_entry_kind {
                         panel.last_created_entry_kind = entry_kind;
                     }
@@ -1426,11 +1426,11 @@ impl AgentPanel {
                     // (e.g. a draft created while a different agent was
                     // active). When restoring a thread, prefer its agent
                     // so the draft survives reload bound to the right
-                    // backend; otherwise fall back to the serialibaymax
+                    // backend; otherwise fall back to the serialisim
                     // selection, then the global last-used agent.
                     let initial_agent = match &thread_to_restore {
                         Some((info, _)) => Some(clamp(info.agent_type.clone())),
-                        None => serialibaymax_panel
+                        None => serialisim_panel
                             .as_ref()
                             .and_then(|p| p.selected_agent.clone())
                             .map(clamp)
@@ -1462,7 +1462,7 @@ impl AgentPanel {
                             cx,
                         );
                     }
-                    if let Some(new_draft_thread_id) = serialibaymax_panel
+                    if let Some(new_draft_thread_id) = serialisim_panel
                         .as_ref()
                         .and_then(|p| p.new_draft_thread_id)
                     {
@@ -3394,8 +3394,8 @@ impl AgentPanel {
         cx: &mut Context<Self>,
     ) {
         window.dispatch_action(
-            Box::new(baymax_actions::OpenSettingsAt {
-                path: baymax_actions::AGENT_SKILLS_SETTINGS_PATH.to_string(),
+            Box::new(sim_actions::OpenSettingsAt {
+                path: sim_actions::AGENT_SKILLS_SETTINGS_PATH.to_string(),
                 target: None,
             }),
             cx,
@@ -4719,7 +4719,7 @@ impl agent::SiblingThreadHost for AgentPanelSiblingHost {
         cx.spawn(async move |cx| {
             let agent_choice = match request.agent_id.as_deref() {
                 None => None,
-                Some(id) if id == agent::BAYMAX_AGENT_ID.as_ref() => Some(Agent::NativeAgent),
+                Some(id) if id == agent::SIM_AGENT_ID.as_ref() => Some(Agent::NativeAgent),
                 Some(id) => {
                     // Reject unknown agent ids up front so the model gets a
                     // structured error pointing at `list_agents_and_models`,
@@ -4781,12 +4781,12 @@ impl agent::SiblingThreadHost for AgentPanelSiblingHost {
                 // detached HEAD state — the agent can attach to a branch via
                 // git afterwards.
                 let branch_target = match request.base_ref.as_ref() {
-                    Some(ref_name) => baymax_actions::NewWorktreeBranchTarget::ExistingBranch {
+                    Some(ref_name) => sim_actions::NewWorktreeBranchTarget::ExistingBranch {
                         name: ref_name.clone(),
                     },
-                    None => baymax_actions::NewWorktreeBranchTarget::CurrentBranch,
+                    None => sim_actions::NewWorktreeBranchTarget::CurrentBranch,
                 };
-                let action = baymax_actions::CreateWorktree {
+                let action = sim_actions::CreateWorktree {
                     worktree_name: request.worktree_name.clone(),
                     branch_target,
                 };
@@ -4868,7 +4868,7 @@ impl agent::SiblingThreadHost for AgentPanelSiblingHost {
 
         let mut agents = Vec::new();
 
-        // Native Baymax agent — always available, and we can enumerate models
+        // Native Sim agent — always available, and we can enumerate models
         // directly from the language model registry.
         let native_models = {
             let registry = LanguageModelRegistry::read_global(cx);
@@ -4895,7 +4895,7 @@ impl agent::SiblingThreadHost for AgentPanelSiblingHost {
             models
         };
         agents.push(agent::AvailableAgent {
-            id: agent::BAYMAX_AGENT_ID.to_string(),
+            id: agent::SIM_AGENT_ID.to_string(),
             name: Agent::NativeAgent.label(),
             is_native: true,
             models: native_models,
@@ -5030,7 +5030,7 @@ impl Panel for AgentPanel {
 
     fn icon(&self, _window: &Window, cx: &App) -> Option<IconName> {
         (self.enabled(cx) && AgentSettings::get_global(cx).button)
-            .then_some(IconName::BaymaxAssistant)
+            .then_some(IconName::SimAssistant)
     }
 
     fn icon_tooltip(&self, _window: &Window, _cx: &App) -> Option<&'static str> {
@@ -5623,9 +5623,9 @@ impl AgentPanel {
                                 .action("Add Custom Server…", Box::new(AddContextServer))
                                 .action(
                                     "Install New Servers…",
-                                    Box::new(baymax_actions::Extensions {
+                                    Box::new(sim_actions::Extensions {
                                         category_filter: Some(
-                                            baymax_actions::ExtensionCategoryFilter::ContextServers,
+                                            sim_actions::ExtensionCategoryFilter::ContextServers,
                                         ),
                                         id: None,
                                     }),
@@ -5819,12 +5819,12 @@ impl AgentPanel {
                             }
                         })
                         .item(
-                            ContextMenuEntry::new("Baymax Agent")
+                            ContextMenuEntry::new("Sim Agent")
                                 .when(
                                     !showing_terminal && is_agent_selected(Agent::NativeAgent),
                                     |this| this.action(Box::new(NewThread)),
                                 )
-                                .icon(IconName::BaymaxAgent)
+                                .icon(IconName::SimAgent)
                                 .icon_color(Color::Muted)
                                 .handler({
                                     let workspace = workspace.clone();
@@ -5978,7 +5978,7 @@ impl AgentPanel {
                                 .handler({
                                     move |window, cx| {
                                         window.dispatch_action(
-                                            Box::new(baymax_actions::AcpRegistry),
+                                            Box::new(sim_actions::AcpRegistry),
                                             cx,
                                         )
                                     }
@@ -6102,7 +6102,7 @@ impl AgentPanel {
                     .size(IconSize::Small)
                     .color(icon_color)
             } else {
-                let icon_name = selected_agent_builtin_icon.unwrap_or(IconName::BaymaxAgent);
+                let icon_name = selected_agent_builtin_icon.unwrap_or(IconName::SimAgent);
                 Icon::new(icon_name).size(IconSize::Small).color(icon_color)
             };
 
@@ -6229,7 +6229,7 @@ impl AgentPanel {
                     .read(cx)
                     .default_model()
                     .is_some_and(|model| {
-                        model.provider.id() != language_model::BAYMAX_CLOUD_PROVIDER_ID
+                        model.provider.id() != language_model::SIM_CLOUD_PROVIDER_ID
                     })
                 {
                     return false;
@@ -6243,7 +6243,7 @@ impl AgentPanel {
         let plan = self.user_store.read(cx).plan();
         let has_previous_trial = self.user_store.read(cx).trial_started_at().is_some();
 
-        plan.is_some_and(|plan| plan == Plan::BaymaxFree) && has_previous_trial
+        plan.is_some_and(|plan| plan == Plan::SimFree) && has_previous_trial
     }
 
     fn dismiss_ai_onboarding(&mut self, cx: &mut Context<Self>) {
@@ -6265,7 +6265,7 @@ impl AgentPanel {
 
         if user_store
             .plan()
-            .is_some_and(|plan| plan == Plan::BaymaxPro)
+            .is_some_and(|plan| plan == Plan::SimPro)
             && user_store
                 .subscription_period()
                 .and_then(|period| period.0.checked_add_days(chrono::Days::new(1)))
@@ -6280,12 +6280,12 @@ impl AgentPanel {
             return false;
         }
 
-        let has_configured_non_baymax_providers = LanguageModelRegistry::read_global(cx)
+        let has_configured_non_sim_providers = LanguageModelRegistry::read_global(cx)
             .visible_providers()
             .iter()
             .any(|provider| {
                 provider.is_authenticated(cx)
-                    && provider.id() != language_model::BAYMAX_CLOUD_PROVIDER_ID
+                    && provider.id() != language_model::SIM_CLOUD_PROVIDER_ID
             });
 
         match &self.base_view {
@@ -6293,7 +6293,7 @@ impl AgentPanel {
             BaseView::AgentThread { conversation_view } => {
                 if conversation_view.read(cx).as_native_thread(cx).is_some() {
                     let history_is_empty = ThreadStore::global(cx).read(cx).is_empty();
-                    history_is_empty || !has_configured_non_baymax_providers
+                    history_is_empty || !has_configured_non_sim_providers
                 } else {
                     false
                 }
@@ -6964,7 +6964,7 @@ mod tests {
 
     impl AgentConnection for SessionTrackingConnection {
         fn agent_id(&self) -> AgentId {
-            agent::BAYMAX_AGENT_ID.clone()
+            agent::SIM_AGENT_ID.clone()
         }
 
         fn telemetry_id(&self) -> SharedString {
@@ -7150,16 +7150,16 @@ mod tests {
             .read_with(cx, |workspace, _cx| workspace.database_id())
             .expect("workspace A should have a database id");
         let kvp = cx.update(|_window, cx| KeyValueStore::global(cx));
-        let serialibaymax_a: SerialibaymaxAgentPanel = cx
-            .background_spawn(async move { read_serialibaymax_panel(workspace_a_id, &kvp) })
+        let serialisim_a: SerialisimAgentPanel = cx
+            .background_spawn(async move { read_serialisim_panel(workspace_a_id, &kvp) })
             .await
             .expect("workspace A should serialize panel state");
         assert!(
-            serialibaymax_a.last_active_thread.is_some(),
+            serialisim_a.last_active_thread.is_some(),
             "active thread should be the thread restore target"
         );
         assert!(
-            serialibaymax_a.last_active_terminal_id.is_none(),
+            serialisim_a.last_active_terminal_id.is_none(),
             "active thread serialization should not also include a terminal restore target"
         );
 
@@ -7253,16 +7253,16 @@ mod tests {
             .read_with(cx, |workspace, _cx| workspace.database_id())
             .expect("workspace should have a database id");
         let kvp = cx.update(|_window, cx| KeyValueStore::global(cx));
-        let serialibaymax: SerialibaymaxAgentPanel = cx
-            .background_spawn(async move { read_serialibaymax_panel(workspace_id, &kvp) })
+        let serialisim: SerialisimAgentPanel = cx
+            .background_spawn(async move { read_serialisim_panel(workspace_id, &kvp) })
             .await
             .expect("workspace should serialize panel state");
         assert_eq!(
-            serialibaymax.last_active_terminal_id,
+            serialisim.last_active_terminal_id,
             Some(terminal_id.to_key_string())
         );
         assert!(
-            serialibaymax.last_active_thread.is_none(),
+            serialisim.last_active_thread.is_none(),
             "active terminal serialization should not also include a thread restore target"
         );
 
@@ -7707,15 +7707,15 @@ mod tests {
         cx.run_until_parked();
 
         let kvp = cx.update(|_window, cx| KeyValueStore::global(cx));
-        let serialibaymax: Option<SerialibaymaxAgentPanel> = cx
-            .background_spawn(async move { read_serialibaymax_panel(workspace_id, &kvp) })
+        let serialisim: Option<SerialisimAgentPanel> = cx
+            .background_spawn(async move { read_serialisim_panel(workspace_id, &kvp) })
             .await;
-        let serialibaymax_session_id = serialibaymax
+        let serialisim_session_id = serialisim
             .as_ref()
             .and_then(|p| p.last_active_thread.as_ref())
             .and_then(|t| t.session_id.clone());
         assert_eq!(
-            serialibaymax_session_id,
+            serialisim_session_id,
             Some(resume_session_id.0.to_string()),
             "serialize() must preserve the restored session id even while the \
              ConversationView is in LoadError; otherwise the bug survives a \
@@ -8175,8 +8175,8 @@ mod tests {
             "resource text should be the raw conflict"
         );
         assert!(
-            uri.starts_with("baymax:///agent/merge-conflict"),
-            "URI should use the baymax merge-conflict scheme, got: {uri}"
+            uri.starts_with("sim:///agent/merge-conflict"),
+            "URI should use the sim merge-conflict scheme, got: {uri}"
         );
         assert!(uri.contains("utils.rs"), "URI should encode the file path");
     }
@@ -11384,7 +11384,7 @@ mod tests {
         panel_b.update(cx, |panel, cx| panel.serialize(cx));
         cx.run_until_parked();
 
-        // Load fresh panels from serialibaymax state and verify independence
+        // Load fresh panels from serialisim state and verify independence
         let async_cx = cx.update(|window, cx| window.to_async(cx));
         let loaded_a = AgentPanel::load(workspace_a.downgrade(), async_cx)
             .await
@@ -12578,7 +12578,7 @@ mod tests {
 
     impl AgentConnection for DisassociationTrackingConnection {
         fn agent_id(&self) -> AgentId {
-            agent::BAYMAX_AGENT_ID.clone()
+            agent::SIM_AGENT_ID.clone()
         }
 
         fn telemetry_id(&self) -> SharedString {

@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Baymax currently shows online/busy presence but lacks custom user status messages — short text labels like "In a meeting", "AFK", "Out sick", or custom text. Mattermost supports custom status with emoji. Adding custom status will let users communicate their availability more precisely.
+Sim currently shows online/busy presence but lacks custom user status messages — short text labels like "In a meeting", "AFK", "Out sick", or custom text. Mattermost supports custom status with emoji. Adding custom status will let users communicate their availability more precisely.
 
 ## Glossary
 

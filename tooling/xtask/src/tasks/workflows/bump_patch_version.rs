@@ -30,7 +30,7 @@ fn run_bump_patch_version(branch: &WorkflowInput) -> steps::NamedJob {
 
     fn read_channel() -> Step<Run> {
         named::bash(indoc::indoc! {r#"
-            channel="$(cat crates/baymax/RELEASE_CHANNEL)"
+            channel="$(cat crates/sim/RELEASE_CHANNEL)"
 
             tag_suffix=""
             case $channel in
@@ -45,7 +45,7 @@ fn run_bump_patch_version(branch: &WorkflowInput) -> steps::NamedJob {
                 ;;
             esac
 
-            version=$(script/get-crate-version baymax)
+            version=$(script/get-crate-version sim)
 
             {
                 echo "channel=$channel"
@@ -58,7 +58,7 @@ fn run_bump_patch_version(branch: &WorkflowInput) -> steps::NamedJob {
 
     fn bump_version() -> Step<Run> {
         named::bash(indoc::indoc! {r#"
-            version="$(cargo set-version -p baymax --bump patch 2>&1 | sed 's/.* //')"
+            version="$(cargo set-version -p sim --bump patch 2>&1 | sed 's/.* //')"
             echo "version=$version" >> "$GITHUB_OUTPUT"
         "#})
         .id("bump-version")

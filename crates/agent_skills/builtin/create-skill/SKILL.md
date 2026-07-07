@@ -1,11 +1,11 @@
 ---
 name: create-skill
-description: Helps you create new agent skills for Baymax. Use this to create a skill, ask about SKILLs.md, or package reusable agent instructions.
+description: Helps you create new agent skills for Sim. Use this to create a skill, ask about SKILLs.md, or package reusable agent instructions.
 ---
 
-# Creating a Baymax Agent Skill
+# Creating a Sim Agent Skill
 
-Use this skill when the user wants to create, edit, or understand agent skills in Baymax.
+Use this skill when the user wants to create, edit, or understand agent skills in Sim.
 
 ## What is a Skill?
 
@@ -93,4 +93,4 @@ Reference these in the skill body. The agent can read them using the file path s
 4. Write the `SKILL.md` with frontmatter and instructions. The `write_file` and `edit_file` tools also have a special allow case for creating or modifying files under `~/.agents/skills`.
 5. Optionally add supporting files (templates, examples, references).
 
-After creating the skill, it will be automatically discovered by Baymax's agent on the next conversation (no restart needed for global skills if the `~/.agents/skills/` directory already exists).
+After creating the skill, it will be automatically discovered by Sim's agent on the next conversation (no restart needed for global skills if the `~/.agents/skills/` directory already exists).

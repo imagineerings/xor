@@ -16,10 +16,10 @@ pub const GOOGLE_PROVIDER_NAME: LanguageModelProviderName =
 pub const X_AI_PROVIDER_ID: LanguageModelProviderId = LanguageModelProviderId::new("x_ai");
 pub const X_AI_PROVIDER_NAME: LanguageModelProviderName = LanguageModelProviderName::new("xAI");
 
-pub const BAYMAX_CLOUD_PROVIDER_ID: LanguageModelProviderId =
-    LanguageModelProviderId::new("baymax.dev");
-pub const BAYMAX_CLOUD_PROVIDER_NAME: LanguageModelProviderName =
-    LanguageModelProviderName::new("Baymax");
+pub const SIM_CLOUD_PROVIDER_ID: LanguageModelProviderId =
+    LanguageModelProviderId::new("sim.dev");
+pub const SIM_CLOUD_PROVIDER_NAME: LanguageModelProviderName =
+    LanguageModelProviderName::new("Sim");
 
 /// An embedding provider generates vector embeddings from text input.
 ///

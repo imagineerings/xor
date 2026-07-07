@@ -295,7 +295,7 @@ pub struct MarksState {
     buffer_marks: HashMap<BufferId, HashMap<String, Vec<text::Anchor>>>,
     watched_buffers: HashMap<BufferId, (MarkLocation, Subscription, Subscription)>,
 
-    serialibaymax_marks: HashMap<Arc<Path>, HashMap<String, Vec<Point>>>,
+    serialisim_marks: HashMap<Arc<Path>, HashMap<String, Vec<Point>>>,
     global_marks: HashMap<String, MarkLocation>,
 
     _subscription: Subscription,
@@ -328,7 +328,7 @@ impl MarksState {
                 multibuffer_marks: HashMap::default(),
                 buffer_marks: HashMap::default(),
                 watched_buffers: HashMap::default(),
-                serialibaymax_marks: HashMap::default(),
+                serialisim_marks: HashMap::default(),
                 global_marks: HashMap::default(),
                 _subscription: subscription,
             };
@@ -373,7 +373,7 @@ impl MarksState {
 
     fn loaded(
         &mut self,
-        marks: Vec<SerialibaymaxMark>,
+        marks: Vec<SerialisimMark>,
         global_mark_paths: Vec<(String, Arc<Path>)>,
         cx: &mut Context<Self>,
     ) {
@@ -382,7 +382,7 @@ impl MarksState {
         };
 
         for mark in marks {
-            self.serialibaymax_marks
+            self.serialisim_marks
                 .entry(mark.path)
                 .or_default()
                 .insert(mark.name, mark.points);
@@ -424,13 +424,13 @@ impl MarksState {
         };
         let abs_path: Arc<Path> = abs_path.into();
 
-        let Some(serialibaymax_marks) = self.serialibaymax_marks.get(&abs_path) else {
+        let Some(serialisim_marks) = self.serialisim_marks.get(&abs_path) else {
             return;
         };
 
         let mut loaded_marks = HashMap::default();
         let buffer = buffer_handle.read(cx);
-        for (name, points) in serialibaymax_marks.iter() {
+        for (name, points) in serialisim_marks.iter() {
             loaded_marks.insert(
                 name.clone(),
                 points
@@ -466,7 +466,7 @@ impl MarksState {
             } else {
                 HashMap::default()
             };
-        let old_points = self.serialibaymax_marks.get(&path);
+        let old_points = self.serialisim_marks.get(&path);
         if old_points == Some(&new_points) {
             return;
         }
@@ -494,7 +494,7 @@ impl MarksState {
             }
         }
 
-        self.serialibaymax_marks.insert(path.clone(), new_points);
+        self.serialisim_marks.insert(path.clone(), new_points);
 
         if let Some(workspace_id) = self.workspace_id(cx) {
             let db = VimDb::global(cx);
@@ -687,7 +687,7 @@ impl MarksState {
                 Some(Mark::Buffer(*entity_id, anchors.get(name)?.clone()))
             }
             MarkLocation::Path(path) => {
-                let points = self.serialibaymax_marks.get(path)?;
+                let points = self.serialisim_marks.get(path)?;
                 Some(Mark::Path(path.clone(), points.get(name)?.clone()))
             }
         }
@@ -739,7 +739,7 @@ impl MarksState {
             }
         };
         self.global_marks.remove(&mark_name);
-        self.serialibaymax_marks
+        self.serialisim_marks
             .get_mut(&path)
             .map(|m| m.remove(&mark_name.clone()));
         if let Some(workspace_id) = self.workspace_id(cx) {
@@ -1626,7 +1626,7 @@ impl PickerDelegate for MarksViewDelegate {
                         }
                         MarkLocation::Path(path) => {
                             if let Some(&position) = marks_state
-                                .serialibaymax_marks
+                                .serialisim_marks
                                 .get(path.as_ref())
                                 .and_then(|map| map.get(name))
                                 .and_then(|points| points.first())
@@ -1827,7 +1827,7 @@ impl Domain for VimDb {
 
 db::static_connection!(VimDb, [WorkspaceDb]);
 
-struct SerialibaymaxMark {
+struct SerialisimMark {
     path: Arc<Path>,
     name: String,
     points: Vec<Point>,
@@ -1854,15 +1854,15 @@ impl VimDb {
                     .into_iter()
                     .map(|point| (point.row, point.column))
                     .collect();
-                let serialibaymax = serde_json::to_string(&pairs)?;
-                query((workspace_id, mark_name, path.clone(), serialibaymax))?;
+                let serialisim = serde_json::to_string(&pairs)?;
+                query((workspace_id, mark_name, path.clone(), serialisim))?;
             }
             Ok(())
         })
         .await
     }
 
-    fn get_marks(&self, workspace_id: WorkspaceId) -> Result<Vec<SerialibaymaxMark>> {
+    fn get_marks(&self, workspace_id: WorkspaceId) -> Result<Vec<SerialisimMark>> {
         let result: Vec<(Arc<Path>, String, String)> = self.select_bound(sql!(
             SELECT path, mark_name, value FROM vim_marks
                 WHERE workspace_id = ?
@@ -1872,7 +1872,7 @@ impl VimDb {
             .into_iter()
             .filter_map(|(path, name, value)| {
                 let pairs: Vec<(u32, u32)> = serde_json::from_str(&value).log_err()?;
-                Some(SerialibaymaxMark {
+                Some(SerialisimMark {
                     path,
                     name,
                     points: pairs

@@ -1,38 +1,38 @@
 ---
-title: Baymax and trusted worktrees
-description: "Configure which folders Baymax trusts for running code and extensions."
+title: Sim and trusted worktrees
+description: "Configure which folders Sim trusts for running code and extensions."
 ---
 
-# Baymax and trusted worktrees
+# Sim and trusted worktrees
 
-A worktree in Baymax is either a directory or a single file that Baymax opens as a standalone "project".
-Baymax opens a worktree each time you run `baymax some/path`, drag a file or directory into Baymax, or open your user settings file.
+A worktree in Sim is either a directory or a single file that Sim opens as a standalone "project".
+Sim opens a worktree each time you run `sim some/path`, drag a file or directory into Sim, or open your user settings file.
 
-> Note: This is broader than a [Git worktree](./git.md#git-worktrees). A Git worktree is a linked checkout managed by Git; Baymax's trust model applies to every opened file or folder root, including Git worktrees.
+> Note: This is broader than a [Git worktree](./git.md#git-worktrees). A Git worktree is a linked checkout managed by Git; Sim's trust model applies to every opened file or folder root, including Git worktrees.
 
-Every worktree opened may contain a `.baymax/settings.json` file with extra configuration options that may require installing and spawning language servers or MCP servers.
-To let users choose based on their own threat model and risk tolerance, all worktrees start in Restricted Mode. Restricted Mode prevents downloading and running related items from `.baymax/settings.json`. Until a worktree is trusted, Baymax does not run related untrusted actions and waits for user confirmation. This gives users a chance to review project settings, MCP servers, and language servers.
+Every worktree opened may contain a `.sim/settings.json` file with extra configuration options that may require installing and spawning language servers or MCP servers.
+To let users choose based on their own threat model and risk tolerance, all worktrees start in Restricted Mode. Restricted Mode prevents downloading and running related items from `.sim/settings.json`. Until a worktree is trusted, Sim does not run related untrusted actions and waits for user confirmation. This gives users a chance to review project settings, MCP servers, and language servers.
 
-Baymax still trusts tools it installs globally. Global MCP servers and global language servers such as Prettier and Copilot are installed and started as usual, independent of worktree trust.
+Sim still trusts tools it installs globally. Global MCP servers and global language servers such as Prettier and Copilot are installed and started as usual, independent of worktree trust.
 
-If a worktree is not trusted, Baymax will indicate this with an exclamation mark icon in the title bar. Clicking this icon or using `workspace::ToggleWorktreeSecurity` action will bring up the security modal that allows the user to trust the worktree.
+If a worktree is not trusted, Sim will indicate this with an exclamation mark icon in the title bar. Clicking this icon or using `workspace::ToggleWorktreeSecurity` action will bring up the security modal that allows the user to trust the worktree.
 
 Trusting a worktree persists that decision between restarts. You can clear all trusted worktrees with the `workspace::ClearTrustedWorktrees` command.
-This command will restart Baymax, to ensure no untrusted settings, language servers or MCP servers persist.
+This command will restart Sim, to ensure no untrusted settings, language servers or MCP servers persist.
 
-This feature works locally and on SSH and WSL remote hosts. Baymax tracks trust information per host in these cases.
+This feature works locally and on SSH and WSL remote hosts. Sim tracks trust information per host in these cases.
 
 ## What is restricted
 
 Restricted Mode prevents:
 
-- Project settings (`.baymax/settings.json`) from being parsed and applied
+- Project settings (`.sim/settings.json`) from being parsed and applied
 - Language servers from being installed and spawned
 - MCP servers from being installed and spawned
 
 ## Configuring broad worktree trust
 
-By default, Baymax does not trust new worktrees. Users must trust each new worktree individually. Though not recommended, users can trust all worktrees with this setting ([how to edit](./configuring-baymax.md#settings-files)):
+By default, Sim does not trust new worktrees. Users must trust each new worktree individually. Though not recommended, users can trust all worktrees with this setting ([how to edit](./configuring-sim.md#settings-files)):
 
 ```json [settings]
 "session": {
@@ -45,21 +45,21 @@ Auto-trusted worktrees are not persisted between restarts; only manually trusted
 ## Trust hierarchy
 
 These are mostly internal details and may change, but they help explain how multiple trust requests can be approved at once.
-Baymax has multiple layers of trust, based on the requests, from the least to most trusted level:
+Sim has multiple layers of trust, based on the requests, from the least to most trusted level:
 
 - "single file worktree"
 
-After opening an empty Baymax window, you can open a single file. You can also open a file outside the current directory after opening a directory.
-A common example is {#action baymax::OpenSettingsFile}, which may start a language server for that file and create a new single-file worktree.
+After opening an empty Sim window, you can open a single file. You can also open a file outside the current directory after opening a directory.
+A common example is {#action sim::OpenSettingsFile}, which may start a language server for that file and create a new single-file worktree.
 
-Spawning a language server presents a risk should the language server experience a supply-chain attack; therefore, Baymax restricts that by default. Each single file worktree requires a separate trust grant, unless the directory containing it is trusted or all worktrees are trusted.
+Spawning a language server presents a risk should the language server experience a supply-chain attack; therefore, Sim restricts that by default. Each single file worktree requires a separate trust grant, unless the directory containing it is trusted or all worktrees are trusted.
 
 - "directory worktree"
 
-If a directory is open in Baymax, it is a full worktree. It may spawn multiple language servers and MCP servers defined in project settings. Each directory worktree therefore requires a separate trust grant unless a parent-directory trust grant exists (see below).
+If a directory is open in Sim, it is a full worktree. It may spawn multiple language servers and MCP servers defined in project settings. Each directory worktree therefore requires a separate trust grant unless a parent-directory trust grant exists (see below).
 
 When a directory worktree is trusted, language and MCP servers are permitted to be downloaded and started, hence we also enable single file worktree trust for the host in question automatically when this occurs: this helps when opening single files when using language server features in the trusted directory worktree.
 
 - "parent directory worktree"
 
-To permit trust decisions for multiple directory worktrees at once, it's possible to trust all subdirectories of a given parent directory worktree opened in Baymax by checking the appropriate checkbox. This will grant trust to all its subdirectories, including all current and potential directory worktrees.
+To permit trust decisions for multiple directory worktrees at once, it's possible to trust all subdirectories of a given parent directory worktree opened in Sim by checking the appropriate checkbox. This will grant trust to all its subdirectories, including all current and potential directory worktrees.

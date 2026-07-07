@@ -206,7 +206,7 @@ impl Component for AlertModal {
                                         h_flex()
                                             .gap_1()
                                             .child(Icon::new(IconName::Warning).color(Color::Warning))
-                                            .child(Headline::new("Unrecognibaymax Workspace").size(HeadlineSize::Small))
+                                            .child(Headline::new("Unrecognisim Workspace").size(HeadlineSize::Small))
                                     )
                                     .child(
                                         h_flex()
@@ -216,7 +216,7 @@ impl Component for AlertModal {
                             )
                             .child(
                                 "Untrusted workspaces are opened in Restricted Mode to protect your system.
-Review .baymax/settings.json for any extensions or commands configured by this project.",
+Review .sim/settings.json for any extensions or commands configured by this project.",
                             )
                             .child(
                                 v_flex()

@@ -23,7 +23,7 @@ Add a channel bookmarks feature: a dedicated section in the channel header where
   - Add `UpdateChannelBookmarks` push message for real-time broadcast.
   - Register new push type in the RPC dispatch table.
   - _Requirements: 6.1_
-  - _writes: proto/baymax.proto_
+  - _writes: proto/sim.proto_
 
 - [ ] 2. Create database migration
   - Add `channel_bookmarks` table with columns: `id`, `channel_id`, `label`, `description`, `bookmark_type`, `url`, `file_id`, `message_id`, `created_by`, `created_at`, `updated_at`, `sort_order`.
@@ -36,7 +36,7 @@ Add a channel bookmarks feature: a dedicated section in the channel header where
   - Run the protobuf code generation step to produce Rust types for all new messages.
   - Ensure new types are re-exported from the `proto` crate.
   - _Requirements: 6.1_
-  - _writes: proto/src/gen/baymax.rs_
+  - _writes: proto/src/gen/sim.rs_
 
 - [ ] 4. Implement server `BookmarkStore`
   - [ ] 4.1 Implement `CreateBookmark` — insert row, return created bookmark with sort_order.

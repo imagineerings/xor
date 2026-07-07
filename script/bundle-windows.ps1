@@ -55,9 +55,9 @@ if ($Help) {
     exit 0
 }
 
-Push-Location -Path crates/baymax
+Push-Location -Path crates/sim
 $channel = Get-Content "RELEASE_CHANNEL"
-$env:BAYMAX_RELEASE_CHANNEL = $channel
+$env:SIM_RELEASE_CHANNEL = $channel
 $env:RELEASE_CHANNEL = $channel
 Pop-Location
 
@@ -67,7 +67,7 @@ function CheckEnvironmentVariables {
     }
 
     $requiredVars = @(
-        'BAYMAX_WORKSPACE', 'RELEASE_VERSION', 'BAYMAX_RELEASE_CHANNEL',
+        'SIM_WORKSPACE', 'RELEASE_VERSION', 'SIM_RELEASE_CHANNEL',
         'AZURE_TENANT_ID', 'AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET',
         'ACCOUNT_NAME', 'CERT_PROFILE_NAME', 'ENDPOINT',
         'FILE_DIGEST', 'TIMESTAMP_DIGEST', 'TIMESTAMP_SERVER'
@@ -86,7 +86,7 @@ function PrepareForBundle {
         Remove-Item -Path "$innoDir" -Recurse -Force
     }
     New-Item -Path "$innoDir" -ItemType Directory -Force
-    Copy-Item -Path "$env:BAYMAX_WORKSPACE\crates\baymax\resources\windows\*" -Destination "$innoDir" -Recurse -Force
+    Copy-Item -Path "$env:SIM_WORKSPACE\crates\sim\resources\windows\*" -Destination "$innoDir" -Recurse -Force
     New-Item -Path "$innoDir\make_appx" -ItemType Directory -Force
     New-Item -Path "$innoDir\appx" -ItemType Directory -Force
     New-Item -Path "$innoDir\bin" -ItemType Directory -Force
@@ -99,11 +99,11 @@ function GenerateLicenses {
     . $PSScriptRoot/generate-licenses.ps1
 }
 
-function BuildBaymaxAndItsFriends {
-    Write-Output "Building Baymax and its friends, for channel: $channel"
-    # Build baymax.exe, cli.exe and auto_update_helper.exe
-    cargo build --release --package baymax --package cli --package auto_update_helper --target $target
-    Copy-Item -Path ".\$CargoOutDir\baymax.exe" -Destination "$innoDir\Baymax.exe" -Force
+function BuildSimAndItsFriends {
+    Write-Output "Building Sim and its friends, for channel: $channel"
+    # Build sim.exe, cli.exe and auto_update_helper.exe
+    cargo build --release --package sim --package cli --package auto_update_helper --target $target
+    Copy-Item -Path ".\$CargoOutDir\sim.exe" -Destination "$innoDir\Sim.exe" -Force
     Copy-Item -Path ".\$CargoOutDir\cli.exe" -Destination "$innoDir\cli.exe" -Force
     Copy-Item -Path ".\$CargoOutDir\auto_update_helper.exe" -Destination "$innoDir\auto_update_helper.exe" -Force
     # Build explorer_command_injector.dll
@@ -118,7 +118,7 @@ function BuildBaymaxAndItsFriends {
             cargo build --release --package explorer_command_injector --target $target
         }
     }
-    Copy-Item -Path ".\$CargoOutDir\explorer_command_injector.dll" -Destination "$innoDir\baymax_explorer_command_injector.dll" -Force
+    Copy-Item -Path ".\$CargoOutDir\explorer_command_injector.dll" -Destination "$innoDir\sim_explorer_command_injector.dll" -Force
 }
 
 function BuildRemoteServer {
@@ -133,23 +133,23 @@ function BuildRemoteServer {
         & "$innoDir\sign.ps1" $remoteServerSrc
     }
 
-    $remoteServerDst = "$env:BAYMAX_WORKSPACE\target\baymax-remote-server-windows-$Architecture.zip"
+    $remoteServerDst = "$env:SIM_WORKSPACE\target\sim-remote-server-windows-$Architecture.zip"
     Write-Output "Compressing remote_server to $remoteServerDst"
     Compress-Archive -Path $remoteServerSrc -DestinationPath $remoteServerDst -Force
 
     Write-Output "Remote server compressed successfully"
 }
 
-function ZipBaymaxAndItsFriendsDebug {
+function ZipSimAndItsFriendsDebug {
     $items = @(
-        ".\$CargoOutDir\baymax.pdb",
+        ".\$CargoOutDir\sim.pdb",
         ".\$CargoOutDir\cli.pdb",
         ".\$CargoOutDir\auto_update_helper.pdb",
         ".\$CargoOutDir\explorer_command_injector.pdb",
         ".\$CargoOutDir\remote_server.pdb"
     )
 
-    Compress-Archive -Path $items -DestinationPath ".\$CargoOutDir\baymax-$env:RELEASE_VERSION-$env:BAYMAX_RELEASE_CHANNEL.dbg.zip" -Force
+    Compress-Archive -Path $items -DestinationPath ".\$CargoOutDir\sim-$env:RELEASE_VERSION-$env:SIM_RELEASE_CHANNEL.dbg.zip" -Force
 }
 
 
@@ -163,10 +163,10 @@ function UploadToSentry {
         Write-Output "missing SENTRY_AUTH_TOKEN. skipping sentry upload."
         return
     }
-    Write-Output "Uploading baymax debug symbols to sentry..."
+    Write-Output "Uploading sim debug symbols to sentry..."
     for ($i = 1; $i -le 3; $i++) {
         try {
-            sentry-cli debug-files upload --include-sources --wait -p baymax -o baymax-dev $CargoOutDir
+            sentry-cli debug-files upload --include-sources --wait -p sim -o sim-dev $CargoOutDir
             break
         }
         catch {
@@ -183,28 +183,28 @@ function UploadToSentry {
 function MakeAppx {
     switch ($channel) {
         "stable" {
-            $manifestFile = "$env:BAYMAX_WORKSPACE\crates\explorer_command_injector\AppxManifest.xml"
+            $manifestFile = "$env:SIM_WORKSPACE\crates\explorer_command_injector\AppxManifest.xml"
         }
         "preview" {
-            $manifestFile = "$env:BAYMAX_WORKSPACE\crates\explorer_command_injector\AppxManifest-Preview.xml"
+            $manifestFile = "$env:SIM_WORKSPACE\crates\explorer_command_injector\AppxManifest-Preview.xml"
         }
         default {
-            $manifestFile = "$env:BAYMAX_WORKSPACE\crates\explorer_command_injector\AppxManifest-Nightly.xml"
+            $manifestFile = "$env:SIM_WORKSPACE\crates\explorer_command_injector\AppxManifest-Nightly.xml"
         }
     }
     Copy-Item -Path "$manifestFile" -Destination "$innoDir\make_appx\AppxManifest.xml"
     # Add makeAppx.exe to Path
     $sdk = "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64"
     $env:Path += ';' + $sdk
-    makeAppx.exe pack /d "$innoDir\make_appx" /p "$innoDir\baymax_explorer_command_injector.appx" /nv
+    makeAppx.exe pack /d "$innoDir\make_appx" /p "$innoDir\sim_explorer_command_injector.appx" /nv
 }
 
-function SignBaymaxAndItsFriends {
+function SignSimAndItsFriends {
     if (-not $env:CI) {
         return
     }
 
-    $files = "$innoDir\Baymax.exe,$innoDir\cli.exe,$innoDir\auto_update_helper.exe,$innoDir\baymax_explorer_command_injector.dll,$innoDir\baymax_explorer_command_injector.appx"
+    $files = "$innoDir\Sim.exe,$innoDir\cli.exe,$innoDir\auto_update_helper.exe,$innoDir\sim_explorer_command_injector.dll,$innoDir\sim_explorer_command_injector.appx"
     & "$innoDir\sign.ps1" $files
 }
 
@@ -226,10 +226,10 @@ function DownloadConpty {
 }
 
 function CollectFiles {
-    Move-Item -Path "$innoDir\baymax_explorer_command_injector.appx" -Destination "$innoDir\appx\baymax_explorer_command_injector.appx" -Force
-    Move-Item -Path "$innoDir\baymax_explorer_command_injector.dll" -Destination "$innoDir\appx\baymax_explorer_command_injector.dll" -Force
-    Move-Item -Path "$innoDir\cli.exe" -Destination "$innoDir\bin\baymax.exe" -Force
-    Move-Item -Path "$innoDir\baymax.sh" -Destination "$innoDir\bin\baymax" -Force
+    Move-Item -Path "$innoDir\sim_explorer_command_injector.appx" -Destination "$innoDir\appx\sim_explorer_command_injector.appx" -Force
+    Move-Item -Path "$innoDir\sim_explorer_command_injector.dll" -Destination "$innoDir\appx\sim_explorer_command_injector.dll" -Force
+    Move-Item -Path "$innoDir\cli.exe" -Destination "$innoDir\bin\sim.exe" -Force
+    Move-Item -Path "$innoDir\sim.sh" -Destination "$innoDir\bin\sim" -Force
     Move-Item -Path "$innoDir\auto_update_helper.exe" -Destination "$innoDir\tools\auto_update_helper.exe" -Force
     if($Architecture -eq "aarch64") {
         New-Item -Type Directory -Path "$innoDir\arm64" -Force
@@ -247,63 +247,63 @@ function CollectFiles {
 }
 
 function BuildInstaller {
-    $issFilePath = "$innoDir\baymax.iss"
+    $issFilePath = "$innoDir\sim.iss"
     switch ($channel) {
         "stable" {
             $appId = "{{2DB0DA96-CA55-49BB-AF4F-64AF36A86712}"
             $appIconName = "app-icon"
-            $appName = "Baymax"
-            $appDisplayName = "Baymax"
-            $appSetupName = "Baymax-$Architecture"
-            # The mutex name here should match the mutex name in crates\baymax\src\baymax\windows_only_instance.rs
-            $appMutex = "Baymax-Stable-Instance-Mutex"
-            $appExeName = "Baymax"
-            $regValueName = "Baymax"
-            $appUserId = "BaymaxIndustries.Baymax"
+            $appName = "Sim"
+            $appDisplayName = "Sim"
+            $appSetupName = "Sim-$Architecture"
+            # The mutex name here should match the mutex name in crates\sim\src\sim\windows_only_instance.rs
+            $appMutex = "Sim-Stable-Instance-Mutex"
+            $appExeName = "Sim"
+            $regValueName = "Sim"
+            $appUserId = "SimIndustries.Sim"
             $appShellNameShort = "Z&ed"
-            $appAppxFullName = "BaymaxIndustries.Baymax_1.0.0.0_neutral__japxn1gcva8rg"
+            $appAppxFullName = "SimIndustries.Sim_1.0.0.0_neutral__japxn1gcva8rg"
         }
         "preview" {
             $appId = "{{F70E4811-D0E2-4D88-AC99-D63752799F95}"
             $appIconName = "app-icon-preview"
-            $appName = "Baymax Preview"
-            $appDisplayName = "Baymax Preview"
-            $appSetupName = "Baymax-$Architecture"
-            # The mutex name here should match the mutex name in crates\baymax\src\baymax\windows_only_instance.rs
-            $appMutex = "Baymax-Preview-Instance-Mutex"
-            $appExeName = "Baymax"
-            $regValueName = "BaymaxPreview"
-            $appUserId = "BaymaxIndustries.Baymax.Preview"
+            $appName = "Sim Preview"
+            $appDisplayName = "Sim Preview"
+            $appSetupName = "Sim-$Architecture"
+            # The mutex name here should match the mutex name in crates\sim\src\sim\windows_only_instance.rs
+            $appMutex = "Sim-Preview-Instance-Mutex"
+            $appExeName = "Sim"
+            $regValueName = "SimPreview"
+            $appUserId = "SimIndustries.Sim.Preview"
             $appShellNameShort = "Z&ed Preview"
-            $appAppxFullName = "BaymaxIndustries.Baymax.Preview_1.0.0.0_neutral__japxn1gcva8rg"
+            $appAppxFullName = "SimIndustries.Sim.Preview_1.0.0.0_neutral__japxn1gcva8rg"
         }
         "nightly" {
             $appId = "{{1BDB21D3-14E7-433C-843C-9C97382B2FE0}"
             $appIconName = "app-icon-nightly"
-            $appName = "Baymax Nightly"
-            $appDisplayName = "Baymax Nightly"
-            $appSetupName = "Baymax-$Architecture"
-            # The mutex name here should match the mutex name in crates\baymax\src\baymax\windows_only_instance.rs
-            $appMutex = "Baymax-Nightly-Instance-Mutex"
-            $appExeName = "Baymax"
-            $regValueName = "BaymaxNightly"
-            $appUserId = "BaymaxIndustries.Baymax.Nightly"
+            $appName = "Sim Nightly"
+            $appDisplayName = "Sim Nightly"
+            $appSetupName = "Sim-$Architecture"
+            # The mutex name here should match the mutex name in crates\sim\src\sim\windows_only_instance.rs
+            $appMutex = "Sim-Nightly-Instance-Mutex"
+            $appExeName = "Sim"
+            $regValueName = "SimNightly"
+            $appUserId = "SimIndustries.Sim.Nightly"
             $appShellNameShort = "Z&ed Editor Nightly"
-            $appAppxFullName = "BaymaxIndustries.Baymax.Nightly_1.0.0.0_neutral__japxn1gcva8rg"
+            $appAppxFullName = "SimIndustries.Sim.Nightly_1.0.0.0_neutral__japxn1gcva8rg"
         }
         "dev" {
             $appId = "{{8357632E-24A4-4F32-BA97-E575B4D1FE5D}"
             $appIconName = "app-icon-dev"
-            $appName = "Baymax Dev"
-            $appDisplayName = "Baymax Dev"
-            $appSetupName = "Baymax-$Architecture"
-            # The mutex name here should match the mutex name in crates\baymax\src\baymax\windows_only_instance.rs
-            $appMutex = "Baymax-Dev-Instance-Mutex"
-            $appExeName = "Baymax"
-            $regValueName = "BaymaxDev"
-            $appUserId = "BaymaxIndustries.Baymax.Dev"
+            $appName = "Sim Dev"
+            $appDisplayName = "Sim Dev"
+            $appSetupName = "Sim-$Architecture"
+            # The mutex name here should match the mutex name in crates\sim\src\sim\windows_only_instance.rs
+            $appMutex = "Sim-Dev-Instance-Mutex"
+            $appExeName = "Sim"
+            $regValueName = "SimDev"
+            $appUserId = "SimIndustries.Sim.Dev"
             $appShellNameShort = "Z&ed Dev"
-            $appAppxFullName = "BaymaxIndustries.Baymax.Dev_1.0.0.0_neutral__japxn1gcva8rg"
+            $appAppxFullName = "SimIndustries.Sim.Dev_1.0.0.0_neutral__japxn1gcva8rg"
         }
         default {
             Write-Error "can't bundle installer for $channel."
@@ -319,7 +319,7 @@ function BuildInstaller {
     $definitions = @{
         "AppId"          = $appId
         "AppIconName"    = $appIconName
-        "OutputDir"      = "$env:BAYMAX_WORKSPACE\target"
+        "OutputDir"      = "$env:SIM_WORKSPACE\target"
         "AppSetupName"   = $appSetupName
         "AppName"        = $appName
         "AppDisplayName" = $appDisplayName
@@ -330,7 +330,7 @@ function BuildInstaller {
         "ShellNameShort" = $appShellNameShort
         "AppUserId"      = $appUserId
         "Version"        = "$env:RELEASE_VERSION"
-        "SourceDir"      = "$env:BAYMAX_WORKSPACE"
+        "SourceDir"      = "$env:SIM_WORKSPACE"
         "AppxFullName"   = $appAppxFullName
     }
 
@@ -360,19 +360,19 @@ function BuildInstaller {
     }
 }
 
-ParseBaymaxWorkspace
-$innoDir = "$env:BAYMAX_WORKSPACE\inno\$Architecture"
-$debugArchive = "$CargoOutDir\baymax-$env:RELEASE_VERSION-$env:BAYMAX_RELEASE_CHANNEL.dbg.zip"
-$debugStoreKey = "$env:BAYMAX_RELEASE_CHANNEL/baymax-$env:RELEASE_VERSION-$env:BAYMAX_RELEASE_CHANNEL.dbg.zip"
+ParseSimWorkspace
+$innoDir = "$env:SIM_WORKSPACE\inno\$Architecture"
+$debugArchive = "$CargoOutDir\sim-$env:RELEASE_VERSION-$env:SIM_RELEASE_CHANNEL.dbg.zip"
+$debugStoreKey = "$env:SIM_RELEASE_CHANNEL/sim-$env:RELEASE_VERSION-$env:SIM_RELEASE_CHANNEL.dbg.zip"
 
 CheckEnvironmentVariables
 PrepareForBundle
 GenerateLicenses
-BuildBaymaxAndItsFriends
+BuildSimAndItsFriends
 BuildRemoteServer
 MakeAppx
-SignBaymaxAndItsFriends
-ZipBaymaxAndItsFriendsDebug
+SignSimAndItsFriends
+ZipSimAndItsFriendsDebug
 DownloadAMDGpuServices
 DownloadConpty
 CollectFiles
@@ -385,8 +385,8 @@ if($env:CI) {
 if ($buildSuccess) {
     Write-Output "Build successful"
     if ($Install) {
-        Write-Output "Installing Baymax..."
-        Start-Process -FilePath "$env:BAYMAX_WORKSPACE/target/BaymaxEditorUserSetup-x64-$env:RELEASE_VERSION.exe"
+        Write-Output "Installing Sim..."
+        Start-Process -FilePath "$env:SIM_WORKSPACE/target/SimEditorUserSetup-x64-$env:RELEASE_VERSION.exe"
     }
     exit 0
 }

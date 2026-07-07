@@ -22,7 +22,7 @@ use db::{
 use gpui::{Axis, Bounds, Task, WindowBounds, WindowId, point, size};
 use project::{
     ProjectGroupKey,
-    bookmark_store::SerialibaymaxBookmark,
+    bookmark_store::SerialisimBookmark,
     debugger::breakpoint_store::{BreakpointState, SourceBreakpoint},
     trusted_worktrees::{DbTrustedPaths, RemoteHostLocation},
 };
@@ -45,16 +45,16 @@ use uuid::Uuid;
 
 use crate::{
     WorkspaceId,
-    path_list::{PathList, SerialibaymaxPathList},
+    path_list::{PathList, SerialisimPathList},
     persistence::model::RemoteConnectionKind,
 };
 
 use model::{
-    GroupId, ItemId, PaneId, RemoteConnectionId, SerialibaymaxItem, SerialibaymaxPane,
-    SerialibaymaxPaneGroup, SerialibaymaxWorkspace,
+    GroupId, ItemId, PaneId, RemoteConnectionId, SerialisimItem, SerialisimPane,
+    SerialisimPaneGroup, SerialisimWorkspace,
 };
 
-use self::model::{DockStructure, SerialibaymaxWorkspaceLocation, SessionWorkspace};
+use self::model::{DockStructure, SerialisimWorkspaceLocation, SessionWorkspace};
 
 // https://www.sqlite.org/limits.html
 // > <..> the maximum value of a host parameter number is SQLITE_MAX_VARIABLE_NUMBER,
@@ -76,9 +76,9 @@ fn contains_wsl_path(paths: &PathList) -> bool {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub(crate) struct SerialibaymaxAxis(pub(crate) gpui::Axis);
-impl sqlez::bindable::StaticColumnCount for SerialibaymaxAxis {}
-impl sqlez::bindable::Bind for SerialibaymaxAxis {
+pub(crate) struct SerialisimAxis(pub(crate) gpui::Axis);
+impl sqlez::bindable::StaticColumnCount for SerialisimAxis {}
+impl sqlez::bindable::Bind for SerialisimAxis {
     fn bind(
         &self,
         statement: &sqlez::statement::Statement,
@@ -92,7 +92,7 @@ impl sqlez::bindable::Bind for SerialibaymaxAxis {
     }
 }
 
-impl sqlez::bindable::Column for SerialibaymaxAxis {
+impl sqlez::bindable::Column for SerialisimAxis {
     fn column(
         statement: &mut sqlez::statement::Statement,
         start_index: i32,
@@ -102,7 +102,7 @@ impl sqlez::bindable::Column for SerialibaymaxAxis {
                 match axis_text.as_str() {
                     "Horizontal" => Self(Axis::Horizontal),
                     "Vertical" => Self(Axis::Vertical),
-                    _ => anyhow::bail!("Stored serialibaymax item kind is incorrect"),
+                    _ => anyhow::bail!("Stored serialisim item kind is incorrect"),
                 },
                 next_index,
             ))
@@ -111,25 +111,25 @@ impl sqlez::bindable::Column for SerialibaymaxAxis {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Default)]
-pub(crate) struct SerialibaymaxWindowBounds(pub(crate) WindowBounds);
+pub(crate) struct SerialisimWindowBounds(pub(crate) WindowBounds);
 
-impl StaticColumnCount for SerialibaymaxWindowBounds {
+impl StaticColumnCount for SerialisimWindowBounds {
     fn column_count() -> usize {
         5
     }
 }
 
-impl Bind for SerialibaymaxWindowBounds {
+impl Bind for SerialisimWindowBounds {
     fn bind(&self, statement: &Statement, start_index: i32) -> Result<i32> {
         match self.0 {
             WindowBounds::Windowed(bounds) => {
                 let next_index = statement.bind(&"Windowed", start_index)?;
                 statement.bind(
                     &(
-                        SerialibaymaxPixels(bounds.origin.x),
-                        SerialibaymaxPixels(bounds.origin.y),
-                        SerialibaymaxPixels(bounds.size.width),
-                        SerialibaymaxPixels(bounds.size.height),
+                        SerialisimPixels(bounds.origin.x),
+                        SerialisimPixels(bounds.origin.y),
+                        SerialisimPixels(bounds.size.width),
+                        SerialisimPixels(bounds.size.height),
                     ),
                     next_index,
                 )
@@ -138,10 +138,10 @@ impl Bind for SerialibaymaxWindowBounds {
                 let next_index = statement.bind(&"Maximized", start_index)?;
                 statement.bind(
                     &(
-                        SerialibaymaxPixels(bounds.origin.x),
-                        SerialibaymaxPixels(bounds.origin.y),
-                        SerialibaymaxPixels(bounds.size.width),
-                        SerialibaymaxPixels(bounds.size.height),
+                        SerialisimPixels(bounds.origin.x),
+                        SerialisimPixels(bounds.origin.y),
+                        SerialisimPixels(bounds.size.width),
+                        SerialisimPixels(bounds.size.height),
                     ),
                     next_index,
                 )
@@ -150,10 +150,10 @@ impl Bind for SerialibaymaxWindowBounds {
                 let next_index = statement.bind(&"FullScreen", start_index)?;
                 statement.bind(
                     &(
-                        SerialibaymaxPixels(bounds.origin.x),
-                        SerialibaymaxPixels(bounds.origin.y),
-                        SerialibaymaxPixels(bounds.size.width),
-                        SerialibaymaxPixels(bounds.size.height),
+                        SerialisimPixels(bounds.origin.x),
+                        SerialisimPixels(bounds.origin.y),
+                        SerialisimPixels(bounds.size.width),
+                        SerialisimPixels(bounds.size.height),
                     ),
                     next_index,
                 )
@@ -162,7 +162,7 @@ impl Bind for SerialibaymaxWindowBounds {
     }
 }
 
-impl Column for SerialibaymaxWindowBounds {
+impl Column for SerialisimWindowBounds {
     fn column(statement: &mut Statement, start_index: i32) -> Result<(Self, i32)> {
         let (window_state, next_index) = String::column(statement, start_index)?;
         let ((x, y, width, height), _): ((i32, i32, i32, i32), _) =
@@ -173,9 +173,9 @@ impl Column for SerialibaymaxWindowBounds {
         };
 
         let status = match window_state.as_str() {
-            "Windowed" | "Fixed" => SerialibaymaxWindowBounds(WindowBounds::Windowed(bounds)),
-            "Maximized" => SerialibaymaxWindowBounds(WindowBounds::Maximized(bounds)),
-            "FullScreen" => SerialibaymaxWindowBounds(WindowBounds::Fullscreen(bounds)),
+            "Windowed" | "Fixed" => SerialisimWindowBounds(WindowBounds::Windowed(bounds)),
+            "Maximized" => SerialisimWindowBounds(WindowBounds::Maximized(bounds)),
+            "FullScreen" => SerialisimWindowBounds(WindowBounds::Fullscreen(bounds)),
             _ => bail!("Window State did not have a valid string"),
         };
 
@@ -324,10 +324,10 @@ pub async fn write_multi_workspace_state(
     }
 }
 
-pub fn read_serialibaymax_multi_workspaces(
+pub fn read_serialisim_multi_workspaces(
     session_workspaces: Vec<model::SessionWorkspace>,
     cx: &App,
-) -> Vec<model::SerialibaymaxMultiWorkspace> {
+) -> Vec<model::SerialisimMultiWorkspace> {
     let mut window_groups: Vec<Vec<model::SessionWorkspace>> = Vec::new();
     let mut window_id_to_group: HashMap<WindowId, usize> = HashMap::default();
 
@@ -365,7 +365,7 @@ pub fn read_serialibaymax_multi_workspaces(
                 .or_else(|| group.iter().position(|ws| !ws.paths.is_empty()))
                 .or(Some(0))
                 .and_then(|index| group.into_iter().nth(index))?;
-            Some(model::SerialibaymaxMultiWorkspace {
+            Some(model::SerialisimMultiWorkspace {
                 active_workspace,
                 state,
             })
@@ -515,10 +515,10 @@ impl Column for Breakpoint {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-struct SerialibaymaxPixels(gpui::Pixels);
-impl sqlez::bindable::StaticColumnCount for SerialibaymaxPixels {}
+struct SerialisimPixels(gpui::Pixels);
+impl sqlez::bindable::StaticColumnCount for SerialisimPixels {}
 
-impl sqlez::bindable::Bind for SerialibaymaxPixels {
+impl sqlez::bindable::Bind for SerialisimPixels {
     fn bind(
         &self,
         statement: &sqlez::statement::Statement,
@@ -539,9 +539,9 @@ impl Domain for WorkspaceDb {
             CREATE TABLE workspaces(
                 workspace_id INTEGER PRIMARY KEY,
                 workspace_location BLOB UNIQUE,
-                dock_visible INTEGER, // Deprecated. Preserving so users can downgrade Baymax.
-                dock_anchor TEXT, // Deprecated. Preserving so users can downgrade Baymax.
-                dock_pane INTEGER, // Deprecated.  Preserving so users can downgrade Baymax.
+                dock_visible INTEGER, // Deprecated. Preserving so users can downgrade Sim.
+                dock_anchor TEXT, // Deprecated. Preserving so users can downgrade Sim.
+                dock_pane INTEGER, // Deprecated.  Preserving so users can downgrade Sim.
                 left_sidebar_open INTEGER, // Boolean
                 timestamp TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
                 FOREIGN KEY(dock_pane) REFERENCES panes(pane_id)
@@ -605,9 +605,9 @@ impl Domain for WorkspaceDb {
             CREATE TABLE workspaces_2(
                 workspace_id INTEGER PRIMARY KEY,
                 workspace_location BLOB UNIQUE,
-                dock_visible INTEGER, // Deprecated. Preserving so users can downgrade Baymax.
-                dock_anchor TEXT, // Deprecated. Preserving so users can downgrade Baymax.
-                dock_pane INTEGER, // Deprecated.  Preserving so users can downgrade Baymax.
+                dock_visible INTEGER, // Deprecated. Preserving so users can downgrade Sim.
+                dock_anchor TEXT, // Deprecated. Preserving so users can downgrade Sim.
+                dock_pane INTEGER, // Deprecated.  Preserving so users can downgrade Sim.
                 left_sidebar_open INTEGER, // Boolean
                 timestamp TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
                 window_state TEXT,
@@ -642,7 +642,7 @@ impl Domain for WorkspaceDb {
         ),
         // Add fullscreen field to workspace
         // Deprecated, `WindowBounds` holds the fullscreen state now.
-        // Preserving so users can downgrade Baymax.
+        // Preserving so users can downgrade Sim.
         sql!(
             ALTER TABLE workspaces ADD COLUMN fullscreen INTEGER; //bool
         ),
@@ -1057,13 +1057,13 @@ impl Domain for WorkspaceDb {
 db::static_connection!(WorkspaceDb, []);
 
 impl WorkspaceDb {
-    /// Returns a serialibaymax workspace for the given worktree_roots. If the passed array
+    /// Returns a serialisim workspace for the given worktree_roots. If the passed array
     /// is empty, the most recent workspace is returned instead. If no workspace for the
     /// passed roots is stored, returns none.
     pub(crate) fn workspace_for_roots<P: AsRef<Path>>(
         &self,
         worktree_roots: &[P],
-    ) -> Option<SerialibaymaxWorkspace> {
+    ) -> Option<SerialisimWorkspace> {
         self.workspace_for_roots_internal(worktree_roots, None)
     }
 
@@ -1071,7 +1071,7 @@ impl WorkspaceDb {
         &self,
         worktree_roots: &[P],
         remote_project_id: RemoteConnectionId,
-    ) -> Option<SerialibaymaxWorkspace> {
+    ) -> Option<SerialisimWorkspace> {
         self.workspace_for_roots_internal(worktree_roots, Some(remote_project_id))
     }
 
@@ -1079,7 +1079,7 @@ impl WorkspaceDb {
         &self,
         worktree_roots: &[P],
         remote_connection_id: Option<RemoteConnectionId>,
-    ) -> Option<SerialibaymaxWorkspace> {
+    ) -> Option<SerialisimWorkspace> {
         // paths are sorted before db interactions to ensure that the order of the paths
         // doesn't affect the workspace selection for existing workspaces
         let root_paths = PathList::new(worktree_roots);
@@ -1109,7 +1109,7 @@ impl WorkspaceDb {
             String,
             Option<String>,
             Option<String>,
-            Option<SerialibaymaxWindowBounds>,
+            Option<SerialisimWindowBounds>,
             Option<Uuid>,
             Option<bool>,
             DockStructure,
@@ -1155,12 +1155,12 @@ impl WorkspaceDb {
             .warn_on_err()
             .flatten()?;
 
-        let paths = PathList::deserialize(&SerialibaymaxPathList {
+        let paths = PathList::deserialize(&SerialisimPathList {
             paths,
             order: paths_order,
         });
         let identity_paths = identity_paths.map(|paths| {
-            PathList::deserialize(&SerialibaymaxPathList {
+            PathList::deserialize(&SerialisimPathList {
                 paths,
                 order: identity_paths_order.unwrap_or_default(),
             })
@@ -1174,11 +1174,11 @@ impl WorkspaceDb {
             None
         };
 
-        Some(SerialibaymaxWorkspace {
+        Some(SerialisimWorkspace {
             id: workspace_id,
             location: match remote_connection_options {
-                Some(options) => SerialibaymaxWorkspaceLocation::Remote(options),
-                None => SerialibaymaxWorkspaceLocation::Local,
+                Some(options) => SerialisimWorkspaceLocation::Remote(options),
+                None => SerialisimWorkspaceLocation::Local,
             },
             paths,
             identity_paths,
@@ -1202,7 +1202,7 @@ impl WorkspaceDb {
     pub(crate) fn workspace_for_id(
         &self,
         workspace_id: WorkspaceId,
-    ) -> Option<SerialibaymaxWorkspace> {
+    ) -> Option<SerialisimWorkspace> {
         let (
             paths,
             paths_order,
@@ -1219,7 +1219,7 @@ impl WorkspaceDb {
             String,
             Option<String>,
             Option<String>,
-            Option<SerialibaymaxWindowBounds>,
+            Option<SerialisimWindowBounds>,
             Option<Uuid>,
             Option<bool>,
             DockStructure,
@@ -1258,12 +1258,12 @@ impl WorkspaceDb {
             .warn_on_err()
             .flatten()?;
 
-        let paths = PathList::deserialize(&SerialibaymaxPathList {
+        let paths = PathList::deserialize(&SerialisimPathList {
             paths,
             order: paths_order,
         });
         let identity_paths = identity_paths.map(|paths| {
-            PathList::deserialize(&SerialibaymaxPathList {
+            PathList::deserialize(&SerialisimPathList {
                 paths,
                 order: identity_paths_order.unwrap_or_default(),
             })
@@ -1278,11 +1278,11 @@ impl WorkspaceDb {
             None
         };
 
-        Some(SerialibaymaxWorkspace {
+        Some(SerialisimWorkspace {
             id: workspace_id,
             location: match remote_connection_options {
-                Some(options) => SerialibaymaxWorkspaceLocation::Remote(options),
-                None => SerialibaymaxWorkspaceLocation::Local,
+                Some(options) => SerialisimWorkspaceLocation::Remote(options),
+                None => SerialisimWorkspaceLocation::Local,
             },
             paths,
             identity_paths,
@@ -1305,7 +1305,7 @@ impl WorkspaceDb {
     fn bookmarks(
         &self,
         workspace_id: WorkspaceId,
-    ) -> BTreeMap<Arc<Path>, Vec<SerialibaymaxBookmark>> {
+    ) -> BTreeMap<Arc<Path>, Vec<SerialisimBookmark>> {
         let bookmarks: Result<Vec<(PathBuf, Bookmark)>> = self
             .select_bound(sql! {
                 SELECT path, row
@@ -1327,7 +1327,7 @@ impl WorkspaceDb {
                     let path: Arc<Path> = path.into();
                     map.entry(path.clone())
                         .or_default()
-                        .push(SerialibaymaxBookmark(bookmark.row))
+                        .push(SerialisimBookmark(bookmark.row))
                 }
 
                 map
@@ -1457,15 +1457,15 @@ impl WorkspaceDb {
         ret
     }
 
-    pub(crate) async fn save_workspace(&self, workspace: SerialibaymaxWorkspace) {
+    pub(crate) async fn save_workspace(&self, workspace: SerialisimWorkspace) {
         let paths = workspace.paths.serialize();
         let identity_paths = workspace.identity_paths.map(|paths| paths.serialize());
         log::debug!("Saving workspace at location: {:?}", workspace.location);
         self.write(move |conn| {
             conn.with_savepoint("update_worktrees", || {
                 let remote_connection_id = match workspace.location.clone() {
-                    SerialibaymaxWorkspaceLocation::Local => None,
-                    SerialibaymaxWorkspaceLocation::Remote(connection_options) => {
+                    SerialisimWorkspaceLocation::Local => None,
+                    SerialisimWorkspaceLocation::Remote(connection_options) => {
                         Some(Self::get_or_create_remote_connection_internal(
                             conn,
                             connection_options
@@ -1815,9 +1815,9 @@ impl WorkspaceDb {
                 )| {
                     (
                         id,
-                        PathList::deserialize(&SerialibaymaxPathList { paths, order }),
+                        PathList::deserialize(&SerialisimPathList { paths, order }),
                         identity_paths.map(|paths| {
-                            PathList::deserialize(&SerialibaymaxPathList {
+                            PathList::deserialize(&SerialisimPathList {
                                 paths,
                                 order: identity_paths_order.unwrap_or_default(),
                             })
@@ -1860,7 +1860,7 @@ impl WorkspaceDb {
                 |(workspace_id, paths, order, window_id, remote_connection_id)| {
                     (
                         WorkspaceId(workspace_id),
-                        PathList::deserialize(&SerialibaymaxPathList { paths, order }),
+                        PathList::deserialize(&SerialisimPathList { paths, order }),
                         window_id,
                         remote_connection_id.map(RemoteConnectionId),
                     )
@@ -2021,7 +2021,7 @@ impl WorkspaceDb {
                 if let Some(connection_options) = remote_connections.get(&remote_connection_id) {
                     result.push(RecentWorkspace {
                         workspace_id: id,
-                        location: SerialibaymaxWorkspaceLocation::Remote(
+                        location: SerialisimWorkspaceLocation::Remote(
                             connection_options.clone(),
                         ),
                         paths: paths.clone(),
@@ -2043,7 +2043,7 @@ impl WorkspaceDb {
                     .unwrap_or_else(|| paths.clone());
                 result.push(RecentWorkspace {
                     workspace_id: id,
-                    location: SerialibaymaxWorkspaceLocation::Local,
+                    location: SerialisimWorkspaceLocation::Local,
                     paths,
                     identity_paths,
                     timestamp,
@@ -2056,7 +2056,7 @@ impl WorkspaceDb {
 
     // Returns the recent project workspaces suitable for recent-project UIs.
     // Entries are deduplicated by git worktree identity, but preserve the original
-    // serialibaymax paths for reopening.
+    // serialisim paths for reopening.
     pub async fn recent_project_workspaces(&self, fs: &dyn Fs) -> Result<Vec<RecentWorkspace>> {
         Ok(dedupe_recent_workspaces(
             self.recent_project_workspaces_ungrouped(fs).await?,
@@ -2069,8 +2069,8 @@ impl WorkspaceDb {
     ) -> Result<Vec<WorkspaceId>> {
         let target_paths = &target.identity_paths;
         let target_remote_connection = match &target.location {
-            SerialibaymaxWorkspaceLocation::Local => None,
-            SerialibaymaxWorkspaceLocation::Remote(connection) => {
+            SerialisimWorkspaceLocation::Local => None,
+            SerialisimWorkspaceLocation::Remote(connection) => {
                 Some(remote_connection_identity(connection))
             }
         };
@@ -2168,7 +2168,7 @@ impl WorkspaceDb {
     }
 
     // Returns the locations of the workspaces that were still opened when the last
-    // session was closed (i.e. when Baymax was quit).
+    // session was closed (i.e. when Sim was quit).
     // If `last_session_window_order` is provided, the returned locations are ordered
     // according to that.
     pub async fn last_session_workspace_locations(
@@ -2187,7 +2187,7 @@ impl WorkspaceDb {
             if let Some(remote_connection_id) = remote_connection_id {
                 workspaces.push(SessionWorkspace {
                     workspace_id,
-                    location: SerialibaymaxWorkspaceLocation::Remote(
+                    location: SerialisimWorkspaceLocation::Remote(
                         self.remote_connection(remote_connection_id)?,
                     ),
                     paths,
@@ -2199,7 +2199,7 @@ impl WorkspaceDb {
             if paths.is_empty() || Self::all_paths_exist_with_a_directory(paths.paths(), fs).await {
                 workspaces.push(SessionWorkspace {
                     workspace_id,
-                    location: SerialibaymaxWorkspaceLocation::Local,
+                    location: SerialisimWorkspaceLocation::Local,
                     paths,
                     window_id,
                 });
@@ -2218,13 +2218,13 @@ impl WorkspaceDb {
         Ok(workspaces)
     }
 
-    fn get_center_pane_group(&self, workspace_id: WorkspaceId) -> Result<SerialibaymaxPaneGroup> {
+    fn get_center_pane_group(&self, workspace_id: WorkspaceId) -> Result<SerialisimPaneGroup> {
         Ok(self
             .get_pane_group(workspace_id, None)?
             .into_iter()
             .next()
             .unwrap_or_else(|| {
-                SerialibaymaxPaneGroup::Pane(SerialibaymaxPane {
+                SerialisimPaneGroup::Pane(SerialisimPane {
                     active: true,
                     children: vec![],
                     pinned_count: 0,
@@ -2236,11 +2236,11 @@ impl WorkspaceDb {
         &self,
         workspace_id: WorkspaceId,
         group_id: Option<GroupId>,
-    ) -> Result<Vec<SerialibaymaxPaneGroup>> {
+    ) -> Result<Vec<SerialisimPaneGroup>> {
         type GroupKey = (Option<GroupId>, WorkspaceId);
         type GroupOrPane = (
             Option<GroupId>,
-            Option<SerialibaymaxAxis>,
+            Option<SerialisimAxis>,
             Option<PaneId>,
             Option<bool>,
             Option<usize>,
@@ -2283,13 +2283,13 @@ impl WorkspaceDb {
                     .map(|flexes: String| serde_json::from_str::<Vec<f32>>(&flexes))
                     .transpose()?;
 
-                Ok(SerialibaymaxPaneGroup::Group {
+                Ok(SerialisimPaneGroup::Group {
                     axis,
                     children: self.get_pane_group(workspace_id, Some(group_id))?,
                     flexes,
                 })
             } else if let Some((pane_id, active, pinned_count)) = maybe_pane {
-                Ok(SerialibaymaxPaneGroup::Pane(SerialibaymaxPane::new(
+                Ok(SerialisimPaneGroup::Pane(SerialisimPane::new(
                     self.get_items(pane_id)?,
                     active,
                     pinned_count,
@@ -2300,8 +2300,8 @@ impl WorkspaceDb {
         })
         // Filter out panes and pane groups which don't have any children or items
         .filter(|pane_group| match pane_group {
-            Ok(SerialibaymaxPaneGroup::Group { children, .. }) => !children.is_empty(),
-            Ok(SerialibaymaxPaneGroup::Pane(pane)) => !pane.children.is_empty(),
+            Ok(SerialisimPaneGroup::Group { children, .. }) => !children.is_empty(),
+            Ok(SerialisimPaneGroup::Pane(pane)) => !pane.children.is_empty(),
             _ => true,
         })
         .collect::<Result<_>>()
@@ -2310,14 +2310,14 @@ impl WorkspaceDb {
     fn save_pane_group(
         conn: &Connection,
         workspace_id: WorkspaceId,
-        pane_group: &SerialibaymaxPaneGroup,
+        pane_group: &SerialisimPaneGroup,
         parent: Option<(GroupId, usize)>,
     ) -> Result<()> {
         if parent.is_none() {
             log::debug!("Saving a pane group for workspace {workspace_id:?}");
         }
         match pane_group {
-            SerialibaymaxPaneGroup::Group {
+            SerialisimPaneGroup::Group {
                 axis,
                 children,
                 flexes,
@@ -2353,7 +2353,7 @@ impl WorkspaceDb {
 
                 Ok(())
             }
-            SerialibaymaxPaneGroup::Pane(pane) => {
+            SerialisimPaneGroup::Pane(pane) => {
                 Self::save_pane(conn, workspace_id, pane, parent)?;
                 Ok(())
             }
@@ -2363,7 +2363,7 @@ impl WorkspaceDb {
     fn save_pane(
         conn: &Connection,
         workspace_id: WorkspaceId,
-        pane: &SerialibaymaxPane,
+        pane: &SerialisimPane,
         parent: Option<(GroupId, usize)>,
     ) -> Result<PaneId> {
         let pane_id = conn.select_row_bound::<_, i64>(sql!(
@@ -2384,7 +2384,7 @@ impl WorkspaceDb {
         Ok(pane_id)
     }
 
-    fn get_items(&self, pane_id: PaneId) -> Result<Vec<SerialibaymaxItem>> {
+    fn get_items(&self, pane_id: PaneId) -> Result<Vec<SerialisimItem>> {
         self.select_bound(sql!(
             SELECT kind, item_id, active, preview FROM items
             WHERE pane_id = ?
@@ -2396,7 +2396,7 @@ impl WorkspaceDb {
         conn: &Connection,
         workspace_id: WorkspaceId,
         pane_id: PaneId,
-        items: &[SerialibaymaxItem],
+        items: &[SerialisimItem],
     ) -> Result<()> {
         let mut insert = conn.exec_bound(sql!(
             INSERT INTO items(workspace_id, pane_id, position, kind, item_id, active, preview) VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -2426,7 +2426,7 @@ impl WorkspaceDb {
     }
 
     query! {
-        pub(crate) async fn set_window_open_status(workspace_id: WorkspaceId, bounds: SerialibaymaxWindowBounds, display: Uuid) -> Result<()> {
+        pub(crate) async fn set_window_open_status(workspace_id: WorkspaceId, bounds: SerialisimWindowBounds, display: Uuid) -> Result<()> {
             UPDATE workspaces
             SET window_state = ?2,
                 window_x = ?3,
@@ -2654,7 +2654,7 @@ VALUES {placeholders};"#
 #[derive(Clone, Debug, PartialEq)]
 pub struct RecentWorkspace {
     pub workspace_id: WorkspaceId,
-    pub location: SerialibaymaxWorkspaceLocation,
+    pub location: SerialisimWorkspaceLocation,
     pub paths: PathList,
     pub identity_paths: PathList,
     pub timestamp: DateTime<Utc>,
@@ -2663,8 +2663,8 @@ pub struct RecentWorkspace {
 impl RecentWorkspace {
     pub fn project_group_key(&self) -> ProjectGroupKey {
         let host = match &self.location {
-            SerialibaymaxWorkspaceLocation::Local => None,
-            SerialibaymaxWorkspaceLocation::Remote(options) => Some(options.clone()),
+            SerialisimWorkspaceLocation::Local => None,
+            SerialisimWorkspaceLocation::Remote(options) => Some(options.clone()),
         };
         ProjectGroupKey::new(host, self.identity_paths.clone())
     }
@@ -2705,8 +2705,8 @@ fn dedupe_recent_workspaces(
     let mut result: Vec<RecentWorkspace> = Vec::new();
     for workspace in workspaces {
         let location_identity = match &workspace.location {
-            SerialibaymaxWorkspaceLocation::Local => None,
-            SerialibaymaxWorkspaceLocation::Remote(connection) => {
+            SerialisimWorkspaceLocation::Local => None,
+            SerialisimWorkspaceLocation::Remote(connection) => {
                 Some(remote_connection_identity(connection))
             }
         };
@@ -2765,8 +2765,8 @@ mod tests {
         multi_workspace::MultiWorkspace,
         persistence::{
             model::{
-                SerialibaymaxItem, SerialibaymaxPane, SerialibaymaxPaneGroup,
-                SerialibaymaxWorkspace, SessionWorkspace,
+                SerialisimItem, SerialisimPane, SerialisimPaneGroup,
+                SerialisimWorkspace, SessionWorkspace,
             },
             read_multi_workspace_state,
         },
@@ -2826,7 +2826,7 @@ mod tests {
         let active_workspace2_db_id = workspace2.read_with(cx, |ws, _| ws.database_id());
         assert_eq!(
             state_after_add.active_workspace_id, active_workspace2_db_id,
-            "After adding a second workspace, the serialibaymax active_workspace_id should match \
+            "After adding a second workspace, the serialisim active_workspace_id should match \
              the newly activated workspace's database id"
         );
 
@@ -2848,7 +2848,7 @@ mod tests {
             multi_workspace.read_with(cx, |mw, cx| mw.workspace().read(cx).database_id());
         assert_eq!(
             state_after_remove.active_workspace_id, remaining_db_id,
-            "After removing a workspace, the serialibaymax active_workspace_id should match \
+            "After removing a workspace, the serialisim active_workspace_id should match \
              the remaining active workspace's database id"
         );
     }
@@ -2902,11 +2902,11 @@ mod tests {
             hit_condition: Some(">= 3".into()),
         };
 
-        let workspace = SerialibaymaxWorkspace {
+        let workspace = SerialisimWorkspace {
             id,
             paths: PathList::new(&["/tmp"]),
             identity_paths: None,
-            location: SerialibaymaxWorkspaceLocation::Local,
+            location: SerialisimWorkspaceLocation::Local,
             center_group: Default::default(),
             window_bounds: Default::default(),
             display: Default::default(),
@@ -3059,11 +3059,11 @@ mod tests {
             hit_condition: None,
         };
 
-        let workspace = SerialibaymaxWorkspace {
+        let workspace = SerialisimWorkspace {
             id,
             paths: PathList::new(&["/tmp"]),
             identity_paths: None,
-            location: SerialibaymaxWorkspaceLocation::Local,
+            location: SerialisimWorkspaceLocation::Local,
             center_group: Default::default(),
             window_bounds: Default::default(),
             display: Default::default(),
@@ -3109,11 +3109,11 @@ mod tests {
         assert_eq!(loaded_breakpoints[0].state, breakpoint_to_remove.state);
         assert_eq!(loaded_breakpoints[0].path, Arc::from(singular_path));
 
-        let workspace_without_breakpoint = SerialibaymaxWorkspace {
+        let workspace_without_breakpoint = SerialisimWorkspace {
             id,
             paths: PathList::new(&["/tmp"]),
             identity_paths: None,
-            location: SerialibaymaxWorkspaceLocation::Local,
+            location: SerialisimWorkspaceLocation::Local,
             center_group: Default::default(),
             window_bounds: Default::default(),
             display: Default::default(),
@@ -3209,11 +3209,11 @@ mod tests {
         .await
         .unwrap();
 
-        let mut workspace_1 = SerialibaymaxWorkspace {
+        let mut workspace_1 = SerialisimWorkspace {
             id: WorkspaceId(1),
             paths: PathList::new(&["/tmp", "/tmp2"]),
             identity_paths: None,
-            location: SerialibaymaxWorkspaceLocation::Local,
+            location: SerialisimWorkspaceLocation::Local,
             center_group: Default::default(),
             window_bounds: Default::default(),
             display: Default::default(),
@@ -3226,11 +3226,11 @@ mod tests {
             user_toolchains: Default::default(),
         };
 
-        let workspace_2 = SerialibaymaxWorkspace {
+        let workspace_2 = SerialisimWorkspace {
             id: WorkspaceId(2),
             paths: PathList::new(&["/tmp"]),
             identity_paths: None,
-            location: SerialibaymaxWorkspaceLocation::Local,
+            location: SerialisimWorkspaceLocation::Local,
             center_group: Default::default(),
             window_bounds: Default::default(),
             display: Default::default(),
@@ -3281,9 +3281,9 @@ mod tests {
         assert_eq!(test_text_1, "test-text-1");
     }
 
-    fn group(axis: Axis, children: Vec<SerialibaymaxPaneGroup>) -> SerialibaymaxPaneGroup {
-        SerialibaymaxPaneGroup::Group {
-            axis: SerialibaymaxAxis(axis),
+    fn group(axis: Axis, children: Vec<SerialisimPaneGroup>) -> SerialisimPaneGroup {
+        SerialisimPaneGroup::Group {
+            axis: SerialisimAxis(axis),
             flexes: None,
             children,
         }
@@ -3306,28 +3306,28 @@ mod tests {
                 group(
                     Axis::Vertical,
                     vec![
-                        SerialibaymaxPaneGroup::Pane(SerialibaymaxPane::new(
+                        SerialisimPaneGroup::Pane(SerialisimPane::new(
                             vec![
-                                SerialibaymaxItem::new("Terminal", 5, false, false),
-                                SerialibaymaxItem::new("Terminal", 6, true, false),
+                                SerialisimItem::new("Terminal", 5, false, false),
+                                SerialisimItem::new("Terminal", 6, true, false),
                             ],
                             false,
                             0,
                         )),
-                        SerialibaymaxPaneGroup::Pane(SerialibaymaxPane::new(
+                        SerialisimPaneGroup::Pane(SerialisimPane::new(
                             vec![
-                                SerialibaymaxItem::new("Terminal", 7, true, false),
-                                SerialibaymaxItem::new("Terminal", 8, false, false),
+                                SerialisimItem::new("Terminal", 7, true, false),
+                                SerialisimItem::new("Terminal", 8, false, false),
                             ],
                             false,
                             0,
                         )),
                     ],
                 ),
-                SerialibaymaxPaneGroup::Pane(SerialibaymaxPane::new(
+                SerialisimPaneGroup::Pane(SerialisimPane::new(
                     vec![
-                        SerialibaymaxItem::new("Terminal", 9, false, false),
-                        SerialibaymaxItem::new("Terminal", 10, true, false),
+                        SerialisimItem::new("Terminal", 9, false, false),
+                        SerialisimItem::new("Terminal", 10, true, false),
                     ],
                     false,
                     0,
@@ -3335,11 +3335,11 @@ mod tests {
             ],
         );
 
-        let workspace = SerialibaymaxWorkspace {
+        let workspace = SerialisimWorkspace {
             id: WorkspaceId(5),
             paths: PathList::new(&["/tmp", "/tmp2"]),
             identity_paths: None,
-            location: SerialibaymaxWorkspaceLocation::Local,
+            location: SerialisimWorkspaceLocation::Local,
             center_group,
             window_bounds: Default::default(),
             bookmarks: Default::default(),
@@ -3371,11 +3371,11 @@ mod tests {
 
         let db = WorkspaceDb::open_test_db("test_basic_functionality").await;
 
-        let workspace_1 = SerialibaymaxWorkspace {
+        let workspace_1 = SerialisimWorkspace {
             id: WorkspaceId(1),
             paths: PathList::new(&["/tmp", "/tmp2"]),
             identity_paths: None,
-            location: SerialibaymaxWorkspaceLocation::Local,
+            location: SerialisimWorkspaceLocation::Local,
             center_group: Default::default(),
             window_bounds: Default::default(),
             bookmarks: Default::default(),
@@ -3388,11 +3388,11 @@ mod tests {
             user_toolchains: Default::default(),
         };
 
-        let mut workspace_2 = SerialibaymaxWorkspace {
+        let mut workspace_2 = SerialisimWorkspace {
             id: WorkspaceId(2),
             paths: PathList::new(&["/tmp"]),
             identity_paths: None,
-            location: SerialibaymaxWorkspaceLocation::Local,
+            location: SerialisimWorkspaceLocation::Local,
             center_group: Default::default(),
             window_bounds: Default::default(),
             display: Default::default(),
@@ -3432,11 +3432,11 @@ mod tests {
         );
 
         // Test other mechanism for mutating
-        let mut workspace_3 = SerialibaymaxWorkspace {
+        let mut workspace_3 = SerialisimWorkspace {
             id: WorkspaceId(3),
             paths: PathList::new(&["/tmp2", "/tmp"]),
             identity_paths: None,
-            location: SerialibaymaxWorkspaceLocation::Local,
+            location: SerialisimWorkspaceLocation::Local,
             center_group: Default::default(),
             window_bounds: Default::default(),
             bookmarks: Default::default(),
@@ -3472,11 +3472,11 @@ mod tests {
 
         let db = WorkspaceDb::open_test_db("test_serializing_workspaces_session_id").await;
 
-        let workspace_1 = SerialibaymaxWorkspace {
+        let workspace_1 = SerialisimWorkspace {
             id: WorkspaceId(1),
             paths: PathList::new(&["/tmp1"]),
             identity_paths: None,
-            location: SerialibaymaxWorkspaceLocation::Local,
+            location: SerialisimWorkspaceLocation::Local,
             center_group: Default::default(),
             window_bounds: Default::default(),
             display: Default::default(),
@@ -3489,11 +3489,11 @@ mod tests {
             user_toolchains: Default::default(),
         };
 
-        let workspace_2 = SerialibaymaxWorkspace {
+        let workspace_2 = SerialisimWorkspace {
             id: WorkspaceId(2),
             paths: PathList::new(&["/tmp2"]),
             identity_paths: None,
-            location: SerialibaymaxWorkspaceLocation::Local,
+            location: SerialisimWorkspaceLocation::Local,
             center_group: Default::default(),
             window_bounds: Default::default(),
             display: Default::default(),
@@ -3506,11 +3506,11 @@ mod tests {
             user_toolchains: Default::default(),
         };
 
-        let workspace_3 = SerialibaymaxWorkspace {
+        let workspace_3 = SerialisimWorkspace {
             id: WorkspaceId(3),
             paths: PathList::new(&["/tmp3"]),
             identity_paths: None,
-            location: SerialibaymaxWorkspaceLocation::Local,
+            location: SerialisimWorkspaceLocation::Local,
             center_group: Default::default(),
             window_bounds: Default::default(),
             display: Default::default(),
@@ -3523,11 +3523,11 @@ mod tests {
             user_toolchains: Default::default(),
         };
 
-        let workspace_4 = SerialibaymaxWorkspace {
+        let workspace_4 = SerialisimWorkspace {
             id: WorkspaceId(4),
             paths: PathList::new(&["/tmp4"]),
             identity_paths: None,
-            location: SerialibaymaxWorkspaceLocation::Local,
+            location: SerialisimWorkspaceLocation::Local,
             center_group: Default::default(),
             window_bounds: Default::default(),
             display: Default::default(),
@@ -3549,11 +3549,11 @@ mod tests {
             .await
             .unwrap();
 
-        let workspace_5 = SerialibaymaxWorkspace {
+        let workspace_5 = SerialisimWorkspace {
             id: WorkspaceId(5),
             paths: PathList::default(),
             identity_paths: None,
-            location: SerialibaymaxWorkspaceLocation::Remote(
+            location: SerialisimWorkspaceLocation::Remote(
                 db.remote_connection(connection_id).unwrap(),
             ),
             center_group: Default::default(),
@@ -3568,11 +3568,11 @@ mod tests {
             user_toolchains: Default::default(),
         };
 
-        let workspace_6 = SerialibaymaxWorkspace {
+        let workspace_6 = SerialisimWorkspace {
             id: WorkspaceId(6),
             paths: PathList::new(&["/tmp6c", "/tmp6b", "/tmp6a"]),
             identity_paths: None,
-            location: SerialibaymaxWorkspaceLocation::Local,
+            location: SerialisimWorkspaceLocation::Local,
             center_group: Default::default(),
             window_bounds: Default::default(),
             bookmarks: Default::default(),
@@ -3625,13 +3625,13 @@ mod tests {
 
     fn default_workspace<P: AsRef<Path>>(
         paths: &[P],
-        center_group: &SerialibaymaxPaneGroup,
-    ) -> SerialibaymaxWorkspace {
-        SerialibaymaxWorkspace {
+        center_group: &SerialisimPaneGroup,
+    ) -> SerialisimWorkspace {
+        SerialisimWorkspace {
             id: WorkspaceId(4),
             paths: PathList::new(paths),
             identity_paths: None,
-            location: SerialibaymaxWorkspaceLocation::Local,
+            location: SerialisimWorkspaceLocation::Local,
             center_group: center_group.clone(),
             window_bounds: Default::default(),
             display: Default::default(),
@@ -3670,11 +3670,11 @@ mod tests {
             (6, vec![dir4.path(), dir3.path(), dir2.path()], 4),
         ]
         .into_iter()
-        .map(|(id, paths, window_id)| SerialibaymaxWorkspace {
+        .map(|(id, paths, window_id)| SerialisimWorkspace {
             id: WorkspaceId(id),
             paths: PathList::new(paths.as_slice()),
             identity_paths: None,
-            location: SerialibaymaxWorkspaceLocation::Local,
+            location: SerialisimWorkspaceLocation::Local,
             center_group: Default::default(),
             window_bounds: Default::default(),
             display: Default::default(),
@@ -3710,37 +3710,37 @@ mod tests {
             [
                 SessionWorkspace {
                     workspace_id: WorkspaceId(4),
-                    location: SerialibaymaxWorkspaceLocation::Local,
+                    location: SerialisimWorkspaceLocation::Local,
                     paths: PathList::new(&[dir4.path()]),
                     window_id: Some(WindowId::from(2u64)),
                 },
                 SessionWorkspace {
                     workspace_id: WorkspaceId(3),
-                    location: SerialibaymaxWorkspaceLocation::Local,
+                    location: SerialisimWorkspaceLocation::Local,
                     paths: PathList::new(&[dir3.path()]),
                     window_id: Some(WindowId::from(8u64)),
                 },
                 SessionWorkspace {
                     workspace_id: WorkspaceId(2),
-                    location: SerialibaymaxWorkspaceLocation::Local,
+                    location: SerialisimWorkspaceLocation::Local,
                     paths: PathList::new(&[dir2.path()]),
                     window_id: Some(WindowId::from(5u64)),
                 },
                 SessionWorkspace {
                     workspace_id: WorkspaceId(1),
-                    location: SerialibaymaxWorkspaceLocation::Local,
+                    location: SerialisimWorkspaceLocation::Local,
                     paths: PathList::new(&[dir1.path()]),
                     window_id: Some(WindowId::from(9u64)),
                 },
                 SessionWorkspace {
                     workspace_id: WorkspaceId(5),
-                    location: SerialibaymaxWorkspaceLocation::Local,
+                    location: SerialisimWorkspaceLocation::Local,
                     paths: PathList::new(&[dir1.path(), dir2.path(), dir3.path()]),
                     window_id: Some(WindowId::from(3u64)),
                 },
                 SessionWorkspace {
                     workspace_id: WorkspaceId(6),
-                    location: SerialibaymaxWorkspaceLocation::Local,
+                    location: SerialisimWorkspaceLocation::Local,
                     paths: PathList::new(&[dir4.path(), dir3.path(), dir2.path()]),
                     window_id: Some(WindowId::from(4u64)),
                 },
@@ -3748,32 +3748,32 @@ mod tests {
         );
     }
 
-    fn pane_with_items(item_ids: &[ItemId]) -> SerialibaymaxPaneGroup {
-        SerialibaymaxPaneGroup::Pane(SerialibaymaxPane::new(
+    fn pane_with_items(item_ids: &[ItemId]) -> SerialisimPaneGroup {
+        SerialisimPaneGroup::Pane(SerialisimPane::new(
             item_ids
                 .iter()
-                .map(|id| SerialibaymaxItem::new("Terminal", *id, true, false))
+                .map(|id| SerialisimItem::new("Terminal", *id, true, false))
                 .collect(),
             true,
             0,
         ))
     }
 
-    fn empty_pane_group() -> SerialibaymaxPaneGroup {
-        SerialibaymaxPaneGroup::Pane(SerialibaymaxPane::default())
+    fn empty_pane_group() -> SerialisimPaneGroup {
+        SerialisimPaneGroup::Pane(SerialisimPane::default())
     }
 
     fn workspace_with(
         id: u64,
         paths: &[&Path],
-        center_group: SerialibaymaxPaneGroup,
+        center_group: SerialisimPaneGroup,
         session_id: Option<&str>,
-    ) -> SerialibaymaxWorkspace {
-        SerialibaymaxWorkspace {
+    ) -> SerialisimWorkspace {
+        SerialisimWorkspace {
             id: WorkspaceId(id as i64),
             paths: PathList::new(paths),
             identity_paths: None,
-            location: SerialibaymaxWorkspaceLocation::Local,
+            location: SerialisimWorkspaceLocation::Local,
             center_group,
             window_bounds: Default::default(),
             display: Default::default(),
@@ -3787,12 +3787,12 @@ mod tests {
         }
     }
 
-    fn remote_workspace_with(id: u64, host: &str, paths: &[&Path]) -> SerialibaymaxWorkspace {
-        SerialibaymaxWorkspace {
+    fn remote_workspace_with(id: u64, host: &str, paths: &[&Path]) -> SerialisimWorkspace {
+        SerialisimWorkspace {
             id: WorkspaceId(id as i64),
             paths: PathList::new(paths),
             identity_paths: None,
-            location: SerialibaymaxWorkspaceLocation::Remote(RemoteConnectionOptions::Ssh(
+            location: SerialisimWorkspaceLocation::Remote(RemoteConnectionOptions::Ssh(
                 SshConnectionOptions {
                     host: host.into(),
                     ..Default::default()
@@ -3822,7 +3822,7 @@ mod tests {
             .unwrap_or_else(|| paths.clone());
         RecentWorkspace {
             workspace_id,
-            location: SerialibaymaxWorkspaceLocation::Local,
+            location: SerialisimWorkspaceLocation::Local,
             paths,
             identity_paths,
             timestamp,
@@ -4052,11 +4052,11 @@ mod tests {
         ]
         .into_iter()
         .map(
-            |(id, remote_connection, window_id)| SerialibaymaxWorkspace {
+            |(id, remote_connection, window_id)| SerialisimWorkspace {
                 id: WorkspaceId(id),
                 paths: PathList::default(),
                 identity_paths: None,
-                location: SerialibaymaxWorkspaceLocation::Remote(remote_connection),
+                location: SerialisimWorkspaceLocation::Remote(remote_connection),
                 center_group: Default::default(),
                 window_bounds: Default::default(),
                 display: Default::default(),
@@ -4091,7 +4091,7 @@ mod tests {
             have[0],
             SessionWorkspace {
                 workspace_id: WorkspaceId(4),
-                location: SerialibaymaxWorkspaceLocation::Remote(remote_connections[3].clone()),
+                location: SerialisimWorkspaceLocation::Remote(remote_connections[3].clone()),
                 paths: PathList::default(),
                 window_id: Some(WindowId::from(2u64)),
             }
@@ -4100,7 +4100,7 @@ mod tests {
             have[1],
             SessionWorkspace {
                 workspace_id: WorkspaceId(3),
-                location: SerialibaymaxWorkspaceLocation::Remote(remote_connections[2].clone()),
+                location: SerialisimWorkspaceLocation::Remote(remote_connections[2].clone()),
                 paths: PathList::default(),
                 window_id: Some(WindowId::from(8u64)),
             }
@@ -4109,7 +4109,7 @@ mod tests {
             have[2],
             SessionWorkspace {
                 workspace_id: WorkspaceId(2),
-                location: SerialibaymaxWorkspaceLocation::Remote(remote_connections[1].clone()),
+                location: SerialisimWorkspaceLocation::Remote(remote_connections[1].clone()),
                 paths: PathList::default(),
                 window_id: Some(WindowId::from(5u64)),
             }
@@ -4118,7 +4118,7 @@ mod tests {
             have[3],
             SessionWorkspace {
                 workspace_id: WorkspaceId(1),
-                location: SerialibaymaxWorkspaceLocation::Remote(remote_connections[0].clone()),
+                location: SerialisimWorkspaceLocation::Remote(remote_connections[0].clone()),
                 paths: PathList::default(),
                 window_id: Some(WindowId::from(9u64)),
             }
@@ -4287,28 +4287,28 @@ mod tests {
                 group(
                     Axis::Vertical,
                     vec![
-                        SerialibaymaxPaneGroup::Pane(SerialibaymaxPane::new(
+                        SerialisimPaneGroup::Pane(SerialisimPane::new(
                             vec![
-                                SerialibaymaxItem::new("Terminal", 1, false, false),
-                                SerialibaymaxItem::new("Terminal", 2, true, false),
+                                SerialisimItem::new("Terminal", 1, false, false),
+                                SerialisimItem::new("Terminal", 2, true, false),
                             ],
                             false,
                             0,
                         )),
-                        SerialibaymaxPaneGroup::Pane(SerialibaymaxPane::new(
+                        SerialisimPaneGroup::Pane(SerialisimPane::new(
                             vec![
-                                SerialibaymaxItem::new("Terminal", 4, false, false),
-                                SerialibaymaxItem::new("Terminal", 3, true, false),
+                                SerialisimItem::new("Terminal", 4, false, false),
+                                SerialisimItem::new("Terminal", 3, true, false),
                             ],
                             true,
                             0,
                         )),
                     ],
                 ),
-                SerialibaymaxPaneGroup::Pane(SerialibaymaxPane::new(
+                SerialisimPaneGroup::Pane(SerialisimPane::new(
                     vec![
-                        SerialibaymaxItem::new("Terminal", 5, true, false),
-                        SerialibaymaxItem::new("Terminal", 6, false, false),
+                        SerialisimItem::new("Terminal", 5, true, false),
+                        SerialisimItem::new("Terminal", 6, false, false),
                     ],
                     false,
                     0,
@@ -4337,28 +4337,28 @@ mod tests {
                 group(
                     Axis::Vertical,
                     vec![
-                        SerialibaymaxPaneGroup::Pane(SerialibaymaxPane::new(
+                        SerialisimPaneGroup::Pane(SerialisimPane::new(
                             vec![
-                                SerialibaymaxItem::new("Terminal", 1, false, false),
-                                SerialibaymaxItem::new("Terminal", 2, true, false),
+                                SerialisimItem::new("Terminal", 1, false, false),
+                                SerialisimItem::new("Terminal", 2, true, false),
                             ],
                             false,
                             0,
                         )),
-                        SerialibaymaxPaneGroup::Pane(SerialibaymaxPane::new(
+                        SerialisimPaneGroup::Pane(SerialisimPane::new(
                             vec![
-                                SerialibaymaxItem::new("Terminal", 4, false, false),
-                                SerialibaymaxItem::new("Terminal", 3, true, false),
+                                SerialisimItem::new("Terminal", 4, false, false),
+                                SerialisimItem::new("Terminal", 3, true, false),
                             ],
                             true,
                             0,
                         )),
                     ],
                 ),
-                SerialibaymaxPaneGroup::Pane(SerialibaymaxPane::new(
+                SerialisimPaneGroup::Pane(SerialisimPane::new(
                     vec![
-                        SerialibaymaxItem::new("Terminal", 5, false, false),
-                        SerialibaymaxItem::new("Terminal", 6, true, false),
+                        SerialisimItem::new("Terminal", 5, false, false),
+                        SerialisimItem::new("Terminal", 6, true, false),
                     ],
                     false,
                     0,
@@ -4375,18 +4375,18 @@ mod tests {
         workspace.center_group = group(
             Axis::Vertical,
             vec![
-                SerialibaymaxPaneGroup::Pane(SerialibaymaxPane::new(
+                SerialisimPaneGroup::Pane(SerialisimPane::new(
                     vec![
-                        SerialibaymaxItem::new("Terminal", 1, false, false),
-                        SerialibaymaxItem::new("Terminal", 2, true, false),
+                        SerialisimItem::new("Terminal", 1, false, false),
+                        SerialisimItem::new("Terminal", 2, true, false),
                     ],
                     false,
                     0,
                 )),
-                SerialibaymaxPaneGroup::Pane(SerialibaymaxPane::new(
+                SerialisimPaneGroup::Pane(SerialisimPane::new(
                     vec![
-                        SerialibaymaxItem::new("Terminal", 4, true, false),
-                        SerialibaymaxItem::new("Terminal", 3, false, false),
+                        SerialisimItem::new("Terminal", 4, true, false),
+                        SerialisimItem::new("Terminal", 3, false, false),
                     ],
                     true,
                     0,
@@ -4411,16 +4411,16 @@ mod tests {
         // Create a workspace with empty paths (empty workspace)
         let empty_paths: &[&str] = &[];
         let display_uuid = Uuid::new_v4();
-        let window_bounds = SerialibaymaxWindowBounds(WindowBounds::Windowed(Bounds {
+        let window_bounds = SerialisimWindowBounds(WindowBounds::Windowed(Bounds {
             origin: point(px(100.0), px(200.0)),
             size: size(px(800.0), px(600.0)),
         }));
 
-        let workspace = SerialibaymaxWorkspace {
+        let workspace = SerialisimWorkspace {
             id,
             paths: PathList::new(empty_paths),
             identity_paths: None,
-            location: SerialibaymaxWorkspaceLocation::Local,
+            location: SerialisimWorkspaceLocation::Local,
             center_group: Default::default(),
             window_bounds: None,
             display: None,
@@ -4494,11 +4494,11 @@ mod tests {
         ];
 
         for (id, dir, window_id) in &workspaces_data {
-            db.save_workspace(SerialibaymaxWorkspace {
+            db.save_workspace(SerialisimWorkspace {
                 id: WorkspaceId(*id),
                 paths: PathList::new(&[*dir]),
                 identity_paths: None,
-                location: SerialibaymaxWorkspaceLocation::Local,
+                location: SerialisimWorkspaceLocation::Local,
                 center_group: Default::default(),
                 window_bounds: Default::default(),
                 display: Default::default(),
@@ -4569,7 +4569,7 @@ mod tests {
     }
 
     #[gpui::test]
-    async fn test_read_serialibaymax_multi_workspaces_with_state(cx: &mut gpui::TestAppContext) {
+    async fn test_read_serialisim_multi_workspaces_with_state(cx: &mut gpui::TestAppContext) {
         use crate::persistence::model::MultiWorkspaceState;
 
         // Write multi-workspace state for two windows via the scoped KVP.
@@ -4606,31 +4606,31 @@ mod tests {
         let session_workspaces = vec![
             SessionWorkspace {
                 workspace_id: WorkspaceId(1),
-                location: SerialibaymaxWorkspaceLocation::Local,
+                location: SerialisimWorkspaceLocation::Local,
                 paths: PathList::new(&["/a"]),
                 window_id: Some(window_10),
             },
             SessionWorkspace {
                 workspace_id: WorkspaceId(2),
-                location: SerialibaymaxWorkspaceLocation::Local,
+                location: SerialisimWorkspaceLocation::Local,
                 paths: PathList::new(&["/b"]),
                 window_id: Some(window_10),
             },
             SessionWorkspace {
                 workspace_id: WorkspaceId(3),
-                location: SerialibaymaxWorkspaceLocation::Local,
+                location: SerialisimWorkspaceLocation::Local,
                 paths: PathList::new(&["/c"]),
                 window_id: Some(window_20),
             },
             SessionWorkspace {
                 workspace_id: WorkspaceId(4),
-                location: SerialibaymaxWorkspaceLocation::Local,
+                location: SerialisimWorkspaceLocation::Local,
                 paths: PathList::new(&["/d"]),
                 window_id: None,
             },
         ];
 
-        let results = cx.update(|cx| read_serialibaymax_multi_workspaces(session_workspaces, cx));
+        let results = cx.update(|cx| read_serialisim_multi_workspaces(session_workspaces, cx));
 
         // Should produce 3 results: window 10, window 20, and the orphan.
         assert_eq!(results.len(), 3);
@@ -4687,9 +4687,9 @@ mod tests {
         task.await;
 
         // Read the workspace back from the DB and verify serialization happened.
-        let serialibaymax = db.workspace_for_id(workspace_id);
+        let serialisim = db.workspace_for_id(workspace_id);
         assert!(
-            serialibaymax.is_some(),
+            serialisim.is_some(),
             "flush_serialization should have persisted the workspace to DB"
         );
     }
@@ -4732,17 +4732,17 @@ mod tests {
         let state = cx.update(|_, cx| read_multi_workspace_state(window_id, cx));
         assert_eq!(
             state.active_workspace_id, new_workspace_db_id,
-            "Serialibaymax active_workspace_id should match the new workspace's database_id"
+            "Serialisim active_workspace_id should match the new workspace's database_id"
         );
 
         // The individual workspace row should exist with real data
         // (not just the bare DEFAULT VALUES row from next_id).
         let workspace_id = new_workspace_db_id.unwrap();
         let db = cx.update(|_, cx| WorkspaceDb::global(cx));
-        let serialibaymax = db.workspace_for_id(workspace_id);
+        let serialisim = db.workspace_for_id(workspace_id);
         assert!(
-            serialibaymax.is_some(),
-            "Newly created workspace should be fully serialibaymax in the DB after database_id assignment"
+            serialisim.is_some(),
+            "Newly created workspace should be fully serialisim in the DB after database_id assignment"
         );
     }
 
@@ -4781,11 +4781,11 @@ mod tests {
 
         // Save a full workspace row to the DB directly.
         let session_id = format!("remove-test-session-{}", Uuid::new_v4());
-        db.save_workspace(SerialibaymaxWorkspace {
+        db.save_workspace(SerialisimWorkspace {
             id: workspace2_db_id,
             paths: PathList::new(&[&dir]),
             identity_paths: None,
-            location: SerialibaymaxWorkspaceLocation::Local,
+            location: SerialisimWorkspaceLocation::Local,
             center_group: Default::default(),
             window_bounds: Default::default(),
             display: Default::default(),
@@ -4878,11 +4878,11 @@ mod tests {
         let session_id = "test-zombie-session";
         let window_id_val: u64 = 42;
 
-        db.save_workspace(SerialibaymaxWorkspace {
+        db.save_workspace(SerialisimWorkspace {
             id: ws1_id,
             paths: PathList::new(&[dir1.path()]),
             identity_paths: None,
-            location: SerialibaymaxWorkspaceLocation::Local,
+            location: SerialisimWorkspaceLocation::Local,
             center_group: Default::default(),
             window_bounds: Default::default(),
             display: Default::default(),
@@ -4896,11 +4896,11 @@ mod tests {
         })
         .await;
 
-        db.save_workspace(SerialibaymaxWorkspace {
+        db.save_workspace(SerialisimWorkspace {
             id: ws2_id,
             paths: PathList::new(&[dir2.path()]),
             identity_paths: None,
-            location: SerialibaymaxWorkspaceLocation::Local,
+            location: SerialisimWorkspaceLocation::Local,
             center_group: Default::default(),
             window_bounds: Default::default(),
             display: Default::default(),
@@ -4976,11 +4976,11 @@ mod tests {
 
         // Save a full workspace row to the DB directly and let it settle.
         let session_id = format!("pending-removal-session-{}", Uuid::new_v4());
-        db.save_workspace(SerialibaymaxWorkspace {
+        db.save_workspace(SerialisimWorkspace {
             id: workspace2_db_id,
             paths: PathList::new(&[&dir]),
             identity_paths: None,
-            location: SerialibaymaxWorkspaceLocation::Local,
+            location: SerialisimWorkspaceLocation::Local,
             center_group: Default::default(),
             window_bounds: Default::default(),
             display: Default::default(),
@@ -5084,11 +5084,11 @@ mod tests {
         cx.executor().advance_clock(Duration::from_millis(200));
         cx.run_until_parked();
 
-        let serialibaymax = db
+        let serialisim = db
             .workspace_for_id(workspace_id)
             .expect("workspace row should still exist");
         assert!(
-            serialibaymax.window_bounds.is_some(),
+            serialisim.window_bounds.is_some(),
             "The bounds observer should write bounds for the workspace's real DB ID, \
              even when the workspace was created via create_workspace (where the ID \
              is assigned asynchronously after construction)."
@@ -5422,7 +5422,7 @@ mod tests {
             WorkspaceDb::open_test_db("test_recent_project_workspaces_remote_identity_hint").await;
 
         let workspace = remote_workspace_with(1, "example.com", &[Path::new("/repo/feature-a")]);
-        db.save_workspace(SerialibaymaxWorkspace {
+        db.save_workspace(SerialisimWorkspace {
             identity_paths: Some(PathList::new(&["/repo"])),
             ..workspace
         })
@@ -5552,12 +5552,12 @@ mod tests {
         )
         .await;
 
-        db.save_workspace(SerialibaymaxWorkspace {
+        db.save_workspace(SerialisimWorkspace {
             identity_paths: Some(PathList::new(&["/the-group"])),
             ..workspace_with(1, &[Path::new("/the-group")], empty_pane_group(), None)
         })
         .await;
-        db.save_workspace(SerialibaymaxWorkspace {
+        db.save_workspace(SerialisimWorkspace {
             identity_paths: Some(PathList::new(&["/the-group"])),
             ..workspace_with(
                 2,
@@ -5673,7 +5673,7 @@ mod tests {
             "Active workspace should have a database ID"
         );
 
-        // --- Phase 2: Read back and verify the serialibaymax state ---
+        // --- Phase 2: Read back and verify the serialisim state ---
 
         let session_id = multi_workspace
             .read_with(cx, |mw, cx| mw.workspace().read(cx).session_id())
@@ -5689,23 +5689,23 @@ mod tests {
         );
 
         let multi_workspaces =
-            cx.update(|_, cx| read_serialibaymax_multi_workspaces(session_workspaces, cx));
+            cx.update(|_, cx| read_serialisim_multi_workspaces(session_workspaces, cx));
         assert_eq!(
             multi_workspaces.len(),
             1,
             "All workspaces share one window, so there should be exactly one multi-workspace"
         );
 
-        let serialibaymax = &multi_workspaces[0];
+        let serialisim = &multi_workspaces[0];
         assert_eq!(
-            serialibaymax.active_workspace.workspace_id,
+            serialisim.active_workspace.workspace_id,
             active_db_id.unwrap(),
         );
-        assert_eq!(serialibaymax.state.project_groups.len(), 2,);
+        assert_eq!(serialisim.state.project_groups.len(), 2,);
 
-        // Verify the serialibaymax project group keys round-trip back to the
+        // Verify the serialisim project group keys round-trip back to the
         // originals.
-        let restored_keys: Vec<ProjectGroupKey> = serialibaymax
+        let restored_keys: Vec<ProjectGroupKey> = serialisim
             .state
             .project_groups
             .iter()
@@ -5718,7 +5718,7 @@ mod tests {
         ];
         assert_eq!(
             restored_keys, expected_keys,
-            "Deserialibaymax project group keys should match the originals"
+            "Deserialisim project group keys should match the originals"
         );
 
         // --- Phase 3: Restore the window and verify the result ---
@@ -5726,11 +5726,11 @@ mod tests {
         let app_state =
             multi_workspace.read_with(cx, |mw, cx| mw.workspace().read(cx).app_state().clone());
 
-        let serialibaymax_mw = multi_workspaces.into_iter().next().unwrap();
+        let serialisim_mw = multi_workspaces.into_iter().next().unwrap();
         let restored_handle: gpui::WindowHandle<MultiWorkspace> = cx
             .update(|_, cx| {
                 cx.spawn(async move |mut cx| {
-                    crate::restore_multiworkspace(serialibaymax_mw, app_state, &mut cx).await
+                    crate::restore_multiworkspace(serialisim_mw, app_state, &mut cx).await
                 })
             })
             .await

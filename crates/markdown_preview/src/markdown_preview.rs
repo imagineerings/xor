@@ -3,7 +3,7 @@ use workspace::Workspace;
 
 pub mod markdown_preview_view;
 
-pub use baymax_actions::preview::markdown::{OpenPreview, OpenPreviewToTheSide};
+pub use sim_actions::preview::markdown::{OpenPreview, OpenPreviewToTheSide};
 
 actions!(
     markdown,

@@ -10,14 +10,14 @@ fi
 mkdir -p snap/gui
 
 export DO_STARTUP_NOTIFY="true"
-export APP_NAME="Baymax"
-export APP_CLI="baymax"
-export APP_ICON="\${SNAP}/meta/gui/baymax.png"
+export APP_NAME="Sim"
+export APP_CLI="sim"
+export APP_ICON="\${SNAP}/meta/gui/sim.png"
 export APP_ARGS="%U"
-envsubst < "crates/baymax/resources/baymax.desktop.in" > "snap/gui/baymax.desktop"
-cp "crates/baymax/resources/app-icon.png" "snap/gui/baymax.png"
+envsubst < "crates/sim/resources/sim.desktop.in" > "snap/gui/sim.desktop"
+cp "crates/sim/resources/app-icon.png" "snap/gui/sim.png"
 
-RELEASE_VERSION="$1" envsubst < crates/baymax/resources/snap/snapcraft.yaml.in > snap/snapcraft.yaml
+RELEASE_VERSION="$1" envsubst < crates/sim/resources/snap/snapcraft.yaml.in > snap/snapcraft.yaml
 
 # Clean seems to be needed to actually check that the snapcraft.yaml
 # works.  For example, when a `stage-package` is removed, it will

@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-Collaboration features connect the mobile app to the Baymax Collab Server via WebSocket. The architecture separates channel browsing, channel chat, contacts, and shared documents into distinct feature modules that share the collab WebSocket connection. The design prioritizes real-time updates via WebSocket events with REST fallback for initial data loading.
+Collaboration features connect the mobile app to the Sim Collab Server via WebSocket. The architecture separates channel browsing, channel chat, contacts, and shared documents into distinct feature modules that share the collab WebSocket connection. The design prioritizes real-time updates via WebSocket events with REST fallback for initial data loading.
 
 ### Key Decisions
 

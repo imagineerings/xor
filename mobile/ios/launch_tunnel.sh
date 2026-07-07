@@ -14,9 +14,9 @@ NC='\033[0m' # No Color
 # Configuration
 PREFERRED_PORT=62998
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BAYMAXED_URL="https://github.com/michaelneale/baymax-tunnel/releases/download/test/baymaxed"
-TUNNEL_DIR="${HOME}/.baymax-tunnel"
-BAYMAXED_LOCAL_PATH="${TUNNEL_DIR}/baymaxed"
+SIMED_URL="https://github.com/michaelneale/sim-tunnel/releases/download/test/simed"
+TUNNEL_DIR="${HOME}/.sim-tunnel"
+SIMED_LOCAL_PATH="${TUNNEL_DIR}/simed"
 TUNNEL_REPO="https://github.com/michaelneale/lapstone-tunnel"
 TUNNEL_CLIENT_PATH="${TUNNEL_DIR}/client.js"
 WORKER_URL="https://cloudflare-tunnel-proxy.michael-neale.workers.dev"
@@ -54,30 +54,30 @@ else
     echo -e "${YELLOW}✓ Using available port $PORT (preferred $PREFERRED_PORT was in use)${NC}"
 fi
 
-# Function to download baymaxed binary
-download_baymaxd() {
+# Function to download simed binary
+download_simd() {
     echo ""
     echo -e "${BOLD}${MAGENTA}╔═══════════════════════════════════════════════════════════════════════╗${NC}"
     echo -e "${BOLD}${MAGENTA}║                                                                       ║${NC}"
-    echo -e "${BOLD}${MAGENTA}║                   🚀  DOWNLOADING BAYMAXED BINARY  🚀                   ║${NC}"
+    echo -e "${BOLD}${MAGENTA}║                   🚀  DOWNLOADING SIMED BINARY  🚀                   ║${NC}"
     echo -e "${BOLD}${MAGENTA}║                                                                       ║${NC}"
     echo -e "${BOLD}${MAGENTA}╚═══════════════════════════════════════════════════════════════════════╝${NC}"
     echo ""
-    echo -e "${BOLD}${CYAN}⬇️  Fetching from: ${BAYMAXED_URL}${NC}"
-    echo -e "${BOLD}${CYAN}📦 Saving to: ${BAYMAXED_LOCAL_PATH}${NC}"
+    echo -e "${BOLD}${CYAN}⬇️  Fetching from: ${SIMED_URL}${NC}"
+    echo -e "${BOLD}${CYAN}📦 Saving to: ${SIMED_LOCAL_PATH}${NC}"
     echo ""
     
     # Ensure tunnel directory exists
     mkdir -p "$TUNNEL_DIR"
     
-    if curl -L -o "$BAYMAXED_LOCAL_PATH" "$BAYMAXED_URL"; then
-        chmod +x "$BAYMAXED_LOCAL_PATH"
+    if curl -L -o "$SIMED_LOCAL_PATH" "$SIMED_URL"; then
+        chmod +x "$SIMED_LOCAL_PATH"
         echo ""
         echo -e "${BOLD}${GREEN}╔═══════════════════════════════════════════════════════════════════════╗${NC}"
         echo -e "${BOLD}${GREEN}║                                                                       ║${NC}"
         echo -e "${BOLD}${GREEN}║                  ✅  DOWNLOAD SUCCESSFUL!  ✅                         ║${NC}"
         echo -e "${BOLD}${GREEN}║                                                                       ║${NC}"
-        echo -e "${BOLD}${GREEN}║              baymaxed binary is now available locally!                  ║${NC}"
+        echo -e "${BOLD}${GREEN}║              simed binary is now available locally!                  ║${NC}"
         echo -e "${BOLD}${GREEN}║                                                                       ║${NC}"
         echo -e "${BOLD}${GREEN}╚═══════════════════════════════════════════════════════════════════════╝${NC}"
         echo ""
@@ -95,40 +95,40 @@ download_baymaxd() {
     fi
 }
 
-# Determine which baymaxed to use
-BAYMAXED_CMD=""
-if command -v baymaxed &> /dev/null; then
+# Determine which simed to use
+SIMED_CMD=""
+if command -v simed &> /dev/null; then
     # Found in PATH
-    BAYMAXED_CMD="baymaxed"
+    SIMED_CMD="simed"
     echo ""
     echo -e "${BOLD}${BLUE}╔═══════════════════════════════════════════════════════════════════════╗${NC}"
     echo -e "${BOLD}${BLUE}║                                                                       ║${NC}"
-    echo -e "${BOLD}${BLUE}║                   📍  USING BAYMAXED FROM PATH  📍                      ║${NC}"
+    echo -e "${BOLD}${BLUE}║                   📍  USING SIMED FROM PATH  📍                      ║${NC}"
     echo -e "${BOLD}${BLUE}║                                                                       ║${NC}"
     echo -e "${BOLD}${BLUE}╚═══════════════════════════════════════════════════════════════════════╝${NC}"
     echo ""
-    echo -e "${BOLD}${CYAN}📂 Location: $(which baymaxed)${NC}"
+    echo -e "${BOLD}${CYAN}📂 Location: $(which simed)${NC}"
     echo ""
-elif [ -f "$BAYMAXED_LOCAL_PATH" ]; then
+elif [ -f "$SIMED_LOCAL_PATH" ]; then
     # Found locally
-    BAYMAXED_CMD="$BAYMAXED_LOCAL_PATH"
+    SIMED_CMD="$SIMED_LOCAL_PATH"
     echo ""
     echo -e "${BOLD}${YELLOW}╔═══════════════════════════════════════════════════════════════════════╗${NC}"
     echo -e "${BOLD}${YELLOW}║                                                                       ║${NC}"
-    echo -e "${BOLD}${YELLOW}║                  📦  USING LOCAL BAYMAXED BINARY  📦                    ║${NC}"
+    echo -e "${BOLD}${YELLOW}║                  📦  USING LOCAL SIMED BINARY  📦                    ║${NC}"
     echo -e "${BOLD}${YELLOW}║                                                                       ║${NC}"
     echo -e "${BOLD}${YELLOW}╚═══════════════════════════════════════════════════════════════════════╝${NC}"
     echo ""
-    echo -e "${BOLD}${CYAN}📂 Location: $BAYMAXED_LOCAL_PATH${NC}"
+    echo -e "${BOLD}${CYAN}📂 Location: $SIMED_LOCAL_PATH${NC}"
     echo ""
 else
     # Not found anywhere - download it
-    if download_baymaxd; then
-        BAYMAXED_CMD="$BAYMAXED_LOCAL_PATH"
+    if download_simd; then
+        SIMED_CMD="$SIMED_LOCAL_PATH"
     else
-        echo -e "${RED}Error: Failed to download baymaxed${NC}"
-        echo -e "${YELLOW}Please manually download from: ${BAYMAXED_URL}${NC}"
-        echo -e "${YELLOW}Or add baymax/target/release to your PATH${NC}"
+        echo -e "${RED}Error: Failed to download simed${NC}"
+        echo -e "${YELLOW}Please manually download from: ${SIMED_URL}${NC}"
+        echo -e "${YELLOW}Or add sim/target/release to your PATH${NC}"
         exit 1
     fi
 fi
@@ -160,8 +160,8 @@ setup_tunnel_client() {
             echo -e "${YELLOW}$TUNNEL_DIR exists but is not a git repository${NC}"
             echo -e "${YELLOW}Saving existing binary and re-cloning...${NC}"
             # Move the binary if it exists
-            if [ -f "$TUNNEL_DIR/baymaxed" ]; then
-                mv "$TUNNEL_DIR/baymaxed" /tmp/baymaxed.backup
+            if [ -f "$TUNNEL_DIR/simed" ]; then
+                mv "$TUNNEL_DIR/simed" /tmp/simed.backup
             fi
             rm -rf "$TUNNEL_DIR"
         fi
@@ -170,9 +170,9 @@ setup_tunnel_client() {
         if git clone "$TUNNEL_REPO" "$TUNNEL_DIR"; then
             echo -e "${GREEN}✓ Repository cloned successfully${NC}"
             # Restore the binary if we backed it up
-            if [ -f /tmp/baymaxed.backup ]; then
-                mv /tmp/baymaxed.backup "$TUNNEL_DIR/baymaxed"
-                chmod +x "$TUNNEL_DIR/baymaxed"
+            if [ -f /tmp/simed.backup ]; then
+                mv /tmp/simed.backup "$TUNNEL_DIR/simed"
+                chmod +x "$TUNNEL_DIR/simed"
             fi
         else
             echo -e "${RED}Error: Failed to clone tunnel repository${NC}"
@@ -215,21 +215,21 @@ fi
 # Generate a deterministic agent ID based on hostname/username
 # This ensures the same tunnel URL each time the script is run
 MACHINE_ID=$(echo -n "$(hostname)-$(whoami)" | openssl dgst -sha256 | cut -d' ' -f2 | cut -c1-16)
-AGENT_ID="baymax-${MACHINE_ID}"
+AGENT_ID="sim-${MACHINE_ID}"
 SECRET="tunnel_$(openssl rand -hex 16)"
 
 echo ""
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║              Baymax Cloudflare Tunnel Remote Access                 ║${NC}"
+echo -e "${BLUE}║              Sim Cloudflare Tunnel Remote Access                 ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
 # Cleanup function
 cleanup() {
     echo -e "\n${YELLOW}Shutting down...${NC}"
-    if [ ! -z "$BAYMAXED_PID" ]; then
-        echo "Stopping baymaxed (PID: $BAYMAXED_PID)"
-        kill $BAYMAXED_PID 2>/dev/null || true
+    if [ ! -z "$SIMED_PID" ]; then
+        echo "Stopping simed (PID: $SIMED_PID)"
+        kill $SIMED_PID 2>/dev/null || true
     fi
     if [ ! -z "$TUNNEL_PID" ]; then
         echo "Stopping tunnel client (PID: $TUNNEL_PID)"
@@ -240,22 +240,22 @@ cleanup() {
 
 trap cleanup SIGINT SIGTERM EXIT
 
-# Start baymaxed in the background
-echo -e "${GREEN}Starting baymaxed on port ${PORT}...${NC}"
-export BAYMAX_PORT=$PORT
-export BAYMAX_SERVER__SECRET_KEY="$SECRET"
-$BAYMAXED_CMD agent > /dev/null 2>&1 &
-BAYMAXED_PID=$!
+# Start simed in the background
+echo -e "${GREEN}Starting simed on port ${PORT}...${NC}"
+export SIM_PORT=$PORT
+export SIM_SERVER__SECRET_KEY="$SECRET"
+$SIMED_CMD agent > /dev/null 2>&1 &
+SIMED_PID=$!
 
-# Wait for baymaxed to be ready
-echo "Waiting for baymaxed to start..."
+# Wait for simed to be ready
+echo "Waiting for simed to start..."
 for i in {1..30}; do
     if curl -s "http://localhost:${PORT}/health" > /dev/null 2>&1; then
-        echo -e "${GREEN}✓ Baymaxed is running (PID: $BAYMAXED_PID)${NC}"
+        echo -e "${GREEN}✓ Simed is running (PID: $SIMED_PID)${NC}"
         break
     fi
     if [ $i -eq 30 ]; then
-        echo -e "${RED}Error: baymaxed failed to start${NC}"
+        echo -e "${RED}Error: simed failed to start${NC}"
         exit 1
     fi
     sleep 0.5
@@ -296,7 +296,7 @@ CONFIG_JSON="{\"url\":\"${TUNNEL_URL}\",\"secret\":\"${SECRET}\"}"
 URL_ENCODED_CONFIG=$(printf %s "$CONFIG_JSON" | jq -sRr @uri)
 
 # Create the app URL for deep linking
-APP_URL="baymaxchat://configure?data=${URL_ENCODED_CONFIG}"
+APP_URL="simchat://configure?data=${URL_ENCODED_CONFIG}"
 
 echo ""
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════════════╗${NC}"

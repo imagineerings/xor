@@ -1,7 +1,7 @@
 # Android Feature Parity - Requirements
 
 ## Overview
-Bring the Android Baymax client to feature parity with the iOS implementation. This spec documents the **complete roadmap** from initial infrastructure (Phases 1-10, ✅ completed) through remaining gaps and polish (Phases 11-15, ❌ remaining).
+Bring the Android Sim client to feature parity with the iOS implementation. This spec documents the **complete roadmap** from initial infrastructure (Phases 1-10, ✅ completed) through remaining gaps and polish (Phases 11-15, ❌ remaining).
 
 ---
 
@@ -10,7 +10,7 @@ Bring the Android Baymax client to feature parity with the iOS implementation. T
 The following work was completed in the initial parity effort (commit `2d197f6` on `android-feature-parity` branch). All 34 tasks are implemented.
 
 ### 1. Voice Input & Output (Priority 1) — ✅ DONE
-**User Story**: As a mobile user, I want to use voice to interact with Baymax so I can use it hands-free.
+**User Story**: As a mobile user, I want to use voice to interact with Sim so I can use it hands-free.
 
 | Criteria | Status |
 |---|---|
@@ -22,14 +22,14 @@ The following work was completed in the initial parity effort (commit `2d197f6` 
 | **Voice Modes**: Normal, Transcribe, Continuous | ✅ |
 
 ### 2. Agent Configuration & Storage (Priority 1) — ✅ DONE
-**User Story**: As a user with multiple Baymax instances, I want to save and switch between agent configurations.
+**User Story**: As a user with multiple Sim instances, I want to save and switch between agent configurations.
 
 | Criteria | Status |
 |---|---|
 | WHEN user configures a new server URL/secret THEN THE app SHALL offer to save as named agent | ✅ |
 | WHEN user opens settings THEN THE app SHALL display list of saved agents | ✅ |
 | WHEN user taps a saved agent THEN THE app SHALL switch configuration and test connection | ✅ |
-| WHEN user scans QR code THEN THE app SHALL parse baymaxchat://configure URL | ✅ |
+| WHEN user scans QR code THEN THE app SHALL parse simchat://configure URL | ✅ |
 | IF connection test fails for Tailscale URL THEN THE app SHALL show Tailscale-specific error | ✅ |
 
 ### 3. QR Code / Deep Link Configuration (Priority 1) — ✅ DONE
@@ -37,7 +37,7 @@ The following work was completed in the initial parity effort (commit `2d197f6` 
 
 | Criteria | Status |
 |---|---|
-| WHEN app receives baymaxchat://configure?data=<encoded> intent THEN THE app SHALL decode and apply | ✅ |
+| WHEN app receives simchat://configure?data=<encoded> intent THEN THE app SHALL decode and apply | ✅ |
 | WHEN configuration applies successfully THEN THE app SHALL test connection and show result | ✅ |
 | IF configuration URL uses Tailscale THEN THE app SHALL detect and offer to open Tailscale app | ✅ |
 
@@ -117,11 +117,11 @@ The following features were identified as gaps after the initial parity effort. 
 ### 11. Welcome Screen Enhancements (NEW — Feature Area D)
 
 #### Requirement D.1: Animated Splash Screen
-**User Story**: As a user launching the app, I want to see an animated splash screen with the Baymax logo.
+**User Story**: As a user launching the app, I want to see an animated splash screen with the Sim logo.
 
 | Criteria | Status |
 |---|---|
-| WHEN the app is launched THEN THE system SHALL show a splash screen with Baymax logo centered | ❌ |
+| WHEN the app is launched THEN THE system SHALL show a splash screen with Sim logo centered | ❌ |
 | WHEN the splash screen appears THEN THE system SHALL fade in the logo over 0.2-0.4 seconds | ❌ |
 | IF first launch OR app not opened in 24+ hours THEN THE system SHALL show splash for ~1.8 seconds | ❌ |
 | IF app opened recently (<24 hours) THEN THE system SHALL show splash for ~0.7 seconds | ❌ |
@@ -284,8 +284,8 @@ The following features were identified as gaps after the initial parity effort. 
 |---|---|
 | **Tool Call** | An LLM-generated request to invoke a specific function/tool, with arguments and results. |
 | **SSE** | Server-Sent Events — the streaming protocol used for real-time chat responses. |
-| **Trial Mode** | A mode where the app uses a demo server (`demo-baymaxed.fly.dev`) with mock data and limited functionality. |
-| **Tailscale** | A WireGuard-based VPN used for secure tunneling between mobile and desktop Baymax instances. |
+| **Trial Mode** | A mode where the app uses a demo server (`demo-simed.fly.dev`) with mock data and limited functionality. |
+| **Tailscale** | A WireGuard-based VPN used for secure tunneling between mobile and desktop Sim instances. |
 | **Cloudflare Tunnel** | An alternative tunneling mechanism using Cloudflare's `trycloudflare.com` service. |
 | **NodeMatrix** | A session visualization grid on the iOS Welcome screen showing circular nodes for each session. |
 | **Markwon** | The Android library used for Markdown rendering (equivalent to iOS's SwiftUI Markdown + custom renderer). |

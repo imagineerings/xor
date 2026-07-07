@@ -4,5 +4,5 @@ compatibility_date = "2024-05-03"
 workers_dev = true
 
 [[routes]]
-pattern = "baymax.dev/docs*"
-zone_name = "baymax.dev"
+pattern = "sim.dev/docs*"
+zone_name = "sim.dev"

@@ -1,6 +1,6 @@
-//! # UI – Baymax UI Primitives & Components
+//! # UI – Sim UI Primitives & Components
 //!
-//! This crate provides a set of UI primitives and components that are used to build all of the elements in Baymax's UI.
+//! This crate provides a set of UI primitives and components that are used to build all of the elements in Sim's UI.
 //!
 //! ## Related Crates:
 //!

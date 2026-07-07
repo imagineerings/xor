@@ -1,6 +1,6 @@
 {
-  "$schema": "baymax://schemas/settings",
-  // The name of the Baymax theme to use for the UI.
+  "$schema": "sim://schemas/settings",
+  // The name of the Sim theme to use for the UI.
   //
   // `mode` is one of:
   // - "system": Use the theme that corresponds to the system's appearance
@@ -11,7 +11,7 @@
     "light": "One Light",
     "dark": "One Dark",
   },
-  "icon_theme": "Baymax (Default)",
+  "icon_theme": "Sim (Default)",
   // The name of a base set of key bindings to use.
   // This setting can take six values, each named after another
   // text editor:
@@ -24,9 +24,9 @@
   // 6. "TextMate"
   "base_keymap": "VSCode",
   // The name of a font to use for rendering text in the editor
-  // ".BaymaxMono" currently aliases to Lilex
+  // ".SimMono" currently aliases to Lilex
   // but this may change in the future.
-  "buffer_font_family": ".BaymaxMono",
+  "buffer_font_family": ".SimMono",
   // Set the buffer text's font fallbacks, this will be merged with
   // the platform's default fallbacks.
   "buffer_font_fallbacks": null,
@@ -52,9 +52,9 @@
   "buffer_line_height": "comfortable",
   // The name of a font to use for rendering text in the UI
   // You can set this to ".SystemUIFont" to use the system font
-  // ".BaymaxSans" currently aliases to "IBM Plex Sans", but this may
+  // ".SimSans" currently aliases to "IBM Plex Sans", but this may
   // change in the future
-  "ui_font_family": ".BaymaxSans",
+  "ui_font_family": ".SimSans",
   // Set the UI's font fallbacks, this will be merged with the platform's
   // default font fallbacks.
   "ui_font_fallbacks": null,
@@ -129,9 +129,9 @@
   // after the mouse moves away from the hover target.
   // Only applies when `hover_popover_sticky` is enabled.
   "hover_popover_hiding_delay": 300,
-  // Whether to confirm before quitting Baymax.
+  // Whether to confirm before quitting Sim.
   "confirm_quit": false,
-  // Whether to restore last closed project when fresh Baymax instance is opened
+  // Whether to restore last closed project when fresh Sim instance is opened
   // May take 3 values:
   //  1. All workspaces open during last session
   //         "restore_on_startup": "last_session"
@@ -144,7 +144,7 @@
   // an explicit `-e` (existing window) or `-n` (new window) flag.
   //
   // May take 2 values:
-  //  1. Open directories as a new workspace in the current Baymax window's sidebar
+  //  1. Open directories as a new workspace in the current Sim window's sidebar
   //         "cli_default_open_behavior": "existing_window"
   //  2. Open directories in a new window (reuse existing windows for files
   //     that are already part of an open project)
@@ -153,7 +153,7 @@
   // The default behavior when opening projects from the UI.
   //
   // May take 2 values:
-  //  1. Open projects as a new workspace in the current Baymax window's sidebar
+  //  1. Open projects as a new workspace in the current Sim window's sidebar
   //         "default_open_behavior": "existing_window"
   //  2. Open projects in a new window
   //         "default_open_behavior": "new_window"
@@ -208,23 +208,23 @@
   //
   // Default: true
   "zoomed_padding": true,
-  // What draws Baymax's window decorations (titlebar):
-  // 1. Client application (Baymax) draws its own window decorations
+  // What draws Sim's window decorations (titlebar):
+  // 1. Client application (Sim) draws its own window decorations
   //    "client"
   // 2. Display server draws the window decorations. Not supported by GNOME Wayland.
   //    "server"
   //
-  // This requires restarting Baymax for changes to take effect.
+  // This requires restarting Sim for changes to take effect.
   //
   // Default: "client"
   "window_decorations": "client",
   // Whether to use the system provided dialogs for Open and Save As.
-  // When set to false, Baymax will use the built-in keyboard-first pickers.
+  // When set to false, Sim will use the built-in keyboard-first pickers.
   "use_system_path_prompts": true,
   // Whether to use the system provided dialogs for prompts, such as confirmation
   // prompts.
-  // When set to false, Baymax will use its built-in prompts. Note that on Linux,
-  // this option is ignored and Baymax will always use the built-in prompts.
+  // When set to false, Sim will use its built-in prompts. Note that on Linux,
+  // this option is ignored and Sim will always use the built-in prompts.
   "use_system_prompts": true,
   // Whether the cursor blinks in the editor.
   "cursor_blink": true,
@@ -308,7 +308,7 @@
   // (also known as "rainbow brackets")
   //
   // The colors that are used for different indentation levels are defined in the theme (theme key: `accents`).
-  // They can be customibaymax by using theme overrides.
+  // They can be customisim by using theme overrides.
   "colorize_brackets": false,
   // When to show the scrollbar in the completion menu.
   // This setting can take four values:
@@ -330,7 +330,7 @@
   //
   // 1. Do not display item kinds:
   //   "off" (default)
-  // 2. Display a single-letter badge, coloribaymax based on the active syntax theme:
+  // 2. Display a single-letter badge, colorisim based on the active syntax theme:
   //   "symbol"
   "completion_menu_item_kind": "off",
   // How to display diffs in the editor.
@@ -420,11 +420,11 @@
   "use_on_type_format": true,
   // Whether to automatically add matching closing characters when typing
   // opening parenthesis, bracket, brace, single or double quote characters.
-  // For example, when you type '(', Baymax will add a closing ) at the correct position.
+  // For example, when you type '(', Sim will add a closing ) at the correct position.
   "use_autoclose": true,
   // Whether to automatically surround selected text when typing opening parenthesis,
   // bracket, brace, single or double quote characters.
-  // For example, when you select text and type '(', Baymax will surround the text with ().
+  // For example, when you select text and type '(', Sim will surround the text with ().
   "use_auto_surround": true,
   // Controls automatic indentation behavior when typing.
   // - "syntax_aware": Adjusts indentation based on syntax context (default)
@@ -485,7 +485,7 @@
     "space": "•",
     "tab": "→",
   },
-  // Settings related to calls in Baymax
+  // Settings related to calls in Sim
   "calls": {
     // Join calls with the microphone live by default
     "mute_on_join": false,
@@ -531,11 +531,11 @@
   "audio": {
     // Select specific output audio device.
     // `null` means use system default.
-    // Any unrecognibaymax output device will fall back to system default.
+    // Any unrecognisim output device will fall back to system default.
     "experimental.output_audio_device": null,
     // Select specific input audio device.
     // `null` means use system default.
-    // Any unrecognibaymax input device will fall back to system default.
+    // Any unrecognisim input device will fall back to system default.
     "experimental.input_audio_device": null,
   },
   // Scrollbar related settings
@@ -1035,7 +1035,7 @@
     // The default model to use when creating new threads.
     "default_model": {
       // The provider to use.
-      "provider": "baymax.dev",
+      "provider": "sim.dev",
       // The model to use.
       "model": "claude-sonnet-4",
       // Whether thinking is enabled.
@@ -1058,23 +1058,23 @@
       //
       // To set parameters for a specific provider and model:
       // {
-      //   "provider": "baymax.dev",
+      //   "provider": "sim.dev",
       //   "model": "claude-sonnet-4",
       //   "temperature": 1.0
       // }
     ],
-    // The default behavior mode for Baymax-compatible agent prompts.
+    // The default behavior mode for Sim-compatible agent prompts.
     // One of:
     //   - "focus": prefer narrow, low-risk execution.
     //   - "balanced": balance directness with enough context to finish the task.
     //   - "creative": allow broader exploration when it helps solve the task.
-    "baymax_mode": "balanced",
+    "sim_mode": "balanced",
     // Permission rules for tool actions.
     //
     // The "default" setting applies when no tool-specific rules match.
     // For external agents that define their own permission modes,
     // "deny" and "confirm" still take precedence — the external agent's
-    // permission system is only used when Baymax would allow the action.
+    // permission system is only used when Sim would allow the action.
     //
     // Per-tool regex patterns ("tools" below) match against tool input text
     // (commands, paths, URLs, etc.). For `copy_path` and `move_path`,
@@ -1273,7 +1273,7 @@
   "linked_edits": true,
   // The list of language servers to use (or disable) for all languages.
   //
-  // This is typically customibaymax on a per-language basis.
+  // This is typically customisim on a per-language basis.
   "language_servers": ["..."],
   // Controls how semantic tokens from language servers are used for syntax highlighting.
   //
@@ -1305,7 +1305,7 @@
   //
   // 1. Never automatically save:
   //     "autosave": "off",
-  // 2. Save when changing focus away from the Baymax window:
+  // 2. Save when changing focus away from the Sim window:
   //     "autosave": "on_window_change",
   // 3. Save when changing focus away from a specific buffer:
   //     "autosave": "on_focus_change",
@@ -1421,11 +1421,11 @@
     // Default: true
     "skip_focus_for_active_in_search": true,
     // Whether to use gitignored files when searching.
-    // Only the file Baymax had indexed will be used, not necessary all the gitignored files.
+    // Only the file Sim had indexed will be used, not necessary all the gitignored files.
     //
     // Can accept 3 values:
     //   * "all": Use all gitignored files
-    //   * "indexed": Use only the files Baymax had indexed
+    //   * "indexed": Use only the files Sim had indexed
     //   * "smart": Be smart and search for ignored when called from a gitignored worktree
     "include_ignored": "smart",
     // Whether to include text channels in file finder results.
@@ -1466,7 +1466,7 @@
   "format_on_save": "on",
   // How to perform a buffer format. This setting can take multiple values:
   //
-  // 1. Default. Format files using Baymax's Prettier integration (if applicable),
+  // 1. Default. Format files using Sim's Prettier integration (if applicable),
   //    or falling back to formatting via language server:
   //     "formatter": "auto"
   // 2. Format code using the current language server:
@@ -1480,7 +1480,7 @@
   //         "arguments": ["--stdin-filepath", "{buffer_path}"]
   //       }
   //     }
-  // 5. Format code using Baymax's Prettier integration:
+  // 5. Format code using Sim's Prettier integration:
   //     "formatter": "prettier"
   // 6. Format code using a code action
   //     "formatter": {"code_action": "source.fixAll.eslint"}
@@ -1521,21 +1521,21 @@
   //
   // Default: true
   "word_diff_enabled": true,
-  // Control what info is collected by Baymax.
+  // Control what info is collected by Sim.
   "telemetry": {
     // Send debug info like crash reports.
     "diagnostics": true,
-    // Send anonymibaymax usage data like what languages you're using Baymax with.
+    // Send anonymisim usage data like what languages you're using Sim with.
     "metrics": true,
     // Allow sending requests to Anthropic models that cannot be offered with
     // Zero Data Retention
     "anthropic_retention": false,
   },
-  // Whether to disable all AI features in Baymax.
+  // Whether to disable all AI features in Sim.
   //
   // Default: false
   "disable_ai": false,
-  // Automatically update Baymax. This setting may be ignored on Linux if
+  // Automatically update Sim. This setting may be ignored on Linux if
   // installed through a package manager.
   "auto_update": true,
   // How to render LSP `textDocument/documentColor` colors in the editor.
@@ -1563,7 +1563,7 @@
     //
     // Default: true
     "include_warnings": true,
-    // Settings for using LSP pull diagnostics mechanism in Baymax.
+    // Settings for using LSP pull diagnostics mechanism in Sim.
     "lsp_pull_diagnostics": {
       // Whether to pull for diagnostics or not.
       "enabled": true,
@@ -1590,7 +1590,7 @@
       "max_severity": null,
     },
   },
-  // Files or globs of files that will be excluded by Baymax entirely. They will be skipped during file
+  // Files or globs of files that will be excluded by Sim entirely. They will be skipped during file
   // scans, file searches, and not be displayed in the project file tree. Takes precedence over `file_scan_inclusions`.
   "file_scan_exclusions": [
     "**/.git",
@@ -1605,9 +1605,9 @@
     "**/.classpath",
     "**/.settings",
   ],
-  // Files or globs of files that will be included by Baymax, even when ignored by git. This is useful
+  // Files or globs of files that will be included by Sim, even when ignored by git. This is useful
   // for files that are not tracked by git, but are still important to your project. Note that globs
-  // that are overly broad can slow down Baymax's file scanning. `file_scan_exclusions` takes
+  // that are overly broad can slow down Sim's file scanning. `file_scan_exclusions` takes
   // precedence over these inclusions.
   "file_scan_inclusions": [".env*"],
   // When to scan content of linked directories.
@@ -1684,15 +1684,15 @@
     // When the resolved directory is outside the project root, the
     // project's directory name is automatically appended so that
     // sibling repos don't collide. For example, with the default
-    // "../worktrees" and a project at ~/code/baymax, worktrees are
-    // created under ~/code/worktrees/baymax/.
+    // "../worktrees" and a project at ~/code/sim, worktrees are
+    // created under ~/code/worktrees/sim/.
     //
     // When the resolved directory is inside the project root, no
     // extra component is added (it's already project-scoped).
     //
     // Examples:
     //   "../worktrees" — ~/code/worktrees/<project>/ (default)
-    //   ".git/baymax-worktrees" — <project>/.git/baymax-worktrees/
+    //   ".git/sim-worktrees" — <project>/.git/sim-worktrees/
     //   "my-worktrees" — <project>/my-worktrees/
     //
     // Trailing slashes are ignored.
@@ -1716,7 +1716,7 @@
   "load_direnv": "direct",
   "edit_predictions": {
     // Which edit prediction provider to use.
-    "provider": "baymax",
+    "provider": "sim",
     // A list of globs representing files that edit predictions should be disabled for.
     // There's a sensible default list of globs already included.
     // Any addition to this list will be merged with the default list.
@@ -1730,9 +1730,9 @@
       "**/*.crt",
       "**/.dev.vars",
       "**/secrets.yml",
-      "**/.baymax/settings.json", // baymax project settings
-      "/**/baymax/settings.json", // baymax user settings
-      "/**/baymax/keymap.json",
+      "**/.sim/settings.json", // sim project settings
+      "/**/sim/settings.json", // sim user settings
+      "/**/sim/keymap.json",
     ],
     // When to show edit predictions previews in buffer.
     // This setting takes two possible values:
@@ -1771,7 +1771,7 @@
       "prompt_format": "infer",
       "max_output_tokens": 64,
     },
-    // Controls whether Baymax may collect training data when using Baymax's Edit Predictions.
+    // Controls whether Sim may collect training data when using Sim's Edit Predictions.
     // Data is only captured when the project is detected as open source.
     // Possible values:
     //   - "default": use the preference previously set via the status-bar toggle,
@@ -1849,7 +1849,7 @@
     //    this platform's home directory  (if we can find it)
     //      "working_directory": {
     //        "always": {
-    //          "directory": "~/baymax/projects/"
+    //          "directory": "~/sim/projects/"
     //        }
     //      }
     "working_directory": "current_project_directory",
@@ -1964,7 +1964,7 @@
     // "font_size": 15,
     // Set the terminal's font family. If this option is not included,
     // the terminal will default to matching the buffer's font family.
-    // "font_family": ".BaymaxMono",
+    // "font_family": ".SimMono",
     // Set the terminal's font fallbacks. If this option is not included,
     // the terminal will default to matching the buffer's font fallbacks.
     // This will be merged with the platform's default font fallbacks
@@ -2050,13 +2050,13 @@
   "tasks": {
     "variables": {},
     "enabled": true,
-    // Use LSP tasks over Baymax language extension ones.
+    // Use LSP tasks over Sim language extension ones.
     // If no LSP tasks are returned due to error/timeout or regular execution,
-    // Baymax language extension tasks will be used instead.
+    // Sim language extension tasks will be used instead.
     //
-    // Other Baymax tasks will still be shown:
-    // * Baymax task from either of the task config file
-    // * Baymax task from history (e.g. one-off task was spawned before)
+    // Other Sim tasks will still be shown:
+    // * Sim task from either of the task config file
+    // * Sim task from history (e.g. one-off task was spawned before)
     //
     // Default: true
     "prefer_lsp": true,
@@ -2075,9 +2075,9 @@
   //
   "file_types": {
     "JSONC": [
-      "**/.baymax/*.json",
+      "**/.sim/*.json",
       "**/.vscode/**/*.json",
-      "**/{baymax,Baymax}/{settings,keymap,tasks,debug}.json",
+      "**/{sim,Sim}/{settings,keymap,tasks,debug}.json",
       "tsconfig*.json",
     ],
     "Markdown": [".rules", ".cursorrules", ".windsurfrules", ".clinerules"],
@@ -2086,20 +2086,20 @@
   // Settings for which version of Node.js and NPM to use when installing
   // language servers and Copilot.
   //
-  // Note: changing this setting currently requires restarting Baymax.
+  // Note: changing this setting currently requires restarting Sim.
   "node": {
-    // By default, Baymax will look for `node` and `npm` on your `$PATH`, and use the
+    // By default, Sim will look for `node` and `npm` on your `$PATH`, and use the
     // existing executables if their version is recent enough. Set this to `true`
-    // to prevent this, and force Baymax to always download and install its own
+    // to prevent this, and force Sim to always download and install its own
     // version of Node.
     "ignore_system_version": false,
     // You can also specify alternative paths to Node and NPM. If you specify
-    // `path`, but not `npm_path`, Baymax will assume that `npm` is located at
+    // `path`, but not `npm_path`, Sim will assume that `npm` is located at
     // `${path}/../npm`.
     "path": null,
     "npm_path": null,
   },
-  // The extensions that Baymax should automatically install on startup.
+  // The extensions that Sim should automatically install on startup.
   //
   // If you don't want any of these extensions, add this field to your settings
   // and change the value to `false`.
@@ -2108,7 +2108,7 @@
   },
   // The capabilities granted to extensions.
   //
-  // This list can be customibaymax to restrict what extensions are able to do.
+  // This list can be customisim to restrict what extensions are able to do.
   "granted_extension_capabilities": [
     { "kind": "process:exec", "command": "*", "args": ["**"] },
     { "kind": "download_file", "host": "*", "path": ["**"] },
@@ -2149,7 +2149,7 @@
     // When LSP servers give an `InsertReplaceEdit` completion, they provides two ranges: `insert` and `replace`. Usually, `insert`
     // contains the word prefix before your cursor and `replace` contains the whole word.
     //
-    // Effectively, this setting just changes whether Baymax will use the received range for `insert` or `replace`, so the results may
+    // Effectively, this setting just changes whether Sim will use the received range for `insert` or `replace`, so the results may
     // differ depending on the underlying LSP server.
     //
     // Possible values:
@@ -2441,7 +2441,7 @@
     "x_ai": {
       "api_url": "https://api.x.ai/v1",
     },
-    "baymax.dev": {},
+    "sim.dev": {},
   },
   "session": {
     // Whether or not to restore unsaved buffers on restart.
@@ -2452,13 +2452,13 @@
     // Default: true
     "restore_unsaved_buffers": true,
     // Whether or not to skip worktree trust checks.
-    // When trusted, project settings are synchronibaymax automatically,
+    // When trusted, project settings are synchronisim automatically,
     // language and MCP servers are downloaded and started automatically.
     //
     // Default: false
     "trust_all_worktrees": false,
   },
-  // Baymax's Prettier integration settings.
+  // Sim's Prettier integration settings.
   // Allows to enable/disable formatting with Prettier
   // and configure default Prettier, used when no project-level Prettier installation is found.
   "prettier": {
@@ -2486,7 +2486,7 @@
     // "rust-analyzer": {
     //     // A special flag for rust-analyzer integration, to use server-provided tasks
     //     enable_lsp_tasks": true,
-    //     // These initialization options are merged into Baymax's defaults
+    //     // These initialization options are merged into Sim's defaults
     //     "initialization_options": {
     //         "check": {
     //             "command": "clippy" // rust-analyzer.check.command (default: "check")
@@ -2545,7 +2545,7 @@
     //   }
     // ]
     //
-    // Default rules are viewable via the "baymax: show default semantic token rules" action.
+    // Default rules are viewable via the "sim: show default semantic token rules" action.
     "semantic_token_rules": [],
   },
   // Jupyter settings
@@ -2604,15 +2604,15 @@
     "delay_ms": 1000,
   },
   // The server to connect to. If the environment variable
-  // BAYMAX_SERVER_URL is set, it will override this setting.
-  "server_url": "https://baymax.dev",
-  // Settings overrides to use when using Baymax Preview.
-  // Mostly useful for developers who are managing multiple instances of Baymax.
+  // SIM_SERVER_URL is set, it will override this setting.
+  "server_url": "https://sim.dev",
+  // Settings overrides to use when using Sim Preview.
+  // Mostly useful for developers who are managing multiple instances of Sim.
   "preview": {
     // "theme": "Andromeda"
   },
-  // Settings overrides to use when using Baymax Nightly.
-  // Mostly useful for developers who are managing multiple instances of Baymax.
+  // Settings overrides to use when using Sim Nightly.
+  // Mostly useful for developers who are managing multiple instances of Sim.
   "nightly": {
     // "theme": "Andromeda"
     "instrumentation": {
@@ -2621,13 +2621,13 @@
       },
     },
   },
-  // Settings overrides to use when using Baymax Stable.
-  // Mostly useful for developers who are managing multiple instances of Baymax.
+  // Settings overrides to use when using Sim Stable.
+  // Mostly useful for developers who are managing multiple instances of Sim.
   "stable": {
     // "theme": "Andromeda"
   },
-  // Settings overrides to use when using Baymax Dev.
-  // Mostly useful for developers who are managing multiple instances of Baymax.
+  // Settings overrides to use when using Sim Dev.
+  // Mostly useful for developers who are managing multiple instances of Sim.
   "dev": {
     // "theme": "Andromeda"
     "instrumentation": {
@@ -2660,7 +2660,7 @@
   // Supported URI scheme: `http`, `https`, `socks4`, `socks4a`, `socks5`,
   // `socks5h`. `http` will be used when no scheme is specified.
   //
-  // By default no proxy will be used, or Baymax will try get proxy settings from
+  // By default no proxy will be used, or Sim will try get proxy settings from
   // environment variables. If certain hosts should not be proxied,
   // set the `no_proxy` environment variable and provide a comma-separated list.
   //
@@ -2678,7 +2678,7 @@
   "command_aliases": {},
   // ssh_connections is an array of ssh connections.
   // You can configure these from `project: Open Remote` in the command palette.
-  // Baymax's ssh support will pull configuration from your ~/.ssh too.
+  // Sim's ssh support will pull configuration from your ~/.ssh too.
   // Examples:
   // [
   //   {
@@ -2686,7 +2686,7 @@
   //     // "port": 22, "username": "test", "args": ["-i", "/home/user/.ssh/id_rsa"]
   //     "projects": [
   //       {
-  //         "paths": ["/home/user/code/baymax"]
+  //         "paths": ["/home/user/code/sim"]
   //       }
   //     ]
   //   }
@@ -2724,7 +2724,7 @@
   // Each profile has an optional `base` ("user" or "default") and a `settings`
   // object. When `base` is "user" (the default), the profile applies on top of
   // your user settings. When `base` is "default", user settings are ignored and
-  // the profile applies on top of Baymax's defaults.
+  // the profile applies on top of Sim's defaults.
   //
   // Examples:
   // "profiles": {
@@ -2758,7 +2758,7 @@
   // Configuration for developer-oriented instrumentation tools that can be
   // toggled at runtime.
   "instrumentation": {
-    // Performance profiler, accessed via the `baymax: open performance profiler`
+    // Performance profiler, accessed via the `sim: open performance profiler`
     // action. Collects timing data for foreground and background executor
     // tasks. Enabling this may lead to increased memory usage, hence it's
     // disabled by default for regular builds.

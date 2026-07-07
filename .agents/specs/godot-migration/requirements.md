@@ -2,15 +2,15 @@
 
 ## Introduction
 
-Baymax needs a Baymax-owned, Godot-compatible, world-model-, and Comfy-aware game development surface without copying duplicate game-engine runtime infrastructure. The migration adds compatibility, authoring, generation, workflow orchestration, asset, node, provider, and serving primitives while preserving Baymax ownership of UI, platform, rendering, task execution, agents, media, storage, and project systems. Comfy provides core functionality for the world-model harness, so implementation decisions must evaluate Comfy workflow, graph, sampler, scheduler, conditioning, diffusion/world-model execution, node, model, asset, provider, and extension semantics before adding Baymax-only behavior.
+Sim needs a Sim-owned, Godot-compatible, world-model-, and Comfy-aware game development surface without copying duplicate game-engine runtime infrastructure. The migration adds compatibility, authoring, generation, workflow orchestration, asset, node, provider, and serving primitives while preserving Sim ownership of UI, platform, rendering, task execution, agents, media, storage, and project systems. Comfy provides core functionality for the world-model harness, so implementation decisions must evaluate Comfy workflow, graph, sampler, scheduler, conditioning, diffusion/world-model execution, node, model, asset, provider, and extension semantics before adding Sim-only behavior.
 
 ## Glossary
 
-- **Boundary policy**: the explicit rule set for what Baymax adopts as native features, adapts, invokes externally, or refuses to duplicate.
+- **Boundary policy**: the explicit rule set for what Sim adopts as native features, adapts, invokes externally, or refuses to duplicate.
 - **Execution gate**: a prerequisite validation checkpoint that blocks task execution until satisfied.
 - **Dependency wave**: the ordered implementation phase used to keep shared foundations ahead of dependent integrations.
-- **World-model engine harness**: Baymax-managed typed requests, controls, workers, artifacts, and provenance around `projects/world-model`.
-- **Comfy world-model harness substrate**: Baymax-managed core protocol, graph, sampler, scheduler, conditioning, diffusion/world-model execution, node, model, asset, provider, blueprint, extension, and packaging behavior derived from `projects/comfy`.
+- **World-model engine harness**: Sim-managed typed requests, controls, workers, artifacts, and provenance around `projects/world-model`.
+- **Comfy world-model harness substrate**: Sim-managed core protocol, graph, sampler, scheduler, conditioning, diffusion/world-model execution, node, model, asset, provider, blueprint, extension, and packaging behavior derived from `projects/comfy`.
 
 ### Requirement 1: Complete Inventory
 
@@ -24,17 +24,17 @@ Baymax needs a Baymax-owned, Godot-compatible, world-model-, and Comfy-aware gam
 
 ### Requirement 2: Duplication Avoidance
 
-**User Story:** As a maintainer, I want Baymax to reuse existing infrastructure so the migration does not fork duplicate runtimes.
+**User Story:** As a maintainer, I want Sim to reuse existing infrastructure so the migration does not fork duplicate runtimes.
 
 #### Acceptance Criteria
 
-2.1 IF Baymax already owns a platform, rendering, UI, media, task, project, agent, or language capability THEN THE migration SHALL reuse that capability.
-2.2 IF a Godot runtime subsystem duplicates Baymax runtime architecture THEN THE migration SHALL mark it as excluded or external-command only.
+2.1 IF Sim already owns a platform, rendering, UI, media, task, project, agent, or language capability THEN THE migration SHALL reuse that capability.
+2.2 IF a Godot runtime subsystem duplicates Sim runtime architecture THEN THE migration SHALL mark it as excluded or external-command only.
 2.3 WHEN a new crate is proposed THEN THE migration SHALL justify why existing crates cannot hold the behavior.
 
 ### Requirement 3: Godot Project Support
 
-**User Story:** As a game developer, I want Baymax to understand Godot-like projects so I can inspect and edit existing assets.
+**User Story:** As a game developer, I want Sim to understand Godot-like projects so I can inspect and edit existing assets.
 
 #### Acceptance Criteria
 
@@ -54,7 +54,7 @@ Baymax needs a Baymax-owned, Godot-compatible, world-model-, and Comfy-aware gam
 
 ### Requirement 5: World Model Runtime Harness
 
-**User Story:** As a game creator, I want world foundation models to drive interactive game-world generation from Baymax.
+**User Story:** As a game creator, I want world foundation models to drive interactive game-world generation from Sim.
 
 #### Acceptance Criteria
 
@@ -115,7 +115,7 @@ Baymax needs a Baymax-owned, Godot-compatible, world-model-, and Comfy-aware gam
 
 ### Requirement 11: Third-Party and License Control
 
-**User Story:** As a maintainer, I want third-party code and assets controlled before dependencies enter Baymax.
+**User Story:** As a maintainer, I want third-party code and assets controlled before dependencies enter Sim.
 
 #### Acceptance Criteria
 
@@ -136,13 +136,13 @@ Baymax needs a Baymax-owned, Godot-compatible, world-model-, and Comfy-aware gam
 
 ### Requirement 13: Comfy Workflow Orchestration Migration
 
-**User Story:** As a workflow creator, I want Comfy features represented in Baymax specs so visual AI workflows, assets, and provider nodes can migrate without duplicate infrastructure.
+**User Story:** As a workflow creator, I want Comfy features represented in Sim specs so visual AI workflows, assets, and provider nodes can migrate without duplicate infrastructure.
 
 #### Acceptance Criteria
 
 13.1 WHEN Comfy migration specs are reviewed THEN THE system SHALL include non-overlapping specs for runtime APIs, graph/node runtime, model/memory runtime, diffusion/world-model runtime, assets, workflows/blueprints, media node pipelines, provider API nodes, extension ecosystem, and packaging/quality.
 13.2 IF a Comfy feature overlaps an existing Godot/world-model migration spec THEN THE Comfy spec SHALL name the owning spec and delegate that behavior.
-13.3 WHEN Comfy endpoints, nodes, assets, providers, or extensions are implemented THEN THE system SHALL use Baymax task, media, artifact, secret, storage, diagnostic, and dependency-review infrastructure.
-13.4 WHEN a world-model harness implementation decision involves graph orchestration, prompt/job lifecycle, model resolution, sampler/scheduler behavior, conditioning, diffusion/world-model execution, asset handling, media nodes, provider calls, or extension loading THEN THE system SHALL consult the applicable Comfy spec before introducing Baymax-only behavior.
-13.5 IF Comfy semantics conflict with existing Baymax infrastructure THEN THE system SHALL document the decision and preserve Comfy workflow compatibility unless safety, security, dependency, or platform gates require divergence.
+13.3 WHEN Comfy endpoints, nodes, assets, providers, or extensions are implemented THEN THE system SHALL use Sim task, media, artifact, secret, storage, diagnostic, and dependency-review infrastructure.
+13.4 WHEN a world-model harness implementation decision involves graph orchestration, prompt/job lifecycle, model resolution, sampler/scheduler behavior, conditioning, diffusion/world-model execution, asset handling, media nodes, provider calls, or extension loading THEN THE system SHALL consult the applicable Comfy spec before introducing Sim-only behavior.
+13.5 IF Comfy semantics conflict with existing Sim infrastructure THEN THE system SHALL document the decision and preserve Comfy workflow compatibility unless safety, security, dependency, or platform gates require divergence.
 13.6 WHEN local diffusion or world-model execution is implemented THEN THE system SHALL preserve Comfy sampler, scheduler, conditioning, latent, VAE, model patch, guidance, and model-family execution semantics unless a documented gate requires divergence.

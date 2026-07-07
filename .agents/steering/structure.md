@@ -3,7 +3,7 @@
 ## Top-level
 
 ```
-crates/          Main Baymax Rust workspace — all production crates
+crates/          Main Sim Rust workspace — all production crates
 extensions/      In-tree WASM extensions (glsl, html, proto, test-extension)
 tooling/         Build tooling crates (compliance, perf, xtask)
 docs/            mdBook documentation source
@@ -15,7 +15,7 @@ ci/              CI configuration helpers
 .github/     GitHub Actions workflows and templates
 .cloudflare/     Cloudflare Workers for docs proxy and assets
 .factory/        AI agent prompt templates and skills
-.agents/         Agent skills (gpui-test, Baymax-cherry-pick, coding)
+.agents/         Agent skills (gpui-test, Sim-cherry-pick, coding)
 ```
 
 ## `crates/` — Key Crates
@@ -24,7 +24,7 @@ The workspace has ~200 crates. The most important ones:
 
 | Crate | Role |
 |---|---|
-| `baymax` | Main binary entry point, wires everything together |
+| `sim` | Main binary entry point, wires everything together |
 | `gpui` | GPU-accelerated UI framework (rendering, layout, concurrency, events) |
 | `editor` | Core editor type — text editing, LSP display, completions, inlay hints |
 | `project` | File tree, worktree management, LSP client side |

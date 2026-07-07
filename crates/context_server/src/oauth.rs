@@ -33,8 +33,8 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use url::Url;
 
-/// The CIMD URL where Baymax's OAuth client metadata document is hosted.
-pub const CIMD_URL: &str = "https://baymax.dev/oauth/client-metadata.json";
+/// The CIMD URL where Sim's OAuth client metadata document is hosted.
+pub const CIMD_URL: &str = "https://sim.dev/oauth/client-metadata.json";
 
 /// Validate that a URL is safe to use as an OAuth endpoint.
 ///
@@ -66,7 +66,7 @@ fn require_https_or_loopback(url: &Url) -> Result<()> {
 /// protections against private/reserved IP ranges.
 ///
 /// This wraps [`require_https_or_loopback`] and adds IP-range checks to prevent
-/// an attacker-controlled MCP server from directing Baymax to fetch internal
+/// an attacker-controlled MCP server from directing Sim to fetch internal
 /// network resources via metadata URLs.
 ///
 /// **Known limitation:** Domain-name URLs that resolve to private IPs are *not*
@@ -205,7 +205,7 @@ pub struct OAuthDiscovery {
 ///
 /// Stored in the keychain so startup can restore a refresh-capable provider
 /// without another browser flow. Deliberately excludes the full discovery
-/// metadata to keep the serialibaymax size well within keychain item limits.
+/// metadata to keep the serialisim size well within keychain item limits.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct OAuthSession {
     pub token_endpoint: Url,
@@ -235,7 +235,7 @@ pub enum BearerError {
     InvalidToken,
     /// The request requires higher privileges than provided by the access token.
     InsufficientScope,
-    /// An unrecognibaymax error code (extension or future spec addition).
+    /// An unrecognisim error code (extension or future spec addition).
     Other,
 }
 
@@ -703,7 +703,7 @@ pub fn token_refresh_params(
 /// port (e.g. `http://127.0.0.1:12345/callback`). Some auth servers do strict
 /// redirect URI matching even for loopback addresses, so we register the
 /// exact URI we intend to use.
-/// The grant types Baymax can use. Intersected with the server's
+/// The grant types Sim can use. Intersected with the server's
 /// `grant_types_supported` to build the DCR request.
 const SUPPORTED_GRANT_TYPES: &[&str] = &["authorization_code", "refresh_token"];
 
@@ -724,7 +724,7 @@ pub fn dcr_registration_body(
     };
 
     serde_json::json!({
-        "client_name": "Baymax",
+        "client_name": "Sim",
         "redirect_uris": [redirect_uri],
         "grant_types": grant_types,
         "response_types": ["code"],
@@ -1770,7 +1770,7 @@ mod tests {
         };
         let url = build_authorization_url(
             &metadata,
-            "https://baymax.dev/oauth/client-metadata.json",
+            "https://sim.dev/oauth/client-metadata.json",
             "http://127.0.0.1:12345/callback",
             &["files:read".into(), "files:write".into()],
             "https://mcp.example.com",
@@ -1782,7 +1782,7 @@ mod tests {
         assert_eq!(pairs.get("response_type").unwrap(), "code");
         assert_eq!(
             pairs.get("client_id").unwrap(),
-            "https://baymax.dev/oauth/client-metadata.json"
+            "https://sim.dev/oauth/client-metadata.json"
         );
         assert_eq!(
             pairs.get("redirect_uri").unwrap(),
@@ -1897,7 +1897,7 @@ mod tests {
     fn test_dcr_registration_body_without_server_metadata() {
         // When server metadata is unavailable, include all supported grant types.
         let body = dcr_registration_body("http://127.0.0.1:12345/callback", None);
-        assert_eq!(body["client_name"], "Baymax");
+        assert_eq!(body["client_name"], "Sim");
         assert_eq!(body["redirect_uris"][0], "http://127.0.0.1:12345/callback");
         assert_eq!(body["grant_types"][0], "authorization_code");
         assert_eq!(body["grant_types"][1], "refresh_token");

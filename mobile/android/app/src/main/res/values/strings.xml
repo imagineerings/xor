@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Baymax</string>
+    <string name="app_name">Sim</string>
     <string name="welcome_greeting">Good morning</string>
     <string name="welcome_subtitle">How can I help you today?</string>
     <string name="input_placeholder">I want to…</string>
@@ -9,7 +9,7 @@
     <string name="today">TODAY</string>
     <string name="yesterday">YESTERDAY</string>
     <string name="loading_session">Loading session…</string>
-    <string name="thinking">baymax is thinking…</string>
+    <string name="thinking">sim is thinking…</string>
     <string name="send">Send</string>
     <string name="stop">Stop</string>
     <string name="back">Back</string>
@@ -28,5 +28,5 @@
     <string name="reset_to_trial">Reset to Trial Mode</string>
     <string name="reset_confirmation">This will reset your configuration to use the trial service.</string>
     <string name="trial_mode">Trial Mode</string>
-    <string name="trial_mode_description">You are using the demo server. Connect your own baymax instance for full features.</string>
+    <string name="trial_mode_description">You are using the demo server. Connect your own sim instance for full features.</string>
 </resources>

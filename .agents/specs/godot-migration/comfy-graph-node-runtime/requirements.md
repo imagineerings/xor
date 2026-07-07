@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Baymax needs Comfy graph and node runtime compatibility so Comfy workflows can be validated, introspected, partially executed, cached, and connected to Baymax artifacts. These graph and node semantics are core world-model harness functionality, so Baymax graph implementation decisions must account for this spec before adding alternate execution behavior. This spec owns runtime graph scheduling, validation, and node schema adaptation. It delegates canvas UI to `diffusion-graph-editor/`, HTTP submission to `comfy-runtime-control-plane/`, model loading to `comfy-model-memory-runtime/`, and sampler/model-family execution semantics to `comfy-diffusion-world-model-runtime/`.
+Sim needs Comfy graph and node runtime compatibility so Comfy workflows can be validated, introspected, partially executed, cached, and connected to Sim artifacts. These graph and node semantics are core world-model harness functionality, so Sim graph implementation decisions must account for this spec before adding alternate execution behavior. This spec owns runtime graph scheduling, validation, and node schema adaptation. It delegates canvas UI to `diffusion-graph-editor/`, HTTP submission to `comfy-runtime-control-plane/`, model loading to `comfy-model-memory-runtime/`, and sampler/model-family execution semantics to `comfy-diffusion-world-model-runtime/`.
 
 ## Glossary
 
@@ -10,13 +10,13 @@ Baymax needs Comfy graph and node runtime compatibility so Comfy workflows can b
 - **Node Schema**: The introspection data returned to clients through object info.
 - **Prompt Graph**: A Comfy execution graph keyed by node id where linked inputs reference upstream node outputs.
 - **Execution Plan**: A validated topological order and output target set for running a prompt graph.
-- **Node Cache**: Reusable node output state keyed by node identity, input signature, or Baymax cache policy.
+- **Node Cache**: Reusable node output state keyed by node identity, input signature, or Sim cache policy.
 
 ## Requirements
 
 ### Requirement 1: Node Registry and Schema Introspection
 
-**User Story:** As a workflow author, I want Baymax to expose Comfy node definitions so workflows can be edited and validated.
+**User Story:** As a workflow author, I want Sim to expose Comfy node definitions so workflows can be edited and validated.
 
 #### Acceptance Criteria
 
@@ -36,7 +36,7 @@ Baymax needs Comfy graph and node runtime compatibility so Comfy workflows can b
 
 ### Requirement 3: Execution Planning and Caching
 
-**User Story:** As a workflow author, I want Baymax to execute only the graph parts that need to run.
+**User Story:** As a workflow author, I want Sim to execute only the graph parts that need to run.
 
 #### Acceptance Criteria
 
@@ -47,7 +47,7 @@ Baymax needs Comfy graph and node runtime compatibility so Comfy workflows can b
 
 ### Requirement 4: Async and Batched Node Execution
 
-**User Story:** As a node author, I want Baymax to support Comfy nodes that operate over lists or asynchronous work.
+**User Story:** As a node author, I want Sim to support Comfy nodes that operate over lists or asynchronous work.
 
 #### Acceptance Criteria
 
@@ -55,7 +55,7 @@ Baymax needs Comfy graph and node runtime compatibility so Comfy workflows can b
 4.2 WHEN a node returns an execution blocker THEN THE system SHALL stop dependent execution and report a structured block reason.
 4.3 WHEN a node performs async work THEN THE system SHALL keep cancellation, progress, and error propagation connected to the parent job.
 
-### Requirement 5: Baymax Integration Boundary
+### Requirement 5: Sim Integration Boundary
 
 **User Story:** As a maintainer, I want runtime compatibility without duplicating the visual editor.
 

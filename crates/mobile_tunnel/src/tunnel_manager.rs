@@ -32,7 +32,7 @@ pub enum TunnelStatus {
 
 /// Manages the lifecycle of a secure SSH tunnel for mobile app access.
 ///
-/// Reuses Baymax's existing SSH remote infrastructure when available:
+/// Reuses Sim's existing SSH remote infrastructure when available:
 /// - If an `SshRemoteConnection` is active via `ControlMaster`, the tunnel
 ///   creates a forwarded-port session through the existing socket without
 ///   re-authentication.

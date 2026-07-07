@@ -18,7 +18,7 @@ use ui::{
     prelude::*,
 };
 
-pub use baymax_actions::{Rerun, Spawn};
+pub use sim_actions::{Rerun, Spawn};
 use util::{ResultExt, truncate_and_trailoff};
 use workspace::{ModalView, Workspace};
 
@@ -756,7 +756,7 @@ mod tests {
         fs.insert_tree(
             path!("/dir"),
             json!({
-                ".baymax": {
+                ".sim": {
                     "tasks.json": r#"[
                         {
                             "label": "example task",
@@ -929,17 +929,17 @@ mod tests {
         fs.insert_tree(
             path!("/dir"),
             json!({
-                ".baymax": {
+                ".sim": {
                     "tasks.json": r#"[
                         {
-                            "label": "hello from $BAYMAX_FILE:$BAYMAX_ROW:$BAYMAX_COLUMN",
+                            "label": "hello from $SIM_FILE:$SIM_ROW:$SIM_COLUMN",
                             "command": "echo",
-                            "args": ["hello", "from", "$BAYMAX_FILE", ":", "$BAYMAX_ROW", ":", "$BAYMAX_COLUMN"]
+                            "args": ["hello", "from", "$SIM_FILE", ":", "$SIM_ROW", ":", "$SIM_COLUMN"]
                         },
                         {
-                            "label": "opened now: $BAYMAX_WORKTREE_ROOT",
+                            "label": "opened now: $SIM_WORKTREE_ROOT",
                             "command": "echo",
-                            "args": ["opened", "now:", "$BAYMAX_WORKTREE_ROOT"]
+                            "args": ["opened", "now:", "$SIM_WORKTREE_ROOT"]
                         }
                     ]"#,
                 },
@@ -1147,12 +1147,12 @@ mod tests {
                             ..TaskTemplate::default()
                         },
                         TaskTemplate {
-                            label: "TypeScript task from file $BAYMAX_FILE".to_string(),
+                            label: "TypeScript task from file $SIM_FILE".to_string(),
                             command: "npm run build".to_string(),
                             ..TaskTemplate::default()
                         },
                         TaskTemplate {
-                            label: "Another task from file $BAYMAX_FILE".to_string(),
+                            label: "Another task from file $SIM_FILE".to_string(),
                             command: "npm run lint".to_string(),
                             ..TaskTemplate::default()
                         },

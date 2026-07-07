@@ -68,8 +68,8 @@ util.workspace = true
 uuid.workspace = true
 workspace.workspace = true
 worktree.workspace = true
-baymax_actions.workspace = true
-baymax_credentials_provider.workspace = true
+sim_actions.workspace = true
+sim_credentials_provider.workspace = true
 zeta_prompt.workspace = true
 zstd.workspace = true
 

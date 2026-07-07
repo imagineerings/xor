@@ -13,7 +13,7 @@ pub use sqlez;
 pub use sqlez_macros;
 pub use uuid;
 
-use baymax_env_vars::BAYMAX_STATELESS;
+use sim_env_vars::SIM_STATELESS;
 pub use release_channel::RELEASE_CHANNEL;
 use release_channel::ReleaseChannel;
 use sqlez::domain::Migrator;
@@ -175,7 +175,7 @@ pub async fn open_db<M: Migrator + 'static>(
     db_dir: &Path,
     scope: impl DbScope,
 ) -> ThreadSafeConnection {
-    if *BAYMAX_STATELESS {
+    if *SIM_STATELESS {
         return open_fallback_db::<M>().await;
     }
 

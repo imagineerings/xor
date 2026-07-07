@@ -1,11 +1,11 @@
 ---
 title: Prisma
-description: "Configure Prisma language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure Prisma language support in Sim, including language servers, formatting, and debugging."
 ---
 
 # Prisma
 
-Prisma support is available through the [Prisma extension](https://github.com/baymax-extensions/prisma).
+Prisma support is available through the [Prisma extension](https://github.com/sim-extensions/prisma).
 
 - Tree-sitter: [victorhqc/tree-sitter-prisma](https://github.com/victorhqc/tree-sitter-prisma)
 - Language-Server: [prisma/language-tools](https://github.com/prisma/language-tools)

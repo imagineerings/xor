@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-Baymax currently exposes a binary online/busy presence model via the `Contact` struct (`online: bool`, `busy: bool` in `client::user`). Users have no way to communicate fine-grained availability such as "In a meeting", "Out sick", or "Working remotely". This design adds a custom user status feature — an optional emoji + short text label that users can set, with an optional auto-clear timer, persisted server-side and synced to all connected clients in real time.
+Sim currently exposes a binary online/busy presence model via the `Contact` struct (`online: bool`, `busy: bool` in `client::user`). Users have no way to communicate fine-grained availability such as "In a meeting", "Out sick", or "Working remotely". This design adds a custom user status feature — an optional emoji + short text label that users can set, with an optional auto-clear timer, persisted server-side and synced to all connected clients in real time.
 
 ### Key Architectural Decisions
 
@@ -19,7 +19,7 @@ Baymax currently exposes a binary online/busy presence model via the `Contact` s
 
 - **Adding a new field vs. separate entity**: Adding `status` to `Contact` is simpler but means the custom status is coupled to the contact sync cycle. A separate `UserStatusStore` entity would be cleaner but requires new subscription/observation infrastructure. For v1, coupling to `Contact` is acceptable since status is closely related to presence.
 - **Server-side TTL vs. client-side timer**: Server-side expiration is more reliable (survives client disconnect) and avoids clock-skew issues. The trade-off is that the server needs a periodic sweep, adding a small load. Each sweep is a single `UPDATE ... WHERE expires_at < NOW()` query — negligible overhead.
-- **Push to all clients vs. pull-on-demand**: Broadcasting status changes to all connected clients ensures the UI is always up-to-date without polling. The cost is bandwidth: each status update is ~200 bytes * number of connected clients. This is acceptable for typical Baymax usage (dozens to low hundreds of clients).
+- **Push to all clients vs. pull-on-demand**: Broadcasting status changes to all connected clients ensures the UI is always up-to-date without polling. The cost is bandwidth: each status update is ~200 bytes * number of connected clients. This is acceptable for typical Sim usage (dozens to low hundreds of clients).
 
 ## 2. Architecture
 
@@ -65,14 +65,14 @@ flowchart TB
 
 ### External Integrations
 
-- **Proto definitions** (new messages in `baymax.proto`): `SetStatus` (request), `SetStatusResponse` (response), `ClearStatus` (request), `UpdateUserStatus` (push), `UpdateUserStatuses` (batch for initial load).
+- **Proto definitions** (new messages in `sim.proto`): `SetStatus` (request), `SetStatusResponse` (response), `ClearStatus` (request), `UpdateUserStatus` (push), `UpdateUserStatuses` (batch for initial load).
 - **Database migration**: New `user_custom_statuses` table.
 - **Collab RPC handlers**: New handlers registered in the RPC dispatch table.
 - **Proto registration**: New messages registered in `proto::messages!()` and `proto::request_messages!()` macros.
 
 ## 3. Components and Interfaces
 
-### 3.1 Protobuf Messages (`crates/proto/proto/baymax.proto`)
+### 3.1 Protobuf Messages (`crates/proto/proto/sim.proto`)
 
 ```protobuf
 message SetStatus {
@@ -101,7 +101,7 @@ message UserCustomStatus {
 }
 ```
 
-**Envelope registration** (add to `oneof payload` in `baymax.proto`):
+**Envelope registration** (add to `oneof payload` in `sim.proto`):
 
 ```protobuf
 SetStatus set_status = 250;
@@ -594,7 +594,7 @@ CREATE INDEX idx_user_custom_statuses_expires_at
 ### Proto Deployment Order
 
 1. Add proto messages and register in `proto.rs`
-2. Add `oneof payload` entries to `baymax.proto`
+2. Add `oneof payload` entries to `sim.proto`
 3. Deploy collab server (new RPC handlers, sweeper)
 4. Deploy client update (new UI, new message handlers)
 

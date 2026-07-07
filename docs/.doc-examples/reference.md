@@ -7,7 +7,7 @@
   Key patterns to note:
   - Anchor IDs on categories and individual items for deep-linking
   - Opening paragraph explains what these are and where they're used
-  - Organibaymax into logical categories
+  - Organisim into logical categories
   - Each item has a clear, actionable description
   - Links to related configuration docs
   - "See Also" section for related topics
@@ -15,14 +15,14 @@
 
 ---
 
-title: AI Agent Tools - Baymax
-description: Built-in tools for Baymax's AI agent including file editing, code search, terminal commands, web search, and diagnostics.
+title: AI Agent Tools - Sim
+description: Built-in tools for Sim's AI agent including file editing, code search, terminal commands, web search, and diagnostics.
 
 ---
 
 # Tools
 
-Baymax's built-in agent has access to these tools for reading, searching, and editing your codebase. These tools are used in the [Agent Panel](./agent-panel.md) during conversations with AI agents.
+Sim's built-in agent has access to these tools for reading, searching, and editing your codebase. These tools are used in the [Agent Panel](./agent-panel.md) during conversations with AI agents.
 
 You can configure permissions for tool actions, including situations where they are automatically approved, automatically denied, or require your confirmation on a case-by-case basis. See [Tool Permissions](./tool-permissions.md) for the list of permission-gated tools and details.
 

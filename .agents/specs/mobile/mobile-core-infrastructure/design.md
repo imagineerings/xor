@@ -124,7 +124,7 @@ stateDiagram-v2
     ProvenanceCheck --> TailscaleDetected: URL is 100.x.x.x or *.ts.net
     ProvenanceCheck --> CloudflareDetected: URL contains cloudflare-tunnel-proxy
     ProvenanceCheck --> SSHTunnelDetected: URL is 127.0.0.1 or localhost
-    ProvenanceCheck --> TrialMode: URL is demo-baymaxed.fly.dev
+    ProvenanceCheck --> TrialMode: URL is demo-simed.fly.dev
     ProvenanceCheck --> Error: unreachable
 
     TailscaleDetected --> TailscaleError: show Tailscale-specific error
@@ -155,7 +155,7 @@ sequenceDiagram
     participant UI as Chat UI
     participant VM as ViewModel
     participant API as AgentAPIService
-    participant Agent as Baymax Agent
+    participant Agent as Sim Agent
 
     User->>UI: Type & Send Message
     UI->>VM: sendMessage(text)
@@ -301,7 +301,7 @@ detectProvenance(url):
     lower = url.lowercase()
     
     // Trial mode check first
-    if "demo-baymaxed.fly.dev" in lower:
+    if "demo-simed.fly.dev" in lower:
         return trialMode
     
     // Tailscale: 100.x.x.x IP or .ts.net domain
@@ -322,7 +322,7 @@ detectProvenance(url):
 
 ### 3.3 AgentAPIService
 
-**Purpose:** Single HTTP client for all communication with the Baymax agent server. Handles REST calls, SSE streaming, retry logic, and error classification.
+**Purpose:** Single HTTP client for all communication with the Sim agent server. Handles REST calls, SSE streaming, retry logic, and error classification.
 
 **Interface:**
 
@@ -481,7 +481,7 @@ Empty line ("\n\n") delimits events.
 
 ### 3.7 CollabWebSocketManager
 
-**Purpose:** Manages the WebSocket connection to the Baymax collaboration server for real-time features (presence, channel messages, call notifications).
+**Purpose:** Manages the WebSocket connection to the Sim collaboration server for real-time features (presence, channel messages, call notifications).
 
 **Interface:**
 
@@ -564,7 +564,7 @@ connecting:
 testing:
   → connected (200 OK)
   → tailscaleError (URL matches Tailscale pattern)
-  → trialMode (URL is demo-baymaxed)
+  → trialMode (URL is demo-simed)
   → error (all other failures)
 
 connected:

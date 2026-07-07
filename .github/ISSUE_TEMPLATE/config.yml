@@ -2,8 +2,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Feature request
-    url: https://github.com/simtropolis/baymax/discussions/new?category=feature-requests
+    url: https://github.com/simtropolis/sim/discussions/new?category=feature-requests
     about: To request a feature, open a new discussion under one of the appropriate categories.
   - name: Our Discord community
-    url: https://discord.com/invite/baymaxindustries
+    url: https://discord.com/invite/simindustries
     about: Join our Discord server for real-time discussion and user support.

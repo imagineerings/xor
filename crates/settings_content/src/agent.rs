@@ -71,7 +71,7 @@ pub enum ThinkingBlockDisplay {
     AlwaysCollapsed,
 }
 
-/// The default behavior mode for Baymax-compatible agent prompts.
+/// The default behavior mode for Sim-compatible agent prompts.
 #[derive(
     Clone,
     Copy,
@@ -87,7 +87,7 @@ pub enum ThinkingBlockDisplay {
     strum::VariantNames,
 )]
 #[serde(rename_all = "snake_case")]
-pub enum BaymaxModeContent {
+pub enum SimModeContent {
     /// Prefer narrow, low-risk execution.
     Focus,
     /// Balance directness with enough context to finish the task.
@@ -101,7 +101,7 @@ pub enum BaymaxModeContent {
 /// [`AutoCompactSettingsContent::threshold`] for the accepted formats.
 ///
 /// The canonical textual form is stored verbatim so it can round-trip through
-/// the settings UI; it is serialibaymax back as a JSON string for percentages and
+/// the settings UI; it is serialisim back as a JSON string for percentages and
 /// as a JSON integer for token counts.
 #[derive(Clone, Debug, PartialEq, Eq, MergeFrom)]
 pub struct AutoCompactThreshold(pub String);
@@ -326,10 +326,10 @@ pub struct AgentSettingsContent {
     /// Default: []
     #[serde(default)]
     pub model_parameters: Vec<LanguageModelParameters>,
-    /// The default behavior mode for Baymax-compatible agent prompts.
+    /// The default behavior mode for Sim-compatible agent prompts.
     ///
     /// Default: balanced
-    pub baymax_mode: Option<BaymaxModeContent>,
+    pub sim_mode: Option<SimModeContent>,
     /// Settings for automatic agent context compaction, which summarizes
     /// earlier messages to free up room in the model's context window once the
     /// context grows too large.
@@ -378,7 +378,7 @@ pub struct AgentSettingsContent {
     /// The global `default` applies when no tool-specific rules match.
     /// For external agent servers (e.g. Claude Agent) that define their own
     /// permission modes, "deny" and "confirm" still take precedence — the
-    /// external agent's permission system is only used when Baymax would allow
+    /// external agent's permission system is only used when Sim would allow
     /// the action. Per-tool regex patterns (`always_allow`, `always_deny`,
     /// `always_confirm`) match against the tool's text input (command, path,
     /// URL, etc.).
@@ -641,7 +641,7 @@ impl JsonSchema for LanguageModelProviderSetting {
                         "openrouter",
                         "vercel_ai_gateway",
                         "x_ai",
-                        "baymax.dev"
+                        "sim.dev"
                     ]
                 },
                 {
@@ -766,7 +766,7 @@ pub struct SandboxPermissionsContent {
     pub allow_unsandboxed: Option<bool>,
 
     /// Directory subtrees that sandboxed terminal commands may always write
-    /// to without prompting. Paths written by Baymax are absolute.
+    /// to without prompting. Paths written by Sim are absolute.
     /// Default: []
     pub write_paths: Option<ExtendingVec<PathBuf>>,
 }

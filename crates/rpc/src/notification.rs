@@ -76,7 +76,7 @@ mod tests {
 
     #[test]
     fn test_notification() {
-        // Notifications can be serialibaymax and deserialibaymax.
+        // Notifications can be serialisim and deserialisim.
         for notification in [
             Notification::ContactRequest { sender_id: 1 },
             Notification::ContactRequestAccepted { responder_id: 2 },
@@ -87,11 +87,11 @@ mod tests {
             },
         ] {
             let message = notification.to_proto();
-            let deserialibaymax = Notification::from_proto(&message).unwrap();
-            assert_eq!(deserialibaymax, notification);
+            let deserialisim = Notification::from_proto(&message).unwrap();
+            assert_eq!(deserialisim, notification);
         }
 
-        // When notifications are serialibaymax, the `kind` and `actor_id` fields are
+        // When notifications are serialisim, the `kind` and `actor_id` fields are
         // stored separately, and do not appear redundantly in the JSON.
         let notification = Notification::ContactRequest { sender_id: 1 };
         assert_eq!(notification.to_proto().content, "{}");

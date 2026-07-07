@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-The mobile build and publish foundation should make Android and iOS builds reproducible from the Baymax repository root, while keeping signing and external publishing optional and explicit. The design uses checked-in platform build scripts as the stable interface, with root-level GitHub Actions workflows calling those scripts for CI validation and release artifacts.
+The mobile build and publish foundation should make Android and iOS builds reproducible from the Sim repository root, while keeping signing and external publishing optional and explicit. The design uses checked-in platform build scripts as the stable interface, with root-level GitHub Actions workflows calling those scripts for CI validation and release artifacts.
 
 The main constraints are:
 
@@ -118,7 +118,7 @@ Scripts should exit non-zero with a concise error when required inputs are missi
 
 **Responsibilities**:
 
-- Add or restore an Xcode project/workspace that includes the Swift sources in `mobile/ios/Baymax`.
+- Add or restore an Xcode project/workspace that includes the Swift sources in `mobile/ios/Sim`.
 - Define bundle identifier, marketing version, and build number in project settings.
 - Support local simulator/device compile validation.
 - Support signed archive and IPA export when signing material is available.
@@ -214,7 +214,7 @@ items:
   "version": "1.0.0",
   "build_number": "123",
   "commit_sha": "abc123",
-  "artifacts": ["mobile/build/android/baymax-android-artifact-1.0.0-abc123.aab"],
+  "artifacts": ["mobile/build/android/sim-android-artifact-1.0.0-abc123.aab"],
   "published": false,
   "created_at": "2026-06-29T12:00:00Z"
 }

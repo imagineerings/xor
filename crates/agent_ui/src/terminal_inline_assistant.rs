@@ -320,7 +320,7 @@ impl TerminalInlineAssistant {
                     )
                 };
 
-                // Fire Baymax telemetry
+                // Fire Sim telemetry
                 telemetry::event!(
                     event_type,
                     kind = "inline_terminal",

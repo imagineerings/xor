@@ -2,7 +2,7 @@
 
 ## Overview
 
-Implement an interactive terminal UI mode for baymax's CLI using crossterm/ratatui, with a configuration wizard, extension management, markdown rendering, onboarding, and slash commands. This extends `crates/cli/` with a new `goose interactive` subcommand.
+Implement an interactive terminal UI mode for sim's CLI using crossterm/ratatui, with a configuration wizard, extension management, markdown rendering, onboarding, and slash commands. This extends `crates/cli/` with a new `goose interactive` subcommand.
 
 ## Repo Reconciliation
 
@@ -36,7 +36,7 @@ Implement an interactive terminal UI mode for baymax's CLI using crossterm/ratat
   - Step-by-step wizard for provider setup
   - Input types: text (with secret masking), confirm, select, file
   - Validation per step
-  - Persist to baymax settings
+  - Persist to sim settings
   - _Requirements: 2_
   - _writes: crates/cli/src/commands/configure.rs_
 

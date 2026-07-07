@@ -1,4 +1,4 @@
-// This crate was essentially pulled out verbatim from main `baymax` crate to avoid having to run RustEmbed macro whenever baymax has to be rebuilt. It saves a second or two on an incremental build.
+// This crate was essentially pulled out verbatim from main `sim` crate to avoid having to run RustEmbed macro whenever sim has to be rebuilt. It saves a second or two on an incremental build.
 
 use anyhow::Context as _;
 use gpui::{App, AssetSource, Result, SharedString};

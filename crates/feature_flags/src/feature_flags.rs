@@ -17,8 +17,8 @@ pub use flags::*;
 pub use settings::{FeatureFlagsSettings, generate_feature_flags_schema};
 pub use store::*;
 
-pub static BAYMAX_DISABLE_STAFF: LazyLock<bool> = LazyLock::new(|| {
-    std::env::var("BAYMAX_DISABLE_STAFF").is_ok_and(|value| !value.is_empty() && value != "0")
+pub static SIM_DISABLE_STAFF: LazyLock<bool> = LazyLock::new(|| {
+    std::env::var("SIM_DISABLE_STAFF").is_ok_and(|value| !value.is_empty() && value != "0")
 });
 
 impl Global for FeatureFlagStore {}
@@ -108,9 +108,9 @@ impl FeatureFlagValue for PresenceFlag {
 /// To create a feature flag, implement this trait on a trivial type and use it as
 /// a generic parameter when called [`FeatureFlagAppExt::has_flag`].
 ///
-/// Feature flags are enabled for members of Baymax staff by default. To disable this behavior
-/// so you can test flags being disabled, set BAYMAX_DISABLE_STAFF=1 in your environment,
-/// which will force Baymax to treat the current user as non-staff.
+/// Feature flags are enabled for members of Sim staff by default. To disable this behavior
+/// so you can test flags being disabled, set SIM_DISABLE_STAFF=1 in your environment,
+/// which will force Sim to treat the current user as non-staff.
 pub trait FeatureFlag {
     const NAME: &'static str;
 
@@ -118,7 +118,7 @@ pub trait FeatureFlag {
     /// on/off flags.
     type Value: FeatureFlagValue;
 
-    /// Returns whether this feature flag is enabled for Baymax staff.
+    /// Returns whether this feature flag is enabled for Sim staff.
     fn enabled_for_staff() -> bool {
         true
     }

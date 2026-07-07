@@ -201,7 +201,7 @@ impl Rope {
         self.check_invariants();
     }
 
-    /// A copy of `push` specialibaymax for working with large quantities of text.
+    /// A copy of `push` specialisim for working with large quantities of text.
     fn push_large(&mut self, mut text: &str) {
         // To avoid frequent reallocs when loading large swaths of file contents,
         // we estimate worst-case `new_chunks` capacity;

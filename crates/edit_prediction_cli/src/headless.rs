@@ -26,11 +26,11 @@ pub struct EpAppState {
 }
 
 pub fn init(cx: &mut App) -> EpAppState {
-    let app_commit_sha = option_env!("BAYMAX_COMMIT_SHA").map(|s| AppCommitSha::new(s.to_owned()));
+    let app_commit_sha = option_env!("SIM_COMMIT_SHA").map(|s| AppCommitSha::new(s.to_owned()));
 
     let app_version = AppVersion::load(
-        env!("BAYMAX_PKG_VERSION"),
-        option_env!("BAYMAX_BUILD_ID"),
+        env!("SIM_PKG_VERSION"),
+        option_env!("SIM_BUILD_ID"),
         app_commit_sha,
     );
     release_channel::init(app_version.clone(), cx);

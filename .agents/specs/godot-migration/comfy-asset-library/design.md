@@ -2,7 +2,7 @@
 
 ## Overview
 
-The asset library provides the world-model harness asset model and Comfy-compatible asset APIs on top of Baymax storage, artifact, and media services. It preserves the useful Comfy split between immutable content and mutable owner-scoped references while avoiding a parallel media preview stack.
+The asset library provides the world-model harness asset model and Comfy-compatible asset APIs on top of Sim storage, artifact, and media services. It preserves the useful Comfy split between immutable content and mutable owner-scoped references while avoiding a parallel media preview stack.
 
 ## Architecture
 
@@ -13,7 +13,7 @@ flowchart LR
     Service --> Tags[TagService]
     Service --> Seed[AssetSeeder]
     Seed --> Scanner[FilesystemScanner]
-    Service --> Media[Baymax Media Preview]
+    Service --> Media[Sim Media Preview]
     Service --> Provenance[Generated Artifact Store]
 ```
 

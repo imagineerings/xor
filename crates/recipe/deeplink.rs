@@ -6,7 +6,7 @@ use url::Url;
 
 use crate::{Recipe, RecipeSourceType};
 
-const RECIPE_LINK_PREFIX: &str = "baymax://recipe";
+const RECIPE_LINK_PREFIX: &str = "sim://recipe";
 const DATA_QUERY_KEY: &str = "data";
 
 #[derive(Debug, Error)]
@@ -46,7 +46,7 @@ impl RecipeDeeplink {
 
     pub fn parse(link: &str) -> Result<Self, RecipeDeeplinkError> {
         let url = Url::parse(link)?;
-        if url.scheme() != "baymax" || url.host_str() != Some("recipe") {
+        if url.scheme() != "sim" || url.host_str() != Some("recipe") {
             return Err(RecipeDeeplinkError::MissingData);
         }
 
@@ -109,18 +109,18 @@ parameters:
     #[test]
     fn round_trips_recipe_deeplink() {
         let recipe = test_recipe();
-        let variables = HashMap::from([("name".to_string(), "Baymax".to_string())]);
+        let variables = HashMap::from([("name".to_string(), "Sim".to_string())]);
         let link = RecipeDeeplink::encode(&recipe, &variables).unwrap();
 
         let parsed = RecipeDeeplink::parse(&link).unwrap();
 
         assert_eq!(parsed.recipe.title, "Shared Recipe");
-        assert_eq!(parsed.variables.get("name"), Some(&"Baymax".to_string()));
+        assert_eq!(parsed.variables.get("name"), Some(&"Sim".to_string()));
     }
 
     #[test]
     fn rejects_missing_data() {
-        let error = RecipeDeeplink::parse("baymax://recipe").unwrap_err();
+        let error = RecipeDeeplink::parse("sim://recipe").unwrap_err();
 
         assert!(matches!(error, RecipeDeeplinkError::MissingData));
     }

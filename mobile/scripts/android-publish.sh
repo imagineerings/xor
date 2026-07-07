@@ -13,7 +13,7 @@ Required:
   --aab <path>                    Signed Android App Bundle to upload.
 
 Options:
-  --package-name <identifier>     Defaults to ANDROID_PACKAGE_NAME or com.simtropolis.baymaxchat.
+  --package-name <identifier>     Defaults to ANDROID_PACKAGE_NAME or com.simtropolis.simchat.
   --track <track>                 Defaults to internal.
   --release-status <status>       Defaults to completed.
   --help
@@ -23,7 +23,7 @@ USAGE
 }
 
 aab_path=""
-package_name="${ANDROID_PACKAGE_NAME:-com.simtropolis.baymaxchat}"
+package_name="${ANDROID_PACKAGE_NAME:-com.simtropolis.simchat}"
 track="${ANDROID_PLAY_TRACK:-internal}"
 release_status="${ANDROID_PLAY_RELEASE_STATUS:-completed}"
 
@@ -79,7 +79,7 @@ decode_base64_file() {
     fi
 }
 
-json_key_path="$(mktemp "${TMPDIR:-/tmp}/baymax-play-service-account.XXXXXX.json")"
+json_key_path="$(mktemp "${TMPDIR:-/tmp}/sim-play-service-account.XXXXXX.json")"
 cleanup() {
     rm -f "${json_key_path}"
 }

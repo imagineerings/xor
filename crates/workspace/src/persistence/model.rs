@@ -1,7 +1,7 @@
-use super::{SerialibaymaxAxis, SerialibaymaxWindowBounds};
+use super::{SerialisimAxis, SerialisimWindowBounds};
 use crate::{
     Member, Pane, PaneAxis, SerializableItemRegistry, Workspace, WorkspaceId, item::ItemHandle,
-    multi_workspace::SerialibaymaxProjectGroupState, path_list::PathList,
+    multi_workspace::SerialisimProjectGroupState, path_list::PathList,
 };
 use anyhow::{Context, Result};
 use async_recursion::async_recursion;
@@ -14,7 +14,7 @@ use gpui::{AsyncWindowContext, Entity, WeakEntity, WindowId};
 
 use language::{Toolchain, ToolchainScope};
 use project::{
-    Project, ProjectGroupKey, bookmark_store::SerialibaymaxBookmark,
+    Project, ProjectGroupKey, bookmark_store::SerialisimBookmark,
     debugger::breakpoint_store::SourceBreakpoint,
 };
 use remote::RemoteConnectionOptions;
@@ -24,7 +24,7 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-use util::{ResultExt, path_list::SerialibaymaxPathList};
+use util::{ResultExt, path_list::SerialisimPathList};
 use uuid::Uuid;
 
 #[derive(
@@ -40,12 +40,12 @@ pub(crate) enum RemoteConnectionKind {
 }
 
 #[derive(Debug, PartialEq, Clone, serde::Serialize, serde::Deserialize)]
-pub enum SerialibaymaxWorkspaceLocation {
+pub enum SerialisimWorkspaceLocation {
     Local,
     Remote(RemoteConnectionOptions),
 }
 
-impl SerialibaymaxWorkspaceLocation {
+impl SerialisimWorkspaceLocation {
     /// Get sorted paths
     pub fn sorted_paths(&self) -> Arc<Vec<PathBuf>> {
         unimplemented!()
@@ -57,15 +57,15 @@ impl SerialibaymaxWorkspaceLocation {
 #[derive(Debug, PartialEq, Clone)]
 pub struct SessionWorkspace {
     pub workspace_id: WorkspaceId,
-    pub location: SerialibaymaxWorkspaceLocation,
+    pub location: SerialisimWorkspaceLocation,
     pub paths: PathList,
     pub window_id: Option<WindowId>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct SerialibaymaxProjectGroup {
-    pub path_list: SerialibaymaxPathList,
-    pub(crate) location: SerialibaymaxWorkspaceLocation,
+pub struct SerialisimProjectGroup {
+    pub path_list: SerialisimPathList,
+    pub(crate) location: SerialisimWorkspaceLocation,
     #[serde(default = "default_expanded")]
     pub expanded: bool,
 }
@@ -74,33 +74,33 @@ fn default_expanded() -> bool {
     true
 }
 
-impl SerialibaymaxProjectGroup {
+impl SerialisimProjectGroup {
     pub fn from_group(key: &ProjectGroupKey, expanded: bool) -> Self {
         Self {
             path_list: key.path_list().serialize(),
             location: match key.host() {
-                Some(host) => SerialibaymaxWorkspaceLocation::Remote(host),
-                None => SerialibaymaxWorkspaceLocation::Local,
+                Some(host) => SerialisimWorkspaceLocation::Remote(host),
+                None => SerialisimWorkspaceLocation::Local,
             },
             expanded,
         }
     }
 
-    pub fn into_restored_state(self) -> SerialibaymaxProjectGroupState {
+    pub fn into_restored_state(self) -> SerialisimProjectGroupState {
         let path_list = PathList::deserialize(&self.path_list);
         let host = match self.location {
-            SerialibaymaxWorkspaceLocation::Local => None,
-            SerialibaymaxWorkspaceLocation::Remote(opts) => Some(opts),
+            SerialisimWorkspaceLocation::Local => None,
+            SerialisimWorkspaceLocation::Remote(opts) => Some(opts),
         };
-        SerialibaymaxProjectGroupState {
+        SerialisimProjectGroupState {
             key: ProjectGroupKey::new(host, path_list),
             expanded: self.expanded,
         }
     }
 }
 
-impl From<SerialibaymaxProjectGroup> for ProjectGroupKey {
-    fn from(value: SerialibaymaxProjectGroup) -> Self {
+impl From<SerialisimProjectGroup> for ProjectGroupKey {
+    fn from(value: SerialisimProjectGroup) -> Self {
         value.into_restored_state().key
     }
 }
@@ -111,24 +111,24 @@ pub struct MultiWorkspaceState {
     pub active_workspace_id: Option<WorkspaceId>,
     pub sidebar_open: bool,
     #[serde(alias = "project_group_keys")]
-    pub project_groups: Vec<SerialibaymaxProjectGroup>,
+    pub project_groups: Vec<SerialisimProjectGroup>,
     #[serde(default)]
     pub sidebar_state: Option<String>,
 }
 
-/// The serialibaymax state of a single MultiWorkspace window from a previous session:
+/// The serialisim state of a single MultiWorkspace window from a previous session:
 /// the active workspace to restore plus window-level state (project group keys,
 /// sidebar).
 #[derive(Debug, Clone)]
-pub struct SerialibaymaxMultiWorkspace {
+pub struct SerialisimMultiWorkspace {
     pub active_workspace: SessionWorkspace,
     pub state: MultiWorkspaceState,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct SerialibaymaxWorkspace {
+pub(crate) struct SerialisimWorkspace {
     pub(crate) id: WorkspaceId,
-    pub(crate) location: SerialibaymaxWorkspaceLocation,
+    pub(crate) location: SerialisimWorkspaceLocation,
     pub(crate) paths: PathList,
     /// The workspace's main worktree paths at the time this workspace was saved.
     ///
@@ -137,13 +137,13 @@ pub(crate) struct SerialibaymaxWorkspace {
     /// become stale if the repository layout changes after the save. Use `paths` when
     /// reopening the workspace.
     pub(crate) identity_paths: Option<PathList>,
-    pub(crate) center_group: SerialibaymaxPaneGroup,
-    pub(crate) window_bounds: Option<SerialibaymaxWindowBounds>,
+    pub(crate) center_group: SerialisimPaneGroup,
+    pub(crate) window_bounds: Option<SerialisimWindowBounds>,
     pub(crate) centered_layout: bool,
     pub(crate) display: Option<Uuid>,
     pub(crate) docks: DockStructure,
     pub(crate) session_id: Option<String>,
-    pub(crate) bookmarks: BTreeMap<Arc<Path>, Vec<SerialibaymaxBookmark>>,
+    pub(crate) bookmarks: BTreeMap<Arc<Path>, Vec<SerialisimBookmark>>,
     pub(crate) breakpoints: BTreeMap<Arc<Path>, Vec<SourceBreakpoint>>,
     pub(crate) user_toolchains: BTreeMap<ToolchainScope, IndexSet<Toolchain>>,
     pub(crate) window_id: Option<u64>,
@@ -231,27 +231,27 @@ impl Bind for DockData {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum SerialibaymaxPaneGroup {
+pub(crate) enum SerialisimPaneGroup {
     Group {
-        axis: SerialibaymaxAxis,
+        axis: SerialisimAxis,
         flexes: Option<Vec<f32>>,
-        children: Vec<SerialibaymaxPaneGroup>,
+        children: Vec<SerialisimPaneGroup>,
     },
-    Pane(SerialibaymaxPane),
+    Pane(SerialisimPane),
 }
 
 #[cfg(test)]
-impl Default for SerialibaymaxPaneGroup {
+impl Default for SerialisimPaneGroup {
     fn default() -> Self {
-        Self::Pane(SerialibaymaxPane {
-            children: vec![SerialibaymaxItem::default()],
+        Self::Pane(SerialisimPane {
+            children: vec![SerialisimItem::default()],
             active: false,
             pinned_count: 0,
         })
     }
 }
 
-impl SerialibaymaxPaneGroup {
+impl SerialisimPaneGroup {
     #[async_recursion(?Send)]
     pub(crate) async fn deserialize(
         self,
@@ -265,7 +265,7 @@ impl SerialibaymaxPaneGroup {
         Vec<Option<Box<dyn ItemHandle>>>,
     )> {
         match self {
-            SerialibaymaxPaneGroup::Group {
+            SerialisimPaneGroup::Group {
                 axis,
                 children,
                 flexes,
@@ -298,14 +298,14 @@ impl SerialibaymaxPaneGroup {
                     items,
                 ))
             }
-            SerialibaymaxPaneGroup::Pane(serialibaymax_pane) => {
+            SerialisimPaneGroup::Pane(serialisim_pane) => {
                 let pane = workspace
                     .update_in(cx, |workspace, window, cx| {
                         workspace.add_pane(window, cx).downgrade()
                     })
                     .log_err()?;
-                let active = serialibaymax_pane.active;
-                let new_items = serialibaymax_pane
+                let active = serialisim_pane.active;
+                let new_items = serialisim_pane
                     .deserialize_to(project, &pane, workspace_id, workspace.clone(), cx)
                     .await
                     .context("Could not deserialize pane)")
@@ -336,15 +336,15 @@ impl SerialibaymaxPaneGroup {
 }
 
 #[derive(Debug, PartialEq, Eq, Default, Clone)]
-pub struct SerialibaymaxPane {
+pub struct SerialisimPane {
     pub(crate) active: bool,
-    pub(crate) children: Vec<SerialibaymaxItem>,
+    pub(crate) children: Vec<SerialisimItem>,
     pub(crate) pinned_count: usize,
 }
 
-impl SerialibaymaxPane {
-    pub fn new(children: Vec<SerialibaymaxItem>, active: bool, pinned_count: usize) -> Self {
-        SerialibaymaxPane {
+impl SerialisimPane {
+    pub fn new(children: Vec<SerialisimItem>, active: bool, pinned_count: usize) -> Self {
+        SerialisimPane {
             children,
             active,
             pinned_count,
@@ -421,14 +421,14 @@ pub type PaneId = i64;
 pub type ItemId = u64;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct SerialibaymaxItem {
+pub struct SerialisimItem {
     pub kind: Arc<str>,
     pub item_id: ItemId,
     pub active: bool,
     pub preview: bool,
 }
 
-impl SerialibaymaxItem {
+impl SerialisimItem {
     pub fn new(kind: impl AsRef<str>, item_id: ItemId, active: bool, preview: bool) -> Self {
         Self {
             kind: Arc::from(kind.as_ref()),
@@ -440,9 +440,9 @@ impl SerialibaymaxItem {
 }
 
 #[cfg(test)]
-impl Default for SerialibaymaxItem {
+impl Default for SerialisimItem {
     fn default() -> Self {
-        SerialibaymaxItem {
+        SerialisimItem {
             kind: Arc::from("Terminal"),
             item_id: 100000,
             active: false,
@@ -451,12 +451,12 @@ impl Default for SerialibaymaxItem {
     }
 }
 
-impl StaticColumnCount for SerialibaymaxItem {
+impl StaticColumnCount for SerialisimItem {
     fn column_count() -> usize {
         4
     }
 }
-impl Bind for &SerialibaymaxItem {
+impl Bind for &SerialisimItem {
     fn bind(&self, statement: &Statement, start_index: i32) -> Result<i32> {
         let next_index = statement.bind(&self.kind, start_index)?;
         let next_index = statement.bind(&self.item_id, next_index)?;
@@ -465,14 +465,14 @@ impl Bind for &SerialibaymaxItem {
     }
 }
 
-impl Column for SerialibaymaxItem {
+impl Column for SerialisimItem {
     fn column(statement: &mut Statement, start_index: i32) -> Result<(Self, i32)> {
         let (kind, next_index) = Arc::<str>::column(statement, start_index)?;
         let (item_id, next_index) = ItemId::column(statement, next_index)?;
         let (active, next_index) = bool::column(statement, next_index)?;
         let (preview, next_index) = bool::column(statement, next_index)?;
         Ok((
-            SerialibaymaxItem {
+            SerialisimItem {
                 kind,
                 item_id,
                 active,

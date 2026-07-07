@@ -1,5 +1,5 @@
 [package]
-name = "baymax_proto"
+name = "sim_proto"
 version = "0.3.2"
 edition.workspace = true
 publish.workspace = true

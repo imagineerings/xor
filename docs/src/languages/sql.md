@@ -1,17 +1,17 @@
 ---
 title: SQL
-description: "Configure SQL language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure SQL language support in Sim, including language servers, formatting, and debugging."
 ---
 
 # SQL
 
-SQL files are handled by the [SQL Extension](https://github.com/baymax-extensions/sql).
+SQL files are handled by the [SQL Extension](https://github.com/sim-extensions/sql).
 
 - Tree-sitter: [nervenes/tree-sitter-sql](https://github.com/nervenes/tree-sitter-sql)
 
 ### Formatting
 
-Baymax supports auto-formatting SQL using external tools like [`sql-formatter`](https://github.com/sql-formatter-org/sql-formatter).
+Sim supports auto-formatting SQL using external tools like [`sql-formatter`](https://github.com/sql-formatter-org/sql-formatter).
 
 1. Install `sql-formatter`:
 
@@ -26,7 +26,7 @@ which sql-formatter
 sql-formatter --version
 ```
 
-3. Configure formatting in Settings ({#kb baymax::OpenSettings}) under Languages > SQL, or add to your settings file:
+3. Configure formatting in Settings ({#kb sim::OpenSettings}) under Languages > SQL, or add to your settings file:
 
 ```json [settings]
   "languages": {
@@ -43,7 +43,7 @@ sql-formatter --version
 
 Substitute your preferred [SQL Dialect] for `mysql` above (`duckdb`, `hive`, `mariadb`, `postgresql`, `redshift`, `snowflake`, `sqlite`, `spark`, etc).
 
-You can add this to Baymax project settings (`.baymax/settings.json`) or via your Baymax user settings (`~/.config/baymax/settings.json`).
+You can add this to Sim project settings (`.sim/settings.json`) or via your Sim user settings (`~/.config/sim/settings.json`).
 
 ### Advanced Formatting
 
@@ -58,7 +58,7 @@ Sql-formatter also allows more precise control by providing [sql-formatter confi
 }
 ```
 
-When using a `.sql-formatter.json` file you can use a simplified Baymax settings configuration:
+When using a `.sql-formatter.json` file you can use a simplified Sim settings configuration:
 
 ```json [settings]
 {

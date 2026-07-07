@@ -16,7 +16,7 @@ Migrate goose's authentication infrastructure: the OIDC proxy (Cloudflare Worker
 
 ### Requirement 1: OIDC Proxy
 
-**User Story:** As a baymax user, I want to authenticate via OpenID Connect through a proxy, so that I can use OIDC-based provider authentication.
+**User Story:** As a sim user, I want to authenticate via OpenID Connect through a proxy, so that I can use OIDC-based provider authentication.
 
 #### Acceptance Criteria
 
@@ -27,7 +27,7 @@ Migrate goose's authentication infrastructure: the OIDC proxy (Cloudflare Worker
 
 ### Requirement 2: OAuth Persistence
 
-**User Story:** As a baymax user, I want OAuth tokens to persist across application restarts, so that I don't need to re-authenticate every time.
+**User Story:** As a sim user, I want OAuth tokens to persist across application restarts, so that I don't need to re-authenticate every time.
 
 #### Acceptance Criteria
 
@@ -38,7 +38,7 @@ Migrate goose's authentication infrastructure: the OIDC proxy (Cloudflare Worker
 
 ### Requirement 3: OAuth Device Flow
 
-**User Story:** As a baymax user, I want to authenticate using OAuth device flow, so that I can authorize the agent on devices without a browser (terminals, SSH, etc.).
+**User Story:** As a sim user, I want to authenticate using OAuth device flow, so that I can authorize the agent on devices without a browser (terminals, SSH, etc.).
 
 #### Acceptance Criteria
 
@@ -52,4 +52,4 @@ Migrate goose's authentication infrastructure: the OIDC proxy (Cloudflare Worker
 - Source: `projects/goose/oidc-proxy/` — Cloudflare Worker implementation
 - Source: `projects/goose/crates/goose/src/oauth/` — persist.rs, mod.rs
 - Source: `projects/goose/crates/goose/src/providers/oauth_device_flow.rs`
-- Existing baymax: `crates/oauth_callback_server/`
+- Existing sim: `crates/oauth_callback_server/`

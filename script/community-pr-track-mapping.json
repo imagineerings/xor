@@ -65,14 +65,14 @@
       "labels": ["area:controls/ime", "area:controls/mouse", "area:gpui"]
     },
     {
-      "name": "Auth & Baymax.dev",
+      "name": "Auth & Sim.dev",
       "labels": [
         "area:auth",
         "area:billing",
         "area:permissions",
-        "area:baymax account",
-        "area:baymax.dev",
-        "area:baymax.dev/theme builder"
+        "area:sim account",
+        "area:sim.dev",
+        "area:sim.dev/theme builder"
       ]
     },
     {

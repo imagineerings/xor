@@ -119,7 +119,7 @@ pub fn initiate_sign_in_impl(
                 .spawn(cx, async move |cx| {
                     task.await;
                     cx.update(|window, cx| match copilot.read(cx).status() {
-                        Status::Authoribaymax => {
+                        Status::Authorisim => {
                             copilot_toast(Some("Copilot has started."), window, cx)
                         }
                         _ => {
@@ -190,7 +190,7 @@ impl CopilotCodeVerification {
             _subscription: cx.observe(copilot, |this, copilot, cx| {
                 let status = copilot.read(cx).status();
                 match status {
-                    Status::Authoribaymax | Status::Unauthorized | Status::SigningIn { .. } => {
+                    Status::Authorisim | Status::Unauthorized | Status::SigningIn { .. } => {
                         this.set_status(status, cx)
                     }
                     _ => cx.emit(DismissEvent),
@@ -248,7 +248,7 @@ impl CopilotCodeVerification {
             .gap_2p5()
             .items_center()
             .text_center()
-            .child(Headline::new("Use GitHub Copilot in Baymax").size(HeadlineSize::Large))
+            .child(Headline::new("Use GitHub Copilot in Sim").size(HeadlineSize::Large))
             .child(
                 Label::new("Using Copilot requires an active subscription on GitHub.")
                     .color(Color::Muted),
@@ -428,7 +428,7 @@ impl Render for CopilotCodeVerification {
                 self.connect_clicked = false;
                 self.render_unauthorized_modal(cx).into_any_element()
             }
-            Status::Authoribaymax => {
+            Status::Authorisim => {
                 self.connect_clicked = false;
                 Self::render_enabled_modal(cx).into_any_element()
             }
@@ -455,7 +455,7 @@ impl Render for CopilotCodeVerification {
                 window.focus(&this.focus_handle, cx);
             }))
             .child(
-                Vector::new(VectorName::BaymaxXCopilot, rems(8.), rems(4.))
+                Vector::new(VectorName::SimXCopilot, rems(8.), rems(4.))
                     .color(Color::Custom(cx.theme().colors().icon)),
             )
             .child(prompt)
@@ -653,7 +653,7 @@ impl ConfigurationView {
     }
 
     fn render_for_chat(&self) -> impl IntoElement {
-        let start_label = "To use Baymax's agent with GitHub Copilot, you need to be logged in to GitHub. Note that your GitHub account must have an active Copilot Chat subscription.";
+        let start_label = "To use Sim's agent with GitHub Copilot, you need to be logged in to GitHub. Note that your GitHub account must have an active Copilot Chat subscription.";
         let no_status_label = "Copilot Chat requires an active GitHub Copilot subscription. Please ensure Copilot is configured and try again, or use a different LLM provider.";
 
         if let Some(msg) = self.loading_message() {
@@ -689,7 +689,7 @@ impl Render for ConfigurationView {
         let is_authenticated = &self.is_authenticated;
 
         if is_authenticated(cx) {
-            return ConfiguredApiCard::new("Authoribaymax")
+            return ConfiguredApiCard::new("Authorisim")
                 .button_label("Sign Out")
                 .on_click(|_, window, cx| {
                     if let Some(auth) = GlobalCopilotAuth::try_global(cx) {

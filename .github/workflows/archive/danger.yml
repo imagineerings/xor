@@ -13,7 +13,7 @@ on:
     - main
 jobs:
   danger:
-    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'baymax-extensions')
+    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'sim-extensions')
     runs-on: namespace-profile-2x4-ubuntu-2404
     steps:
     - name: steps::checkout_repo
@@ -36,7 +36,7 @@ jobs:
       run: pnpm run --dir script/danger danger ci
       env:
         GITHUB_TOKEN: not_a_real_token
-        DANGER_GITHUB_API_BASE_URL: https://danger-proxy.baymax.dev/github
+        DANGER_GITHUB_API_BASE_URL: https://danger-proxy.sim.dev/github
 defaults:
   run:
     shell: bash -euxo pipefail {0}

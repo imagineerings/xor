@@ -16,7 +16,7 @@ use editor::{
 use futures_lite::future::yield_now;
 use git::repository::DiffType;
 
-use baymax_actions::agent::ReviewBranchDiff;
+use sim_actions::agent::ReviewBranchDiff;
 use git::{
     Commit, StageAll, StageAndNext, ToggleStaged, UnstageAll, UnstageAndNext, repository::RepoPath,
     status::FileStatus,
@@ -1394,7 +1394,7 @@ impl Render for ProjectDiff {
 }
 
 impl SerializableItem for ProjectDiff {
-    fn serialibaymax_item_kind() -> &'static str {
+    fn serialisim_item_kind() -> &'static str {
         "ProjectDiff"
     }
 
@@ -1790,7 +1790,7 @@ fn render_send_review_to_agent_button(review_count: usize, focus_handle: &FocusH
         format!("Send Review to Agent ({})", review_count),
     )
     .start_icon(
-        Icon::new(IconName::BaymaxAssistant)
+        Icon::new(IconName::SimAssistant)
             .size(IconSize::Small)
             .color(Color::Muted),
     )
@@ -1937,7 +1937,7 @@ impl Render for BranchDiffToolbar {
                 this.child(Divider::vertical()).child(
                     Button::new("review-diff", "Review Diff")
                         .start_icon(
-                            Icon::new(IconName::BaymaxAssistant)
+                            Icon::new(IconName::SimAssistant)
                                 .size(IconSize::Small)
                                 .color(Color::Muted),
                         )

@@ -7,7 +7,7 @@ use cloud_llm_client::WebSearchResponse;
 use futures::FutureExt as _;
 use gpui::{App, Task};
 use language_model::{
-    BAYMAX_CLOUD_PROVIDER_ID, LanguageModelProviderId, LanguageModelToolResultContent,
+    SIM_CLOUD_PROVIDER_ID, LanguageModelProviderId, LanguageModelToolResultContent,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -62,9 +62,9 @@ impl AgentTool for WebSearchTool {
         "Searching the Web".into()
     }
 
-    /// We currently only support Baymax Cloud as a provider.
+    /// We currently only support Sim Cloud as a provider.
     fn supports_provider(provider: &LanguageModelProviderId) -> bool {
-        provider == &BAYMAX_CLOUD_PROVIDER_ID
+        provider == &SIM_CLOUD_PROVIDER_ID
     }
 
     fn run(

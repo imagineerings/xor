@@ -132,7 +132,7 @@ fn docs_deploy_steps(job: Job, project_name: &StepOutput) -> Job {
         .add_with(("accountId", vars::CLOUDFLARE_ACCOUNT_ID))
         .add_with((
             "command",
-            "r2 object put -f script/install.sh baymax-open-source-website-assets/install.sh",
+            "r2 object put -f script/install.sh sim-open-source-website-assets/install.sh",
         ))
     }
 
@@ -254,7 +254,7 @@ pub(crate) fn deploy_docs_workflow_call(
         .permissions(Permissions::default().contents(Level::Read))
         .uses(
             "simtropolis",
-            "baymax",
+            "sim",
             ".github/workflows/deploy_docs.yml",
             // Pinned to a commit rather than the mutable `main` ref (supply-chain hardening).
             // Same-repo reusable workflow; bump via Dependabot or alongside deploy_docs.yml changes.

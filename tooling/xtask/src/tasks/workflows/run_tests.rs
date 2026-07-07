@@ -127,9 +127,9 @@ pub(crate) fn run_tests() -> Workflow {
 /// Controls which features `orchestrate_impl` includes in the generated script.
 #[derive(PartialEq, Eq)]
 enum OrchestrateTarget {
-    /// For the main Baymax repo: includes the cargo package filter and extension
+    /// For the main Sim repo: includes the cargo package filter and extension
     /// change detection, but no working-directory scoping.
-    BaymaxRepo,
+    SimRepo,
     /// For individual extension repos: scopes changed-file detection to the
     /// working directory, with no package filter or extension detection.
     Extension,
@@ -138,7 +138,7 @@ enum OrchestrateTarget {
 // Generates a bash script that checks changed files against regex patterns
 // and sets GitHub output variables accordingly
 pub fn orchestrate(rules: &[&PathCondition]) -> NamedJob {
-    orchestrate_impl(rules, OrchestrateTarget::BaymaxRepo)
+    orchestrate_impl(rules, OrchestrateTarget::SimRepo)
 }
 
 pub fn orchestrate_for_extension(rules: &[&PathCondition]) -> NamedJob {
@@ -192,7 +192,7 @@ fn orchestrate_impl(rules: &[&PathCondition], target: OrchestrateTarget) -> Name
 
     let mut outputs = IndexMap::new();
 
-    if target == OrchestrateTarget::BaymaxRepo {
+    if target == OrchestrateTarget::SimRepo {
         script.push_str(indoc::indoc! {r#"
         # Check for changes that require full rebuild (no filter)
         # Direct pushes to main/stable/preview always run full suite
@@ -382,7 +382,7 @@ pub(crate) fn fetch_ts_query_ls() -> Step<Use> {
 }
 
 pub(crate) enum RunContext {
-    BaymaxRepository,
+    SimRepository,
     Extension,
 }
 
@@ -392,12 +392,12 @@ pub(crate) fn run_ts_query_ls(context: RunContext) -> Step<Run> {
         "$GITHUB_WORKSPACE/ts_query_ls" format --check {directory} || {{
             echo "Found unformatted queries, please format them with ts_query_ls."
             echo "For easy use, install the Tree-sitter query extension:"
-            echo "baymax://extension/tree-sitter-query"
+            echo "sim://extension/tree-sitter-query"
             false
         }}"#,
         directory = match context {
             RunContext::Extension => "languages",
-            RunContext::BaymaxRepository => ".",
+            RunContext::SimRepository => ".",
         }
     ))
 }
@@ -424,7 +424,7 @@ fn check_style() -> NamedJob {
             .add_step(steps::script("./script/check-keymaps"))
             .add_step(check_for_typos())
             .add_step(fetch_ts_query_ls())
-            .add_step(run_ts_query_ls(RunContext::BaymaxRepository)),
+            .add_step(run_ts_query_ls(RunContext::SimRepository)),
     )
 }
 
@@ -617,7 +617,7 @@ fn run_platform_tests_impl(platform: Platform, filter_packages: bool) -> NamedJo
 
 fn build_visual_tests_binary() -> NamedJob {
     pub fn cargo_build_visual_tests() -> Step<Run> {
-        named::bash("cargo build -p baymax --bin baymax_visual_test_runner --features visual-tests")
+        named::bash("cargo build -p sim --bin sim_visual_test_runner --features visual-tests")
     }
 
     named::job(
@@ -677,9 +677,9 @@ pub(crate) fn check_postgres_and_protobuf_migrations() -> NamedJob {
         release_job(&[])
             .runs_on(runners::LINUX_DEFAULT)
             .add_env(("GIT_AUTHOR_NAME", "Protobuf Action"))
-            .add_env(("GIT_AUTHOR_EMAIL", "ci@baymax.dev"))
+            .add_env(("GIT_AUTHOR_EMAIL", "ci@sim.dev"))
             .add_env(("GIT_COMMITTER_NAME", "Protobuf Action"))
-            .add_env(("GIT_COMMITTER_EMAIL", "ci@baymax.dev"))
+            .add_env(("GIT_COMMITTER_EMAIL", "ci@sim.dev"))
             .add_step(steps::checkout_repo().with_full_history())
             .add_step(ensure_fresh_merge())
             .add_step(bufbuild_setup_action())

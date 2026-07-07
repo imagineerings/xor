@@ -1,6 +1,6 @@
 # GPUI Examples
 
-Examples can be run from the Baymax repository root:
+Examples can be run from the Sim repository root:
 
 ```sh
 cargo run -p gpui --example hello_world
@@ -12,7 +12,7 @@ cargo run -p gpui --example hello_world
   `Application`, open a window, create a root view, and render a `div`.
 - `input` demonstrates text input, focus, selections, clipboard actions, and
   keyboard bindings.
-- `uniform_list` shows how to render a simple virtualibaymax list.
+- `uniform_list` shows how to render a simple virtualisim list.
 - `testing` demonstrates `#[gpui::test]`, `TestAppContext`, actions, focus, and
   window-based tests.
 
@@ -29,7 +29,7 @@ cargo run -p gpui --example hello_world
 ## Interaction
 
 - `anchor` demonstrates anchored positioning.
-- `data_table` combines virtualibaymax list rendering with table-style rows and a
+- `data_table` combines virtualisim list rendering with table-style rows and a
   custom scrollbar.
 - `drag_drop` shows draggable elements and drop targets.
 - `focus_visible` demonstrates keyboard-visible focus styling.
@@ -58,7 +58,7 @@ cargo run -p gpui --example hello_world
 - `window_positioning` demonstrates window bounds and placement.
 - `window_shadow` demonstrates window shadow styling.
 
-## Specialibaymax examples
+## Specialisim examples
 
 These examples are useful when working on GPUI itself, but they may not be the
 best starting point for new applications:

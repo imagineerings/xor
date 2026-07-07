@@ -1,6 +1,6 @@
 ---
 title: Debugger Extensions
-description: "Debugger Extensions for Baymax extensions."
+description: "Debugger Extensions for Sim extensions."
 ---
 
 # Debugger Extensions
@@ -22,7 +22,7 @@ schema_path = "relative/path/to/schema.json"
 Then, in the Rust code for your extension, implement the `get_dap_binary` method on your extension:
 
 ```rust
-impl baymax::Extension for MyExtension {
+impl sim::Extension for MyExtension {
     fn get_dap_binary(
         &mut self,
         adapter_name: String,
@@ -41,7 +41,7 @@ You must also implement `dap_request_kind`. This function is used to determine w
 We also use it to determine that a given debug scenario requires running a _locator_.
 
 ```rust
-impl baymax::Extension for MyExtension {
+impl sim::Extension for MyExtension {
     fn dap_request_kind(
         &mut self,
         _adapter_name: String,
@@ -53,7 +53,7 @@ impl baymax::Extension for MyExtension {
 These two functions are sufficient to expose your debug adapter in `debug.json`-based user workflows, but you should strongly consider implementing `dap_config_to_scenario` as well.
 
 ```rust
-impl baymax::Extension for MyExtension {
+impl sim::Extension for MyExtension {
     fn dap_config_to_scenario(
         &mut self,
         _adapter_name: DebugConfig,
@@ -67,7 +67,7 @@ Put another way, it is supposed to answer the question: "Given a program, a list
 
 ## Defining Debug Locators
 
-Baymax offers an automatic way to create debug scenarios with _debug locators_.
+Sim offers an automatic way to create debug scenarios with _debug locators_.
 A locator locates the debug target and figures out how to spawn a debug session for it. Thanks to locators, we can automatically convert existing user tasks (e.g. `cargo run`) and convert them into debug scenarios (e.g. `cargo build` followed by spawning a debugger with `target/debug/my_program` as the program to debug).
 
 > Your extension can define its own debug locators even if it does not expose a debug adapter. We strongly recommend doing so when your extension already exposes language tasks, as it allows users to spawn a debug session without having to manually configure the debug adapter.
@@ -84,7 +84,7 @@ Locators have two components.
 First, each locator is ran on each available task to figure out if any of the available locators can provide a debug scenario for a given task. This is done by calling `dap_locator_create_scenario`.
 
 ```rust
-impl baymax::Extension for MyExtension {
+impl sim::Extension for MyExtension {
     fn dap_locator_create_scenario(
         &mut self,
         _locator_name: String,
@@ -99,7 +99,7 @@ This function should return `Some` debug scenario when that scenario defines a d
 Note that a `DebugScenario` can include a [build task](../debugger.md#build-tasks). If there is one, we will execute `run_dap_locator` after a build task is finished successfully.
 
 ```rust
-impl baymax::Extension for MyExtension {
+impl sim::Extension for MyExtension {
     fn run_dap_locator(
         &mut self,
         _locator_name: String,
@@ -113,7 +113,7 @@ Note however that you do _not_ need to go through a 2-phase resolution; if you c
 
 ## Available Extensions
 
-See DAP servers published as extensions [on Baymax's site](https://baymax.dev/extensions?filter=debug-adapters).
+See DAP servers published as extensions [on Sim's site](https://sim.dev/extensions?filter=debug-adapters).
 
 Review their repositories to see common implementation patterns and structure.
 

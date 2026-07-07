@@ -9,7 +9,7 @@ license = "GPL-3.0-or-later"
 workspace = true
 
 [[bin]]
-name = "baymax-extension"
+name = "sim-extension"
 path = "src/main.rs"
 
 [dependencies]

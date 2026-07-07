@@ -1,7 +1,7 @@
 use std::{cmp::Reverse, sync::Arc};
 
 use agent_settings::AgentSettings;
-use baymax_actions::agent::OpenSettings;
+use sim_actions::agent::OpenSettings;
 use collections::{HashMap, HashSet, IndexMap};
 use fuzzy::{StringMatch, StringMatchCandidate, match_strings};
 use gpui::{
@@ -664,7 +664,7 @@ mod tests {
                     .any(|(fav_provider, fav_name)| *fav_provider == provider && *fav_name == name);
                 ModelInfo {
                     model: Arc::new(TestLanguageModel::new(name, provider)),
-                    icon: IconOrSvg::Icon(IconName::BaymaxAgent),
+                    icon: IconOrSvg::Icon(IconName::SimAgent),
                     is_favorite,
                 }
             })
@@ -691,10 +691,10 @@ mod tests {
     #[gpui::test]
     fn test_exact_match(cx: &mut TestAppContext) {
         let models = create_models(vec![
-            ("baymax", "Claude 3.7 Sonnet"),
-            ("baymax", "Claude 3.7 Sonnet Thinking"),
-            ("baymax", "gpt-5"),
-            ("baymax", "gpt-5-mini"),
+            ("sim", "Claude 3.7 Sonnet"),
+            ("sim", "Claude 3.7 Sonnet Thinking"),
+            ("sim", "gpt-5"),
+            ("sim", "gpt-5-mini"),
             ("openai", "gpt-3.5-turbo"),
             ("openai", "gpt-5"),
             ("openai", "gpt-5-mini"),
@@ -712,8 +712,8 @@ mod tests {
         assert_models_eq(
             results,
             vec![
-                "baymax/gpt-5",
-                "baymax/gpt-5-mini",
+                "sim/gpt-5",
+                "sim/gpt-5-mini",
                 "openai/gpt-5",
                 "openai/gpt-5-mini",
             ],
@@ -723,10 +723,10 @@ mod tests {
     #[gpui::test]
     fn test_fuzzy_match(cx: &mut TestAppContext) {
         let models = create_models(vec![
-            ("baymax", "Claude 3.7 Sonnet"),
-            ("baymax", "Claude 3.7 Sonnet Thinking"),
-            ("baymax", "gpt-5"),
-            ("baymax", "gpt-5-mini"),
+            ("sim", "Claude 3.7 Sonnet"),
+            ("sim", "Claude 3.7 Sonnet Thinking"),
+            ("sim", "gpt-5"),
+            ("sim", "gpt-5-mini"),
             ("openai", "gpt-3.5-turbo"),
             ("openai", "gpt-5"),
             ("openai", "gpt-5-mini"),
@@ -740,11 +740,11 @@ mod tests {
         );
 
         // Results should preserve models order whenever possible.
-        // In the case below, `baymax/gpt-5-mini` and `openai/gpt-5-mini` have identical
-        // similarity scores, but `baymax/gpt-5-mini` was higher in the models list,
+        // In the case below, `sim/gpt-5-mini` and `openai/gpt-5-mini` have identical
+        // similarity scores, but `sim/gpt-5-mini` was higher in the models list,
         // so it should appear first in the results.
         let results = matcher.fuzzy_search("gptmini");
-        assert_models_eq(results, vec!["baymax/gpt-5-mini", "openai/gpt-5-mini"]);
+        assert_models_eq(results, vec!["sim/gpt-5-mini", "openai/gpt-5-mini"]);
 
         // Model provider should be searchable as well
         let results = matcher.fuzzy_search("ol"); // meaning "ollama"
@@ -752,15 +752,15 @@ mod tests {
 
         // Fuzzy search - search for Claude to get the Thinking variant
         let results = matcher.fuzzy_search("thinking");
-        assert_models_eq(results, vec!["baymax/Claude 3.7 Sonnet Thinking"]);
+        assert_models_eq(results, vec!["sim/Claude 3.7 Sonnet Thinking"]);
     }
 
     #[gpui::test]
     fn test_recommended_models_also_appear_in_other(_cx: &mut TestAppContext) {
-        let recommended_models = create_models(vec![("baymax", "claude")]);
+        let recommended_models = create_models(vec![("sim", "claude")]);
         let all_models = create_models(vec![
-            ("baymax", "claude"), // Should also appear in "other"
-            ("baymax", "gemini"),
+            ("sim", "claude"), // Should also appear in "other"
+            ("sim", "gemini"),
             ("copilot", "o3"),
         ]);
 
@@ -776,16 +776,16 @@ mod tests {
         // Recommended models should also appear in "all"
         assert_models_eq(
             actual_all_models,
-            vec!["baymax/claude", "baymax/gemini", "copilot/o3"],
+            vec!["sim/claude", "sim/gemini", "copilot/o3"],
         );
     }
 
     #[gpui::test]
     fn test_models_from_different_providers(_cx: &mut TestAppContext) {
-        let recommended_models = create_models(vec![("baymax", "claude")]);
+        let recommended_models = create_models(vec![("sim", "claude")]);
         let all_models = create_models(vec![
-            ("baymax", "claude"), // Should also appear in "other"
-            ("baymax", "gemini"),
+            ("sim", "claude"), // Should also appear in "other"
+            ("sim", "gemini"),
             ("copilot", "claude"), // Different provider, should appear in "other"
         ]);
 
@@ -801,20 +801,20 @@ mod tests {
         // All models should appear in "all" regardless of recommended status
         assert_models_eq(
             actual_all_models,
-            vec!["baymax/claude", "baymax/gemini", "copilot/claude"],
+            vec!["sim/claude", "sim/gemini", "copilot/claude"],
         );
     }
 
     #[gpui::test]
     fn test_favorites_section_appears_when_favorites_exist(_cx: &mut TestAppContext) {
-        let recommended_models = create_models(vec![("baymax", "claude")]);
+        let recommended_models = create_models(vec![("sim", "claude")]);
         let all_models = create_models_with_favorites(
             vec![
-                ("baymax", "claude"),
-                ("baymax", "gemini"),
+                ("sim", "claude"),
+                ("sim", "gemini"),
                 ("openai", "gpt-4"),
             ],
-            vec![("baymax", "gemini")],
+            vec![("sim", "gemini")],
         );
 
         let grouped_models = GroupedModels::new(all_models, recommended_models);
@@ -825,13 +825,13 @@ mod tests {
             Some(LanguageModelPickerEntry::Separator(s)) if s == "Favorite"
         ));
 
-        assert_models_eq(grouped_models.favorites, vec!["baymax/gemini"]);
+        assert_models_eq(grouped_models.favorites, vec!["sim/gemini"]);
     }
 
     #[gpui::test]
     fn test_no_favorites_section_when_no_favorites(_cx: &mut TestAppContext) {
-        let recommended_models = create_models(vec![("baymax", "claude")]);
-        let all_models = create_models(vec![("baymax", "claude"), ("baymax", "gemini")]);
+        let recommended_models = create_models(vec![("sim", "claude")]);
+        let all_models = create_models(vec![("sim", "claude"), ("sim", "gemini")]);
 
         let grouped_models = GroupedModels::new(all_models, recommended_models);
         let entries = grouped_models.entries();
@@ -847,14 +847,14 @@ mod tests {
     #[gpui::test]
     fn test_models_have_correct_actions(_cx: &mut TestAppContext) {
         let recommended_models =
-            create_models_with_favorites(vec![("baymax", "claude")], vec![("baymax", "claude")]);
+            create_models_with_favorites(vec![("sim", "claude")], vec![("sim", "claude")]);
         let all_models = create_models_with_favorites(
             vec![
-                ("baymax", "claude"),
-                ("baymax", "gemini"),
+                ("sim", "claude"),
+                ("sim", "gemini"),
                 ("openai", "gpt-4"),
             ],
-            vec![("baymax", "claude")],
+            vec![("sim", "claude")],
         );
 
         let grouped_models = GroupedModels::new(all_models, recommended_models);
@@ -862,8 +862,8 @@ mod tests {
 
         for entry in &entries {
             if let LanguageModelPickerEntry::Model(info) = entry {
-                if info.model.telemetry_id() == "baymax/claude" {
-                    assert!(info.is_favorite, "baymax/claude should be a favorite");
+                if info.model.telemetry_id() == "sim/claude" {
+                    assert!(info.is_favorite, "sim/claude should be a favorite");
                 } else {
                     assert!(
                         !info.is_favorite,
@@ -877,15 +877,15 @@ mod tests {
 
     #[gpui::test]
     fn test_favorites_appear_in_other_sections(_cx: &mut TestAppContext) {
-        let favorites = vec![("baymax", "gemini"), ("openai", "gpt-4")];
+        let favorites = vec![("sim", "gemini"), ("openai", "gpt-4")];
 
         let recommended_models =
-            create_models_with_favorites(vec![("baymax", "claude")], favorites.clone());
+            create_models_with_favorites(vec![("sim", "claude")], favorites.clone());
 
         let all_models = create_models_with_favorites(
             vec![
-                ("baymax", "claude"),
-                ("baymax", "gemini"),
+                ("sim", "claude"),
+                ("sim", "gemini"),
                 ("openai", "gpt-4"),
                 ("openai", "gpt-3.5"),
             ],
@@ -896,14 +896,14 @@ mod tests {
 
         assert_models_eq(
             grouped_models.favorites,
-            vec!["baymax/gemini", "openai/gpt-4"],
+            vec!["sim/gemini", "openai/gpt-4"],
         );
-        assert_models_eq(grouped_models.recommended, vec!["baymax/claude"]);
+        assert_models_eq(grouped_models.recommended, vec!["sim/claude"]);
         assert_models_eq(
             grouped_models.all.values().flatten().cloned().collect(),
             vec![
-                "baymax/claude",
-                "baymax/gemini",
+                "sim/claude",
+                "sim/gemini",
                 "openai/gpt-4",
                 "openai/gpt-3.5",
             ],

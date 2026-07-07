@@ -28,30 +28,30 @@ pub(crate) fn serialize_pane_group(
     pane_group: &PaneGroup,
     active_pane: &Entity<Pane>,
     cx: &mut App,
-) -> SerialibaymaxPaneGroup {
-    build_serialibaymax_pane_group(&pane_group.root, active_pane, cx)
+) -> SerialisimPaneGroup {
+    build_serialisim_pane_group(&pane_group.root, active_pane, cx)
 }
 
-fn build_serialibaymax_pane_group(
+fn build_serialisim_pane_group(
     pane_group: &Member,
     active_pane: &Entity<Pane>,
     cx: &mut App,
-) -> SerialibaymaxPaneGroup {
+) -> SerialisimPaneGroup {
     match pane_group {
         Member::Axis(PaneAxis {
             axis,
             members,
             flexes,
             bounding_boxes: _,
-        }) => SerialibaymaxPaneGroup::Group {
-            axis: SerialibaymaxAxis(*axis),
+        }) => SerialisimPaneGroup::Group {
+            axis: SerialisimAxis(*axis),
             children: members
                 .iter()
-                .map(|member| build_serialibaymax_pane_group(member, active_pane, cx))
+                .map(|member| build_serialisim_pane_group(member, active_pane, cx))
                 .collect::<Vec<_>>(),
             flexes: Some(flexes.lock().clone()),
         },
-        Member::Pane(pane_handle) => SerialibaymaxPaneGroup::Pane(serialize_pane(
+        Member::Pane(pane_handle) => SerialisimPaneGroup::Pane(serialize_pane(
             pane_handle,
             pane_handle == active_pane,
             cx,
@@ -59,7 +59,7 @@ fn build_serialibaymax_pane_group(
     }
 }
 
-fn serialize_pane(pane: &Entity<Pane>, active: bool, cx: &mut App) -> SerialibaymaxPane {
+fn serialize_pane(pane: &Entity<Pane>, active: bool, cx: &mut App) -> SerialisimPane {
     let mut items_to_serialize = HashSet::default();
     let pane = pane.read(cx);
     let children = pane
@@ -81,7 +81,7 @@ fn serialize_pane(pane: &Entity<Pane>, active: bool, cx: &mut App) -> Serialibay
         .filter(|active_id| items_to_serialize.contains(active_id));
 
     let pinned_count = pane.pinned_count();
-    SerialibaymaxPane {
+    SerialisimPane {
         active,
         children,
         active_item,
@@ -93,7 +93,7 @@ pub(crate) fn deserialize_terminal_panel(
     workspace: WeakEntity<Workspace>,
     project: Entity<Project>,
     database_id: WorkspaceId,
-    serialibaymax_panel: SerialibaymaxTerminalPanel,
+    serialisim_panel: SerialisimTerminalPanel,
     window: &mut Window,
     cx: &mut App,
 ) -> Task<anyhow::Result<Entity<TerminalPanel>>> {
@@ -101,8 +101,8 @@ pub(crate) fn deserialize_terminal_panel(
         let terminal_panel = workspace.update_in(cx, |workspace, window, cx| {
             cx.new(|cx| TerminalPanel::new(workspace, window, cx))
         })?;
-        match &serialibaymax_panel.items {
-            SerialibaymaxItems::NoSplits(item_ids) => {
+        match &serialisim_panel.items {
+            SerialisimItems::NoSplits(item_ids) => {
                 let items = deserialize_terminal_views(
                     database_id,
                     project,
@@ -111,20 +111,20 @@ pub(crate) fn deserialize_terminal_panel(
                     cx,
                 )
                 .await;
-                let active_item = serialibaymax_panel.active_item_id;
+                let active_item = serialisim_panel.active_item_id;
                 terminal_panel.update_in(cx, |terminal_panel, window, cx| {
                     terminal_panel.active_pane.update(cx, |pane, cx| {
                         populate_pane_items(pane, items, active_item, window, cx);
                     });
                 })?;
             }
-            SerialibaymaxItems::WithSplits(serialibaymax_pane_group) => {
+            SerialisimItems::WithSplits(serialisim_pane_group) => {
                 let center_pane = deserialize_pane_group(
                     workspace,
                     project,
                     terminal_panel.clone(),
                     database_id,
-                    serialibaymax_pane_group,
+                    serialisim_pane_group,
                     cx,
                 )
                 .await;
@@ -167,11 +167,11 @@ async fn deserialize_pane_group(
     project: Entity<Project>,
     panel: Entity<TerminalPanel>,
     workspace_id: WorkspaceId,
-    serialibaymax: &SerialibaymaxPaneGroup,
+    serialisim: &SerialisimPaneGroup,
     cx: &mut AsyncWindowContext,
 ) -> Option<(Member, Option<Entity<Pane>>)> {
-    match serialibaymax {
-        SerialibaymaxPaneGroup::Group {
+    match serialisim {
+        SerialisimPaneGroup::Group {
             axis,
             flexes,
             children,
@@ -207,8 +207,8 @@ async fn deserialize_pane_group(
                 current_active_pane,
             ))
         }
-        SerialibaymaxPaneGroup::Pane(serialibaymax_pane) => {
-            let active = serialibaymax_pane.active;
+        SerialisimPaneGroup::Pane(serialisim_pane) => {
+            let active = serialisim_pane.active;
 
             let pane = panel
                 .update_in(cx, |terminal_panel, window, cx| {
@@ -221,13 +221,13 @@ async fn deserialize_pane_group(
                     )
                 })
                 .log_err()?;
-            let active_item = serialibaymax_pane.active_item;
-            let pinned_count = serialibaymax_pane.pinned_count;
+            let active_item = serialisim_pane.active_item;
+            let pinned_count = serialisim_pane.pinned_count;
             let new_items = deserialize_terminal_views(
                 workspace_id,
                 project.clone(),
                 workspace.clone(),
-                serialibaymax_pane.children.as_slice(),
+                serialisim_pane.children.as_slice(),
                 cx,
             );
             cx.spawn({
@@ -285,7 +285,7 @@ fn deserialize_terminal_views(
     item_ids: &[u64],
     cx: &mut AsyncWindowContext,
 ) -> impl Future<Output = Vec<Entity<TerminalView>>> + use<> {
-    let deserialibaymax_items = join_all(item_ids.iter().filter_map(|item_id| {
+    let deserialisim_items = join_all(item_ids.iter().filter_map(|item_id| {
         cx.update(|window, cx| {
             TerminalView::deserialize(
                 project.clone(),
@@ -299,7 +299,7 @@ fn deserialize_terminal_views(
         .ok()
     }));
     async move {
-        deserialibaymax_items
+        deserialisim_items
             .await
             .into_iter()
             .filter_map(|item| item.log_err())
@@ -308,32 +308,32 @@ fn deserialize_terminal_views(
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct SerialibaymaxTerminalPanel {
-    pub items: SerialibaymaxItems,
+pub(crate) struct SerialisimTerminalPanel {
+    pub items: SerialisimItems,
     // A deprecated field, kept for backwards compatibility for the code before terminal splits were introduced.
     pub active_item_id: Option<u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
-pub(crate) enum SerialibaymaxItems {
+pub(crate) enum SerialisimItems {
     // The data stored before terminal splits were introduced.
     NoSplits(Vec<u64>),
-    WithSplits(SerialibaymaxPaneGroup),
+    WithSplits(SerialisimPaneGroup),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) enum SerialibaymaxPaneGroup {
-    Pane(SerialibaymaxPane),
+pub(crate) enum SerialisimPaneGroup {
+    Pane(SerialisimPane),
     Group {
-        axis: SerialibaymaxAxis,
+        axis: SerialisimAxis,
         flexes: Option<Vec<f32>>,
-        children: Vec<SerialibaymaxPaneGroup>,
+        children: Vec<SerialisimPaneGroup>,
     },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct SerialibaymaxPane {
+pub(crate) struct SerialisimPane {
     pub active: bool,
     pub children: Vec<u64>,
     pub active_item: Option<u64>,
@@ -342,9 +342,9 @@ pub(crate) struct SerialibaymaxPane {
 }
 
 #[derive(Debug)]
-pub(crate) struct SerialibaymaxAxis(pub Axis);
+pub(crate) struct SerialisimAxis(pub Axis);
 
-impl Serialize for SerialibaymaxAxis {
+impl Serialize for SerialisimAxis {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -356,15 +356,15 @@ impl Serialize for SerialibaymaxAxis {
     }
 }
 
-impl<'de> Deserialize<'de> for SerialibaymaxAxis {
+impl<'de> Deserialize<'de> for SerialisimAxis {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
         match s.as_str() {
-            "horizontal" => Ok(SerialibaymaxAxis(Axis::Horizontal)),
-            "vertical" => Ok(SerialibaymaxAxis(Axis::Vertical)),
+            "horizontal" => Ok(SerialisimAxis(Axis::Horizontal)),
+            "vertical" => Ok(SerialisimAxis(Axis::Vertical)),
             invalid => Err(serde::de::Error::custom(format!(
                 "Invalid axis value: '{invalid}'"
             ))),

@@ -38,7 +38,7 @@ pub enum MentionUri {
     },
     /// Deprecated: kept so threads from before rules became skills still
     /// deserialize. `id` (an opaque `prompt_store::PromptId`) is preserved
-    /// verbatim so re-saved threads stay loadable by older Baymax versions.
+    /// verbatim so re-saved threads stay loadable by older Sim versions.
     Rule {
         #[serde(default = "default_deprecated_rule_id")]
         id: serde_json::Value,
@@ -201,7 +201,7 @@ impl MentionUri {
                     })
                 }
             }
-            "baymax" => {
+            "sim" => {
                 if let Some(thread_id) = path.strip_prefix("/agent/thread/") {
                     let name = single_query_param(&url, "name")?.context("Missing thread name")?;
                     Ok(Self::Thread {
@@ -329,11 +329,11 @@ impl MentionUri {
                         skill_file_path: skill_file_path.context("missing skill file path")?,
                     })
                 } else {
-                    bail!("invalid baymax url: {:?}", input);
+                    bail!("invalid sim url: {:?}", input);
                 }
             }
             "http" | "https" => Ok(MentionUri::Fetch { url }),
-            other => bail!("unrecognibaymax scheme {:?}", other),
+            other => bail!("unrecognisim scheme {:?}", other),
         }
     }
 
@@ -471,7 +471,7 @@ impl MentionUri {
                 url
             }
             MentionUri::PastedImage { name } => {
-                let mut url = Url::parse("baymax:///agent/pasted-image").unwrap();
+                let mut url = Url::parse("sim:///agent/pasted-image").unwrap();
                 url.query_pairs_mut().append_pair("name", name);
                 url
             }
@@ -510,7 +510,7 @@ impl MentionUri {
                     url.set_path(&path.to_string_lossy());
                     url
                 } else {
-                    let mut url = Url::parse("baymax:///").unwrap();
+                    let mut url = Url::parse("sim:///").unwrap();
                     url.set_path("/agent/untitled-buffer");
                     url
                 };
@@ -526,13 +526,13 @@ impl MentionUri {
                 url
             }
             MentionUri::Thread { name, id } => {
-                let mut url = Url::parse("baymax:///").unwrap();
+                let mut url = Url::parse("sim:///").unwrap();
                 url.set_path(&format!("/agent/thread/{id}"));
                 url.query_pairs_mut().append_pair("name", name);
                 url
             }
             MentionUri::Rule { id, name } => {
-                let mut url = Url::parse("baymax:///").unwrap();
+                let mut url = Url::parse("sim:///").unwrap();
                 let rule_id = id
                     .get("User")
                     .and_then(|user| user.get("uuid"))
@@ -546,7 +546,7 @@ impl MentionUri {
                 include_errors,
                 include_warnings,
             } => {
-                let mut url = Url::parse("baymax:///").unwrap();
+                let mut url = Url::parse("sim:///").unwrap();
                 url.set_path("/agent/diagnostics");
                 if *include_warnings {
                     url.query_pairs_mut()
@@ -559,18 +559,18 @@ impl MentionUri {
             }
             MentionUri::Fetch { url } => url.clone(),
             MentionUri::TerminalSelection { line_count } => {
-                let mut url = Url::parse("baymax:///agent/terminal-selection").unwrap();
+                let mut url = Url::parse("sim:///agent/terminal-selection").unwrap();
                 url.query_pairs_mut()
                     .append_pair("lines", &line_count.to_string());
                 url
             }
             MentionUri::GitDiff { base_ref } => {
-                let mut url = Url::parse("baymax:///agent/git-diff").unwrap();
+                let mut url = Url::parse("sim:///agent/git-diff").unwrap();
                 url.query_pairs_mut().append_pair("base", base_ref);
                 url
             }
             MentionUri::MergeConflict { file_path } => {
-                let mut url = Url::parse("baymax:///agent/merge-conflict").unwrap();
+                let mut url = Url::parse("sim:///agent/merge-conflict").unwrap();
                 url.query_pairs_mut().append_pair("path", file_path);
                 url
             }
@@ -579,7 +579,7 @@ impl MentionUri {
                 source,
                 skill_file_path,
             } => {
-                let mut url = Url::parse("baymax:///").unwrap();
+                let mut url = Url::parse("sim:///").unwrap();
                 url.set_path("/agent/skill");
                 url.query_pairs_mut()
                     .append_pair("name", name)
@@ -603,7 +603,7 @@ fn default_include_errors() -> bool {
     true
 }
 
-/// Placeholder rule `id` for legacy mentions missing one, shaped so older Baymax
+/// Placeholder rule `id` for legacy mentions missing one, shaped so older Sim
 /// versions can still deserialize it as a `prompt_store::PromptId`.
 fn default_deprecated_rule_id() -> serde_json::Value {
     serde_json::json!({ "User": { "uuid": "00000000-0000-0000-0000-000000000000" } })
@@ -741,12 +741,12 @@ mod tests {
         let uri = MentionUri::Directory {
             abs_path: PathBuf::from(path!("/path/to/dir")),
         };
-        let serialibaymax = uri.to_uri().to_string();
+        let serialisim = uri.to_uri().to_string();
         assert!(
-            serialibaymax.ends_with('/'),
+            serialisim.ends_with('/'),
             "directory URI must end with /"
         );
-        let parsed = MentionUri::parse(&serialibaymax, PathStyle::local()).unwrap();
+        let parsed = MentionUri::parse(&serialisim, PathStyle::local()).unwrap();
         assert!(
             matches!(parsed, MentionUri::Directory { .. }),
             "expected Directory variant, got {:?}",
@@ -809,7 +809,7 @@ mod tests {
 
     #[test]
     fn test_parse_untitled_selection_uri() {
-        let selection_uri = uri!("baymax:///agent/untitled-buffer#L1:10");
+        let selection_uri = uri!("sim:///agent/untitled-buffer#L1:10");
         let parsed = MentionUri::parse(selection_uri, PathStyle::local()).unwrap();
         match &parsed {
             MentionUri::Selection {
@@ -827,7 +827,7 @@ mod tests {
 
     #[test]
     fn test_parse_thread_uri() {
-        let thread_uri = "baymax:///agent/thread/session123?name=Thread+name";
+        let thread_uri = "sim:///agent/thread/session123?name=Thread+name";
         let parsed = MentionUri::parse(thread_uri, PathStyle::local()).unwrap();
         match &parsed {
             MentionUri::Thread {
@@ -844,7 +844,7 @@ mod tests {
 
     #[test]
     fn test_parse_legacy_rule_uri() {
-        let rule_uri = "baymax:///agent/rule/d8694ff2-90d5-4b6f-be33-33c1763acd52?name=Some+rule";
+        let rule_uri = "sim:///agent/rule/d8694ff2-90d5-4b6f-be33-33c1763acd52?name=Some+rule";
         let parsed = MentionUri::parse(rule_uri, PathStyle::local()).unwrap();
         match &parsed {
             MentionUri::Rule { name, .. } => assert_eq!(name, "Some rule"),
@@ -856,16 +856,16 @@ mod tests {
 
     #[test]
     fn test_legacy_rule_mention_preserves_id() {
-        // The `id` older Baymax versions require must survive a load + save.
+        // The `id` older Sim versions require must survive a load + save.
         let json = r#"{"Rule":{"id":{"User":{"uuid":"d8694ff2-90d5-4b6f-be33-33c1763acd52"}},"name":"Some rule"}}"#;
         let parsed: MentionUri = serde_json::from_str(json).unwrap();
         match &parsed {
             MentionUri::Rule { name, .. } => assert_eq!(name, "Some rule"),
             _ => panic!("Expected Rule variant"),
         }
-        let reserialibaymax = serde_json::to_value(&parsed).unwrap();
+        let reserialisim = serde_json::to_value(&parsed).unwrap();
         assert_eq!(
-            reserialibaymax["Rule"]["id"]["User"]["uuid"],
+            reserialisim["Rule"]["id"]["User"]["uuid"],
             "d8694ff2-90d5-4b6f-be33-33c1763acd52"
         );
     }
@@ -875,8 +875,8 @@ mod tests {
         // A mention missing its id still serializes a valid id for older versions.
         let json = r#"{"Rule":{"name":"Some rule"}}"#;
         let parsed: MentionUri = serde_json::from_str(json).unwrap();
-        let reserialibaymax = serde_json::to_value(&parsed).unwrap();
-        assert!(reserialibaymax["Rule"]["id"]["User"]["uuid"].is_string());
+        let reserialisim = serde_json::to_value(&parsed).unwrap();
+        assert!(reserialisim["Rule"]["id"]["User"]["uuid"].is_string());
     }
 
     #[test]
@@ -887,8 +887,8 @@ mod tests {
             skill_file_path: PathBuf::from(path!("/path/to/skills/rust-best-practices/SKILL.md")),
         };
 
-        let serialibaymax = skill_uri.to_uri().to_string();
-        let parsed = MentionUri::parse(&serialibaymax, PathStyle::local()).unwrap();
+        let serialisim = skill_uri.to_uri().to_string();
+        let parsed = MentionUri::parse(&serialisim, PathStyle::local()).unwrap();
 
         assert_eq!(parsed, skill_uri);
     }
@@ -921,7 +921,7 @@ mod tests {
 
     #[test]
     fn test_parse_diagnostics_uri() {
-        let uri = "baymax:///agent/diagnostics?include_warnings=true";
+        let uri = "sim:///agent/diagnostics?include_warnings=true";
         let parsed = MentionUri::parse(uri, PathStyle::local()).unwrap();
         match &parsed {
             MentionUri::Diagnostics {
@@ -938,7 +938,7 @@ mod tests {
 
     #[test]
     fn test_parse_diagnostics_uri_warnings_only() {
-        let uri = "baymax:///agent/diagnostics?include_warnings=true&include_errors=false";
+        let uri = "sim:///agent/diagnostics?include_warnings=true&include_errors=false";
         let parsed = MentionUri::parse(uri, PathStyle::local()).unwrap();
         match &parsed {
             MentionUri::Diagnostics {
@@ -961,9 +961,9 @@ mod tests {
     }
 
     #[test]
-    fn test_invalid_baymax_path() {
-        assert!(MentionUri::parse("baymax:///invalid/path", PathStyle::local()).is_err());
-        assert!(MentionUri::parse("baymax:///agent/unknown/test", PathStyle::local()).is_err());
+    fn test_invalid_sim_path() {
+        assert!(MentionUri::parse("sim:///invalid/path", PathStyle::local()).is_err());
+        assert!(MentionUri::parse("sim:///agent/unknown/test", PathStyle::local()).is_err());
     }
 
     #[test]
@@ -1039,11 +1039,11 @@ mod tests {
 
     #[test]
     fn test_parse_absolute_windows_path() {
-        let file_path = "C:\\Users\\baymax\\project\\main.rs";
+        let file_path = "C:\\Users\\sim\\project\\main.rs";
         let parsed = MentionUri::parse(file_path, PathStyle::Windows).unwrap();
         match &parsed {
             MentionUri::File { abs_path } => {
-                assert_eq!(abs_path, Path::new("C:\\Users\\baymax\\project\\main.rs"));
+                assert_eq!(abs_path, Path::new("C:\\Users\\sim\\project\\main.rs"));
             }
             _ => panic!("Expected File variant"),
         }
@@ -1051,7 +1051,7 @@ mod tests {
 
     #[test]
     fn test_parse_absolute_windows_file_path_with_row() {
-        let file_path = "C:\\Users\\baymax\\project\\main.rs:42";
+        let file_path = "C:\\Users\\sim\\project\\main.rs:42";
         let parsed = MentionUri::parse(file_path, PathStyle::Windows).unwrap();
         match &parsed {
             MentionUri::Selection {
@@ -1061,7 +1061,7 @@ mod tests {
             } => {
                 assert_eq!(
                     path.as_ref().unwrap(),
-                    Path::new("C:\\Users\\baymax\\project\\main.rs")
+                    Path::new("C:\\Users\\sim\\project\\main.rs")
                 );
                 assert_eq!(line_range.start(), &41);
                 assert_eq!(line_range.end(), &41);
@@ -1072,7 +1072,7 @@ mod tests {
 
     #[test]
     fn test_parse_absolute_windows_file_path_with_fragment_line() {
-        let file_path = "C:\\Users\\baymax\\project\\main.rs#L42";
+        let file_path = "C:\\Users\\sim\\project\\main.rs#L42";
         let parsed = MentionUri::parse(file_path, PathStyle::Windows).unwrap();
         match &parsed {
             MentionUri::Selection {
@@ -1082,7 +1082,7 @@ mod tests {
             } => {
                 assert_eq!(
                     path.as_ref().unwrap(),
-                    Path::new("C:\\Users\\baymax\\project\\main.rs")
+                    Path::new("C:\\Users\\sim\\project\\main.rs")
                 );
                 assert_eq!(line_range.start(), &41);
                 assert_eq!(line_range.end(), &41);
@@ -1123,7 +1123,7 @@ mod tests {
 
     #[test]
     fn test_parse_backticked_absolute_windows_file_path_with_fragment_line() {
-        let file_path = "`C:\\Users\\baymax\\project\\main.rs#L42`";
+        let file_path = "`C:\\Users\\sim\\project\\main.rs#L42`";
         let parsed = MentionUri::parse(file_path, PathStyle::Windows).unwrap();
         match &parsed {
             MentionUri::Selection {
@@ -1133,7 +1133,7 @@ mod tests {
             } => {
                 assert_eq!(
                     path.as_ref().unwrap(),
-                    Path::new("C:\\Users\\baymax\\project\\main.rs")
+                    Path::new("C:\\Users\\sim\\project\\main.rs")
                 );
                 assert_eq!(line_range.start(), &41);
                 assert_eq!(line_range.end(), &41);
@@ -1144,7 +1144,7 @@ mod tests {
 
     #[test]
     fn test_single_line_number() {
-        // https://github.com/simtropolis/baymax/issues/46114
+        // https://github.com/simtropolis/sim/issues/46114
         let uri = uri!("file:///path/to/file.rs#L1872");
         let parsed = MentionUri::parse(uri, PathStyle::local()).unwrap();
         match &parsed {
@@ -1197,7 +1197,7 @@ mod tests {
 
     #[test]
     fn test_parse_terminal_selection_uri() {
-        let terminal_uri = "baymax:///agent/terminal-selection?lines=42";
+        let terminal_uri = "sim:///agent/terminal-selection?lines=42";
         let parsed = MentionUri::parse(terminal_uri, PathStyle::local()).unwrap();
         match &parsed {
             MentionUri::TerminalSelection { line_count } => {
@@ -1209,7 +1209,7 @@ mod tests {
         assert_eq!(parsed.name(), "Terminal (42 lines)");
 
         // Test single line
-        let single_line_uri = "baymax:///agent/terminal-selection?lines=1";
+        let single_line_uri = "sim:///agent/terminal-selection?lines=1";
         let parsed_single = MentionUri::parse(single_line_uri, PathStyle::local()).unwrap();
         assert_eq!(parsed_single.name(), "Terminal (1 line)");
     }

@@ -2,12 +2,12 @@
 
 ## Introduction
 
-Baymax needs a Comfy-compatible runtime control plane so existing Comfy workflow clients, scripts, and frontends can submit prompts, observe execution, manage queues, and retrieve outputs without copying ComfyUI's web-server implementation. This control plane is core world-model harness functionality because it defines prompt/job lifecycle, realtime progress, queue state, and output retrieval for harness workflows. This spec owns protocol compatibility and safety. It delegates graph editing to `diffusion-graph-editor/`, node execution to `comfy-graph-node-runtime/`, assets to `comfy-asset-library/`, and model worker setup to `model-serving-packaging/`.
+Sim needs a Comfy-compatible runtime control plane so existing Comfy workflow clients, scripts, and frontends can submit prompts, observe execution, manage queues, and retrieve outputs without copying ComfyUI's web-server implementation. This control plane is core world-model harness functionality because it defines prompt/job lifecycle, realtime progress, queue state, and output retrieval for harness workflows. This spec owns protocol compatibility and safety. It delegates graph editing to `diffusion-graph-editor/`, node execution to `comfy-graph-node-runtime/`, assets to `comfy-asset-library/`, and model worker setup to `model-serving-packaging/`.
 
 ## Glossary
 
 - **Prompt**: A serialized Comfy workflow execution request containing node instances, inputs, and optional metadata.
-- **Job**: Baymax's durable representation of a submitted prompt, including status, queue priority, timestamps, outputs, and errors.
+- **Job**: Sim's durable representation of a submitted prompt, including status, queue priority, timestamps, outputs, and errors.
 - **Client Session**: A connected UI or script identified by a client id and optional negotiated feature flags.
 - **Control Plane**: HTTP and WebSocket APIs that coordinate prompt submission, queue state, progress, cancellation, and output access.
 - **Preview Event**: A binary or JSON event carrying intermediate image, text, video, audio, or 3D preview metadata.
@@ -16,13 +16,13 @@ Baymax needs a Comfy-compatible runtime control plane so existing Comfy workflow
 
 ### Requirement 1: Comfy-Compatible API Surface
 
-**User Story:** As a workflow client author, I want Baymax to expose Comfy-compatible endpoints so existing Comfy API scripts can run against Baymax with minimal changes.
+**User Story:** As a workflow client author, I want Sim to expose Comfy-compatible endpoints so existing Comfy API scripts can run against Sim with minimal changes.
 
 #### Acceptance Criteria
 
-1.1 WHEN a client posts a valid prompt to `/prompt` or `/api/prompt` THEN THE system SHALL create a Baymax job and return a prompt id, queue number, and node validation errors.
-1.2 WHEN a client requests `/queue`, `/history`, `/history/{prompt_id}`, `/prompt`, `/features`, `/object_info`, or `/object_info/{node_class}` THEN THE system SHALL return Comfy-compatible response shapes backed by Baymax state.
-1.3 WHEN a client requests `/models`, `/models/{folder}`, `/embeddings`, or `/extensions` THEN THE system SHALL return catalog data from Baymax model, embedding, and extension registries.
+1.1 WHEN a client posts a valid prompt to `/prompt` or `/api/prompt` THEN THE system SHALL create a Sim job and return a prompt id, queue number, and node validation errors.
+1.2 WHEN a client requests `/queue`, `/history`, `/history/{prompt_id}`, `/prompt`, `/features`, `/object_info`, or `/object_info/{node_class}` THEN THE system SHALL return Comfy-compatible response shapes backed by Sim state.
+1.3 WHEN a client requests `/models`, `/models/{folder}`, `/embeddings`, or `/extensions` THEN THE system SHALL return catalog data from Sim model, embedding, and extension registries.
 1.4 IF an endpoint has both legacy and `/api` forms THEN THE system SHALL route both forms to the same handler behavior.
 
 ### Requirement 2: Queue and Job Lifecycle
@@ -50,7 +50,7 @@ Baymax needs a Comfy-compatible runtime control plane so existing Comfy workflow
 
 ### Requirement 4: HTTP Safety and File Access
 
-**User Story:** As a maintainer, I want Comfy-compatible routes to preserve Baymax's security boundaries.
+**User Story:** As a maintainer, I want Comfy-compatible routes to preserve Sim's security boundaries.
 
 #### Acceptance Criteria
 
@@ -60,12 +60,12 @@ Baymax needs a Comfy-compatible runtime control plane so existing Comfy workflow
 4.4 WHEN a client views potentially executable content THEN THE system SHALL force a safe download content type.
 4.5 WHEN cacheable static assets or non-cacheable dynamic responses are served THEN THE system SHALL apply cache-control behavior matching the endpoint purpose.
 
-### Requirement 5: Baymax Integration Boundary
+### Requirement 5: Sim Integration Boundary
 
-**User Story:** As a Baymax developer, I want Comfy control-plane behavior to reuse Baymax infrastructure rather than fork another application server.
+**User Story:** As a Sim developer, I want Comfy control-plane behavior to reuse Sim infrastructure rather than fork another application server.
 
 #### Acceptance Criteria
 
-5.1 IF Baymax already has task, process, HTTP, WebSocket, media, project, or secret infrastructure THEN THE Comfy control plane SHALL adapt those systems instead of duplicating them.
+5.1 IF Sim already has task, process, HTTP, WebSocket, media, project, or secret infrastructure THEN THE Comfy control plane SHALL adapt those systems instead of duplicating them.
 5.2 WHEN a control-plane event references generated outputs THEN THE system SHALL reference artifacts through the shared generated artifact and asset systems.
 5.3 IF full Comfy parity is not implemented for an endpoint THEN THE system SHALL return an explicit unsupported capability error rather than a partial silent response.

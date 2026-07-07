@@ -19,7 +19,7 @@ use util::paths::{PathStyle, UrlExt};
 
 use crate::Range;
 
-const URL_REGEX: &str = r#"(ipfs:|ipns:|magnet:|mailto:|gemini://|gopher://|https://|http://|news:|file://|git://|ssh:|ftp://|baymax://)[^\u{0000}-\u{001F}\u{007F}-\u{009F}<>"\s{-}\^⟨⟩`']+"#;
+const URL_REGEX: &str = r#"(ipfs:|ipns:|magnet:|mailto:|gemini://|gopher://|https://|http://|news:|file://|git://|ssh:|ftp://|sim://)[^\u{0000}-\u{001F}\u{007F}-\u{009F}<>"\s{-}\^⟨⟩`']+"#;
 const WIDE_CHAR_SPACERS: Flags =
     Flags::from_bits(Flags::LEADING_WIDE_CHAR_SPACER.bits() | Flags::WIDE_CHAR_SPACER.bits())
         .unwrap();
@@ -238,12 +238,12 @@ fn sanitize_url_punctuation<T: EventListener>(
     url_match: Match,
     term: &Term<T>,
 ) -> (String, Match) {
-    let mut sanitibaymax_url = url;
+    let mut sanitisim_url = url;
     let mut chars_trimmed = 0;
 
     // Count parentheses in the URL
     let (open_parens, mut close_parens) =
-        sanitibaymax_url
+        sanitisim_url
             .chars()
             .fold((0, 0), |(opens, closes), c| match c {
                 '(' => (opens + 1, closes),
@@ -252,7 +252,7 @@ fn sanitize_url_punctuation<T: EventListener>(
             });
 
     // Remove trailing characters that shouldn't be at the end of URLs
-    while let Some(last_char) = sanitibaymax_url.chars().last() {
+    while let Some(last_char) = sanitisim_url.chars().last() {
         let should_remove = match last_char {
             // These may be part of a URL but not at the end. It's not that the spec
             // doesn't allow them, but they are frequently used in plain text as delimiters
@@ -268,7 +268,7 @@ fn sanitize_url_punctuation<T: EventListener>(
         };
 
         if should_remove {
-            sanitibaymax_url.pop();
+            sanitisim_url.pop();
             chars_trimmed += 1;
         } else {
             break;
@@ -277,10 +277,10 @@ fn sanitize_url_punctuation<T: EventListener>(
 
     if chars_trimmed > 0 {
         let new_end = url_match.end().sub(term, Boundary::Grid, chars_trimmed);
-        let sanitibaymax_match = Match::new(*url_match.start(), new_end);
-        (sanitibaymax_url, sanitibaymax_match)
+        let sanitisim_match = Match::new(*url_match.start(), new_end);
+        (sanitisim_url, sanitisim_match)
     } else {
-        (sanitibaymax_url, url_match)
+        (sanitisim_url, url_match)
     }
 }
 
@@ -520,8 +520,8 @@ mod tests {
         );
         re_test(
             URL_REGEX,
-            "open baymax://channel/the-channel and baymax://settings/theme now",
-            vec!["baymax://channel/the-channel", "baymax://settings/theme"],
+            "open sim://channel/the-channel and sim://settings/theme now",
+            vec!["sim://channel/the-channel", "sim://settings/theme"],
         );
     }
 
@@ -529,13 +529,13 @@ mod tests {
     fn test_url_parentheses_sanitization() {
         // Test our sanitize_url_parentheses function directly
         let test_cases = vec![
-            // Cases that should be sanitibaymax (unbalanced parentheses)
+            // Cases that should be sanitisim (unbalanced parentheses)
             ("https://www.google.com/)", "https://www.google.com/"),
             ("https://example.com/path)", "https://example.com/path"),
             ("https://test.com/))", "https://test.com/"),
             ("https://test.com/(((", "https://test.com/"),
             ("https://test.com/(test)(", "https://test.com/(test)"),
-            // Cases that should NOT be sanitibaymax (balanced parentheses)
+            // Cases that should NOT be sanitisim (balanced parentheses)
             (
                 "https://en.wikipedia.org/wiki/Example_(disambiguation)",
                 "https://en.wikipedia.org/wiki/Example_(disambiguation)",
@@ -571,8 +571,8 @@ mod tests {
         let test_cases = vec![
             ("https://example.com.", "https://example.com"),
             (
-                "https://github.com/simtropolis/baymax.",
-                "https://github.com/simtropolis/baymax",
+                "https://github.com/simtropolis/sim.",
+                "https://github.com/simtropolis/sim",
             ),
             (
                 "https://example.com/path/file.html.",
@@ -935,7 +935,7 @@ mod tests {
             }
 
             #[test]
-            // <https://github.com/simtropolis/baymax/issues/12338>
+            // <https://github.com/simtropolis/sim/issues/12338>
             fn issue_12338_regex() {
                 // Issue #12338
                 test_path!(".rw-r--r--     0     staff 05-27 14:03 ‹«'test file 👉1.txt'»›");
@@ -943,7 +943,7 @@ mod tests {
             }
 
             #[test]
-            // <https://github.com/simtropolis/baymax/issues/12338>
+            // <https://github.com/simtropolis/sim/issues/12338>
             fn issue_12338() {
                 // Issue #12338
                 test_path!(".rw-r--r--     0     staff 05-27 14:03 ‹«test👉、2.txt»›");
@@ -977,7 +977,7 @@ mod tests {
             }
 
             #[test]
-            // <https://github.com/simtropolis/baymax/issues/40202>
+            // <https://github.com/simtropolis/sim/issues/40202>
             fn issue_40202() {
                 // Elixir
                 test_path!("[‹«lib/blitz_apex_👉server/stats/aggregate_rank_stats.ex»:«35»›: BlitzApexServer.Stats.AggregateRankStats.update/2]
@@ -985,7 +985,7 @@ mod tests {
             }
 
             #[test]
-            // <https://github.com/simtropolis/baymax/issues/28194>
+            // <https://github.com/simtropolis/sim/issues/28194>
             fn issue_28194() {
                 test_path!(
                     "‹«test/c👉ontrollers/template_items_controller_test.rb»:«20»›:in 'block (2 levels) in <class:TemplateItemsControllerTest>'"
@@ -993,7 +993,7 @@ mod tests {
             }
 
             #[test]
-            // <https://github.com/simtropolis/baymax/issues/50531>
+            // <https://github.com/simtropolis/sim/issues/50531>
             fn issue_50531() {
                 // Paths preceded by "N:" prefix (e.g. grep output line numbers)
                 // should still be clickable
@@ -1005,7 +1005,7 @@ mod tests {
             }
 
             #[test]
-            // <https://github.com/simtropolis/baymax/issues/46795>
+            // <https://github.com/simtropolis/sim/issues/46795>
             fn issue_46795() {
                 // Box drawing characters are commonly used as UI elements and
                 // should not interfere with path detection; they appear rarely
@@ -1169,7 +1169,7 @@ mod tests {
 
             #[perf]
             pub fn cargo_hyperlink_benchmark() {
-                const LINE: &str = "    Compiling terminal v0.1.0 (/Hyperlinks/Bench/Source/baymax-hyperlinks/crates/terminal)\r\n";
+                const LINE: &str = "    Compiling terminal v0.1.0 (/Hyperlinks/Bench/Source/sim-hyperlinks/crates/terminal)\r\n";
                 thread_local! {
                     static TEST_TERM_AND_POINT: (Term<VoidListener>, AlacPoint) =
                         build_test_term(LINE, 500, 50);
@@ -1179,7 +1179,7 @@ mod tests {
                         find_from_grid_point_bench(term, *point)
                             .map(|hyperlink| hyperlink.text)
                             .unwrap_or_default(),
-                        "/Hyperlinks/Bench/Source/baymax-hyperlinks/crates/terminal",
+                        "/Hyperlinks/Bench/Source/sim-hyperlinks/crates/terminal",
                         "Hyperlink should have been found"
                     );
                 });
@@ -1187,7 +1187,7 @@ mod tests {
 
             #[perf]
             pub fn rust_hyperlink_benchmark() {
-                const LINE: &str = "    --> /Hyperlinks/Bench/Source/baymax-hyperlinks/crates/terminal/terminal.rs:1000:42\r\n";
+                const LINE: &str = "    --> /Hyperlinks/Bench/Source/sim-hyperlinks/crates/terminal/terminal.rs:1000:42\r\n";
                 thread_local! {
                     static TEST_TERM_AND_POINT: (Term<VoidListener>, AlacPoint) =
                         build_test_term(LINE, 500, 50);
@@ -1197,7 +1197,7 @@ mod tests {
                         find_from_grid_point_bench(term, *point)
                             .map(|hyperlink| hyperlink.text)
                             .unwrap_or_default(),
-                        "/Hyperlinks/Bench/Source/baymax-hyperlinks/crates/terminal/terminal.rs:1000:42",
+                        "/Hyperlinks/Bench/Source/sim-hyperlinks/crates/terminal/terminal.rs:1000:42",
                         "Hyperlink should have been found"
                     );
                 });
@@ -1222,7 +1222,7 @@ mod tests {
             }
 
             #[perf]
-            // https://github.com/simtropolis/baymax/pull/44407
+            // https://github.com/simtropolis/sim/pull/44407
             pub fn pr_44407_hyperlink_benchmark() {
                 const LINE: &str = "-748, 706, 163, 222, -980, 949, 381, -568, 199, 501, 760, -821, 90, -451, 183, 867, -351, -810, -762, -109, 423, 84, 14, -77, -820, -345, 74, -791, 930, -618, -900, 862, -959, 289, -19, 471, -757, 793, 155, -554, 249, 830, 402, 732, -731, -866, -720, -703, -257, -439, 731, 872, -489, 676, -167, 613, -698, 415, -80, -453, -896, 333, -511, 621, -450, 624, -309, -575, 177, 141, 891, -104, -97, -367, -599, -675, 607, -225, -760, 552, -465, 804, 55, 282, 104, -929, -252,\
 -311, 900, 550, 599, -80, 774, 553, 837, -395, 541, 953, 154, -396, -596, -111, -802, -221, -337, -633, -73, -527, -82, -658, -264, 222, 375, 434, 204, -756, -703, 303, 239, -257, -365, -351, 904, 364, -743, -484, 655, -542, 446, 888, 632, -167, -260, 716, 150, 806, 723, 513, -118, -323, -683, 983, -564, 358, -16, -287, 277, -607, 87, 365, -1, 164, 401, 257, 369, -893, 145, -969, 375, -53, 541, -408, -865, 753, 258, 337, -886, 593, -378, -528, 191, 204, 566, -61, -621, 769, 524, -628, 6,\
@@ -1285,7 +1285,7 @@ mod tests {
             }
 
             #[perf]
-            // https://github.com/simtropolis/baymax/issues/44510
+            // https://github.com/simtropolis/sim/issues/44510
             pub fn issue_44510_hyperlink_benchmark() {
                 const LINE: &str = "..............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................\
 ..............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................\
@@ -1401,7 +1401,7 @@ mod tests {
                 }
 
                 // See https://en.wikipedia.org/wiki/File_URI_scheme
-                // https://github.com/simtropolis/baymax/issues/39189
+                // https://github.com/simtropolis/sim/issues/39189
                 #[test]
                 fn issue_39189() {
                     test_file_iri!("file:///C:/test/cool/index.rs");
@@ -1484,7 +1484,7 @@ mod tests {
         #[test]
         fn iris() {
             // These refer to the same location, see example here:
-            // <https://en.wikipedia.org/wiki/Internationalibaymax_Resource_Identifier#Compatibility>
+            // <https://en.wikipedia.org/wiki/Internationalisim_Resource_Identifier#Compatibility>
             test_iri!("https://en.wiktionary.org/wiki/Ῥόδος"); // IRI
             test_iri!("https://en.wiktionary.org/wiki/%E1%BF%AC%CF%8C%CE%B4%CE%BF%CF%82"); // URI
         }

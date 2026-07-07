@@ -1,11 +1,11 @@
 ---
-title: Multibuffers - Edit Multiple Files at Once in Baymax
-description: Edit multiple files simultaneously in Baymax using multibuffers. Combine with multi-cursor for fast cross-file refactoring.
+title: Multibuffers - Edit Multiple Files at Once in Sim
+description: Edit multiple files simultaneously in Sim using multibuffers. Combine with multi-cursor for fast cross-file refactoring.
 ---
 
 # Multibuffers
 
-One of the superpowers Baymax gives you is the ability to edit multiple files simultaneously. When combined with multiple cursors, this makes wide-ranging refactors significantly faster.
+One of the superpowers Sim gives you is the ability to edit multiple files simultaneously. When combined with multiple cursors, this makes wide-ranging refactors significantly faster.
 
 ## Editing in a multibuffer
 

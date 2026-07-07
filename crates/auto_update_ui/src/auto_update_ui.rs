@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use agent_skills::GLOBAL_SKILLS_DIR_DISPLAY;
 use auto_update::{AutoUpdater, release_notes_url};
-use baymax_actions::ShowUpdateNotification;
-use client::baymax_urls;
+use sim_actions::ShowUpdateNotification;
+use client::sim_urls;
 use db::kvp::Dismissable;
 use editor::{Editor, MultiBuffer};
 use gpui::{
@@ -240,10 +240,10 @@ fn announcement_for_version(version: &Version, cx: &App) -> Option<AnnouncementC
             secondary_action_label: "Read Documentation".into(),
             primary_action_url: None,
             primary_action_callback: Some(Arc::new(move |window, cx| {
-                window.dispatch_action(Box::new(baymax_actions::assistant::FocusAgent), cx);
+                window.dispatch_action(Box::new(sim_actions::assistant::FocusAgent), cx);
             })),
             on_dismiss: Some(Arc::new(|cx| SkillsAnnouncement::set_dismissed(true, cx))),
-            secondary_action_url: Some(baymax_urls::skills_docs(cx).into()),
+            secondary_action_url: Some(sim_urls::skills_docs(cx).into()),
         })
     } else {
         None

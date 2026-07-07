@@ -1,19 +1,19 @@
 ---
-title: AI Agent Tools - Baymax
-description: Built-in tools for Baymax's AI agent including file editing, code search, terminal commands, web search, skills, and diagnostics.
+title: AI Agent Tools - Sim
+description: Built-in tools for Sim's AI agent including file editing, code search, terminal commands, web search, skills, and diagnostics.
 ---
 
 # Tools
 
-Baymax's built-in agent has access to these tools for reading, searching, and editing your codebase. These tools are used in the [Agent Panel](./agent-panel.md) during conversations with AI agents.
+Sim's built-in agent has access to these tools for reading, searching, and editing your codebase. These tools are used in the [Agent Panel](./agent-panel.md) during conversations with AI agents.
 
-The exact tool list can vary by [Agent Profile](./agent-profiles.md), selected model provider, and Baymax version.
+The exact tool list can vary by [Agent Profile](./agent-profiles.md), selected model provider, and Sim version.
 
 You can configure permissions for tool actions, including situations where they are automatically approved, automatically denied, or require your confirmation on a case-by-case basis. See [Tool Permissions](./tool-permissions.md) for the list of permission-gated tools and details.
 
 To add custom tools beyond these built-in ones, see [MCP servers](./mcp.md).
 
-To choose which built-in tools and MCP tools are available in a Baymax Agent thread, use [Agent Profiles](./agent-profiles.md). Profiles control tool availability; tool permissions control allow, deny, and confirm behavior.
+To choose which built-in tools and MCP tools are available in a Sim Agent thread, use [Agent Profiles](./agent-profiles.md). Profiles control tool availability; tool permissions control allow, deny, and confirm behavior.
 
 ## Read & Search Tools
 
@@ -57,7 +57,7 @@ Searches the web for information, providing results with snippets and links from
 
 **Example:** Looking up whether a known bug in a dependency has been patched in a recent release, or finding the current API signature for a third-party library when the local docs are out of date.
 
-> **Note:** The built-in `search_web` tool is only available to [Baymax Pro](https://baymax.dev/pricing) subscribers using the Baymax provider. If you're on a free plan or using a different provider, you can get equivalent functionality by connecting an MCP server that provides web search capabilities. See [MCP servers](./mcp.md) for details.
+> **Note:** The built-in `search_web` tool is only available to [Sim Pro](https://sim.dev/pricing) subscribers using the Sim provider. If you're on a free plan or using a different provider, you can get equivalent functionality by connecting an MCP server that provides web search capabilities. See [MCP servers](./mcp.md) for details.
 
 ## Edit Tools
 

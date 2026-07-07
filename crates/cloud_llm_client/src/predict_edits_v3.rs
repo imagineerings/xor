@@ -3,9 +3,9 @@ use std::borrow::Cow;
 use std::ops::Range;
 use strum::{AsRefStr, EnumString};
 
-pub const PREDICT_EDITS_MODE_HEADER_NAME: &str = "X-Baymax-Predict-Edits-Mode";
-pub const PREDICT_EDITS_REQUEST_ID_HEADER_NAME: &str = "X-Baymax-Predict-Edits-Request-Id";
-pub const PREDICT_EDITS_TRIGGER_HEADER_NAME: &str = "X-Baymax-Predict-Edits-Trigger";
+pub const PREDICT_EDITS_MODE_HEADER_NAME: &str = "X-Sim-Predict-Edits-Mode";
+pub const PREDICT_EDITS_REQUEST_ID_HEADER_NAME: &str = "X-Sim-Predict-Edits-Request-Id";
+pub const PREDICT_EDITS_TRIGGER_HEADER_NAME: &str = "X-Sim-Predict-Edits-Trigger";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, AsRefStr, EnumString)]
 #[serde(rename_all = "snake_case")]

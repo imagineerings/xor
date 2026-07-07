@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-Baymax currently supports @mentioning individual users in channel messages (via `ChatMention { range, user_id }`), but there is no way to notify a collection of users at once. This design adds named user groups — collections of users within a workspace (e.g., `@eng`, `@design`, `@team-leads`) that can be @mentioned to notify all members simultaneously.
+Sim currently supports @mentioning individual users in channel messages (via `ChatMention { range, user_id }`), but there is no way to notify a collection of users at once. This design adds named user groups — collections of users within a workspace (e.g., `@eng`, `@design`, `@team-leads`) that can be @mentioned to notify all members simultaneously.
 
 ### Key Architectural Decisions
 

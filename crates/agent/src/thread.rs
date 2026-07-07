@@ -38,7 +38,7 @@ use gpui::{
 };
 use heck::ToSnakeCase as _;
 use language_model::{
-    BAYMAX_CLOUD_PROVIDER_ID, CompletionIntent, LanguageModel, LanguageModelCompletionError,
+    SIM_CLOUD_PROVIDER_ID, CompletionIntent, LanguageModel, LanguageModelCompletionError,
     LanguageModelCompletionEvent, LanguageModelId, LanguageModelImage, LanguageModelProviderId,
     LanguageModelRegistry, LanguageModelRequest, LanguageModelRequestMessage,
     LanguageModelRequestTool, LanguageModelToolResult, LanguageModelToolResultContent,
@@ -766,7 +766,7 @@ pub struct SiblingThreadRequest {
     pub title: SharedString,
     /// The initial prompt to send to the new thread.
     pub prompt: String,
-    /// Optional agent ID to use. Defaults to the native Baymax agent.
+    /// Optional agent ID to use. Defaults to the native Sim agent.
     pub agent_id: Option<String>,
     /// Optional model override, as `provider/model-id`.
     /// Defaults to the user's configured default model for the agent.
@@ -810,7 +810,7 @@ pub struct AvailableAgent {
     pub id: String,
     /// Human-readable name shown in the UI.
     pub name: SharedString,
-    /// Whether this is Baymax's built-in native agent.
+    /// Whether this is Sim's built-in native agent.
     pub is_native: bool,
     /// Models available for this agent. May be empty if models are not
     /// enumerated up front (e.g., external agents that choose their own).
@@ -1383,7 +1383,7 @@ impl Thread {
         }
 
         let temp_dir = tempfile::Builder::new()
-            .prefix("baymax-agent-terminal-")
+            .prefix("sim-agent-terminal-")
             .tempdir()
             .context("failed to create sandboxed terminal temp directory")?;
         let temp_dir = temp_dir.keep();
@@ -1735,7 +1735,7 @@ impl Thread {
             thinking_effort: self.thinking_effort.clone(),
             draft_prompt: self.draft_prompt.clone(),
             ui_scroll_position: self.ui_scroll_position.map(|lo| {
-                crate::db::SerialibaymaxScrollPosition {
+                crate::db::SerialisimScrollPosition {
                     item_ix: lo.item_ix,
                     offset_in_item: lo.offset_in_item.as_f32(),
                 }
@@ -3118,7 +3118,7 @@ impl Thread {
             return Err(anyhow!(error));
         };
 
-        let auto_retry = if model.provider_id() == BAYMAX_CLOUD_PROVIDER_ID {
+        let auto_retry = if model.provider_id() == SIM_CLOUD_PROVIDER_ID {
             plan.is_some()
         } else {
             true
@@ -4723,7 +4723,7 @@ impl<T: DeserializeOwned> ToolInput<T> {
         (sender, input.cast())
     }
 
-    /// Wait for the final deserialibaymax input, ignoring all partial updates.
+    /// Wait for the final deserialisim input, ignoring all partial updates.
     /// Non-streaming tools can use this to wait until the whole input is available.
     pub async fn recv(mut self) -> Result<T> {
         while let Ok(value) = self.next().await {

@@ -278,7 +278,7 @@ pub fn into_anthropic(
                     Some(Thinking::Enabled { budget_tokens })
                 }
                 AnthropicModelMode::AdaptiveThinking => Some(Thinking::Adaptive {
-                    display: Some(AdaptiveThinkingDisplay::Summaribaymax),
+                    display: Some(AdaptiveThinkingDisplay::Summarisim),
                 }),
                 AnthropicModelMode::Default => None,
             }
@@ -707,7 +707,7 @@ mod tests {
     }
 
     #[test]
-    fn test_xhigh_effort_is_serialibaymax_for_adaptive_thinking() {
+    fn test_xhigh_effort_is_serialisim_for_adaptive_thinking() {
         let request = LanguageModelRequest {
             messages: vec![LanguageModelRequestMessage {
                 role: Role::User,

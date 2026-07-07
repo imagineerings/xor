@@ -1,27 +1,27 @@
 #!/usr/bin/env sh
 set -eu
 
-# Uninstalls Baymax that was installed using the install.sh script
+# Uninstalls Sim that was installed using the install.sh script
 
 check_remaining_installations() {
     platform="$(uname -s)"
     if [ "$platform" = "Darwin" ]; then
-        # Check for any Baymax variants in /Applications
-        remaining=$(ls -d /Applications/Baymax*.app 2>/dev/null | wc -l)
+        # Check for any Sim variants in /Applications
+        remaining=$(ls -d /Applications/Sim*.app 2>/dev/null | wc -l)
         [ "$remaining" -eq 0 ]
     else
-        # Check for any Baymax variants in ~/.local
-        remaining=$(ls -d "$HOME/.local/baymax"*.app 2>/dev/null | wc -l)
+        # Check for any Sim variants in ~/.local
+        remaining=$(ls -d "$HOME/.local/sim"*.app 2>/dev/null | wc -l)
         [ "$remaining" -eq 0 ]
     fi
 }
 
 prompt_remove_preferences() {
-    printf "Do you want to keep your Baymax preferences? [Y/n] "
+    printf "Do you want to keep your Sim preferences? [Y/n] "
     read -r response
     case "$response" in
         [nN]|[nN][oO])
-            rm -rf "$HOME/.config/baymax"
+            rm -rf "$HOME/.config/sim"
             echo "Preferences removed."
             ;;
         *)
@@ -32,7 +32,7 @@ prompt_remove_preferences() {
 
 main() {
     platform="$(uname -s)"
-    channel="${BAYMAX_CHANNEL:-stable}"
+    channel="${SIM_CHANNEL:-stable}"
 
     if [ "$platform" = "Darwin" ]; then
         platform="macos"
@@ -45,7 +45,7 @@ main() {
 
     "$platform"
 
-    echo "Baymax has been uninstalled"
+    echo "Sim has been uninstalled"
 }
 
 linux() {
@@ -58,71 +58,71 @@ linux() {
     db_suffix="stable"
     case "$channel" in
       stable)
-        appid="dev.baymax.Baymax"
+        appid="dev.sim.Sim"
         db_suffix="stable"
         ;;
       nightly)
-        appid="dev.baymax.Baymax-Nightly"
+        appid="dev.sim.Sim-Nightly"
         db_suffix="nightly"
         ;;
       preview)
-        appid="dev.baymax.Baymax-Preview"
+        appid="dev.sim.Sim-Preview"
         db_suffix="preview"
         ;;
       dev)
-        appid="dev.baymax.Baymax-Dev"
+        appid="dev.sim.Sim-Dev"
         db_suffix="dev"
         ;;
       *)
         echo "Unknown release channel: ${channel}. Using stable app ID."
-        appid="dev.baymax.Baymax"
+        appid="dev.sim.Sim"
         db_suffix="stable"
         ;;
     esac
 
     # Remove the app directory
-    rm -rf "$HOME/.local/baymax$suffix.app"
+    rm -rf "$HOME/.local/sim$suffix.app"
 
     # Remove the binary symlink
-    rm -f "$HOME/.local/bin/baymax"
+    rm -f "$HOME/.local/bin/sim"
 
     # Remove the .desktop file
     rm -f "$HOME/.local/share/applications/${appid}.desktop"
 
     # Remove the database directory for this channel
-    rm -rf "$HOME/.local/share/baymax/db/0-$db_suffix"
+    rm -rf "$HOME/.local/share/sim/db/0-$db_suffix"
 
     # Remove socket file
-    rm -f "$HOME/.local/share/baymax/baymax-$db_suffix.sock"
+    rm -f "$HOME/.local/share/sim/sim-$db_suffix.sock"
 
-    # Remove the entire Baymax directory if no installations remain
+    # Remove the entire Sim directory if no installations remain
     if check_remaining_installations; then
-        rm -rf "$HOME/.local/share/baymax"
+        rm -rf "$HOME/.local/share/sim"
         prompt_remove_preferences
     fi
 
-    rm -rf $HOME/.baymax_server
+    rm -rf $HOME/.sim_server
 }
 
 macos() {
-    app="Baymax.app"
+    app="Sim.app"
     db_suffix="stable"
-    app_id="dev.baymax.Baymax"
+    app_id="dev.sim.Sim"
     case "$channel" in
       nightly)
-        app="Baymax Nightly.app"
+        app="Sim Nightly.app"
         db_suffix="nightly"
-        app_id="dev.baymax.Baymax-Nightly"
+        app_id="dev.sim.Sim-Nightly"
         ;;
       preview)
-        app="Baymax Preview.app"
+        app="Sim Preview.app"
         db_suffix="preview"
-        app_id="dev.baymax.Baymax-Preview"
+        app_id="dev.sim.Sim-Preview"
         ;;
       dev)
-        app="Baymax Dev.app"
+        app="Sim Dev.app"
         db_suffix="dev"
-        app_id="dev.baymax.Baymax-Dev"
+        app_id="dev.sim.Sim-Dev"
         ;;
     esac
 
@@ -132,10 +132,10 @@ macos() {
     fi
 
     # Remove the binary symlink
-    rm -f "$HOME/.local/bin/baymax"
+    rm -f "$HOME/.local/bin/sim"
 
     # Remove the database directory for this channel
-    rm -rf "$HOME/Library/Application Support/Baymax/db/0-$db_suffix"
+    rm -rf "$HOME/Library/Application Support/Sim/db/0-$db_suffix"
 
     # Remove app-specific files and directories
     rm -rf "$HOME/Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.ApplicationRecentDocuments/$app_id.sfl"*
@@ -144,15 +144,15 @@ macos() {
     rm -rf "$HOME/Library/Preferences/$app_id.plist"
     rm -rf "$HOME/Library/Saved Application State/$app_id.savedState"
 
-    # Remove the entire Baymax directory if no installations remain
+    # Remove the entire Sim directory if no installations remain
     if check_remaining_installations; then
-        rm -rf "$HOME/Library/Application Support/Baymax"
-        rm -rf "$HOME/Library/Logs/Baymax"
+        rm -rf "$HOME/Library/Application Support/Sim"
+        rm -rf "$HOME/Library/Logs/Sim"
 
         prompt_remove_preferences
     fi
 
-    rm -rf $HOME/.baymax_server
+    rm -rf $HOME/.sim_server
 }
 
 main "$@"

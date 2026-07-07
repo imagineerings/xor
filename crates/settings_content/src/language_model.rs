@@ -23,8 +23,8 @@ pub struct AllLanguageModelSettingsContent {
     pub openai_compatible: Option<HashMap<Arc<str>, OpenAiCompatibleSettingsContent>>,
     pub vercel_ai_gateway: Option<VercelAiGatewaySettingsContent>,
     pub x_ai: Option<XAiSettingsContent>,
-    #[serde(rename = "baymax.dev")]
-    pub baymax_dot_dev: Option<BaymaxDotDevSettingsContent>,
+    #[serde(rename = "sim.dev")]
+    pub sim_dot_dev: Option<SimDotDevSettingsContent>,
     pub azure: Option<AzureSettingsContent>,
     pub gcp_vertex_ai: Option<GcpVertexAiSettingsContent>,
     pub huggingface: Option<HuggingFaceSettingsContent>,
@@ -52,7 +52,7 @@ pub struct AnthropicSettingsContent {
 pub struct AnthropicAvailableModel {
     /// The model's name in the Anthropic API. e.g. claude-3-5-sonnet-latest, claude-3-opus-20240229, etc
     pub name: String,
-    /// The model's name in Baymax's UI, such as in the model selector dropdown menu in the agent panel.
+    /// The model's name in Sim's UI, such as in the model selector dropdown menu in the agent panel.
     pub display_name: Option<String>,
     /// The model's context window size.
     pub max_tokens: u64,
@@ -126,7 +126,7 @@ pub struct OllamaSettingsContent {
 pub struct OllamaAvailableModel {
     /// The model name in the Ollama API (e.g. "llama3.2:latest")
     pub name: String,
-    /// The model's name in Baymax's UI, such as in the model selector dropdown menu in the agent panel.
+    /// The model's name in Sim's UI, such as in the model selector dropdown menu in the agent panel.
     pub display_name: Option<String>,
     /// The Context Length parameter to the model (aka num_ctx or n_ctx)
     pub max_tokens: u64,
@@ -415,15 +415,15 @@ pub struct XaiAvailableModel {
 
 #[with_fallible_options]
 #[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema, MergeFrom)]
-pub struct BaymaxDotDevSettingsContent {
-    pub available_models: Option<Vec<BaymaxDotDevAvailableModel>>,
+pub struct SimDotDevSettingsContent {
+    pub available_models: Option<Vec<SimDotDevAvailableModel>>,
 }
 
 #[with_fallible_options]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom)]
-pub struct BaymaxDotDevAvailableModel {
+pub struct SimDotDevAvailableModel {
     /// The provider of the language model.
-    pub provider: BaymaxDotDevAvailableProvider,
+    pub provider: SimDotDevAvailableProvider,
     /// The model's name in the provider's API. e.g. claude-3-5-sonnet-20240620
     pub name: String,
     /// The name displayed in the UI, such as in the agent panel model dropdown menu.
@@ -450,7 +450,7 @@ pub struct BaymaxDotDevAvailableModel {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom)]
 #[serde(rename_all = "lowercase")]
-pub enum BaymaxDotDevAvailableProvider {
+pub enum SimDotDevAvailableProvider {
     Anthropic,
     OpenAi,
     Google,

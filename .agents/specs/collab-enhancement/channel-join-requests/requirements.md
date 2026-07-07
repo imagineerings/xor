@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Baymax private channels currently require an explicit invitation from an existing member. Mattermost supports join requests — users can request access to a private channel, and channel admins/members can approve or deny the request. This reduces friction for team onboarding.
+Sim private channels currently require an explicit invitation from an existing member. Mattermost supports join requests — users can request access to a private channel, and channel admins/members can approve or deny the request. This reduces friction for team onboarding.
 
 ## Glossary
 

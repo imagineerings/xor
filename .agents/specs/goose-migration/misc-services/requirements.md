@@ -15,7 +15,7 @@ Migrate the remaining goose services, scripts, and examples: the Ask AI bot serv
 
 ### Requirement 1: Ask AI Bot Service
 
-**User Story:** As a baymax user, I want a Q&A bot that can answer questions about using the agent, so that I can get help without reading all documentation.
+**User Story:** As a sim user, I want a Q&A bot that can answer questions about using the agent, so that I can get help without reading all documentation.
 
 #### Acceptance Criteria
 
@@ -25,7 +25,7 @@ Migrate the remaining goose services, scripts, and examples: the Ask AI bot serv
 
 ### Requirement 2: Session Import Formats
 
-**User Story:** As a baymax user, I want to import sessions from other formats, so that I can migrate conversations from other tools.
+**User Story:** As a sim user, I want to import sessions from other formats, so that I can migrate conversations from other tools.
 
 #### Acceptance Criteria
 
@@ -36,7 +36,7 @@ Migrate the remaining goose services, scripts, and examples: the Ask AI bot serv
 
 ### Requirement 3: Nostr Session Sharing
 
-**User Story:** As a baymax user, I want to share agent sessions via Nostr, so that I can publish and discover sessions on a decentralized network.
+**User Story:** As a sim user, I want to share agent sessions via Nostr, so that I can publish and discover sessions on a decentralized network.
 
 #### Acceptance Criteria
 
@@ -46,7 +46,7 @@ Migrate the remaining goose services, scripts, and examples: the Ask AI bot serv
 
 ### Requirement 4: Examples
 
-**User Story:** As a baymax developer, I want example integrations, so that I can see how to use and extend the agent.
+**User Story:** As a sim developer, I want example integrations, so that I can see how to use and extend the agent.
 
 #### Acceptance Criteria
 
@@ -57,7 +57,7 @@ Migrate the remaining goose services, scripts, and examples: the Ask AI bot serv
 
 ### Requirement 5: Development and CI Scripts
 
-**User Story:** As a baymax developer, I want scripts for common development tasks, so that development workflows are automated.
+**User Story:** As a sim developer, I want scripts for common development tasks, so that development workflows are automated.
 
 #### Acceptance Criteria
 
@@ -72,7 +72,7 @@ Migrate the remaining goose services, scripts, and examples: the Ask AI bot serv
 
 ### Requirement 6: Provider Error Proxy
 
-**User Story:** As a baymax developer, I want a proxy for intercepting and debugging provider API errors, so that I can diagnose provider integration issues.
+**User Story:** As a sim developer, I want a proxy for intercepting and debugging provider API errors, so that I can diagnose provider integration issues.
 
 #### Acceptance Criteria
 

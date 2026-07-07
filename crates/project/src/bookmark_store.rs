@@ -20,7 +20,7 @@ impl BookmarkAnchor {
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct SerialibaymaxBookmark(pub u32);
+pub struct SerialisimBookmark(pub u32);
 
 #[derive(Debug)]
 pub struct BufferBookmarks {
@@ -60,7 +60,7 @@ impl BufferBookmarks {
 #[derive(Debug)]
 pub enum BookmarkEntry {
     Loaded(BufferBookmarks),
-    Unloaded(Vec<SerialibaymaxBookmark>),
+    Unloaded(Vec<SerialisimBookmark>),
 }
 
 impl BookmarkEntry {
@@ -94,9 +94,9 @@ impl BookmarkStore {
         }
     }
 
-    pub fn load_serialibaymax_bookmarks(
+    pub fn load_serialisim_bookmarks(
         &mut self,
-        bookmark_rows: BTreeMap<Arc<Path>, Vec<SerialibaymaxBookmark>>,
+        bookmark_rows: BTreeMap<Arc<Path>, Vec<SerialisimBookmark>>,
         cx: &mut Context<Self>,
     ) -> Task<Result<()>> {
         self.bookmarks.clear();
@@ -295,10 +295,10 @@ impl BookmarkStore {
         }
     }
 
-    pub fn all_serialibaymax_bookmarks(
+    pub fn all_serialisim_bookmarks(
         &self,
         cx: &App,
-    ) -> BTreeMap<Arc<Path>, Vec<SerialibaymaxBookmark>> {
+    ) -> BTreeMap<Arc<Path>, Vec<SerialisimBookmark>> {
         self.bookmarks
             .iter()
             .filter_map(|(path, entry)| {
@@ -315,7 +315,7 @@ impl BookmarkStore {
                                 }
                                 let row =
                                     snapshot.summary_for_anchor::<Point>(&bookmark.anchor()).row;
-                                Some(SerialibaymaxBookmark(row))
+                                Some(SerialisimBookmark(row))
                             })
                             .collect()
                     }

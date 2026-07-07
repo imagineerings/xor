@@ -247,7 +247,7 @@ pub enum Request {
 /// This struct represent a user created debug task from the new process modal
 #[derive(Deserialize, Serialize, PartialEq, Eq, Clone, Debug, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub struct BaymaxDebugConfig {
+pub struct SimDebugConfig {
     /// Name of the debug task
     pub label: SharedString,
     /// The debug adapter to use
@@ -364,7 +364,7 @@ impl DebugTaskFile {
                 "type": "object",
                 "required": ["adapter", "label"],
                 // TODO: Uncommenting this will cause json-language-server to provide warnings for
-                // unrecognibaymax properties. It should be enabled if/when there's an adapter JSON
+                // unrecognisim properties. It should be enabled if/when there's an adapter JSON
                 // schema that's comprehensive. In order to not get warnings for the other schemas,
                 // `additionalProperties` or `unevaluatedProperties` (to handle "allOf" etc style
                 // schema combinations) could be set to `true` for that schema.
@@ -422,9 +422,9 @@ mod tests {
             }
         }"#;
 
-        let deserialibaymax: DebugScenario = serde_json::from_str(json).unwrap();
-        assert!(deserialibaymax.build.is_some());
-        match deserialibaymax.build.as_ref().unwrap() {
+        let deserialisim: DebugScenario = serde_json::from_str(json).unwrap();
+        assert!(deserialisim.build.is_some());
+        match deserialisim.build.as_ref().unwrap() {
             crate::BuildTaskDefinition::Template { task_template, .. } => {
                 assert_eq!("debug-build", task_template.label);
                 assert_eq!("rust", task_template.command);
@@ -432,9 +432,9 @@ mod tests {
             }
             _ => panic!("Expected Template variant"),
         }
-        assert_eq!(json!({}), deserialibaymax.config);
-        assert_eq!("CodeLLDB", deserialibaymax.adapter.as_ref());
-        assert_eq!("Build & debug rust", deserialibaymax.label.as_ref());
+        assert_eq!(json!({}), deserialisim.config);
+        assert_eq!("CodeLLDB", deserialisim.adapter.as_ref());
+        assert_eq!("Build & debug rust", deserialisim.label.as_ref());
     }
 
     #[test]
@@ -445,11 +445,11 @@ mod tests {
             "adapter": "CodeLLDB"
         }"#;
 
-        let deserialibaymax: DebugScenario = serde_json::from_str(json).unwrap();
+        let deserialisim: DebugScenario = serde_json::from_str(json).unwrap();
 
-        assert_eq!(json!({}), deserialibaymax.config);
-        assert_eq!("CodeLLDB", deserialibaymax.adapter.as_ref());
-        assert_eq!("Build & debug rust", deserialibaymax.label.as_ref());
+        assert_eq!(json!({}), deserialisim.config);
+        assert_eq!("CodeLLDB", deserialisim.adapter.as_ref());
+        assert_eq!("Build & debug rust", deserialisim.label.as_ref());
     }
 
     #[test]
@@ -462,14 +462,14 @@ mod tests {
             "args": ["--test"]
         }"#;
 
-        let deserialibaymax: DebugScenario = serde_json::from_str(json).unwrap();
+        let deserialisim: DebugScenario = serde_json::from_str(json).unwrap();
 
         assert_eq!(
             json!({ "request": "launch", "program": "target/debug/myapp", "args": ["--test"] }),
-            deserialibaymax.config
+            deserialisim.config
         );
-        assert_eq!("CodeLLDB", deserialibaymax.adapter.as_ref());
-        assert_eq!("Launch program", deserialibaymax.label.as_ref());
+        assert_eq!("CodeLLDB", deserialisim.adapter.as_ref());
+        assert_eq!("Launch program", deserialisim.label.as_ref());
     }
 
     #[test]
@@ -481,14 +481,14 @@ mod tests {
             "request": "attach"
         }"#;
 
-        let deserialibaymax: DebugScenario = serde_json::from_str(json).unwrap();
+        let deserialisim: DebugScenario = serde_json::from_str(json).unwrap();
 
         assert_eq!(
             json!({ "request": "attach", "process_id": 1234 }),
-            deserialibaymax.config
+            deserialisim.config
         );
-        assert_eq!("CodeLLDB", deserialibaymax.adapter.as_ref());
-        assert_eq!("Attach to process", deserialibaymax.label.as_ref());
+        assert_eq!("CodeLLDB", deserialisim.adapter.as_ref());
+        assert_eq!("Attach to process", deserialisim.label.as_ref());
     }
 
     #[test]
@@ -496,8 +496,8 @@ mod tests {
         use crate::BuildTaskDefinition;
 
         let json = r#""my_build_task""#;
-        let deserialibaymax: BuildTaskDefinition = serde_json::from_str(json).unwrap();
-        match deserialibaymax {
+        let deserialisim: BuildTaskDefinition = serde_json::from_str(json).unwrap();
+        match deserialisim {
             BuildTaskDefinition::ByName(name) => assert_eq!("my_build_task", name.as_ref()),
             _ => panic!("Expected ByName variant"),
         }
@@ -506,8 +506,8 @@ mod tests {
             "command": "cargo",
             "args": ["build", "--release"]
         }"#;
-        let deserialibaymax: BuildTaskDefinition = serde_json::from_str(json).unwrap();
-        match deserialibaymax {
+        let deserialisim: BuildTaskDefinition = serde_json::from_str(json).unwrap();
+        match deserialisim {
             BuildTaskDefinition::Template { task_template, .. } => {
                 assert_eq!("debug-build", task_template.label);
                 assert_eq!("cargo", task_template.command);
@@ -521,8 +521,8 @@ mod tests {
             "command": "cargo",
             "args": ["build", "--release"]
         }"#;
-        let deserialibaymax: BuildTaskDefinition = serde_json::from_str(json).unwrap();
-        match deserialibaymax {
+        let deserialisim: BuildTaskDefinition = serde_json::from_str(json).unwrap();
+        match deserialisim {
             BuildTaskDefinition::Template { task_template, .. } => {
                 assert_eq!("Build Release", task_template.label);
                 assert_eq!("cargo", task_template.command);

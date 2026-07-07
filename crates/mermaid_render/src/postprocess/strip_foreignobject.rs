@@ -3,7 +3,7 @@
 //!
 //! merman's raster-safe SVG pipeline converts `<foreignObject>` labels into
 //! native `<text>` fallback groups (`data-merman-foreignobject="fallback"`) and
-//! removes the original `<foreignObject>` elements before Baymax-specific
+//! removes the original `<foreignObject>` elements before Sim-specific
 //! post-processing runs. For most diagram types the fallback `<text>` group is
 //! the *only* remaining copy of a label, so it must be preserved.
 //!
@@ -107,7 +107,7 @@ impl<'a, I: Iterator<Item = Result<Event<'a>>>> Iterator for StripForeignObject<
             };
 
             // Strip foreignObject elements and their contents (defensive: merman
-            // already removes them, but a stray one cannot be rasteribaymax).
+            // already removes them, but a stray one cannot be rasterisim).
             match &event {
                 Event::Start(e) if e.name().as_ref() == b"foreignObject" => {
                     self.foreign_depth += 1;

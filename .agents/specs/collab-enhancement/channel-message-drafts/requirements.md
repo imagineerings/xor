@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Baymax channel message composition currently loses unsent content if the user navigates away or closes the window. Mattermost supports message drafts — composition state that persists across sessions. Adding drafts will prevent data loss and improve the composition experience.
+Sim channel message composition currently loses unsent content if the user navigates away or closes the window. Mattermost supports message drafts — composition state that persists across sessions. Adding drafts will prevent data loss and improve the composition experience.
 
 ## Glossary
 

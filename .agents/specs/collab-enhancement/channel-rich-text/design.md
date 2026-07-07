@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-Channel chat messages in Baymax are currently sent and displayed as plain text via the `SendChannelMessage`/`ChannelMessage` protobuf types. Baymax's `markdown` crate already provides a full Markdown rendering pipeline (`pulldown-cmark` parser, GPUI element tree output, syntax highlighting, mermaid support). This design reuses that crate to render channel messages, and adds a minimal formatting toolbar to the message composition UI.
+Channel chat messages in Sim are currently sent and displayed as plain text via the `SendChannelMessage`/`ChannelMessage` protobuf types. Sim's `markdown` crate already provides a full Markdown rendering pipeline (`pulldown-cmark` parser, GPUI element tree output, syntax highlighting, mermaid support). This design reuses that crate to render channel messages, and adds a minimal formatting toolbar to the message composition UI.
 
 **Key decisions:**
 

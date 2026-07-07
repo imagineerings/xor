@@ -22,7 +22,7 @@ use gpui::{
     Subscription, Task, TaskExt, WeakEntity, anchored, deferred,
 };
 
-use baymax_actions::debug_panel::ToggleFocus;
+use sim_actions::debug_panel::ToggleFocus;
 use itertools::Itertools as _;
 use language::Buffer;
 use project::debugger::session::{Session, SessionQuirks, SessionState, SessionStateEvent};
@@ -639,7 +639,7 @@ impl DebugPanel {
             IconButton::new("debug-edit-debug-json", IconName::Code)
                 .icon_size(IconSize::Small)
                 .on_click(|_, window, cx| {
-                    window.dispatch_action(baymax_actions::OpenProjectDebugTasks.boxed_clone(), cx);
+                    window.dispatch_action(sim_actions::OpenProjectDebugTasks.boxed_clone(), cx);
                 })
                 .tooltip(Tooltip::text("Edit debug.json"))
         };
@@ -647,7 +647,7 @@ impl DebugPanel {
         let documentation_button = || {
             IconButton::new("debug-open-documentation", IconName::CircleHelp)
                 .icon_size(IconSize::Small)
-                .on_click(move |_, _, cx| cx.open_url("https://baymax.dev/docs/debugger"))
+                .on_click(move |_, _, cx| cx.open_url("https://sim.dev/docs/debugger"))
                 .tooltip(Tooltip::text("Open Documentation"))
         };
 
@@ -1152,10 +1152,10 @@ impl DebugPanel {
                     return Task::ready(Err(anyhow!("Couldn't get worktree path")));
                 };
 
-                let serialibaymax_scenario = serde_json::to_value(scenario);
+                let serialisim_scenario = serde_json::to_value(scenario);
 
                 cx.spawn_in(window, async move |workspace, cx| {
-                    let serialibaymax_scenario = serialibaymax_scenario?;
+                    let serialisim_scenario = serialisim_scenario?;
                     let fs =
                         workspace.read_with(cx, |workspace, _| workspace.app_state().fs.clone())?;
 
@@ -1184,7 +1184,7 @@ impl DebugPanel {
                             .read(cx)
                             .project_path_for_absolute_path(path, cx)
                             .context(
-                                "Couldn't get project path for .baymax/debug.json in active worktree",
+                                "Couldn't get project path for .sim/debug.json in active worktree",
                             )
                     })??;
 
@@ -1199,7 +1199,7 @@ impl DebugPanel {
                         .update(|_, cx| editor.act_as::<Editor>(cx))?
                         .context("expected editor")?;
 
-                    let new_scenario = serde_json_lenient::to_string_pretty(&serialibaymax_scenario)?
+                    let new_scenario = serde_json_lenient::to_string_pretty(&serialisim_scenario)?
                         .lines()
                         .map(|l| format!("  {l}"))
                         .join("\n");
@@ -1461,9 +1461,9 @@ async fn register_session_inner(
         .detach();
     })
     .ok();
-    let serialibaymax_layout = this
+    let serialisim_layout = this
         .update(cx, |_, cx| {
-            persistence::get_serialibaymax_layout(
+            persistence::get_serialisim_layout(
                 &adapter_name,
                 &db::kvp::KeyValueStore::global(cx),
             )
@@ -1493,7 +1493,7 @@ async fn register_session_inner(
                 .as_ref()
                 .map(|p| p.read(cx).running_state().read(cx).debug_terminal.clone()),
             session,
-            serialibaymax_layout,
+            serialisim_layout,
             this.position(window, cx).axis(),
             window,
             cx,
@@ -1842,7 +1842,7 @@ impl Render for DebugPanel {
                                 )
                                 .on_click(|_, window, cx| {
                                     window.dispatch_action(
-                                        baymax_actions::OpenProjectDebugTasks.boxed_clone(),
+                                        sim_actions::OpenProjectDebugTasks.boxed_clone(),
                                         cx,
                                     );
                                 }),
@@ -1855,7 +1855,7 @@ impl Render for DebugPanel {
                                         .color(Color::Muted),
                                 )
                                 .on_click(|_, _, cx| {
-                                    cx.open_url("https://baymax.dev/docs/debugger")
+                                    cx.open_url("https://sim.dev/docs/debugger")
                                 }),
                         )
                         .child(
@@ -1870,9 +1870,9 @@ impl Render for DebugPanel {
                             )
                             .on_click(|_, window, cx| {
                                 window.dispatch_action(
-                                    baymax_actions::Extensions {
+                                    sim_actions::Extensions {
                                         category_filter: Some(
-                                            baymax_actions::ExtensionCategoryFilter::DebugAdapters,
+                                            sim_actions::ExtensionCategoryFilter::DebugAdapters,
                                         ),
                                         id: None,
                                     }

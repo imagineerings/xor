@@ -1,5 +1,5 @@
 use anyhow::Result;
-use client::{Client, UserStore, baymax_urls};
+use client::{Client, UserStore, sim_urls};
 use cloud_llm_client::UsageLimit;
 use codestral::{self, CodestralEditPredictionDelegate};
 use copilot::Status;
@@ -36,7 +36,7 @@ use ui::{
 };
 use util::ResultExt as _;
 
-use baymax_actions::{OpenBrowser, OpenSettingsAt};
+use sim_actions::{OpenBrowser, OpenSettingsAt};
 use workspace::{
     HideStatusItem, StatusItemView, Toast, Workspace, create_and_open_local_file, item::ItemHandle,
     notifications::NotificationId,
@@ -54,7 +54,7 @@ actions!(
 
 const COPILOT_SETTINGS_PATH: &str = "/settings/copilot";
 const COPILOT_SETTINGS_URL: &str = concat!("https://github.com", "/settings/copilot");
-const PRIVACY_DOCS: &str = "https://baymax.dev/docs/ai/privacy-and-security";
+const PRIVACY_DOCS: &str = "https://sim.dev/docs/ai/privacy-and-security";
 
 struct CopilotErrorToast;
 
@@ -94,7 +94,7 @@ impl Render for EditPredictionButton {
 
                 let icon = match status {
                     Status::Error(_) => IconName::CopilotError,
-                    Status::Authoribaymax => {
+                    Status::Authorisim => {
                         if enabled {
                             IconName::Copilot
                         } else {
@@ -161,7 +161,7 @@ impl Render for EditPredictionButton {
                                 .read(cx)
                                 .status();
                             match current_status {
-                                Status::Authoribaymax => this.update(cx, |this, cx| {
+                                Status::Authorisim => this.update(cx, |this, cx| {
                                     this.build_copilot_context_menu(window, cx)
                                 }),
                                 _ => this.update(cx, |this, cx| {
@@ -321,13 +321,13 @@ impl Render for EditPredictionButton {
                         .with_handle(self.popover_menu_handle.clone()),
                 )
             }
-            provider @ (EditPredictionProvider::Baymax | EditPredictionProvider::Mercury) => {
+            provider @ (EditPredictionProvider::Sim | EditPredictionProvider::Mercury) => {
                 let enabled = self.editor_enabled.unwrap_or(true);
                 let file = self.file.clone();
                 let language = self.language.clone();
                 let project = self.project.clone();
                 let provider_name: &'static str = match provider {
-                    EditPredictionProvider::Baymax => "baymax",
+                    EditPredictionProvider::Sim => "sim",
                     _ => "unknown",
                 };
                 let icons = self
@@ -335,7 +335,7 @@ impl Render for EditPredictionButton {
                     .as_ref()
                     .map(|p| p.icons(cx))
                     .unwrap_or_else(|| {
-                        edit_prediction_types::EditPredictionIconSet::new(IconName::BaymaxPredict)
+                        edit_prediction_types::EditPredictionIconSet::new(IconName::SimPredict)
                     });
 
                 let ep_icon;
@@ -373,7 +373,7 @@ impl Render for EditPredictionButton {
                     };
 
                     return div().child(
-                        IconButton::new("baymax-predict-pending-button", ep_icon)
+                        IconButton::new("sim-predict-pending-button", ep_icon)
                             .shape(IconButtonShape::Square)
                             .indicator(Indicator::dot().color(Color::Muted))
                             .indicator_border_color(Some(cx.theme().colors().status_bar_background))
@@ -386,7 +386,7 @@ impl Render for EditPredictionButton {
                                     source = "Edit Prediction Status Button"
                                 );
                                 window.dispatch_action(
-                                    baymax_actions::OpenBaymaxPredictOnboarding.boxed_clone(),
+                                    sim_actions::OpenSimPredictOnboarding.boxed_clone(),
                                     cx,
                                 );
                             })),
@@ -423,12 +423,12 @@ impl Render for EditPredictionButton {
                     None
                 };
 
-                let baymax_cloud_needs_sign_in =
-                    matches!(provider, EditPredictionProvider::Baymax) && user.is_none();
+                let sim_cloud_needs_sign_in =
+                    matches!(provider, EditPredictionProvider::Sim) && user.is_none();
                 let provider_unavailable =
-                    missing_token || mercury_has_error || baymax_cloud_needs_sign_in;
+                    missing_token || mercury_has_error || sim_cloud_needs_sign_in;
 
-                let icon_button = IconButton::new("baymax-predict-pending-button", ep_icon)
+                let icon_button = IconButton::new("sim-predict-pending-button", ep_icon)
                     .shape(IconButtonShape::Square)
                     .when_some(indicator_color, |this, color| {
                         this.indicator(Indicator::dot().color(color))
@@ -438,7 +438,7 @@ impl Render for EditPredictionButton {
                         element.tooltip(move |_window, cx| {
                             let description = if !enabled {
                                 "Disabled For This File"
-                            } else if baymax_cloud_needs_sign_in {
+                            } else if sim_cloud_needs_sign_in {
                                 "Sign In Or Configure a Provider"
                             } else if provider_unavailable || show_editor_predictions {
                                 tooltip_meta
@@ -574,7 +574,7 @@ impl EditPredictionButton {
             .read(cx)
             .current_organization_configuration();
 
-        let is_baymax_provider_disabled = organization_configuration
+        let is_sim_provider_disabled = organization_configuration
             .is_some_and(|configuration| !configuration.edit_prediction.is_enabled);
 
         let available_providers = get_available_providers(cx);
@@ -592,18 +592,18 @@ impl EditPredictionButton {
                     continue;
                 };
                 let is_current = provider == current_provider;
-                let is_disabled_baymax_provider =
-                    provider == EditPredictionProvider::Baymax && is_baymax_provider_disabled;
+                let is_disabled_sim_provider =
+                    provider == EditPredictionProvider::Sim && is_sim_provider_disabled;
                 let fs = self.fs.clone();
 
                 menu = menu.item(
                     ContextMenuEntry::new(name)
                         .toggleable(
                             IconPosition::Start,
-                            is_current && !is_disabled_baymax_provider,
+                            is_current && !is_disabled_sim_provider,
                         )
-                        .disabled(is_disabled_baymax_provider)
-                        .when(is_disabled_baymax_provider, |item| {
+                        .disabled(is_disabled_sim_provider)
+                        .when(is_disabled_sim_provider, |item| {
                             item.documentation_aside(DocumentationSide::Left, move |_cx| {
                                 Label::new("Edit predictions are disabled for this organization.")
                                     .into_any_element()
@@ -810,7 +810,7 @@ impl EditPredictionButton {
 
         menu = menu.separator().header("Privacy");
 
-        if matches!(provider, EditPredictionProvider::Baymax) {
+        if matches!(provider, EditPredictionProvider::Sim) {
             if let Some(provider) = &self.edit_prediction_provider {
                 let data_collection = provider.data_collection_state(cx);
 
@@ -863,7 +863,7 @@ impl EditPredictionButton {
                                     .child(
                                         Label::new(indoc!{
                                             "Help us improve our open dataset model by sharing data from open source repositories. \
-                                            Baymax must detect a license file in your repo for this setting to take effect. \
+                                            Sim must detect a license file in your repo for this setting to take effect. \
                                             Files with sensitive data and secrets are excluded by default."
                                         })
                                     )
@@ -917,7 +917,7 @@ impl EditPredictionButton {
                 .icon_color(Color::Muted)
                 .documentation_aside(DocumentationSide::Left, |_| {
                     Label::new(indoc!{"
-                        Open your settings to add sensitive paths for which Baymax will never predict edits."}).into_any_element()
+                        Open your settings to add sensitive paths for which Sim will never predict edits."}).into_any_element()
                 })
                 .handler(move |window, cx| {
                     telemetry::event!(
@@ -955,7 +955,7 @@ impl EditPredictionButton {
                 .as_ref()
                 .map(|p| p.icons(cx))
                 .unwrap_or_else(|| {
-                    edit_prediction_types::EditPredictionIconSet::new(IconName::BaymaxPredict)
+                    edit_prediction_types::EditPredictionIconSet::new(IconName::SimPredict)
                 });
             menu = menu.item(
                 ContextMenuEntry::new("This file is excluded.")
@@ -1078,7 +1078,7 @@ impl EditPredictionButton {
             let needs_sign_in = user.is_none()
                 && matches!(
                     provider,
-                    EditPredictionProvider::None | EditPredictionProvider::Baymax
+                    EditPredictionProvider::None | EditPredictionProvider::Sim
                 );
 
             if needs_sign_in {
@@ -1106,7 +1106,7 @@ impl EditPredictionButton {
                         telemetry::event!(
                             "Edit Prediction Menu Action",
                             action = "sign_in",
-                            provider = "baymax",
+                            provider = "sim",
                         );
                         let client = Client::global(cx);
                         window
@@ -1121,7 +1121,7 @@ impl EditPredictionButton {
                     .link_with_handler(
                         "Learn More",
                         OpenBrowser {
-                            url: baymax_urls::edit_prediction_docs(cx).into(),
+                            url: sim_urls::edit_prediction_docs(cx).into(),
                         }
                         .boxed_clone(),
                         |_window, _cx| {
@@ -1188,7 +1188,7 @@ impl EditPredictionButton {
                                     )
                                     .into_any_element()
                             },
-                            move |_, cx| cx.open_url(&baymax_urls::account_url(cx)),
+                            move |_, cx| cx.open_url(&sim_urls::account_url(cx)),
                         )
                         .when(usage.over_limit(), |menu| -> ContextMenu {
                             menu.entry("Subscribe to increase your limit", None, |_window, cx| {
@@ -1197,7 +1197,7 @@ impl EditPredictionButton {
                                     action = "upsell_clicked",
                                     reason = "usage_limit",
                                 );
-                                cx.open_url(&baymax_urls::account_url(cx))
+                                cx.open_url(&sim_urls::account_url(cx))
                             })
                         })
                         .separator();
@@ -1210,10 +1210,10 @@ impl EditPredictionButton {
                                     .color(Color::Warning)
                                     .into_any_element()
                             },
-                            |_window, cx| cx.open_url(&baymax_urls::account_url(cx)),
+                            |_window, cx| cx.open_url(&sim_urls::account_url(cx)),
                         )
                         .entry(
-                            "Upgrade to Baymax Pro or contact us.",
+                            "Upgrade to Sim Pro or contact us.",
                             None,
                             |_window, cx| {
                                 telemetry::event!(
@@ -1221,7 +1221,7 @@ impl EditPredictionButton {
                                     action = "upsell_clicked",
                                     reason = "account_age",
                                 );
-                                cx.open_url(&baymax_urls::account_url(cx))
+                                cx.open_url(&sim_urls::account_url(cx))
                             },
                         )
                         .separator();
@@ -1235,14 +1235,14 @@ impl EditPredictionButton {
                                     .into_any_element()
                             },
                             |_window, cx| {
-                                cx.open_url(&baymax_urls::account_url(cx))
+                                cx.open_url(&sim_urls::account_url(cx))
                             },
                         )
                         .entry(
-                            "Check your payment status or contact us at billing-support@baymax.dev to continue using this feature.",
+                            "Check your payment status or contact us at billing-support@sim.dev to continue using this feature.",
                             None,
                             |_window, cx| {
-                                cx.open_url(&baymax_urls::account_url(cx))
+                                cx.open_url(&sim_urls::account_url(cx))
                             },
                         )
                         .separator();
@@ -1454,7 +1454,7 @@ pub fn set_completion_provider(fs: Arc<dyn Fs>, cx: &mut App, provider: EditPred
 pub fn get_available_providers(cx: &mut App) -> Vec<EditPredictionProvider> {
     let mut providers = Vec::new();
 
-    providers.push(EditPredictionProvider::Baymax);
+    providers.push(EditPredictionProvider::Sim);
 
     let app_state = workspace::AppState::global(cx);
     if copilot::GlobalCopilotAuth::try_get_or_init(app_state, cx)
@@ -1602,7 +1602,7 @@ fn render_zeta_tab_animation(cx: &App) -> impl IntoElement {
             8.,
         ))
         .child(tab_sequence(true))
-        .child(Icon::new(IconName::BaymaxPredict))
+        .child(Icon::new(IconName::SimPredict))
         .child(tab_sequence(false))
 }
 

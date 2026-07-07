@@ -191,7 +191,7 @@
 //!
 //! Assistive technology can dispatch actions to the UI. While many users of
 //! assistive technology use traditional input devices (e.g. a keyboard), some
-//! use more specialibaymax systems. For example, users with limited mobility may
+//! use more specialisim systems. For example, users with limited mobility may
 //! use voice control to interact with your app.
 //!
 //! When a user dispatches an action, it is dispatched *to a specific node*. It

@@ -1,7 +1,7 @@
 {
-  "name": "baymax-oidc-proxy",
+  "name": "sim-oidc-proxy",
   "version": "0.1.0",
-  "description": "OIDC proxy (Cloudflare Worker) for baymax authentication",
+  "description": "OIDC proxy (Cloudflare Worker) for sim authentication",
   "private": true,
   "main": "src/index.ts",
   "scripts": {

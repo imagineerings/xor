@@ -16,5 +16,5 @@ fn main() {
     }
     path.pop();
 
-    println!("cargo:rustc-env=BAYMAX_REPO_DIR={}", path.display());
+    println!("cargo:rustc-env=SIM_REPO_DIR={}", path.display());
 }

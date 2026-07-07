@@ -1,14 +1,14 @@
-This contains the code for Baymax's Vim emulation mode.
+This contains the code for Sim's Vim emulation mode.
 
-Vim mode in Baymax is supposed to primarily "do what you expect": it mostly tries to copy vim exactly, but will use Baymax-specific functionality when available to make things smoother. This means Baymax will never be 100% vim compatible, but should be 100% vim familiar!
+Vim mode in Sim is supposed to primarily "do what you expect": it mostly tries to copy vim exactly, but will use Sim-specific functionality when available to make things smoother. This means Sim will never be 100% vim compatible, but should be 100% vim familiar!
 
 The backlog is maintained in the `#vim` channel notes.
 
 ## Testing against Neovim
 
-If you are making a change to make Baymax's behavior more closely match vim/nvim, you can create a test using the `NeovimBackedTestContext`.
+If you are making a change to make Sim's behavior more closely match vim/nvim, you can create a test using the `NeovimBackedTestContext`.
 
-For example, the following test checks that Baymax and Neovim have the same behavior when running `*` in visual mode:
+For example, the following test checks that Sim and Neovim have the same behavior when running `*` in visual mode:
 
 ```rust
 #[gpui::test]
@@ -31,6 +31,6 @@ cargo test -p vim --features neovim test_visual_star_hash
 This will run your keystrokes against a headless neovim and cache the results in the test_data directory. Note that neovim must be installed and reachable on your $PATH in order to run the feature.
 
 
-## Testing baymax-only behavior
+## Testing sim-only behavior
 
-Baymax does more than vim/neovim in their default modes. The `VimTestContext` can be used instead. This lets you test integration with the language server and other parts of baymax's UI that don't have a NeoVim equivalent.
+Sim does more than vim/neovim in their default modes. The `VimTestContext` can be used instead. This lets you test integration with the language server and other parts of sim's UI that don't have a NeoVim equivalent.

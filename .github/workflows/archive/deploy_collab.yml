@@ -9,7 +9,7 @@ on:
     - collab-production
 jobs:
   style:
-    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'baymax-extensions')
+    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'sim-extensions')
     name: Check formatting and Clippy lints
     runs-on: namespace-profile-16x32-ubuntu-2204
     env:
@@ -100,10 +100,10 @@ jobs:
       run: |
         docker build -f Dockerfile-collab \
           --build-arg "GITHUB_SHA=$GITHUB_SHA" \
-          --tag "registry.digitalocean.com/baymax/collab:$GITHUB_SHA" \
+          --tag "registry.digitalocean.com/sim/collab:$GITHUB_SHA" \
           .
     - name: deploy_collab::publish::publish_docker_image
-      run: docker push "registry.digitalocean.com/baymax/collab:${GITHUB_SHA}"
+      run: docker push "registry.digitalocean.com/sim/collab:${GITHUB_SHA}"
     - name: deploy_collab::publish::prune_docker_system
       run: docker system prune --filter 'until=72h' -f
   deploy:
@@ -128,40 +128,40 @@ jobs:
       run: |
         set -eu
         if [[ $GITHUB_REF_NAME = "collab-production" ]]; then
-          export BAYMAX_KUBE_NAMESPACE=production
-          export BAYMAX_COLLAB_LOAD_BALANCER_SIZE_UNIT=10
-          export BAYMAX_API_LOAD_BALANCER_SIZE_UNIT=2
+          export SIM_KUBE_NAMESPACE=production
+          export SIM_COLLAB_LOAD_BALANCER_SIZE_UNIT=10
+          export SIM_API_LOAD_BALANCER_SIZE_UNIT=2
         elif [[ $GITHUB_REF_NAME = "collab-staging" ]]; then
-          export BAYMAX_KUBE_NAMESPACE=staging
-          export BAYMAX_COLLAB_LOAD_BALANCER_SIZE_UNIT=1
-          export BAYMAX_API_LOAD_BALANCER_SIZE_UNIT=1
+          export SIM_KUBE_NAMESPACE=staging
+          export SIM_COLLAB_LOAD_BALANCER_SIZE_UNIT=1
+          export SIM_API_LOAD_BALANCER_SIZE_UNIT=1
         else
           echo "cowardly refusing to deploy from an unknown branch"
           exit 1
         fi
 
-        echo "Deploying collab:$GITHUB_SHA to $BAYMAX_KUBE_NAMESPACE"
+        echo "Deploying collab:$GITHUB_SHA to $SIM_KUBE_NAMESPACE"
 
         source script/lib/deploy-helpers.sh
-        export_vars_for_environment "$BAYMAX_KUBE_NAMESPACE"
+        export_vars_for_environment "$SIM_KUBE_NAMESPACE"
 
-        BAYMAX_DO_CERTIFICATE_ID="$(doctl compute certificate list --format ID --no-header)"
-        export BAYMAX_DO_CERTIFICATE_ID
-        export BAYMAX_IMAGE_ID="registry.digitalocean.com/baymax/collab:${GITHUB_SHA}"
+        SIM_DO_CERTIFICATE_ID="$(doctl compute certificate list --format ID --no-header)"
+        export SIM_DO_CERTIFICATE_ID
+        export SIM_IMAGE_ID="registry.digitalocean.com/sim/collab:${GITHUB_SHA}"
 
-        export BAYMAX_SERVICE_NAME=collab
-        export BAYMAX_LOAD_BALANCER_SIZE_UNIT=$BAYMAX_COLLAB_LOAD_BALANCER_SIZE_UNIT
+        export SIM_SERVICE_NAME=collab
+        export SIM_LOAD_BALANCER_SIZE_UNIT=$SIM_COLLAB_LOAD_BALANCER_SIZE_UNIT
         export DATABASE_MAX_CONNECTIONS=850
         envsubst < crates/collab/k8s/collab.template.yml | kubectl apply -f -
-        kubectl -n "$BAYMAX_KUBE_NAMESPACE" rollout status "deployment/$BAYMAX_SERVICE_NAME" --watch
-        echo "deployed ${BAYMAX_SERVICE_NAME} to ${BAYMAX_KUBE_NAMESPACE}"
+        kubectl -n "$SIM_KUBE_NAMESPACE" rollout status "deployment/$SIM_SERVICE_NAME" --watch
+        echo "deployed ${SIM_SERVICE_NAME} to ${SIM_KUBE_NAMESPACE}"
 
-        export BAYMAX_SERVICE_NAME=api
-        export BAYMAX_LOAD_BALANCER_SIZE_UNIT=$BAYMAX_API_LOAD_BALANCER_SIZE_UNIT
+        export SIM_SERVICE_NAME=api
+        export SIM_LOAD_BALANCER_SIZE_UNIT=$SIM_API_LOAD_BALANCER_SIZE_UNIT
         export DATABASE_MAX_CONNECTIONS=60
         envsubst < crates/collab/k8s/collab.template.yml | kubectl apply -f -
-        kubectl -n "$BAYMAX_KUBE_NAMESPACE" rollout status "deployment/$BAYMAX_SERVICE_NAME" --watch
-        echo "deployed ${BAYMAX_SERVICE_NAME} to ${BAYMAX_KUBE_NAMESPACE}"
+        kubectl -n "$SIM_KUBE_NAMESPACE" rollout status "deployment/$SIM_SERVICE_NAME" --watch
+        echo "deployed ${SIM_SERVICE_NAME} to ${SIM_KUBE_NAMESPACE}"
 defaults:
   run:
     shell: bash -euxo pipefail {0}

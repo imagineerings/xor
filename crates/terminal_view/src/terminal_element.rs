@@ -567,7 +567,7 @@ impl TerminalElement {
     /// and borders where color matching with adjacent backgrounds is critical.
     /// Regular icons (git, folders, etc.) are excluded as they need to remain readable.
     ///
-    /// Fixes https://github.com/simtropolis/baymax/issues/34234
+    /// Fixes https://github.com/simtropolis/sim/issues/34234
     fn is_decorative_character(ch: char) -> bool {
         matches!(
             ch as u32,
@@ -1022,7 +1022,7 @@ impl Element for TerminalElement {
                     size.width -= gutter;
                     let available_height = size.height;
 
-                    // https://github.com/simtropolis/baymax/issues/2750
+                    // https://github.com/simtropolis/sim/issues/2750
                     // if the terminal is one column wide, rendering 🦀
                     // causes alacritty to misbehave.
                     if size.width < cell_width * 2.0 {
@@ -1839,7 +1839,7 @@ mod tests {
         let problematic_char = '◗'; // U+25D7
         assert!(
             TerminalElement::is_decorative_character(problematic_char),
-            "Character ◗ (U+25D7) should be recognibaymax as decorative"
+            "Character ◗ (U+25D7) should be recognisim as decorative"
         );
 
         // Verify some other commonly used decorative characters

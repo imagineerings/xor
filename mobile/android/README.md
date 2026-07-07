@@ -1,10 +1,10 @@
-# Baymax Android
+# Sim Android
 
-Android client for the Baymax mobile HTTP/SSE protocol, built with Jetpack Compose.
+Android client for the Sim mobile HTTP/SSE protocol, built with Jetpack Compose.
 
 ## Features
 
-- **Chat Interface**: Send messages and receive streaming responses from the Baymax API
+- **Chat Interface**: Send messages and receive streaming responses from the Sim API
 - **Session Management**: View, create, and resume chat sessions
 - **Settings**: Configure server URL and secret key
 - **Trial Mode**: Connect to the demo server by default
@@ -22,12 +22,12 @@ The app follows a clean architecture pattern with:
 ## Project Structure
 
 ```
-app/src/main/java/com/simtropolis/baymax/
-├── BaymaxApplication.kt      # Application class with DI
+app/src/main/java/com/simtropolis/sim/
+├── SimApplication.kt      # Application class with DI
 ├── MainActivity.kt          # Entry point with navigation
 ├── data/
 │   ├── api/
-│   │   ├── BaymaxApiService.kt    # API client with SSE support
+│   │   ├── SimApiService.kt    # API client with SSE support
 │   │   └── SettingsRepository.kt # Preferences management
 │   └── model/
 │       ├── Message.kt            # Message data models
@@ -70,7 +70,7 @@ To create an APK for direct download from GitHub:
    - `channel=artifact`
    - `publish=false`
    - the desired `version` and `build_number`
-3. Download the `baymax-android-apk-<version>-<build>-<sha>` artifact from the completed workflow run.
+3. Download the `sim-android-apk-<version>-<build>-<sha>` artifact from the completed workflow run.
 
 This APK is built with Android's debug signing key so it can be installed for testing without Play Console signing secrets. Play/internal distribution still uses the release AAB path.
 
@@ -107,7 +107,7 @@ For Play internal publishing, the manual `mobile_release` workflow requires `AND
 
 ## API Compatibility
 
-This app is designed to work with the same baymaxed API as the iOS app:
+This app is designed to work with the same simed API as the iOS app:
 
 - `/status` - Connection test
 - `/sessions` - List sessions  

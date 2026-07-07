@@ -84,7 +84,7 @@ fn render_header() -> impl IntoElement {
         .child(
             Label::new(
                 "Securely connect your mobile device to this development environment via SSH tunneling. \
-                 Scan the QR code from the Baymax mobile app to establish a connection.",
+                 Scan the QR code from the Sim mobile app to establish a connection.",
             )
             .size(LabelSize::Small)
             .color(Color::Muted),
@@ -206,7 +206,7 @@ fn render_running_state(
         Some(
             v_flex()
                 .gap_2()
-                .child(Label::new("Scan this QR code with the Baymax mobile app:"))
+                .child(Label::new("Scan this QR code with the Sim mobile app:"))
                 .child(img(image).w(px(220.)).h(px(220.)).rounded_md())
                 .child(
                     Button::new("copy-connection", "Copy Connection String")
@@ -388,7 +388,7 @@ mod tests {
             }));
             let state = GlobalTunnelState {
                 manager,
-                cached_connection_string: "baymax-tunnel://127.0.0.1:9999?token=tok-test"
+                cached_connection_string: "sim-tunnel://127.0.0.1:9999?token=tok-test"
                     .to_string(),
                 // QR image left None to keep test dependencies minimal;
                 // the render function handles this gracefully (skips QR section).

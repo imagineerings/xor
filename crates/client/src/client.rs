@@ -1,7 +1,7 @@
 #[cfg(any(test, feature = "test-support"))]
 pub mod test;
 
-pub mod baymax_urls;
+pub mod sim_urls;
 mod llm_token;
 mod proxy;
 pub mod telemetry;
@@ -60,31 +60,31 @@ pub use rpc::*;
 pub use telemetry_events::Event;
 pub use user::*;
 
-static BAYMAX_SERVER_URL: LazyLock<Option<String>> =
-    LazyLock::new(|| std::env::var("BAYMAX_SERVER_URL").ok());
-static BAYMAX_RPC_URL: LazyLock<Option<String>> =
-    LazyLock::new(|| std::env::var("BAYMAX_RPC_URL").ok());
+static SIM_SERVER_URL: LazyLock<Option<String>> =
+    LazyLock::new(|| std::env::var("SIM_SERVER_URL").ok());
+static SIM_RPC_URL: LazyLock<Option<String>> =
+    LazyLock::new(|| std::env::var("SIM_RPC_URL").ok());
 
 pub static IMPERSONATE_LOGIN: LazyLock<Option<String>> = LazyLock::new(|| {
-    std::env::var("BAYMAX_IMPERSONATE")
+    std::env::var("SIM_IMPERSONATE")
         .ok()
         .and_then(|s| if s.is_empty() { None } else { Some(s) })
 });
 
 pub static USE_WEB_LOGIN: LazyLock<bool> =
-    LazyLock::new(|| std::env::var("BAYMAX_WEB_LOGIN").is_ok());
+    LazyLock::new(|| std::env::var("SIM_WEB_LOGIN").is_ok());
 
 pub static ADMIN_API_TOKEN: LazyLock<Option<String>> = LazyLock::new(|| {
-    std::env::var("BAYMAX_ADMIN_API_TOKEN")
+    std::env::var("SIM_ADMIN_API_TOKEN")
         .ok()
         .and_then(|s| if s.is_empty() { None } else { Some(s) })
 });
 
-pub static BAYMAX_APP_PATH: LazyLock<Option<PathBuf>> =
-    LazyLock::new(|| std::env::var("BAYMAX_APP_PATH").ok().map(PathBuf::from));
+pub static SIM_APP_PATH: LazyLock<Option<PathBuf>> =
+    LazyLock::new(|| std::env::var("SIM_APP_PATH").ok().map(PathBuf::from));
 
-pub static BAYMAX_ALWAYS_ACTIVE: LazyLock<bool> =
-    LazyLock::new(|| std::env::var("BAYMAX_ALWAYS_ACTIVE").is_ok_and(|e| !e.is_empty()));
+pub static SIM_ALWAYS_ACTIVE: LazyLock<bool> =
+    LazyLock::new(|| std::env::var("SIM_ALWAYS_ACTIVE").is_ok_and(|e| !e.is_empty()));
 
 pub const INITIAL_RECONNECTION_DELAY: Duration = Duration::from_millis(500);
 pub const MAX_RECONNECTION_DELAY: Duration = Duration::from_secs(30);
@@ -93,9 +93,9 @@ pub const CONNECTION_TIMEOUT: Duration = Duration::from_secs(20);
 actions!(
     client,
     [
-        /// Signs in to Baymax account.
+        /// Signs in to Sim account.
         SignIn,
-        /// Signs out of Baymax account.
+        /// Signs out of Sim account.
         SignOut,
         /// Reconnects to the collaboration server.
         Reconnect
@@ -108,7 +108,7 @@ pub struct ClientSettings {
     /// Overrides the key used to store credentials in the system keychain.
     /// Defaults to `server_url` when unset.
     ///
-    /// Useful when running multiple Baymax instances side by side without them
+    /// Useful when running multiple Sim instances side by side without them
     /// overwriting each other's keychain entries.
     ///
     /// Note: changing this after signing in will require signing in again, as
@@ -118,7 +118,7 @@ pub struct ClientSettings {
 
 impl Settings for ClientSettings {
     fn from_settings(content: &settings::SettingsContent) -> Self {
-        if let Some(server_url) = &*BAYMAX_SERVER_URL {
+        if let Some(server_url) = &*SIM_SERVER_URL {
             return Self {
                 server_url: server_url.clone(),
                 credentials_url: content.credentials_url.clone(),
@@ -361,7 +361,7 @@ pub struct ClientCredentialsProvider {
 impl ClientCredentialsProvider {
     pub fn new(cx: &App) -> Self {
         Self {
-            provider: baymax_credentials_provider::global(cx),
+            provider: sim_credentials_provider::global(cx),
         }
     }
 
@@ -1040,7 +1040,7 @@ impl Client {
 
     /// Performs a sign-in and also (optionally) connects to Collab.
     ///
-    /// Only Baymax staff automatically connect to Collab.
+    /// Only Sim staff automatically connect to Collab.
     pub async fn sign_in_with_optional_connect(
         self: &Arc<Self>,
         try_provider: bool,
@@ -1296,7 +1296,7 @@ impl Client {
                 return Ok(url);
             }
 
-            if let Some(url) = &*BAYMAX_RPC_URL {
+            if let Some(url) = &*SIM_RPC_URL {
                 return Url::parse(url).context("invalid rpc url");
             }
 
@@ -1393,22 +1393,22 @@ impl Client {
                 HeaderValue::from_str(&credentials.authorization_header())?,
             );
             request_headers.insert(
-                "x-baymax-protocol-version",
+                "x-sim-protocol-version",
                 HeaderValue::from_str(&rpc::PROTOCOL_VERSION.to_string())?,
             );
-            request_headers.insert("x-baymax-app-version", HeaderValue::from_str(&app_version)?);
+            request_headers.insert("x-sim-app-version", HeaderValue::from_str(&app_version)?);
             request_headers.insert(
-                "x-baymax-release-channel",
+                "x-sim-release-channel",
                 HeaderValue::from_str(release_channel.map(|r| r.dev_name()).unwrap_or("unknown"))?,
             );
             if let Some(user_agent) = user_agent {
                 request_headers.insert(http::header::USER_AGENT, user_agent);
             }
             if let Some(system_id) = system_id {
-                request_headers.insert("x-baymax-system-id", HeaderValue::from_str(&system_id)?);
+                request_headers.insert("x-sim-system-id", HeaderValue::from_str(&system_id)?);
             }
             if let Some(metrics_id) = metrics_id {
-                request_headers.insert("x-baymax-metrics-id", HeaderValue::from_str(&metrics_id)?);
+                request_headers.insert("x-sim-metrics-id", HeaderValue::from_str(&metrics_id)?);
             }
 
             let (stream, _) = async_tungstenite::tokio::client_async_tls_with_connector_and_config(
@@ -1447,7 +1447,7 @@ impl Client {
                 .clone()
                 .spawn(async move {
                     // Generate a pair of asymmetric encryption keys. The public key will be used by the
-                    // baymax server to encrypt the user's access token, so that it can'be intercepted by
+                    // sim server to encrypt the user's access token, so that it can'be intercepted by
                     // any other app running on the user's device.
                     let (public_key, private_key) =
                         rpc::auth::keypair().context("failed to generate keypair for auth")?;
@@ -1466,7 +1466,7 @@ impl Client {
                         }
                     }
 
-                    // Start an HTTP server to receive the redirect from Baymax's sign-in page.
+                    // Start an HTTP server to receive the redirect from Sim's sign-in page.
                     let server = tiny_http::Server::http("127.0.0.1:0")
                         .map_err(|e| anyhow!(e).context("failed to bind callback port"))?;
                     let port = server
@@ -1482,8 +1482,8 @@ impl Client {
                         system_id: Option<Arc<str>>,
                     }
 
-                    // Open the Baymax sign-in page in the user's browser, with query parameters that indicate
-                    // that the user is signing in from a Baymax app running on the same device.
+                    // Open the Sim sign-in page in the user's browser, with query parameters that indicate
+                    // that the user is signing in from a Sim app running on the same device.
                     let url = http.build_url(&format!(
                         "/native_app_signin?{}",
                         serde_urlencoded::to_string(&NativeAppSignInQueryParams {
@@ -1577,7 +1577,7 @@ impl Client {
 
         let url = self
             .http
-            .build_baymax_cloud_url("/internal/users/impersonate")?;
+            .build_sim_cloud_url("/internal/users/impersonate")?;
         let request = Request::post(url.as_str())
             .header("Content-Type", "application/json")
             .header("Authorization", format!("Bearer {api_token}"))
@@ -1625,7 +1625,7 @@ impl Client {
         }
     }
 
-    /// Sends an authenticated request to the Baymax LLM service, retrying once
+    /// Sends an authenticated request to the Sim LLM service, retrying once
     /// with a refreshed token if the server signals that the cached LLM
     /// token is expired or otherwise rejected. Returns the raw response so
     /// callers can inspect headers and stream the body.
@@ -1938,33 +1938,33 @@ impl ProtoClient for Client {
     }
 }
 
-/// prefix for the baymax:// url scheme
-pub const BAYMAX_URL_SCHEME: &str = "baymax";
+/// prefix for the sim:// url scheme
+pub const SIM_URL_SCHEME: &str = "sim";
 
-/// A parsed Baymax link that can be handled internally by the application.
+/// A parsed Sim link that can be handled internally by the application.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum BaymaxLink {
-    /// Join a channel: `baymax.dev/channel/channel-name-123` or `baymax://channel/channel-name-123`
+pub enum SimLink {
+    /// Join a channel: `sim.dev/channel/channel-name-123` or `sim://channel/channel-name-123`
     Channel { channel_id: u64 },
-    /// Open channel notes: `baymax.dev/channel/channel-name-123/notes` or with heading `notes#heading`
+    /// Open channel notes: `sim.dev/channel/channel-name-123/notes` or with heading `notes#heading`
     ChannelNotes {
         channel_id: u64,
         heading: Option<String>,
     },
 }
 
-/// Parses the given link into a Baymax link.
+/// Parses the given link into a Sim link.
 ///
-/// Returns a [`Some`] containing the parsed link if the link is a recognibaymax Baymax link
+/// Returns a [`Some`] containing the parsed link if the link is a recognisim Sim link
 /// that should be handled internally by the application.
 /// Returns [`None`] for links that should be opened in the browser.
-pub fn parse_baymax_link(link: &str, cx: &App) -> Option<BaymaxLink> {
+pub fn parse_sim_link(link: &str, cx: &App) -> Option<SimLink> {
     let server_url = &ClientSettings::get_global(cx).server_url;
     let path = link
         .strip_prefix(server_url)
         .and_then(|result| result.strip_prefix('/'))
         .or_else(|| {
-            link.strip_prefix(BAYMAX_URL_SCHEME)
+            link.strip_prefix(SIM_URL_SCHEME)
                 .and_then(|result| result.strip_prefix("://"))
         })?;
 
@@ -1979,18 +1979,18 @@ pub fn parse_baymax_link(link: &str, cx: &App) -> Option<BaymaxLink> {
     let channel_id = id_str.parse::<u64>().ok()?;
 
     let Some(next) = parts.next() else {
-        return Some(BaymaxLink::Channel { channel_id });
+        return Some(SimLink::Channel { channel_id });
     };
 
     if let Some(heading) = next.strip_prefix("notes#") {
-        return Some(BaymaxLink::ChannelNotes {
+        return Some(SimLink::ChannelNotes {
             channel_id,
             heading: Some(heading.to_string()),
         });
     }
 
     if next == "notes" {
-        return Some(BaymaxLink::ChannelNotes {
+        return Some(SimLink::ChannelNotes {
             channel_id,
             heading: None,
         });

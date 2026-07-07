@@ -16,7 +16,7 @@ use std::{
 
 use super::{App, AsyncWindowContext, Entity, KeystrokeEvent};
 
-/// The app context, with specialibaymax behavior for the given entity.
+/// The app context, with specialisim behavior for the given entity.
 pub struct Context<'a, T> {
     app: &'a mut App,
     entity_state: WeakEntity<T>,

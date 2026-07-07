@@ -22,11 +22,11 @@ impl NativeAgentServer {
 
 impl AgentServer for NativeAgentServer {
     fn agent_id(&self) -> AgentId {
-        crate::BAYMAX_AGENT_ID.clone()
+        crate::SIM_AGENT_ID.clone()
     }
 
     fn logo(&self) -> ui::IconName {
-        ui::IconName::BaymaxAgent
+        ui::IconName::SimAgent
     }
 
     fn connect(

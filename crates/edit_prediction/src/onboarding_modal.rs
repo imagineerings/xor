@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{BaymaxPredictUpsell, EditPredictionStore};
+use crate::{SimPredictUpsell, EditPredictionStore};
 use ai_onboarding::EditPredictionOnboarding;
 use client::{Client, UserStore};
 use db::kvp::Dismissable;
@@ -24,8 +24,8 @@ macro_rules! onboarding_event {
     };
 }
 
-/// Introduces user to Baymax's Edit Prediction feature
-pub struct BaymaxPredictModal {
+/// Introduces user to Sim's Edit Prediction feature
+pub struct SimPredictModal {
     onboarding: Entity<EditPredictionOnboarding>,
     focus_handle: FocusHandle,
 }
@@ -42,7 +42,7 @@ pub(crate) fn set_edit_prediction_provider(provider: EditPredictionProvider, cx:
     });
 }
 
-impl BaymaxPredictModal {
+impl SimPredictModal {
     pub fn toggle(
         workspace: &mut Workspace,
         user_store: Entity<UserStore>,
@@ -66,15 +66,15 @@ impl BaymaxPredictModal {
                         Arc::new({
                             let this = weak_entity.clone();
                             move |_window, cx| {
-                                BaymaxPredictUpsell::set_dismissed(true, cx);
-                                set_edit_prediction_provider(EditPredictionProvider::Baymax, cx);
+                                SimPredictUpsell::set_dismissed(true, cx);
+                                set_edit_prediction_provider(EditPredictionProvider::Sim, cx);
                                 this.update(cx, |_, cx| cx.emit(DismissEvent)).ok();
                             }
                         }),
                         Arc::new({
                             let this = weak_entity.clone();
                             move |window, cx| {
-                                BaymaxPredictUpsell::set_dismissed(true, cx);
+                                SimPredictUpsell::set_dismissed(true, cx);
                                 set_edit_prediction_provider(EditPredictionProvider::Copilot, cx);
                                 this.update(cx, |_, cx| cx.emit(DismissEvent)).ok();
                                 if let Some(copilot) = copilot.clone() {
@@ -91,31 +91,31 @@ impl BaymaxPredictModal {
     }
 
     fn cancel(&mut self, _: &menu::Cancel, _: &mut Window, cx: &mut Context<Self>) {
-        BaymaxPredictUpsell::set_dismissed(true, cx);
+        SimPredictUpsell::set_dismissed(true, cx);
         cx.emit(DismissEvent);
     }
 }
 
-impl EventEmitter<DismissEvent> for BaymaxPredictModal {}
+impl EventEmitter<DismissEvent> for SimPredictModal {}
 
-impl Focusable for BaymaxPredictModal {
+impl Focusable for SimPredictModal {
     fn focus_handle(&self, _cx: &App) -> FocusHandle {
         self.focus_handle.clone()
     }
 }
 
-impl ModalView for BaymaxPredictModal {
+impl ModalView for SimPredictModal {
     fn on_before_dismiss(
         &mut self,
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) -> workspace::DismissDecision {
-        BaymaxPredictUpsell::set_dismissed(true, cx);
+        SimPredictUpsell::set_dismissed(true, cx);
         workspace::DismissDecision::Dismiss(true)
     }
 }
 
-impl Render for BaymaxPredictModal {
+impl Render for SimPredictModal {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let window_height = window.viewport_size().height;
         let max_height = window_height - px(200.);
@@ -123,7 +123,7 @@ impl Render for BaymaxPredictModal {
 
         v_flex()
             .id("edit-prediction-onboarding")
-            .key_context("BaymaxPredictModal")
+            .key_context("SimPredictModal")
             .relative()
             .w(px(550.))
             .h_full()

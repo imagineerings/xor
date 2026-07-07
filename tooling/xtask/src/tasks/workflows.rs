@@ -84,10 +84,10 @@ struct WorkflowFile {
     r#type: WorkflowType,
 }
 
-const ARCHIVED_BAYMAX_WORKFLOW_FILENAMES: &[&str] = &[
+const ARCHIVED_SIM_WORKFLOW_FILENAMES: &[&str] = &[
     "after_release.yml",
     "autofix_pr.yml",
-    "bump_baymax_version.yml",
+    "bump_sim_version.yml",
     "bump_patch_version.yml",
     "cherry_pick.yml",
     "compliance_check.yml",
@@ -108,10 +108,10 @@ const ARCHIVED_BAYMAX_WORKFLOW_FILENAMES: &[&str] = &[
 ];
 
 impl WorkflowFile {
-    fn baymax(f: fn() -> Workflow) -> WorkflowFile {
+    fn sim(f: fn() -> Workflow) -> WorkflowFile {
         WorkflowFile {
             source: WorkflowSource::Contextless(f),
-            r#type: WorkflowType::Baymax,
+            r#type: WorkflowType::Sim,
         }
     }
 
@@ -169,13 +169,13 @@ impl WorkflowFile {
 
 #[derive(PartialEq, Eq, strum::EnumIter)]
 pub enum WorkflowType {
-    /// Workflows living in the Baymax repository
-    Baymax,
-    /// Workflows living in the `baymax-extensions/workflows` repository that are
+    /// Workflows living in the Sim repository
+    Sim,
+    /// Workflows living in the `sim-extensions/workflows` repository that are
     /// required workflows for PRs to the extension organization
     ExtensionCi,
     /// Workflows living in each of the extensions to perform checks and version
-    /// bumps until a better, more centralibaymax system for that is in place.
+    /// bumps until a better, more centralisim system for that is in place.
     ExtensionsShared,
 }
 
@@ -190,22 +190,22 @@ impl WorkflowType {
             ),
             preamble = Self::PREAMBLE,
             workflow_name = workflow_name,
-            external_disclaimer = (*self != WorkflowType::Baymax)
-                .then_some(" within the Baymax repository.")
+            external_disclaimer = (*self != WorkflowType::Sim)
+                .then_some(" within the Sim repository.")
                 .unwrap_or_default(),
         )
     }
 
     pub fn folder_path(&self) -> PathBuf {
         match self {
-            WorkflowType::Baymax => PathBuf::from(".github/workflows"),
+            WorkflowType::Sim => PathBuf::from(".github/workflows"),
             WorkflowType::ExtensionCi => PathBuf::from("extensions/workflows"),
             WorkflowType::ExtensionsShared => PathBuf::from("extensions/workflows/shared"),
         }
     }
 
     fn should_skip_archived_workflow(&self, filename: &str) -> bool {
-        *self == WorkflowType::Baymax && ARCHIVED_BAYMAX_WORKFLOW_FILENAMES.contains(&filename)
+        *self == WorkflowType::Sim && ARCHIVED_SIM_WORKFLOW_FILENAMES.contains(&filename)
     }
 
     fn remove_generated_workflows() -> Result<()> {
@@ -234,10 +234,10 @@ mod tests {
     use super::WorkflowType;
 
     #[test]
-    fn skips_archived_baymax_workflows() {
-        assert!(WorkflowType::Baymax.should_skip_archived_workflow("run_bundling.yml"));
-        assert!(WorkflowType::Baymax.should_skip_archived_workflow("release.yml"));
-        assert!(WorkflowType::Baymax.should_skip_archived_workflow("run_tests.yml"));
+    fn skips_archived_sim_workflows() {
+        assert!(WorkflowType::Sim.should_skip_archived_workflow("run_bundling.yml"));
+        assert!(WorkflowType::Sim.should_skip_archived_workflow("release.yml"));
+        assert!(WorkflowType::Sim.should_skip_archived_workflow("run_tests.yml"));
     }
 
     #[test]
@@ -247,13 +247,13 @@ mod tests {
     }
 
     #[test]
-    fn does_not_skip_unarchived_baymax_workflows() {
-        assert!(!WorkflowType::Baymax.should_skip_archived_workflow("mobile_android_ci.yml"));
+    fn does_not_skip_unarchived_sim_workflows() {
+        assert!(!WorkflowType::Sim.should_skip_archived_workflow("mobile_android_ci.yml"));
     }
 }
 
 pub fn run_workflows(args: GenerateWorkflowArgs) -> Result<()> {
-    if !Path::new("crates/baymax/").is_dir() {
+    if !Path::new("crates/sim/").is_dir() {
         anyhow::bail!("xtask workflows must be ran from the project root");
     }
 

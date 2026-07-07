@@ -3,7 +3,7 @@ use acp_thread::UserMessageId;
 use agent_client_protocol::schema as acp;
 use agent_settings::AgentProfileId;
 use anyhow::{Result, anyhow};
-use baymax_env_vars::BAYMAX_STATELESS;
+use sim_env_vars::SIM_STATELESS;
 use chrono::{DateTime, Utc};
 use collections::{HashMap, IndexMap};
 use futures::{FutureExt, future::Shared};
@@ -23,7 +23,7 @@ use util::path_list::PathList;
 
 pub type DbMessage = crate::Message;
 pub type DbSummary = crate::legacy_thread::DetailedSummaryState;
-pub type DbLanguageModel = crate::legacy_thread::SerialibaymaxLanguageModel;
+pub type DbLanguageModel = crate::legacy_thread::SerialisimLanguageModel;
 
 #[derive(Debug, Clone)]
 pub struct DbThreadMetadata {
@@ -80,13 +80,13 @@ pub struct DbThread {
     #[serde(default)]
     pub draft_prompt: Option<Vec<acp::ContentBlock>>,
     #[serde(default)]
-    pub ui_scroll_position: Option<SerialibaymaxScrollPosition>,
+    pub ui_scroll_position: Option<SerialisimScrollPosition>,
     #[serde(default)]
     pub sandboxed_terminal_temp_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct SerialibaymaxScrollPosition {
+pub struct SerialisimScrollPosition {
     pub item_ix: usize,
     pub offset_in_item: f32,
 }
@@ -162,16 +162,16 @@ impl DbThread {
             Some(serde_json::Value::String(version)) => match version.as_str() {
                 Self::VERSION => Ok(serde_json::from_value(saved_thread_json)?),
                 _ => Self::upgrade_from_agent_1(
-                    crate::legacy_thread::SerialibaymaxThread::from_json(json)?,
+                    crate::legacy_thread::SerialisimThread::from_json(json)?,
                 ),
             },
-            _ => Self::upgrade_from_agent_1(crate::legacy_thread::SerialibaymaxThread::from_json(
+            _ => Self::upgrade_from_agent_1(crate::legacy_thread::SerialisimThread::from_json(
                 json,
             )?),
         }
     }
 
-    fn upgrade_from_agent_1(thread: crate::legacy_thread::SerialibaymaxThread) -> Result<Self> {
+    fn upgrade_from_agent_1(thread: crate::legacy_thread::SerialisimThread) -> Result<Self> {
         let mut messages = Vec::new();
         let mut request_token_usage = HashMap::default();
 
@@ -184,17 +184,17 @@ impl DbThread {
                     // Convert segments to content
                     for segment in msg.segments {
                         match segment {
-                            crate::legacy_thread::SerialibaymaxMessageSegment::Text { text } => {
+                            crate::legacy_thread::SerialisimMessageSegment::Text { text } => {
                                 content.push(UserMessageContent::Text(text));
                             }
-                            crate::legacy_thread::SerialibaymaxMessageSegment::Thinking {
+                            crate::legacy_thread::SerialisimMessageSegment::Thinking {
                                 text,
                                 ..
                             } => {
                                 // User messages don't have thinking segments, but handle gracefully
                                 content.push(UserMessageContent::Text(text));
                             }
-                            crate::legacy_thread::SerialibaymaxMessageSegment::RedactedThinking {
+                            crate::legacy_thread::SerialisimMessageSegment::RedactedThinking {
                                 ..
                             } => {
                                 // User messages don't have redacted thinking, skip.
@@ -222,16 +222,16 @@ impl DbThread {
                     // Convert segments to content
                     for segment in msg.segments {
                         match segment {
-                            crate::legacy_thread::SerialibaymaxMessageSegment::Text { text } => {
+                            crate::legacy_thread::SerialisimMessageSegment::Text { text } => {
                                 content.push(AgentMessageContent::Text(text));
                             }
-                            crate::legacy_thread::SerialibaymaxMessageSegment::Thinking {
+                            crate::legacy_thread::SerialisimMessageSegment::Thinking {
                                 text,
                                 signature,
                             } => {
                                 content.push(AgentMessageContent::Thinking { text, signature });
                             }
-                            crate::legacy_thread::SerialibaymaxMessageSegment::RedactedThinking {
+                            crate::legacy_thread::SerialisimMessageSegment::RedactedThinking {
                                 data,
                             } => {
                                 content.push(AgentMessageContent::RedactedThinking(data));
@@ -383,7 +383,7 @@ impl ThreadsDatabase {
     }
 
     pub fn new(executor: BackgroundExecutor) -> Result<Self> {
-        let connection = if *BAYMAX_STATELESS {
+        let connection = if *SIM_STATELESS {
             Connection::open_memory(Some("THREAD_FALLBACK_DB"))
         } else if cfg!(any(feature = "test-support", test)) {
             // rust stores the name of the test on the current thread.
@@ -457,7 +457,7 @@ impl ThreadsDatabase {
         const COMPRESSION_LEVEL: i32 = 3;
 
         #[derive(Serialize)]
-        struct SerialibaymaxThread {
+        struct SerialisimThread {
             #[serde(flatten)]
             thread: DbThread,
             version: &'static str,
@@ -469,17 +469,17 @@ impl ThreadsDatabase {
             .subagent_context
             .as_ref()
             .map(|ctx| ctx.parent_thread_id.0.clone());
-        let serialibaymax_folder_paths = folder_paths.serialize();
+        let serialisim_folder_paths = folder_paths.serialize();
         let (folder_paths_str, folder_paths_order_str): (Option<String>, Option<String>) =
             if folder_paths.is_empty() {
                 (None, None)
             } else {
                 (
-                    Some(serialibaymax_folder_paths.paths),
-                    Some(serialibaymax_folder_paths.order),
+                    Some(serialisim_folder_paths.paths),
+                    Some(serialisim_folder_paths.order),
                 )
             };
-        let json_data = serde_json::to_string(&SerialibaymaxThread {
+        let json_data = serde_json::to_string(&SerialisimThread {
             thread,
             version: DbThread::VERSION,
         })?;
@@ -540,7 +540,7 @@ impl ThreadsDatabase {
             for (id, parent_id, folder_paths, folder_paths_order, summary, updated_at, created_at) in rows {
                 let folder_paths = folder_paths
                     .map(|paths| {
-                        PathList::deserialize(&util::path_list::SerialibaymaxPathList {
+                        PathList::deserialize(&util::path_list::SerialisimPathList {
                             paths,
                             order: folder_paths_order.unwrap_or_default(),
                         })
@@ -894,7 +894,7 @@ mod tests {
         let database = ThreadsDatabase::new(cx.executor()).unwrap();
         let thread_id = session_id("sandbox-temp-dir-thread");
         let temp_dir = tempfile::Builder::new()
-            .prefix("baymax-agent-terminal-test-")
+            .prefix("sim-agent-terminal-test-")
             .tempdir()
             .unwrap()
             .keep();
@@ -923,7 +923,7 @@ mod tests {
         let database = ThreadsDatabase::new(cx.executor()).unwrap();
         let thread_id = session_id("sandbox-temp-dir-delete-thread");
         let temp_dir = tempfile::Builder::new()
-            .prefix("baymax-agent-terminal-test-")
+            .prefix("sim-agent-terminal-test-")
             .tempdir()
             .unwrap()
             .keep();
@@ -1073,7 +1073,7 @@ mod tests {
             "Thread With Scroll",
             Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap(),
         );
-        thread.ui_scroll_position = Some(SerialibaymaxScrollPosition {
+        thread.ui_scroll_position = Some(SerialisimScrollPosition {
             item_ix: 42,
             offset_in_item: 13.5,
         });

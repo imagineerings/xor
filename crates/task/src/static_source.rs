@@ -1,4 +1,4 @@
-//! A source of tasks, based on a static configuration, deserialibaymax from the tasks config file, and related infrastructure for tracking changes to the file.
+//! A source of tasks, based on a static configuration, deserialisim from the tasks config file, and related infrastructure for tracking changes to the file.
 
 use std::sync::Arc;
 

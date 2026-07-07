@@ -1,6 +1,6 @@
 use agent::ThreadStore;
 use agent_settings::AgentSettings;
-use baymax_actions::{
+use sim_actions::{
     agent::ToggleModelSelector,
     editor::{MoveDown, MoveUp},
 };
@@ -399,7 +399,7 @@ impl<T: 'static> PromptEditor<T> {
         };
 
         let agent_panel_keybinding =
-            ui::text_for_action(&baymax_actions::assistant::ToggleFocus, window, cx)
+            ui::text_for_action(&sim_actions::assistant::ToggleFocus, window, cx)
                 .map(|keybinding| format!("{keybinding} to chat"))
                 .unwrap_or_default();
 

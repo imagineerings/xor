@@ -266,7 +266,7 @@ pub trait AgentSessionSetTitle {
 }
 
 pub trait AgentTelemetry {
-    /// A representation of the current thread state that can be serialibaymax for
+    /// A representation of the current thread state that can be serialisim for
     /// storage with telemetry events.
     fn thread_data(
         &self,
@@ -479,7 +479,7 @@ pub trait AgentModelSelector: 'static {
 /// Icon for a model in the model selector.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AgentModelIcon {
-    /// A built-in icon from Baymax's icon set.
+    /// A built-in icon from Sim's icon set.
     Named(IconName),
     /// Path to a custom SVG icon file.
     Path(SharedString),
@@ -1061,7 +1061,7 @@ mod test_support {
                     id: AgentModelId::new("visual-test-model"),
                     name: "Visual Test Model".into(),
                     description: Some("A stub model for visual testing".into()),
-                    icon: Some(AgentModelIcon::Named(ui::IconName::BaymaxAssistant)),
+                    icon: Some(AgentModelIcon::Named(ui::IconName::SimAssistant)),
                     is_latest: false,
                     cost: None,
                 })),

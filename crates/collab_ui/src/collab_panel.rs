@@ -280,7 +280,7 @@ pub struct CollabPanel {
 }
 
 #[derive(Serialize, Deserialize)]
-struct SerialibaymaxCollabPanel {
+struct SerialisimCollabPanel {
     collapsed_channels: Option<Vec<u64>>,
 }
 
@@ -464,7 +464,7 @@ impl CollabPanel {
         workspace: WeakEntity<Workspace>,
         mut cx: AsyncWindowContext,
     ) -> anyhow::Result<Entity<Self>> {
-        let serialibaymax_panel = match workspace
+        let serialisim_panel = match workspace
             .read_with(&cx, |workspace, _| {
                 CollabPanel::serialization_key(workspace)
             })
@@ -477,7 +477,7 @@ impl CollabPanel {
                     .context("reading collaboration panel from key value store")
                     .log_err()
                     .flatten()
-                    .map(|panel| serde_json::from_str::<SerialibaymaxCollabPanel>(&panel))
+                    .map(|panel| serde_json::from_str::<SerialisimCollabPanel>(&panel))
                     .transpose()
                     .log_err()
                     .flatten()
@@ -487,9 +487,9 @@ impl CollabPanel {
 
         workspace.update_in(&mut cx, |workspace, window, cx| {
             let panel = CollabPanel::new(workspace, window, cx);
-            if let Some(serialibaymax_panel) = serialibaymax_panel {
+            if let Some(serialisim_panel) = serialisim_panel {
                 panel.update(cx, |panel, cx| {
-                    panel.collapsed_channels = serialibaymax_panel
+                    panel.collapsed_channels = serialisim_panel
                         .collapsed_channels
                         .unwrap_or_default()
                         .iter()
@@ -563,7 +563,7 @@ impl CollabPanel {
             async move {
                 kvp.write_kvp(
                     serialization_key,
-                    serde_json::to_string(&SerialibaymaxCollabPanel { collapsed_channels })?,
+                    serde_json::to_string(&SerialisimCollabPanel { collapsed_channels })?,
                 )
                 .await?;
                 anyhow::Ok(())
@@ -1399,7 +1399,7 @@ impl CollabPanel {
                             })
                             .detach_and_prompt_err("Failed to grant write access", window, cx, |e, _, _| {
                                 match e.error_code() {
-                                    ErrorCode::NeedsCla => Some("This user has not yet signed the CLA at https://baymax.dev/cla.".into()),
+                                    ErrorCode::NeedsCla => Some("This user has not yet signed the CLA at https://sim.dev/cla.".into()),
                                     _ => None,
                                 }
                             })

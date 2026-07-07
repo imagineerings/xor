@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-Migrate ~17 foundational agent infrastructure features from goose into baymax's existing agent and supporting crates. These are varied subsystems that augment the core agent loop, configuration, and system management.
+Migrate ~17 foundational agent infrastructure features from goose into sim's existing agent and supporting crates. These are varied subsystems that augment the core agent loop, configuration, and system management.
 
 ### Key Architectural Decisions
 
@@ -15,7 +15,7 @@ Migrate ~17 foundational agent infrastructure features from goose into baymax's 
   - Doctor → new `crates/doctor/`
   - Download manager → new `crates/download_manager/`
   - Config migrations → `crates/settings/`
-  - Baymax mode → `crates/agent_settings/`
+  - Sim mode → `crates/agent_settings/`
   - Misc (instance_id, subprocess, prompt_template, etc.) → `crates/util/` or small modules
 
 ## 2. Architecture
@@ -40,7 +40,7 @@ graph TD
 
     subgraph "crates/settings/ + crates/agent_settings/"
         ConfigMigrate[ConfigMigrations]
-        BaymaxMode[BaymaxMode]
+        SimMode[SimMode]
     end
 
     subgraph "crates/util/ + small modules"
@@ -207,17 +207,17 @@ pub trait Migration: Send + Sync {
 }
 ```
 
-### Component: Baymax Mode
+### Component: Sim Mode
 
 ```rust
-pub enum BaymaxMode {
+pub enum SimMode {
     Balanced,
     Focus,
     Creative,
     Custom { prompt_override: String, temperature: Option<f32> },
 }
 
-impl BaymaxMode {
+impl SimMode {
     pub fn system_prompt_modifier(&self) -> &str;
     pub fn temperature(&self) -> Option<f32>;
 }
@@ -300,4 +300,4 @@ _For any_ doctor run, ALL registered checks SHALL execute and produce a result.
 ## References
 
 - Source: All `projects/goose/crates/goose/src/` files listed in requirements
-- Baymax: `crates/agent/`, `crates/settings/`, `crates/agent_settings/`, `crates/util/`
+- Sim: `crates/agent/`, `crates/settings/`, `crates/agent_settings/`, `crates/util/`

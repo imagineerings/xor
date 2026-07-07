@@ -18,4 +18,4 @@ case $channel in
     ;;
 esac
 
-curl -s "https://cloud.baymax.dev/releases/$channel/latest/asset?asset=baymax&os=macos&arch=aarch64" | jq -r .version
+curl -s "https://cloud.sim.dev/releases/$channel/latest/asset?asset=sim&os=macos&arch=aarch64" | jq -r .version

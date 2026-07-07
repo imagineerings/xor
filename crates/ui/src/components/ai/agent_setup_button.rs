@@ -67,8 +67,8 @@ impl Component for AgentSetupButton {
         single_example(
             "Default",
             AgentSetupButton::new("preview")
-                .icon(Icon::new(IconName::BaymaxAgent))
-                .name("Baymax Agent")
+                .icon(Icon::new(IconName::SimAgent))
+                .name("Sim Agent")
                 .into_any_element(),
         )
         .into_any_element()

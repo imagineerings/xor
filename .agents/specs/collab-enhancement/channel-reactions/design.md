@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-Channel messages in Baymax currently have no reaction support. This design adds emoji reactions — lightweight non-verbal responses. Reactions require both server-side persistence and real-time sync, plus a client-side emoji picker and reaction bar UI.
+Channel messages in Sim currently have no reaction support. This design adds emoji reactions — lightweight non-verbal responses. Reactions require both server-side persistence and real-time sync, plus a client-side emoji picker and reaction bar UI.
 
 **Key decisions:**
 

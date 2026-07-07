@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Baymax channel messages are sent immediately upon composition. Mattermost supports scheduled messages (`scheduled_post.yaml` API) — messages that are composed now and delivered at a specified future time. This enables users to communicate at appropriate times without staying online.
+Sim channel messages are sent immediately upon composition. Mattermost supports scheduled messages (`scheduled_post.yaml` API) — messages that are composed now and delivered at a specified future time. This enables users to communicate at appropriate times without staying online.
 
 ## Glossary
 

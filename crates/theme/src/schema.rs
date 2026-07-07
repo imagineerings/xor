@@ -5,7 +5,7 @@ use palette::FromColor;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-/// The appearance of a theme in serialibaymax content.
+/// The appearance of a theme in serialisim content.
 #[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum AppearanceContent {

@@ -1,7 +1,7 @@
 use ai_onboarding::YoungAccountBanner;
 use anyhow::{Result, anyhow};
 use client::{
-    Client, RefreshLlmTokenListener, TelemetrySettings, UserStore, baymax_urls, global_llm_token,
+    Client, RefreshLlmTokenListener, TelemetrySettings, UserStore, sim_urls, global_llm_token,
 };
 use cloud_api_client::LlmApiToken;
 use cloud_api_types::OrganizationId;
@@ -11,7 +11,7 @@ use futures::StreamExt;
 use futures::future::BoxFuture;
 use gpui::{AnyElement, AnyView, App, AppContext, Context, Entity, Subscription, Task, TaskExt};
 use language_model::{
-    AuthenticateError, BAYMAX_CLOUD_PROVIDER_ID, BAYMAX_CLOUD_PROVIDER_NAME, FastModeConfirmation,
+    AuthenticateError, SIM_CLOUD_PROVIDER_ID, SIM_CLOUD_PROVIDER_NAME, FastModeConfirmation,
     IconOrSvg, LanguageModel, LanguageModelProvider, LanguageModelProviderId,
     LanguageModelProviderName, LanguageModelProviderState,
 };
@@ -19,15 +19,15 @@ use language_models_cloud::{CloudLlmTokenProvider, CloudModelProvider};
 use rand::{Rng as _, SeedableRng as _, rngs::StdRng};
 use release_channel::AppVersion;
 
-pub use settings::BaymaxDotDevAvailableModel as AvailableModel;
-pub use settings::BaymaxDotDevAvailableProvider as AvailableProvider;
+pub use settings::SimDotDevAvailableModel as AvailableModel;
+pub use settings::SimDotDevAvailableProvider as AvailableProvider;
 use settings::SettingsStore;
 use std::sync::Arc;
 use std::time::Duration;
 use ui::{TintColor, prelude::*};
 
-const PROVIDER_ID: LanguageModelProviderId = BAYMAX_CLOUD_PROVIDER_ID;
-const PROVIDER_NAME: LanguageModelProviderName = BAYMAX_CLOUD_PROVIDER_NAME;
+const PROVIDER_ID: LanguageModelProviderId = SIM_CLOUD_PROVIDER_ID;
+const PROVIDER_NAME: LanguageModelProviderName = SIM_CLOUD_PROVIDER_NAME;
 const MODELS_REFRESH_DEBOUNCE: Duration = Duration::from_secs(5 * 60);
 
 struct ClientTokenProvider {
@@ -87,7 +87,7 @@ impl CloudLlmTokenProvider for ClientTokenProvider {
 }
 
 #[derive(Default, Clone, Debug, PartialEq)]
-pub struct BaymaxDotDevSettings {
+pub struct SimDotDevSettings {
     pub available_models: Vec<AvailableModel>,
 }
 
@@ -283,7 +283,7 @@ impl LanguageModelProvider for CloudLanguageModelProvider {
     }
 
     fn icon(&self) -> IconOrSvg {
-        IconOrSvg::Icon(IconName::AiBaymax)
+        IconOrSvg::Icon(IconName::AiSim)
     }
 
     fn default_model(&self, cx: &App) -> Option<Arc<dyn LanguageModel>> {
@@ -375,53 +375,53 @@ impl LanguageModelProvider for CloudLanguageModelProvider {
 
     fn fast_mode_confirmation(&self, _cx: &App) -> Option<FastModeConfirmation> {
         Some(FastModeConfirmation {
-            title: "Enable Fast Mode for Baymax?".into(),
+            title: "Enable Fast Mode for Sim?".into(),
             message: "Fast mode routes requests through the upstream provider's fast mode or priority tier. The \
                 upstream provider's premium per-token pricing applies and is passed through to \
-                your Baymax billing."
+                your Sim billing."
                 .into(),
         })
     }
 }
 
 #[derive(IntoElement, RegisterComponent)]
-struct BaymaxAiConfiguration {
+struct SimAiConfiguration {
     is_connected: bool,
     plan: Option<Plan>,
-    is_baymax_model_provider_enabled: bool,
+    is_sim_model_provider_enabled: bool,
     eligible_for_trial: bool,
     account_too_young: bool,
     sign_in_callback: Arc<dyn Fn(&mut Window, &mut App) + Send + Sync>,
 }
 
-impl RenderOnce for BaymaxAiConfiguration {
+impl RenderOnce for SimAiConfiguration {
     fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
         let (subscription_text, has_paid_plan) = match self.plan {
-            Some(Plan::BaymaxPro) => (
-                "You have access to Baymax's hosted models through your Pro subscription.",
+            Some(Plan::SimPro) => (
+                "You have access to Sim's hosted models through your Pro subscription.",
                 true,
             ),
-            Some(Plan::BaymaxProTrial) => (
-                "You have access to Baymax's hosted models through your Pro trial.",
+            Some(Plan::SimProTrial) => (
+                "You have access to Sim's hosted models through your Pro trial.",
                 false,
             ),
-            Some(Plan::BaymaxStudent) => (
-                "You have access to Baymax's hosted models through your Student subscription.",
+            Some(Plan::SimStudent) => (
+                "You have access to Sim's hosted models through your Student subscription.",
                 true,
             ),
-            Some(Plan::BaymaxBusiness) => (
-                if self.is_baymax_model_provider_enabled {
-                    "You have access to Baymax's hosted models through your organization."
+            Some(Plan::SimBusiness) => (
+                if self.is_sim_model_provider_enabled {
+                    "You have access to Sim's hosted models through your organization."
                 } else {
-                    "Baymax's hosted models are disabled by your organization's configuration."
+                    "Sim's hosted models are disabled by your organization's configuration."
                 },
                 true,
             ),
-            Some(Plan::BaymaxFree) | None => (
+            Some(Plan::SimFree) | None => (
                 if self.eligible_for_trial {
-                    "Subscribe for access to Baymax's hosted models. Start with a 14 day free trial."
+                    "Subscribe for access to Sim's hosted models. Start with a 14 day free trial."
                 } else {
-                    "Subscribe for access to Baymax's hosted models."
+                    "Subscribe for access to Sim's hosted models."
                 },
                 false,
             ),
@@ -432,28 +432,28 @@ impl RenderOnce for BaymaxAiConfiguration {
                 .full_width()
                 .label_size(LabelSize::Small)
                 .style(ButtonStyle::Tinted(TintColor::Accent))
-                .on_click(|_, _, cx| cx.open_url(&baymax_urls::account_url(cx)))
+                .on_click(|_, _, cx| cx.open_url(&sim_urls::account_url(cx)))
                 .into_any_element()
         } else if self.plan.is_none() || self.eligible_for_trial {
             Button::new("start_trial", "Start 14-day Free Pro Trial")
                 .full_width()
                 .style(ui::ButtonStyle::Tinted(ui::TintColor::Accent))
-                .on_click(|_, _, cx| cx.open_url(&baymax_urls::start_trial_url(cx)))
+                .on_click(|_, _, cx| cx.open_url(&sim_urls::start_trial_url(cx)))
                 .into_any_element()
         } else {
             Button::new("upgrade", "Upgrade to Pro")
                 .full_width()
                 .style(ui::ButtonStyle::Tinted(ui::TintColor::Accent))
-                .on_click(|_, _, cx| cx.open_url(&baymax_urls::upgrade_to_baymax_pro_url(cx)))
+                .on_click(|_, _, cx| cx.open_url(&sim_urls::upgrade_to_sim_pro_url(cx)))
                 .into_any_element()
         };
 
         if !self.is_connected {
             return v_flex()
                 .gap_2()
-                .child(Label::new("Sign in to have access to Baymax's complete agentic experience with hosted models."))
+                .child(Label::new("Sign in to have access to Sim's complete agentic experience with hosted models."))
                 .child(
-                    Button::new("sign_in", "Sign In to use Baymax AI")
+                    Button::new("sign_in", "Sign In to use Sim AI")
                         .start_icon(Icon::new(IconName::Github).size(IconSize::Small).color(Color::Muted))
                         .full_width()
                         .on_click({
@@ -470,7 +470,7 @@ impl RenderOnce for BaymaxAiConfiguration {
                         .style(ui::ButtonStyle::Tinted(ui::TintColor::Accent))
                         .full_width()
                         .on_click(|_, _, cx| {
-                            cx.open_url(&baymax_urls::upgrade_to_baymax_pro_url(cx))
+                            cx.open_url(&sim_urls::upgrade_to_sim_pro_url(cx))
                         }),
                 )
             } else {
@@ -510,14 +510,14 @@ impl Render for ConfigurationView {
         let state = self.state.read(cx);
         let user_store = state.user_store.read(cx);
 
-        let is_baymax_model_provider_enabled = user_store
+        let is_sim_model_provider_enabled = user_store
             .current_organization_configuration()
-            .map_or(true, |config| config.is_baymax_model_provider_enabled);
+            .map_or(true, |config| config.is_sim_model_provider_enabled);
 
-        BaymaxAiConfiguration {
+        SimAiConfiguration {
             is_connected: !state.is_signed_out(cx),
             plan: user_store.plan(),
-            is_baymax_model_provider_enabled,
+            is_sim_model_provider_enabled,
             eligible_for_trial: user_store.trial_started_at().is_none(),
             account_too_young: user_store.account_too_young(),
             sign_in_callback: self.sign_in_callback.clone(),
@@ -800,7 +800,7 @@ mod tests {
     }
 }
 
-impl Component for BaymaxAiConfiguration {
+impl Component for SimAiConfiguration {
     fn name() -> &'static str {
         "AI Configuration Content"
     }
@@ -814,24 +814,24 @@ impl Component for BaymaxAiConfiguration {
     }
 
     fn description() -> &'static str {
-        "The configuration surface for Baymax's hosted AI models, \
+        "The configuration surface for Sim's hosted AI models, \
         showing the user's connection status, current plan, trial eligibility, \
-        and entry points for enabling the Baymax model provider."
+        and entry points for enabling the Sim model provider."
     }
 
     fn preview(_window: &mut Window, _cx: &mut App) -> AnyElement {
         struct PreviewConfiguration {
             plan: Option<Plan>,
             is_connected: bool,
-            is_baymax_model_provider_enabled: bool,
+            is_sim_model_provider_enabled: bool,
             eligible_for_trial: bool,
         }
 
         let configuration = |config: PreviewConfiguration| -> AnyElement {
-            BaymaxAiConfiguration {
+            SimAiConfiguration {
                 is_connected: config.is_connected,
                 plan: config.plan,
-                is_baymax_model_provider_enabled: config.is_baymax_model_provider_enabled,
+                is_sim_model_provider_enabled: config.is_sim_model_provider_enabled,
                 eligible_for_trial: config.eligible_for_trial,
                 account_too_young: false,
                 sign_in_callback: Arc::new(|_, _| {}),
@@ -848,7 +848,7 @@ impl Component for BaymaxAiConfiguration {
                     configuration(PreviewConfiguration {
                         plan: None,
                         is_connected: false,
-                        is_baymax_model_provider_enabled: true,
+                        is_sim_model_provider_enabled: true,
                         eligible_for_trial: false,
                     }),
                 ),
@@ -857,7 +857,7 @@ impl Component for BaymaxAiConfiguration {
                     configuration(PreviewConfiguration {
                         plan: None,
                         is_connected: true,
-                        is_baymax_model_provider_enabled: true,
+                        is_sim_model_provider_enabled: true,
                         eligible_for_trial: true,
                     }),
                 ),
@@ -866,7 +866,7 @@ impl Component for BaymaxAiConfiguration {
                     configuration(PreviewConfiguration {
                         plan: None,
                         is_connected: true,
-                        is_baymax_model_provider_enabled: true,
+                        is_sim_model_provider_enabled: true,
                         eligible_for_trial: false,
                     }),
                 ),
@@ -875,52 +875,52 @@ impl Component for BaymaxAiConfiguration {
                     configuration(PreviewConfiguration {
                         plan: None,
                         is_connected: true,
-                        is_baymax_model_provider_enabled: true,
+                        is_sim_model_provider_enabled: true,
                         eligible_for_trial: true,
                     }),
                 ),
                 single_example(
                     "Free Plan",
                     configuration(PreviewConfiguration {
-                        plan: Some(Plan::BaymaxFree),
+                        plan: Some(Plan::SimFree),
                         is_connected: true,
-                        is_baymax_model_provider_enabled: true,
+                        is_sim_model_provider_enabled: true,
                         eligible_for_trial: true,
                     }),
                 ),
                 single_example(
-                    "Baymax Pro Trial Plan",
+                    "Sim Pro Trial Plan",
                     configuration(PreviewConfiguration {
-                        plan: Some(Plan::BaymaxProTrial),
+                        plan: Some(Plan::SimProTrial),
                         is_connected: true,
-                        is_baymax_model_provider_enabled: true,
+                        is_sim_model_provider_enabled: true,
                         eligible_for_trial: true,
                     }),
                 ),
                 single_example(
-                    "Baymax Pro Plan",
+                    "Sim Pro Plan",
                     configuration(PreviewConfiguration {
-                        plan: Some(Plan::BaymaxPro),
+                        plan: Some(Plan::SimPro),
                         is_connected: true,
-                        is_baymax_model_provider_enabled: true,
+                        is_sim_model_provider_enabled: true,
                         eligible_for_trial: true,
                     }),
                 ),
                 single_example(
-                    "Business Plan - Baymax models enabled",
+                    "Business Plan - Sim models enabled",
                     configuration(PreviewConfiguration {
-                        plan: Some(Plan::BaymaxBusiness),
+                        plan: Some(Plan::SimBusiness),
                         is_connected: true,
-                        is_baymax_model_provider_enabled: true,
+                        is_sim_model_provider_enabled: true,
                         eligible_for_trial: false,
                     }),
                 ),
                 single_example(
-                    "Business Plan - Baymax models disabled",
+                    "Business Plan - Sim models disabled",
                     configuration(PreviewConfiguration {
-                        plan: Some(Plan::BaymaxBusiness),
+                        plan: Some(Plan::SimBusiness),
                         is_connected: true,
-                        is_baymax_model_provider_enabled: false,
+                        is_sim_model_provider_enabled: false,
                         eligible_for_trial: false,
                     }),
                 ),

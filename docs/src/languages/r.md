@@ -1,18 +1,18 @@
 ---
 title: R
-description: "Configure R language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure R language support in Sim, including language servers, formatting, and debugging."
 ---
 
 # R
 
-R support is available via multiple R Baymax extensions:
+R support is available via multiple R Sim extensions:
 
-- [ocsmit/baymax-r](https://github.com/ocsmit/baymax-r)
+- [ocsmit/sim-r](https://github.com/ocsmit/sim-r)
 
   - Tree-sitter: [r-lib/tree-sitter-r](https://github.com/r-lib/tree-sitter-r)
   - Language-Server: [REditorSupport/languageserver](https://github.com/REditorSupport/languageserver)
 
-- [posit-dev/air](https://github.com/posit-dev/air/tree/main/editors/baymax)
+- [posit-dev/air](https://github.com/posit-dev/air/tree/main/editors/sim)
   - Formatter: [posit-dev/air](https://posit-dev.github.io/air/)
 
 ## Installation
@@ -25,9 +25,9 @@ install.packages("languageserver")
 install.packages("lintr")
 ```
 
-3. Install the [R](https://github.com/ocsmit/baymax-r) extension through Baymax's extensions manager for basic R language support (syntax highlighting, tree-sitter support) and for [REditorSupport/languageserver](https://github.com/REditorSupport/languageserver) support.
+3. Install the [R](https://github.com/ocsmit/sim-r) extension through Sim's extensions manager for basic R language support (syntax highlighting, tree-sitter support) and for [REditorSupport/languageserver](https://github.com/REditorSupport/languageserver) support.
 
-4. Install the [Air](https://posit-dev.github.io/air/) extension through Baymax's extensions manager for R code formatting via Air.
+4. Install the [Air](https://posit-dev.github.io/air/) extension through Sim's extensions manager for R code formatting via Air.
 
 ## Linting
 
@@ -57,11 +57,11 @@ See [Using lintr](https://lintr.r-lib.org/articles/lintr.html) for a complete li
 
 ### Air
 
-[Air](https://posit-dev.github.io/air/) provides code formatting for R, including support for format-on-save. The [Air documentation for Baymax](https://posit-dev.github.io/air/editor-baymax.html) contains the most up-to-date advice for running Air in Baymax.
+[Air](https://posit-dev.github.io/air/) provides code formatting for R, including support for format-on-save. The [Air documentation for Sim](https://posit-dev.github.io/air/editor-sim.html) contains the most up-to-date advice for running Air in Sim.
 
-Ensure that you have installed both the [ocsmit/baymax-r](https://github.com/ocsmit/baymax-r) extension (for general R language awareness in Baymax) and the [Air](https://posit-dev.github.io/air/) extension.
+Ensure that you have installed both the [ocsmit/sim-r](https://github.com/ocsmit/sim-r) extension (for general R language awareness in Sim) and the [Air](https://posit-dev.github.io/air/) extension.
 
-Configure language servers in Settings ({#kb baymax::OpenSettings}) under Languages > R, or add to your settings file:
+Configure language servers in Settings ({#kb sim::OpenSettings}) under Languages > R, or add to your settings file:
 
 ```json [settings]
 {
@@ -73,7 +73,7 @@ Configure language servers in Settings ({#kb baymax::OpenSettings}) under Langua
 }
 ```
 
-If you use the `"r_language_server"` from `REditorSupport/languageserver`, but would still like to use Air for formatting, configure in Settings ({#kb baymax::OpenSettings}) under Languages > R, or add to your settings file:
+If you use the `"r_language_server"` from `REditorSupport/languageserver`, but would still like to use Air for formatting, configure in Settings ({#kb sim::OpenSettings}) under Languages > R, or add to your settings file:
 
 ```json [settings]
 {
@@ -111,7 +111,7 @@ TBD: Get this working
 
 ### REditorSupport/languageserver Configuration
 
-You can configure the [R languageserver settings](https://github.com/REditorSupport/languageserver#settings) via Baymax Project Settings `.baymax/settings.json` or Baymax User Settings `~/.config/baymax/settings.json`:
+You can configure the [R languageserver settings](https://github.com/REditorSupport/languageserver#settings) via Sim Project Settings `.sim/settings.json` or Sim User Settings `~/.config/sim/settings.json`:
 
 For example to disable Lintr linting and suppress code snippet suggestions (both enabled by default):
 
@@ -141,7 +141,7 @@ TBD: R REPL Docs
 
 ### Ark Installation
 
-To use the Baymax REPL with R you need to install [Ark](https://github.com/posit-dev/ark), an R Kernel for Jupyter applications.
+To use the Sim REPL with R you need to install [Ark](https://github.com/posit-dev/ark), an R Kernel for Jupyter applications.
 You can download the latest version from the [Ark GitHub Releases](https://github.com/posit-dev/ark/releases) and then extract the `ark` binary to a directory in your `PATH`.
 
 For example to install the latest non-debug build:

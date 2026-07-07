@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Baymax should parse and index Godot scene/resource/import files and generated game assets without importing duplicate geometry or codec stacks.
+Sim should parse and index Godot scene/resource/import files and generated game assets without importing duplicate geometry or codec stacks.
 
 ### Requirement 1: Scene and Resource Parsing
 

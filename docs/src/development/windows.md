@@ -1,15 +1,15 @@
 ---
-title: Building Baymax for Windows
-description: "Guide to building baymax for windows for Baymax development."
+title: Building Sim for Windows
+description: "Guide to building sim for windows for Sim development."
 ---
 
-# Building Baymax for Windows
+# Building Sim for Windows
 
 > The following commands may be executed in any shell.
 
 ## Repository
 
-Clone the [Baymax repository](https://github.com/simtropolis/baymax).
+Clone the [Sim repository](https://github.com/simtropolis/sim).
 
 ## Dependencies
 
@@ -21,7 +21,7 @@ Clone the [Baymax repository](https://github.com/simtropolis/baymax).
 - Install the Windows 11 or 10 SDK for your system, and make sure at least `Windows 10 SDK version 2104 (10.0.20348.0)` is installed. You can download it from the [Windows SDK Archive](https://developer.microsoft.com/windows/downloads/windows-sdk/).
 - Install [CMake](https://cmake.org/download) (required by [a dependency](https://docs.rs/wasmtime-c-api-impl/latest/wasmtime_c_api/)). Or you can install it through Visual Studio Installer, then manually add the `bin` directory to your `PATH`, for example: `C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin`.
 
-If you cannot compile Baymax, make sure a Visual Studio installation includes at least the following components:
+If you cannot compile Sim, make sure a Visual Studio installation includes at least the following components:
 
 ```json
 {
@@ -93,7 +93,7 @@ After this, restart the `postgresql` service. Press `Win`+`R` to open the Run di
 
 ## Building from source
 
-Once you have the dependencies installed, you can build Baymax using [Cargo](https://doc.rust-lang.org/cargo/).
+Once you have the dependencies installed, you can build Sim using [Cargo](https://doc.rust-lang.org/cargo/).
 
 For a debug build:
 
@@ -113,19 +113,19 @@ And to run the tests:
 cargo test --workspace
 ```
 
-> **Note:** Visual regression tests are currently macOS-only and require Screen Recording permission. See [Building Baymax for macOS](./macos.md#visual-regression-tests) for details.
+> **Note:** Visual regression tests are currently macOS-only and require Screen Recording permission. See [Building Sim for macOS](./macos.md#visual-regression-tests) for details.
 
 ## Installing from msys2
 
-Baymax does not support unofficial MSYS2 Baymax packages built for Mingw-w64. Please report any issues you may have with [mingw-w64-baymax](https://packages.msys2.org/base/mingw-w64-baymax) to [msys2/MINGW-packages/issues](https://github.com/msys2/MINGW-packages/issues?q=is%3Aissue+is%3Aopen+baymax).
+Sim does not support unofficial MSYS2 Sim packages built for Mingw-w64. Please report any issues you may have with [mingw-w64-sim](https://packages.msys2.org/base/mingw-w64-sim) to [msys2/MINGW-packages/issues](https://github.com/msys2/MINGW-packages/issues?q=is%3Aissue+is%3Aopen+sim).
 
-Please refer to [MSYS2 documentation](https://www.msys2.org/docs/ides-editors/#baymax) first.
+Please refer to [MSYS2 documentation](https://www.msys2.org/docs/ides-editors/#sim) first.
 
 ## Troubleshooting
 
 ### Setting `RUSTFLAGS` env var breaks builds
 
-If you set the `RUSTFLAGS` env var, it will override the `rustflags` settings in `.cargo/config.toml` which is required to properly build Baymax.
+If you set the `RUSTFLAGS` env var, it will override the `rustflags` settings in `.cargo/config.toml` which is required to properly build Sim.
 
 Because these settings change over time, the resulting build errors may vary from linker failures to other hard-to-diagnose errors.
 
@@ -150,13 +150,13 @@ rustflags = [
 ]
 ```
 
-Or, create a new `.cargo/config.toml` in the parent directory of the Baymax repo (see below). This is useful in CI because you do not need to edit the repo's original `.cargo/config.toml`.
+Or, create a new `.cargo/config.toml` in the parent directory of the Sim repo (see below). This is useful in CI because you do not need to edit the repo's original `.cargo/config.toml`.
 
 ```
 upper_dir
 ├── .cargo          // <-- Make this folder
 │   └── config.toml // <-- Make this file
-└── baymax
+└── sim
     ├── .cargo
     │   └── config.toml
     └── crates
@@ -179,22 +179,22 @@ Try `cargo clean` and `cargo build`.
 
 This error can happen if you are using the "rust-lld.exe" linker. Consider trying a different linker.
 
-If you are using a global config, consider moving the Baymax repository to a nested directory and add a `.cargo/config.toml` with a custom linker config in the parent directory.
+If you are using a global config, consider moving the Sim repository to a nested directory and add a `.cargo/config.toml` with a custom linker config in the parent directory.
 
-See this issue for more information [#12041](https://github.com/simtropolis/baymax/issues/12041)
+See this issue for more information [#12041](https://github.com/simtropolis/sim/issues/12041)
 
 ### Invalid RC path selected
 
-Sometimes, depending on the security rules applied to your laptop, you may get the following error while compiling Baymax:
+Sometimes, depending on the security rules applied to your laptop, you may get the following error while compiling Sim:
 
 ```
-error: failed to run custom build command for `baymax(C:\Users\USER\src\baymax\crates\baymax)`
+error: failed to run custom build command for `sim(C:\Users\USER\src\sim\crates\sim)`
 
 Caused by:
-  process didn't exit successfully: `C:\Users\USER\src\baymax\target\debug\build\baymax-b24f1e9300107efc\build-script-build` (exit code: 1)
+  process didn't exit successfully: `C:\Users\USER\src\sim\target\debug\build\sim-b24f1e9300107efc\build-script-build` (exit code: 1)
   --- stdout
   cargo:rerun-if-changed=../../.git/logs/HEAD
-  cargo:rustc-env=BAYMAX_COMMIT_SHA=25e2e9c6727ba9b77415588cfa11fd969612adb7
+  cargo:rustc-env=SIM_COMMIT_SHA=25e2e9c6727ba9b77415588cfa11fd969612adb7
   cargo:rustc-link-arg=/stack:8388608
   cargo:rerun-if-changed=resources/windows/app-icon.ico
   package.metadata.winresource does not exist
@@ -205,17 +205,17 @@ Caused by:
 warning: build failed, waiting for other jobs to finish...
 ```
 
-To fix this issue, manually set the `BAYMAX_RC_TOOLKIT_PATH` environment variable to the RC toolkit path. Usually this is:
+To fix this issue, manually set the `SIM_RC_TOOLKIT_PATH` environment variable to the RC toolkit path. Usually this is:
 `C:\Program Files (x86)\Windows Kits\10\bin\<SDK_version>\x64`.
 
-See this [issue](https://github.com/simtropolis/baymax/issues/18393) for more information.
+See this [issue](https://github.com/simtropolis/sim/issues/18393) for more information.
 
 ### Build fails: Path too long
 
 You may receive an error like the following when building
 
 ```
-error: failed to get `pet` as a dependency of package `languages v0.1.0 (D:\a\baymax-windows-builds\baymax-windows-builds\crates\languages)`
+error: failed to get `pet` as a dependency of package `languages v0.1.0 (D:\a\sim-windows-builds\sim-windows-builds\crates\languages)`
 
 Caused by:
   failed to load source for dependency `pet`
@@ -243,20 +243,20 @@ For more information on this, please see [win32 docs](https://learn.microsoft.co
 
 ### Graphics issues
 
-#### Baymax fails to launch
+#### Sim fails to launch
 
-Baymax currently uses Vulkan as its graphics API on Windows. If Baymax fails to launch, Vulkan is a common cause.
+Sim currently uses Vulkan as its graphics API on Windows. If Sim fails to launch, Vulkan is a common cause.
 
-You can check the Baymax log at:
-`C:\Users\YOU\AppData\Local\Baymax\logs\Baymax.log`
+You can check the Sim log at:
+`C:\Users\YOU\AppData\Local\Sim\logs\Sim.log`
 
 If you see messages like:
 
-- `Baymax failed to open a window: NoSupportedDeviceFound`
+- `Sim failed to open a window: NoSupportedDeviceFound`
 - `ERROR_INITIALIZATION_FAILED`
 - `GPU Crashed`
 - `ERROR_SURFACE_LOST_KHR`
 
 Vulkan may not be working correctly on your system. Updating GPU drivers often resolves this.
 
-If there's nothing Vulkan-related in the logs and you happen to have Bandicam installed, try uninstalling it. Baymax is currently not compatible with Bandicam.
+If there's nothing Vulkan-related in the logs and you happen to have Bandicam installed, try uninstalling it. Sim is currently not compatible with Bandicam.

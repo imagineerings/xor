@@ -2709,15 +2709,15 @@ fn model_id_to_selection(model_id: &AgentModelId, cx: &App) -> LanguageModelSele
     agent_settings::language_model_to_selection(&resolved, current_user_selection.as_ref())
 }
 
-pub static BAYMAX_AGENT_ID: LazyLock<AgentId> = LazyLock::new(|| AgentId::new("Baymax Agent"));
+pub static SIM_AGENT_ID: LazyLock<AgentId> = LazyLock::new(|| AgentId::new("Sim Agent"));
 
 impl acp_thread::AgentConnection for NativeAgentConnection {
     fn agent_id(&self) -> AgentId {
-        BAYMAX_AGENT_ID.clone()
+        SIM_AGENT_ID.clone()
     }
 
     fn telemetry_id(&self) -> SharedString {
-        "baymax".into()
+        "sim".into()
     }
 
     fn new_session(
@@ -4195,17 +4195,17 @@ mod internal_tests {
         // Hand-typed `/global:<name>` is not aliased to the global
         // source; it looks for a worktree literally named `global`.
         assert!(!global.matches_scope("global"));
-        assert!(!global.matches_scope("baymax"));
+        assert!(!global.matches_scope("sim"));
 
         let project = SkillSource::ProjectLocal {
             worktree_id: SkillScopeId(1),
-            worktree_root_name: "baymax".into(),
+            worktree_root_name: "sim".into(),
         };
         // Project-local skills are scoped by their worktree root name
         // so multiple open worktrees with same-named skills can each
         // be addressed unambiguously.
-        assert_eq!(project.scope_prefix(), "baymax");
-        assert!(project.matches_scope("baymax"));
+        assert_eq!(project.scope_prefix(), "sim");
+        assert!(project.matches_scope("sim"));
         // The empty scope is reserved for globals.
         assert!(!project.matches_scope(""));
         // An unrelated worktree name (or MCP server name) must not
@@ -4343,7 +4343,7 @@ mod internal_tests {
         };
 
         // Sanity-check the test setup: the third skill is small enough
-        // that a greedy packer would have squeebaymax it in alongside the
+        // that a greedy packer would have squeesim it in alongside the
         // first one.
         let leftover_after_first =
             MAX_SKILL_DESCRIPTIONS_SIZE - (first.name.len() + first.description.len());
@@ -5637,7 +5637,7 @@ mod internal_tests {
                     name: "Fake".into(),
                     description: None,
                     icon: Some(acp_thread::AgentModelIcon::Named(
-                        ui::IconName::BaymaxAssistant
+                        ui::IconName::SimAssistant
                     )),
                     is_latest: false,
                     cost: None,

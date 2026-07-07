@@ -10,7 +10,7 @@ use recipe::{
 };
 
 #[derive(Parser, Debug)]
-#[command(name = "recipe", about = "Manage Baymax recipes")]
+#[command(name = "recipe", about = "Manage Sim recipes")]
 struct RecipeArgs {
     #[arg(long, value_name = "DIR", global = true)]
     directory: Option<PathBuf>,
@@ -57,7 +57,7 @@ fn run_command_with_writer(args: RecipeArgs, output: &mut impl Write) -> Result<
         .unwrap_or(env::current_dir().context("failed to read current directory")?);
     let engine = RecipeEngine::new()
         .with_source(LocalRecipeSource::new(directory))
-        .with_source(BuiltinRecipeSource::baymax_defaults());
+        .with_source(BuiltinRecipeSource::sim_defaults());
 
     match args.command {
         RecipeCommand::List { json } => {
@@ -170,9 +170,9 @@ parameters:
 
     #[test]
     fn parses_variables() {
-        let variables = parse_variables(&["name=Baymax".to_string()]).unwrap();
+        let variables = parse_variables(&["name=Sim".to_string()]).unwrap();
 
-        assert_eq!(variables.get("name"), Some(&"Baymax".to_string()));
+        assert_eq!(variables.get("name"), Some(&"Sim".to_string()));
     }
 
     #[test]
@@ -269,7 +269,7 @@ parameters:
                 directory: Some(temp_dir.path().to_path_buf()),
                 command: RecipeCommand::Run {
                     name: "local_recipe".to_string(),
-                    variables: vec!["name=Baymax".to_string()],
+                    variables: vec!["name=Sim".to_string()],
                 },
             },
             &mut output,
@@ -277,6 +277,6 @@ parameters:
         .unwrap();
 
         let output = String::from_utf8(output).unwrap();
-        assert!(output.contains("Hello Baymax"));
+        assert!(output.contains("Hello Sim"));
     }
 }

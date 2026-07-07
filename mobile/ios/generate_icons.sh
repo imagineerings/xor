@@ -3,8 +3,8 @@
 # Script to generate iOS app icons from a source image
 # Requires ImageMagick (install with: brew install imagemagick)
 
-SOURCE_IMAGE="Baymax/Assets.xcassets/AppIcon.appiconset/baymax-icon.svg"
-ICONSET_DIR="Baymax/Assets.xcassets/AppIcon.appiconset"
+SOURCE_IMAGE="Sim/Assets.xcassets/AppIcon.appiconset/sim-icon.svg"
+ICONSET_DIR="Sim/Assets.xcassets/AppIcon.appiconset"
 
 # Check if source image exists
 if [ ! -f "$SOURCE_IMAGE" ]; then

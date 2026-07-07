@@ -2,11 +2,11 @@
 
 ## Introduction
 
-Migrate the LLM provider integrations from goose that do not yet have equivalents in baymax. Goose includes 20+ provider implementations that extend baymax's current provider ecosystem (which already covers Anthropic, OpenAI, Google, Bedrock, Ollama, OpenRouter, DeepSeek, Mistral, xAI, LM Studio, Copilot Chat, and OpenAI-compatible).
+Migrate the LLM provider integrations from goose that do not yet have equivalents in sim. Goose includes 20+ provider implementations that extend sim's current provider ecosystem (which already covers Anthropic, OpenAI, Google, Bedrock, Ollama, OpenRouter, DeepSeek, Mistral, xAI, LM Studio, Copilot Chat, and OpenAI-compatible).
 
 ## Glossary
 
-- **Provider**: An LLM API service implementation that conforms to baymax's `language_model` trait
+- **Provider**: An LLM API service implementation that conforms to sim's `language_model` trait
 - **ACP Provider**: A provider that communicates via the Agent-Client Protocol
 - **Declarative Provider**: A provider defined via configuration rather than code
 - **Embedding Provider**: A provider that generates embeddings rather than chat completions
@@ -17,7 +17,7 @@ Migrate the LLM provider integrations from goose that do not yet have equivalent
 
 ### Requirement 1: Cloud API Providers
 
-**User Story:** As a baymax user, I want to use Azure OpenAI, GCP Vertex AI, HuggingFace, LiteLLM, Snowflake, and Sagemaker TGI as LLM providers, so that I can leverage enterprise cloud AI services.
+**User Story:** As a sim user, I want to use Azure OpenAI, GCP Vertex AI, HuggingFace, LiteLLM, Snowflake, and Sagemaker TGI as LLM providers, so that I can leverage enterprise cloud AI services.
 
 #### Acceptance Criteria
 
@@ -31,7 +31,7 @@ Migrate the LLM provider integrations from goose that do not yet have equivalent
 
 ### Requirement 2: Consumer API Providers
 
-**User Story:** As a baymax user, I want to use NanoGPT, Tetrate, Avian, and KimiCode as LLM providers, so that I can access additional LLM API services.
+**User Story:** As a sim user, I want to use NanoGPT, Tetrate, Avian, and KimiCode as LLM providers, so that I can access additional LLM API services.
 
 #### Acceptance Criteria
 
@@ -43,7 +43,7 @@ Migrate the LLM provider integrations from goose that do not yet have equivalent
 
 ### Requirement 3: ACP-Based Providers
 
-**User Story:** As a baymax user, I want to use Claude ACP, Claude Code, ChatGPT/Codex (Codex CLI), Cursor Agent, and Gemini CLI as providers, so that I can leverage my existing subscriptions.
+**User Story:** As a sim user, I want to use Claude ACP, Claude Code, ChatGPT/Codex (Codex CLI), Cursor Agent, and Gemini CLI as providers, so that I can leverage my existing subscriptions.
 
 #### Acceptance Criteria
 
@@ -56,7 +56,7 @@ Migrate the LLM provider integrations from goose that do not yet have equivalent
 
 ### Requirement 4: Databricks Provider
 
-**User Story:** As a baymax user, I want to use Databricks as an LLM provider with both v1 and v2 API support, so that I can use Databricks-hosted models.
+**User Story:** As a sim user, I want to use Databricks as an LLM provider with both v1 and v2 API support, so that I can use Databricks-hosted models.
 
 #### Acceptance Criteria
 
@@ -66,20 +66,20 @@ Migrate the LLM provider integrations from goose that do not yet have equivalent
 
 ### Requirement 5: Local Inference
 
-**User Story:** As a baymax user, I want to run LLM inference locally without a cloud provider, so that I can work offline and keep data private.
+**User Story:** As a sim user, I want to run LLM inference locally without a cloud provider, so that I can work offline and keep data private.
 
 #### Acceptance Criteria
 
 1. WHEN a user enables local inference via an OpenAI-compatible local server THEN the system SHALL allow configuring the provider with a local `/v1` endpoint such as `http://localhost:11434/v1`
 2. WHEN a local Ollama or llama.cpp server does not require authentication THEN the system SHALL allow saving the provider without a user-entered API key
 3. IF a local inference provider is selected while its local server is not running THEN the system SHALL display a clear error that instructs the user to start Ollama or llama.cpp and configure the OpenAI-compatible endpoint
-4. THE local inference SHALL support loading models via candle (ML framework) when Baymax-owned in-process local inference is implemented
+4. THE local inference SHALL support loading models via candle (ML framework) when Sim-owned in-process local inference is implemented
 5. IF local inference hardware is insufficient THEN the system SHALL display a clear error
 6. WHILE local inference is running THE system SHALL handle resource constraints gracefully
 
 ### Requirement 6: Declarative Providers
 
-**User Story:** As a baymax user, I want to define custom providers via configuration files or UI, so that I can use any OpenAI-compatible API without writing code.
+**User Story:** As a sim user, I want to define custom providers via configuration files or UI, so that I can use any OpenAI-compatible API without writing code.
 
 #### Acceptance Criteria
 
@@ -91,7 +91,7 @@ Migrate the LLM provider integrations from goose that do not yet have equivalent
 
 ### Requirement 7: Provider Registry
 
-**User Story:** As a baymax developer, I want a centralized provider registry, so that providers can be discovered and instantiated by name.
+**User Story:** As a sim developer, I want a centralized provider registry, so that providers can be discovered and instantiated by name.
 
 #### Acceptance Criteria
 
@@ -101,7 +101,7 @@ Migrate the LLM provider integrations from goose that do not yet have equivalent
 
 ### Requirement 8: Embedding Providers
 
-**User Story:** As a baymax user, I want embedding model support, so that I can use embeddings for retrieval-augmented generation and semantic search.
+**User Story:** As a sim user, I want embedding model support, so that I can use embeddings for retrieval-augmented generation and semantic search.
 
 #### Acceptance Criteria
 
@@ -112,4 +112,4 @@ Migrate the LLM provider integrations from goose that do not yet have equivalent
 ## References
 
 - Source: `projects/goose/crates/goose/src/providers/` — azure.rs, gcpvertexai.rs, huggingface.rs, litellm.rs, snowflake.rs, sagemaker_tgi.rs, nanogpt.rs, tetrate.rs, avian.rs, kimicode.rs, databricks.rs, databricks_v2.rs, local_inference.rs, claude_acp.rs, claude_code.rs, codex.rs, chatgpt_codex.rs, cursor_agent.rs, gemini_cli.rs, declarative/, provider_registry.rs, embedding.rs, init.rs
-- Existing baymax providers: `crates/language_models/src/provider/`
+- Existing sim providers: `crates/language_models/src/provider/`

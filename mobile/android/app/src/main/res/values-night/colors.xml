@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Brand Colors - White primary for dark mode like iOS -->
-    <color name="baymax_primary">#FFFFFF</color>
-    <color name="baymax_primary_dark">#E0E0E0</color>
-    <color name="baymax_secondary">#64B5F6</color>
+    <color name="sim_primary">#FFFFFF</color>
+    <color name="sim_primary_dark">#E0E0E0</color>
+    <color name="sim_secondary">#64B5F6</color>
     
     <!-- Background Colors - Dark Mode matching iOS -->
     <color name="background_primary">#1C1C1E</color>

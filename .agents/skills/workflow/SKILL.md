@@ -17,7 +17,7 @@ do not duplicate effort.
 This skill follows the Symphony service spec's core shape where it applies:
 `WORKFLOW.md` is the repository-owned contract, the prompt body is rendered with
 strict template variables, Linear is the tracker, and tracker writes are part of
-the workflow/tooling layer. Baymax's local workflow mode differs from the full
+the workflow/tooling layer. Sim's local workflow mode differs from the full
 service spec by using checked-in task files as the dispatch source instead of
 polling Linear for candidates.
 
@@ -239,7 +239,7 @@ tracker:
   kind: linear
   api_key: $LINEAR_API_KEY
   team_key: ENG
-  project_slug: baymax
+  project_slug: sim
 tasks:
   glob: .agents/specs/**/tasks.md
 ---

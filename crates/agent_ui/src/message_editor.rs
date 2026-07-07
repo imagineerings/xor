@@ -14,7 +14,7 @@ use agent::ThreadStore;
 use agent_client_protocol::schema as acp;
 use anyhow::{Result, anyhow};
 use base64::Engine as _;
-use baymax_actions::agent::{Chat, PasteRaw};
+use sim_actions::agent::{Chat, PasteRaw};
 use editor::{
     Addon, AnchorRangeExt, ContextMenuOptions, Editor, EditorElement, EditorEvent, EditorMode,
     EditorStyle, Inlay, MultiBuffer, MultiBufferOffset, MultiBufferSnapshot, ToOffset,
@@ -799,7 +799,7 @@ impl MessageEditor {
 
                 if !direct_match && !scope_match {
                     return Err(anyhow!(indoc::formatdoc!(
-                        "/{command_name} is not a recognibaymax command in {agent_id}. \
+                        "/{command_name} is not a recognisim command in {agent_id}. \
                          Messages that start with `/` are interpreted as commands.
 
                          If you are trying to send a message and not run a command, \
@@ -2334,7 +2334,7 @@ mod tests {
 
     #[test]
     fn test_validate_slash_commands_accepts_scope_qualified_skill() {
-        let agent_id = AgentId::from("Baymax");
+        let agent_id = AgentId::from("Sim");
         let make_skill = |name: &str, source: &str| AvailableSkill {
             name: name.into(),
             description: "desc".into(),
@@ -2348,14 +2348,14 @@ mod tests {
         // name. The empty-scope encoding means a worktree literally
         // named `global` no longer collides with the global source.
         let commands = vec![acp::AvailableCommand::new("help", "Get help")];
-        let skills = vec![make_skill("deploy", ""), make_skill("deploy", "baymax")];
+        let skills = vec![make_skill("deploy", ""), make_skill("deploy", "sim")];
         let no_skills = Vec::new();
 
         // Bare name still works (current behavior — the resolver
         // applies project-overrides-global for unqualified commands).
         MessageEditor::validate_slash_commands("/deploy", &commands, &skills, &agent_id)
             .expect("bare /deploy should validate when a skill named `deploy` exists");
-        MessageEditor::validate_slash_commands("/baymax:deploy", &commands, &no_skills, &agent_id)
+        MessageEditor::validate_slash_commands("/sim:deploy", &commands, &no_skills, &agent_id)
             .expect_err("scope-qualified skills should require a first-class available skill");
 
         // Scope-qualified forms both validate, each pointing at the
@@ -2364,8 +2364,8 @@ mod tests {
         // for a project-local skill.
         MessageEditor::validate_slash_commands("/:deploy", &commands, &skills, &agent_id)
             .expect("/:deploy should validate when a global skill named `deploy` exists");
-        MessageEditor::validate_slash_commands("/baymax:deploy", &commands, &skills, &agent_id).expect(
-            "/baymax:deploy should validate when a project skill named `deploy` exists in the `baymax` worktree",
+        MessageEditor::validate_slash_commands("/sim:deploy", &commands, &skills, &agent_id).expect(
+            "/sim:deploy should validate when a project skill named `deploy` exists in the `sim` worktree",
         );
 
         // Hand-typed `/global:<name>` is NOT an alias for `/:<name>`.
@@ -2377,25 +2377,25 @@ mod tests {
             );
 
         // The `:` separator is what distinguishes a skill scope from
-        // an MCP server prefix — the dotted form `/baymax.deploy` is an
+        // an MCP server prefix — the dotted form `/sim.deploy` is an
         // MCP-style lookup, which doesn't match here.
-        MessageEditor::validate_slash_commands("/baymax.deploy", &commands, &skills, &agent_id)
+        MessageEditor::validate_slash_commands("/sim.deploy", &commands, &skills, &agent_id)
             .expect_err(
-                "/baymax.deploy (dotted) should be treated as an MCP-style prefix and fail",
+                "/sim.deploy (dotted) should be treated as an MCP-style prefix and fail",
             );
 
         // Wrong scope is rejected so the resolver doesn't silently
-        // fall through when the user meant a skill. `baymax:help` looks
+        // fall through when the user meant a skill. `sim:help` looks
         // like a skill scope qualifier but no skill named `help`
-        // exists in the `baymax` worktree (it's an MCP command).
+        // exists in the `sim` worktree (it's an MCP command).
         let err =
-            MessageEditor::validate_slash_commands("/baymax:help", &commands, &skills, &agent_id)
+            MessageEditor::validate_slash_commands("/sim:help", &commands, &skills, &agent_id)
                 .expect_err(
-                    "/baymax:help should fail — `help` is an MCP command, not a worktree skill",
+                    "/sim:help should fail — `help` is an MCP command, not a worktree skill",
                 );
         let err_message = err.to_string();
         assert!(
-            err_message.contains("/baymax:help"),
+            err_message.contains("/sim:help"),
             "error should mention the typed command: {err_message}"
         );
         // Error listing shows qualified forms for skills so users see
@@ -2406,7 +2406,7 @@ mod tests {
             "error listing should show qualified global form: {err_message}"
         );
         assert!(
-            err_message.contains("/baymax:deploy"),
+            err_message.contains("/sim:deploy"),
             "error listing should show qualified worktree form: {err_message}"
         );
         assert!(
@@ -2436,7 +2436,7 @@ mod tests {
     #[test]
     fn test_parse_mention_links() {
         // Single file mention
-        let text = "[@bundle-mac](file:///Users/test/baymax/script/bundle-mac)";
+        let text = "[@bundle-mac](file:///Users/test/sim/script/bundle-mac)";
         let mentions = parse_mention_links(text, PathStyle::local());
         assert_eq!(mentions.len(), 1);
         assert_eq!(mentions[0].0, 0..text.len());
@@ -2618,7 +2618,7 @@ mod tests {
         fs.insert_tree(
             "/test",
             json!({
-                ".baymax": {
+                ".sim": {
                     "tasks.json": r#"[{"label": "test", "command": "echo"}]"#
                 },
                 "src": {
@@ -2671,7 +2671,7 @@ mod tests {
         // Should fail because available_commands is empty (no commands supported)
         assert!(contents_result.is_err());
         let error_message = contents_result.unwrap_err().to_string();
-        assert!(error_message.contains("is not a recognibaymax command in Claude Agent"));
+        assert!(error_message.contains("is not a recognisim command in Claude Agent"));
         assert!(error_message.contains("Available commands for Claude Agent: none"));
 
         // Now simulate Claude providing its list of available commands (which doesn't include file)
@@ -2690,7 +2690,7 @@ mod tests {
 
         assert!(contents_result.is_err());
         let error_message = contents_result.unwrap_err().to_string();
-        assert!(error_message.contains("is not a recognibaymax command in Claude Agent"));
+        assert!(error_message.contains("is not a recognisim command in Claude Agent"));
         assert!(error_message.contains("/file"));
         assert!(error_message.contains("Available commands for Claude Agent: /help"));
 
@@ -4698,7 +4698,7 @@ mod tests {
     }
 
     #[gpui::test]
-    async fn test_serialibaymax_copy_text_selection_covers_only_mention(cx: &mut TestAppContext) {
+    async fn test_serialisim_copy_text_selection_covers_only_mention(cx: &mut TestAppContext) {
         init_test(cx);
 
         let (fixture, mut cx) = setup_selection_mention_fixture(cx).await;
@@ -4728,7 +4728,7 @@ mod tests {
     }
 
     #[gpui::test]
-    async fn test_serialibaymax_copy_text_returns_none_when_mentions_outside_selection(
+    async fn test_serialisim_copy_text_returns_none_when_mentions_outside_selection(
         cx: &mut TestAppContext,
     ) {
         init_test(cx);
@@ -4841,7 +4841,7 @@ mod tests {
                 Some(ClipboardEntry::String(entry)) => Some(entry.text().to_string()),
                 _ => None,
             })
-            .expect("cut should write serialibaymax text to clipboard");
+            .expect("cut should write serialisim text to clipboard");
         assert_eq!(clipboard_text, expected_text);
 
         let remaining_text = fixture.message_editor.read_with(&cx, |message_editor, cx| {
@@ -4876,7 +4876,7 @@ mod tests {
                 Some(ClipboardEntry::String(entry)) => Some(entry.text().to_string()),
                 _ => None,
             })
-            .expect("cut should write serialibaymax text to clipboard");
+            .expect("cut should write serialisim text to clipboard");
         assert_eq!(
             clipboard_text,
             format!("{} needs work\n", fixture.first_uri.as_link())
@@ -4889,7 +4889,7 @@ mod tests {
     }
 
     #[gpui::test]
-    async fn test_serialibaymax_cut_text_returns_none_when_mentions_outside_selection(
+    async fn test_serialisim_cut_text_returns_none_when_mentions_outside_selection(
         cx: &mut TestAppContext,
     ) {
         init_test(cx);
@@ -5279,11 +5279,11 @@ mod tests {
             .expect("decode png");
         let file_name = match extension {
             Some(extension) => format!(
-                "baymax-agent-ui-test-{}.{}",
+                "sim-agent-ui-test-{}.{}",
                 uuid::Uuid::new_v4(),
                 extension
             ),
-            None => format!("baymax-agent-ui-test-{}", uuid::Uuid::new_v4()),
+            None => format!("sim-agent-ui-test-{}", uuid::Uuid::new_v4()),
         };
         let path = std::env::temp_dir().join(file_name);
         std::fs::write(&path, bytes).expect("write temp png");

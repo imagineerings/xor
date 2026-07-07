@@ -11,12 +11,12 @@ on:
     - synchronize
 jobs:
   build_nix_linux_x86_64:
-    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'baymax-extensions') && ((github.event.action == 'labeled' && (github.event.label.name == 'run-nix' || github.event.label.name == 'run-bundling')) || (github.event.action == 'synchronize' && (contains(github.event.pull_request.labels.*.name, 'run-nix') || contains(github.event.pull_request.labels.*.name, 'run-bundling'))))
+    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'sim-extensions') && ((github.event.action == 'labeled' && (github.event.label.name == 'run-nix' || github.event.label.name == 'run-bundling')) || (github.event.action == 'synchronize' && (contains(github.event.pull_request.labels.*.name, 'run-nix') || contains(github.event.pull_request.labels.*.name, 'run-bundling'))))
     runs-on: namespace-profile-32x64-ubuntu-2004
     env:
-      BAYMAX_CLIENT_CHECKSUM_SEED: ${{ secrets.BAYMAX_CLIENT_CHECKSUM_SEED }}
-      BAYMAX_MINIDUMP_ENDPOINT: ${{ secrets.BAYMAX_SENTRY_MINIDUMP_ENDPOINT }}
-      BAYMAX_CLOUD_PROVIDER_ADDITIONAL_MODELS_JSON: ${{ secrets.BAYMAX_CLOUD_PROVIDER_ADDITIONAL_MODELS_JSON }}
+      SIM_CLIENT_CHECKSUM_SEED: ${{ secrets.SIM_CLIENT_CHECKSUM_SEED }}
+      SIM_MINIDUMP_ENDPOINT: ${{ secrets.SIM_SENTRY_MINIDUMP_ENDPOINT }}
+      SIM_CLOUD_PROVIDER_ADDITIONAL_MODELS_JSON: ${{ secrets.SIM_CLOUD_PROVIDER_ADDITIONAL_MODELS_JSON }}
       GIT_LFS_SKIP_SMUDGE: '1'
     steps:
     - name: steps::checkout_repo
@@ -34,21 +34,21 @@ jobs:
     - name: nix_build::build_nix::cachix_action
       uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad
       with:
-        name: baymax
+        name: sim
         authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
         cachixArgs: -v
-        pushFilter: -baymax-editor-[0-9.]*
+        pushFilter: -sim-editor-[0-9.]*
     - name: nix_build::build_nix::build
       run: nix build .#default -L --accept-flake-config
     timeout-minutes: 60
     continue-on-error: true
   build_nix_mac_aarch64:
-    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'baymax-extensions') && ((github.event.action == 'labeled' && (github.event.label.name == 'run-nix' || github.event.label.name == 'run-bundling')) || (github.event.action == 'synchronize' && (contains(github.event.pull_request.labels.*.name, 'run-nix') || contains(github.event.pull_request.labels.*.name, 'run-bundling'))))
+    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'sim-extensions') && ((github.event.action == 'labeled' && (github.event.label.name == 'run-nix' || github.event.label.name == 'run-bundling')) || (github.event.action == 'synchronize' && (contains(github.event.pull_request.labels.*.name, 'run-nix') || contains(github.event.pull_request.labels.*.name, 'run-bundling'))))
     runs-on: namespace-profile-mac-large
     env:
-      BAYMAX_CLIENT_CHECKSUM_SEED: ${{ secrets.BAYMAX_CLIENT_CHECKSUM_SEED }}
-      BAYMAX_MINIDUMP_ENDPOINT: ${{ secrets.BAYMAX_SENTRY_MINIDUMP_ENDPOINT }}
-      BAYMAX_CLOUD_PROVIDER_ADDITIONAL_MODELS_JSON: ${{ secrets.BAYMAX_CLOUD_PROVIDER_ADDITIONAL_MODELS_JSON }}
+      SIM_CLIENT_CHECKSUM_SEED: ${{ secrets.SIM_CLIENT_CHECKSUM_SEED }}
+      SIM_MINIDUMP_ENDPOINT: ${{ secrets.SIM_SENTRY_MINIDUMP_ENDPOINT }}
+      SIM_CLOUD_PROVIDER_ADDITIONAL_MODELS_JSON: ${{ secrets.SIM_CLOUD_PROVIDER_ADDITIONAL_MODELS_JSON }}
       GIT_LFS_SKIP_SMUDGE: '1'
     steps:
     - name: steps::checkout_repo
@@ -72,10 +72,10 @@ jobs:
     - name: nix_build::build_nix::cachix_action
       uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad
       with:
-        name: baymax
+        name: sim
         authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
         cachixArgs: -v
-        pushFilter: -baymax-editor-[0-9.]*
+        pushFilter: -sim-editor-[0-9.]*
     - name: nix_build::build_nix::build
       run: nix build .#default -L --accept-flake-config
     - name: nix_build::build_nix::export_to_local_nix_cache

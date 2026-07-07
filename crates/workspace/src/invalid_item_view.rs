@@ -1,6 +1,6 @@
 use std::{path::Path, sync::Arc};
 
-use baymax_actions::workspace::OpenWithSystem;
+use sim_actions::workspace::OpenWithSystem;
 use gpui::{EventEmitter, FocusHandle, Focusable};
 use ui::{
     App, Button, ButtonCommon, ButtonStyle, Clickable, Context, FluentBuilder, InteractiveElement,

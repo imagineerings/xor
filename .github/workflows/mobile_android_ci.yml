@@ -46,7 +46,7 @@ jobs:
       - name: Upload Android debug artifact
         uses: actions/upload-artifact@v4
         with:
-          name: baymax-android-debug
+          name: sim-android-debug
           path: mobile/build/android/*.apk
           if-no-files-found: error
 

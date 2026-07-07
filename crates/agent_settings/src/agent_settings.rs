@@ -1,5 +1,5 @@
 mod agent_profile;
-mod baymax_mode;
+mod sim_mode;
 mod user_agents_md;
 
 use std::cmp::Ordering::{Equal, Greater, Less};
@@ -26,7 +26,7 @@ use settings::{
 use util::ResultExt as _;
 
 pub use crate::agent_profile::*;
-pub use crate::baymax_mode::*;
+pub use crate::sim_mode::*;
 pub use crate::user_agents_md::{UserAgentsMd, UserAgentsMdState, init as init_user_agents_md};
 
 pub const SUMMARIZE_THREAD_PROMPT: &str = include_str!("prompts/summarize_thread_prompt.txt");
@@ -256,7 +256,7 @@ pub struct AgentSettings {
     pub play_sound_when_agent_done: PlaySoundWhenAgentDone,
     pub single_file_review: bool,
     pub model_parameters: Vec<LanguageModelParameters>,
-    pub baymax_mode: BaymaxMode,
+    pub sim_mode: SimMode,
     pub auto_compact: AutoCompactSettings,
     pub enable_feedback: bool,
     pub expand_edit_card: bool,
@@ -779,7 +779,7 @@ impl Settings for AgentSettings {
             play_sound_when_agent_done: agent.play_sound_when_agent_done.unwrap_or_default(),
             single_file_review: agent.single_file_review.unwrap(),
             model_parameters: agent.model_parameters,
-            baymax_mode: agent.baymax_mode.unwrap_or_default().into(),
+            sim_mode: agent.sim_mode.unwrap_or_default().into(),
             auto_compact: {
                 let auto_compact = agent.auto_compact.unwrap();
                 let threshold = parse_auto_compact_threshold(&auto_compact.threshold.unwrap().0)
@@ -1520,7 +1520,7 @@ mod tests {
         project::DisableAiSettings::register(cx);
         AgentSettings::register(cx);
 
-        // Should be Agent with an empty user layout (user hasn't customibaymax).
+        // Should be Agent with an empty user layout (user hasn't customisim).
         let layout = AgentSettings::get_layout(cx);
         let WindowLayout::Agent(Some(user_layout)) = layout else {
             panic!("expected Agent(Some), got {:?}", layout);
@@ -1703,7 +1703,7 @@ mod tests {
     #[gpui::test]
     async fn test_backfill_editor_layout(cx: &mut TestAppContext) {
         let fs = fs::FakeFs::new(cx.background_executor.clone());
-        // User has only customibaymax project_panel to "right".
+        // User has only customisim project_panel to "right".
         fs.save(
             paths::settings_file().as_path(),
             &serde_json::json!({
@@ -1729,7 +1729,7 @@ mod tests {
                 });
             });
 
-            // User has only customibaymax project_panel to "right".
+            // User has only customisim project_panel to "right".
             SettingsStore::update_global(cx, |store, cx| {
                 store
                     .set_user_settings(r#"{ "project_panel": { "dock": "right" } }"#, cx)

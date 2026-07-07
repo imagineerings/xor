@@ -12,7 +12,7 @@ use collab::{
     AppState, Config,
     db::UserId,
     executor::Executor,
-    rpc::{BaymaxVersion, CLEANUP_TIMEOUT, Principal, RECONNECT_TIMEOUT, Server},
+    rpc::{SimVersion, CLEANUP_TIMEOUT, Principal, RECONNECT_TIMEOUT, Server},
 };
 use collab_ui::channel_view::ChannelView;
 use collections::{HashMap, HashSet};
@@ -107,7 +107,7 @@ impl TestServer {
         let app_state = Self::build_app_state(&test_db, &livekit_server, executor.clone()).await;
         let epoch = app_state
             .db
-            .create_server(&app_state.config.baymax_environment)
+            .create_server(&app_state.config.sim_environment)
             .await
             .unwrap();
         let server = Server::new(epoch, app_state.clone());
@@ -156,7 +156,7 @@ impl TestServer {
         let epoch = self
             .app_state
             .db
-            .create_server(&self.app_state.config.baymax_environment)
+            .create_server(&self.app_state.config.sim_environment)
             .await
             .unwrap();
         self.server.reset(epoch);
@@ -299,7 +299,7 @@ impl TestServer {
                             server_conn,
                             client_name,
                             Principal::User(user),
-                            BaymaxVersion(semver::Version::new(1, 0, 0)),
+                            SimVersion(semver::Version::new(1, 0, 0)),
                             Some("test".to_string()),
                             None,
                             None,
@@ -588,14 +588,14 @@ impl TestServer {
                 livekit_secret: None,
                 rust_log: None,
                 log_json: None,
-                baymax_environment: "test".into(),
-                baymax_cloud_internal_api_key: "test-internal-api-key".into(),
+                sim_environment: "test".into(),
+                sim_cloud_internal_api_key: "test-internal-api-key".into(),
                 blob_store_url: None,
                 blob_store_region: None,
                 blob_store_access_key: None,
                 blob_store_secret_key: None,
                 blob_store_bucket: None,
-                baymax_client_checksum_seed: None,
+                sim_client_checksum_seed: None,
                 kinesis_region: None,
                 kinesis_stream: None,
                 kinesis_access_key: None,

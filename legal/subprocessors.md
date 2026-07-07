@@ -3,29 +3,29 @@ title: Subprocessor List
 slug: subprocessors
 ---
 
-Baymax uses select third-party subprocessors to deliver core product functionality. Each subprocessor processes customer personal data only as necessary to provide its service, and all are subject to appropriate data protection agreements.
+Sim uses select third-party subprocessors to deliver core product functionality. Each subprocessor processes customer personal data only as necessary to provide its service, and all are subject to appropriate data protection agreements.
 
-### How Baymax Uses Subprocessors
+### How Sim Uses Subprocessors
 
-To provide fast, reliable, and secure functionality, Baymax relies on a small number of carefully vetted third-party subprocessors. These vendors help us deliver essential capabilities such as hosting, billing, analytics, real-time collaboration, and hosted AI features.
+To provide fast, reliable, and secure functionality, Sim relies on a small number of carefully vetted third-party subprocessors. These vendors help us deliver essential capabilities such as hosting, billing, analytics, real-time collaboration, and hosted AI features.
 
 Each subprocessor only processes customer personal data as needed to provide its service.
 
-Baymax maintains contracts and data protection agreements with all subprocessors, including GDPR-compliant terms where applicable. We do not sell customer data, and we do not share customer personal data with vendors for advertising or marketing purposes.
+Sim maintains contracts and data protection agreements with all subprocessors, including GDPR-compliant terms where applicable. We do not sell customer data, and we do not share customer personal data with vendors for advertising or marketing purposes.
 
 ### AI Subprocessors
 
-Baymax offers three modes for AI:
+Sim offers three modes for AI:
 
-1. **Bring your own API key** — data goes directly from the customer to the model provider; Baymax does not process or store it.
-2. [**External Agents**](https://baymax.dev/docs/ai/external-agents) — Baymax uses ACP to provide an enhanced experience with terminal-based AI code agents like Claude Code or OpenAI Codex. Data is not processed or stored by Baymax when using external agents.
-3. **Baymax-hosted models** — Baymax sends customer prompts to one of its AI providers (listed below). These vendors act as subprocessors only for customers who choose this mode.
+1. **Bring your own API key** — data goes directly from the customer to the model provider; Sim does not process or store it.
+2. [**External Agents**](https://sim.dev/docs/ai/external-agents) — Sim uses ACP to provide an enhanced experience with terminal-based AI code agents like Claude Code or OpenAI Codex. Data is not processed or stored by Sim when using external agents.
+3. **Sim-hosted models** — Sim sends customer prompts to one of its AI providers (listed below). These vendors act as subprocessors only for customers who choose this mode.
 
 ### Ongoing Updates
 
 **Last Updated**: March 2, 2026
 
-This subprocessor list is reviewed regularly. Baymax will notify customers of material changes in accordance with our [Terms](https://baymax.dev/terms) and [Privacy Policy](https://baymax.dev/privacy-policy).
+This subprocessor list is reviewed regularly. Sim will notify customers of material changes in accordance with our [Terms](https://sim.dev/terms) and [Privacy Policy](https://sim.dev/privacy-policy).
 
 ---
 
@@ -74,7 +74,7 @@ This subprocessor list is reviewed regularly. Baymax will notify customers of ma
 | -------------------- | ---------------------------------------------------------------------------------------- | ------------- |
 | **Amplitude**        | Product analytics                                                                        | United States |
 | **Axiom**            | Application telemetry, observability, and logs                                           | United States |
-| **Fivetran**         | Automates data pipeline integration (extract, transformation, and load services) for Baymax | United States |
+| **Fivetran**         | Automates data pipeline integration (extract, transformation, and load services) for Sim | United States |
 | **Hex Technologies** | Analytics and debugging                                                                  | United States |
 | **Snowflake**        | Data warehouse                                                                           | United States |
 
@@ -88,9 +88,9 @@ This subprocessor list is reviewed regularly. Baymax will notify customers of ma
 
 ---
 
-## AI Services (Baymax-Hosted Models)
+## AI Services (Sim-Hosted Models)
 
-_These subprocessors apply only when customers opt to use Baymax's hosted AI models. When users supply their own API keys, or use external agents, data is sent directly to the provider and does not pass through Baymax's infrastructure._
+_These subprocessors apply only when customers opt to use Sim's hosted AI models. When users supply their own API keys, or use external agents, data is sent directly to the provider and does not pass through Sim's infrastructure._
 
 | Subprocessor        | Purpose                                                                                                                                                                                                          | Data Location |
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |

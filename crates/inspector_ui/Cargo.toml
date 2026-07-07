@@ -26,4 +26,4 @@ ui.workspace = true
 util.workspace = true
 util_macros.workspace = true
 workspace.workspace = true
-baymax_actions.workspace = true
+sim_actions.workspace = true

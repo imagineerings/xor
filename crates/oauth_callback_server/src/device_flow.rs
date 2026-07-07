@@ -7,7 +7,7 @@
 //! # Runtime requirements
 //!
 //! Both [`start_device_flow`] and [`poll_for_token`] / [`poll_once`] require
-//! a Tokio runtime.  In the baymax application this is always available via
+//! a Tokio runtime.  In the sim application this is always available via
 //! `crates/reqwest_client`, which initialises a global Tokio runtime on
 //! startup.
 

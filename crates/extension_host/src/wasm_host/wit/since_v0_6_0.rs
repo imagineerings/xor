@@ -23,16 +23,16 @@ wasmtime::component::bindgen!({
         "worktree": ExtensionWorktree,
         "project": ExtensionProject,
         "key-value-store": ExtensionKeyValueStore,
-        "baymax:extension/common": latest::baymax::extension::common,
-        "baymax:extension/http-client": latest::baymax::extension::http_client,
-        "baymax:extension/nodejs": latest::baymax::extension::nodejs,
-        "baymax:extension/process": latest::baymax::extension::process,
-        "baymax:extension/slash-command": latest::baymax::extension::slash_command,
-        "baymax:extension/context-server": latest::baymax::extension::context_server,
+        "sim:extension/common": latest::sim::extension::common,
+        "sim:extension/http-client": latest::sim::extension::http_client,
+        "sim:extension/nodejs": latest::sim::extension::nodejs,
+        "sim:extension/process": latest::sim::extension::process,
+        "sim:extension/slash-command": latest::sim::extension::slash_command,
+        "sim:extension/context-server": latest::sim::extension::context_server,
     },
 });
 
-pub use self::baymax::extension::*;
+pub use self::sim::extension::*;
 
 mod settings {
     #![allow(dead_code)]
@@ -138,7 +138,7 @@ impl From<github::GithubReleaseOptions> for latest::github::GithubReleaseOptions
     }
 }
 
-impl baymax::extension::github::Host for WasmState {
+impl sim::extension::github::Host for WasmState {
     async fn github_release_by_tag_name(
         &mut self,
         repo: String,
@@ -722,7 +722,7 @@ impl TryFrom<latest::DebugAdapterBinary> for DebugAdapterBinary {
     }
 }
 
-impl baymax::extension::dap::Host for WasmState {
+impl sim::extension::dap::Host for WasmState {
     async fn resolve_tcp_template(
         &mut self,
         template: dap::TcpArgumentsTemplate,

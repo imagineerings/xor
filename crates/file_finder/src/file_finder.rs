@@ -4,7 +4,7 @@ mod file_finder_tests;
 use futures::future::join_all;
 pub use open_path_prompt::OpenPathDelegate;
 
-use baymax_actions::search::ToggleIncludeIgnored;
+use sim_actions::search::ToggleIncludeIgnored;
 use channel::ChannelStore;
 use client::ChannelId;
 use collections::HashMap;

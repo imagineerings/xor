@@ -4132,7 +4132,7 @@ impl Item for GitGraph {
 }
 
 impl workspace::SerializableItem for GitGraph {
-    fn serialibaymax_item_kind() -> &'static str {
+    fn serialisim_item_kind() -> &'static str {
         "GitGraph"
     }
 
@@ -4173,7 +4173,7 @@ impl workspace::SerializableItem for GitGraph {
             return Task::ready(Err(anyhow::anyhow!("No git graph to deserialize")));
         };
 
-        let state = persistence::SerialibaymaxGitGraphState {
+        let state = persistence::SerialisimGitGraphState {
             log_source_type,
             log_source_value,
             log_order,
@@ -4384,7 +4384,7 @@ mod persistence {
         }
     }
 
-    pub fn deserialize_log_source(state: &SerialibaymaxGitGraphState) -> LogSource {
+    pub fn deserialize_log_source(state: &SerialisimGitGraphState) -> LogSource {
         match state.log_source_type {
             Some(LOG_SOURCE_ALL) => LogSource::All,
             Some(LOG_SOURCE_BRANCH) => state
@@ -4408,7 +4408,7 @@ mod persistence {
         }
     }
 
-    pub fn deserialize_log_order(state: &SerialibaymaxGitGraphState) -> LogOrder {
+    pub fn deserialize_log_order(state: &SerialisimGitGraphState) -> LogOrder {
         match state.log_order {
             Some(LOG_ORDER_DATE) => LogOrder::DateOrder,
             Some(LOG_ORDER_TOPO) => LogOrder::TopoOrder,
@@ -4419,7 +4419,7 @@ mod persistence {
     }
 
     #[derive(Debug, Default, Clone)]
-    pub struct SerialibaymaxGitGraphState {
+    pub struct SerialisimGitGraphState {
         pub log_source_type: Option<i32>,
         pub log_source_value: Option<String>,
         pub log_order: Option<i32>,
@@ -5746,13 +5746,13 @@ mod tests {
     }
 
     #[gpui::test]
-    fn test_serialibaymax_state_roundtrip(_cx: &mut TestAppContext) {
-        use persistence::SerialibaymaxGitGraphState;
+    fn test_serialisim_state_roundtrip(_cx: &mut TestAppContext) {
+        use persistence::SerialisimGitGraphState;
 
         let path = RepoPath::new(&"src/main.rs").unwrap();
         let sha = Oid::from_bytes(&[0xab; 20]).unwrap();
 
-        let state = SerialibaymaxGitGraphState {
+        let state = SerialisimGitGraphState {
             log_source_type: Some(persistence::LOG_SOURCE_PATH),
             log_source_value: Some("src/main.rs".to_string()),
             log_order: Some(persistence::LOG_ORDER_TOPO),
@@ -5776,7 +5776,7 @@ mod tests {
         assert_eq!(state.search_query.as_deref(), Some("fix bug"));
         assert_eq!(state.search_case_sensitive, Some(true));
 
-        let all_state = SerialibaymaxGitGraphState {
+        let all_state = SerialisimGitGraphState {
             log_source_type: Some(persistence::LOG_SOURCE_ALL),
             log_source_value: None,
             log_order: Some(persistence::LOG_ORDER_DATE),
@@ -5793,7 +5793,7 @@ mod tests {
             LogOrder::DateOrder
         ));
 
-        let branch_state = SerialibaymaxGitGraphState {
+        let branch_state = SerialisimGitGraphState {
             log_source_type: Some(persistence::LOG_SOURCE_BRANCH),
             log_source_value: Some("refs/heads/main".to_string()),
             ..Default::default()
@@ -5803,7 +5803,7 @@ mod tests {
             LogSource::Branch("refs/heads/main".into())
         );
 
-        let sha_state = SerialibaymaxGitGraphState {
+        let sha_state = SerialisimGitGraphState {
             log_source_type: Some(persistence::LOG_SOURCE_SHA),
             log_source_value: Some(sha.to_string()),
             ..Default::default()
@@ -5813,7 +5813,7 @@ mod tests {
             LogSource::Sha(sha)
         );
 
-        let empty_state = SerialibaymaxGitGraphState::default();
+        let empty_state = SerialisimGitGraphState::default();
         assert_eq!(
             persistence::deserialize_log_source(&empty_state),
             LogSource::All
@@ -6655,12 +6655,12 @@ mod tests {
                         &serde_json::to_string(&json!([
                             // Tagged global task that should be scheduled from the Git graph context menu.
                             {
-                                "label": "Git Show $BAYMAX_GIT_SHA_SHORT",
+                                "label": "Git Show $SIM_GIT_SHA_SHORT",
                                 "command": "git",
-                                "args": ["show", "$BAYMAX_GIT_SHA"],
-                                "cwd": "$BAYMAX_GIT_REPOSITORY_PATH",
+                                "args": ["show", "$SIM_GIT_SHA"],
+                                "cwd": "$SIM_GIT_REPOSITORY_PATH",
                                 "env": {
-                                    "REPOSITORY": "$BAYMAX_GIT_REPOSITORY_NAME",
+                                    "REPOSITORY": "$SIM_GIT_REPOSITORY_NAME",
                                 },
                                 "tags": [GIT_COMMAND_TASK_TAG],
                             },
@@ -6673,9 +6673,9 @@ mod tests {
                             // Tagged task that still should not appear because Git graph task contexts
                             // do not provide editor-specific variables.
                             {
-                                "label": "Print File $BAYMAX_FILE",
+                                "label": "Print File $SIM_FILE",
                                 "command": "echo",
-                                "args": ["$BAYMAX_FILE"],
+                                "args": ["$SIM_FILE"],
                                 "tags": [GIT_COMMAND_TASK_TAG],
                             },
                         ]))
@@ -6808,10 +6808,10 @@ mod tests {
                     Some(
                         &serde_json::to_string(&json!([
                             {
-                                "label": "Check out $BAYMAX_GIT_REF",
+                                "label": "Check out $SIM_GIT_REF",
                                 "command": "git",
-                                "args": ["checkout", "$BAYMAX_GIT_REF"],
-                                "cwd": "$BAYMAX_GIT_REPOSITORY_PATH",
+                                "args": ["checkout", "$SIM_GIT_REF"],
+                                "cwd": "$SIM_GIT_REPOSITORY_PATH",
                                 "tags": [GIT_COMMAND_TASK_TAG],
                             },
                         ]))

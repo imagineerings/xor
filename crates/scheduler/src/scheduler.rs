@@ -38,7 +38,7 @@ pub enum Priority {
     /// Medium priority - suitable for most use cases.
     #[default]
     Medium,
-    /// Low priority - use for background work that can be deprioritibaymax.
+    /// Low priority - use for background work that can be deprioritisim.
     Low,
 }
 

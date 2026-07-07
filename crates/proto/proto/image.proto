@@ -1,5 +1,5 @@
 syntax = "proto3";
-package baymax.messages;
+package sim.messages;
 
 import "core.proto";
 import "worktree.proto";

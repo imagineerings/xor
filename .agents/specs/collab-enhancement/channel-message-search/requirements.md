@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Baymax channels currently provide no mechanism to search past messages. Mattermost provides full-text search across messages with filters for channels, users, dates, and content types (`posts.yaml` API). Adding message search will make channels useful as a knowledge base where past discussions can be retrieved.
+Sim channels currently provide no mechanism to search past messages. Mattermost provides full-text search across messages with filters for channels, users, dates, and content types (`posts.yaml` API). Adding message search will make channels useful as a knowledge base where past discussions can be retrieved.
 
 ## Glossary
 

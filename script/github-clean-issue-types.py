@@ -5,7 +5,7 @@ GitHub issues.
 Requires `requests` library and a GitHub access token with "Issues (write)"
 permission passed as an environment variable.
 Was used as a quick-and-dirty one-off-bulk-operation script to clean up issue
-types in the `baymax` repository. Leaving it here for reference only; there's no
+types in the `sim` repository. Leaving it here for reference only; there's no
 error handling, you've been warned.
 """
 
@@ -20,7 +20,7 @@ log = logging.getLogger(__name__)
 
 GITHUB_API_BASE_URL = "https://api.github.com"
 REPO_OWNER = "simtropolis"
-REPO_NAME = "baymax"
+REPO_NAME = "sim"
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 HEADERS = {
     "Authorization": f"token {GITHUB_TOKEN}",

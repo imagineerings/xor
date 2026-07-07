@@ -205,8 +205,8 @@ impl<'a> Matcher<'a> {
         }
 
         let path_len = prefix.len() + path.len();
-        if let Some(memoibaymax) = self.score_matrix[query_idx * path_len + path_idx] {
-            return memoibaymax;
+        if let Some(memoisim) = self.score_matrix[query_idx * path_len + path_idx] {
+            return memoisim;
         }
 
         let mut score = 0.0;
@@ -627,7 +627,7 @@ mod tests {
             .collect()
     }
 
-    /// Test for https://github.com/simtropolis/baymax/issues/44324
+    /// Test for https://github.com/simtropolis/sim/issues/44324
     #[test]
     fn test_recursive_score_match_index_out_of_bounds() {
         let paths = vec!["İ/İ/İ/İ"];

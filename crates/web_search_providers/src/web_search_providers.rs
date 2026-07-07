@@ -19,7 +19,7 @@ fn register_web_search_providers(
     user_store: Entity<UserStore>,
     cx: &mut Context<WebSearchRegistry>,
 ) {
-    register_baymax_web_search_provider(
+    register_sim_web_search_provider(
         registry,
         client.clone(),
         user_store.clone(),
@@ -31,7 +31,7 @@ fn register_web_search_providers(
         &LanguageModelRegistry::global(cx),
         move |this, registry, event, cx| {
             if let language_model::Event::DefaultModelChanged = event {
-                register_baymax_web_search_provider(
+                register_sim_web_search_provider(
                     this,
                     client.clone(),
                     user_store.clone(),
@@ -44,25 +44,25 @@ fn register_web_search_providers(
     .detach();
 }
 
-fn register_baymax_web_search_provider(
+fn register_sim_web_search_provider(
     registry: &mut WebSearchRegistry,
     client: Arc<Client>,
     user_store: Entity<UserStore>,
     language_model_registry: &Entity<LanguageModelRegistry>,
     cx: &mut Context<WebSearchRegistry>,
 ) {
-    let using_baymax_provider = language_model_registry
+    let using_sim_provider = language_model_registry
         .read(cx)
         .default_model()
-        .is_some_and(|default| default.is_provided_by_baymax());
-    if using_baymax_provider {
+        .is_some_and(|default| default.is_provided_by_sim());
+    if using_sim_provider {
         registry.register_provider(
             cloud::CloudWebSearchProvider::new(client, user_store, cx),
             cx,
         )
     } else {
         registry.unregister_provider(WebSearchProviderId(
-            cloud::BAYMAX_WEB_SEARCH_PROVIDER_ID.into(),
+            cloud::SIM_WEB_SEARCH_PROVIDER_ID.into(),
         ));
     }
 }

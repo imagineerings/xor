@@ -13,7 +13,7 @@ use crate::{
     git::CommitDetails,
 };
 
-const PULL_REQUEST_BASE_URL: &str = "https://github.com/simtropolis/baymax/pull";
+const PULL_REQUEST_BASE_URL: &str = "https://github.com/simtropolis/sim/pull";
 
 #[derive(Debug)]
 pub struct ReportEntry<R> {
@@ -400,7 +400,7 @@ mod tests {
         );
         report.add(
             make_commit("ddd", "Dave", "dave@test.com", "Bump Version", ""),
-            Ok(ReviewSuccess::BaymaxZippyCommit(
+            Ok(ReviewSuccess::SimZippyCommit(
                 AutomatedChangeKind::VersionBump,
                 GithubLogin::new("dave".to_string()),
             )),

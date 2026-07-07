@@ -112,9 +112,9 @@
       "g s": "outline::Toggle",
       "g shift-o": "outline::Toggle",
       "g shift-s": "project_symbols::Toggle",
-      "g .": "editor::ToggleCodeActions", // baymax specific
-      "g shift-a": "editor::FindAllReferences", // baymax specific
-      "g space": "editor::OpenExcerpts", // baymax specific
+      "g .": "editor::ToggleCodeActions", // sim specific
+      "g shift-a": "editor::FindAllReferences", // sim specific
+      "g space": "editor::OpenExcerpts", // sim specific
       "g *": ["vim::MoveToNext", { "partial_word": true }],
       "g #": ["vim::MoveToPrevious", { "partial_word": true }],
       "g j": ["vim::Down", { "display_lines": true }],
@@ -359,9 +359,9 @@
       "escape": "vim::NormalBefore",
       "ctrl-x": null,
       "ctrl-x ctrl-o": "editor::ShowCompletions",
-      "ctrl-x ctrl-a": "assistant::InlineAssist", // baymax specific
-      "ctrl-x ctrl-c": "editor::ShowEditPrediction", // baymax specific
-      "ctrl-x ctrl-l": "editor::ToggleCodeActions", // baymax specific
+      "ctrl-x ctrl-a": "assistant::InlineAssist", // sim specific
+      "ctrl-x ctrl-c": "editor::ShowEditPrediction", // sim specific
+      "ctrl-x ctrl-l": "editor::ToggleCodeActions", // sim specific
       "ctrl-x ctrl-z": "editor::Cancel",
       "ctrl-x ctrl-e": "vim::LineDown",
       "ctrl-x ctrl-y": "vim::LineUp",
@@ -515,11 +515,11 @@
       "shift-h": "pane::ActivatePreviousItem", // not a helix default
       "g w": "vim::HelixJumpToWord",
       "g .": "vim::HelixGotoLastModification",
-      "g o": "editor::ToggleSelectedDiffHunks", // Baymax specific
-      "g shift-o": "git::ToggleStaged", // Baymax specific
-      "g shift-r": "git::Restore", // Baymax specific
-      "g u": "git::StageAndNext", // Baymax specific
-      "g shift-u": "git::UnstageAndNext", // Baymax specific
+      "g o": "editor::ToggleSelectedDiffHunks", // Sim specific
+      "g shift-o": "git::ToggleStaged", // Sim specific
+      "g shift-r": "git::Restore", // Sim specific
+      "g u": "git::StageAndNext", // Sim specific
+      "g shift-u": "git::UnstageAndNext", // Sim specific
 
       // Window mode
       "space w v": "pane::SplitRight",
@@ -703,7 +703,7 @@
     "bindings": {
       "c": "vim::CurrentLine",
       "x": "vim::Exchange",
-      "d": "editor::Rename", // baymax specific
+      "d": "editor::Rename", // sim specific
       "s": ["vim::PushChangeSurrounds", {}],
     },
   },
@@ -859,7 +859,7 @@
       "escape": ["vim::Literal", ["escape", "\u001B"]],
       "enter": ["vim::Literal", ["enter", "\u000D"]],
       "tab": ["vim::Literal", ["tab", "\u0009"]],
-      // baymax extensions:
+      // sim extensions:
       "backspace": ["vim::Literal", ["backspace", "\u0008"]],
       "delete": ["vim::Literal", ["delete", "\u007F"]],
     },

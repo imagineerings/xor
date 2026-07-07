@@ -2,7 +2,7 @@
 
 ## Overview
 
-Add emoji reaction support to Baymax channel messages. This spans five layers: protobuf definitions, database migration, server-side `ReactionStore` with RPC handlers, client-side UI (emoji picker + reaction bar), and real-time WebSocket sync. Tasks build incrementally — each phase produces testable, mergeable code before the next begins.
+Add emoji reaction support to Sim channel messages. This spans five layers: protobuf definitions, database migration, server-side `ReactionStore` with RPC handlers, client-side UI (emoji picker + reaction bar), and real-time WebSocket sync. Tasks build incrementally — each phase produces testable, mergeable code before the next begins.
 
 ## Tasks
 

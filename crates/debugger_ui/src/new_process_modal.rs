@@ -21,7 +21,7 @@ use gpui::{
 use itertools::Itertools as _;
 use picker::{Picker, PickerDelegate, highlighted_match_with_paths::HighlightedMatch};
 use project::{DebugScenarioContext, Project, TaskContexts, TaskSourceKind, task_store::TaskStore};
-use task::{BaymaxDebugConfig, DebugScenario, RevealTarget, SharedTaskContext, VariableName};
+use task::{SimDebugConfig, DebugScenario, RevealTarget, SharedTaskContext, VariableName};
 use ui::{
     ContextMenu, DropdownMenu, IconWithIndicator, Indicator, KeyBinding, ListItem, ListItemSpacing,
     Switch, SwitchLabelPosition, ToggleButtonGroup, ToggleButtonSimple, ToggleState, Tooltip,
@@ -330,7 +330,7 @@ impl NewProcessModal {
             None
         };
 
-        let session_scenario = BaymaxDebugConfig {
+        let session_scenario = SimDebugConfig {
             adapter: debugger.to_owned().into(),
             label,
             request,
@@ -343,7 +343,7 @@ impl NewProcessModal {
 
         cx.spawn(async move |_| {
             adapter?
-                .config_from_baymax_format(session_scenario)
+                .config_from_sim_format(session_scenario)
                 .await
                 .ok()
         })
@@ -833,14 +833,14 @@ pub(super) struct ConfigureMode {
 impl ConfigureMode {
     pub(super) fn new(window: &mut Window, cx: &mut App) -> Entity<Self> {
         let program = cx.new(|cx| {
-            InputField::new(window, cx, "ENV=Baymax ~/bin/program --option")
+            InputField::new(window, cx, "ENV=Sim ~/bin/program --option")
                 .label("Program")
                 .tab_stop(true)
                 .tab_index(1)
         });
 
         let cwd = cx.new(|cx| {
-            InputField::new(window, cx, "Ex: $BAYMAX_WORKTREE_ROOT")
+            InputField::new(window, cx, "Ex: $SIM_WORKTREE_ROOT")
                 .label("Working Directory")
                 .tab_stop(true)
                 .tab_index(2)
@@ -964,7 +964,7 @@ impl ConfigureMode {
 
 #[derive(Clone)]
 pub(super) struct AttachMode {
-    pub(super) definition: BaymaxDebugConfig,
+    pub(super) definition: SimDebugConfig,
     pub(super) attach_picker: Entity<AttachModal>,
 }
 
@@ -976,7 +976,7 @@ impl AttachMode {
         window: &mut Window,
         cx: &mut Context<NewProcessModal>,
     ) -> Entity<Self> {
-        let definition = BaymaxDebugConfig {
+        let definition = SimDebugConfig {
             adapter: debugger.unwrap_or(DebugAdapterName("".into())).0,
             label: "Attach New Session Setup".into(),
             request: dap::DebugRequest::Attach(task::AttachRequest { process_id: None }),
@@ -1073,7 +1073,7 @@ impl DebugDelegate {
                     };
 
                     match path.components().next_back() {
-                        Some(".baymax") => {
+                        Some(".sim") => {
                             path.push(RelPath::unix("debug.json").unwrap());
                         }
                         Some(".vscode") => {
@@ -1170,7 +1170,7 @@ impl DebugDelegate {
                         id: _,
                         directory_in_worktree: dir,
                         id_base: _,
-                    } => dir.ends_with(RelPath::unix(".baymax").unwrap()),
+                    } => dir.ends_with(RelPath::unix(".sim").unwrap()),
                     _ => false,
                 });
 
@@ -1493,7 +1493,7 @@ impl PickerDelegate for DebugDelegate {
                     Button::new("edit-debug-json", "Edit debug.json").on_click(cx.listener(
                         |_picker, _, window, cx| {
                             window.dispatch_action(
-                                baymax_actions::OpenProjectDebugTasks.boxed_clone(),
+                                sim_actions::OpenProjectDebugTasks.boxed_clone(),
                                 cx,
                             );
                             cx.emit(DismissEvent);
@@ -1616,7 +1616,7 @@ pub(crate) fn resolve_path(path: &mut String) {
         *path = trimmed_path.replacen('~', &home, 1);
     } else if let Some(strip_path) = path.strip_prefix(&format!(".{}", std::path::MAIN_SEPARATOR)) {
         *path = format!(
-            "$BAYMAX_WORKTREE_ROOT{}{}",
+            "$SIM_WORKTREE_ROOT{}{}",
             std::path::MAIN_SEPARATOR,
             &strip_path
         );

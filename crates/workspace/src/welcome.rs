@@ -1,5 +1,5 @@
 use crate::{
-    NewFile, Open, OpenMode, PathList, RecentWorkspace, SerialibaymaxWorkspaceLocation,
+    NewFile, Open, OpenMode, PathList, RecentWorkspace, SerialisimWorkspaceLocation,
     ToggleWorkspaceSidebar, Workspace, WorkspaceSettings,
     item::{Item, ItemEvent},
     persistence::WorkspaceDb,
@@ -13,7 +13,7 @@ use gpui::{
 use gpui::{WeakEntity, linear_color_stop, linear_gradient};
 use menu::{SelectNext, SelectPrevious};
 
-use baymax_actions::{
+use sim_actions::{
     Extensions, OpenKeymap, OpenOnboarding, OpenSettings, assistant::ToggleFocus, command_palette,
 };
 use schemars::JsonSchema;
@@ -30,9 +30,9 @@ pub struct OpenRecentProject {
 }
 
 actions!(
-    baymax,
+    sim,
     [
-        /// Show the Baymax welcome screen
+        /// Show the Sim welcome screen
         ShowWelcome
     ]
 );
@@ -303,7 +303,7 @@ impl WelcomePage {
     ) {
         if let Some(recent_workspaces) = &self.recent_workspaces {
             if let Some(workspace) = recent_workspaces.get(action.index) {
-                let is_local = matches!(workspace.location, SerialibaymaxWorkspaceLocation::Local);
+                let is_local = matches!(workspace.location, SerialisimWorkspaceLocation::Local);
 
                 if is_local {
                     let paths = workspace.paths.paths().to_vec();
@@ -319,7 +319,7 @@ impl WelcomePage {
                         })
                         .log_err();
                 } else {
-                    use baymax_actions::OpenRecent;
+                    use sim_actions::OpenRecent;
                     window.dispatch_action(OpenRecent::default().boxed_clone(), cx);
                 }
             }
@@ -347,7 +347,7 @@ impl WelcomePage {
                 h_flex()
                     .gap_1p5()
                     .child(
-                        Icon::new(IconName::BaymaxAssistant)
+                        Icon::new(IconName::SimAssistant)
                             .color(Color::Muted)
                             .size(IconSize::Small),
                     )
@@ -389,14 +389,14 @@ impl WelcomePage {
         &self,
         project_index: usize,
         tab_index: usize,
-        location: &SerialibaymaxWorkspaceLocation,
+        location: &SerialisimWorkspaceLocation,
         paths: &PathList,
     ) -> impl IntoElement {
         let name = project_name(paths);
 
         let (icon, title) = match location {
-            SerialibaymaxWorkspaceLocation::Local => (IconName::Folder, name),
-            SerialibaymaxWorkspaceLocation::Remote(_) => (IconName::Server, name),
+            SerialisimWorkspaceLocation::Local => (IconName::Folder, name),
+            SerialisimWorkspaceLocation::Remote(_) => (IconName::Server, name),
         };
 
         SectionButton::new(
@@ -448,9 +448,9 @@ impl Render for WelcomePage {
         };
 
         let welcome_label = if self.fallback_to_recent_projects {
-            "Welcome back to Baymax"
+            "Welcome back to Sim"
         } else {
-            "Welcome to Baymax"
+            "Welcome to Sim"
         };
 
         h_flex()
@@ -477,7 +477,7 @@ impl Render for WelcomePage {
                             .justify_center()
                             .mb_4()
                             .gap_4()
-                            .child(Vector::square(VectorName::BaymaxLogo, rems_from_px(45.)))
+                            .child(Vector::square(VectorName::SimLogo, rems_from_px(45.)))
                             .child(
                                 v_flex().child(Headline::new(welcome_label)).child(
                                     Label::new("The editor for what's next")
@@ -540,7 +540,7 @@ impl Item for WelcomePage {
 }
 
 impl crate::SerializableItem for WelcomePage {
-    fn serialibaymax_item_kind() -> &'static str {
+    fn serialisim_item_kind() -> &'static str {
         "WelcomePage"
     }
 
@@ -686,8 +686,8 @@ mod tests {
     #[test]
     fn test_project_name_multiple() {
         // PathList sorts lexicographically, so filenames appear in alpha order
-        let paths = PathList::new(&["/home/user/baymax", "/home/user/api"]);
-        assert_eq!(project_name(&paths), "api, baymax");
+        let paths = PathList::new(&["/home/user/sim", "/home/user/api"]);
+        assert_eq!(project_name(&paths), "api, sim");
     }
 
     #[test]

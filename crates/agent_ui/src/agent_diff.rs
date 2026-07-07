@@ -18,7 +18,7 @@ use gpui::{
     Global, SharedString, Subscription, Task, TaskExt, WeakEntity, Window, prelude::*,
 };
 
-use baymax_actions::assistant::ToggleFocus;
+use sim_actions::assistant::ToggleFocus;
 use language::{Buffer, Capability, OffsetRangeExt, Point};
 use multi_buffer::PathKey;
 use project::{Project, ProjectItem, ProjectPath};
@@ -507,7 +507,7 @@ impl Item for AgentDiffPane {
     type Event = EditorEvent;
 
     fn tab_icon(&self, _window: &Window, _cx: &App) -> Option<Icon> {
-        Some(Icon::new(IconName::BaymaxAssistant).color(Color::Muted))
+        Some(Icon::new(IconName::SimAssistant).color(Color::Muted))
     }
 
     fn to_item_events(event: &EditorEvent, f: &mut dyn FnMut(ItemEvent)) {

@@ -1,6 +1,6 @@
 ---
 title: Yarn
-description: "Configure Yarn language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure Yarn language support in Sim, including language servers, formatting, and debugging."
 ---
 
 # Yarn

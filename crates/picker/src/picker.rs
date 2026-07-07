@@ -4,7 +4,7 @@ pub mod popover_menu;
 
 use anyhow::Result;
 
-use baymax_actions::editor::{MoveDown, MoveUp};
+use sim_actions::editor::{MoveDown, MoveUp};
 use gpui::{
     Action, AnyElement, App, Bounds, ClickEvent, Context, DismissEvent, EventEmitter, FocusHandle,
     Focusable, Length, ListSizingBehavior, ListState, MouseButton, MouseUpEvent, Pixels, Render,

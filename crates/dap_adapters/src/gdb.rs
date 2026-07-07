@@ -4,7 +4,7 @@ use collections::HashMap;
 use dap::{StartDebuggingRequestArguments, adapters::DebugTaskDefinition};
 use gpui::AsyncApp;
 use std::ffi::OsStr;
-use task::{BaymaxDebugConfig, DebugScenario};
+use task::{SimDebugConfig, DebugScenario};
 
 use crate::*;
 
@@ -29,13 +29,13 @@ impl DebugAdapter for GdbDebugAdapter {
         DebugAdapterName(Self::ADAPTER_NAME.into())
     }
 
-    async fn config_from_baymax_format(
+    async fn config_from_sim_format(
         &self,
-        baymax_scenario: BaymaxDebugConfig,
+        sim_scenario: SimDebugConfig,
     ) -> Result<DebugScenario> {
         let mut obj = serde_json::Map::default();
 
-        match &baymax_scenario.request {
+        match &sim_scenario.request {
             dap::DebugRequest::Attach(attach) => {
                 obj.insert("request".into(), "attach".into());
                 obj.insert("pid".into(), attach.process_id.into());
@@ -53,7 +53,7 @@ impl DebugAdapter for GdbDebugAdapter {
                     obj.insert("env".into(), launch.env_json());
                 }
 
-                if let Some(stop_on_entry) = baymax_scenario.stop_on_entry {
+                if let Some(stop_on_entry) = sim_scenario.stop_on_entry {
                     obj.insert(
                         "stopAtBeginningOfMainSubprogram".into(),
                         stop_on_entry.into(),
@@ -66,8 +66,8 @@ impl DebugAdapter for GdbDebugAdapter {
         }
 
         Ok(DebugScenario {
-            adapter: baymax_scenario.adapter,
-            label: baymax_scenario.label,
+            adapter: sim_scenario.adapter,
+            label: sim_scenario.label,
             build: None,
             config: serde_json::Value::Object(obj),
             tcp_connection: None,

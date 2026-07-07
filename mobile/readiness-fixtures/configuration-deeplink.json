@@ -1,6 +1,6 @@
 {
   "description": "Representative QR/deep-link payload for mobile connection configuration.",
-  "deep_link": "baymaxchat://configure?data=%7B%22url%22%3A%22https%3A%2F%2Fexample.trycloudflare.com%22%2C%22secret%22%3A%22test-secret%22%7D",
+  "deep_link": "simchat://configure?data=%7B%22url%22%3A%22https%3A%2F%2Fexample.trycloudflare.com%22%2C%22secret%22%3A%22test-secret%22%7D",
   "payload": {
     "url": "https://example.trycloudflare.com",
     "secret": "test-secret"

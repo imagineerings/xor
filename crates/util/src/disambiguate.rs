@@ -154,17 +154,17 @@ mod tests {
     fn test_duplicate_paths_from_multiple_groups() {
         use std::path::Path;
 
-        // Simulates the sidebar scenario: a path like /Users/rtfeldman/code/baymax
-        // appears in two project groups (e.g. "baymax" alone and "baymax, roc").
+        // Simulates the sidebar scenario: a path like /Users/rtfeldman/code/sim
+        // appears in two project groups (e.g. "sim" alone and "sim, roc").
         // After deduplication, only unique paths should be disambiguated.
         //
         // Paths:
-        //   /Users/rtfeldman/code/worktrees/baymax/focal-arrow/baymax  (group 1)
-        //   /Users/rtfeldman/code/baymax                             (group 2)
-        //   /Users/rtfeldman/code/baymax                             (group 3, same path as group 2)
+        //   /Users/rtfeldman/code/worktrees/sim/focal-arrow/sim  (group 1)
+        //   /Users/rtfeldman/code/sim                             (group 2)
+        //   /Users/rtfeldman/code/sim                             (group 3, same path as group 2)
         //   /Users/rtfeldman/code/roc                             (group 3)
         //
-        // A naive flat_map collects duplicates. The duplicate /code/baymax entries
+        // A naive flat_map collects duplicates. The duplicate /code/sim entries
         // collide with each other and drive the detail to the full path.
         // The fix is to deduplicate before disambiguating.
 
@@ -183,20 +183,20 @@ mod tests {
         }
 
         let all_paths: Vec<&Path> = vec![
-            Path::new("/Users/rtfeldman/code/worktrees/baymax/focal-arrow/baymax"),
-            Path::new("/Users/rtfeldman/code/baymax"),
+            Path::new("/Users/rtfeldman/code/worktrees/sim/focal-arrow/sim"),
+            Path::new("/Users/rtfeldman/code/sim"),
             Path::new("/Users/rtfeldman/code/roc"),
         ];
 
         let details =
             compute_disambiguation_details(&all_paths, |path, detail| path_suffix(path, detail));
 
-        // focal-arrow/baymax and code/baymax both end in "baymax", so they need detail 1.
+        // focal-arrow/sim and code/sim both end in "sim", so they need detail 1.
         // "roc" is unique at detail 0.
         assert_eq!(details, vec![1, 1, 0]);
 
-        assert_eq!(path_suffix(all_paths[0], details[0]), "focal-arrow/baymax");
-        assert_eq!(path_suffix(all_paths[1], details[1]), "code/baymax");
+        assert_eq!(path_suffix(all_paths[0], details[0]), "focal-arrow/sim");
+        assert_eq!(path_suffix(all_paths[1], details[1]), "code/sim");
         assert_eq!(path_suffix(all_paths[2], details[2]), "roc");
     }
 }

@@ -4,27 +4,27 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-function getBaymaxDataDir() {
+function getSimDataDir() {
   const platform = process.platform;
 
   if (platform === "darwin") {
-    // macOS: ~/Library/Application Support/Baymax
-    return path.join(os.homedir(), "Library", "Application Support", "Baymax");
+    // macOS: ~/Library/Application Support/Sim
+    return path.join(os.homedir(), "Library", "Application Support", "Sim");
   } else if (platform === "linux" || platform === "freebsd") {
-    // Linux/FreeBSD: $FLATPAK_XDG_DATA_HOME or XDG_DATA_HOME/baymax
+    // Linux/FreeBSD: $FLATPAK_XDG_DATA_HOME or XDG_DATA_HOME/sim
     if (process.env.FLATPAK_XDG_DATA_HOME) {
-      return path.join(process.env.FLATPAK_XDG_DATA_HOME, "baymax");
+      return path.join(process.env.FLATPAK_XDG_DATA_HOME, "sim");
     }
     const xdgDataHome = process.env.XDG_DATA_HOME || path.join(os.homedir(), ".local", "share");
-    return path.join(xdgDataHome, "baymax");
+    return path.join(xdgDataHome, "sim");
   } else if (platform === "win32") {
-    // Windows: LocalAppData/Baymax
+    // Windows: LocalAppData/Sim
     const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local");
-    return path.join(localAppData, "Baymax");
+    return path.join(localAppData, "Sim");
   } else {
     // Fallback to XDG config dir
     const xdgConfigHome = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
-    return path.join(xdgConfigHome, "baymax");
+    return path.join(xdgConfigHome, "sim");
   }
 }
 
@@ -73,7 +73,7 @@ function parseTimestampFromFilename(filePath) {
 }
 
 function writeBuildTimingJson(filePath, durationMs, firstCrate, target, blockedMs, command) {
-  const buildTimingsDir = path.join(getBaymaxDataDir(), "build_timings");
+  const buildTimingsDir = path.join(getSimDataDir(), "build_timings");
 
   // Create directory if it doesn't exist
   if (!fs.existsSync(buildTimingsDir)) {

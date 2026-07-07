@@ -802,7 +802,7 @@ mod tests {
             setup_test_with_fs(cx, fs, &[path!("/").as_ref()]).await;
         let language_registry = project.read_with(cx, |p, _cx| p.languages().clone());
 
-        // Ensure the diff is finalibaymax after the edit completes.
+        // Ensure the diff is finalisim after the edit completes.
         {
             let (stream_tx, mut stream_rx) = ToolCallEventStream::test();
             let edit = cx.update(|cx| {
@@ -820,10 +820,10 @@ mod tests {
             diff.read_with(cx, |diff, _| assert!(matches!(diff, Diff::Pending(_))));
             cx.run_until_parked();
             edit.await.unwrap();
-            diff.read_with(cx, |diff, _| assert!(matches!(diff, Diff::Finalibaymax(_))));
+            diff.read_with(cx, |diff, _| assert!(matches!(diff, Diff::Finalisim(_))));
         }
 
-        // Ensure the diff is finalibaymax if the tool call gets dropped.
+        // Ensure the diff is finalisim if the tool call gets dropped.
         {
             let tool = Arc::new(WriteFileTool::new(
                 project.clone(),
@@ -847,7 +847,7 @@ mod tests {
             diff.read_with(cx, |diff, _| assert!(matches!(diff, Diff::Pending(_))));
             drop(edit);
             cx.run_until_parked();
-            diff.read_with(cx, |diff, _| assert!(matches!(diff, Diff::Finalibaymax(_))));
+            diff.read_with(cx, |diff, _| assert!(matches!(diff, Diff::Finalisim(_))));
         }
     }
 
@@ -973,8 +973,8 @@ mod tests {
         assert_eq!(new_text, "new line 1\nnew line 2\n");
         assert_eq!(*old_text, "old line 1\nold line 2\nold line 3\n");
 
-        // Diff is finalibaymax after completion
-        diff.read_with(cx, |diff, _| assert!(matches!(diff, Diff::Finalibaymax(_))));
+        // Diff is finalisim after completion
+        diff.read_with(cx, |diff, _| assert!(matches!(diff, Diff::Finalisim(_))));
     }
 
     #[gpui::test]

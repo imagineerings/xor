@@ -24,11 +24,11 @@ pub fn home_dir() -> &'static PathBuf {
     HOME_DIR.get_or_init(|| {
         if cfg!(any(test, feature = "test-support")) {
             if cfg!(target_os = "macos") {
-                PathBuf::from("/Users/baymax")
+                PathBuf::from("/Users/sim")
             } else if cfg!(target_os = "windows") {
-                PathBuf::from("C:\\Users\\baymax")
+                PathBuf::from("C:\\Users\\sim")
             } else {
-                PathBuf::from("/home/baymax")
+                PathBuf::from("/home/sim")
             }
         } else {
             dirs::home_dir().expect("failed to determine home directory")
@@ -197,7 +197,7 @@ pub fn path_ends_with(base: &Path, suffix: &Path) -> bool {
 
 /// Case-insensitive ASCII comparison of a path component to a literal
 /// folder name. macOS and Windows use case-insensitive filesystems by
-/// default, so a path like `.BAYMAX/settings.json` resolves to the same
+/// default, so a path like `.SIM/settings.json` resolves to the same
 /// inode as the lowercase form. A case-sensitive `==` check would miss
 /// those and let a malicious settings author bypass classifiers with
 /// unusual casing. Callers should restrict `name` to ASCII; for ASCII
@@ -233,9 +233,9 @@ pub fn strip_path_suffix<'a>(base: &'a Path, suffix: &Path) -> Option<&'a Path> 
 /// windows, these conversions sanitize UNC paths by removing the `\\\\?\\` prefix.
 #[derive(Eq, PartialEq, Hash, Ord, PartialOrd)]
 #[repr(transparent)]
-pub struct SanitibaymaxPath(Path);
+pub struct SanitisimPath(Path);
 
-impl SanitibaymaxPath {
+impl SanitisimPath {
     pub fn new<T: AsRef<Path> + ?Sized>(path: &T) -> &Self {
         #[cfg(not(target_os = "windows"))]
         return Self::unchecked_new(path.as_ref());
@@ -245,12 +245,12 @@ impl SanitibaymaxPath {
     }
 
     pub fn unchecked_new<T: AsRef<Path> + ?Sized>(path: &T) -> &Self {
-        // safe because `Path` and `SanitibaymaxPath` have the same repr and Drop impl
+        // safe because `Path` and `SanitisimPath` have the same repr and Drop impl
         unsafe { mem::transmute::<&Path, &Self>(path.as_ref()) }
     }
 
     pub fn from_arc(path: Arc<Path>) -> Arc<Self> {
-        // safe because `Path` and `SanitibaymaxPath` have the same repr and Drop impl
+        // safe because `Path` and `SanitisimPath` have the same repr and Drop impl
         #[cfg(not(target_os = "windows"))]
         return unsafe { mem::transmute::<Arc<Path>, Arc<Self>>(path) };
 
@@ -258,7 +258,7 @@ impl SanitibaymaxPath {
         {
             let simplified = dunce::simplified(path.as_ref());
             if simplified == path.as_ref() {
-                // safe because `Path` and `SanitibaymaxPath` have the same repr and Drop impl
+                // safe because `Path` and `SanitisimPath` have the same repr and Drop impl
                 unsafe { mem::transmute::<Arc<Path>, Arc<Self>>(path) }
             } else {
                 Self::unchecked_new(simplified).into()
@@ -271,12 +271,12 @@ impl SanitibaymaxPath {
     }
 
     pub fn cast_arc(path: Arc<Self>) -> Arc<Path> {
-        // safe because `Path` and `SanitibaymaxPath` have the same repr and Drop impl
+        // safe because `Path` and `SanitisimPath` have the same repr and Drop impl
         unsafe { mem::transmute::<Arc<Self>, Arc<Path>>(path) }
     }
 
     pub fn cast_arc_ref(path: &Arc<Self>) -> &Arc<Path> {
-        // safe because `Path` and `SanitibaymaxPath` have the same repr and Drop impl
+        // safe because `Path` and `SanitisimPath` have the same repr and Drop impl
         unsafe { mem::transmute::<&Arc<Self>, &Arc<Path>>(path) }
     }
 
@@ -317,33 +317,33 @@ impl SanitibaymaxPath {
     }
 }
 
-impl std::fmt::Debug for SanitibaymaxPath {
+impl std::fmt::Debug for SanitisimPath {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(&self.0, formatter)
     }
 }
 
-impl Display for SanitibaymaxPath {
+impl Display for SanitisimPath {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0.display())
     }
 }
 
-impl From<&SanitibaymaxPath> for Arc<SanitibaymaxPath> {
-    fn from(sanitibaymax_path: &SanitibaymaxPath) -> Self {
-        let path: Arc<Path> = sanitibaymax_path.0.into();
-        // safe because `Path` and `SanitibaymaxPath` have the same repr and Drop impl
+impl From<&SanitisimPath> for Arc<SanitisimPath> {
+    fn from(sanitisim_path: &SanitisimPath) -> Self {
+        let path: Arc<Path> = sanitisim_path.0.into();
+        // safe because `Path` and `SanitisimPath` have the same repr and Drop impl
         unsafe { mem::transmute(path) }
     }
 }
 
-impl From<&SanitibaymaxPath> for PathBuf {
-    fn from(sanitibaymax_path: &SanitibaymaxPath) -> Self {
-        sanitibaymax_path.as_path().into()
+impl From<&SanitisimPath> for PathBuf {
+    fn from(sanitisim_path: &SanitisimPath) -> Self {
+        sanitisim_path.as_path().into()
     }
 }
 
-impl AsRef<Path> for SanitibaymaxPath {
+impl AsRef<Path> for SanitisimPath {
     fn as_ref(&self) -> &Path {
         &self.0
     }
@@ -1128,7 +1128,7 @@ where
 /// * Numbers are compared by numeric value, not character by character
 /// * Leading zeros affect ordering when numeric values are equal
 /// * Can handle numbers larger than u128::MAX (falls back to string comparison)
-/// * When strings are equal case-insensitively, lowercase is prioritibaymax (lowercase < uppercase)
+/// * When strings are equal case-insensitively, lowercase is prioritisim (lowercase < uppercase)
 ///
 /// # Algorithm
 ///
@@ -1683,8 +1683,8 @@ mod tests {
     #[test]
     fn test_normalize_uses_path_style_separator() {
         assert_eq!(
-            PathStyle::Posix.normalize("/home/user/dev/../worktrees/./baymax"),
-            "/home/user/worktrees/baymax"
+            PathStyle::Posix.normalize("/home/user/dev/../worktrees/./sim"),
+            "/home/user/worktrees/sim"
         );
         assert_eq!(
             PathStyle::Windows.normalize("C:\\Users\\user\\dev\\worktrees"),
@@ -2582,9 +2582,9 @@ mod tests {
         );
 
         assert_eq!(
-            PathWithPosition::parse_str("app-editors:baymax-0.143.6:20240710-201212.log:34:"),
+            PathWithPosition::parse_str("app-editors:sim-0.143.6:20240710-201212.log:34:"),
             PathWithPosition {
-                path: PathBuf::from("app-editors:baymax-0.143.6:20240710-201212.log"),
+                path: PathBuf::from("app-editors:sim-0.143.6:20240710-201212.log"),
                 row: Some(34),
                 column: None,
             }
@@ -2827,7 +2827,7 @@ mod tests {
 
     // #[perf]
     // fn project_search() {
-    //     let path = Path::new("/Users/someonetoignore/work/baymax/baymax.dev/node_modules");
+    //     let path = Path::new("/Users/someonetoignore/work/sim/sim.dev/node_modules");
     //     let path_matcher =
     //         PathMatcher::new(&["**/node_modules/**".to_owned()], PathStyle::Posix).unwrap();
     //     assert!(
@@ -2837,18 +2837,18 @@ mod tests {
     // }
     #[perf]
     #[cfg(target_os = "windows")]
-    fn test_sanitibaymax_path() {
+    fn test_sanitisim_path() {
         let path = Path::new("C:\\Users\\someone\\test_file.rs");
-        let sanitibaymax_path = SanitibaymaxPath::new(path);
+        let sanitisim_path = SanitisimPath::new(path);
         assert_eq!(
-            sanitibaymax_path.to_string(),
+            sanitisim_path.to_string(),
             "C:\\Users\\someone\\test_file.rs"
         );
 
         let path = Path::new("\\\\?\\C:\\Users\\someone\\test_file.rs");
-        let sanitibaymax_path = SanitibaymaxPath::new(path);
+        let sanitisim_path = SanitisimPath::new(path);
         assert_eq!(
-            sanitibaymax_path.to_string(),
+            sanitisim_path.to_string(),
             "C:\\Users\\someone\\test_file.rs"
         );
     }

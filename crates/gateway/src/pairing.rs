@@ -5,12 +5,12 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 /// A simple pairing service that maps external platform user IDs
-/// to internal baymax user identities.
+/// to internal sim user identities.
 ///
 /// Pairings can be persisted to a JSON file for durability across
 /// application restarts.
 pub struct PairingService {
-    /// The underlying store: maps `platform_id` → `baymax_user`.
+    /// The underlying store: maps `platform_id` → `sim_user`.
     store: HashMap<String, String>,
     /// Optional path to a JSON file used for persistence.
     storage_path: Option<PathBuf>,
@@ -49,11 +49,11 @@ impl PairingService {
         }
     }
 
-    /// Link an external platform user to a baymax user identity.
+    /// Link an external platform user to a sim user identity.
     ///
     /// Returns an error if the pairing already exists (use
     /// [`unlink`](Self::unlink) first to change a pairing).
-    pub fn pair_platform_user(&mut self, platform_id: &str, baymax_user: &str) -> Result<()> {
+    pub fn pair_platform_user(&mut self, platform_id: &str, sim_user: &str) -> Result<()> {
         if self.store.contains_key(platform_id) {
             anyhow::bail!(
                 "platform user '{platform_id}' is already paired to '{}'",
@@ -61,12 +61,12 @@ impl PairingService {
             );
         }
         self.store
-            .insert(platform_id.to_string(), baymax_user.to_string());
+            .insert(platform_id.to_string(), sim_user.to_string());
         self.persist()
     }
 
-    /// Look up the baymax user identity associated with a platform user.
-    pub fn lookup_baymax_user(&self, platform_id: &str) -> Option<&str> {
+    /// Look up the sim user identity associated with a platform user.
+    pub fn lookup_sim_user(&self, platform_id: &str) -> Option<&str> {
         self.store.get(platform_id).map(|s| s.as_str())
     }
 
@@ -86,7 +86,7 @@ impl PairingService {
         self.store.len()
     }
 
-    /// Iterate over all pairings (platform_id, baymax_user).
+    /// Iterate over all pairings (platform_id, sim_user).
     pub fn store(&self) -> impl Iterator<Item = (&str, &str)> {
         self.store.iter().map(|(k, v)| (k.as_str(), v.as_str()))
     }
@@ -124,7 +124,7 @@ mod tests {
     fn test_pair_and_lookup() {
         let mut service = PairingService::new();
         assert!(service.pair_platform_user("tg:12345", "alice").is_ok());
-        assert_eq!(service.lookup_baymax_user("tg:12345"), Some("alice"));
+        assert_eq!(service.lookup_sim_user("tg:12345"), Some("alice"));
     }
 
     #[test]
@@ -134,7 +134,7 @@ mod tests {
         let err = service.pair_platform_user("tg:12345", "bob");
         assert!(err.is_err());
         // Original pairing is preserved
-        assert_eq!(service.lookup_baymax_user("tg:12345"), Some("alice"));
+        assert_eq!(service.lookup_sim_user("tg:12345"), Some("alice"));
     }
 
     #[test]
@@ -149,7 +149,7 @@ mod tests {
     #[test]
     fn test_lookup_nonexistent() {
         let service = PairingService::new();
-        assert_eq!(service.lookup_baymax_user("tg:99999"), None);
+        assert_eq!(service.lookup_sim_user("tg:99999"), None);
     }
 
     #[test]
@@ -167,7 +167,7 @@ mod tests {
         // Load from the same file and verify
         {
             let service = PairingService::with_storage(&path);
-            assert_eq!(service.lookup_baymax_user("tg:12345"), Some("alice"));
+            assert_eq!(service.lookup_sim_user("tg:12345"), Some("alice"));
             assert_eq!(service.count(), 1);
         }
     }

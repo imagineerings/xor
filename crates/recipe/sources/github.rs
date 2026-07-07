@@ -187,12 +187,12 @@ prompt: Run remote recipe
 
     #[test]
     fn builds_raw_github_url() {
-        let request = GitHubRecipeRequest::new("simtropolis", "baymax", "recipes/release.yaml")
+        let request = GitHubRecipeRequest::new("simtropolis", "sim", "recipes/release.yaml")
             .with_reference("main");
 
         assert_eq!(
             request.raw_url(),
-            "https://raw.githubusercontent.com/simtropolis/baymax/main/recipes/release.yaml"
+            "https://raw.githubusercontent.com/simtropolis/sim/main/recipes/release.yaml"
         );
     }
 
@@ -204,7 +204,7 @@ prompt: Run remote recipe
             },
             vec![GitHubRecipeRequest::new(
                 "simtropolis",
-                "baymax",
+                "sim",
                 "recipes/remote.yaml",
             )],
         );
@@ -225,7 +225,7 @@ prompt: Run remote recipe
             },
             vec![GitHubRecipeRequest::new(
                 "simtropolis",
-                "baymax",
+                "sim",
                 "recipes/remote.yaml",
             )],
         );

@@ -2,11 +2,11 @@
 
 ## 1. Overview
 
-Channel Recaps are automated daily summaries of channel activity tailored to Baymax's collaborative document model (Markdown buffers synced via CRDT). Unlike chat-centric platforms where recaps count messages, Baymax recaps summarize document contributions: who edited what, which sections saw the most change, and the overall document evolution over a 24-hour period. Recaps are rendered as visually distinct entries inline in the channel, with optional notification delivery.
+Channel Recaps are automated daily summaries of channel activity tailored to Sim's collaborative document model (Markdown buffers synced via CRDT). Unlike chat-centric platforms where recaps count messages, Sim recaps summarize document contributions: who edited what, which sections saw the most change, and the overall document evolution over a 24-hour period. Recaps are rendered as visually distinct entries inline in the channel, with optional notification delivery.
 
 **Key architectural decisions:**
 
-- **Recap focuses on buffer contributions, not chat messages**: Baymax channels are centered on shared documents (`ChannelBuffer` backed by `language::Buffer`). Chat messages were removed from the codebase (RPC handlers return errors). The recap tracks CRDT buffer operations (edits), active collaborators, and document snapshots — not chat-style messages. The data model is designed to accommodate future re-addition of chat messages if needed, but the initial implementation is document-first.
+- **Recap focuses on buffer contributions, not chat messages**: Sim channels are centered on shared documents (`ChannelBuffer` backed by `language::Buffer`). Chat messages were removed from the codebase (RPC handlers return errors). The recap tracks CRDT buffer operations (edits), active collaborators, and document snapshots — not chat-style messages. The data model is designed to accommodate future re-addition of chat messages if needed, but the initial implementation is document-first.
 - **Polling loop for recap generation**: The `collab` crate has no dedicated job queue or cron system. The existing pattern for periodic background work is `executor.spawn_detached` with a loop + `executor.sleep` (as used by `fetch_extensions_from_blob_store_periodically`). The recap generator follows this same pattern: a polling loop checks once per minute for channels whose recap is due, generates the recap, and stores it.
 - **Recap is a stored entity in the database**: Each generated recap is persisted as a row in a new `channel_recaps` table. This enables historical access, efficient querying for the UI, and avoids regenerating recaps on every client request.
 - **Recap content is structured JSON**: The summary data (edit count, active participants, top sections, etc.) is stored as a JSON blob. This avoids schema migrations for every new recap metric and allows the client to render rich content without additional server queries.
@@ -623,7 +623,7 @@ Clicking the notification navigates to the channel and opens the recap panel.
 
 ### 3.9 Recap display in channel (integration point)
 
-Recap entries are rendered inline in the channel's timeline/buffer view. Since Baymax channels display a collaborative document (not a chronological message list), the recap is placed:
+Recap entries are rendered inline in the channel's timeline/buffer view. Since Sim channels display a collaborative document (not a chronological message list), the recap is placed:
 
 1. **As a floating card at the top of the buffer** when the user first opens a channel that has an unread recap
 2. **In the channel header** as a "View Recap" button when one is available

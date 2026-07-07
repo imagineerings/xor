@@ -199,7 +199,7 @@ impl CliInput {
                     process::exit(0);
                 }
                 unknown => {
-                    return Err(format!("unrecognibaymax argument: {unknown}"));
+                    return Err(format!("unrecognisim argument: {unknown}"));
                 }
             }
             index += 1;

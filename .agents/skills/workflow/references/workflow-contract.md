@@ -180,7 +180,7 @@ tracker:
   endpoint: https://api.linear.app/graphql
   api_key: $LINEAR_API_KEY
   team_key: ENG
-  project_slug: baymax
+  project_slug: sim
   active_states: [Todo, In Progress]
   terminal_states: [Done, Closed, Canceled, Cancelled, Duplicate]
 tasks:
@@ -234,7 +234,7 @@ the next top-level checkbox. The parser derives:
 Use strict double-brace interpolation:
 
 ```markdown
-You are working on a local Baymax spec task.
+You are working on a local Sim spec task.
 
 Task: {{ issue.title }}
 Source: {{ issue.task_file }}:{{ issue.task_line }}

@@ -1,6 +1,6 @@
 version: 1.0.0
 title: Release Risk Check
-description: Assess pull request risk for an upcoming Baymax release.
+description: Assess pull request risk for an upcoming Sim release.
 tags:
   - release
   - risk

@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Baymax should preview relevant Godot media and world-model outputs without porting Godot rendering, audio, video, or text stacks.
+Sim should preview relevant Godot media and world-model outputs without porting Godot rendering, audio, video, or text stacks.
 
 ### Requirement 1: Do Not Port Render Backends
 
@@ -14,7 +14,7 @@ Baymax should preview relevant Godot media and world-model outputs without porti
 
 #### Acceptance Criteria
 
-2.1 WHEN a supported texture, image, shader, generated frame, or video is selected THEN THE system SHALL route it to existing Baymax preview infrastructure.
+2.1 WHEN a supported texture, image, shader, generated frame, or video is selected THEN THE system SHALL route it to existing Sim preview infrastructure.
 2.2 IF preview is unsupported THEN THE system SHALL show an unsupported-preview reason.
 
 ### Requirement 3: Generated Media

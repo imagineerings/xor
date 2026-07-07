@@ -43,7 +43,7 @@ use ui::{
     prelude::*,
 };
 
-use baymax_actions::{
+use sim_actions::{
     AGENT_SKILLS_SETTINGS_PATH, OpenProjectSettings, OpenSettings, OpenSettingsAt,
     OpenSettingsAtTarget,
 };
@@ -423,10 +423,10 @@ pub fn init(cx: &mut App) {
     cx.on_action(|_: &OpenSettings, cx| {
         open_settings_editor(None, None, None, cx);
     });
-    cx.on_action(|_: &baymax_actions::assistant::OpenSkillCreator, cx| {
+    cx.on_action(|_: &sim_actions::assistant::OpenSkillCreator, cx| {
         open_skill_creator(pages::SkillCreatorOpenMode::Form, None, cx);
     });
-    cx.on_action(|_: &baymax_actions::assistant::CreateSkillFromUrl, cx| {
+    cx.on_action(|_: &sim_actions::assistant::CreateSkillFromUrl, cx| {
         let initial_url = pages::skill_url_from_clipboard(cx);
         open_skill_creator(pages::SkillCreatorOpenMode::Url { initial_url }, None, cx);
     });
@@ -461,13 +461,13 @@ pub fn init(cx: &mut App) {
                 open_settings_editor(None, target_worktree_id, window_handle, cx);
             })
             .register_action(
-                |_, _: &baymax_actions::assistant::OpenSkillCreator, window, cx| {
+                |_, _: &sim_actions::assistant::OpenSkillCreator, window, cx| {
                     let window_handle = window.window_handle().downcast::<MultiWorkspace>();
                     open_skill_creator(pages::SkillCreatorOpenMode::Form, window_handle, cx);
                 },
             )
             .register_action(
-                |_, _: &baymax_actions::assistant::CreateSkillFromUrl, window, cx| {
+                |_, _: &sim_actions::assistant::CreateSkillFromUrl, window, cx| {
                     let window_handle = window.window_handle().downcast::<MultiWorkspace>();
                     let initial_url = pages::skill_url_from_clipboard(cx);
                     open_skill_creator(
@@ -785,7 +785,7 @@ fn open_settings_editor_with(
         let scaled_bounds: gpui::Size<Pixels> = default_bounds.map(|axis| axis * scale_factor);
 
         let app_id = ReleaseChannel::global(cx).app_id();
-        let window_decorations = match std::env::var("BAYMAX_WINDOW_DECORATIONS") {
+        let window_decorations = match std::env::var("SIM_WINDOW_DECORATIONS") {
             Ok(val) if val == "server" => gpui::WindowDecorations::Server,
             Ok(val) if val == "client" => gpui::WindowDecorations::Client,
             _ => match WorkspaceSettings::get_global(cx).window_decorations {
@@ -797,7 +797,7 @@ fn open_settings_editor_with(
         cx.open_window(
             WindowOptions {
                 titlebar: Some(TitlebarOptions {
-                    title: Some("Baymax — Settings".into()),
+                    title: Some("Sim — Settings".into()),
                     appears_transparent: true,
                     traffic_light_position: Some(point(px(12.0), px(12.0))),
                 }),
@@ -1425,7 +1425,7 @@ fn render_settings_item_link(
                 .tooltip(Tooltip::text("Copy Link"))
                 .when_some(json_path, |this, path| {
                     this.on_click(cx.listener(move |this, _, _, cx| {
-                        let link = format!("baymax://settings/{}", path);
+                        let link = format!("sim://settings/{}", path);
                         cx.write_to_clipboard(ClipboardItem::new_string(link));
                         this.last_copied_link_path = Some(path);
                         cx.notify();
@@ -1564,7 +1564,7 @@ fn all_language_names(cx: &App) -> Vec<SharedString> {
         .languages
         .language_names()
         .into_iter()
-        .filter(|name| name.as_ref() != "Baymax Keybind Context")
+        .filter(|name| name.as_ref() != "Sim Keybind Context")
         .map(Into::into)
         .collect()
 }
@@ -3934,7 +3934,7 @@ impl SettingsWindow {
 
                 let worktree_id = *worktree_id;
 
-                // TODO: move baymax::open_local_file() APIs to this crate, and
+                // TODO: move sim::open_local_file() APIs to this crate, and
                 // re-implement the "initial_contents" behavior
                 let workspace_weak = corresponding_workspace.downgrade();
                 workspace_window
@@ -6094,7 +6094,7 @@ pub mod test {
         // Dispatch the action the way the command palette does: on the
         // workspace window.
         multi_workspace.update_in(cx, |_multi_workspace, window, cx| {
-            window.dispatch_action(Box::new(baymax_actions::assistant::OpenSkillCreator), cx);
+            window.dispatch_action(Box::new(sim_actions::assistant::OpenSkillCreator), cx);
         });
 
         cx.run_until_parked();
@@ -6156,7 +6156,7 @@ mod project_settings_update_tests {
         let fs = FakeFs::new(cx.executor());
         let tree = if let Some(settings_content) = initial_settings {
             json!({
-                ".baymax": {
+                ".sim": {
                     "settings.json": settings_content
                 },
                 "src": { "main.rs": "" }
@@ -6173,7 +6173,7 @@ mod project_settings_update_tests {
             (worktree.read(cx).id(), worktree.downgrade())
         });
 
-        let rel_path: Arc<RelPath> = RelPath::unix(".baymax/settings.json")
+        let rel_path: Arc<RelPath> = RelPath::unix(".sim/settings.json")
             .expect("valid path")
             .into_arc();
         let project_path = ProjectPath {
@@ -6260,7 +6260,7 @@ mod project_settings_update_tests {
     }
 
     #[gpui::test]
-    async fn test_updates_are_serialibaymax(cx: &mut TestAppContext) {
+    async fn test_updates_are_serialisim(cx: &mut TestAppContext) {
         let setup = init_test(cx, Some("{}")).await;
 
         let update_order = Arc::new(std::sync::Mutex::new(Vec::new()));
@@ -6403,7 +6403,7 @@ mod project_settings_update_tests {
 
         let file_content = setup
             .fs
-            .load("/project/.baymax/settings.json".as_ref())
+            .load("/project/.sim/settings.json".as_ref())
             .await
             .unwrap();
         assert_eq!(
@@ -6436,7 +6436,7 @@ mod project_settings_update_tests {
         setup
             .fs
             .save(
-                "/project/.baymax/settings.json".as_ref(),
+                "/project/.sim/settings.json".as_ref(),
                 &r#"{ "tab_size": 99 }"#.into(),
                 Default::default(),
             )

@@ -1,4 +1,4 @@
-name = "baymax-oidc-proxy"
+name = "sim-oidc-proxy"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
 
@@ -6,11 +6,11 @@ compatibility_date = "2025-01-01"
 # Route traffic to this Worker.  Update the zone/pattern to match your
 # Cloudflare deployment.
 #
-#   pattern = "oidc.baymax.sh/*"
+#   pattern = "oidc.sim.sh/*"
 #   zone_id = "<your-zone-id>"
 
 routes = [
-  { pattern = "oidc.baymax.sh/*", zone_id = "<your-zone-id>" },
+  { pattern = "oidc.sim.sh/*", zone_id = "<your-zone-id>" },
 ]
 
 # ── Environment variables ───────────────────────────────────────────────────
@@ -24,7 +24,7 @@ OIDC_PROVIDER_AUTHORIZE_URL = "https://auth.anthropic.com/authorize"
 # URL of the upstream OIDC provider's token endpoint.
 OIDC_PROVIDER_TOKEN_URL = "https://auth.anthropic.com/oauth/token"
 # Issuer identifier returned in the well-known configuration.
-OIDC_ISSUER = "https://oidc.baymax.sh"
+OIDC_ISSUER = "https://oidc.sim.sh"
 
 # ── Secrets (set via `wrangler secret put <NAME>`) ──────────────────────────
 # OIDC_CLIENT_ID       — OAuth client identifier issued by the provider.
@@ -37,4 +37,4 @@ command = "npm run build"
 watch_dir = "src"
 ```
 
-<｜｜DSML｜｜parameter name="path" string="true">baymax/oidc-proxy/package.json
+<｜｜DSML｜｜parameter name="path" string="true">sim/oidc-proxy/package.json

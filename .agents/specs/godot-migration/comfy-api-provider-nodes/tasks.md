@@ -31,7 +31,7 @@ Create a provider-node framework before individual providers. Initial implementa
   - _writes: crates/world_model/src/comfy_provider_policy.rs, crates/world_model/src/comfy_provider_policy_tests.rs_
 
 - [ ] 3. Implement provider secret redaction
-  - Resolve credentials through Baymax secrets and redact credentials, signed URLs, and sensitive payload fields.
+  - Resolve credentials through Sim secrets and redact credentials, signed URLs, and sensitive payload fields.
   - _Requirements: 2.1, 2.2, 2.3_
   - _writes: crates/world_model/src/comfy_provider_secrets.rs, crates/world_model/src/comfy_provider_redaction_tests.rs_
 
@@ -46,7 +46,7 @@ Create a provider-node framework before individual providers. Initial implementa
   - _writes: crates/world_model/src/comfy_provider_io.rs, crates/world_model/src/comfy_provider_io_tests.rs_
 
 - [ ] 6. Add provider catalog fixtures
-  - Snapshot Comfy provider families and node ids from `comfy_api_nodes` into a Baymax provider catalog fixture.
+  - Snapshot Comfy provider families and node ids from `comfy_api_nodes` into a Sim provider catalog fixture.
   - _Requirements: 1.1, 1.3_
   - _writes: crates/world_model/fixtures/comfy/provider_nodes.json, crates/world_model/tests/comfy_provider_catalog.rs_
 

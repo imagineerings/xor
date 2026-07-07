@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Baymax needs Comfy migration support for launch configuration, feature flags, frontend/template/doc packages, OpenAPI/schema compatibility, examples, tests, CI, dependency review, and platform packaging. These controls protect core Comfy-derived world-model harness behavior from drift across implementation tasks. This spec owns migration quality controls and compatibility fixtures. It delegates runtime behavior to the other Comfy specs.
+Sim needs Comfy migration support for launch configuration, feature flags, frontend/template/doc packages, OpenAPI/schema compatibility, examples, tests, CI, dependency review, and platform packaging. These controls protect core Comfy-derived world-model harness behavior from drift across implementation tasks. This spec owns migration quality controls and compatibility fixtures. It delegates runtime behavior to the other Comfy specs.
 
 ## Glossary
 
@@ -16,13 +16,13 @@ Baymax needs Comfy migration support for launch configuration, feature flags, fr
 
 ### Requirement 1: Launch Configuration
 
-**User Story:** As a developer, I want Comfy-compatible launch options mapped to Baymax configuration so runtime behavior is predictable.
+**User Story:** As a developer, I want Comfy-compatible launch options mapped to Sim configuration so runtime behavior is predictable.
 
 #### Acceptance Criteria
 
 1.1 WHEN a launch profile is parsed THEN THE system SHALL capture listen address, port, TLS, CORS, upload size, base/input/output/temp/user directories, auto-launch, logging, assets, database URL, API nodes, custom nodes, manager mode, feature flags, and compression settings.
 1.2 WHEN device, precision, memory, attention, cache, or performance options are present THEN THE system SHALL pass validated settings to the model runtime policy resolver.
-1.3 IF a launch option is unsupported THEN THE system SHALL report the option, reason, and nearest Baymax equivalent.
+1.3 IF a launch option is unsupported THEN THE system SHALL report the option, reason, and nearest Sim equivalent.
 
 ### Requirement 2: Feature Flags and Frontend Packages
 
@@ -56,12 +56,12 @@ Baymax needs Comfy migration support for launch configuration, feature flags, fr
 
 ### Requirement 5: Packaging and Dependency Governance
 
-**User Story:** As a maintainer, I want packaging and dependency changes controlled before they affect Baymax distributions.
+**User Story:** As a maintainer, I want packaging and dependency changes controlled before they affect Sim distributions.
 
 #### Acceptance Criteria
 
 5.1 IF a task adds a native library, codec, Python package, provider SDK, model dependency, frontend package, or vendored code THEN THE system SHALL require dependency review before implementation.
-5.2 WHEN platform packaging is configured THEN THE system SHALL describe CPU-only and GPU-specific launch profiles without duplicating Baymax platform packaging.
+5.2 WHEN platform packaging is configured THEN THE system SHALL describe CPU-only and GPU-specific launch profiles without duplicating Sim platform packaging.
 5.3 WHEN a task requires network access or large downloads THEN THE system SHALL require explicit user approval and preserve an audit record.
 
 ### Requirement 6: Logs and Internal Diagnostics
@@ -70,6 +70,6 @@ Baymax needs Comfy migration support for launch configuration, feature flags, fr
 
 #### Acceptance Criteria
 
-6.1 WHEN logs are requested THEN THE system SHALL expose raw and formatted logs through Baymax diagnostics with terminal size metadata where available.
+6.1 WHEN logs are requested THEN THE system SHALL expose raw and formatted logs through Sim diagnostics with terminal size metadata where available.
 6.2 WHEN folder paths or recent files are requested for diagnostics THEN THE system SHALL expose only approved input, output, temp, model, and user roots.
 6.3 IF a diagnostic endpoint is internal-only THEN THE system SHALL mark it unstable and avoid depending on it for public API compatibility.

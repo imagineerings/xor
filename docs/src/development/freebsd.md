@@ -1,15 +1,15 @@
 ---
-title: Building Baymax for FreeBSD
-description: "Guide to building baymax for freebsd for Baymax development."
+title: Building Sim for FreeBSD
+description: "Guide to building sim for freebsd for Sim development."
 ---
 
-# Building Baymax for FreeBSD
+# Building Sim for FreeBSD
 
 FreeBSD is not currently a supported platform, so this guide is a work in progress.
 
 ## Repository
 
-Clone the [Baymax repository](https://github.com/simtropolis/baymax).
+Clone the [Sim repository](https://github.com/simtropolis/sim).
 
 ## Dependencies
 
@@ -19,11 +19,11 @@ Clone the [Baymax repository](https://github.com/simtropolis/baymax).
   script/freebsd
   ```
 
-  If preferred, you can inspect [`script/freebsd`](https://github.com/simtropolis/baymax/blob/main/script/freebsd) and perform the steps manually.
+  If preferred, you can inspect [`script/freebsd`](https://github.com/simtropolis/sim/blob/main/script/freebsd) and perform the steps manually.
 
 ## Building from source
 
-Once the dependencies are installed, you can build Baymax using [Cargo](https://doc.rust-lang.org/cargo/).
+Once the dependencies are installed, you can build Sim using [Cargo](https://doc.rust-lang.org/cargo/).
 
 For a debug build of the editor:
 
@@ -47,7 +47,7 @@ cargo run -p cli
 
 Building `webrtc-sys` on FreeBSD currently fails due to missing upstream support and unavailable prebuilt binaries. As a result, collaboration features that depend on WebRTC (audio calls and screen sharing) are temporarily disabled.
 
-See [Issue #15309: FreeBSD Support] and [Discussion #29550: Unofficial FreeBSD port for Baymax] for more.
+See [Issue #15309: FreeBSD Support] and [Discussion #29550: Unofficial FreeBSD port for Sim] for more.
 
 ## Troubleshooting
 

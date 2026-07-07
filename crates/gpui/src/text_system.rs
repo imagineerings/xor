@@ -70,8 +70,8 @@ impl TextSystem {
             font_runs_pool: Mutex::default(),
             fallback_font_stack: smallvec![
                 // TODO: Remove this when Linux have implemented setting fallbacks.
-                font(".BaymaxMono"),
-                font(".BaymaxSans"),
+                font(".SimMono"),
+                font(".SimSans"),
                 font("Helvetica"),
                 font("Segoe UI"),     // Windows
                 font("Ubuntu"),       // Gnome (Ubuntu)
@@ -320,7 +320,7 @@ impl TextSystem {
         }
     }
 
-    /// Get the rasteribaymax size and location of a specific, rendered glyph.
+    /// Get the rasterisim size and location of a specific, rendered glyph.
     pub(crate) fn raster_bounds(&self, params: &RenderGlyphParams) -> Result<Bounds<DevicePixels>> {
         let raster_bounds = self.raster_bounds.upgradable_read();
         if let Some(bounds) = raster_bounds.get(params) {
@@ -1177,13 +1177,13 @@ impl FontMetrics {
 /// Maps well-known virtual font names to their concrete equivalents.
 #[allow(unused)]
 pub fn font_name_with_fallbacks<'a>(name: &'a str, system: &'a str) -> &'a str {
-    // Note: the "Baymax Plex" fonts were deprecated as we are not allowed to use "Plex"
+    // Note: the "Sim Plex" fonts were deprecated as we are not allowed to use "Plex"
     // in a derived font name. They are essentially indistinguishable from IBM Plex/Lilex,
     // and so retained here for backward compatibility.
     match name {
         ".SystemUIFont" => system,
-        ".BaymaxSans" | "Baymax Plex Sans" => "IBM Plex Sans",
-        ".BaymaxMono" | "Baymax Plex Mono" => "Lilex",
+        ".SimSans" | "Sim Plex Sans" => "IBM Plex Sans",
+        ".SimMono" | "Sim Plex Mono" => "Lilex",
         _ => name,
     }
 }
@@ -1194,13 +1194,13 @@ pub fn font_name_with_fallbacks_shared<'a>(
     name: &'a SharedString,
     system: &'a SharedString,
 ) -> &'a SharedString {
-    // Note: the "Baymax Plex" fonts were deprecated as we are not allowed to use "Plex"
+    // Note: the "Sim Plex" fonts were deprecated as we are not allowed to use "Plex"
     // in a derived font name. They are essentially indistinguishable from IBM Plex/Lilex,
     // and so retained here for backward compatibility.
     match name.as_str() {
         ".SystemUIFont" => system,
-        ".BaymaxSans" | "Baymax Plex Sans" => const { &SharedString::new_static("IBM Plex Sans") },
-        ".BaymaxMono" | "Baymax Plex Mono" => const { &SharedString::new_static("Lilex") },
+        ".SimSans" | "Sim Plex Sans" => const { &SharedString::new_static("IBM Plex Sans") },
+        ".SimMono" | "Sim Plex Mono" => const { &SharedString::new_static("Lilex") },
         _ => name,
     }
 }

@@ -2,10 +2,10 @@
 set -e
 
 # =============================================================================
-# Baymax Tunnel Launcher
+# Sim Tunnel Launcher
 #
-# Builds and runs the baymaxed-tunnel (Tailscale tunnel) from the local Go
-# source at mobile/baymax-tunnel/, or falls back to a mock server for testing.
+# Builds and runs the simed-tunnel (Tailscale tunnel) from the local Go
+# source at mobile/sim-tunnel/, or falls back to a mock server for testing.
 #
 # Supports both iOS (QR codes, deep links) and Android (emulator 10.0.2.2
 # mapping, adb deep link push) workflows.
@@ -13,8 +13,8 @@ set -e
 # Usage:
 #   ./mobile/launch_tunnel.sh [--mock] [--port PORT] [--secret SECRET]
 #
-#   --mock       Run a lightweight Python mock server instead of baymaxed
-#                (useful when the baymaxed Rust binary isn't available).
+#   --mock       Run a lightweight Python mock server instead of simed
+#                (useful when the simed Rust binary isn't available).
 #   --port PORT  Local port (default: 62996).
 #   --secret KEY Secret key (default: auto-generated).
 # =============================================================================
@@ -24,8 +24,8 @@ PORT=${PORT:-62996}
 SECRET="${SECRET:-test}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-TUNNEL_SRC="$PROJECT_ROOT/mobile/baymax-tunnel"
-TUNNEL_BIN="$TUNNEL_SRC/baymaxed-tunnel"
+TUNNEL_SRC="$PROJECT_ROOT/mobile/sim-tunnel"
+TUNNEL_BIN="$TUNNEL_SRC/simed-tunnel"
 MODE="auto"   # auto | mock
 
 # --- Colors ------------------------------------------------------------------
@@ -47,9 +47,9 @@ while [[ $# -gt 0 ]]; do
         --port) PORT="$2"; shift 2 ;;
         --secret) SECRET="$2"; shift 2 ;;
         -h|--help)
-            echo "Baymax Tunnel Launcher"
+            echo "Sim Tunnel Launcher"
             echo ""
-            echo "  --mock       Run mock server (no baymaxed binary needed)"
+            echo "  --mock       Run mock server (no simed binary needed)"
             echo "  --port PORT  Local port (default: 62996)"
             echo "  --secret KEY Secret key (default: auto-generated)"
             exit 0
@@ -59,7 +59,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # -----------------------------------------------------------------------------
-# Build baymaxed-tunnel from local Go source
+# Build simed-tunnel from local Go source
 # -----------------------------------------------------------------------------
 build_tunnel() {
     if [ ! -d "$TUNNEL_SRC" ]; then
@@ -81,7 +81,7 @@ build_tunnel() {
 
     echo ""
     echo -e "${BOLD}${MAGENTA}╔═══════════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BOLD}${MAGENTA}║               🔨  BUILDING BAYMAXED-TUNNEL FROM SOURCE              ║${NC}"
+    echo -e "${BOLD}${MAGENTA}║               🔨  BUILDING SIMED-TUNNEL FROM SOURCE              ║${NC}"
     echo -e "${BOLD}${MAGENTA}╚═══════════════════════════════════════════════════════════════════════╝${NC}"
     echo ""
     echo -e "${CYAN}📂 Source: ${TUNNEL_SRC}${NC}"
@@ -110,7 +110,7 @@ start_mock_server() {
     echo -e "${BOLD}${YELLOW}╔═══════════════════════════════════════════════════════════════════════╗${NC}"
     echo -e "${BOLD}${YELLOW}║               🧪  STARTING MOCK SERVER (TEST MODE)                   ║${NC}"
     echo -e "${BOLD}${YELLOW}║                                                                       ║${NC}"
-    echo -e "${BOLD}${YELLOW}║   No baymaxed binary found — using a lightweight mock server.         ║${NC}"
+    echo -e "${BOLD}${YELLOW}║   No simed binary found — using a lightweight mock server.         ║${NC}"
     echo -e "${BOLD}${YELLOW}║   This is suitable for UI/API integration testing only.               ║${NC}"
     echo -e "${BOLD}${YELLOW}╚═══════════════════════════════════════════════════════════════════════╝${NC}"
     echo ""
@@ -140,7 +140,7 @@ start_mock_server() {
     # variable expansion issues with the heredoc.
     # Create a temp file for the Python mock server script.
     # macOS mktemp requires exactly 6 X's; Linux is flexible.
-    MOCK_SCRIPT="$(mktemp 2>/dev/null || mktemp -t baymax-mock-server)"
+    MOCK_SCRIPT="$(mktemp 2>/dev/null || mktemp -t sim-mock-server)"
     # Ensure .py extension (for editor association); macOS mktemp gives a bare name
     if [[ "$MOCK_SCRIPT" != *.py ]]; then
         mv "$MOCK_SCRIPT" "${MOCK_SCRIPT}.py" 2>/dev/null || true
@@ -228,7 +228,7 @@ class MockHandler(http.server.BaseHTTPRequestHandler):
         print(f'[mock] {args[0]} {args[1]} {args[2]}', flush=True)
 
 server = http.server.HTTPServer(('0.0.0.0', PORT), MockHandler)
-print(f'[mock] Mock Baymax server running on port {PORT}')
+print(f'[mock] Mock Sim server running on port {PORT}')
 sys.stdout.flush()
 server.serve_forever()
 PYEOF
@@ -264,9 +264,9 @@ cleanup() {
         echo "Stopping mock server (PID: $MOCK_SERVER_PID)"
         kill $MOCK_SERVER_PID 2>/dev/null || true
     fi
-    if [ ! -z "$BAYMAXED_PID" ]; then
-        echo "Stopping baymaxed (PID: $BAYMAXED_PID)"
-        kill $BAYMAXED_PID 2>/dev/null || true
+    if [ ! -z "$SIMED_PID" ]; then
+        echo "Stopping simed (PID: $SIMED_PID)"
+        kill $SIMED_PID 2>/dev/null || true
     fi
     exit 0
 }
@@ -279,9 +279,9 @@ trap cleanup SIGINT SIGTERM EXIT
 
 echo ""
 echo -e "${BOLD}${BLUE}╔════════════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BOLD}${BLUE}║               🚀  Baymax Tunnel Launcher  🚀                       ║${NC}"
+echo -e "${BOLD}${BLUE}║               🚀  Sim Tunnel Launcher  🚀                       ║${NC}"
 echo -e "${BOLD}${BLUE}║                                                                     ║${NC}"
-echo -e "${BOLD}${BLUE}║  Local source: mobile/baymax-tunnel/                                ║${NC}"
+echo -e "${BOLD}${BLUE}║  Local source: mobile/sim-tunnel/                                ║${NC}"
 echo -e "${BOLD}${BLUE}╚════════════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -289,28 +289,28 @@ echo ""
 build_tunnel
 
 # Determine mode
-FOUND_BAYMAXED=false
-if command -v baymaxed &>/dev/null; then
-    FOUND_BAYMAXED=true
-    echo -e "${GREEN}✓ baymaxed found in PATH at $(which baymaxed)${NC}"
-elif [ -f "$PROJECT_ROOT/target/release/baymaxed" ]; then
-    FOUND_BAYMAXED=true
+FOUND_SIMED=false
+if command -v simed &>/dev/null; then
+    FOUND_SIMED=true
+    echo -e "${GREEN}✓ simed found in PATH at $(which simed)${NC}"
+elif [ -f "$PROJECT_ROOT/target/release/simed" ]; then
+    FOUND_SIMED=true
     export PATH="$PROJECT_ROOT/target/release:$PATH"
-    echo -e "${GREEN}✓ baymaxed found at $PROJECT_ROOT/target/release/baymaxed${NC}"
-elif [ -f "$PROJECT_ROOT/target/debug/baymaxed" ]; then
-    FOUND_BAYMAXED=true
+    echo -e "${GREEN}✓ simed found at $PROJECT_ROOT/target/release/simed${NC}"
+elif [ -f "$PROJECT_ROOT/target/debug/simed" ]; then
+    FOUND_SIMED=true
     export PATH="$PROJECT_ROOT/target/debug:$PATH"
-    echo -e "${GREEN}✓ baymaxed found at $PROJECT_ROOT/target/debug/baymaxed${NC}"
+    echo -e "${GREEN}✓ simed found at $PROJECT_ROOT/target/debug/simed${NC}"
 fi
 
-if [ "$MODE" = "mock" ] || [ "$FOUND_BAYMAXED" = false ]; then
+if [ "$MODE" = "mock" ] || [ "$FOUND_SIMED" = false ]; then
     # --- Mock server mode ----------------------------------------------------
     if [ "$MODE" = "mock" ]; then
         echo -e "${YELLOW}➡️  Mock mode requested via --mock flag${NC}"
     else
-        echo -e "${YELLOW}⚠️  baymaxed binary not found — falling back to mock server${NC}"
-        echo -e "${YELLOW}   For production use, build baymaxed from Rust source:${NC}"
-        echo -e "${YELLOW}   cargo build --release -p baymax${NC}"
+        echo -e "${YELLOW}⚠️  simed binary not found — falling back to mock server${NC}"
+        echo -e "${YELLOW}   For production use, build simed from Rust source:${NC}"
+        echo -e "${YELLOW}   cargo build --release -p sim${NC}"
     fi
     echo ""
 
@@ -323,36 +323,36 @@ if [ "$MODE" = "mock" ] || [ "$FOUND_BAYMAXED" = false ]; then
     SERVER_URL="http://localhost:${PORT}"
     SERVER_TYPE="Mock"
 else
-    # --- Production mode: run baymaxed ---------------------------------------
+    # --- Production mode: run simed ---------------------------------------
     echo ""
     echo -e "${BOLD}${GREEN}╔═══════════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BOLD}${GREEN}║               🚀  STARTING BAYMAXED AGENT DAEMON                      ║${NC}"
+    echo -e "${BOLD}${GREEN}║               🚀  STARTING SIMED AGENT DAEMON                      ║${NC}"
     echo -e "${BOLD}${GREEN}╚═══════════════════════════════════════════════════════════════════════╝${NC}"
     echo ""
 
-    echo -e "${GREEN}Starting baymaxed on port ${PORT}...${NC}"
-    export BAYMAX_PORT=$PORT
-    export BAYMAX_SERVER__SECRET_KEY="$SECRET"
-    baymaxed agent &
-    BAYMAXED_PID=$!
+    echo -e "${GREEN}Starting simed on port ${PORT}...${NC}"
+    export SIM_PORT=$PORT
+    export SIM_SERVER__SECRET_KEY="$SECRET"
+    simed agent &
+    SIMED_PID=$!
 
-    # Wait for baymaxed to be ready
-    echo "Waiting for baymaxed to start..."
+    # Wait for simed to be ready
+    echo "Waiting for simed to start..."
     for i in {1..30}; do
         if curl -s "http://localhost:${PORT}/health" > /dev/null 2>&1; then
-            echo -e "${GREEN}✓ Baymaxed is running (PID: $BAYMAXED_PID)${NC}"
+            echo -e "${GREEN}✓ Simed is running (PID: $SIMED_PID)${NC}"
             break
         fi
         if [ $i -eq 30 ]; then
-            echo -e "${RED}Error: baymaxed failed to start${NC}"
+            echo -e "${RED}Error: simed failed to start${NC}"
             exit 1
         fi
         sleep 0.5
     done
 
-    SERVER_PID=$BAYMAXED_PID
+    SERVER_PID=$SIMED_PID
     SERVER_URL="http://localhost:${PORT}"
-    SERVER_TYPE="Baymaxed"
+    SERVER_TYPE="Simed"
 fi
 
 echo ""
@@ -378,7 +378,7 @@ echo -e "${YELLOW}To configure the Android app, run this adb command:${NC}"
 echo ""
 echo -e "  ${GREEN}adb shell am start \\\\${NC}"
 echo -e "  ${GREEN}  -a android.intent.action.VIEW \\\\${NC}"
-echo -e "  ${GREEN}  -d \"baymaxchat://configure?data=\$(python3 -c 'import urllib.parse, json; print(urllib.parse.quote(json.dumps({\"url\": \"http://10.0.2.2:${PORT}\", \"secret\": \"${SECRET}\"})))')\"${NC}"
+echo -e "  ${GREEN}  -d \"simchat://configure?data=\$(python3 -c 'import urllib.parse, json; print(urllib.parse.quote(json.dumps({\"url\": \"http://10.0.2.2:${PORT}\", \"secret\": \"${SECRET}\"})))')\"${NC}"
 echo ""
 echo -e "${YELLOW}Or with the app already running:${NC}"
 echo ""
@@ -386,11 +386,11 @@ CONFIG_JSON="{\"url\":\"http://10.0.2.2:${PORT}\",\"secret\":\"${SECRET}\"}"
 URL_ENCODED=$(python3 -c "import urllib.parse, json; print(urllib.parse.quote(json.dumps({'url': 'http://10.0.2.2:${PORT}', 'secret': '${SECRET}'})))" 2>/dev/null || \
               python -c "import urllib.parse, json; print(urllib.parse.quote(json.dumps({'url': 'http://10.0.2.2:${PORT}', 'secret': '${SECRET}'})))" 2>/dev/null || \
               echo "URL-ENCODING-UNAVAILABLE")
-DEEP_LINK="baymaxchat://configure?data=${URL_ENCODED}"
+DEEP_LINK="simchat://configure?data=${URL_ENCODED}"
 echo -e "  ${GREEN}adb shell am start -a android.intent.action.VIEW -d \"${DEEP_LINK}\"${NC}"
 echo ""
 echo -e "${YELLOW}To verify:${NC}"
-echo -e "  ${CYAN}adb logcat | grep -E \"(Configuration|✅|BaymaxApi|MockServer)\"${NC}"
+echo -e "  ${CYAN}adb logcat | grep -E \"(Configuration|✅|SimApi|MockServer)\"${NC}"
 echo ""
 
 # -----------------------------------------------------------------------------

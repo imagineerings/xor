@@ -32,10 +32,10 @@ import requests
 GITHUB_API = "https://api.github.com"
 GRAPHQL_URL = "https://api.github.com/graphql"
 REPO_OWNER = "simtropolis"
-REPO_NAME = "baymax"
+REPO_NAME = "sim"
 STAFF_TEAM_SLUG = "staff"
-BOT_LOGIN = "baymax-community-bot[bot]"
-BOT_APP_SLUG = "baymax-community-bot"
+BOT_LOGIN = "sim-community-bot[bot]"
+BOT_APP_SLUG = "sim-community-bot"
 # Strings that identify a comment posted by the duplicate-detection bot. Any
 # match counts as a bot comment for classification purposes. A single comment
 # can contain both markers (v3+ produces this when there are both confident

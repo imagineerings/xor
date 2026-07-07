@@ -1,16 +1,16 @@
 ---
 title: Using a debugger
-description: "Guide to using a debugger for Baymax development."
+description: "Guide to using a debugger for Sim development."
 ---
 
 # Using a debugger
 
-> This page is not about [configuring Baymax's debugger](../debugger.md).
-> It covers how to use a debugger while developing Baymax itself.
+> This page is not about [configuring Sim's debugger](../debugger.md).
+> It covers how to use a debugger while developing Sim itself.
 
-## Using Baymax's built-in debugger
+## Using Sim's built-in debugger
 
-While the Baymax project is open you can open the `New Process Modal` and select the `Debug` tab. There you can see two debug configurations to debug Baymax with, one for GDB and one for LLDB. Select the configuration you want and Baymax will build and launch the binary.
+While the Sim project is open you can open the `New Process Modal` and select the `Debug` tab. There you can see two debug configurations to debug Sim with, one for GDB and one for LLDB. Select the configuration you want and Sim will build and launch the binary.
 
 GDB is not supported on Apple Silicon Macs.
 
@@ -27,7 +27,7 @@ In release builds, this reduces binary size. Type-level and variable-level debug
 
 However, this data matters when you are actively debugging. Without it, debuggers cannot resolve local variables, inspect values, or format output with pretty-printers.
 
-To get the full debugger experience on a release build, compile a Baymax binary with full debug info.
+To get the full debugger experience on a release build, compile a Sim binary with full debug info.
 
 The simplest way is to use `--config` to override the `debug` field in the root `Cargo.toml` when running `cargo run` or `cargo build`:
 
@@ -36,7 +36,7 @@ cargo run --config 'profile.release.debug="full"'
 cargo build --config 'profile.release.debug="full"'
 ```
 
-> If you do not want to pass `--config` on every `cargo` command, you can also change the section in the [root `Cargo.toml`](https://github.com/simtropolis/baymax/blob/main/Cargo.toml)
+> If you do not want to pass `--config` on every `cargo` command, you can also change the section in the [root `Cargo.toml`](https://github.com/simtropolis/sim/blob/main/Cargo.toml)
 >
 > from
 >
@@ -56,11 +56,11 @@ cargo build --config 'profile.release.debug="full"'
 >
 > **Warning:** Do not commit these changes.
 
-## Running Baymax with a shell debugger GDB/LLDB
+## Running Sim with a shell debugger GDB/LLDB
 
 ### Background
 
-When you install Rust through rustup (the recommended setup for Baymax development; see your platform guide [here](../development.md)), rustup also installs helper scripts for debugging Rust binaries.
+When you install Rust through rustup (the recommended setup for Sim development; see your platform guide [here](../development.md)), rustup also installs helper scripts for debugging Rust binaries.
 
 These scripts are `rust-gdb` and `rust-lldb`.
 
@@ -76,31 +76,31 @@ The [linked article](https://michaelwoerister.github.io/2015/03/27/rust-xxdb.htm
 
 If you are new to these tools, see the `gdb` docs [here](https://www.gnu.org/software/gdb/) and the `lldb` docs [here](https://lldb.llvm.org/).
 
-### Usage with Baymax
+### Usage with Sim
 
-After enabling full debug info and building with `cargo build`, run `rust-gdb` or `rust-lldb` against the compiled Baymax binary:
+After enabling full debug info and building with `cargo build`, run `rust-gdb` or `rust-lldb` against the compiled Sim binary:
 
 ```
-rust-gdb target/debug/baymax
-rust-lldb target/debug/baymax
+rust-gdb target/debug/sim
+rust-lldb target/debug/sim
 ```
 
-You can also attach to a running Baymax process (for example, one started with `cargo run`):
+You can also attach to a running Sim process (for example, one started with `cargo run`):
 
 ```
 rust-gdb -p <pid>
 rust-lldb -p <pid>
 ```
 
-`<pid>` is the process ID of the Baymax instance you want to attach to.
+`<pid>` is the process ID of the Sim instance you want to attach to.
 
 To find the PID, use your system's process tools, such as Task Manager on Windows or Activity Monitor on macOS.
 
-You can also run `ps aux | grep baymax` on macOS and Linux, or `Get-Process | Select-Object Id, ProcessName` in PowerShell on Windows.
+You can also run `ps aux | grep sim` on macOS and Linux, or `Get-Process | Select-Object Id, ProcessName` in PowerShell on Windows.
 
 #### Debugging Panics and Crashes
 
-Debuggers are useful for finding the cause of panics and crashes, including in Baymax.
+Debuggers are useful for finding the cause of panics and crashes, including in Sim.
 
 By default, when a process attached to `gdb` or `lldb` hits an exception such as a panic, the debugger stops at that point so you can inspect program state.
 
@@ -110,4 +110,4 @@ In `lldb`, use `backtrace` with `frame select`. `gdb` provides equivalent comman
 
 After the program stops on the exception, you usually cannot continue normal execution. You can still move between stack frames and inspect variables and expressions, which is often enough to identify the crash cause.
 
-You can find additional information on debugging Baymax crashes [here](./debugging-crashes.md).
+You can find additional information on debugging Sim crashes [here](./debugging-crashes.md).

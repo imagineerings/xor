@@ -8,7 +8,7 @@ The notification system has two delivery channels: push (background via APNs/FCM
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Push provider | Baymax Push Proxy Service (existing) | Already deployed; mobile-dev uses same |
+| Push provider | Sim Push Proxy Service (existing) | Already deployed; mobile-dev uses same |
 | In-app toasts | Platform-native (iOS: Toast/SwiftUI overlay, Android: Snackbar) | Consistent with platform conventions |
 | Preference storage | UserDefaults / DataStore | Simple key-value; no complex queries |
 | Badge | Platform API (iOS: UIApplication.applicationIconBadgeNumber, Android: NotificationChannel badge) | Standard behavior |

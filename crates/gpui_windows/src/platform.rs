@@ -9,7 +9,7 @@ use std::{
     },
 };
 
-use ::util::{ResultExt, paths::SanitibaymaxPath};
+use ::util::{ResultExt, paths::SanitisimPath};
 use anyhow::{Context as _, Result, anyhow};
 use futures::channel::oneshot::{self, Receiver};
 use itertools::Itertools;
@@ -1186,7 +1186,7 @@ fn file_save_dialog(
             .context("failed to canonicalize directory")
             .log_err()
     {
-        let full_path = SanitibaymaxPath::new(&full_path);
+        let full_path = SanitisimPath::new(&full_path);
         let full_path_string = full_path.to_string();
         let path_item: IShellItem =
             unsafe { SHCreateItemFromParsingName(&HSTRING::from(full_path_string), None)? };
@@ -1315,7 +1315,7 @@ fn handle_gpu_device_lost(
     Ok(())
 }
 
-const PLATFORM_WINDOW_CLASS_NAME: PCWSTR = w!("Baymax::PlatformWindow");
+const PLATFORM_WINDOW_CLASS_NAME: PCWSTR = w!("Sim::PlatformWindow");
 
 fn register_platform_window_class() {
     let wc = WNDCLASSW {

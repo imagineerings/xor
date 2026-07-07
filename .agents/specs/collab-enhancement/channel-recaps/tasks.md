@@ -2,7 +2,7 @@
 
 ## Overview
 
-Channel Recaps are automated daily summaries of channel activity over 24-hour periods. Unlike chat-centric recaps, Baymax's recaps are document-first: they summarize CRDT buffer contributions (edits, active editors, sections with most change, line diffs). The implementation spans protobuf definitions, database schema, server-side generation (scheduler + generator), client-side UI widgets (RecapEntry, RecapPanel), a client-side recap store, notification integration, and preference management.
+Channel Recaps are automated daily summaries of channel activity over 24-hour periods. Unlike chat-centric recaps, Sim's recaps are document-first: they summarize CRDT buffer contributions (edits, active editors, sections with most change, line diffs). The implementation spans protobuf definitions, database schema, server-side generation (scheduler + generator), client-side UI widgets (RecapEntry, RecapPanel), a client-side recap store, notification integration, and preference management.
 
 The feature is built in five phases, each producing a working increment:
 

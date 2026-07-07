@@ -1,10 +1,10 @@
-//! Paths to locations used by Baymax.
+//! Paths to locations used by Sim.
 
 use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, OnceLock};
 
-use util::paths::SanitibaymaxPath;
+use util::paths::SanitisimPath;
 pub use util::paths::home_dir;
 use util::rel_path::RelPath;
 
@@ -14,8 +14,8 @@ pub const EDITORCONFIG_NAME: &str = ".editorconfig";
 /// The application name, used to derive platform-specific data, config, cache,
 /// and state directory paths.
 ///
-/// Forks should change this to avoid colliding with Baymax's user data.
-pub const APP_NAME: &str = "Baymax";
+/// Forks should change this to avoid colliding with Sim's user data.
+pub const APP_NAME: &str = "Sim";
 
 /// Lowercased form of [`APP_NAME`], for use in XDG-style paths on
 /// Linux/FreeBSD and the macOS `~/.config` fallback.
@@ -53,36 +53,36 @@ static CUSTOM_DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 /// The resolved data directory, combining custom override or platform defaults.
 /// This is set once and cached for subsequent calls.
-/// On macOS, this is `~/Library/Application Support/Baymax`.
-/// On Linux/FreeBSD, this is `$XDG_DATA_HOME/baymax`.
-/// On Windows, this is `%LOCALAPPDATA%\Baymax`.
+/// On macOS, this is `~/Library/Application Support/Sim`.
+/// On Linux/FreeBSD, this is `$XDG_DATA_HOME/sim`.
+/// On Windows, this is `%LOCALAPPDATA%\Sim`.
 static CURRENT_DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 /// The resolved config directory, combining custom override or platform defaults.
 /// This is set once and cached for subsequent calls.
-/// On macOS, this is `~/.config/baymax`.
-/// On Linux/FreeBSD, this is `$XDG_CONFIG_HOME/baymax`.
-/// On Windows, this is `%APPDATA%\Baymax`.
+/// On macOS, this is `~/.config/sim`.
+/// On Linux/FreeBSD, this is `$XDG_CONFIG_HOME/sim`.
+/// On Windows, this is `%APPDATA%\Sim`.
 static CONFIG_DIR: OnceLock<PathBuf> = OnceLock::new();
 
-/// Returns the relative path to the baymax_server directory on the ssh host.
+/// Returns the relative path to the sim_server directory on the ssh host.
 pub fn remote_server_dir_relative() -> &'static RelPath {
     static CACHED: LazyLock<&'static RelPath> =
-        LazyLock::new(|| RelPath::unix(".baymax_server").unwrap());
+        LazyLock::new(|| RelPath::unix(".sim_server").unwrap());
     *CACHED
 }
 
 // Remove this once 223 goes stable
-/// Returns the relative path to the baymax_wsl_server directory on the wsl host.
+/// Returns the relative path to the sim_wsl_server directory on the wsl host.
 pub fn remote_wsl_server_dir_relative() -> &'static RelPath {
     static CACHED: LazyLock<&'static RelPath> =
-        LazyLock::new(|| RelPath::unix(".baymax_wsl_server").unwrap());
+        LazyLock::new(|| RelPath::unix(".sim_wsl_server").unwrap());
     *CACHED
 }
 
 /// Sets a custom directory for all user data, overriding the default data directory.
 /// This function must be called before any other path operations that depend on the data directory.
-/// The directory's path will be canonicalibaymax to an absolute path by a blocking FS operation.
+/// The directory's path will be canonicalisim to an absolute path by a blocking FS operation.
 /// The directory will be created if it doesn't exist.
 ///
 /// # Arguments
@@ -98,7 +98,7 @@ pub fn remote_wsl_server_dir_relative() -> &'static RelPath {
 ///
 /// Panics if:
 /// * Called after the data directory has been initialized (e.g., via `data_dir` or `config_dir`)
-/// * The directory's path cannot be canonicalibaymax to an absolute path
+/// * The directory's path cannot be canonicalisim to an absolute path
 /// * The directory cannot be created
 pub fn set_custom_data_dir(dir: &str) -> &'static PathBuf {
     if CURRENT_DATA_DIR.get().is_some() || CONFIG_DIR.get().is_some() {
@@ -107,20 +107,20 @@ pub fn set_custom_data_dir(dir: &str) -> &'static PathBuf {
     CUSTOM_DATA_DIR.get_or_init(|| {
         let path = PathBuf::from(dir);
         std::fs::create_dir_all(&path).expect("failed to create custom data directory");
-        let canonicalibaymax = path
+        let canonicalisim = path
             .canonicalize()
             .expect("failed to canonicalize custom data directory's path to an absolute path");
         // On Windows, `canonicalize` produces extended-length paths prefixed
         // with `\\?\`. Strip that prefix so downstream consumers (e.g.
         // Node.js language servers) that receive derived paths as arguments
         // don't choke on the verbatim syntax.
-        SanitibaymaxPath::new(&canonicalibaymax)
+        SanitisimPath::new(&canonicalisim)
             .as_path()
             .to_path_buf()
     })
 }
 
-/// Returns the path to the configuration directory used by Baymax.
+/// Returns the path to the configuration directory used by Sim.
 pub fn config_dir() -> &'static PathBuf {
     CONFIG_DIR.get_or_init(|| {
         if let Some(custom_dir) = CUSTOM_DATA_DIR.get() {
@@ -142,7 +142,7 @@ pub fn config_dir() -> &'static PathBuf {
     })
 }
 
-/// Returns the path to the data directory used by Baymax.
+/// Returns the path to the data directory used by Sim.
 pub fn data_dir() -> &'static PathBuf {
     CURRENT_DATA_DIR.get_or_init(|| {
         if let Some(custom_dir) = CUSTOM_DATA_DIR.get() {
@@ -191,7 +191,7 @@ pub fn state_dir() -> &'static PathBuf {
     })
 }
 
-/// Returns the path to the temp directory used by Baymax.
+/// Returns the path to the temp directory used by Sim.
 pub fn temp_dir() -> &'static PathBuf {
     static TEMP_DIR: OnceLock<PathBuf> = OnceLock::new();
     TEMP_DIR.get_or_init(|| {
@@ -238,19 +238,19 @@ pub fn logs_dir() -> &'static PathBuf {
     })
 }
 
-/// Returns the path to the Baymax server directory on this SSH host.
+/// Returns the path to the Sim server directory on this SSH host.
 pub fn remote_server_state_dir() -> &'static PathBuf {
     static REMOTE_SERVER_STATE: OnceLock<PathBuf> = OnceLock::new();
     REMOTE_SERVER_STATE.get_or_init(|| data_dir().join("server_state"))
 }
 
-/// Returns the path to the `Baymax.log` file.
+/// Returns the path to the `Sim.log` file.
 pub fn log_file() -> &'static PathBuf {
     static LOG_FILE: OnceLock<PathBuf> = OnceLock::new();
     LOG_FILE.get_or_init(|| logs_dir().join(format!("{}.log", APP_NAME)))
 }
 
-/// Returns the path to the `Baymax.log.old` file.
+/// Returns the path to the `Sim.log.old` file.
 pub fn old_log_file() -> &'static PathBuf {
     static OLD_LOG_FILE: OnceLock<PathBuf> = OnceLock::new();
     OLD_LOG_FILE.get_or_init(|| logs_dir().join(format!("{}.log.old", APP_NAME)))
@@ -321,7 +321,7 @@ pub fn debug_scenarios_file() -> &'static PathBuf {
 /// Returns the path to the user-global `AGENTS.md` file.
 ///
 /// This file holds personal agent instructions that apply to every project the
-/// user opens, and is loaded into the native Baymax agent's system prompt.
+/// user opens, and is loaded into the native Sim agent's system prompt.
 pub fn agents_file() -> &'static PathBuf {
     static AGENTS_FILE: OnceLock<PathBuf> = OnceLock::new();
     AGENTS_FILE.get_or_init(|| config_dir().join("AGENTS.md"))
@@ -402,7 +402,7 @@ pub fn prompts_dir() -> &'static PathBuf {
 ///
 /// # Arguments
 ///
-/// * `dev_mode` - If true, assumes the current working directory is the Baymax repository.
+/// * `dev_mode` - If true, assumes the current working directory is the Sim repository.
 pub fn prompt_overrides_dir(repo_path: Option<&Path>) -> PathBuf {
     if let Some(path) = repo_path {
         let dev_path = path.join("assets").join("prompts");
@@ -439,7 +439,7 @@ pub fn embeddings_dir() -> &'static PathBuf {
 
 /// Returns the path to the languages directory.
 ///
-/// This is where language servers are downloaded to for languages built-in to Baymax.
+/// This is where language servers are downloaded to for languages built-in to Sim.
 pub fn languages_dir() -> &'static PathBuf {
     static LANGUAGES_DIR: OnceLock<PathBuf> = OnceLock::new();
     LANGUAGES_DIR.get_or_init(|| data_dir().join("languages"))
@@ -447,7 +447,7 @@ pub fn languages_dir() -> &'static PathBuf {
 
 /// Returns the path to the debug adapters directory
 ///
-/// This is where debug adapters are downloaded to for DAPs that are built-in to Baymax.
+/// This is where debug adapters are downloaded to for DAPs that are built-in to Sim.
 pub fn debug_adapters_dir() -> &'static PathBuf {
     static DEBUG_ADAPTERS_DIR: OnceLock<PathBuf> = OnceLock::new();
     DEBUG_ADAPTERS_DIR.get_or_init(|| data_dir().join("debug_adapters"))
@@ -485,9 +485,9 @@ pub fn devcontainer_dir() -> &'static PathBuf {
     DEVCONTAINER_DIR.get_or_init(|| data_dir().join("devcontainer"))
 }
 
-/// Returns the relative path to a `.baymax` folder within a project.
+/// Returns the relative path to a `.sim` folder within a project.
 pub fn local_settings_folder_name() -> &'static str {
-    ".baymax"
+    ".sim"
 }
 
 /// Returns the relative path to a `.vscode` folder within a project.
@@ -498,14 +498,14 @@ pub fn local_vscode_folder_name() -> &'static str {
 /// Returns the relative path to a `settings.json` file within a project.
 pub fn local_settings_file_relative_path() -> &'static RelPath {
     static CACHED: LazyLock<&'static RelPath> =
-        LazyLock::new(|| RelPath::unix(".baymax/settings.json").unwrap());
+        LazyLock::new(|| RelPath::unix(".sim/settings.json").unwrap());
     *CACHED
 }
 
 /// Returns the relative path to a `tasks.json` file within a project.
 pub fn local_tasks_file_relative_path() -> &'static RelPath {
     static CACHED: LazyLock<&'static RelPath> =
-        LazyLock::new(|| RelPath::unix(".baymax/tasks.json").unwrap());
+        LazyLock::new(|| RelPath::unix(".sim/tasks.json").unwrap());
     *CACHED
 }
 
@@ -525,10 +525,10 @@ pub fn task_file_name() -> &'static str {
 }
 
 /// Returns the relative path to a `debug.json` file within a project.
-/// .baymax/debug.json
+/// .sim/debug.json
 pub fn local_debug_file_relative_path() -> &'static RelPath {
     static CACHED: LazyLock<&'static RelPath> =
-        LazyLock::new(|| RelPath::unix(".baymax/debug.json").unwrap());
+        LazyLock::new(|| RelPath::unix(".sim/debug.json").unwrap());
     *CACHED
 }
 

@@ -3,7 +3,7 @@ pub enum RowRenderMechanism {
     /// More correct for multiline content, but slower.
     #[allow(dead_code)] // Will be used when settings ui is added
     VariableList,
-    /// Default behaviour for now while resizable columns are being stabilibaymax.
+    /// Default behaviour for now while resizable columns are being stabilisim.
     #[default]
     UniformList,
 }

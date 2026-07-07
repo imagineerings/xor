@@ -477,7 +477,7 @@ fn format_timestamp_fallback(timestamp: OffsetDateTime, reference: OffsetDateTim
     format_timestamp_naive(timestamp, reference, is_12_hour_time)
 }
 
-/// Returns `true` if the locale is recognibaymax as a 12-hour time locale.
+/// Returns `true` if the locale is recognisim as a 12-hour time locale.
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 fn is_12_hour_time_by_locale(locale: &str) -> bool {
     [

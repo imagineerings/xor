@@ -3,7 +3,7 @@ use std::iter::zip;
 
 use crate::{
     debugger_panel::DebugPanel,
-    persistence::SerialibaymaxPaneLayout,
+    persistence::SerialisimPaneLayout,
     tests::{init_test, init_test_workspace, start_debug_session},
 };
 use dap::{StoppedEvent, StoppedEventReason, messages::Events};
@@ -72,7 +72,7 @@ async fn test_invert_axis_on_panel_position_change(
         "Default dock position should be bottom for debug panel"
     );
 
-    let pre_serialibaymax_layout = debug_panel
+    let pre_serialisim_layout = debug_panel
         .read_with(cx, |panel, cx| {
             panel
                 .active_session()
@@ -80,11 +80,11 @@ async fn test_invert_axis_on_panel_position_change(
                 .read(cx)
                 .running_state()
                 .read(cx)
-                .serialibaymax_layout(cx)
+                .serialisim_layout(cx)
         })
         .panes;
 
-    let post_serialibaymax_layout = debug_panel
+    let post_serialisim_layout = debug_panel
         .update_in(cx, |panel, window, cx| {
             panel.set_position(DockPosition::Right, window, cx);
 
@@ -94,24 +94,24 @@ async fn test_invert_axis_on_panel_position_change(
                 .read(cx)
                 .running_state()
                 .read(cx)
-                .serialibaymax_layout(cx)
+                .serialisim_layout(cx)
         })
         .panes;
 
-    let pre_panes = pre_serialibaymax_layout.in_order();
-    let post_panes = post_serialibaymax_layout.in_order();
+    let pre_panes = pre_serialisim_layout.in_order();
+    let post_panes = post_serialisim_layout.in_order();
 
     assert_eq!(pre_panes.len(), post_panes.len());
 
     for (pre, post) in zip(pre_panes, post_panes) {
         match (pre, post) {
             (
-                SerialibaymaxPaneLayout::Group {
+                SerialisimPaneLayout::Group {
                     axis: pre_axis,
                     flexes: pre_flexes,
                     children: _,
                 },
-                SerialibaymaxPaneLayout::Group {
+                SerialisimPaneLayout::Group {
                     axis: post_axis,
                     flexes: post_flexes,
                     children: _,
@@ -120,7 +120,7 @@ async fn test_invert_axis_on_panel_position_change(
                 assert_ne!(pre_axis, post_axis);
                 assert_eq!(pre_flexes, post_flexes);
             }
-            (SerialibaymaxPaneLayout::Pane(pre_pane), SerialibaymaxPaneLayout::Pane(post_pane)) => {
+            (SerialisimPaneLayout::Pane(pre_pane), SerialisimPaneLayout::Pane(post_pane)) => {
                 assert_eq!(pre_pane.children, post_pane.children);
                 assert_eq!(pre_pane.active_item, post_pane.active_item);
             }

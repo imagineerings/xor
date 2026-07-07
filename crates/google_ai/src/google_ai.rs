@@ -700,11 +700,11 @@ mod tests {
             thought_signature: Some("test_signature".to_string()),
         };
 
-        let serialibaymax = serde_json::to_value(&part).unwrap();
+        let serialisim = serde_json::to_value(&part).unwrap();
 
-        assert_eq!(serialibaymax["functionCall"]["name"], "test_function");
-        assert_eq!(serialibaymax["functionCall"]["args"]["arg"], "value");
-        assert_eq!(serialibaymax["thoughtSignature"], "test_signature");
+        assert_eq!(serialisim["functionCall"]["name"], "test_function");
+        assert_eq!(serialisim["functionCall"]["args"]["arg"], "value");
+        assert_eq!(serialisim["thoughtSignature"], "test_signature");
     }
 
     #[test]
@@ -718,12 +718,12 @@ mod tests {
             thought_signature: None,
         };
 
-        let serialibaymax = serde_json::to_value(&part).unwrap();
+        let serialisim = serde_json::to_value(&part).unwrap();
 
-        assert_eq!(serialibaymax["functionCall"]["name"], "test_function");
-        assert_eq!(serialibaymax["functionCall"]["args"]["arg"], "value");
+        assert_eq!(serialisim["functionCall"]["name"], "test_function");
+        assert_eq!(serialisim["functionCall"]["args"]["arg"], "value");
         // thoughtSignature field should not be present when None
-        assert!(serialibaymax.get("thoughtSignature").is_none());
+        assert!(serialisim.get("thoughtSignature").is_none());
     }
 
     #[test]
@@ -768,19 +768,19 @@ mod tests {
             thought_signature: Some("round_trip_signature".to_string()),
         };
 
-        let serialibaymax = serde_json::to_value(&original).unwrap();
-        let deserialibaymax: FunctionCallPart = serde_json::from_value(serialibaymax).unwrap();
+        let serialisim = serde_json::to_value(&original).unwrap();
+        let deserialisim: FunctionCallPart = serde_json::from_value(serialisim).unwrap();
 
         assert_eq!(
-            deserialibaymax.function_call.name,
+            deserialisim.function_call.name,
             original.function_call.name
         );
         assert_eq!(
-            deserialibaymax.function_call.args,
+            deserialisim.function_call.args,
             original.function_call.args
         );
         assert_eq!(
-            deserialibaymax.thought_signature,
+            deserialisim.thought_signature,
             original.thought_signature
         );
     }
@@ -796,9 +796,9 @@ mod tests {
             thought_signature: Some("".to_string()),
         };
 
-        let serialibaymax = serde_json::to_value(&part).unwrap();
+        let serialisim = serde_json::to_value(&part).unwrap();
 
-        // Empty string should still be serialibaymax (normalization happens at a higher level)
-        assert_eq!(serialibaymax["thoughtSignature"], "");
+        // Empty string should still be serialisim (normalization happens at a higher level)
+        assert_eq!(serialisim["thoughtSignature"], "");
     }
 }

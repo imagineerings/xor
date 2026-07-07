@@ -3,7 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use agent::{BAYMAX_AGENT_ID, ThreadStore};
+use agent::{SIM_AGENT_ID, ThreadStore};
 use agent_client_protocol::schema as acp;
 use anyhow::Context as _;
 use chrono::{DateTime, Utc};
@@ -26,7 +26,7 @@ use project::{AgentId, linked_worktree_short_name};
 use remote::{RemoteConnectionOptions, same_remote_connection_identity};
 use ui::{App, Context, SharedString, ThreadItemWorktreeInfo, WorktreeKind};
 use util::ResultExt as _;
-use workspace::{PathList, SerialibaymaxWorkspaceLocation, WorkspaceDb};
+use workspace::{PathList, SerialisimWorkspaceLocation, WorkspaceDb};
 
 use crate::DEFAULT_THREAD_TITLE;
 
@@ -127,7 +127,7 @@ fn migrate_thread_metadata(cx: &mut App) -> Task<anyhow::Result<()>> {
                     Some(ThreadMetadata {
                         thread_id: ThreadId::new(),
                         session_id: Some(entry.id),
-                        agent_id: BAYMAX_AGENT_ID.clone(),
+                        agent_id: SIM_AGENT_ID.clone(),
                         title: if entry.title.is_empty()
                             || entry.title.as_ref() == DEFAULT_THREAD_TITLE
                         {
@@ -217,7 +217,7 @@ fn migrate_thread_remote_connections(cx: &mut App, migration_task: Task<anyhow::
             .iter()
             .filter(|workspace| {
                 !workspace.paths.is_empty()
-                    && matches!(workspace.location, SerialibaymaxWorkspaceLocation::Local)
+                    && matches!(workspace.location, SerialisimWorkspaceLocation::Local)
             })
             .for_each(|workspace| {
                 local_path_lists.insert(workspace.paths.clone());
@@ -225,7 +225,7 @@ fn migrate_thread_remote_connections(cx: &mut App, migration_task: Task<anyhow::
 
         for workspace in recent_workspaces {
             match workspace.location {
-                SerialibaymaxWorkspaceLocation::Remote(remote_connection)
+                SerialisimWorkspaceLocation::Remote(remote_connection)
                     if !local_path_lists.contains(&workspace.paths) =>
                 {
                     remote_path_lists
@@ -469,8 +469,8 @@ pub struct ArchivedGitWorktree {
     /// the files.
     pub main_repo_path: PathBuf,
     /// Branch that was checked out in the worktree at archive time. `None` if
-    /// the worktree was in detached HEAD state, which isn't supported in Baymax, but
-    /// could happen if the user made a detached one outside of Baymax.
+    /// the worktree was in detached HEAD state, which isn't supported in Sim, but
+    /// could happen if the user made a detached one outside of Sim.
     /// On restore, we try to switch to this branch. If that fails (e.g. it's
     /// checked out elsewhere), we auto-generate a new one.
     pub branch_name: Option<String>,
@@ -1496,7 +1496,7 @@ impl ThreadMetadataDb {
     /// then flow through this same upsert path.
     pub async fn save(&self, row: ThreadMetadata) -> anyhow::Result<()> {
         let session_id = row.session_id.as_ref().map(|s| s.0.clone());
-        let agent_id = if row.agent_id.as_ref() == BAYMAX_AGENT_ID.as_ref() {
+        let agent_id = if row.agent_id.as_ref() == SIM_AGENT_ID.as_ref() {
             None
         } else {
             Some(row.agent_id.to_string())
@@ -1509,20 +1509,20 @@ impl ThreadMetadataDb {
         let updated_at = row.updated_at.to_rfc3339();
         let created_at = row.created_at.map(|dt| dt.to_rfc3339());
         let interacted_at = row.interacted_at.map(|dt| dt.to_rfc3339());
-        let serialibaymax = row.folder_paths().serialize();
+        let serialisim = row.folder_paths().serialize();
         let (folder_paths, folder_paths_order) = if row.folder_paths().is_empty() {
             (None, None)
         } else {
-            (Some(serialibaymax.paths), Some(serialibaymax.order))
+            (Some(serialisim.paths), Some(serialisim.order))
         };
-        let main_serialibaymax = row.main_worktree_paths().serialize();
+        let main_serialisim = row.main_worktree_paths().serialize();
         let (main_worktree_paths, main_worktree_paths_order) =
             if row.main_worktree_paths().is_empty() {
                 (None, None)
             } else {
                 (
-                    Some(main_serialibaymax.paths),
-                    Some(main_serialibaymax.order),
+                    Some(main_serialisim.paths),
+                    Some(main_serialisim.order),
                 )
             };
         let remote_connection = row
@@ -1727,7 +1727,7 @@ impl Column for ThreadMetadata {
 
         let agent_id = agent_id
             .map(|id| AgentId::new(id))
-            .unwrap_or(BAYMAX_AGENT_ID.clone());
+            .unwrap_or(SIM_AGENT_ID.clone());
 
         let updated_at = DateTime::parse_from_rfc3339(&updated_at_str)?.with_timezone(&Utc);
         let created_at = created_at_str
@@ -1744,7 +1744,7 @@ impl Column for ThreadMetadata {
 
         let folder_paths = folder_paths_str
             .map(|paths| {
-                PathList::deserialize(&util::path_list::SerialibaymaxPathList {
+                PathList::deserialize(&util::path_list::SerialisimPathList {
                     paths,
                     order: folder_paths_order_str.unwrap_or_default(),
                 })
@@ -1753,7 +1753,7 @@ impl Column for ThreadMetadata {
 
         let main_worktree_paths = main_worktree_paths_str
             .map(|paths| {
-                PathList::deserialize(&util::path_list::SerialibaymaxPathList {
+                PathList::deserialize(&util::path_list::SerialisimPathList {
                     paths,
                     order: main_worktree_paths_order_str.unwrap_or_default(),
                 })
@@ -1868,7 +1868,7 @@ mod tests {
             thread_id: ThreadId::new(),
             archived: false,
             session_id: Some(acp::SessionId::new(session_id)),
-            agent_id: agent::BAYMAX_AGENT_ID.clone(),
+            agent_id: agent::SIM_AGENT_ID.clone(),
             title: if title.is_empty() {
                 None
             } else {
@@ -2165,7 +2165,7 @@ mod tests {
         let moved_metadata = ThreadMetadata {
             thread_id: session1_thread_id,
             session_id: Some(acp::SessionId::new("session-1")),
-            agent_id: agent::BAYMAX_AGENT_ID.clone(),
+            agent_id: agent::SIM_AGENT_ID.clone(),
             title: Some("First Thread".into()),
             title_override: None,
             updated_at: updated_time,
@@ -2250,7 +2250,7 @@ mod tests {
         let existing_metadata = ThreadMetadata {
             thread_id: ThreadId::new(),
             session_id: Some(acp::SessionId::new("a-session-0")),
-            agent_id: agent::BAYMAX_AGENT_ID.clone(),
+            agent_id: agent::SIM_AGENT_ID.clone(),
             title: Some("Existing Metadata".into()),
             title_override: None,
             updated_at: now - chrono::Duration::seconds(10),
@@ -2325,7 +2325,7 @@ mod tests {
         assert_eq!(list.len(), 4);
         assert!(
             list.iter()
-                .all(|metadata| metadata.agent_id.as_ref() == agent::BAYMAX_AGENT_ID.as_ref())
+                .all(|metadata| metadata.agent_id.as_ref() == agent::SIM_AGENT_ID.as_ref())
         );
 
         let existing_metadata = list
@@ -2376,7 +2376,7 @@ mod tests {
         let existing_metadata = ThreadMetadata {
             thread_id: ThreadId::new(),
             session_id: Some(acp::SessionId::new("existing-session")),
-            agent_id: agent::BAYMAX_AGENT_ID.clone(),
+            agent_id: agent::SIM_AGENT_ID.clone(),
             title: Some("Existing Metadata".into()),
             title_override: None,
             updated_at: existing_updated_at,
@@ -2451,7 +2451,7 @@ mod tests {
 
         let workspace_db = cx.update(|cx| WorkspaceDb::global(cx));
         let workspace_id = workspace_db.next_id().await.unwrap();
-        let serialibaymax_paths = folder_paths.serialize();
+        let serialisim_paths = folder_paths.serialize();
         let remote_connection_id = 1_i64;
         workspace_db
             .write(move |conn| {
@@ -2470,8 +2470,8 @@ mod tests {
                     "UPDATE workspaces SET paths = ?2, paths_order = ?3, remote_connection_id = ?4, timestamp = CURRENT_TIMESTAMP WHERE workspace_id = ?1",
                 )?;
                 let mut next_index = stmt.bind(&workspace_id, 1)?;
-                next_index = stmt.bind(&serialibaymax_paths.paths, next_index)?;
-                next_index = stmt.bind(&serialibaymax_paths.order, next_index)?;
+                next_index = stmt.bind(&serialisim_paths.paths, next_index)?;
+                next_index = stmt.bind(&serialisim_paths.order, next_index)?;
                 stmt.bind(&Some(remote_connection_id as i32), next_index)?;
                 stmt.exec()
             })
@@ -3121,7 +3121,7 @@ mod tests {
             thread_id: ThreadId::new(),
             archived: false,
             session_id: Some(acp::SessionId::new("local-linked")),
-            agent_id: agent::BAYMAX_AGENT_ID.clone(),
+            agent_id: agent::SIM_AGENT_ID.clone(),
             title: Some("Local Linked".into()),
             title_override: None,
             updated_at: now,
@@ -3135,7 +3135,7 @@ mod tests {
             thread_id: ThreadId::new(),
             archived: false,
             session_id: Some(acp::SessionId::new("remote-linked")),
-            agent_id: agent::BAYMAX_AGENT_ID.clone(),
+            agent_id: agent::SIM_AGENT_ID.clone(),
             title: Some("Remote Linked".into()),
             title_override: None,
             updated_at: now - chrono::Duration::seconds(1),
@@ -3916,11 +3916,11 @@ mod tests {
     #[test]
     fn test_thread_worktree_paths_full_add_then_remove_cycle() {
         // Full scenario from the issue:
-        //   1. Start with linked worktree selectric → baymax
+        //   1. Start with linked worktree selectric → sim
         //   2. Add cloud
-        //   3. Remove baymax
+        //   3. Remove sim
 
-        let mut paths = make_worktree_paths(&[("/projects/baymax", "/worktrees/selectric/baymax")]);
+        let mut paths = make_worktree_paths(&[("/projects/sim", "/worktrees/selectric/sim")]);
 
         // Step 2: add cloud
         paths.add_path(Path::new("/projects/cloud"), Path::new("/projects/cloud"));
@@ -3929,17 +3929,17 @@ mod tests {
         assert_eq!(
             paths.folder_path_list(),
             &PathList::new(&[
-                Path::new("/worktrees/selectric/baymax"),
+                Path::new("/worktrees/selectric/sim"),
                 Path::new("/projects/cloud"),
             ])
         );
         assert_eq!(
             paths.main_worktree_path_list(),
-            &PathList::new(&[Path::new("/projects/baymax"), Path::new("/projects/cloud"),])
+            &PathList::new(&[Path::new("/projects/sim"), Path::new("/projects/cloud"),])
         );
 
-        // Step 3: remove baymax
-        paths.remove_main_path(Path::new("/projects/baymax"));
+        // Step 3: remove sim
+        paths.remove_main_path(Path::new("/projects/sim"));
 
         assert_eq!(paths.ordered_pairs().count(), 1);
         assert_eq!(
@@ -3954,16 +3954,16 @@ mod tests {
 
     #[test]
     fn test_thread_worktree_paths_add_is_idempotent() {
-        let mut paths = make_worktree_paths(&[("/projects/baymax", "/projects/baymax")]);
+        let mut paths = make_worktree_paths(&[("/projects/sim", "/projects/sim")]);
 
-        paths.add_path(Path::new("/projects/baymax"), Path::new("/projects/baymax"));
+        paths.add_path(Path::new("/projects/sim"), Path::new("/projects/sim"));
 
         assert_eq!(paths.ordered_pairs().count(), 1);
     }
 
     #[test]
     fn test_thread_worktree_paths_remove_nonexistent_is_noop() {
-        let mut paths = make_worktree_paths(&[("/projects/baymax", "/worktrees/selectric/baymax")]);
+        let mut paths = make_worktree_paths(&[("/projects/sim", "/worktrees/selectric/sim")]);
 
         paths.remove_main_path(Path::new("/projects/nonexistent"));
 
@@ -3973,10 +3973,10 @@ mod tests {
     #[test]
     fn test_thread_worktree_paths_from_path_lists_preserves_association() {
         let folder = PathList::new(&[
-            Path::new("/worktrees/selectric/baymax"),
+            Path::new("/worktrees/selectric/sim"),
             Path::new("/projects/cloud"),
         ]);
-        let main = PathList::new(&[Path::new("/projects/baymax"), Path::new("/projects/cloud")]);
+        let main = PathList::new(&[Path::new("/projects/sim"), Path::new("/projects/cloud")]);
 
         let paths = WorktreePaths::from_path_lists(main, folder).unwrap();
 
@@ -3986,8 +3986,8 @@ mod tests {
             .collect();
         assert_eq!(pairs.len(), 2);
         assert!(pairs.contains(&(
-            PathBuf::from("/projects/baymax"),
-            PathBuf::from("/worktrees/selectric/baymax")
+            PathBuf::from("/projects/sim"),
+            PathBuf::from("/worktrees/selectric/sim")
         )));
         assert!(pairs.contains(&(
             PathBuf::from("/projects/cloud"),
@@ -4001,8 +4001,8 @@ mod tests {
         // deduplicates because PathList stores unique sorted paths, but
         // ordered_pairs still has both entries.
         let paths = make_worktree_paths(&[
-            ("/projects/baymax", "/worktrees/selectric/baymax"),
-            ("/projects/baymax", "/worktrees/feature/baymax"),
+            ("/projects/sim", "/worktrees/selectric/sim"),
+            ("/projects/sim", "/worktrees/feature/sim"),
         ]);
 
         // main_worktree_path_list has the duplicate main path twice
@@ -4011,23 +4011,23 @@ mod tests {
         assert_eq!(
             paths.folder_path_list(),
             &PathList::new(&[
-                Path::new("/worktrees/selectric/baymax"),
-                Path::new("/worktrees/feature/baymax"),
+                Path::new("/worktrees/selectric/sim"),
+                Path::new("/worktrees/feature/sim"),
             ])
         );
         assert_eq!(
             paths.main_worktree_path_list(),
-            &PathList::new(&[Path::new("/projects/baymax"), Path::new("/projects/baymax"),])
+            &PathList::new(&[Path::new("/projects/sim"), Path::new("/projects/sim"),])
         );
     }
 
     #[test]
     fn test_thread_worktree_paths_mismatched_lengths_returns_error() {
         let folder = PathList::new(&[
-            Path::new("/worktrees/selectric/baymax"),
+            Path::new("/worktrees/selectric/sim"),
             Path::new("/projects/cloud"),
         ]);
-        let main = PathList::new(&[Path::new("/projects/baymax")]);
+        let main = PathList::new(&[Path::new("/projects/sim")]);
 
         let result = WorktreePaths::from_path_lists(main, folder);
         assert!(result.is_err());

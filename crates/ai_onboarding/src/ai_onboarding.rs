@@ -15,7 +15,7 @@ pub use young_account_banner::YoungAccountBanner;
 
 use std::sync::Arc;
 
-use client::{Client, UserStore, baymax_urls};
+use client::{Client, UserStore, sim_urls};
 use gpui::{AnyElement, Entity, IntoElement, ParentElement, TaskExt};
 use ui::{Divider, RegisterComponent, Tooltip, Vector, VectorName, prelude::*};
 
@@ -39,20 +39,20 @@ impl From<client::Status> for SignInStatus {
 }
 
 #[derive(RegisterComponent, IntoElement)]
-pub struct BaymaxAiOnboarding {
+pub struct SimAiOnboarding {
     pub sign_in_status: SignInStatus,
     pub plan: Option<Plan>,
     pub account_too_young: bool,
-    pub continue_with_baymax_ai: Arc<dyn Fn(&mut Window, &mut App)>,
+    pub continue_with_sim_ai: Arc<dyn Fn(&mut Window, &mut App)>,
     pub sign_in: Arc<dyn Fn(&mut Window, &mut App)>,
     pub dismiss_onboarding: Option<Arc<dyn Fn(&mut Window, &mut App)>>,
 }
 
-impl BaymaxAiOnboarding {
+impl SimAiOnboarding {
     pub fn new(
         client: Arc<Client>,
         user_store: &Entity<UserStore>,
-        continue_with_baymax_ai: Arc<dyn Fn(&mut Window, &mut App)>,
+        continue_with_sim_ai: Arc<dyn Fn(&mut Window, &mut App)>,
         cx: &mut App,
     ) -> Self {
         let store = user_store.read(cx);
@@ -62,7 +62,7 @@ impl BaymaxAiOnboarding {
             sign_in_status: status.into(),
             plan: store.plan(),
             account_too_young: store.account_too_young(),
-            continue_with_baymax_ai,
+            continue_with_sim_ai,
             sign_in: Arc::new(move |_window, cx| {
                 cx.spawn({
                     let client = client.clone();
@@ -154,15 +154,15 @@ impl BaymaxAiOnboarding {
             .w_full()
             .relative()
             .gap_1()
-            .child(Headline::new("Welcome to Baymax AI"))
+            .child(Headline::new("Welcome to Sim AI"))
             .child(
-                Label::new("Sign in to try Baymax Pro free for 14 days.")
+                Label::new("Sign in to try Sim Pro free for 14 days.")
                     .color(Color::Muted)
                     .mb_2(),
             )
             .child(PlanDefinitions.sign_in_upsell())
             .child(
-                Button::new("sign_in", "Try Baymax Pro for Free")
+                Button::new("sign_in", "Try Sim Pro for Free")
                     .disabled(signing_in)
                     .full_width()
                     .style(ButtonStyle::Tinted(ui::TintColor::Accent))
@@ -184,7 +184,7 @@ impl BaymaxAiOnboarding {
                 .relative()
                 .min_w_0()
                 .gap_1()
-                .child(Headline::new("Welcome to Baymax AI"))
+                .child(Headline::new("Welcome to Sim AI"))
                 .child(YoungAccountBanner)
                 .child(
                     v_flex()
@@ -211,7 +211,7 @@ impl BaymaxAiOnboarding {
                                         "Upgrade To Pro Clicked",
                                         state = "young-account"
                                     );
-                                    cx.open_url(&baymax_urls::upgrade_to_baymax_pro_url(cx))
+                                    cx.open_url(&sim_urls::upgrade_to_sim_pro_url(cx))
                                 }),
                         ),
                 )
@@ -221,7 +221,7 @@ impl BaymaxAiOnboarding {
                 .w_full()
                 .relative()
                 .gap_1()
-                .child(Headline::new("Welcome to Baymax AI"))
+                .child(Headline::new("Welcome to Sim AI"))
                 .child(
                     v_flex()
                         .mt_2()
@@ -273,7 +273,7 @@ impl BaymaxAiOnboarding {
                                         "Start Trial Clicked",
                                         state = "post-sign-in"
                                     );
-                                    cx.open_url(&baymax_urls::start_trial_url(cx))
+                                    cx.open_url(&sim_urls::start_trial_url(cx))
                                 }),
                         ),
                 )
@@ -287,7 +287,7 @@ impl BaymaxAiOnboarding {
             .relative()
             .gap_1()
             .child(Self::pro_trial_stamp(cx))
-            .child(Headline::new("Welcome to the Baymax Pro Trial"))
+            .child(Headline::new("Welcome to the Sim Pro Trial"))
             .child(
                 Label::new("Here's what you get for the next 14 days:")
                     .color(Color::Muted)
@@ -304,7 +304,7 @@ impl BaymaxAiOnboarding {
             .relative()
             .gap_1()
             .child(Self::certified_user_stamp(cx))
-            .child(Headline::new("Welcome to Baymax Pro"))
+            .child(Headline::new("Welcome to Sim Pro"))
             .child(
                 Label::new("Here's what you get:")
                     .color(Color::Muted)
@@ -321,7 +321,7 @@ impl BaymaxAiOnboarding {
             .relative()
             .gap_1()
             .child(Self::business_stamp(cx))
-            .child(Headline::new("Welcome to Baymax Business"))
+            .child(Headline::new("Welcome to Sim Business"))
             .child(
                 Label::new("Here's what you get:")
                     .color(Color::Muted)
@@ -338,7 +338,7 @@ impl BaymaxAiOnboarding {
             .relative()
             .gap_1()
             .child(Self::student_stamp(cx))
-            .child(Headline::new("Welcome to Baymax Student"))
+            .child(Headline::new("Welcome to Sim Student"))
             .child(
                 Label::new("Here's what you get:")
                     .color(Color::Muted)
@@ -350,16 +350,16 @@ impl BaymaxAiOnboarding {
     }
 }
 
-impl RenderOnce for BaymaxAiOnboarding {
+impl RenderOnce for SimAiOnboarding {
     fn render(self, _window: &mut ui::Window, cx: &mut App) -> impl IntoElement {
         if matches!(self.sign_in_status, SignInStatus::SignedIn) {
             match self.plan {
                 None => self.render_free_plan_state(cx),
-                Some(Plan::BaymaxFree) => self.render_free_plan_state(cx),
-                Some(Plan::BaymaxProTrial) => self.render_trial_state(cx),
-                Some(Plan::BaymaxPro) => self.render_pro_plan_state(cx),
-                Some(Plan::BaymaxBusiness) => self.render_business_plan_state(cx),
-                Some(Plan::BaymaxStudent) => self.render_student_plan_state(cx),
+                Some(Plan::SimFree) => self.render_free_plan_state(cx),
+                Some(Plan::SimProTrial) => self.render_trial_state(cx),
+                Some(Plan::SimPro) => self.render_pro_plan_state(cx),
+                Some(Plan::SimBusiness) => self.render_business_plan_state(cx),
+                Some(Plan::SimStudent) => self.render_student_plan_state(cx),
             }
         } else {
             self.render_sign_in_disclaimer(cx)
@@ -367,7 +367,7 @@ impl RenderOnce for BaymaxAiOnboarding {
     }
 }
 
-impl Component for BaymaxAiOnboarding {
+impl Component for SimAiOnboarding {
     fn scope() -> ComponentScope {
         ComponentScope::Onboarding
     }
@@ -378,7 +378,7 @@ impl Component for BaymaxAiOnboarding {
 
     fn description() -> &'static str {
         "The onboarding surface shown to new agent panel users, \
-        guiding them through signing in to Baymax and selecting a plan \
+        guiding them through signing in to Sim and selecting a plan \
         before they can start using the agent."
     }
 
@@ -394,11 +394,11 @@ impl Component for BaymaxAiOnboarding {
                 .max_w(px(1100.))
                 .child(
                     AgentPanelOnboardingCard::new().child(
-                        BaymaxAiOnboarding {
+                        SimAiOnboarding {
                             sign_in_status,
                             plan,
                             account_too_young,
-                            continue_with_baymax_ai: Arc::new(|_, _| {}),
+                            continue_with_sim_ai: Arc::new(|_, _| {}),
                             sign_in: Arc::new(|_, _| {}),
                             dismiss_onboarding: None,
                         }
@@ -422,23 +422,23 @@ impl Component for BaymaxAiOnboarding {
                 ),
                 single_example(
                     "Free Plan",
-                    onboarding(SignInStatus::SignedIn, Some(Plan::BaymaxFree), false),
+                    onboarding(SignInStatus::SignedIn, Some(Plan::SimFree), false),
                 ),
                 single_example(
                     "Pro Trial",
-                    onboarding(SignInStatus::SignedIn, Some(Plan::BaymaxProTrial), false),
+                    onboarding(SignInStatus::SignedIn, Some(Plan::SimProTrial), false),
                 ),
                 single_example(
                     "Pro Plan",
-                    onboarding(SignInStatus::SignedIn, Some(Plan::BaymaxPro), false),
+                    onboarding(SignInStatus::SignedIn, Some(Plan::SimPro), false),
                 ),
                 single_example(
                     "Business Plan",
-                    onboarding(SignInStatus::SignedIn, Some(Plan::BaymaxBusiness), false),
+                    onboarding(SignInStatus::SignedIn, Some(Plan::SimBusiness), false),
                 ),
                 single_example(
                     "Student Plan",
-                    onboarding(SignInStatus::SignedIn, Some(Plan::BaymaxStudent), false),
+                    onboarding(SignInStatus::SignedIn, Some(Plan::SimStudent), false),
                 ),
             ])
             .into_any_element()

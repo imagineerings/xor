@@ -2,34 +2,34 @@
 
 ## Architecture
 
-The migration is organized as Baymax-native integration layers:
+The migration is organized as Sim-native integration layers:
 
-- `crates/baymax_game`: Baymax-owned game authoring metadata, boundary policy, parsing diagnostics, project descriptors, fixture attribution, and task/debug/export descriptors for Godot-compatible source projects.
+- `crates/sim_game`: Sim-owned game authoring metadata, boundary policy, parsing diagnostics, project descriptors, fixture attribution, and task/debug/export descriptors for Godot-compatible source projects.
 - `crates/world_model`: world-model request/control/worker/graph/mesh/artifact/provenance primitives.
 - Comfy harness modules inside `crates/world_model`: core runtime control-plane adapters, Comfy graph/node schemas, sampler/scheduler execution semantics, conditioning, latent/VAE behavior, model patching, diffusion/world-model runner profiles, model folder and memory policy, asset APIs, workflow/blueprint catalogs, provider connectors, extension loading policy, and compatibility fixtures.
-- Existing Baymax crates: project, worktree, language, LSP, tasks, debugger, media, UI, agent, and app registry own their existing domains.
+- Existing Sim crates: project, worktree, language, LSP, tasks, debugger, media, UI, agent, and app registry own their existing domains.
 
 ## Components
 
-### BaymaxGameMigrationInventory
+### SimGameMigrationInventory
 
 Validates that grouped spec coverage exists for every accepted feature area and that excluded runtime areas have explicit boundary reasons.
 
 ```rust
-pub trait BaymaxGameMigrationInventory {
+pub trait SimGameMigrationInventory {
     fn validate_spec_pack(&self) -> MigrationValidationReport;
-    fn classify_source_area(&self, path: &BaymaxGameSourcePath) -> MigrationDecision;
+    fn classify_source_area(&self, path: &SimGameSourcePath) -> MigrationDecision;
 }
 ```
 
 ### RuntimeBoundaryPolicy
 
-Encodes whether a feature is metadata-only, Baymax-adapter, external-command, or excluded.
+Encodes whether a feature is metadata-only, Sim-adapter, external-command, or excluded.
 
 ```rust
 pub enum MigrationDecision {
     MetadataOnly,
-    BaymaxAdapter,
+    SimAdapter,
     ExternalCommand,
     Excluded,
 }
@@ -61,7 +61,7 @@ pub trait DiffusionGraphValidator {
 
 ### ComfyHarnessLayer
 
-Owns Comfy-derived world-model harness semantics, protocol adapters, and compatibility catalogs while delegating storage, media, tasks, secrets, UI, model serving, and dependency review to Baymax systems.
+Owns Comfy-derived world-model harness semantics, protocol adapters, and compatibility catalogs while delegating storage, media, tasks, secrets, UI, model serving, and dependency review to Sim systems.
 
 ```rust
 pub trait ComfyHarnessLayer {
@@ -89,7 +89,7 @@ pub trait MigrationGatekeeper {
 pub enum ExecutionGate {
     SpecConsistency,
     BoundaryPolicy,
-    SharedBaymaxGameMetadata,
+    SharedSimGameMetadata,
     SharedWorldModelFoundations,
     WorkerSafety,
     GraphSafety,
@@ -101,7 +101,7 @@ pub enum ExecutionGate {
 pub enum DependencyWave {
     PlanningValidation,
     SharedFoundations,
-    BaymaxGameCompatibilitySubstrate,
+    SimGameCompatibilitySubstrate,
     WorldModelAndComfyServingSubstrate,
     AuthoringGraphUxAndComfyWorkflows,
     GenerationOutputsAndAssetPipelines,
@@ -113,7 +113,7 @@ pub enum DependencyWave {
 
 ### Property 1: No Runtime Duplication
 
-_For any_ Godot subsystem that duplicates Baymax platform, rendering, UI, input, physics, networking, audio, XR, or text infrastructure, the boundary policy SHALL classify it as excluded or external-command only.
+_For any_ Godot subsystem that duplicates Sim platform, rendering, UI, input, physics, networking, audio, XR, or text infrastructure, the boundary policy SHALL classify it as excluded or external-command only.
 
 **Validates: Requirement 2.1, 2.2**
 
@@ -143,7 +143,7 @@ _For any_ generated video, mesh, texture, or exported artifact, the artifact rec
 
 ### Property 6: Comfy Ownership Boundaries
 
-_For any_ Comfy feature, if an existing Baymax or Godot/world-model migration spec owns the underlying UI, task, media, asset, secret, model-serving, mesh, or dependency-review behavior, the Comfy harness layer SHALL delegate to that owner and SHALL NOT add a parallel subsystem.
+_For any_ Comfy feature, if an existing Sim or Godot/world-model migration spec owns the underlying UI, task, media, asset, secret, model-serving, mesh, or dependency-review behavior, the Comfy harness layer SHALL delegate to that owner and SHALL NOT add a parallel subsystem.
 
 **Validates: Requirement 2.1, 2.2, 13.2, 13.3**
 

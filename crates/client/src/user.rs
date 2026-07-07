@@ -775,15 +775,15 @@ impl UserStore {
 
     pub fn plan(&self) -> Option<Plan> {
         #[cfg(debug_assertions)]
-        if let Ok(plan) = std::env::var("BAYMAX_SIMULATE_PLAN").as_ref() {
+        if let Ok(plan) = std::env::var("SIM_SIMULATE_PLAN").as_ref() {
             use cloud_api_client::Plan;
 
             return match plan.as_str() {
-                "free" => Some(Plan::BaymaxFree),
-                "trial" => Some(Plan::BaymaxProTrial),
-                "pro" => Some(Plan::BaymaxPro),
+                "free" => Some(Plan::SimFree),
+                "trial" => Some(Plan::SimProTrial),
+                "pro" => Some(Plan::SimPro),
                 _ => {
-                    panic!("BAYMAX_SIMULATE_PLAN must be one of 'free', 'trial', or 'pro'");
+                    panic!("SIM_SIMULATE_PLAN must be one of 'free', 'trial', or 'pro'");
                 }
             };
         }
@@ -867,7 +867,7 @@ impl UserStore {
         response: GetAuthenticatedUserResponse,
         cx: &mut Context<Self>,
     ) {
-        let staff = response.user.is_staff && !*feature_flags::BAYMAX_DISABLE_STAFF;
+        let staff = response.user.is_staff && !*feature_flags::SIM_DISABLE_STAFF;
         cx.update_flags(staff, response.feature_flags);
         if let Some(client) = self.client.upgrade() {
             client
@@ -894,7 +894,7 @@ impl UserStore {
                     KnownOrUnknown::Known(plan) => plan,
                     KnownOrUnknown::Unknown(_) => {
                         // If we get a plan that we don't recognize, fall back to the Free plan.
-                        Plan::BaymaxFree
+                        Plan::SimFree
                     }
                 };
 

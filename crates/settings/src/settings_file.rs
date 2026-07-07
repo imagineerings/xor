@@ -63,15 +63,15 @@ mod tests {
     async fn test_watch_config_file_reloads_when_parent_dir_is_symlink(cx: &mut TestAppContext) {
         cx.executor().allow_parking();
         let fs = FakeFs::new(cx.background_executor.clone());
-        let config_settings_path = PathBuf::from("/root/.config/baymax/settings.json");
-        let target_settings_path = PathBuf::from("/root/dotfiles/baymax/settings.json");
+        let config_settings_path = PathBuf::from("/root/.config/sim/settings.json");
+        let target_settings_path = PathBuf::from("/root/dotfiles/sim/settings.json");
 
         fs.insert_tree(
             Path::new("/root"),
             json!({
                 ".config": {},
                 "dotfiles": {
-                    "baymax": {
+                    "sim": {
                         "settings.json": "A"
                     }
                 }
@@ -80,8 +80,8 @@ mod tests {
         .await;
 
         fs.create_symlink(
-            Path::new("/root/.config/baymax"),
-            PathBuf::from("/root/dotfiles/baymax"),
+            Path::new("/root/.config/sim"),
+            PathBuf::from("/root/dotfiles/sim"),
         )
         .await
         .unwrap();

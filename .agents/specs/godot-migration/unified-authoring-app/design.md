@@ -2,7 +2,7 @@
 
 ## Architecture
 
-Add a Baymax app registry entry for game authoring that composes existing project, media, task, agent, and graph surfaces around Godot/world-model metadata.
+Add a Sim app registry entry for game authoring that composes existing project, media, task, agent, and graph surfaces around Godot/world-model metadata.
 
 ## Components
 

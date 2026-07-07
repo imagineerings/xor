@@ -2,11 +2,11 @@
 
 ## 1. Overview
 
-Channel message composition in Baymax currently loses unsent content if the user navigates away, switches channels, or closes the app. This design adds automatic local draft persistence for channel messages, with channel sidebar indicators showing which channels have unsaved drafts.
+Channel message composition in Sim currently loses unsent content if the user navigates away, switches channels, or closes the app. This design adds automatic local draft persistence for channel messages, with channel sidebar indicators showing which channels have unsaved drafts.
 
 **Key decisions:**
 
-- **Client-side only**: Drafts are stored locally in the `KeyValueStore` (SQLite KVP — already part of Baymax). No server involvement.
+- **Client-side only**: Drafts are stored locally in the `KeyValueStore` (SQLite KVP — already part of Sim). No server involvement.
 - **Auto-save with debounce**: Save draft 500ms after the user stops typing, debounced.
 - **Channel-scoped**: Each channel has at most one draft (the most recent unsent message).
 - **Draft indicator**: An italicized channel name or pencil icon in the collab panel's channel list.
@@ -40,7 +40,7 @@ flowchart LR
 | `DraftStore` | Client-side singleton managing draft persistence |
 | `ComposeArea` | Message input field; integrates with DraftStore |
 | `CollabPanel` | Channel list; shows draft indicators |
-| `KeyValueStore` | Existing Baymax persistence layer (SQLite key-value pairs) |
+| `KeyValueStore` | Existing Sim persistence layer (SQLite key-value pairs) |
 
 ## 3. Components and Interfaces
 

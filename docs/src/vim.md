@@ -1,34 +1,34 @@
 ---
-title: Vim Mode - Baymax
-description: Full Vim emulation in Baymax with motions, text objects, visual mode, macros, and Baymax-specific extensions.
+title: Vim Mode - Sim
+description: Full Vim emulation in Sim with motions, text objects, visual mode, macros, and Sim-specific extensions.
 ---
 
 # Vim Mode
 
-Baymax includes a Vim emulation layer. This page covers enabling and disabling vim mode, key bindings, Baymax-specific features, and configuration options.
+Sim includes a Vim emulation layer. This page covers enabling and disabling vim mode, key bindings, Sim-specific features, and configuration options.
 
-## Baymax's vim mode design
+## Sim's vim mode design
 
-Vim mode replicates the behavior of motions and commands where it makes sense and uses Baymax-specific functionality where Baymax's approach is better. The goal is a familiar experience that works out of the box without requiring configuration.
+Vim mode replicates the behavior of motions and commands where it makes sense and uses Sim-specific functionality where Sim's approach is better. The goal is a familiar experience that works out of the box without requiring configuration.
 
 This includes support for semantic navigation, multiple cursors, or other features usually provided by plugins like surrounding text.
 
-So, Baymax's vim mode does not replicate Vim one-to-one, but it meshes Vim's modal design with Baymax's modern features to provide a more fluid experience. It's also configurable, so you can add your own key bindings or override the defaults.
+So, Sim's vim mode does not replicate Vim one-to-one, but it meshes Vim's modal design with Sim's modern features to provide a more fluid experience. It's also configurable, so you can add your own key bindings or override the defaults.
 
 ### Core differences
 
-There are four types of features in vim mode that use Baymax's core functionality, leading to some differences in behavior:
+There are four types of features in vim mode that use Sim's core functionality, leading to some differences in behavior:
 
-1. **Motions**: vim mode uses Baymax's semantic parsing to tune the behavior of motions per language. For example, in Rust, jumping to matching bracket with `%` works with the pipe character `|`. In JavaScript, `w` considers `$` to be a word character.
-2. **Visual block selections**: vim mode uses Baymax's multiple cursor to emulate visual block selections, making block selections a lot more flexible. For example, anything you insert after a block selection updates on every line in real-time, and you can add or remove cursors anytime.
-3. **Macros**: vim mode uses Baymax's recording system for vim macros. So, you can capture and replay more complex actions, like autocompletion.
-4. **Search and replace**: vim mode uses Baymax's search system, so, the syntax for regular expressions is slightly different compared to Vim. [Head to the Regex differences section](#regex-differences) for details.
+1. **Motions**: vim mode uses Sim's semantic parsing to tune the behavior of motions per language. For example, in Rust, jumping to matching bracket with `%` works with the pipe character `|`. In JavaScript, `w` considers `$` to be a word character.
+2. **Visual block selections**: vim mode uses Sim's multiple cursor to emulate visual block selections, making block selections a lot more flexible. For example, anything you insert after a block selection updates on every line in real-time, and you can add or remove cursors anytime.
+3. **Macros**: vim mode uses Sim's recording system for vim macros. So, you can capture and replay more complex actions, like autocompletion.
+4. **Search and replace**: vim mode uses Sim's search system, so, the syntax for regular expressions is slightly different compared to Vim. [Head to the Regex differences section](#regex-differences) for details.
 
-> **Note:** The foundations of Baymax's vim mode should already cover many use cases, and we're always looking to improve it. If you find missing features that you rely on in your workflow, please [file an issue on GitHub](https://github.com/simtropolis/baymax/issues).
+> **Note:** The foundations of Sim's vim mode should already cover many use cases, and we're always looking to improve it. If you find missing features that you rely on in your workflow, please [file an issue on GitHub](https://github.com/simtropolis/sim/issues).
 
 ## Enabling and disabling vim mode
 
-When you first open Baymax, you'll see a checkbox on the welcome screen that allows you to enable vim mode.
+When you first open Sim, you'll see a checkbox on the welcome screen that allows you to enable vim mode.
 
 If you missed this, you can toggle vim mode on or off anytime by opening the command palette and using the workspace command {#action workspace::ToggleVimMode}.
 
@@ -40,11 +40,11 @@ If you missed this, you can toggle vim mode on or off anytime by opening the com
 > }
 > ```
 
-## Baymax-specific features
+## Sim-specific features
 
-Baymax is built on a modern foundation that (among other things) uses Tree-sitter and language servers to understand the content of the file you're editing and supports multiple cursors out of the box.
+Sim is built on a modern foundation that (among other things) uses Tree-sitter and language servers to understand the content of the file you're editing and supports multiple cursors out of the box.
 
-Vim mode has several "core Baymax" key bindings that will help you make the most of Baymax's specific feature set.
+Vim mode has several "core Sim" key bindings that will help you make the most of Sim's specific feature set.
 
 ### Language server
 
@@ -79,7 +79,7 @@ The following commands use the language server to help you navigate and refactor
 
 ### Tree-sitter
 
-Tree-sitter is the parser Baymax uses to understand the structure of your code. Baymax provides motions that change the current cursor position, and text objects that can be used as the target of actions.
+Tree-sitter is the parser Sim uses to understand the structure of your code. Sim provides motions that change the current cursor position, and text objects that can be used as the target of actions.
 
 | Command                         | Default Shortcut            |
 | ------------------------------- | --------------------------- |
@@ -117,7 +117,7 @@ per language.
 
 ### Multi cursor
 
-These commands help you manage multiple cursors in Baymax.
+These commands help you manage multiple cursors in Sim.
 
 | Command                                                                           | Default Shortcut |
 | --------------------------------------------------------------------------------- | ---------------- |
@@ -143,7 +143,7 @@ These commands open new panes or jump to specific panes.
 
 ### In insert mode
 
-The following commands help you bring up Baymax's completion menu, request a suggestion from GitHub Copilot, or open the inline AI assistant without leaving insert mode.
+The following commands help you bring up Sim's completion menu, request a suggestion from GitHub Copilot, or open the inline AI assistant without leaving insert mode.
 
 | Command                                                                      | Default Shortcut |
 | ---------------------------------------------------------------------------- | ---------------- |
@@ -155,7 +155,7 @@ The following commands help you bring up Baymax's completion menu, request a sug
 
 ### Supported plugins
 
-Baymax's vim mode includes features commonly provided by plugins in the Vim ecosystem:
+Sim's vim mode includes features commonly provided by plugins in the Vim ecosystem:
 
 - You can surround text objects with `ys` (yank surround), change surrounding with `cs`, and delete surrounding with `ds`.
 - You can comment and uncomment selections with `gc` in visual mode and `gcc` in normal mode.
@@ -164,12 +164,12 @@ Baymax's vim mode includes features commonly provided by plugins in the Vim ecos
 - You can use `gR` to do [ReplaceWithRegister](https://github.com/vim-scripts/ReplaceWithRegister).
 - You can use `cx` for [vim-exchange](https://github.com/tommcdo/vim-exchange) functionality. Note that it does not have a default binding in visual mode, but you can add one to your keymap (refer to the [optional key bindings](#optional-key-bindings) section).
 - You can navigate to indent depths relative to your cursor with the [indent wise](https://github.com/jeetsukumaran/vim-indentwise) plugin `[-`, `]-`, `[+`, `]+`, `[=`, `]=`.
-- You can select quoted text with AnyQuotes and bracketed text with AnyBrackets text objects. Baymax also provides MiniQuotes and MiniBrackets which offer alternative selection behavior based on the [mini.ai](https://github.com/echasnovski/mini.nvim/blob/main/readmes/mini-ai.md) Neovim plugin. See the [Quote and Bracket text objects](#quote-and-bracket-text-objects) section below for details.
+- You can select quoted text with AnyQuotes and bracketed text with AnyBrackets text objects. Sim also provides MiniQuotes and MiniBrackets which offer alternative selection behavior based on the [mini.ai](https://github.com/echasnovski/mini.nvim/blob/main/readmes/mini-ai.md) Neovim plugin. See the [Quote and Bracket text objects](#quote-and-bracket-text-objects) section below for details.
 - You can configure AnyQuotes, AnyBrackets, MiniQuotes, and MiniBrackets text objects for selecting quoted and bracketed text using different selection strategies. See the [Any Bracket Functionality](#any-bracket-functionality) section below for details.
 
 ### Any Bracket Functionality
 
-Baymax offers two different strategies for selecting text surrounded by any quote, or any bracket. These text objects are **not enabled by default** and must be configured in your keymap to be used.
+Sim offers two different strategies for selecting text surrounded by any quote, or any bracket. These text objects are **not enabled by default** and must be configured in your keymap to be used.
 
 #### Included Characters
 
@@ -240,11 +240,11 @@ With this configuration, you can use commands like:
 
 ## Command palette
 
-Vim mode allows you to open Baymax's command palette with `:`. You can then type to access any usual Baymax command. Additionally, vim mode adds aliases for popular Vim commands to ensure your muscle memory transfers to Baymax. For example, you can write `:w` or `:write` to save the file.
+Vim mode allows you to open Sim's command palette with `:`. You can then type to access any usual Sim command. Additionally, vim mode adds aliases for popular Vim commands to ensure your muscle memory transfers to Sim. For example, you can write `:w` or `:write` to save the file.
 
 Below, you'll find tables listing the commands you can use in the command palette. We put optional characters in square brackets to indicate that you can omit them.
 
-> **Note**: We don't emulate the full power of Vim's command line yet. In particular, commands currently do not support arguments. Please [file issues on GitHub](https://github.com/simtropolis/baymax) as you find things that are missing from the command palette.
+> **Note**: We don't emulate the full power of Vim's command line yet. In particular, commands currently do not support arguments. Please [file issues on GitHub](https://github.com/simtropolis/sim) as you find things that are missing from the command palette.
 
 ### File and window management
 
@@ -260,7 +260,7 @@ This table shows commands for managing windows, tabs, and panes. As commands don
 | `:qa[ll][!]`    | Close all buffers                                    |
 | `:[e]x[it][!]`  | Close the buffer                                     |
 | `:up[date]`     | Save the current file                                |
-| `:cq`           | Quit completely (close all running instances of Baymax) |
+| `:cq`           | Quit completely (close all running instances of Sim) |
 | `:bd[elete][!]` | Close the active file in all panes                   |
 | `:vs[plit]`     | Split the pane vertically                            |
 | `:sp[lit]`      | Split the pane horizontally                          |
@@ -277,7 +277,7 @@ This table shows commands for managing windows, tabs, and panes. As commands don
 
 ### Ex commands
 
-These ex commands open Baymax's various panels and windows.
+These ex commands open Sim's various panels and windows.
 
 | Command                      | Default Shortcut |
 | ---------------------------- | ---------------- |
@@ -324,7 +324,7 @@ These commands jump to specific positions in the file.
 
 ### Replacement
 
-This command replaces text. It emulates the substitute command in vim. The substitute command uses regular expressions, and Baymax uses a slightly different syntax than vim. You can learn more about Baymax's syntax below, [in the regex differences section](#regex-differences). Baymax will replace only the first occurrence of the search pattern in the current line. To replace all matches append the `g` flag.
+This command replaces text. It emulates the substitute command in vim. The substitute command uses regular expressions, and Sim uses a slightly different syntax than vim. You can learn more about Sim's syntax below, [in the regex differences section](#regex-differences). Sim will replace only the first occurrence of the search pattern in the current line. To replace all matches append the `g` flag.
 
 | Command                 | Description                       |
 | ----------------------- | --------------------------------- |
@@ -354,7 +354,7 @@ These commands modify editor options locally for the current buffer.
 
 ### Command mnemonics
 
-Baymax does not ship with any command mnemonics by default, but you can define short aliases for Baymax commands using the `command_aliases` setting in your settings file. When you type an alias from this map in the command palette, it resolves to the mapped command.
+Sim does not ship with any command mnemonics by default, but you can define short aliases for Sim commands using the `command_aliases` setting in your settings file. When you type an alias from this map in the command palette, it resolves to the mapped command.
 
 #### Example Configuration
 
@@ -363,7 +363,7 @@ To configure command mnemonics, add the `command_aliases` key to your settings f
 ```json [settings]
 {
   "command_aliases": {
-    "zlog": "baymax::OpenLog",
+    "zlog": "sim::OpenLog",
     "newf": "workspace::NewFile",
     "diffs": "editor::ToggleSelectedDiffHunks",
     "crp": "workspace::CopyRelativePath",
@@ -376,7 +376,7 @@ To configure command mnemonics, add the `command_aliases` key to your settings f
 
 With this configuration, you can use commands like:
 
-- `:zlog` - Open the Baymax log
+- `:zlog` - Open the Sim log
 - `:newf` - Create a new file
 - `:diffs` - Toggle selected diff hunks
 - `:crp` - Copy the relative path to the current file
@@ -388,7 +388,7 @@ With this configuration, you can use commands like:
 
 ### Selecting the correct context
 
-Baymax's key bindings are evaluated only when the `"context"` property matches your location in the editor. For example, if you add key bindings to the `"Editor"` context, they will only work when you're editing a file. If you add key bindings to the `"Workspace"` context, they will work everywhere in Baymax. Here's an example of a key binding that saves when you're editing a file:
+Sim's key bindings are evaluated only when the `"context"` property matches your location in the editor. For example, if you add key bindings to the `"Editor"` context, they will only work when you're editing a file. If you add key bindings to the `"Workspace"` context, they will work everywhere in Sim. Here's an example of a key binding that saves when you're editing a file:
 
 ```json [keymap]
 {
@@ -402,7 +402,7 @@ Baymax's key bindings are evaluated only when the `"context"` property matches y
 Contexts are nested, so when you're editing a file, the context is the `"Editor"` context, which is inside the `"Pane"` context, which is inside the `"Workspace"` context. That's why any key bindings you add to the `"Workspace"` context will work when you're editing a file. Here's an example:
 
 ```json [keymap]
-// This key binding will work when you're editing a file. It comes built into Baymax by default as the workspace: save command.
+// This key binding will work when you're editing a file. It comes built into Sim by default as the workspace: save command.
 {
   "context": "Workspace",
   "bindings": {
@@ -512,7 +512,7 @@ Vim mode comes with shortcuts to surround the selection in normal mode (`ys`), b
 }
 ```
 
-In non-modal text editors, cursor navigation typically wraps when moving past line ends. Baymax, however, handles this behavior exactly like Vim by default: the cursor stops at line boundaries. If you prefer your cursor to wrap between lines, override these keybindings:
+In non-modal text editors, cursor navigation typically wraps when moving past line ends. Sim, however, handles this behavior exactly like Vim by default: the cursor stops at line boundaries. If you prefer your cursor to wrap between lines, override these keybindings:
 
 ```json [keymap]
 // In VimScript, this would look like this:
@@ -562,7 +562,7 @@ The [vim-exchange](https://github.com/tommcdo/vim-exchange) feature does not hav
 }
 ```
 
-### Restoring common text editing and Baymax keybindings
+### Restoring common text editing and Sim keybindings
 
 If you're using vim mode on Linux or Windows, you may find it overrides keybindings you can't live without: `ctrl+v` to paste, `ctrl+f` to search, etc. You can restore them by copying this data into your keymap:
 
@@ -631,9 +631,9 @@ Here's an example of these settings changed:
 }
 ```
 
-## Useful core Baymax settings for vim mode
+## Useful core Sim settings for vim mode
 
-Here are a few general Baymax settings that can help you fine-tune your Vim experience:
+Here are a few general Sim settings that can help you fine-tune your Vim experience:
 
 | Property                | Description                                                                                                                                                   | Default Value        |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
@@ -675,13 +675,13 @@ The `command_aliases` property is a single object that maps keys or key sequence
 
 ## Regex differences
 
-Baymax uses a different regular expression engine from Vim. This means that you will have to use a different syntax in some cases. Here are the most common differences:
+Sim uses a different regular expression engine from Vim. This means that you will have to use a different syntax in some cases. Here are the most common differences:
 
-- **Capture groups**: Vim uses `\(` and `\)` to represent capture groups, in Baymax these are `(` and `)`. On the flip side, in Vim, `(` and `)` represent literal parentheses, but in Baymax these must be escaped to `\(` and `\)`.
-- **Matches**: When replacing, Vim uses the backslash character followed by a number to represent a matched capture group. For example, `\1`. Baymax uses the dollar sign instead. So, when in Vim you use `\0` to represent the entire match, in Baymax the syntax is `$0` instead. Same for numbered capture groups: `\1` in Vim is `$1` in Baymax.
-- **Global option**: By default, in Vim, regex searches only match the first occurrence on a line, and you append `/g` at the end of your query to find all matches. In Baymax, regex searches are global by default.
-- **Case sensitivity**: Vim uses `/i` to indicate a case-insensitive search. In Baymax you can either write `(?i)` at the start of the pattern or toggle case-sensitivity with the shortcut {#kb search::ToggleCaseSensitive}.
+- **Capture groups**: Vim uses `\(` and `\)` to represent capture groups, in Sim these are `(` and `)`. On the flip side, in Vim, `(` and `)` represent literal parentheses, but in Sim these must be escaped to `\(` and `\)`.
+- **Matches**: When replacing, Vim uses the backslash character followed by a number to represent a matched capture group. For example, `\1`. Sim uses the dollar sign instead. So, when in Vim you use `\0` to represent the entire match, in Sim the syntax is `$0` instead. Same for numbered capture groups: `\1` in Vim is `$1` in Sim.
+- **Global option**: By default, in Vim, regex searches only match the first occurrence on a line, and you append `/g` at the end of your query to find all matches. In Sim, regex searches are global by default.
+- **Case sensitivity**: Vim uses `/i` to indicate a case-insensitive search. In Sim you can either write `(?i)` at the start of the pattern or toggle case-sensitivity with the shortcut {#kb search::ToggleCaseSensitive}.
 
-> **Note**: To help with the transition, the command palette will fix parentheses and replace groups for you when you write a Vim-style substitute command, `:%s//`. So, Baymax will convert `%s:/\(a\)(b)/\1/` into a search for "(a)\(b\)" and a replacement of "$1".
+> **Note**: To help with the transition, the command palette will fix parentheses and replace groups for you when you write a Vim-style substitute command, `:%s//`. So, Sim will convert `%s:/\(a\)(b)/\1/` into a search for "(a)\(b\)" and a replacement of "$1".
 
-For the full syntax supported by Baymax's regex engine [see the regex crate documentation](https://docs.rs/regex/latest/regex/#syntax).
+For the full syntax supported by Sim's regex engine [see the regex crate documentation](https://docs.rs/regex/latest/regex/#syntax).

@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Baymax currently supports @mentioning individual users but has no concept of user groups. Mattermost supports user groups — named collections of users (@eng, @design, @team-leads) that can be @mentioned to notify all members at once. Adding groups will streamline team communication.
+Sim currently supports @mentioning individual users but has no concept of user groups. Mattermost supports user groups — named collections of users (@eng, @design, @team-leads) that can be @mentioned to notify all members at once. Adding groups will streamline team communication.
 
 ## Glossary
 

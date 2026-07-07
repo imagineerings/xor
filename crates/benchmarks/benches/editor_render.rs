@@ -1,4 +1,4 @@
-use baymax_actions::editor::{MoveDown, MoveUp};
+use sim_actions::editor::{MoveDown, MoveUp};
 use criterion::{Bencher, BenchmarkId};
 use editor::{
     Editor, EditorMode, MultiBuffer,

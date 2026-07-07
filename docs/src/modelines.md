@@ -1,10 +1,10 @@
 # Modelines
 
-Modelines are special comments at the beginning or end of a file that configure editor settings for that specific file. Baymax supports both Vim and Emacs modeline formats, allowing you to specify settings like tab size, indentation style, and file type directly within your files.
+Modelines are special comments at the beginning or end of a file that configure editor settings for that specific file. Sim supports both Vim and Emacs modeline formats, allowing you to specify settings like tab size, indentation style, and file type directly within your files.
 
 ## Configuration
 
-Use the [`modeline_lines`](./reference/all-settings.md#modeline-lines) setting to control how many lines Baymax searches for modelines:
+Use the [`modeline_lines`](./reference/all-settings.md#modeline-lines) setting to control how many lines Sim searches for modelines:
 
 ```json [settings]
 {
@@ -16,7 +16,7 @@ Set to `0` to disable modeline parsing entirely.
 
 ## Emacs
 
-Baymax has some compatibility support for [Emacs file variables](https://www.gnu.org/software/emacs/manual/html_node/emacs/Specifying-File-Variables.html).
+Sim has some compatibility support for [Emacs file variables](https://www.gnu.org/software/emacs/manual/html_node/emacs/Specifying-File-Variables.html).
 
 Example:
 
@@ -26,7 +26,7 @@ Example:
 
 ### Supported Emacs Variables
 
-| Variable                   | Description                    | Baymax Setting                                                                                |
+| Variable                   | Description                    | Sim Setting                                                                                |
 | -------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------ |
 | `mode`                     | Major mode/language            | Language detection                                                                         |
 | `tab-width`                | Tab display width              | [`tab_size`](./reference/all-settings.md#tab-size)                                         |
@@ -38,7 +38,7 @@ Example:
 
 ## Vim
 
-Baymax has some compatibility support for [Vim modeline](https://vimhelp.org/options.txt.html#modeline).
+Sim has some compatibility support for [Vim modeline](https://vimhelp.org/options.txt.html#modeline).
 
 Example:
 
@@ -48,7 +48,7 @@ Example:
 
 ### Supported Vim Options
 
-| Option         | Aliases | Description                       | Baymax Setting                                                                                |
+| Option         | Aliases | Description                       | Sim Setting                                                                                |
 | -------------- | ------- | --------------------------------- | ------------------------------------------------------------------------------------------ |
 | `filetype`     | `ft`    | File type/language                | Language detection                                                                         |
 | `tabstop`      | `ts`    | Number of spaces a tab counts for | [`tab_size`](./reference/all-settings.md#tab-size)                                         |

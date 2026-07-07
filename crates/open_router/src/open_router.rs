@@ -450,8 +450,8 @@ pub async fn stream_completion(
         .uri(uri)
         .header("Content-Type", "application/json")
         .header("Authorization", format!("Bearer {}", api_key))
-        .header("HTTP-Referer", "https://baymax.dev")
-        .header("X-Title", "Baymax Editor")
+        .header("HTTP-Referer", "https://sim.dev")
+        .header("X-Title", "Sim Editor")
         .extra_headers(extra_headers)
         .body(AsyncBody::from(
             serde_json::to_string(&request).map_err(OpenRouterError::SerializeRequest)?,
@@ -543,8 +543,8 @@ pub async fn list_models(
         .uri(uri)
         .header("Accept", "application/json")
         .header("Authorization", format!("Bearer {}", api_key))
-        .header("HTTP-Referer", "https://baymax.dev")
-        .header("X-Title", "Baymax Editor")
+        .header("HTTP-Referer", "https://sim.dev")
+        .header("X-Title", "Sim Editor")
         .extra_headers(extra_headers)
         .body(AsyncBody::default())
         .map_err(OpenRouterError::BuildRequestBody)?;

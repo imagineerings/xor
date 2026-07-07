@@ -1,4 +1,4 @@
-//! A module, responsible for managing the trust logic in Baymax.
+//! A module, responsible for managing the trust logic in Sim.
 //!
 //! It deals with multiple hosts, distinguished by [`RemoteHostLocation`].
 //! Each [`crate::Project`] and `HeadlessProject` should call [`init_global`], if wants to establish the trust mechanism.
@@ -11,32 +11,32 @@
 //! Unless `trust_all_worktrees` auto trust is enabled, does not trust anything that was not persisted before.
 //! When dealing with "restricted" and other related concepts in the API, it means all explicitly restricted, after any of the [`TrustedWorktreesStore::can_trust`] and [`TrustedWorktreesStore::can_trust_global`] calls.
 //!
-//! Baymax does not consider invisible, `worktree.is_visible() == false` worktrees in Baymax, as those are programmatically created inside Baymax for internal needs, e.g. a tmp dir for `keymap_editor.rs` needs.
+//! Sim does not consider invisible, `worktree.is_visible() == false` worktrees in Sim, as those are programmatically created inside Sim for internal needs, e.g. a tmp dir for `keymap_editor.rs` needs.
 //!
 //!
 //! Path rust hierarchy.
 //!
-//! Baymax has multiple layers of trust, based on the requests and [`PathTrust`] enum variants.
+//! Sim has multiple layers of trust, based on the requests and [`PathTrust`] enum variants.
 //! From the least to the most trusted level:
 //!
 //! * "single file worktree"
 //!
-//! After opening an empty Baymax it's possible to open just a file, same as after opening a directory in Baymax it's possible to open a file outside of this directory.
-//! Usual scenario for both cases is opening Baymax's settings.json file via `baymax: open settings file` command: that starts a language server for a new file open, which originates from a newly created, single file worktree.
+//! After opening an empty Sim it's possible to open just a file, same as after opening a directory in Sim it's possible to open a file outside of this directory.
+//! Usual scenario for both cases is opening Sim's settings.json file via `sim: open settings file` command: that starts a language server for a new file open, which originates from a newly created, single file worktree.
 //!
-//! Spawning a language server is potentially dangerous, and Baymax needs to restrict that by default.
+//! Spawning a language server is potentially dangerous, and Sim needs to restrict that by default.
 //! Each single file worktree requires a separate trust permission, unless a more global level is trusted.
 //!
 //! * "directory worktree"
 //!
-//! If a directory is open in Baymax, it's a full worktree which may spawn multiple language servers associated with it.
+//! If a directory is open in Sim, it's a full worktree which may spawn multiple language servers associated with it.
 //! Each such worktree requires a separate trust permission, so each separate directory worktree has to be trusted separately, unless a more global level is trusted.
 //!
 //! When a directory worktree is trusted and language servers are allowed to be downloaded and started, hence, "single file worktree" level of trust also.
 //!
 //! * "path override"
 //!
-//! To ease trusting multiple directory worktrees at once, it's possible to trust a parent directory of a certain directory worktree opened in Baymax.
+//! To ease trusting multiple directory worktrees at once, it's possible to trust a parent directory of a certain directory worktree opened in Sim.
 //! Trusting a directory means trusting all its subdirectories as well, including all current and potential directory worktrees.
 
 use client::ProjectId;
@@ -450,7 +450,7 @@ impl TrustedWorktreesStore {
     }
 
     /// Erases all trust information.
-    /// Requires Baymax's restart to take proper effect.
+    /// Requires Sim's restart to take proper effect.
     pub fn clear_trusted_paths(&mut self) {
         self.trusted_paths.clear();
         self.db_trusted_paths.clear();
@@ -475,7 +475,7 @@ impl TrustedWorktreesStore {
             return false;
         };
         let worktree_path = worktree.read(cx).abs_path();
-        // Baymax opened an "internal" directory: e.g. a tmp dir for `keymap_editor.rs` needs.
+        // Sim opened an "internal" directory: e.g. a tmp dir for `keymap_editor.rs` needs.
         if !worktree.read(cx).is_visible() {
             log::debug!("Skipping worktree trust checks for not visible {worktree_path:?}");
             return true;

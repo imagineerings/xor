@@ -274,7 +274,7 @@ pub struct Dock {
     active_panel_index: Option<usize>,
     focus_handle: FocusHandle,
     focus_follows_mouse: FocusFollowsMouse,
-    pub(crate) serialibaymax_dock: Option<DockData>,
+    pub(crate) serialisim_dock: Option<DockData>,
     zoom_layer_open: bool,
     modal_layer: Entity<ModalLayer>,
     _subscriptions: [Subscription; 2],
@@ -419,7 +419,7 @@ impl Dock {
                 focus_handle: focus_handle.clone(),
                 focus_follows_mouse: WorkspaceSettings::get_global(cx).focus_follows_mouse,
                 _subscriptions: [focus_subscription, zoom_subscription],
-                serialibaymax_dock: None,
+                serialisim_dock: None,
                 zoom_layer_open: false,
                 modal_layer,
             }
@@ -754,19 +754,19 @@ impl Dock {
     }
 
     pub fn restore_state(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
-        if let Some(serialibaymax) = self.serialibaymax_dock.clone() {
-            if let Some(active_panel) = serialibaymax.active_panel.filter(|_| serialibaymax.visible)
+        if let Some(serialisim) = self.serialisim_dock.clone() {
+            if let Some(active_panel) = serialisim.active_panel.filter(|_| serialisim.visible)
                 && let Some(idx) = self.panel_index_for_persistent_name(active_panel.as_str(), cx)
             {
                 self.activate_panel(idx, window, cx);
             }
 
-            if serialibaymax.zoom
+            if serialisim.zoom
                 && let Some(panel) = self.active_panel()
             {
                 panel.set_zoomed(true, window, cx)
             }
-            self.set_open(serialibaymax.visible, window, cx);
+            self.set_open(serialisim.visible, window, cx);
             return true;
         }
         false

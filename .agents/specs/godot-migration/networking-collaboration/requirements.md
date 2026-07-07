@@ -2,13 +2,13 @@
 
 ## Introduction
 
-Baymax should not port Godot multiplayer networking. It may expose metadata and external debug/run integration through existing Baymax collaboration and debugger systems.
+Sim should not port Godot multiplayer networking. It may expose metadata and external debug/run integration through existing Sim collaboration and debugger systems.
 
-### Requirement 1: Reuse Baymax Networking
+### Requirement 1: Reuse Sim Networking
 
 #### Acceptance Criteria
 
-1.1 IF a Godot networking feature duplicates Baymax networking or collaboration systems THEN THE system SHALL not port it.
+1.1 IF a Godot networking feature duplicates Sim networking or collaboration systems THEN THE system SHALL not port it.
 
 ### Requirement 2: Debug Metadata
 

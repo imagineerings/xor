@@ -1,7 +1,7 @@
 use crate::{BufferDiagnosticsEditor, ProjectDiagnosticsEditor, ToggleDiagnosticsRefresh};
 use agent_settings::AgentSettings;
-use baymax_actions::assistant::InlineAssist;
-use baymax_actions::buffer_search;
+use sim_actions::assistant::InlineAssist;
+use sim_actions::buffer_search;
 use gpui::{Context, EventEmitter, ParentElement, Render, Window};
 use language::DiagnosticEntry;
 use settings::Settings;
@@ -71,7 +71,7 @@ impl Render for ToolbarControls {
             })
             .when(is_agent_enabled, |this| {
                 this.child(
-                    IconButton::new("inline_assist", IconName::BaymaxAssistant)
+                    IconButton::new("inline_assist", IconName::SimAssistant)
                         .icon_size(IconSize::Small)
                         .tooltip(Tooltip::for_action_title(
                             "Inline Assist",

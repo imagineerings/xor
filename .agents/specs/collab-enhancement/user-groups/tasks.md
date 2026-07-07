@@ -2,7 +2,7 @@
 
 ## Overview
 
-Add named user groups to Baymax so workspace members can @mention a group (e.g., `@eng`, `@design`) to notify all members at once. This touches every layer: protobuf definitions, database schema and migrations, server-side GroupStore and RPC handlers, client-side GroupStore caching, autocomplete integration, distinct mention rendering, a group management UI, and notification dispatch.
+Add named user groups to Sim so workspace members can @mention a group (e.g., `@eng`, `@design`) to notify all members at once. This touches every layer: protobuf definitions, database schema and migrations, server-side GroupStore and RPC handlers, client-side GroupStore caching, autocomplete integration, distinct mention rendering, a group management UI, and notification dispatch.
 
 The work is organized into 15 incremental tasks, each producing a buildable artifact with tests where appropriate. Each task references the relevant requirements (R9.x) and correctness properties (P5.x) from the spec.
 

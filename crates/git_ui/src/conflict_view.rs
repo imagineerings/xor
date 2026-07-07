@@ -1,5 +1,5 @@
 use agent_settings::AgentSettings;
-use baymax_actions::agent::{
+use sim_actions::agent::{
     ConflictContent, ResolveConflictedFilesWithAgent, ResolveConflictsWithAgent,
 };
 use collections::{HashMap, HashSet};
@@ -393,7 +393,7 @@ fn render_conflict_buttons(
                 Button::new("resolve-with-agent", "Resolve with Agent")
                     .label_size(LabelSize::Small)
                     .start_icon(
-                        Icon::new(IconName::BaymaxAssistant)
+                        Icon::new(IconName::SimAssistant)
                             .size(IconSize::Small)
                             .color(Color::Muted),
                     )

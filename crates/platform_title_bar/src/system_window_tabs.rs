@@ -64,7 +64,7 @@ impl SystemWindowTabs {
             was_use_system_window_tabs = use_system_window_tabs;
 
             let tabbing_identifier = if use_system_window_tabs {
-                Some(String::from("baymax"))
+                Some(String::from("sim"))
             } else {
                 None
             };
@@ -483,7 +483,7 @@ impl Render for SystemWindowTabs {
                             .icon_color(Color::Muted)
                             .on_click(|_event, window, cx| {
                                 window.dispatch_action(
-                                    Box::new(baymax_actions::OpenRecent {
+                                    Box::new(sim_actions::OpenRecent {
                                         create_new_window: Some(true),
                                     }),
                                     cx,

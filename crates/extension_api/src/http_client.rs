@@ -1,6 +1,6 @@
 //! An HTTP client.
 
-pub use crate::wit::baymax::extension::http_client::{
+pub use crate::wit::sim::extension::http_client::{
     HttpMethod, HttpRequest, HttpResponse, HttpResponseStream, RedirectPolicy, fetch, fetch_stream,
 };
 

@@ -66,7 +66,7 @@ impl OutlineSearchEntry {
 }
 
 impl<T: ToPoint> OutlineItem<T> {
-    /// Converts to an equivalent outline item, but with parameteribaymax over Points.
+    /// Converts to an equivalent outline item, but with parameterisim over Points.
     pub fn to_point(&self, buffer: &BufferSnapshot) -> OutlineItem<Point> {
         OutlineItem {
             depth: self.depth,

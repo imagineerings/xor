@@ -37,10 +37,10 @@ impl EditPredictionIconSet {
     pub fn new(base: IconName) -> Self {
         Self {
             base,
-            disabled: IconName::BaymaxPredictDisabled,
-            up: IconName::BaymaxPredictUp,
-            down: IconName::BaymaxPredictDown,
-            error: IconName::BaymaxPredictError,
+            disabled: IconName::SimPredictDisabled,
+            up: IconName::SimPredictUp,
+            down: IconName::SimPredictDown,
+            error: IconName::SimPredictError,
         }
     }
 

@@ -597,7 +597,7 @@ fn breadcrumbs_text_for_image(project: &Project, image: &ImageItem, cx: &App) ->
 }
 
 impl SerializableItem for ImageView {
-    fn serialibaymax_item_kind() -> &'static str {
+    fn serialisim_item_kind() -> &'static str {
         "ImageView"
     }
 

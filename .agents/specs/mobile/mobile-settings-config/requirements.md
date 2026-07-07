@@ -2,13 +2,13 @@
 
 ## Introduction
 
-The Baymax mobile client needs a comprehensive settings system covering app configuration, server management, and security. The iOS app already has a basic `SettingsView.swift` with server URL/secret configuration. Android has `SettingsScreen.kt` and `SettingsViewModel.kt`. This spec extends them with advanced settings from `mobile-dev` including display customization, notification management, about/licensing, and security controls.
+The Sim mobile client needs a comprehensive settings system covering app configuration, server management, and security. The iOS app already has a basic `SettingsView.swift` with server URL/secret configuration. Android has `SettingsScreen.kt` and `SettingsViewModel.kt`. This spec extends them with advanced settings from `mobile-dev` including display customization, notification management, about/licensing, and security controls.
 
 ## Glossary
 
 | Term | Definition |
 |------|------------|
-| **Server Configuration** | The URL and secret key for connecting to a Baymax agent, plus any collab server settings. |
+| **Server Configuration** | The URL and secret key for connecting to a Sim agent, plus any collab server settings. |
 | **Multiple Servers** | The ability to save, switch, and manage multiple agent configurations. |
 | **Biometric Lock** | App-level security using Face ID / Fingerprint to prevent unauthorized access. |
 | **Display Settings** | Visual customization: theme, font size, time format, CRT mode. |

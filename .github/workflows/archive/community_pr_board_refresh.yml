@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   refresh:
-    if: github.repository == 'simtropolis/baymax'
+    if: github.repository == 'simtropolis/sim'
     runs-on: namespace-profile-2x4-ubuntu-2404
     timeout-minutes: 15
 
@@ -29,8 +29,8 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859 # v3.0.0
         with:
-          app-id: ${{ secrets.BAYMAX_COMMUNITY_BOT_APP_ID }}
-          private-key: ${{ secrets.BAYMAX_COMMUNITY_BOT_PRIVATE_KEY }}
+          app-id: ${{ secrets.SIM_COMMUNITY_BOT_APP_ID }}
+          private-key: ${{ secrets.SIM_COMMUNITY_BOT_PRIVATE_KEY }}
           owner: simtropolis
 
       - name: Checkout repository

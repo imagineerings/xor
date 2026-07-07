@@ -2,12 +2,12 @@
 
 ## 1. Overview
 
-Migrate goose's standalone MCP server tools — Computer Controller, Memory, Peekaboo, AutoVisualiser, Tutorial — into baymax's MCP/extension ecosystem. Each tool becomes either a built-in MCP server (run as subprocess or in-process) or a set of native agent tools registered directly.
+Migrate goose's standalone MCP server tools — Computer Controller, Memory, Peekaboo, AutoVisualiser, Tutorial — into sim's MCP/extension ecosystem. Each tool becomes either a built-in MCP server (run as subprocess or in-process) or a set of native agent tools registered directly.
 
 ### Key Architectural Decisions
 
 - **Dual deployment**: Ship as both standalone MCP binaries (for external use) and native agent tools (for lower latency). The MCP server runner from goose provides the standalone path.
-- **Document tools as native**: Computer Controller (PDF, DOCX, XLSX) maps naturally to baymax's existing agent tool system (`crates/agent/src/tools/`) since these are file operations.
+- **Document tools as native**: Computer Controller (PDF, DOCX, XLSX) maps naturally to sim's existing agent tool system (`crates/agent/src/tools/`) since these are file operations.
 - **Memory as MCP server**: Persistent memory benefits from being an MCP server with its own process lifetime rather than an in-memory tool.
 - **Peekaboo as platform-specific**: Screen capture requires platform-specific APIs (macOS ScreenCaptureKit, Windows DXGI, Linux X11/PipeWire).
 - **Visualiser/Tutorial as MCP servers**: These are self-contained services with templates and tutorials that work well as MCP servers.
@@ -16,7 +16,7 @@ Migrate goose's standalone MCP server tools — Computer Controller, Memory, Pee
 
 ```mermaid
 graph TD
-    subgraph "baymax Agent"
+    subgraph "sim Agent"
         Agent[Agent Core]
         Tools[Tool Registry]
     end
@@ -222,5 +222,5 @@ _For any_ MCP server launched by the server runner, [if the process exits unexpe
 ## References
 
 - Source: `projects/goose/crates/goose-mcp/src/`
-- Baymax: `crates/agent/src/tools/` — existing agent tool pattern
-- Baymax: `crates/context_server/` — MCP client
+- Sim: `crates/agent/src/tools/` — existing agent tool pattern
+- Sim: `crates/context_server/` — MCP client

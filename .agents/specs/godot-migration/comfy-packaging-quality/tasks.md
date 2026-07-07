@@ -51,7 +51,7 @@ Build cross-cutting migration controls that other Comfy specs depend on: launch 
   - _writes: crates/world_model/src/comfy_packaging_profiles.rs, crates/world_model/src/comfy_packaging_profiles_tests.rs_
 
 - [ ] 7. Implement logs and internal diagnostics adapter
-  - Expose formatted/raw logs, terminal size metadata, approved folder paths, and recent input/output/temp files through Baymax diagnostics.
+  - Expose formatted/raw logs, terminal size metadata, approved folder paths, and recent input/output/temp files through Sim diagnostics.
   - _Requirements: 6.1, 6.2, 6.3_
   - _writes: crates/world_model/src/comfy_diagnostics.rs, crates/world_model/src/comfy_diagnostics_tests.rs_
 

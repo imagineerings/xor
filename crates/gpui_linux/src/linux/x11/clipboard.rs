@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 - 2025 Baymax Industries, Inc.
+ * Copyright 2022 - 2025 Sim Industries, Inc.
  * License: Apache-2.0
  * See LICENSE-APACHE for complete license terms
  *
@@ -204,7 +204,7 @@ struct ClipboardData {
 enum ReadSelNotifyResult {
     GotData(ClipboardData),
     IncrStarted,
-    EventNotRecognibaymax,
+    EventNotRecognisim,
 }
 
 impl Inner {
@@ -431,7 +431,7 @@ impl Inner {
                             // reset our timeout.
                             timeout_end += SHORT_TIMEOUT_DUR;
                         }
-                        ReadSelNotifyResult::EventNotRecognibaymax => (),
+                        ReadSelNotifyResult::EventNotRecognisim => (),
                     }
                 }
                 // If the previous SelectionNotify event specified that the data
@@ -551,11 +551,11 @@ impl Inner {
             log::info!(
                 "Received a SelectionNotify for a selection other than CLIPBOARD, PRIMARY or SECONDARY. This is unexpected."
             );
-            return Ok(ReadSelNotifyResult::EventNotRecognibaymax);
+            return Ok(ReadSelNotifyResult::EventNotRecognisim);
         }
         if *using_incr {
             log::warn!("Received a SelectionNotify while already expecting INCR segments.");
-            return Ok(ReadSelNotifyResult::EventNotRecognibaymax);
+            return Ok(ReadSelNotifyResult::EventNotRecognisim);
         }
         // Accept any property type. The property type will typically match the format type except
         // when it is `TARGETS` in which case it is `ATOM`. `ANY` is provided to handle the case

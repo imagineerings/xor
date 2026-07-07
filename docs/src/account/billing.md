@@ -1,11 +1,11 @@
 ---
 title: Billing
-description: Manage billing for your Baymax subscription, including payment methods, invoices, and sales tax information for individual and organization accounts.
+description: Manage billing for your Sim subscription, including payment methods, invoices, and sales tax information for individual and organization accounts.
 ---
 
 # Billing
 
-Baymax uses Stripe for payment processing. All plans that require payment do so via credit card or other supported payment methods. Individual Pro subscriptions also use Orb for invoicing and metering.
+Sim uses Stripe for payment processing. All plans that require payment do so via credit card or other supported payment methods. Individual Pro subscriptions also use Orb for invoicing and metering.
 
 For details on what's included in each plan and how token usage works, see [Plans & Pricing](./plans-and-pricing.md).
 
@@ -13,20 +13,20 @@ For details on what's included in each plan and how token usage works, see [Plan
 
 ### Billing information {#settings}
 
-Access billing information and settings from your [Baymax dashboard](https://dashboard.baymax.dev).
+Access billing information and settings from your [Sim dashboard](https://dashboard.sim.dev).
 This page embeds data from Orb, our invoicing and metering partner.
 
 ### Billing cycles {#billing-cycles}
 
-Baymax is billed on a monthly basis based on the date you initially subscribe. You'll receive _at least_ one invoice from Baymax each month you're subscribed to Baymax Pro, and may receive more than one invoice if you use hosted models beyond your included monthly token credit.
+Sim is billed on a monthly basis based on the date you initially subscribe. You'll receive _at least_ one invoice from Sim each month you're subscribed to Sim Pro, and may receive more than one invoice if you use hosted models beyond your included monthly token credit.
 
-### Baymax Pro threshold billing {#threshold-billing}
+### Sim Pro threshold billing {#threshold-billing}
 
-For individual Baymax Pro subscriptions, Baymax uses threshold billing to ensure timely payment collection. Threshold billing controls when already-allowed token usage is invoiced during the month; your [monthly spend limit](./plans-and-pricing.md#usage-spend-limits) still controls when hosted model usage stops.
+For individual Sim Pro subscriptions, Sim uses threshold billing to ensure timely payment collection. Threshold billing controls when already-allowed token usage is invoiced during the month; your [monthly spend limit](./plans-and-pricing.md#usage-spend-limits) still controls when hosted model usage stops.
 
-Threshold invoices start at $10 of pre-tax incremental token spend. For higher token usage, Baymax may automatically raise your pre-tax invoicing threshold in $10 increments, up to $100, so you receive fewer mid-cycle invoices. Once raised, the invoicing threshold is not automatically lowered during the same subscription.
+Threshold invoices start at $10 of pre-tax incremental token spend. For higher token usage, Sim may automatically raise your pre-tax invoicing threshold in $10 increments, up to $100, so you receive fewer mid-cycle invoices. Once raised, the invoicing threshold is not automatically lowered during the same subscription.
 
-For Baymax Business billing, see [Organization billing](#organization).
+For Sim Business billing, see [Organization billing](#organization).
 
 For example,
 
@@ -36,23 +36,23 @@ For example,
 
 ### Payment failures {#payment-failures}
 
-If payment of an invoice fails, Baymax will block usage of our hosted models until the payment is complete. Email [billing-support@baymax.dev](mailto:billing-support@baymax.dev) for assistance.
+If payment of an invoice fails, Sim will block usage of our hosted models until the payment is complete. Email [billing-support@sim.dev](mailto:billing-support@sim.dev) for assistance.
 
 ### Invoice history {#invoice-history}
 
-You can access your invoice history from the Billing page at [dashboard.baymax.dev](https://dashboard.baymax.dev) by clicking `Invoice history` within the embedded Orb portal.
+You can access your invoice history from the Billing page at [dashboard.sim.dev](https://dashboard.sim.dev) by clicking `Invoice history` within the embedded Orb portal.
 
-If you require historical Stripe invoices, email [billing-support@baymax.dev](mailto:billing-support@baymax.dev).
+If you require historical Stripe invoices, email [billing-support@sim.dev](mailto:billing-support@sim.dev).
 
 ## Organization billing {#organization}
 
-Baymax Business consolidates your team's costs. Paid Business seats and member AI usage appear on one bill, with no separate invoices per member. For a full feature overview, see [Baymax Business](../business/overview.md).
+Sim Business consolidates your team's costs. Paid Business seats and member AI usage appear on one bill, with no separate invoices per member. For a full feature overview, see [Sim Business](../business/overview.md).
 
 ### Billing dashboard {#dashboard}
 
-Owners, admins, and Billing Managers can access billing information at [dashboard.baymax.dev](https://dashboard.baymax.dev). The dashboard shows the current plan and links to update billing details, tax ID information, and payment information. You can also access invoice history through the Orb billing portal.
+Owners, admins, and Billing Managers can access billing information at [dashboard.sim.dev](https://dashboard.sim.dev). The dashboard shows the current plan and links to update billing details, tax ID information, and payment information. You can also access invoice history through the Orb billing portal.
 
-Use the Billing Manager role for someone who needs billing access but does not need a paid Business seat. Billing Managers can view subscription usage, update billing details and payment methods, and access invoice history. They cannot manage members, change organization settings, cancel the subscription, or use Baymax-hosted AI models and Edit Predictions through the Business subscription. For the full permissions list, see [Roles](../roles.md#role-billing-manager).
+Use the Billing Manager role for someone who needs billing access but does not need a paid Business seat. Billing Managers can view subscription usage, update billing details and payment methods, and access invoice history. They cannot manage members, change organization settings, cancel the subscription, or use Sim-hosted AI models and Edit Predictions through the Business subscription. For the full permissions list, see [Roles](../roles.md#role-billing-manager).
 
 ### AI usage {#ai-usage}
 
@@ -62,22 +62,22 @@ Administrators can set an org-wide AI spend limit from the Data & Privacy page i
 
 ### Invoice history {#org-invoice-history}
 
-Owners, admins, and Billing Managers can access an organization's invoice history from the Billing page at [dashboard.baymax.dev](https://dashboard.baymax.dev) by clicking `Invoice history` within the embedded Orb portal.
+Owners, admins, and Billing Managers can access an organization's invoice history from the Billing page at [dashboard.sim.dev](https://dashboard.sim.dev) by clicking `Invoice history` within the embedded Orb portal.
 
-If you require historical Stripe invoices, email [billing-support@baymax.dev](mailto:billing-support@baymax.dev).
+If you require historical Stripe invoices, email [billing-support@sim.dev](mailto:billing-support@sim.dev).
 
 ## Updating billing information {#updating-billing-info}
 
 From the _Billing_ page, owners, admins, and Billing Managers can update billing name, address, tax ID information, and payment method.
 
-Changes to billing information will **only** affect future invoices. We cannot modify historical invoices. Email [billing-support@baymax.dev](mailto:billing-support@baymax.dev) with any questions.
+Changes to billing information will **only** affect future invoices. We cannot modify historical invoices. Email [billing-support@sim.dev](mailto:billing-support@sim.dev) with any questions.
 
 ## Sales tax {#sales-tax}
 
-Baymax partners with [Sphere](https://www.getsphere.com/) to calculate indirect tax rates for invoices, based on customer location and the product being sold. Tax is listed as a separate line item on invoices, based preferentially on your billing address, followed by the card issue country known to Stripe.
+Sim partners with [Sphere](https://www.getsphere.com/) to calculate indirect tax rates for invoices, based on customer location and the product being sold. Tax is listed as a separate line item on invoices, based preferentially on your billing address, followed by the card issue country known to Stripe.
 
 If you have a tax ID, such as a VAT or GST ID, you can add it during checkout or update it later from the Billing page. Check the box that denotes you as a business.
 
 Changes to tax IDs and addresses will **only** affect future invoices. We cannot modify historical invoices.
 
-Email [billing-support@baymax.dev](mailto:billing-support@baymax.dev) with any tax questions.
+Email [billing-support@sim.dev](mailto:billing-support@sim.dev) with any tax questions.

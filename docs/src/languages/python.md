@@ -1,11 +1,11 @@
 ---
 title: Python
-description: "Configure Python language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure Python language support in Sim, including language servers, formatting, and debugging."
 ---
 
-# How to Set Up Python in Baymax
+# How to Set Up Python in Sim
 
-Python support is available natively in Baymax.
+Python support is available natively in Sim.
 
 - Tree-sitter: [tree-sitter-python](https://github.com/simtropolis/tree-sitter-python)
 - Language Servers:
@@ -18,11 +18,11 @@ Python support is available natively in Baymax.
 
 ## Install Python
 
-You'll need both Baymax and Python installed before you can begin.
+You'll need both Sim and Python installed before you can begin.
 
 ### Step 1: Install Python
 
-Baymax does not bundle a Python runtime, so you’ll need to install one yourself.
+Sim does not bundle a Python runtime, so you’ll need to install one yourself.
 Choose one of the following options:
 
 - uv (recommended)
@@ -51,28 +51,28 @@ python3 --version
 
 You should see an output like `Python 3.x.x`.
 
-## Open Your First Python Project in Baymax
+## Open Your First Python Project in Sim
 
-Once Baymax and Python are installed, open a folder containing Python code to start working.
+Once Sim and Python are installed, open a folder containing Python code to start working.
 
-### Step 1: Launch Baymax with a Python Project
+### Step 1: Launch Sim with a Python Project
 
-Open Baymax.
+Open Sim.
 From the menu bar, choose File > Open Folder, or launch from the terminal:
 
 ```bash
-baymax path/to/your/project
+sim path/to/your/project
 ```
 
-Baymax will recognize `.py` files automatically using its native tree-sitter-python parser, with no plugins or manual setup required.
+Sim will recognize `.py` files automatically using its native tree-sitter-python parser, with no plugins or manual setup required.
 
 ### Step 2: Use the Integrated Terminal (Optional)
 
-Baymax includes an integrated terminal, accessible from the bottom panel. If Baymax detects that your project is using a [virtual environment](#virtual-environments), it will be activated automatically in newly-created terminals. You can configure this behavior with the [`detect_venv`](../reference/all-settings.md#terminal-detect_venv) setting.
+Sim includes an integrated terminal, accessible from the bottom panel. If Sim detects that your project is using a [virtual environment](#virtual-environments), it will be activated automatically in newly-created terminals. You can configure this behavior with the [`detect_venv`](../reference/all-settings.md#terminal-detect_venv) setting.
 
-## Configure Python Language Servers in Baymax
+## Configure Python Language Servers in Sim
 
-Baymax provides several Python language servers out of the box. By default, [basedpyright](https://github.com/DetachHead/basedpyright) is the primary language server, and [Ruff](https://github.com/astral-sh/ruff) is used for formatting and linting.
+Sim provides several Python language servers out of the box. By default, [basedpyright](https://github.com/DetachHead/basedpyright) is the primary language server, and [Ruff](https://github.com/astral-sh/ruff) is used for formatting and linting.
 
 Other built-in language servers are:
 
@@ -82,7 +82,7 @@ Other built-in language servers are:
 
 These are disabled by default, but can be enabled in your settings.
 
-Configure language servers in Settings ({#kb baymax::OpenSettings}) under Languages > Python, or add to your settings file:
+Configure language servers in Settings ({#kb sim::OpenSettings}) under Languages > Python, or add to your settings file:
 
 ```json [settings]
 {
@@ -100,19 +100,19 @@ Configure language servers in Settings ({#kb baymax::OpenSettings}) under Langua
 }
 ```
 
-See: [Working with Language Servers](https://baymax.dev/docs/configuring-languages#working-with-language-servers) for more information about how to enable and disable language servers.
+See: [Working with Language Servers](https://sim.dev/docs/configuring-languages#working-with-language-servers) for more information about how to enable and disable language servers.
 
 ### Basedpyright
 
-[basedpyright](https://docs.basedpyright.com/latest/) is the primary Python language server in Baymax beginning with Baymax v0.204.0. It provides core language server functionality like navigation (go to definition/find all references) and type checking. Compared to Pyright, it adds support for additional language server features (like inlay hints) and checking rules.
+[basedpyright](https://docs.basedpyright.com/latest/) is the primary Python language server in Sim beginning with Sim v0.204.0. It provides core language server functionality like navigation (go to definition/find all references) and type checking. Compared to Pyright, it adds support for additional language server features (like inlay hints) and checking rules.
 
-Note that while basedpyright in isolation defaults to the `recommended` [type-checking mode](https://docs.basedpyright.com/latest/benefits-over-pyright/better-defaults/#typecheckingmode), Baymax configures it to use the less-strict `standard` mode by default, which matches the behavior of Pyright. You can set the type-checking mode for your project using the `typeCheckingMode` setting in `pyrightconfig.json` or `pyproject.toml`, which will override Baymax's default. Read on for more details about how to configure basedpyright.
+Note that while basedpyright in isolation defaults to the `recommended` [type-checking mode](https://docs.basedpyright.com/latest/benefits-over-pyright/better-defaults/#typecheckingmode), Sim configures it to use the less-strict `standard` mode by default, which matches the behavior of Pyright. You can set the type-checking mode for your project using the `typeCheckingMode` setting in `pyrightconfig.json` or `pyproject.toml`, which will override Sim's default. Read on for more details about how to configure basedpyright.
 
 #### Basedpyright Configuration
 
 basedpyright reads configuration options from two different kinds of sources:
 
-- Language server settings ("workspace configuration"), which must be configured per-editor (using `settings.json` in Baymax's case) but apply to all projects opened in that editor
+- Language server settings ("workspace configuration"), which must be configured per-editor (using `settings.json` in Sim's case) but apply to all projects opened in that editor
 - Configuration files (`pyrightconfig.json`, `pyproject.toml`), which are editor-independent but specific to the project where they are placed
 
 As a rule of thumb, options that are only relevant when using basedpyright from an editor must be set in language server settings, and options that are relevant even if you're running it [as a command-line tool](https://docs.basedpyright.com/latest/configuration/command-line/) must be set in configuration files. Settings related to inlay hints are examples of the first category, and the [diagnostic category](https://docs.basedpyright.com/latest/configuration/config-files/#diagnostic-categories) settings are examples of the second category.
@@ -121,7 +121,7 @@ Examples of both kinds of configuration are provided below. Refer to the basedpy
 
 ##### Language server settings
 
-Language server settings for basedpyright in Baymax can be set in the `lsp` section of your `settings.json`.
+Language server settings for basedpyright in Sim can be set in the `lsp` section of your `settings.json`.
 
 For example, to:
 
@@ -168,9 +168,9 @@ See [Python Language Server Configuration](https://github.com/python-lsp/python-
 
 ## Virtual Environments
 
-[Virtual environments](https://docs.python.org/3/library/venv.html) are a useful tool for fixing a Python version and set of dependencies for a specific project, in a way that's isolated from other projects on the same machine. Baymax has built-in support for discovering, configuring, and activating virtual environments, based on the language-agnostic concept of a [toolchain](../toolchains.md).
+[Virtual environments](https://docs.python.org/3/library/venv.html) are a useful tool for fixing a Python version and set of dependencies for a specific project, in a way that's isolated from other projects on the same machine. Sim has built-in support for discovering, configuring, and activating virtual environments, based on the language-agnostic concept of a [toolchain](../toolchains.md).
 
-Note that if you have a global Python installation, it is also counted as a toolchain for Baymax's purposes.
+Note that if you have a global Python installation, it is also counted as a toolchain for Sim's purposes.
 
 ### Create a Virtual Environment
 
@@ -182,28 +182,28 @@ python3 -m venv .venv
 
 Alternatively, if you're using `uv`, running `uv sync` will create a virtual environment the first time you run it.
 
-### How Baymax Uses Python Toolchains
+### How Sim Uses Python Toolchains
 
-Baymax uses the selected Python toolchain for your project in the following ways:
+Sim uses the selected Python toolchain for your project in the following ways:
 
 - Built-in language servers will be automatically configured with the path to the toolchain's Python interpreter and, if applicable, virtual environment. This is important so that they can resolve dependencies. (Note that language servers provided by extensions can't be automatically configured like this currently.)
 - Python tasks (such as pytest tests) will be run using the toolchain's Python interpreter.
-- If the toolchain is a virtual environment, the environment's activation script will be run automatically when you launch a new shell in Baymax's integrated terminal, giving you convenient access to the selected Python interpreter and dependency set.
-- If a built-in language server is installed in the active virtual environment, that binary will be used instead of Baymax's private automatically-installed binary. This also applies to debugpy.
+- If the toolchain is a virtual environment, the environment's activation script will be run automatically when you launch a new shell in Sim's integrated terminal, giving you convenient access to the selected Python interpreter and dependency set.
+- If a built-in language server is installed in the active virtual environment, that binary will be used instead of Sim's private automatically-installed binary. This also applies to debugpy.
 
 ### Selecting a Toolchain
 
-For most projects, Baymax will automatically select the right Python toolchain. In complex projects with multiple virtual environments, it might be necessary to override this selection. You can use the [toolchain selector](../toolchains.md#selecting-toolchains) to pick a toolchain from the list discovered by Baymax, or [specify the path to a toolchain manually](../toolchains.md#adding-toolchains-manually) if it's not on the list.
+For most projects, Sim will automatically select the right Python toolchain. In complex projects with multiple virtual environments, it might be necessary to override this selection. You can use the [toolchain selector](../toolchains.md#selecting-toolchains) to pick a toolchain from the list discovered by Sim, or [specify the path to a toolchain manually](../toolchains.md#adding-toolchains-manually) if it's not on the list.
 
 ## Code Formatting & Linting
 
-Baymax uses [Ruff](https://github.com/astral-sh/ruff) for formatting and linting Python code. Specifically, it runs Ruff as an LSP server using the `ruff server` subcommand.
+Sim uses [Ruff](https://github.com/astral-sh/ruff) for formatting and linting Python code. Specifically, it runs Ruff as an LSP server using the `ruff server` subcommand.
 
 ### Configuring Formatting
 
-Formatting in Baymax follows a two-phase pipeline: first, code actions on format (`code_actions_on_format`) are executed, followed by the configured formatter.
+Formatting in Sim follows a two-phase pipeline: first, code actions on format (`code_actions_on_format`) are executed, followed by the configured formatter.
 
-Configure formatting in Settings ({#kb baymax::OpenSettings}) under Languages > Python, or add to your settings file:
+Configure formatting in Settings ({#kb sim::OpenSettings}) under Languages > Python, or add to your settings file:
 
 ```json [settings]
 {
@@ -224,7 +224,7 @@ Configure formatting in Settings ({#kb baymax::OpenSettings}) under Languages > 
 
 These two phases are independent. For example, if you prefer [Black](https://github.com/psf/black) for code formatting, but want to keep Ruff's import sorting, you only need to change the formatter phase.
 
-Configure in Settings ({#kb baymax::OpenSettings}) under Languages > Python, or add to your settings file:
+Configure in Settings ({#kb sim::OpenSettings}) under Languages > Python, or add to your settings file:
 
 ```json [settings]
 {
@@ -250,7 +250,7 @@ To completely switch to another tool and prevent Ruff from modifying your code a
 
 To prevent any formatting actions when you save, you can disable format-on-save for Python files.
 
-Configure in Settings ({#kb baymax::OpenSettings}) under Languages > Python, or add to your settings file:
+Configure in Settings ({#kb sim::OpenSettings}) under Languages > Python, or add to your settings file:
 
 ```json [settings]
 {
@@ -264,9 +264,9 @@ Configure in Settings ({#kb baymax::OpenSettings}) under Languages > Python, or 
 
 ### Configuring Ruff
 
-Like basedpyright, Ruff reads options from both Baymax's language server settings and configuration files (`ruff.toml`) when used in Baymax. Unlike basedpyright, _all_ options can be configured in either of these locations, so the choice of where to put your Ruff configuration comes down to whether you want it to be shared between projects but specific to Baymax (in which case you should use language server settings), or specific to one project but common to all Ruff invocations (in which case you should use `ruff.toml`).
+Like basedpyright, Ruff reads options from both Sim's language server settings and configuration files (`ruff.toml`) when used in Sim. Unlike basedpyright, _all_ options can be configured in either of these locations, so the choice of where to put your Ruff configuration comes down to whether you want it to be shared between projects but specific to Sim (in which case you should use language server settings), or specific to one project but common to all Ruff invocations (in which case you should use `ruff.toml`).
 
-Here's an example of using language server settings in Baymax's `settings.json` to disable all Ruff lints in Baymax (while still using Ruff as a formatter):
+Here's an example of using language server settings in Sim's `settings.json` to disable all Ruff lints in Sim (while still using Ruff as a formatter):
 
 ```json [settings]
 {
@@ -298,7 +298,7 @@ For more details, refer to the Ruff documentation about [configuration files](ht
 
 ### Embedded Language Highlighting
 
-Baymax supports syntax highlighting for code embedded in Python strings by adding a comment with the language name.
+Sim supports syntax highlighting for code embedded in Python strings by adding a comment with the language name.
 
 ```python
 # sql
@@ -317,22 +317,22 @@ result = func( #sql
 
 ## Debugging
 
-Baymax supports Python debugging through the `debugpy` adapter. You can start with no configuration or define custom launch profiles in `.baymax/debug.json`.
+Sim supports Python debugging through the `debugpy` adapter. You can start with no configuration or define custom launch profiles in `.sim/debug.json`.
 
 ### Start Debugging with No Setup
 
-Baymax can automatically detect debuggable Python entry points. Press F4 (or run debugger: start from the Command Palette) to see available options for your current project.
+Sim can automatically detect debuggable Python entry points. Press F4 (or run debugger: start from the Command Palette) to see available options for your current project.
 This works for:
 
 - Python scripts
 - Modules
 - pytest tests
 
-Baymax uses `debugpy` under the hood, but no manual adapter configuration is required.
+Sim uses `debugpy` under the hood, but no manual adapter configuration is required.
 
 ### Define Custom Debug Configurations
 
-For reusable setups, create a `.baymax/debug.json` file in your project root. This gives you more control over how Baymax runs and debugs your code.
+For reusable setups, create a `.sim/debug.json` file in your project root. This gives you more control over how Sim runs and debugs your code.
 
 - [debugpy configuration documentation](https://github.com/microsoft/debugpy/wiki/Debug-configuration-settings#launchattach-settings)
 
@@ -343,7 +343,7 @@ For reusable setups, create a `.baymax/debug.json` file in your project root. Th
   {
     "label": "Python Active File",
     "adapter": "Debugpy",
-    "program": "$BAYMAX_FILE",
+    "program": "$SIM_FILE",
     "request": "launch"
   }
 ]
@@ -377,7 +377,7 @@ requirements.txt
     "adapter": "Debugpy",
     "request": "launch",
     "module": "app",
-    "cwd": "$BAYMAX_WORKTREE_ROOT",
+    "cwd": "$SIM_WORKTREE_ROOT",
     "env": {
       "FLASK_APP": "app",
       "FLASK_DEBUG": "1"
@@ -431,17 +431,17 @@ my_django_project/
 
 ## Troubleshooting
 
-Issues with Python in Baymax typically involve virtual environments, language servers, or tooling configuration.
+Issues with Python in Sim typically involve virtual environments, language servers, or tooling configuration.
 
 ### Resolve Language Server Startup Issues
 
 If a language server isn't responding or features like diagnostics or autocomplete aren't available:
 
-- Check your Baymax log (using the {#action baymax::OpenLog} action) for errors related to the language server you're trying to use. This is where you're likely to find useful information if the language server failed to start up at all.
+- Check your Sim log (using the {#action sim::OpenLog} action) for errors related to the language server you're trying to use. This is where you're likely to find useful information if the language server failed to start up at all.
 - Use the language server logs view to understand the lifecycle of the affected language server. You can access this view using the {#action dev::OpenLanguageServerLogs} action, or by clicking the lightning bolt icon in the status bar and selecting your language server. The most useful pieces of data in this view are:
   - "Server Logs", which shows any errors printed by the language server
   - "Server Info", which shows details about how the language server was started
 - Verify your `settings.json` or `pyrightconfig.json` is syntactically correct.
-- Restart Baymax to reinitialize language server connections, or try restarting the language server using the {#action editor::RestartLanguageServer}
+- Restart Sim to reinitialize language server connections, or try restarting the language server using the {#action editor::RestartLanguageServer}
 
-If the language server is failing to resolve imports, and you're using a virtual environment, make sure that the right environment is chosen in the selector. You can use "Server Info" view to confirm which virtual environment Baymax is sending to the language server&mdash;look for the `* Configuration` section at the end.
+If the language server is failing to resolve imports, and you're using a virtual environment, make sure that the right environment is chosen in the selector. You can use "Server Info" view to confirm which virtual environment Sim is sending to the language server&mdash;look for the `* Configuration` section at the end.

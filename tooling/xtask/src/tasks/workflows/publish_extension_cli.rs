@@ -9,7 +9,7 @@ use crate::tasks::workflows::{
 
 pub fn publish_extension_cli() -> Workflow {
     let publish = publish_job();
-    let update_sha_in_baymax = update_sha_in_baymax(&publish);
+    let update_sha_in_sim = update_sha_in_sim(&publish);
     let update_sha_in_extensions = update_sha_in_extensions(&publish);
 
     named::workflow()
@@ -17,7 +17,7 @@ pub fn publish_extension_cli() -> Workflow {
         .add_env(("CARGO_TERM_COLOR", "always"))
         .add_env(("CARGO_INCREMENTAL", 0))
         .add_job(publish.name, publish.job)
-        .add_job(update_sha_in_baymax.name, update_sha_in_baymax.job)
+        .add_job(update_sha_in_sim.name, update_sha_in_sim.job)
         .add_job(update_sha_in_extensions.name, update_sha_in_extensions.job)
 }
 
@@ -50,13 +50,13 @@ fn publish_job() -> NamedJob {
     )
 }
 
-fn update_sha_in_baymax(publish_job: &NamedJob) -> NamedJob {
+fn update_sha_in_sim(publish_job: &NamedJob) -> NamedJob {
     let (generate_token, generated_token) =
-        generate_token(vars::BAYMAX_ZIPPY_APP_ID, vars::BAYMAX_ZIPPY_APP_PRIVATE_KEY).into();
+        generate_token(vars::SIM_ZIPPY_APP_ID, vars::SIM_ZIPPY_APP_PRIVATE_KEY).into();
 
     fn replace_sha() -> Step<Run> {
         named::bash(indoc! {r#"
-            sed -i "s/BAYMAX_EXTENSION_CLI_SHA: &str = \"[a-f0-9]*\"/BAYMAX_EXTENSION_CLI_SHA: \&str = \"$GITHUB_SHA\"/" \
+            sed -i "s/SIM_EXTENSION_CLI_SHA: &str = \"[a-f0-9]*\"/SIM_EXTENSION_CLI_SHA: \&str = \"$GITHUB_SHA\"/" \
                 tooling/xtask/src/tasks/workflows/extension_tests.rs
         "#})
     }
@@ -78,11 +78,11 @@ fn update_sha_in_baymax(publish_job: &NamedJob) -> NamedJob {
             .add_step(get_short_sha_step)
             .add_step(replace_sha())
             .add_step(regenerate_workflows())
-            .add_step(create_pull_request_baymax(&generated_token, &short_sha)),
+            .add_step(create_pull_request_sim(&generated_token, &short_sha)),
     )
 }
 
-fn create_pull_request_baymax(generated_token: &StepOutput, short_sha: &StepOutput) -> Step<Use> {
+fn create_pull_request_sim(generated_token: &StepOutput, short_sha: &StepOutput) -> Step<Use> {
     let title = format!(
         "extension_ci: Bump extension CLI version to `{}`",
         short_sha
@@ -102,7 +102,7 @@ fn create_pull_request_baymax(generated_token: &StepOutput, short_sha: &StepOutp
 fn update_sha_in_extensions(publish_job: &NamedJob) -> NamedJob {
     let extensions_repo = RepositoryTarget::new("simtropolis", &["extensions"]);
     let (generate_token, generated_token) =
-        generate_token(vars::BAYMAX_ZIPPY_APP_ID, vars::BAYMAX_ZIPPY_APP_PRIVATE_KEY)
+        generate_token(vars::SIM_ZIPPY_APP_ID, vars::SIM_ZIPPY_APP_PRIVATE_KEY)
             .for_repository(extensions_repo)
             .into();
 
@@ -118,7 +118,7 @@ fn update_sha_in_extensions(publish_job: &NamedJob) -> NamedJob {
 
     fn replace_sha() -> Step<Run> {
         named::bash(indoc! {r#"
-            sed -i "s/BAYMAX_EXTENSION_CLI_SHA: [a-f0-9]*/BAYMAX_EXTENSION_CLI_SHA: $GITHUB_SHA/" \
+            sed -i "s/SIM_EXTENSION_CLI_SHA: [a-f0-9]*/SIM_EXTENSION_CLI_SHA: $GITHUB_SHA/" \
                 .github/workflows/ci.yml
         "#})
     }
@@ -146,7 +146,7 @@ fn create_pull_request_extensions(
 
     steps::CreatePrStep::new(title, "update-extension-cli-sha", generated_token)
         .with_body(indoc::indoc! {r#"
-            This PR bumps the extension CLI version to https://github.com/simtropolis/baymax/commit/${{ github.sha }}.
+            This PR bumps the extension CLI version to https://github.com/simtropolis/sim/commit/${{ github.sha }}.
         "#})
         .with_labels("allow-no-extension")
         .into()

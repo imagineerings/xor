@@ -1,12 +1,12 @@
-# Baymax iOS Deployment
+# Sim iOS Deployment
 
 This guide documents the repository-owned iOS build, archive, and TestFlight entry points.
 
 ## Current Project
 
-- Project: `mobile/ios/Baymax.xcodeproj`
-- Scheme: `Baymax`
-- Default bundle identifier: `com.simtropolis.baymaxchat`
+- Project: `mobile/ios/Sim.xcodeproj`
+- Scheme: `Sim`
+- Default bundle identifier: `com.simtropolis.simchat`
 - Default version/build: supplied by scripts with `--version` and `--build-number`
 - Export template: `mobile/ios/ExportOptions.plist.template`
 

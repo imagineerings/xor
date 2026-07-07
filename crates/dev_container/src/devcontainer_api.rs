@@ -81,7 +81,7 @@ pub enum DevContainerError {
     NotInValidProject,
     /// Multiple existing containers match this project's identifying labels
     /// (`devcontainer.local_folder` + `devcontainer.config_file`). The spec
-    /// expects those labels to be unique per project, so Baymax can't choose
+    /// expects those labels to be unique per project, so Sim can't choose
     /// which one to connect to. The user must remove the duplicate(s).
     MultipleMatchingContainers(Vec<String>),
 }
@@ -119,7 +119,7 @@ impl Display for DevContainerError {
                 DevContainerError::DevContainerValidationFailed(failure) => failure.to_string(),
                 DevContainerError::MultipleMatchingContainers(ids) => format!(
                     "Multiple containers match this project's dev container labels ({}). \
-                     Baymax can't decide which to connect to. Stop and remove the stale one(s) with \
+                     Sim can't decide which to connect to. Stop and remove the stale one(s) with \
                      `docker stop <id>` and `docker rm <id>`, then try again.",
                     ids.join(", ")
                 ),

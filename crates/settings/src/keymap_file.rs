@@ -66,7 +66,7 @@ pub struct KeymapSection {
     /// `Workspace`, the bindings will be active in that context. Boolean expressions like `X && Y`,
     /// `X || Y`, `!X` are also supported. Some more complex logic including checking OS and the
     /// current file extension are also supported - see [the
-    /// documentation](https://baymax.dev/docs/key-bindings#contexts) for more details.
+    /// documentation](https://sim.dev/docs/key-bindings#contexts) for more details.
     #[serde(default)]
     pub context: String,
     /// This option enables specifying keys based on their position on a QWERTY keyboard, by using
@@ -88,7 +88,7 @@ pub struct KeymapSection {
     #[serde(default)]
     bindings: Option<IndexMap<String, KeymapAction>>,
     #[serde(flatten)]
-    unrecognibaymax_fields: IndexMap<String, Value>,
+    unrecognisim_fields: IndexMap<String, Value>,
     // This struct intentionally uses permissive types for its fields, rather than validating during
     // deserialization. The purpose of this is to allow loading the portion of the keymap that doesn't
     // have errors. The downside of this is that the errors are not reported with line+column info.
@@ -276,7 +276,7 @@ impl KeymapFile {
             use_key_equivalents,
             unbind,
             bindings,
-            unrecognibaymax_fields,
+            unrecognisim_fields,
         } in self.0.iter()
         {
             let context_predicate: Option<Rc<KeyBindingContextPredicate>> = if context.is_empty() {
@@ -298,11 +298,11 @@ impl KeymapFile {
 
             let mut section_errors = String::new();
 
-            if !unrecognibaymax_fields.is_empty() {
+            if !unrecognisim_fields.is_empty() {
                 write!(
                     section_errors,
-                    "\n\n - Unrecognibaymax fields: {}",
-                    MarkdownInlineCode(&format!("{:?}", unrecognibaymax_fields.keys()))
+                    "\n\n - Unrecognisim fields: {}",
+                    MarkdownInlineCode(&format!("{:?}", unrecognisim_fields.keys()))
                 )
                 .unwrap();
             }
@@ -1674,7 +1674,7 @@ mod tests {
                 [
                     {
                         "unbind": {
-                            "ctrl-a": ["baymax::Unbind", "test_keymap_file::StringAction"]
+                            "ctrl-a": ["sim::Unbind", "test_keymap_file::StringAction"]
                         }
                     }
                 ]
@@ -1689,7 +1689,7 @@ mod tests {
                 assert!(
                     error_message
                         .0
-                        .contains("can't use `\"baymax::Unbind\"` as an unbind target.")
+                        .contains("can't use `\"sim::Unbind\"` as an unbind target.")
                 );
             }
             other => panic!("expected SomeFailedToLoad, got {other:?}"),
@@ -1774,14 +1774,14 @@ mod tests {
             "[]",
             KeybindUpdateOperation::add(KeybindUpdateTarget {
                 keystrokes: &parse_keystrokes("ctrl-a"),
-                action_name: "baymax::SomeAction",
+                action_name: "sim::SomeAction",
                 context: None,
                 action_arguments: None,
             }),
             r#"[
                 {
                     "bindings": {
-                        "ctrl-a": "baymax::SomeAction"
+                        "ctrl-a": "sim::SomeAction"
                     }
                 }
             ]"#
@@ -1792,14 +1792,14 @@ mod tests {
             "[]",
             KeybindUpdateOperation::add(KeybindUpdateTarget {
                 keystrokes: &parse_keystrokes("\\ a"),
-                action_name: "baymax::SomeAction",
+                action_name: "sim::SomeAction",
                 context: None,
                 action_arguments: None,
             }),
             r#"[
                 {
                     "bindings": {
-                        "\\ a": "baymax::SomeAction"
+                        "\\ a": "sim::SomeAction"
                     }
                 }
             ]"#
@@ -1810,14 +1810,14 @@ mod tests {
             "[]",
             KeybindUpdateOperation::add(KeybindUpdateTarget {
                 keystrokes: &parse_keystrokes("ctrl-a"),
-                action_name: "baymax::SomeAction",
+                action_name: "sim::SomeAction",
                 context: None,
                 action_arguments: Some(""),
             }),
             r#"[
                 {
                     "bindings": {
-                        "ctrl-a": "baymax::SomeAction"
+                        "ctrl-a": "sim::SomeAction"
                     }
                 }
             ]"#
@@ -1828,26 +1828,26 @@ mod tests {
             r#"[
                 {
                     "bindings": {
-                        "ctrl-a": "baymax::SomeAction"
+                        "ctrl-a": "sim::SomeAction"
                     }
                 }
             ]"#
             .unindent(),
             KeybindUpdateOperation::add(KeybindUpdateTarget {
                 keystrokes: &parse_keystrokes("ctrl-b"),
-                action_name: "baymax::SomeOtherAction",
+                action_name: "sim::SomeOtherAction",
                 context: None,
                 action_arguments: None,
             }),
             r#"[
                 {
                     "bindings": {
-                        "ctrl-a": "baymax::SomeAction"
+                        "ctrl-a": "sim::SomeAction"
                     }
                 },
                 {
                     "bindings": {
-                        "ctrl-b": "baymax::SomeOtherAction"
+                        "ctrl-b": "sim::SomeOtherAction"
                     }
                 }
             ]"#
@@ -1858,27 +1858,27 @@ mod tests {
             r#"[
                 {
                     "bindings": {
-                        "ctrl-a": "baymax::SomeAction"
+                        "ctrl-a": "sim::SomeAction"
                     }
                 }
             ]"#
             .unindent(),
             KeybindUpdateOperation::add(KeybindUpdateTarget {
                 keystrokes: &parse_keystrokes("ctrl-b"),
-                action_name: "baymax::SomeOtherAction",
+                action_name: "sim::SomeOtherAction",
                 context: None,
                 action_arguments: Some(r#"{"foo": "bar"}"#),
             }),
             r#"[
                 {
                     "bindings": {
-                        "ctrl-a": "baymax::SomeAction"
+                        "ctrl-a": "sim::SomeAction"
                     }
                 },
                 {
                     "bindings": {
                         "ctrl-b": [
-                            "baymax::SomeOtherAction",
+                            "sim::SomeOtherAction",
                             {
                                 "foo": "bar"
                             }
@@ -1893,28 +1893,28 @@ mod tests {
             r#"[
                 {
                     "bindings": {
-                        "ctrl-a": "baymax::SomeAction"
+                        "ctrl-a": "sim::SomeAction"
                     }
                 }
             ]"#
             .unindent(),
             KeybindUpdateOperation::add(KeybindUpdateTarget {
                 keystrokes: &parse_keystrokes("ctrl-b"),
-                action_name: "baymax::SomeOtherAction",
-                context: Some("Baymax > Editor && some_condition = true"),
+                action_name: "sim::SomeOtherAction",
+                context: Some("Sim > Editor && some_condition = true"),
                 action_arguments: Some(r#"{"foo": "bar"}"#),
             }),
             r#"[
                 {
                     "bindings": {
-                        "ctrl-a": "baymax::SomeAction"
+                        "ctrl-a": "sim::SomeAction"
                     }
                 },
                 {
-                    "context": "Baymax > Editor && some_condition = true",
+                    "context": "Sim > Editor && some_condition = true",
                     "bindings": {
                         "ctrl-b": [
-                            "baymax::SomeOtherAction",
+                            "sim::SomeOtherAction",
                             {
                                 "foo": "bar"
                             }
@@ -1929,7 +1929,7 @@ mod tests {
             r#"[
                 {
                     "bindings": {
-                        "ctrl-a": "baymax::SomeAction"
+                        "ctrl-a": "sim::SomeAction"
                     }
                 }
             ]"#
@@ -1937,13 +1937,13 @@ mod tests {
             KeybindUpdateOperation::Replace {
                 target: KeybindUpdateTarget {
                     keystrokes: &parse_keystrokes("ctrl-a"),
-                    action_name: "baymax::SomeAction",
+                    action_name: "sim::SomeAction",
                     context: None,
                     action_arguments: None,
                 },
                 source: KeybindUpdateTarget {
                     keystrokes: &parse_keystrokes("ctrl-b"),
-                    action_name: "baymax::SomeOtherAction",
+                    action_name: "sim::SomeOtherAction",
                     context: None,
                     action_arguments: Some(r#"{"foo": "bar"}"#),
                 },
@@ -1952,13 +1952,13 @@ mod tests {
             r#"[
                 {
                     "bindings": {
-                        "ctrl-a": "baymax::SomeAction"
+                        "ctrl-a": "sim::SomeAction"
                     }
                 },
                 {
                     "bindings": {
                         "ctrl-b": [
-                            "baymax::SomeOtherAction",
+                            "sim::SomeOtherAction",
                             {
                                 "foo": "bar"
                             }
@@ -1967,7 +1967,7 @@ mod tests {
                 },
                 {
                     "unbind": {
-                        "ctrl-a": "baymax::SomeAction"
+                        "ctrl-a": "sim::SomeAction"
                     }
                 }
             ]"#
@@ -1980,7 +1980,7 @@ mod tests {
             r#"[
                 {
                     "bindings": {
-                        "ctrl-a": "baymax::SomeAction"
+                        "ctrl-a": "sim::SomeAction"
                     }
                 }
             ]"#
@@ -1988,13 +1988,13 @@ mod tests {
             KeybindUpdateOperation::Replace {
                 target: KeybindUpdateTarget {
                     keystrokes: &parse_keystrokes("ctrl-a"),
-                    action_name: "baymax::SomeAction",
+                    action_name: "sim::SomeAction",
                     context: None,
                     action_arguments: None,
                 },
                 source: KeybindUpdateTarget {
                     keystrokes: &parse_keystrokes("ctrl-a"),
-                    action_name: "baymax::SomeOtherAction",
+                    action_name: "sim::SomeOtherAction",
                     context: None,
                     action_arguments: None,
                 },
@@ -2003,12 +2003,12 @@ mod tests {
             r#"[
                 {
                     "bindings": {
-                        "ctrl-a": "baymax::SomeAction"
+                        "ctrl-a": "sim::SomeAction"
                     }
                 },
                 {
                     "bindings": {
-                        "ctrl-a": "baymax::SomeOtherAction"
+                        "ctrl-a": "sim::SomeOtherAction"
                     }
                 }
             ]"#
@@ -2022,7 +2022,7 @@ mod tests {
                 {
                     "context": "SomeContext",
                     "bindings": {
-                        "ctrl-a": "baymax::SomeAction"
+                        "ctrl-a": "sim::SomeAction"
                     }
                 }
             ]"#
@@ -2030,13 +2030,13 @@ mod tests {
             KeybindUpdateOperation::Replace {
                 target: KeybindUpdateTarget {
                     keystrokes: &parse_keystrokes("ctrl-a"),
-                    action_name: "baymax::SomeAction",
+                    action_name: "sim::SomeAction",
                     context: Some("SomeContext"),
                     action_arguments: None,
                 },
                 source: KeybindUpdateTarget {
                     keystrokes: &parse_keystrokes("ctrl-b"),
-                    action_name: "baymax::SomeOtherAction",
+                    action_name: "sim::SomeOtherAction",
                     context: Some("SomeContext"),
                     action_arguments: None,
                 },
@@ -2046,19 +2046,19 @@ mod tests {
                 {
                     "context": "SomeContext",
                     "bindings": {
-                        "ctrl-a": "baymax::SomeAction"
+                        "ctrl-a": "sim::SomeAction"
                     }
                 },
                 {
                     "context": "SomeContext",
                     "bindings": {
-                        "ctrl-b": "baymax::SomeOtherAction"
+                        "ctrl-b": "sim::SomeOtherAction"
                     }
                 },
                 {
                     "context": "SomeContext",
                     "unbind": {
-                        "ctrl-a": "baymax::SomeAction"
+                        "ctrl-a": "sim::SomeAction"
                     }
                 }
             ]"#
@@ -2069,7 +2069,7 @@ mod tests {
             r#"[
                 {
                     "bindings": {
-                        "a": "baymax::SomeAction"
+                        "a": "sim::SomeAction"
                     }
                 }
             ]"#
@@ -2077,13 +2077,13 @@ mod tests {
             KeybindUpdateOperation::Replace {
                 target: KeybindUpdateTarget {
                     keystrokes: &parse_keystrokes("a"),
-                    action_name: "baymax::SomeAction",
+                    action_name: "sim::SomeAction",
                     context: None,
                     action_arguments: None,
                 },
                 source: KeybindUpdateTarget {
                     keystrokes: &parse_keystrokes("ctrl-b"),
-                    action_name: "baymax::SomeOtherAction",
+                    action_name: "sim::SomeOtherAction",
                     context: None,
                     action_arguments: Some(r#"{"foo": "bar"}"#),
                 },
@@ -2093,7 +2093,7 @@ mod tests {
                 {
                     "bindings": {
                         "ctrl-b": [
-                            "baymax::SomeOtherAction",
+                            "sim::SomeOtherAction",
                             {
                                 "foo": "bar"
                             }
@@ -2108,7 +2108,7 @@ mod tests {
             r#"[
                 {
                     "bindings": {
-                        "\\ a": "baymax::SomeAction"
+                        "\\ a": "sim::SomeAction"
                     }
                 }
             ]"#
@@ -2116,13 +2116,13 @@ mod tests {
             KeybindUpdateOperation::Replace {
                 target: KeybindUpdateTarget {
                     keystrokes: &parse_keystrokes("\\ a"),
-                    action_name: "baymax::SomeAction",
+                    action_name: "sim::SomeAction",
                     context: None,
                     action_arguments: None,
                 },
                 source: KeybindUpdateTarget {
                     keystrokes: &parse_keystrokes("\\ b"),
-                    action_name: "baymax::SomeOtherAction",
+                    action_name: "sim::SomeOtherAction",
                     context: None,
                     action_arguments: Some(r#"{"foo": "bar"}"#),
                 },
@@ -2132,7 +2132,7 @@ mod tests {
                 {
                     "bindings": {
                         "\\ b": [
-                            "baymax::SomeOtherAction",
+                            "sim::SomeOtherAction",
                             {
                                 "foo": "bar"
                             }
@@ -2147,7 +2147,7 @@ mod tests {
             r#"[
                 {
                     "bindings": {
-                        "\\ a": "baymax::SomeAction"
+                        "\\ a": "sim::SomeAction"
                     }
                 }
             ]"#
@@ -2155,13 +2155,13 @@ mod tests {
             KeybindUpdateOperation::Replace {
                 target: KeybindUpdateTarget {
                     keystrokes: &parse_keystrokes("\\ a"),
-                    action_name: "baymax::SomeAction",
+                    action_name: "sim::SomeAction",
                     context: None,
                     action_arguments: None,
                 },
                 source: KeybindUpdateTarget {
                     keystrokes: &parse_keystrokes("\\ a"),
-                    action_name: "baymax::SomeAction",
+                    action_name: "sim::SomeAction",
                     context: None,
                     action_arguments: None,
                 },
@@ -2170,7 +2170,7 @@ mod tests {
             r#"[
                 {
                     "bindings": {
-                        "\\ a": "baymax::SomeAction"
+                        "\\ a": "sim::SomeAction"
                     }
                 }
             ]"#
@@ -2181,7 +2181,7 @@ mod tests {
             r#"[
                 {
                     "bindings": {
-                        "ctrl-a": "baymax::SomeAction"
+                        "ctrl-a": "sim::SomeAction"
                     }
                 }
             ]"#
@@ -2189,13 +2189,13 @@ mod tests {
             KeybindUpdateOperation::Replace {
                 target: KeybindUpdateTarget {
                     keystrokes: &parse_keystrokes("ctrl-a"),
-                    action_name: "baymax::SomeNonexistentAction",
+                    action_name: "sim::SomeNonexistentAction",
                     context: None,
                     action_arguments: None,
                 },
                 source: KeybindUpdateTarget {
                     keystrokes: &parse_keystrokes("ctrl-b"),
-                    action_name: "baymax::SomeOtherAction",
+                    action_name: "sim::SomeOtherAction",
                     context: None,
                     action_arguments: None,
                 },
@@ -2204,12 +2204,12 @@ mod tests {
             r#"[
                 {
                     "bindings": {
-                        "ctrl-a": "baymax::SomeAction"
+                        "ctrl-a": "sim::SomeAction"
                     }
                 },
                 {
                     "bindings": {
-                        "ctrl-b": "baymax::SomeOtherAction"
+                        "ctrl-b": "sim::SomeOtherAction"
                     }
                 }
             ]"#
@@ -2221,7 +2221,7 @@ mod tests {
                 {
                     "bindings": {
                         // some comment
-                        "ctrl-a": "baymax::SomeAction"
+                        "ctrl-a": "sim::SomeAction"
                         // some other comment
                     }
                 }
@@ -2230,13 +2230,13 @@ mod tests {
             KeybindUpdateOperation::Replace {
                 target: KeybindUpdateTarget {
                     keystrokes: &parse_keystrokes("ctrl-a"),
-                    action_name: "baymax::SomeAction",
+                    action_name: "sim::SomeAction",
                     context: None,
                     action_arguments: None,
                 },
                 source: KeybindUpdateTarget {
                     keystrokes: &parse_keystrokes("ctrl-b"),
-                    action_name: "baymax::SomeOtherAction",
+                    action_name: "sim::SomeOtherAction",
                     context: None,
                     action_arguments: Some(r#"{"foo": "bar"}"#),
                 },
@@ -2247,7 +2247,7 @@ mod tests {
                     "bindings": {
                         // some comment
                         "ctrl-b": [
-                            "baymax::SomeOtherAction",
+                            "sim::SomeOtherAction",
                             {
                                 "foo": "bar"
                             }

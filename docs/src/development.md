@@ -1,11 +1,11 @@
 ---
-title: Developing Baymax
-description: "Guide to building and developing Baymax from source."
+title: Developing Sim
+description: "Guide to building and developing Sim from source."
 ---
 
-# Developing Baymax
+# Developing Sim
 
-See the platform-specific instructions for building Baymax from source:
+See the platform-specific instructions for building Sim from source:
 
 - [macOS](./development/macos.md)
 - [Linux](./development/linux.md)
@@ -13,9 +13,9 @@ See the platform-specific instructions for building Baymax from source:
 
 ## Keychain access
 
-Baymax stores secrets in the system keychain.
+Sim stores secrets in the system keychain.
 
-However, when running a development build of Baymax on macOS (and perhaps other
+However, when running a development build of Sim on macOS (and perhaps other
 platforms) trying to access the keychain results in a lot of keychain prompts
 that require entering your password over and over.
 
@@ -25,32 +25,32 @@ your password again the next time something changes in the binary.
 
 This quickly becomes annoying and impedes development speed.
 
-That is why, by default, when running a development build of Baymax an alternative
+That is why, by default, when running a development build of Sim an alternative
 credential provider is used to bypass the system keychain.
 
 > **Note:** This is **only** the case for development builds. For all non-development
 > release channels the system keychain is always used.
 
 If you need to test something out using the real system keychain in a
-development build, run Baymax with the following environment variable set:
+development build, run Sim with the following environment variable set:
 
 ```
-BAYMAX_DEVELOPMENT_USE_KEYCHAIN=1
+SIM_DEVELOPMENT_USE_KEYCHAIN=1
 ```
 
 ## Performance Measurements
 
-Baymax includes a frame time measurement system that can be used to profile how long it takes to render each frame. This is particularly useful when comparing rendering performance between different versions or when optimizing frame rendering code.
+Sim includes a frame time measurement system that can be used to profile how long it takes to render each frame. This is particularly useful when comparing rendering performance between different versions or when optimizing frame rendering code.
 
-### Using BAYMAX_MEASUREMENTS
+### Using SIM_MEASUREMENTS
 
-To enable performance measurements, set the `BAYMAX_MEASUREMENTS` environment variable:
+To enable performance measurements, set the `SIM_MEASUREMENTS` environment variable:
 
 ```sh
-export BAYMAX_MEASUREMENTS=1
+export SIM_MEASUREMENTS=1
 ```
 
-When enabled, Baymax will print frame rendering timing information to stderr, showing how long each frame takes to render.
+When enabled, Sim will print frame rendering timing information to stderr, showing how long each frame takes to render.
 
 ### Performance Comparison Workflow
 
@@ -59,18 +59,18 @@ Here's a typical workflow for comparing frame rendering performance between diff
 1. **Enable measurements:**
 
    ```sh
-   export BAYMAX_MEASUREMENTS=1
+   export SIM_MEASUREMENTS=1
    ```
 
 2. **Test the first version:**
 
    - Checkout the commit you want to measure
-   - Run Baymax in release mode and use it for 5-10 seconds: `cargo run --release &> version-a`
+   - Run Sim in release mode and use it for 5-10 seconds: `cargo run --release &> version-a`
 
 3. **Test the second version:**
 
    - Checkout another commit you want to compare
-   - Run Baymax in release mode and use it for 5-10 seconds: `cargo run --release &> version-b`
+   - Run Sim in release mode and use it for 5-10 seconds: `cargo run --release &> version-b`
 
 4. **Generate comparison:**
 
@@ -88,7 +88,7 @@ in-depth examples and explanations.
 
 ## ETW Profiling on Windows
 
-Baymax supports performance profiling with Event Tracing for Windows (ETW) to capture detailed performance data, including CPU, GPU, memory, disk, and file I/O activity. Data is saved to an `.etl` file, which can be opened in standard profiling tools for analysis.
+Sim supports performance profiling with Event Tracing for Windows (ETW) to capture detailed performance data, including CPU, GPU, memory, disk, and file I/O activity. Data is saved to an `.etl` file, which can be opened in standard profiling tools for analysis.
 
 ETW recordings may contain personally identifiable or security-sensitive information, such as paths to files and registry keys accessed, as well as process names. Please keep this in mind when sharing traces with others.
 
@@ -96,23 +96,23 @@ ETW recordings may contain personally identifiable or security-sensitive informa
 
 Open the command palette and run one of the following:
 
-- `baymax: record etw trace`: records CPU, GPU, memory, and I/O activity
-- `baymax: record etw trace with heap tracing`: includes heap allocation data for the Baymax process
+- `sim: record etw trace`: records CPU, GPU, memory, and I/O activity
+- `sim: record etw trace with heap tracing`: includes heap allocation data for the Sim process
 
-Baymax will prompt you to choose a save location for the `.etl` file, then request administrator permission. Once granted, recording will begin.
+Sim will prompt you to choose a save location for the `.etl` file, then request administrator permission. Once granted, recording will begin.
 
 ### Saving or canceling
 
 While a trace is recording, open the command palette and run one of the following:
 
-- `baymax: save etw trace`: stops recording and saves the trace to disk
-- `baymax: cancel etw trace`: stops recording without saving
+- `sim: save etw trace`: stops recording and saves the trace to disk
+- `sim: cancel etw trace`: stops recording without saving
 
 Recordings automatically save after 60 seconds if not stopped manually.
 
 ## Contributor links
 
-- [CONTRIBUTING.md](https://github.com/simtropolis/baymax/blob/main/CONTRIBUTING.md)
+- [CONTRIBUTING.md](https://github.com/simtropolis/sim/blob/main/CONTRIBUTING.md)
 - [Debugging Crashes](./development/debugging-crashes.md)
-- [Code of Conduct](https://baymax.dev/code-of-conduct)
-- [Baymax Contributor License](https://baymax.dev/cla)
+- [Code of Conduct](https://sim.dev/code-of-conduct)
+- [Sim Contributor License](https://sim.dev/cla)

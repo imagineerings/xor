@@ -507,10 +507,10 @@ struct TestKeyboardLayout;
 
 impl PlatformKeyboardLayout for TestKeyboardLayout {
     fn id(&self) -> &str {
-        "baymax.keyboard.example"
+        "sim.keyboard.example"
     }
 
     fn name(&self) -> &str {
-        "baymax.keyboard.example"
+        "sim.keyboard.example"
     }
 }

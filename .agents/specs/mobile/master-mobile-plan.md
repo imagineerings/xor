@@ -1,12 +1,12 @@
-# Baymax Mobile App — Master Plan
+# Sim Mobile App — Master Plan
 
 ## Purpose
 
-Define the complete mobile experience for Baymax by consolidating all mobile feature specifications into a single umbrella. This plan covers **iOS (Swift/SwiftUI)** and **Android (Kotlin/Jetpack Compose)** clients, plus the desktop-side infrastructure needed to support them. Each subspec follows the EARS requirements → Design → Tasks workflow.
+Define the complete mobile experience for Sim by consolidating all mobile feature specifications into a single umbrella. This plan covers **iOS (Swift/SwiftUI)** and **Android (Kotlin/Jetpack Compose)** clients, plus the desktop-side infrastructure needed to support them. Each subspec follows the EARS requirements → Design → Tasks workflow.
 
 ## Scope
 
-The Baymax mobile app provides AI agent interaction, collaboration, voice/calls, file management, notifications, and more — on both iOS and Android. The desktop companion features (tunnel management, QR code generation, push proxy) are included where they directly enable mobile functionality.
+The Sim mobile app provides AI agent interaction, collaboration, voice/calls, file management, notifications, and more — on both iOS and Android. The desktop companion features (tunnel management, QR code generation, push proxy) are included where they directly enable mobile functionality.
 
 ---
 
@@ -69,7 +69,7 @@ The Baymax mobile app provides AI agent interaction, collaboration, voice/calls,
 
 ### 4. Collaboration
 
-**Summary**: Connect to the Baymax Collab Server for channels, chat, contacts, shared documents, project sharing, and agent thread sharing.
+**Summary**: Connect to the Sim Collab Server for channels, chat, contacts, shared documents, project sharing, and agent thread sharing.
 
 | Feature | iOS | Android | Notes |
 |---------|-----|---------|-------|
@@ -238,7 +238,7 @@ The Baymax mobile app provides AI agent interaction, collaboration, voice/calls,
 
 ## Related Specs
 
-- **Goose → Baymax Migration** (`../goose-migration/`) — Desktop-side features that also benefit mobile (e.g., gateway, dictation, ACP tools)
+- **Goose → Sim Migration** (`../goose-migration/`) — Desktop-side features that also benefit mobile (e.g., gateway, dictation, ACP tools)
 - **Collab Enhancement** (`../collab-enhancement/`) — Shared collaboration features used by mobile collaboration spec
 - **Spectrum 2 Theme & UI Language** (`../spectrum-2-theme/`, `../spectrum-2-ui-language/`) — Design system used by all mobile UI
 

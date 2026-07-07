@@ -22,13 +22,13 @@ fn process_settings(cx: &mut App) {
     if settings.use_system_prompts && cfg!(not(any(target_os = "linux", target_os = "freebsd"))) {
         cx.reset_prompt_builder();
     } else {
-        cx.set_prompt_builder(baymax_prompt_renderer);
+        cx.set_prompt_builder(sim_prompt_renderer);
     }
 }
 
 /// Use this function in conjunction with [App::set_prompt_builder] to force
 /// GPUI to use the internal prompt system.
-fn baymax_prompt_renderer(
+fn sim_prompt_renderer(
     level: PromptLevel,
     message: &str,
     detail: Option<&str>,
@@ -38,7 +38,7 @@ fn baymax_prompt_renderer(
     cx: &mut App,
 ) -> RenderablePromptHandle {
     let renderer = cx.new({
-        |cx| BaymaxPromptRenderer {
+        |cx| SimPromptRenderer {
             _level: level,
             message: cx.new(|cx| Markdown::new(SharedString::new(message), None, None, cx)),
             actions: actions.iter().map(|a| a.label().to_string()).collect(),
@@ -53,7 +53,7 @@ fn baymax_prompt_renderer(
     handle.with_view(renderer, window, cx)
 }
 
-pub struct BaymaxPromptRenderer {
+pub struct SimPromptRenderer {
     _level: PromptLevel,
     message: Entity<Markdown>,
     actions: Vec<String>,
@@ -62,7 +62,7 @@ pub struct BaymaxPromptRenderer {
     detail: Option<Entity<Markdown>>,
 }
 
-impl BaymaxPromptRenderer {
+impl SimPromptRenderer {
     fn confirm(&mut self, _: &menu::Confirm, _window: &mut Window, cx: &mut Context<Self>) {
         cx.emit(PromptResponse(self.active_action_id));
     }
@@ -108,7 +108,7 @@ impl BaymaxPromptRenderer {
     }
 }
 
-impl Render for BaymaxPromptRenderer {
+impl Render for SimPromptRenderer {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let settings = ThemeSettings::get_global(cx);
 
@@ -205,9 +205,9 @@ fn markdown_style(main_message: bool, window: &Window, cx: &App) -> MarkdownStyl
     }
 }
 
-impl EventEmitter<PromptResponse> for BaymaxPromptRenderer {}
+impl EventEmitter<PromptResponse> for SimPromptRenderer {}
 
-impl Focusable for BaymaxPromptRenderer {
+impl Focusable for SimPromptRenderer {
     fn focus_handle(&self, _: &crate::App) -> FocusHandle {
         self.focus.clone()
     }

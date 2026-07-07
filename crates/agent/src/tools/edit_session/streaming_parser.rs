@@ -48,7 +48,7 @@ struct EditStreamState {
 /// Because partial JSON comes through a fixer (`partial-json-fixer`) that
 /// closes incomplete escape sequences, a string can temporarily contain wrong
 /// trailing characters (e.g. a literal `\` instead of `\n`).  We handle this
-/// by holding back trailing backslash characters in non-finalibaymax chunks: if
+/// by holding back trailing backslash characters in non-finalisim chunks: if
 /// a partial string ends with `\` (0x5C), that byte is not emitted until the
 /// next partial confirms or corrects it.  This avoids feeding corrupted bytes
 /// to downstream consumers.
@@ -180,9 +180,9 @@ impl StreamingParser {
 
     /// Finalize all edits with the complete input. This emits `done: true`
     /// events for any in-progress old_text or new_text that hasn't been
-    /// finalibaymax yet.
+    /// finalisim yet.
     ///
-    /// `final_edits` should be the fully deserialibaymax final edits array. The
+    /// `final_edits` should be the fully deserialisim final edits array. The
     /// parser compares against its tracked state and emits any remaining deltas
     /// with `done: true`.
     pub fn finalize_edits(&mut self, edits: &[Edit]) -> SmallVec<[EditEvent; 4]> {
@@ -270,7 +270,7 @@ impl StreamingParser {
     }
 
     /// When a new edit appears at `index`, finalize the edit at `index - 1`
-    /// by emitting a `NewTextChunk { done: true }` if it hasn't been finalibaymax.
+    /// by emitting a `NewTextChunk { done: true }` if it hasn't been finalisim.
     fn finalize_previous_edit(
         &mut self,
         new_index: usize,
@@ -647,7 +647,7 @@ mod tests {
             ]
         );
 
-        // Second edit appears → first edit's new_text is finalibaymax
+        // Second edit appears → first edit's new_text is finalisim
         let events = parser.push_edits(&[
             PartialEdit {
                 old_text: Some("first old".into()),

@@ -146,7 +146,7 @@ pub struct SettingsContent {
     pub agent: Option<AgentSettingsContent>,
     pub agent_servers: Option<AllAgentServersSettings>,
 
-    /// Configuration of audio in Baymax.
+    /// Configuration of audio in Sim.
     pub audio: Option<AudioSettingsContent>,
 
     /// Whether or not to automatically check for updates.
@@ -154,8 +154,8 @@ pub struct SettingsContent {
     /// Default: true
     pub auto_update: Option<bool>,
 
-    /// This base keymap settings adjusts the default keybindings in Baymax to be similar
-    /// to other common code editors. By default, Baymax's keymap closely follows VSCode's
+    /// This base keymap settings adjusts the default keybindings in Sim to be similar
+    /// to other common code editors. By default, Sim's keymap closely follows VSCode's
     /// keymap, with minor adjustments, this corresponds to the "VSCode" setting.
     ///
     /// Default: VSCode
@@ -216,22 +216,22 @@ pub struct SettingsContent {
 
     pub proxy: Option<String>,
 
-    /// The URL of the Baymax server to connect to.
+    /// The URL of the Sim server to connect to.
     pub server_url: Option<String>,
 
     /// The URL used as the key for credential storage.
     ///
     /// When set, credentials are stored under this URL instead of `server_url`.
-    /// This allows running multiple Baymax instances side by side without them
+    /// This allows running multiple Sim instances side by side without them
     /// overwriting each other's keychain entries.
     pub credentials_url: Option<String>,
 
     /// Configuration for session-related features
     pub session: Option<SessionSettingsContent>,
-    /// Control what info is collected by Baymax.
+    /// Control what info is collected by Sim.
     pub telemetry: Option<TelemetrySettingsContent>,
 
-    /// Configuration of the terminal in Baymax.
+    /// Configuration of the terminal in Sim.
     pub terminal: Option<TerminalSettingsContent>,
 
     pub title_bar: Option<TitleBarSettingsContent>,
@@ -241,13 +241,13 @@ pub struct SettingsContent {
     /// Default: false
     pub vim_mode: Option<bool>,
 
-    // Settings related to calls in Baymax
+    // Settings related to calls in Sim
     pub calls: Option<CallSettingsContent>,
 
     /// Settings for the which-key popup.
     pub which_key: Option<WhichKeySettingsContent>,
 
-    /// Settings related to Vim mode in Baymax.
+    /// Settings related to Vim mode in Sim.
     pub vim: Option<VimSettingsContent>,
 
     /// Number of lines to search for modelines at the beginning and end of files.
@@ -266,12 +266,12 @@ pub struct SettingsContent {
 }
 
 /// Configuration for developer-oriented instrumentation tools that collect
-/// diagnostic data about a running Baymax instance.
+/// diagnostic data about a running Sim instance.
 #[with_fallible_options]
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom)]
 pub struct InstrumentationSettingsContent {
     /// Configuration for the performance profiler, accessed via the
-    /// `baymax: open performance profiler` action.
+    /// `sim: open performance profiler` action.
     pub performance_profiler: Option<PerformanceProfilerSettingsContent>,
 }
 
@@ -384,7 +384,7 @@ pub enum ProfileBase {
     /// Apply profile settings on top of the user's current settings.
     #[default]
     User,
-    /// Apply profile settings on top of Baymax's default settings, ignoring user customizations.
+    /// Apply profile settings on top of Sim's default settings, ignoring user customizations.
     Default,
 }
 
@@ -395,7 +395,7 @@ pub struct SettingsProfile {
     /// What base settings to start from before applying this profile's overrides.
     ///
     /// - `user`: Apply on top of user's settings (default)
-    /// - `default`: Apply on top of Baymax's default settings, ignoring user customizations
+    /// - `default`: Apply on top of Sim's default settings, ignoring user customizations
     #[serde(default)]
     pub base: ProfileBase,
 
@@ -465,7 +465,7 @@ impl strum::VariantNames for BaseKeymapContent {
     ];
 }
 
-/// Configuration of audio in Baymax.
+/// Configuration of audio in Sim.
 #[with_fallible_options]
 #[derive(Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema, MergeFrom, Debug)]
 pub struct AudioSettingsContent {
@@ -509,7 +509,7 @@ impl From<Option<String>> for AudioOutputDeviceName {
     }
 }
 
-/// Control what info is collected by Baymax.
+/// Control what info is collected by Sim.
 #[with_fallible_options]
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Debug, MergeFrom)]
 pub struct TelemetrySettingsContent {
@@ -517,7 +517,7 @@ pub struct TelemetrySettingsContent {
     ///
     /// Default: true
     pub diagnostics: Option<bool>,
-    /// Send anonymibaymax usage data like what languages you're using Baymax with.
+    /// Send anonymisim usage data like what languages you're using Sim with.
     ///
     /// Default: true
     pub metrics: Option<bool>,
@@ -545,7 +545,7 @@ pub struct DebuggerSettingsContent {
     ///
     /// Default: line
     pub stepping_granularity: Option<SteppingGranularity>,
-    /// Whether the breakpoints should be reused across Baymax sessions.
+    /// Whether the breakpoints should be reused across Sim sessions.
     ///
     /// Default: true
     pub save_breakpoints: Option<bool>,
@@ -557,7 +557,7 @@ pub struct DebuggerSettingsContent {
     ///
     /// Default: 2000ms
     pub timeout: Option<u64>,
-    /// Whether to log messages between active debug adapters and Baymax
+    /// Whether to log messages between active debug adapters and Sim
     ///
     /// Default: true
     pub log_dap_communications: Option<bool>,
@@ -618,7 +618,7 @@ pub enum DockPosition {
     Right,
 }
 
-/// Configuration of voice calls in Baymax.
+/// Configuration of voice calls in Sim.
 #[with_fallible_options]
 #[derive(Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema, MergeFrom, Debug)]
 pub struct CallSettingsContent {
@@ -786,7 +786,7 @@ pub struct FileFinderSettingsContent {
     /// Default: true
     pub skip_focus_for_active_in_search: Option<bool>,
     /// Whether to use gitignored files when searching.
-    /// Only the file Baymax had indexed will be used, not necessary all the gitignored files.
+    /// Only the file Sim had indexed will be used, not necessary all the gitignored files.
     ///
     /// Default: Smart
     pub include_ignored: Option<IncludeIgnoredContent>,
@@ -814,7 +814,7 @@ pub struct FileFinderSettingsContent {
 pub enum IncludeIgnoredContent {
     /// Use all gitignored files
     All,
-    /// Use only the files Baymax had indexed
+    /// Use only the files Sim had indexed
     Indexed,
     /// Be smart and search for ignored when called from a gitignored worktree
     #[default]
@@ -1174,8 +1174,8 @@ pub struct SshConnection {
     pub projects: collections::BTreeSet<RemoteProject>,
     /// Name to use for this server in UI.
     pub nickname: Option<String>,
-    // By default Baymax will download the binary to the host directly.
-    // If this is set to true, Baymax will download the binary to your local machine,
+    // By default Sim will download the binary to the host directly.
+    // If this is set to true, Sim will download the binary to your local machine,
     // and then upload it over the SSH connection. Useful if your SSH server has
     // limited outbound internet access.
     pub upload_binary_over_ssh: Option<bool>,

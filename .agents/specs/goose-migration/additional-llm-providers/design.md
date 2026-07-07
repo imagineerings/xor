@@ -2,21 +2,21 @@
 
 ## 1. Overview
 
-Integrate the 18+ LLM provider implementations from goose that do not yet have equivalents in baymax. Each provider adapts goose's provider trait to baymax's `language_model` infrastructure, following the established patterns in `crates/language_models/src/provider/`.
+Integrate the 18+ LLM provider implementations from goose that do not yet have equivalents in sim. Each provider adapts goose's provider trait to sim's `language_model` infrastructure, following the established patterns in `crates/language_models/src/provider/`.
 
 ### Key Architectural Decisions
 
-- **Provider trait reuse**: Implement the existing `LanguageModelProvider` / `LanguageModel` traits from `crates/language_model_core/`, not goose's provider trait — baymax already has a well-defined provider interface.
+- **Provider trait reuse**: Implement the existing `LanguageModelProvider` / `LanguageModel` traits from `crates/language_model_core/`, not goose's provider trait — sim already has a well-defined provider interface.
 - **Feature-gated crates**: Cloud providers (Azure, Vertex AI, etc.) that require heavy SDK dependencies get their own crates under `crates/`; simpler API-only providers (NanoGPT, Avian, etc.) can live in a single shared crate.
 - **ACP-based providers**: Claude ACP, Claude Code, ChatGPT/Codex, Cursor Agent communicate via spawning subprocesses or connecting via ACP — these follow the pattern of `crates/acp_thread/` rather than direct HTTP.
 - **Declarative providers**: Implemented entirely in configuration, no Rust code changes needed for new OpenAI-compatible endpoints.
-- **Local endpoint configuration**: Ollama and llama.cpp use the existing OpenAI-compatible provider path with a local `/v1` endpoint preset. The UI must not require a user-entered API key for these local endpoints, but Baymax may store an internal placeholder credential so provider authentication state remains compatible with the existing OpenAI-compatible runtime.
+- **Local endpoint configuration**: Ollama and llama.cpp use the existing OpenAI-compatible provider path with a local `/v1` endpoint preset. The UI must not require a user-entered API key for these local endpoints, but Sim may store an internal placeholder credential so provider authentication state remains compatible with the existing OpenAI-compatible runtime.
 
 ## 2. Architecture
 
 ```mermaid
 graph TD
-    subgraph "baymax Language Model System"
+    subgraph "sim Language Model System"
         LM[language_model_core::LanguageModel trait]
         LM_Models[language_models::Provider Registry]
         LM_Providers[language_models::provider/ directory]
@@ -214,5 +214,5 @@ _For any_ provider credential [stored or transmitted], THE system SHALL NOT log,
 ## References
 
 - Source: `projects/goose/crates/goose/src/providers/` (all files listed in requirements)
-- Baymax trait: `crates/language_model_core/`
-- Baymax providers: `crates/language_models/src/provider/`
+- Sim trait: `crates/language_model_core/`
+- Sim providers: `crates/language_models/src/provider/`

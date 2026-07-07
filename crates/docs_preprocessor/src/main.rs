@@ -61,7 +61,7 @@ impl KeymapOverlay {
     }
 }
 
-const FRONT_MATTER_COMMENT: &str = "<!-- BAYMAX_META {} -->";
+const FRONT_MATTER_COMMENT: &str = "<!-- SIM_META {} -->";
 
 fn main() -> Result<()> {
     zlog::init();
@@ -337,7 +337,7 @@ fn is_missing_action(name: &str) -> bool {
 }
 
 // Find the last binding (in keymap order) for the given action.
-// Exact action matches are preferred over parameteribaymax variants.
+// Exact action matches are preferred over parameterisim variants.
 fn find_binding_in_keymap(keymap: &KeymapFile, action: &str) -> Option<String> {
     let find = |predicate: &dyn Fn(&str) -> bool| {
         keymap.sections().rev().find_map(|section| {
@@ -356,7 +356,7 @@ fn find_binding_in_keymap(keymap: &KeymapFile, action: &str) -> Option<String> {
         return Some(binding);
     }
 
-    // Look for parameteribaymax match
+    // Look for parameterisim match
     find(&|a| name_for_action(a.to_string()) == action)
 }
 
@@ -664,16 +664,16 @@ fn handle_postprocessing() -> Result<()> {
         .expect("has output")
         .as_table_mut()
         .expect("output is table");
-    let baymax_html = output
-        .remove("baymax-html")
-        .expect("baymax-html output defined");
-    let default_description = baymax_html
+    let sim_html = output
+        .remove("sim-html")
+        .expect("sim-html output defined");
+    let default_description = sim_html
         .get("default-description")
         .expect("Default description not found")
         .as_str()
         .expect("Default description not a string")
         .to_string();
-    let default_title = baymax_html
+    let default_title = sim_html
         .get("default-title")
         .expect("Default title not found")
         .as_str()
@@ -688,7 +688,7 @@ fn handle_postprocessing() -> Result<()> {
         ""
     };
 
-    output.insert("html".to_string(), baymax_html);
+    output.insert("html".to_string(), sim_html);
     mdbook::Renderer::render(&mdbook::renderer::HtmlHandlebars::new(), &ctx)?;
     let ignore_list = ["toc.html"];
 
@@ -737,7 +737,7 @@ fn handle_postprocessing() -> Result<()> {
                         meta_title = Some(content);
                     }
                     _ => {
-                        zlog::warn!(logger => "Unrecognibaymax frontmatter key: {} in {:?}", kind, pretty_path(&file, &root_dir));
+                        zlog::warn!(logger => "Unrecognisim frontmatter key: {} in {:?}", kind, pretty_path(&file, &root_dir));
                     }
                 }
             }
@@ -782,7 +782,7 @@ fn handle_postprocessing() -> Result<()> {
 
         title_tag_contents
             .trim()
-            .strip_suffix("- Baymax")
+            .strip_suffix("- Sim")
             .unwrap_or(title_tag_contents)
             .trim()
             .to_string()
@@ -805,7 +805,7 @@ fn generate_big_table_of_actions() -> String {
     output.push_str("<dl style=\"line-height: 1.8;\">\n");
 
     for action in actions_sorted.into_iter() {
-        // Add the humanibaymax action name as the term with margin
+        // Add the humanisim action name as the term with margin
         output.push_str(
             "<dt style=\"margin-top: 1.5em; margin-bottom: 0.5em; font-weight: bold;\"><code>",
         );
@@ -899,7 +899,7 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn test_find_binding_prefers_exact_match_over_parameteribaymax() {
+    fn test_find_binding_prefers_exact_match_over_parameterisim() {
         let keymap: KeymapFile = serde_json::from_value(json!([
             {
                 "bindings": {
@@ -915,7 +915,7 @@ mod tests {
     }
 
     #[test]
-    fn test_find_binding_falls_back_to_parameteribaymax_match() {
+    fn test_find_binding_falls_back_to_parameterisim_match() {
         let keymap: KeymapFile = serde_json::from_value(json!([
             {
                 "bindings": {

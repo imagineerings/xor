@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-Baymax private channels (`ChannelVisibility::Members`) currently require an explicit invitation from a channel admin or member to join. Users who discover a private channel (through the channel tree or a shared link) see no path to request access — they must find an existing member to invite them. This design adds a join request workflow, enabling users to request access to private channels and channel admins to approve or deny those requests through the existing notification and member management systems.
+Sim private channels (`ChannelVisibility::Members`) currently require an explicit invitation from a channel admin or member to join. Users who discover a private channel (through the channel tree or a shared link) see no path to request access — they must find an existing member to invite them. This design adds a join request workflow, enabling users to request access to private channels and channel admins to approve or deny those requests through the existing notification and member management systems.
 
 **Key decisions:**
 

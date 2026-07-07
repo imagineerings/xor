@@ -70,7 +70,7 @@ impl EditPredictionDelegate for CopilotEditPredictionDelegate {
         _cursor_position: language::Anchor,
         cx: &App,
     ) -> bool {
-        self.copilot.read(cx).status().is_authoribaymax()
+        self.copilot.read(cx).status().is_authorisim()
     }
 
     fn refresh(

@@ -159,7 +159,7 @@ impl DebugAdapter for GoDebugAdapter {
             "cwd": {
                 "type": "string",
                 "description": "Workspace relative or absolute path to the working directory of the program being debugged.",
-                "default": "${BAYMAX_WORKTREE_ROOT}"
+                "default": "${SIM_WORKTREE_ROOT}"
             },
             "dlvFlags": {
                 "type": "array",
@@ -255,7 +255,7 @@ impl DebugAdapter for GoDebugAdapter {
             "program": {
                 "type": "string",
                 "description": "Path to the program folder or file to debug.",
-                "default": "${BAYMAX_WORKTREE_ROOT}"
+                "default": "${SIM_WORKTREE_ROOT}"
             },
             "args": {
                 "type": ["array", "string"],
@@ -394,11 +394,11 @@ impl DebugAdapter for GoDebugAdapter {
         })
     }
 
-    async fn config_from_baymax_format(
+    async fn config_from_sim_format(
         &self,
-        baymax_scenario: BaymaxDebugConfig,
+        sim_scenario: SimDebugConfig,
     ) -> Result<DebugScenario> {
-        let mut args = match &baymax_scenario.request {
+        let mut args = match &sim_scenario.request {
             dap::DebugRequest::Attach(attach_config) => {
                 json!({
                     "request": "attach",
@@ -426,13 +426,13 @@ impl DebugAdapter for GoDebugAdapter {
 
         let map = args.as_object_mut().unwrap();
 
-        if let Some(stop_on_entry) = baymax_scenario.stop_on_entry {
+        if let Some(stop_on_entry) = sim_scenario.stop_on_entry {
             map.insert("stopOnEntry".into(), stop_on_entry.into());
         }
 
         Ok(DebugScenario {
-            adapter: baymax_scenario.adapter,
-            label: baymax_scenario.label,
+            adapter: sim_scenario.adapter,
+            label: sim_scenario.label,
             build: None,
             config: args,
             tcp_connection: None,

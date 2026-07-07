@@ -16,10 +16,10 @@ use ui_input::ErasedEditor;
 use util::{ResultExt, paths::PathExt};
 use workspace::{
     MultiWorkspace, OpenMode, OpenOptions, ProjectGroupKey, RecentWorkspace,
-    SerialibaymaxWorkspaceLocation, Workspace, WorkspaceDb, notifications::DetachAndPromptErr,
+    SerialisimWorkspaceLocation, Workspace, WorkspaceDb, notifications::DetachAndPromptErr,
 };
 
-use baymax_actions::OpenRemote;
+use sim_actions::OpenRemote;
 
 use crate::{highlights_for_path, icon_for_remote_connection, open_remote_project};
 
@@ -124,7 +124,7 @@ impl SidebarRecentProjectsDelegate {
     pub fn set_workspaces(&mut self, workspaces: Vec<RecentWorkspace>) {
         self.has_any_non_local_projects = workspaces
             .iter()
-            .any(|workspace| !matches!(workspace.location, SerialibaymaxWorkspaceLocation::Local));
+            .any(|workspace| !matches!(workspace.location, SerialisimWorkspaceLocation::Local));
         self.workspaces = workspaces;
     }
 }
@@ -245,7 +245,7 @@ impl PickerDelegate for SidebarRecentProjectsDelegate {
         };
 
         match &recent_workspace.location {
-            SerialibaymaxWorkspaceLocation::Local => {
+            SerialisimWorkspaceLocation::Local => {
                 if let Some(handle) = window.window_handle().downcast::<MultiWorkspace>() {
                     let paths = recent_workspace.paths.paths().to_vec();
                     cx.defer(move |cx| {
@@ -260,7 +260,7 @@ impl PickerDelegate for SidebarRecentProjectsDelegate {
                     });
                 }
             }
-            SerialibaymaxWorkspaceLocation::Remote(connection) => {
+            SerialisimWorkspaceLocation::Remote(connection) => {
                 let mut connection = connection.clone();
                 workspace.update(cx, |workspace, cx| {
                     let app_state = workspace.app_state().clone();
@@ -318,7 +318,7 @@ impl PickerDelegate for SidebarRecentProjectsDelegate {
             .collect();
 
         let tooltip_path: SharedString = match &workspace.location {
-            SerialibaymaxWorkspaceLocation::Remote(options) => {
+            SerialisimWorkspaceLocation::Remote(options) => {
                 let host = options.display_name();
                 if ordered_paths.len() == 1 {
                     format!("{} ({})", ordered_paths[0], host).into()
@@ -343,7 +343,7 @@ impl PickerDelegate for SidebarRecentProjectsDelegate {
             .collect();
 
         let prefix = match &workspace.location {
-            SerialibaymaxWorkspaceLocation::Remote(options) => {
+            SerialisimWorkspaceLocation::Remote(options) => {
                 Some(SharedString::from(options.display_name()))
             }
             _ => None,
@@ -357,8 +357,8 @@ impl PickerDelegate for SidebarRecentProjectsDelegate {
         };
 
         let icon = icon_for_remote_connection(match &workspace.location {
-            SerialibaymaxWorkspaceLocation::Local => None,
-            SerialibaymaxWorkspaceLocation::Remote(options) => Some(options),
+            SerialisimWorkspaceLocation::Local => None,
+            SerialisimWorkspaceLocation::Remote(options) => Some(options),
         });
 
         Some(

@@ -25,7 +25,7 @@ pub struct VsCodeTokenColorSettings {
 }
 
 #[derive(Debug, PartialEq, Copy, Clone, EnumIter)]
-pub enum BaymaxSyntaxToken {
+pub enum SimSyntaxToken {
     Attribute,
     Boolean,
     Comment,
@@ -67,57 +67,57 @@ pub enum BaymaxSyntaxToken {
     Variant,
 }
 
-impl std::fmt::Display for BaymaxSyntaxToken {
+impl std::fmt::Display for SimSyntaxToken {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{}",
             match self {
-                BaymaxSyntaxToken::Attribute => "attribute",
-                BaymaxSyntaxToken::Boolean => "boolean",
-                BaymaxSyntaxToken::Comment => "comment",
-                BaymaxSyntaxToken::CommentDoc => "comment.doc",
-                BaymaxSyntaxToken::Constant => "constant",
-                BaymaxSyntaxToken::Constructor => "constructor",
-                BaymaxSyntaxToken::Embedded => "embedded",
-                BaymaxSyntaxToken::Emphasis => "emphasis",
-                BaymaxSyntaxToken::EmphasisStrong => "emphasis.strong",
-                BaymaxSyntaxToken::Enum => "enum",
-                BaymaxSyntaxToken::Function => "function",
-                BaymaxSyntaxToken::Hint => "hint",
-                BaymaxSyntaxToken::Keyword => "keyword",
-                BaymaxSyntaxToken::Label => "label",
-                BaymaxSyntaxToken::LinkText => "link_text",
-                BaymaxSyntaxToken::LinkUri => "link_uri",
-                BaymaxSyntaxToken::Number => "number",
-                BaymaxSyntaxToken::Operator => "operator",
-                BaymaxSyntaxToken::Predictive => "predictive",
-                BaymaxSyntaxToken::Preproc => "preproc",
-                BaymaxSyntaxToken::Primary => "primary",
-                BaymaxSyntaxToken::Property => "property",
-                BaymaxSyntaxToken::Punctuation => "punctuation",
-                BaymaxSyntaxToken::PunctuationBracket => "punctuation.bracket",
-                BaymaxSyntaxToken::PunctuationDelimiter => "punctuation.delimiter",
-                BaymaxSyntaxToken::PunctuationListMarker => "punctuation.list_marker",
-                BaymaxSyntaxToken::PunctuationSpecial => "punctuation.special",
-                BaymaxSyntaxToken::String => "string",
-                BaymaxSyntaxToken::StringEscape => "string.escape",
-                BaymaxSyntaxToken::StringRegex => "string.regex",
-                BaymaxSyntaxToken::StringSpecial => "string.special",
-                BaymaxSyntaxToken::StringSpecialSymbol => "string.special.symbol",
-                BaymaxSyntaxToken::Tag => "tag",
-                BaymaxSyntaxToken::TextLiteral => "text.literal",
-                BaymaxSyntaxToken::Title => "title",
-                BaymaxSyntaxToken::Type => "type",
-                BaymaxSyntaxToken::Variable => "variable",
-                BaymaxSyntaxToken::VariableSpecial => "variable.special",
-                BaymaxSyntaxToken::Variant => "variant",
+                SimSyntaxToken::Attribute => "attribute",
+                SimSyntaxToken::Boolean => "boolean",
+                SimSyntaxToken::Comment => "comment",
+                SimSyntaxToken::CommentDoc => "comment.doc",
+                SimSyntaxToken::Constant => "constant",
+                SimSyntaxToken::Constructor => "constructor",
+                SimSyntaxToken::Embedded => "embedded",
+                SimSyntaxToken::Emphasis => "emphasis",
+                SimSyntaxToken::EmphasisStrong => "emphasis.strong",
+                SimSyntaxToken::Enum => "enum",
+                SimSyntaxToken::Function => "function",
+                SimSyntaxToken::Hint => "hint",
+                SimSyntaxToken::Keyword => "keyword",
+                SimSyntaxToken::Label => "label",
+                SimSyntaxToken::LinkText => "link_text",
+                SimSyntaxToken::LinkUri => "link_uri",
+                SimSyntaxToken::Number => "number",
+                SimSyntaxToken::Operator => "operator",
+                SimSyntaxToken::Predictive => "predictive",
+                SimSyntaxToken::Preproc => "preproc",
+                SimSyntaxToken::Primary => "primary",
+                SimSyntaxToken::Property => "property",
+                SimSyntaxToken::Punctuation => "punctuation",
+                SimSyntaxToken::PunctuationBracket => "punctuation.bracket",
+                SimSyntaxToken::PunctuationDelimiter => "punctuation.delimiter",
+                SimSyntaxToken::PunctuationListMarker => "punctuation.list_marker",
+                SimSyntaxToken::PunctuationSpecial => "punctuation.special",
+                SimSyntaxToken::String => "string",
+                SimSyntaxToken::StringEscape => "string.escape",
+                SimSyntaxToken::StringRegex => "string.regex",
+                SimSyntaxToken::StringSpecial => "string.special",
+                SimSyntaxToken::StringSpecialSymbol => "string.special.symbol",
+                SimSyntaxToken::Tag => "tag",
+                SimSyntaxToken::TextLiteral => "text.literal",
+                SimSyntaxToken::Title => "title",
+                SimSyntaxToken::Type => "type",
+                SimSyntaxToken::Variable => "variable",
+                SimSyntaxToken::VariableSpecial => "variable.special",
+                SimSyntaxToken::Variant => "variant",
             }
         )
     }
 }
 
-impl BaymaxSyntaxToken {
+impl SimSyntaxToken {
     pub fn find_best_token_color_match<'a>(
         &self,
         token_colors: &'a [VsCodeTokenColor],
@@ -175,51 +175,51 @@ impl BaymaxSyntaxToken {
 
     pub fn fallbacks(&self) -> &[Self] {
         match self {
-            BaymaxSyntaxToken::CommentDoc => &[BaymaxSyntaxToken::Comment],
-            BaymaxSyntaxToken::Number => &[BaymaxSyntaxToken::Constant],
-            BaymaxSyntaxToken::VariableSpecial => &[BaymaxSyntaxToken::Variable],
-            BaymaxSyntaxToken::PunctuationBracket
-            | BaymaxSyntaxToken::PunctuationDelimiter
-            | BaymaxSyntaxToken::PunctuationListMarker
-            | BaymaxSyntaxToken::PunctuationSpecial => &[BaymaxSyntaxToken::Punctuation],
-            BaymaxSyntaxToken::StringEscape
-            | BaymaxSyntaxToken::StringRegex
-            | BaymaxSyntaxToken::StringSpecial
-            | BaymaxSyntaxToken::StringSpecialSymbol => &[BaymaxSyntaxToken::String],
+            SimSyntaxToken::CommentDoc => &[SimSyntaxToken::Comment],
+            SimSyntaxToken::Number => &[SimSyntaxToken::Constant],
+            SimSyntaxToken::VariableSpecial => &[SimSyntaxToken::Variable],
+            SimSyntaxToken::PunctuationBracket
+            | SimSyntaxToken::PunctuationDelimiter
+            | SimSyntaxToken::PunctuationListMarker
+            | SimSyntaxToken::PunctuationSpecial => &[SimSyntaxToken::Punctuation],
+            SimSyntaxToken::StringEscape
+            | SimSyntaxToken::StringRegex
+            | SimSyntaxToken::StringSpecial
+            | SimSyntaxToken::StringSpecialSymbol => &[SimSyntaxToken::String],
             _ => &[],
         }
     }
 
     fn to_vscode(self) -> Vec<&'static str> {
         match self {
-            BaymaxSyntaxToken::Attribute => vec!["entity.other.attribute-name"],
-            BaymaxSyntaxToken::Boolean => vec!["constant.language"],
-            BaymaxSyntaxToken::Comment => vec!["comment"],
-            BaymaxSyntaxToken::CommentDoc => vec!["comment.block.documentation"],
-            BaymaxSyntaxToken::Constant => {
+            SimSyntaxToken::Attribute => vec!["entity.other.attribute-name"],
+            SimSyntaxToken::Boolean => vec!["constant.language"],
+            SimSyntaxToken::Comment => vec!["comment"],
+            SimSyntaxToken::CommentDoc => vec!["comment.block.documentation"],
+            SimSyntaxToken::Constant => {
                 vec!["constant", "constant.language", "constant.character"]
             }
-            BaymaxSyntaxToken::Constructor => {
+            SimSyntaxToken::Constructor => {
                 vec![
                     "entity.name.tag",
                     "entity.name.function.definition.special.constructor",
                 ]
             }
-            BaymaxSyntaxToken::Embedded => vec!["meta.embedded"],
-            BaymaxSyntaxToken::Emphasis => vec!["markup.italic"],
-            BaymaxSyntaxToken::EmphasisStrong => vec![
+            SimSyntaxToken::Embedded => vec!["meta.embedded"],
+            SimSyntaxToken::Emphasis => vec!["markup.italic"],
+            SimSyntaxToken::EmphasisStrong => vec![
                 "markup.bold",
                 "markup.italic markup.bold",
                 "markup.bold markup.italic",
             ],
-            BaymaxSyntaxToken::Enum => vec!["support.type.enum"],
-            BaymaxSyntaxToken::Function => vec![
+            SimSyntaxToken::Enum => vec!["support.type.enum"],
+            SimSyntaxToken::Function => vec![
                 "entity.function",
                 "entity.name.function",
                 "variable.function",
             ],
-            BaymaxSyntaxToken::Hint => vec![],
-            BaymaxSyntaxToken::Keyword => vec![
+            SimSyntaxToken::Hint => vec![],
+            SimSyntaxToken::Keyword => vec![
                 "keyword",
                 "keyword.other.fn.rust",
                 "keyword.control",
@@ -228,63 +228,63 @@ impl BaymaxSyntaxToken {
                 "punctuation.accessor",
                 "entity.name.tag",
             ],
-            BaymaxSyntaxToken::Label => vec![
+            SimSyntaxToken::Label => vec![
                 "label",
                 "entity.name",
                 "entity.name.import",
                 "entity.name.package",
             ],
-            BaymaxSyntaxToken::LinkText => vec!["markup.underline.link", "string.other.link"],
-            BaymaxSyntaxToken::LinkUri => vec!["markup.underline.link", "string.other.link"],
-            BaymaxSyntaxToken::Number => vec!["constant.numeric", "number"],
-            BaymaxSyntaxToken::Operator => vec!["operator", "keyword.operator"],
-            BaymaxSyntaxToken::Predictive => vec![],
-            BaymaxSyntaxToken::Preproc => vec![
+            SimSyntaxToken::LinkText => vec!["markup.underline.link", "string.other.link"],
+            SimSyntaxToken::LinkUri => vec!["markup.underline.link", "string.other.link"],
+            SimSyntaxToken::Number => vec!["constant.numeric", "number"],
+            SimSyntaxToken::Operator => vec!["operator", "keyword.operator"],
+            SimSyntaxToken::Predictive => vec![],
+            SimSyntaxToken::Preproc => vec![
                 "preproc",
                 "meta.preprocessor",
                 "punctuation.definition.preprocessor",
             ],
-            BaymaxSyntaxToken::Primary => vec![],
-            BaymaxSyntaxToken::Property => vec![
+            SimSyntaxToken::Primary => vec![],
+            SimSyntaxToken::Property => vec![
                 "variable.member",
                 "support.type.property-name",
                 "variable.object.property",
                 "variable.other.field",
             ],
-            BaymaxSyntaxToken::Punctuation => vec![
+            SimSyntaxToken::Punctuation => vec![
                 "punctuation",
                 "punctuation.section",
                 "punctuation.accessor",
                 "punctuation.separator",
                 "punctuation.definition.tag",
             ],
-            BaymaxSyntaxToken::PunctuationBracket => vec![
+            SimSyntaxToken::PunctuationBracket => vec![
                 "punctuation.bracket",
                 "punctuation.definition.tag.begin",
                 "punctuation.definition.tag.end",
             ],
-            BaymaxSyntaxToken::PunctuationDelimiter => vec![
+            SimSyntaxToken::PunctuationDelimiter => vec![
                 "punctuation.delimiter",
                 "punctuation.separator",
                 "punctuation.terminator",
             ],
-            BaymaxSyntaxToken::PunctuationListMarker => {
+            SimSyntaxToken::PunctuationListMarker => {
                 vec!["markup.list punctuation.definition.list.begin"]
             }
-            BaymaxSyntaxToken::PunctuationSpecial => vec!["punctuation.special"],
-            BaymaxSyntaxToken::String => vec!["string"],
-            BaymaxSyntaxToken::StringEscape => {
+            SimSyntaxToken::PunctuationSpecial => vec!["punctuation.special"],
+            SimSyntaxToken::String => vec!["string"],
+            SimSyntaxToken::StringEscape => {
                 vec!["string.escape", "constant.character", "constant.other"]
             }
-            BaymaxSyntaxToken::StringRegex => vec!["string.regex"],
-            BaymaxSyntaxToken::StringSpecial => vec!["string.special", "constant.other.symbol"],
-            BaymaxSyntaxToken::StringSpecialSymbol => {
+            SimSyntaxToken::StringRegex => vec!["string.regex"],
+            SimSyntaxToken::StringSpecial => vec!["string.special", "constant.other.symbol"],
+            SimSyntaxToken::StringSpecialSymbol => {
                 vec!["string.special.symbol", "constant.other.symbol"]
             }
-            BaymaxSyntaxToken::Tag => vec!["tag", "entity.name.tag", "meta.tag.sgml"],
-            BaymaxSyntaxToken::TextLiteral => vec!["text.literal", "string"],
-            BaymaxSyntaxToken::Title => vec!["title", "entity.name"],
-            BaymaxSyntaxToken::Type => vec![
+            SimSyntaxToken::Tag => vec!["tag", "entity.name.tag", "meta.tag.sgml"],
+            SimSyntaxToken::TextLiteral => vec!["text.literal", "string"],
+            SimSyntaxToken::Title => vec!["title", "entity.name"],
+            SimSyntaxToken::Type => vec![
                 "entity.name.type",
                 "entity.name.type.primitive",
                 "entity.name.type.numeric",
@@ -293,20 +293,20 @@ impl BaymaxSyntaxToken {
                 "support.type.primitive",
                 "support.class",
             ],
-            BaymaxSyntaxToken::Variable => vec![
+            SimSyntaxToken::Variable => vec![
                 "variable",
                 "variable.language",
                 "variable.member",
                 "variable.parameter",
                 "variable.parameter.function-call",
             ],
-            BaymaxSyntaxToken::VariableSpecial => vec![
+            SimSyntaxToken::VariableSpecial => vec![
                 "variable.special",
                 "variable.member",
                 "variable.annotation",
                 "variable.language",
             ],
-            BaymaxSyntaxToken::Variant => vec!["variant"],
+            SimSyntaxToken::Variant => vec!["variant"],
         }
     }
 }

@@ -1,11 +1,11 @@
 ---
 title: Jsonnet
-description: "Configure Jsonnet language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure Jsonnet language support in Sim, including language servers, formatting, and debugging."
 ---
 
 # Jsonnet
 
-Jsonnet language support in Baymax is provided by the community-maintained [Jsonnet extension](https://github.com/narqo/baymax-jsonnet).
+Jsonnet language support in Sim is provided by the community-maintained [Jsonnet extension](https://github.com/narqo/sim-jsonnet).
 
 - Tree-sitter: [sourcegraph/tree-sitter-jsonnet](https://github.com/sourcegraph/tree-sitter-jsonnet)
 - Language Server: [grafana/jsonnet-language-server](https://github.com/grafana/jsonnet-language-server)

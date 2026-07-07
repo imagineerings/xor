@@ -2,12 +2,12 @@
 
 ## Introduction
 
-Baymax needs the feature coverage represented by Comfy's media-processing node library: image, video, audio, 3D, depth, segmentation, pose, detection, post-processing, and utility nodes. These node capabilities are core world-model harness functionality because they define the media transformations and control signals available to generation workflows. This spec owns capability grouping and node-level media transformations. It delegates preview display to `rendering-media/`, mesh artifact lifecycle to `mesh-generation-pipeline/`, graph execution semantics to `comfy-graph-node-runtime/`, and diffusion/world-model execution semantics to `comfy-diffusion-world-model-runtime/`.
+Sim needs the feature coverage represented by Comfy's media-processing node library: image, video, audio, 3D, depth, segmentation, pose, detection, post-processing, and utility nodes. These node capabilities are core world-model harness functionality because they define the media transformations and control signals available to generation workflows. This spec owns capability grouping and node-level media transformations. It delegates preview display to `rendering-media/`, mesh artifact lifecycle to `mesh-generation-pipeline/`, graph execution semantics to `comfy-graph-node-runtime/`, and diffusion/world-model execution semantics to `comfy-diffusion-world-model-runtime/`.
 
 ## Glossary
 
 - **Media Node**: A node that transforms, loads, saves, previews, analyzes, or generates image, video, audio, 3D, mask, latent, or text data.
-- **Previewable Output**: Output media that can be shown by Baymax preview infrastructure: image, video, audio, text, 3D, or generated preview metadata.
+- **Previewable Output**: Output media that can be shown by Sim preview infrastructure: image, video, audio, text, 3D, or generated preview metadata.
 - **Latent Media**: Intermediate tensors or encoded representations used by diffusion/audio/video models.
 - **Analysis Node**: A node that computes detection, segmentation, pose, depth, geometry, face landmarks, or metadata from source media.
 - **Post-Processing Node**: A node that performs deterministic media transformations such as color, crop, blur, sharpen, composite, resize, or channel operations.
@@ -16,13 +16,13 @@ Baymax needs the feature coverage represented by Comfy's media-processing node l
 
 ### Requirement 1: Image and Mask Operations
 
-**User Story:** As a creator, I want Comfy image and mask operations available in Baymax workflows.
+**User Story:** As a creator, I want Comfy image and mask operations available in Sim workflows.
 
 #### Acceptance Criteria
 
 1.1 WHEN an image pipeline uses load, save, preview, resize, crop, pad, invert, batch, stitch, tile, rotate, flip, add noise, SVG save, or get-size nodes THEN THE system SHALL provide equivalent node behavior or an explicit unsupported diagnostic.
 1.2 WHEN a mask pipeline uses mask-to-image, image-to-mask, color-to-mask, solid mask, invert, crop, composite, feather, grow, threshold, or preview nodes THEN THE system SHALL preserve Comfy-compatible data shapes.
-1.3 WHEN post-processing nodes perform blend, blur, quantize, sharpen, color transfer, brightness, contrast, levels, hue, saturation, curves, film grain, glow, chromatic aberration, edge-preserving blur, or unsharp mask THEN THE system SHALL route deterministic operations through Baymax media processing services.
+1.3 WHEN post-processing nodes perform blend, blur, quantize, sharpen, color transfer, brightness, contrast, levels, hue, saturation, curves, film grain, glow, chromatic aberration, edge-preserving blur, or unsharp mask THEN THE system SHALL route deterministic operations through Sim media processing services.
 
 ### Requirement 2: Video Operations
 
@@ -46,11 +46,11 @@ Baymax needs the feature coverage represented by Comfy's media-processing node l
 
 ### Requirement 4: 3D, Geometry, and Gaussian Splat Operations
 
-**User Story:** As a game creator, I want Comfy 3D and geometry outputs integrated with Baymax project assets.
+**User Story:** As a game creator, I want Comfy 3D and geometry outputs integrated with Sim project assets.
 
 #### Acceptance Criteria
 
-4.1 WHEN a node loads, previews, transforms, renders, merges, saves, or converts 3D assets or Gaussian splats THEN THE system SHALL route artifacts through Baymax 3D asset and preview infrastructure.
+4.1 WHEN a node loads, previews, transforms, renders, merges, saves, or converts 3D assets or Gaussian splats THEN THE system SHALL route artifacts through Sim 3D asset and preview infrastructure.
 4.2 WHEN depth or geometry estimation produces mesh, point cloud, normal, camera, or point-map outputs THEN THE system SHALL register outputs with provenance and preview metadata.
 4.3 IF a node creates textured meshes or game-ready exports THEN THE system SHALL delegate artifact lifecycle to `mesh-generation-pipeline/`.
 

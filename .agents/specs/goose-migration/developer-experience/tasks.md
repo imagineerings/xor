@@ -2,7 +2,7 @@
 
 ## Overview
 
-Implement slash commands, hints system, goose apps (GPUI panels), source roots, and execution manager by extending existing baymax crates.
+Implement slash commands, hints system, goose apps (GPUI panels), source roots, and execution manager by extending existing sim crates.
 
 ## Repo Reconciliation
 
@@ -31,27 +31,27 @@ Implement slash commands, hints system, goose apps (GPUI panels), source roots, 
 
 - [x] 2. Implement hints system
   - Created `HintLoader` in `crates/agent/src/hints/loader.rs`
-  - Supports global hints (`~/.config/baymax/hints/`) and project hints (`.baymaxhints` in worktree roots)
+  - Supports global hints (`~/.config/sim/hints/`) and project hints (`.simhints` in worktree roots)
   - Hint content injected into agent context via `ProjectContext.hints_content`
   - `@import` file resolution for hints that reference other files
   - Hints rendered in `## Project Hints` section of system prompt
   - _Requirements: 2_
   - _writes: crates/agent/src/hints/mod.rs, crates/agent/src/hints/loader.rs_
 
-- [x] 3. Implement baymax apps as GPUI panels
+- [x] 3. Implement sim apps as GPUI panels
   - Created `AppRegistry` for registering and launching embedded apps
-  - Implemented `ChatApp` (plain struct with `BaymaxApp` trait impl, chat-like interface)
-  - Implemented `ClockApp` (plain struct with `BaymaxApp` trait impl, clock/time display)
+  - Implemented `ChatApp` (plain struct with `SimApp` trait impl, chat-like interface)
+  - Implemented `ClockApp` (plain struct with `SimApp` trait impl, clock/time display)
   - Implemented `ResourceManager` for app data (key-value with JSON values)
   - Implemented `CacheManager` for app cache (key-value with optional TTL)
   - Created `AppsPanel` GPUI Entity implementing `Panel`, `Focusable`, `EventEmitter<PanelEvent>`, `Render`
   - `AppsPanel` owns `AppRegistry`, registers ChatApp + ClockApp by default, launches ChatApp on startup
-  - Panel registered in workspace initialization (`initialize_panels` in `crates/baymax/src/baymax.rs`)
+  - Panel registered in workspace initialization (`initialize_panels` in `crates/sim/src/sim.rs`)
   - ToggleFocus action registered for keyboard shortcut
   - AppsPanel docked to right side by default, 320px width
   - Removed dead `ChatApp.input` field, removed GPUI Entity pattern from ChatApp/ClockApp
   - _Requirements: 3_
-  - _writes: crates/baymax_apps/src/baymax_apps.rs, crates/baymax_apps/src/chat_app.rs, crates/baymax_apps/src/clock_app.rs, crates/baymax_apps/src/app_registry.rs, crates/baymax_apps/src/resource_manager.rs, crates/baymax_apps/src/cache_manager.rs, crates/baymax/src/baymax/apps_panel.rs, crates/baymax/src/baymax.rs, crates/baymax/Cargo.toml_
+  - _writes: crates/sim_apps/src/sim_apps.rs, crates/sim_apps/src/chat_app.rs, crates/sim_apps/src/clock_app.rs, crates/sim_apps/src/app_registry.rs, crates/sim_apps/src/resource_manager.rs, crates/sim_apps/src/cache_manager.rs, crates/sim/src/sim/apps_panel.rs, crates/sim/src/sim.rs, crates/sim/Cargo.toml_
 
 - [x] 4. Implement source roots and sources
   - Define SourceRoot and Source types
@@ -83,4 +83,4 @@ Implement slash commands, hints system, goose apps (GPUI panels), source roots, 
 
 - Slash commands are parsed before the input reaches the LLM, giving them priority over model-generated commands
 - Hints integrate with the prompt builder to inject context
-- Baymax apps follow the same GPUI Entity pattern as existing workspace panels
+- Sim apps follow the same GPUI Entity pattern as existing workspace panels

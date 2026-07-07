@@ -43,11 +43,11 @@ use crate::{
 
 use settings_json::{infer_json_indent_size, update_value_in_json_text};
 
-pub const LSP_SETTINGS_SCHEMA_URL_PREFIX: &str = "baymax://schemas/settings/lsp/";
+pub const LSP_SETTINGS_SCHEMA_URL_PREFIX: &str = "sim://schemas/settings/lsp/";
 
 pub trait SettingsKey: 'static + Send + Sync {
     /// The name of a key within the JSON file from which this setting should
-    /// be deserialibaymax. If this is `None`, then the setting will be deserialibaymax
+    /// be deserialisim. If this is `None`, then the setting will be deserialisim
     /// from the root object.
     const KEY: Option<&'static str>;
 
@@ -784,7 +784,7 @@ impl SettingsStore {
     }
 
     #[inline(always)]
-    fn parse_and_migrate_baymax_settings<SettingsContentType: RootUserSettings>(
+    fn parse_and_migrate_sim_settings<SettingsContentType: RootUserSettings>(
         &mut self,
         user_settings_content: &str,
         file: SettingsFile,
@@ -939,7 +939,7 @@ impl SettingsStore {
         self.last_user_settings_content = Some(user_settings_content.to_string());
 
         let (settings, parse_result) = self
-            .parse_and_migrate_baymax_settings::<UserSettingsContent>(
+            .parse_and_migrate_sim_settings::<UserSettingsContent>(
                 user_settings_content,
                 SettingsFile::User,
             );
@@ -966,7 +966,7 @@ impl SettingsStore {
         }
         self.last_global_settings_content = Some(global_settings_content.to_string());
 
-        let (settings, parse_result) = self.parse_and_migrate_baymax_settings::<SettingsContent>(
+        let (settings, parse_result) = self.parse_and_migrate_sim_settings::<SettingsContent>(
             global_settings_content,
             SettingsFile::Global,
         );
@@ -1043,7 +1043,7 @@ impl SettingsStore {
         let content = settings_content
             .map(|content| content.trim())
             .filter(|content| !content.is_empty());
-        let mut baymax_settings_changed = false;
+        let mut sim_settings_changed = false;
         match (path.clone(), kind, content) {
             (LocalSettingsPath::InWorktree(directory_path), LocalSettingsKind::Tasks, _) => {
                 return Err(InvalidSettingsError::Tasks {
@@ -1065,7 +1065,7 @@ impl SettingsStore {
                 });
             }
             (LocalSettingsPath::InWorktree(directory_path), LocalSettingsKind::Settings, None) => {
-                baymax_settings_changed = self
+                sim_settings_changed = self
                     .local_settings
                     .remove(&(root_id, directory_path.clone()))
                     .is_some();
@@ -1078,7 +1078,7 @@ impl SettingsStore {
                 Some(settings_contents),
             ) => {
                 let (new_settings, parse_result) = self
-                    .parse_and_migrate_baymax_settings::<ProjectSettingsContent>(
+                    .parse_and_migrate_sim_settings::<ProjectSettingsContent>(
                         settings_contents,
                         SettingsFile::Project((root_id, directory_path.clone())),
                     );
@@ -1097,7 +1097,7 @@ impl SettingsStore {
                                 project: new_settings,
                                 ..Default::default()
                             });
-                            baymax_settings_changed = true;
+                            sim_settings_changed = true;
                         }
                         btree_map::Entry::Occupied(mut o) => {
                             if &o.get().project != &new_settings {
@@ -1105,7 +1105,7 @@ impl SettingsStore {
                                     project: new_settings,
                                     ..Default::default()
                                 });
-                                baymax_settings_changed = true;
+                                sim_settings_changed = true;
                             }
                         }
                     }
@@ -1126,7 +1126,7 @@ impl SettingsStore {
             }
         }
         if let LocalSettingsPath::InWorktree(directory_path) = &path {
-            if baymax_settings_changed {
+            if sim_settings_changed {
                 self.recompute_values(Some((root_id, &directory_path)), cx);
             }
         }
@@ -1781,7 +1781,7 @@ mod tests {
             );
         });
 
-        // When the FS event occurs, the settings are recognibaymax as unchanged.
+        // When the FS event occurs, the settings are recognisim as unchanged.
         fs.flush_events(100);
         cx.run_until_parked();
         assert_eq!(
@@ -2932,9 +2932,9 @@ mod tests {
 
         let schema = SettingsStore::json_schema(&SettingsJsonSchemaParams {
             language_names: &["Rust".to_string(), "TypeScript".to_string()],
-            font_names: &["Baymax Mono".to_string()],
+            font_names: &["Sim Mono".to_string()],
             theme_names: &["One Dark".into()],
-            icon_theme_names: &["Baymax Icons".into()],
+            icon_theme_names: &["Sim Icons".into()],
             lsp_adapter_names: &[
                 "rust-analyzer".to_string(),
                 "typescript-language-server".to_string(),
@@ -2964,7 +2964,7 @@ mod tests {
 
         assert_eq!(
             init_options_ref,
-            "baymax://schemas/settings/lsp/rust-analyzer/initialization_options"
+            "sim://schemas/settings/lsp/rust-analyzer/initialization_options"
         );
 
         let settings_ref = properties
@@ -2977,7 +2977,7 @@ mod tests {
 
         assert_eq!(
             settings_ref,
-            "baymax://schemas/settings/lsp/rust-analyzer/settings"
+            "sim://schemas/settings/lsp/rust-analyzer/settings"
         );
     }
 
@@ -2987,9 +2987,9 @@ mod tests {
 
         let schema = SettingsStore::project_json_schema(&SettingsJsonSchemaParams {
             language_names: &["Rust".to_string(), "TypeScript".to_string()],
-            font_names: &["Baymax Mono".to_string()],
+            font_names: &["Sim Mono".to_string()],
             theme_names: &["One Dark".into()],
-            icon_theme_names: &["Baymax Icons".into()],
+            icon_theme_names: &["Sim Icons".into()],
             lsp_adapter_names: &[
                 "rust-analyzer".to_string(),
                 "typescript-language-server".to_string(),
@@ -3019,7 +3019,7 @@ mod tests {
 
         assert_eq!(
             init_options_ref,
-            "baymax://schemas/settings/lsp/rust-analyzer/initialization_options"
+            "sim://schemas/settings/lsp/rust-analyzer/initialization_options"
         );
 
         let settings_ref = properties
@@ -3032,7 +3032,7 @@ mod tests {
 
         assert_eq!(
             settings_ref,
-            "baymax://schemas/settings/lsp/rust-analyzer/settings"
+            "sim://schemas/settings/lsp/rust-analyzer/settings"
         );
     }
 
@@ -3042,9 +3042,9 @@ mod tests {
 
         let params = SettingsJsonSchemaParams {
             language_names: &["Rust".to_string()],
-            font_names: &["Baymax Mono".to_string()],
+            font_names: &["Sim Mono".to_string()],
             theme_names: &["One Dark".into()],
-            icon_theme_names: &["Baymax Icons".into()],
+            icon_theme_names: &["Sim Icons".into()],
             lsp_adapter_names: &["rust-analyzer".to_string()],
             action_names: &[],
             action_documentation: &HashMap::default(),

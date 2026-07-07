@@ -20,14 +20,14 @@ pub fn after_release() -> Workflow {
     let prerelease = WorkflowInput::bool("prerelease", None);
     let body = WorkflowInput::string("body", Some(String::new()));
 
-    let refresh_baymax_dev = rebuild_releases_page();
+    let refresh_sim_dev = rebuild_releases_page();
     let deploy_docs = deploy_docs_workflow_call(DOCS_CHANNEL, TAG_NAME_ENV);
-    let post_to_discord = post_to_discord(&[&refresh_baymax_dev]);
+    let post_to_discord = post_to_discord(&[&refresh_sim_dev]);
     let publish_winget = publish_winget();
     let create_sentry_release = create_sentry_release();
     let notify_on_failure = {
         let notify_on_failure = notify_on_failure(&[
-            &refresh_baymax_dev,
+            &refresh_sim_dev,
             &post_to_discord,
             &publish_winget,
             &create_sentry_release,
@@ -49,7 +49,7 @@ pub fn after_release() -> Workflow {
                     .add_input(prerelease.name, prerelease.input())
                     .add_input(body.name, body.input()),
             ))
-        .add_job(refresh_baymax_dev.name, refresh_baymax_dev.job)
+        .add_job(refresh_sim_dev.name, refresh_sim_dev.job)
         .add_job(deploy_docs.name, deploy_docs.job)
         .add_job(post_to_discord.name, post_to_discord.job)
         .add_job(publish_winget.name, publish_winget.job)
@@ -59,10 +59,10 @@ pub fn after_release() -> Workflow {
 
 fn rebuild_releases_page() -> NamedJob {
     fn refresh_cloud_releases() -> Step<Run> {
-        named::bash("curl -fX POST \"https://cloud.baymax.dev/releases/refresh?expect_tag=$TAG_NAME\"")
+        named::bash("curl -fX POST \"https://cloud.sim.dev/releases/refresh?expect_tag=$TAG_NAME\"")
     }
 
-    fn redeploy_baymax_dev() -> Step<Run> {
+    fn redeploy_sim_dev() -> Step<Run> {
         named::bash("./script/redeploy-vercel").add_env(("VERCEL_TOKEN", vars::VERCEL_TOKEN))
     }
 
@@ -72,7 +72,7 @@ fn rebuild_releases_page() -> NamedJob {
             .with_repository_owner_guard()
             .add_step(refresh_cloud_releases())
             .add_step(checkout_repo())
-            .add_step(redeploy_baymax_dev()),
+            .add_step(redeploy_sim_dev()),
     )
 }
 
@@ -80,9 +80,9 @@ fn post_to_discord(deps: &[&NamedJob]) -> NamedJob {
     fn get_release_url() -> Step<Run> {
         named::bash(
             r#"if [ "$IS_PRERELEASE" == "true" ]; then
-    URL="https://baymax.dev/releases/preview"
+    URL="https://sim.dev/releases/preview"
 else
-    URL="https://baymax.dev/releases/stable"
+    URL="https://sim.dev/releases/stable"
 fi
 
 echo "URL=$URL" >> "$GITHUB_OUTPUT"
@@ -101,7 +101,7 @@ echo "URL=$URL" >> "$GITHUB_OUTPUT"
         .add_with((
             "stringToTruncate",
             format!(
-                "📣 Baymax [{TAG_NAME}](<${{{{ steps.get-release-url.outputs.URL }}}}>)  was just released!\n\n{RELEASE_BODY}\n"
+                "📣 Sim [{TAG_NAME}](<${{{{ steps.get-release-url.outputs.URL }}}}>)  was just released!\n\n{RELEASE_BODY}\n"
             ),
         ))
         .add_with(("maxLength", 2000))
@@ -149,9 +149,9 @@ fn publish_winget() -> NamedJob {
 
     fn set_package_name() -> (Step<Run>, StepOutput) {
         let script = r#"if ($env:IS_PRERELEASE -eq "true") {
-    $PACKAGE_NAME = "BaymaxIndustries.Baymax.Preview"
+    $PACKAGE_NAME = "SimIndustries.Sim.Preview"
 } else {
-    $PACKAGE_NAME = "BaymaxIndustries.Baymax"
+    $PACKAGE_NAME = "SimIndustries.Sim"
 }
 
 echo "PACKAGE_NAME=$PACKAGE_NAME" >> $env:GITHUB_OUTPUT

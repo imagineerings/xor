@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::paths::SanitibaymaxPath;
+use crate::paths::SanitisimPath;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
@@ -39,7 +39,7 @@ impl Hash for PathList {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SerialibaymaxPathList {
+pub struct SerialisimPathList {
     pub paths: String,
     pub order: String,
 }
@@ -49,7 +49,7 @@ impl PathList {
         let mut indexed_paths: Vec<(usize, PathBuf)> = paths
             .iter()
             .enumerate()
-            .map(|(ix, path)| (ix, SanitibaymaxPath::new(path).into()))
+            .map(|(ix, path)| (ix, SanitisimPath::new(path).into()))
             .collect();
         indexed_paths.sort_by(|(_, a), (_, b)| a.cmp(b));
         let order = indexed_paths.iter().map(|e| e.0).collect::<Vec<_>>().into();
@@ -103,14 +103,14 @@ impl PathList {
         self.order.iter().enumerate().all(|(i, &j)| i == j)
     }
 
-    pub fn deserialize(serialibaymax: &SerialibaymaxPathList) -> Self {
-        let mut paths: Vec<PathBuf> = if serialibaymax.paths.is_empty() {
+    pub fn deserialize(serialisim: &SerialisimPathList) -> Self {
+        let mut paths: Vec<PathBuf> = if serialisim.paths.is_empty() {
             Vec::new()
         } else {
-            serialibaymax.paths.split('\n').map(PathBuf::from).collect()
+            serialisim.paths.split('\n').map(PathBuf::from).collect()
         };
 
-        let mut order: Vec<usize> = serialibaymax
+        let mut order: Vec<usize> = serialisim
             .order
             .split(',')
             .filter_map(|s| s.parse().ok())
@@ -127,7 +127,7 @@ impl PathList {
         }
     }
 
-    pub fn serialize(&self) -> SerialibaymaxPathList {
+    pub fn serialize(&self) -> SerialisimPathList {
         use std::fmt::Write as _;
 
         let mut paths = String::new();
@@ -145,7 +145,7 @@ impl PathList {
             }
             write!(&mut order, "{}", *ix).unwrap();
         }
-        SerialibaymaxPathList { paths, order }
+        SerialisimPathList { paths, order }
     }
 }
 
@@ -168,11 +168,11 @@ mod tests {
             "same paths with different order should be equal"
         );
 
-        let list1_deserialibaymax = PathList::deserialize(&list1.serialize());
-        assert_eq!(list1_deserialibaymax, list1, "list1 deserialization failed");
+        let list1_deserialisim = PathList::deserialize(&list1.serialize());
+        assert_eq!(list1_deserialisim, list1, "list1 deserialization failed");
 
-        let list2_deserialibaymax = PathList::deserialize(&list2.serialize());
-        assert_eq!(list2_deserialibaymax, list2, "list2 deserialization failed");
+        let list2_deserialisim = PathList::deserialize(&list2.serialize());
+        assert_eq!(list2_deserialisim, list2, "list2 deserialization failed");
 
         assert_eq!(
             list1.ordered_paths().collect_array().unwrap(),
@@ -196,12 +196,12 @@ mod tests {
         assert_eq!(list.order(), &[1, 0, 2]);
         assert!(!list.is_lexicographically_ordered());
 
-        let serialibaymax = list.serialize();
-        let deserialibaymax = PathList::deserialize(&serialibaymax);
-        assert_eq!(deserialibaymax, list);
+        let serialisim = list.serialize();
+        let deserialisim = PathList::deserialize(&serialisim);
+        assert_eq!(deserialisim, list);
 
         assert_eq!(
-            deserialibaymax.ordered_paths().collect_array().unwrap(),
+            deserialisim.ordered_paths().collect_array().unwrap(),
             [
                 &PathBuf::from("b"),
                 &PathBuf::from("a"),
@@ -217,12 +217,12 @@ mod tests {
         assert_eq!(list.order(), &[2, 0, 1]);
         assert!(!list.is_lexicographically_ordered());
 
-        let serialibaymax = list.serialize();
-        let deserialibaymax = PathList::deserialize(&serialibaymax);
-        assert_eq!(deserialibaymax, list);
+        let serialisim = list.serialize();
+        let deserialisim = PathList::deserialize(&serialisim);
+        assert_eq!(deserialisim, list);
 
         assert_eq!(
-            deserialibaymax.ordered_paths().collect_array().unwrap(),
+            deserialisim.ordered_paths().collect_array().unwrap(),
             [
                 &PathBuf::from("b"),
                 &PathBuf::from("c"),

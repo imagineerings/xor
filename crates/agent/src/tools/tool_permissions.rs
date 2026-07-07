@@ -63,16 +63,16 @@ pub async fn canonicalize_worktree_roots<C: gpui::AppContext>(
 }
 
 /// Walks up ancestors of `path` to find the deepest one that exists on disk and
-/// can be canonicalibaymax, then reattaches the remaining suffix components.
+/// can be canonicalisim, then reattaches the remaining suffix components.
 ///
 /// This is needed for paths where the leaf (or intermediate directories) don't
 /// exist yet but an ancestor may be a symlink. For example, when creating
-/// `.baymax/settings.json` where `.baymax` is a symlink to an external directory.
+/// `.sim/settings.json` where `.sim` is a symlink to an external directory.
 ///
 /// Note: intermediate directories *can* be symlinks (not just leaf entries),
 /// so we must walk the full ancestor chain. For example:
-///   `ln -s /external/config /project/.baymax`
-/// makes `.baymax` an intermediate symlink directory.
+///   `ln -s /external/config /project/.sim`
+/// makes `.sim` an intermediate symlink directory.
 async fn canonicalize_with_ancestors(path: &Path, fs: &dyn Fs) -> Option<PathBuf> {
     let mut current: Option<&Path> = Some(path);
     let mut suffix_components = Vec::new();
@@ -98,7 +98,7 @@ async fn canonicalize_with_ancestors(path: &Path, fs: &dyn Fs) -> Option<PathBuf
     }
 }
 
-/// Returns the canonicalibaymax global agent skills directory
+/// Returns the canonicalisim global agent skills directory
 /// (`~/.agents/skills`).
 ///
 /// Recomputed on every call rather than cached: the underlying
@@ -117,9 +117,9 @@ fn is_within_any_worktree(canonical_path: &Path, canonical_worktree_roots: &[Pat
 }
 
 /// If `path` names `~/.agents/skills` or one of its descendants, return the
-/// canonicalibaymax absolute path. Returns `None` for any path that resolves
+/// canonicalisim absolute path. Returns `None` for any path that resolves
 /// outside the global skills tree, for relative paths that don't start with
-/// `~`, or if the skills directory itself can't be canonicalibaymax (fail closed
+/// `~`, or if the skills directory itself can't be canonicalisim (fail closed
 /// — better to refuse access than to compare against a non-canonical path).
 ///
 /// This is the gate that lets `read_file` / `list_directory` reach into the
@@ -285,28 +285,28 @@ pub async fn resolve_creatable_global_skill_descendant_path(
 }
 
 /// Returns the kind of sensitive settings or agent skills location this path targets, if any:
-/// either inside a `.baymax/` local-settings directory, inside `.agents/skills/`, or inside
+/// either inside a `.sim/` local-settings directory, inside `.agents/skills/`, or inside
 /// the global config dir.
 ///
 /// `canonical_worktree_roots` should be the result of
 /// [`canonicalize_worktree_roots`]; it's used to re-check the local
-/// `.baymax/` and `.agents/skills/` protections against the canonical form
+/// `.sim/` and `.agents/skills/` protections against the canonical form
 /// of `path`, which catches two classes of bypass that the raw-component
 /// scan misses:
 ///
 ///   1. `..` traversal, e.g. `.agents/foo/../skills/SKILL.md`. The raw
 ///      components are `[.agents, foo, .., skills, SKILL.md]`, so the
 ///      consecutive-pair match in [`is_agents_skills_path`] fails.
-///   2. Intra-project symlinks, e.g. a symlink `safe -> .baymax` followed
+///   2. Intra-project symlinks, e.g. a symlink `safe -> .sim` followed
 ///      by `safe/settings.json`. `resolve_project_path` correctly classes
 ///      this as *not* a symlink escape (it stays inside the project), so
 ///      the raw-path check is our only line of defense and it doesn't see
-///      `.baymax` either.
+///      `.sim` either.
 ///
 /// After canonicalizing we strip the matching worktree root before
 /// re-scanning components, so that a worktree literally rooted at a path
-/// like `~/projects/.baymax/foo` doesn't classify every file inside it as
-/// `.baymax/` local-settings — only files that have `.baymax` (or
+/// like `~/projects/.sim/foo` doesn't classify every file inside it as
+/// `.sim/` local-settings — only files that have `.sim` (or
 /// `.agents/skills`) inside the worktree are flagged.
 pub async fn sensitive_settings_kind(
     path: &Path,
@@ -317,7 +317,7 @@ pub async fn sensitive_settings_kind(
 
     // Fast path: scan the raw path components before any I/O. Covers the
     // common case where the agent passes a path that literally contains
-    // `.baymax/` or `.agents/skills/`.
+    // `.sim/` or `.agents/skills/`.
     if path.components().any(|component| {
         component_matches_ignore_ascii_case(component.as_os_str(), local_settings_folder)
     }) {

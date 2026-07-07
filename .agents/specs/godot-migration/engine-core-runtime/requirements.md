@@ -2,14 +2,14 @@
 
 ## Introduction
 
-Baymax should understand Godot project structure, resources, scenes, and class metadata without porting the Godot engine runtime.
+Sim should understand Godot project structure, resources, scenes, and class metadata without porting the Godot engine runtime.
 
 ### Requirement 1: Avoid Runtime Duplication
 
 #### Acceptance Criteria
 
 1.1 IF a feature requires Godot scene-tree execution THEN THE system SHALL classify it as external-command or excluded.
-1.2 WHEN core metadata is needed THEN THE system SHALL model only the data required for Baymax indexing, preview, and tooling.
+1.2 WHEN core metadata is needed THEN THE system SHALL model only the data required for Sim indexing, preview, and tooling.
 
 ### Requirement 2: Godot Project Detection
 

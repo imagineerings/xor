@@ -86,7 +86,7 @@ fn generate_label(command: &Option<Command>) -> String {
 }
 
 impl VsCodeTaskDefinition {
-    fn into_baymax_format(
+    fn into_sim_format(
         self,
         replacer: &EnvVariableReplacer,
     ) -> anyhow::Result<Option<TaskTemplate>> {
@@ -154,7 +154,7 @@ impl TryFrom<VsCodeTaskFile> for TaskTemplates {
             .into_iter()
             .filter_map(|vscode_definition| {
                 vscode_definition
-                    .into_baymax_format(&replacer)
+                    .into_sim_format(&replacer)
                     .log_err()
                     .flatten()
             })
@@ -201,15 +201,15 @@ mod tests {
         // And now, the actual replacing
         let replacer = EnvVariableReplacer::new(HashMap::from_iter([(
             "PATH".to_owned(),
-            "BAYMAX_PATH".to_owned(),
+            "SIM_PATH".to_owned(),
         )]));
         assert_eq!(replacer.replace("Food"), "Food");
         assert_eq!(
             replacer.replace("$PATH is an environment variable"),
-            "${BAYMAX_PATH} is an environment variable"
+            "${SIM_PATH} is an environment variable"
         );
-        assert_eq!(replacer.replace("${PATH}"), "${BAYMAX_PATH}");
-        assert_eq!(replacer.replace("${PATH:food}"), "${BAYMAX_PATH:food}");
+        assert_eq!(replacer.replace("${PATH}"), "${SIM_PATH}");
+        assert_eq!(replacer.replace("${PATH:food}"), "${SIM_PATH:food}");
     }
 
     #[test]
@@ -277,9 +277,9 @@ mod tests {
                 label: "tsc: watch ./src".to_string(),
                 command: "node".to_string(),
                 args: vec![
-                    "${BAYMAX_WORKTREE_ROOT}/node_modules/typescript/lib/tsc.js".to_string(),
+                    "${SIM_WORKTREE_ROOT}/node_modules/typescript/lib/tsc.js".to_string(),
                     "--build".to_string(),
-                    "${BAYMAX_WORKTREE_ROOT}/src".to_string(),
+                    "${SIM_WORKTREE_ROOT}/src".to_string(),
                     "--watch".to_string(),
                 ],
                 ..Default::default()

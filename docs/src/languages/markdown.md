@@ -1,18 +1,18 @@
 ---
 title: Markdown
-description: "Configure Markdown language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure Markdown language support in Sim, including language servers, formatting, and debugging."
 ---
 
 # Markdown
 
-Markdown support is available natively in Baymax.
+Markdown support is available natively in Sim.
 
 - Tree-sitter: [tree-sitter-markdown](https://github.com/tree-sitter-grammars/tree-sitter-markdown)
 - Language Server: N/A
 
 ## Syntax Highlighting Code Blocks
 
-Baymax supports language-specific syntax highlighting of markdown code blocks by leveraging [tree-sitter language grammars](../extensions/languages.md#grammar). All [Baymax supported languages](../languages.md), including those provided by official or community extensions, are available for use in markdown code blocks. All you need to do is provide a language name after the opening <kbd>```</kbd> code fence like so:
+Sim supports language-specific syntax highlighting of markdown code blocks by leveraging [tree-sitter language grammars](../extensions/languages.md#grammar). All [Sim supported languages](../languages.md), including those provided by official or community extensions, are available for use in markdown code blocks. All you need to do is provide a language name after the opening <kbd>```</kbd> code fence like so:
 
 ````python
 ```python
@@ -28,9 +28,9 @@ def fib(n):
 
 ### Format
 
-Baymax supports using Prettier to automatically re-format Markdown documents. You can trigger this manually via the {#action editor::Format} action or via the {#kb editor::Format} keyboard shortcut. Alternately, you can enable format on save.
+Sim supports using Prettier to automatically re-format Markdown documents. You can trigger this manually via the {#action editor::Format} action or via the {#kb editor::Format} keyboard shortcut. Alternately, you can enable format on save.
 
-Configure formatting in Settings ({#kb baymax::OpenSettings}) under Languages > Markdown, or add to your settings file:
+Configure formatting in Settings ({#kb sim::OpenSettings}) under Languages > Markdown, or add to your settings file:
 
 ```json [settings]
   "languages": {
@@ -42,7 +42,7 @@ Configure formatting in Settings ({#kb baymax::OpenSettings}) under Languages > 
 
 ### List Continuation
 
-Baymax automatically continues lists when you press Enter at the end of a list item. Supported list types:
+Sim automatically continues lists when you press Enter at the end of a list item. Supported list types:
 
 - Unordered lists (`-`, `*`, or `+` markers)
 - Ordered lists (numbers are auto-incremented)
@@ -50,7 +50,7 @@ Baymax automatically continues lists when you press Enter at the end of a list i
 
 Pressing Enter on an empty list item removes the marker and exits the list.
 
-To disable this behavior, configure in Settings ({#kb baymax::OpenSettings}) under Languages > Markdown, or add to your settings file:
+To disable this behavior, configure in Settings ({#kb sim::OpenSettings}) under Languages > Markdown, or add to your settings file:
 
 ```json [settings]
   "languages": {
@@ -62,9 +62,9 @@ To disable this behavior, configure in Settings ({#kb baymax::OpenSettings}) und
 
 ### List Indentation
 
-Baymax indents list items when you press Tab while the cursor is on a line containing only a list marker. This allows you to quickly create nested lists.
+Sim indents list items when you press Tab while the cursor is on a line containing only a list marker. This allows you to quickly create nested lists.
 
-To disable this behavior, configure in Settings ({#kb baymax::OpenSettings}) under Languages > Markdown, or add to your settings file:
+To disable this behavior, configure in Settings ({#kb sim::OpenSettings}) under Languages > Markdown, or add to your settings file:
 
 ```json [settings]
   "languages": {
@@ -76,9 +76,9 @@ To disable this behavior, configure in Settings ({#kb baymax::OpenSettings}) und
 
 ### Trailing Whitespace
 
-By default Baymax will remove trailing whitespace on save. If you rely on invisible trailing whitespace being converted to `<br />` in Markdown files you can disable this behavior.
+By default Sim will remove trailing whitespace on save. If you rely on invisible trailing whitespace being converted to `<br />` in Markdown files you can disable this behavior.
 
-Configure in Settings ({#kb baymax::OpenSettings}) under Languages > Markdown, or add to your settings file:
+Configure in Settings ({#kb sim::OpenSettings}) under Languages > Markdown, or add to your settings file:
 
 ```json [settings]
   "languages": {

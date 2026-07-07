@@ -11,7 +11,7 @@ pub mod notifications;
 pub mod pane;
 pub mod pane_group;
 pub mod path_list {
-    pub use util::path_list::{PathList, SerialibaymaxPathList};
+    pub use util::path_list::{PathList, SerialisimPathList};
 }
 pub mod path_link;
 mod persistence;
@@ -33,11 +33,11 @@ pub use dock::Panel;
 pub use multi_workspace::{
     CloseWorkspaceSidebar, DraggedSidebar, FocusWorkspaceSidebar, MoveProjectToNewWindow,
     MultiWorkspace, MultiWorkspaceEvent, NewThread, NextProject, NextThread, PreviousProject,
-    PreviousThread, ProjectGroup, ProjectGroupKey, SerialibaymaxProjectGroupState, Sidebar,
+    PreviousThread, ProjectGroup, ProjectGroupKey, SerialisimProjectGroupState, Sidebar,
     SidebarEvent, SidebarHandle, SidebarRenderState, SidebarSide, ToggleWorkspaceSidebar,
     sidebar_side_context_menu,
 };
-pub use path_list::{PathList, SerialibaymaxPathList};
+pub use path_list::{PathList, SerialisimPathList};
 pub use remote::{
     RemoteConnectionIdentity, remote_connection_identity, same_remote_connection_identity,
 };
@@ -88,12 +88,12 @@ pub use pane_group::{
 pub use persistence::{
     RecentWorkspace, WorkspaceDb, delete_unloaded_items,
     model::{
-        DockData, DockStructure, ItemId, MultiWorkspaceState, SerialibaymaxMultiWorkspace,
-        SerialibaymaxProjectGroup, SerialibaymaxWorkspaceLocation, SessionWorkspace,
+        DockData, DockStructure, ItemId, MultiWorkspaceState, SerialisimMultiWorkspace,
+        SerialisimProjectGroup, SerialisimWorkspaceLocation, SessionWorkspace,
     },
-    read_serialibaymax_multi_workspaces,
+    read_serialisim_multi_workspaces,
 };
-use persistence::{SerialibaymaxWindowBounds, model::SerialibaymaxWorkspace};
+use persistence::{SerialisimWindowBounds, model::SerialisimWorkspace};
 use postage::stream::Stream;
 use project::{
     DirectoryLister, Project, ProjectEntryId, ProjectPath, ResolvedPath, Worktree, WorktreeId,
@@ -115,7 +115,7 @@ use settings::{
     update_settings_file,
 };
 
-use baymax_actions::{Spawn, feedback::FileBugReport, theme::ToggleMode};
+use sim_actions::{Spawn, feedback::FileBugReport, theme::ToggleMode};
 use sqlez::{
     bindable::{Bind, Column, StaticColumnCount},
     statement::Statement,
@@ -150,7 +150,7 @@ use ui::{Window, prelude::*};
 use url::Url;
 use util::{
     ResultExt, TryFutureExt,
-    paths::{PathStyle, SanitibaymaxPath},
+    paths::{PathStyle, SanitisimPath},
     rel_path::RelPath,
     serde::default_true,
 };
@@ -163,23 +163,23 @@ pub use workspace_settings::{
 use crate::{dock::PanelSizeState, item::ItemBufferKind, notifications::NotificationId};
 use crate::{
     persistence::{
-        SerialibaymaxAxis,
-        model::{SerialibaymaxItem, SerialibaymaxPane, SerialibaymaxPaneGroup},
+        SerialisimAxis,
+        model::{SerialisimItem, SerialisimPane, SerialisimPaneGroup},
     },
     security_modal::SecurityModal,
 };
 
 pub const SERIALIZATION_THROTTLE_TIME: Duration = Duration::from_millis(200);
 
-static BAYMAX_WINDOW_SIZE: LazyLock<Option<Size<Pixels>>> = LazyLock::new(|| {
-    env::var("BAYMAX_WINDOW_SIZE")
+static SIM_WINDOW_SIZE: LazyLock<Option<Size<Pixels>>> = LazyLock::new(|| {
+    env::var("SIM_WINDOW_SIZE")
         .ok()
         .as_deref()
         .and_then(parse_pixel_size_env_var)
 });
 
-static BAYMAX_WINDOW_POSITION: LazyLock<Option<Point<Pixels>>> = LazyLock::new(|| {
-    env::var("BAYMAX_WINDOW_POSITION")
+static SIM_WINDOW_POSITION: LazyLock<Option<Point<Pixels>>> = LazyLock::new(|| {
+    env::var("SIM_WINDOW_POSITION")
         .ok()
         .as_deref()
         .and_then(parse_pixel_position_env_var)
@@ -669,7 +669,7 @@ fn prompt_and_open_paths(
     cx: &mut App,
 ) {
     if let Some(workspace_window) =
-        workspace_windows_for_location(&SerialibaymaxWorkspaceLocation::Local, cx)
+        workspace_windows_for_location(&SerialisimWorkspaceLocation::Local, cx)
             .into_iter()
             .next()
     {
@@ -1080,7 +1080,7 @@ impl SerializableItemRegistry {
 }
 
 pub fn register_serializable_item<I: SerializableItem>(cx: &mut App) {
-    let serialibaymax_item_kind = I::serialibaymax_item_kind();
+    let serialisim_item_kind = I::serialisim_item_kind();
 
     let registry = cx.default_global::<SerializableItemRegistry>();
     let descriptor = SerializableItemDescriptor {
@@ -1096,7 +1096,7 @@ pub fn register_serializable_item<I: SerializableItem>(cx: &mut App) {
     };
     registry
         .descriptors_by_kind
-        .insert(Arc::from(serialibaymax_item_kind), descriptor);
+        .insert(Arc::from(serialisim_item_kind), descriptor);
     registry
         .descriptors_by_type
         .insert(TypeId::of::<I>(), descriptor);
@@ -1313,7 +1313,7 @@ pub enum OpenVisible {
 
 enum WorkspaceLocation {
     // Valid local paths or SSH project to serialize
-    Location(SerialibaymaxWorkspaceLocation, PathList),
+    Location(SerialisimWorkspaceLocation, PathList),
     // No valid location found hence clear session id
     DetachFromSession,
     // No valid location found to serialize
@@ -1901,9 +1901,9 @@ impl Workspace {
                 }
             }
 
-            let serialibaymax_workspace = db.workspace_for_roots(paths_to_open.as_slice());
+            let serialisim_workspace = db.workspace_for_roots(paths_to_open.as_slice());
 
-            if let Some(paths) = serialibaymax_workspace.as_ref().map(|ws| &ws.paths) {
+            if let Some(paths) = serialisim_workspace.as_ref().map(|ws| &ws.paths) {
                 paths_to_open = paths.ordered_paths().cloned().collect();
             }
 
@@ -1926,8 +1926,8 @@ impl Workspace {
             }
 
             let workspace_id =
-                if let Some(serialibaymax_workspace) = serialibaymax_workspace.as_ref() {
-                    serialibaymax_workspace.id
+                if let Some(serialisim_workspace) = serialisim_workspace.as_ref() {
+                    serialisim_workspace.id
                 } else {
                     db.next_id().await.unwrap_or_else(|_| Default::default())
                 };
@@ -1959,7 +1959,7 @@ impl Workspace {
                     })
                     .await;
             }
-            if let Some(workspace) = serialibaymax_workspace.as_ref() {
+            if let Some(workspace) = serialisim_workspace.as_ref() {
                 project_handle.update(cx, |this, cx| {
                     for (scope, toolchains) in &workspace.user_toolchains {
                         for toolchain in toolchains {
@@ -1976,7 +1976,7 @@ impl Workspace {
 
             let (window, workspace): (WindowHandle<MultiWorkspace>, Entity<Workspace>) =
                 if let Some(window) = window_to_replace {
-                    let centered_layout = serialibaymax_workspace
+                    let centered_layout = serialisim_workspace
                         .as_ref()
                         .map(|w| w.centered_layout)
                         .unwrap_or(false);
@@ -2019,7 +2019,7 @@ impl Workspace {
 
                     let (window_bounds, display) = if let Some(bounds) = window_bounds_override {
                         (Some(WindowBounds::Windowed(bounds)), None)
-                    } else if let Some(workspace) = serialibaymax_workspace.as_ref()
+                    } else if let Some(workspace) = serialisim_workspace.as_ref()
                         && let Some(display) = workspace.display
                         && let Some(bounds) = workspace.window_bounds.as_ref()
                     {
@@ -2035,10 +2035,10 @@ impl Workspace {
                         (None, None)
                     };
 
-                    // Use the serialibaymax workspace to construct the new window
+                    // Use the serialisim workspace to construct the new window
                     let mut options = cx.update(|cx| (app_state.build_window_options)(display, cx));
                     options.window_bounds = window_bounds;
-                    let centered_layout = serialibaymax_workspace
+                    let centered_layout = serialisim_workspace
                         .as_ref()
                         .map(|w| w.centered_layout)
                         .unwrap_or(false);
@@ -2077,8 +2077,8 @@ impl Workspace {
             // Check if this is an empty workspace (no paths to open)
             // An empty workspace is one where project_paths is empty
             let is_empty_workspace = project_paths.is_empty();
-            // Check if serialibaymax workspace has paths before it's moved
-            let serialibaymax_workspace_has_paths = serialibaymax_workspace
+            // Check if serialisim workspace has paths before it's moved
+            let serialisim_workspace_has_paths = serialisim_workspace
                 .as_ref()
                 .map(|ws| !ws.paths.is_empty())
                 .unwrap_or(false);
@@ -2086,7 +2086,7 @@ impl Workspace {
             let opened_items = window
                 .update(cx, |_, window, cx| {
                     workspace.update(cx, |_workspace: &mut Workspace, cx| {
-                        open_items(serialibaymax_workspace, project_paths, window, cx)
+                        open_items(serialisim_workspace, project_paths, window, cx)
                     })
                 })?
                 .await
@@ -2095,19 +2095,19 @@ impl Workspace {
             // Restore default dock state for empty workspaces
             // Only restore if:
             // 1. This is an empty workspace (no paths), AND
-            // 2. The serialibaymax workspace either doesn't exist or has no paths
-            if is_empty_workspace && !serialibaymax_workspace_has_paths {
+            // 2. The serialisim workspace either doesn't exist or has no paths
+            if is_empty_workspace && !serialisim_workspace_has_paths {
                 if let Some(default_docks) = persistence::read_default_dock_state(&kvp) {
                     window
                         .update(cx, |_, window, cx| {
                             workspace.update(cx, |workspace, cx| {
-                                for (dock, serialibaymax_dock) in [
+                                for (dock, serialisim_dock) in [
                                     (&workspace.right_dock, &default_docks.right),
                                     (&workspace.left_dock, &default_docks.left),
                                     (&workspace.bottom_dock, &default_docks.bottom),
                                 ] {
                                     dock.update(cx, |dock, cx| {
-                                        dock.serialibaymax_dock = Some(serialibaymax_dock.clone());
+                                        dock.serialisim_dock = Some(serialisim_dock.clone());
                                         dock.restore_state(window, cx);
                                     });
                                 }
@@ -2245,7 +2245,7 @@ impl Workspace {
             (&self.right_dock, docks.right),
         ] {
             dock.update(cx, |dock, cx| {
-                dock.serialibaymax_dock = Some(data);
+                dock.serialisim_dock = Some(data);
                 dock.restore_state(window, cx);
             });
         }
@@ -3683,7 +3683,7 @@ impl Workspace {
                 };
 
                 let this = this.clone();
-                let abs_path: Arc<Path> = SanitibaymaxPath::new(&abs_path).as_path().into();
+                let abs_path: Arc<Path> = SanitisimPath::new(&abs_path).as_path().into();
                 let fs = fs.clone();
                 let pane = pane.clone();
                 let task = cx.spawn(async move |cx| {
@@ -3751,7 +3751,7 @@ impl Workspace {
             if let Some((winner_abs_path, winner_is_dir)) = winner {
                 'emit_winner: {
                     let winner_abs_path: Arc<Path> =
-                        SanitibaymaxPath::new(&winner_abs_path).as_path().into();
+                        SanitisimPath::new(&winner_abs_path).as_path().into();
 
                     let visible = match options.visible.as_ref().unwrap_or(&OpenVisible::None) {
                         OpenVisible::All => true,
@@ -6477,7 +6477,7 @@ impl Workspace {
 
             let Some(task) = task else {
                 anyhow::bail!(
-                    "failed to construct view from leader (maybe from a different version of baymax?)"
+                    "failed to construct view from leader (maybe from a different version of sim?)"
                 );
             };
 
@@ -6915,7 +6915,7 @@ impl Workspace {
             if let Some(database_id) = database_id {
                 db.set_window_open_status(
                     database_id,
-                    SerialibaymaxWindowBounds(window_bounds),
+                    SerialisimWindowBounds(window_bounds),
                     display_uuid,
                 )
                 .await
@@ -7024,7 +7024,7 @@ impl Workspace {
             pane_handle: &Entity<Pane>,
             window: &mut Window,
             cx: &mut App,
-        ) -> SerialibaymaxPane {
+        ) -> SerialisimPane {
             let (items, active, pinned_count) = {
                 let pane = pane_handle.read(cx);
                 let active_item_id = pane.active_item().map(|item| item.item_id());
@@ -7033,8 +7033,8 @@ impl Workspace {
                         .filter_map(|handle| {
                             let handle = handle.to_serializable_item_handle(cx)?;
 
-                            Some(SerialibaymaxItem {
-                                kind: Arc::from(handle.serialibaymax_item_kind()),
+                            Some(SerialisimItem {
+                                kind: Arc::from(handle.serialisim_item_kind()),
                                 item_id: handle.item_id().as_u64(),
                                 active: Some(handle.item_id()) == active_item_id,
                                 preview: pane.is_active_preview_item(handle.item_id()),
@@ -7046,35 +7046,35 @@ impl Workspace {
                 )
             };
 
-            SerialibaymaxPane::new(items, active, pinned_count)
+            SerialisimPane::new(items, active, pinned_count)
         }
 
-        fn build_serialibaymax_pane_group(
+        fn build_serialisim_pane_group(
             pane_group: &Member,
             window: &mut Window,
             cx: &mut App,
-        ) -> SerialibaymaxPaneGroup {
+        ) -> SerialisimPaneGroup {
             match pane_group {
                 Member::Axis(PaneAxis {
                     axis,
                     members,
                     flexes,
                     bounding_boxes: _,
-                }) => SerialibaymaxPaneGroup::Group {
-                    axis: SerialibaymaxAxis(*axis),
+                }) => SerialisimPaneGroup::Group {
+                    axis: SerialisimAxis(*axis),
                     children: members
                         .iter()
-                        .map(|member| build_serialibaymax_pane_group(member, window, cx))
+                        .map(|member| build_serialisim_pane_group(member, window, cx))
                         .collect::<Vec<_>>(),
                     flexes: Some(flexes.lock().clone()),
                 },
                 Member::Pane(pane_handle) => {
-                    SerialibaymaxPaneGroup::Pane(serialize_pane_handle(pane_handle, window, cx))
+                    SerialisimPaneGroup::Pane(serialize_pane_handle(pane_handle, window, cx))
                 }
             }
         }
 
-        fn build_serialibaymax_docks(
+        fn build_serialisim_docks(
             this: &Workspace,
             window: &mut Window,
             cx: &mut App,
@@ -7088,7 +7088,7 @@ impl Workspace {
                     project
                         .bookmark_store()
                         .read(cx)
-                        .all_serialibaymax_bookmarks(cx)
+                        .all_serialisim_bookmarks(cx)
                 });
 
                 let breakpoints = self.project.update(cx, |project, cx| {
@@ -7103,12 +7103,12 @@ impl Workspace {
                     .user_toolchains(cx)
                     .unwrap_or_default();
 
-                let center_group = build_serialibaymax_pane_group(&self.center.root, window, cx);
-                let docks = build_serialibaymax_docks(self, window, cx);
-                let window_bounds = Some(SerialibaymaxWindowBounds(window.window_bounds()));
+                let center_group = build_serialisim_pane_group(&self.center.root, window, cx);
+                let docks = build_serialisim_docks(self, window, cx);
+                let window_bounds = Some(SerialisimWindowBounds(window.window_bounds()));
                 let identity_paths_hint = self.project_group_key(cx).path_list().clone();
 
-                let serialibaymax_workspace = SerialibaymaxWorkspace {
+                let serialisim_workspace = SerialisimWorkspace {
                     id: database_id,
                     location,
                     paths,
@@ -7127,14 +7127,14 @@ impl Workspace {
 
                 let db = WorkspaceDb::global(cx);
                 window.spawn(cx, async move |_| {
-                    db.save_workspace(serialibaymax_workspace).await;
+                    db.save_workspace(serialisim_workspace).await;
                 })
             }
             WorkspaceLocation::DetachFromSession => {
-                let window_bounds = SerialibaymaxWindowBounds(window.window_bounds());
+                let window_bounds = SerialisimWindowBounds(window.window_bounds());
                 let display = window.display(cx).and_then(|d| d.uuid().ok());
                 // Save dock state for empty local workspaces
-                let docks = build_serialibaymax_docks(self, window, cx);
+                let docks = build_serialisim_docks(self, window, cx);
                 let db = WorkspaceDb::global(cx);
                 let kvp = db::kvp::KeyValueStore::global(cx);
                 window.spawn(cx, async move |_| {
@@ -7153,7 +7153,7 @@ impl Workspace {
             }
             WorkspaceLocation::None => {
                 // Save dock state for empty non-local workspaces
-                let docks = build_serialibaymax_docks(self, window, cx);
+                let docks = build_serialisim_docks(self, window, cx);
                 let kvp = db::kvp::KeyValueStore::global(cx);
                 window.spawn(cx, async move |_| {
                     persistence::write_default_dock_state(&kvp, docks)
@@ -7171,10 +7171,10 @@ impl Workspace {
     fn workspace_location(&self, cx: &App) -> WorkspaceLocation {
         let paths = PathList::new(&self.root_paths(cx));
         if let Some(connection) = self.project.read(cx).remote_connection_options(cx) {
-            WorkspaceLocation::Location(SerialibaymaxWorkspaceLocation::Remote(connection), paths)
+            WorkspaceLocation::Location(SerialisimWorkspaceLocation::Remote(connection), paths)
         } else if self.project.read(cx).is_local() {
             if !paths.is_empty() || self.has_any_items_open(cx) {
-                WorkspaceLocation::Location(SerialibaymaxWorkspaceLocation::Local, paths)
+                WorkspaceLocation::Location(SerialisimWorkspaceLocation::Local, paths)
             } else {
                 WorkspaceLocation::DetachFromSession
             }
@@ -7245,7 +7245,7 @@ impl Workspace {
     }
 
     pub(crate) fn load_workspace(
-        serialibaymax_workspace: SerialibaymaxWorkspace,
+        serialisim_workspace: SerialisimWorkspace,
         paths_to_open: Vec<Option<ProjectPath>>,
         window: &mut Window,
         cx: &mut Context<Workspace>,
@@ -7257,9 +7257,9 @@ impl Workspace {
             let mut center_items = None;
 
             // Traverse the splits tree and add to things
-            if let Some((group, active_pane, items)) = serialibaymax_workspace
+            if let Some((group, active_pane, items)) = serialisim_workspace
                 .center_group
-                .deserialize(&project, serialibaymax_workspace.id, workspace.clone(), cx)
+                .deserialize(&project, serialisim_workspace.id, workspace.clone(), cx)
                 .await
             {
                 center_items = Some(items);
@@ -7268,12 +7268,12 @@ impl Workspace {
 
             let mut items_by_project_path = HashMap::default();
             let mut item_ids_by_kind = HashMap::default();
-            let mut all_deserialibaymax_items = Vec::default();
+            let mut all_deserialisim_items = Vec::default();
             cx.update(|_, cx| {
                 for item in center_items.unwrap_or_default().into_iter().flatten() {
                     if let Some(serializable_item_handle) = item.to_serializable_item_handle(cx) {
                         item_ids_by_kind
-                            .entry(serializable_item_handle.serialibaymax_item_kind())
+                            .entry(serializable_item_handle.serialisim_item_kind())
                             .or_insert(Vec::new())
                             .push(item.item_id().as_u64() as ItemId);
                     }
@@ -7281,7 +7281,7 @@ impl Workspace {
                     if let Some(project_path) = item.project_path(cx) {
                         items_by_project_path.insert(project_path, item.clone());
                     }
-                    all_deserialibaymax_items.push(item);
+                    all_deserialisim_items.push(item);
                 }
             })?;
 
@@ -7311,9 +7311,9 @@ impl Workspace {
                     }
                 }
 
-                let docks = serialibaymax_workspace.docks;
+                let docks = serialisim_workspace.docks;
 
-                for (dock, serialibaymax_dock) in [
+                for (dock, serialisim_dock) in [
                     (&mut workspace.right_dock, docks.right),
                     (&mut workspace.left_dock, docks.left),
                     (&mut workspace.bottom_dock, docks.bottom),
@@ -7321,7 +7321,7 @@ impl Workspace {
                 .iter_mut()
                 {
                     dock.update(cx, |dock, cx| {
-                        dock.serialibaymax_dock = Some(serialibaymax_dock.clone());
+                        dock.serialisim_dock = Some(serialisim_dock.clone());
                         dock.restore_state(window, cx);
                     });
                 }
@@ -7333,7 +7333,7 @@ impl Workspace {
                 .update(cx, |project, cx| {
                     project.bookmark_store().update(cx, |bookmark_store, cx| {
                         bookmark_store
-                            .load_serialibaymax_bookmarks(serialibaymax_workspace.bookmarks, cx)
+                            .load_serialisim_bookmarks(serialisim_workspace.bookmarks, cx)
                     })
                 })
                 .await
@@ -7344,8 +7344,8 @@ impl Workspace {
                     project
                         .breakpoint_store()
                         .update(cx, |breakpoint_store, cx| {
-                            breakpoint_store.with_serialibaymax_breakpoints(
-                                serialibaymax_workspace.breakpoints,
+                            breakpoint_store.with_serialisim_breakpoints(
+                                serialisim_workspace.breakpoints,
                                 cx,
                             )
                         })
@@ -7363,7 +7363,7 @@ impl Workspace {
                     .map(|(item_kind, loaded_items)| {
                         SerializableItemRegistry::cleanup(
                             item_kind,
-                            serialibaymax_workspace.id,
+                            serialisim_workspace.id,
                             loaded_items,
                             window,
                             cx,
@@ -8379,8 +8379,8 @@ fn leader_border_for_pane(
 }
 
 fn window_bounds_env_override() -> Option<Bounds<Pixels>> {
-    BAYMAX_WINDOW_POSITION
-        .zip(*BAYMAX_WINDOW_SIZE)
+    SIM_WINDOW_POSITION
+        .zip(*SIM_WINDOW_SIZE)
         .map(|(position, size)| Bounds {
             origin: position,
             size,
@@ -8388,14 +8388,14 @@ fn window_bounds_env_override() -> Option<Bounds<Pixels>> {
 }
 
 fn open_items(
-    serialibaymax_workspace: Option<SerialibaymaxWorkspace>,
+    serialisim_workspace: Option<SerialisimWorkspace>,
     mut project_paths_to_open: Vec<(PathBuf, Option<ProjectPath>)>,
     window: &mut Window,
     cx: &mut Context<Workspace>,
 ) -> impl 'static + Future<Output = Result<Vec<Option<Result<Box<dyn ItemHandle>>>>>> + use<> {
-    let restored_items = serialibaymax_workspace.map(|serialibaymax_workspace| {
+    let restored_items = serialisim_workspace.map(|serialisim_workspace| {
         Workspace::load_workspace(
-            serialibaymax_workspace,
+            serialisim_workspace,
             project_paths_to_open
                 .iter()
                 .map(|(_, project_path)| project_path)
@@ -9200,7 +9200,7 @@ impl WorkspaceHandle for Entity<Workspace> {
 pub async fn last_opened_workspace_location(
     db: &WorkspaceDb,
     fs: &dyn fs::Fs,
-) -> Option<(WorkspaceId, SerialibaymaxWorkspaceLocation, PathList)> {
+) -> Option<(WorkspaceId, SerialisimWorkspaceLocation, PathList)> {
     db.last_workspace(fs)
         .await
         .log_err()
@@ -9220,11 +9220,11 @@ pub async fn last_session_workspace_locations(
 }
 
 pub async fn restore_multiworkspace(
-    multi_workspace: SerialibaymaxMultiWorkspace,
+    multi_workspace: SerialisimMultiWorkspace,
     app_state: Arc<AppState>,
     cx: &mut AsyncApp,
 ) -> anyhow::Result<WindowHandle<MultiWorkspace>> {
-    let SerialibaymaxMultiWorkspace {
+    let SerialisimMultiWorkspace {
         active_workspace,
         state,
     } = multi_workspace;
@@ -9314,10 +9314,10 @@ pub async fn apply_restored_multiworkspace_state(
     if !project_groups.is_empty() {
         // Resolve linked worktree paths to their main repo paths so
         // stale keys from previous sessions get normalized and deduped.
-        let mut resolved_groups: Vec<SerialibaymaxProjectGroupState> = Vec::new();
-        for serialibaymax in project_groups.iter().cloned() {
-            let SerialibaymaxProjectGroupState { key, expanded } =
-                serialibaymax.into_restored_state();
+        let mut resolved_groups: Vec<SerialisimProjectGroupState> = Vec::new();
+        for serialisim in project_groups.iter().cloned() {
+            let SerialisimProjectGroupState { key, expanded } =
+                serialisim.into_restored_state();
             if key.path_list().paths().is_empty() {
                 continue;
             }
@@ -9335,7 +9335,7 @@ pub async fn apply_restored_multiworkspace_state(
             }
             let resolved = ProjectGroupKey::new(key.host(), PathList::new(&resolved_paths));
             if !resolved_groups.iter().any(|g| g.key == resolved) {
-                resolved_groups.push(SerialibaymaxProjectGroupState {
+                resolved_groups.push(SerialisimProjectGroupState {
                     key: resolved,
                     expanded,
                 });
@@ -9361,7 +9361,7 @@ pub async fn apply_restored_multiworkspace_state(
         window_handle
             .update(cx, |multi_workspace, window, cx| {
                 if let Some(sidebar) = multi_workspace.sidebar() {
-                    sidebar.restore_serialibaymax_state(sidebar_state, window, cx);
+                    sidebar.restore_serialisim_state(sidebar_state, window, cx);
                 }
                 multi_workspace.serialize(cx);
             })
@@ -9377,9 +9377,9 @@ actions!(
         /// Use `collab_panel::OpenSelectedChannelNotes` to open the channel notes for the selected
         /// channel in the collab panel.
         ///
-        /// If you want to open a specific channel, use `baymax::OpenBaymaxUrl` with a channel notes URL -
+        /// If you want to open a specific channel, use `sim::OpenSimUrl` with a channel notes URL -
         /// can be copied via "Copy link to section" in the context menu of the channel notes
-        /// buffer. These URLs look like `https://baymax.dev/channel/channel-name-CHANNEL_ID/notes`.
+        /// buffer. These URLs look like `https://sim.dev/channel/channel-name-CHANNEL_ID/notes`.
         OpenChannelNotes,
         /// Mutes your microphone.
         Mute,
@@ -9405,11 +9405,11 @@ pub struct OpenChannelNotesById {
 }
 
 actions!(
-    baymax,
+    sim,
     [
-        /// Opens the Baymax log file.
+        /// Opens the Sim log file.
         OpenLog,
-        /// Reveals the Baymax log file in the system file manager.
+        /// Reveals the Sim log file in the system file manager.
         RevealLogInFileManager
     ]
 );
@@ -9623,7 +9623,7 @@ pub fn join_channel(
                         let detail: SharedString = match err.error_code() {
                             ErrorCode::SignedOut => "Please sign in to continue.".into(),
                             ErrorCode::UpgradeRequired => concat!(
-                                "Your are running an unsupported version of Baymax. ",
+                                "Your are running an unsupported version of Sim. ",
                                 "Please update to continue."
                             )
                             .into(),
@@ -9680,7 +9680,7 @@ pub async fn get_any_active_multi_workspace(
         })
         .await?;
     }
-    activate_any_workspace_window(&mut cx).context("could not open baymax")
+    activate_any_workspace_window(&mut cx).context("could not open sim")
 }
 
 pub fn activate_any_workspace_window(cx: &mut AsyncApp) -> Option<WindowHandle<MultiWorkspace>> {
@@ -9705,7 +9705,7 @@ pub fn activate_any_workspace_window(cx: &mut AsyncApp) -> Option<WindowHandle<M
 }
 
 pub fn workspace_windows_for_location(
-    serialibaymax_location: &SerialibaymaxWorkspaceLocation,
+    serialisim_location: &SerialisimWorkspaceLocation,
     cx: &App,
 ) -> Vec<WindowHandle<MultiWorkspace>> {
     cx.windows()
@@ -9734,14 +9734,14 @@ pub fn workspace_windows_for_location(
                 multi_workspace.workspaces().any(|workspace| {
                     match workspace.read(cx).workspace_location(cx) {
                         WorkspaceLocation::Location(location, _) => {
-                            match (&location, serialibaymax_location) {
+                            match (&location, serialisim_location) {
                                 (
-                                    SerialibaymaxWorkspaceLocation::Local,
-                                    SerialibaymaxWorkspaceLocation::Local,
+                                    SerialisimWorkspaceLocation::Local,
+                                    SerialisimWorkspaceLocation::Local,
                                 ) => true,
                                 (
-                                    SerialibaymaxWorkspaceLocation::Remote(a),
-                                    SerialibaymaxWorkspaceLocation::Remote(b),
+                                    SerialisimWorkspaceLocation::Remote(a),
+                                    SerialisimWorkspaceLocation::Remote(b),
                                 ) => same_host(a, b),
                                 _ => false,
                             }
@@ -9757,7 +9757,7 @@ pub fn workspace_windows_for_location(
 pub async fn find_existing_workspace(
     abs_paths: &[PathBuf],
     open_options: &OpenOptions,
-    location: &SerialibaymaxWorkspaceLocation,
+    location: &SerialisimWorkspaceLocation,
     cx: &mut AsyncApp,
 ) -> (
     Option<(WindowHandle<MultiWorkspace>, Entity<Workspace>)>,
@@ -9800,7 +9800,7 @@ pub async fn find_existing_workspace(
                     let project = workspace.project.read(cx);
                     let path_style = workspace.path_style(cx);
                     Some(!abs_paths.iter().any(|path| {
-                        let path = util::paths::SanitibaymaxPath::new(path);
+                        let path = util::paths::SanitisimPath::new(path);
                         project.worktrees(cx).any(|worktree| {
                             let worktree = worktree.read(cx);
                             let abs_path = worktree.abs_path();
@@ -9847,7 +9847,7 @@ pub enum WorkspaceMatching {
     /// Match paths against existing worktrees including subdirectories, and
     /// fall back to any existing window if no worktree matched.
     ///
-    /// For example, `baymax -a foo/bar` will activate the `bar` workspace if it
+    /// For example, `sim -a foo/bar` will activate the `bar` workspace if it
     /// exists, otherwise it will open a new window with `foo/bar` as the root.
     MatchSubdirectory,
 }
@@ -9922,11 +9922,11 @@ pub fn open_workspace_by_id(
     let db = WorkspaceDb::global(cx);
     let kvp = db::kvp::KeyValueStore::global(cx);
     cx.spawn(async move |cx| {
-        let serialibaymax_workspace = db
+        let serialisim_workspace = db
             .workspace_for_id(workspace_id)
             .with_context(|| format!("Workspace {workspace_id:?} not found"))?;
 
-        let centered_layout = serialibaymax_workspace.centered_layout;
+        let centered_layout = serialisim_workspace.centered_layout;
 
         let (window, workspace) = if let Some(window) = requesting_window {
             let workspace = window.update(cx, |multi_workspace, window, cx| {
@@ -9950,8 +9950,8 @@ pub fn open_workspace_by_id(
 
             let (window_bounds, display) = if let Some(bounds) = window_bounds_override {
                 (Some(WindowBounds::Windowed(bounds)), None)
-            } else if let Some(display) = serialibaymax_workspace.display
-                && let Some(bounds) = serialibaymax_workspace.window_bounds.as_ref()
+            } else if let Some(display) = serialisim_workspace.display
+                && let Some(bounds) = serialisim_workspace.window_bounds.as_ref()
             {
                 (Some(bounds.0), Some(display))
             } else if let Some((display, bounds)) = persistence::read_default_window_bounds(&kvp) {
@@ -9994,11 +9994,11 @@ pub fn open_workspace_by_id(
 
         notify_if_database_failed(window, cx);
 
-        // Restore items from the serialibaymax workspace
+        // Restore items from the serialisim workspace
         window
             .update(cx, |_, window, cx| {
                 workspace.update(cx, |_workspace, cx| {
-                    open_items(Some(serialibaymax_workspace), vec![], window, cx)
+                    open_items(Some(serialisim_workspace), vec![], window, cx)
                 })
             })?
             .await?;
@@ -10030,7 +10030,7 @@ pub fn open_paths(
         let (mut existing, mut open_visible) = find_existing_workspace(
             &abs_paths,
             &open_options,
-            &SerialibaymaxWorkspaceLocation::Local,
+            &SerialisimWorkspaceLocation::Local,
             cx,
         )
         .await;
@@ -10047,7 +10047,7 @@ pub fn open_paths(
             if all_metadatas.into_iter().all(|file| !file.is_dir) {
                 cx.update(|cx| {
                     let windows = workspace_windows_for_location(
-                        &SerialibaymaxWorkspaceLocation::Local,
+                        &SerialisimWorkspaceLocation::Local,
                         cx,
                     );
                     let window = cx
@@ -10082,7 +10082,7 @@ pub fn open_paths(
             if use_existing_window {
                 let target_window = cx.update(|cx| {
                     let windows = workspace_windows_for_location(
-                        &SerialibaymaxWorkspaceLocation::Local,
+                        &SerialisimWorkspaceLocation::Local,
                         cx,
                     );
                     let window = cx
@@ -10299,7 +10299,7 @@ pub fn open_remote_project_with_new_connection(
     cx: &mut App,
 ) -> Task<Result<Vec<Option<Box<dyn ItemHandle>>>>> {
     cx.spawn(async move |cx| {
-        let (workspace_id, serialibaymax_workspace) =
+        let (workspace_id, serialisim_workspace) =
             deserialize_remote_project(remote_connection.connection_options(), paths.clone(), cx)
                 .await?;
 
@@ -10336,7 +10336,7 @@ pub fn open_remote_project_with_new_connection(
             project,
             paths,
             workspace_id,
-            serialibaymax_workspace,
+            serialisim_workspace,
             app_state,
             window,
             None,
@@ -10358,14 +10358,14 @@ pub fn open_remote_project_with_existing_connection(
     cx: &mut AsyncApp,
 ) -> Task<Result<Vec<Option<Box<dyn ItemHandle>>>>> {
     cx.spawn(async move |cx| {
-        let (workspace_id, serialibaymax_workspace) =
+        let (workspace_id, serialisim_workspace) =
             deserialize_remote_project(connection_options.clone(), paths.clone(), cx).await?;
 
         open_remote_project_inner(
             project,
             paths,
             workspace_id,
-            serialibaymax_workspace,
+            serialisim_workspace,
             app_state,
             window,
             provisional_project_group_key,
@@ -10380,7 +10380,7 @@ async fn open_remote_project_inner(
     project: Entity<Project>,
     paths: Vec<PathBuf>,
     workspace_id: WorkspaceId,
-    serialibaymax_workspace: Option<SerialibaymaxWorkspace>,
+    serialisim_workspace: Option<SerialisimWorkspace>,
     app_state: Arc<AppState>,
     window: WindowHandle<MultiWorkspace>,
     provisional_project_group_key: Option<ProjectGroupKey>,
@@ -10440,8 +10440,8 @@ async fn open_remote_project_inner(
                 Workspace::new(Some(workspace_id), project, app_state.clone(), window, cx);
             workspace.update_history(cx);
 
-            if let Some(ref serialibaymax) = serialibaymax_workspace {
-                workspace.centered_layout = serialibaymax.centered_layout;
+            if let Some(ref serialisim) = serialisim_workspace {
+                workspace.centered_layout = serialisim.centered_layout;
             }
 
             workspace
@@ -10464,7 +10464,7 @@ async fn open_remote_project_inner(
         .update(cx, |_, window, cx| {
             window.activate_window();
             workspace.update(cx, |_workspace, cx| {
-                open_items(serialibaymax_workspace, project_paths_to_open, window, cx)
+                open_items(serialisim_workspace, project_paths_to_open, window, cx)
             })
         })?
         .await?;
@@ -10488,16 +10488,16 @@ fn deserialize_remote_project(
     connection_options: RemoteConnectionOptions,
     paths: Vec<PathBuf>,
     cx: &AsyncApp,
-) -> Task<Result<(WorkspaceId, Option<SerialibaymaxWorkspace>)>> {
+) -> Task<Result<(WorkspaceId, Option<SerialisimWorkspace>)>> {
     let db = cx.update(|cx| WorkspaceDb::global(cx));
     cx.background_spawn(async move {
         let remote_connection_id = db
             .get_or_create_remote_connection(connection_options)
             .await?;
 
-        let serialibaymax_workspace = db.remote_workspace_for_roots(&paths, remote_connection_id);
+        let serialisim_workspace = db.remote_workspace_for_roots(&paths, remote_connection_id);
 
-        let workspace_id = if let Some(workspace_id) = serialibaymax_workspace
+        let workspace_id = if let Some(workspace_id) = serialisim_workspace
             .as_ref()
             .map(|workspace| workspace.id)
         {
@@ -10506,7 +10506,7 @@ fn deserialize_remote_project(
             db.next_id().await?
         };
 
-        Ok((workspace_id, serialibaymax_workspace))
+        Ok((workspace_id, serialisim_workspace))
     })
 }
 
@@ -11081,27 +11081,27 @@ pub fn remote_workspace_position_from_db(
         let remote_connection_id = db
             .get_or_create_remote_connection(connection_options)
             .await
-            .context("fetching serialibaymax ssh project")?;
-        let serialibaymax_workspace = db.remote_workspace_for_roots(&paths, remote_connection_id);
+            .context("fetching serialisim ssh project")?;
+        let serialisim_workspace = db.remote_workspace_for_roots(&paths, remote_connection_id);
 
         let (window_bounds, display) = if let Some(bounds) = window_bounds_env_override() {
             (Some(WindowBounds::Windowed(bounds)), None)
         } else {
-            let restorable_bounds = serialibaymax_workspace
+            let restorable_bounds = serialisim_workspace
                 .as_ref()
                 .and_then(|workspace| {
                     Some((workspace.display?, workspace.window_bounds.map(|b| b.0)?))
                 })
                 .or_else(|| persistence::read_default_window_bounds(&kvp));
 
-            if let Some((serialibaymax_display, serialibaymax_bounds)) = restorable_bounds {
-                (Some(serialibaymax_bounds), Some(serialibaymax_display))
+            if let Some((serialisim_display, serialisim_bounds)) = restorable_bounds {
+                (Some(serialisim_bounds), Some(serialisim_display))
             } else {
                 (None, None)
             }
         };
 
-        let centered_layout = serialibaymax_workspace
+        let centered_layout = serialisim_workspace
             .as_ref()
             .map(|w| w.centered_layout)
             .unwrap_or(false);
@@ -11717,7 +11717,7 @@ mod tests {
         assert!(task.await.unwrap());
     }
 
-    // See https://github.com/simtropolis/baymax/issues/55726.
+    // See https://github.com/simtropolis/sim/issues/55726.
     //
     // macOS only: on Linux/Windows, closing the last window sets
     // `save_last_workspace`, which preserves the session (same as `Quit`),
@@ -11796,7 +11796,7 @@ mod tests {
         assert!(task.await.unwrap());
     }
 
-    // See https://github.com/simtropolis/baymax/issues/55726.
+    // See https://github.com/simtropolis/sim/issues/55726.
     #[gpui::test]
     async fn test_replace_window_without_worktrees_prompts(cx: &mut TestAppContext) {
         init_test(cx);
@@ -15943,7 +15943,7 @@ mod tests {
 
     #[gpui::test]
     async fn test_toggle_theme_mode_persists_and_updates_active_theme(cx: &mut TestAppContext) {
-        use baymax_actions::theme::ToggleMode;
+        use sim_actions::theme::ToggleMode;
         use settings::{ThemeName, ThemeSelection};
         use theme::SystemAppearance;
 

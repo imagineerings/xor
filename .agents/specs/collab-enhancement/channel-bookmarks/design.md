@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-Baymax channels currently have no mechanism to pin important links or references. This design adds channel bookmarks — a section in the channel header where users (with appropriate permissions) can save important URLs, file references, and message links. Bookmarks are persisted server-side and synced to all channel members in real-time.
+Sim channels currently have no mechanism to pin important links or references. This design adds channel bookmarks — a section in the channel header where users (with appropriate permissions) can save important URLs, file references, and message links. Bookmarks are persisted server-side and synced to all channel members in real-time.
 
 **Key decisions:**
 

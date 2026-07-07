@@ -1,14 +1,14 @@
-# Baymax Server
+# Sim Server
 
-This crate is what we run at https://collab.baymax.dev.
+This crate is what we run at https://collab.sim.dev.
 
-It contains our back-end logic for collaboration, to which we connect from the Baymax client via a websocket after authenticating via https://baymax.dev, which is a separate repo running on Vercel.
+It contains our back-end logic for collaboration, to which we connect from the Sim client via a websocket after authenticating via https://sim.dev, which is a separate repo running on Vercel.
 
 # Local Development
 
 ## Database setup
 
-Before you can run the collab server locally, you'll need to set up a baymax Postgres database. Follow the steps sequentially:
+Before you can run the collab server locally, you'll need to set up a sim Postgres database. Follow the steps sequentially:
 
 1. Ensure you have postgres installed. If not, install with `brew install postgresql@15`.
 2. Follow the steps on Brew's formula and verify your `$PATH` contains `/opt/homebrew/opt/postgresql@15/bin`.
@@ -19,7 +19,7 @@ Before you can run the collab server locally, you'll need to set up a baymax Pos
 script/bootstrap
 ```
 
-This script will set up the `baymax` Postgres database, and populate it with some users. It requires internet access, because it fetches some users from the GitHub API.
+This script will set up the `sim` Postgres database, and populate it with some users. It requires internet access, because it fetches some users from the GitHub API.
 
 The script will create several _admin_ users, who you'll sign in as by default when developing locally. The GitHub logins for the default users are specified in the `seed.default.json` file.
 
@@ -28,32 +28,32 @@ To use a different set of admin users, create `crates/collab/seed.json`.
 ```json
 {
   "admins": ["yourgithubhere"],
-  "channels": ["baymax"]
+  "channels": ["sim"]
 }
 ```
 
 ## Testing collaborative features locally
 
-In one terminal, run Baymax's collaboration server and the livekit dev server:
+In one terminal, run Sim's collaboration server and the livekit dev server:
 
 ```sh
 foreman start
 ```
 
-In a second terminal, run two or more instances of Baymax.
+In a second terminal, run two or more instances of Sim.
 
 ```sh
-script/baymax-local -2
+script/sim-local -2
 ```
 
-This script starts one to four instances of Baymax, depending on the `-2`, `-3` or `-4` flags. Each instance will be connected to the local `collab` server, signed in as a different user from `seed.json` or `seed.default.json`.
+This script starts one to four instances of Sim, depending on the `-2`, `-3` or `-4` flags. Each instance will be connected to the local `collab` server, signed in as a different user from `seed.json` or `seed.default.json`.
 
 # Deployment
 
 We run two instances of collab:
 
-- Staging (https://staging-collab.baymax.dev)
-- Production (https://collab.baymax.dev)
+- Staging (https://staging-collab.sim.dev)
+- Production (https://collab.sim.dev)
 
 Both of these run on the Kubernetes cluster hosted in Digital Ocean.
 

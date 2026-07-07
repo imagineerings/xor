@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-Baymax channels currently support only text messages. This design adds file attachments to channel messages: upload via drag-and-drop or file picker, inline previews for images/PDFs/video/audio/code, file metadata display, and storage management.
+Sim channels currently support only text messages. This design adds file attachments to channel messages: upload via drag-and-drop or file picker, inline previews for images/PDFs/video/audio/code, file metadata display, and storage management.
 
 **Key decisions:**
 

@@ -3,7 +3,7 @@ use anyhow::{Context, Result};
 /// Generate a QR code PNG from a connection string.
 ///
 /// The connection string has the format:
-/// `baymax-tunnel://{host}:{port}?token={token}`
+/// `sim-tunnel://{host}:{port}?token={token}`
 ///
 /// Returns the raw PNG bytes of the QR code image.
 pub fn generate_qr_code_png(connection_string: &str) -> Result<Vec<u8>> {
@@ -22,8 +22,8 @@ pub fn generate_qr_code_png(connection_string: &str) -> Result<Vec<u8>> {
 /// Build a connection string for the QR code payload.
 pub fn build_connection_string(host: &str, port: u16, token: Option<&str>) -> String {
     match token {
-        Some(token) => format!("baymax-tunnel://{host}:{port}?token={token}"),
-        None => format!("baymax-tunnel://{host}:{port}"),
+        Some(token) => format!("sim-tunnel://{host}:{port}?token={token}"),
+        None => format!("sim-tunnel://{host}:{port}"),
     }
 }
 
@@ -34,18 +34,18 @@ mod tests {
     #[test]
     fn test_build_connection_string_with_token() {
         let result = build_connection_string("127.0.0.1", 9999, Some("abc123"));
-        assert_eq!(result, "baymax-tunnel://127.0.0.1:9999?token=abc123");
+        assert_eq!(result, "sim-tunnel://127.0.0.1:9999?token=abc123");
     }
 
     #[test]
     fn test_build_connection_string_without_token() {
         let result = build_connection_string("127.0.0.1", 9999, None);
-        assert_eq!(result, "baymax-tunnel://127.0.0.1:9999");
+        assert_eq!(result, "sim-tunnel://127.0.0.1:9999");
     }
 
     #[test]
     fn test_generate_qr_code_png_valid() {
-        let data = "baymax-tunnel://127.0.0.1:9999?token=test123";
+        let data = "sim-tunnel://127.0.0.1:9999?token=test123";
         let png_bytes = generate_qr_code_png(data).expect("should generate QR code");
         // Should be a valid PNG starting with the PNG signature
         assert!(png_bytes.starts_with(&[137, 80, 78, 71, 13, 10, 26, 10]));
@@ -65,7 +65,7 @@ mod tests {
         // Edge case: long connection string with max-length-ish content
         let long_token = "a".repeat(64);
         let data = format!(
-            "baymax-tunnel://very-long-hostname.example.com:30000?token={}",
+            "sim-tunnel://very-long-hostname.example.com:30000?token={}",
             long_token
         );
         let png_bytes =

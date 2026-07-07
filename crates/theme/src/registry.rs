@@ -108,9 +108,9 @@ impl ThemeRegistry {
             assets,
         };
 
-        // We're loading the Baymax default theme, as we need a theme to be loaded
+        // We're loading the Sim default theme, as we need a theme to be loaded
         // for tests.
-        registry.insert_theme_families([crate::fallback_themes::baymax_default_themes()]);
+        registry.insert_theme_families([crate::fallback_themes::sim_default_themes()]);
 
         let default_icon_theme = crate::default_icon_theme();
         registry

@@ -649,7 +649,7 @@ enum RemoteEntry {
 }
 
 impl RemoteEntry {
-    fn is_from_baymax(&self) -> bool {
+    fn is_from_sim(&self) -> bool {
         matches!(self, Self::Project { .. })
     }
 
@@ -1729,7 +1729,7 @@ impl RemoteServerProjects {
     ) -> impl IntoElement {
         let entry = visible.entry;
         let create_new_window = self.create_new_window;
-        let is_from_baymax = server.is_from_baymax();
+        let is_from_sim = server.is_from_sim();
         let element_id_base = SharedString::from(format!(
             "remote-project-{}",
             match server_ix {
@@ -1830,7 +1830,7 @@ impl RemoteServerProjects {
                         callback(this, secondary_confirm, window, cx)
                     }))
                     .tooltip(Tooltip::text(entry.project.paths.join("\n")))
-                    .when(is_from_baymax, |server_list_item| {
+                    .when(is_from_sim, |server_list_item| {
                         server_list_item
                             .end_slot(
                                 div()
@@ -2187,7 +2187,7 @@ impl RemoteServerProjects {
                                         .inset(true)
                                         .spacing(ui::ListItemSpacing::Sparse)
                                         .start_slot(Icon::new(IconName::File).color(Color::Muted))
-                                        .child(Label::new("Open Baymax Log"))
+                                        .child(Label::new("Open Sim Log"))
                                         .on_click(cx.listener(|_, _, window, cx| {
                                             window.dispatch_action(Box::new(OpenLog), cx);
                                             cx.emit(DismissEvent);
@@ -2351,7 +2351,7 @@ impl RemoteServerProjects {
                                             )
                                             .on_click(|_, _, cx| {
                                                 cx.open_url(
-                                                    "https://baymax.dev/docs/remote-development",
+                                                    "https://sim.dev/docs/remote-development",
                                                 );
                                             }),
                                     ),

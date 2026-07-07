@@ -16,7 +16,7 @@ Migrate goose's documentation infrastructure — a Docusaurus-based documentatio
 
 ### Requirement 1: Documentation Site
 
-**User Story:** As a baymax user, I want comprehensive documentation, so that I can learn how to install, configure, and use the agent.
+**User Story:** As a sim user, I want comprehensive documentation, so that I can learn how to install, configure, and use the agent.
 
 #### Acceptance Criteria
 
@@ -29,7 +29,7 @@ Migrate goose's documentation infrastructure — a Docusaurus-based documentatio
 
 ### Requirement 2: Blog
 
-**User Story:** As a baymax user, I want a blog with release notes and announcements, so that I can stay updated on changes.
+**User Story:** As a sim user, I want a blog with release notes and announcements, so that I can stay updated on changes.
 
 #### Acceptance Criteria
 
@@ -39,7 +39,7 @@ Migrate goose's documentation infrastructure — a Docusaurus-based documentatio
 
 ### Requirement 3: Tutorials
 
-**User Story:** As a baymax user, I want step-by-step tutorials, so that I can learn how to use specific features.
+**User Story:** As a sim user, I want step-by-step tutorials, so that I can learn how to use specific features.
 
 #### Acceptance Criteria
 
@@ -49,7 +49,7 @@ Migrate goose's documentation infrastructure — a Docusaurus-based documentatio
 
 ### Requirement 4: Automation Scripts
 
-**User Story:** As a baymax developer, I want automation scripts for the documentation, so that building, validating, and deploying docs is automated.
+**User Story:** As a sim developer, I want automation scripts for the documentation, so that building, validating, and deploying docs is automated.
 
 #### Acceptance Criteria
 
@@ -59,7 +59,7 @@ Migrate goose's documentation infrastructure — a Docusaurus-based documentatio
 
 ### Requirement 5: Sidebars and Navigation
 
-**User Story:** As a baymax user, I want clear navigation through the documentation, so that I can find what I need.
+**User Story:** As a sim user, I want clear navigation through the documentation, so that I can find what I need.
 
 #### Acceptance Criteria
 

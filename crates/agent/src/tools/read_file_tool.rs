@@ -434,7 +434,7 @@ impl AgentTool for ReadFileTool {
                     let end_anchor = buffer.anchor_before(Point::new(end, 0));
                     // Stream the numbered output directly from the buffer's
                     // chunk iterator so the unnumbered range is never
-                    // materialibaymax as its own `String`.
+                    // materialisim as its own `String`.
                     let mut output = String::new();
                     write_lines_numbered(
                         &mut output,
@@ -1320,7 +1320,7 @@ mod test {
                     "test.rs": "mod tests { fn test_it() {} }",
                     "fixture.sql": "CREATE TABLE users (id INT, name VARCHAR(255));"
                 },
-                ".baymax": {
+                ".sim": {
                     "settings.json": r#"{
                         "file_scan_exclusions": ["**/fixture.*"],
                         "private_files": ["**/secret.rs", "**/config.toml"]
@@ -1343,7 +1343,7 @@ mod test {
                     "README.md": "# Public Documentation",
                     "internal.md": "# Internal Secrets and Configuration"
                 },
-                ".baymax": {
+                ".sim": {
                     "settings.json": r#"{
                         "file_scan_exclusions": ["**/internal.*"],
                         "private_files": ["**/private.js", "**/data.json"]

@@ -1,12 +1,12 @@
 ---
 title: Groovy
-description: "Configure Groovy language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure Groovy language support in Sim, including language servers, formatting, and debugging."
 ---
 
 # Groovy
 
-Groovy language support in Baymax is provided by the community-maintained [Groovy extension](https://github.com/valentinegb/baymax-groovy).
-Report issues to: [https://github.com/valentinegb/baymax-groovy/issues](https://github.com/valentinegb/baymax-groovy/issues)
+Groovy language support in Sim is provided by the community-maintained [Groovy extension](https://github.com/valentinegb/sim-groovy).
+Report issues to: [https://github.com/valentinegb/sim-groovy/issues](https://github.com/valentinegb/sim-groovy/issues)
 
 - Tree-sitter: [murtaza64/tree-sitter-groovy](https://github.com/murtaza64/tree-sitter-groovy)
 - Language Server: [GroovyLanguageServer/groovy-language-server](https://github.com/GroovyLanguageServer/groovy-language-server)

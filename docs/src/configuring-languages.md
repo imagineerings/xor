@@ -1,11 +1,11 @@
 ---
-title: Language Server and Tree-sitter Config - Baymax
-description: Configure language support in Baymax with Tree-sitter for syntax highlighting and LSP for diagnostics, completion, and formatting.
+title: Language Server and Tree-sitter Config - Sim
+description: Configure language support in Sim with Tree-sitter for syntax highlighting and LSP for diagnostics, completion, and formatting.
 ---
 
 # Configuring Supported Languages
 
-Baymax's language support is built on two technologies:
+Sim's language support is built on two technologies:
 
 1. **Tree-sitter** handles syntax highlighting and structure-based features like the outline panel.
 2. **Language Server Protocol (LSP)** provides semantic features: code completion, diagnostics, go-to-definition, and refactoring.
@@ -16,7 +16,7 @@ For a list of supported languages, see [Supported Languages](./languages.md). To
 
 ## Language-specific Settings
 
-Baymax allows you to override global settings for individual languages. These custom configurations are defined in your `settings.json` file under the `languages` key.
+Sim allows you to override global settings for individual languages. These custom configurations are defined in your `settings.json` file under the `languages` key.
 
 Here's an example of language-specific settings:
 
@@ -56,7 +56,7 @@ These settings allow you to maintain specific coding styles across different lan
 
 ## File Associations
 
-Baymax automatically detects file types based on their extensions, but you can customize these associations to fit your workflow.
+Sim automatically detects file types based on their extensions, but you can customize these associations to fit your workflow.
 
 To set up custom file associations, use the [`file_types`](./reference/all-settings.md#file-types) setting in your `settings.json`:
 
@@ -68,7 +68,7 @@ To set up custom file associations, use the [`file_types`](./reference/all-setti
 }
 ```
 
-This configuration tells Baymax to:
+This configuration tells Sim to:
 
 - Treat `.c` files as C++ instead of C
 - Recognize files named "MyLockFile" as TOML
@@ -78,11 +78,11 @@ You can use glob patterns for more flexible matching, allowing you to handle com
 
 ## Working with Language Servers
 
-Language servers are a crucial part of Baymax's intelligent coding features, providing capabilities like auto-completion, go-to-definition, and real-time error checking.
+Language servers are a crucial part of Sim's intelligent coding features, providing capabilities like auto-completion, go-to-definition, and real-time error checking.
 
 ### What are Language Servers?
 
-Language servers implement the Language Server Protocol (LSP), which standardizes communication between the editor and language-specific tools. This allows Baymax to support advanced features for multiple programming languages without implementing each feature separately.
+Language servers implement the Language Server Protocol (LSP), which standardizes communication between the editor and language-specific tools. This allows Sim to support advanced features for multiple programming languages without implementing each feature separately.
 
 Some key features provided by language servers include:
 
@@ -95,20 +95,20 @@ Some key features provided by language servers include:
 
 ### Managing Language Servers
 
-Baymax simplifies language server management for users:
+Sim simplifies language server management for users:
 
-1. Automatic Download: When you open a file with a matching file type, Baymax automatically downloads the appropriate language server. Baymax may prompt you to install an extension for known file types.
+1. Automatic Download: When you open a file with a matching file type, Sim automatically downloads the appropriate language server. Sim may prompt you to install an extension for known file types.
 
 2. Storage Location:
 
-   - macOS: `~/Library/Application Support/Baymax/languages`
-   - Linux: `$XDG_DATA_HOME/baymax/languages`, `$FLATPAK_XDG_DATA_HOME/baymax/languages`, or `$HOME/.local/share/baymax/languages`
+   - macOS: `~/Library/Application Support/Sim/languages`
+   - Linux: `$XDG_DATA_HOME/sim/languages`, `$FLATPAK_XDG_DATA_HOME/sim/languages`, or `$HOME/.local/share/sim/languages`
 
-3. Automatic Updates: Baymax keeps your language servers up-to-date, ensuring you always have the latest features and improvements.
+3. Automatic Updates: Sim keeps your language servers up-to-date, ensuring you always have the latest features and improvements.
 
 ### Choosing Language Servers
 
-Some languages in Baymax offer multiple language server options. You might have multiple extensions installed that bundle language servers targeting the same language, potentially leading to overlapping capabilities. To ensure you get the functionality you prefer, Baymax allows you to prioritize which language servers are used and in what order.
+Some languages in Sim offer multiple language server options. You might have multiple extensions installed that bundle language servers targeting the same language, potentially leading to overlapping capabilities. To ensure you get the functionality you prefer, Sim allows you to prioritize which language servers are used and in what order.
 
 You can specify your preference using the `language_servers` setting:
 
@@ -160,12 +160,12 @@ When you override `language_servers` in your settings, your list **replaces** th
 ### Toolchains
 
 Some language servers need to be configured with a current "toolchain", which is an installation of a specific version of a programming language compiler or/and interpreter, which can possibly include a full set of dependencies of a project.
-An example of what Baymax considers a toolchain is a virtual environment in Python.
-Not all languages in Baymax support toolchain discovery and selection, but for those that do, you can specify the toolchain from a toolchain picker (via {#action toolchain::Select}). To learn more about toolchains in Baymax, see [`toolchains`](./toolchains.md).
+An example of what Sim considers a toolchain is a virtual environment in Python.
+Not all languages in Sim support toolchain discovery and selection, but for those that do, you can specify the toolchain from a toolchain picker (via {#action toolchain::Select}). To learn more about toolchains in Sim, see [`toolchains`](./toolchains.md).
 
 ### Configuring Language Servers
 
-When configuring language servers in your `settings.json`, autocomplete suggestions include all available LSP adapters recognibaymax by Baymax, not only those currently active for loaded languages. This helps you discover and configure language servers before opening files that use them.
+When configuring language servers in your `settings.json`, autocomplete suggestions include all available LSP adapters recognisim by Sim, not only those currently active for loaded languages. This helps you discover and configure language servers before opening files that use them.
 
 Many language servers accept custom configuration options. You can set these in the `lsp` section of your `settings.json`:
 
@@ -185,14 +185,14 @@ This example configures the Rust Analyzer to use Clippy for additional linting w
 
 #### Nested objects
 
-When configuring language server options in Baymax, it's important to use nested objects rather than dot-delimited strings. This is particularly relevant when working with more complex configurations. Let's look at a real-world example using the TypeScript language server:
+When configuring language server options in Sim, it's important to use nested objects rather than dot-delimited strings. This is particularly relevant when working with more complex configurations. Let's look at a real-world example using the TypeScript language server:
 
 Suppose you want to configure the following settings for TypeScript:
 
 - Enable strict null checks
 - Set the target ECMAScript version to ES2020
 
-Here's how you would structure these settings in Baymax's `settings.json`:
+Here's how you would structure these settings in Sim's `settings.json`:
 
 ```json [settings]
 "lsp": {
@@ -249,7 +249,7 @@ Most of the servers would rely on this way of configuring only.
 }
 ```
 
-Apart from the LSP-related server configuration options, certain servers in Baymax allow configuring the way binary is launched by Baymax.
+Apart from the LSP-related server configuration options, certain servers in Sim allow configuring the way binary is launched by Sim.
 
 Language servers are automatically downloaded or launched if found in your path, if you wish to specify an explicit alternate binary you can specify that in settings:
 
@@ -281,15 +281,15 @@ You can toggle language server support globally or per-language:
   }
 ```
 
-This disables the language server for Markdown files, which can be useful for performance in large documentation projects. You can configure this globally in your `~/.config/baymax/settings.json` or inside a `.baymax/settings.json` in your project directory.
+This disables the language server for Markdown files, which can be useful for performance in large documentation projects. You can configure this globally in your `~/.config/sim/settings.json` or inside a `.sim/settings.json` in your project directory.
 
 ## Formatting and Linting
 
-Baymax provides support for code formatting and linting to maintain consistent code style and catch potential issues early.
+Sim provides support for code formatting and linting to maintain consistent code style and catch potential issues early.
 
 ### Configuring Formatters
 
-Baymax supports both built-in and external formatters. See [`formatter`](./reference/all-settings.md#formatter) docs for more. You can configure formatters globally or per-language in your `settings.json`:
+Sim supports both built-in and external formatters. See [`formatter`](./reference/all-settings.md#formatter) docs for more. You can configure formatters globally or per-language in your `settings.json`:
 
 ```json [settings]
 "languages": {
@@ -323,7 +323,7 @@ To disable formatting for a specific language:
 
 ### Setting Up Linters
 
-Linting in Baymax is typically handled by language servers. Many language servers allow you to configure linting rules:
+Linting in Sim is typically handled by language servers. Many language servers allow you to configure linting rules:
 
 ```json [settings]
 "lsp": {
@@ -353,7 +353,7 @@ To run linter fixes automatically on save:
 
 ### Formatting Selections
 
-Baymax supports formatting only the selected text via {#action editor::FormatSelections} ({#kb editor::FormatSelections}). How
+Sim supports formatting only the selected text via {#action editor::FormatSelections} ({#kb editor::FormatSelections}). How
 this works depends on the configured formatter:
 
 - The action is only shown when the active formatter can actually format ranges for at least one
@@ -370,7 +370,7 @@ this works depends on the configured formatter:
 
 ### Integrating Formatting and Linting
 
-Baymax allows you to run both formatting and linting on save. Here's an example that uses Prettier for formatting and ESLint for linting JavaScript files:
+Sim allows you to run both formatting and linting on save. Here's an example that uses Prettier for formatting and ESLint for linting JavaScript files:
 
 ```json [settings]
 "languages": {
@@ -395,17 +395,17 @@ Baymax allows you to run both formatting and linting on save. Here's an example 
 
 If you encounter issues with formatting or linting:
 
-1. Check Baymax's log file for error messages (Use the command palette: {#action baymax::OpenLog})
+1. Check Sim's log file for error messages (Use the command palette: {#action sim::OpenLog})
 2. Ensure external tools (formatters, linters) are correctly installed and in your PATH
-3. Verify configurations in both Baymax settings and language-specific config files (e.g., `.eslintrc`, `.prettierrc`)
+3. Verify configurations in both Sim settings and language-specific config files (e.g., `.eslintrc`, `.prettierrc`)
 
 ## Syntax Highlighting and Themes
 
-Baymax offers customization options for syntax highlighting and themes, allowing you to tailor the visual appearance of your code.
+Sim offers customization options for syntax highlighting and themes, allowing you to tailor the visual appearance of your code.
 
 ### Customizing Syntax Highlighting
 
-Baymax uses Tree-sitter grammars for syntax highlighting. Override the default highlighting using the `theme_overrides` setting.
+Sim uses Tree-sitter grammars for syntax highlighting. Override the default highlighting using the `theme_overrides` setting.
 
 This example makes comments italic and changes the color of strings:
 
@@ -439,11 +439,11 @@ Change your theme:
 }
 ```
 
-Create custom themes by creating a JSON file in `~/.config/baymax/themes/`. Baymax will automatically detect and make available any themes in this directory.
+Create custom themes by creating a JSON file in `~/.config/sim/themes/`. Sim will automatically detect and make available any themes in this directory.
 
 ### Using Theme Extensions
 
-Baymax supports theme extensions. Browse and install theme extensions from the Extensions panel ({#kb baymax::Extensions}).
+Sim supports theme extensions. Browse and install theme extensions from the Extensions panel ({#kb sim::Extensions}).
 
 To create your own theme extension, refer to the [Developing Theme Extensions](./extensions/themes.md) guide.
 
@@ -502,7 +502,7 @@ To rename a symbol across your project:
 
 These features depend on the capabilities of the language server for each language.
 
-When renaming a symbol that spans multiple files, Baymax will open a preview in a multibuffer. This allows you to review all the changes across your project before applying them. To confirm the rename, simply save the multibuffer. If you decide not to proceed with the rename, you can undo the changes or close the multibuffer without saving.
+When renaming a symbol that spans multiple files, Sim will open a preview in a multibuffer. This allows you to review all the changes across your project before applying them. To confirm the rename, simply save the multibuffer. If you decide not to proceed with the rename, you can undo the changes or close the multibuffer without saving.
 
 ### Hover Information
 
@@ -514,7 +514,7 @@ The {#action project_symbols::Toggle} command allows you to search for symbols (
 
 ### Code Completion
 
-Baymax provides intelligent code completion suggestions as you type. You can manually trigger completion with the {#action editor::ShowCompletions} command. Use <kbd>tab|tab</kbd> or <kbd>enter|enter</kbd> to accept suggestions.
+Sim provides intelligent code completion suggestions as you type. You can manually trigger completion with the {#action editor::ShowCompletions} command. Use <kbd>tab|tab</kbd> or <kbd>enter|enter</kbd> to accept suggestions.
 
 ### Diagnostics
 

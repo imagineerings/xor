@@ -1,6 +1,6 @@
 ---
-title: Use API Access - Baymax
-description: Configure provider API access, API keys, API credits, usage billing, and OpenAI-compatible endpoints for Baymax AI features.
+title: Use API Access - Sim
+description: Configure provider API access, API keys, API credits, usage billing, and OpenAI-compatible endpoints for Sim AI features.
 ---
 
 # Use API Access
@@ -11,7 +11,7 @@ Paid API credits, usage billing, and top-ups are API access, even when you pay t
 
 ## Supported API Providers {#providers}
 
-Baymax supports these first-class API providers for model-backed Baymax AI features:
+Sim supports these first-class API providers for model-backed Sim AI features:
 
 - [Anthropic](#anthropic)
   - [Custom Anthropic Models](#anthropic-custom-models)
@@ -31,8 +31,8 @@ Baymax supports these first-class API providers for model-backed Baymax AI featu
 
 ## What API Access Applies To {#support}
 
-Use API access for the Baymax Agent, Inline Assistant, Git commit generation,
-thread summaries, and similar Baymax-owned AI features.
+Use API access for the Sim Agent, Inline Assistant, Git commit generation,
+thread summaries, and similar Sim-owned AI features.
 
 External Agents and Terminal Threads usually configure model access in the
 agent or CLI itself. See [Agents](./agents.md) for the difference between
@@ -40,9 +40,9 @@ agent paths and model access paths.
 
 ## API Keys and Environment Variables {#api-keys}
 
-Most API-access providers can be configured in Baymax's Agent Settings panel with {#action agent::OpenSettings}. Keys saved through Baymax are stored in the system keychain, not in `settings.json`.
+Most API-access providers can be configured in Sim's Agent Settings panel with {#action agent::OpenSettings}. Keys saved through Sim are stored in the system keychain, not in `settings.json`.
 
-Baymax also reads provider-specific environment variables. Non-empty environment variables take precedence over keychain values. If a key comes from an environment variable, unset the variable and restart Baymax to stop using it.
+Sim also reads provider-specific environment variables. Non-empty environment variables take precedence over keychain values. If a key comes from an environment variable, unset the variable and restart Sim to stop using it.
 
 | Provider          | Environment variable                                  |
 | ----------------- | ----------------------------------------------------- |
@@ -62,7 +62,7 @@ OpenAI-compatible provider environment variables are generated from the configur
 
 ## Custom Headers {#custom-headers}
 
-You can attach extra HTTP headers to every request Baymax makes to supported HTTP-based providers. This is useful in corporate environments or for observability tooling.
+You can attach extra HTTP headers to every request Sim makes to supported HTTP-based providers. This is useful in corporate environments or for observability tooling.
 
 Configure them with `language_models.<provider>.custom_headers`:
 
@@ -72,7 +72,7 @@ Configure them with `language_models.<provider>.custom_headers`:
     "openai": {
       "custom_headers": {
         "Fancy-Auth": "Bearer <your-fancy-key>",
-        "X-My-Tag": "baymax"
+        "X-My-Tag": "sim"
       }
     }
   }
@@ -81,11 +81,11 @@ Configure them with `language_models.<provider>.custom_headers`:
 
 `custom_headers` is supported by Amazon Bedrock, Anthropic, DeepSeek, Google AI, LM Studio, Mistral, Ollama, OpenAI, OpenAI-compatible providers, OpenCode, OpenRouter, Vercel AI Gateway, and xAI.
 
-Headers managed by Baymax for each provider, such as `Authorization`, `Content-Type`, `Accept`, and provider-specific authentication headers, are ignored with a warning if you try to override them.
+Headers managed by Sim for each provider, such as `Authorization`, `Content-Type`, `Accept`, and provider-specific authentication headers, are ignored with a warning if you try to override them.
 
 ## Remote Projects {#remote-projects}
 
-Baymax LLM providers for Baymax AI features are initialized in the local Baymax app. In SSH, dev container, and other remote projects, API keys saved in Baymax are read from the local system keychain, and provider environment variables are read from the local Baymax process environment.
+Sim LLM providers for Sim AI features are initialized in the local Sim app. In SSH, dev container, and other remote projects, API keys saved in Sim are read from the local system keychain, and provider environment variables are read from the local Sim process environment.
 
 External Agents and Terminal Threads may run their own processes and use their own remote or local environment. See [External Agents](./external-agents.md) and [Terminal Threads](./terminal-threads.md).
 
@@ -100,7 +100,7 @@ Use Anthropic API access when you have an Anthropic API key or API credits. Clau
 3. Open Agent Settings with {#action agent::OpenSettings} and go to the Anthropic section.
 4. Enter your Anthropic API key.
 
-Baymax also reads `ANTHROPIC_API_KEY` from the local Baymax process environment.
+Sim also reads `ANTHROPIC_API_KEY` from the local Sim process environment.
 
 #### Custom Anthropic Models {#anthropic-custom-models}
 
@@ -156,7 +156,7 @@ Use OpenAI API access when you have an OpenAI API key or API billing. ChatGPT Pl
 3. Open Agent Settings with {#action agent::OpenSettings} and go to the OpenAI section.
 4. Enter your OpenAI API key.
 
-Baymax also reads `OPENAI_API_KEY` from the local Baymax process environment.
+Sim also reads `OPENAI_API_KEY` from the local Sim process environment.
 
 #### Custom OpenAI Models {#openai-custom-models}
 
@@ -190,7 +190,7 @@ Use Google AI API access when you have a Gemini API key.
 2. Open Agent Settings with {#action agent::OpenSettings} and go to the Google AI section.
 3. Enter your Google AI API key.
 
-Baymax reads `GEMINI_API_KEY`, falling back to `GOOGLE_AI_API_KEY`, from the local Baymax process environment.
+Sim reads `GEMINI_API_KEY`, falling back to `GOOGLE_AI_API_KEY`, from the local Sim process environment.
 
 #### Custom Google AI Models {#google-ai-custom-models}
 
@@ -234,7 +234,7 @@ Use Mistral API access when you have a Mistral API key.
 2. Open Agent Settings with {#action agent::OpenSettings} and go to the Mistral section.
 3. Enter your Mistral API key.
 
-Baymax also reads `MISTRAL_API_KEY` from the local Baymax process environment.
+Sim also reads `MISTRAL_API_KEY` from the local Sim process environment.
 
 #### Custom Mistral Models {#mistral-custom-models}
 
@@ -264,13 +264,13 @@ support, image support, or a custom endpoint.
 
 ### DeepSeek {#deepseek}
 
-Use DeepSeek API access when you have paid API usage, top-ups, or an API key. In Baymax, DeepSeek is API access, not subscription sign-in.
+Use DeepSeek API access when you have paid API usage, top-ups, or an API key. In Sim, DeepSeek is API access, not subscription sign-in.
 
 1. Visit the DeepSeek platform and [create an API key](https://platform.deepseek.com/api_keys).
 2. Open Agent Settings with {#action agent::OpenSettings} and go to the DeepSeek section.
 3. Enter your DeepSeek API key.
 
-Baymax also reads `DEEPSEEK_API_KEY` from the local Baymax process environment.
+Sim also reads `DEEPSEEK_API_KEY` from the local Sim process environment.
 
 #### Custom DeepSeek Models {#deepseek-custom-models}
 
@@ -309,7 +309,7 @@ Use xAI API access when you have an xAI API key.
 2. Open Agent Settings with {#action agent::OpenSettings} and go to the xAI section.
 3. Enter your xAI API key.
 
-Baymax also reads `XAI_API_KEY` from the local Baymax process environment.
+Sim also reads `XAI_API_KEY` from the local Sim process environment.
 
 #### Custom xAI Models {#xai-custom-models}
 
@@ -345,7 +345,7 @@ image support, or a custom endpoint.
 
 Use OpenCode API access when you have an OpenCode API key. OpenCode Zen and Go affect which OpenCode models are available.
 
-Baymax does not sign in to OpenCode with OAuth or detect your OpenCode subscription; it uses an OpenCode API key saved in the system keychain or `OPENCODE_API_KEY`.
+Sim does not sign in to OpenCode with OAuth or detect your OpenCode subscription; it uses an OpenCode API key saved in the system keychain or `OPENCODE_API_KEY`.
 
 1. Visit [OpenCode Console](https://opencode.ai/auth) and create an account.
 2. Free models are available without payment. To use Zen or Go models, make sure you have enough credits or an active subscription.
@@ -353,7 +353,7 @@ Baymax does not sign in to OpenCode with OAuth or detect your OpenCode subscript
 4. Open Agent Settings with {#action agent::OpenSettings} and go to the OpenCode section.
 5. Enter your OpenCode API key.
 
-Baymax also reads `OPENCODE_API_KEY` from the local Baymax process environment.
+Sim also reads `OPENCODE_API_KEY` from the local Sim process environment.
 
 By default, models from all OpenCode subscription types are shown. You can hide subscriptions that are not relevant to you in the provider UI or in settings:
 
@@ -369,11 +369,11 @@ By default, models from all OpenCode subscription types are shown. You can hide 
 }
 ```
 
-**Note:** Baymax only bundles configuration for long-term OpenCode Free models. Free models that are available for a limited time are not included in Baymax. To use those models, add a custom OpenCode model with configuration from [the OpenCode website](https://opencode.ai/docs/zen#pricing) and [models.dev](https://github.com/anomalyco/models.dev/tree/dev/providers/opencode/models).
+**Note:** Sim only bundles configuration for long-term OpenCode Free models. Free models that are available for a limited time are not included in Sim. To use those models, add a custom OpenCode model with configuration from [the OpenCode website](https://opencode.ai/docs/zen#pricing) and [models.dev](https://github.com/anomalyco/models.dev/tree/dev/providers/opencode/models).
 
 #### Custom OpenCode Models {#opencode-custom-models}
 
-The Baymax Agent comes preconfigured with OpenCode models. Add custom OpenCode models when you need newer models, limited-time Free models, or models with custom endpoints.
+The Sim Agent comes preconfigured with OpenCode models. Add custom OpenCode models when you need newer models, limited-time Free models, or models with custom endpoints.
 
 Add custom models in your settings file:
 
@@ -449,6 +449,6 @@ By default, OpenAI-compatible models inherit these capabilities:
 - `chat_completions`: `true`
 - `interleaved_reasoning`: `false`
 
-If a model only works with the Responses API, set `capabilities.chat_completions` to `false`. Baymax will use the Responses endpoint for that model.
+If a model only works with the Responses API, set `capabilities.chat_completions` to `false`. Sim will use the Responses endpoint for that model.
 
 Enter the API key in the provider settings UI or set the generated environment variable. Do not put API keys in `settings.json`.

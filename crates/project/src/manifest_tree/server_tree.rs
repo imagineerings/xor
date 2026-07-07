@@ -257,7 +257,7 @@ impl LanguageServerTree {
             .collect::<Vec<_>>();
 
         let desired_language_servers =
-            settings.customibaymax_language_servers(&available_language_servers);
+            settings.customisim_language_servers(&available_language_servers);
         let adapters_with_settings = desired_language_servers
             .into_iter()
             .filter_map(|desired_adapter| {

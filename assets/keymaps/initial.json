@@ -1,9 +1,9 @@
-// Baymax keymap
+// Sim keymap
 //
-// For information on binding keys, see the Baymax
-// documentation: https://baymax.dev/docs/key-bindings
+// For information on binding keys, see the Sim
+// documentation: https://sim.dev/docs/key-bindings
 //
-// To see the default key bindings run `baymax: open default keymap`
+// To see the default key bindings run `sim: open default keymap`
 // from the command palette.
 [
   {

@@ -1,11 +1,11 @@
 ---
 title: Erlang
-description: "Configure Erlang language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure Erlang language support in Sim, including language servers, formatting, and debugging."
 ---
 
 # Erlang
 
-Erlang support is available through the [Erlang extension](https://github.com/baymax-extensions/erlang).
+Erlang support is available through the [Erlang extension](https://github.com/sim-extensions/erlang).
 
 - Tree-sitter: [WhatsApp/tree-sitter-erlang](https://github.com/WhatsApp/tree-sitter-erlang)
 - Language Servers:
@@ -18,7 +18,7 @@ The Erlang extension offers language server support for `erlang_ls` and `erlang-
 
 `erlang_ls` is enabled by default.
 
-Configure language servers in Settings ({#kb baymax::OpenSettings}) under Languages > Erlang, or add to your settings file:
+Configure language servers in Settings ({#kb sim::OpenSettings}) under Languages > Erlang, or add to your settings file:
 
 ```json [settings]
 {

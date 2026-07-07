@@ -1,37 +1,37 @@
 ---
-title: How to Migrate from RustRover to Baymax
-description: "Guide for migrating from RustRover to Baymax, including settings and keybindings."
+title: How to Migrate from RustRover to Sim
+description: "Guide for migrating from RustRover to Sim, including settings and keybindings."
 ---
 
-# How to Migrate from RustRover to Baymax
+# How to Migrate from RustRover to Sim
 
 This guide covers keybindings, settings, and the differences you'll encounter as a Rust developer switching from RustRover.
 
-## Install Baymax
+## Install Sim
 
-Baymax is available on macOS, Windows, and Linux.
+Sim is available on macOS, Windows, and Linux.
 
-For macOS, you can download it from baymax.dev/download, or install via Homebrew:
-
-```sh
-brew install --cask baymax
-```
-
-For Windows, download the installer from baymax.dev/download, or install via winget:
+For macOS, you can download it from sim.dev/download, or install via Homebrew:
 
 ```sh
-winget install Baymax.Baymax
+brew install --cask sim
 ```
 
-For most Linux users, the easiest way to install Baymax is through our installation script:
+For Windows, download the installer from sim.dev/download, or install via winget:
 
 ```sh
-curl -f https://baymax.dev/install.sh | sh
+winget install Sim.Sim
 ```
 
-After installation, you can launch Baymax from your Applications folder (macOS), Start menu (Windows), or directly from the terminal using:
-`baymax .`
-This opens the current directory in Baymax.
+For most Linux users, the easiest way to install Sim is through our installation script:
+
+```sh
+curl -f https://sim.dev/install.sh | sh
+```
+
+After installation, you can launch Sim from your Applications folder (macOS), Start menu (Windows), or directly from the terminal using:
+`sim .`
+This opens the current directory in Sim.
 
 ## Set Up the JetBrains Keymap
 
@@ -45,11 +45,11 @@ This maps familiar shortcuts like `Shift Shift` for Search Everywhere, `Cmd+O` f
 
 ## Set Up Editor Preferences
 
-You can configure most settings in the Settings Editor ({#kb baymax::OpenSettings}). For advanced settings, run {#action baymax::OpenSettingsFile} from the Command Palette to edit your settings file directly.
+You can configure most settings in the Settings Editor ({#kb sim::OpenSettings}). For advanced settings, run {#action sim::OpenSettingsFile} from the Command Palette to edit your settings file directly.
 
 Settings RustRover users typically configure first:
 
-| Baymax Setting             | What it does                                                                    |
+| Sim Setting             | What it does                                                                    |
 | ----------------------- | ------------------------------------------------------------------------------- |
 | `format_on_save`        | Auto-format when saving. Set to `"on"` to enable (uses rustfmt by default).     |
 | `soft_wrap`             | Wrap long lines. Options: `"none"`, `"editor_width"`, `"preferred_line_length"` |
@@ -57,20 +57,20 @@ Settings RustRover users typically configure first:
 | `inlay_hints`           | Show type hints, parameter names, and chaining hints inline.                    |
 | `relative_line_numbers` | Useful if you're coming from IdeaVim.                                           |
 
-Baymax also supports per-project settings. Create a `.baymax/settings.json` file in your project root to override global settings for that project.
+Sim also supports per-project settings. Create a `.sim/settings.json` file in your project root to override global settings for that project.
 
 > **Tip:** If you're joining an existing project, check `format_on_save` before making your first commit. Otherwise you might accidentally reformat an entire file when you only meant to change one line.
 
 ## Open or Create a Project
 
-After setup, press `Cmd+Shift+O` (with JetBrains keymap) to open a folder. This becomes your workspace in Baymax.
+After setup, press `Cmd+Shift+O` (with JetBrains keymap) to open a folder. This becomes your workspace in Sim.
 
 To start a new project, use Cargo from the terminal:
 
 ```sh
 cargo new my_project
 cd my_project
-baymax .
+sim .
 ```
 
 Or for a library:
@@ -79,8 +79,8 @@ Or for a library:
 cargo new --lib my_library
 ```
 
-You can also launch Baymax from the terminal inside any existing Cargo project with:
-`baymax .`
+You can also launch Sim from the terminal inside any existing Cargo project with:
+`sim .`
 
 Once inside a project:
 
@@ -92,7 +92,7 @@ Open buffers appear as tabs across the top. The Project Panel shows your file tr
 
 ## Differences in Keybindings
 
-If you chose the JetBrains keymap during onboarding, most of your shortcuts should already feel familiar. Here's a quick reference for how Baymax compares to RustRover.
+If you chose the JetBrains keymap during onboarding, most of your shortcuts should already feel familiar. Here's a quick reference for how Sim compares to RustRover.
 
 ### Common Shared Keybindings
 
@@ -117,9 +117,9 @@ If you chose the JetBrains keymap during onboarding, most of your shortcuts shou
 | Go Back / Forward             | `Cmd + [` / `Cmd + ]`   |
 | Toggle Breakpoint             | `Ctrl + F8`             |
 
-### Different Keybindings (RustRover → Baymax)
+### Different Keybindings (RustRover → Sim)
 
-| Action                 | RustRover   | Baymax (JetBrains keymap)   |
+| Action                 | RustRover   | Sim (JetBrains keymap)   |
 | ---------------------- | ----------- | ------------------------ |
 | File Structure         | `Cmd + F12` | `Cmd + F12` (outline)    |
 | Navigate to Next Error | `F2`        | `F2`                     |
@@ -128,7 +128,7 @@ If you chose the JetBrains keymap during onboarding, most of your shortcuts shou
 | Stop                   | `Cmd + F2`  | `Ctrl + F2`              |
 | Expand Macro           | `Alt+Enter` | `Cmd + Shift + M`        |
 
-### Unique to Baymax
+### Unique to Sim
 
 | Action            | Shortcut                   | Notes                          |
 | ----------------- | -------------------------- | ------------------------------ |
@@ -138,52 +138,52 @@ If you chose the JetBrains keymap during onboarding, most of your shortcuts shou
 ### How to Customize Keybindings
 
 - Open the Command Palette (`Cmd+Shift+A` or `Shift Shift`)
-- Run {#action baymax::OpenKeymap}
+- Run {#action sim::OpenKeymap}
 
 This opens a list of all available bindings. You can override individual shortcuts or remove conflicts.
 
-Baymax also supports key sequences (multi-key shortcuts).
+Sim also supports key sequences (multi-key shortcuts).
 
 ## Differences in User Interfaces
 
 ### Different Analysis Engines
 
-RustRover uses its own proprietary code analysis engine for Rust intelligence. Baymax uses rust-analyzer via the Language Server Protocol (LSP).
+RustRover uses its own proprietary code analysis engine for Rust intelligence. Sim uses rust-analyzer via the Language Server Protocol (LSP).
 
 What this means for you:
 
-- **Completions, go-to-definition, find usages, type inference** — All available in Baymax via rust-analyzer
-- **Macro expansion** — Available in both (use `Cmd+Shift+M` in Baymax)
+- **Completions, go-to-definition, find usages, type inference** — All available in Sim via rust-analyzer
+- **Macro expansion** — Available in both (use `Cmd+Shift+M` in Sim)
 - **Inlay hints** — Both support type hints, parameter hints, and chaining hints
 
 Where you might notice differences:
 
 - Some refactorings available in RustRover may not have rust-analyzer equivalents
-- RustRover-specific inspections (beyond Clippy) won't exist in Baymax
-- rust-analyzer is configured via JSON in Baymax, not through a GUI
+- RustRover-specific inspections (beyond Clippy) won't exist in Sim
+- rust-analyzer is configured via JSON in Sim, not through a GUI
 
 **How to adapt:**
 
 - Use `Alt+Enter` for available code actions—rust-analyzer provides many
-- Configure rust-analyzer settings in `.baymax/settings.json` for project-specific needs
+- Configure rust-analyzer settings in `.sim/settings.json` for project-specific needs
 - Run `cargo clippy` for linting (it integrates with rust-analyzer diagnostics)
 
 ### Project Configuration
 
-Both editors store per-project configuration in a hidden folder. RustRover uses `.idea` (with XML files), Baymax uses `.baymax` (with JSON files).
+Both editors store per-project configuration in a hidden folder. RustRover uses `.idea` (with XML files), Sim uses `.sim` (with JSON files).
 
-**Run configurations don't transfer.** RustRover stores run/debug configurations in `.idea`. These have no automatic migration path. You'll recreate them as Baymax [tasks](../tasks.md) in `.baymax/tasks.json` and debug configurations in `.baymax/debug.json`.
+**Run configurations don't transfer.** RustRover stores run/debug configurations in `.idea`. These have no automatic migration path. You'll recreate them as Sim [tasks](../tasks.md) in `.sim/tasks.json` and debug configurations in `.sim/debug.json`.
 
-**No Cargo tool window.** RustRover provides a visual tree of your workspace members, targets, features, and dependencies. Baymax doesn't have this. You work with `Cargo.toml` and the Cargo CLI directly.
+**No Cargo tool window.** RustRover provides a visual tree of your workspace members, targets, features, and dependencies. Sim doesn't have this. You work with `Cargo.toml` and the Cargo CLI directly.
 
-**Toolchain management is external.** RustRover lets you select and switch toolchains in its settings UI. In Baymax, you manage toolchains through `rustup`.
+**Toolchain management is external.** RustRover lets you select and switch toolchains in its settings UI. In Sim, you manage toolchains through `rustup`.
 
-**Configuration is opt-in.** RustRover auto-generates `.idea` when you open a project. Baymax doesn't generate anything. You create `.baymax/settings.json`, `tasks.json`, and `debug.json` as needed.
+**Configuration is opt-in.** RustRover auto-generates `.idea` when you open a project. Sim doesn't generate anything. You create `.sim/settings.json`, `tasks.json`, and `debug.json` as needed.
 
 **How to adapt:**
 
-- Create a `.baymax/settings.json` in your project root for project-specific settings
-- Define common commands in `tasks.json` (open via Command Palette: {#action baymax::OpenTasks}):
+- Create a `.sim/settings.json` in your project root for project-specific settings
+- Define common commands in `tasks.json` (open via Command Palette: {#action sim::OpenTasks}):
 
 ```json
 [
@@ -217,7 +217,7 @@ Both editors store per-project configuration in a hidden folder. RustRover uses 
 
 RustRover's Cargo tool window provides visual access to your project's targets, dependencies, and common Cargo commands. You can run builds, tests, and benchmarks with a click.
 
-Baymax doesn't have a Cargo GUI. You work with Cargo through:
+Sim doesn't have a Cargo GUI. You work with Cargo through:
 
 - **Terminal** — Run any Cargo command directly
 - **Tasks** — Define shortcuts for common commands
@@ -231,9 +231,9 @@ Baymax doesn't have a Cargo GUI. You work with Cargo through:
 
 ### Tool Windows vs. Docks
 
-RustRover organizes auxiliary views into numbered tool windows (Project = 1, Cargo = Alt+1, Terminal = Alt+F12, etc.). Baymax uses a similar concept called "docks":
+RustRover organizes auxiliary views into numbered tool windows (Project = 1, Cargo = Alt+1, Terminal = Alt+F12, etc.). Sim uses a similar concept called "docks":
 
-| RustRover Tool Window | Baymax Equivalent | Shortcut (JetBrains keymap) |
+| RustRover Tool Window | Sim Equivalent | Shortcut (JetBrains keymap) |
 | --------------------- | -------------- | --------------------------- |
 | Project (1)           | Project Panel  | `Cmd + 1`                   |
 | Git (9 or Cmd+0)      | Git Panel      | `Cmd + 0`                   |
@@ -242,27 +242,27 @@ RustRover organizes auxiliary views into numbered tool windows (Project = 1, Car
 | Problems (6)          | Diagnostics    | `Cmd + 6`                   |
 | Debug (5)             | Debug Panel    | `Cmd + 5`                   |
 
-Baymax has three dock positions: left, bottom, and right. Panels can be moved between docks by dragging or through settings.
+Sim has three dock positions: left, bottom, and right. Panels can be moved between docks by dragging or through settings.
 
-Note that there's no dedicated Cargo tool window in Baymax. Use the terminal or define tasks for your common Cargo commands.
+Note that there's no dedicated Cargo tool window in Sim. Use the terminal or define tasks for your common Cargo commands.
 
 ### Debugging
 
-Both RustRover and Baymax offer integrated debugging for Rust, but using different backends:
+Both RustRover and Sim offer integrated debugging for Rust, but using different backends:
 
 - RustRover uses its own debugger integration
-- Baymax uses **CodeLLDB** (the same debug adapter popular in VS Code)
+- Sim uses **CodeLLDB** (the same debug adapter popular in VS Code)
 
-To debug Rust code in Baymax:
+To debug Rust code in Sim:
 
 - Set breakpoints with `Ctrl+F8`
 - Start debugging with `Alt+Shift+F9` or press `F4` and select a debug target
 - Step through code with `F7` (step into), `F8` (step over), `Shift+F8` (step out)
 - Continue execution with `F9`
 
-Baymax can automatically detect debuggable targets in your Cargo project. Press `F4` to see available options.
+Sim can automatically detect debuggable targets in your Cargo project. Press `F4` to see available options.
 
-For more control, create a `.baymax/debug.json` file:
+For more control, create a `.sim/debug.json` file:
 
 ```json
 [
@@ -295,7 +295,7 @@ For more control, create a `.baymax/debug.json` file:
 
 ### Running Tests
 
-RustRover has a dedicated test runner with a visual interface showing pass/fail status for each test. Baymax provides test running through:
+RustRover has a dedicated test runner with a visual interface showing pass/fail status for each test. Sim provides test running through:
 
 - **Gutter icons** — Click the play button next to `#[test]` functions or test modules
 - **Tasks** — Define `cargo test` commands in `tasks.json`
@@ -311,13 +311,13 @@ The test output appears in the terminal panel. For more detailed output, use:
 
 RustRover has a full JetBrains plugin catalog.
 
-Baymax's extension catalog is smaller and more focused:
+Sim's extension catalog is smaller and more focused:
 
 - Language support and syntax highlighting
 - Themes
 - Context servers
 
-Several features that might require plugins in other editors are built into Baymax:
+Several features that might require plugins in other editors are built into Sim:
 
 - Real-time collaboration with voice chat
 - AI coding assistance
@@ -326,9 +326,9 @@ Several features that might require plugins in other editors are built into Baym
 - rust-analyzer integration
 - rustfmt formatting
 
-### What's Not in Baymax
+### What's Not in Sim
 
-Here's what RustRover offers that Baymax doesn't have:
+Here's what RustRover offers that Sim doesn't have:
 
 - **Profiler integration** — Use `cargo flamegraph`, `perf`, or external profiling tools
 - **Database tools** — Use DataGrip, DBeaver, or TablePlus
@@ -339,22 +339,22 @@ Here's what RustRover offers that Baymax doesn't have:
 
 On licensing and telemetry:
 
-- **Baymax is open source** (primarily GPL-licensed, with Apache-licensed components)
+- **Sim is open source** (primarily GPL-licensed, with Apache-licensed components)
 - **Telemetry is optional** and can be disabled during onboarding or in settings
 
-## Collaboration in Baymax vs. RustRover
+## Collaboration in Sim vs. RustRover
 
-RustRover offers Code With Me as a separate feature for collaboration. Baymax has collaboration built into the core experience.
+RustRover offers Code With Me as a separate feature for collaboration. Sim has collaboration built into the core experience.
 
 - Open the Collab Panel in the left dock
-- Create a channel and [invite your collaborators](https://baymax.dev/docs/collaboration#inviting-a-collaborator) to join
-- [Share your screen or your codebase](https://baymax.dev/docs/collaboration#share-a-project) directly
+- Create a channel and [invite your collaborators](https://sim.dev/docs/collaboration#inviting-a-collaborator) to join
+- [Share your screen or your codebase](https://sim.dev/docs/collaboration#share-a-project) directly
 
 Once connected, you'll see each other's cursors, selections, and edits in real time. Voice chat is included. There's no need for separate tools or third-party logins.
 
-## Using AI in Baymax
+## Using AI in Sim
 
-Baymax has built-in AI features. If you've used JetBrains AI Assistant, here's how to get set up.
+Sim has built-in AI features. If you've used JetBrains AI Assistant, here's how to get set up.
 
 ### Configuring GitHub Copilot
 
@@ -363,19 +363,19 @@ Baymax has built-in AI features. If you've used JetBrains AI Assistant, here's h
 3. Click **Configure** next to "Configure Providers"
 4. Under **GitHub Copilot**, click **Sign in to GitHub**
 
-Once signed in, just start typing. Baymax will offer suggestions inline for you to accept.
+Once signed in, just start typing. Sim will offer suggestions inline for you to accept.
 
 ### Additional AI Options
 
-To use other AI models in Baymax, you have several options:
+To use other AI models in Sim, you have several options:
 
-- Use Baymax's hosted models, with higher rate limits. Requires [authentication](https://baymax.dev/docs/authentication) and access through [Baymax Pro](https://baymax.dev/docs/account/baymax-hosted-models.html).
-- Bring your own [API keys](https://baymax.dev/docs/ai/use-api-access.html), no authentication needed
-- Use [External Agents like Claude Agent](https://baymax.dev/docs/ai/external-agents.html)
+- Use Sim's hosted models, with higher rate limits. Requires [authentication](https://sim.dev/docs/authentication) and access through [Sim Pro](https://sim.dev/docs/account/sim-hosted-models.html).
+- Bring your own [API keys](https://sim.dev/docs/ai/use-api-access.html), no authentication needed
+- Use [External Agents like Claude Agent](https://sim.dev/docs/ai/external-agents.html)
 
 ## Advanced Config and Productivity Tweaks
 
-Baymax exposes advanced settings for power users who want to fine-tune their environment.
+Sim exposes advanced settings for power users who want to fine-tune their environment.
 
 Here are a few useful tweaks for Rust developers:
 
@@ -460,11 +460,11 @@ If you work with multiple Cargo projects that aren't in a workspace, you can tel
 
 ## Next Steps
 
-Now that you're set up, here are some resources to help you get the most out of Baymax:
+Now that you're set up, here are some resources to help you get the most out of Sim:
 
 - [All Settings](../reference/all-settings.md) — Customize settings, themes, and editor behavior
 - [Key Bindings](../key-bindings.md) — Learn how to customize and extend your keymap
 - [Tasks](../tasks.md) — Set up build and run commands for your projects
-- [AI Features](../ai/overview.md) — Explore Baymax's AI capabilities beyond code completion
+- [AI Features](../ai/overview.md) — Explore Sim's AI capabilities beyond code completion
 - [Collaboration](../collaboration/overview.md) — Share your projects and code together in real time
-- [Rust in Baymax](../languages/rust.md) — Rust-specific setup and configuration
+- [Rust in Sim](../languages/rust.md) — Rust-specific setup and configuration

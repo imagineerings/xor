@@ -46,7 +46,7 @@ use project::{DisableAiSettings, Project};
 use prompt_store::PromptBuilder;
 use settings::{Settings, SettingsStore};
 
-use baymax_actions::agent::OpenSettings;
+use sim_actions::agent::OpenSettings;
 use terminal_view::{TerminalView, terminal_panel::TerminalPanel};
 use ui::prelude::*;
 use util::{RangeExt, ResultExt, maybe};
@@ -205,7 +205,7 @@ impl InlineAssistant {
 
     pub fn inline_assist(
         workspace: &mut Workspace,
-        action: &baymax_actions::assistant::InlineAssist,
+        action: &sim_actions::assistant::InlineAssist,
         window: &mut Window,
         cx: &mut Context<Workspace>,
     ) {
@@ -2065,7 +2065,7 @@ pub mod evals {
                 prompt.clone(),
                 |cx| {
                     // Reconfigure to use a real model instead of the fake one
-                    let model_name = std::env::var("BAYMAX_AGENT_MODEL")
+                    let model_name = std::env::var("SIM_AGENT_MODEL")
                         .unwrap_or("anthropic/claude-sonnet-4-latest".into());
 
                     let selected_model = SelectedModel::from_str(&model_name)

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition.workspace = true
 publish = false
 license = "Apache-2.0"
-description = "Utility macros for Baymax"
+description = "Utility macros for Sim"
 
 [lints]
 workspace = true

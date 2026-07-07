@@ -2,11 +2,11 @@
 
 ## Architecture
 
-Add documentation ingestion and fixture attribution helpers while leaving Baymax build/test systems authoritative.
+Add documentation ingestion and fixture attribution helpers while leaving Sim build/test systems authoritative.
 
 ## Components
 
-- `BaymaxGameDocsIngestion`
+- `SimGameDocsIngestion`
 - `FixtureAttributionValidator`
 - `DependencyReviewGate`
 

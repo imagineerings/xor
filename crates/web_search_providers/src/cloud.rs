@@ -40,11 +40,11 @@ impl State {
     }
 }
 
-pub const BAYMAX_WEB_SEARCH_PROVIDER_ID: &str = "baymax.dev";
+pub const SIM_WEB_SEARCH_PROVIDER_ID: &str = "sim.dev";
 
 impl WebSearchProvider for CloudWebSearchProvider {
     fn id(&self) -> WebSearchProviderId {
-        WebSearchProviderId(BAYMAX_WEB_SEARCH_PROVIDER_ID.into())
+        WebSearchProviderId(SIM_WEB_SEARCH_PROVIDER_ID.into())
     }
 
     fn search(&self, query: String, cx: &mut App) -> Task<Result<WebSearchResponse>> {
@@ -73,7 +73,7 @@ async fn perform_web_search(
 
     let url = client
         .http_client()
-        .build_baymax_llm_url("/web_search", &[])?;
+        .build_sim_llm_url("/web_search", &[])?;
     let body = serde_json::to_string(&body)?;
     let mut response = client
         .authenticated_llm_request(&llm_api_token, organization_id, |token| {

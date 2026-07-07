@@ -47,7 +47,7 @@
 - [AI Quick Start](./ai/quick-start.md)
 - [AI by Company](./ai/by-company.md)
 - [Agents](./ai/agents.md)
-  - [Baymax Agent](./ai/baymax-agent.md)
+  - [Sim Agent](./ai/sim-agent.md)
   - [External Agents](./ai/external-agents.md)
   - [Terminal Threads](./ai/terminal-threads.md)
 - [Agent Panel](./ai/agent-panel.md)
@@ -73,10 +73,10 @@
 
 - [Authenticate](./authentication.md)
 - [Plans & Pricing](./account/plans-and-pricing.md)
-- [Baymax-Hosted Models](./account/baymax-hosted-models.md)
+- [Sim-Hosted Models](./account/sim-hosted-models.md)
 - [Billing](./account/billing.md)
 
-# Baymax Business
+# Sim Business
 
 - [Overview](./business/overview.md)
 - [Organizations](./business/organizations.md)
@@ -213,9 +213,9 @@
 - [All Actions](./all-actions.md)
 - [CLI Reference](./reference/cli.md)
 
-# Developing Baymax
+# Developing Sim
 
-- [Developing Baymax](./development.md)
+- [Developing Sim](./development.md)
   - [macOS](./development/macos.md)
   - [Linux](./development/linux.md)
   - [Windows](./development/windows.md)

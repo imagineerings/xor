@@ -1208,7 +1208,7 @@ mod git_worktrees {
 
         // Valid: subdirectory
         assert!(
-            worktrees_directory_for_repo(work_dir, ".git/baymax-worktrees", PathStyle::Posix)
+            worktrees_directory_for_repo(work_dir, ".git/sim-worktrees", PathStyle::Posix)
                 .is_ok()
         );
         assert!(worktrees_directory_for_repo(work_dir, "my-worktrees", PathStyle::Posix).is_ok());
@@ -1748,11 +1748,11 @@ mod resolve_worktree_tests {
     fn test_repo_identity_path() {
         let examples = [
             // Normal checkout: `.git` starts with `.`, so parent is the worktree
-            ("/home/bob/baymax/.git", "/home/bob/baymax"),
+            ("/home/bob/sim/.git", "/home/bob/sim"),
             // Bare clone named `.bare`: starts with `.`, so parent is the project dir
             ("/repos/project/.bare", "/repos/project"),
             // Bare clone with `.git` extension: does not start with `.`, kept as-is
-            ("/repos/baymax.git", "/repos/baymax.git"),
+            ("/repos/sim.git", "/repos/sim.git"),
             // Bare clone with arbitrary plain name: kept as-is
             ("/repos/project", "/repos/project"),
         ];
@@ -1769,21 +1769,21 @@ mod resolve_worktree_tests {
     fn test_linked_worktree_short_name() {
         let examples = [
             (
-                "/home/bob/baymax",
-                "/home/bob/worktrees/olivetti/baymax",
+                "/home/bob/sim",
+                "/home/bob/worktrees/olivetti/sim",
                 Some("olivetti".into()),
             ),
             (
-                "/home/bob/baymax",
-                "/home/bob/baymax2",
-                Some("baymax2".into()),
+                "/home/bob/sim",
+                "/home/bob/sim2",
+                Some("sim2".into()),
             ),
             (
-                "/home/bob/baymax",
-                "/home/bob/worktrees/baymax/selectric",
+                "/home/bob/sim",
+                "/home/bob/worktrees/sim/selectric",
                 Some("selectric".into()),
             ),
-            ("/home/bob/baymax", "/home/bob/baymax", None),
+            ("/home/bob/sim", "/home/bob/sim", None),
         ];
         for (main_worktree_path, linked_worktree_path, expected) in examples {
             let short_name = linked_worktree_short_name(

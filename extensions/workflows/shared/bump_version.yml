@@ -1,4 +1,4 @@
-# Generated from xtask::workflows::extensions::bump_version within the Baymax repository.
+# Generated from xtask::workflows::extensions::bump_version within the Sim repository.
 # Rebuild with `cargo xtask workflows`.
 name: extensions::bump_version
 on:
@@ -13,7 +13,7 @@ on:
   workflow_dispatch: {}
 jobs:
   determine_bump_type:
-    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'baymax-extensions')
+    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'sim-extensions')
     runs-on: namespace-profile-2x4-ubuntu-2404
     permissions: {}
     steps:
@@ -46,10 +46,10 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
-    uses: simtropolis/baymax/.github/workflows/extension_bump.yml@main
+    uses: simtropolis/sim/.github/workflows/extension_bump.yml@main
     secrets:
-      app-id: ${{ secrets.BAYMAX_ZIPPY_APP_ID }}
-      app-secret: ${{ secrets.BAYMAX_ZIPPY_APP_PRIVATE_KEY }}
+      app-id: ${{ secrets.SIM_ZIPPY_APP_ID }}
+      app-secret: ${{ secrets.SIM_ZIPPY_APP_PRIVATE_KEY }}
     with:
       bump-type: ${{ needs.determine_bump_type.outputs.bump_type }}
       force-bump: ${{ github.event_name != 'push' }}

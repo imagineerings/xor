@@ -1,4 +1,4 @@
-//! See [Telemetry in Baymax](https://baymax.dev/docs/telemetry) for additional information.
+//! See [Telemetry in Sim](https://sim.dev/docs/telemetry) for additional information.
 use futures::channel::mpsc;
 pub use serde_json;
 use std::sync::OnceLock;

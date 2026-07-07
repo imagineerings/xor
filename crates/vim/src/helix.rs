@@ -138,7 +138,7 @@ impl Vim {
         self.update_editor(cx, |_, editor, cx| {
             let text_layout_details = editor.text_layout_details(window, cx);
             editor.change_selections(Default::default(), window, cx, |s| {
-                if let Motion::BaymaxSearchResult { new_selections, .. } = &motion {
+                if let Motion::SimSearchResult { new_selections, .. } = &motion {
                     s.select_anchor_ranges(new_selections.clone());
                     return;
                 };
@@ -3024,7 +3024,7 @@ mod test {
         cx.assert_state("«ˇone» two three", Mode::HelixSelect);
     }
 
-    // Regression test for BAYMAX-758: helix motions called
+    // Regression test for SIM-758: helix motions called
     // `Editor::text_layout_details` on an editor whose `style` had never
     // been set, panicking on `unwrap()`.
     #[gpui::test]

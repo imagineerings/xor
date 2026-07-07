@@ -1,75 +1,75 @@
 ---
-title: Install Baymax - macOS, Linux, Windows
-description: Download and install Baymax on macOS, Linux, or Windows. Includes Homebrew, direct download, and package manager options.
+title: Install Sim - macOS, Linux, Windows
+description: Download and install Sim on macOS, Linux, or Windows. Includes Homebrew, direct download, and package manager options.
 ---
 
-# Installing Baymax
+# Installing Sim
 
-## Download Baymax
+## Download Sim
 
 ### macOS
 
-Get the latest stable builds via [the download page](https://baymax.dev/download). If you want to download our preview build, you can find it on its [releases page](https://baymax.dev/releases/preview). After the first manual installation, Baymax will periodically check for install updates.
+Get the latest stable builds via [the download page](https://sim.dev/download). If you want to download our preview build, you can find it on its [releases page](https://sim.dev/releases/preview). After the first manual installation, Sim will periodically check for install updates.
 
-You can also install Baymax stable via Homebrew:
+You can also install Sim stable via Homebrew:
 
 ```sh
-brew install --cask baymax
+brew install --cask sim
 ```
 
-As well as Baymax preview:
+As well as Sim preview:
 
 ```sh
-brew install --cask baymax@preview
+brew install --cask sim@preview
 ```
 
 ### Windows
 
-Get the latest stable builds via [the download page](https://baymax.dev/download). If you want to download our preview build, you can find it on its [releases page](https://baymax.dev/releases/preview). After the first manual installation, Baymax will periodically check for install updates.
+Get the latest stable builds via [the download page](https://sim.dev/download). If you want to download our preview build, you can find it on its [releases page](https://sim.dev/releases/preview). After the first manual installation, Sim will periodically check for install updates.
 
-Additionally, you can install Baymax using winget:
+Additionally, you can install Sim using winget:
 
 ```sh
-winget install -e --id BaymaxIndustries.Baymax
+winget install -e --id SimIndustries.Sim
 ```
 
 ### Linux
 
-For most Linux users, the easiest way to install Baymax is through our installation script:
+For most Linux users, the easiest way to install Sim is through our installation script:
 
 ```sh
-curl -f https://baymax.dev/install.sh | sh
+curl -f https://sim.dev/install.sh | sh
 ```
 
-You can now optionally specify a **version** of Baymax to install using the `BAYMAX_VERSION` environment variable:
+You can now optionally specify a **version** of Sim to install using the `SIM_VERSION` environment variable:
 
 ```sh
 # Install the latest stable version (default)
-curl -f https://baymax.dev/install.sh | sh
+curl -f https://sim.dev/install.sh | sh
 
 # Install a specific version
-curl -f https://baymax.dev/install.sh | BAYMAX_VERSION=0.216.0 sh
+curl -f https://sim.dev/install.sh | SIM_VERSION=0.216.0 sh
 ```
 
 To install the preview build, which receives updates about a week ahead of stable:
 
 ```sh
-curl -f https://baymax.dev/install.sh | BAYMAX_CHANNEL=preview sh
+curl -f https://sim.dev/install.sh | SIM_CHANNEL=preview sh
 ```
 
 This script supports `x86_64` and `AArch64`, as well as common Linux distributions: Ubuntu, Arch, Debian, RedHat, CentOS, Fedora, and more.
 
-If Baymax is installed using this installation script, it can be uninstalled at any time by running the shell command `baymax --uninstall`. The shell will then prompt you whether you'd like to keep your preferences or delete them. After making a choice, you should see a message that Baymax was successfully uninstalled.
+If Sim is installed using this installation script, it can be uninstalled at any time by running the shell command `sim --uninstall`. The shell will then prompt you whether you'd like to keep your preferences or delete them. After making a choice, you should see a message that Sim was successfully uninstalled.
 
-If this script is insufficient for your use case, you run into problems running Baymax, or there are errors in uninstalling Baymax, please see our [Linux-specific documentation](./linux.md).
+If this script is insufficient for your use case, you run into problems running Sim, or there are errors in uninstalling Sim, please see our [Linux-specific documentation](./linux.md).
 
 ## System Requirements
 
 ### macOS
 
-Baymax supports the following macOS releases:
+Sim supports the following macOS releases:
 
-| Version       | Codename | Apple Status   | Baymax Status          |
+| Version       | Codename | Apple Status   | Sim Status          |
 | ------------- | -------- | -------------- | ------------------- |
 | macOS 26.x    | Tahoe    | Supported      | Supported           |
 | macOS 15.x    | Sequoia  | Supported      | Supported           |
@@ -79,11 +79,11 @@ Baymax supports the following macOS releases:
 | macOS 11.x    | Big Sur  | EOL 2023-09-26 | Partially Supported |
 | macOS 10.15.x | Catalina | EOL 2022-09-12 | Partially Supported |
 
-The macOS releases labelled "Partially Supported" (Big Sur and Catalina) do not support screen sharing via Baymax Collaboration. These features use the [LiveKit SDK](https://livekit.io) which relies upon [ScreenCaptureKit.framework](https://developer.apple.com/documentation/screencapturekit/) only available on macOS 12 (Monterey) and newer.
+The macOS releases labelled "Partially Supported" (Big Sur and Catalina) do not support screen sharing via Sim Collaboration. These features use the [LiveKit SDK](https://livekit.io) which relies upon [ScreenCaptureKit.framework](https://developer.apple.com/documentation/screencapturekit/) only available on macOS 12 (Monterey) and newer.
 
 #### Mac Hardware
 
-Baymax supports machines with Intel (x86_64) or Apple (aarch64) processors that meet the above macOS requirements:
+Sim supports machines with Intel (x86_64) or Apple (aarch64) processors that meet the above macOS requirements:
 
 - MacBook Pro (Early 2015 and newer)
 - MacBook Air (Early 2015 and newer)
@@ -96,9 +96,9 @@ Baymax supports machines with Intel (x86_64) or Apple (aarch64) processors that 
 
 ### Linux
 
-Baymax supports 64-bit Intel/AMD (x86_64) and 64-bit Arm (aarch64) processors.
+Sim supports 64-bit Intel/AMD (x86_64) and 64-bit Arm (aarch64) processors.
 
-Baymax requires a Vulkan 1.3 driver and the following desktop portals:
+Sim requires a Vulkan 1.3 driver and the following desktop portals:
 
 - `org.freedesktop.portal.FileChooser`
 - `org.freedesktop.portal.OpenURI`
@@ -106,17 +106,17 @@ Baymax requires a Vulkan 1.3 driver and the following desktop portals:
 
 ### Windows
 
-Baymax supports the following Windows releases:
-| Version | Baymax Status |
+Sim supports the following Windows releases:
+| Version | Sim Status |
 | ------------------------- | ------------------- |
 | Windows 11, version 22H2 and later | Supported |
 | Windows 10, version 1903 and later | Supported |
 
-A 64-bit operating system is required to run Baymax.
+A 64-bit operating system is required to run Sim.
 
 #### Windows Hardware
 
-Baymax supports machines with x64 (Intel, AMD) or Arm64 (Qualcomm) processors that meet the following requirements:
+Sim supports machines with x64 (Intel, AMD) or Arm64 (Qualcomm) processors that meet the following requirements:
 
 - Graphics: A GPU that supports DirectX 11 (most PCs from 2012+).
 - Driver: Current NVIDIA/AMD/Intel/Qualcomm driver (not the Microsoft Basic Display Adapter).
@@ -127,4 +127,4 @@ Not yet available as an official download. Can be built [from source](./developm
 
 ### Web
 
-Not supported at this time. See our [Platform Support issue](https://github.com/simtropolis/baymax/issues/5391).
+Not supported at this time. See our [Platform Support issue](https://github.com/simtropolis/sim/issues/5391).

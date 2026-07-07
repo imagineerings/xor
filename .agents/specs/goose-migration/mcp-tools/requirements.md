@@ -17,7 +17,7 @@ Migrate the Model Context Protocol (MCP) tools from goose that provide desktop a
 
 ### Requirement 1: Computer Controller MCP Tools
 
-**User Story:** As a baymax user, I want the agent to create and manipulate documents (PDF, DOCX, XLSX) and control computer platforms, so that I can automate document workflows.
+**User Story:** As a sim user, I want the agent to create and manipulate documents (PDF, DOCX, XLSX) and control computer platforms, so that I can automate document workflows.
 
 #### Acceptance Criteria
 
@@ -30,7 +30,7 @@ Migrate the Model Context Protocol (MCP) tools from goose that provide desktop a
 
 ### Requirement 2: Memory MCP Tool
 
-**User Story:** As a baymax user, I want the agent to have persistent long-term memory, so that it can recall information across sessions.
+**User Story:** As a sim user, I want the agent to have persistent long-term memory, so that it can recall information across sessions.
 
 #### Acceptance Criteria
 
@@ -42,7 +42,7 @@ Migrate the Model Context Protocol (MCP) tools from goose that provide desktop a
 
 ### Requirement 3: Peekaboo Screen Monitoring
 
-**User Story:** As a baymax user, I want the agent to be able to capture and analyze screen content, so that it can help with visual tasks.
+**User Story:** As a sim user, I want the agent to be able to capture and analyze screen content, so that it can help with visual tasks.
 
 #### Acceptance Criteria
 
@@ -52,7 +52,7 @@ Migrate the Model Context Protocol (MCP) tools from goose that provide desktop a
 
 ### Requirement 4: AutoVisualiser
 
-**User Story:** As a baymax user, I want the agent to generate visual diagrams and visualizations from code or descriptions, so that I can understand complex systems.
+**User Story:** As a sim user, I want the agent to generate visual diagrams and visualizations from code or descriptions, so that I can understand complex systems.
 
 #### Acceptance Criteria
 
@@ -63,7 +63,7 @@ Migrate the Model Context Protocol (MCP) tools from goose that provide desktop a
 
 ### Requirement 5: Tutorial MCP Tool
 
-**User Story:** As a baymax user, I want the agent to provide interactive tutorials, so that I can learn how to use features step by step.
+**User Story:** As a sim user, I want the agent to provide interactive tutorials, so that I can learn how to use features step by step.
 
 #### Acceptance Criteria
 
@@ -74,7 +74,7 @@ Migrate the Model Context Protocol (MCP) tools from goose that provide desktop a
 
 ### Requirement 6: MCP Server Runner
 
-**User Story:** As a baymax developer, I want a standardized MCP server runner, so that MCP tools can be launched and managed consistently.
+**User Story:** As a sim developer, I want a standardized MCP server runner, so that MCP tools can be launched and managed consistently.
 
 #### Acceptance Criteria
 
@@ -85,4 +85,4 @@ Migrate the Model Context Protocol (MCP) tools from goose that provide desktop a
 ## References
 
 - Source: `projects/goose/crates/goose-mcp/src/` — autovisualiser/, computercontroller/, memory/, peekaboo/, tutorial/, mcp_server_runner.rs, subprocess.rs
-- Existing baymax: `crates/context_server/` (MCP client), `crates/agent_servers/` (agent server management)
+- Existing sim: `crates/context_server/` (MCP client), `crates/agent_servers/` (agent server management)

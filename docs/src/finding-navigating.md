@@ -1,15 +1,15 @@
 ---
-title: Finding and Navigating Code - Baymax
-description: Navigate your codebase in Baymax with file finder, project search, go to definition, symbol search, and the command palette.
+title: Finding and Navigating Code - Sim
+description: Navigate your codebase in Sim with file finder, project search, go to definition, symbol search, and the command palette.
 ---
 
 # Finding & Navigating
 
-Baymax provides several ways to move around your codebase quickly. Here's an overview of the main navigation tools.
+Sim provides several ways to move around your codebase quickly. Here's an overview of the main navigation tools.
 
 ## Command Palette
 
-The Command Palette ({#kb command_palette::Toggle}) is your gateway to almost everything in Baymax. Type a few characters to filter commands, then press Enter to execute.
+The Command Palette ({#kb command_palette::Toggle}) is your gateway to almost everything in Sim. Type a few characters to filter commands, then press Enter to execute.
 
 [Learn more about the Command Palette →](./command-palette.md)
 

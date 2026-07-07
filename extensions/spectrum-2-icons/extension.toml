@@ -2,7 +2,7 @@ id = "spectrum-2-icons"
 name = "Spectrum 2 Inspired Icons"
 version = "0.1.0"
 schema_version = 1
-description = "Spectrum 2-inspired file and folder icons for Baymax"
+description = "Spectrum 2-inspired file and folder icons for Sim"
 authors = ["Ahmad Vegah"]
 
 icon_themes = ["themes/spectrum-2-inspired-icons.json"]

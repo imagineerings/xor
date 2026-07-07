@@ -17,8 +17,8 @@ jobs:
     runs-on: namespace-profile-8x32-ubuntu-2004-arm-m4
     env:
       CARGO_INCREMENTAL: 0
-      BAYMAX_CLIENT_CHECKSUM_SEED: ${{ secrets.BAYMAX_CLIENT_CHECKSUM_SEED }}
-      BAYMAX_MINIDUMP_ENDPOINT: ${{ secrets.BAYMAX_SENTRY_MINIDUMP_ENDPOINT }}
+      SIM_CLIENT_CHECKSUM_SEED: ${{ secrets.SIM_CLIENT_CHECKSUM_SEED }}
+      SIM_MINIDUMP_ENDPOINT: ${{ secrets.SIM_SENTRY_MINIDUMP_ENDPOINT }}
       CC: clang-18
       CXX: clang++-18
     steps:
@@ -39,14 +39,14 @@ jobs:
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: baymax-linux-aarch64.tar.gz
-        path: target/release/baymax-linux-aarch64.tar.gz
+        name: sim-linux-aarch64.tar.gz
+        path: target/release/sim-linux-aarch64.tar.gz
         if-no-files-found: error
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: baymax-remote-server-linux-aarch64.gz
-        path: target/baymax-remote-server-linux-aarch64.gz
+        name: sim-remote-server-linux-aarch64.gz
+        path: target/sim-remote-server-linux-aarch64.gz
         if-no-files-found: error
     timeout-minutes: 60
   bundle_linux_x86_64:
@@ -56,8 +56,8 @@ jobs:
     runs-on: namespace-profile-32x64-ubuntu-2004
     env:
       CARGO_INCREMENTAL: 0
-      BAYMAX_CLIENT_CHECKSUM_SEED: ${{ secrets.BAYMAX_CLIENT_CHECKSUM_SEED }}
-      BAYMAX_MINIDUMP_ENDPOINT: ${{ secrets.BAYMAX_SENTRY_MINIDUMP_ENDPOINT }}
+      SIM_CLIENT_CHECKSUM_SEED: ${{ secrets.SIM_CLIENT_CHECKSUM_SEED }}
+      SIM_MINIDUMP_ENDPOINT: ${{ secrets.SIM_SENTRY_MINIDUMP_ENDPOINT }}
       CC: clang-18
       CXX: clang++-18
     steps:
@@ -78,14 +78,14 @@ jobs:
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: baymax-linux-x86_64.tar.gz
-        path: target/release/baymax-linux-x86_64.tar.gz
+        name: sim-linux-x86_64.tar.gz
+        path: target/release/sim-linux-x86_64.tar.gz
         if-no-files-found: error
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: baymax-remote-server-linux-x86_64.gz
-        path: target/baymax-remote-server-linux-x86_64.gz
+        name: sim-remote-server-linux-x86_64.gz
+        path: target/sim-remote-server-linux-x86_64.gz
         if-no-files-found: error
     timeout-minutes: 60
   bundle_mac_aarch64:
@@ -95,8 +95,8 @@ jobs:
     runs-on: namespace-profile-mac-large
     env:
       CARGO_INCREMENTAL: 0
-      BAYMAX_CLIENT_CHECKSUM_SEED: ${{ secrets.BAYMAX_CLIENT_CHECKSUM_SEED }}
-      BAYMAX_MINIDUMP_ENDPOINT: ${{ secrets.BAYMAX_SENTRY_MINIDUMP_ENDPOINT }}
+      SIM_CLIENT_CHECKSUM_SEED: ${{ secrets.SIM_CLIENT_CHECKSUM_SEED }}
+      SIM_MINIDUMP_ENDPOINT: ${{ secrets.SIM_SENTRY_MINIDUMP_ENDPOINT }}
       MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
       MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
       APPLE_NOTARIZATION_KEY: ${{ secrets.APPLE_NOTARIZATION_KEY }}
@@ -122,14 +122,14 @@ jobs:
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: Baymax-aarch64.dmg
-        path: target/aarch64-apple-darwin/release/Baymax-aarch64.dmg
+        name: Sim-aarch64.dmg
+        path: target/aarch64-apple-darwin/release/Sim-aarch64.dmg
         if-no-files-found: error
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: baymax-remote-server-macos-aarch64.gz
-        path: target/baymax-remote-server-macos-aarch64.gz
+        name: sim-remote-server-macos-aarch64.gz
+        path: target/sim-remote-server-macos-aarch64.gz
         if-no-files-found: error
     timeout-minutes: 60
   bundle_mac_x86_64:
@@ -139,8 +139,8 @@ jobs:
     runs-on: namespace-profile-mac-large
     env:
       CARGO_INCREMENTAL: 0
-      BAYMAX_CLIENT_CHECKSUM_SEED: ${{ secrets.BAYMAX_CLIENT_CHECKSUM_SEED }}
-      BAYMAX_MINIDUMP_ENDPOINT: ${{ secrets.BAYMAX_SENTRY_MINIDUMP_ENDPOINT }}
+      SIM_CLIENT_CHECKSUM_SEED: ${{ secrets.SIM_CLIENT_CHECKSUM_SEED }}
+      SIM_MINIDUMP_ENDPOINT: ${{ secrets.SIM_SENTRY_MINIDUMP_ENDPOINT }}
       MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
       MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
       APPLE_NOTARIZATION_KEY: ${{ secrets.APPLE_NOTARIZATION_KEY }}
@@ -166,14 +166,14 @@ jobs:
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: Baymax-x86_64.dmg
-        path: target/x86_64-apple-darwin/release/Baymax-x86_64.dmg
+        name: Sim-x86_64.dmg
+        path: target/x86_64-apple-darwin/release/Sim-x86_64.dmg
         if-no-files-found: error
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: baymax-remote-server-macos-x86_64.gz
-        path: target/baymax-remote-server-macos-x86_64.gz
+        name: sim-remote-server-macos-x86_64.gz
+        path: target/sim-remote-server-macos-x86_64.gz
         if-no-files-found: error
     timeout-minutes: 60
   bundle_windows_aarch64:
@@ -183,8 +183,8 @@ jobs:
     runs-on: self-32vcpu-windows-2022
     env:
       CARGO_INCREMENTAL: 0
-      BAYMAX_CLIENT_CHECKSUM_SEED: ${{ secrets.BAYMAX_CLIENT_CHECKSUM_SEED }}
-      BAYMAX_MINIDUMP_ENDPOINT: ${{ secrets.BAYMAX_SENTRY_MINIDUMP_ENDPOINT }}
+      SIM_CLIENT_CHECKSUM_SEED: ${{ secrets.SIM_CLIENT_CHECKSUM_SEED }}
+      SIM_MINIDUMP_ENDPOINT: ${{ secrets.SIM_SENTRY_MINIDUMP_ENDPOINT }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_SIGNING_TENANT_ID }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_SIGNING_CLIENT_ID }}
       AZURE_CLIENT_SECRET: ${{ secrets.AZURE_SIGNING_CLIENT_SECRET }}
@@ -206,18 +206,18 @@ jobs:
     - name: run_bundling::bundle_windows::bundle_windows
       run: script/bundle-windows.ps1 -Architecture aarch64
       shell: pwsh
-      working-directory: ${{ env.BAYMAX_WORKSPACE }}
+      working-directory: ${{ env.SIM_WORKSPACE }}
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: Baymax-aarch64.exe
-        path: target/Baymax-aarch64.exe
+        name: Sim-aarch64.exe
+        path: target/Sim-aarch64.exe
         if-no-files-found: error
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: baymax-remote-server-windows-aarch64.zip
-        path: target/baymax-remote-server-windows-aarch64.zip
+        name: sim-remote-server-windows-aarch64.zip
+        path: target/sim-remote-server-windows-aarch64.zip
         if-no-files-found: error
     timeout-minutes: 60
   bundle_windows_x86_64:
@@ -227,8 +227,8 @@ jobs:
     runs-on: self-32vcpu-windows-2022
     env:
       CARGO_INCREMENTAL: 0
-      BAYMAX_CLIENT_CHECKSUM_SEED: ${{ secrets.BAYMAX_CLIENT_CHECKSUM_SEED }}
-      BAYMAX_MINIDUMP_ENDPOINT: ${{ secrets.BAYMAX_SENTRY_MINIDUMP_ENDPOINT }}
+      SIM_CLIENT_CHECKSUM_SEED: ${{ secrets.SIM_CLIENT_CHECKSUM_SEED }}
+      SIM_MINIDUMP_ENDPOINT: ${{ secrets.SIM_SENTRY_MINIDUMP_ENDPOINT }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_SIGNING_TENANT_ID }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_SIGNING_CLIENT_ID }}
       AZURE_CLIENT_SECRET: ${{ secrets.AZURE_SIGNING_CLIENT_SECRET }}
@@ -250,18 +250,18 @@ jobs:
     - name: run_bundling::bundle_windows::bundle_windows
       run: script/bundle-windows.ps1 -Architecture x86_64
       shell: pwsh
-      working-directory: ${{ env.BAYMAX_WORKSPACE }}
+      working-directory: ${{ env.SIM_WORKSPACE }}
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: Baymax-x86_64.exe
-        path: target/Baymax-x86_64.exe
+        name: Sim-x86_64.exe
+        path: target/Sim-x86_64.exe
         if-no-files-found: error
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: baymax-remote-server-windows-x86_64.zip
-        path: target/baymax-remote-server-windows-x86_64.zip
+        name: sim-remote-server-windows-x86_64.zip
+        path: target/sim-remote-server-windows-x86_64.zip
         if-no-files-found: error
     timeout-minutes: 60
 concurrency:

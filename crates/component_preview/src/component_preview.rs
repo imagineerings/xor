@@ -305,12 +305,12 @@ impl ComponentPreview {
             }
         }
 
-        // Add uncategoribaymax components last
+        // Add uncategorisim components last
         if let Some(components) = scope_groups.get(&ComponentScope::None)
             && !components.is_empty()
         {
             entries.push(PreviewEntry::Separator);
-            entries.push(PreviewEntry::SectionHeader("Uncategoribaymax".into()));
+            entries.push(PreviewEntry::SectionHeader("Uncategorisim".into()));
             let mut sorted_components = components.clone();
             sorted_components.sort_by_key(|(c, _)| c.sort_name());
 
@@ -555,7 +555,7 @@ impl ComponentPreview {
         if let Some(workspace) = self.workspace.upgrade() {
             workspace.update(cx, |workspace, cx| {
                 let status_toast = StatusToast::new(
-                    "`baymax/new-notification-system` created!",
+                    "`sim/new-notification-system` created!",
                     cx,
                     |this, _cx| {
                         this.icon(
@@ -782,7 +782,7 @@ impl Item for ComponentPreview {
 }
 
 impl SerializableItem for ComponentPreview {
-    fn serialibaymax_item_kind() -> &'static str {
+    fn serialisim_item_kind() -> &'static str {
         "ComponentPreview"
     }
 
@@ -794,7 +794,7 @@ impl SerializableItem for ComponentPreview {
         window: &mut Window,
         cx: &mut App,
     ) -> Task<anyhow::Result<Entity<Self>>> {
-        let deserialibaymax_active_page =
+        let deserialisim_active_page =
             match ComponentPreviewDb::global(cx).get_active_page(item_id, workspace_id) {
                 Ok(page) => {
                     if let Some(page) = page {
@@ -808,10 +808,10 @@ impl SerializableItem for ComponentPreview {
 
         let user_store = project.read(cx).user_store();
         let language_registry = project.read(cx).languages().clone();
-        let preview_page = if deserialibaymax_active_page.0 == ActivePageId::default().0 {
+        let preview_page = if deserialisim_active_page.0 == ActivePageId::default().0 {
             Some(PreviewPage::default())
         } else {
-            let component_str = deserialibaymax_active_page.0;
+            let component_str = deserialisim_active_page.0;
             let component_registry = components();
             let all_components = component_registry.components();
             let found_component = all_components.iter().find(|c| c.id().0 == component_str);

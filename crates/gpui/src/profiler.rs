@@ -223,7 +223,7 @@ impl ThreadTaskStatistics {
 
 /// Serializable variant of [`core::panic::Location`]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SerialibaymaxLocation {
+pub struct SerialisimLocation {
     /// Name of the source file
     pub file: SharedString,
     /// Line in the source file
@@ -232,9 +232,9 @@ pub struct SerialibaymaxLocation {
     pub column: u32,
 }
 
-impl From<&core::panic::Location<'static>> for SerialibaymaxLocation {
+impl From<&core::panic::Location<'static>> for SerialisimLocation {
     fn from(value: &core::panic::Location<'static>) -> Self {
-        SerialibaymaxLocation {
+        SerialisimLocation {
             file: value.file().into(),
             line: value.line(),
             column: value.column(),
@@ -244,28 +244,28 @@ impl From<&core::panic::Location<'static>> for SerialibaymaxLocation {
 
 /// Serializable variant of [`TaskTiming`]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SerialibaymaxTaskTiming {
+pub struct SerialisimTaskTiming {
     /// Location of the timing
-    pub location: SerialibaymaxLocation,
+    pub location: SerialisimLocation,
     /// Time at which the measurement was reported in nanoseconds
     pub start: u128,
     /// Duration of the measurement in nanoseconds
     pub duration: u128,
 }
 
-impl SerialibaymaxTaskTiming {
+impl SerialisimTaskTiming {
     /// Convert an array of [`TaskTiming`] into their serializable format
     ///
     /// # Params
     ///
     /// `anchor` - [`Instant`] that should be earlier than all timings to use as base anchor
-    pub fn convert(anchor: Instant, timings: &[TaskTiming]) -> Vec<SerialibaymaxTaskTiming> {
-        let serialibaymax = timings
+    pub fn convert(anchor: Instant, timings: &[TaskTiming]) -> Vec<SerialisimTaskTiming> {
+        let serialisim = timings
             .iter()
             .map(|timing| {
                 let start = timing.start.duration_since(anchor).as_nanos();
                 let duration = timing.end.0.duration_since(timing.start).as_nanos();
-                SerialibaymaxTaskTiming {
+                SerialisimTaskTiming {
                     location: timing.location.into(),
                     start,
                     duration,
@@ -273,14 +273,14 @@ impl SerialibaymaxTaskTiming {
             })
             .collect::<Vec<_>>();
 
-        serialibaymax
+        serialisim
     }
 
     /// `anchor` - [`Instant`] that should be earlier than all timings to use as base anchor
-    pub fn from(anchor: Instant, timing: TaskTiming) -> SerialibaymaxTaskTiming {
+    pub fn from(anchor: Instant, timing: TaskTiming) -> SerialisimTaskTiming {
         let start = timing.start.duration_since(anchor).as_nanos();
         let duration = timing.end.0.duration_since(timing.start).as_nanos();
-        SerialibaymaxTaskTiming {
+        SerialisimTaskTiming {
             location: timing.location.into(),
             start,
             duration,
@@ -290,32 +290,32 @@ impl SerialibaymaxTaskTiming {
 
 /// Serializable variant of [`ThreadTaskTimings`]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SerialibaymaxThreadTaskTimings {
+pub struct SerialisimThreadTaskTimings {
     /// Thread name
     pub thread_name: Option<String>,
     /// Hash of the thread id
     pub thread_id: u64,
     /// Timing records for this thread
-    pub timings: Vec<SerialibaymaxTaskTiming>,
+    pub timings: Vec<SerialisimTaskTiming>,
 }
 
-impl SerialibaymaxThreadTaskTimings {
+impl SerialisimThreadTaskTimings {
     /// Convert [`ThreadTaskTimings`] into their serializable format
     ///
     /// # Params
     ///
     /// `anchor` - [`Instant`] that should be earlier than all timings to use as base anchor
-    pub fn convert(anchor: Instant, timings: ThreadTaskTimings) -> SerialibaymaxThreadTaskTimings {
-        let serialibaymax_timings = SerialibaymaxTaskTiming::convert(anchor, &timings.timings);
+    pub fn convert(anchor: Instant, timings: ThreadTaskTimings) -> SerialisimThreadTaskTimings {
+        let serialisim_timings = SerialisimTaskTiming::convert(anchor, &timings.timings);
 
         let mut hasher = DefaultHasher::new();
         timings.thread_id.hash(&mut hasher);
         let thread_id = hasher.finish();
 
-        SerialibaymaxThreadTaskTimings {
+        SerialisimThreadTaskTimings {
             thread_name: timings.thread_name,
             thread_id,
-            timings: serialibaymax_timings,
+            timings: serialisim_timings,
         }
     }
 }
@@ -329,7 +329,7 @@ pub struct ThreadTimingsDelta {
     pub thread_name: Option<String>,
     /// New timings since the last call. If the circular buffer wrapped around
     /// since the previous poll, some entries may have been lost.
-    pub new_timings: Vec<SerialibaymaxTaskTiming>,
+    pub new_timings: Vec<SerialisimTaskTiming>,
 }
 
 /// Tracks which timing events have already been seen so that callers can request only unseen events.
@@ -382,7 +382,7 @@ impl ProfilingCollector {
                 continue;
             }
 
-            let new_timings = SerialibaymaxTaskTiming::convert(self.startup_time, slice);
+            let new_timings = SerialisimTaskTiming::convert(self.startup_time, slice);
 
             deltas.push(ThreadTimingsDelta {
                 thread_id: hashed_id,

@@ -19,10 +19,10 @@ wasmtime::component::bindgen!({
     path: "../extension_api/wit/since_v0.0.6",
     with: {
         "worktree": ExtensionWorktree,
-        "baymax:extension/github": since_v0_6_0::baymax::extension::github,
-        "baymax:extension/lsp": since_v0_1_0::baymax::extension::lsp,
-        "baymax:extension/nodejs": latest::baymax::extension::nodejs,
-        "baymax:extension/platform": since_v0_6_0::baymax::extension::platform,
+        "sim:extension/github": since_v0_6_0::sim::extension::github,
+        "sim:extension/lsp": since_v0_1_0::sim::extension::lsp,
+        "sim:extension/nodejs": latest::sim::extension::nodejs,
+        "sim:extension/platform": since_v0_6_0::sim::extension::platform,
     },
 });
 

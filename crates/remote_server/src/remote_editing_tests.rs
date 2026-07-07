@@ -452,7 +452,7 @@ async fn test_remote_settings(cx: &mut TestAppContext, server_cx: &mut TestAppCo
                 .language(None, Some(&"Rust".into()), cx)
                 .language_servers,
             ["from-local-settings"],
-            "User language settings should be synchronibaymax with the server settings"
+            "User language settings should be synchronisim with the server settings"
         )
     });
 
@@ -478,7 +478,7 @@ async fn test_remote_settings(cx: &mut TestAppContext, server_cx: &mut TestAppCo
     });
 
     fs.insert_tree(
-        "/code/project1/.baymax",
+        "/code/project1/.sim",
         json!({
             "settings.json": r#"
                   {
@@ -565,7 +565,7 @@ async fn test_remote_lsp(cx: &mut TestAppContext, server_cx: &mut TestAppContext
     let (project, headless) = init_test(&fs, cx, server_cx).await;
 
     fs.insert_tree(
-        path!("/code/project1/.baymax"),
+        path!("/code/project1/.sim"),
         json!({
             "settings.json": r#"
           {
@@ -804,7 +804,7 @@ async fn test_remote_cancel_language_server_work(
     let (project, headless) = init_test(&fs, cx, server_cx).await;
 
     fs.insert_tree(
-        path!("/code/project1/.baymax"),
+        path!("/code/project1/.sim"),
         json!({
             "settings.json": r#"
           {
@@ -1785,7 +1785,7 @@ async fn test_remote_archive_git_operations_are_supported(
 
     cx.update(|cx| {
         repository.update(cx, |repository, _| {
-            repository.update_ref("refs/baymax-tests/archive-checkpoint".to_string(), head_sha)
+            repository.update_ref("refs/sim-tests/archive-checkpoint".to_string(), head_sha)
         })
     })
     .await
@@ -1796,7 +1796,7 @@ async fn test_remote_archive_git_operations_are_supported(
 
     cx.update(|cx| {
         repository.update(cx, |repository, _| {
-            repository.delete_ref("refs/baymax-tests/archive-checkpoint".to_string())
+            repository.delete_ref("refs/sim-tests/archive-checkpoint".to_string())
         })
     })
     .await
@@ -2657,7 +2657,7 @@ async fn test_remote_apply_code_action_skips_unadvertised_command(
     let (project, headless) = init_test(&fs, cx, server_cx).await;
 
     fs.insert_tree(
-        path!("/code/project1/.baymax"),
+        path!("/code/project1/.sim"),
         json!({
             "settings.json": r#"
           {

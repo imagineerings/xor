@@ -96,7 +96,7 @@ See `.agents/specs/ci-migration/tasks.md` for the full prioritized implementatio
 |------|-------------|
 | `nix_build.yml` | Nix build via PR label `run-nix` |
 | `cherry_pick.yml` | Cherry-pick commits into release branches |
-| `bump_baymax_version.yml` | Bump Baymax version (main/preview/stable) |
+| `bump_sim_version.yml` | Bump Sim version (main/preview/stable) |
 | `bump_patch_version.yml` | Bump patch version |
 | `bump_collab_staging.yml` | Bump collab staging version |
 

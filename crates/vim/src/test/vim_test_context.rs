@@ -30,7 +30,7 @@ impl VimTestContext {
             theme_settings::init(theme::LoadThemes::JustBase, cx);
             settings_ui::init(cx);
             markdown_preview::init(cx);
-            baymax_actions::init();
+            sim_actions::init();
         });
     }
 

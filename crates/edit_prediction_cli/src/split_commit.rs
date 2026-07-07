@@ -81,9 +81,9 @@ pub struct SplitCommitArgs {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct AnnotatedCommit {
-    /// Repository path (e.g., "repos/baymax")
+    /// Repository path (e.g., "repos/sim")
     pub repo: String,
-    /// Repository URL (e.g., "https://github.com/simtropolis/baymax")
+    /// Repository URL (e.g., "https://github.com/simtropolis/sim")
     pub repo_url: String,
     /// Commit SHA
     pub commit_sha: String,
@@ -2102,11 +2102,11 @@ Date: Mon Jan 1 00:00:00 2024
         };
 
         let json = serde_json::to_string(&case).unwrap();
-        let deserialibaymax: ExampleSpec = serde_json::from_str(&json).unwrap();
+        let deserialisim: ExampleSpec = serde_json::from_str(&json).unwrap();
 
-        assert_eq!(case.repository_url, deserialibaymax.repository_url);
-        assert_eq!(case.revision, deserialibaymax.revision);
-        assert_eq!(case.cursor_position, deserialibaymax.cursor_position);
+        assert_eq!(case.repository_url, deserialisim.repository_url);
+        assert_eq!(case.revision, deserialisim.revision);
+        assert_eq!(case.cursor_position, deserialisim.cursor_position);
     }
 
     #[test]

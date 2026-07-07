@@ -2,14 +2,14 @@
 
 ## 1. Overview
 
-Migrate goose's TypeScript SDK, which provides a programmatic client for interacting with the baymax agent from TypeScript/JavaScript applications. The SDK enables embedding agent functionality into web apps, Node.js services, and other JavaScript environments.
+Migrate goose's TypeScript SDK, which provides a programmatic client for interacting with the sim agent from TypeScript/JavaScript applications. The SDK enables embedding agent functionality into web apps, Node.js services, and other JavaScript environments.
 
 ### Key Architectural Decisions
 
 - **Standalone npm package**: Published separately from the Rust codebase, likely from `ui/sdk/` within the monorepo.
 - **Generated from OpenAPI**: The SDK is largely derived from the OpenAPI spec (see REST API server design), ensuring type safety and API alignment.
-- **ACP-based for desktop, HTTP for remote**: The SDK supports both local ACP connections (to a local baymax instance) and HTTP connections (to a remote baymax-server).
-- **Binary resolution for local mode**: When connecting locally, the SDK locates and manages the baymax binary process.
+- **ACP-based for desktop, HTTP for remote**: The SDK supports both local ACP connections (to a local sim instance) and HTTP connections (to a remote sim-server).
+- **Binary resolution for local mode**: When connecting locally, the SDK locates and manages the sim binary process.
 
 ## 2. Architecture
 
@@ -237,7 +237,7 @@ _For any_ platform [macOS, Linux, Windows], THE binary resolver SHALL find the c
 ## 7. Testing Strategy
 
 - **Unit tests**: Client methods with mock HTTP/ACP transport
-- **Integration tests**: Against a running baymax-server instance
+- **Integration tests**: Against a running sim-server instance
 - **Binary resolver tests**: On each platform in CI
 - **Type generation tests**: Generated types match the OpenAPI schema
 
@@ -246,4 +246,4 @@ _For any_ platform [macOS, Linux, Windows], THE binary resolver SHALL find the c
 - Source: `projects/goose/ui/sdk/` — TypeScript SDK
 - Source: `projects/goose/crates/goose-sdk/` — Rust SDK bindings
 - Source: `projects/goose/crates/goose-sdk-types/` — SDK type definitions
-- Baymax: `crates/baymax-server/` (design) — REST API server
+- Sim: `crates/sim-server/` (design) — REST API server

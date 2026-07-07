@@ -1,21 +1,21 @@
 ---
 title: Themes
-description: "Themes for Baymax extensions."
+description: "Themes for Sim extensions."
 ---
 
 # Themes
 
 The `themes` directory in an extension should contain one or more theme files.
 
-Each theme file should adhere to the JSON schema specified at [`https://baymax.dev/schema/themes/v0.2.0.json`](https://baymax.dev/schema/themes/v0.2.0.json).
+Each theme file should adhere to the JSON schema specified at [`https://sim.dev/schema/themes/v0.2.0.json`](https://sim.dev/schema/themes/v0.2.0.json).
 
-See [this blog post](https://baymax.dev/blog/user-themes-now-in-preview) for additional background on creating themes.
+See [this blog post](https://sim.dev/blog/user-themes-now-in-preview) for additional background on creating themes.
 
 ## Theme JSON Structure
 
-The structure of a Baymax theme is defined in the [Baymax Theme JSON Schema](https://baymax.dev/schema/themes/v0.2.0.json).
+The structure of a Sim theme is defined in the [Sim Theme JSON Schema](https://sim.dev/schema/themes/v0.2.0.json).
 
-A Baymax theme consists of a Theme Family object including:
+A Sim theme consists of a Theme Family object including:
 
 - `name`: The name for the theme family
 - `author`: The name of the author of the theme family
@@ -57,7 +57,7 @@ The core components of a Theme object include:
 
 ## Designing Your Theme
 
-You can use [Baymax's Theme Builder](https://baymax.dev/theme-builder) to design your own custom theme based on an existing one.
+You can use [Sim's Theme Builder](https://sim.dev/theme-builder) to design your own custom theme based on an existing one.
 
-This tool lets you fine-tune and preview how surfaces in Baymax will look.
-You can then export the JSON and publish it in Baymax's extension store.
+This tool lets you fine-tune and preview how surfaces in Sim will look.
+You can then export the JSON and publish it in Sim's extension store.

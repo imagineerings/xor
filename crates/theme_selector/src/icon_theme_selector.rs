@@ -1,4 +1,4 @@
-use baymax_actions::{ExtensionCategoryFilter, Extensions};
+use sim_actions::{ExtensionCategoryFilter, Extensions};
 use fs::Fs;
 use fuzzy::{StringMatch, StringMatchCandidate, match_strings};
 use gpui::{
@@ -337,7 +337,7 @@ impl PickerDelegate for IconThemeSelectorDelegate {
                                 .color(Color::Muted),
                         )
                         .on_click(|_event, _window, cx| {
-                            cx.open_url("https://baymax.dev/docs/icon-themes");
+                            cx.open_url("https://sim.dev/docs/icon-themes");
                         }),
                 )
                 .child(
@@ -423,7 +423,7 @@ mod tests {
         workspace: &Entity<workspace::Workspace>,
         cx: &mut VisualTestContext,
     ) -> Entity<Picker<IconThemeSelectorDelegate>> {
-        cx.dispatch_action(baymax_actions::icon_theme_selector::Toggle {
+        cx.dispatch_action(sim_actions::icon_theme_selector::Toggle {
             themes_filter: None,
         });
         cx.run_until_parked();

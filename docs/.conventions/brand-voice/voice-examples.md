@@ -1,6 +1,6 @@
 # Voice Transformation Examples
 
-Ten before/after transformations demonstrating Baymax's brand voice. Use these as calibration for diagnosis and reconstruction.
+Ten before/after transformations demonstrating Sim's brand voice. Use these as calibration for diagnosis and reconstruction.
 
 ---
 
@@ -8,11 +8,11 @@ Ten before/after transformations demonstrating Baymax's brand voice. Use these a
 
 **Before (Score: 2/5 Technical Grounding)**
 
-> Baymax delivers blazingly fast performance that will revolutionize your coding experience. Our cutting-edge technology ensures you never wait again.
+> Sim delivers blazingly fast performance that will revolutionize your coding experience. Our cutting-edge technology ensures you never wait again.
 
 **After (Score: 5/5)**
 
-> Baymax is written in Rust with GPU-accelerated rendering. Keystrokes register in under 8ms. Scrolling stays at 120fps even in large files.
+> Sim is written in Rust with GPU-accelerated rendering. Keystrokes register in under 8ms. Scrolling stays at 120fps even in large files.
 
 **Transformation notes:**
 
@@ -27,11 +27,11 @@ Ten before/after transformations demonstrating Baymax's brand voice. Use these a
 
 **Before (Score: 2/5 Developer Respect)**
 
-> Don't worry about the complicated stuff — Baymax handles it all for you! Just focus on what you do best: writing amazing code.
+> Don't worry about the complicated stuff — Sim handles it all for you! Just focus on what you do best: writing amazing code.
 
 **After (Score: 5/5)**
 
-> Baymax runs language servers in separate processes with automatic crash recovery. If a language server fails, you keep editing while it restarts.
+> Sim runs language servers in separate processes with automatic crash recovery. If a language server fails, you keep editing while it restarts.
 
 **Transformation notes:**
 
@@ -46,7 +46,7 @@ Ten before/after transformations demonstrating Baymax's brand voice. Use these a
 
 **Before (Score: 2/5 Specificity)**
 
-> Baymax provides a seamless collaborative experience that brings your team together in powerful new ways.
+> Sim provides a seamless collaborative experience that brings your team together in powerful new ways.
 
 **After (Score: 5/5)**
 
@@ -65,11 +65,11 @@ Ten before/after transformations demonstrating Baymax's brand voice. Use these a
 
 **Before (Score: 2/5 Natural Syntax)**
 
-> Baymax is fast — really fast — and built for the way developers actually work — not how tools think they should work.
+> Sim is fast — really fast — and built for the way developers actually work — not how tools think they should work.
 
 **After (Score: 5/5)**
 
-> Baymax is built for speed. We optimized for the workflows developers actually use: jumping between files, searching across projects, editing multiple cursors at once.
+> Sim is built for speed. We optimized for the workflows developers actually use: jumping between files, searching across projects, editing multiple cursors at once.
 
 **Transformation notes:**
 
@@ -84,11 +84,11 @@ Ten before/after transformations demonstrating Baymax's brand voice. Use these a
 
 **Before (Score: 1/5 Quiet Confidence)**
 
-> We're thrilled to announce Baymax 1.0! After years of hard work, we can't wait for you to experience what we've built. You're going to love it!
+> We're thrilled to announce Sim 1.0! After years of hard work, we can't wait for you to experience what we've built. You're going to love it!
 
 **After (Score: 5/5)**
 
-> Baymax 1.0 is available today. This release includes GPU text rendering, multi-buffer editing, and native collaboration. Download it at baymax.dev.
+> Sim 1.0 is available today. This release includes GPU text rendering, multi-buffer editing, and native collaboration. Download it at sim.dev.
 
 **Transformation notes:**
 
@@ -104,11 +104,11 @@ Ten before/after transformations demonstrating Baymax's brand voice. Use these a
 
 **Before (Score: 2/5 Natural Syntax)**
 
-> Baymax isn't just an editor — it's a complete development environment. It's not about features — it's about flow. And it's not slow — it's instant.
+> Sim isn't just an editor — it's a complete development environment. It's not about features — it's about flow. And it's not slow — it's instant.
 
 **After (Score: 5/5)**
 
-> Baymax combines editing, debugging, collaboration, and AI assistance in one application. Everything runs in the same process, so switching between tasks has no context-switch overhead.
+> Sim combines editing, debugging, collaboration, and AI assistance in one application. Everything runs in the same process, so switching between tasks has no context-switch overhead.
 
 **Transformation notes:**
 
@@ -123,11 +123,11 @@ Ten before/after transformations demonstrating Baymax's brand voice. Use these a
 
 **Before (Score: 2/5 Specificity)**
 
-> Baymax's AI integration enhances your productivity and streamlines your workflow, helping you code smarter and ship faster.
+> Sim's AI integration enhances your productivity and streamlines your workflow, helping you code smarter and ship faster.
 
 **After (Score: 5/5)**
 
-> Baymax runs AI completions inline as you type. Suggestions appear in 200ms. Accept with Tab, reject by continuing to type. The model runs locally or connects to your preferred API.
+> Sim runs AI completions inline as you type. Suggestions appear in 200ms. Accept with Tab, reject by continuing to type. The model runs locally or connects to your preferred API.
 
 **Transformation notes:**
 
@@ -142,11 +142,11 @@ Ten before/after transformations demonstrating Baymax's brand voice. Use these a
 
 **Before (Score: 1/5 across multiple criteria)**
 
-> 🚀 Big news! Baymax just dropped MASSIVE updates! Multi-file editing, insane AI features, and SO much more. This is a game-changer, folks! Try it now! 🔥
+> 🚀 Big news! Sim just dropped MASSIVE updates! Multi-file editing, insane AI features, and SO much more. This is a game-changer, folks! Try it now! 🔥
 
 **After (Score: 4/5)**
 
-> Baymax 0.150: Multi-buffer editing is here. Edit across files in a single view. AI completions now stream inline. Full changelog at baymax.dev/releases.
+> Sim 0.150: Multi-buffer editing is here. Edit across files in a single view. AI completions now stream inline. Full changelog at sim.dev/releases.
 
 **Transformation notes:**
 
@@ -167,7 +167,7 @@ Ten before/after transformations demonstrating Baymax's brand voice. Use these a
 
 **After (Score: 5/5)**
 
-> Baymax now includes a built-in terminal. Open it with `ctrl+\``. Terminals run in splits alongside your editor panes and share the same working directory as your project.
+> Sim now includes a built-in terminal. Open it with `ctrl+\``. Terminals run in splits alongside your editor panes and share the same working directory as your project.
 
 **Transformation notes:**
 
@@ -182,11 +182,11 @@ Ten before/after transformations demonstrating Baymax's brand voice. Use these a
 
 **Before (Score: 3/5 Quiet Confidence)**
 
-> At Baymax, we believe that developers deserve better tools. We're passionate about creating the best possible coding experience because we know how frustrating slow, bloated editors can be.
+> At Sim, we believe that developers deserve better tools. We're passionate about creating the best possible coding experience because we know how frustrating slow, bloated editors can be.
 
 **After (Score: 5/5)**
 
-> Developer tools should be fast, understandable, and collaborative. We built Baymax to meet that standard. It's open source so you can verify our work and extend it.
+> Developer tools should be fast, understandable, and collaborative. We built Sim to meet that standard. It's open source so you can verify our work and extend it.
 
 **Transformation notes:**
 
@@ -207,7 +207,7 @@ When transforming copy, certain elements must survive unchanged:
 Tag factual claims with `[FACT]` during diagnosis phase:
 
 ```
-Baymax is written in [FACT: Rust] with [FACT: GPU-accelerated rendering].
+Sim is written in [FACT: Rust] with [FACT: GPU-accelerated rendering].
 It was built by [FACT: the team behind Atom and Tree-sitter].
 ```
 
@@ -217,9 +217,9 @@ It was built by [FACT: the team behind Atom and Tree-sitter].
 | ------------------ | ------------------------------------------ |
 | Technical specs    | "120fps", "8ms latency", "Rust"            |
 | Proper nouns       | "Tree-sitter", "Anthropic", "Claude"       |
-| Version numbers    | "Baymax 1.0", "v0.150"                        |
+| Version numbers    | "Sim 1.0", "v0.150"                        |
 | Keyboard shortcuts | "cmd+shift+c", "ctrl+\`"                   |
-| URLs               | "baymax.dev/releases"                         |
+| URLs               | "sim.dev/releases"                         |
 | Attribution        | "built by the team behind Atom"            |
 | Dates              | "available today", "released January 2024" |
 | Quotes             | Any attributed quotation                   |
@@ -237,11 +237,11 @@ After reconstruction, diff against original `[FACT]` markers:
 
 **Original with markers:**
 
-> Baymax is [FACT: written in Rust] with [FACT: GPU-accelerated rendering at 120fps]. Built by [FACT: the team behind Atom and Tree-sitter].
+> Sim is [FACT: written in Rust] with [FACT: GPU-accelerated rendering at 120fps]. Built by [FACT: the team behind Atom and Tree-sitter].
 
 **Reconstruction:**
 
-> Baymax renders every frame on the GPU at 120fps. The Rust codebase prioritizes memory safety without garbage collection pauses. The same engineers who built Atom and Tree-sitter lead development.
+> Sim renders every frame on the GPU at 120fps. The Rust codebase prioritizes memory safety without garbage collection pauses. The same engineers who built Atom and Tree-sitter lead development.
 
 **Verification:**
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GitHub PR Analyzer for simtropolis/baymax repository
+GitHub PR Analyzer for simtropolis/sim repository
 Downloads all PRs and groups them by first assignee with status, open date, and last updated date.
 """
 
@@ -16,7 +16,7 @@ import os
 # GitHub API configuration
 GITHUB_API_BASE = "https://api.github.com"
 REPO_OWNER = "simtropolis"
-REPO_NAME = "baymax"
+REPO_NAME = "sim"
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
 def make_github_request(url, params=None):

@@ -228,7 +228,7 @@ impl LanguageModelCompletionError {
             .and_then(|code| StatusCode::from_str(code).ok())
         {
             Self::from_http_status(
-                BAYMAX_CLOUD_PROVIDER_NAME,
+                SIM_CLOUD_PROVIDER_NAME,
                 status_code,
                 message,
                 retry_after,
@@ -597,11 +597,11 @@ mod tests {
             thought_signature: Some("test_signature".to_string()),
         };
 
-        let serialibaymax = serde_json::to_value(&tool_use).unwrap();
+        let serialisim = serde_json::to_value(&tool_use).unwrap();
 
-        assert_eq!(serialibaymax["id"], "test_id");
-        assert_eq!(serialibaymax["name"], "test_tool");
-        assert_eq!(serialibaymax["thought_signature"], "test_signature");
+        assert_eq!(serialisim["id"], "test_id");
+        assert_eq!(serialisim["name"], "test_tool");
+        assert_eq!(serialisim["thought_signature"], "test_signature");
     }
 
     #[test]
@@ -636,13 +636,13 @@ mod tests {
             thought_signature: Some("round_trip_sig".to_string()),
         };
 
-        let serialibaymax = serde_json::to_value(&original).unwrap();
-        let deserialibaymax: LanguageModelToolUse = serde_json::from_value(serialibaymax).unwrap();
+        let serialisim = serde_json::to_value(&original).unwrap();
+        let deserialisim: LanguageModelToolUse = serde_json::from_value(serialisim).unwrap();
 
-        assert_eq!(deserialibaymax.id, original.id);
-        assert_eq!(deserialibaymax.name, original.name);
+        assert_eq!(deserialisim.id, original.id);
+        assert_eq!(deserialisim.name, original.name);
         assert_eq!(
-            deserialibaymax.thought_signature,
+            deserialisim.thought_signature,
             original.thought_signature
         );
     }
@@ -660,11 +660,11 @@ mod tests {
             thought_signature: None,
         };
 
-        let serialibaymax = serde_json::to_value(&original).unwrap();
-        let deserialibaymax: LanguageModelToolUse = serde_json::from_value(serialibaymax).unwrap();
+        let serialisim = serde_json::to_value(&original).unwrap();
+        let deserialisim: LanguageModelToolUse = serde_json::from_value(serialisim).unwrap();
 
-        assert_eq!(deserialibaymax.id, original.id);
-        assert_eq!(deserialibaymax.name, original.name);
-        assert_eq!(deserialibaymax.thought_signature, None);
+        assert_eq!(deserialisim.id, original.id);
+        assert_eq!(deserialisim.name, original.name);
+        assert_eq!(deserialisim.thought_signature, None);
     }
 }

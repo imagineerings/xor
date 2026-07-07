@@ -78,7 +78,7 @@ Add client-side draft persistence for channel message composition. When a user t
 - [ ] 8. Implement discard draft with confirmation dialog
   - Add a `DiscardDraft` action to `ChannelView`.
   - Bind the action to the `Escape` key (or add a "Discard" button in the compose area).
-  - On trigger, show a confirmation dialog using an existing Baymax pattern (e.g., a confirmation toast or modal).
+  - On trigger, show a confirmation dialog using an existing Sim pattern (e.g., a confirmation toast or modal).
   - On confirm: call `DraftStore::clear_draft(channel_id)` and clear the editor content.
   - On cancel: do nothing; keep draft intact.
   - _Requirements: 7.3_

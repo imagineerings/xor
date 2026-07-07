@@ -1,11 +1,11 @@
 ---
 name: commit
-description: Stage and commit changes in Baymax with repo-appropriate validation, a conventional multi-line message, and Co-authored-by attribution.
+description: Stage and commit changes in Sim with repo-appropriate validation, a conventional multi-line message, and Co-authored-by attribution.
 ---
 
 # commit skill
 
-Use this skill whenever you need to create a git commit in the Baymax workspace.
+Use this skill whenever you need to create a git commit in the Sim workspace.
 
 ## 1. Validation gate
 

@@ -42,11 +42,11 @@ The first useful milestone is artifact-only Android release builds. iOS publishi
 
 - [x] 3. Restore iOS project buildability
   - [x] 3.1 Add or restore iOS Xcode project metadata
-    - Add an Xcode project or workspace under `mobile/ios` that includes existing Swift sources in `mobile/ios/Baymax`
+    - Add an Xcode project or workspace under `mobile/ios` that includes existing Swift sources in `mobile/ios/Sim`
     - Configure bundle identifier, marketing version, build number, deployment target, app icons, Info.plist, and entitlements as needed
     - Ensure the project can be discovered by `xcodebuild` from scripts
     - _Requirements: 2.1, 2.2, 2.5, 7.5_
-    - _writes: `mobile/ios/Baymax.xcodeproj/`, `mobile/ios/Baymax/*.entitlements`_
+    - _writes: `mobile/ios/Sim.xcodeproj/`, `mobile/ios/Sim/*.entitlements`_
 
   - [x] 3.2 Add iOS build and archive scripts
     - Create `mobile/scripts/ios-build.sh` for simulator/device compile validation

@@ -6,13 +6,13 @@ Use metadata-only support for XR action maps, camera/spatial classes, and docs. 
 
 ## Components
 
-- `BaymaxGameXrBoundary`
+- `SimGameXrBoundary`
 - `SpatialAssetMetadata`
 
 ## Correctness Properties
 
 ### Property 1: XR Exclusion
 
-_For any_ XR runtime feature, Baymax SHALL not classify it as a native runtime adapter.
+_For any_ XR runtime feature, Sim SHALL not classify it as a native runtime adapter.
 
 **Validates: Requirement 1.1**

@@ -13,14 +13,14 @@ flowchart LR
     Flags[FeatureFlagRegistry] --> Runtime[comfy-runtime-control-plane]
     Schema[ComfyApiSchemaCatalog] --> Tests[CompatibilityFixtureSuite]
     Deps[DependencyReviewGate] --> Packaging[PackagingProfileCatalog]
-    Logs[DiagnosticsAdapter] --> BaymaxDiag[Baymax Diagnostics]
+    Logs[DiagnosticsAdapter] --> SimDiag[Sim Diagnostics]
 ```
 
 ## Components and Interfaces
 
 ### ComfyLaunchProfileParser
 
-- **Purpose**: Parse Comfy-compatible launch options into Baymax configuration.
+- **Purpose**: Parse Comfy-compatible launch options into Sim configuration.
 - **Responsibilities**: Networking, directories, upload limits, logging, assets, database, API nodes, custom nodes, manager mode, feature flags, memory, precision, device, cache, and performance options.
 
 ### FeatureFlagRegistry
@@ -45,7 +45,7 @@ flowchart LR
 
 ### DiagnosticsAdapter
 
-- **Purpose**: Expose logs and internal diagnostics through Baymax diagnostics without making internal endpoints stable public API.
+- **Purpose**: Expose logs and internal diagnostics through Sim diagnostics without making internal endpoints stable public API.
 
 ## Data Models
 
@@ -73,7 +73,7 @@ pub enum ComfyRouteSupport {
 
 ### Property 1: Unsupported Option Visibility
 
-_For any_ Comfy launch option supplied to Baymax, if no Baymax behavior supports it, the parser SHALL report it as unsupported with a reason and nearest equivalent when one exists.
+_For any_ Comfy launch option supplied to Sim, if no Sim behavior supports it, the parser SHALL report it as unsupported with a reason and nearest equivalent when one exists.
 
 **Validates: Requirement 1.3**
 

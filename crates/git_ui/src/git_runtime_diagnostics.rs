@@ -4,7 +4,7 @@
 //! never fail just because diagnostics couldn't be collected.
 //!
 //! What we gather:
-//! - All transitive descendant processes of the current Baymax process
+//! - All transitive descendant processes of the current Sim process
 //!   (cross-platform via `sysinfo`).
 //! - On Linux: each descendant's `/proc/<pid>/wchan` (kernel function the
 //!   thread is currently sleeping in) and `State:` from `/proc/<pid>/status`.
@@ -105,7 +105,7 @@ fn collect_process_tree() -> anyhow::Result<Value> {
         .collect();
 
     Ok(serde_json::json!({
-        "baymax_pid": current_pid.as_u32(),
+        "sim_pid": current_pid.as_u32(),
         "descendant_count": entries.len(),
         "descendants": entries,
     }))
@@ -121,15 +121,15 @@ fn collect_process_tree() -> anyhow::Result<Value> {
 /// argv, so we return `None` so the caller emits a JSON null rather than
 /// something misleading.
 fn sanitize_cmd(cmd: impl IntoIterator<Item = String>) -> Option<Vec<String>> {
-    let sanitibaymax: Vec<String> = cmd.into_iter().map(redact_env_var_entry).collect();
-    if sanitibaymax.is_empty() {
+    let sanitisim: Vec<String> = cmd.into_iter().map(redact_env_var_entry).collect();
+    if sanitisim.is_empty() {
         return None;
     }
-    let all_redacted = sanitibaymax.iter().all(|s| s.ends_with("=<redacted>"));
+    let all_redacted = sanitisim.iter().all(|s| s.ends_with("=<redacted>"));
     if all_redacted {
         None
     } else {
-        Some(sanitibaymax)
+        Some(sanitisim)
     }
 }
 

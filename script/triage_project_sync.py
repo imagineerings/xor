@@ -3,8 +3,8 @@
 triage_project_sync.py
 ======================
 
-Sync triage state from `simtropolis/baymax` issues into the
-"Baymax weekly triage" project (#84).
+Sync triage state from `simtropolis/sim` issues into the
+"Sim weekly triage" project (#84).
 
 Auto-derives `Status`, `Stale since`, `Aged?`, `Intake week` from issue labels
 + comment activity + assignees. Mutates the project to
@@ -25,7 +25,7 @@ Modes
 Auth
 ----
 Reads `GITHUB_TOKEN` from env. For production, this is an installation token
-from the `BAYMAX_COMMUNITY_BOT_APP_ID` GitHub App, scoped to
+from the `SIM_COMMUNITY_BOT_APP_ID` GitHub App, scoped to
 `owner: simtropolis`, with `Organization Projects: Read and write`.
 
 For local `--dry-run` testing, a personal token with `repo, read:org,
@@ -60,7 +60,7 @@ import requests
 # Constants
 
 REPO_OWNER = "simtropolis"
-REPO_NAME = "baymax"
+REPO_NAME = "sim"
 REPO = f"{REPO_OWNER}/{REPO_NAME}"
 
 PROJECT_NUMBER = 84
@@ -427,14 +427,14 @@ def derive_status(issue: IssueData, staff: set[str]) -> tuple[str, str, str]:
                 )
         return STATUS_NEEDS_REPRO_ATTEMPT, "R5a", "no substantive staff comment after reporter's last activity"
 
-    # R3 (state:needs triage) is checked LAST among recognibaymax state labels.
+    # R3 (state:needs triage) is checked LAST among recognisim state labels.
     # If state:needs triage is the only state label, the issue genuinely needs
     # initial labeling. If any other state label is also present, that state
     # has already been matched above and won.
     if "state:needs triage" in L:
         return STATUS_NEEDS_LABELS, "R3", "state:needs triage label present (no other state:* matched)"
 
-    return STATUS_UNKNOWN, "R6", f"open with no recognibaymax state label (labels: {sorted(L) or '<none>'})"
+    return STATUS_UNKNOWN, "R6", f"open with no recognisim state label (labels: {sorted(L) or '<none>'})"
 
 
 def derive_stale_since(

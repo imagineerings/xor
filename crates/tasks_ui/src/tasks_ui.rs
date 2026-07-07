@@ -411,7 +411,7 @@ mod tests {
         fs.insert_tree(
             path!("/dir"),
             json!({
-                ".baymax": {
+                ".sim": {
                     "tasks.json": r#"[
                             {
                                 "label": "example task",

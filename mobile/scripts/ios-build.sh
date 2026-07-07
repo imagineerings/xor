@@ -13,18 +13,18 @@ Options:
   --configuration <Debug|Release>  Defaults to Debug.
   --version <version>              Defaults to 1.0.
   --build-number <number>          Defaults to GITHUB_RUN_NUMBER or 1.
-  --bundle-id <identifier>         Defaults to com.simtropolis.baymaxchat.
+  --bundle-id <identifier>         Defaults to com.simtropolis.simchat.
   --derived-data-path <path>       Defaults to mobile/build/ios/DerivedData.
   --help
 
-Compile-validates the iOS app from mobile/ios/Baymax.xcodeproj.
+Compile-validates the iOS app from mobile/ios/Sim.xcodeproj.
 USAGE
 }
 
 configuration="Debug"
 version="1.0"
 build_number="$(default_build_number)"
-bundle_id="com.simtropolis.baymaxchat"
+bundle_id="com.simtropolis.simchat"
 derived_data_path="${mobile_root}/build/ios/DerivedData"
 
 while [[ $# -gt 0 ]]; do
@@ -74,7 +74,7 @@ validate_build_number "${build_number}"
 require_command xcodebuild "Install Xcode and retry."
 
 ios_root="${mobile_root}/ios"
-project="${ios_root}/Baymax.xcodeproj"
+project="${ios_root}/Sim.xcodeproj"
 
 [[ -d "${project}" ]] || die "Missing iOS project metadata at ${project}. Run the iOS project metadata task first."
 
@@ -83,12 +83,12 @@ mkdir -p "${derived_data_path}"
 log "building iOS ${configuration}"
 xcodebuild \
     -project "${project}" \
-    -scheme Baymax \
+    -scheme Sim \
     -configuration "${configuration}" \
     -destination "generic/platform=iOS Simulator" \
     -derivedDataPath "${derived_data_path}" \
-    BAYMAX_VERSION_NAME="${version}" \
-    BAYMAX_BUILD_NUMBER="${build_number}" \
-    BAYMAX_BUNDLE_IDENTIFIER="${bundle_id}" \
+    SIM_VERSION_NAME="${version}" \
+    SIM_BUILD_NUMBER="${build_number}" \
+    SIM_BUNDLE_IDENTIFIER="${bundle_id}" \
     CODE_SIGNING_ALLOWED=NO \
     build

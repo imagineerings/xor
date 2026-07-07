@@ -563,7 +563,7 @@ pub struct Runnable {
     pub args: RunnableArgs,
 }
 
-/// The `kind` field in the JSON determines which variant is deserialibaymax; see
+/// The `kind` field in the JSON determines which variant is deserialisim; see
 /// comment on `Runnables` above for more discussion.
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(tag = "kind", content = "args")]

@@ -1,17 +1,17 @@
 ---
-title: Terminal Threads - Baymax
-description: Run agent CLIs and TUIs directly in terminal-backed threads in Baymax.
+title: Terminal Threads - Sim
+description: Run agent CLIs and TUIs directly in terminal-backed threads in Sim.
 ---
 
 # Terminal Threads
 
-Terminal Threads are terminal-backed threads in the [Threads Sidebar](./parallel-agents.md#threads-sidebar). Use them when you want to run an agent CLI or TUI directly in Baymax.
+Terminal Threads are terminal-backed threads in the [Threads Sidebar](./parallel-agents.md#threads-sidebar). Use them when you want to run an agent CLI or TUI directly in Sim.
 
-Terminal Threads are different from [External Agents](./external-agents.md). External Agents integrate with Baymax through ACP and render as agent threads. Terminal Threads run the native command-line tool in a terminal that Baymax organizes as a thread.
+Terminal Threads are different from [External Agents](./external-agents.md). External Agents integrate with Sim through ACP and render as agent threads. Terminal Threads run the native command-line tool in a terminal that Sim organizes as a thread.
 
-## What Baymax Owns {#what-baymax-owns}
+## What Sim Owns {#what-sim-owns}
 
-Baymax owns the thread surface:
+Sim owns the thread surface:
 
 - the terminal-backed thread in the Threads Sidebar
 - thread grouping by project
@@ -28,7 +28,7 @@ The CLI or TUI running inside the terminal owns its own:
 - skills and instruction files
 - MCP configuration
 
-Baymax Agent profiles, Baymax Agent tool permissions, Baymax Skills, and Baymax Agent MCP settings do not automatically apply to Terminal Threads.
+Sim Agent profiles, Sim Agent tool permissions, Sim Skills, and Sim Agent MCP settings do not automatically apply to Terminal Threads.
 
 ## Opening a Terminal Thread {#opening-a-terminal-thread}
 
@@ -42,7 +42,7 @@ The terminal title in the toolbar updates automatically to reflect the running s
 
 ## Notifications {#terminal-thread-notifications}
 
-When a terminal produces a bell character while not in focus, Baymax notifies you the same way it does when an agent finishes: with a visual pop-up and an optional sound. Clicking the notification brings the terminal into focus and clears the indicator.
+When a terminal produces a bell character while not in focus, Sim notifies you the same way it does when an agent finishes: with a visual pop-up and an optional sound. Clicking the notification brings the terminal into focus and clears the indicator.
 
 The same `agent.notify_when_agent_waiting` and `agent.play_sound_when_agent_done` settings apply.
 
@@ -52,7 +52,7 @@ Unlike agent threads, Terminal Threads are closed rather than archived. They do 
 
 ## CLI/TUI Setup Notes {#cli-setup}
 
-Some agent CLIs and TUIs can send terminal signals, such as bell notifications or title updates, that Baymax uses to show useful context in the sidebar.
+Some agent CLIs and TUIs can send terminal signals, such as bell notifications or title updates, that Sim uses to show useful context in the sidebar.
 
 ### Claude Code Notifications {#claude-code-notifications}
 
@@ -76,7 +76,7 @@ For more, see the [Claude Code documentation](https://code.claude.com/docs/en/te
 
 ### Amp Notifications {#amp-notifications}
 
-Amp updates terminal titles automatically and can also notify you when it needs your attention. To enable notifications in Baymax Terminal Threads, add `AMP_FORCE_BEL=1` to your terminal environment settings:
+Amp updates terminal titles automatically and can also notify you when it needs your attention. To enable notifications in Sim Terminal Threads, add `AMP_FORCE_BEL=1` to your terminal environment settings:
 
 ```json [settings]
 {
@@ -92,12 +92,12 @@ Restart Amp after adding the environment variable.
 
 ### OpenCode Notifications {#opencode-notifications}
 
-OpenCode can update terminal titles automatically. For Baymax notifications, add an OpenCode plugin that emits a terminal bell when OpenCode needs your attention.
+OpenCode can update terminal titles automatically. For Sim notifications, add an OpenCode plugin that emits a terminal bell when OpenCode needs your attention.
 
-Create `.opencode/plugins/baymax-bell.js` in your project, or `~/.config/opencode/plugins/baymax-bell.js` to use it globally:
+Create `.opencode/plugins/sim-bell.js` in your project, or `~/.config/opencode/plugins/sim-bell.js` to use it globally:
 
 ```js
-export const BaymaxBell = async () => {
+export const SimBell = async () => {
   return {
     event: async ({ event }) => {
       if (event.type === "session.idle" || event.type === "permission.asked") {
@@ -112,7 +112,7 @@ Restart OpenCode after adding the plugin.
 
 ### Pi Notifications {#pi-notifications}
 
-Pi can use an extension to emit a notification when it finishes a turn. Create `.pi/extensions/baymax-bell.ts` in your project, or `~/.pi/agent/extensions/baymax-bell.ts` to use it globally:
+Pi can use an extension to emit a notification when it finishes a turn. Create `.pi/extensions/sim-bell.ts` in your project, or `~/.pi/agent/extensions/sim-bell.ts` to use it globally:
 
 ```ts
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -128,7 +128,7 @@ Restart Pi after adding the extension, or run `/reload` if the extension is in o
 
 ### Codex Terminal Titles {#codex-terminal-titles}
 
-Codex can update the terminal title as it works, which Baymax uses to show useful context for Codex Terminal Threads in the sidebar, such as the project, current status, branch, model, or task progress.
+Codex can update the terminal title as it works, which Sim uses to show useful context for Codex Terminal Threads in the sidebar, such as the project, current status, branch, model, or task progress.
 
 To configure this from within Codex, run `/title` and use the picker to choose which fields appear and in what order. Codex saves the selection to `tui.terminal_title` in `~/.codex/config.toml`. You can also edit it directly:
 
@@ -141,7 +141,7 @@ terminal_title = ["spinner", "project-name", "run-state", "thread-title"]
 
 Credentials come from the terminal session and the CLI/TUI running inside it.
 
-In remote projects, the CLI may read the remote shell environment and remote config files. In local Terminal Threads, it reads the local shell environment and local config files. Baymax does not copy API keys from LLM provider settings into Terminal Threads.
+In remote projects, the CLI may read the remote shell environment and remote config files. In local Terminal Threads, it reads the local shell environment and local config files. Sim does not copy API keys from LLM provider settings into Terminal Threads.
 
 ## When to Use Terminal Threads {#when-to-use-terminal-threads}
 

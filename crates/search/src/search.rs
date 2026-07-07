@@ -1,4 +1,4 @@
-pub use baymax_actions::search::ToggleIncludeIgnored;
+pub use sim_actions::search::ToggleIncludeIgnored;
 use bitflags::bitflags;
 pub use buffer_search::BufferSearchBar;
 pub use editor::HighlightKey;

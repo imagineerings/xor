@@ -2,7 +2,7 @@
 
 ## Overview
 
-This spec makes Comfy's model-execution semantics explicit inside the world-model harness. The implementation should not treat Comfy as only an API or graph format: Comfy also defines how samplers, schedulers, conditioning, latent formats, VAEs, model patches, and model families are assembled into executable diffusion and world-model runs. Baymax keeps worker processes, storage, UI, media previews, and dependency review in existing systems.
+This spec makes Comfy's model-execution semantics explicit inside the world-model harness. The implementation should not treat Comfy as only an API or graph format: Comfy also defines how samplers, schedulers, conditioning, latent formats, VAEs, model patches, and model families are assembled into executable diffusion and world-model runs. Sim keeps worker processes, storage, UI, media previews, and dependency review in existing systems.
 
 ## Architecture
 
@@ -21,7 +21,7 @@ flowchart LR
     Worker --> Artifacts[Artifacts and Provenance]
 ```
 
-The graph runtime decides which nodes execute and in what order. This runtime turns executable sampling/model nodes into typed execution requests and sends those requests through Baymax worker boundaries.
+The graph runtime decides which nodes execute and in what order. This runtime turns executable sampling/model nodes into typed execution requests and sends those requests through Sim worker boundaries.
 
 ## Components and Interfaces
 
@@ -67,7 +67,7 @@ pub trait ComfyExecutionRegistry {
 
 ### WorkerExecutionAdapter
 
-- **Purpose**: Send validated execution requests through Baymax worker infrastructure.
+- **Purpose**: Send validated execution requests through Sim worker infrastructure.
 - **Responsibilities**: Worker capability checks, progress events, preview events, cancellation, terminal state mapping, output collection, and diagnostics.
 
 ## Data Models
@@ -111,7 +111,7 @@ pub struct DivergenceRecord {
     pub behavior: ExecutionBehaviorKey,
     pub comfy_source: SourceReference,
     pub reason: DivergenceReason,
-    pub baymax_behavior: String,
+    pub sim_behavior: String,
 }
 ```
 
@@ -155,13 +155,13 @@ _For any_ video or world-model execution profile, the worker request SHALL prese
 
 ### Property 7: Worker Boundary
 
-_For any_ local model execution that requires Python, PyTorch, GPU APIs, custom kernels, native packages, model weights, or large downloads, the system SHALL use Baymax worker and dependency-review boundaries before execution.
+_For any_ local model execution that requires Python, PyTorch, GPU APIs, custom kernels, native packages, model weights, or large downloads, the system SHALL use Sim worker and dependency-review boundaries before execution.
 
 **Validates: Requirement 5.1, 5.2, 5.3**
 
 ### Property 8: Divergence Accountability
 
-_For any_ intentional Baymax divergence from Comfy execution behavior, a machine-readable divergence record SHALL identify the Comfy source behavior, reason, and Baymax behavior.
+_For any_ intentional Sim divergence from Comfy execution behavior, a machine-readable divergence record SHALL identify the Comfy source behavior, reason, and Sim behavior.
 
 **Validates: Requirement 6.3**
 

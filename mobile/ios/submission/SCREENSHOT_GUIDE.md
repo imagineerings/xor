@@ -22,7 +22,7 @@
 
 ### 1. Main Chat Screen ⭐ MOST IMPORTANT
 **What to show:**
-- Active conversation with Baymax
+- Active conversation with Sim
 - Good example query/response
 - Shows markdown rendering
 - Clean, professional look
@@ -35,7 +35,7 @@
 ### 2. Tool Execution
 **What to show:**
 - Expanded tool request/response
-- Shows Baymax using developer tools
+- Shows Sim using developer tools
 - Demonstrates automation capabilities
 
 **How to get it:**

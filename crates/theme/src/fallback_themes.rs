@@ -8,16 +8,16 @@ use crate::{
     ThemeFamily, ThemeStyles, default_color_scales,
 };
 
-/// The default theme family for Baymax.
+/// The default theme family for Sim.
 ///
 /// This is used to construct the default theme fallback values, as well as to
 /// have a theme available at compile time for tests.
-pub fn baymax_default_themes() -> ThemeFamily {
+pub fn sim_default_themes() -> ThemeFamily {
     ThemeFamily {
-        id: "baymax-default".to_string(),
-        name: "Baymax Default".into(),
+        id: "sim-default".to_string(),
+        name: "Sim Default".into(),
         author: "".into(),
-        themes: vec![baymax_default_dark()],
+        themes: vec![sim_default_dark()],
         scales: default_color_scales(),
     }
 }
@@ -57,7 +57,7 @@ pub fn apply_theme_color_defaults(
     }
 }
 
-pub(crate) fn baymax_default_dark() -> Theme {
+pub(crate) fn sim_default_dark() -> Theme {
     let bg = hsla(215. / 360., 12. / 100., 15. / 100., 1.);
     let editor = hsla(220. / 360., 12. / 100., 18. / 100., 1.);
     let elevated_surface = hsla(225. / 360., 12. / 100., 17. / 100., 1.);

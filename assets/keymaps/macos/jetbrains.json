@@ -19,8 +19,8 @@
   {
     "context": "Editor",
     "bindings": {
-      "ctrl->": ["baymax::IncreaseBufferFontSize", { "persist": true }],
-      "ctrl-<": ["baymax::DecreaseBufferFontSize", { "persist": true }],
+      "ctrl->": ["sim::IncreaseBufferFontSize", { "persist": true }],
+      "ctrl-<": ["sim::DecreaseBufferFontSize", { "persist": true }],
       "ctrl-shift-j": "editor::JoinLines",
       "cmd-d": "editor::DuplicateSelection",
       "cmd-backspace": "editor::DeleteLine",

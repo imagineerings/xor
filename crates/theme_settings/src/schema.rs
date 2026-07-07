@@ -20,7 +20,7 @@ const DARK_DIFF_HUNK_FILLED_OPACITY: f32 = 0.12;
 const DARK_DIFF_HUNK_HOLLOW_BACKGROUND_OPACITY: f32 = 0.06;
 const DARK_DIFF_HUNK_HOLLOW_BORDER_OPACITY: f32 = 0.36;
 
-/// The content of a serialibaymax theme family.
+/// The content of a serialisim theme family.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ThemeFamilyContent {
     pub name: String,
@@ -28,7 +28,7 @@ pub struct ThemeFamilyContent {
     pub themes: Vec<ThemeContent>,
 }
 
-/// The content of a serialibaymax theme.
+/// The content of a serialisim theme.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ThemeContent {
     pub name: String,

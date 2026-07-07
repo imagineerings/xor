@@ -93,7 +93,7 @@ impl Forgejo {
         }
 
         // TODO: detecting self hosted instances by checking whether "forgejo" is in the url or not
-        // is not very reliable. See https://github.com/simtropolis/baymax/issues/26393 for more
+        // is not very reliable. See https://github.com/simtropolis/sim/issues/26393 for more
         // information.
         if !host.contains("forgejo") {
             bail!("not a Forgejo URL");
@@ -124,7 +124,7 @@ impl Forgejo {
             .follow_redirects(http_client::RedirectPolicy::FollowAll);
 
         // TODO: not renamed yet for compatibility reasons, may require a refactor later
-        // see https://github.com/simtropolis/baymax/issues/11043#issuecomment-3480446231
+        // see https://github.com/simtropolis/sim/issues/11043#issuecomment-3480446231
         if host == "codeberg.org"
             && let Ok(codeberg_token) = std::env::var("CODEBERG_TOKEN")
         {
@@ -274,14 +274,14 @@ mod tests {
     #[test]
     fn test_parse_remote_url_given_ssh_url() {
         let parsed_remote = Forgejo::public_instance()
-            .parse_remote_url("git@codeberg.org:simtropolis/baymax.git")
+            .parse_remote_url("git@codeberg.org:simtropolis/sim.git")
             .unwrap();
 
         assert_eq!(
             parsed_remote,
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "baymax".into(),
+                repo: "sim".into(),
             }
         );
     }
@@ -289,21 +289,21 @@ mod tests {
     #[test]
     fn test_parse_remote_url_given_https_url() {
         let parsed_remote = Forgejo::public_instance()
-            .parse_remote_url("https://codeberg.org/simtropolis/baymax.git")
+            .parse_remote_url("https://codeberg.org/simtropolis/sim.git")
             .unwrap();
 
         assert_eq!(
             parsed_remote,
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "baymax".into(),
+                repo: "sim".into(),
             }
         );
     }
 
     #[test]
     fn test_parse_remote_url_given_self_hosted_ssh_url() {
-        let remote_url = "git@forgejo.my-enterprise.com:simtropolis/baymax.git";
+        let remote_url = "git@forgejo.my-enterprise.com:simtropolis/sim.git";
 
         let parsed_remote = Forgejo::from_remote_url(remote_url)
             .unwrap()
@@ -314,14 +314,14 @@ mod tests {
             parsed_remote,
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "baymax".into(),
+                repo: "sim".into(),
             }
         );
     }
 
     #[test]
     fn test_parse_remote_url_given_self_hosted_https_url() {
-        let remote_url = "https://forgejo.my-enterprise.com/simtropolis/baymax.git";
+        let remote_url = "https://forgejo.my-enterprise.com/simtropolis/sim.git";
         let parsed_remote = Forgejo::from_remote_url(remote_url)
             .unwrap()
             .parse_remote_url(remote_url)
@@ -331,7 +331,7 @@ mod tests {
             parsed_remote,
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "baymax".into(),
+                repo: "sim".into(),
             }
         );
     }
@@ -341,7 +341,7 @@ mod tests {
         let permalink = Forgejo::public_instance().build_permalink(
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "baymax".into(),
+                repo: "sim".into(),
             },
             BuildPermalinkParams::new(
                 "faa6f979be417239b2e070dbbf6392b909224e0b",
@@ -350,7 +350,7 @@ mod tests {
             ),
         );
 
-        let expected_url = "https://codeberg.org/simtropolis/baymax/src/commit/faa6f979be417239b2e070dbbf6392b909224e0b/crates/editor/src/git/permalink.rs";
+        let expected_url = "https://codeberg.org/simtropolis/sim/src/commit/faa6f979be417239b2e070dbbf6392b909224e0b/crates/editor/src/git/permalink.rs";
         assert_eq!(permalink.to_string(), expected_url.to_string())
     }
 
@@ -359,7 +359,7 @@ mod tests {
         let permalink = Forgejo::public_instance().build_permalink(
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "baymax".into(),
+                repo: "sim".into(),
             },
             BuildPermalinkParams::new(
                 "faa6f979be417239b2e070dbbf6392b909224e0b",
@@ -368,7 +368,7 @@ mod tests {
             ),
         );
 
-        let expected_url = "https://codeberg.org/simtropolis/baymax/src/commit/faa6f979be417239b2e070dbbf6392b909224e0b/crates/editor/src/git/permalink.rs#L7";
+        let expected_url = "https://codeberg.org/simtropolis/sim/src/commit/faa6f979be417239b2e070dbbf6392b909224e0b/crates/editor/src/git/permalink.rs#L7";
         assert_eq!(permalink.to_string(), expected_url.to_string())
     }
 
@@ -377,7 +377,7 @@ mod tests {
         let permalink = Forgejo::public_instance().build_permalink(
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "baymax".into(),
+                repo: "sim".into(),
             },
             BuildPermalinkParams::new(
                 "faa6f979be417239b2e070dbbf6392b909224e0b",
@@ -386,19 +386,19 @@ mod tests {
             ),
         );
 
-        let expected_url = "https://codeberg.org/simtropolis/baymax/src/commit/faa6f979be417239b2e070dbbf6392b909224e0b/crates/editor/src/git/permalink.rs#L24-L48";
+        let expected_url = "https://codeberg.org/simtropolis/sim/src/commit/faa6f979be417239b2e070dbbf6392b909224e0b/crates/editor/src/git/permalink.rs#L24-L48";
         assert_eq!(permalink.to_string(), expected_url.to_string())
     }
 
     #[test]
     fn test_build_forgejo_self_hosted_permalink_from_ssh_url() {
         let forgejo =
-            Forgejo::from_remote_url("git@forgejo.some-enterprise.com:simtropolis/baymax.git")
+            Forgejo::from_remote_url("git@forgejo.some-enterprise.com:simtropolis/sim.git")
                 .unwrap();
         let permalink = forgejo.build_permalink(
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "baymax".into(),
+                repo: "sim".into(),
             },
             BuildPermalinkParams::new(
                 "e6ebe7974deb6bb6cc0e2595c8ec31f0c71084b7",
@@ -407,28 +407,28 @@ mod tests {
             ),
         );
 
-        let expected_url = "https://forgejo.some-enterprise.com/simtropolis/baymax/src/commit/e6ebe7974deb6bb6cc0e2595c8ec31f0c71084b7/crates/editor/src/git/permalink.rs";
+        let expected_url = "https://forgejo.some-enterprise.com/simtropolis/sim/src/commit/e6ebe7974deb6bb6cc0e2595c8ec31f0c71084b7/crates/editor/src/git/permalink.rs";
         assert_eq!(permalink.to_string(), expected_url.to_string())
     }
 
     #[test]
     fn test_build_forgejo_self_hosted_permalink_from_https_url() {
         let forgejo =
-            Forgejo::from_remote_url("https://forgejo-instance.big-co.com/simtropolis/baymax.git")
+            Forgejo::from_remote_url("https://forgejo-instance.big-co.com/simtropolis/sim.git")
                 .unwrap();
         let permalink = forgejo.build_permalink(
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "baymax".into(),
+                repo: "sim".into(),
             },
             BuildPermalinkParams::new(
                 "b2efec9824c45fcc90c9a7eb107a50d1772a60aa",
-                &repo_path("crates/baymax/src/main.rs"),
+                &repo_path("crates/sim/src/main.rs"),
                 None,
             ),
         );
 
-        let expected_url = "https://forgejo-instance.big-co.com/simtropolis/baymax/src/commit/b2efec9824c45fcc90c9a7eb107a50d1772a60aa/crates/baymax/src/main.rs";
+        let expected_url = "https://forgejo-instance.big-co.com/simtropolis/sim/src/commit/b2efec9824c45fcc90c9a7eb107a50d1772a60aa/crates/sim/src/main.rs";
         assert_eq!(permalink.to_string(), expected_url.to_string())
     }
 }

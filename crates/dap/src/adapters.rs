@@ -23,7 +23,7 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-use task::{BaymaxDebugConfig, DebugScenario, TcpArgumentsTemplate};
+use task::{SimDebugConfig, DebugScenario, TcpArgumentsTemplate};
 use util::{archive::extract_zip, rel_path::RelPath};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -349,9 +349,9 @@ pub async fn download_adapter_from_github(
 pub trait DebugAdapter: 'static + Send + Sync {
     fn name(&self) -> DebugAdapterName;
 
-    async fn config_from_baymax_format(
+    async fn config_from_sim_format(
         &self,
-        baymax_scenario: BaymaxDebugConfig,
+        sim_scenario: SimDebugConfig,
     ) -> Result<DebugScenario>;
 
     async fn get_binary(
@@ -442,15 +442,15 @@ impl DebugAdapter for FakeAdapter {
         None
     }
 
-    async fn config_from_baymax_format(
+    async fn config_from_sim_format(
         &self,
-        baymax_scenario: BaymaxDebugConfig,
+        sim_scenario: SimDebugConfig,
     ) -> Result<DebugScenario> {
-        let config = serde_json::to_value(baymax_scenario.request).unwrap();
+        let config = serde_json::to_value(sim_scenario.request).unwrap();
 
         Ok(DebugScenario {
-            adapter: baymax_scenario.adapter,
-            label: baymax_scenario.label,
+            adapter: sim_scenario.adapter,
+            label: sim_scenario.label,
             build: None,
             config,
             tcp_connection: None,

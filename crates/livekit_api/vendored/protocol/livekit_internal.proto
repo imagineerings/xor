@@ -120,7 +120,7 @@ message StartSession {
   ClientInfo client = 11;
   bool recorder = 12;
   string name = 13;
-  // A user's ClaimGrants serialibaymax in JSON
+  // A user's ClaimGrants serialisim in JSON
   string grants_json = 14;
   bool adaptive_stream = 15;
   //if reconnect, client will set current sid

@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Baymax currently ships with "One Dark" and "One Light" as its default themes, derived from the Atom One color scheme. This feature replaces the default theme with a new "Spectrum 2 Inspired" family that inherits design ideas from Adobe Spectrum 2: approachable brightness, clear hierarchy, readable contrast, modular surfaces, subtle depth, and restrained expressive accents.
+Sim currently ships with "One Dark" and "One Light" as its default themes, derived from the Atom One color scheme. This feature replaces the default theme with a new "Spectrum 2 Inspired" family that inherits design ideas from Adobe Spectrum 2: approachable brightness, clear hierarchy, readable contrast, modular surfaces, subtle depth, and restrained expressive accents.
 
 This is **not** an Adobe clone. It translates Spectrum 2's design principles into an editor context — layered surfaces, semantic color mapping, accessible contrast, and a controlled accent language — without copying Adobe branding.
 
@@ -10,7 +10,7 @@ This is **not** an Adobe clone. It translates Spectrum 2's design principles int
 
 | Term | Definition |
 |---|---|
-| **Baymax Theme** | A JSON file at `assets/themes/` or `~/.config/baymax/themes/` containing light and dark appearance variants with semantic color tokens (UI, editor, syntax, terminal, diagnostics). |
+| **Sim Theme** | A JSON file at `assets/themes/` or `~/.config/sim/themes/` containing light and dark appearance variants with semantic color tokens (UI, editor, syntax, terminal, diagnostics). |
 | **Spectrum 2** | Adobe's design system. Its principles used here: layered surfaces, token-based color scales, semantic aliases (accent, negative, informative, etc.), subdued backgrounds, restrained accent usage. |
 | **Accent Language** | The intentional use of color accents. In this theme, blue is the primary accent, purple is a secondary expressive accent — both used sparingly for signal, not decoration. |
 | **Layered Surface** | A visual hierarchy created by varying background lightness/darkness: main background, editor background, panel background, elevated surface (modals/popovers). |
@@ -71,15 +71,15 @@ The theme JSON controls colors only. Typography is configured via user settings.
 
 ### Requirement 1: New Spectrum 2 Inspired Default Theme
 
-**User Story:** As a new Baymax user, I want the default theme to feel modern, clean, and approachable, with layered surfaces and controlled accent colors, so that my first impression of the editor is polished and professional.
+**User Story:** As a new Sim user, I want the default theme to feel modern, clean, and approachable, with layered surfaces and controlled accent colors, so that my first impression of the editor is polished and professional.
 
 #### Acceptance Criteria
 
-1. THE `spectrum-2-inspired.json` file SHALL be placed at `~/.config/baymax/themes/spectrum-2-inspired.json` for local usage.
+1. THE `spectrum-2-inspired.json` file SHALL be placed at `~/.config/sim/themes/spectrum-2-inspired.json` for local usage.
 2. THE file SHALL contain both `"appearance": "dark"` and `"appearance": "light"` variants under a single theme family named "Spectrum 2 Inspired".
-3. THE file SHALL reference `https://baymax.dev/schema/themes/v0.2.0.json` as its `$schema`.
+3. THE file SHALL reference `https://sim.dev/schema/themes/v0.2.0.json` as its `$schema`.
 4. THE file SHALL include `"author": "Ahmad Vegah"` in the metadata.
-5. THE file SHALL validate against the Baymax theme schema without errors.
+5. THE file SHALL validate against the Sim theme schema without errors.
 
 ### Requirement 2: Layered Surface System
 
@@ -145,7 +145,7 @@ The theme JSON controls colors only. Typography is configured via user settings.
 
 ### Requirement 6: All Theme Keys Covered
 
-**User Story:** As a theme developer, I want all Baymax theme keys to have explicit values in the new theme, so that no UI element falls back to potentially mismatched defaults.
+**User Story:** As a theme developer, I want all Sim theme keys to have explicit values in the new theme, so that no UI element falls back to potentially mismatched defaults.
 
 #### Acceptance Criteria
 
@@ -280,5 +280,5 @@ The theme JSON controls colors only. Typography is configured via user settings.
 - Implementing Spectrum 2's component library or CSS-in-JS system.
 - Modifying the Theme Builder tool or any existing documentation files.
 - Forcing Adobe Clean or any specific font — typography is a user setting, not a theme concern.
-- Touch/pointer detection, RTL support, or other Spectrum 2 concepts not applicable to Baymax's Rust-native UI framework.
+- Touch/pointer detection, RTL support, or other Spectrum 2 concepts not applicable to Sim's Rust-native UI framework.
 

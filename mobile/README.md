@@ -1,6 +1,6 @@
-# Baymax Mobile
+# Sim Mobile
 
-This directory contains the Android and iOS clients for connecting to Baymax agents over the mobile HTTP/SSE protocol. Both apps support local or remote agent URLs, QR/deep-link configuration, session listing, chat, settings, trial mode, and readiness checks for tunneling-enabled mobile access.
+This directory contains the Android and iOS clients for connecting to Sim agents over the mobile HTTP/SSE protocol. Both apps support local or remote agent URLs, QR/deep-link configuration, session listing, chat, settings, trial mode, and readiness checks for tunneling-enabled mobile access.
 
 ## Local Build Entry Points
 
@@ -29,7 +29,7 @@ Artifacts are written under `mobile/build/`:
 - `.github/workflows/mobile_ios_ci.yml` validates shared scripts, mobile readiness, and an iOS debug build.
 - `.github/workflows/mobile_release.yml` is manual. It accepts `platform`, `channel`, `version`, `build_number`, and `publish` inputs, builds platform artifacts, writes release metadata, and uploads the readiness summary.
 
-`publish=false` is artifact-only mode. For Android, artifact-only mode also uploads a downloadable installable APK named `baymax-android-apk-<version>-<build>-<sha>` in the workflow run artifacts. Use `platform=android`, `channel=artifact`, and `publish=false` when you want an APK that can be downloaded from GitHub Actions.
+`publish=false` is artifact-only mode. For Android, artifact-only mode also uploads a downloadable installable APK named `sim-android-apk-<version>-<build>-<sha>` in the workflow run artifacts. Use `platform=android`, `channel=artifact`, and `publish=false` when you want an APK that can be downloaded from GitHub Actions.
 
 `publish=true` is intentionally gated:
 
@@ -49,7 +49,7 @@ Android signed builds and Play internal publishing require:
 
 Optional Android repository variable:
 
-- `ANDROID_PACKAGE_NAME` defaults to `com.simtropolis.baymaxchat`.
+- `ANDROID_PACKAGE_NAME` defaults to `com.simtropolis.simchat`.
 
 iOS signed archive/export and TestFlight publishing require:
 

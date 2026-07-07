@@ -2,15 +2,15 @@
 
 ## Introduction
 
-This specification defines the typography, iconography, spacing, shapes, and editor UI behavior for a Spectrum 2-inspired visual language in Baymax. While the companion [Spectrum 2 Theme](../spectrum-2-theme/requirements.md) spec covers **color**, this spec covers everything else that makes the editor feel like a cohesive, approachable, modern tool.
+This specification defines the typography, iconography, spacing, shapes, and editor UI behavior for a Spectrum 2-inspired visual language in Sim. While the companion [Spectrum 2 Theme](../spectrum-2-theme/requirements.md) spec covers **color**, this spec covers everything else that makes the editor feel like a cohesive, approachable, modern tool.
 
-Spectrum 2's design principles center on being **approachable, bright, rounded-feeling, and clear**. This spec translates those principles into concrete Baymax settings, theme extensions, and code changes across typography, icons, spacing, shapes, and editor chrome.
+Spectrum 2's design principles center on being **approachable, bright, rounded-feeling, and clear**. This spec translates those principles into concrete Sim settings, theme extensions, and code changes across typography, icons, spacing, shapes, and editor chrome.
 
 ## Glossary
 
 - **Typography Scale**: The system of font sizes, weights, line heights, and font families used across the UI and editor buffers
-- **Icon Theme**: A Baymax extension or built-in theme that maps file types and UI states to SVG icon files
-- **Dynamic Spacing**: Baymax's spacing system using `DynamicSpacing::BaseNN` rems-based spacing tokens
+- **Icon Theme**: A Sim extension or built-in theme that maps file types and UI states to SVG icon files
+- **Dynamic Spacing**: Sim's spacing system using `DynamicSpacing::BaseNN` rems-based spacing tokens
 - **Element Shape**: The border radius, corner smoothing, and visual outline of UI elements (buttons, panels, tabs, inputs)
 - **Editor Chrome**: The non-editing UI surrounding the buffer — gutter, scrollbar, minimap, tabs, breadcrumbs, status bar
 - **Spectrum 2 (S2)**: Adobe's design system — see [Introducing Spectrum 2](https://adobe.design/ideas/introducing-spectrum-2)
@@ -23,7 +23,7 @@ Spectrum 2's design principles center on being **approachable, bright, rounded-f
 
 ### Typography
 
-Spectrum 2 uses [Adobe Clean](https://fonts.adobe.com/fonts/adobe-clean) as its primary typeface — a humanist sans-serif with approachable, warm curves. For Baymax:
+Spectrum 2 uses [Adobe Clean](https://fonts.adobe.com/fonts/adobe-clean) as its primary typeface — a humanist sans-serif with approachable, warm curves. For Sim:
 
 | Setting | Recommendation | Rationale |
 |---|---|---|
@@ -46,15 +46,15 @@ Spectrum 2 uses a [consistent, rounded, stroke-based icon set](https://react-spe
 - Rounded line caps and joins
 - Clear, minimal designs with no filled variants for default states
 
-For Baymax, this translates to:
-- A new Spectrum 2-inspired icon theme as a Baymax extension (or bundled theme)
+For Sim, this translates to:
+- A new Spectrum 2-inspired icon theme as a Sim extension (or bundled theme)
 - Redesigned SVG file icons with rounded strokes
 - Spectrum 2-style chevrons and folder icons
 - Spectrum 2-style UI icons (search, settings, close, etc.) — though these are shared across all themes
 
 ### Spacing
 
-Spectrum 2 uses an 8px grid with a 4px sub-unit for fine adjustments. Baymax already uses a `DynamicSpacing` system. The recommendation is:
+Spectrum 2 uses an 8px grid with a 4px sub-unit for fine adjustments. Sim already uses a `DynamicSpacing` system. The recommendation is:
 
 | Token | Current Default | S2-Inspired Value | Usage |
 |---|---|---|---|
@@ -78,7 +78,7 @@ The key principle: elements in the same group should be `Base04` (8px) apart; re
 
 Spectrum 2 is described as "rounded-feeling." Key shape guidelines:
 
-| Element | S2-Inspired Radius | Baymax Current (approx) |
+| Element | S2-Inspired Radius | Sim Current (approx) |
 |---|---|---|
 | Buttons (default) | `8px` | `6px` |
 | Input fields | `6px` | `4px` |
@@ -101,9 +101,9 @@ Spectrum 2 principles applied to editor chrome:
 | **Cursor blink** | Softer blink with smooth opacity transition | Animate cursor blink with opacity 0.3→1.0 (not binary on/off) |
 | **Active line** | Subtle background highlight, not full-width border | Use `editor.active_line.background` only (already set in theme) |
 | **Scrollbar** | Thinner, rounded, auto-hide in editor, always-show in panels | Set scrollbar width to 6px, thumb radius to 3px |
-| **Minimap** | Show as a block overview, not character-precise | No Baymax setting change — minimap rendering is built-in |
+| **Minimap** | Show as a block overview, not character-precise | No Sim setting change — minimap rendering is built-in |
 | **Tab sizing** | Equal-width tabs with fixed min/max; active tab has bottom accent | The theme already sets accent via `tab.active_background` |
-| **Gutter** | Show line numbers only (no breakpoint gutter when no breakpoints) | No change needed — Baymax already hides breakpoint gutter when empty |
+| **Gutter** | Show line numbers only (no breakpoint gutter when no breakpoints) | No change needed — Sim already hides breakpoint gutter when empty |
 | **Autocomplete** | Compact, rounded menu with clear hierarchy | Adjust autocomplete menu border radius to 8px |
 | **Command palette** | Full-width, elevated surface with clear search | Already elevated via `elevated_surface.background` in theme |
 | **Focus ring** | Use `border.focused` (blue accent) with 2px width | The theme already sets `border.focused` to the accent blue |
@@ -114,14 +114,14 @@ Spectrum 2 principles applied to editor chrome:
 
 ### Requirement 1: Spectrum 2 Inspired Default Typography Settings
 
-**User Story:** As a Baymax user selecting the Spectrum 2 Inspired theme, I want the typography to feel approachable and modern like Spectrum 2, so that the text in both UI and editor buffers is comfortable to read.
+**User Story:** As a Sim user selecting the Spectrum 2 Inspired theme, I want the typography to feel approachable and modern like Spectrum 2, so that the text in both UI and editor buffers is comfortable to read.
 
 #### Acceptance Criteria
 
 1. WHEN the user selects "Spectrum 2 Inspired Light" or "Spectrum 2 Inspired Dark" THEN THE system SHALL apply recommended font settings (Inter for UI, SF Mono/JetBrains Mono for buffers, 14px UI font, 15px buffer font, 1.3 line height)
 2. IF the user has not explicitly set `buffer_font_family` or `ui_font_family` THEN THE system SHALL use the Spectrum 2-inspired defaults when the Spectrum 2 Inspired theme is active
-3. IF Inter is not installed on the system THEN THE system SHALL fall back to the default Baymax UI font stack
-4. IF SF Mono is not installed THEN THE system SHALL fall back to JetBrains Mono, then to the default Baymax buffer font
+3. IF Inter is not installed on the system THEN THE system SHALL fall back to the default Sim UI font stack
+4. IF SF Mono is not installed THEN THE system SHALL fall back to JetBrains Mono, then to the default Sim buffer font
 5. THE Spectrum 2 typography settings SHALL NOT override explicit user font preferences
 
 ### Requirement 2: Typography Scale and Features
@@ -147,7 +147,7 @@ Spectrum 2 principles applied to editor chrome:
 4. ALL file type icons SHALL be redesigned with minimal, clear shapes — no complex fills, no excessive detail
 5. Folder icons SHALL use an open-book or folder shape with rounded corners and a subtle fold
 6. Chevron icons SHALL use a simple V-shape with rounded endpoints (not filled triangles)
-7. THE icon theme SHALL be distributed as a Baymax extension that users can install from the Extensions page
+7. THE icon theme SHALL be distributed as a Sim extension that users can install from the Extensions page
 
 ### Requirement 4: Icon Sizing and Theming
 
@@ -239,13 +239,13 @@ Spectrum 2 principles applied to editor chrome:
 
 ### Requirement 11: Backward Compatibility
 
-**User Story:** As an existing Baymax user, I want the Spectrum 2 UI language changes to not break my existing setup.
+**User Story:** As an existing Sim user, I want the Spectrum 2 UI language changes to not break my existing setup.
 
 #### Acceptance Criteria
 
 1. WHEN a user does not have the Spectrum 2 Inspired theme selected THEN ALL typography, spacing, and shape defaults SHALL remain unchanged
 2. WHEN a user has configured custom font settings THEN Spectrum 2 defaults SHALL NOT override them
-3. IF a user uninstalls the Spectrum 2 Inspired icon theme THEN the system SHALL fall back to the default Baymax icon theme
+3. IF a user uninstalls the Spectrum 2 Inspired icon theme THEN the system SHALL fall back to the default Sim icon theme
 4. THE Spectrum 2 Inspired icon theme SHALL be distributed as an installable extension, not a core dependency
 
 ### Requirement 12: Accessibility
@@ -273,8 +273,8 @@ Spectrum 2 principles applied to editor chrome:
 
 ## Out of Scope
 
-- Redesigning core Baymax SVG icons (search, settings, close, etc.) — these are shared across all themes and controlled by the app
-- Changing the Baymax DynamicSpacing tokens themselves (the values are fine; what changes is how elements use them)
+- Redesigning core Sim SVG icons (search, settings, close, etc.) — these are shared across all themes and controlled by the app
+- Changing the Sim DynamicSpacing tokens themselves (the values are fine; what changes is how elements use them)
 - Creating a full Spectrum 2 icon set for every file type (the initial spec covers the most common ~30 file types)
 - Animations or micro-interactions beyond cursor blink
 - Changing the layout of the editor (gutter position, tab bar position, panel docking) — only visual styling

@@ -79,19 +79,19 @@ impl UpdateButton {
     }
 
     pub fn checking() -> Self {
-        Self::new(IconName::LoadCircle, "Checking for Baymax Updates…")
+        Self::new(IconName::LoadCircle, "Checking for Sim Updates…")
             .icon_animate(true)
             .disabled(true)
     }
 
     pub fn downloading(version: impl Into<SharedString>) -> Self {
-        Self::new(IconName::Download, "Downloading Baymax Update…")
+        Self::new(IconName::Download, "Downloading Sim Update…")
             .tooltip(version)
             .disabled(true)
     }
 
     pub fn installing(version: impl Into<SharedString>) -> Self {
-        Self::new(IconName::LoadCircle, "Installing Baymax Update…")
+        Self::new(IconName::LoadCircle, "Installing Sim Update…")
             .icon_animate(true)
             .tooltip(version)
             .disabled(true)
@@ -174,7 +174,7 @@ impl Component for UpdateButton {
 
     fn description() -> &'static str {
         "A button component displayed in the title bar to \
-        show auto-update status and allow users to restart Baymax."
+        show auto-update status and allow users to restart Sim."
     }
 
     fn preview(_window: &mut Window, _cx: &mut App) -> AnyElement {

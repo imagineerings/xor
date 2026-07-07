@@ -5,7 +5,7 @@ use client::{Client, UserStore};
 use collections::HashSet;
 use credentials_provider::CredentialsProvider;
 use gpui::{App, Context, Entity};
-use language_model::{BAYMAX_CLOUD_PROVIDER_ID, ConfiguredModel, LanguageModelRegistry};
+use language_model::{SIM_CLOUD_PROVIDER_ID, ConfiguredModel, LanguageModelRegistry};
 use provider::registry::ProviderRegistry;
 
 pub mod extension;
@@ -134,16 +134,16 @@ pub fn init(user_store: Entity<UserStore>, client: Arc<Client>, cx: &mut App) {
 /// Recomputes and sets the [`LanguageModelRegistry`]'s environment fallback
 /// model based on currently authenticated providers.
 ///
-/// Prefers the Baymax cloud provider so that, once the user is signed in, we
-/// always pick a Baymax-hosted model over models from other authenticated
-/// providers in the environment. If the Baymax cloud provider is authenticated
+/// Prefers the Sim cloud provider so that, once the user is signed in, we
+/// always pick a Sim-hosted model over models from other authenticated
+/// providers in the environment. If the Sim cloud provider is authenticated
 /// but hasn't finished loading its models yet, we don't fall back to another
 /// provider to avoid flickering between providers during sign in.
 pub fn update_environment_fallback_model(cx: &mut App) {
     let registry = LanguageModelRegistry::global(cx);
     let fallback_model = {
         let registry = registry.read(cx);
-        let cloud_provider = registry.provider(&BAYMAX_CLOUD_PROVIDER_ID);
+        let cloud_provider = registry.provider(&SIM_CLOUD_PROVIDER_ID);
         if cloud_provider
             .as_ref()
             .is_some_and(|provider| provider.is_authenticated(cx))
@@ -200,7 +200,7 @@ fn register_language_model_providers(
     credentials_provider: Arc<dyn CredentialsProvider>,
     cx: &mut Context<LanguageModelRegistry>,
 ) {
-    // Register the cloud (baymax.dev) provider separately since it needs
+    // Register the cloud (sim.dev) provider separately since it needs
     // user_store, which the ProviderRegistry doesn't hold.
     registry.register_provider(
         Arc::new(CloudLanguageModelProvider::new(

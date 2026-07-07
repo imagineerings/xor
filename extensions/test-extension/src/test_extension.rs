@@ -1,8 +1,8 @@
-use baymax::lsp::CompletionKind;
-use baymax::{CodeLabel, CodeLabelSpan, LanguageServerId};
+use sim::lsp::CompletionKind;
+use sim::{CodeLabel, CodeLabelSpan, LanguageServerId};
 use std::fs;
 use zed_extension_api::process::Command;
-use zed_extension_api::{self as baymax, Result};
+use zed_extension_api::{self as sim, Result};
 
 struct TestExtension {
     cached_binary_path: Option<String>,
@@ -12,9 +12,9 @@ impl TestExtension {
     fn language_server_binary_path(
         &mut self,
         language_server_id: &LanguageServerId,
-        _worktree: &baymax::Worktree,
+        _worktree: &sim::Worktree,
     ) -> Result<String> {
-        let (platform, arch) = baymax::current_platform();
+        let (platform, arch) = sim::current_platform();
 
         let current_dir = std::env::current_dir().unwrap();
         println!("current_dir: {}", current_dir.display());
@@ -41,8 +41,8 @@ impl TestExtension {
         );
 
         let command = match platform {
-            baymax::Os::Linux | baymax::Os::Mac => Command::new("echo"),
-            baymax::Os::Windows => Command::new("cmd").args(["/C", "echo"]),
+            sim::Os::Linux | sim::Os::Mac => Command::new("echo"),
+            sim::Os::Windows => Command::new("cmd").args(["/C", "echo"]),
         };
         let output = command.arg("hello from a child process!").output()?;
         println!(
@@ -56,39 +56,39 @@ impl TestExtension {
             return Ok(path.clone());
         }
 
-        baymax::set_language_server_installation_status(
+        sim::set_language_server_installation_status(
             language_server_id,
-            &baymax::LanguageServerInstallationStatus::CheckingForUpdate,
+            &sim::LanguageServerInstallationStatus::CheckingForUpdate,
         );
-        let release = baymax::latest_github_release(
+        let release = sim::latest_github_release(
             "gleam-lang/gleam",
-            baymax::GithubReleaseOptions {
+            sim::GithubReleaseOptions {
                 require_assets: true,
                 pre_release: false,
             },
         )?;
 
         let ext = "tar.gz";
-        let download_type = baymax::DownloadedFileType::GzipTar;
+        let download_type = sim::DownloadedFileType::GzipTar;
 
         // Do this if you want to actually run this extension -
         // the actual asset is a .zip. But the integration test is simpler
         // if every platform uses .tar.gz.
         //
         // ext = "zip";
-        // download_type = baymax::DownloadedFileType::Zip;
+        // download_type = sim::DownloadedFileType::Zip;
 
         let asset_name = format!(
             "gleam-{version}-{arch}-{os}.{ext}",
             version = release.version,
             arch = match arch {
-                baymax::Architecture::Aarch64 => "aarch64",
-                baymax::Architecture::X8664 => "x86_64",
+                sim::Architecture::Aarch64 => "aarch64",
+                sim::Architecture::X8664 => "x86_64",
             },
             os = match platform {
-                baymax::Os::Mac => "apple-darwin",
-                baymax::Os::Linux => "unknown-linux-musl",
-                baymax::Os::Windows => "pc-windows-msvc",
+                sim::Os::Mac => "apple-darwin",
+                sim::Os::Linux => "unknown-linux-musl",
+                sim::Os::Windows => "pc-windows-msvc",
             },
         );
 
@@ -102,17 +102,17 @@ impl TestExtension {
         let binary_path = format!("{version_dir}/gleam");
 
         if !fs::metadata(&binary_path).is_ok_and(|stat| stat.is_file()) {
-            baymax::set_language_server_installation_status(
+            sim::set_language_server_installation_status(
                 language_server_id,
-                &baymax::LanguageServerInstallationStatus::Downloading,
+                &sim::LanguageServerInstallationStatus::Downloading,
             );
 
-            baymax::download_file(&asset.download_url, &version_dir, download_type)
+            sim::download_file(&asset.download_url, &version_dir, download_type)
                 .map_err(|e| format!("failed to download file: {e}"))?;
 
-            baymax::set_language_server_installation_status(
+            sim::set_language_server_installation_status(
                 language_server_id,
-                &baymax::LanguageServerInstallationStatus::None,
+                &sim::LanguageServerInstallationStatus::None,
             );
 
             let entries =
@@ -132,7 +132,7 @@ impl TestExtension {
     }
 }
 
-impl baymax::Extension for TestExtension {
+impl sim::Extension for TestExtension {
     fn new() -> Self {
         Self {
             cached_binary_path: None,
@@ -142,9 +142,9 @@ impl baymax::Extension for TestExtension {
     fn language_server_command(
         &mut self,
         language_server_id: &LanguageServerId,
-        worktree: &baymax::Worktree,
-    ) -> Result<baymax::Command> {
-        Ok(baymax::Command {
+        worktree: &sim::Worktree,
+    ) -> Result<sim::Command> {
+        Ok(sim::Command {
             command: self.language_server_binary_path(language_server_id, worktree)?,
             args: vec!["lsp".to_string()],
             env: Default::default(),
@@ -154,8 +154,8 @@ impl baymax::Extension for TestExtension {
     fn label_for_completion(
         &self,
         _language_server_id: &LanguageServerId,
-        completion: baymax::lsp::Completion,
-    ) -> Option<baymax::CodeLabel> {
+        completion: sim::lsp::Completion,
+    ) -> Option<sim::CodeLabel> {
         let name = &completion.label;
         let ty = strip_newlines_from_detail(&completion.detail?);
         let let_binding = "let a";
@@ -188,12 +188,12 @@ impl baymax::Extension for TestExtension {
     }
 }
 
-baymax::register_extension!(TestExtension);
+sim::register_extension!(TestExtension);
 
 /// Removes newlines from the completion detail.
 ///
 /// The Gleam LSP can return types containing newlines, which causes formatting
-/// issues within the Baymax completions menu.
+/// issues within the Sim completions menu.
 fn strip_newlines_from_detail(detail: &str) -> String {
     let without_newlines = detail
         .replace("->\n  ", "-> ")

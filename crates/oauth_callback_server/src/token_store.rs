@@ -67,7 +67,7 @@ impl KeyringTokenStore {
     /// Create a new store with the given service name.
     ///
     /// The service name identifies the application in the keyring (e.g.
-    /// `"baymax-oauth"`).
+    /// `"sim-oauth"`).
     pub fn new(service_name: impl Into<String>) -> Self {
         Self {
             service_name: service_name.into(),
@@ -290,7 +290,7 @@ mod tests {
 
     /// Helper: returns `true` if the OS keyring supports full CRUD.
     fn keyring_available() -> bool {
-        let store = KeyringTokenStore::new("baymax-test-probe");
+        let store = KeyringTokenStore::new("sim-test-probe");
         let key = "__probe__";
         let tokens = sample_tokens();
         // Clean up any stale entry first.
@@ -309,7 +309,7 @@ mod tests {
             eprintln!("skipping keyring test: OS keychain not available in this environment");
             return;
         }
-        let store = KeyringTokenStore::new("baymax-test");
+        let store = KeyringTokenStore::new("sim-test");
         let key = "test_keyring_key";
         let tokens = sample_tokens();
 
@@ -328,7 +328,7 @@ mod tests {
     #[test]
     fn test_encrypted_file_store() {
         let dir =
-            std::env::temp_dir().join(format!("baymax-test-tokens-{}", rand::random::<u64>()));
+            std::env::temp_dir().join(format!("sim-test-tokens-{}", rand::random::<u64>()));
         let file_path = dir.join("tokens.json.enc");
 
         let (store, key) = EncryptedFileTokenStore::new(&file_path, b"test-key-12345");
@@ -352,7 +352,7 @@ mod tests {
     #[test]
     fn test_encrypted_file_store_multiple_keys() {
         let dir =
-            std::env::temp_dir().join(format!("baymax-test-tokens-{}", rand::random::<u64>()));
+            std::env::temp_dir().join(format!("sim-test-tokens-{}", rand::random::<u64>()));
         let file_path = dir.join("tokens.json.enc");
 
         let (store, key) = EncryptedFileTokenStore::new(&file_path, b"multi-key-test");

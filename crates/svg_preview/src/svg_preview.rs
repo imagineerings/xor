@@ -3,7 +3,7 @@ use workspace::Workspace;
 
 pub mod svg_preview_view;
 
-pub use baymax_actions::preview::svg::{OpenPreview, OpenPreviewToTheSide};
+pub use sim_actions::preview::svg::{OpenPreview, OpenPreviewToTheSide};
 
 actions!(
     svg,

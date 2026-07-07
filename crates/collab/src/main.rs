@@ -75,7 +75,7 @@ async fn main() -> Result<()> {
                 if mode.is_collab() {
                     let epoch = state
                         .db
-                        .create_server(&state.config.baymax_environment)
+                        .create_server(&state.config.sim_environment)
                         .await?;
                     let rpc_server = collab::rpc::Server::new(epoch, state.clone());
                     rpc_server.start().await?;
@@ -194,7 +194,7 @@ async fn setup_app_database(config: &Config) -> Result<()> {
 
 async fn handle_root(Extension(mode): Extension<ServiceMode>) -> String {
     format!(
-        "baymax:{mode} v{VERSION} ({})",
+        "sim:{mode} v{VERSION} ({})",
         REVISION.unwrap_or("unknown")
     )
 }

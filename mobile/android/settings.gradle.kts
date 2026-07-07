@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Baymax"
+rootProject.name = "Sim"
 include(":app")

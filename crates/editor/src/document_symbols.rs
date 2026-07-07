@@ -329,7 +329,7 @@ mod tests {
         time::Duration,
     };
 
-    use baymax_actions::editor::{MoveDown, MoveUp};
+    use sim_actions::editor::{MoveDown, MoveUp};
     use futures::StreamExt as _;
     use gpui::TestAppContext;
     use settings::{DocumentSymbols, SettingsStore};

@@ -239,13 +239,13 @@ parameters:
         let mut context = ExecutionContext::default();
         context
             .variables
-            .insert("name".to_string(), "Baymax".to_string());
+            .insert("name".to_string(), "Sim".to_string());
 
         let output = RecipeEngine::new().execute(&recipe, &mut context).unwrap();
 
         assert!(output.success);
         assert_eq!(output.completed_steps, 2);
-        assert_eq!(output.step_results[0].prompt, "Hello Baymax");
+        assert_eq!(output.step_results[0].prompt, "Hello Sim");
         assert_eq!(context.current_step, 1);
     }
 

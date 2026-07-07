@@ -1,4 +1,4 @@
-use zed_extension_api::{self as baymax, Result, settings::LspSettings};
+use zed_extension_api::{self as sim, Result, settings::LspSettings};
 
 use crate::language_servers::{BufLsp, ProtoLs, ProtobufLanguageServer};
 
@@ -10,7 +10,7 @@ struct ProtobufExtension {
     buf_lsp: Option<BufLsp>,
 }
 
-impl baymax::Extension for ProtobufExtension {
+impl sim::Extension for ProtobufExtension {
     fn new() -> Self {
         Self {
             protobuf_language_server: None,
@@ -46,21 +46,21 @@ impl baymax::Extension for ProtobufExtension {
 
     fn language_server_workspace_configuration(
         &mut self,
-        server_id: &baymax::LanguageServerId,
-        worktree: &baymax::Worktree,
-    ) -> Result<Option<baymax::serde_json::Value>> {
+        server_id: &sim::LanguageServerId,
+        worktree: &sim::Worktree,
+    ) -> Result<Option<sim::serde_json::Value>> {
         LspSettings::for_worktree(server_id.as_ref(), worktree)
             .map(|lsp_settings| lsp_settings.settings)
     }
 
     fn language_server_initialization_options(
         &mut self,
-        server_id: &baymax::LanguageServerId,
-        worktree: &baymax::Worktree,
+        server_id: &sim::LanguageServerId,
+        worktree: &sim::Worktree,
     ) -> Result<Option<zed_extension_api::serde_json::Value>> {
         LspSettings::for_worktree(server_id.as_ref(), worktree)
             .map(|lsp_settings| lsp_settings.initialization_options)
     }
 }
 
-baymax::register_extension!(ProtobufExtension);
+sim::register_extension!(ProtobufExtension);

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The extension ecosystem is a controlled harness extension layer. Baymax discovers node packs, extracts supported schemas and assets, and records diagnostics, but it does not run arbitrary extension code without policy gates. Python-backed execution and package installation are separate concerns.
+The extension ecosystem is a controlled harness extension layer. Sim discovers node packs, extracts supported schemas and assets, and records diagnostics, but it does not run arbitrary extension code without policy gates. Python-backed execution and package installation are separate concerns.
 
 ## Architecture
 

@@ -41,25 +41,25 @@ actions!(
 
 pub fn checkout_branch(
     workspace: &mut Workspace,
-    _: &baymax_actions::git::CheckoutBranch,
+    _: &sim_actions::git::CheckoutBranch,
     window: &mut Window,
     cx: &mut Context<Workspace>,
 ) {
-    open(workspace, &baymax_actions::git::Branch, window, cx);
+    open(workspace, &sim_actions::git::Branch, window, cx);
 }
 
 pub fn switch(
     workspace: &mut Workspace,
-    _: &baymax_actions::git::Switch,
+    _: &sim_actions::git::Switch,
     window: &mut Window,
     cx: &mut Context<Workspace>,
 ) {
-    open(workspace, &baymax_actions::git::Branch, window, cx);
+    open(workspace, &sim_actions::git::Branch, window, cx);
 }
 
 pub fn open(
     workspace: &mut Workspace,
-    _: &baymax_actions::git::Branch,
+    _: &sim_actions::git::Branch,
     window: &mut Window,
     cx: &mut Context<Workspace>,
 ) {
@@ -2047,7 +2047,7 @@ mod tests {
                 < ordered_branch_names
                     .iter()
                     .position(|name| *name == "fork/main"),
-            "branches on the active branch's remote should be prioritibaymax"
+            "branches on the active branch's remote should be prioritisim"
         );
     }
 

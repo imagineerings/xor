@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Baymax should migrate `projects/world-model` as an external/Python-backed world foundation model harness for interactive game-world generation.
+Sim should migrate `projects/world-model` as an external/Python-backed world foundation model harness for interactive game-world generation.
 
 ### Requirement 1: Generation Request Model
 

@@ -1,5 +1,5 @@
 use crate::multibuffer_hint::MultibufferHint;
-use client::{Client, UserStore, baymax_urls};
+use client::{Client, UserStore, sim_urls};
 use cloud_api_types::Plan;
 use db::kvp::KeyValueStore;
 use fs::Fs;
@@ -19,7 +19,7 @@ use ui::{
     WithScrollbar as _, prelude::*, rems_from_px,
 };
 
-use baymax_actions::OpenOnboarding;
+use sim_actions::OpenOnboarding;
 pub use workspace::welcome::ShowWelcome;
 use workspace::welcome::WelcomePage;
 use workspace::{
@@ -37,7 +37,7 @@ mod theme_preview;
 
 /// Imports settings from Visual Studio Code.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Deserialize, JsonSchema, Action)]
-#[action(namespace = baymax)]
+#[action(namespace = sim)]
 #[serde(deny_unknown_fields)]
 pub struct ImportVsCodeSettings {
     #[serde(default)]
@@ -46,7 +46,7 @@ pub struct ImportVsCodeSettings {
 
 /// Imports settings from Cursor editor.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Deserialize, JsonSchema, Action)]
-#[action(namespace = baymax)]
+#[action(namespace = sim)]
 #[serde(deny_unknown_fields)]
 pub struct ImportCursorSettings {
     #[serde(default)]
@@ -62,7 +62,7 @@ actions!(
         Finish,
         /// Sign in while in the onboarding flow.
         SignIn,
-        /// Open the user account in baymax.dev while in the onboarding flow.
+        /// Open the user account in sim.dev while in the onboarding flow.
         OpenAccount,
         /// Resets the welcome screen hints to their initial state.
         ResetHints
@@ -224,7 +224,7 @@ impl Onboarding {
         let client = Client::global(cx);
         let status = *client.status().borrow();
         let plan = workspace.user_store().read(cx).plan();
-        let baymax_agent_state = if status.is_signed_out()
+        let sim_agent_state = if status.is_signed_out()
             || matches!(
                 status,
                 client::Status::AuthenticationError | client::Status::ConnectionError
@@ -234,11 +234,11 @@ impl Onboarding {
             "signing_in"
         } else {
             match plan {
-                Some(Plan::BaymaxPro) => "pro",
-                Some(Plan::BaymaxProTrial) => "trial",
-                Some(Plan::BaymaxBusiness) => "business",
-                Some(Plan::BaymaxStudent) => "student",
-                Some(Plan::BaymaxFree) | None => "free",
+                Some(Plan::SimPro) => "pro",
+                Some(Plan::SimProTrial) => "trial",
+                Some(Plan::SimBusiness) => "business",
+                Some(Plan::SimStudent) => "student",
+                Some(Plan::SimFree) | None => "free",
             }
         };
         let agents_installed = basics_page::FEATURED_AGENT_IDS
@@ -248,7 +248,7 @@ impl Onboarding {
             .collect::<Vec<_>>();
         telemetry::event!(
             "Welcome Agent Setup Viewed",
-            baymax_agent = baymax_agent_state,
+            sim_agent = sim_agent_state,
             agents_installed = agents_installed,
         );
 
@@ -292,7 +292,7 @@ impl Onboarding {
     }
 
     fn handle_open_account(_: &OpenAccount, _: &mut Window, cx: &mut App) {
-        cx.open_url(&baymax_urls::account_url(cx))
+        cx.open_url(&sim_urls::account_url(cx))
     }
 
     fn render_page(&mut self, cx: &mut Context<Self>) -> AnyElement {
@@ -347,13 +347,13 @@ impl Render for Onboarding {
                                         h_flex()
                                             .gap_4()
                                             .child(Vector::square(
-                                                VectorName::BaymaxLogo,
+                                                VectorName::SimLogo,
                                                 rems(2.5),
                                             ))
                                             .child(
                                                 v_flex()
                                                     .child(
-                                                        Headline::new("Welcome to Baymax")
+                                                        Headline::new("Welcome to Sim")
                                                             .size(HeadlineSize::Small),
                                                     )
                                                     .child(
@@ -590,7 +590,7 @@ impl SettingsImportState {
 }
 
 impl workspace::SerializableItem for Onboarding {
-    fn serialibaymax_item_kind() -> &'static str {
+    fn serialisim_item_kind() -> &'static str {
         "OnboardingPage"
     }
 

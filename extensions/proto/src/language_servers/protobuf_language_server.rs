@@ -1,4 +1,4 @@
-use zed_extension_api::{self as baymax, Result, settings::LspSettings};
+use zed_extension_api::{self as sim, Result, settings::LspSettings};
 
 pub(crate) struct ProtobufLanguageServer {
     cached_binary_path: Option<String>,
@@ -15,8 +15,8 @@ impl ProtobufLanguageServer {
 
     pub(crate) fn language_server_binary(
         &mut self,
-        worktree: &baymax::Worktree,
-    ) -> Result<baymax::Command> {
+        worktree: &sim::Worktree,
+    ) -> Result<sim::Command> {
         let binary_settings = LspSettings::for_worktree(Self::SERVER_NAME, worktree)
             .ok()
             .and_then(|lsp_settings| lsp_settings.binary);
@@ -27,20 +27,20 @@ impl ProtobufLanguageServer {
             .unwrap_or_else(|| vec!["-logs".into(), "".into()]);
 
         if let Some(path) = binary_settings.and_then(|binary_settings| binary_settings.path) {
-            Ok(baymax::Command {
+            Ok(sim::Command {
                 command: path,
                 args,
                 env: Default::default(),
             })
         } else if let Some(path) = self.cached_binary_path.clone() {
-            Ok(baymax::Command {
+            Ok(sim::Command {
                 command: path,
                 args,
                 env: Default::default(),
             })
         } else if let Some(path) = worktree.which(Self::SERVER_NAME) {
             self.cached_binary_path = Some(path.clone());
-            Ok(baymax::Command {
+            Ok(sim::Command {
                 command: path,
                 args,
                 env: Default::default(),

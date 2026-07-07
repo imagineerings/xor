@@ -1,11 +1,11 @@
 ---
 title: Svelte
-description: "Configure Svelte language support in Baymax, including language servers, formatting, and debugging."
+description: "Configure Svelte language support in Sim, including language servers, formatting, and debugging."
 ---
 
 # Svelte
 
-Svelte support is available through the [Svelte extension](https://github.com/baymax-extensions/svelte).
+Svelte support is available through the [Svelte extension](https://github.com/sim-extensions/svelte).
 
 - Tree-sitter: [tree-sitter-grammars/tree-sitter-svelte](https://github.com/tree-sitter-grammars/tree-sitter-svelte)
 - Language Server: [sveltejs/language-tools](https://github.com/sveltejs/language-tools)
@@ -29,7 +29,7 @@ You can modify how certain styles, such as directives and modifiers, appear in a
 
 ## Inlay Hints
 
-When inlay hints are enabled in Baymax, to make the language server send them back, Baymax sets the following initialization options:
+When inlay hints are enabled in Sim, to make the language server send them back, Sim sets the following initialization options:
 
 ```json
 "inlayHints": {

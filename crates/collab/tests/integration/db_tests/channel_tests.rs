@@ -13,29 +13,29 @@ async fn test_channels(db: &Arc<Database>) {
     let a_id = new_test_user(db).await;
     let b_id = new_test_user(db).await;
 
-    let baymax_id = db.create_root_channel("baymax", a_id).await.unwrap();
+    let sim_id = db.create_root_channel("sim", a_id).await.unwrap();
 
     // Make sure that people cannot read channels they haven't been invited to
-    assert!(db.get_channel(baymax_id, b_id).await.is_err());
+    assert!(db.get_channel(sim_id, b_id).await.is_err());
 
-    db.invite_channel_member(baymax_id, b_id, a_id, ChannelRole::Member)
+    db.invite_channel_member(sim_id, b_id, a_id, ChannelRole::Member)
         .await
         .unwrap();
 
-    db.respond_to_channel_invite(baymax_id, b_id, true)
+    db.respond_to_channel_invite(sim_id, b_id, true)
         .await
         .unwrap();
 
     let crdb_id = db
-        .create_sub_channel("crdb", baymax_id, a_id)
+        .create_sub_channel("crdb", sim_id, a_id)
         .await
         .unwrap();
     let livestreaming_id = db
-        .create_sub_channel("livestreaming", baymax_id, a_id)
+        .create_sub_channel("livestreaming", sim_id, a_id)
         .await
         .unwrap();
     let replace_id = db
-        .create_sub_channel("replace", baymax_id, a_id)
+        .create_sub_channel("replace", sim_id, a_id)
         .await
         .unwrap();
 
@@ -56,10 +56,10 @@ async fn test_channels(db: &Arc<Database>) {
     assert_channel_tree_matches(
         result.channels,
         channel_tree(&[
-            (baymax_id, &[], "baymax"),
-            (crdb_id, &[baymax_id], "crdb"),
-            (livestreaming_id, &[baymax_id], "livestreaming"),
-            (replace_id, &[baymax_id], "replace"),
+            (sim_id, &[], "sim"),
+            (crdb_id, &[sim_id], "crdb"),
+            (livestreaming_id, &[sim_id], "livestreaming"),
+            (replace_id, &[sim_id], "replace"),
             (rust_id, &[], "rust"),
             (cargo_id, &[rust_id], "cargo"),
             (cargo_ra_id, &[rust_id, cargo_id], "cargo-ra"),
@@ -70,10 +70,10 @@ async fn test_channels(db: &Arc<Database>) {
     assert_channel_tree_matches(
         result.channels,
         channel_tree(&[
-            (baymax_id, &[], "baymax"),
-            (crdb_id, &[baymax_id], "crdb"),
-            (livestreaming_id, &[baymax_id], "livestreaming"),
-            (replace_id, &[baymax_id], "replace"),
+            (sim_id, &[], "sim"),
+            (crdb_id, &[sim_id], "crdb"),
+            (livestreaming_id, &[sim_id], "livestreaming"),
+            (replace_id, &[sim_id], "replace"),
         ]),
     );
 
@@ -83,7 +83,7 @@ async fn test_channels(db: &Arc<Database>) {
         .await;
     assert!(set_subchannel_admin.is_err());
     let set_channel_admin = db
-        .set_channel_member_role(baymax_id, a_id, b_id, ChannelRole::Admin)
+        .set_channel_member_role(sim_id, a_id, b_id, ChannelRole::Admin)
         .await;
     assert!(set_channel_admin.is_ok());
 
@@ -91,10 +91,10 @@ async fn test_channels(db: &Arc<Database>) {
     assert_channel_tree_matches(
         result.channels,
         channel_tree(&[
-            (baymax_id, &[], "baymax"),
-            (crdb_id, &[baymax_id], "crdb"),
-            (livestreaming_id, &[baymax_id], "livestreaming"),
-            (replace_id, &[baymax_id], "replace"),
+            (sim_id, &[], "sim"),
+            (crdb_id, &[sim_id], "crdb"),
+            (livestreaming_id, &[sim_id], "livestreaming"),
+            (replace_id, &[sim_id], "replace"),
         ]),
     );
 
@@ -268,19 +268,19 @@ async fn test_channel_renames(db: &Arc<Database>) {
 
     let user_2 = db.create_user(false).await.unwrap().user_id;
 
-    let baymax_id = db.create_root_channel("baymax", user_1).await.unwrap();
+    let sim_id = db.create_root_channel("sim", user_1).await.unwrap();
 
-    db.rename_channel(baymax_id, user_1, "#baymax-archive")
+    db.rename_channel(sim_id, user_1, "#sim-archive")
         .await
         .unwrap();
 
-    let channel = db.get_channel(baymax_id, user_1).await.unwrap();
-    assert_eq!(channel.name, "baymax-archive");
+    let channel = db.get_channel(sim_id, user_1).await.unwrap();
+    assert_eq!(channel.name, "sim-archive");
 
-    let non_permissioned_rename = db.rename_channel(baymax_id, user_2, "hacked-lol").await;
+    let non_permissioned_rename = db.rename_channel(sim_id, user_2, "hacked-lol").await;
     assert!(non_permissioned_rename.is_err());
 
-    let bad_name_rename = db.rename_channel(baymax_id, user_1, "#").await;
+    let bad_name_rename = db.rename_channel(sim_id, user_1, "#").await;
     assert!(bad_name_rename.is_err())
 }
 
@@ -293,15 +293,15 @@ test_both_dbs!(
 async fn test_db_channel_moving(db: &Arc<Database>) {
     let a_id = db.create_user(false).await.unwrap().user_id;
 
-    let baymax_id = db.create_root_channel("baymax", a_id).await.unwrap();
+    let sim_id = db.create_root_channel("sim", a_id).await.unwrap();
 
     let crdb_id = db
-        .create_sub_channel("crdb", baymax_id, a_id)
+        .create_sub_channel("crdb", sim_id, a_id)
         .await
         .unwrap();
 
     let gpui2_id = db
-        .create_sub_channel("gpui2", baymax_id, a_id)
+        .create_sub_channel("gpui2", sim_id, a_id)
         .await
         .unwrap();
 
@@ -317,19 +317,19 @@ async fn test_db_channel_moving(db: &Arc<Database>) {
 
     // sanity check
     //     /- gpui2
-    // baymax -- crdb - livestreaming - livestreaming_sub
+    // sim -- crdb - livestreaming - livestreaming_sub
     let result = db.get_channels_for_user(a_id).await.unwrap();
     assert_channel_tree(
         result.channels,
         &[
-            (baymax_id, &[]),
-            (crdb_id, &[baymax_id]),
-            (livestreaming_id, &[baymax_id, crdb_id]),
+            (sim_id, &[]),
+            (crdb_id, &[sim_id]),
+            (livestreaming_id, &[sim_id, crdb_id]),
             (
                 livestreaming_sub_id,
-                &[baymax_id, crdb_id, livestreaming_id],
+                &[sim_id, crdb_id, livestreaming_id],
             ),
-            (gpui2_id, &[baymax_id]),
+            (gpui2_id, &[sim_id]),
         ],
     );
 
@@ -339,34 +339,34 @@ async fn test_db_channel_moving(db: &Arc<Database>) {
         .unwrap();
 
     //     /- gpui2
-    // baymax -- crdb -- livestreaming
+    // sim -- crdb -- livestreaming
     //             \- livestreaming_sub
     let result = db.get_channels_for_user(a_id).await.unwrap();
     assert_channel_tree(
         result.channels,
         &[
-            (baymax_id, &[]),
-            (crdb_id, &[baymax_id]),
-            (livestreaming_id, &[baymax_id, crdb_id]),
-            (livestreaming_sub_id, &[baymax_id, crdb_id]),
-            (gpui2_id, &[baymax_id]),
+            (sim_id, &[]),
+            (crdb_id, &[sim_id]),
+            (livestreaming_id, &[sim_id, crdb_id]),
+            (livestreaming_sub_id, &[sim_id, crdb_id]),
+            (gpui2_id, &[sim_id]),
         ],
     );
 
     // Check that we can move a whole subtree at once
     db.move_channel(crdb_id, gpui2_id, a_id).await.unwrap();
 
-    // baymax -- gpui2 -- crdb -- livestreaming
+    // sim -- gpui2 -- crdb -- livestreaming
     //                      \- livestreaming_sub
     let result = db.get_channels_for_user(a_id).await.unwrap();
     assert_channel_tree(
         result.channels,
         &[
-            (baymax_id, &[]),
-            (gpui2_id, &[baymax_id]),
-            (crdb_id, &[baymax_id, gpui2_id]),
-            (livestreaming_id, &[baymax_id, gpui2_id, crdb_id]),
-            (livestreaming_sub_id, &[baymax_id, gpui2_id, crdb_id]),
+            (sim_id, &[]),
+            (gpui2_id, &[sim_id]),
+            (crdb_id, &[sim_id, gpui2_id]),
+            (livestreaming_id, &[sim_id, gpui2_id, crdb_id]),
+            (livestreaming_sub_id, &[sim_id, gpui2_id, crdb_id]),
         ],
     );
 }
@@ -551,10 +551,10 @@ test_both_dbs!(
 async fn test_db_channel_moving_bugs(db: &Arc<Database>) {
     let user_id = db.create_user(false).await.unwrap().user_id;
 
-    let baymax_id = db.create_root_channel("baymax", user_id).await.unwrap();
+    let sim_id = db.create_root_channel("sim", user_id).await.unwrap();
 
     let projects_id = db
-        .create_sub_channel("projects", baymax_id, user_id)
+        .create_sub_channel("projects", sim_id, user_id)
         .await
         .unwrap();
 
@@ -567,9 +567,9 @@ async fn test_db_channel_moving_bugs(db: &Arc<Database>) {
     assert_channel_tree(
         result.channels,
         &[
-            (baymax_id, &[]),
-            (projects_id, &[baymax_id]),
-            (livestreaming_id, &[baymax_id, projects_id]),
+            (sim_id, &[]),
+            (projects_id, &[sim_id]),
+            (livestreaming_id, &[sim_id, projects_id]),
         ],
     );
 
@@ -581,23 +581,23 @@ async fn test_db_channel_moving_bugs(db: &Arc<Database>) {
     assert_channel_tree(
         result.channels,
         &[
-            (baymax_id, &[]),
-            (projects_id, &[baymax_id]),
-            (livestreaming_id, &[baymax_id, projects_id]),
+            (sim_id, &[]),
+            (projects_id, &[sim_id]),
+            (livestreaming_id, &[sim_id, projects_id]),
         ],
     );
 
     // Can't un-root a root channel
-    db.move_channel(baymax_id, livestreaming_id, user_id)
+    db.move_channel(sim_id, livestreaming_id, user_id)
         .await
         .unwrap_err();
     let result = db.get_channels_for_user(user_id).await.unwrap();
     assert_channel_tree(
         result.channels,
         &[
-            (baymax_id, &[]),
-            (projects_id, &[baymax_id]),
-            (livestreaming_id, &[baymax_id, projects_id]),
+            (sim_id, &[]),
+            (projects_id, &[sim_id]),
+            (livestreaming_id, &[sim_id, projects_id]),
         ],
     );
 }
@@ -613,17 +613,17 @@ async fn test_user_is_channel_participant(db: &Arc<Database>) {
     let member = new_test_user(db).await;
     let guest = new_test_user(db).await;
 
-    let baymax_channel = db.create_root_channel("baymax", admin).await.unwrap();
+    let sim_channel = db.create_root_channel("sim", admin).await.unwrap();
     let internal_channel_id = db
-        .create_sub_channel("active", baymax_channel, admin)
+        .create_sub_channel("active", sim_channel, admin)
         .await
         .unwrap();
     let public_channel_id = db
-        .create_sub_channel("vim", baymax_channel, admin)
+        .create_sub_channel("vim", sim_channel, admin)
         .await
         .unwrap();
 
-    db.set_channel_visibility(baymax_channel, collab::db::ChannelVisibility::Public, admin)
+    db.set_channel_visibility(sim_channel, collab::db::ChannelVisibility::Public, admin)
         .await
         .unwrap();
     db.set_channel_visibility(
@@ -633,14 +633,14 @@ async fn test_user_is_channel_participant(db: &Arc<Database>) {
     )
     .await
     .unwrap();
-    db.invite_channel_member(baymax_channel, member, admin, ChannelRole::Member)
+    db.invite_channel_member(sim_channel, member, admin, ChannelRole::Member)
         .await
         .unwrap();
-    db.invite_channel_member(baymax_channel, guest, admin, ChannelRole::Guest)
+    db.invite_channel_member(sim_channel, guest, admin, ChannelRole::Guest)
         .await
         .unwrap();
 
-    db.respond_to_channel_invite(baymax_channel, member, true)
+    db.respond_to_channel_invite(sim_channel, member, true)
         .await
         .unwrap();
 
@@ -693,7 +693,7 @@ async fn test_user_is_channel_participant(db: &Arc<Database>) {
         ]
     );
 
-    db.respond_to_channel_invite(baymax_channel, guest, true)
+    db.respond_to_channel_invite(sim_channel, guest, true)
         .await
         .unwrap();
 
@@ -712,21 +712,21 @@ async fn test_user_is_channel_participant(db: &Arc<Database>) {
     assert_channel_tree(
         channels,
         &[
-            (baymax_channel, &[]),
-            (public_channel_id, &[baymax_channel]),
+            (sim_channel, &[]),
+            (public_channel_id, &[sim_channel]),
         ],
     );
     let channels = db.get_channels_for_user(member).await.unwrap().channels;
     assert_channel_tree(
         channels,
         &[
-            (baymax_channel, &[]),
-            (internal_channel_id, &[baymax_channel]),
-            (public_channel_id, &[baymax_channel]),
+            (sim_channel, &[]),
+            (internal_channel_id, &[sim_channel]),
+            (public_channel_id, &[sim_channel]),
         ],
     );
 
-    db.set_channel_member_role(baymax_channel, admin, guest, ChannelRole::Banned)
+    db.set_channel_member_role(sim_channel, admin, guest, ChannelRole::Banned)
         .await
         .unwrap();
     assert!(
@@ -772,11 +772,11 @@ async fn test_user_is_channel_participant(db: &Arc<Database>) {
         ]
     );
 
-    db.remove_channel_member(baymax_channel, guest, admin)
+    db.remove_channel_member(sim_channel, guest, admin)
         .await
         .unwrap();
 
-    db.invite_channel_member(baymax_channel, guest, admin, ChannelRole::Guest)
+    db.invite_channel_member(sim_channel, guest, admin, ChannelRole::Guest)
         .await
         .unwrap();
 
@@ -809,13 +809,13 @@ async fn test_user_is_channel_participant(db: &Arc<Database>) {
         ]
     );
 
-    db.respond_to_channel_invite(baymax_channel, guest, true)
+    db.respond_to_channel_invite(sim_channel, guest, true)
         .await
         .unwrap();
 
     db.transaction(|tx| async move {
         db.check_user_is_channel_participant(
-            &db.get_channel_internal(baymax_channel, &tx).await.unwrap(),
+            &db.get_channel_internal(sim_channel, &tx).await.unwrap(),
             guest,
             &tx,
         )
@@ -883,8 +883,8 @@ async fn test_user_is_channel_participant(db: &Arc<Database>) {
     assert_channel_tree(
         channels,
         &[
-            (baymax_channel, &[]),
-            (public_channel_id, &[baymax_channel]),
+            (sim_channel, &[]),
+            (public_channel_id, &[sim_channel]),
         ],
     )
 }

@@ -26,7 +26,7 @@ Add full-text search across channel messages using PostgreSQL tsvector/tsquery, 
   - Register the new RPC in the service definition
   - Run proto codegen to produce Rust types
   - _Requirements: 5.1, 5.3_
-  - _writes: crates/proto/proto/baymax/proto/collab/search.proto_
+  - _writes: crates/proto/proto/sim/proto/collab/search.proto_
   - _writes: crates/proto/src/gen/collab/search.rs_ (codegen output)
 
 ### Phase 2 — Server-Side Search Engine

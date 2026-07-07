@@ -14,12 +14,12 @@ Options:
   --export <true|false>            Defaults to false.
   --version <version>              Defaults to 1.0.
   --build-number <number>          Defaults to GITHUB_RUN_NUMBER or 1.
-  --bundle-id <identifier>         Defaults to com.simtropolis.baymaxchat.
+  --bundle-id <identifier>         Defaults to com.simtropolis.simchat.
   --output-dir <path>              Defaults to mobile/build/ios.
   --derived-data-path <path>       Defaults to mobile/build/ios/DerivedData.
   --help
 
-Archives the iOS app from mobile/ios/Baymax.xcodeproj. Unsigned archives are
+Archives the iOS app from mobile/ios/Sim.xcodeproj. Unsigned archives are
 for artifact validation only; IPA export requires signed mode.
 USAGE
 }
@@ -28,7 +28,7 @@ signed="false"
 export_ipa="false"
 version="1.0"
 build_number="$(default_build_number)"
-bundle_id="com.simtropolis.baymaxchat"
+bundle_id="com.simtropolis.simchat"
 output_dir="${mobile_root}/build/ios"
 derived_data_path="${mobile_root}/build/ios/DerivedData"
 
@@ -110,7 +110,7 @@ fi
 require_command xcodebuild "Install Xcode and retry."
 
 ios_root="${mobile_root}/ios"
-project="${ios_root}/Baymax.xcodeproj"
+project="${ios_root}/Sim.xcodeproj"
 
 [[ -d "${project}" ]] || die "Missing iOS project metadata at ${project}. Run the iOS project metadata task first."
 
@@ -118,7 +118,7 @@ mkdir -p "${output_dir}" "${derived_data_path}"
 
 commit_sha="$(current_commit_sha)"
 short_sha="${commit_sha:0:12}"
-archive_path="${output_dir}/Baymax-${version}-${build_number}-${short_sha}.xcarchive"
+archive_path="${output_dir}/Sim-${version}-${build_number}-${short_sha}.xcarchive"
 
 decode_base64_file() {
     local output_file="$1"
@@ -154,12 +154,12 @@ code_sign_args=(CODE_SIGNING_ALLOWED=NO)
 if [[ "${signed}" == "true" ]]; then
     require_command security "Install Xcode command line tools and retry."
 
-    signing_dir="$(mktemp -d "${TMPDIR:-/tmp}/baymax-ios-signing.XXXXXX")"
+    signing_dir="$(mktemp -d "${TMPDIR:-/tmp}/sim-ios-signing.XXXXXX")"
     cleanup_dirs+=("${signing_dir}")
     certificate_path="${signing_dir}/certificate.p12"
     profile_path="${signing_dir}/profile.mobileprovision"
     export_options_path="${signing_dir}/ExportOptions.plist"
-    keychain_path="${signing_dir}/baymax-ios-signing.keychain-db"
+    keychain_path="${signing_dir}/sim-ios-signing.keychain-db"
     keychain_password="$(uuidgen)"
 
     printf '%s' "${IOS_SIGNING_CERTIFICATE_BASE64}" | decode_base64_file "${certificate_path}"
@@ -190,14 +190,14 @@ fi
 log "archiving iOS app"
 xcodebuild \
     -project "${project}" \
-    -scheme Baymax \
+    -scheme Sim \
     -configuration Release \
     -destination "generic/platform=iOS" \
     -derivedDataPath "${derived_data_path}" \
     -archivePath "${archive_path}" \
-    BAYMAX_VERSION_NAME="${version}" \
-    BAYMAX_BUILD_NUMBER="${build_number}" \
-    BAYMAX_BUNDLE_IDENTIFIER="${bundle_id}" \
+    SIM_VERSION_NAME="${version}" \
+    SIM_BUILD_NUMBER="${build_number}" \
+    SIM_BUNDLE_IDENTIFIER="${bundle_id}" \
     "${code_sign_args[@]}" \
     archive
 

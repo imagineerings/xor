@@ -5,7 +5,7 @@ use acp_thread::{
 };
 
 use anyhow::Result;
-use baymax_actions::agent::OpenSettings;
+use sim_actions::agent::OpenSettings;
 use collections::{HashSet, IndexMap};
 use futures::FutureExt;
 use fuzzy::{StringMatchCandidate, match_strings};
@@ -665,7 +665,7 @@ mod tests {
     async fn test_fuzzy_match(cx: &mut TestAppContext) {
         let models = create_model_list(vec![
             (
-                "baymax",
+                "sim",
                 vec![
                     "Claude 3.7 Sonnet",
                     "Claude 3.7 Sonnet Thinking",
@@ -678,14 +678,14 @@ mod tests {
         ]);
 
         // Results should preserve models order whenever possible.
-        // In the case below, `baymax/gpt-5-mini` and `openai/gpt-5-mini` have identical
-        // similarity scores, but `baymax/gpt-5-mini` was higher in the models list,
+        // In the case below, `sim/gpt-5-mini` and `openai/gpt-5-mini` have identical
+        // similarity scores, but `sim/gpt-5-mini` was higher in the models list,
         // so it should appear first in the results.
         let results = fuzzy_search(models.clone(), "mini".into(), cx.executor()).await;
         assert_models_eq(
             results,
             vec![
-                ("baymax", vec!["gpt-5-mini"]),
+                ("sim", vec!["gpt-5-mini"]),
                 ("openai", vec!["gpt-5-mini"]),
             ],
         );
@@ -698,10 +698,10 @@ mod tests {
     #[gpui::test]
     fn test_favorites_section_appears_when_favorites_exist(_cx: &mut TestAppContext) {
         let models = create_model_list(vec![
-            ("baymax", vec!["baymax/claude", "baymax/gemini"]),
+            ("sim", vec!["sim/claude", "sim/gemini"]),
             ("openai", vec!["openai/gpt-5"]),
         ]);
-        let favorites = create_favorites(vec!["baymax/gemini"]);
+        let favorites = create_favorites(vec!["sim/gemini"]);
 
         let entries = info_list_to_picker_entries(models, &favorites);
 
@@ -711,36 +711,36 @@ mod tests {
         ));
 
         let model_ids = get_entry_model_ids(&entries);
-        assert_eq!(model_ids[0], "baymax/gemini");
+        assert_eq!(model_ids[0], "sim/gemini");
     }
 
     #[gpui::test]
     fn test_no_favorites_section_when_no_favorites(_cx: &mut TestAppContext) {
-        let models = create_model_list(vec![("baymax", vec!["baymax/claude", "baymax/gemini"])]);
+        let models = create_model_list(vec![("sim", vec!["sim/claude", "sim/gemini"])]);
         let favorites = create_favorites(vec![]);
 
         let entries = info_list_to_picker_entries(models, &favorites);
 
         assert!(matches!(
             entries.first(),
-            Some(ModelPickerEntry::Separator(s)) if s == "baymax"
+            Some(ModelPickerEntry::Separator(s)) if s == "sim"
         ));
     }
 
     #[gpui::test]
     fn test_models_have_correct_actions(_cx: &mut TestAppContext) {
         let models = create_model_list(vec![
-            ("baymax", vec!["baymax/claude", "baymax/gemini"]),
+            ("sim", vec!["sim/claude", "sim/gemini"]),
             ("openai", vec!["openai/gpt-5"]),
         ]);
-        let favorites = create_favorites(vec!["baymax/claude"]);
+        let favorites = create_favorites(vec!["sim/claude"]);
 
         let entries = info_list_to_picker_entries(models, &favorites);
 
         for entry in &entries {
             if let ModelPickerEntry::Model(info, is_favorite) = entry {
-                if info.id.as_ref() == "baymax/claude" {
-                    assert!(is_favorite, "baymax/claude should be a favorite");
+                if info.id.as_ref() == "sim/claude" {
+                    assert!(is_favorite, "sim/claude should be a favorite");
                 } else {
                     assert!(!is_favorite, "{} should not be a favorite", info.id);
                 }
@@ -751,31 +751,31 @@ mod tests {
     #[gpui::test]
     fn test_favorites_appear_in_both_sections(_cx: &mut TestAppContext) {
         let models = create_model_list(vec![
-            ("baymax", vec!["baymax/claude", "baymax/gemini"]),
+            ("sim", vec!["sim/claude", "sim/gemini"]),
             ("openai", vec!["openai/gpt-5", "openai/gpt-4"]),
         ]);
-        let favorites = create_favorites(vec!["baymax/gemini", "openai/gpt-5"]);
+        let favorites = create_favorites(vec!["sim/gemini", "openai/gpt-5"]);
 
         let entries = info_list_to_picker_entries(models, &favorites);
         let model_ids = get_entry_model_ids(&entries);
 
-        assert_eq!(model_ids[0], "baymax/gemini");
+        assert_eq!(model_ids[0], "sim/gemini");
         assert_eq!(model_ids[1], "openai/gpt-5");
 
-        assert!(model_ids[2..].contains(&"baymax/gemini"));
+        assert!(model_ids[2..].contains(&"sim/gemini"));
         assert!(model_ids[2..].contains(&"openai/gpt-5"));
     }
 
     #[gpui::test]
     fn test_favorites_are_not_duplicated_when_repeated_in_other_sections(_cx: &mut TestAppContext) {
         let models = create_model_list(vec![
-            ("Recommended", vec!["baymax/claude", "anthropic/claude"]),
-            ("Baymax", vec!["baymax/claude", "baymax/gpt-5"]),
+            ("Recommended", vec!["sim/claude", "anthropic/claude"]),
+            ("Sim", vec!["sim/claude", "sim/gpt-5"]),
             ("Antropic", vec!["anthropic/claude"]),
             ("OpenAI", vec!["openai/gpt-5"]),
         ]);
 
-        let favorites = create_favorites(vec!["baymax/claude"]);
+        let favorites = create_favorites(vec!["sim/claude"]);
 
         let entries = info_list_to_picker_entries(models, &favorites);
         let labels = get_entry_labels(&entries);
@@ -784,13 +784,13 @@ mod tests {
             labels,
             vec![
                 "Favorite",
-                "baymax/claude",
+                "sim/claude",
                 "Recommended",
-                "baymax/claude",
+                "sim/claude",
                 "anthropic/claude",
-                "Baymax",
-                "baymax/claude",
-                "baymax/gpt-5",
+                "Sim",
+                "sim/claude",
+                "sim/gpt-5",
                 "Antropic",
                 "anthropic/claude",
                 "OpenAI",
@@ -803,7 +803,7 @@ mod tests {
     fn test_flat_model_list_with_favorites(_cx: &mut TestAppContext) {
         let models = AgentModelList::Flat(vec![
             acp_thread::AgentModelInfo {
-                id: AgentModelId::new("baymax/claude"),
+                id: AgentModelId::new("sim/claude"),
                 name: "Claude".into(),
                 description: None,
                 icon: None,
@@ -811,7 +811,7 @@ mod tests {
                 cost: None,
             },
             acp_thread::AgentModelInfo {
-                id: AgentModelId::new("baymax/gemini"),
+                id: AgentModelId::new("sim/gemini"),
                 name: "Gemini".into(),
                 description: None,
                 icon: None,
@@ -819,7 +819,7 @@ mod tests {
                 cost: None,
             },
         ]);
-        let favorites = create_favorites(vec!["baymax/gemini"]);
+        let favorites = create_favorites(vec!["sim/gemini"]);
 
         let entries = info_list_to_picker_entries(models, &favorites);
 

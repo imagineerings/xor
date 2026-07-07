@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The Baymax mobile client needs a comprehensive notification system covering push notifications (for agent responses and collab events when the app is backgrounded) and in-app notifications (toasts, alerts). This enables users to stay informed about agent task completion, incoming calls, channel messages, and other events. This spec draws from `mobile-dev`'s push notification infrastructure, notification preferences, and the Baymax desktop's notification system.
+The Sim mobile client needs a comprehensive notification system covering push notifications (for agent responses and collab events when the app is backgrounded) and in-app notifications (toasts, alerts). This enables users to stay informed about agent task completion, incoming calls, channel messages, and other events. This spec draws from `mobile-dev`'s push notification infrastructure, notification preferences, and the Sim desktop's notification system.
 
 ## Glossary
 
@@ -11,7 +11,7 @@ The Baymax mobile client needs a comprehensive notification system covering push
 | **Push Notification** | A remote notification delivered via APNs (iOS) or FCM (Android) when the app is in the background. |
 | **In-App Notification** | A visual alert (toast, banner, snack bar) displayed while the app is in the foreground. |
 | **Notification Preference** | User-configurable settings controlling what types of notifications are delivered and how. |
-| **Push Proxy** | The Baymax Push Notification Service that bridges agent/collab events to APNs/FCM. |
+| **Push Proxy** | The Sim Push Notification Service that bridges agent/collab events to APNs/FCM. |
 | **Badge** | The numbered badge on the app icon indicating unread notification count. |
 
 ## Requirements
@@ -72,4 +72,4 @@ The Baymax mobile client needs a comprehensive notification system covering push
 ## Existing Assets
 
 - mobile-dev: `app/init/push_notifications.ts`, `app/constants/push_notification.ts`, `app/constants/push_proxy.ts`, `app/managers/network_manager.ts`, `app/screens/in_app_notification/`, `app/components/toast/`
-- Baymax desktop: `crates/collab_ui/src/notifications/` (incoming call, project shared notifications), `crates/notifications/` (notification store)
+- Sim desktop: `crates/collab_ui/src/notifications/` (incoming call, project shared notifications), `crates/notifications/` (notification store)

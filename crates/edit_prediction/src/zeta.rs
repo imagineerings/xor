@@ -1,5 +1,5 @@
 use crate::{
-    BaymaxUpdateRequiredError, CloudRequestTimeoutError, CurrentEditPrediction, DebugEvent,
+    SimUpdateRequiredError, CloudRequestTimeoutError, CurrentEditPrediction, DebugEvent,
     EditPredictionFinishedDebugEvent, EditPredictionId, EditPredictionModelInput,
     EditPredictionStartedDebugEvent, EditPredictionStore, buffer_path_with_id_fallback,
     cursor_excerpt::{self, compute_cursor_excerpt, compute_syntax_ranges},
@@ -521,7 +521,7 @@ fn handle_api_response<T>(
                     .ok();
             }
 
-            if err.is::<BaymaxUpdateRequiredError>() {
+            if err.is::<SimUpdateRequiredError>() {
                 cx.update(|cx| {
                     this.update(cx, |this, _cx| {
                         this.update_required = true;
@@ -541,12 +541,12 @@ fn handle_api_response<T>(
                             ErrorSeverity::Critical
                         }
                         fn primary_action(&self) -> ErrorAction {
-                            ErrorAction::link("Update Baymax", "https://baymax.dev/releases")
+                            ErrorAction::link("Update Sim", "https://sim.dev/releases")
                         }
                     }
 
                     show_app_notification(
-                        NotificationId::unique::<BaymaxUpdateRequiredError>(),
+                        NotificationId::unique::<SimUpdateRequiredError>(),
                         cx,
                         move |cx| {
                             cx.new({
@@ -727,7 +727,7 @@ pub(crate) fn edit_prediction_accepted(
 
         let url = client
             .http_client()
-            .build_baymax_llm_url("/predict_edits/accept", &[])?;
+            .build_sim_llm_url("/predict_edits/accept", &[])?;
         EditPredictionStore::send_api_request::<()>(
             move |builder| Ok(builder.uri(url.as_ref()).body(body.clone().into())?),
             client,

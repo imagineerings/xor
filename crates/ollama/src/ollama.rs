@@ -487,7 +487,7 @@ mod tests {
                 assert!(tool_calls.is_some_and(|v| !v.is_empty()));
                 assert!(thinking.is_none());
             }
-            _ => panic!("Deserialibaymax wrong role"),
+            _ => panic!("Deserialisim wrong role"),
         }
     }
 
@@ -682,9 +682,9 @@ mod tests {
             tools: vec![],
         };
 
-        let serialibaymax = serde_json::to_string(&request).unwrap();
-        assert!(serialibaymax.contains("images"));
-        assert!(serialibaymax.contains(base64_image));
+        let serialisim = serde_json::to_string(&request).unwrap();
+        assert!(serialisim.contains("images"));
+        assert!(serialisim.contains(base64_image));
     }
 
     #[test]
@@ -702,8 +702,8 @@ mod tests {
             tools: vec![],
         };
 
-        let serialibaymax = serde_json::to_string(&request).unwrap();
-        assert!(!serialibaymax.contains("images"));
+        let serialisim = serde_json::to_string(&request).unwrap();
+        assert!(!serialisim.contains("images"));
     }
 
     #[test]
@@ -723,9 +723,9 @@ mod tests {
             tools: vec![],
         };
 
-        let serialibaymax = serde_json::to_string(&request).unwrap();
+        let serialisim = serde_json::to_string(&request).unwrap();
 
-        let parsed: serde_json::Value = serde_json::from_str(&serialibaymax).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&serialisim).unwrap();
         let message_images = parsed["messages"][0]["images"].as_array().unwrap();
         assert_eq!(message_images.len(), 1);
         assert_eq!(message_images[0].as_str().unwrap(), base64_image);
@@ -741,27 +741,27 @@ mod tests {
             temperature: Some(0.7),
             ..Default::default()
         };
-        let serialibaymax = serde_json::to_string(&options_no_stop).unwrap();
+        let serialisim = serde_json::to_string(&options_no_stop).unwrap();
         assert!(
-            !serialibaymax.contains("stop"),
+            !serialisim.contains("stop"),
             "stop should not be in JSON when None"
         );
-        assert!(serialibaymax.contains("num_ctx"));
-        assert!(serialibaymax.contains("temperature"));
+        assert!(serialisim.contains("num_ctx"));
+        assert!(serialisim.contains("temperature"));
 
-        // When stop has values, they should be serialibaymax
+        // When stop has values, they should be serialisim
         let options_with_stop = ChatOptions {
             stop: Some(vec!["<|eot_id|>".to_string()]),
             ..Default::default()
         };
-        let serialibaymax = serde_json::to_string(&options_with_stop).unwrap();
-        assert!(serialibaymax.contains("stop"));
-        assert!(serialibaymax.contains("<|eot_id|>"));
+        let serialisim = serde_json::to_string(&options_with_stop).unwrap();
+        assert!(serialisim.contains("stop"));
+        assert!(serialisim.contains("<|eot_id|>"));
 
         // All None options should result in empty object
         let options_all_none = ChatOptions::default();
-        let serialibaymax = serde_json::to_string(&options_all_none).unwrap();
-        assert_eq!(serialibaymax, "{}");
+        let serialisim = serde_json::to_string(&options_all_none).unwrap();
+        assert_eq!(serialisim, "{}");
     }
 
     #[test]
@@ -782,8 +782,8 @@ mod tests {
             tools: vec![],
         };
 
-        let serialibaymax = serde_json::to_string(&request).unwrap();
-        let parsed: serde_json::Value = serde_json::from_str(&serialibaymax).unwrap();
+        let serialisim = serde_json::to_string(&request).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&serialisim).unwrap();
 
         let stop = parsed["options"]["stop"].as_array().unwrap();
         assert_eq!(stop.len(), 2);
@@ -813,13 +813,13 @@ mod tests {
             tools: vec![],
         };
 
-        let serialibaymax = serde_json::to_string(&request).unwrap();
+        let serialisim = serde_json::to_string(&request).unwrap();
 
-        // The key check: "stop" should not appear in the serialibaymax JSON
+        // The key check: "stop" should not appear in the serialisim JSON
         assert!(
-            !serialibaymax.contains("\"stop\""),
+            !serialisim.contains("\"stop\""),
             "stop field should be omitted when None, got: {}",
-            serialibaymax
+            serialisim
         );
     }
 }

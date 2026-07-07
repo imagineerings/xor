@@ -40,8 +40,8 @@ fn test_pairing_persistence() {
 
     {
         let service = PairingService::with_storage(&path);
-        assert_eq!(service.lookup_baymax_user("tg:123"), Some("alice"));
-        assert_eq!(service.lookup_baymax_user("tg:456"), Some("bob"));
+        assert_eq!(service.lookup_sim_user("tg:123"), Some("alice"));
+        assert_eq!(service.lookup_sim_user("tg:456"), Some("bob"));
     }
 
     let _ = std::fs::remove_file(&path);

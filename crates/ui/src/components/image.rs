@@ -18,8 +18,8 @@ pub enum VectorName {
     ProTrialStamp,
     ProUserStamp,
     StudentStamp,
-    BaymaxLogo,
-    BaymaxXCopilot,
+    SimLogo,
+    SimXCopilot,
 }
 
 impl VectorName {
@@ -121,7 +121,7 @@ impl Component for Vector {
                     vec![
                         single_example(
                             "Default",
-                            Vector::square(VectorName::BaymaxLogo, size).into_any_element(),
+                            Vector::square(VectorName::SimLogo, size).into_any_element(),
                         ),
                         single_example(
                             "Custom Size",
@@ -129,7 +129,7 @@ impl Component for Vector {
                                 .h(rems_from_px(120.))
                                 .justify_center()
                                 .child(Vector::new(
-                                    VectorName::BaymaxLogo,
+                                    VectorName::SimLogo,
                                     rems_from_px(120.),
                                     rems_from_px(200.),
                                 ))
@@ -142,13 +142,13 @@ impl Component for Vector {
                     vec![
                         single_example(
                             "Accent Color",
-                            Vector::square(VectorName::BaymaxLogo, size)
+                            Vector::square(VectorName::SimLogo, size)
                                 .color(Color::Accent)
                                 .into_any_element(),
                         ),
                         single_example(
                             "Error Color",
-                            Vector::square(VectorName::BaymaxLogo, size)
+                            Vector::square(VectorName::SimLogo, size)
                                 .color(Color::Error)
                                 .into_any_element(),
                         ),
@@ -157,8 +157,8 @@ impl Component for Vector {
                 example_group_with_title(
                     "Different Vectors",
                     vec![single_example(
-                        "Baymax X Copilot",
-                        Vector::square(VectorName::BaymaxXCopilot, rems_from_px(100.))
+                        "Sim X Copilot",
+                        Vector::square(VectorName::SimXCopilot, rems_from_px(100.))
                             .into_any_element(),
                     )],
                 ),
@@ -174,8 +174,8 @@ mod tests {
     #[test]
     fn vector_path() {
         assert_eq!(
-            VectorName::BaymaxLogo.path().as_ref(),
-            "images/baymax_logo.svg"
+            VectorName::SimLogo.path().as_ref(),
+            "images/sim_logo.svg"
         );
     }
 }

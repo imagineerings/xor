@@ -33,7 +33,7 @@ TALLY_API = "https://api.tally.so"
 SLACK_API = "https://slack.com/api"
 
 REPO_OWNER = "simtropolis"
-REPO_NAME = "baymax"
+REPO_NAME = "sim"
 PROJECT_NUMBER = 83
 SLACK_ACTIVITY_CHANNEL_ID = "C0B0JCE8GDC"
 

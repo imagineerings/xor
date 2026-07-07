@@ -4,15 +4,15 @@
 
 ### Problem
 
-Baymax users who work on remote machines can use the desktop client via the existing SSH remote server infrastructure, but there is no way for the **Baymax mobile app** to securely connect to those remote environments. Users need a way to start a secure tunnel and obtain connection details (via QR code) that the mobile app can scan.
+Sim users who work on remote machines can use the desktop client via the existing SSH remote server infrastructure, but there is no way for the **Sim mobile app** to securely connect to those remote environments. Users need a way to start a secure tunnel and obtain connection details (via QR code) that the mobile app can scan.
 
 ### Solution
 
-**Migrate** the tunnel management logic (currently in the `goose-server` crate's `/tunnel/start`, `/tunnel/stop`, `/tunnel/status` endpoints) into Baymax as a native module, and add a **Mobile Access** settings page that interacts with this module directly.
+**Migrate** the tunnel management logic (currently in the `goose-server` crate's `/tunnel/start`, `/tunnel/stop`, `/tunnel/status` endpoints) into Sim as a native module, and add a **Mobile Access** settings page that interacts with this module directly.
 
 This means:
 - No external HTTP dependency on goose-server for tunnel management
-- The tunnel manager is a first-class Baymax component, callable via direct programmatic API
+- The tunnel manager is a first-class Sim component, callable via direct programmatic API
 - The settings panel lives in `settings_ui` (following existing patterns)
 - QR code generation and rendering is done natively
 
@@ -22,10 +22,10 @@ This means:
 |----------|--------|-----------|
 | **Where to host the tunnel manager** | A new `mobile_tunnel` crate (or reuse the existing `remote` crate), exposing a `TunnelManager` struct/entity | The tunnel logic is a distinct concern from SSH connections; a dedicated crate keeps it clean and testable. Alternatively, if the logic is small, it can live in a module within `remote`. |
 | **How the UI communicates with the tunnel manager** | Direct method calls on a `TunnelManager` entity (no HTTP), with state updates via `cx.notify()` and events | No serialization overhead, no server process needed, consistent with GPUI patterns. |
-| **QR code rendering** | Add `qrcode` crate as a workspace dependency; encode connection params as a QR code in memory, render via GPUI's `img` element | The `qrcode` crate is pure Rust, lightweight, and integrates with the `image` crate that Baymax already uses. |
-| **Tunnel mechanism** | SSH reverse tunnel (using Baymax's existing SSH infrastructure) or a relay-based tunnel, matching what goose-server currently does | Reuses existing battle-tested SSH code. The exact mechanism is ported from goose-server's implementation. |
-| **Tunnel config persistence** | Store goose-server URL and last-used settings in Baymax's `settings.json` user settings | Follows the existing patterns for user settings persistence. |
-| **Subprocess management** | Use `util::command` for any subprocess lifecycle (same pattern as SSH kernel and remote server) | Consistent with existing Baymax patterns for managing external processes. |
+| **QR code rendering** | Add `qrcode` crate as a workspace dependency; encode connection params as a QR code in memory, render via GPUI's `img` element | The `qrcode` crate is pure Rust, lightweight, and integrates with the `image` crate that Sim already uses. |
+| **Tunnel mechanism** | SSH reverse tunnel (using Sim's existing SSH infrastructure) or a relay-based tunnel, matching what goose-server currently does | Reuses existing battle-tested SSH code. The exact mechanism is ported from goose-server's implementation. |
+| **Tunnel config persistence** | Store goose-server URL and last-used settings in Sim's `settings.json` user settings | Follows the existing patterns for user settings persistence. |
+| **Subprocess management** | Use `util::command` for any subprocess lifecycle (same pattern as SSH kernel and remote server) | Consistent with existing Sim patterns for managing external processes. |
 
 ### Dependencies
 
@@ -41,7 +41,7 @@ This means:
 
 ```mermaid
 graph TD
-    subgraph Baymax
+    subgraph Sim
         subgraph "settings_ui crate"
             A["SettingsWindow"]
             A --> B["MobileAccessPage"]
@@ -98,7 +98,7 @@ graph TD
 
 ### 3.1 TunnelManager (the ported goose-server logic)
 
-**Purpose**: Manages the lifecycle of a secure tunnel — starting, stopping, and monitoring — by reusing Baymax's existing SSH remote infrastructure. This is the core logic migrated from `goose-server`'s `/tunnel/*` endpoints.
+**Purpose**: Manages the lifecycle of a secure tunnel — starting, stopping, and monitoring — by reusing Sim's existing SSH remote infrastructure. This is the core logic migrated from `goose-server`'s `/tunnel/*` endpoints.
 
 **Location**: A new crate `crates/mobile_tunnel/src/lib.rs` (or `crates/remote/src/tunnel.rs` if folded into the remote crate)
 
@@ -198,7 +198,7 @@ pub(crate) fn render_mobile_access_setup_page(
 │  Section: Mobile Access                   │
 │                                           │
 │  "Configure secure tunnel to expose your  │
-│   workspace to the Baymax mobile app."    │
+│   workspace to the Sim mobile app."    │
 │                                           │
 │  Status: ● Running at 127.0.0.1:9999     │
 │          ○ Stopped                        │
@@ -212,7 +212,7 @@ pub(crate) fn render_mobile_access_setup_page(
 │  │  │ (200x200)│                        │ │
 │  │  └──────────┘                        │ │
 │  │                                      │ │
-│  │  "Open the Baymax mobile app,        │ │
+│  │  "Open the Sim mobile app,        │ │
 │  │   tap 'Add Connection', and          │ │
 │  │   scan this QR code."                │ │
 │  └──────────────────────────────────────┘ │
@@ -267,7 +267,7 @@ fn network_page() -> SettingsPage {
     fn remote_development_section() -> [SettingsPageItem; 1] {
         [SettingsPageItem::SubPageLink(SubPageLink {
             title: "Mobile Access".into(),
-            description: Some("Configure secure tunnel for Baymax mobile app connection.".into()),
+            description: Some("Configure secure tunnel for Sim mobile app connection.".into()),
             json_path: Some("mobile_access"),
             in_json: true,
             files: USER,
@@ -287,7 +287,7 @@ fn network_page() -> SettingsPage {
 **Location**: `crates/settings_content` + `crates/settings_ui/src/page_data.rs`
 
 ```rust
-// In Baymax settings content (auto-generated or manual):
+// In Sim settings content (auto-generated or manual):
 #[derive(Deserialize, Serialize, Default)]
 struct MobileAccessSettings {
     /// The SSH host to use for tunneling (optional — auto-discovered if empty)
@@ -340,7 +340,7 @@ pub struct TunnelInfo {
 The QR code encodes a URL-like string that the mobile app can parse:
 
 ```
-baymax-tunnel://127.0.0.1:{port}?token={auth_token}&host={ssh_host}
+sim-tunnel://127.0.0.1:{port}?token={auth_token}&host={ssh_host}
 ```
 
 ### 4.4 State Transitions
@@ -427,7 +427,7 @@ _For any_ `stop()` call or unexpected `TunnelManager` drop, the spawned tunnel s
 ### Cleanup
 
 - `TunnelManager`'s `Drop` implementation kills the tunnel subprocess if still running
-- On Baymax startup, any leftover tunnel processes from a previous session are detected via a PID file or port scan and cleaned up
+- On Sim startup, any leftover tunnel processes from a previous session are detected via a PID file or port scan and cleaned up
 
 ---
 
@@ -458,7 +458,7 @@ _For any_ `stop()` call or unexpected `TunnelManager` drop, the spawned tunnel s
 
 ---
 
-## 8. Migration Plan (goose-server → Baymax)
+## 8. Migration Plan (goose-server → Sim)
 
 | Step | What | Description |
 |------|------|-------------|

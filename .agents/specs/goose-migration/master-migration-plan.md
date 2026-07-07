@@ -1,13 +1,13 @@
-# Goose → Baymax Migration Plan
+# Goose → Sim Migration Plan
 
 ## Purpose
 
-Identify all features and functionality present in the `projects/goose/` directory and plan their migration into baymax, avoiding duplication where baymax already has equivalent functionality.
+Identify all features and functionality present in the `projects/goose/` directory and plan their migration into sim, avoiding duplication where sim already has equivalent functionality.
 
 ## Methodology
 
 For each goose feature, we assess:
-- **Already exists in baymax** — No migration needed; document the correspondence.
+- **Already exists in sim** — No migration needed; document the correspondence.
 - **Partially exists** — Gaps to fill.
 - **Does not exist** — Full migration required.
 
@@ -17,7 +17,7 @@ For each goose feature, we assess:
 
 ### 1. Core Agent Engine (`projects/goose/crates/goose/src/agents/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | Agent loop & tool execution | `crates/agent/` | ✅ Already exists |
 | MCP client | `crates/context_server/` | ✅ Already exists |
@@ -35,7 +35,7 @@ For each goose feature, we assess:
 
 ### 2. LLM Providers (`projects/goose/crates/goose/src/providers/`)
 
-| Goose Provider | Baymax Equivalent | Status |
+| Goose Provider | Sim Equivalent | Status |
 |---|---|---|
 | Anthropic | `crates/anthropic/` | ✅ Already exists |
 | OpenAI | `crates/open_ai/` | ✅ Already exists |
@@ -73,7 +73,7 @@ For each goose feature, we assess:
 
 ### 3. ACP Protocol (`projects/goose/crates/goose/src/acp/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | ACP server | `crates/acp_thread/` | ✅ Already exists |
 | ACP tools | `crates/acp_tools/` | ✅ Already exists |
@@ -85,7 +85,7 @@ For each goose feature, we assess:
 
 ### 4. MCP Tools (`crates/goose-mcp/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | MCP server runner | — | ❌ New |
 | **AutoVisualiser** (code viz) | — | ❌ New |
@@ -96,12 +96,12 @@ For each goose feature, we assess:
 
 ### 5. Configuration (`projects/goose/crates/goose/src/config/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | Base config | `crates/settings/` | ✅ Already exists |
 | Provider config | `crates/agent_settings/` | ✅ Already exists |
 | Extension config | `crates/settings/` | ✅ Already exists |
-| Baymax mode | `crates/agent_settings/src/baymax_mode.rs` | ✅ Implemented |
+| Sim mode | `crates/agent_settings/src/sim_mode.rs` | ✅ Implemented |
 | Experiments/feature flags | `crates/feature_flags/` | ✅ Already exists |
 | Migrations | — | ❌ New |
 | Permission config | — | ❌ New |
@@ -109,7 +109,7 @@ For each goose feature, we assess:
 
 ### 6. Security (`projects/goose/crates/goose/src/security/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | Adversary inspector | — | ❌ New |
 | Egress inspector | — | ❌ New |
@@ -120,7 +120,7 @@ For each goose feature, we assess:
 
 ### 7. Permissions (`projects/goose/crates/goose/src/permission/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | Permission confirmation | `crates/agent/src/tool_permissions.rs` | ⚠️ Partial |
 | Permission inspector | — | ❌ New |
@@ -129,7 +129,7 @@ For each goose feature, we assess:
 
 ### 8. Gateway (`projects/goose/crates/goose/src/gateway/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | Gateway handler | — | ❌ New |
 | Gateway manager | — | ❌ New |
@@ -139,14 +139,14 @@ For each goose feature, we assess:
 
 ### 9. Dictation (`projects/goose/crates/goose/src/dictation/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | Whisper STT | — | ❌ New |
 | Cloud dictation providers | — | ❌ New |
 
 ### 10. Session (`projects/goose/crates/goose/src/session/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | Session manager | `crates/session/` | ✅ Already exists |
 | Chat history search | `crates/search/` | ⚠️ Partial |
@@ -159,7 +159,7 @@ For each goose feature, we assess:
 
 ### 11. Skills (`projects/goose/crates/goose/src/skills/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | Skill management | `crates/agent_skills/` | ✅ Already exists |
 | Built-in skills | — | ⚠️ Partial |
@@ -169,7 +169,7 @@ For each goose feature, we assess:
 
 ### 12. Slash Commands (`projects/goose/crates/goose/src/slash_commands/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | Slash command system | `crates/agent/src/agent.rs`, `crates/agent_ui/src/conversation_view/thread_view.rs` | ⚠️ Partially exists |
 | Recipe slash command | — | ❌ New |
@@ -178,14 +178,14 @@ For each goose feature, we assess:
 
 ### 13. Hints (`projects/goose/crates/goose/src/hints/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | Import files hints | — | ❌ New |
 | Load hints | — | ❌ New |
 
 ### 14. Goose Apps (`projects/goose/crates/goose/src/goose_apps/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | App system (chat, clock, etc.) | — | ❌ New |
 | Cache | — | ❌ New |
@@ -193,19 +193,19 @@ For each goose feature, we assess:
 
 ### 15. Execution (`projects/goose/crates/goose/src/execution/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | Execution manager | `crates/agent/` | ⚠️ Partial |
 
 ### 16. Scheduler (`projects/goose/crates/goose/src/scheduler*.rs`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | Scheduler | `crates/scheduler/` | ✅ Already exists |
 
 ### 17. Prompts (`projects/goose/crates/goose/src/prompts/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | System prompts | `crates/prompt_store/` | ✅ Already exists |
 | Specialized prompts | `crates/prompt_store/` | ✅ Already exists |
@@ -215,16 +215,16 @@ For each goose feature, we assess:
 
 ### 18. Tracing/Observability (`projects/goose/crates/goose/src/tracing/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | Langfuse layer | — | ❌ New |
 | Observation layer | — | ❌ New |
 | Rate limiter | `crates/language_model_core/src/rate_limiter.rs` | ⚠️ Partially exists |
-| OpenTelemetry (OTLP) | `crates/telemetry/`, `crates/baymax/src/baymax/telemetry_log.rs` | ⚠️ Partial |
+| OpenTelemetry (OTLP) | `crates/telemetry/`, `crates/sim/src/sim/telemetry_log.rs` | ⚠️ Partial |
 
 ### 19. OAuth (`projects/goose/crates/goose/src/oauth/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | OAuth callback server | `crates/oauth_callback_server/` | ✅ Already exists |
 | OAuth persistence | — | ❌ New |
@@ -232,26 +232,26 @@ For each goose feature, we assess:
 
 ### 20. Context Management (`projects/goose/crates/goose/src/context_mgmt/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | Context window management | `crates/agent/src/thread.rs`, `crates/agent_settings/src/agent_settings.rs` | ⚠️ Partially exists |
 
 ### 21. Plugins (`projects/goose/crates/goose/src/plugins/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | Plugin discovery | — | ❌ New |
 | Plugin formats | — | ❌ New |
 
 ### 22. Hooks (`projects/goose/crates/goose/src/hooks/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | Hook system | — | ❌ New |
 
 ### 23. Platform Extensions (`projects/goose/crates/goose/src/agents/platform_extensions/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | Apps extension | — | ❌ New |
 | Code execution | — | ❌ New |
@@ -267,7 +267,7 @@ For each goose feature, we assess:
 
 ### 24. Other Core Files (`projects/goose/crates/goose/src/*.rs`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | Action required manager | — | ❌ New |
 | Built-in extensions | `crates/extension/` | ⚠️ Partial |
@@ -289,7 +289,7 @@ For each goose feature, we assess:
 
 ### 25. CLI (`crates/goose-cli/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | CLI commands | `crates/cli/` | ✅ Already exists |
 | Configure command | — | ⚠️ Partial |
@@ -307,7 +307,7 @@ For each goose feature, we assess:
 
 ### 26. Server (`crates/goose-server/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | REST API server | — | ❌ New |
 | Auth/TLS | `crates/collab/` | ⚠️ Partial |
@@ -318,7 +318,7 @@ For each goose feature, we assess:
 
 ### 27. UI Desktop (`ui/desktop/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | Electron desktop app | — | ❌ New |
 | React component library | — | ❌ New |
@@ -333,7 +333,7 @@ For each goose feature, we assess:
 
 ### 28. UI Text / TUI (`ui/text/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | Terminal UI application | — | ❌ New |
 | Configure flow | — | ❌ New |
@@ -343,7 +343,7 @@ For each goose feature, we assess:
 
 ### 29. TypeScript SDK (`ui/sdk/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | Goose TS client | — | ❌ New |
 | HTTP streaming | — | ❌ New |
@@ -352,41 +352,41 @@ For each goose feature, we assess:
 
 ### 30. OIDC Proxy (`oidc-proxy/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | Cloudflare OIDC worker | — | ❌ New |
 | Anthropic OIDC proxy | — | ❌ New |
 
 ### 31. Recipe Scanner (`recipe-scanner/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | Recipe scanning infrastructure | — | ❌ New |
 | Docker-based scanning | — | ❌ New |
 
 ### 32. Workflow Recipes (`workflow_recipes/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | Pre-built workflow recipes | — | ❌ New |
 
 ### 33. Evals (`evals/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | Harbor eval framework | — | ❌ New |
 | Open Model Gym | — | ❌ New |
 
 ### 34. Documentation (`documentation/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | Docusaurus docs site | — | ❌ New |
 | Blog, docs, tutorials | — | ❌ New |
 
 ### 35. Examples (`examples/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | MCP wiki example | — | ⚠️ Partial |
 | Plugin examples | — | ⚠️ Partial |
@@ -394,13 +394,13 @@ For each goose feature, we assess:
 
 ### 36. Services (`services/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | Ask AI bot service | — | ❌ New |
 
 ### 37. Scripts (`scripts/`)
 
-| Goose Feature | Baymax Equivalent | Status |
+| Goose Feature | Sim Equivalent | Status |
 |---|---|---|
 | Benchmark scripts | — | ⚠️ Partial |
 | DB helper | — | ❌ New |
@@ -418,8 +418,8 @@ For each goose feature, we assess:
 
 | Category | Count |
 |---|---|
-| ✅ Already exists in baymax | ~40 features |
-| ⚠️ Partially exists in baymax | ~25 features |
+| ✅ Already exists in sim | ~40 features |
+| ⚠️ Partially exists in sim | ~25 features |
 | ❌ New (needs migration) | ~80 features |
 
 ## Migration Specs

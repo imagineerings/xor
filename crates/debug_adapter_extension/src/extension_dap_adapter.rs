@@ -15,7 +15,7 @@ use dap::{
 };
 use extension::{Extension, WorktreeDelegate};
 use gpui::AsyncApp;
-use task::{BaymaxDebugConfig, DebugScenario};
+use task::{SimDebugConfig, DebugScenario};
 use util::rel_path::RelPath;
 
 pub(crate) struct ExtensionDapAdapter {
@@ -106,11 +106,11 @@ impl DebugAdapter for ExtensionDapAdapter {
             .await
     }
 
-    async fn config_from_baymax_format(
+    async fn config_from_sim_format(
         &self,
-        baymax_scenario: BaymaxDebugConfig,
+        sim_scenario: SimDebugConfig,
     ) -> Result<DebugScenario> {
-        self.extension.dap_config_to_scenario(baymax_scenario).await
+        self.extension.dap_config_to_scenario(sim_scenario).await
     }
 
     async fn request_kind(

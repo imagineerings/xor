@@ -2,7 +2,7 @@ mod thread_switcher;
 
 use acp_thread::ThreadStatus;
 use action_log::DiffStats;
-use agent::{BAYMAX_AGENT_ID, ThreadStore};
+use agent::{SIM_AGENT_ID, ThreadStore};
 use agent_client_protocol::schema as acp;
 use agent_settings::AgentSettings;
 use agent_ui::terminal_thread_metadata_store::{
@@ -68,10 +68,10 @@ use workspace::{
     notifications::NotificationId, sidebar_side_context_menu,
 };
 
-use baymax_actions::OpenRecent;
-use baymax_actions::editor::{MoveDown, MoveUp};
+use sim_actions::OpenRecent;
+use sim_actions::editor::{MoveDown, MoveUp};
 
-use baymax_actions::agents_sidebar::{FocusSidebarFilter, ToggleThreadSwitcher};
+use sim_actions::agents_sidebar::{FocusSidebarFilter, ToggleThreadSwitcher};
 
 use crate::thread_switcher::{
     ThreadSwitcher, ThreadSwitcherEntry, ThreadSwitcherEvent, ThreadSwitcherSelection,
@@ -104,7 +104,7 @@ const MIN_WIDTH: Pixels = px(200.0);
 const MAX_WIDTH: Pixels = px(800.0);
 
 #[derive(Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-enum SerialibaymaxSidebarView {
+enum SerialisimSidebarView {
     #[default]
     ThreadList,
     #[serde(alias = "Archive")]
@@ -118,11 +118,11 @@ enum NewEntryTarget {
 }
 
 #[derive(Default, Serialize, Deserialize)]
-struct SerialibaymaxSidebar {
+struct SerialisimSidebar {
     #[serde(default)]
     width: Option<f32>,
     #[serde(default)]
-    active_view: SerialibaymaxSidebarView,
+    active_view: SerialisimSidebarView,
 }
 
 #[derive(Debug, Default)]
@@ -371,7 +371,7 @@ struct TerminalEntry {
 impl ThreadEntry {
     /// Updates this thread entry with active thread information.
     ///
-    /// The existing [`ThreadEntry`] was likely deserialibaymax from the database
+    /// The existing [`ThreadEntry`] was likely deserialisim from the database
     /// but if we have a correspond thread already loaded we want to apply the
     /// live information.
     fn apply_active_info(&mut self, info: &ActiveThreadInfo) {
@@ -1377,10 +1377,10 @@ impl Sidebar {
         let resolve_agent_icon = |agent_id: &AgentId| -> (IconName, Option<SharedString>) {
             let agent = Agent::from(agent_id.clone());
             let icon = match agent {
-                Agent::NativeAgent => IconName::BaymaxAgent,
+                Agent::NativeAgent => IconName::SimAgent,
                 Agent::Custom { .. } => IconName::Terminal,
 
-                _ => IconName::BaymaxAgent,
+                _ => IconName::SimAgent,
             };
             let icon_from_external_svg = agent_server_store
                 .as_ref()
@@ -6320,8 +6320,8 @@ impl Sidebar {
             ThreadEntryWorkspace::Closed { .. } => None,
         };
 
-        let is_baymax_thread = thread.metadata.agent_id.as_ref() == BAYMAX_AGENT_ID.as_ref();
-        let can_open_as_markdown = thread.is_live || is_baymax_thread;
+        let is_sim_thread = thread.metadata.agent_id.as_ref() == SIM_AGENT_ID.as_ref();
+        let can_open_as_markdown = thread.is_live || is_sim_thread;
         let folder_paths = thread.metadata.folder_paths().clone();
 
         right_click_menu(context_menu_id)
@@ -6357,7 +6357,7 @@ impl Sidebar {
                             }
                         });
 
-                        if is_baymax_thread {
+                        if is_sim_thread {
                             menu = menu.entry("Regenerate Thread Title", None, {
                                 let session_id = session_id.clone();
                                 let sidebar = sidebar.clone();
@@ -6402,7 +6402,7 @@ impl Sidebar {
                                         }
                                     }
 
-                                    if is_baymax_thread
+                                    if is_sim_thread
                                         && let Some(active_workspace) = &active_workspace
                                     {
                                         Self::open_closed_native_thread_as_markdown(
@@ -7519,7 +7519,7 @@ impl Sidebar {
         render_import_onboarding_banner(
             "acp",
             "Looking for threads from external agents?",
-            "Import threads from agents like Claude Agent, Codex, and more, whether started in Baymax or another client.",
+            "Import threads from agents like Claude Agent, Codex, and more, whether started in Sim or another client.",
             if verbose_labels {
                 "Import Threads from External Agents"
             } else {
@@ -7765,28 +7765,28 @@ impl WorkspaceSidebar for Sidebar {
         self.cycle_thread_impl(forward, window, cx);
     }
 
-    fn serialibaymax_state(&self, _cx: &App) -> Option<String> {
-        let serialibaymax = SerialibaymaxSidebar {
+    fn serialisim_state(&self, _cx: &App) -> Option<String> {
+        let serialisim = SerialisimSidebar {
             width: Some(f32::from(self.width)),
             active_view: match self.view {
-                SidebarView::ThreadList => SerialibaymaxSidebarView::ThreadList,
-                SidebarView::Archive(_) => SerialibaymaxSidebarView::History,
+                SidebarView::ThreadList => SerialisimSidebarView::ThreadList,
+                SidebarView::Archive(_) => SerialisimSidebarView::History,
             },
         };
-        serde_json::to_string(&serialibaymax).ok()
+        serde_json::to_string(&serialisim).ok()
     }
 
-    fn restore_serialibaymax_state(
+    fn restore_serialisim_state(
         &mut self,
         state: &str,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if let Some(serialibaymax) = serde_json::from_str::<SerialibaymaxSidebar>(state).log_err() {
-            if let Some(width) = serialibaymax.width {
+        if let Some(serialisim) = serde_json::from_str::<SerialisimSidebar>(state).log_err() {
+            if let Some(width) = serialisim.width {
                 self.width = px(width).clamp(MIN_WIDTH, MAX_WIDTH);
             }
-            if serialibaymax.active_view == SerialibaymaxSidebarView::History {
+            if serialisim.active_view == SerialisimSidebarView::History {
                 cx.defer_in(window, |this, window, cx| {
                     this.show_archive(window, cx);
                 });

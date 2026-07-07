@@ -4,17 +4,17 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
-val baymaxVersionName = providers.gradleProperty("baymax.versionName")
-    .orElse(providers.environmentVariable("BAYMAX_VERSION_NAME"))
+val simVersionName = providers.gradleProperty("sim.versionName")
+    .orElse(providers.environmentVariable("SIM_VERSION_NAME"))
     .orElse("1.0")
 
-val baymaxVersionCode = providers.gradleProperty("baymax.versionCode")
-    .orElse(providers.environmentVariable("BAYMAX_VERSION_CODE"))
+val simVersionCode = providers.gradleProperty("sim.versionCode")
+    .orElse(providers.environmentVariable("SIM_VERSION_CODE"))
     .orElse("1")
     .map { value ->
         value.toIntOrNull()
             ?.takeIf { it > 0 }
-            ?: throw GradleException("baymax.versionCode must be a positive integer, got '${value}'")
+            ?: throw GradleException("sim.versionCode must be a positive integer, got '${value}'")
     }
 
 val androidReleaseSigningEnabled = listOf(
@@ -25,15 +25,15 @@ val androidReleaseSigningEnabled = listOf(
 ).all { name -> providers.environmentVariable(name).isPresent }
 
 android {
-    namespace = "com.simtropolis.baymax"
+    namespace = "com.simtropolis.sim"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.simtropolis.baymax"
+        applicationId = "com.simtropolis.sim"
         minSdk = 26
         targetSdk = 34
-        versionCode = baymaxVersionCode.get()
-        versionName = baymaxVersionName.get()
+        versionCode = simVersionCode.get()
+        versionName = simVersionName.get()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

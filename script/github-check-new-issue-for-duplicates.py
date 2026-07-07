@@ -37,7 +37,7 @@ import requests
 
 GITHUB_API = "https://api.github.com"
 REPO_OWNER = "simtropolis"
-REPO_NAME = "baymax"
+REPO_NAME = "sim"
 TRACKING_ISSUE_NUMBER = 46355
 STAFF_TEAM_SLUG = "staff"
 
@@ -48,7 +48,7 @@ PREFIXES_TO_COLLAPSE = ["languages", "parity", "tooling"]
 STOPWORDS = {
     "after", "all", "also", "and", "any", "but", "can't", "does", "doesn't",
     "don't", "for", "from", "have", "just", "not", "only", "some", "that",
-    "the", "this", "when", "while", "with", "won't", "work", "working", "baymax",
+    "the", "this", "when", "while", "with", "won't", "work", "working", "sim",
 }
 
 # HTTP statuses we'll retry on for GET requests
@@ -286,7 +286,7 @@ def detect_areas(anthropic_key, issue, area_labels):
 
 Decide the area from the user's stated symptom and reproduction steps. Issue bodies routinely
 contain pasted log output, crash dumps, stack traces, settings files, and template headers like
-"Attach Baymax log file" or "Relevant Baymax settings" — these are evidence about the symptom and
+"Attach Sim log file" or "Relevant Sim settings" — these are evidence about the symptom and
 should not push you toward labels like "logging" or "settings" unless the bug itself is about
 how that subsystem works.
 
@@ -343,7 +343,7 @@ def parse_duplicate_magnets():
 
     # parse the issue body
     # format: ## area_name
-    #         -   [N dupes] https://github.com/simtropolis/baymax/issues/NUMBER
+    #         -   [N dupes] https://github.com/simtropolis/sim/issues/NUMBER
     magnets = {}  # number -> {number, areas, dupe_count}
     current_area = None
 
@@ -556,9 +556,9 @@ Sort duplicates into two buckets:
   at a surface level.
 
 Examples of things that are NOT duplicates:
-- Two issues about "Copilot models not showing" — one caused by a Baymax update breaking the model list,
+- Two issues about "Copilot models not showing" — one caused by a Sim update breaking the model list,
   the other caused by the user's plan not including those models.
-- Two issues about "Baymax hangs" — one triggered by network drives, the other by large projects.
+- Two issues about "Sim hangs" — one triggered by network drives, the other by large projects.
 - Two issues about "can't sign in" — one caused by a missing system package, the other by a server-side error.
 
 For OPEN duplicates (either bucket), false positives are MUCH worse than false negatives — they
@@ -604,7 +604,7 @@ Omit a candidate if ANY of these apply (in observed practice, almost everything 
    - "Worktree path bug" alongside "worktree display label confusion" — same feature,
      unrelated.
 
-6. Vague catch-all candidate. A closed issue like "Baymax is slow" / "performance" / "agent
+6. Vague catch-all candidate. A closed issue like "Sim is slow" / "performance" / "agent
    panel UX" that could be cited next to almost any new bug is filler. If you'd reuse the
    same closed issue across many unrelated new issues, omit.
 
@@ -744,7 +744,7 @@ Return "omit" if ANY of the following apply (in observed practice, almost everyt
    was a recent fix in roughly the same area" is not enough.
 5. Same area / feature, different mechanism. Same area label but different bug, different
    code path, different trigger. Omit.
-6. Vague catch-all candidate. A closed issue like "Baymax is slow" / "performance" / "agent
+6. Vague catch-all candidate. A closed issue like "Sim is slow" / "performance" / "agent
    panel UX" that you could cite next to many unrelated new bugs. Omit.
 7. Label or single-keyword overlap. Only connection is a shared area:* label or one shared
    keyword. Omit.

@@ -36,11 +36,11 @@ secret!(GITHUB_TOKEN);
 secret!(MACOS_CERTIFICATE);
 secret!(MACOS_CERTIFICATE_PASSWORD);
 secret!(SENTRY_AUTH_TOKEN);
-secret!(BAYMAX_CLIENT_CHECKSUM_SEED);
-secret!(BAYMAX_CLOUD_PROVIDER_ADDITIONAL_MODELS_JSON);
-secret!(BAYMAX_SENTRY_MINIDUMP_ENDPOINT);
-secret!(BAYMAX_ZIPPY_APP_ID);
-secret!(BAYMAX_ZIPPY_APP_PRIVATE_KEY);
+secret!(SIM_CLIENT_CHECKSUM_SEED);
+secret!(SIM_CLOUD_PROVIDER_ADDITIONAL_MODELS_JSON);
+secret!(SIM_SENTRY_MINIDUMP_ENDPOINT);
+secret!(SIM_ZIPPY_APP_ID);
+secret!(SIM_ZIPPY_APP_PRIVATE_KEY);
 secret!(DISCORD_WEBHOOK_RELEASE_NOTES);
 secret!(WINGET_TOKEN);
 secret!(VERCEL_TOKEN);
@@ -61,8 +61,8 @@ var!(AZURE_SIGNING_ENDPOINT);
 pub fn bundle_envs(platform: Platform) -> Env {
     let env = Env::default()
         .add("CARGO_INCREMENTAL", 0)
-        .add("BAYMAX_CLIENT_CHECKSUM_SEED", BAYMAX_CLIENT_CHECKSUM_SEED)
-        .add("BAYMAX_MINIDUMP_ENDPOINT", BAYMAX_SENTRY_MINIDUMP_ENDPOINT);
+        .add("SIM_CLIENT_CHECKSUM_SEED", SIM_CLIENT_CHECKSUM_SEED)
+        .add("SIM_MINIDUMP_ENDPOINT", SIM_SENTRY_MINIDUMP_ENDPOINT);
 
     match platform {
         Platform::Linux => env,
@@ -371,20 +371,20 @@ impl serde::Serialize for WorkflowSecret {
 }
 
 pub mod assets {
-    // NOTE: these asset names also exist in the baymax.dev codebase.
-    pub const MAC_AARCH64: &str = "Baymax-aarch64.dmg";
-    pub const MAC_X86_64: &str = "Baymax-x86_64.dmg";
-    pub const LINUX_AARCH64: &str = "baymax-linux-aarch64.tar.gz";
-    pub const LINUX_X86_64: &str = "baymax-linux-x86_64.tar.gz";
-    pub const WINDOWS_X86_64: &str = "Baymax-x86_64.exe";
-    pub const WINDOWS_AARCH64: &str = "Baymax-aarch64.exe";
+    // NOTE: these asset names also exist in the sim.dev codebase.
+    pub const MAC_AARCH64: &str = "Sim-aarch64.dmg";
+    pub const MAC_X86_64: &str = "Sim-x86_64.dmg";
+    pub const LINUX_AARCH64: &str = "sim-linux-aarch64.tar.gz";
+    pub const LINUX_X86_64: &str = "sim-linux-x86_64.tar.gz";
+    pub const WINDOWS_X86_64: &str = "Sim-x86_64.exe";
+    pub const WINDOWS_AARCH64: &str = "Sim-aarch64.exe";
 
-    pub const REMOTE_SERVER_MAC_AARCH64: &str = "baymax-remote-server-macos-aarch64.gz";
-    pub const REMOTE_SERVER_MAC_X86_64: &str = "baymax-remote-server-macos-x86_64.gz";
-    pub const REMOTE_SERVER_LINUX_AARCH64: &str = "baymax-remote-server-linux-aarch64.gz";
-    pub const REMOTE_SERVER_LINUX_X86_64: &str = "baymax-remote-server-linux-x86_64.gz";
-    pub const REMOTE_SERVER_WINDOWS_AARCH64: &str = "baymax-remote-server-windows-aarch64.zip";
-    pub const REMOTE_SERVER_WINDOWS_X86_64: &str = "baymax-remote-server-windows-x86_64.zip";
+    pub const REMOTE_SERVER_MAC_AARCH64: &str = "sim-remote-server-macos-aarch64.gz";
+    pub const REMOTE_SERVER_MAC_X86_64: &str = "sim-remote-server-macos-x86_64.gz";
+    pub const REMOTE_SERVER_LINUX_AARCH64: &str = "sim-remote-server-linux-aarch64.gz";
+    pub const REMOTE_SERVER_LINUX_X86_64: &str = "sim-remote-server-linux-x86_64.gz";
+    pub const REMOTE_SERVER_WINDOWS_AARCH64: &str = "sim-remote-server-windows-aarch64.zip";
+    pub const REMOTE_SERVER_WINDOWS_X86_64: &str = "sim-remote-server-windows-x86_64.zip";
 
     pub fn all() -> Vec<&'static str> {
         vec![

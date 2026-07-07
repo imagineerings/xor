@@ -109,7 +109,7 @@ impl Github {
         }
 
         // TODO: detecting self hosted instances by checking whether "github" is in the url or not
-        // is not very reliable. See https://github.com/simtropolis/baymax/issues/26393 for more
+        // is not very reliable. See https://github.com/simtropolis/sim/issues/26393 for more
         // information.
         if !host.contains("github") {
             bail!("not a GitHub URL");
@@ -177,7 +177,7 @@ impl GitHostingProvider for Github {
 
     fn supports_avatars(&self) -> bool {
         // Avatars are not supported for self-hosted GitHub instances
-        // See tracking issue: https://github.com/simtropolis/baymax/issues/11043
+        // See tracking issue: https://github.com/simtropolis/sim/issues/11043
         &self.name == "GitHub"
     }
 
@@ -310,7 +310,7 @@ mod tests {
 
     #[test]
     fn test_remote_url_with_root_slash() {
-        let remote_url = "git@github.com:/simtropolis/baymax";
+        let remote_url = "git@github.com:/simtropolis/sim";
         let parsed_remote = Github::public_instance()
             .parse_remote_url(remote_url)
             .unwrap();
@@ -319,21 +319,21 @@ mod tests {
             parsed_remote,
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "baymax".into(),
+                repo: "sim".into(),
             }
         );
     }
 
     #[test]
     fn test_invalid_self_hosted_remote_url() {
-        let remote_url = "git@github.com:simtropolis/baymax.git";
+        let remote_url = "git@github.com:simtropolis/sim.git";
         let github = Github::from_remote_url(remote_url);
         assert!(github.is_err());
     }
 
     #[test]
     fn test_from_remote_url_ssh() {
-        let remote_url = "git@github.my-enterprise.com:simtropolis/baymax.git";
+        let remote_url = "git@github.my-enterprise.com:simtropolis/sim.git";
         let github = Github::from_remote_url(remote_url).unwrap();
 
         assert!(!github.supports_avatars());
@@ -346,7 +346,7 @@ mod tests {
 
     #[test]
     fn test_from_remote_url_https() {
-        let remote_url = "https://github.my-enterprise.com/simtropolis/baymax.git";
+        let remote_url = "https://github.my-enterprise.com/simtropolis/sim.git";
         let github = Github::from_remote_url(remote_url).unwrap();
 
         assert!(!github.supports_avatars());
@@ -359,7 +359,7 @@ mod tests {
 
     #[test]
     fn test_parse_remote_url_given_self_hosted_ssh_url() {
-        let remote_url = "git@github.my-enterprise.com:simtropolis/baymax.git";
+        let remote_url = "git@github.my-enterprise.com:simtropolis/sim.git";
         let parsed_remote = Github::from_remote_url(remote_url)
             .unwrap()
             .parse_remote_url(remote_url)
@@ -369,14 +369,14 @@ mod tests {
             parsed_remote,
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "baymax".into(),
+                repo: "sim".into(),
             }
         );
     }
 
     #[test]
     fn test_parse_remote_url_given_self_hosted_https_url_with_subgroup() {
-        let remote_url = "https://github.my-enterprise.com/simtropolis/baymax.git";
+        let remote_url = "https://github.my-enterprise.com/simtropolis/sim.git";
         let parsed_remote = Github::from_remote_url(remote_url)
             .unwrap()
             .parse_remote_url(remote_url)
@@ -386,7 +386,7 @@ mod tests {
             parsed_remote,
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "baymax".into(),
+                repo: "sim".into(),
             }
         );
     }
@@ -394,14 +394,14 @@ mod tests {
     #[test]
     fn test_parse_remote_url_given_ssh_url() {
         let parsed_remote = Github::public_instance()
-            .parse_remote_url("git@github.com:simtropolis/baymax.git")
+            .parse_remote_url("git@github.com:simtropolis/sim.git")
             .unwrap();
 
         assert_eq!(
             parsed_remote,
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "baymax".into(),
+                repo: "sim".into(),
             }
         );
     }
@@ -409,14 +409,14 @@ mod tests {
     #[test]
     fn test_parse_remote_url_given_https_url() {
         let parsed_remote = Github::public_instance()
-            .parse_remote_url("https://github.com/simtropolis/baymax.git")
+            .parse_remote_url("https://github.com/simtropolis/sim.git")
             .unwrap();
 
         assert_eq!(
             parsed_remote,
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "baymax".into(),
+                repo: "sim".into(),
             }
         );
     }
@@ -440,7 +440,7 @@ mod tests {
     fn test_build_github_permalink_from_ssh_url() {
         let remote = ParsedGitRemote {
             owner: "simtropolis".into(),
-            repo: "baymax".into(),
+            repo: "sim".into(),
         };
         let permalink = Github::public_instance().build_permalink(
             remote,
@@ -451,7 +451,7 @@ mod tests {
             ),
         );
 
-        let expected_url = "https://github.com/simtropolis/baymax/blob/e6ebe7974deb6bb6cc0e2595c8ec31f0c71084b7/crates/editor/src/git/permalink.rs";
+        let expected_url = "https://github.com/simtropolis/sim/blob/e6ebe7974deb6bb6cc0e2595c8ec31f0c71084b7/crates/editor/src/git/permalink.rs";
         assert_eq!(permalink.to_string(), expected_url.to_string())
     }
 
@@ -460,16 +460,16 @@ mod tests {
         let permalink = Github::public_instance().build_permalink(
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "baymax".into(),
+                repo: "sim".into(),
             },
             BuildPermalinkParams::new(
                 "b2efec9824c45fcc90c9a7eb107a50d1772a60aa",
-                &repo_path("crates/baymax/src/main.rs"),
+                &repo_path("crates/sim/src/main.rs"),
                 None,
             ),
         );
 
-        let expected_url = "https://github.com/simtropolis/baymax/blob/b2efec9824c45fcc90c9a7eb107a50d1772a60aa/crates/baymax/src/main.rs";
+        let expected_url = "https://github.com/simtropolis/sim/blob/b2efec9824c45fcc90c9a7eb107a50d1772a60aa/crates/sim/src/main.rs";
         assert_eq!(permalink.to_string(), expected_url.to_string())
     }
 
@@ -478,7 +478,7 @@ mod tests {
         let permalink = Github::public_instance().build_permalink(
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "baymax".into(),
+                repo: "sim".into(),
             },
             BuildPermalinkParams::new(
                 "e6ebe7974deb6bb6cc0e2595c8ec31f0c71084b7",
@@ -487,7 +487,7 @@ mod tests {
             ),
         );
 
-        let expected_url = "https://github.com/simtropolis/baymax/blob/e6ebe7974deb6bb6cc0e2595c8ec31f0c71084b7/crates/editor/src/git/permalink.rs#L7";
+        let expected_url = "https://github.com/simtropolis/sim/blob/e6ebe7974deb6bb6cc0e2595c8ec31f0c71084b7/crates/editor/src/git/permalink.rs#L7";
         assert_eq!(permalink.to_string(), expected_url.to_string())
     }
 
@@ -496,7 +496,7 @@ mod tests {
         let permalink = Github::public_instance().build_permalink(
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "baymax".into(),
+                repo: "sim".into(),
             },
             BuildPermalinkParams::new(
                 "e6ebe7974deb6bb6cc0e2595c8ec31f0c71084b7",
@@ -505,7 +505,7 @@ mod tests {
             ),
         );
 
-        let expected_url = "https://github.com/simtropolis/baymax/blob/e6ebe7974deb6bb6cc0e2595c8ec31f0c71084b7/crates/editor/src/git/permalink.rs#L24-L48";
+        let expected_url = "https://github.com/simtropolis/sim/blob/e6ebe7974deb6bb6cc0e2595c8ec31f0c71084b7/crates/editor/src/git/permalink.rs#L24-L48";
         assert_eq!(permalink.to_string(), expected_url.to_string())
     }
 
@@ -513,7 +513,7 @@ mod tests {
     fn test_build_github_create_pr_url() {
         let remote = ParsedGitRemote {
             owner: "simtropolis".into(),
-            repo: "baymax".into(),
+            repo: "sim".into(),
         };
 
         let provider = Github::public_instance();
@@ -524,7 +524,7 @@ mod tests {
 
         assert_eq!(
             url.as_str(),
-            "https://github.com/simtropolis/baymax/pull/new/feature%2Fsomething%20cool"
+            "https://github.com/simtropolis/sim/pull/new/feature%2Fsomething%20cool"
         );
     }
 
@@ -532,7 +532,7 @@ mod tests {
     fn test_github_pull_requests() {
         let remote = ParsedGitRemote {
             owner: "simtropolis".into(),
-            repo: "baymax".into(),
+            repo: "sim".into(),
         };
 
         let github = Github::public_instance();
@@ -557,7 +557,7 @@ mod tests {
                 .unwrap()
                 .url
                 .as_str(),
-            "https://github.com/simtropolis/baymax/pull/10687"
+            "https://github.com/simtropolis/sim/pull/10687"
         );
 
         // Pull request number in middle of line, which we want to ignore
@@ -593,7 +593,7 @@ mod tests {
     fn test_build_create_pull_request_url() {
         let remote = ParsedGitRemote {
             owner: "simtropolis".into(),
-            repo: "baymax".into(),
+            repo: "sim".into(),
         };
 
         let github = Github::public_instance();
@@ -603,10 +603,10 @@ mod tests {
 
         assert_eq!(
             url.as_str(),
-            "https://github.com/simtropolis/baymax/pull/new/feature%2Fnew-feature"
+            "https://github.com/simtropolis/sim/pull/new/feature%2Fnew-feature"
         );
 
-        let base_url = Url::parse("https://github.baymax.com").unwrap();
+        let base_url = Url::parse("https://github.sim.com").unwrap();
         let github = Github::new("GitHub Self-Hosted", base_url);
         let url = github
             .build_create_pull_request_url(&remote, "feature/new-feature")
@@ -614,7 +614,7 @@ mod tests {
 
         assert_eq!(
             url.as_str(),
-            "https://github.baymax.com/simtropolis/baymax/pull/new/feature%2Fnew-feature"
+            "https://github.sim.com/simtropolis/sim/pull/new/feature%2Fnew-feature"
         );
     }
 

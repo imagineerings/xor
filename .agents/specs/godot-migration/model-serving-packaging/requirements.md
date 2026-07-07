@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Baymax should package world-model execution as diagnosable local, persistent, and remote worker modes without silently downloading large assets.
+Sim should package world-model execution as diagnosable local, persistent, and remote worker modes without silently downloading large assets.
 
 ### Requirement 1: Environment Diagnostics
 

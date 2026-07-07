@@ -35,14 +35,14 @@ Extract concrete signals from the crash + analysis:
 
 ### Step 2: Search GitHub Issues
 
-Search **only** issues in `simtropolis/baymax` (prefer `gh issue list` / `gh issue view` / GraphQL if available) by:
+Search **only** issues in `simtropolis/sim` (prefer `gh issue list` / `gh issue view` / GraphQL if available) by:
 
 1. Panic/error text
 2. Function/file names
 3. Crate/module names + symptom keywords
 4. Similar reproduction patterns
 
-Check both open and recently closed issues in `simtropolis/baymax`.
+Check both open and recently closed issues in `simtropolis/sim`.
 
 ### Step 3: Score Confidence
 
@@ -62,7 +62,7 @@ Write `LINKED_ISSUES.md` using this exact structure:
 # Potentially Related GitHub Issues
 
 ## High Confidence
-- [#12345](https://github.com/simtropolis/baymax/issues/12345) — <title>
+- [#12345](https://github.com/simtropolis/sim/issues/12345) — <title>
   - Why: <1-2 sentence evidence-backed rationale>
   - Evidence: <stack frame / error text / repro alignment>
 
@@ -83,7 +83,7 @@ If no credible matches are found, keep sections present and write `- None found`
 ## Rules
 
 - Do not fabricate issues or URLs.
-- Do not include issues from any repository other than `simtropolis/baymax`.
+- Do not include issues from any repository other than `simtropolis/sim`.
 - Do not add closing keywords automatically.
 - Keep rationale short and evidence-based.
 - Favor precision over recall.

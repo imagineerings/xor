@@ -59,7 +59,7 @@ pub struct ChatState {
     pub pending_action: Option<PendingAction>,
 }
 
-/// Pairing status between an external platform user and a baymax user identity.
+/// Pairing status between an external platform user and a sim user identity.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum PairingStatus {
     /// No pairing has been attempted.

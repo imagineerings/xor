@@ -10,7 +10,7 @@ local_install=false
 can_code_sign=false
 
 # This must match the team in the provisioning profile.
-IDENTITY="Baymax Industries, Inc."
+IDENTITY="Sim Industries, Inc."
 APPLE_NOTARIZATION_TEAM="MQ55VZLNZQ"
 
 # Function for displaying help info
@@ -49,16 +49,16 @@ shift $((OPTIND-1))
 
 
 # Get release channel
-pushd crates/baymax
+pushd crates/sim
 channel=$(<RELEASE_CHANNEL)
-export BAYMAX_RELEASE_CHANNEL="${channel}"
+export SIM_RELEASE_CHANNEL="${channel}"
 popd
 
-export BAYMAX_BUNDLE=true
+export SIM_BUNDLE=true
 
 cargo_bundle_version=$(cargo -q bundle --help 2>&1 | head -n 1 || echo "")
-if [ "$cargo_bundle_version" != "cargo-bundle v0.6.1-baymax" ]; then
-    cargo install cargo-bundle --git https://github.com/simtropolis/cargo-bundle.git --branch baymax-deploy
+if [ "$cargo_bundle_version" != "cargo-bundle v0.6.1-sim" ]; then
+    cargo install cargo-bundle --git https://github.com/simtropolis/cargo-bundle.git --branch sim-deploy
 fi
 
 # Deal with versions of macOS that don't include libstdc++ headers
@@ -86,14 +86,14 @@ script/generate-licenses
 
 rustup target add $target_triple
 
-echo "Compiling baymax binaries"
-cargo build ${build_flag} --package baymax --package cli --target $target_triple
+echo "Compiling sim binaries"
+cargo build ${build_flag} --package sim --package cli --target $target_triple
 # Build remote_server in separate invocation to prevent feature unification from other crates
 # from influencing dynamic libraries required by it.
 cargo build ${build_flag} --package remote_server --target $target_triple
 
 echo "Creating application bundle"
-pushd crates/baymax
+pushd crates/sim
 cp Cargo.toml Cargo.toml.backup
 sed \
     -i.backup \
@@ -108,7 +108,7 @@ echo "Bundled ${app_path}"
 
 # DocumentTypes.plist references CFBundleTypeIconFile "Document", so the bundle must contain Document.icns.
 # We use the app icon as a placeholder document icon for now.
-document_icon_source="crates/baymax/resources/Document.icns"
+document_icon_source="crates/sim/resources/Document.icns"
 document_icon_target="${app_path}/Contents/Resources/Document.icns"
 if [[ -f "${document_icon_source}" ]]; then
     mkdir -p "$(dirname "${document_icon_target}")"
@@ -121,20 +121,20 @@ if [[ -n "${MACOS_CERTIFICATE:-}" && -n "${MACOS_CERTIFICATE_PASSWORD:-}" && -n 
     can_code_sign=true
 
     echo "Setting up keychain for code signing..."
-    security create-keychain -p "$MACOS_CERTIFICATE_PASSWORD" baymax.keychain || echo ""
-    security default-keychain -s baymax.keychain
-    security unlock-keychain -p "$MACOS_CERTIFICATE_PASSWORD" baymax.keychain
+    security create-keychain -p "$MACOS_CERTIFICATE_PASSWORD" sim.keychain || echo ""
+    security default-keychain -s sim.keychain
+    security unlock-keychain -p "$MACOS_CERTIFICATE_PASSWORD" sim.keychain
     # Calling set-keychain-settings without `-t` disables the auto-lock timeout
-    security set-keychain-settings baymax.keychain
-    echo "$MACOS_CERTIFICATE" | base64 --decode > /tmp/baymax-certificate.p12
-    security import /tmp/baymax-certificate.p12 -k baymax.keychain -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-    rm /tmp/baymax-certificate.p12
-    security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$MACOS_CERTIFICATE_PASSWORD" baymax.keychain
+    security set-keychain-settings sim.keychain
+    echo "$MACOS_CERTIFICATE" | base64 --decode > /tmp/sim-certificate.p12
+    security import /tmp/sim-certificate.p12 -k sim.keychain -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+    rm /tmp/sim-certificate.p12
+    security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$MACOS_CERTIFICATE_PASSWORD" sim.keychain
 
     function cleanup() {
         echo "Cleaning up keychain"
         security default-keychain -s login.keychain
-        security delete-keychain baymax.keychain
+        security delete-keychain sim.keychain
     }
 
     trap cleanup EXIT
@@ -196,15 +196,15 @@ function sign_app_binaries() {
     download_git "${target_triple}" "${app_path}/Contents/MacOS/git"
 
     # Note: The app identifier for our development builds is the same as the app identifier for nightly.
-    cp crates/baymax/contents/$channel/embedded.provisionprofile "${app_path}/Contents/"
+    cp crates/sim/contents/$channel/embedded.provisionprofile "${app_path}/Contents/"
 
     if [[ $can_code_sign = true ]]; then
         echo "Code signing binaries"
         # sequence of codesign commands modeled after this example: https://developer.apple.com/forums/thread/701514
         /usr/bin/codesign --deep --force --timestamp --options runtime --sign "$IDENTITY" "${app_path}/Contents/MacOS/cli" -v
         /usr/bin/codesign --deep --force --timestamp --options runtime --sign "$IDENTITY" "${app_path}/Contents/MacOS/git" -v
-        /usr/bin/codesign --deep --force --timestamp --options runtime --entitlements crates/baymax/resources/baymax.entitlements --sign "$IDENTITY" "${app_path}/Contents/MacOS/baymax" -v
-        /usr/bin/codesign --force --timestamp --options runtime --entitlements crates/baymax/resources/baymax.entitlements --sign "$IDENTITY" "${app_path}" -v
+        /usr/bin/codesign --deep --force --timestamp --options runtime --entitlements crates/sim/resources/sim.entitlements --sign "$IDENTITY" "${app_path}/Contents/MacOS/sim" -v
+        /usr/bin/codesign --force --timestamp --options runtime --entitlements crates/sim/resources/sim.entitlements --sign "$IDENTITY" "${app_path}" -v
     else
         echo "One or more of the following variables are missing: MACOS_CERTIFICATE, MACOS_CERTIFICATE_PASSWORD, APPLE_NOTARIZATION_KEY, APPLE_NOTARIZATION_KEY_ID, APPLE_NOTARIZATION_ISSUER_ID"
 
@@ -217,9 +217,9 @@ function sign_app_binaries() {
         # - get a signing key for the MQ55VZLNZQ team from Nathan.
         # - create your own signing key, and update references to MQ55VZLNZQ to your own team ID
         # then comment out this line.
-        cat crates/baymax/resources/baymax.entitlements | sed '/com.apple.developer.associated-domains/,+1d' > "${app_path}/Contents/Resources/baymax.entitlements"
+        cat crates/sim/resources/sim.entitlements | sed '/com.apple.developer.associated-domains/,+1d' > "${app_path}/Contents/Resources/sim.entitlements"
 
-        codesign --force --deep --entitlements "${app_path}/Contents/Resources/baymax.entitlements" --sign ${MACOS_SIGNING_KEY:- -} "${app_path}" -v
+        codesign --force --deep --entitlements "${app_path}/Contents/Resources/sim.entitlements" --sign ${MACOS_SIGNING_KEY:- -} "${app_path}" -v
     fi
 
     bundle_name=$(basename "$app_path")
@@ -245,7 +245,7 @@ function sign_app_binaries() {
     else
         dmg_target_directory="target/${target_triple}/${target_dir}"
         dmg_source_directory="${dmg_target_directory}/dmg"
-        dmg_file_path="${dmg_target_directory}/Baymax-${arch_suffix}.dmg"
+        dmg_file_path="${dmg_target_directory}/Sim-${arch_suffix}.dmg"
         xcode_bin_dir_path="$(xcode-select -p)/usr/bin"
 
         rm -rf ${dmg_source_directory}
@@ -257,10 +257,10 @@ function sign_app_binaries() {
         ln -s /Applications ${dmg_source_directory}
 
         echo "Creating final DMG at ${dmg_file_path} using ${dmg_source_directory}"
-        hdiutil create -volname Baymax -srcfolder "${dmg_source_directory}" -ov -format UDZO "${dmg_file_path}"
+        hdiutil create -volname Sim -srcfolder "${dmg_source_directory}" -ov -format UDZO "${dmg_file_path}"
 
         # If someone runs this bundle script locally, a symlink will be placed in `dmg_source_directory`.
-        # This symlink causes CPU issues with Baymax if the Baymax codebase is the project being worked on, so we simply remove it for now.
+        # This symlink causes CPU issues with Sim if the Sim codebase is the project being worked on, so we simply remove it for now.
         echo "Removing symlink to /Applications from ${dmg_source_directory}"
         rm ${dmg_source_directory}/Applications
 
@@ -288,7 +288,7 @@ function sign_binary() {
 
     if [[ $can_code_sign = true ]]; then
         echo "Code signing executable $binary_path"
-        /usr/bin/codesign --deep --force --timestamp --options runtime --entitlements crates/baymax/resources/baymax.entitlements --sign "$IDENTITY" "${binary_path}" -v
+        /usr/bin/codesign --deep --force --timestamp --options runtime --entitlements crates/sim/resources/sim.entitlements --sign "$IDENTITY" "${binary_path}" -v
     fi
 }
 
@@ -296,9 +296,9 @@ function upload_debug_symbols() {
     if [ "$local_install" = true ]; then
         echo "local install; skipping sentry upload."
     elif [[ -n "${SENTRY_AUTH_TOKEN:-}" ]]; then
-        echo "Uploading baymax debug symbols to sentry..."
-        exe_path="target/${target_triple}/release/Baymax"
-        if ! dsymutil --flat "target/${target_triple}/${target_dir}/baymax" 2> target/dsymutil.log; then
+        echo "Uploading sim debug symbols to sentry..."
+        exe_path="target/${target_triple}/release/Sim"
+        if ! dsymutil --flat "target/${target_triple}/${target_dir}/sim" 2> target/dsymutil.log; then
             echo "dsymutil failed"
             cat target/dsymutil.log
             exit 1
@@ -313,8 +313,8 @@ function upload_debug_symbols() {
         # Try uploading up to 3 times
         for attempt in 1 2 3; do
             echo "Sentry upload attempt $attempt..."
-            if sentry-cli debug-files upload --include-sources --wait -p baymax -o baymax-dev \
-                "target/${target_triple}/${target_dir}/baymax.dwarf" \
+            if sentry-cli debug-files upload --include-sources --wait -p sim -o sim-dev \
+                "target/${target_triple}/${target_dir}/sim.dwarf" \
                 "target/${target_triple}/${target_dir}/remote_server.dwarf"; then
                 break
             else
@@ -332,9 +332,9 @@ function upload_debug_symbols() {
 
 upload_debug_symbols
 
-cp target/${target_triple}/${target_dir}/baymax "${app_path}/Contents/MacOS/baymax"
+cp target/${target_triple}/${target_dir}/sim "${app_path}/Contents/MacOS/sim"
 cp target/${target_triple}/${target_dir}/cli "${app_path}/Contents/MacOS/cli"
 sign_app_binaries
 
 sign_binary "target/$target_triple/release/remote_server"
-gzip -f --stdout --best target/$target_triple/release/remote_server > target/baymax-remote-server-macos-$arch_suffix.gz
+gzip -f --stdout --best target/$target_triple/release/remote_server > target/sim-remote-server-macos-$arch_suffix.gz

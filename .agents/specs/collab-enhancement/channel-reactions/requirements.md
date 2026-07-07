@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Baymax channel messages currently lack emoji reactions — a core affordance of modern chat that allows lightweight, non-verbal responses without adding reply noise. Mattermost supports emoji reactions on posts (via the `reactions.yaml` API). Adding reactions will reduce message clutter and enable quick sentiment/acknowledgement in channels.
+Sim channel messages currently lack emoji reactions — a core affordance of modern chat that allows lightweight, non-verbal responses without adding reply noise. Mattermost supports emoji reactions on posts (via the `reactions.yaml` API). Adding reactions will reduce message clutter and enable quick sentiment/acknowledgement in channels.
 
 ## Glossary
 

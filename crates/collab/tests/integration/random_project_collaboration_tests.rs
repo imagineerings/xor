@@ -1270,7 +1270,7 @@ impl randomizedTest for ProjectCollaborationTest {
                     });
 
                 // A hack to work around a hack in
-                // https://github.com/simtropolis/baymax/pull/16696 that wasn't
+                // https://github.com/simtropolis/sim/pull/16696 that wasn't
                 // detected until we upgraded the rng crate. This whole crate is
                 // going away with DeltaDB soon, so we hold our nose and
                 // continue.

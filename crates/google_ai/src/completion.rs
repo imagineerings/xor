@@ -499,9 +499,9 @@ mod tests {
         assert_eq!(thinking_config.include_thoughts, Some(true));
         assert_eq!(thinking_config.thinking_level, Some(ThinkingLevel::Low));
 
-        let serialibaymax = serde_json::to_value(thinking_config).unwrap();
-        assert_eq!(serialibaymax["thinkingLevel"], "LOW");
-        assert_eq!(serialibaymax["includeThoughts"], true);
+        let serialisim = serde_json::to_value(thinking_config).unwrap();
+        assert_eq!(serialisim["thinkingLevel"], "LOW");
+        assert_eq!(serialisim["includeThoughts"], true);
     }
 
     #[test]

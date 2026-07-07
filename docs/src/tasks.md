@@ -1,11 +1,11 @@
 ---
-title: Tasks - Run Commands in Baymax
-description: Run and rerun shell commands from Baymax with task definitions. Supports variables, templates, and language-specific tasks.
+title: Tasks - Run Commands in Sim
+description: Run and rerun shell commands from Sim with task definitions. Supports variables, templates, and language-specific tasks.
 ---
 
 # Tasks
 
-Baymax supports ways to spawn (and rerun) commands using its integrated [terminal](./terminal.md) to output the results. These commands can read a limited subset of Baymax state (such as a path to the file currently being edited or selected text).
+Sim supports ways to spawn (and rerun) commands using its integrated [terminal](./terminal.md) to output the results. These commands can read a limited subset of Sim state (such as a path to the file currently being edited or selected text).
 
 ```json [tasks]
 [
@@ -74,41 +74,41 @@ Keep `"use_new_terminal": false` and set `"allow_concurrent_runs": true` to allo
 
 Tasks can be defined:
 
-- in the global `tasks.json` file; such tasks are available in all Baymax projects you work on. This file is usually located in `~/.config/baymax/tasks.json`. You can edit them by using the {#action baymax::OpenTasks} action.
-- in the worktree-specific (local) `.baymax/tasks.json` file; such tasks are available only when working on a project with that worktree included. You can edit worktree-specific tasks by using the {#action baymax::OpenProjectTasks} action.
+- in the global `tasks.json` file; such tasks are available in all Sim projects you work on. This file is usually located in `~/.config/sim/tasks.json`. You can edit them by using the {#action sim::OpenTasks} action.
+- in the worktree-specific (local) `.sim/tasks.json` file; such tasks are available only when working on a project with that worktree included. You can edit worktree-specific tasks by using the {#action sim::OpenProjectTasks} action.
 - on the fly with [oneshot tasks](#oneshot-tasks). These tasks are project-specific and do not persist across sessions.
 - by language extension.
 
 ## Variables
 
-Baymax tasks act just like your shell; that also means that you can reference environmental variables via sh-esque `$VAR_NAME` syntax. A couple of additional environmental variables are set for your convenience.
+Sim tasks act just like your shell; that also means that you can reference environmental variables via sh-esque `$VAR_NAME` syntax. A couple of additional environmental variables are set for your convenience.
 These variables allow you to pull information from the current editor and use it in your tasks. The following variables are available:
 
-- `BAYMAX_COLUMN`: current line column
-- `BAYMAX_ROW`: current line row
-- `BAYMAX_FILE`: absolute path of the currently opened file (e.g. `/Users/my-user/path/to/project/src/main.rs`)
-- `BAYMAX_FILENAME`: filename of the currently opened file (e.g. `main.rs`)
-- `BAYMAX_DIRNAME`: absolute path of the currently opened file with file name stripped (e.g. `/Users/my-user/path/to/project/src`)
-- `BAYMAX_RELATIVE_FILE`: path of the currently opened file, relative to `BAYMAX_WORKTREE_ROOT` (e.g. `src/main.rs`)
-- `BAYMAX_RELATIVE_DIR`: path of the currently opened file's directory, relative to `BAYMAX_WORKTREE_ROOT` (e.g. `src`)
-- `BAYMAX_STEM`: stem (filename without extension) of the currently opened file (e.g. `main`)
-- `BAYMAX_SYMBOL`: currently selected symbol; should match the last symbol shown in a symbol breadcrumb (e.g. `mod tests > fn test_task_contexts`)
-- `BAYMAX_SELECTED_TEXT`: currently selected text
-- `BAYMAX_LANGUAGE`: language of the currently opened buffer (e.g. `Rust`, `Python`, `Shell Script`)
-- `BAYMAX_WORKTREE_ROOT`: absolute path to the root of the current worktree. (e.g. `/Users/my-user/path/to/project`)
-- `BAYMAX_MAIN_GIT_WORKTREE`: absolute path to the main git worktree's working directory. For normal checkouts this equals `BAYMAX_WORKTREE_ROOT`; for linked git worktrees this is the original repository's working directory.
-- `BAYMAX_CUSTOM_RUST_PACKAGE`: (Rust-specific) name of the parent package of $BAYMAX_FILE source file.
+- `SIM_COLUMN`: current line column
+- `SIM_ROW`: current line row
+- `SIM_FILE`: absolute path of the currently opened file (e.g. `/Users/my-user/path/to/project/src/main.rs`)
+- `SIM_FILENAME`: filename of the currently opened file (e.g. `main.rs`)
+- `SIM_DIRNAME`: absolute path of the currently opened file with file name stripped (e.g. `/Users/my-user/path/to/project/src`)
+- `SIM_RELATIVE_FILE`: path of the currently opened file, relative to `SIM_WORKTREE_ROOT` (e.g. `src/main.rs`)
+- `SIM_RELATIVE_DIR`: path of the currently opened file's directory, relative to `SIM_WORKTREE_ROOT` (e.g. `src`)
+- `SIM_STEM`: stem (filename without extension) of the currently opened file (e.g. `main`)
+- `SIM_SYMBOL`: currently selected symbol; should match the last symbol shown in a symbol breadcrumb (e.g. `mod tests > fn test_task_contexts`)
+- `SIM_SELECTED_TEXT`: currently selected text
+- `SIM_LANGUAGE`: language of the currently opened buffer (e.g. `Rust`, `Python`, `Shell Script`)
+- `SIM_WORKTREE_ROOT`: absolute path to the root of the current worktree. (e.g. `/Users/my-user/path/to/project`)
+- `SIM_MAIN_GIT_WORKTREE`: absolute path to the main git worktree's working directory. For normal checkouts this equals `SIM_WORKTREE_ROOT`; for linked git worktrees this is the original repository's working directory.
+- `SIM_CUSTOM_RUST_PACKAGE`: (Rust-specific) name of the parent package of $SIM_FILE source file.
 
 To use a variable in a task, prefix it with a dollar sign (`$`):
 
 ```json [tasks]
 {
   "label": "echo current file's path",
-  "command": "echo $BAYMAX_FILE"
+  "command": "echo $SIM_FILE"
 }
 ```
 
-You can also use verbose syntax that allows specifying a default if a given variable is not available: `${BAYMAX_FILE:default_value}`
+You can also use verbose syntax that allows specifying a default if a given variable is not available: `${SIM_FILE:default_value}`
 
 These environmental variables can also be used in tasks' `cwd`, `args`, and `label` fields.
 
@@ -121,7 +121,7 @@ For example, instead of this (which will fail if the path has a space):
 ```json [tasks]
 {
   "label": "stat current file",
-  "command": "stat $BAYMAX_FILE"
+  "command": "stat $SIM_FILE"
 }
 ```
 
@@ -131,7 +131,7 @@ Provide the following:
 {
   "label": "stat current file",
   "command": "stat",
-  "args": ["$BAYMAX_FILE"]
+  "args": ["$SIM_FILE"]
 }
 ```
 
@@ -140,7 +140,7 @@ Or explicitly include escaped quotes like so:
 ```json [tasks]
 {
   "label": "stat current file",
-  "command": "stat \"$BAYMAX_FILE\""
+  "command": "stat \"$SIM_FILE\""
 }
 ```
 
@@ -152,7 +152,7 @@ For example, the following task will appear in the spawn modal only if there is 
 ```json [tasks]
 {
   "label": "selected text",
-  "command": "echo \"$BAYMAX_SELECTED_TEXT\""
+  "command": "echo \"$SIM_SELECTED_TEXT\""
 }
 ```
 
@@ -161,7 +161,7 @@ Set default values to such variables to have such tasks always displayed:
 ```json [tasks]
 {
   "label": "selected text with default",
-  "command": "echo \"${BAYMAX_SELECTED_TEXT:no text selected}\""
+  "command": "echo \"${SIM_SELECTED_TEXT:no text selected}\""
 }
 ```
 
@@ -213,7 +213,7 @@ This could be useful for launching a terminal application that you want to use i
 // In tasks.json
 {
   "label": "start lazygit",
-  "command": "lazygit -p $BAYMAX_WORKTREE_ROOT"
+  "command": "lazygit -p $SIM_WORKTREE_ROOT"
 }
 ```
 
@@ -232,11 +232,11 @@ This could be useful for launching a terminal application that you want to use i
 
 ## Hooks
 
-In addition to being spawned manually, tasks can be configured to run automatically in response to certain Baymax events by adding a hook to the `hooks` field on a task template. A task with a matching hook will be resolved and spawned when that event fires.
+In addition to being spawned manually, tasks can be configured to run automatically in response to certain Sim events by adding a hook to the `hooks` field on a task template. A task with a matching hook will be resolved and spawned when that event fires.
 
 The following hooks are currently supported:
 
-- `create_worktree` — runs after Baymax creates a new linked Git worktree, either directly through the CLI or from the [worktree picker](./git.md#git-worktrees). The task is spawned with `BAYMAX_WORKTREE_ROOT` pointing at the newly created worktree and `BAYMAX_MAIN_GIT_WORKTREE` pointing at the original repository's working directory, which makes these hooks well-suited to copying untracked files (such as `.env` files) or running per-worktree setup commands.
+- `create_worktree` — runs after Sim creates a new linked Git worktree, either directly through the CLI or from the [worktree picker](./git.md#git-worktrees). The task is spawned with `SIM_WORKTREE_ROOT` pointing at the newly created worktree and `SIM_MAIN_GIT_WORKTREE` pointing at the original repository's working directory, which makes these hooks well-suited to copying untracked files (such as `.env` files) or running per-worktree setup commands.
 
 Hook tasks are resolved from the same global and worktree-local `tasks.json` files as manually spawned tasks, and multiple tasks may register for the same hook; they all run when the hook fires. A hook task still benefits from the usual task configuration fields — `cwd`, `env`, `reveal`, `hide`, and so on — so you can control how much of the terminal UI is shown while it runs.
 
@@ -245,7 +245,7 @@ Hook tasks are resolved from the same global and worktree-local `tasks.json` fil
   {
     "label": "copy .env into new worktree",
     "command": "cp",
-    "args": ["$BAYMAX_MAIN_GIT_WORKTREE/.env", "$BAYMAX_WORKTREE_ROOT/.env"],
+    "args": ["$SIM_MAIN_GIT_WORKTREE/.env", "$SIM_WORKTREE_ROOT/.env"],
     "hooks": ["create_worktree"],
     "reveal": "no_focus",
     "hide": "on_success"
@@ -260,32 +260,32 @@ Tasks that define `hooks` are still available from the task modal like any other
 The Git Graph supports running custom Git command tasks from the commit context menu.
 To add a command, define a task in your global `tasks.json` file with the `git-command` tag (worktree-local tasks are not supported yet).
 When shown from a commit's context menu, the task is resolved against the selected commit and repository, and runs from the selected repository root by default.
-Right-clicking a ref label (a branch, remote ref, or tag) opens a ref-specific context menu, where the task is additionally resolved against the clicked ref via `BAYMAX_GIT_REF`.
+Right-clicking a ref label (a branch, remote ref, or tag) opens a ref-specific context menu, where the task is additionally resolved against the clicked ref via `SIM_GIT_REF`.
 
 Git Graph command tasks support the Git-specific task variables below.
 These variables are provided only when resolving Git Graph command tasks.
-Other task variables, such as `BAYMAX_FILE`, `BAYMAX_SELECTED_TEXT`, `BAYMAX_WORKTREE_ROOT`, and `BAYMAX_MAIN_GIT_WORKTREE`, are not provided to Git Graph command tasks unless they use default values.
+Other task variables, such as `SIM_FILE`, `SIM_SELECTED_TEXT`, `SIM_WORKTREE_ROOT`, and `SIM_MAIN_GIT_WORKTREE`, are not provided to Git Graph command tasks unless they use default values.
 
-- `BAYMAX_GIT_SHA`: full SHA of the selected commit.
-- `BAYMAX_GIT_SHA_SHORT`: short SHA of the selected commit.
-- `BAYMAX_GIT_REPOSITORY_NAME`: name of the selected Git repository.
-- `BAYMAX_GIT_REPOSITORY_PATH`: absolute path to the selected Git repository's working directory.
-- `BAYMAX_GIT_REF`: name of the clicked ref (a branch, remote ref, or tag). Only provided when the menu is opened from a ref label.
+- `SIM_GIT_SHA`: full SHA of the selected commit.
+- `SIM_GIT_SHA_SHORT`: short SHA of the selected commit.
+- `SIM_GIT_REPOSITORY_NAME`: name of the selected Git repository.
+- `SIM_GIT_REPOSITORY_PATH`: absolute path to the selected Git repository's working directory.
+- `SIM_GIT_REF`: name of the clicked ref (a branch, remote ref, or tag). Only provided when the menu is opened from a ref label.
 
 For example:
 
 ```json [tasks]
 [
   {
-    "label": "Branches containing commit: $BAYMAX_GIT_SHA_SHORT",
+    "label": "Branches containing commit: $SIM_GIT_SHA_SHORT",
     "command": "git",
-    "args": ["branch", "-a", "--contains", "$BAYMAX_GIT_SHA"],
+    "args": ["branch", "-a", "--contains", "$SIM_GIT_SHA"],
     "tags": ["git-command"]
   },
   {
-    "label": "Check out $BAYMAX_GIT_REF",
+    "label": "Check out $SIM_GIT_REF",
     "command": "git",
-    "args": ["checkout", "$BAYMAX_GIT_REF"],
+    "args": ["checkout", "$SIM_GIT_REF"],
     "tags": ["git-command"]
   }
 ]
@@ -293,7 +293,7 @@ For example:
 
 ## VS Code Task Format
 
-When importing VS Code tasks from `.vscode/tasks.json`, you can omit the `label` field. Baymax automatically generates labels based on the task type:
+When importing VS Code tasks from `.vscode/tasks.json`, you can omit the `label` field. Sim automatically generates labels based on the task type:
 
 - **npm tasks**: `npm: <script>` (e.g., `npm: start`)
 - **gulp tasks**: `gulp: <task>` (e.g., `gulp: build`)
@@ -322,7 +322,7 @@ These tasks appear in the task picker as "npm: start" and "cargo build --release
 
 ## Binding runnable tags to task templates
 
-Baymax supports overriding the default action for inline runnable indicators via workspace-local and global `tasks.json` file with the following precedence hierarchy:
+Sim supports overriding the default action for inline runnable indicators via workspace-local and global `tasks.json` file with the following precedence hierarchy:
 
 1. Workspace `tasks.json`
 2. Global `tasks.json`
@@ -333,7 +333,7 @@ To tag a task, add the runnable tag name to the `tags` field on the task templat
 ```json [tasks]
 {
   "label": "echo current file's path",
-  "command": "echo $BAYMAX_FILE",
+  "command": "echo $SIM_FILE",
   "tags": ["rust-test"]
 }
 ```
@@ -342,11 +342,11 @@ In doing so, you can change which task is shown in the runnables indicator.
 
 ## Keybindings to run tasks bound to runnables
 
-When you have a task definition that is bound to the runnable, you can quickly run it using [Code Actions](https://baymax.dev/docs/configuring-languages?#code-actions) that you can trigger either via {#action editor::ToggleCodeActions} command or by the `cmd-.`/`ctrl-.` shortcut. Your task will be the first in the dropdown. The task will run immediately if there are no additional Code Actions for this line.
+When you have a task definition that is bound to the runnable, you can quickly run it using [Code Actions](https://sim.dev/docs/configuring-languages?#code-actions) that you can trigger either via {#action editor::ToggleCodeActions} command or by the `cmd-.`/`ctrl-.` shortcut. Your task will be the first in the dropdown. The task will run immediately if there are no additional Code Actions for this line.
 
 ## Running Bash Scripts
 
-You can run bash scripts directly from Baymax. When you open a `.sh` or `.bash` file, Baymax automatically detects the script as runnable and makes it available in the task picker.
+You can run bash scripts directly from Sim. When you open a `.sh` or `.bash` file, Sim automatically detects the script as runnable and makes it available in the task picker.
 
 To run a bash script:
 
@@ -356,7 +356,7 @@ To run a bash script:
 
 Bash scripts are tagged with `bash-script`, allowing you to filter or reference them in task configurations.
 
-If you need to pass arguments or customize the execution environment, add a task configuration in your `.baymax/tasks.json`:
+If you need to pass arguments or customize the execution environment, add a task configuration in your `.sim/tasks.json`:
 
 ```json
 [
@@ -371,7 +371,7 @@ If you need to pass arguments or customize the execution environment, add a task
 
 ## Shell Initialization
 
-When Baymax runs a task, it launches the command in a login shell. This ensures your shell's initialization files (`.bash_profile`, `.zshrc`, etc.) are sourced before the task executes.
+When Sim runs a task, it launches the command in a login shell. This ensures your shell's initialization files (`.bash_profile`, `.zshrc`, etc.) are sourced before the task executes.
 
 This behavior gives tasks access to the same environment variables, aliases, and PATH modifications you've configured in your shell profile. If a task fails to find a command that works in your terminal, verify your shell configuration files are properly set up.
 

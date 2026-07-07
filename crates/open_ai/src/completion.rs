@@ -60,7 +60,7 @@ pub fn into_open_ai(
                 MessageContent::Text(text) | MessageContent::Thinking { text, .. } => {
                     let should_add = if message.role == Role::User {
                         // Including whitespace-only user messages can cause error with OpenAI compatible APIs
-                        // See https://github.com/simtropolis/baymax/issues/40097
+                        // See https://github.com/simtropolis/sim/issues/40097
                         !text.trim().is_empty()
                     } else {
                         !text.is_empty()
@@ -1423,7 +1423,7 @@ mod tests {
             false,
         );
 
-        let serialibaymax = serde_json::to_value(&response).unwrap();
+        let serialisim = serde_json::to_value(&response).unwrap();
         let expected = json!({
             "model": "custom-model",
             "input": [
@@ -1479,7 +1479,7 @@ mod tests {
             "reasoning": { "effort": "high", "summary": "auto" }
         });
 
-        assert_eq!(serialibaymax, expected);
+        assert_eq!(serialisim, expected);
     }
 
     #[test]
@@ -1544,9 +1544,9 @@ mod tests {
             false,
         );
 
-        let serialibaymax = serde_json::to_value(&response).unwrap();
+        let serialisim = serde_json::to_value(&response).unwrap();
         assert_eq!(
-            serialibaymax["input"],
+            serialisim["input"],
             json!([
                 {
                     "type": "reasoning",
@@ -1575,10 +1575,10 @@ mod tests {
             ])
         );
         assert_eq!(
-            serialibaymax["include"],
+            serialisim["include"],
             json!(["reasoning.encrypted_content"])
         );
-        assert_eq!(serialibaymax.get("reasoning"), None);
+        assert_eq!(serialisim.get("reasoning"), None);
     }
 
     #[test]
@@ -1618,10 +1618,10 @@ mod tests {
 
         let response =
             into_open_ai_response(request, "custom-model", false, false, None, None, false);
-        let serialibaymax = serde_json::to_value(&response).unwrap();
+        let serialisim = serde_json::to_value(&response).unwrap();
 
         assert_eq!(
-            serialibaymax["input"],
+            serialisim["input"],
             json!([
                 {
                     "type": "reasoning",
@@ -1682,8 +1682,8 @@ mod tests {
             false,
         );
 
-        let serialibaymax = serde_json::to_value(&response).unwrap();
-        assert_eq!(serialibaymax.get("reasoning"), None);
+        let serialisim = serde_json::to_value(&response).unwrap();
+        assert_eq!(serialisim.get("reasoning"), None);
     }
 
     /// `Speed::Fast` should translate to `service_tier: "priority"` on the
@@ -1717,9 +1717,9 @@ mod tests {
 
             let response = into_open_ai_response(request, "gpt-5.4", true, true, None, None, true);
 
-            let serialibaymax = serde_json::to_value(&response)?;
+            let serialisim = serde_json::to_value(&response)?;
             assert_eq!(
-                serialibaymax
+                serialisim
                     .get("service_tier")
                     .and_then(|value| value.as_str()),
                 expected,
@@ -1758,9 +1758,9 @@ mod tests {
 
             let chat = into_open_ai(request, "gpt-5.4", true, true, None, None, false);
 
-            let serialibaymax = serde_json::to_value(&chat)?;
+            let serialisim = serde_json::to_value(&chat)?;
             assert_eq!(
-                serialibaymax
+                serialisim
                     .get("service_tier")
                     .and_then(|value| value.as_str()),
                 expected,
@@ -1801,9 +1801,9 @@ mod tests {
             true,
         );
 
-        let serialibaymax = serde_json::to_value(&response)?;
-        assert_eq!(serialibaymax["reasoning"], json!({ "effort": "none" }));
-        assert_eq!(serialibaymax.get("include"), None);
+        let serialisim = serde_json::to_value(&response)?;
+        assert_eq!(serialisim["reasoning"], json!({ "effort": "none" }));
+        assert_eq!(serialisim.get("include"), None);
 
         Ok(())
     }
@@ -1839,9 +1839,9 @@ mod tests {
             true,
         );
 
-        let serialibaymax = serde_json::to_value(&response)?;
+        let serialisim = serde_json::to_value(&response)?;
         assert_eq!(
-            serialibaymax["reasoning"],
+            serialisim["reasoning"],
             json!({ "effort": "medium", "summary": "auto" })
         );
 
@@ -1889,9 +1889,9 @@ mod tests {
             false,
         );
 
-        let serialibaymax = serde_json::to_value(&response).unwrap();
+        let serialisim = serde_json::to_value(&response).unwrap();
         assert_eq!(
-            serialibaymax["input"],
+            serialisim["input"],
             json!([
                 {
                     "type": "reasoning",
@@ -1978,9 +1978,9 @@ mod tests {
             false,
         );
 
-        let serialibaymax = serde_json::to_value(&response).unwrap();
+        let serialisim = serde_json::to_value(&response).unwrap();
         assert_eq!(
-            serialibaymax["input"],
+            serialisim["input"],
             json!([
                 {
                     "type": "reasoning",
@@ -2057,10 +2057,10 @@ mod tests {
 
         let response =
             into_open_ai_response(request, "custom-model", false, false, None, None, false);
-        let serialibaymax = serde_json::to_value(&response).unwrap();
+        let serialisim = serde_json::to_value(&response).unwrap();
 
         assert_eq!(
-            serialibaymax["input"],
+            serialisim["input"],
             json!([
                 {
                     "type": "reasoning",
@@ -2088,7 +2088,7 @@ mod tests {
             ])
         );
         assert_eq!(
-            serialibaymax["include"],
+            serialisim["include"],
             json!(["reasoning.encrypted_content"])
         );
     }

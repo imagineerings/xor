@@ -57,7 +57,7 @@ RETRY_DELAY_SECONDS = 5
 
 GITHUB_API_URL = "https://api.github.com"
 REPO_OWNER = "simtropolis"
-REPO_NAME = "baymax"
+REPO_NAME = "sim"
 STAFF_TEAM_SLUG = "staff"
 
 SKIP_LABELS = {"staff", "bot"}
@@ -491,12 +491,12 @@ def github_pr_issue_type(pr_node_id):
     for priority in ("Crash", "Bug", "Feature", "Docs"):
         if priority in type_names:
             return priority
-    # Org-wide guardrails should ensure every issue has a recognibaymax type,
+    # Org-wide guardrails should ensure every issue has a recognisim type,
     # so reaching this branch means something slipped through. Log it and
     # fall back so the PR doesn't carry stale data.
     print(
         f"Warning: PR has {refs['totalCount']} linked issue(s) but none with "
-        f"a recognibaymax type (saw: {type_names or 'no type set'})"
+        f"a recognisim type (saw: {type_names or 'no type set'})"
     )
     return "No issue"
 

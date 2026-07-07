@@ -3323,12 +3323,12 @@ impl EditorElement {
             window,
             cx,
         );
-        let quantibaymax_height = (preliminary_size.height / line_height).ceil() * line_height;
-        let final_size = if preliminary_size.height == quantibaymax_height {
+        let quantisim_height = (preliminary_size.height / line_height).ceil() * line_height;
+        let final_size = if preliminary_size.height == quantisim_height {
             preliminary_size
         } else {
             element.layout_as_root(
-                size(available_width, quantibaymax_height.into()),
+                size(available_width, quantisim_height.into()),
                 window,
                 cx,
             )
@@ -6771,7 +6771,7 @@ pub fn render_breadcrumb_text(
                                         .justify_between()
                                         .child(Label::new("Show Symbol Outline"))
                                         .child(ui::KeyBinding::for_action_in(
-                                            &baymax_actions::outline::ToggleOutline,
+                                            &sim_actions::outline::ToggleOutline,
                                             &focus_handle,
                                             cx,
                                         )),
@@ -6794,7 +6794,7 @@ pub fn render_breadcrumb_text(
                             move |_, window, cx| {
                                 if let Some((editor, callback)) = editor
                                     .upgrade()
-                                    .zip(baymax_actions::outline::TOGGLE_OUTLINE.get())
+                                    .zip(sim_actions::outline::TOGGLE_OUTLINE.get())
                                 {
                                     callback(editor.to_any_view(), window, cx);
                                 }

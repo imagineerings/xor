@@ -1,4 +1,4 @@
-# CODEOWNERS for simtropolis/baymax
+# CODEOWNERS for simtropolis/sim
 #
 # ┌─────────────────────────────────────────────────────────────────────────────┐
 # │ WARNING: This file is auto-generated. DO NOT EDIT MANUALLY.                │
@@ -207,7 +207,7 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 
 /.factory/ @simtropolis/platform-team
-/.baymax/ @simtropolis/platform-team
+/.sim/ @simtropolis/platform-team
 /assets/badge/ @simtropolis/platform-team
 /assets/settings/ @simtropolis/platform-team
 /ci/ @simtropolis/platform-team
@@ -239,9 +239,9 @@
 # SUGGESTED: Review needed - based on Finn Evers (2 commits)
 /crates/sidebar/ @simtropolis/platform-team
 /crates/system_specs/ @simtropolis/platform-team
-/crates/baymax/ @simtropolis/platform-team
-/crates/baymax_actions/ @simtropolis/platform-team
-/crates/baymax_env_vars/ @simtropolis/platform-team
+/crates/sim/ @simtropolis/platform-team
+/crates/sim_actions/ @simtropolis/platform-team
+/crates/sim_env_vars/ @simtropolis/platform-team
 /docs/ @simtropolis/platform-team
 /docs/.conventions/ @simtropolis/platform-team
 /docs/.doc-examples/ @simtropolis/platform-team
@@ -319,12 +319,12 @@
 /crates/which_key/ @simtropolis/ui-team
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# baymax-dev-team
-# Baymax website, marketing, documentation site
+# sim-dev-team
+# Sim website, marketing, documentation site
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # SUGGESTED: Review needed - based on Joseph T. Lyons (1 commits)
-/crates/open_path_prompt/ @simtropolis/baymax-dev-team
+/crates/open_path_prompt/ @simtropolis/sim-dev-team
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # DIRECT OVERRIDES
