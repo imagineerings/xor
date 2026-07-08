@@ -88,6 +88,17 @@ pub trait WorkflowStore {
   diagnostics. Metadata failures preserve the asset record and are not delegated
   to ComfyUI image/audio metadata readers.
 
+### AppModeBridge
+
+- **Purpose**: Preserve app-like workflow controls for the unified authoring app.
+- **Responsibilities**: Parse app-mode metadata, expose Sim control records,
+  preserve graph-workflow fallback, and report invalid control metadata.
+- **Native app-mode records**: App-mode controls are stored as Sim-owned
+  metadata with control kind, label, default value, choices, target node/input,
+  and UI ownership. The bridge stores data for the unified authoring app and
+  graph editor instead of implementing UI or forwarding to ComfyUI frontend
+  app-mode code.
+
 ## Data Models
 
 ```rust
@@ -158,3 +169,4 @@ _For any_ generated file import, metadata extraction failure SHALL NOT block ass
 - Replacement catalog and graph-rewrite tests shared with native graph validation.
 - Metadata extraction tests for supported generated-file metadata containers and
   non-fatal asset preservation.
+- App-mode metadata tests for native control records and graph-workflow fallback.

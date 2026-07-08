@@ -1,4 +1,5 @@
 pub mod artifact;
+pub mod comfy_app_mode;
 pub mod comfy_blueprints;
 pub mod comfy_cache;
 pub mod comfy_cancellation;
@@ -50,6 +51,8 @@ pub mod worker_launcher;
 
 #[cfg(test)]
 mod artifact_tests;
+#[cfg(test)]
+mod comfy_app_mode_tests;
 #[cfg(test)]
 mod comfy_blueprints_tests;
 #[cfg(test)]
@@ -128,6 +131,11 @@ mod session_tests;
 mod tests;
 
 pub use artifact::{GeneratedWorldArtifact, GeneratedWorldArtifactError};
+pub use comfy_app_mode::{
+    ComfyAppModeBridge, ComfyAppModeControl, ComfyAppModeControlKind, ComfyAppModeControlTarget,
+    ComfyAppModeDiagnostic, ComfyAppModeReport, ComfyAppModeUiOwner, INVALID_APP_MODE_CONTROL_CODE,
+    INVALID_APP_MODE_METADATA_CODE,
+};
 pub use comfy_blueprints::{
     BLUEPRINT_COUNT_MISMATCH_CODE, ComfyBlueprintCatalog, ComfyBlueprintCategory,
     ComfyBlueprintDependency, ComfyBlueprintDependencyKind, ComfyBlueprintDiagnostic,

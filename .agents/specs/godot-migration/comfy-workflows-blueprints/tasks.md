@@ -56,8 +56,9 @@ Import shipped blueprints first, then add workflow persistence and API export, t
   - _Requirements: 5.1, 5.2, 5.3_
   - _writes: crates/world_model/src/comfy_embedded_workflow.rs, crates/world_model/src/comfy_embedded_workflow_tests.rs_
 
-- [ ] 7. Add app-mode metadata bridge
+- [x] 7. Add app-mode metadata bridge
   - Preserve app-mode control metadata and expose it to the unified authoring app without implementing UI here.
+  - Preserve control kinds, labels, defaults, choices, target node/input bindings, graph fallback, UI ownership, and diagnostics as native Sim app-mode records without ComfyUI frontend pass-through.
   - _Requirements: 6.1, 6.2, 6.3_
   - _writes: crates/world_model/src/comfy_app_mode.rs, crates/world_model/src/comfy_app_mode_tests.rs_
 
