@@ -44,14 +44,15 @@ Restore the channel-chat storage, RPC, client, and desktop UI foundation that th
   - _writes: `crates/client/src/client.rs`_
   - _validated: `cargo fmt -p client`; `cargo check -p client`_
 
-- [ ] 5. Build the desktop channel-chat view
-  - [ ] 5.1 Render a scrollable message list with sender, timestamp, and body text.
-  - [ ] 5.2 Add a composer that sends through the client channel-chat API.
-  - [ ] 5.3 Preserve drafts and show user-visible errors on send failure.
-  - [ ] 5.4 Apply live `ChannelMessageSent` and `ChannelMessageUpdate` events to the open view.
+- [x] 5. Build the desktop channel-chat view
+  - [x] 5.1 Render a scrollable message list with sender, timestamp, and body text.
+  - [x] 5.2 Add a composer that sends through the client channel-chat API.
+  - [x] 5.3 Preserve drafts and show user-visible errors on send failure.
+  - [x] 5.4 Apply live `ChannelMessageSent` and `ChannelMessageUpdate` events to the open view.
   - _Requirements: 0.3_
   - _writes: `crates/collab_ui/src/channel_chat.rs`_
   - _writes: `crates/collab_ui/src/collab_ui.rs`_
+  - _validated: `cargo fmt -p collab_ui`; `cargo check -p collab_ui`_
 
 - [ ] 6. Wire channel chat into navigation
   - [ ] 6.1 Add an entry point from channel navigation/panel surfaces.

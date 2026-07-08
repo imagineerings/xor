@@ -1,4 +1,5 @@
 mod call_stats_modal;
+pub mod channel_chat;
 pub mod channel_view;
 pub mod collab_panel;
 pub mod notifications;
@@ -19,6 +20,7 @@ use workspace::AppState;
 // Another comment, nice.
 pub fn init(app_state: &Arc<AppState>, cx: &mut App) {
     call_stats_modal::init(cx);
+    channel_chat::init(cx);
     channel_view::init(cx);
     collab_panel::init(cx);
     notifications::init(app_state, cx);
