@@ -77,6 +77,16 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: "category",
+      label: "Configuration",
+      items: [
+        "configuration/index",
+        "configuration/providers",
+        "configuration/extensions-mcp",
+        "configuration/troubleshooting",
+      ],
+    },
+    {
+      type: "category",
       label: "Remote Development",
       items: ["remote-development", "environment", "dev-containers"],
     },

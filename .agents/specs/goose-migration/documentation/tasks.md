@@ -28,7 +28,7 @@ Set up a Docusaurus-based documentation site for sim with installation guides, c
   - _Requirements: 1_
   - _writes: docs/docs/features/_
 
-- [ ] 4. Write configuration and troubleshooting docs
+- [x] 4. Write configuration and troubleshooting docs
   - Provider configuration for each supported provider
   - Extension/MCP server setup
   - Troubleshooting guide with common issues
