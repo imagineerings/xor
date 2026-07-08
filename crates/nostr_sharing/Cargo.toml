@@ -1,0 +1,24 @@
+[package]
+name = "nostr_sharing"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+license = "GPL-3.0-or-later"
+
+[lints]
+workspace = true
+
+[lib]
+path = "src/nostr_sharing.rs"
+doctest = false
+
+[features]
+default = []
+nostr = []
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+session.workspace = true
+uuid.workspace = true

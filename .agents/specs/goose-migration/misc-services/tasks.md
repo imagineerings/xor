@@ -14,7 +14,7 @@ Implement the remaining smaller goose components: session import formats, Nostr 
   - _Requirements: 2_
   - _writes: crates/session/src/import/mod.rs, crates/session/src/import/formats/_
 
-- [ ] 2. Implement Nostr session sharing
+- [x] 2. Implement Nostr session sharing
   - Create Nostr client for publishing/retrieving session events
   - Session serialization/deserialization for Nostr events
   - Configurable relay list

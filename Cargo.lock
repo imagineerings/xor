@@ -11648,6 +11648,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "nostr_sharing"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+ "session",
+ "uuid",
+]
+
+[[package]]
 name = "notifications"
 version = "0.1.0"
 dependencies = [
