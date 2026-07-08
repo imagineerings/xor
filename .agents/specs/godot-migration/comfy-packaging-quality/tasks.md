@@ -46,10 +46,11 @@ Build cross-cutting migration controls that other Comfy specs depend on: launch 
   - _Requirements: 3.2, 4.1, 4.2, 4.3_
   - _writes: crates/world_model/tests/comfy_compat_suite.rs, crates/world_model/fixtures/comfy/README.md_
 
-- [ ] 5. Implement dependency review gate
+- [x] 5. Implement dependency review gate
   - Require review metadata for native libraries, codecs, Python packages, provider SDKs, model dependencies, frontend packages, vendored code, network access, and large downloads.
+  - Represent dependency proposals, review records, decisions, diagnostics, and audit approvals with native `SimDependencyReview*` types rather than Comfy-labeled pass-through records.
   - _Requirements: 5.1, 5.3_
-  - _writes: crates/world_model/src/comfy_dependency_review.rs, crates/world_model/src/comfy_dependency_review_tests.rs_
+  - _writes: crates/world_model/src/sim_dependency_review.rs, crates/world_model/src/sim_dependency_review_tests.rs_
 
 - [ ] 6. Add packaging profile catalog
   - Define CPU-only, GPU-specific, API-disabled, custom-node-disabled, asset-enabled, portable-like, and remote-worker launch profiles without duplicating platform packaging.

@@ -12,7 +12,7 @@ flowchart LR
     Policy --> Model[comfy-model-memory-runtime]
     Flags[SimFeatureFlagRegistry] --> Runtime[comfy-runtime-control-plane]
     Schema[SimApiSchemaCatalog] --> Tests[CompatibilityFixtureSuite]
-    Deps[DependencyReviewGate] --> Packaging[PackagingProfileCatalog]
+    Deps[SimDependencyReviewGate] --> Packaging[PackagingProfileCatalog]
     Logs[DiagnosticsAdapter] --> SimDiag[Sim Diagnostics]
 ```
 
@@ -55,10 +55,16 @@ flowchart LR
   detailed media fixtures remain explicitly assigned to their owning specs until
   those native Sim features land.
 
-### DependencyReviewGate
+### SimDependencyReviewGate
 
 - **Purpose**: Block unreviewed dependencies and large downloads.
 - **Responsibilities**: License, maintenance, security, binary size, platform impact, network requirement, and fallback strategy records.
+- **Native behavior**: Evaluates dependency proposals with Sim-owned
+  `SimDependencyReview*` records for native libraries, codecs, Python packages,
+  provider SDKs, model dependencies, frontend packages, vendored code, network
+  access, and large downloads. Compatibility tasks may feed Comfy-derived
+  dependency proposals into the gate, but approval and audit state are native
+  Sim governance records rather than ComfyUI pass-through labels.
 
 ### DiagnosticsAdapter
 
@@ -85,6 +91,11 @@ pub struct SimFeatureFlagRegistry {
 
 pub struct SimApiSchemaCatalog {
     pub routes: Vec<SimApiSchemaRoute>,
+}
+
+pub struct SimDependencyReviewGate {
+    pub reviews: BTreeMap<String, SimDependencyReviewRecord>,
+    pub audit_records: Vec<SimDependencyAuditRecord>,
 }
 
 pub enum ComfyRouteSupport {

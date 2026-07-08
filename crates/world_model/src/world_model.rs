@@ -57,6 +57,7 @@ pub mod sim_asset_seeder;
 pub mod sim_asset_tags;
 pub mod sim_asset_upload;
 pub mod sim_assets;
+pub mod sim_dependency_review;
 pub mod sim_feature_flags;
 pub mod sim_launch_profile;
 pub mod sim_user_data;
@@ -154,6 +155,8 @@ mod sim_asset_query_tests;
 mod sim_asset_scanner_tests;
 #[cfg(test)]
 mod sim_assets_tests;
+#[cfg(test)]
+mod sim_dependency_review_tests;
 #[cfg(test)]
 mod sim_feature_flags_tests;
 #[cfg(test)]
@@ -388,6 +391,14 @@ pub use sim_assets::{
     SimAssetContentId, SimAssetContentRecord, SimAssetDiagnostic, SimAssetHash, SimAssetOwnerId,
     SimAssetReferenceId, SimAssetReferencePatch, SimAssetReferenceRecord, SimAssetReferenceRequest,
     SimAssetRepository,
+};
+pub use sim_dependency_review::{
+    DEFAULT_LARGE_DOWNLOAD_THRESHOLD_BYTES, DEPENDENCY_REVIEW_AUDIT_MISSING_CODE,
+    DEPENDENCY_REVIEW_INCOMPLETE_CODE, DEPENDENCY_REVIEW_MISSING_CODE,
+    DEPENDENCY_REVIEW_NOT_APPROVED_CODE, SimDependencyAuditKind, SimDependencyAuditRecord,
+    SimDependencyKind, SimDependencyProposal, SimDependencyReviewDecision,
+    SimDependencyReviewDiagnostic, SimDependencyReviewDiagnosticSeverity, SimDependencyReviewGate,
+    SimDependencyReviewRecord, SimDependencyReviewReport, SimDependencyReviewStatus,
 };
 pub use sim_feature_flags::{
     ASSETS_FLAG, FEATURE_FLAG_CORE_OVERRIDE_CODE, FEATURE_FLAG_INVALID_VALUE_CODE,
