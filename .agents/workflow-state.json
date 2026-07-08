@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T20:32:00Z",
+  "updated_at": "2026-07-08T20:52:00Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -682,6 +682,12 @@
       "status": "done",
       "summary": "Task 1: Added the CLI interactive session core with ConversationMessage/ConversationRole state, multiline InputEditor editing and history navigation, session input/output transitions, plain-text conversation rendering, and TerminalModeGuard raw-mode setup/teardown semantics.",
       "updated_at": "2026-07-08T20:32:00Z"
+    },
+    {
+      "task_identifier": ".agents/specs/goose-migration/text-ui/tasks.md:20",
+      "status": "done",
+      "summary": "Task 2: Added terminal rendering primitives for CLI interactive sessions, including Markdown-to-ANSI block/inline rendering, lightweight code keyword highlighting, deterministic spinner frames, conversation rendering, and tool-call state display with arguments and results.",
+      "updated_at": "2026-07-08T20:52:00Z"
     }
   ],
   "dependency_notes": [
@@ -737,8 +743,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/text-ui",
-      "summary": "Task 1 is checked complete. crates/cli now exposes an interactive session/input core with conversation state, multiline editing, history navigation, and raw terminal mode guard semantics. Task 2 can build terminal rendering and markdown formatting on top of this module.",
-      "updated_at": "2026-07-08T20:32:00Z"
+      "summary": "Tasks 1-2 are checked complete. crates/cli now exposes an interactive session/input core plus terminal rendering primitives for Markdown-to-ANSI output, code block highlighting, spinner frames, and tool-call state display. Task 3 can build slash-command parsing/routing on top of this interactive module.",
+      "updated_at": "2026-07-08T20:52:00Z"
     },
     {
       "scope": ".agents/specs/godot-migration",

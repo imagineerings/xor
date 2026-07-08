@@ -17,7 +17,7 @@ Implement an interactive terminal UI mode for sim's CLI using crossterm/ratatui,
   - _Requirements: 1_
   - _writes: crates/cli/src/interactive/session.rs, crates/cli/src/interactive/input.rs_
 
-- [ ] 2. Implement terminal renderer
+- [x] 2. Implement terminal renderer
   - Markdown to ANSI rendering (headings, lists, bold, italic, code blocks)
   - Syntax highlighting for code blocks
   - Progress spinner for loading states
