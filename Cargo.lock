@@ -10856,6 +10856,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "mcp_memory"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "serde",
+ "serde_json",
+ "sqlez",
+ "tempfile",
+ "uuid",
+]
+
+[[package]]
 name = "mcp_runner"
 version = "0.1.0"
 dependencies = [

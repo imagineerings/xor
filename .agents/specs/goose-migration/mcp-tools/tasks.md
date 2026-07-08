@@ -26,7 +26,7 @@ Implement the MCP tool servers from goose as a combination of native agent tools
     - _Requirements: 1.4_
     - _writes: crates/agent/src/tools/platform_tool.rs_
 
-- [ ] 3. Implement Memory MCP server
+- [x] 3. Implement Memory MCP server
   - Create MCP server with `store_fact`, `retrieve_memories`, `search_memories` tools
   - Implement local SQLite-based memory store
   - Add persistence across restarts

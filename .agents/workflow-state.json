@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T12:00:00.000Z",
+  "updated_at": "2026-07-08T13:01:35Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -317,6 +317,12 @@
       "updated_at": "2026-07-08T12:51:45Z"
     },
     {
+      "task_identifier": ".agents/specs/goose-migration/mcp-tools/tasks.md:29",
+      "status": "done",
+      "summary": "Task 3: Added crates/mcp_servers/memory with store_fact, retrieve_memories, and search_memories tool handling, a local sqlez-backed SQLite memory store, a stdio JSON-RPC binary, and unit coverage for CRUD, search, tool calls, and restart persistence.",
+      "updated_at": "2026-07-08T13:01:35Z"
+    },
+    {
       "task_identifier": ".agents/specs/ci-migration/tasks.md",
       "status": "deprioritized",
       "summary": "All tasks in .agents/specs/ci-migration are deprioritized until every other local workflow task is complete. Do not select CI migration work while non-CI tasks remain available.",
@@ -352,8 +358,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/mcp-tools",
-      "summary": "Task 1 is checked complete. Remaining MCP server crates can depend on crates/mcp_runner for shared command, stdio transport, lifecycle status, health check, and crash recovery policy types.",
-      "updated_at": "2026-07-08T12:51:45Z"
+      "summary": "Tasks 1 and 3 are checked complete. Remaining MCP server crates can depend on crates/mcp_runner for process lifecycle support, and later context_server integration can launch crates/mcp_servers/memory's mcp-memory binary with a local SQLite database path.",
+      "updated_at": "2026-07-08T13:01:35Z"
     },
     {
       "scope": ".agents/specs/godot-migration",
