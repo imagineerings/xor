@@ -40,8 +40,8 @@ Implement Comfy model-execution semantics after model catalogs and graph validat
   - _Requirements: 3.1, 3.4_
   - _writes: crates/world_model/src/comfy_latents.rs, crates/world_model/src/comfy_vae.rs, crates/world_model/src/comfy_latents_tests.rs_
 
-- [ ] 5. Implement model component and patch pipeline
-  - Compose loader outputs and apply LoRA, hypernetwork, ControlNet, GLIGEN, model patch, model merge, and edit-model records in deterministic order with provenance.
+- [x] 5. Implement model component and patch pipeline
+  - Compose loader outputs and apply LoRA, hypernetwork, ControlNet, GLIGEN, model patch, model merge, and edit-model records as native Sim component and patch plans in deterministic order with provenance.
   - _Requirements: 3.2, 3.3, 3.4_
   - _writes: crates/world_model/src/comfy_model_components.rs, crates/world_model/src/comfy_model_patches.rs, crates/world_model/src/comfy_model_patches_tests.rs_
 

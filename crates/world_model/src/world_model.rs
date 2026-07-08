@@ -3,9 +3,11 @@ pub mod comfy_conditioning;
 pub mod comfy_execution_registry;
 pub mod comfy_latents;
 pub mod comfy_model_catalog;
+pub mod comfy_model_components;
 pub mod comfy_model_family;
 pub mod comfy_model_folders;
 pub mod comfy_model_metadata;
+pub mod comfy_model_patches;
 pub mod comfy_model_resources;
 pub mod comfy_quantization;
 pub mod comfy_runtime_policy;
@@ -37,6 +39,8 @@ mod comfy_model_family_tests;
 mod comfy_model_folders_tests;
 #[cfg(test)]
 mod comfy_model_metadata_tests;
+#[cfg(test)]
+mod comfy_model_patches_tests;
 #[cfg(test)]
 mod comfy_model_resources_tests;
 #[cfg(test)]
@@ -76,6 +80,10 @@ pub use comfy_latents::{
 pub use comfy_model_catalog::{
     ComfyModelCatalog, ModelCatalogError, ModelCatalogSnapshot, ModelFileSummary, ModelRootSnapshot,
 };
+pub use comfy_model_components::{
+    ComfyModelComponentComposer, ModelComponent, ModelComponentDiagnostic, ModelComponentRole,
+    ModelComponentSet,
+};
 pub use comfy_model_family::{
     AdapterKind, ComfyModelFamilyDetector, ConditioningMode, LatentFormat, ModelFamilyCapability,
     ModelFamilyDiagnostic, ModelFamilyKind, ModelFamilyProfile, ModelMediaCapability,
@@ -88,6 +96,10 @@ pub use comfy_model_folders::{
 pub use comfy_model_metadata::{
     ComfyModelMetadataReader, DEFAULT_SAFETENSORS_HEADER_LIMIT_BYTES, ModelMetadataError,
     ModelMetadataSummary, ModelPreviewRef, SafetensorsHeaderMetadata,
+};
+pub use comfy_model_patches::{
+    AppliedModelPatch, ComfyModelPatchPipeline, ModelPatchDiagnostic, ModelPatchKind,
+    ModelPatchPlan, ModelPatchRecord,
 };
 pub use comfy_model_resources::{
     ComfyModelResourceBridge, FreeMemoryScope, ModelResourceIntent, ModelResourceIntentResult,

@@ -144,6 +144,18 @@ pub struct VaeRuntimeRequest {
     pub temporal_frames: Option<u32>,
 }
 
+pub struct ModelComponentSet {
+    pub id: ModelComponentSetId,
+    pub family: ModelFamilyId,
+    pub latent_format: LatentFormat,
+    pub components: Vec<ModelComponent>,
+}
+
+pub struct ModelPatchPlan {
+    pub component_set: ModelComponentSet,
+    pub patches: Vec<AppliedModelPatch>,
+}
+
 pub struct ModelFamilyExecutionProfile {
     pub family: ModelFamilyId,
     pub media_domain: MediaDomain,
@@ -180,6 +192,13 @@ tiled, temporal, and inpaint operations preserve Comfy-compatible metadata, but
 Sim validates latent format, dimensions, frame counts, masks, compression, VAE
 model references, and tiling metadata before worker execution rather than
 delegating those checks to Comfy.
+
+Model loader outputs and model patches are native Sim component and patch plans.
+The runtime validates component category, model family, latent format, patch
+category, compatibility, strengths, duplicate ids, and patch support before
+worker execution. Patch application order is deterministic across LoRA,
+hypernetwork, ControlNet, GLIGEN, model patch, model merge, and edit-model
+records, with provenance preserved on every applied patch.
 
 ## Correctness Properties
 
