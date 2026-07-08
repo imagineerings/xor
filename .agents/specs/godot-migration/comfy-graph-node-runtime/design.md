@@ -89,6 +89,13 @@ pub struct SimNodeInputSchema {
     pub tooltip: Option<String>,
 }
 
+pub struct NodeReplacementRule {
+    pub from_node_type: NodeTypeId,
+    pub to_node_type: NodeTypeId,
+    pub input_mappings: BTreeMap<InputId, InputId>,
+    pub output_mappings: BTreeMap<OutputId, OutputId>,
+}
+
 pub struct PromptNode {
     pub id: NodeId,
     pub class_type: NodeTypeId,
@@ -115,6 +122,13 @@ hidden, primitive, combo, list, and lazy Comfy declarations into typed Sim graph
 schema inputs with deterministic diagnostics for unsupported types or invalid
 combo declarations, then reuses native node outputs from the registry.
 
+The node replacement engine is a native Sim graph rewrite pass. It applies
+validated old-to-new node type mappings only when a node type is missing from
+the enabled Sim registry, rewrites input and output port names on graph nodes
+and links, preserves literal input metadata under the new Sim input names, and
+leaves invalid replacement targets untouched with deterministic diagnostics for
+later validation.
+
 ## Correctness Properties
 
 ### Property 1: No Unknown Node Execution
@@ -123,31 +137,39 @@ _For any_ prompt graph, if a node id is missing after replacement mappings are a
 
 **Validates: Requirement 2.1, 2.2, 2.3**
 
-### Property 2: Topological Execution
+### Property 2: Replacement Link Preservation
+
+_For any_ replacement mapping applied before validation, every rewritten edge
+SHALL preserve its original source and target node identities while translating
+only mapped input or output port names.
+
+**Validates: Requirement 2.3**
+
+### Property 3: Topological Execution
 
 _For any_ valid prompt graph, the execution plan SHALL order every executed node after its linked dependencies.
 
 **Validates: Requirement 2.1, 3.2**
 
-### Property 3: Cache Policy Fidelity
+### Property 4: Cache Policy Fidelity
 
 _For any_ node output, if the selected cache policy determines the output is reusable, the executor SHALL use the cached value; if cache policy is none, it SHALL not reuse previous node outputs.
 
 **Validates: Requirement 3.1, 3.3**
 
-### Property 4: Partial Target Closure
+### Property 5: Partial Target Closure
 
 _For any_ partial execution target set, the execution plan SHALL include exactly the valid targets and their required dependency closure, except nodes reused from cache.
 
 **Validates: Requirement 3.2**
 
-### Property 5: Cancellation Propagation
+### Property 6: Cancellation Propagation
 
 _For any_ async or long-running node, when the parent job is cancelled, the node executor SHALL stop or mark the node interrupted and propagate that state to dependent nodes.
 
 **Validates: Requirement 4.3**
 
-### Property 6: Model Execution Delegation
+### Property 7: Model Execution Delegation
 
 _For any_ node that requires sampler, scheduler, conditioning, VAE, latent, model patch, diffusion, or world-model execution semantics, the graph runtime SHALL dispatch to `comfy-diffusion-world-model-runtime/` rather than implementing those semantics in the graph scheduler.
 

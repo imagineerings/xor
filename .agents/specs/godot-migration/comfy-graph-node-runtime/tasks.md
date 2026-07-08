@@ -30,8 +30,8 @@ Implement runtime graph compatibility in layers: registry/schema first, validati
   - _Requirements: 1.1, 1.2_
   - _writes: crates/world_model/src/comfy_schema.rs, crates/world_model/src/comfy_schema_tests.rs_
 
-- [ ] 3. Implement node replacement engine
-  - Apply old-to-new node mappings, input mappings, and output link rewrites before validation.
+- [x] 3. Implement node replacement engine
+  - Apply old-to-new node mappings, input mappings, metadata key rewrites, and output link rewrites as native Sim graph transformations before validation rather than passing replacement handling through to Comfy.
   - _Requirements: 2.3_
   - _writes: crates/world_model/src/comfy_node_replacement.rs, crates/world_model/src/comfy_node_replacement_tests.rs_
 
