@@ -9,6 +9,7 @@ pub mod comfy_model_folders;
 pub mod comfy_model_metadata;
 pub mod comfy_model_patches;
 pub mod comfy_model_resources;
+pub mod comfy_nodes;
 pub mod comfy_quantization;
 pub mod comfy_runner_profiles;
 pub mod comfy_runtime_policy;
@@ -46,6 +47,8 @@ mod comfy_model_metadata_tests;
 mod comfy_model_patches_tests;
 #[cfg(test)]
 mod comfy_model_resources_tests;
+#[cfg(test)]
+mod comfy_nodes_tests;
 #[cfg(test)]
 mod comfy_runner_profiles_tests;
 #[cfg(test)]
@@ -112,6 +115,10 @@ pub use comfy_model_resources::{
     ComfyModelResourceBridge, FreeMemoryScope, ModelResourceIntent, ModelResourceIntentResult,
     ModelResourceReleaseReport, ModelResourceReleaseRequest, ModelResourceWorker,
     ModelResourceWorkerError,
+};
+pub use comfy_nodes::{
+    ComfyNodeDefinition, ComfyNodeDiagnostic, ComfyNodeInput, ComfyNodeOutput, ComfyNodeRegistry,
+    ComfyNodeSource, ComfyObjectInfoNode, ComfyObjectInfoResponse,
 };
 pub use comfy_quantization::{
     ComfyQuantizationMetadata, QuantizationFormat, QuantizedLayerMetadata,

@@ -68,8 +68,14 @@ pub struct NodeDefinition {
     pub category: String,
     pub inputs: Vec<NodeInputDefinition>,
     pub outputs: Vec<NodeOutputDefinition>,
+    pub source: NodeSource,
     pub api_node: bool,
     pub search_aliases: Vec<String>,
+    pub tooltip: Option<String>,
+}
+
+pub struct ObjectInfoResponse {
+    pub nodes: BTreeMap<NodeTypeId, ObjectInfoNode>,
 }
 
 pub struct PromptNode {
@@ -86,6 +92,12 @@ pub enum CachePolicy {
     None,
 }
 ```
+
+The node registry is a native Sim registry. It stores core, extra, API-provider,
+and custom node definitions as typed records, filters disabled nodes from
+object-info responses, and returns deterministic availability diagnostics for
+unknown or disabled node classes. It does not proxy object-info lookup to
+ComfyUI.
 
 ## Correctness Properties
 

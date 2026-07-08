@@ -20,8 +20,8 @@ Implement runtime graph compatibility in layers: registry/schema first, validati
 
 ## Tasks
 
-- [ ] 1. Implement Comfy node registry
-  - Store node definitions, display metadata, categories, API-node markers, and disabled-node policy.
+- [x] 1. Implement Comfy node registry
+  - Store node definitions, display metadata, categories, API-node markers, and disabled-node policy as native Sim registry records rather than forwarding object-info lookup to Comfy.
   - _Requirements: 1.1, 1.2, 1.3_
   - _writes: crates/world_model/src/comfy_nodes.rs, crates/world_model/src/comfy_nodes_tests.rs_
 
