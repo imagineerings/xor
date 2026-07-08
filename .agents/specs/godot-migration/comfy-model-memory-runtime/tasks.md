@@ -20,7 +20,7 @@ Implement the model runtime as catalog and policy primitives first, then connect
 
 ## Tasks
 
-- [ ] 1. Implement Comfy model folder registry
+- [x] 1. Implement Comfy model folder registry
   - Register default Comfy model categories, allowed extensions, legacy folder mapping, and extra path config merge.
   - _Requirements: 1.1, 1.2, 1.3_
   - _writes: crates/world_model/src/comfy_model_folders.rs, crates/world_model/src/comfy_model_folders_tests.rs_

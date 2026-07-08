@@ -91,10 +91,43 @@ impl WorldControl {
             errors.push("A and D cannot both be pressed at the same time".to_string());
         }
 
+        let look_horiz: Vec<&WorldActionControl> = self
+            .actions
+            .iter()
+            .filter(|action| action.name == "i" || action.name == "k")
+            .collect();
+        let look_vert: Vec<&WorldActionControl> = self
+            .actions
+            .iter()
+            .filter(|action| action.name == "j" || action.name == "l")
+            .collect();
+
+        if look_horiz
+            .iter()
+            .filter(|action| action.value != 0.0)
+            .count()
+            > 1
+        {
+            errors.push("I and K cannot both be pressed at the same time".to_string());
+        }
+        if look_vert
+            .iter()
+            .filter(|action| action.value != 0.0)
+            .count()
+            > 1
+        {
+            errors.push("J and L cannot both be pressed at the same time".to_string());
+        }
+
         // Reject NaN values.
         for action in &self.actions {
             if action.value.is_nan() {
                 errors.push(format!("Action '{}' has NaN value", action.name));
+            } else if !(0.0..=1.0).contains(&action.value) {
+                errors.push(format!(
+                    "Action '{}' value {} is outside [0.0, 1.0]",
+                    action.name, action.value
+                ));
             }
         }
 
@@ -149,5 +182,33 @@ impl WorldGenerationRequest {
     pub fn with_seed(mut self, seed: u64) -> Self {
         self.seed = Some(seed);
         self
+    }
+
+    pub fn validate(&self) -> Vec<String> {
+        let mut errors = Vec::new();
+
+        if self.prompt.trim().is_empty() {
+            errors.push("prompt is required".to_string());
+        }
+        if self.model_profile.name.trim().is_empty() {
+            errors.push("model profile name is required".to_string());
+        }
+        if self.model_profile.family.trim().is_empty() {
+            errors.push("model profile family is required".to_string());
+        }
+        if self.output_target.trim().is_empty() {
+            errors.push("output target is required".to_string());
+        }
+        if self.controls.is_empty() {
+            errors.push("at least one control frame is required".to_string());
+        }
+
+        for (index, control) in self.controls.iter().enumerate() {
+            for error in control.validate() {
+                errors.push(format!("control frame {index}: {error}"));
+            }
+        }
+
+        errors
     }
 }

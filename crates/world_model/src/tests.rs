@@ -106,6 +106,53 @@ fn generation_request_with_all_options() {
     assert_eq!(req.controls.len(), 1);
 }
 
+#[test]
+fn generation_request_validate_accepts_complete_lingbot_request() {
+    let profile = WorldModelProfile::new("lingbot-video", "lingbot");
+    let controls = vec![WorldControl::new(
+        vec![
+            WorldActionControl::new("w", 1.0, 0),
+            WorldActionControl::new("i", 0.5, 0),
+        ],
+        0,
+    )];
+    let req = WorldGenerationRequest::new("walk forward", profile, "outputs/walk.mp4")
+        .with_source_image("inputs/start.png")
+        .with_controls(controls)
+        .with_seed(42);
+
+    assert!(req.validate().is_empty());
+}
+
+#[test]
+fn generation_request_validate_reports_missing_required_fields() {
+    let req = WorldGenerationRequest::new("", WorldModelProfile::new("", ""), "");
+    let errors = req.validate();
+
+    assert!(errors.iter().any(|error| error.contains("prompt")));
+    assert!(errors.iter().any(|error| error.contains("profile name")));
+    assert!(errors.iter().any(|error| error.contains("profile family")));
+    assert!(errors.iter().any(|error| error.contains("output target")));
+    assert!(errors.iter().any(|error| error.contains("control frame")));
+}
+
+#[test]
+fn generation_request_validate_reports_ijkl_control_conflicts() {
+    let profile = WorldModelProfile::new("wan-video", "wan");
+    let controls = vec![WorldControl::new(
+        vec![
+            WorldActionControl::new("i", 1.0, 0),
+            WorldActionControl::new("k", 1.0, 0),
+        ],
+        0,
+    )];
+    let req = WorldGenerationRequest::new("look conflict", profile, "outputs/look.mp4")
+        .with_controls(controls);
+    let errors = req.validate();
+
+    assert!(errors.iter().any(|error| error.contains("I and K")));
+}
+
 // ---------------------------------------------------------------------------
 // ArtifactRecord
 // ---------------------------------------------------------------------------
