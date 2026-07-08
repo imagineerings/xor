@@ -32,8 +32,9 @@ Build extension support with policy and diagnostics first. Only after disabled a
   - _Requirements: 1.2, 1.3, 1.4, 3.1, 5.3_
   - _writes: crates/world_model/src/comfy_extension_policy.rs, crates/world_model/src/comfy_extension_diagnostics.rs, crates/world_model/src/comfy_extension_policy_tests.rs_
 
-- [ ] 3. Implement controlled extension loader
+- [x] 3. Implement controlled extension loader
   - Load allowed packs, run permitted prestartup scripts, restore protected hooks, and isolate import failures.
+  - Represent load metadata, loaded/skipped packs, restored hooks, missing dependencies, and import diagnostics with native `SimExtensionLoad*` records without arbitrary ComfyUI execution.
   - _Requirements: 1.4, 3.1, 3.2, 3.3_
   - _writes: crates/world_model/src/comfy_extension_loader.rs, crates/world_model/src/comfy_extension_loader_tests.rs_
 

@@ -42,6 +42,11 @@ flowchart TD
 
 - **Purpose**: Load allowed extension metadata and registration output.
 - **Responsibilities**: Run allowed prestartup scripts, call supported registration mechanisms, isolate diagnostics, and restore protected hooks.
+- **Native behavior**: Consumes discovered `SimExtensionRecord` values and
+  native policy evaluations, records `SimExtensionLoad*` loaded/skipped pack
+  outcomes, reports missing dependencies and import failures per extension, and
+  records protected hook restoration without granting arbitrary ComfyUI process
+  mutation.
 
 ### NodeRegistrationBridge
 

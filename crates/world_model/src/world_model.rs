@@ -11,6 +11,7 @@ pub mod comfy_execution_plan;
 pub mod comfy_execution_registry;
 pub mod comfy_executor;
 pub mod comfy_extension_diagnostics;
+pub mod comfy_extension_loader;
 pub mod comfy_extension_policy;
 pub mod comfy_extensions;
 pub mod comfy_graph_validation;
@@ -105,6 +106,8 @@ mod comfy_execution_plan_tests;
 mod comfy_execution_registry_tests;
 #[cfg(test)]
 mod comfy_executor_tests;
+#[cfg(test)]
+mod comfy_extension_loader_tests;
 #[cfg(test)]
 mod comfy_extension_policy_tests;
 #[cfg(test)]
@@ -276,6 +279,12 @@ pub use comfy_extension_diagnostics::{
     SIM_EXTENSION_POLICY_NETWORK_DENIED_CODE, SIM_EXTENSION_POLICY_SCRIPT_DENIED_CODE,
     SIM_EXTENSION_POLICY_WEB_ASSET_DENIED_CODE, SimExtensionPolicyDiagnostic,
     SimExtensionPolicyDiagnosticSeverity,
+};
+pub use comfy_extension_loader::{
+    SIM_EXTENSION_LOADER_HOOK_RESTORED_CODE, SIM_EXTENSION_LOADER_IMPORT_FAILED_CODE,
+    SIM_EXTENSION_LOADER_MISSING_DEPENDENCY_CODE, SimExtensionLoadMetadata, SimExtensionLoadReport,
+    SimExtensionLoadedPack, SimExtensionLoader, SimExtensionLoaderDiagnostic,
+    SimExtensionSkippedPack,
 };
 pub use comfy_extension_policy::{
     SimExtensionPermissionReport, SimExtensionPolicy, SimExtensionPolicyDecisionKind,
