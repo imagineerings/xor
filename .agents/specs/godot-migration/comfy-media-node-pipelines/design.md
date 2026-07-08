@@ -55,6 +55,12 @@ flowchart TD
 
 - **Purpose**: Implement audio load/save/preview/edit nodes and audio latent validation.
 - **Responsibilities**: Sample rate, channels, duration, codec selection, and VAE/model compatibility checks.
+- **Native behavior**: Uses `SimAudio*` adapters to preserve sample rate,
+  channel count, duration, MIME type, sample ranges, output references, volume
+  and equalization metadata, and audio latent capability diagnostics. Codec
+  support is represented as native Sim backend status, including dependency
+  review and unsupported diagnostics, rather than forwarding audio work to
+  ComfyUI.
 
 ### ThreeDGeometryOps
 
@@ -103,6 +109,11 @@ pub struct SimMaskArtifact {
 pub struct SimVideoArtifact {
     pub reference: String,
     pub metadata: SimVideoMetadata,
+}
+
+pub struct SimAudioArtifact {
+    pub reference: String,
+    pub metadata: SimAudioMetadata,
 }
 ```
 

@@ -38,10 +38,11 @@ Represent media functionality as capability groups and implement deterministic o
   - _Requirements: 2.1, 2.2, 2.3_
   - _writes: crates/world_model/src/sim_video_nodes.rs, crates/world_model/src/sim_video_nodes_tests.rs_
 
-- [ ] 4. Implement audio node adapters and diagnostics
+- [x] 4. Implement audio node adapters and diagnostics
   - Add audio metadata handling, simple transforms, codec diagnostics, and audio latent model capability validation.
+  - Represent audio metadata, sample ranges, edit operations, codec status, equalization bands, and diagnostics with native `SimAudio*` records.
   - _Requirements: 3.1, 3.2, 3.3_
-  - _writes: crates/world_model/src/comfy_audio_nodes.rs, crates/world_model/src/comfy_audio_nodes_tests.rs_
+  - _writes: crates/world_model/src/sim_audio_nodes.rs, crates/world_model/src/sim_audio_nodes_tests.rs_
 
 - [ ] 5. Implement 3D, geometry, and Gaussian splat adapters
   - Register 3D artifacts, depth/geometry outputs, point clouds, splats, preview metadata, and mesh lifecycle delegation.

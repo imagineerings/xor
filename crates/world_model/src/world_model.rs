@@ -57,6 +57,7 @@ pub mod sim_asset_seeder;
 pub mod sim_asset_tags;
 pub mod sim_asset_upload;
 pub mod sim_assets;
+pub mod sim_audio_nodes;
 pub mod sim_dependency_review;
 pub mod sim_diagnostics_adapter;
 pub mod sim_feature_flags;
@@ -161,6 +162,8 @@ mod sim_asset_query_tests;
 mod sim_asset_scanner_tests;
 #[cfg(test)]
 mod sim_assets_tests;
+#[cfg(test)]
+mod sim_audio_nodes_tests;
 #[cfg(test)]
 mod sim_dependency_review_tests;
 #[cfg(test)]
@@ -407,6 +410,13 @@ pub use sim_assets::{
     SimAssetContentId, SimAssetContentRecord, SimAssetDiagnostic, SimAssetHash, SimAssetOwnerId,
     SimAssetReferenceId, SimAssetReferencePatch, SimAssetReferenceRecord, SimAssetReferenceRequest,
     SimAssetRepository,
+};
+pub use sim_audio_nodes::{
+    SIM_AUDIO_DEPENDENCY_REVIEW_REQUIRED_CODE, SIM_AUDIO_INVALID_CHANNEL_CODE,
+    SIM_AUDIO_INVALID_RANGE_CODE, SIM_AUDIO_LATENT_MISMATCH_CODE, SIM_AUDIO_SHAPE_MISMATCH_CODE,
+    SIM_AUDIO_UNSUPPORTED_CODEC_CODE, SimAudioArtifact, SimAudioCodecStatus,
+    SimAudioEqualizationBand, SimAudioMetadata, SimAudioNodeAdapter, SimAudioNodeDiagnostic,
+    SimAudioOperation, SimAudioSampleRange,
 };
 pub use sim_dependency_review::{
     DEFAULT_LARGE_DOWNLOAD_THRESHOLD_BYTES, DEPENDENCY_REVIEW_AUDIT_MISSING_CODE,
