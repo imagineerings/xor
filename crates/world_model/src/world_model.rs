@@ -6,6 +6,7 @@ pub mod comfy_execution_plan;
 pub mod comfy_execution_registry;
 pub mod comfy_executor;
 pub mod comfy_graph_validation;
+pub mod comfy_http_safety;
 pub mod comfy_latents;
 pub mod comfy_model_catalog;
 pub mod comfy_model_components;
@@ -50,6 +51,8 @@ mod comfy_execution_registry_tests;
 mod comfy_executor_tests;
 #[cfg(test)]
 mod comfy_graph_validation_tests;
+#[cfg(test)]
+mod comfy_http_safety_tests;
 #[cfg(test)]
 mod comfy_latents_tests;
 #[cfg(test)]
@@ -118,6 +121,11 @@ pub use comfy_executor::{
     ComfyNodeExecutor, ComfyNodeRuntime, ComfyUiOutput,
 };
 pub use comfy_graph_validation::{ComfyPromptGraphValidator, ComfyValidationCapabilities};
+pub use comfy_http_safety::{
+    ComfyApiNodeMode, ComfyCacheClass, ComfyContentDisposition, ComfyContentSecurityPolicy,
+    ComfyHttpSafetyDiagnostic, ComfyOriginCheck, ComfyPathRoots, ORIGIN_MISMATCH_CODE,
+    PATH_ESCAPE_CODE, UNKNOWN_ROOT_CODE,
+};
 pub use comfy_latents::{
     ComfyLatentRuntime, LatentArtifact, LatentCompressionKind, LatentCompressionMetadata,
     LatentMask, LatentMediaKind, LatentValidationDiagnostic,

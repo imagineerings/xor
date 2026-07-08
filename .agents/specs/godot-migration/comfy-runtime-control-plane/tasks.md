@@ -26,8 +26,9 @@ Build the control plane as a protocol adapter over Sim task, HTTP, WebSocket, me
   - _Requirements: 1.1, 1.2, 2.1, 3.2_
   - _writes: crates/world_model/src/comfy_control.rs, crates/world_model/src/comfy_control_tests.rs_
 
-- [ ] 2. Implement HTTP safety primitives
-  - Add origin checks, CSP mode selection, safe content-type handling, cache-control classification, and path confinement helpers.
+- [x] 2. Implement HTTP safety primitives
+  - Add origin checks, CSP mode selection, safe content-type handling, cache-control classification, and path confinement helpers as native Sim safety records.
+  - Reject loopback origin mismatches, executable view content, unknown roots, absolute paths, and parent-directory escapes before route handling rather than delegating safety to ComfyUI.
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
   - _writes: crates/world_model/src/comfy_http_safety.rs, crates/world_model/src/comfy_http_safety_tests.rs_
 

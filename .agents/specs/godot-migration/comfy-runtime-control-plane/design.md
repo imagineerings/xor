@@ -68,6 +68,13 @@ pub trait ComfyWebSocketAdapter {
 - **Purpose**: Preserve Comfy's local-server safety behavior while using Sim middleware.
 - **Responsibilities**: origin checks, CORS policy, CSP when API nodes are disabled, path confinement, safe content disposition, and cache-control classification.
 
+Task 2 implements the safety layer as native Sim primitives. Loopback browser
+requests validate host/origin before route handling, API-node mode selects an
+explicit content-security policy, executable view content is forced to a safe
+download type, cache-control is classified by response purpose, and file
+resolution rejects absolute paths or parent-directory escapes before joining
+against registered Sim roots.
+
 ## Data Models
 
 Task 1 defines these as native Sim protocol records in `crates/world_model`.
@@ -149,7 +156,7 @@ _For any_ upload, view, or download request, the resolved filesystem path SHALL 
 
 ## Testing Strategy
 
-- Unit tests for prompt id validation, native protocol records, `/api` alias routing, queue redaction, cancel classification, and path confinement.
+- Unit tests for prompt id validation, native protocol records, HTTP safety primitives, `/api` alias routing, queue redaction, cancel classification, and path confinement.
 - Integration tests for prompt submission through queue, job status transitions, WebSocket feature negotiation, progress events, and preview metadata negotiation.
 - Compatibility fixtures from `projects/comfy/script_examples` for basic HTTP prompt execution and WebSocket image retrieval.
 - Property tests for route alias equivalence and path traversal rejection.
