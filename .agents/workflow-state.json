@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T21:28:00Z",
+  "updated_at": "2026-07-08T21:45:00Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -700,6 +700,12 @@
       "status": "done",
       "summary": "Task 4: Added a CLI configuration wizard with provider/model/API-key/extension-path steps, text/secret/select/confirm/file input validation, stdin/stdout execution, settings-file persistence for agent.default_model plus CLI onboarding metadata, and sim configure dispatch.",
       "updated_at": "2026-07-08T21:28:00Z"
+    },
+    {
+      "task_identifier": ".agents/specs/goose-migration/text-ui/tasks.md:43",
+      "status": "done",
+      "summary": "Task 5: Added sim extension list/add/remove/status commands backed by a local JSON registry, with extension path registration, duplicate/remove validation, path/manifest status reporting, and focused command/storage tests.",
+      "updated_at": "2026-07-08T21:45:00Z"
     }
   ],
   "dependency_notes": [
@@ -755,8 +761,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/text-ui",
-      "summary": "Tasks 1-4 are checked complete. crates/cli now exposes an interactive session/input core, terminal rendering primitives, catalog-driven slash-command parsing/routing, and a sim configure wizard that persists provider/model setup into settings.json. Task 5 can replace the wizard's extension-path placeholder with concrete extension management commands.",
-      "updated_at": "2026-07-08T21:28:00Z"
+      "summary": "Tasks 1-5 are checked complete. crates/cli now exposes an interactive session/input core, terminal rendering primitives, slash-command routing, a sim configure wizard, and sim extension list/add/remove/status commands backed by a local extension registry. Task 6 can add first-run onboarding on top of configure and extension commands.",
+      "updated_at": "2026-07-08T21:45:00Z"
     },
     {
       "scope": ".agents/specs/godot-migration",

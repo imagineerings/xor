@@ -40,7 +40,7 @@ Implement an interactive terminal UI mode for sim's CLI using crossterm/ratatui,
   - _Requirements: 2_
   - _writes: crates/cli/src/commands/configure.rs_
 
-- [ ] 5. Implement extension management commands
+- [x] 5. Implement extension management commands
   - `goose extension list` — list installed extensions with status
   - `goose extension add <path>` — add extension
   - `goose extension remove <name>` — remove extension
