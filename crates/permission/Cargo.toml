@@ -1,0 +1,20 @@
+[package]
+name = "permission"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+license = "GPL-3.0-or-later"
+
+[lints]
+workspace = true
+
+[lib]
+path = "src/permission.rs"
+doctest = false
+
+[dependencies]
+anyhow.workspace = true
+sqlez.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

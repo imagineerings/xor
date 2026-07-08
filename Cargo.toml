@@ -163,6 +163,7 @@ members = [
     "crates/panel",
     "crates/paths",
     "crates/picker",
+    "crates/permission",
     "crates/platform_title_bar",
     "crates/plugins",
     "crates/posthog",
@@ -442,6 +443,7 @@ panel = { path = "crates/panel" }
 paths = { path = "crates/paths" }
 perf = { path = "tooling/perf" }
 picker = { path = "crates/picker" }
+permission = { path = "crates/permission" }
 prettier = { path = "crates/prettier" }
 settings_profile_selector = { path = "crates/settings_profile_selector" }
 project = { path = "crates/project" }

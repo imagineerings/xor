@@ -13000,6 +13000,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "permission"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "sqlez",
+ "tempfile",
+]
+
+[[package]]
 name = "pest"
 version = "2.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"

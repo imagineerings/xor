@@ -40,7 +40,7 @@ Implement the security inspection system (`crates/security/`) and permission sys
   - _Requirements: 4_
   - _writes: crates/security/src/scanner.rs, crates/security/src/security.rs_
 
-- [ ] 6. Implement permission store
+- [x] 6. Implement permission store
   - Persistent storage for permission decisions (SQLite/db)
   - Store tool name, args pattern, decision type, expiration
   - CRUD operations for stored decisions

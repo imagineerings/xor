@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T19:05:00Z",
+  "updated_at": "2026-07-08T19:18:00Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -646,6 +646,12 @@
       "status": "done",
       "summary": "Task 5: Added SecurityScanner aggregation over adversary, egress, and classification primitives with input/output scan methods, normalized findings/actions, redacted output propagation, configurable fail-open/fail-closed mode carried in results, default inspector construction, custom composition support, and focused unit coverage.",
       "updated_at": "2026-07-08T19:05:00Z"
+    },
+    {
+      "task_identifier": ".agents/specs/goose-migration/security-permissions/tasks.md:43",
+      "status": "done",
+      "summary": "Task 6: Added crates/permission with PermissionStore backed by sqlez/SQLite, migration-on-open table creation, StoredDecision/DecisionType models, record/get/list/delete/clear CRUD, wildcard args-pattern lookup with expiry filtering, memory/file open helpers, and persistence-focused unit coverage.",
+      "updated_at": "2026-07-08T19:18:00Z"
     }
   ],
   "dependency_notes": [
@@ -696,8 +702,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/security-permissions",
-      "summary": "Tasks 1-5 are checked complete. crates/security now provides PatternRegistry, AdversaryInspector, EgressInspector, ClassificationClient, and SecurityScanner aggregation with input/output scan methods, normalized findings/actions, redacted output propagation, and default/custom inspector composition. Permission system work can begin independently in crates/permission.",
-      "updated_at": "2026-07-08T19:05:00Z"
+      "summary": "Tasks 1-6 are checked complete. crates/security now provides PatternRegistry, AdversaryInspector, EgressInspector, ClassificationClient, and SecurityScanner aggregation. crates/permission now provides a sqlez/SQLite-backed PermissionStore with StoredDecision/DecisionType CRUD, expiry filtering, wildcard args-pattern lookup, and file-backed persistence tests. Task 7 can build inspector/judge logic on this store.",
+      "updated_at": "2026-07-08T19:18:00Z"
     },
     {
       "scope": ".agents/specs/godot-migration",
