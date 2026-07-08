@@ -28,7 +28,7 @@ Implement a TypeScript SDK as an npm package that provides programmatic access t
   - _Requirements: 2_
   - _writes: ui/sdk/src/stream.ts_
 
-- [ ] 4. Implement GooseClient
+- [x] 4. Implement GooseClient
   - Session management (create, list, get, delete)
   - Message sending (batch + streaming)
   - Agent status
