@@ -12,7 +12,7 @@ flowchart LR
     Policy --> Model[comfy-model-memory-runtime]
     Flags[SimFeatureFlagRegistry] --> Runtime[comfy-runtime-control-plane]
     Schema[SimApiSchemaCatalog] --> Tests[CompatibilityFixtureSuite]
-    Deps[SimDependencyReviewGate] --> Packaging[PackagingProfileCatalog]
+    Deps[SimDependencyReviewGate] --> Packaging[SimPackagingProfileCatalog]
     Logs[DiagnosticsAdapter] --> SimDiag[Sim Diagnostics]
 ```
 
@@ -66,6 +66,17 @@ flowchart LR
   dependency proposals into the gate, but approval and audit state are native
   Sim governance records rather than ComfyUI pass-through labels.
 
+### SimPackagingProfileCatalog
+
+- **Purpose**: Describe supported launch profile presets without owning
+  installer or platform packaging logic.
+- **Responsibilities**: CPU-only, GPU-specific, API-disabled,
+  custom-node-disabled, asset-enabled, portable-like, and remote-worker launch
+  profiles.
+- **Native behavior**: Emits `SimPackagingProfile*` records that configure
+  Sim launch/runtime options and explicitly delegate installer, bundle, and
+  platform distribution details to existing Sim packaging systems.
+
 ### DiagnosticsAdapter
 
 - **Purpose**: Expose logs and internal diagnostics through Sim diagnostics without making internal endpoints stable public API.
@@ -96,6 +107,10 @@ pub struct SimApiSchemaCatalog {
 pub struct SimDependencyReviewGate {
     pub reviews: BTreeMap<String, SimDependencyReviewRecord>,
     pub audit_records: Vec<SimDependencyAuditRecord>,
+}
+
+pub struct SimPackagingProfileCatalog {
+    pub profiles: Vec<SimPackagingProfile>,
 }
 
 pub enum ComfyRouteSupport {

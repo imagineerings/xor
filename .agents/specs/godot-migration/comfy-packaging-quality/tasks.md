@@ -52,10 +52,11 @@ Build cross-cutting migration controls that other Comfy specs depend on: launch 
   - _Requirements: 5.1, 5.3_
   - _writes: crates/world_model/src/sim_dependency_review.rs, crates/world_model/src/sim_dependency_review_tests.rs_
 
-- [ ] 6. Add packaging profile catalog
+- [x] 6. Add packaging profile catalog
   - Define CPU-only, GPU-specific, API-disabled, custom-node-disabled, asset-enabled, portable-like, and remote-worker launch profiles without duplicating platform packaging.
+  - Represent catalog entries with native `SimPackagingProfile*` records and keep installer/platform packaging delegated to existing Sim systems.
   - _Requirements: 5.2_
-  - _writes: crates/world_model/src/comfy_packaging_profiles.rs, crates/world_model/src/comfy_packaging_profiles_tests.rs_
+  - _writes: crates/world_model/src/sim_packaging_profiles.rs, crates/world_model/src/sim_packaging_profiles_tests.rs_
 
 - [ ] 7. Implement logs and internal diagnostics adapter
   - Expose formatted/raw logs, terminal size metadata, approved folder paths, and recent input/output/temp files through Sim diagnostics.

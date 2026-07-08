@@ -60,6 +60,7 @@ pub mod sim_assets;
 pub mod sim_dependency_review;
 pub mod sim_feature_flags;
 pub mod sim_launch_profile;
+pub mod sim_packaging_profiles;
 pub mod sim_user_data;
 pub mod worker_launcher;
 
@@ -161,6 +162,8 @@ mod sim_dependency_review_tests;
 mod sim_feature_flags_tests;
 #[cfg(test)]
 mod sim_launch_profile_tests;
+#[cfg(test)]
+mod sim_packaging_profiles_tests;
 #[cfg(test)]
 mod sim_user_data_tests;
 #[cfg(test)]
@@ -414,6 +417,14 @@ pub use sim_launch_profile::{
     SimLaunchDiagnostic, SimLaunchDiagnosticSeverity, SimLaunchProfile, SimLaunchProfileParser,
     SimLoggingLaunchOptions, SimManagerLaunchOptions, SimNetworkLaunchOptions,
     SimPerformanceLaunchOptions,
+};
+pub use sim_packaging_profiles::{
+    SIM_PACKAGING_PROFILE_API_DISABLED, SIM_PACKAGING_PROFILE_ASSET_ENABLED,
+    SIM_PACKAGING_PROFILE_CPU_ONLY, SIM_PACKAGING_PROFILE_CUDA_GPU,
+    SIM_PACKAGING_PROFILE_CUSTOM_NODE_DISABLED, SIM_PACKAGING_PROFILE_METAL_GPU,
+    SIM_PACKAGING_PROFILE_PORTABLE_LIKE, SIM_PACKAGING_PROFILE_REMOTE_WORKER,
+    SimPackagingExecutionTarget, SimPackagingProfile, SimPackagingProfileCatalog,
+    SimPackagingProfileKind, SimPackagingScope,
 };
 pub use sim_user_data::{
     SimUserDataDiagnostic, SimUserDataEntry, SimUserDataPathParts, SimUserDataStore,
