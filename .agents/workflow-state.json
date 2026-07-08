@@ -311,6 +311,12 @@
       "updated_at": "2026-07-08T12:44:53Z"
     },
     {
+      "task_identifier": ".agents/specs/goose-migration/mcp-tools/tasks.md:9",
+      "status": "done",
+      "summary": "Task 1: Added crates/mcp_runner with shared MCP command/stdio transport config, process lifecycle state, health checks, crash recovery policy, and fake-process lifecycle tests.",
+      "updated_at": "2026-07-08T12:51:45Z"
+    },
+    {
       "task_identifier": ".agents/specs/ci-migration/tasks.md",
       "status": "deprioritized",
       "summary": "All tasks in .agents/specs/ci-migration are deprioritized until every other local workflow task is complete. Do not select CI migration work while non-CI tasks remain available.",
@@ -343,6 +349,11 @@
       "scope": ".agents/specs/goose-migration/evaluation",
       "summary": "Tasks 1-6 are checked complete. The evaluation slice now has Harbor scenario definitions, runner/assertion/reporting, deterministic MockProvider record/replay, ModelGym comparisons, agent scenario recording/replay tests, agent benchmark JSON/criterion entry points, and validation coverage for the delivered behavior.",
       "updated_at": "2026-07-08T12:44:53Z"
+    },
+    {
+      "scope": ".agents/specs/goose-migration/mcp-tools",
+      "summary": "Task 1 is checked complete. Remaining MCP server crates can depend on crates/mcp_runner for shared command, stdio transport, lifecycle status, health check, and crash recovery policy types.",
+      "updated_at": "2026-07-08T12:51:45Z"
     },
     {
       "scope": ".agents/specs/godot-migration",

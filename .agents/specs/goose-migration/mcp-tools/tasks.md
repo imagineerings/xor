@@ -6,7 +6,7 @@ Implement the MCP tool servers from goose as a combination of native agent tools
 
 ## Tasks
 
-- [ ] 1. Create shared MCP server runner library
+- [x] 1. Create shared MCP server runner library
   - Extract the subprocess MCP server runner pattern into a shared utility
   - Handle process lifecycle, stdio transport, health checks, crash recovery
   - _Requirements: 6_
