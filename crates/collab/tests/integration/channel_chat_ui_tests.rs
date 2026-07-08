@@ -167,6 +167,20 @@ async fn test_channel_chat_emoji_picker_adds_reaction(
     );
 
     chat.update_in(cx_a, |chat, window, cx| {
+        chat.set_emoji_search_for_test("skin", window, cx);
+    });
+    assert_eq!(
+        chat.read_with(cx_a, |chat, cx| chat.emoji_picker_labels_for_test(cx)),
+        vec![
+            "👍🏻 thumbs_up_light_skin_tone".to_string(),
+            "👍🏼 thumbs_up_medium_light_skin_tone".to_string(),
+            "👍🏽 thumbs_up_medium_skin_tone".to_string(),
+            "👍🏾 thumbs_up_medium_dark_skin_tone".to_string(),
+            "👍🏿 thumbs_up_dark_skin_tone".to_string(),
+        ]
+    );
+
+    chat.update_in(cx_a, |chat, window, cx| {
         chat.set_emoji_search_for_test("definitely-not-an-emoji", window, cx);
     });
     assert!(chat.read_with(cx_a, |chat, cx| chat.emoji_picker_empty_for_test(cx)));

@@ -76,6 +76,31 @@ const EMOJI_DEFINITIONS: &[EmojiDefinition] = &[
         keywords: &["approve", "yes", "like", "plus"],
     },
     EmojiDefinition {
+        name: "thumbs_up_light_skin_tone",
+        character: "👍🏻",
+        keywords: &["approve", "yes", "like", "plus", "skin", "tone"],
+    },
+    EmojiDefinition {
+        name: "thumbs_up_medium_light_skin_tone",
+        character: "👍🏼",
+        keywords: &["approve", "yes", "like", "plus", "skin", "tone"],
+    },
+    EmojiDefinition {
+        name: "thumbs_up_medium_skin_tone",
+        character: "👍🏽",
+        keywords: &["approve", "yes", "like", "plus", "skin", "tone"],
+    },
+    EmojiDefinition {
+        name: "thumbs_up_medium_dark_skin_tone",
+        character: "👍🏾",
+        keywords: &["approve", "yes", "like", "plus", "skin", "tone"],
+    },
+    EmojiDefinition {
+        name: "thumbs_up_dark_skin_tone",
+        character: "👍🏿",
+        keywords: &["approve", "yes", "like", "plus", "skin", "tone"],
+    },
+    EmojiDefinition {
         name: "heart",
         character: "❤️",
         keywords: &["love", "favorite", "like"],
@@ -619,7 +644,8 @@ impl ChannelChat {
             .to_ascii_lowercase();
         let mut emoji_options = EMOJI_DEFINITIONS
             .iter()
-            .filter(|emoji| {
+            .enumerate()
+            .filter(|(_, emoji)| {
                 query.is_empty()
                     || emoji.name.contains(&query)
                     || emoji
@@ -629,13 +655,15 @@ impl ChannelChat {
             })
             .collect::<Vec<_>>();
 
-        emoji_options.sort_by_key(|emoji| {
-            self.recent_emoji_names
+        emoji_options.sort_by_key(|(emoji_index, emoji)| {
+            let recent_rank = self
+                .recent_emoji_names
                 .iter()
                 .position(|recent| recent == emoji.name)
-                .unwrap_or(MAX_RECENT_EMOJIS + emoji.name.len())
+                .unwrap_or(MAX_RECENT_EMOJIS);
+            (recent_rank, *emoji_index)
         });
-        emoji_options
+        emoji_options.into_iter().map(|(_, emoji)| emoji).collect()
     }
 
     fn open_emoji_picker(&mut self, message_id: u64, window: &mut Window, cx: &mut Context<Self>) {
