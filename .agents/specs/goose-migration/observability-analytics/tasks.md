@@ -70,7 +70,7 @@ Extend sim's observability infrastructure with Langfuse tracing, OpenTelemetry O
   - _Requirements: 1-8_
   - _writes: crates/agent/src/observability_integration.rs_
 
-- [ ] 9. Write tests
+- [x] 9. Write tests
   - Token counter accuracy with known texts
   - Rate limiter burst and window behavior
   - Observation layer capture and export

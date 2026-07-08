@@ -12,6 +12,7 @@ case "$mode" in
     node scripts/diagnostics-viewer.js --help >/dev/null
     scripts/test-misc-services.sh
     scripts/test-mcp-servers.sh
+    scripts/test-observability-analytics.sh
     ;;
   full)
     scripts/prerelease-check.sh quick

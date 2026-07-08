@@ -610,6 +610,12 @@
       "status": "done",
       "summary": "Task 8: Added agent AgentObservability integration layer that composes token estimation for LanguageModelRequest messages, ObservationLayer recording for agent turns/LLM requests/tool calls, ToolMonitor stats, ToolInspector descriptors, and optional sanitized PostHog event capture.",
       "updated_at": "2026-07-08T17:56:00Z"
+    },
+    {
+      "task_identifier": ".agents/specs/goose-migration/observability-analytics/tasks.md:73",
+      "status": "done",
+      "summary": "Task 9: Added observability analytics validation script covering token counter, rate limiter, Langfuse/OTLP, observation, PostHog, tool monitor, tool inspector, and AgentObservability integration tests, and wired it into prerelease quick checks.",
+      "updated_at": "2026-07-08T18:12:00Z"
     }
   ],
   "dependency_notes": [
@@ -655,8 +661,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/observability-analytics",
-      "summary": "Tasks 1-8 are checked complete. language_model_core exposes model-aware token counting and optional token-bucket request limiting, language_models has provider default rate-limit configuration, telemetry has configurable Langfuse/OTLP backend foundations plus an observation layer, crates/posthog provides sanitized product analytics capture, and agent now has monitor/inspector primitives plus AgentObservability integration helpers. Slice tests remain.",
-      "updated_at": "2026-07-08T17:56:00Z"
+      "summary": "Tasks 1-9 are checked complete. language_model_core exposes model-aware token counting and optional token-bucket request limiting, language_models has provider default rate-limit configuration, telemetry has configurable Langfuse/OTLP backend foundations plus an observation layer, crates/posthog provides sanitized product analytics capture, agent has monitor/inspector primitives plus AgentObservability integration helpers, and scripts/test-observability-analytics.sh validates the slice from prerelease quick checks.",
+      "updated_at": "2026-07-08T18:12:00Z"
     },
     {
       "scope": ".agents/specs/godot-migration",
