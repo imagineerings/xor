@@ -7,8 +7,8 @@ use std::{
 use pretty_assertions::assert_eq;
 
 use crate::{
-    SimGameMigrationInventory, SimGameSourcePath, MigrationDecision, MigrationInventory,
-    MigrationSourceArea, MigrationSpecCoverage, MigrationValidationError,
+    MigrationDecision, MigrationInventory, MigrationSourceArea, MigrationSpecCoverage,
+    MigrationValidationError, SimGameMigrationInventory, SimGameSourcePath,
 };
 
 #[test]

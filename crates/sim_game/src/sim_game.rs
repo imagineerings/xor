@@ -3,6 +3,7 @@ pub mod diagnostics;
 pub mod fixtures;
 pub mod integration;
 pub mod inventory;
+pub mod media;
 pub mod migration;
 pub mod parser;
 pub mod spec_gatekeeper;
@@ -15,6 +16,8 @@ mod fixtures_tests;
 mod integration_tests;
 #[cfg(test)]
 mod inventory_tests;
+#[cfg(test)]
+mod media_tests;
 #[cfg(test)]
 mod parser_tests;
 #[cfg(test)]
@@ -30,15 +33,16 @@ pub use diagnostics::{
 };
 pub use fixtures::{FixtureAttribution, FixtureLicense, FixtureManifest, FixtureSource};
 pub use integration::{
-    ExternalGameTaskProvider, GameAssetPreviewRoute, SimScriptLanguageConfig, PreviewKind,
+    ExternalGameTaskProvider, GameAssetPreviewRoute, PreviewKind, SimScriptLanguageConfig,
     default_game_preview_routes, default_game_task_providers, detect_game_project_roots,
-    simscript_language_config, is_game_project_manifest, target_project_format,
+    is_game_project_manifest, simscript_language_config, target_project_format,
 };
 pub use inventory::{
     MigrationDecision, MigrationInventory, MigrationSourceArea, MigrationSpecCoverage,
     MigrationValidationError, MigrationValidationReport, SimGameMigrationInventory,
     SimGameSourcePath,
 };
+pub use media::{SimGameMediaClassification, SimGameMediaClassifier, SimGameMediaKind};
 pub use migration::{
     RuntimeBoundaryDecision, SimGameFeatureArea, SimGameMetadata, SimGameProjectDescriptor,
     SimGameProjectFormat, SimGameSourceReference,

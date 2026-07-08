@@ -247,8 +247,7 @@ impl SimGameMigrationInventory for MigrationInventory {
             .max_by_key(|source_area| source_area.source.as_path().components().count())
             .map(|source_area| source_area.decision.clone())
             .unwrap_or(MigrationDecision::Excluded {
-                reason: "Source area is not listed in the Sim game migration inventory"
-                    .to_string(),
+                reason: "Source area is not listed in the Sim game migration inventory".to_string(),
             })
     }
 }

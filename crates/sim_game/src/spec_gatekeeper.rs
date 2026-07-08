@@ -7,8 +7,8 @@ use std::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    SimGameMigrationInventory, MigrationInventory, MigrationValidationError,
-    MigrationValidationReport,
+    MigrationInventory, MigrationValidationError, MigrationValidationReport,
+    SimGameMigrationInventory,
 };
 
 // ---------------------------------------------------------------------------

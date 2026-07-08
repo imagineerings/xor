@@ -4,11 +4,14 @@
 
 Reuse Sim media, image, shader-language, and preview infrastructure. Treat world-model outputs as generated artifacts with provenance.
 
+Rendering and media support is a native Sim feature. Godot media files are classified into Sim preview decisions with explicit unsupported reasons, while world-model outputs route through `GeneratedMedia*` records that require provenance metadata instead of delegating to Godot render/audio/text servers or Comfy preview pass-throughs.
+
 ## Components
 
+- `SimGameMediaClassification`
 - `SimGameMediaClassifier`
 - `GeneratedMediaPreviewRoute`
-- `UnsupportedPreviewReason`
+- `GeneratedMediaPreviewDiagnostic`
 
 ## Correctness Properties
 

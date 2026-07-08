@@ -3,9 +3,8 @@ use std::path::Path;
 use pretty_assertions::assert_eq;
 
 use crate::{
-    SimGameFeatureArea, SimGameMetadata, SimGameProjectDescriptor,
-    SimGameProjectFormat, SimGameSourceReference, RuntimeBoundaryDecision,
-    migration::is_godot_compatible_manifest,
+    RuntimeBoundaryDecision, SimGameFeatureArea, SimGameMetadata, SimGameProjectDescriptor,
+    SimGameProjectFormat, SimGameSourceReference, migration::is_godot_compatible_manifest,
 };
 
 #[test]

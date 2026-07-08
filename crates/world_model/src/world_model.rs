@@ -50,6 +50,7 @@ pub mod comfy_ws;
 pub mod controls;
 pub mod graph;
 pub mod graph_validation;
+pub mod media_artifacts;
 pub mod mesh;
 pub mod provenance;
 pub mod request;
@@ -175,6 +176,8 @@ mod comfy_ws_tests;
 mod controls_tests;
 #[cfg(test)]
 mod graph_tests;
+#[cfg(test)]
+mod media_artifacts_tests;
 #[cfg(test)]
 mod mesh_tests;
 #[cfg(test)]
@@ -455,6 +458,11 @@ pub use controls::{ControlKeyGroup, ControlParseError, WorldActionControlParser}
 pub use graph::{DataType, DiffusionGraph, GraphEdge, GraphNode, NodePort, PortDirection};
 pub use graph_validation::{
     DefaultGraphValidator, DiffusionGraphValidator, GraphValidationError, GraphValidationResult,
+};
+pub use media_artifacts::{
+    GENERATED_MEDIA_MISSING_PREVIEW_CODE, GENERATED_MEDIA_UNSUPPORTED_PREVIEW_CODE,
+    GeneratedMediaPreviewDiagnostic, GeneratedMediaPreviewKind, GeneratedMediaPreviewRoute,
+    GeneratedMediaPreviewRouter,
 };
 pub use mesh::{
     BackendOptions, MeshArtifactMetadata, MeshBackend, MeshFormat, MeshGenerationRequest,

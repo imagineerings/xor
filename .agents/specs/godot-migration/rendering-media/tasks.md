@@ -19,7 +19,8 @@ Route generated outputs through existing Sim preview/media systems first; Godot 
 
 ## Tasks
 
-- [ ] 1. Add Godot media and generated-output preview routing
+- [x] 1. Add Godot media and generated-output preview routing
   - Classify media files, preserve unsupported reasons, and route generated media with provenance.
+  - Represent media classification and generated preview routing with native Sim `SimGameMedia*` and `GeneratedMedia*` records.
   - _Requirements: 1.1, 2.1, 2.2, 3.1_
   - _writes: crates/sim_game/src/media.rs, crates/world_model/src/media_artifacts.rs, crates/sim_game/src/media_tests.rs_

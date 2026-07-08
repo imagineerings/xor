@@ -1,12 +1,12 @@
 use std::path::Path;
 
 use crate::{
-    SimGameFeatureArea, SimGameMetadata, SimGameMigrationInventory,
-    SimGameProjectDescriptor, SimGameSourcePath, SimGameSourceReference,
     DefaultBoundaryPolicy, DiagnosticCollection, DiagnosticSeverity, FixtureAttribution,
     FixtureLicense, FixtureSource, LineIndexer, MigrationDecision, MigrationInventory,
     MigrationSourceArea, MigrationSpecCoverage, ParseResult, ParserContext,
-    RuntimeBoundaryDecision, RuntimeBoundaryPolicy, SourceDiagnostic, SourcePosition, SourceRange,
+    RuntimeBoundaryDecision, RuntimeBoundaryPolicy, SimGameFeatureArea, SimGameMetadata,
+    SimGameMigrationInventory, SimGameProjectDescriptor, SimGameSourcePath, SimGameSourceReference,
+    SourceDiagnostic, SourcePosition, SourceRange,
 };
 
 // ---------------------------------------------------------------------------
@@ -17,8 +17,7 @@ use crate::{
 fn detects_godot_project_and_creates_metadata() {
     // Simulate finding a project.godot manifest and creating metadata.
     let manifest_path = Path::new("/workspace/my-game/project.godot");
-    let descriptor =
-        SimGameProjectDescriptor::from_godot_compatible_manifest_path(manifest_path);
+    let descriptor = SimGameProjectDescriptor::from_godot_compatible_manifest_path(manifest_path);
     assert!(
         descriptor.is_some(),
         "Expected descriptor for project.godot"
