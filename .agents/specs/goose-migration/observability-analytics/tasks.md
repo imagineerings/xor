@@ -39,7 +39,7 @@ Extend sim's observability infrastructure with Langfuse tracing, OpenTelemetry O
   - _Requirements: 3_
   - _writes: crates/telemetry/src/observation.rs_
 
-- [ ] 5. Extend existing provider rate limiter
+- [x] 5. Extend existing provider rate limiter
   - Audit current semaphore-based `language_model_core::RateLimiter`
   - Add token-bucket or sliding-window behavior only if Goose requires rate-over-time enforcement
   - Add per-provider configuration for limits

@@ -114,7 +114,7 @@ impl OpenAiLanguageModelProvider {
             model,
             state: self.state.clone(),
             http_client: self.http_client.clone(),
-            request_limiter: RateLimiter::new(4),
+            request_limiter: super::rate_limits::default_rate_limiter(&PROVIDER_ID),
         })
     }
 

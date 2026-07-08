@@ -586,6 +586,12 @@
       "status": "done",
       "summary": "Task 4: Added telemetry ObservationLayer with circular-buffer storage for agent turns, tool calls, and LLM requests, duration/success/token metadata, and export helpers for Langfuse and OTLP backends with focused unit coverage.",
       "updated_at": "2026-07-08T16:59:00Z"
+    },
+    {
+      "task_identifier": ".agents/specs/goose-migration/observability-analytics/tasks.md:42",
+      "status": "done",
+      "summary": "Task 5: Extended language_model_core RateLimiter with optional request-per-minute token-bucket behavior, burst allowances, status reporting, and provider default configuration for OpenAI and Anthropic while preserving existing concurrency-only behavior.",
+      "updated_at": "2026-07-08T17:16:00Z"
     }
   ],
   "dependency_notes": [
@@ -631,8 +637,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/observability-analytics",
-      "summary": "Tasks 1-4 are checked complete. language_model_core exposes model-aware token counting with tiktoken-rs plus fallback counting, and telemetry now has configurable Langfuse and OTLP backend foundations plus an observation layer for agent turns, tool calls, and LLM requests with backend export helpers. Rate limiter extensions, PostHog, tool monitor/inspector, integration, and slice tests remain.",
-      "updated_at": "2026-07-08T16:59:00Z"
+      "summary": "Tasks 1-5 are checked complete. language_model_core exposes model-aware token counting and an optional token-bucket request limiter with burst/status support, language_models has provider default rate-limit configuration, and telemetry now has configurable Langfuse/OTLP backend foundations plus an observation layer. PostHog, tool monitor/inspector, integration, and slice tests remain.",
+      "updated_at": "2026-07-08T17:16:00Z"
     },
     {
       "scope": ".agents/specs/godot-migration",

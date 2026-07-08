@@ -35,6 +35,7 @@ pub mod open_ai_compatible;
 pub mod open_router;
 pub mod openai_subscribed;
 pub mod opencode;
+pub mod rate_limits;
 pub mod registry;
 pub mod sagemaker_tgi;
 pub mod snowflake;

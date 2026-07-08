@@ -9878,6 +9878,7 @@ name = "language_model_core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-io",
  "async-lock",
  "cloud_llm_client",
  "futures 0.3.32",
@@ -9888,6 +9889,7 @@ dependencies = [
  "schemars 1.2.1",
  "serde",
  "serde_json",
+ "smol",
  "strum 0.27.2",
  "thiserror 2.0.18",
  "tiktoken-rs",
