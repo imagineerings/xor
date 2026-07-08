@@ -224,9 +224,16 @@ impl DraftStore {
         else {
             return Ok(None);
         };
-        serde_json::from_str(&payload)
-            .map(Some)
+        match serde_json::from_str(&payload)
             .context("deserializing channel draft")
+            .log_err()
+        {
+            Some(draft) => Ok(Some(draft)),
+            None => {
+                self.delete_from_kvp(channel_id).await?;
+                Ok(None)
+            }
+        }
     }
 
     async fn delete_from_kvp(&self, channel_id: ChannelId) -> Result<()> {
@@ -281,8 +288,12 @@ impl DraftStore {
             let Some(channel_id) = Self::channel_id_from_persist_key(&key) else {
                 continue;
             };
-            let draft = serde_json::from_str(&payload).context("deserializing channel draft")?;
-            drafts.insert(channel_id, draft);
+            if let Some(draft) = serde_json::from_str(&payload)
+                .with_context(|| format!("deserializing channel draft {key}"))
+                .log_err()
+            {
+                drafts.insert(channel_id, draft);
+            }
         }
         Ok(drafts)
     }
@@ -435,6 +446,31 @@ mod tests {
     }
 
     #[gpui::test]
+    async fn load_draft_discards_corrupt_kvp_entry() {
+        let kvp = KeyValueStore::open_test_db("draft_store_corrupt_load").await;
+        let channel_id = ChannelId(7);
+        kvp.scoped(DRAFT_NAMESPACE)
+            .write(
+                DraftStore::persist_key(channel_id),
+                "not valid json".to_string(),
+            )
+            .await
+            .expect("write corrupt draft");
+        let mut store = DraftStore::new(kvp.clone());
+
+        assert_eq!(
+            store.load_draft(channel_id).await.expect("load draft"),
+            None
+        );
+        assert_eq!(
+            kvp.scoped(DRAFT_NAMESPACE)
+                .read(&DraftStore::persist_key(channel_id))
+                .expect("read corrupt draft"),
+            None
+        );
+    }
+
+    #[gpui::test]
     async fn cached_draft_returns_in_memory_body() {
         let mut store = DraftStore::memory_only();
         let channel_id = ChannelId(7);
@@ -567,5 +603,36 @@ mod tests {
                 .expect("read drafts")
                 .is_empty()
         );
+    }
+
+    #[gpui::test]
+    async fn read_all_from_kvp_ignores_corrupt_entries() {
+        let kvp = KeyValueStore::open_test_db("draft_store_corrupt_read_all").await;
+        let valid_channel_id = ChannelId(1);
+        let corrupt_channel_id = ChannelId(2);
+        let valid_draft = Draft {
+            body: "valid draft".to_string(),
+            updated_at: Utc::now(),
+        };
+        kvp.scoped(DRAFT_NAMESPACE)
+            .write(
+                DraftStore::persist_key(valid_channel_id),
+                serde_json::to_string(&valid_draft).expect("serialize draft"),
+            )
+            .await
+            .expect("write valid draft");
+        kvp.scoped(DRAFT_NAMESPACE)
+            .write(
+                DraftStore::persist_key(corrupt_channel_id),
+                "not valid json".to_string(),
+            )
+            .await
+            .expect("write corrupt draft");
+
+        let drafts = DraftStore::read_all_from_kvp(&kvp).expect("read drafts");
+
+        assert_eq!(drafts.len(), 1);
+        assert_eq!(drafts.get(&valid_channel_id), Some(&valid_draft));
+        assert!(!drafts.contains_key(&corrupt_channel_id));
     }
 }

@@ -102,12 +102,14 @@ Add client-side draft persistence for channel message composition. When a user t
   - _writes: `crates/collab_ui/src/draft_store.rs`_
   - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui draft_store --features test-support`_
 
-- [ ] 10. Add error handling and logging
-  - Wrap KVP read/write calls and log warnings on failure (draft stays in memory only on write failure; compose area starts empty on read failure).
+- [x] 10. Add error handling and logging
+  - KVP write failures from background saves propagate to the detached task and are logged while the in-memory draft remains available.
+  - KVP read failures are surfaced with context; corrupt draft JSON is logged, skipped, and removed when loading a specific channel draft.
   - Handle corrupt draft JSON: discard the corrupt entry, log error, return `None`.
-  - Handle concurrent channel switching: ensure per-channel serialization — if a save is in-flight for a channel when a new save is requested, cancel the prior task and start fresh.
+  - Handle concurrent channel switching: `ChannelChat` replaces the pending debounced save task on each edit, canceling the prior in-flight save for that channel before starting fresh.
   - _Requirements: 7.1, 7.4_
-  - _writes: `crates/collab_ui/src/draft_store.rs`, `crates/collab_ui/src/channel_view.rs`_
+  - _writes: `crates/collab_ui/src/draft_store.rs`, `crates/collab_ui/src/channel_chat.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui draft_store --features test-support`_
 
 ### Phase 6: Tests
 
