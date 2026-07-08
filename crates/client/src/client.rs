@@ -1950,6 +1950,8 @@ pub enum SimLink {
         channel_id: u64,
         heading: Option<String>,
     },
+    /// Import a local shared session: `sim://session/<encoded-session>`.
+    SharedSession { data: String },
 }
 
 /// Parses the given link into a Sim link.
@@ -1969,30 +1971,39 @@ pub fn parse_sim_link(link: &str, cx: &App) -> Option<SimLink> {
 
     let mut parts = path.split('/');
 
-    if parts.next() != Some("channel") {
-        return None;
-    }
+    match parts.next()? {
+        "channel" => {
+            let slug = parts.next()?;
+            let id_str = slug.split('-').next_back()?;
+            let channel_id = id_str.parse::<u64>().ok()?;
 
-    let slug = parts.next()?;
-    let id_str = slug.split('-').next_back()?;
-    let channel_id = id_str.parse::<u64>().ok()?;
+            let Some(next) = parts.next() else {
+                return Some(SimLink::Channel { channel_id });
+            };
 
-    let Some(next) = parts.next() else {
-        return Some(SimLink::Channel { channel_id });
-    };
+            if let Some(heading) = next.strip_prefix("notes#") {
+                return Some(SimLink::ChannelNotes {
+                    channel_id,
+                    heading: Some(heading.to_string()),
+                });
+            }
 
-    if let Some(heading) = next.strip_prefix("notes#") {
-        return Some(SimLink::ChannelNotes {
-            channel_id,
-            heading: Some(heading.to_string()),
-        });
-    }
-
-    if next == "notes" {
-        return Some(SimLink::ChannelNotes {
-            channel_id,
-            heading: None,
-        });
+            if next == "notes" {
+                return Some(SimLink::ChannelNotes {
+                    channel_id,
+                    heading: None,
+                });
+            }
+        }
+        "session" => {
+            let data = parts.next()?;
+            if !data.is_empty() && parts.next().is_none() {
+                return Some(SimLink::SharedSession {
+                    data: data.to_string(),
+                });
+            }
+        }
+        _ => {}
     }
 
     None

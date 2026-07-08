@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T23:56:00Z",
+  "updated_at": "2026-07-08T23:57:00Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -292,6 +292,17 @@
       "owner": null,
       "summary": "Implemented locally with a GPUI GooseDiagnosticsView backed by crates/doctor checks, pass/warning/fail summaries, expandable remediation details, startup auto-run, manual re-run, doctor result logging, and an AgentPanel diagnostics overlay/menu entry. Ready to merge in PR.",
       "updated_at": "2026-07-08T23:56:00Z"
+    },
+    {
+      "task_id": "task:goose-desktop-ui-5",
+      "task_identifier": ".agents/specs/goose-migration/desktop-ui/tasks.md:48",
+      "title": "Implement shared session support",
+      "linear_identifier": null,
+      "linear_url": null,
+      "status": "inactive",
+      "owner": null,
+      "summary": "Implemented locally with versioned SharedSessionData wrapping SharedThread export/import, sim://session deeplink parsing through parse_sim_link, an OpenRequestKind route, and a sim shared-session handler that saves imported sessions into ThreadStore and opens them in AgentPanel. Ready to merge in PR.",
+      "updated_at": "2026-07-08T23:57:00Z"
     }
   ],
   "task_notes": [
@@ -828,8 +839,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/desktop-ui",
-      "summary": "Tasks 1-4 are checked complete. Agent connection state exposes ACP metadata; agent_ui has RecipeBrowser and GooseDiagnosticsView GPUI components; settings_ui has SchedulingSettings; diagnostics now run crates/doctor checks with pass/warning/fail summaries, expandable remediation, logging, auto-run, manual re-run, and AgentPanel overlay access. Task 5 can proceed with shared session support.",
-      "updated_at": "2026-07-08T23:56:00Z"
+      "summary": "Tasks 1-5 are checked complete. Agent connection state exposes ACP metadata; agent_ui has RecipeBrowser and GooseDiagnosticsView GPUI components; settings_ui has SchedulingSettings; diagnostics now run crates/doctor checks with pass/warning/fail summaries, expandable remediation, logging, auto-run, manual re-run, and AgentPanel overlay access; agent/sim support versioned shared-session export/import and sim://session deeplinks. Task 6 can proceed with agent panel integration.",
+      "updated_at": "2026-07-08T23:57:00Z"
     },
     {
       "scope": ".agents/specs/godot-migration",

@@ -30,9 +30,7 @@ use util::debug_panic;
 use util::paths::PathWithPosition;
 use workspace::PathList;
 use workspace::item::ItemHandle;
-use workspace::{
-    AppState, MultiWorkspace, OpenOptions, OpenResult, SerialisimWorkspaceLocation,
-};
+use workspace::{AppState, MultiWorkspace, OpenOptions, OpenResult, SerialisimWorkspaceLocation};
 
 #[derive(Default, Debug)]
 pub struct OpenRequest {
@@ -63,6 +61,9 @@ pub enum OpenRequestKind {
     },
     SharedAgentThread {
         session_id: String,
+    },
+    SharedSession {
+        data: String,
     },
     InstallSkill {
         /// Full `SKILL.md` contents embedded in a `sim://skill` share link.
@@ -104,6 +105,10 @@ impl std::fmt::Debug for OpenRequestKind {
             Self::SharedAgentThread { session_id } => f
                 .debug_struct("SharedAgentThread")
                 .field("session_id", session_id)
+                .finish(),
+            Self::SharedSession { data } => f
+                .debug_struct("SharedSession")
+                .field("data_len", &data.len())
                 .finish(),
             Self::InstallSkill { content } => f
                 .debug_struct("InstallSkill")
@@ -220,6 +225,9 @@ impl OpenRequest {
                         heading,
                     } => {
                         this.open_channel_notes.push((channel_id, heading));
+                    }
+                    SimLink::SharedSession { data } => {
+                        this.kind = Some(OpenRequestKind::SharedSession { data });
                     }
                 }
             } else {
@@ -1564,6 +1572,30 @@ mod tests {
         });
 
         assert!(request.kind.is_none());
+    }
+
+    #[gpui::test]
+    fn test_parse_local_shared_session_url(cx: &mut TestAppContext) {
+        let _app_state = init_test(cx);
+        let data = "abc123-_";
+
+        let request = cx.update(|cx| {
+            OpenRequest::parse(
+                RawOpenRequest {
+                    urls: vec![format!("sim://session/{data}")],
+                    ..Default::default()
+                },
+                cx,
+            )
+            .unwrap()
+        });
+
+        match request.kind {
+            Some(OpenRequestKind::SharedSession { data: parsed_data }) => {
+                assert_eq!(parsed_data, data);
+            }
+            _ => panic!("Expected SharedSession kind"),
+        }
     }
 
     #[gpui::test]

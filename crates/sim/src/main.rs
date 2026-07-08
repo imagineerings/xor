@@ -1158,6 +1158,15 @@ fn handle_open_request(request: OpenRequest, app_state: Arc<AppState>, cx: &mut 
                 })
                 .detach_and_log_err(cx);
             }
+            OpenRequestKind::SharedSession { data } => {
+                cx.spawn(async move |cx| {
+                    crate::sim::shared_session_handler::import_shared_session_from_link(
+                        app_state, data, cx,
+                    )
+                    .await
+                })
+                .detach_and_log_err(cx);
+            }
             OpenRequestKind::InstallSkill { content } => {
                 cx.spawn(async move |cx| {
                     let multi_workspace =

@@ -45,7 +45,7 @@ Build GPUI-native views for recipe browsing, scheduling, diagnostics, shared ses
   - _Requirements: 4_
   - _writes: crates/agent_ui/src/diagnostics.rs, crates/agent_ui/src/agent_panel.rs_
 
-- [ ] 5. Implement shared session support
+- [x] 5. Implement shared session support
   - Export session as shareable data (serialized JSON)
   - Import session from deeplink or file
   - Deeplink handler integration with `parse_sim_link`
