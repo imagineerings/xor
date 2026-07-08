@@ -55,8 +55,8 @@ Implement Comfy model-execution semantics after model catalogs and graph validat
   - _Requirements: 5.1, 5.2, 5.3, 5.4_
   - _writes: crates/world_model/src/comfy_worker_execution.rs, crates/world_model/src/comfy_worker_execution_tests.rs_
 
-- [ ] 8. Add model execution compatibility fixtures
-  - Add fixture snapshots for text-to-image, image-to-image, inpaint, ControlNet, LoRA, VAE, sampler/scheduler, and video/world-model workflows using mock runners where production weights are unavailable.
+- [x] 8. Add model execution compatibility fixtures
+  - Add native Sim fixture snapshots for text-to-image, image-to-image, inpaint, ControlNet, LoRA, VAE, sampler/scheduler, and video/world-model workflows using mock runners where production weights are unavailable.
   - _Requirements: 6.1, 6.2, 6.3_
   - _writes: crates/world_model/fixtures/comfy/model_execution_manifest.json, crates/world_model/tests/comfy_model_execution.rs_
 

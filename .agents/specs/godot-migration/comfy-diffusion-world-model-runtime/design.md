@@ -245,6 +245,11 @@ capabilities for model family, previews, cancellation, and deterministic
 execution before dispatch, then maps worker progress, previews, terminal state,
 outputs, diagnostics, and provenance back into Sim job records.
 
+Compatibility fixtures use mock runner manifests when production weights are not
+available. The fixture manifest records required workflow categories,
+native-Sim validation surfaces, and dependency-review divergences so tests can
+assert coverage without downloading weights or passing execution through Comfy.
+
 ## Correctness Properties
 
 ### Property 1: Sampling Input Preservation

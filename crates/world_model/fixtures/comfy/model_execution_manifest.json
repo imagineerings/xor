@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "runner": "mock",
+  "requires_production_weights": false,
+  "requires_downloads": false,
+  "native_sim_records": true,
+  "workflows": [
+    {
+      "id": "text_to_image_sdxl",
+      "category": "text-to-image",
+      "family": "StableDiffusionXl",
+      "nodes": ["CheckpointLoaderSimple", "CLIPTextEncode", "KSampler", "VAEDecode", "SaveImage"],
+      "validates": ["sampler", "scheduler", "conditioning", "latent", "vae", "worker", "provenance"]
+    },
+    {
+      "id": "image_to_image_sdxl",
+      "category": "image-to-image",
+      "family": "StableDiffusionXl",
+      "nodes": ["LoadImage", "VAEEncode", "CLIPTextEncode", "KSampler", "VAEDecode"],
+      "validates": ["denoise", "latent", "vae", "worker", "provenance"]
+    },
+    {
+      "id": "inpaint_sdxl",
+      "category": "inpaint",
+      "family": "StableDiffusionXl",
+      "nodes": ["LoadImage", "SetLatentNoiseMask", "InpaintModelConditioning", "KSampler"],
+      "validates": ["mask", "inpaint", "conditioning", "vae", "worker"]
+    },
+    {
+      "id": "controlnet_canny_sdxl",
+      "category": "ControlNet",
+      "family": "StableDiffusionXl",
+      "nodes": ["ControlNetLoader", "ControlNetApply", "CLIPTextEncode", "KSampler"],
+      "validates": ["control_attachment", "conditioning", "patch_pipeline", "worker"]
+    },
+    {
+      "id": "lora_sdxl",
+      "category": "LoRA",
+      "family": "StableDiffusionXl",
+      "nodes": ["LoraLoader", "CheckpointLoaderSimple", "CLIPTextEncode", "KSampler"],
+      "validates": ["component_set", "patch_pipeline", "provenance"]
+    },
+    {
+      "id": "vae_tiled_decode_sdxl",
+      "category": "VAE",
+      "family": "StableDiffusionXl",
+      "nodes": ["VAELoader", "VAEDecodeTiled"],
+      "validates": ["vae", "tiling", "latent"]
+    },
+    {
+      "id": "sampler_scheduler_matrix_sdxl",
+      "category": "sampler/scheduler",
+      "family": "StableDiffusionXl",
+      "nodes": ["KSampler", "KSamplerAdvanced"],
+      "validates": ["sampler", "scheduler", "determinism"]
+    },
+    {
+      "id": "wan_video_world_model",
+      "category": "video/world-model",
+      "family": "WanVideo",
+      "nodes": ["WanModelLoader", "CLIPTextEncode", "KSampler", "VAEDecode"],
+      "validates": ["runner_profile", "temporal_latent", "reference_frames", "camera_controls", "worker"]
+    }
+  ],
+  "divergences": [
+    {
+      "behavior": "production_weights",
+      "reason": "DependencyReview",
+      "sim_behavior": "fixtures use mock runner metadata and do not download weights"
+    }
+  ]
+}
