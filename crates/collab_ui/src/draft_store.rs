@@ -2,10 +2,17 @@ use anyhow::{Context as _, Result};
 use chrono::{DateTime, Utc};
 use client::ChannelId;
 use db::kvp::KeyValueStore;
+use gpui::{App, AppContext as _, Entity, Global};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use util::ResultExt as _;
 
 const DRAFT_NAMESPACE: &str = "channel_drafts";
+const DRAFT_KEY_PREFIX: &str = "channel_draft.";
+
+pub fn init(cx: &mut App) {
+    DraftStore::init(cx);
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Draft {
@@ -21,9 +28,13 @@ pub struct DraftStore {
 
 impl DraftStore {
     pub fn new(kvp: KeyValueStore) -> Self {
+        Self::new_with_drafts(kvp, HashMap::default())
+    }
+
+    fn new_with_drafts(kvp: KeyValueStore, drafts: HashMap<ChannelId, Draft>) -> Self {
         Self {
             kvp: Some(kvp),
-            drafts: HashMap::default(),
+            drafts,
             active_draft_channel: None,
         }
     }
@@ -37,7 +48,18 @@ impl DraftStore {
     }
 
     pub fn persist_key(channel_id: ChannelId) -> String {
-        format!("channel_draft.{}", channel_id.0)
+        format!("{}{}", DRAFT_KEY_PREFIX, channel_id.0)
+    }
+
+    pub fn init(cx: &mut App) {
+        let kvp = KeyValueStore::global(cx);
+        let drafts = Self::read_all_from_kvp(&kvp).log_err().unwrap_or_default();
+        let store = cx.new(|_| Self::new_with_drafts(kvp, drafts));
+        cx.set_global(GlobalDraftStore(store));
+    }
+
+    pub fn global(cx: &App) -> Entity<Self> {
+        cx.global::<GlobalDraftStore>().0.clone()
     }
 
     pub async fn save_draft(&mut self, channel_id: ChannelId, body: &str) -> Result<()> {
@@ -148,7 +170,33 @@ impl DraftStore {
             .await
             .context("deleting channel draft")
     }
+
+    fn read_all_from_kvp(kvp: &KeyValueStore) -> Result<HashMap<ChannelId, Draft>> {
+        let mut drafts = HashMap::default();
+        for (key, payload) in kvp
+            .scoped(DRAFT_NAMESPACE)
+            .read_all()
+            .context("reading channel drafts")?
+        {
+            let Some(channel_id) = Self::channel_id_from_persist_key(&key) else {
+                continue;
+            };
+            let draft = serde_json::from_str(&payload).context("deserializing channel draft")?;
+            drafts.insert(channel_id, draft);
+        }
+        Ok(drafts)
+    }
+
+    fn channel_id_from_persist_key(key: &str) -> Option<ChannelId> {
+        key.strip_prefix(DRAFT_KEY_PREFIX)
+            .and_then(|channel_id| channel_id.parse::<u64>().ok())
+            .map(ChannelId)
+    }
 }
+
+struct GlobalDraftStore(Entity<DraftStore>);
+
+impl Global for GlobalDraftStore {}
 
 #[cfg(test)]
 mod tests {
@@ -272,6 +320,38 @@ mod tests {
                 .read(&DraftStore::persist_key(channel_id))
                 .expect("read stored draft"),
             None
+        );
+    }
+
+    #[gpui::test]
+    async fn init_primes_global_store_from_kvp(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| cx.set_global(db::AppDatabase::test_new()));
+        let kvp = cx.update(|cx| KeyValueStore::global(cx));
+        let channel_id = ChannelId(7);
+        let mut store = DraftStore::new(kvp);
+
+        store
+            .save_draft(channel_id, "persisted hello")
+            .await
+            .expect("save draft");
+
+        cx.update(DraftStore::init);
+
+        assert!(cx.update(|cx| DraftStore::global(cx).read(cx).has_draft(channel_id)));
+    }
+
+    #[gpui::test]
+    async fn read_all_from_kvp_ignores_unknown_keys() {
+        let kvp = KeyValueStore::open_test_db("draft_store_unknown_keys").await;
+        kvp.scoped(DRAFT_NAMESPACE)
+            .write("not-a-channel-draft".to_string(), "{}".to_string())
+            .await
+            .expect("write unknown key");
+
+        assert!(
+            DraftStore::read_all_from_kvp(&kvp)
+                .expect("read drafts")
+                .is_empty()
         );
     }
 }

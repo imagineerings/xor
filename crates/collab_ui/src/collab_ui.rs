@@ -24,6 +24,7 @@ pub fn init(app_state: &Arc<AppState>, cx: &mut App) {
     channel_chat::init(cx);
     channel_view::init(cx);
     collab_panel::init(cx);
+    draft_store::init(cx);
     notifications::init(app_state, cx);
     title_bar::init(cx);
 }

@@ -32,12 +32,13 @@ Add client-side draft persistence for channel message composition. When a user t
   - _writes: `crates/collab_ui/src/draft_store.rs`_
   - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui draft_store --features test-support`_
 
-- [ ] 3. Register `DraftStore` as a global singleton
+- [x] 3. Register `DraftStore` as a global singleton
   - Add `DraftStore::global(cx: &mut App) -> Entity<Self>` using `Global` trait.
   - Add `DraftStore::init(cx)` that creates the entity, primes cache by reading all draft keys from KVP, and registers the global.
   - Wire `draft_store::init(cx)` into `collab_ui::init()`.
   - _Requirements: 7.1, 7.4_
   - _writes: `crates/collab_ui/src/draft_store.rs`, `crates/collab_ui/src/collab_ui.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p db test_scoped_kvp_read_all --features test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui draft_store --features test-support`_
 
 ### Phase 2: Compose area integration (ChannelView)
 

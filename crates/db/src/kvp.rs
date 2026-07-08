@@ -107,6 +107,13 @@ impl ScopedKeyValueStore<'_> {
         .context("Failed to read from scoped_kv_store")
     }
 
+    pub fn read_all(&self) -> anyhow::Result<Vec<(String, String)>> {
+        self.store.select_bound::<&str, (String, String)>(
+            "SELECT key, value FROM scoped_kv_store WHERE namespace = (?)",
+        )?(self.namespace)
+        .context("Failed to read all from scoped_kv_store")
+    }
+
     pub async fn write(&self, key: String, value: String) -> anyhow::Result<()> {
         let namespace = self.namespace.to_owned();
         self.store
@@ -218,6 +225,38 @@ mod tests {
         assert_eq!(scope_a.read("key-2").unwrap(), None);
         assert_eq!(scope_a.read("key-3").unwrap(), None);
         assert_eq!(scope_b.read("key-1").unwrap(), Some("value-b1".to_string()));
+    }
+
+    #[gpui::test]
+    async fn test_scoped_kvp_read_all() {
+        let db = KeyValueStore::open_test_db("test_scoped_kvp_read_all").await;
+
+        let scope_a = db.scoped("namespace-a");
+        let scope_b = db.scoped("namespace-b");
+
+        scope_a
+            .write("key-2".to_string(), "value-a2".to_string())
+            .await
+            .unwrap();
+        scope_a
+            .write("key-1".to_string(), "value-a1".to_string())
+            .await
+            .unwrap();
+        scope_b
+            .write("key-1".to_string(), "value-b1".to_string())
+            .await
+            .unwrap();
+
+        let mut values = scope_a.read_all().unwrap();
+        values.sort();
+
+        assert_eq!(
+            values,
+            vec![
+                ("key-1".to_string(), "value-a1".to_string()),
+                ("key-2".to_string(), "value-a2".to_string())
+            ]
+        );
     }
 }
 
