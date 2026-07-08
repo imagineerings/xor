@@ -22,6 +22,7 @@ pub mod comfy_graph_validation;
 pub mod comfy_http_safety;
 pub mod comfy_jobs;
 pub mod comfy_latents;
+pub mod comfy_manager;
 pub mod comfy_model_catalog;
 pub mod comfy_model_components;
 pub mod comfy_model_family;
@@ -130,6 +131,8 @@ mod comfy_http_safety_tests;
 mod comfy_jobs_tests;
 #[cfg(test)]
 mod comfy_latents_tests;
+#[cfg(test)]
+mod comfy_manager_tests;
 #[cfg(test)]
 mod comfy_model_catalog_tests;
 #[cfg(test)]
@@ -343,6 +346,12 @@ pub use comfy_jobs::{
 pub use comfy_latents::{
     ComfyLatentRuntime, LatentArtifact, LatentCompressionKind, LatentCompressionMetadata,
     LatentMask, LatentMediaKind, LatentValidationDiagnostic,
+};
+pub use comfy_manager::{
+    SIM_MANAGER_ACTION_DENIED_CODE, SIM_MANAGER_APPROVAL_REQUIRED_CODE,
+    SIM_MANAGER_BACKGROUND_DENIED_CODE, SIM_MANAGER_DEPENDENCY_REVIEW_DENIED_CODE,
+    SimManagerActionEvaluation, SimManagerActionKind, SimManagerActionRequest, SimManagerApproval,
+    SimManagerBoundary, SimManagerDiagnostic, SimManagerStatus,
 };
 pub use comfy_model_catalog::{
     ComfyModelCatalog, ModelCatalogError, ModelCatalogSnapshot, ModelFileSummary, ModelRootSnapshot,

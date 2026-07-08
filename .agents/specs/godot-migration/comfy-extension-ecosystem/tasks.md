@@ -56,8 +56,9 @@ Build extension support with policy and diagnostics first. Only after disabled a
   - _Requirements: 4.1, 4.2, 4.3_
   - _writes: crates/world_model/src/comfy_extension_i18n.rs, crates/world_model/src/comfy_extension_templates.rs, crates/world_model/src/comfy_extension_i18n_tests.rs_
 
-- [ ] 7. Implement manager compatibility boundary
+- [x] 7. Implement manager compatibility boundary
   - Add manager status/policy metadata and approval gates for install, update, disable, and background operations.
+  - Represent manager actions, status, approvals, evaluations, and diagnostics with native `SimManager*` records that enforce Sim policy and dependency review instead of calling ComfyUI-Manager directly.
   - _Requirements: 5.1, 5.2, 5.3_
   - _writes: crates/world_model/src/comfy_manager.rs, crates/world_model/src/comfy_manager_tests.rs_
 

@@ -14,6 +14,7 @@ flowchart TD
     Loader --> Web[ExtensionAssetService]
     Loader --> I18n[LocaleBundleMerger]
     Loader --> Templates[ExtensionTemplateIndex]
+    Policy --> Manager[ManagerCompatibilityBoundary]
     Loader --> Diagnostics[ExtensionDiagnostics]
 ```
 
@@ -88,6 +89,18 @@ flowchart TD
   `ComfyWorkflowTemplateAdapter` and `ComfySubgraphIndex`, preserving native
   diagnostics instead of pass-through ComfyUI template loading.
 
+### ManagerCompatibilityBoundary
+
+- **Purpose**: Expose manager-like status and actions without granting
+  uncontrolled package-manager access.
+- **Responsibilities**: Manager route enablement, status metadata, background
+  operation gates, install/update/disable approval checks, and dependency-review
+  enforcement for manager package proposals.
+- **Native behavior**: Evaluates manager requests as native `SimManager*`
+  records against `SimExtensionPolicy` and `SimDependencyReviewGate`, returning
+  explicit diagnostics for disabled routes, background denial, missing approval,
+  and dependency-review failures instead of calling ComfyUI-Manager routes.
+
 ## Data Models
 
 ```rust
@@ -132,6 +145,13 @@ pub struct SimExtensionTemplateDeclaration {
     pub name: String,
     pub template_path: String,
     pub graph_json: serde_json::Value,
+}
+
+pub struct SimManagerActionRequest {
+    pub action: SimManagerActionKind,
+    pub extension: SimExtensionRecord,
+    pub requires_network: bool,
+    pub requires_filesystem_write: bool,
 }
 ```
 
