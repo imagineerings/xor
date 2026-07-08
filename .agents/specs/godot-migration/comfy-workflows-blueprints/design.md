@@ -51,6 +51,11 @@ pub trait WorkflowStore {
 
 - **Purpose**: Expose reusable graph fragments from blueprints and extensions.
 - **Responsibilities**: Stable id generation, source metadata, sanitized listing, and full data retrieval.
+- **Native subgraph records**: Blueprint and custom-node subgraphs are indexed as
+  Sim-owned records with stable ids derived from source type and source path,
+  sanitized listing metadata, node-pack/source metadata, and full graph JSON
+  retrieval for execution/import callers. The index does not defer discovery or
+  graph reads to a ComfyUI extension registry.
 
 ### NodeReplacementCatalog
 
@@ -127,7 +132,7 @@ _For any_ generated file import, metadata extraction failure SHALL NOT block ass
 ## Testing Strategy
 
 - Import tests over the full 89-entry `projects/comfy/blueprints` fixture list.
-- Snapshot tests for blueprint catalog entries and subgraph ids.
+- Snapshot tests for blueprint catalog entries and native subgraph ids/listings.
 - Round-trip tests for workflow load/save/API export through native Sim records.
 - Replacement tests shared with `comfy-graph-node-runtime/`.
 - Metadata extraction tests for supported generated-file metadata containers.

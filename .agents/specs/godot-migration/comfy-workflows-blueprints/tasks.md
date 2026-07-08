@@ -32,8 +32,9 @@ Import shipped blueprints first, then add workflow persistence and API export, t
   - _Requirements: 2.1, 2.2, 2.3_
   - _writes: crates/world_model/src/comfy_workflows.rs, crates/world_model/src/comfy_workflow_export.rs, crates/world_model/src/comfy_workflows_tests.rs_
 
-- [ ] 3. Implement global subgraph index
+- [x] 3. Implement global subgraph index
   - Index blueprint and custom-node subgraphs with stable ids, sanitized listings, and full graph data retrieval.
+  - Preserve blueprint/custom-node source metadata, node-pack metadata, graph JSON, and listing diagnostics as native Sim records without ComfyUI registry pass-through.
   - _Requirements: 3.1, 3.2_
   - _writes: crates/world_model/src/comfy_subgraphs.rs, crates/world_model/src/comfy_subgraphs_tests.rs_
 

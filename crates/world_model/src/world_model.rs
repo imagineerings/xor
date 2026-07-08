@@ -27,6 +27,7 @@ pub mod comfy_runner_profiles;
 pub mod comfy_runtime_policy;
 pub mod comfy_sampling;
 pub mod comfy_schema;
+pub mod comfy_subgraphs;
 pub mod comfy_vae;
 pub mod comfy_worker_execution;
 pub mod comfy_workflow_export;
@@ -96,6 +97,8 @@ mod comfy_runtime_policy_tests;
 mod comfy_sampling_tests;
 #[cfg(test)]
 mod comfy_schema_tests;
+#[cfg(test)]
+mod comfy_subgraphs_tests;
 #[cfg(test)]
 mod comfy_worker_execution_tests;
 #[cfg(test)]
@@ -228,6 +231,11 @@ pub use comfy_sampling::{
 pub use comfy_schema::{
     ComfyInputDeclaration, ComfyInputSchemaDeclaration, ComfyInputSection, ComfySchemaAdapter,
     ComfySchemaDiagnostic, SimNodeInputSchema, SimNodeSchema, declarations_by_section,
+};
+pub use comfy_subgraphs::{
+    ComfySubgraphDiagnostic, ComfySubgraphId, ComfySubgraphIndex, ComfySubgraphListing,
+    ComfySubgraphRecord, ComfySubgraphSource, ComfySubgraphSourceType, DUPLICATE_SUBGRAPH_ID_CODE,
+    SUBGRAPH_NOT_FOUND_CODE,
 };
 pub use comfy_vae::{
     ComfyVaeRuntime, VaeOperationKind, VaeRuntimeRequest, VaeTilingMetadata,
