@@ -56,6 +56,7 @@ pub mod sim_asset_seeder;
 pub mod sim_asset_tags;
 pub mod sim_asset_upload;
 pub mod sim_assets;
+pub mod sim_feature_flags;
 pub mod sim_launch_profile;
 pub mod sim_user_data;
 pub mod worker_launcher;
@@ -150,6 +151,8 @@ mod sim_asset_query_tests;
 mod sim_asset_scanner_tests;
 #[cfg(test)]
 mod sim_assets_tests;
+#[cfg(test)]
+mod sim_feature_flags_tests;
 #[cfg(test)]
 mod sim_launch_profile_tests;
 #[cfg(test)]
@@ -378,6 +381,13 @@ pub use sim_assets::{
     SimAssetContentId, SimAssetContentRecord, SimAssetDiagnostic, SimAssetHash, SimAssetOwnerId,
     SimAssetReferenceId, SimAssetReferencePatch, SimAssetReferenceRecord, SimAssetReferenceRequest,
     SimAssetRepository,
+};
+pub use sim_feature_flags::{
+    ASSETS_FLAG, FEATURE_FLAG_CORE_OVERRIDE_CODE, FEATURE_FLAG_INVALID_VALUE_CODE,
+    FEATURE_PACKAGE_MISSING_CODE, FEATURE_PACKAGE_OUTDATED_CODE, MANAGER_SUPPORT_FLAG,
+    NODE_REPLACEMENTS_FLAG, PREVIEW_METADATA_FLAG, SimClientFeatureNegotiation,
+    SimFeatureFlagDiagnostic, SimFeatureFlagDiagnosticSeverity, SimFeatureFlagRegistry,
+    SimFeatureFlags, SimPackageKind, SimPackageRequirement, UPLOAD_SIZE_FLAG, coerce_flag_value,
 };
 pub use sim_launch_profile::{
     LAUNCH_PROFILE_INVALID_OPTION_CODE, LAUNCH_PROFILE_UNSUPPORTED_OPTION_CODE,

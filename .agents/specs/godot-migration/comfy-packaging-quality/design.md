@@ -10,7 +10,7 @@ This spec centralizes migration-wide quality controls so other Comfy specs do no
 flowchart LR
     Config[SimLaunchProfileParser] --> Policy[RuntimeConfigPolicy]
     Policy --> Model[comfy-model-memory-runtime]
-    Flags[FeatureFlagRegistry] --> Runtime[comfy-runtime-control-plane]
+    Flags[SimFeatureFlagRegistry] --> Runtime[comfy-runtime-control-plane]
     Schema[ComfyApiSchemaCatalog] --> Tests[CompatibilityFixtureSuite]
     Deps[DependencyReviewGate] --> Packaging[PackagingProfileCatalog]
     Logs[DiagnosticsAdapter] --> SimDiag[Sim Diagnostics]
@@ -27,10 +27,15 @@ flowchart LR
   and accumulates diagnostics for invalid or unsupported options instead of
   delegating parsing or validation to ComfyUI.
 
-### FeatureFlagRegistry
+### SimFeatureFlagRegistry
 
 - **Purpose**: Store server and CLI-provided feature flags and connection-specific client flags.
 - **Responsibilities**: Typed coercion, core flag protection, WebSocket negotiation, and response serialization.
+- **Native behavior**: Maintains `SimFeatureFlags` for core and CLI-provided
+  server features, stores accepted per-client feature sets, and reports
+  package diagnostics for missing or outdated frontend, workflow template, and
+  embedded docs packages. Comfy-compatible route/event adapters may translate
+  these values to compatibility payloads, but they do not own the registry.
 
 ### ComfyApiSchemaCatalog
 
@@ -62,6 +67,12 @@ pub struct SimLaunchProfile {
     pub assets: SimAssetLaunchOptions,
     pub extensions: SimExtensionLaunchOptions,
     pub diagnostics: SimDiagnosticLaunchOptions,
+}
+
+pub struct SimFeatureFlagRegistry {
+    pub core_flags: SimFeatureFlags,
+    pub cli_flags: SimFeatureFlags,
+    pub client_flags: BTreeMap<String, SimFeatureFlags>,
 }
 
 pub enum ComfyRouteSupport {

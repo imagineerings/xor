@@ -34,6 +34,7 @@ Sim needs Comfy migration support for launch configuration, feature flags, front
 2.1 WHEN server features are requested THEN THE system SHALL return core flags for preview metadata, upload size, manager support, node replacements, assets, and CLI-provided flags that do not overwrite core flags.
 2.2 WHEN client feature flags are negotiated THEN THE system SHALL store connection-specific flags for event behavior.
 2.3 WHEN frontend, workflow template, or embedded docs packages are missing or outdated THEN THE system SHALL show actionable diagnostics.
+2.4 WHEN Comfy-compatible feature flags are represented in Sim THEN THE system SHALL use native `SimFeatureFlag*` implementation types and SHALL NOT expose Sim-owned flag registries as `ComfyFeatureFlag*` pass-through records.
 
 ### Requirement 3: API Schemas and Examples
 

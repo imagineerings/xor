@@ -26,10 +26,12 @@ Build cross-cutting migration controls that other Comfy specs depend on: launch 
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
   - _writes: crates/world_model/src/sim_launch_profile.rs, crates/world_model/src/sim_launch_profile_tests.rs_
 
-- [ ] 2. Implement feature flag registry
+- [x] 2. Implement feature flag registry
   - Add typed flag coercion, core flag protection, server feature response, and connection-specific client flag storage.
-  - _Requirements: 2.1, 2.2, 2.3_
-  - _writes: crates/world_model/src/comfy_feature_flags.rs, crates/world_model/src/comfy_feature_flags_tests.rs_
+  - Report missing or outdated frontend, workflow template, and embedded docs packages with actionable Sim diagnostics.
+  - Represent the registry and negotiated flags with native `SimFeatureFlag*` records while compatibility adapters translate route/event payloads.
+  - _Requirements: 2.1, 2.2, 2.3, 2.4_
+  - _writes: crates/world_model/src/sim_feature_flags.rs, crates/world_model/src/sim_feature_flags_tests.rs_
 
 - [ ] 3. Implement API schema support catalog
   - Track supported, planned, cloud-only, external, and unsupported route statuses for Comfy/OpenAPI compatibility.
