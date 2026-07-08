@@ -69,6 +69,7 @@ pub mod sim_mask_nodes;
 pub mod sim_media_capabilities;
 pub mod sim_packaging_profiles;
 pub mod sim_provider_nodes;
+pub mod sim_provider_policy;
 pub mod sim_user_data;
 pub mod sim_utility_nodes;
 pub mod sim_video_nodes;
@@ -188,6 +189,8 @@ mod sim_media_capabilities_tests;
 mod sim_packaging_profiles_tests;
 #[cfg(test)]
 mod sim_provider_nodes_tests;
+#[cfg(test)]
+mod sim_provider_policy_tests;
 #[cfg(test)]
 mod sim_user_data_tests;
 #[cfg(test)]
@@ -501,6 +504,14 @@ pub use sim_provider_nodes::{
     SIM_PROVIDER_UNSUPPORTED_CODE, SimProviderCapability, SimProviderCostMetadata, SimProviderId,
     SimProviderNodeAvailability, SimProviderNodeDefinition, SimProviderNodeDiagnostic,
     SimProviderNodeRegistry,
+};
+pub use sim_provider_policy::{
+    SIM_PROVIDER_POLICY_API_DISABLED_CODE, SIM_PROVIDER_POLICY_CAPABILITY_UNAVAILABLE_CODE,
+    SIM_PROVIDER_POLICY_COST_CODE, SIM_PROVIDER_POLICY_EXTERNAL_DATA_CODE,
+    SIM_PROVIDER_POLICY_MODEL_UNAVAILABLE_CODE, SIM_PROVIDER_POLICY_OFFLINE_CODE,
+    SIM_PROVIDER_POLICY_QUOTA_EXCEEDED_CODE, SimProviderCapabilityPolicy, SimProviderPolicyContext,
+    SimProviderPolicyDecision, SimProviderPolicyDiagnostic, SimProviderPolicyDiagnosticSeverity,
+    SimProviderPolicyGate, SimProviderPolicyRequest,
 };
 pub use sim_user_data::{
     SimUserDataDiagnostic, SimUserDataEntry, SimUserDataPathParts, SimUserDataStore,

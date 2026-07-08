@@ -14,7 +14,7 @@ flowchart TD
     Connector --> Remote[RemoteTaskTracker]
     Remote --> Download[ProviderDownloadService]
     Download --> Assets[comfy-asset-library]
-    Connector --> Policy[ProviderPolicyGate]
+    Connector --> Policy[SimProviderPolicyGate]
 ```
 
 ## Components and Interfaces
@@ -45,9 +45,13 @@ pub trait ProviderConnector {
 }
 ```
 
-### ProviderPolicyGate
+### SimProviderPolicyGate
 
 - **Purpose**: Enforce offline mode, credential availability, cost approval, external data policy, provider quotas, and capability availability.
+- **Native behavior**: Evaluates native `SimProviderPolicyRequest` records before
+  provider execution so disabled API nodes, offline mode, unapproved external
+  data transfer, unapproved cost, unavailable provider capabilities, unavailable
+  models, and quota limits fail inside Sim before credentials or media are read.
 
 ### ProviderUploadService and ProviderDownloadService
 
@@ -82,6 +86,15 @@ pub struct ProviderNodeRequest {
     pub inputs: JsonObject,
     pub source_assets: Vec<AssetReferenceId>,
     pub policy_context: ProviderPolicyContext,
+}
+
+pub struct SimProviderPolicyRequest {
+    pub provider: SimProviderId,
+    pub capability: SimProviderCapability,
+    pub transmits_external_data: bool,
+    pub may_incur_cost: bool,
+    pub model_id: Option<String>,
+    pub estimated_quota_units: u64,
 }
 ```
 

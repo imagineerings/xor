@@ -26,10 +26,11 @@ Create a provider-node framework before individual providers. Initial implementa
   - _Requirements: 1.1, 1.2, 1.3, 4.1, 4.2, 4.3, 4.4, 4.5_
   - _writes: crates/world_model/src/sim_provider_nodes.rs, crates/world_model/src/sim_provider_nodes_tests.rs_
 
-- [ ] 2. Implement provider policy gate
+- [x] 2. Implement provider policy gate
   - Enforce offline mode, external data approval, cost approval, quotas, and capability availability.
+  - Represent policy inputs, capability availability, model availability, quotas, decisions, and diagnostics with native `SimProviderPolicy*` records.
   - _Requirements: 5.1, 5.2, 5.3_
-  - _writes: crates/world_model/src/comfy_provider_policy.rs, crates/world_model/src/comfy_provider_policy_tests.rs_
+  - _writes: crates/world_model/src/sim_provider_policy.rs, crates/world_model/src/sim_provider_policy_tests.rs_
 
 - [ ] 3. Implement provider secret redaction
   - Resolve credentials through Sim secrets and redact credentials, signed URLs, and sensitive payload fields.
