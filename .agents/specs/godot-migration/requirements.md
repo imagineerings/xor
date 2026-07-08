@@ -148,6 +148,7 @@ Sim needs a native game development surface for building 2D and 3D games, with G
 13.4 WHEN a world-model harness implementation decision involves graph orchestration, prompt/job lifecycle, model resolution, sampler/scheduler behavior, conditioning, diffusion/world-model execution, asset handling, media nodes, provider calls, or extension loading THEN THE system SHALL consult the applicable Comfy spec before introducing Sim-only behavior.
 13.5 IF Comfy semantics conflict with existing Sim infrastructure THEN THE system SHALL document the decision and preserve Comfy workflow compatibility unless safety, security, dependency, or platform gates require divergence.
 13.6 WHEN local diffusion or world-model execution is implemented THEN THE system SHALL preserve Comfy sampler, scheduler, conditioning, latent, VAE, model patch, guidance, and model-family execution semantics unless a documented gate requires divergence.
+13.7 WHEN Comfy-derived behavior is implemented THEN THE system SHALL recreate the feature as native Sim functionality backed by Sim services and data models, not as a thin compatibility label, hidden pass-through to ComfyUI, or unsupported placeholder.
 
 ### Requirement 14: Value-First Product Sequencing
 

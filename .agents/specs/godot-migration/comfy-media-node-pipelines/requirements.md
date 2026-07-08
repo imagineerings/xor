@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Sim needs the feature coverage represented by Comfy's media-processing node library: image, video, audio, 3D, depth, segmentation, pose, detection, post-processing, and utility nodes. These node capabilities are core world-model harness functionality because they define the media transformations and control signals available to generation workflows. This spec owns capability grouping and node-level media transformations. It delegates preview display to `rendering-media/`, mesh artifact lifecycle to `mesh-generation-pipeline/`, graph execution semantics to `comfy-graph-node-runtime/`, and diffusion/world-model execution semantics to `comfy-diffusion-world-model-runtime/`.
+Sim needs the feature coverage represented by Comfy's media-processing node library: image, video, audio, 3D, depth, segmentation, pose, detection, post-processing, and utility nodes. These node capabilities are core world-model harness functionality because they define the media transformations and control signals available to generation workflows. This spec owns capability grouping and node-level media transformations. It delegates preview display to `rendering-media/`, mesh artifact lifecycle to `mesh-generation-pipeline/`, graph execution semantics to `comfy-graph-node-runtime/`, and diffusion/world-model execution semantics to `comfy-diffusion-world-model-runtime/`. Comfy compatibility defines the expected media-node semantics and fixtures, but every supported media feature must be recreated as native Sim functionality backed by Sim media, graph, artifact, preview, and diagnostic services rather than passed through to ComfyUI or represented by a compatibility label alone.
 
 ## Glossary
 

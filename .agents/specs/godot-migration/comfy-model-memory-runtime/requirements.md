@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Sim needs Comfy-compatible model discovery, loader profiles, precision controls, quantization metadata, and memory policies for local and remote generation workflows. These policies are core world-model harness functionality because graph validation and worker execution depend on Comfy model categories, family detection, and memory choices. This spec owns model catalog and runtime policy. It delegates process launching and dependency checks to `model-serving-packaging/`, graph execution to `comfy-graph-node-runtime/`, sampler/model-family execution semantics to `comfy-diffusion-world-model-runtime/`, and asset indexing to `comfy-asset-library/`.
+Sim needs Comfy-compatible model discovery, loader profiles, precision controls, quantization metadata, and memory policies for local and remote generation workflows. These policies are core world-model harness functionality because graph validation and worker execution depend on Comfy model categories, family detection, and memory choices. This spec owns model catalog and runtime policy. It delegates process launching and dependency checks to `model-serving-packaging/`, graph execution to `comfy-graph-node-runtime/`, sampler/model-family execution semantics to `comfy-diffusion-world-model-runtime/`, and asset indexing to `comfy-asset-library/`. Comfy compatibility defines the expected model and memory semantics and fixtures, but every supported model feature must be recreated as native Sim functionality backed by Sim catalog, metadata, policy, worker, artifact, and diagnostic services rather than passed through to ComfyUI or represented by a compatibility label alone.
 
 ## Glossary
 

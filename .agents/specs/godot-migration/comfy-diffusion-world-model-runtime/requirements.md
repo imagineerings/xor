@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Sim needs Comfy's runtime knowledge for running diffusion models and world models, not only Comfy's API and graph orchestration. This spec owns sampler, scheduler, denoising, conditioning, latent, VAE, model patch, guidance, and model-family execution semantics for local harness workflows. It delegates graph scheduling and cache decisions to `comfy-graph-node-runtime/`, model discovery and memory policy to `comfy-model-memory-runtime/`, worker process setup to `model-serving-packaging/`, artifact/media routing to `comfy-asset-library/` and `rendering-media/`, and interactive control semantics to `world-model-runtime/`.
+Sim needs Comfy's runtime knowledge for running diffusion models and world models, not only Comfy's API and graph orchestration. This spec owns sampler, scheduler, denoising, conditioning, latent, VAE, model patch, guidance, and model-family execution semantics for local harness workflows. It delegates graph scheduling and cache decisions to `comfy-graph-node-runtime/`, model discovery and memory policy to `comfy-model-memory-runtime/`, worker process setup to `model-serving-packaging/`, artifact/media routing to `comfy-asset-library/` and `rendering-media/`, and interactive control semantics to `world-model-runtime/`. Comfy compatibility defines the expected execution semantics and fixtures, but every supported runtime feature must be recreated as native Sim functionality backed by Sim request, worker, policy, progress, artifact, and diagnostic services rather than passed through to ComfyUI or represented by a compatibility label alone.
 
 ## Glossary
 

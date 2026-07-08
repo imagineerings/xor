@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Sim needs Comfy graph and node runtime compatibility so Comfy workflows can be validated, introspected, partially executed, cached, and connected to Sim artifacts. These graph and node semantics are core world-model harness functionality, so Sim graph implementation decisions must account for this spec before adding alternate execution behavior. This spec owns runtime graph scheduling, validation, and node schema adaptation. It delegates canvas UI to `diffusion-graph-editor/`, HTTP submission to `comfy-runtime-control-plane/`, model loading to `comfy-model-memory-runtime/`, and sampler/model-family execution semantics to `comfy-diffusion-world-model-runtime/`.
+Sim needs Comfy graph and node runtime compatibility so Comfy workflows can be validated, introspected, partially executed, cached, and connected to Sim artifacts. These graph and node semantics are core world-model harness functionality, so Sim graph implementation decisions must account for this spec before adding alternate execution behavior. This spec owns runtime graph scheduling, validation, and node schema adaptation. It delegates canvas UI to `diffusion-graph-editor/`, HTTP submission to `comfy-runtime-control-plane/`, model loading to `comfy-model-memory-runtime/`, and sampler/model-family execution semantics to `comfy-diffusion-world-model-runtime/`. Comfy compatibility defines the expected graph and node semantics and fixtures, but every supported graph/runtime feature must be recreated as native Sim functionality backed by Sim graph, validation, execution-plan, cache, artifact, and diagnostic services rather than passed through to ComfyUI or represented by a compatibility label alone.
 
 ## Glossary
 

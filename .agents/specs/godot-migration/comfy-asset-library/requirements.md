@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Sim needs Comfy's asset library behavior for generated outputs, uploads, model references, user files, tags, metadata, previews, and filesystem scans. This asset behavior is core world-model harness functionality because generated outputs, model references, and workflow files must be discoverable and reusable across harness jobs. This spec owns asset indexing and API semantics. It delegates media preview rendering to `rendering-media/`, model folder registration to `comfy-model-memory-runtime/`, and generated artifact provenance to shared world-model artifact models.
+Sim needs Comfy's asset library behavior for generated outputs, uploads, model references, user files, tags, metadata, previews, and filesystem scans. This asset behavior is core world-model harness functionality because generated outputs, model references, and workflow files must be discoverable and reusable across harness jobs. This spec owns asset indexing and API semantics. It delegates media preview rendering to `rendering-media/`, model folder registration to `comfy-model-memory-runtime/`, and generated artifact provenance to shared world-model artifact models. Comfy compatibility defines the expected asset semantics and fixtures, but every supported asset feature must be recreated as native Sim functionality backed by Sim storage, media, artifact, and project services rather than passed through to ComfyUI or represented by a compatibility label alone.
 
 ## Glossary
 

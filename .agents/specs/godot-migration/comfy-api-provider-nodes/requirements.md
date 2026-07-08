@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Sim needs Comfy API-provider node coverage for cloud and third-party media/LLM/model services such as OpenAI, Gemini, Anthropic, OpenRouter, ByteDance, BFL, Stability, Ideogram, Recraft, Runway, Luma, Kling, Vidu, Wan, Veo, Sora, ElevenLabs, Topaz, Tripo, Meshy, Rodin, Hunyuan3D, and related providers. These provider nodes are policy-gated but core world-model harness extension points when enabled. This spec owns provider-node normalization, request lifecycle, credentials, offline mode, and diagnostics. It delegates local model execution to `comfy-model-memory-runtime/` and worker packaging to `model-serving-packaging/`.
+Sim needs Comfy API-provider node coverage for cloud and third-party media/LLM/model services such as OpenAI, Gemini, Anthropic, OpenRouter, ByteDance, BFL, Stability, Ideogram, Recraft, Runway, Luma, Kling, Vidu, Wan, Veo, Sora, ElevenLabs, Topaz, Tripo, Meshy, Rodin, Hunyuan3D, and related providers. These provider nodes are policy-gated but core world-model harness extension points when enabled. This spec owns provider-node normalization, request lifecycle, credentials, offline mode, and diagnostics. It delegates local model execution to `comfy-model-memory-runtime/` and worker packaging to `model-serving-packaging/`. Comfy compatibility defines the expected provider-node semantics and fixtures, but every supported provider feature must be recreated as native Sim functionality backed by Sim connector, secret, task, media, and diagnostic services rather than passed through to ComfyUI or represented by a compatibility label alone.
 
 ## Glossary
 

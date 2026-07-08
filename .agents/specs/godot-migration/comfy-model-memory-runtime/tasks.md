@@ -25,7 +25,7 @@ Implement the model runtime as catalog and policy primitives first, then connect
   - _Requirements: 1.1, 1.2, 1.3_
   - _writes: crates/world_model/src/comfy_model_folders.rs, crates/world_model/src/comfy_model_folders_tests.rs_
 
-- [ ] 2. Implement model file catalog listing
+- [x] 2. Implement model file catalog listing
   - Add recursive visible file search, path indexes, size/timestamp metadata, mtime cache invalidation, and safe path resolution.
   - _Requirements: 2.1_
   - _writes: crates/world_model/src/comfy_model_catalog.rs, crates/world_model/src/comfy_model_catalog_tests.rs_

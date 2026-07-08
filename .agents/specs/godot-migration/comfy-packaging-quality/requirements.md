@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Sim needs Comfy migration support for launch configuration, feature flags, frontend/template/doc packages, OpenAPI/schema compatibility, examples, tests, CI, dependency review, and platform packaging. These controls protect core Comfy-derived world-model harness behavior from drift across implementation tasks. This spec owns migration quality controls and compatibility fixtures. It delegates runtime behavior to the other Comfy specs.
+Sim needs Comfy migration support for launch configuration, feature flags, frontend/template/doc packages, OpenAPI/schema compatibility, examples, tests, CI, dependency review, and platform packaging. These controls protect core Comfy-derived world-model harness behavior from drift across implementation tasks. This spec owns migration quality controls and compatibility fixtures. It delegates runtime behavior to the other Comfy specs. Comfy compatibility defines the expected packaging, schema, and fixture semantics, but every supported quality-control feature must validate native Sim functionality rather than certify a thin compatibility label, hidden ComfyUI pass-through, or unsupported placeholder.
 
 ## Glossary
 

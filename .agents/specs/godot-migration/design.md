@@ -192,6 +192,12 @@ _For any_ world-model harness implementation decision involving prompt jobs, gra
 
 **Validates: Requirement 13.4, 13.5, 13.6**
 
+### Property 7A: Native Comfy Recreation
+
+_For any_ Comfy-derived endpoint, node, workflow, model, asset, provider, extension, media operation, or execution behavior, the implementation SHALL provide a native Sim feature backed by Sim services and data models rather than a thin compatibility label, hidden ComfyUI pass-through, or unsupported placeholder.
+
+**Validates: Requirement 13.7**
+
 ### Property 8: Direct Registry Integration
 
 _For any_ game feature that maps to an existing Sim capability (language support, task providers, preview routing), the integration SHALL use Sim's native registries directly rather than through an intermediate abstraction layer.

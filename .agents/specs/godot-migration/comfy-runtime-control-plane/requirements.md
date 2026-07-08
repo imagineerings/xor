@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Sim needs a Comfy-compatible runtime control plane so existing Comfy workflow clients, scripts, and frontends can submit prompts, observe execution, manage queues, and retrieve outputs without copying ComfyUI's web-server implementation. This control plane is core world-model harness functionality because it defines prompt/job lifecycle, realtime progress, queue state, and output retrieval for harness workflows. This spec owns protocol compatibility and safety. It delegates graph editing to `diffusion-graph-editor/`, node execution to `comfy-graph-node-runtime/`, assets to `comfy-asset-library/`, and model worker setup to `model-serving-packaging/`.
+Sim needs a Comfy-compatible runtime control plane so existing Comfy workflow clients, scripts, and frontends can submit prompts, observe execution, manage queues, and retrieve outputs without copying ComfyUI's web-server implementation. This control plane is core world-model harness functionality because it defines prompt/job lifecycle, realtime progress, queue state, and output retrieval for harness workflows. This spec owns protocol compatibility and safety. It delegates graph editing to `diffusion-graph-editor/`, node execution to `comfy-graph-node-runtime/`, assets to `comfy-asset-library/`, and model worker setup to `model-serving-packaging/`. Comfy compatibility defines the expected protocol semantics and fixtures, but every supported control-plane feature must be recreated as native Sim functionality backed by Sim job, task, queue, session, asset, and diagnostic services rather than passed through to ComfyUI or represented by a compatibility label alone.
 
 ## Glossary
 

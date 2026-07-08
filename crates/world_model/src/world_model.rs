@@ -1,4 +1,5 @@
 pub mod artifact;
+pub mod comfy_model_catalog;
 pub mod comfy_model_folders;
 pub mod controls;
 pub mod graph;
@@ -12,6 +13,8 @@ pub mod session;
 
 #[cfg(test)]
 mod artifact_tests;
+#[cfg(test)]
+mod comfy_model_catalog_tests;
 #[cfg(test)]
 mod comfy_model_folders_tests;
 #[cfg(test)]
@@ -28,6 +31,9 @@ mod session_tests;
 mod tests;
 
 pub use artifact::{GeneratedWorldArtifact, GeneratedWorldArtifactError};
+pub use comfy_model_catalog::{
+    ComfyModelCatalog, ModelCatalogError, ModelCatalogSnapshot, ModelFileSummary, ModelRootSnapshot,
+};
 pub use comfy_model_folders::{
     ComfyModelFolderRegistry, ExtraModelPathConfig, ExtraModelPathRoot, ModelCategory,
     ModelFileRef, ModelFolderError, ModelFolderInfo,

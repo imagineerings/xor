@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Sim needs to migrate Comfy workflow files, blueprint templates, global subgraphs, node replacement metadata, and workflow metadata embedded in generated files. These workflows are first-class world-model harness resources, not secondary import artifacts. This spec owns workflow/template lifecycle and compatibility. It delegates graph validation to `comfy-graph-node-runtime/`, authoring UI to `unified-authoring-app/` and `diffusion-graph-editor/`, and assets to `comfy-asset-library/`.
+Sim needs to migrate Comfy workflow files, blueprint templates, global subgraphs, node replacement metadata, and workflow metadata embedded in generated files. These workflows are first-class world-model harness resources, not secondary import artifacts. This spec owns workflow/template lifecycle and compatibility. It delegates graph validation to `comfy-graph-node-runtime/`, authoring UI to `unified-authoring-app/` and `diffusion-graph-editor/`, and assets to `comfy-asset-library/`. Comfy compatibility defines the expected workflow and blueprint semantics and fixtures, but every supported workflow feature must be recreated as native Sim functionality backed by Sim graph, template, metadata, asset, provenance, and diagnostic services rather than passed through to ComfyUI or represented by a compatibility label alone.
 
 ## Glossary
 

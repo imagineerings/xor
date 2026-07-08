@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Sim needs a controlled harness extension path for Comfy custom nodes, extension web assets, translations, example workflows, prestartup scripts, and ComfyUI-Manager-like package metadata. Custom node discovery is part of the world-model harness feature surface, but execution remains policy-gated. This spec owns extension discovery and policy. It delegates executable node runtime to `comfy-graph-node-runtime/`, provider calls to `comfy-api-provider-nodes/`, and packaging/dependency installation to `comfy-packaging-quality/`.
+Sim needs a controlled harness extension path for Comfy custom nodes, extension web assets, translations, example workflows, prestartup scripts, and ComfyUI-Manager-like package metadata. Custom node discovery is part of the world-model harness feature surface, but execution remains policy-gated. This spec owns extension discovery and policy. It delegates executable node runtime to `comfy-graph-node-runtime/`, provider calls to `comfy-api-provider-nodes/`, and packaging/dependency installation to `comfy-packaging-quality/`. Comfy compatibility defines the expected extension semantics and fixtures, but every supported extension feature must be recreated as native Sim functionality backed by Sim extension policy, asset, web-service, node-schema, and diagnostic services rather than passed through to ComfyUI or represented by a compatibility label alone.
 
 ## Glossary
 
