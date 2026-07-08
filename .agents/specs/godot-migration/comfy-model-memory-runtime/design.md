@@ -69,6 +69,13 @@ pub struct ModelFileSummary {
     pub preview: Option<ModelPreviewRef>,
 }
 
+pub struct ModelFamilyProfile {
+    pub family: ModelFamilyKind,
+    pub capability: ModelFamilyCapability,
+    pub adapter_kind: Option<AdapterKind>,
+    pub compatible_base_families: BTreeSet<ModelFamilyKind>,
+}
+
 pub struct RuntimePolicy {
     pub precision: PrecisionPolicy,
     pub device: DevicePolicy,

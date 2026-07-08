@@ -1,5 +1,6 @@
 pub mod artifact;
 pub mod comfy_model_catalog;
+pub mod comfy_model_family;
 pub mod comfy_model_folders;
 pub mod comfy_model_metadata;
 pub mod controls;
@@ -16,6 +17,8 @@ pub mod session;
 mod artifact_tests;
 #[cfg(test)]
 mod comfy_model_catalog_tests;
+#[cfg(test)]
+mod comfy_model_family_tests;
 #[cfg(test)]
 mod comfy_model_folders_tests;
 #[cfg(test)]
@@ -36,6 +39,11 @@ mod tests;
 pub use artifact::{GeneratedWorldArtifact, GeneratedWorldArtifactError};
 pub use comfy_model_catalog::{
     ComfyModelCatalog, ModelCatalogError, ModelCatalogSnapshot, ModelFileSummary, ModelRootSnapshot,
+};
+pub use comfy_model_family::{
+    AdapterKind, ComfyModelFamilyDetector, ConditioningMode, LatentFormat, ModelFamilyCapability,
+    ModelFamilyDiagnostic, ModelFamilyKind, ModelFamilyProfile, ModelMediaCapability,
+    TextEncoderRequirement, VaeRequirement,
 };
 pub use comfy_model_folders::{
     ComfyModelFolderRegistry, ExtraModelPathConfig, ExtraModelPathRoot, ModelCategory,

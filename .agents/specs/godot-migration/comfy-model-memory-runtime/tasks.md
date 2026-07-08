@@ -35,8 +35,8 @@ Implement the model runtime as catalog and policy primitives first, then connect
   - _Requirements: 2.2, 2.3_
   - _writes: crates/world_model/src/comfy_model_metadata.rs, crates/world_model/src/comfy_model_metadata_tests.rs_
 
-- [ ] 4. Implement model family capability detection
-  - Add model-family and capability records for Comfy-supported image, video, audio, 3D, adapter, segmentation, depth, and detection families.
+- [x] 4. Implement model family capability detection
+  - Add native Sim model-family and capability records for Comfy-supported image, video, audio, 3D, adapter, segmentation, depth, and detection families.
   - _Requirements: 3.1, 3.2, 3.3_
   - _writes: crates/world_model/src/comfy_model_family.rs, crates/world_model/src/comfy_model_family_tests.rs_
 
