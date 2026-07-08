@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T18:35:00Z",
+  "updated_at": "2026-07-08T18:45:00Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -628,6 +628,12 @@
       "status": "done",
       "summary": "Task 2: Added AdversaryInspector with default prompt-injection, jailbreak, indirect-instruction, and tool-output instruction patterns; configurable Low/Medium/High sensitivity thresholds; custom registry support; and focused unit coverage for detection, benign input, and sensitivity filtering.",
       "updated_at": "2026-07-08T18:35:00Z"
+    },
+    {
+      "task_identifier": ".agents/specs/goose-migration/security-permissions/tasks.md:23",
+      "status": "done",
+      "summary": "Task 3: Added EgressInspector with default API key, bearer token, private key, email, and SSN patterns; configurable redact-vs-block default strategies; redacted content generation that avoids echoing matched secrets; custom registry support; and focused unit coverage.",
+      "updated_at": "2026-07-08T18:45:00Z"
     }
   ],
   "dependency_notes": [
@@ -678,8 +684,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/security-permissions",
-      "summary": "Tasks 1-2 are checked complete. crates/security now provides a reusable PatternRegistry with serde-loadable regex, contains, and exact matchers, plus AdversaryInspector defaults and configurable sensitivity for prompt injection, jailbreak, indirect-instruction, and tool-output instruction detection. Task 3 can reuse PatternRegistry for egress patterns.",
-      "updated_at": "2026-07-08T18:35:00Z"
+      "summary": "Tasks 1-3 are checked complete. crates/security now provides PatternRegistry, AdversaryInspector defaults with configurable sensitivity, and EgressInspector defaults with redact/block strategies for API keys, bearer tokens, private keys, email addresses, and SSNs. Classification and scanner work can compose these primitives.",
+      "updated_at": "2026-07-08T18:45:00Z"
     },
     {
       "scope": ".agents/specs/godot-migration",

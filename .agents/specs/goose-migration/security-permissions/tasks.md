@@ -20,7 +20,7 @@ Implement the security inspection system (`crates/security/`) and permission sys
   - _Requirements: 1_
   - _writes: crates/security/src/adversary_inspector.rs_
 
-- [ ] 3. Implement egress inspector
+- [x] 3. Implement egress inspector
   - Detect API keys, secrets, PII in outgoing content
   - Configurable redaction strategies (block vs. redact)
   - _Requirements: 2_
