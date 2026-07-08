@@ -62,6 +62,10 @@ flowchart TD
 
 - **Purpose**: Serve extension web assets and workflow templates safely.
 - **Responsibilities**: Static asset path confinement, cache policy, deprecated path warnings, and content type safety.
+- **Native behavior**: Registers extension web and template roots as native
+  `SimExtensionAsset*` records, resolves requests through Sim-owned confined
+  routes, emits deprecated-path diagnostics, and assigns cache/content metadata
+  without proxying requests through ComfyUI.
 
 ### LocaleBundleMerger
 
@@ -91,6 +95,13 @@ pub struct SimCustomNodeDeclaration {
     pub class_name: String,
     pub registration_kind: SimCustomNodeRegistrationKind,
     pub module: SimCustomNodeModuleMetadata,
+}
+
+pub struct SimExtensionAssetRoot {
+    pub id: SimExtensionAssetRootId,
+    pub extension_id: SimExtensionId,
+    pub kind: SimExtensionAssetKind,
+    pub root_path: PathBuf,
 }
 ```
 

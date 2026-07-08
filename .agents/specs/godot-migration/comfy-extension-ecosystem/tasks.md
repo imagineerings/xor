@@ -44,8 +44,9 @@ Build extension support with policy and diagnostics first. Only after disabled a
   - _Requirements: 2.1, 2.2, 2.4_
   - _writes: crates/world_model/src/comfy_custom_node_bridge.rs, crates/world_model/src/comfy_custom_node_bridge_tests.rs_
 
-- [ ] 5. Implement extension web asset service
+- [x] 5. Implement extension web asset service
   - Serve registered web directories and templates with path confinement, cache policy, and safe content types.
+  - Represent extension web/template roots, responses, and diagnostics with native `SimExtensionAsset*` records and Sim-owned routes rather than ComfyUI asset pass-throughs.
   - _Requirements: 2.3, 4.2_
   - _writes: crates/world_model/src/comfy_extension_assets.rs, crates/world_model/src/comfy_extension_assets_tests.rs_
 

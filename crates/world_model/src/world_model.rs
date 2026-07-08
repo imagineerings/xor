@@ -11,6 +11,7 @@ pub mod comfy_events;
 pub mod comfy_execution_plan;
 pub mod comfy_execution_registry;
 pub mod comfy_executor;
+pub mod comfy_extension_assets;
 pub mod comfy_extension_diagnostics;
 pub mod comfy_extension_loader;
 pub mod comfy_extension_policy;
@@ -109,6 +110,8 @@ mod comfy_execution_plan_tests;
 mod comfy_execution_registry_tests;
 #[cfg(test)]
 mod comfy_executor_tests;
+#[cfg(test)]
+mod comfy_extension_assets_tests;
 #[cfg(test)]
 mod comfy_extension_loader_tests;
 #[cfg(test)]
@@ -281,6 +284,12 @@ pub use comfy_executor::{
     ComfyExecutionReport, ComfyExecutorDiagnostic, ComfyExecutorDispatch,
     ComfyNodeExecutionOutcome, ComfyNodeExecutionRecord, ComfyNodeExecutionState,
     ComfyNodeExecutor, ComfyNodeRuntime, ComfyUiOutput,
+};
+pub use comfy_extension_assets::{
+    SIM_EXTENSION_ASSET_DEPRECATED_PATH_CODE, SIM_EXTENSION_ASSET_PATH_ESCAPE_CODE,
+    SIM_EXTENSION_ASSET_UNKNOWN_ROOT_CODE, SimExtensionAssetDiagnostic, SimExtensionAssetKind,
+    SimExtensionAssetResponse, SimExtensionAssetRoot, SimExtensionAssetRootId,
+    SimExtensionAssetService,
 };
 pub use comfy_extension_diagnostics::{
     SIM_EXTENSION_POLICY_BLOCKED_CODE, SIM_EXTENSION_POLICY_DISABLED_CODE,
