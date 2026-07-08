@@ -14,6 +14,7 @@ pub mod comfy_quantization;
 pub mod comfy_runner_profiles;
 pub mod comfy_runtime_policy;
 pub mod comfy_sampling;
+pub mod comfy_schema;
 pub mod comfy_vae;
 pub mod comfy_worker_execution;
 pub mod comfy_world_model_profiles;
@@ -55,6 +56,8 @@ mod comfy_runner_profiles_tests;
 mod comfy_runtime_policy_tests;
 #[cfg(test)]
 mod comfy_sampling_tests;
+#[cfg(test)]
+mod comfy_schema_tests;
 #[cfg(test)]
 mod comfy_worker_execution_tests;
 #[cfg(test)]
@@ -135,6 +138,10 @@ pub use comfy_sampling::{
     ComfySamplingRequestBuilder, DenoiseRange, DeterministicRunMetadata, LatentDescriptor,
     NoisePolicy, SamplingNodeKind, SamplingProgress, SamplingRunInput, SamplingRunRequest,
     SamplingValidationDiagnostic,
+};
+pub use comfy_schema::{
+    ComfyInputDeclaration, ComfyInputSchemaDeclaration, ComfyInputSection, ComfySchemaAdapter,
+    ComfySchemaDiagnostic, SimNodeInputSchema, SimNodeSchema, declarations_by_section,
 };
 pub use comfy_vae::{
     ComfyVaeRuntime, VaeOperationKind, VaeRuntimeRequest, VaeTilingMetadata,

@@ -25,8 +25,8 @@ Implement runtime graph compatibility in layers: registry/schema first, validati
   - _Requirements: 1.1, 1.2, 1.3_
   - _writes: crates/world_model/src/comfy_nodes.rs, crates/world_model/src/comfy_nodes_tests.rs_
 
-- [ ] 2. Implement node schema adapter
-  - Normalize Comfy required, optional, hidden, primitive, combo, list, and lazy input declarations into Sim graph schema data.
+- [x] 2. Implement node schema adapter
+  - Normalize Comfy required, optional, hidden, primitive, combo, list, and lazy input declarations into native Sim graph schema data rather than forwarding schema conversion to Comfy.
   - _Requirements: 1.1, 1.2_
   - _writes: crates/world_model/src/comfy_schema.rs, crates/world_model/src/comfy_schema_tests.rs_
 

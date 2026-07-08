@@ -78,6 +78,17 @@ pub struct ObjectInfoResponse {
     pub nodes: BTreeMap<NodeTypeId, ObjectInfoNode>,
 }
 
+pub struct SimNodeInputSchema {
+    pub name: InputId,
+    pub data_type: DataType,
+    pub required: bool,
+    pub hidden: bool,
+    pub lazy: bool,
+    pub list: bool,
+    pub combo_values: Vec<String>,
+    pub tooltip: Option<String>,
+}
+
 pub struct PromptNode {
     pub id: NodeId,
     pub class_type: NodeTypeId,
@@ -98,6 +109,11 @@ and custom node definitions as typed records, filters disabled nodes from
 object-info responses, and returns deterministic availability diagnostics for
 unknown or disabled node classes. It does not proxy object-info lookup to
 ComfyUI.
+
+The schema adapter is native Sim normalization. It converts required, optional,
+hidden, primitive, combo, list, and lazy Comfy declarations into typed Sim graph
+schema inputs with deterministic diagnostics for unsupported types or invalid
+combo declarations, then reuses native node outputs from the registry.
 
 ## Correctness Properties
 
