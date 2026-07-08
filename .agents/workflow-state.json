@@ -1,28 +1,26 @@
 {
   "version": 1,
-  "updated_at": "2026-07-07T12:30:30Z",
+  "updated_at": "2026-07-08T06:39:15.099Z",
   "repo_revision": null,
   "recommendation": {
-    "task_id": "task:88d56f7c5fc2",
-    "task_identifier": ".agents/specs/goose-migration/dictation/tasks.md:16",
-    "title": "Create dictation crate with provider trait",
-    "rationale": "Picked as the next Goose migration task after microphone capture landed. It establishes the dictation provider abstraction and audio/config data models required before Whisper, cloud providers, and the dictation service can be implemented.",
+    "task_id": "task:6a9371a824e8",
+    "task_identifier": ".agents/specs/goose-migration/dictation/tasks.md:42",
+    "title": "Integrate dictation into agent and UI",
+    "rationale": "Next dictation migration task after microphone capture, provider trait, Whisper, cloud providers, and dictation service are complete. It exposes the completed dictation service through agent and CLI entry points.",
     "evidence": [
-      "User asked to pause archived workflow work and choose a task from .agents/specs/goose-migration",
-      "Task 1 in dictation is complete and exported the audio capture foundation",
-      "Task 2 is marked ready in the existing dependency notes and writes an isolated new dictation crate",
-      "Task picked into Linear as SIM-16"
+      "Dictation tasks 1 through 5 are checked complete in .agents/specs/goose-migration/dictation/tasks.md",
+      "Task 6 writes a narrow agent/CLI integration surface: crates/agent/src/tools/dictation_tool.rs and crates/cli/src/commands/dictation.rs",
+      "Linear issue SIM-23 was created and moved to In Progress"
     ],
     "stale_if_changed": [
       ".agents/specs/goose-migration/dictation/tasks.md",
       ".agents/specs/goose-migration/dictation/design.md",
       ".agents/specs/goose-migration/dictation/requirements.md",
-      "Cargo.toml",
-      "Cargo.lock",
-      "crates/dictation/Cargo.toml",
-      "crates/dictation/src/dictation.rs"
+      "crates/dictation/src/service.rs",
+      "crates/agent/src/tools/dictation_tool.rs",
+      "crates/cli/src/commands/dictation.rs"
     ],
-    "updated_at": "2026-07-07T12:30:30Z"
+    "updated_at": "2026-07-08T06:39:15.099Z"
   },
   "task_activity": [
     {
@@ -108,10 +106,10 @@
       "title": "Implement cloud dictation providers",
       "linear_identifier": "SIM-21",
       "linear_url": "https://linear.app/simtropolis/issue/SIM-21/implement-cloud-dictation-providers",
-      "status": "active",
+      "status": "inactive",
       "owner": null,
-      "summary": null,
-      "updated_at": "2026-07-06T08:11:52.694Z"
+      "summary": "Completed in PR #47 and task checkbox is marked complete.",
+      "updated_at": "2026-07-08T06:39:15.099Z"
     },
     {
       "task_id": "task:4e662ebfee10",
@@ -130,10 +128,10 @@
       "title": "Implement dictation service",
       "linear_identifier": "SIM-22",
       "linear_url": "https://linear.app/simtropolis/issue/SIM-22/implement-dictation-service",
-      "status": "active",
+      "status": "inactive",
       "owner": null,
-      "summary": null,
-      "updated_at": "2026-07-06T09:03:44.729Z"
+      "summary": "Merged in PR #53; local task checkbox marked complete while Linear was rate-limited.",
+      "updated_at": "2026-07-08T06:39:15.099Z"
     },
     {
       "task_id": "task:9f3d704a8eea",
@@ -189,6 +187,17 @@
       "owner": null,
       "summary": "Merged in PR #32. Theme-level cursor_blink settings exposed to editor rendering. Spectrum 2 defaults to smooth cursor blinking with 530ms GPUI animation easing between 0.3 and 1.0 opacity.",
       "updated_at": "2026-07-07T12:30:30Z"
+    },
+    {
+      "task_id": "task:6a9371a824e8",
+      "task_identifier": ".agents/specs/goose-migration/dictation/tasks.md:42",
+      "title": "Integrate dictation into agent and UI",
+      "linear_identifier": "SIM-23",
+      "linear_url": "https://linear.app/simtropolis/issue/SIM-23/integrate-dictation-into-agent-and-ui",
+      "status": "active",
+      "owner": null,
+      "summary": "Claimed for implementation; Linear moved to In Progress.",
+      "updated_at": "2026-07-08T06:39:15.099Z"
     }
   ],
   "task_notes": [
@@ -242,26 +251,17 @@
   ],
   "ranked_candidates": [
     {
-      "task_id": "task:88d56f7c5fc2",
-      "task_identifier": ".agents/specs/goose-migration/dictation/tasks.md:16",
-      "title": "Create dictation crate with provider trait",
+      "task_id": "task:6a9371a824e8",
+      "task_identifier": ".agents/specs/goose-migration/dictation/tasks.md:42",
+      "title": "Integrate dictation into agent and UI",
       "rank": 1,
-      "rationale": "Next dependency-unlocking Goose dictation task after microphone capture; creates provider APIs needed by Whisper, cloud, and service tasks.",
+      "rationale": "Ready follow-up to completed dictation service work; unlocks user-facing access through agent and CLI surfaces.",
       "blockers": [],
       "evidence": [
-        "Task 1 in .agents/specs/goose-migration/dictation/tasks.md is complete",
-        "requirements.md requirement 3 asks for a common provider abstraction",
-        "design.md places DictationProvider, AudioFormat, and DictationConfig in crates/dictation/"
+        "Tasks 1-5 in dictation are complete",
+        "Task writes do not overlap active cached SIM-11 or SIM-18 work",
+        "SIM-23 is claimed in Linear"
       ]
-    },
-    {
-      "task_id": "task:bad4897797ae",
-      "task_identifier": ".agents/specs/goose-migration/documentation/tasks.md:9",
-      "title": "Initialize Docusaurus project",
-      "rank": 2,
-      "rationale": "Also ready, but less immediately useful than enabling dictation runtime foundations.",
-      "blockers": [],
-      "evidence": ["workflow.js next listed documentation candidates as ready with no dependencies"]
     }
   ],
   "maintenance": {
@@ -281,7 +281,10 @@
         "Previous task 1 is complete and established the required API.",
         "This task unlocks follow-up UI integration work."
       ],
-      "stale_if_changed": [".agents/specs/example/tasks.md", ".agents/specs/example/design.md"],
+      "stale_if_changed": [
+        ".agents/specs/example/tasks.md",
+        ".agents/specs/example/design.md"
+      ],
       "updated_at": "YYYY-MM-DDTHH:MM:SSZ"
     },
     "task_activity_shape": {

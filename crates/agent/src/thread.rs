@@ -2,7 +2,7 @@ use crate::{
     AgentHook, AgentHookContext, AgentHooks, AnalyzeTool, ApplyCodeActionTool, AppsTool,
     ChatrecallTool, CodeActionStore, CodeExecutionTool, ContextServerRegistry, CopyPathTool,
     CreateDirectoryTool, CreateThreadTool, DbLanguageModel, DbThread, DeletePathTool,
-    DeveloperTool, DiagnosticsTool, EditFileTool, FetchTool, FinalOutputTool, FindPathTool,
+    DeveloperTool, DiagnosticsTool, DictationTool, EditFileTool, FetchTool, FinalOutputTool, FindPathTool,
     FindReferencesTool, GetCodeActionsTool, GoToDefinitionTool, GrepTool, HookFlow,
     ListAgentsAndModelsTool, ListDirectoryTool, LlmCallHookContext, LlmRequestHookFlow,
     MovePathTool, OrchestratorTool, ProjectSnapshot, ReadFileTool, RenameTool,
@@ -1961,6 +1961,7 @@ impl Thread {
             environment.clone(),
         ));
         self.add_tool(WebSearchTool);
+        self.add_tool(DictationTool);
         self.add_tool(FinalOutputTool);
         self.add_tool(CodeExecutionTool);
         self.add_tool(OrchestratorTool);

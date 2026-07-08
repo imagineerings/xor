@@ -32,7 +32,7 @@ Implement the dictation system with microphone capture (extending `crates/audio/
   - _Requirements: 2_
   - _writes: crates/dictation/src/cloud_providers.rs, crates/dictation/src/dictation.rs, crates/dictation/Cargo.toml_
 
-- [ ] 5. Implement dictation service
+- [x] 5. Implement dictation service
   - Orchestrates microphone capture → provider → text pipeline
   - Provider selection and fallback
   - Auto-stop on silence detection

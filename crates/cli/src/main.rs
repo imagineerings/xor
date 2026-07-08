@@ -508,6 +508,11 @@ fn run() -> Result<()> {
         return Ok(());
     }
 
+    if std::env::args().nth(1).as_deref() == Some("dictation") {
+        commands::dictation::run(std::env::args().skip(1))?;
+        return Ok(());
+    }
+
     let args = Args::parse();
 
     // `sim --askpass` Makes sim operate in nc/netcat mode for use with askpass

@@ -1409,6 +1409,7 @@ mod tests {
             "code_execution",
             "developer",
             "diagnostics",
+            "dictation",
             "final_output",
             "find_path",
             "find_references",
