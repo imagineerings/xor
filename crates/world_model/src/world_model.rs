@@ -13,8 +13,10 @@ pub mod comfy_execution_registry;
 pub mod comfy_executor;
 pub mod comfy_extension_assets;
 pub mod comfy_extension_diagnostics;
+pub mod comfy_extension_i18n;
 pub mod comfy_extension_loader;
 pub mod comfy_extension_policy;
+pub mod comfy_extension_templates;
 pub mod comfy_extensions;
 pub mod comfy_graph_validation;
 pub mod comfy_http_safety;
@@ -112,6 +114,8 @@ mod comfy_execution_registry_tests;
 mod comfy_executor_tests;
 #[cfg(test)]
 mod comfy_extension_assets_tests;
+#[cfg(test)]
+mod comfy_extension_i18n_tests;
 #[cfg(test)]
 mod comfy_extension_loader_tests;
 #[cfg(test)]
@@ -298,6 +302,12 @@ pub use comfy_extension_diagnostics::{
     SIM_EXTENSION_POLICY_WEB_ASSET_DENIED_CODE, SimExtensionPolicyDiagnostic,
     SimExtensionPolicyDiagnosticSeverity,
 };
+pub use comfy_extension_i18n::{
+    SIM_EXTENSION_I18N_INVALID_BUNDLE_CODE, SIM_EXTENSION_I18N_INVALID_LANGUAGE_CODE,
+    SimExtensionLocaleBundle, SimExtensionLocaleDiagnostic, SimExtensionLocaleFileKind,
+    SimExtensionLocaleLanguage, SimExtensionLocaleMergeReport, SimExtensionLocaleMerger,
+    locale_languages,
+};
 pub use comfy_extension_loader::{
     SIM_EXTENSION_LOADER_HOOK_RESTORED_CODE, SIM_EXTENSION_LOADER_IMPORT_FAILED_CODE,
     SIM_EXTENSION_LOADER_MISSING_DEPENDENCY_CODE, SimExtensionLoadMetadata, SimExtensionLoadReport,
@@ -307,6 +317,12 @@ pub use comfy_extension_loader::{
 pub use comfy_extension_policy::{
     SimExtensionPermissionReport, SimExtensionPolicy, SimExtensionPolicyDecisionKind,
     SimExtensionPolicyEvaluation, SimExtensionPolicyRequest,
+};
+pub use comfy_extension_templates::{
+    SIM_EXTENSION_SUBGRAPH_INDEXED_CODE, SIM_EXTENSION_TEMPLATE_INDEXED_CODE,
+    SimExtensionSubgraphDeclaration, SimExtensionTemplateDeclaration,
+    SimExtensionTemplateIndexDiagnostic, SimExtensionTemplateIndexReport,
+    SimExtensionTemplateIndexer,
 };
 pub use comfy_extensions::{
     SIM_EXTENSION_DISABLED_PACK_CODE, SIM_EXTENSION_NOT_WHITELISTED_CODE,

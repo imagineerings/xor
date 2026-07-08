@@ -50,8 +50,9 @@ Build extension support with policy and diagnostics first. Only after disabled a
   - _Requirements: 2.3, 4.2_
   - _writes: crates/world_model/src/comfy_extension_assets.rs, crates/world_model/src/comfy_extension_assets_tests.rs_
 
-- [ ] 6. Implement translations, templates, and subgraph indexing
+- [x] 6. Implement translations, templates, and subgraph indexing
   - Merge locale bundles, expose template names/assets, and feed custom node subgraphs into workflow subgraph index.
+  - Represent locale bundles, template declarations, subgraph declarations, and index reports with native `SimExtensionLocale*` and `SimExtensionTemplate*` records.
   - _Requirements: 4.1, 4.2, 4.3_
   - _writes: crates/world_model/src/comfy_extension_i18n.rs, crates/world_model/src/comfy_extension_templates.rs, crates/world_model/src/comfy_extension_i18n_tests.rs_
 

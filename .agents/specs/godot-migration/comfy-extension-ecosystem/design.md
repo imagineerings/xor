@@ -70,6 +70,23 @@ flowchart TD
 ### LocaleBundleMerger
 
 - **Purpose**: Merge custom node translation bundles by language.
+- **Responsibilities**: Merge `main.json`, `nodeDefs.json`, `commands.json`,
+  and `settings.json` per language, preserve deterministic extension
+  precedence, and report malformed bundle files.
+- **Native behavior**: Produces native `SimExtensionLocale*` records and
+  diagnostics for merged locale data without loading ComfyUI frontend
+  translation code.
+
+### ExtensionTemplateIndex
+
+- **Purpose**: Feed extension templates and subgraphs into native Sim indexes.
+- **Responsibilities**: Expose extension workflow template names/assets,
+  sanitize metadata, and register reusable custom-node subgraphs in the shared
+  workflow subgraph index.
+- **Native behavior**: Converts extension declarations into native
+  `SimExtensionTemplate*` records before registering them with
+  `ComfyWorkflowTemplateAdapter` and `ComfySubgraphIndex`, preserving native
+  diagnostics instead of pass-through ComfyUI template loading.
 
 ## Data Models
 
@@ -102,6 +119,19 @@ pub struct SimExtensionAssetRoot {
     pub extension_id: SimExtensionId,
     pub kind: SimExtensionAssetKind,
     pub root_path: PathBuf,
+}
+
+pub struct SimExtensionLocaleBundle {
+    pub extension_id: SimExtensionId,
+    pub language: String,
+    pub files: BTreeMap<SimExtensionLocaleFileKind, serde_json::Value>,
+}
+
+pub struct SimExtensionTemplateDeclaration {
+    pub extension_id: SimExtensionId,
+    pub name: String,
+    pub template_path: String,
+    pub graph_json: serde_json::Value,
 }
 ```
 
