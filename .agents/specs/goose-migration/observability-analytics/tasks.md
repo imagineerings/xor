@@ -47,13 +47,13 @@ Extend sim's observability infrastructure with Langfuse tracing, OpenTelemetry O
   - _Requirements: 4_
   - _writes: crates/language_model_core/src/rate_limiter.rs, crates/language_models/src/provider/_
 
-- [ ] 6. Implement PostHog analytics
+- [x] 6. Implement PostHog analytics
   - Create `crates/posthog/` with PostHog client
   - Event capture for key user actions
   - Configurable (disable, API key, host)
   - PII-free event properties
   - _Requirements: 5_
-  - _writes: crates/posthog/src/lib.rs, crates/posthog/src/client.rs_
+  - _writes: crates/posthog/src/posthog.rs, crates/posthog/src/client.rs_
 
 - [ ] 7. Implement tool monitor and inspector
   - Record tool invocations with timing and success/failure

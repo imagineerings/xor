@@ -165,6 +165,7 @@ members = [
     "crates/picker",
     "crates/platform_title_bar",
     "crates/plugins",
+    "crates/posthog",
     "crates/prettier",
     "crates/project",
     "crates/project_benchmarks",
@@ -495,6 +496,7 @@ theme_selector = { path = "crates/theme_selector" }
 time_format = { path = "crates/time_format" }
 platform_title_bar = { path = "crates/platform_title_bar" }
 plugins = { path = "crates/plugins" }
+posthog = { path = "crates/posthog" }
 title_bar = { path = "crates/title_bar" }
 toolchain_selector = { path = "crates/toolchain_selector" }
 ui = { path = "crates/ui" }

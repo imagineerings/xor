@@ -592,6 +592,12 @@
       "status": "done",
       "summary": "Task 5: Extended language_model_core RateLimiter with optional request-per-minute token-bucket behavior, burst allowances, status reporting, and provider default configuration for OpenAI and Anthropic while preserving existing concurrency-only behavior.",
       "updated_at": "2026-07-08T17:16:00Z"
+    },
+    {
+      "task_identifier": ".agents/specs/goose-migration/observability-analytics/tasks.md:50",
+      "status": "done",
+      "summary": "Task 6: Added crates/posthog with PostHogConfig, PostHogClient capture/identify/flush APIs, key user-action event names, injectable senders, in-memory test sender, PostHog payload formatting, and conservative property sanitization for PII-prone keys and string values.",
+      "updated_at": "2026-07-08T17:32:00Z"
     }
   ],
   "dependency_notes": [
@@ -637,8 +643,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/observability-analytics",
-      "summary": "Tasks 1-5 are checked complete. language_model_core exposes model-aware token counting and an optional token-bucket request limiter with burst/status support, language_models has provider default rate-limit configuration, and telemetry now has configurable Langfuse/OTLP backend foundations plus an observation layer. PostHog, tool monitor/inspector, integration, and slice tests remain.",
-      "updated_at": "2026-07-08T17:16:00Z"
+      "summary": "Tasks 1-6 are checked complete. language_model_core exposes model-aware token counting and an optional token-bucket request limiter with burst/status support, language_models has provider default rate-limit configuration, telemetry has configurable Langfuse/OTLP backend foundations plus an observation layer, and crates/posthog now provides configurable sanitized product analytics capture. Tool monitor/inspector, integration, and slice tests remain.",
+      "updated_at": "2026-07-08T17:32:00Z"
     },
     {
       "scope": ".agents/specs/godot-migration",
