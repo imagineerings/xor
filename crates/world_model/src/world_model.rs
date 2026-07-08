@@ -1,6 +1,8 @@
 pub mod artifact;
 pub mod comfy_app_mode;
+pub mod comfy_asset_api;
 pub mod comfy_asset_query;
+pub mod comfy_asset_upload;
 pub mod comfy_assets;
 pub mod comfy_blueprints;
 pub mod comfy_cache;
@@ -55,6 +57,8 @@ pub mod worker_launcher;
 mod artifact_tests;
 #[cfg(test)]
 mod comfy_app_mode_tests;
+#[cfg(test)]
+mod comfy_asset_api_tests;
 #[cfg(test)]
 mod comfy_asset_query_tests;
 #[cfg(test)]
@@ -142,6 +146,11 @@ pub use comfy_app_mode::{
     ComfyAppModeDiagnostic, ComfyAppModeReport, ComfyAppModeUiOwner, INVALID_APP_MODE_CONTROL_CODE,
     INVALID_APP_MODE_METADATA_CODE,
 };
+pub use comfy_asset_api::{
+    ASSET_API_FORBIDDEN_CODE, ASSET_API_HASH_NOT_FOUND_CODE, ComfyAssetApi,
+    ComfyAssetApiDiagnostic, ComfyAssetListPage, ComfyAssetReferenceDetail,
+    ComfyAssetUpdateRequest, missing_content_api_error, missing_reference_api_error,
+};
 pub use comfy_asset_query::{
     ASSET_QUERY_INVALID_CURSOR_CODE, ASSET_QUERY_INVALID_HASH_CODE,
     ASSET_QUERY_INVALID_METADATA_FILTER_CODE, ASSET_QUERY_INVALID_OWNER_CODE,
@@ -150,10 +159,13 @@ pub use comfy_asset_query::{
     ComfyAssetMetadataOperator, ComfyAssetOrder, ComfyAssetOwnerScope, ComfyAssetPagination,
     ComfyAssetQueryDiagnostic, ComfyAssetSort, ComfyAssetValidatedHash, normalize_asset_tag,
 };
+pub use comfy_asset_upload::{
+    ASSET_UPLOAD_INVALID_FIELD_CODE, ComfyAssetUploadDiagnostic, ComfyAssetUploadRequest,
+};
 pub use comfy_assets::{
     ASSET_CONTENT_NOT_FOUND_CODE, ASSET_REFERENCE_NOT_FOUND_CODE, ComfyAssetCacheState,
     ComfyAssetContentId, ComfyAssetContentRecord, ComfyAssetDiagnostic, ComfyAssetHash,
-    ComfyAssetOwnerId, ComfyAssetReferenceId, ComfyAssetReferenceRecord,
+    ComfyAssetOwnerId, ComfyAssetReferenceId, ComfyAssetReferencePatch, ComfyAssetReferenceRecord,
     ComfyAssetReferenceRequest, ComfyAssetRepository,
 };
 pub use comfy_blueprints::{

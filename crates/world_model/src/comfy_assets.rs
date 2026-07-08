@@ -142,6 +142,43 @@ pub struct ComfyAssetReferenceRequest {
     pub cache_state: ComfyAssetCacheState,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct ComfyAssetReferencePatch {
+    pub name: Option<String>,
+    pub tags: Option<BTreeSet<String>>,
+    pub preview_id: Option<Option<ComfyAssetReferenceId>>,
+    pub user_metadata: Option<BTreeMap<String, serde_json::Value>>,
+}
+
+impl ComfyAssetReferencePatch {
+    pub fn with_name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    pub fn with_tags(mut self, tags: impl IntoIterator<Item = impl Into<String>>) -> Self {
+        self.tags = Some(tags.into_iter().map(Into::into).collect());
+        self
+    }
+
+    pub fn with_preview_id(mut self, preview_id: Option<ComfyAssetReferenceId>) -> Self {
+        self.preview_id = Some(preview_id);
+        self
+    }
+
+    pub fn with_user_metadata(mut self, metadata: BTreeMap<String, serde_json::Value>) -> Self {
+        self.user_metadata = Some(metadata);
+        self
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.name.is_none()
+            && self.tags.is_none()
+            && self.preview_id.is_none()
+            && self.user_metadata.is_none()
+    }
+}
+
 impl ComfyAssetReferenceRequest {
     pub fn new(name: impl Into<String>, size_bytes: u64) -> Self {
         Self {
@@ -292,6 +329,40 @@ impl ComfyAssetRepository {
             .values()
             .filter(|reference| &reference.owner_id == owner_id && !reference.is_deleted())
             .collect()
+    }
+
+    pub fn update_reference(
+        &mut self,
+        owner_id: &ComfyAssetOwnerId,
+        reference_id: &ComfyAssetReferenceId,
+        patch: ComfyAssetReferencePatch,
+    ) -> Result<Option<ComfyAssetReferenceRecord>, ComfyAssetDiagnostic> {
+        let now = self.next_timestamp();
+        let Some(reference) = self.references.get_mut(reference_id) else {
+            return Err(ComfyAssetDiagnostic {
+                code: ASSET_REFERENCE_NOT_FOUND_CODE.to_string(),
+                reference_id: Some(reference_id.clone()),
+                content_id: None,
+                message: format!("asset reference `{}` was not found", reference_id.as_str()),
+            });
+        };
+        if &reference.owner_id != owner_id || reference.deleted_at_ms.is_some() {
+            return Ok(None);
+        }
+        if let Some(name) = patch.name {
+            reference.name = name;
+        }
+        if let Some(tags) = patch.tags {
+            reference.tags = tags;
+        }
+        if let Some(preview_id) = patch.preview_id {
+            reference.preview_id = preview_id;
+        }
+        if let Some(user_metadata) = patch.user_metadata {
+            reference.user_metadata = user_metadata;
+        }
+        reference.updated_at_ms = now;
+        Ok(Some(reference.clone()))
     }
 
     pub fn soft_delete_reference(

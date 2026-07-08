@@ -47,6 +47,10 @@ pub trait AssetRepository {
   before any repository access. Compatibility route adapters may translate
   legacy parameter names, but they do not forward ComfyUI query strings or
   rely on ComfyUI validation behavior.
+- **Native CRUD/upload service**: List, detail, create-from-hash, upload,
+  update, delete, and hash-exists operations execute against Sim repository
+  records and owner scopes. Comfy-compatible routes adapt request/response
+  shapes only; they do not proxy asset mutations to ComfyUI.
 
 ### AssetSeeder
 

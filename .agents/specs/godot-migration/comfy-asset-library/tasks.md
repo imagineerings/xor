@@ -32,8 +32,9 @@ Build the asset library as shared storage primitives plus Comfy-compatible route
   - _Requirements: 2.1, 3.2, 3.4, 5.1_
   - _writes: crates/world_model/src/comfy_asset_query.rs, crates/world_model/src/comfy_asset_query_tests.rs_
 
-- [ ] 3. Implement asset CRUD and upload APIs
+- [x] 3. Implement asset CRUD and upload APIs
   - Add list, detail, create-from-hash, multipart upload, update, delete, and hash existence behavior.
+  - Execute CRUD and upload behavior against native Sim repository records, query validators, and owner scopes without proxying mutations to ComfyUI asset routes.
   - _Requirements: 2.1, 2.2, 2.3, 2.5_
   - _writes: crates/world_model/src/comfy_asset_api.rs, crates/world_model/src/comfy_asset_upload.rs, crates/world_model/src/comfy_asset_api_tests.rs_
 
