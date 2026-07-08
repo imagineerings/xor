@@ -112,4 +112,8 @@ async fn test_channel_chat_view_updates_live_reactions(
     assert_eq!(reactions[0][0].emoji_name, "thumbs_up");
     assert_eq!(reactions[0][0].count, 1);
     assert_eq!(reactions[0][0].user_ids, vec![user_id]);
+    assert_eq!(
+        chat.read_with(cx_a, |chat, _| chat.reaction_chip_labels_for_test()),
+        vec![vec!["👍 1".to_string()]]
+    );
 }

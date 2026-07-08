@@ -326,7 +326,106 @@ impl ChannelChat {
                     }),
             )
             .child(Label::new(message.body.clone()).size(LabelSize::Small))
+            .when(!message.reaction_summaries.is_empty(), |this| {
+                this.child(self.render_reactions(message, cx))
+            })
             .into_any_element()
+    }
+
+    fn render_reactions(
+        &self,
+        message: &proto::ChannelMessage,
+        cx: &mut Context<Self>,
+    ) -> gpui::AnyElement {
+        let current_user_id = self
+            .user_store
+            .read(cx)
+            .current_user()
+            .map(|user| user.legacy_id);
+
+        h_flex()
+            .gap_1()
+            .children(message.reaction_summaries.iter().enumerate().map(
+                |(reaction_index, reaction)| {
+                    let message_id = message.id;
+                    let emoji_name = reaction.emoji_name.clone();
+                    let reacted_by_me =
+                        current_user_id.is_some_and(|user_id| reaction.user_ids.contains(&user_id));
+                    let label = format!(
+                        "{} {}",
+                        emoji_character(&reaction.emoji_name),
+                        reaction.count
+                    );
+
+                    div()
+                        .id((
+                            gpui::ElementId::from(("channel-reaction", message.id)),
+                            reaction_index.to_string(),
+                        ))
+                        .px_2()
+                        .py_0p5()
+                        .border_1()
+                        .rounded_md()
+                        .text_size(rems(0.75))
+                        .line_height(rems(1.0))
+                        .border_color(if reacted_by_me {
+                            cx.theme().colors().editor_foreground
+                        } else {
+                            cx.theme().colors().border_variant
+                        })
+                        .bg(if reacted_by_me {
+                            cx.theme().colors().element_hover
+                        } else {
+                            gpui::transparent_black()
+                        })
+                        .child(label)
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.toggle_reaction(
+                                message_id,
+                                emoji_name.clone(),
+                                reacted_by_me,
+                                window,
+                                cx,
+                            );
+                        }))
+                },
+            ))
+            .into_any_element()
+    }
+
+    fn toggle_reaction(
+        &mut self,
+        message_id: u64,
+        emoji_name: String,
+        reacted_by_me: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let client = self.client.clone();
+        let workspace = self.workspace.clone();
+        let channel_id = self.channel_id;
+
+        cx.spawn_in(window, async move |_, cx| {
+            let result = if reacted_by_me {
+                client
+                    .remove_channel_message_reaction(channel_id.0, message_id, emoji_name)
+                    .await
+            } else {
+                client
+                    .add_channel_message_reaction(channel_id.0, message_id, emoji_name)
+                    .await
+            };
+
+            if let Err(error) = result {
+                workspace
+                    .update(cx, |workspace, cx| {
+                        workspace.show_error(format!("Failed to update reaction: {error}"), cx);
+                    })
+                    .log_err();
+            }
+            anyhow::Ok(())
+        })
+        .detach_and_log_err(cx);
     }
 
     #[cfg(any(test, feature = "test-support"))]
@@ -342,6 +441,26 @@ impl ChannelChat {
         self.messages
             .iter()
             .map(|message| message.reaction_summaries.clone())
+            .collect()
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn reaction_chip_labels_for_test(&self) -> Vec<Vec<String>> {
+        self.messages
+            .iter()
+            .map(|message| {
+                message
+                    .reaction_summaries
+                    .iter()
+                    .map(|reaction| {
+                        format!(
+                            "{} {}",
+                            emoji_character(&reaction.emoji_name),
+                            reaction.count
+                        )
+                    })
+                    .collect()
+            })
             .collect()
     }
 
@@ -477,6 +596,17 @@ fn format_timestamp(timestamp: u64) -> String {
     let hour = seconds_in_day / 3_600;
     let minute = (seconds_in_day % 3_600) / 60;
     format!("{hour:02}:{minute:02}")
+}
+
+fn emoji_character(emoji_name: &str) -> &str {
+    match emoji_name {
+        "thumbs_up" => "👍",
+        "heart" => "❤️",
+        "laugh" => "😄",
+        "hooray" => "🎉",
+        "eyes" => "👀",
+        _ => emoji_name,
+    }
 }
 
 fn next_nonce(channel_id: ChannelId) -> u128 {
