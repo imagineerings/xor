@@ -56,8 +56,9 @@ Build the control plane as a protocol adapter over Sim task, HTTP, WebSocket, me
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
   - _writes: crates/world_model/src/comfy_ws.rs, crates/world_model/src/comfy_events.rs, crates/world_model/src/comfy_ws_tests.rs_
 
-- [ ] 7. Add Comfy API compatibility fixtures
+- [x] 7. Add Comfy API compatibility fixtures
   - Convert basic HTTP and WebSocket script examples into automated compatibility tests.
+  - Assert the fixture submits prompts, reads queue/history, negotiates WebSocket features, translates events, and selects preview frames through native Sim records rather than a ComfyUI pass-through.
   - _Requirements: 1.1, 1.4, 3.1, 3.3, 5.3_
   - _writes: crates/world_model/tests/comfy_api_compat.rs, crates/world_model/fixtures/comfy/basic_api_prompt.json_
 

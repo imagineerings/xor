@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "source": "projects/comfy/script_examples/basic_api_prompt",
+  "native_sim_records": true,
+  "comfyui_passthrough": false,
+  "client_id": "fixture-client",
+  "prompt_id": "550e8400-e29b-41d4-a716-446655440300",
+  "target_node": 3,
+  "http": {
+    "submit_paths": ["/prompt", "/api/prompt"],
+    "status_paths": ["/queue", "/api/queue", "/history", "/api/history"]
+  },
+  "websocket": {
+    "session_id": "fixture-session",
+    "requested_features": {
+      "preview_metadata": true,
+      "legacy_preview": false
+    }
+  },
+  "prompt": {
+    "1": {
+      "class_type": "CheckpointLoaderSimple",
+      "inputs": {
+        "ckpt_name": "fixture.safetensors"
+      }
+    },
+    "2": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "a native Sim world model smoke test",
+        "clip": ["1", 1]
+      }
+    },
+    "3": {
+      "class_type": "KSampler",
+      "inputs": {
+        "model": ["1", 0],
+        "positive": ["2", 0],
+        "seed": 42,
+        "steps": 4,
+        "cfg": 7.5,
+        "sampler_name": "euler",
+        "scheduler": "normal"
+      }
+    }
+  },
+  "extra_data": {
+    "workflow": "basic-api-prompt",
+    "secret": "must-not-leak"
+  },
+  "sensitive_keys": ["secret"],
+  "expected": {
+    "queue_number": 1,
+    "artifact_id": "artifact:image-basic-api",
+    "mime_type": "image/png",
+    "preview_width": 512,
+    "preview_height": 512
+  }
+}

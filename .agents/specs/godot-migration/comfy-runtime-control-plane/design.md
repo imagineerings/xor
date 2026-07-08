@@ -88,6 +88,17 @@ pub trait ComfyWebSocketAdapter {
   previews; clients without that support receive legacy binary preview frames.
   Translation does not proxy a ComfyUI WebSocket server.
 
+### Compatibility Fixtures
+
+- **Purpose**: Keep Comfy script-example compatibility executable as native Sim
+  regression tests.
+- **Responsibilities**: Cover basic HTTP prompt submission, queue/history reads,
+  WebSocket connection, feature negotiation, executing/progress events, and
+  metadata-vs-legacy preview selection using checked-in fixtures.
+- **Native fixture contract**: Fixtures declare `native_sim_records: true` and
+  `comfyui_passthrough: false`; tests fail if compatibility is represented only
+  by route labels or hidden ComfyUI proxy behavior.
+
 ### ComfyHttpSafetyLayer
 
 - **Purpose**: Preserve Comfy's local-server safety behavior while using Sim middleware.
@@ -183,5 +194,5 @@ _For any_ upload, view, or download request, the resolved filesystem path SHALL 
 
 - Unit tests for prompt id validation, native protocol records, HTTP safety primitives, method-aware `/api` alias routing, Sim job bridge submission/listing/history redaction, idempotent cancellation and targeted interrupt classification, WebSocket session/feature negotiation and preview frame selection, and path confinement.
 - Integration tests for prompt submission through queue, job status transitions, WebSocket feature negotiation, progress events, and preview metadata negotiation.
-- Compatibility fixtures from `projects/comfy/script_examples` for basic HTTP prompt execution and WebSocket image retrieval.
+- Compatibility fixtures from `projects/comfy/script_examples` for basic HTTP prompt execution and WebSocket image retrieval, backed by native Sim route, job, session, and event records.
 - Property tests for route alias equivalence and path traversal rejection.
