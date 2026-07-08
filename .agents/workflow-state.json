@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T18:55:00Z",
+  "updated_at": "2026-07-08T19:05:00Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -640,6 +640,12 @@
       "status": "done",
       "summary": "Task 4: Added ClassificationClient with provider abstraction for moderation APIs, configurable enabled flag, score threshold, allow/flag/block action, fail-open/fail-closed handling for unavailable providers, rating/category models, decisions, and focused unit coverage.",
       "updated_at": "2026-07-08T18:55:00Z"
+    },
+    {
+      "task_identifier": ".agents/specs/goose-migration/security-permissions/tasks.md:36",
+      "status": "done",
+      "summary": "Task 5: Added SecurityScanner aggregation over adversary, egress, and classification primitives with input/output scan methods, normalized findings/actions, redacted output propagation, configurable fail-open/fail-closed mode carried in results, default inspector construction, custom composition support, and focused unit coverage.",
+      "updated_at": "2026-07-08T19:05:00Z"
     }
   ],
   "dependency_notes": [
@@ -690,8 +696,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/security-permissions",
-      "summary": "Tasks 1-4 are checked complete. crates/security now provides PatternRegistry, AdversaryInspector defaults with configurable sensitivity, EgressInspector defaults with redact/block strategies, and ClassificationClient with provider abstraction, thresholds/actions, and fail-open/fail-closed unavailable handling. Scanner work can compose these primitives.",
-      "updated_at": "2026-07-08T18:55:00Z"
+      "summary": "Tasks 1-5 are checked complete. crates/security now provides PatternRegistry, AdversaryInspector, EgressInspector, ClassificationClient, and SecurityScanner aggregation with input/output scan methods, normalized findings/actions, redacted output propagation, and default/custom inspector composition. Permission system work can begin independently in crates/permission.",
+      "updated_at": "2026-07-08T19:05:00Z"
     },
     {
       "scope": ".agents/specs/godot-migration",

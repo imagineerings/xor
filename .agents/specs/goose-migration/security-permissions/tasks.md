@@ -33,12 +33,12 @@ Implement the security inspection system (`crates/security/`) and permission sys
   - _Requirements: 3_
   - _writes: crates/security/src/classification_client.rs_
 
-- [ ] 5. Implement security scanner
+- [x] 5. Implement security scanner
   - Unified scanner that orchestrates all inspectors
   - Aggregated result reporting
   - Configurable fail-open vs. fail-closed mode
   - _Requirements: 4_
-  - _writes: crates/security/src/scanner.rs, crates/security/src/lib.rs_
+  - _writes: crates/security/src/scanner.rs, crates/security/src/security.rs_
 
 - [ ] 6. Implement permission store
   - Persistent storage for permission decisions (SQLite/db)
