@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T14:33:38Z",
+  "updated_at": "2026-07-08T14:38:39Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -459,6 +459,12 @@
       "updated_at": "2026-07-08T14:33:38Z"
     },
     {
+      "task_identifier": ".agents/specs/goose-migration/documentation/tasks.md:65",
+      "status": "done",
+      "summary": "Task 9: Added .github/workflows/docs.yml to run docs link/spell/build validation on docs PRs and pushes to main, upload the Docusaurus build artifact, and deploy through GitHub Pages on main.",
+      "updated_at": "2026-07-08T14:38:39Z"
+    },
+    {
       "task_identifier": ".agents/specs/ci-migration/tasks.md",
       "status": "deprioritized",
       "summary": "All tasks in .agents/specs/ci-migration are deprioritized until every other local workflow task is complete. Do not select CI migration work while non-CI tasks remain available.",
@@ -504,8 +510,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/documentation",
-      "summary": "Tasks 1-8 are checked complete. Docusaurus is initialized as an overlay around the existing docs/src mdBook content, with getting-started, feature, configuration, provider, extension/MCP, troubleshooting, development workflow, build, contributing docs, enabled blog, tutorials plugin, and docs automation scripts. Remaining documentation task should add CI.",
-      "updated_at": "2026-07-08T14:33:38Z"
+      "summary": "Tasks 1-9 are checked complete. The documentation slice now has Docusaurus scaffolding, getting-started, feature, configuration, development, blog, tutorial content, automation scripts, and docs CI/deploy workflow.",
+      "updated_at": "2026-07-08T14:38:39Z"
     },
     {
       "scope": ".agents/specs/godot-migration",

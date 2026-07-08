@@ -62,7 +62,7 @@ Set up a Docusaurus-based documentation site for sim with installation guides, c
   - _Requirements: 4_
   - _writes: docs/scripts/build.sh, docs/scripts/check-links.sh_
 
-- [ ] 9. Set up CI pipeline
+- [x] 9. Set up CI pipeline
   - Build documentation on PRs
   - Validate links on PRs
   - Deploy on main branch merges
