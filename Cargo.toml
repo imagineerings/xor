@@ -136,6 +136,7 @@ members = [
     "crates/markdown_preview",
     "crates/mcp_servers/autovisualiser",
     "crates/mcp_servers/memory",
+    "crates/mcp_servers/peekaboo",
     "crates/mcp_servers/tutorial",
     "crates/mcp_runner",
     "crates/mermaid_render",
@@ -409,6 +410,7 @@ markdown = { path = "crates/markdown" }
 markdown_preview = { path = "crates/markdown_preview" }
 mcp_autovisualiser = { path = "crates/mcp_servers/autovisualiser" }
 mcp_memory = { path = "crates/mcp_servers/memory" }
+mcp_peekaboo = { path = "crates/mcp_servers/peekaboo" }
 mcp_tutorial = { path = "crates/mcp_servers/tutorial" }
 mermaid_render = { path = "crates/mermaid_render" }
 mcp_runner = { path = "crates/mcp_runner" }

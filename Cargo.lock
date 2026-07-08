@@ -10879,6 +10879,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "mcp_peekaboo"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "mcp_runner"
 version = "0.1.0"
 dependencies = [

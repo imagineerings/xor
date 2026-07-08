@@ -33,14 +33,14 @@ Implement the MCP tool servers from goose as a combination of native agent tools
   - _Requirements: 2_
   - _writes: crates/mcp_servers/memory/src/lib.rs_
 
-- [ ] 4. Implement Peekaboo screen capture MCP server
-  - [ ] 4.1 Screen capture abstraction with platform backends
+- [x] 4. Implement Peekaboo screen capture MCP server
+  - [x] 4.1 Screen capture abstraction with platform backends
     - macOS: ScreenCaptureKit
     - Windows: DXGI
     - Linux: X11/PipeWire
     - _Requirements: 3.1_
     - _writes: crates/mcp_servers/peekaboo/src/lib.rs_
-  - [ ] 4.2 MCP server wrapping screen capture as tools
+  - [x] 4.2 MCP server wrapping screen capture as tools
     - _Requirements: 3_
     - _writes: crates/mcp_servers/peekaboo/src/server.rs_
 
