@@ -1,6 +1,7 @@
 pub mod boundary;
 pub mod diagnostics;
 pub mod fixtures;
+pub mod integration;
 pub mod inventory;
 pub mod migration;
 pub mod parser;
@@ -10,6 +11,8 @@ pub mod spec_gatekeeper;
 mod boundary_tests;
 #[cfg(test)]
 mod fixtures_tests;
+#[cfg(test)]
+mod integration_tests;
 #[cfg(test)]
 mod inventory_tests;
 #[cfg(test)]
@@ -26,14 +29,19 @@ pub use diagnostics::{
     DiagnosticCollection, DiagnosticSeverity, SourceDiagnostic, SourcePosition, SourceRange,
 };
 pub use fixtures::{FixtureAttribution, FixtureLicense, FixtureManifest, FixtureSource};
+pub use integration::{
+    ExternalGameTaskProvider, GameAssetPreviewRoute, SimScriptLanguageConfig, PreviewKind,
+    default_game_preview_routes, default_game_task_providers, detect_game_project_roots,
+    simscript_language_config, is_game_project_manifest, target_project_format,
+};
 pub use inventory::{
-    SimGameMigrationInventory, SimGameSourcePath, MigrationDecision, MigrationInventory,
-    MigrationSourceArea, MigrationSpecCoverage, MigrationValidationError,
-    MigrationValidationReport,
+    MigrationDecision, MigrationInventory, MigrationSourceArea, MigrationSpecCoverage,
+    MigrationValidationError, MigrationValidationReport, SimGameMigrationInventory,
+    SimGameSourcePath,
 };
 pub use migration::{
-    SimGameFeatureArea, SimGameMetadata, SimGameProjectDescriptor,
-    SimGameProjectFormat, SimGameSourceReference, RuntimeBoundaryDecision,
+    RuntimeBoundaryDecision, SimGameFeatureArea, SimGameMetadata, SimGameProjectDescriptor,
+    SimGameProjectFormat, SimGameSourceReference,
 };
 pub use parser::{
     LineIndexer, ParseResult, ParseStatus, ParserContext, RecoverableError, line_at,

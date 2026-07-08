@@ -92,6 +92,7 @@ use uuid::Uuid;
 use vim_mode_setting::VimModeSetting;
 use workspace::notifications::{NotificationId, dismiss_app_notification, show_app_notification};
 
+use sim_game::{default_game_preview_routes, default_game_task_providers, simscript_language_config};
 use sim_actions::{
     About, OpenAccountSettings, OpenSimUrl, OpenBrowser, OpenDocs, OpenServerSettings,
     OpenSettingsFile, OpenStatusPage, Quit,
@@ -388,6 +389,41 @@ pub fn build_window_options(display_uuid: Option<Uuid>, cx: &mut App) -> WindowO
             None
         },
         ..Default::default()
+    }
+}
+
+pub fn register_game_integration(app_state: &AppState, _cx: &mut App) {
+    let simscript_config = simscript_language_config();
+    let name = language::LanguageName::new_static("SimScript");
+    let line_comments: Vec<Arc<str>> = simscript_config
+        .line_comment
+        .as_ref()
+        .map(|comment| vec![comment.clone().into()])
+        .unwrap_or_default();
+    let language = language::Language::new(
+        language::LanguageConfig {
+            name,
+            matcher: language::LanguageMatcher {
+                path_suffixes: simscript_config.extensions,
+                ..Default::default()
+            },
+            line_comments,
+            ..Default::default()
+        },
+        None,
+    );
+    app_state.languages.add(Arc::new(language));
+
+    for provider in default_game_task_providers() {
+        log::info!("game task provider registered: {}", provider.id);
+    }
+
+    for route in default_game_preview_routes() {
+        log::info!(
+            "game preview route registered: .{} -> {:?}",
+            route.extension,
+            route.kind,
+        );
     }
 }
 

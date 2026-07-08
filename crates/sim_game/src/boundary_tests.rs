@@ -132,7 +132,7 @@ fn classifies_asset_library_as_adapter_with_sim_game_owner() {
 #[test]
 fn classifies_language_scope_as_native() {
     let policy = DefaultBoundaryPolicy;
-    let decision = policy.classify("gdscript", "Language support for GDScript");
+    let decision = policy.classify("simscript", "Language support for SimScript");
     assert_eq!(decision, RuntimeBoundaryDecision::NativeSimFeature);
 }
 

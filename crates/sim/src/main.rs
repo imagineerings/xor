@@ -872,6 +872,7 @@ fn main() {
         }
 
         initialize_workspace(app_state.clone(), cx);
+        sim::register_game_integration(&app_state, cx);
 
         cx.activate(true);
 

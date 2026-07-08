@@ -1,4 +1,4 @@
-# Implementation Plan: Godot Migration Umbrella
+# Implementation Plan: Sim Game Development Surface
 
 ## Gates
 
@@ -11,7 +11,7 @@
 
 - **G0 Spec consistency**: all spec folders have requirements, design, and tasks files; every task declares requirement and write manifests; every task reference and design property target resolves to an existing acceptance criterion.
 - **G1 Boundary policy**: excluded Godot runtimes are encoded and tested before runtime-adjacent work.
-- **G2 Shared Sim game metadata**: project descriptors, diagnostics, source references, and fixture attribution exist before Godot integrations.
+- **G2 Shared Sim game metadata**: project descriptors, diagnostics, source references, and fixture attribution exist before game integrations.
 - **G3 Shared world-model foundations**: request/control/worker/graph/mesh/artifact/provenance models exist before world-model integrations.
 - **G4 Worker safety**: Python/model/GPU/remote diagnostics exist before starting real model workers.
 - **G5 Graph safety**: graph validator exists before executing graph nodes.
@@ -34,7 +34,7 @@
 ## Tasks
 
 - [x] 1. Create the shared Sim game support crate
-  - Add metadata, source-reference, boundary-decision, and project descriptor types for Sim-owned Godot-compatible features.
+  - Add metadata, source-reference, boundary-decision, and project descriptor types for Sim-owned game features.
   - _Requirements: 2.1, 2.2, 3.1_
   - _writes: Cargo.toml, crates/sim_game/Cargo.toml, crates/sim_game/src/sim_game.rs, crates/sim_game/src/migration.rs, crates/sim_game/src/tests.rs_
 
@@ -48,8 +48,8 @@
   - _Requirements: 2.1, 2.2, 2.3_
   - _writes: crates/sim_game/src/boundary.rs, crates/sim_game/src/boundary_tests.rs_
 
-- [ ] 4. Add Godot workspace integration registration
-  - Connect Godot detection, tasks, language support, docs, and previews to existing Sim registries.
+- [x] 4. Add game workspace integration registration
+  - Wire game project detection, external-command task providers, SimScript language registration data, docs routes, and preview routing to native Sim registries.
   - _Requirements: 3.1, 3.2, 3.3, 4.1_
   - _writes: crates/sim_game/src/integration.rs, crates/sim/src/sim.rs, crates/sim_game/src/integration_tests.rs_
 
@@ -83,7 +83,7 @@
   - _Requirements: 6.1, 6.2, 6.3_
   - _writes: crates/world_model/src/graph.rs, crates/world_model/src/graph_validation.rs, crates/world_model/src/graph_tests.rs_
 
-- [ ] 11. Add mesh generation primitives
+- [x] 11. Add mesh generation primitives
   - Define mesh generation request, backend, preview, export target, and generated asset metadata.
   - _Requirements: 7.1, 7.2, 7.3_
   - _writes: crates/world_model/src/mesh.rs, crates/world_model/src/mesh_tests.rs_
@@ -113,3 +113,4 @@
 - Do not add vendored Godot third-party code without updating the relevant design and passing dependency review.
 - Do not treat Comfy as optional UI compatibility for the world-model harness; use the applicable Comfy spec as the functional starting point for prompt, graph, sampler, scheduler, conditioning, diffusion/world-model execution, model, asset, media-node, provider, and extension behavior.
 - Do not add a parallel Comfy subsystem when an existing Sim or migration spec already owns the underlying runtime behavior; add a harness adapter and delegation instead.
+- Do not create an intermediate abstraction layer (registrar trait, parallel type hierarchy) between game features and Sim registries. Wire directly into Sim's native registries.

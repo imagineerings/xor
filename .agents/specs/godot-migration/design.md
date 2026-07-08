@@ -1,13 +1,17 @@
-# Design: Godot Migration Umbrella
+# Design: Sim Game Development Surface
 
 ## Architecture
 
-The migration is organized as Sim-native integration layers:
+The game development surface is organized as Sim-native integration layers:
 
-- `crates/sim_game`: Sim-owned game authoring metadata, boundary policy, parsing diagnostics, project descriptors, fixture attribution, and task/debug/export descriptors for Godot-compatible source projects.
+- `crates/sim_game`: Sim-owned game authoring metadata, boundary policy, parsing diagnostics, project descriptors, fixture attribution, and task/debug/export descriptors for Godot-format source projects.
 - `crates/world_model`: world-model request/control/worker/graph/mesh/artifact/provenance primitives.
 - Comfy harness modules inside `crates/world_model`: core runtime control-plane adapters, Comfy graph/node schemas, sampler/scheduler execution semantics, conditioning, latent/VAE behavior, model patching, diffusion/world-model runner profiles, model folder and memory policy, asset APIs, workflow/blueprint catalogs, provider connectors, extension loading policy, and compatibility fixtures.
 - Existing Sim crates: project, worktree, language, LSP, tasks, debugger, media, UI, agent, and app registry own their existing domains.
+
+### Design Principle: Native Integration
+
+Every Godot-originated feature becomes a native Sim feature. There is no compatibility shim layer, no "registrar trait" bridging game features to Sim registries, and no parallel language config type. SimScript is registered as the first-class executable game language via `LanguageRegistry::add` with the same `Language` type used for Rust, Python, and TypeScript; natural language is the authoring interface that produces inspectable SimScript. `sim_game` exports pure-data helpers for external game task templates and game asset preview routes so follow-on task and preview sub-specs can wire them into the native task source and preview action systems without introducing an intermediate compatibility layer.
 
 ## Components
 
@@ -83,6 +87,36 @@ pub trait MigrationGatekeeper {
 }
 ```
 
+### Workspace Integration (sim.rs consumption)
+
+The workspace integration is not a separate component with its own registrar. It is a function in `sim.rs` that calls Sim's native language registry directly and consumes pure-data descriptors for later task/preview hooks:
+
+<!-- impl: crates/sim/src/sim.rs#register_game_integration -->
+<!-- impl: crates/sim_game/src/integration.rs#simscript_language_config -->
+<!-- impl: crates/sim_game/src/integration.rs#default_game_task_providers -->
+<!-- impl: crates/sim_game/src/integration.rs#default_game_preview_routes -->
+
+```rust
+fn register_game_integration(app_state: &AppState, cx: &mut App) {
+    let config = sim_game::simscript_language_config();
+    let language = Language::new(LanguageConfig {
+        name: LanguageName::new_static("SimScript"),
+        matcher: LanguageMatcher { path_suffixes: config.extensions, ..Default::default() },
+        line_comments: config.line_comment.map(|comment| vec![comment.into()]).unwrap_or_default(),
+        ..Default::default()
+    }, None);
+    app_state.languages.add(Arc::new(language));
+
+    for provider in sim_game::default_game_task_providers() {
+        log::info!("game task provider registered: {}", provider.id);
+    }
+
+    for route in sim_game::default_game_preview_routes() {
+        log::info!("game preview route registered: .{}", route.extension);
+    }
+}
+```
+
 ## Data Models
 
 ```rust
@@ -143,7 +177,7 @@ _For any_ generated video, mesh, texture, or exported artifact, the artifact rec
 
 ### Property 6: Comfy Ownership Boundaries
 
-_For any_ Comfy feature, if an existing Sim or Godot/world-model migration spec owns the underlying UI, task, media, asset, secret, model-serving, mesh, or dependency-review behavior, the Comfy harness layer SHALL delegate to that owner and SHALL NOT add a parallel subsystem.
+_For any_ Comfy feature, if an existing Sim or game/world-model migration spec owns the underlying UI, task, media, asset, secret, model-serving, mesh, or dependency-review behavior, the Comfy harness layer SHALL delegate to that owner and SHALL NOT add a parallel subsystem.
 
 **Validates: Requirement 2.1, 2.2, 13.2, 13.3**
 
@@ -152,6 +186,12 @@ _For any_ Comfy feature, if an existing Sim or Godot/world-model migration spec 
 _For any_ world-model harness implementation decision involving prompt jobs, graph orchestration, sampler/scheduler behavior, conditioning, diffusion/world-model execution, model resolution, assets, media nodes, provider calls, or extensions, the migration gatekeeper SHALL require a matching Comfy spec reference or an explicit safety, security, dependency, or platform divergence decision.
 
 **Validates: Requirement 13.4, 13.5, 13.6**
+
+### Property 8: Direct Registry Integration
+
+_For any_ game feature that maps to an existing Sim capability (language support, task providers, preview routing), the integration SHALL use Sim's native registries directly rather than through an intermediate abstraction layer.
+
+**Validates: Requirement 2.1**
 
 ## Error Handling
 

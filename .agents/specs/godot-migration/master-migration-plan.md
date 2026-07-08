@@ -1,12 +1,14 @@
-# Sim + Godot + World Model Game Engine Migration Plan
+# Sim Game Engine Migration Plan
 
 ## Purpose
 
-Identify the specs, features, and functionality present in `projects/godot/`, `projects/world-model/`, and `projects/comfy/`, then plan their migration into Sim without duplicating Sim runtime infrastructure.
+Identify the specs, features, and functionality present in `projects/godot/`, `projects/world-model/`, and `projects/comfy/`, then plan their migration into Sim as native Sim features without duplicating Sim runtime infrastructure.
 
-The target product is a cross-platform application for creating 2D and 3D games from a unified Sim + Godot-inspired interface. Godot contributes project structure, authoring concepts, scene/resource formats, scripting workflows, and export expectations. `projects/world-model` contributes the world foundation model harness used as the generative game engine: prompt and image conditioning, camera/action control, fast video inference, persistent serving, distributed GPU execution, diffusion graph pipelines, and generated 3D mesh workflows. `projects/comfy` contributes core world-model harness functionality: prompt and job APIs, WebSocket progress, typed node schemas, graph execution semantics, model folder/runtime policy, sampler and scheduler behavior, conditioning, latent/VAE execution, diffusion and world-model runner profiles, assets, blueprints, media-processing nodes, provider API nodes, custom-node extension loading, and packaging/test fixtures.
+The target product is a cross-platform application for creating 2D and 3D games from a unified Sim interface. Godot contributes project structure, authoring concepts, scene/resource formats, scripting workflows, and export expectations. `projects/world-model` contributes the world foundation model harness used as the generative game engine: prompt and image conditioning, camera/action control, fast video inference, persistent serving, distributed GPU execution, diffusion graph pipelines, and generated 3D mesh workflows. `projects/comfy` contributes core world-model harness functionality: prompt and job APIs, WebSocket progress, typed node schemas, graph execution semantics, model folder/runtime policy, sampler and scheduler behavior, conditioning, latent/VAE execution, diffusion and world-model runner profiles, assets, blueprints, media-processing nodes, provider API nodes, custom-node extension loading, and packaging/test fixtures.
 
-This is not a wholesale port of the classic Godot runtime. Sim should build a world-model engine harness around existing Sim UI, agent, task, media, and project infrastructure, while preserving compatibility paths for Godot-like projects and assets. Comfy is not a secondary compatibility target in that harness; implementation decisions for world-model graph orchestration, prompt/job lifecycle, model resolution, sampler/scheduler behavior, conditioning, diffusion/world-model execution, generated assets, media nodes, provider calls, and extensions must consult the Comfy-owned specs before introducing Sim-only behavior.
+This is not a wholesale port of the classic Godot runtime. Sim should build a world-model engine harness around existing Sim UI, agent, task, media, and project infrastructure, while providing native Sim support for Godot-format projects and assets. Comfy is not a secondary compatibility target in that harness; implementation decisions for world-model graph orchestration, prompt/job lifecycle, model resolution, sampler/scheduler behavior, conditioning, diffusion/world-model execution, generated assets, media nodes, provider calls, and extensions must consult the Comfy-owned specs before introducing Sim-only behavior.
+
+Every Godot-originated feature becomes a native Sim feature. SimScript is the first-class executable Sim language, with natural language as the authoring interface. Task providers for the `godot` binary are first-class Sim task providers. Scene preview routes are first-class Sim preview routes. There is no compatibility shim layer.
 
 ## Methodology
 
@@ -51,10 +53,10 @@ Duplication rule: prefer existing Sim crates and extension points before adding 
 |---|---|---|---|---|
 | Product goal and unified app | Godot editor + world model workflows | `crates/workspace`, `crates/project`, `crates/ui`, `crates/sim_apps` | Add unified game authoring app | `unified-authoring-app/` |
 | Engine core and runtime metadata | `projects/godot/core`, scene/resource model | Rust std, `crates/project`, `crates/worktree`, `crates/fs` | Metadata/indexing only; no runtime port | `engine-core-runtime/` |
-| Editor experience | Godot editor affordances | command palette, project panel, task/debugger UI | Add Godot-aware Sim affordances | `editor-experience/` |
+| Editor experience | Godot editor affordances | command palette, project panel, task/debugger UI | Add Sim editor affordances | `editor-experience/` |
 | Rendering and media | Godot render/media/shader systems; generated video | GPUI/wgpu, media, image viewer | Preview and shader metadata only; generated media routing | `rendering-media/` |
 | Platform and export | Godot platform/export templates | Sim platform crates, task system | External Godot task integration only | `platform-export/` |
-| Language and scripting | GDScript, Godot C#, class docs | language, LSP, docs infrastructure | Add language support and docs indexing | `language-scripting/` |
+| Language and scripting | SimScript, legacy `.gd`, natural-language authoring, Godot C#, class docs | language, LSP, docs infrastructure | Add native SimScript support, natural-language authoring, and docs indexing | `language-scripting/` |
 | Game formats and assets | `.godot`, `.tscn`, `.tres`, `.import`, glTF | project/worktree/media | Add lightweight parser/indexer and generated asset registration | `game-formats-assets/` |
 | Networking/collaboration | Multiplayer, ENet, WebRTC, debug protocols | collab, RPC, LSP, DAP | Do not port network runtime; optional debug metadata | `networking-collaboration/` |
 | XR and spatial | OpenXR/WebXR/spatial metadata | media preview, docs | Docs/metadata boundaries only | `xr-spatial/` |
@@ -81,10 +83,10 @@ Duplication rule: prefer existing Sim crates and extension points before adding 
 | Spec | Scope | Current Artifacts | Primary Wave |
 |---|---|---|---|
 | `engine-core-runtime/` | Core metadata, resources, and project model | Requirements + Design + Tasks | W2 |
-| `editor-experience/` | Godot-aware Sim editor workflows | Requirements + Design + Tasks | W4/W6 |
+| `editor-experience/` | Sim editor workflows for game development | Requirements + Design + Tasks | W4/W6 |
 | `rendering-media/` | Preview/media/shader/generated-media support without rendering-stack duplication | Requirements + Design + Tasks | W3/W5 |
 | `platform-export/` | Godot project run/export task integration | Requirements + Design + Tasks | W6 |
-| `language-scripting/` | GDScript and Godot C# language tooling | Requirements + Design + Tasks | W2 |
+| `language-scripting/` | SimScript, legacy `.gd`, natural-language authoring, and Godot C# language tooling | Requirements + Design + Tasks | W2 |
 | `game-formats-assets/` | Godot files, scenes, resources, and generated assets | Requirements + Design + Tasks | W2/W5 |
 | `networking-collaboration/` | Godot protocol awareness and debug integration boundaries | Requirements + Design + Tasks | W6 |
 | `xr-spatial/` | XR/spatial docs and metadata boundaries | Requirements + Design + Tasks | W6 |
@@ -98,7 +100,7 @@ Duplication rule: prefer existing Sim crates and extension points before adding 
 | `model-serving-packaging/` | Python worker, model downloads, GPU scheduling, and packaging | Requirements + Design + Tasks | W3/W6 |
 | `comfy-runtime-control-plane/` | Comfy-compatible HTTP/WebSocket prompt, job, queue, progress, preview, and safety APIs | Requirements + Design + Tasks | W4 |
 | `comfy-graph-node-runtime/` | Comfy node schema, graph validation, replacement, execution planning, caching, async/list execution | Requirements + Design + Tasks | W4 |
-| `comfy-model-memory-runtime/` | Comfy model folders, model metadata, family detection, precision, quantization, device, and memory policy | Requirements + Design + Tasks | W3 |
+| `comfy-model-memory-runtime/` | Comfy model folders, model metadata, family detection, precision, device, and memory policy | Requirements + Design + Tasks | W3 |
 | `comfy-diffusion-world-model-runtime/` | Comfy sampler, scheduler, conditioning, latent/VAE, model patch, diffusion runner, and world-model runner semantics | Requirements + Design + Tasks | W4 |
 | `comfy-asset-library/` | Asset CRUD, upload/download, tags, metadata filters, seed scans, user data, settings, and output enrichment | Requirements + Design + Tasks | W5 |
 | `comfy-workflows-blueprints/` | Blueprint catalog, workflow save/load/export, subgraphs, node replacements, embedded workflow metadata, app-mode metadata | Requirements + Design + Tasks | W4/W5 |

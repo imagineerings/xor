@@ -2,7 +2,7 @@
 
 ## Overview
 
-Add Godot-aware commands and project-panel affordances in W4, while run and debug templates remain W6 work because they require the external-command boundary.
+Add native game-development commands and project-panel affordances in W4, while run and debug templates remain W6 work because they require the external-command boundary.
 
 ## Gates
 
@@ -18,7 +18,7 @@ Add Godot-aware commands and project-panel affordances in W4, while run and debu
 
 ## Tasks
 
-- [ ] 1. Add Godot-aware editor affordances
+- [ ] 1. Add native game editor affordances
   - Register commands, project-panel labels, import links, and external run/debug templates.
   - _Requirements: 1.1, 1.2, 2.1, 2.2, 3.1, 3.2_
   - _writes: crates/sim_game/src/editor.rs, crates/sim_game/src/tasks.rs, crates/sim_game/src/editor_tests.rs_

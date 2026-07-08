@@ -58,10 +58,10 @@ fn validates_complete_spec_pack_with_task_manifests() {
   - _Requirements: 3.1, 3.2_
   - _writes: crates/sim_game/src/project.rs
 
-- [ ] 2. Register GDScript language support
-  - Add GDScript detection and syntax configuration.
+- [ ] 2. Register SimScript language support
+  - Add SimScript detection and syntax configuration.
   - _Requirements: 2.1, 2.2_
-  - _writes: crates/languages/src/gdscript.rs, crates/sim_game/src/language.rs
+  - _writes: crates/languages/src/simscript.rs, crates/sim_game/src/language.rs
 "#;
 
     write_tasks_with_manifests(&root_path.join("engine-core-runtime"), tasks_content);

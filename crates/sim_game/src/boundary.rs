@@ -159,7 +159,7 @@ const EXTERNAL_COMMAND_ALIASES: &[(&str, &str)] = &[
     ("godot export", "godot --export"),
     ("godot build", "godot --headless --build"),
     ("godot debug", "godot --debug"),
-    ("gdscript", "godot --script"),
+    ("simscript", "sim --script"),
     ("gdunit", "gdunit"),
 ];
 

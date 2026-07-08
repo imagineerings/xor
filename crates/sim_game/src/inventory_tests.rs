@@ -26,7 +26,7 @@ fn validates_complete_grouped_spec_pack_and_source_coverage() {
             ),
             MigrationSpecCoverage::new(
                 "language-scripting",
-                "GDScript and Godot C# language tooling",
+                "SimScript, legacy `.gd` scripts, natural-language authoring, and Godot C# language tooling",
                 "language-scripting",
             ),
         ])

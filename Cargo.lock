@@ -17176,6 +17176,7 @@ dependencies = [
  "sim_actions",
  "sim_apps",
  "sim_env_vars",
+ "sim_game",
  "smol",
  "snippet_provider",
  "snippets_ui",
@@ -17269,6 +17270,7 @@ version = "0.1.0"
 dependencies = [
  "pretty_assertions",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -1,8 +1,8 @@
-# Requirements: Godot Migration Umbrella
+# Requirements: Sim Game Development Surface
 
 ## Introduction
 
-Sim needs a Sim-owned, Godot-compatible, world-model-, and Comfy-aware game development surface without copying duplicate game-engine runtime infrastructure. The migration adds compatibility, authoring, generation, workflow orchestration, asset, node, provider, and serving primitives while preserving Sim ownership of UI, platform, rendering, task execution, agents, media, storage, and project systems. Comfy provides core functionality for the world-model harness, so implementation decisions must evaluate Comfy workflow, graph, sampler, scheduler, conditioning, diffusion/world-model execution, node, model, asset, provider, and extension semantics before adding Sim-only behavior.
+Sim needs a native game development surface for building 2D and 3D games, with Godot-format project and asset compatibility, world-model foundation harness support, and Comfy-aware workflow orchestration — all without copying duplicate game-engine runtime infrastructure. The migration adds project detection, authoring affordances, language support, generation, and serving primitives while preserving Sim ownership of UI, platform, rendering, task execution, agents, media, storage, and project systems. Comfy provides core functionality for the world-model harness, so implementation decisions must evaluate Comfy workflow, graph, sampler, scheduler, conditioning, diffusion/world-model execution, node, model, asset, provider, and extension semantics before adding Sim-only behavior.
 
 ## Glossary
 
@@ -14,7 +14,7 @@ Sim needs a Sim-owned, Godot-compatible, world-model-, and Comfy-aware game deve
 
 ### Requirement 1: Complete Inventory
 
-**User Story:** As a developer, I want all Godot, world-model, and Comfy feature areas inventoried so migration work does not miss major functionality.
+**User Story:** As a developer, I want all game, world-model, and Comfy feature areas inventoried so migration work does not miss major functionality.
 
 #### Acceptance Criteria
 
@@ -32,14 +32,14 @@ Sim needs a Sim-owned, Godot-compatible, world-model-, and Comfy-aware game deve
 2.2 IF a Godot runtime subsystem duplicates Sim runtime architecture THEN THE migration SHALL mark it as excluded or external-command only.
 2.3 WHEN a new crate is proposed THEN THE migration SHALL justify why existing crates cannot hold the behavior.
 
-### Requirement 3: Godot Project Support
+### Requirement 3: Game Project Support
 
-**User Story:** As a game developer, I want Sim to understand Godot-like projects so I can inspect and edit existing assets.
+**User Story:** As a game developer, I want Sim to understand Godot-format projects so I can inspect and edit existing assets.
 
 #### Acceptance Criteria
 
-3.1 WHEN a workspace contains `project.godot` THEN THE system SHALL detect it as a Godot-compatible project.
-3.2 WHEN Godot scene, resource, import, script, shader, or asset files are opened THEN THE system SHALL provide metadata, diagnostics, and preview routing where supported.
+3.1 WHEN a workspace contains `project.godot` THEN THE system SHALL detect it as a Godot-format game project.
+3.2 WHEN SimScript, legacy `.gd`, scene, resource, shader, or asset files are opened THEN THE system SHALL provide metadata, diagnostics, and preview routing where supported.
 3.3 IF runtime execution is required THEN THE system SHALL use explicit external task/debug/export integration instead of embedding Godot runtime systems.
 
 ### Requirement 4: Unified Game Authoring Product
@@ -141,7 +141,7 @@ Sim needs a Sim-owned, Godot-compatible, world-model-, and Comfy-aware game deve
 #### Acceptance Criteria
 
 13.1 WHEN Comfy migration specs are reviewed THEN THE system SHALL include non-overlapping specs for runtime APIs, graph/node runtime, model/memory runtime, diffusion/world-model runtime, assets, workflows/blueprints, media node pipelines, provider API nodes, extension ecosystem, and packaging/quality.
-13.2 IF a Comfy feature overlaps an existing Godot/world-model migration spec THEN THE Comfy spec SHALL name the owning spec and delegate that behavior.
+13.2 IF a Comfy feature overlaps an existing game/world-model migration spec THEN THE Comfy spec SHALL name the owning spec and delegate that behavior.
 13.3 WHEN Comfy endpoints, nodes, assets, providers, or extensions are implemented THEN THE system SHALL use Sim task, media, artifact, secret, storage, diagnostic, and dependency-review infrastructure.
 13.4 WHEN a world-model harness implementation decision involves graph orchestration, prompt/job lifecycle, model resolution, sampler/scheduler behavior, conditioning, diffusion/world-model execution, asset handling, media nodes, provider calls, or extension loading THEN THE system SHALL consult the applicable Comfy spec before introducing Sim-only behavior.
 13.5 IF Comfy semantics conflict with existing Sim infrastructure THEN THE system SHALL document the decision and preserve Comfy workflow compatibility unless safety, security, dependency, or platform gates require divergence.
