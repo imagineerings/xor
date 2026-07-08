@@ -54,6 +54,7 @@ use std::{
 };
 use util::path;
 
+mod scenario_runner;
 mod test_tools;
 use test_tools::*;
 

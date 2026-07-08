@@ -292,6 +292,7 @@ dependencies = [
  "dictation",
  "editor",
  "env_logger 0.11.10",
+ "eval_harbor",
  "eval_utils",
  "feature_flags",
  "fs",

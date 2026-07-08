@@ -28,14 +28,14 @@ Implement structured evaluation capabilities: Harbor eval framework (`crates/eva
   - _Requirements: 2_
   - _writes: crates/eval_harbor/src/gym.rs_
 
-- [ ] 4. Implement scenario test infrastructure in agent crate
+- [x] 4. Implement scenario test infrastructure in agent crate
   - Recording: capture interactions for replay
   - Playback: replay recorded interactions deterministically
   - Assertion: validate agent behavior against recorded expectations
   - _Requirements: 3_
   - _writes: crates/agent/src/tests/scenario_runner.rs_
 
-- [ ] 5. Implement agent benchmark scripts
+- [x] 5. Implement agent benchmark scripts
   - Response latency benchmark
   - Tool execution benchmark
   - Context compaction benchmark
@@ -44,7 +44,7 @@ Implement structured evaluation capabilities: Harbor eval framework (`crates/eva
   - _Requirements: 4_
   - _writes: scripts/bench-agent.sh, crates/benchmarks/src/agent.rs_
 
-- [ ] 6. Write tests
+- [x] 6. Write tests
   - Harbor eval runner with sample scenarios
   - Mock provider determinism tests
   - Scenario recording/playback round-trip
