@@ -1,6 +1,7 @@
 pub mod artifact;
 pub mod comfy_conditioning;
 pub mod comfy_execution_registry;
+pub mod comfy_graph_validation;
 pub mod comfy_latents;
 pub mod comfy_model_catalog;
 pub mod comfy_model_components;
@@ -35,6 +36,8 @@ mod artifact_tests;
 mod comfy_conditioning_tests;
 #[cfg(test)]
 mod comfy_execution_registry_tests;
+#[cfg(test)]
+mod comfy_graph_validation_tests;
 #[cfg(test)]
 mod comfy_latents_tests;
 #[cfg(test)]
@@ -89,6 +92,7 @@ pub use comfy_execution_registry::{
     GuidanceCapability, GuidanceMode, ModelFamilyExecutionProfile, SamplerCapability, SamplerKind,
     SchedulerCapability, SchedulerKind,
 };
+pub use comfy_graph_validation::{ComfyPromptGraphValidator, ComfyValidationCapabilities};
 pub use comfy_latents::{
     ComfyLatentRuntime, LatentArtifact, LatentCompressionKind, LatentCompressionMetadata,
     LatentMask, LatentMediaKind, LatentValidationDiagnostic,

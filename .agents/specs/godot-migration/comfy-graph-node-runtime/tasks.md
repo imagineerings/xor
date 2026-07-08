@@ -35,8 +35,8 @@ Implement runtime graph compatibility in layers: registry/schema first, validati
   - _Requirements: 2.3_
   - _writes: crates/world_model/src/comfy_node_replacement.rs, crates/world_model/src/comfy_node_replacement_tests.rs_
 
-- [ ] 4. Implement prompt graph validator
-  - Validate node existence, required inputs, link indexes, type compatibility, cycles, and partial execution targets.
+- [x] 4. Implement prompt graph validator
+  - Validate node existence, required inputs, link indexes, type compatibility, cycles, partial execution targets, and provider/model/asset capability gates as native Sim graph validation rather than passing prompt validation through to Comfy.
   - _Requirements: 2.1, 2.2, 5.3_
   - _writes: crates/world_model/src/comfy_graph_validation.rs, crates/world_model/src/comfy_graph_validation_tests.rs_
 

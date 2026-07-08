@@ -96,6 +96,12 @@ pub struct NodeReplacementRule {
     pub output_mappings: BTreeMap<OutputId, OutputId>,
 }
 
+pub struct ComfyValidationCapabilities {
+    pub providers: BTreeSet<String>,
+    pub model_folders: BTreeSet<String>,
+    pub asset_capabilities: BTreeSet<String>,
+}
+
 pub struct PromptNode {
     pub id: NodeId,
     pub class_type: NodeTypeId,
@@ -128,6 +134,12 @@ the enabled Sim registry, rewrites input and output port names on graph nodes
 and links, preserves literal input metadata under the new Sim input names, and
 leaves invalid replacement targets untouched with deterministic diagnostics for
 later validation.
+
+The prompt graph validator is native Sim graph validation. It validates node
+availability through the enabled Sim registry, required inputs satisfied by
+links or literal Sim metadata, linked port existence, link type compatibility,
+cycles, duplicate links, partial execution targets, and provider/model/asset
+capability gates without passing prompt validation through ComfyUI.
 
 ## Correctness Properties
 
