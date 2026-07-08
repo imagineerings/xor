@@ -32,10 +32,11 @@ Represent media functionality as capability groups and implement deterministic o
   - _Requirements: 1.1, 1.2, 1.3_
   - _writes: crates/world_model/src/sim_image_nodes.rs, crates/world_model/src/sim_mask_nodes.rs, crates/world_model/src/sim_image_nodes_tests.rs_
 
-- [ ] 3. Implement video node adapters and diagnostics
+- [x] 3. Implement video node adapters and diagnostics
   - Add load/create/save/slice metadata handling and backend diagnostics for interpolation, stitching, merging, upscaling, inpaint, caption, depth, pose, face, and segmentation nodes.
+  - Represent video metadata, frame ranges, frame batches, advanced operations, backend status, and diagnostics with native `SimVideo*` records.
   - _Requirements: 2.1, 2.2, 2.3_
-  - _writes: crates/world_model/src/comfy_video_nodes.rs, crates/world_model/src/comfy_video_nodes_tests.rs_
+  - _writes: crates/world_model/src/sim_video_nodes.rs, crates/world_model/src/sim_video_nodes_tests.rs_
 
 - [ ] 4. Implement audio node adapters and diagnostics
   - Add audio metadata handling, simple transforms, codec diagnostics, and audio latent model capability validation.

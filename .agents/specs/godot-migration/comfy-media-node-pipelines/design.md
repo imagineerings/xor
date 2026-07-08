@@ -46,6 +46,10 @@ flowchart TD
 
 - **Purpose**: Implement video load/save/create/slice and route advanced video processing to approved backends.
 - **Responsibilities**: Frame extraction, frame ranges, MIME metadata, audio association, and codec diagnostics.
+- **Native behavior**: Uses `SimVideo*` adapters to preserve frame count,
+  frame rate, MIME type, audio references, frame ranges, and output references.
+  Advanced processing surfaces native Sim backend diagnostics for dependency
+  review or unsupported backend state before execution.
 
 ### AudioOps
 
@@ -94,6 +98,11 @@ pub struct SimMaskArtifact {
     pub shape: SimMaskShape,
     pub inverted: bool,
     pub feather_radius: u32,
+}
+
+pub struct SimVideoArtifact {
+    pub reference: String,
+    pub metadata: SimVideoMetadata,
 }
 ```
 
