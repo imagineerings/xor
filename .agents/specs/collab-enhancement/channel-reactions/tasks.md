@@ -112,25 +112,29 @@ Add emoji reaction support to Sim channel messages. This spans five layers: prot
 
 ### Phase 5 — Client: Data Layer
 
-- [ ] 11. Add ReactionSummary Rust type on client
+- [x] 11. Add ReactionSummary Rust type on client
   - Define `ReactionSummary` struct with `emoji_name: SharedString`, `count: usize`, `user_ids: Vec<u64>`, `reacted_by_me: bool`.
   - Implement conversion from proto `ReactionSummary` to client type.
   - _Requirements: 2.2_
-  - _writes: crates/client/src/channel_reactions.rs_
+  - _writes: `crates/client/src/channel_chat.rs`_
+  - _validated: `cargo test -p client channel_chat::tests --lib`_
 
-- [ ] 12. Model reactions in ChannelMessage client state
+- [x] 12. Model reactions in ChannelMessage client state
   - Add `reactions: Vec<ReactionSummary>` field to the client-side `ChannelMessage` struct.
   - Populate from proto `ChannelMessage.reaction_summaries` when messages are fetched.
   - Implement update method to merge incoming `UpdateMessageReactions` into the cached message list.
   - _Requirements: 2.2, 2.4_
-  - _writes: crates/client/src/channel_messages.rs_
+  - _writes: `crates/collab_ui/src/channel_chat.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support --test collab_tests channel_chat_ui_tests`_
 
-- [ ] 13. Handle UpdateMessageReactions push on client
+- [x] 13. Handle UpdateMessageReactions push on client
   - Register handler for incoming `UpdateMessageReactions` in the WebSocket dispatch.
   - Look up the channel and message by ID; merge updated reaction data into the local message.
   - Notify the channel view to re-render the affected message's reaction bar.
   - _Requirements: 2.2_
-  - _writes: crates/client/src/channel_reactions.rs_
+  - _writes: `crates/collab_ui/src/channel_chat.rs`_
+  - _writes: `crates/collab/tests/integration/channel_chat_ui_tests.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support --test collab_tests channel_chat_ui_tests`_
 
 - [x] 14. Implement add_remove_reaction on client ChannelClient
   - Add `add_reaction(channel_id, message_id, emoji_name)` method that sends `AddReaction` RPC.

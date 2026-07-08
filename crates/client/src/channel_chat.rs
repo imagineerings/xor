@@ -1,7 +1,7 @@
 use crate::{Client, Subscription};
 use anyhow::{Context as _, Result};
 use futures::Future;
-use gpui::{AsyncApp, Entity, WeakEntity};
+use gpui::{AsyncApp, Entity, SharedString, WeakEntity};
 use rpc::{TypedEnvelope, proto};
 use std::sync::Arc;
 
@@ -19,6 +19,26 @@ pub struct UpdateChannelMessage {
     pub body: String,
     pub nonce: u128,
     pub mentions: Vec<proto::ChatMention>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ReactionSummary {
+    pub emoji_name: SharedString,
+    pub count: usize,
+    pub user_ids: Vec<u64>,
+    pub reacted_by_me: bool,
+}
+
+impl ReactionSummary {
+    pub fn from_proto(summary: proto::ReactionSummary, current_user_id: u64) -> Self {
+        let reacted_by_me = summary.user_ids.contains(&current_user_id);
+        Self {
+            emoji_name: SharedString::from(summary.emoji_name),
+            count: summary.count as usize,
+            user_ids: summary.user_ids,
+            reacted_by_me,
+        }
+    }
 }
 
 impl Client {
@@ -178,5 +198,27 @@ impl Client {
         F: 'static + Future<Output = Result<()>>,
     {
         self.add_message_handler(entity, handler)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reaction_summary_from_proto_marks_current_user() {
+        let summary = ReactionSummary::from_proto(
+            proto::ReactionSummary {
+                emoji_name: "thumbs_up".to_string(),
+                count: 2,
+                user_ids: vec![1, 2],
+            },
+            2,
+        );
+
+        assert_eq!(summary.emoji_name.as_ref(), "thumbs_up");
+        assert_eq!(summary.count, 2);
+        assert_eq!(summary.user_ids, vec![1, 2]);
+        assert!(summary.reacted_by_me);
     }
 }

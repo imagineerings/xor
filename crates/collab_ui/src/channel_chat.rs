@@ -121,7 +121,12 @@ impl ChannelChat {
         let weak_self = cx.weak_entity();
         let _rpc_subscriptions = vec![
             client.add_channel_message_sent_handler(weak_self.clone(), Self::handle_message_sent),
-            client.add_channel_message_update_handler(weak_self, Self::handle_message_update),
+            client
+                .add_channel_message_update_handler(weak_self.clone(), Self::handle_message_update),
+            client.add_channel_message_reactions_update_handler(
+                weak_self,
+                Self::handle_message_reactions_update,
+            ),
         ];
 
         Self {
@@ -163,6 +168,25 @@ impl ChannelChat {
                 && let Some(message) = message.payload.message
             {
                 this.upsert_message(message, cx);
+            }
+        });
+        Ok(())
+    }
+
+    async fn handle_message_reactions_update(
+        this: Entity<Self>,
+        update: TypedEnvelope<proto::UpdateMessageReactions>,
+        mut cx: AsyncApp,
+    ) -> Result<()> {
+        this.update(&mut cx, |this, cx| {
+            if update.payload.channel_id == this.channel_id.0
+                && let Some(message) = this
+                    .messages
+                    .iter_mut()
+                    .find(|message| message.id == update.payload.message_id)
+            {
+                message.reaction_summaries = update.payload.reactions;
+                cx.notify();
             }
         });
         Ok(())
@@ -310,6 +334,14 @@ impl ChannelChat {
         self.messages
             .iter()
             .map(|message| message.body.clone())
+            .collect()
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn message_reactions_for_test(&self) -> Vec<Vec<proto::ReactionSummary>> {
+        self.messages
+            .iter()
+            .map(|message| message.reaction_summaries.clone())
             .collect()
     }
 
