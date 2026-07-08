@@ -17,7 +17,8 @@ Model mesh requests and artifacts in W4 after shared world-model request and pro
 
 ## Tasks
 
-- [ ] 1. Add mesh request and generated artifact models
+- [x] 1. Add mesh request and generated artifact models
   - Model textured mesh requests, backend descriptors, preview metadata, export targets, and provenance.
+  - Represent mesh requests, backend selection, export formats, texture options, and artifact metadata with native Sim `Mesh*` records in `world_model`.
   - _Requirements: 1.1, 2.1_
   - _writes: crates/world_model/src/mesh.rs, crates/world_model/src/mesh_artifact.rs, crates/world_model/src/mesh_tests.rs_
