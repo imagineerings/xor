@@ -38,8 +38,9 @@ Import shipped blueprints first, then add workflow persistence and API export, t
   - _Requirements: 3.1, 3.2_
   - _writes: crates/world_model/src/comfy_subgraphs.rs, crates/world_model/src/comfy_subgraphs_tests.rs_
 
-- [ ] 4. Implement workflow template adapter
+- [x] 4. Implement workflow template adapter
   - Expose custom node workflow templates and static template assets through Sim template services.
+  - Preserve template names, node-pack metadata, safe static asset refs, graph JSON, sanitized listings, and diagnostics as native Sim template records without ComfyUI directory pass-through.
   - _Requirements: 3.3_
   - _writes: crates/world_model/src/comfy_workflow_templates.rs, crates/world_model/src/comfy_workflow_templates_tests.rs_
 

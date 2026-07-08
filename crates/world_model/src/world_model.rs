@@ -31,6 +31,7 @@ pub mod comfy_subgraphs;
 pub mod comfy_vae;
 pub mod comfy_worker_execution;
 pub mod comfy_workflow_export;
+pub mod comfy_workflow_templates;
 pub mod comfy_workflows;
 pub mod comfy_world_model_profiles;
 pub mod comfy_ws;
@@ -101,6 +102,8 @@ mod comfy_schema_tests;
 mod comfy_subgraphs_tests;
 #[cfg(test)]
 mod comfy_worker_execution_tests;
+#[cfg(test)]
+mod comfy_workflow_templates_tests;
 #[cfg(test)]
 mod comfy_workflows_tests;
 #[cfg(test)]
@@ -248,6 +251,12 @@ pub use comfy_worker_execution::{
 };
 pub use comfy_workflow_export::{
     ComfyWorkflowApiExporter, ComfyWorkflowExportDiagnostic, INVALID_WORKFLOW_GRAPH_CODE,
+};
+pub use comfy_workflow_templates::{
+    ComfyWorkflowTemplateAdapter, ComfyWorkflowTemplateAsset, ComfyWorkflowTemplateDiagnostic,
+    ComfyWorkflowTemplateId, ComfyWorkflowTemplateListing, ComfyWorkflowTemplateRecord,
+    ComfyWorkflowTemplateSource, DUPLICATE_WORKFLOW_TEMPLATE_CODE,
+    UNSAFE_WORKFLOW_TEMPLATE_PATH_CODE, WORKFLOW_TEMPLATE_NOT_FOUND_CODE,
 };
 pub use comfy_workflows::{
     ComfyWorkflowDiagnostic, ComfyWorkflowDocument, ComfyWorkflowId, ComfyWorkflowSource,

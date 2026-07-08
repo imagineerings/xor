@@ -57,6 +57,17 @@ pub trait WorkflowStore {
   retrieval for execution/import callers. The index does not defer discovery or
   graph reads to a ComfyUI extension registry.
 
+### WorkflowTemplateAdapter
+
+- **Purpose**: Expose custom-node workflow examples through Sim template
+  services.
+- **Responsibilities**: Stable template ids, safe template/asset path records,
+  sanitized listings, static asset references, and full workflow graph retrieval.
+- **Native template records**: Custom-node workflow examples are normalized into
+  Sim-owned template records with node-pack metadata, static asset references,
+  sanitized metadata, diagnostics, and full graph JSON. The adapter does not
+  serve templates by proxying a ComfyUI extension directory.
+
 ### NodeReplacementCatalog
 
 - **Purpose**: Store node replacement metadata for old workflow compatibility.
