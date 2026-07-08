@@ -369,6 +369,12 @@
       "updated_at": "2026-07-08T13:08:05Z"
     },
     {
+      "task_identifier": ".agents/specs/goose-migration/mcp-tools/tasks.md:59",
+      "status": "done",
+      "summary": "Task 7: Added integration tests under crates/mcp_servers/*/tests for memory persistence/tool calls, autovisualiser rendering/tool calls, Peekaboo mock capture/listing, and tutorial loading/progression. Existing agent document-tool unit tests cover PDF/DOCX/XLSX round trips.",
+      "updated_at": "2026-07-08T16:05:00Z"
+    },
+    {
       "task_identifier": ".agents/specs/goose-migration/typescript-sdk/tasks.md:9",
       "status": "done",
       "summary": "Task 1: Added ui/sdk npm package scaffold for @sim/sdk with package exports, tsc build/typecheck scripts, strict tsconfig, generated type scaffold, and top-level type exports.",
@@ -512,8 +518,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/mcp-tools",
-      "summary": "Tasks 1-6 are checked complete. The slice now has runner support, native PDF/DOCX/XLSX/platform tools, memory/peekaboo/autovisualiser/tutorial MCP servers, and remaining work is the cross-server test task.",
-      "updated_at": "2026-07-08T15:55:00Z"
+      "summary": "Tasks 1-7 are checked complete. The MCP tools slice now has runner support, native PDF/DOCX/XLSX/platform tools, memory/peekaboo/autovisualiser/tutorial MCP servers, and integration/unit coverage for the delivered behavior.",
+      "updated_at": "2026-07-08T16:05:00Z"
     },
     {
       "scope": ".agents/specs/goose-migration/typescript-sdk",

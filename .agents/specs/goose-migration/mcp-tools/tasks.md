@@ -56,7 +56,7 @@ Implement the MCP tool servers from goose as a combination of native agent tools
   - _Requirements: 5_
   - _writes: crates/mcp_servers/tutorial/src/lib.rs_
 
-- [ ] 7. Write tests
+- [x] 7. Write tests
   - Document format validation tests (PDF, DOCX, XLSX)
   - Memory persistence and CRUD tests
   - Screen capture tests on each platform
