@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T22:18:00Z",
+  "updated_at": "2026-07-08T22:30:00Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -718,6 +718,12 @@
       "status": "done",
       "summary": "Task 7: Added sim interactive dispatch and a line-oriented interactive loop that composes onboarding first-run detection, InteractiveSession, TerminalRenderer, SlashCommandRouter, EOF/interrupted-read shutdown handling, and focused loop/slash/user-input tests.",
       "updated_at": "2026-07-08T22:18:00Z"
+    },
+    {
+      "task_identifier": ".agents/specs/goose-migration/text-ui/tasks.md:66",
+      "status": "done",
+      "summary": "Task 8: Added scripts/test-text-ui.sh to validate CLI interactive/session/renderer/slash tests plus configure, extension, and onboarding command tests, and wired it into prerelease quick checks.",
+      "updated_at": "2026-07-08T22:30:00Z"
     }
   ],
   "dependency_notes": [
@@ -773,8 +779,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/text-ui",
-      "summary": "Tasks 1-7 are checked complete. crates/cli now exposes an interactive session/input core, terminal rendering primitives, slash-command routing, sim configure, sim extension management, sim onboarding, and sim interactive wiring with graceful EOF/interrupted-read shutdown. Task 8 can add the aggregate text-ui validation harness.",
-      "updated_at": "2026-07-08T22:18:00Z"
+      "summary": "Tasks 1-8 are checked complete. crates/cli now exposes an interactive session/input core, terminal rendering primitives, slash-command routing, sim configure, sim extension management, sim onboarding, sim interactive wiring, and scripts/test-text-ui.sh validation wired into prerelease quick checks.",
+      "updated_at": "2026-07-08T22:30:00Z"
     },
     {
       "scope": ".agents/specs/godot-migration",

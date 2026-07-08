@@ -63,7 +63,7 @@ Implement an interactive terminal UI mode for sim's CLI using crossterm/ratatui,
   - _Requirements: 1_
   - _writes: crates/cli/src/main.rs (modifications), crates/cli/src/commands/interactive.rs_
 
-- [ ] 8. Write tests
+- [x] 8. Write tests
   - Markdown rendering with known input/output pairs
   - Slash command parsing and routing
   - Configuration wizard flow (all paths)

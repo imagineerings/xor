@@ -14,6 +14,7 @@ case "$mode" in
     scripts/test-mcp-servers.sh
     scripts/test-observability-analytics.sh
     scripts/test-security-permissions.sh
+    scripts/test-text-ui.sh
     ;;
   full)
     scripts/prerelease-check.sh quick
