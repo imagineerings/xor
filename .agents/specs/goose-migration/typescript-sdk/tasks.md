@@ -50,7 +50,7 @@ Implement a TypeScript SDK as an npm package that provides programmatic access t
   - _Requirements: 4_
   - _writes: ui/sdk/src/client-capabilities.ts_
 
-- [ ] 7. Implement binary resolver
+- [x] 7. Implement binary resolver
   - Find sim binary for current platform
   - Support custom binary paths
   - Version detection

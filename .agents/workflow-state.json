@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T13:39:31Z",
+  "updated_at": "2026-07-08T13:43:22Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -371,6 +371,12 @@
       "updated_at": "2026-07-08T13:39:31Z"
     },
     {
+      "task_identifier": ".agents/specs/goose-migration/typescript-sdk/tasks.md:53",
+      "status": "done",
+      "summary": "Task 7: Added ui/sdk/src/resolve-binary.ts with BinaryResolver, BinaryNotFoundError, custom path support, platform candidate resolution, launchBinary, and findInstalledVersion helpers. Exported the resolver from ui/sdk/src/index.ts.",
+      "updated_at": "2026-07-08T13:43:22Z"
+    },
+    {
       "task_identifier": ".agents/specs/ci-migration/tasks.md",
       "status": "deprioritized",
       "summary": "All tasks in .agents/specs/ci-migration are deprioritized until every other local workflow task is complete. Do not select CI migration work while non-CI tasks remain available.",
@@ -411,8 +417,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/typescript-sdk",
-      "summary": "Tasks 1-6 are checked complete. Future SDK implementation tasks can build from ui/sdk with @sim/sdk package metadata, strict TypeScript config, generated API types, fetch-based HttpTransport, HttpStreamClient SSE support, GooseClient facade, MCPAppsClient, and client capability declaration helpers. Full tsc validation still requires installing ui/sdk dev dependencies.",
-      "updated_at": "2026-07-08T13:39:31Z"
+      "summary": "Tasks 1-7 are checked complete. Future SDK implementation tasks can build from ui/sdk with @sim/sdk package metadata, strict TypeScript config, generated API types, fetch-based HttpTransport, HttpStreamClient SSE support, GooseClient facade, MCPAppsClient, client capability declaration helpers, and BinaryResolver. Full tsc validation still requires installing ui/sdk dev dependencies.",
+      "updated_at": "2026-07-08T13:43:22Z"
     },
     {
       "scope": ".agents/specs/godot-migration",
