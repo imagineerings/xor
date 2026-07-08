@@ -119,6 +119,31 @@ pub struct ConditioningRuntimeContext {
     pub worker_supports_control_attachments: bool,
 }
 
+pub struct LatentArtifact {
+    pub id: LatentId,
+    pub format: LatentFormat,
+    pub media: LatentMediaKind,
+    pub width: u32,
+    pub height: u32,
+    pub channels: u32,
+    pub frames: Option<u32>,
+    pub batch: u32,
+    pub compression: LatentCompressionMetadata,
+    pub mask: Option<LatentMask>,
+}
+
+pub struct VaeRuntimeRequest {
+    pub operation: VaeOperationKind,
+    pub node_id: NodeId,
+    pub vae_model_ref: ModelFileRef,
+    pub image_ref: Option<AssetRef>,
+    pub input_latent: Option<LatentArtifact>,
+    pub output_latent: LatentArtifact,
+    pub mask: Option<LatentMask>,
+    pub tiling: Option<VaeTilingMetadata>,
+    pub temporal_frames: Option<u32>,
+}
+
 pub struct ModelFamilyExecutionProfile {
     pub family: ModelFamilyId,
     pub media_domain: MediaDomain,
@@ -149,6 +174,12 @@ Comfy-compatible conditioning semantics for interoperability, but validation and
 worker handoff use typed Sim bundle, tensor, prompt, region, transform, and
 control-attachment records instead of passing opaque Comfy payloads through the
 runtime.
+
+Latent and VAE records are also native Sim runtime records. VAE encode, decode,
+tiled, temporal, and inpaint operations preserve Comfy-compatible metadata, but
+Sim validates latent format, dimensions, frame counts, masks, compression, VAE
+model references, and tiling metadata before worker execution rather than
+delegating those checks to Comfy.
 
 ## Correctness Properties
 

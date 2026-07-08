@@ -1,6 +1,7 @@
 pub mod artifact;
 pub mod comfy_conditioning;
 pub mod comfy_execution_registry;
+pub mod comfy_latents;
 pub mod comfy_model_catalog;
 pub mod comfy_model_family;
 pub mod comfy_model_folders;
@@ -9,6 +10,7 @@ pub mod comfy_model_resources;
 pub mod comfy_quantization;
 pub mod comfy_runtime_policy;
 pub mod comfy_sampling;
+pub mod comfy_vae;
 pub mod controls;
 pub mod graph;
 pub mod graph_validation;
@@ -25,6 +27,8 @@ mod artifact_tests;
 mod comfy_conditioning_tests;
 #[cfg(test)]
 mod comfy_execution_registry_tests;
+#[cfg(test)]
+mod comfy_latents_tests;
 #[cfg(test)]
 mod comfy_model_catalog_tests;
 #[cfg(test)]
@@ -65,6 +69,10 @@ pub use comfy_execution_registry::{
     GuidanceCapability, GuidanceMode, ModelFamilyExecutionProfile, SamplerCapability, SamplerKind,
     SchedulerCapability, SchedulerKind,
 };
+pub use comfy_latents::{
+    ComfyLatentRuntime, LatentArtifact, LatentCompressionKind, LatentCompressionMetadata,
+    LatentMask, LatentMediaKind, LatentValidationDiagnostic,
+};
 pub use comfy_model_catalog::{
     ComfyModelCatalog, ModelCatalogError, ModelCatalogSnapshot, ModelFileSummary, ModelRootSnapshot,
 };
@@ -98,6 +106,10 @@ pub use comfy_sampling::{
     ComfySamplingRequestBuilder, DenoiseRange, DeterministicRunMetadata, LatentDescriptor,
     NoisePolicy, SamplingNodeKind, SamplingProgress, SamplingRunInput, SamplingRunRequest,
     SamplingValidationDiagnostic,
+};
+pub use comfy_vae::{
+    ComfyVaeRuntime, VaeOperationKind, VaeRuntimeRequest, VaeTilingMetadata,
+    VaeValidationDiagnostic,
 };
 pub use controls::{ControlKeyGroup, ControlParseError, WorldActionControlParser};
 pub use graph::{DataType, DiffusionGraph, GraphEdge, GraphNode, NodePort, PortDirection};

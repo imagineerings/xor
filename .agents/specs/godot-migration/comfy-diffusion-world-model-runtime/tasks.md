@@ -35,8 +35,8 @@ Implement Comfy model-execution semantics after model catalogs and graph validat
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
   - _writes: crates/world_model/src/comfy_conditioning.rs, crates/world_model/src/comfy_conditioning_tests.rs_
 
-- [ ] 4. Implement latent and VAE runtime semantics
-  - Add latent format validation, VAE encode/decode/tiled/temporal/inpaint metadata, mask handling, compression metadata, and mismatch diagnostics.
+- [x] 4. Implement latent and VAE runtime semantics
+  - Add native Sim latent format validation, VAE encode/decode/tiled/temporal/inpaint metadata, mask handling, compression metadata, and mismatch diagnostics rather than forwarding latent or VAE behavior to Comfy.
   - _Requirements: 3.1, 3.4_
   - _writes: crates/world_model/src/comfy_latents.rs, crates/world_model/src/comfy_vae.rs, crates/world_model/src/comfy_latents_tests.rs_
 
