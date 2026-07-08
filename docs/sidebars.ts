@@ -163,7 +163,14 @@ const sidebars: SidebarsConfig = {
     {
       type: "category",
       label: "Developing Sim",
-      items: ["development", "development/macos", "development/linux"],
+      items: [
+        "development",
+        "development/building-from-source",
+        "development/workflow",
+        "development/contributing",
+        "development/macos",
+        "development/linux",
+      ],
     },
   ],
 };

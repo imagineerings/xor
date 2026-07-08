@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T14:15:51Z",
+  "updated_at": "2026-07-08T14:19:40Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -435,6 +435,12 @@
       "updated_at": "2026-07-08T14:15:51Z"
     },
     {
+      "task_identifier": ".agents/specs/goose-migration/documentation/tasks.md:38",
+      "status": "done",
+      "summary": "Task 5: Added Docusaurus development docs under docs/src/development for building from source, development workflow, and contributing. Updated the Developing Sim sidebar section with the new pages.",
+      "updated_at": "2026-07-08T14:19:40Z"
+    },
+    {
       "task_identifier": ".agents/specs/ci-migration/tasks.md",
       "status": "deprioritized",
       "summary": "All tasks in .agents/specs/ci-migration are deprioritized until every other local workflow task is complete. Do not select CI migration work while non-CI tasks remain available.",
@@ -480,8 +486,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/documentation",
-      "summary": "Tasks 1-4 are checked complete. Docusaurus is initialized as an overlay around the existing docs/src mdBook content, with getting-started, feature, configuration, provider, extension/MCP, and troubleshooting docs. Remaining documentation tasks should add development content, blog, tutorials, scripts, and CI before enabling those routes.",
-      "updated_at": "2026-07-08T14:15:51Z"
+      "summary": "Tasks 1-5 are checked complete. Docusaurus is initialized as an overlay around the existing docs/src mdBook content, with getting-started, feature, configuration, provider, extension/MCP, troubleshooting, development workflow, build, and contributing docs. Remaining documentation tasks should add blog, tutorials, scripts, and CI before enabling those routes.",
+      "updated_at": "2026-07-08T14:19:40Z"
     },
     {
       "scope": ".agents/specs/godot-migration",

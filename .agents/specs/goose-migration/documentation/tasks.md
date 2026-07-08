@@ -35,7 +35,7 @@ Set up a Docusaurus-based documentation site for sim with installation guides, c
   - _Requirements: 1_
   - _writes: docs/docs/configuration/, docs/docs/troubleshooting/_
 
-- [ ] 5. Write development and contributing docs
+- [x] 5. Write development and contributing docs
   - Building from source
   - Development workflow
   - Contributing guidelines
