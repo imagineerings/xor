@@ -2,7 +2,7 @@ mod channel_modal;
 mod contact_finder;
 
 use self::channel_modal::ChannelModal;
-use crate::{CollaborationPanelSettings, channel_view::ChannelView};
+use crate::{CollaborationPanelSettings, channel_chat::ChannelChat, channel_view::ChannelView};
 use anyhow::Context as _;
 use call::ActiveCall;
 use channel::{Channel, ChannelEvent, ChannelStore};
@@ -329,6 +329,9 @@ enum ListEntry {
     ChannelNotes {
         channel_id: ChannelId,
     },
+    ChannelChat {
+        channel_id: ChannelId,
+    },
     ChannelEditor {
         depth: usize,
     },
@@ -600,6 +603,7 @@ impl CollabPanel {
                 if query.is_empty()
                     && let Some(channel_id) = room.channel_id()
                 {
+                    self.entries.push(ListEntry::ChannelChat { channel_id });
                     self.entries.push(ListEntry::ChannelNotes { channel_id });
                 }
 
@@ -1325,6 +1329,33 @@ impl CollabPanel {
             .tooltip(Tooltip::text("Open Channel Notes"))
     }
 
+    fn render_channel_chat(
+        &self,
+        channel_id: ChannelId,
+        is_selected: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        ListItem::new("channel-chat")
+            .height(rems_from_px(24.))
+            .toggle_state(is_selected)
+            .on_click(cx.listener(move |this, _, window, cx| {
+                this.open_channel_chat(channel_id, window, cx);
+            }))
+            .start_slot(
+                h_flex()
+                    .gap_1p5()
+                    .child(render_tree_branch(false, true, window, cx))
+                    .child(
+                        Icon::new(IconName::Chat)
+                            .size(IconSize::Small)
+                            .color(Color::Muted),
+                    ),
+            )
+            .child(Label::new("chat"))
+            .tooltip(Tooltip::text("Open Channel Chat"))
+    }
+
     fn has_subchannels(&self, ix: usize) -> bool {
         self.entries.get(ix).is_some_and(|entry| {
             if let ListEntry::Channel { has_children, .. } = entry {
@@ -1492,6 +1523,13 @@ impl CollabPanel {
             }
 
             context_menu = context_menu
+                .entry(
+                    "Open Chat",
+                    None,
+                    window.handler_for(&this, move |this, window, cx| {
+                        this.open_channel_chat(channel_id, window, cx)
+                    }),
+                )
                 .entry(
                     "Open Notes",
                     None,
@@ -1847,6 +1885,9 @@ impl CollabPanel {
                 }
                 ListEntry::ChannelNotes { channel_id } => {
                     self.open_channel_notes(*channel_id, window, cx)
+                }
+                ListEntry::ChannelChat { channel_id } => {
+                    self.open_channel_chat(*channel_id, window, cx)
                 }
                 ListEntry::OutgoingRequest(_) => {}
                 ListEntry::ChannelEditor { .. } => {}
@@ -2347,6 +2388,17 @@ impl CollabPanel {
         }
     }
 
+    fn open_channel_chat(
+        &mut self,
+        channel_id: ChannelId,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(workspace) = self.workspace.upgrade() {
+            ChannelChat::open(channel_id, workspace, window, cx).detach();
+        }
+    }
+
     fn show_inline_context_menu(
         &mut self,
         _: &Secondary,
@@ -2776,6 +2828,9 @@ impl CollabPanel {
                 .into_any_element(),
             ListEntry::ChannelNotes { channel_id } => self
                 .render_channel_notes(channel_id, is_selected, window, cx)
+                .into_any_element(),
+            ListEntry::ChannelChat { channel_id } => self
+                .render_channel_chat(channel_id, is_selected, window, cx)
                 .into_any_element(),
         }
     }
@@ -3907,6 +3962,14 @@ impl PartialEq for ListEntry {
                     return channel_id == other_id;
                 }
             }
+            ListEntry::ChannelChat { channel_id } => {
+                if let ListEntry::ChannelChat {
+                    channel_id: other_id,
+                } = other
+                {
+                    return channel_id == other_id;
+                }
+            }
             ListEntry::ChannelInvite(channel_1) => {
                 if let ListEntry::ChannelInvite(channel_2) = other {
                     return channel_1.id == channel_2.id;
@@ -4140,6 +4203,9 @@ impl CollabPanel {
                 }
                 ListEntry::ChannelNotes { .. } => {
                     string_entries.push(format!("  (notes){selected_marker}"));
+                }
+                ListEntry::ChannelChat { .. } => {
+                    string_entries.push(format!("  (chat){selected_marker}"));
                 }
                 ListEntry::ChannelEditor { depth } => {
                     let indent = "  ".repeat(*depth + 1);

@@ -54,11 +54,12 @@ Restore the channel-chat storage, RPC, client, and desktop UI foundation that th
   - _writes: `crates/collab_ui/src/collab_ui.rs`_
   - _validated: `cargo fmt -p collab_ui`; `cargo check -p collab_ui`_
 
-- [ ] 6. Wire channel chat into navigation
-  - [ ] 6.1 Add an entry point from channel navigation/panel surfaces.
-  - [ ] 6.2 Ensure leaving the view calls `LeaveChannelChat` and cleans subscriptions.
+- [x] 6. Wire channel chat into navigation
+  - [x] 6.1 Add an entry point from channel navigation/panel surfaces.
+  - [x] 6.2 Ensure leaving the view calls `LeaveChannelChat` and cleans subscriptions.
   - _Requirements: 0.3_
   - _writes: `crates/collab_ui/src/collab_panel.rs`_
+  - _validated: `cargo fmt -p collab_ui`; `cargo check -p collab_ui`_
 
 - [ ] 7. Add server integration tests
   - [ ] 7.1 Test join, send, history, edit, delete, and ack flows.
