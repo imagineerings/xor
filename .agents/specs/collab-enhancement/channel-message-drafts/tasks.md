@@ -22,7 +22,7 @@ Add client-side draft persistence for channel message composition. When a user t
   - _writes: `crates/collab_ui/src/draft_store.rs`_
   - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui draft_store --features test-support`_
 
-- [ ] 2. Add KVP persistence layer to `DraftStore`
+- [x] 2. Add KVP persistence layer to `DraftStore`
   - Implement `persist_key(channel_id) -> String` — key format `channel_draft.{channel_id}`.
   - Implement private async `write_to_kvp()` and `read_from_kvp()` methods.
   - Make `save_draft()` persist synchronously to KVP after updating cache.
@@ -30,6 +30,7 @@ Add client-side draft persistence for channel message composition. When a user t
   - Make `clear_draft()` remove from both cache and KVP.
   - _Requirements: 7.1, 7.4_
   - _writes: `crates/collab_ui/src/draft_store.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui draft_store --features test-support`_
 
 - [ ] 3. Register `DraftStore` as a global singleton
   - Add `DraftStore::global(cx: &mut App) -> Entity<Self>` using `Global` trait.

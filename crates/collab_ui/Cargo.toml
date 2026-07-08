@@ -18,6 +18,7 @@ test-support = [
     "call/test-support",
     "client/test-support",
     "collections/test-support",
+    "db/test-support",
     "editor/test-support",
     "gpui/test-support",
     "project/test-support",
