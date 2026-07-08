@@ -36,7 +36,7 @@ This plan covers restoring archived GitHub Actions workflows in priority order. 
 
 ### Phase 2: On-Demand Bundling (P0)
 
-- [ ] 3. Restore `run_bundling.yml`
+- [x] 3. Restore `run_bundling.yml`
   - [ ] 3.1 Move `archive/run_bundling.yml` to `.github/workflows/run_bundling.yml`
   - [ ] 3.2 Verify no path changes needed (the workflow is self-contained)
   - _Requirements: R1_
