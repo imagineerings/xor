@@ -7,6 +7,7 @@ pub mod comfy_model_metadata;
 pub mod comfy_model_resources;
 pub mod comfy_quantization;
 pub mod comfy_runtime_policy;
+pub mod comfy_sampling;
 pub mod controls;
 pub mod graph;
 pub mod graph_validation;
@@ -33,6 +34,8 @@ mod comfy_model_metadata_tests;
 mod comfy_model_resources_tests;
 #[cfg(test)]
 mod comfy_runtime_policy_tests;
+#[cfg(test)]
+mod comfy_sampling_tests;
 #[cfg(test)]
 mod controls_tests;
 #[cfg(test)]
@@ -80,6 +83,11 @@ pub use comfy_runtime_policy::{
     BackendSupport, DeviceBackend, MemoryMode, PrecisionPolicy, RuntimePolicyDiagnostic,
     RuntimePolicyDiagnosticSeverity, RuntimePolicyRequest, RuntimePolicyResolution,
     RuntimePolicyResolver, SimRuntimePolicy,
+};
+pub use comfy_sampling::{
+    ComfySamplingRequestBuilder, DenoiseRange, DeterministicRunMetadata, LatentDescriptor,
+    NoisePolicy, SamplingNodeKind, SamplingProgress, SamplingRunInput, SamplingRunRequest,
+    SamplingValidationDiagnostic,
 };
 pub use controls::{ControlKeyGroup, ControlParseError, WorldActionControlParser};
 pub use graph::{DataType, DiffusionGraph, GraphEdge, GraphNode, NodePort, PortDirection};

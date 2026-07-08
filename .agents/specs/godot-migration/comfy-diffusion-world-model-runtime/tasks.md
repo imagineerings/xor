@@ -25,8 +25,8 @@ Implement Comfy model-execution semantics after model catalogs and graph validat
   - _Requirements: 1.2, 4.1, 4.2, 4.3, 4.4, 6.3_
   - _writes: crates/world_model/src/comfy_execution_registry.rs, crates/world_model/src/comfy_execution_registry_tests.rs_
 
-- [ ] 2. Implement sampling run request builder
-  - Convert KSampler, advanced sampler, custom sampler, and sampling helper node inputs into validated sampling requests with deterministic metadata.
+- [x] 2. Implement sampling run request builder
+  - Convert KSampler, advanced sampler, custom sampler, and sampling helper node inputs into native Sim validated sampling requests with deterministic metadata.
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
   - _writes: crates/world_model/src/comfy_sampling.rs, crates/world_model/src/comfy_sampling_tests.rs_
 

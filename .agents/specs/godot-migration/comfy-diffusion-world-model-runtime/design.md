@@ -86,6 +86,17 @@ pub struct SamplingRunRequest {
     pub model: ModelComponentSet,
     pub patches: Vec<ModelPatchRef>,
     pub family_profile: ModelFamilyExecutionProfile,
+    pub deterministic: Option<DeterministicRunMetadata>,
+}
+
+pub struct DeterministicRunMetadata {
+    pub seed: u64,
+    pub noise_seed: Option<u64>,
+    pub sampler: SamplerId,
+    pub scheduler: SchedulerId,
+    pub backend: DeviceBackend,
+    pub precision: PrecisionPolicy,
+    pub model_hash: Option<String>,
 }
 
 pub struct ConditioningBundle {
