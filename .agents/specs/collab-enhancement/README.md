@@ -10,11 +10,12 @@ This spec suite defines the migration of select Mattermost features into Sim's e
 
 | Priority | Feature | Spec Status | Effort | Impact | Depends On |
 |---|---|---|---|---|---|
-| **P0** | [Channel Rich Text](channel-rich-text/) | ✅ Req + Design + Tasks | Medium | High | — |
-| **P0** | [Channel Reactions](channel-reactions/) | ✅ Req + Design + Tasks | Small | High | — |
-| **P0** | [Message Threading](channel-threads/) | ✅ Req + Design + Tasks | Large | High | — |
-| **P1** | [File Sharing](channel-file-sharing/) | ✅ Req + Design + Tasks | Large | High | Rich Text (for file messages) |
-| **P1** | [Message Search](channel-message-search/) | ✅ Req + Design + Tasks | Large | High | — |
+| **P0** | [Channel Chat Foundation](channel-chat-foundation/) | ✅ Req + Design + Tasks | Large | High | — |
+| **P0** | [Channel Rich Text](channel-rich-text/) | ✅ Req + Design + Tasks | Medium | High | Channel Chat Foundation |
+| **P0** | [Channel Reactions](channel-reactions/) | ✅ Req + Design + Tasks | Small | High | Channel Chat Foundation |
+| **P0** | [Message Threading](channel-threads/) | ✅ Req + Design + Tasks | Large | High | Channel Chat Foundation |
+| **P1** | [File Sharing](channel-file-sharing/) | ✅ Req + Design + Tasks | Large | High | Channel Chat Foundation, Rich Text |
+| **P1** | [Message Search](channel-message-search/) | ✅ Req + Design + Tasks | Large | High | Channel Chat Foundation |
 | **P1** | [Channel Bookmarks](channel-bookmarks/) | ✅ Req + Design + Tasks | Small | Medium | — |
 | **P1** | [Message Drafts](channel-message-drafts/) | ✅ Req + Design + Tasks | Small | Medium | — |
 | **P2** | [Custom User Status](custom-user-status/) | ✅ Req + Design + Tasks | Small | Medium | — |
@@ -41,6 +42,7 @@ These features touch the following Sim components:
 
 ## Execution Order (Recommended)
 
+0. **Phase 0** (P0): Channel Chat Foundation — restore the removed channel chat storage, RPC, and UI surface that the messaging enhancement specs depend on.
 1. **Phase 1** (P0): Rich Text + Reactions + Drafts — foundational messaging UX
 2. **Phase 2** (P1): File Sharing + Bookmarks — content sharing
 3. **Phase 3** (P1): Message Search — information retrieval
