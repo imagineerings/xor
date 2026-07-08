@@ -51,8 +51,9 @@ Implement runtime graph compatibility in layers: registry/schema first, validati
   - _Requirements: 3.4, 4.1, 4.2, 4.3, 5.2, 5.4_
   - _writes: crates/world_model/src/comfy_executor.rs, crates/world_model/src/comfy_executor_tests.rs_
 
-- [ ] 7. Add core node compatibility fixtures
-  - Add fixture prompts and object-info snapshots for core node categories.
+- [x] 7. Add core node compatibility fixtures
+  - Add fixture prompts and object-info snapshots for core node categories as native Sim fixture contracts.
+  - Assert fixture prompts validate, plan, and execute through Sim registry, graph validation, execution planning, and executor dispatch rather than ComfyUI pass-through.
   - _Requirements: 1.1, 1.2, 2.1, 3.4_
   - _writes: crates/world_model/fixtures/comfy/core_nodes.json, crates/world_model/tests/comfy_core_nodes.rs_
 

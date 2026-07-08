@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "native_sim_records": true,
+  "comfyui_passthrough": false,
+  "object_info": {
+    "minimum_node_count": 18,
+    "required_nodes": [
+      "CheckpointLoaderSimple",
+      "CLIPTextEncode",
+      "KSampler",
+      "VAEDecode",
+      "VAEEncode",
+      "LoadImage",
+      "SaveImage",
+      "EmptyLatentImage",
+      "LatentUpscale",
+      "SetLatentNoiseMask",
+      "LoraLoader",
+      "ControlNetLoader",
+      "ControlNetApply",
+      "GLIGENLoader",
+      "GLIGENTextBoxApply",
+      "InpaintModelConditioning",
+      "VAELoader",
+      "VAEDecodeTiled"
+    ],
+    "required_categories": [
+      "conditioning",
+      "conditioning/controlnet",
+      "conditioning/gligen",
+      "conditioning/inpaint",
+      "image",
+      "latent",
+      "latent/inpaint",
+      "loaders",
+      "sampling"
+    ]
+  },
+  "prompts": [
+    {
+      "id": "text_to_image",
+      "target_node": 6,
+      "nodes": [
+        { "id": 1, "type": "CheckpointLoaderSimple", "literals": { "ckpt_name": "sdxl.safetensors" } },
+        { "id": 2, "type": "CLIPTextEncode", "literals": { "text": "quiet mossy courtyard" } },
+        { "id": 3, "type": "CLIPTextEncode", "literals": { "text": "" } },
+        { "id": 4, "type": "EmptyLatentImage", "literals": { "width": "1024", "height": "1024", "batch_size": "1" } },
+        { "id": 5, "type": "KSampler", "literals": { "seed": "42", "steps": "20", "sampler_name": "euler", "scheduler": "normal" } },
+        { "id": 6, "type": "VAEDecode", "literals": {} },
+        { "id": 7, "type": "SaveImage", "literals": { "filename_prefix": "sim-native" } }
+      ],
+      "edges": [
+        { "from": 1, "from_port": "CLIP", "to": 2, "to_port": "clip" },
+        { "from": 1, "from_port": "CLIP", "to": 3, "to_port": "clip" },
+        { "from": 1, "from_port": "MODEL", "to": 5, "to_port": "model" },
+        { "from": 2, "from_port": "CONDITIONING", "to": 5, "to_port": "positive" },
+        { "from": 3, "from_port": "CONDITIONING", "to": 5, "to_port": "negative" },
+        { "from": 4, "from_port": "LATENT", "to": 5, "to_port": "latent_image" },
+        { "from": 5, "from_port": "LATENT", "to": 6, "to_port": "samples" },
+        { "from": 1, "from_port": "VAE", "to": 6, "to_port": "vae" },
+        { "from": 6, "from_port": "IMAGE", "to": 7, "to_port": "images" }
+      ],
+      "expected_dispatch_nodes": [5, 6]
+    },
+    {
+      "id": "controlnet_gligen_inpaint",
+      "target_node": 12,
+      "nodes": [
+        { "id": 1, "type": "CheckpointLoaderSimple", "literals": { "ckpt_name": "sdxl.safetensors" } },
+        { "id": 2, "type": "LoadImage", "literals": { "image": "control.png" } },
+        { "id": 3, "type": "CLIPTextEncode", "literals": { "text": "cabinet of curiosities" } },
+        { "id": 4, "type": "ControlNetLoader", "literals": { "control_net_name": "canny.safetensors" } },
+        { "id": 5, "type": "ControlNetApply", "literals": { "strength": "0.8" } },
+        { "id": 6, "type": "GLIGENLoader", "literals": { "gligen_name": "gligen.safetensors" } },
+        { "id": 7, "type": "GLIGENTextBoxApply", "literals": { "text": "window", "width": "256", "height": "256", "x": "64", "y": "64" } },
+        { "id": 8, "type": "VAEEncode", "literals": {} },
+        { "id": 9, "type": "SetLatentNoiseMask", "literals": {} },
+        { "id": 10, "type": "InpaintModelConditioning", "literals": {} },
+        { "id": 11, "type": "KSampler", "literals": { "seed": "7", "steps": "12", "sampler_name": "dpmpp_2m", "scheduler": "karras" } },
+        { "id": 12, "type": "VAEDecodeTiled", "literals": { "tile_size": "512" } }
+      ],
+      "edges": [
+        { "from": 1, "from_port": "CLIP", "to": 3, "to_port": "clip" },
+        { "from": 3, "from_port": "CONDITIONING", "to": 5, "to_port": "conditioning" },
+        { "from": 4, "from_port": "CONTROL_NET", "to": 5, "to_port": "control_net" },
+        { "from": 2, "from_port": "IMAGE", "to": 5, "to_port": "image" },
+        { "from": 5, "from_port": "CONDITIONING", "to": 7, "to_port": "conditioning" },
+        { "from": 1, "from_port": "CLIP", "to": 7, "to_port": "clip" },
+        { "from": 6, "from_port": "GLIGEN", "to": 7, "to_port": "gligen" },
+        { "from": 2, "from_port": "IMAGE", "to": 8, "to_port": "pixels" },
+        { "from": 1, "from_port": "VAE", "to": 8, "to_port": "vae" },
+        { "from": 8, "from_port": "LATENT", "to": 9, "to_port": "samples" },
+        { "from": 2, "from_port": "MASK", "to": 9, "to_port": "mask" },
+        { "from": 7, "from_port": "CONDITIONING", "to": 10, "to_port": "positive" },
+        { "from": 3, "from_port": "CONDITIONING", "to": 10, "to_port": "negative" },
+        { "from": 2, "from_port": "IMAGE", "to": 10, "to_port": "pixels" },
+        { "from": 1, "from_port": "VAE", "to": 10, "to_port": "vae" },
+        { "from": 2, "from_port": "MASK", "to": 10, "to_port": "mask" },
+        { "from": 1, "from_port": "MODEL", "to": 11, "to_port": "model" },
+        { "from": 10, "from_port": "POSITIVE", "to": 11, "to_port": "positive" },
+        { "from": 10, "from_port": "NEGATIVE", "to": 11, "to_port": "negative" },
+        { "from": 9, "from_port": "LATENT", "to": 11, "to_port": "latent_image" },
+        { "from": 11, "from_port": "LATENT", "to": 12, "to_port": "samples" },
+        { "from": 1, "from_port": "VAE", "to": 12, "to_port": "vae" }
+      ],
+      "expected_dispatch_nodes": [5, 8, 11]
+    }
+  ]
+}

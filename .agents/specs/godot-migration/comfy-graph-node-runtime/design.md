@@ -173,6 +173,11 @@ explicit dispatch records for sampler, conditioning, VAE, latent, model patch,
 diffusion, or world-model node types owned by
 `comfy-diffusion-world-model-runtime/`.
 
+Core node compatibility fixtures are native Sim fixture contracts. They snapshot
+object-info coverage for core node categories and run representative prompt
+graphs through Sim registry lookup, graph validation, execution planning, and
+executor dispatch with mock native outcomes. They are not ComfyUI proxy tests.
+
 ## Correctness Properties
 
 ### Property 1: No Unknown Node Execution
@@ -232,5 +237,5 @@ _For any_ node that requires sampler, scheduler, conditioning, VAE, latent, mode
 
 - Unit tests for schema adaptation, node replacement, link validation, cycle detection, cache key generation, and partial execution closure.
 - Integration tests for prompt validation through queue submission and object info retrieval.
-- Compatibility fixtures for core Comfy nodes: sampler, loaders, CLIP text encode, VAE encode/decode, image save/load, latent operations, LoRA, ControlNet, GLIGEN, and inpaint conditioning.
+- Compatibility fixtures for core Comfy nodes: sampler, loaders, CLIP text encode, VAE encode/decode, image save/load, latent operations, LoRA, ControlNet, GLIGEN, and inpaint conditioning. Fixture approval requires native Sim object-info records, prompt validation, execution planning, and executor dispatch assertions rather than ComfyUI pass-through.
 - Property tests for topological ordering and replacement link preservation.
