@@ -56,7 +56,7 @@ Implement an interactive terminal UI mode for sim's CLI using crossterm/ratatui,
   - _Requirements: 5_
   - _writes: crates/cli/src/commands/onboarding.rs_
 
-- [ ] 7. Wire interactive mode into CLI
+- [x] 7. Wire interactive mode into CLI
   - Add `goose interactive` subcommand
   - Handle CLI arguments and configuration
   - Graceful shutdown (Ctrl+C, Ctrl+D)
