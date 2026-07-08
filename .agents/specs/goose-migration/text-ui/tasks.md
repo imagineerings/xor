@@ -48,7 +48,7 @@ Implement an interactive terminal UI mode for sim's CLI using crossterm/ratatui,
   - _Requirements: 3_
   - _writes: crates/cli/src/commands/extension.rs_
 
-- [ ] 6. Implement CLI onboarding flow
+- [x] 6. Implement CLI onboarding flow
   - First-run detection
   - Welcome message with introduction
   - Provider setup prompt

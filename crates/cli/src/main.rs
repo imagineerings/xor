@@ -518,6 +518,11 @@ fn run() -> Result<()> {
         return Ok(());
     }
 
+    if std::env::args().nth(1).as_deref() == Some("onboarding") {
+        commands::onboarding::run(std::env::args().skip(1))?;
+        return Ok(());
+    }
+
     if std::env::args().nth(1).as_deref() == Some("dictation") {
         commands::dictation::run(std::env::args().skip(1))?;
         return Ok(());

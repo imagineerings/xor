@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T21:45:00Z",
+  "updated_at": "2026-07-08T22:02:00Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -706,6 +706,12 @@
       "status": "done",
       "summary": "Task 5: Added sim extension list/add/remove/status commands backed by a local JSON registry, with extension path registration, duplicate/remove validation, path/manifest status reporting, and focused command/storage tests.",
       "updated_at": "2026-07-08T21:45:00Z"
+    },
+    {
+      "task_identifier": ".agents/specs/goose-migration/text-ui/tasks.md:51",
+      "status": "done",
+      "summary": "Task 6: Added sim onboarding with first-run state detection, welcome/provider/tutorial/extension prompts, completion/reset persistence, stdin/stdout execution, and focused onboarding state/flow tests.",
+      "updated_at": "2026-07-08T22:02:00Z"
     }
   ],
   "dependency_notes": [
@@ -761,8 +767,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/text-ui",
-      "summary": "Tasks 1-5 are checked complete. crates/cli now exposes an interactive session/input core, terminal rendering primitives, slash-command routing, a sim configure wizard, and sim extension list/add/remove/status commands backed by a local extension registry. Task 6 can add first-run onboarding on top of configure and extension commands.",
-      "updated_at": "2026-07-08T21:45:00Z"
+      "summary": "Tasks 1-6 are checked complete. crates/cli now exposes an interactive session/input core, terminal rendering primitives, slash-command routing, sim configure, sim extension management, and sim onboarding with first-run completion state. Task 7 can wire these building blocks into the interactive CLI entry point.",
+      "updated_at": "2026-07-08T22:02:00Z"
     },
     {
       "scope": ".agents/specs/godot-migration",
