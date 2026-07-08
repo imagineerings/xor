@@ -40,8 +40,8 @@ Implement the model runtime as catalog and policy primitives first, then connect
   - _Requirements: 3.1, 3.2, 3.3_
   - _writes: crates/world_model/src/comfy_model_family.rs, crates/world_model/src/comfy_model_family_tests.rs_
 
-- [ ] 5. Implement precision, quantization, device, and memory policy resolver
-  - Parse runtime settings, quantization metadata, backend support, dynamic VRAM/offload options, and compatibility diagnostics.
+- [x] 5. Implement precision, quantization, device, and memory policy resolver
+  - Parse native Sim runtime settings, quantization metadata, backend support, dynamic VRAM/offload options, and compatibility diagnostics without passing policy resolution through to ComfyUI.
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 5.1, 5.2_
   - _writes: crates/world_model/src/comfy_runtime_policy.rs, crates/world_model/src/comfy_quantization.rs, crates/world_model/src/comfy_runtime_policy_tests.rs_
 

@@ -81,6 +81,15 @@ pub struct RuntimePolicy {
     pub device: DevicePolicy,
     pub memory: MemoryPolicy,
     pub quantization: Option<QuantizationPlan>,
+    pub async_offload: bool,
+    pub pinned_memory: bool,
+    pub mmap_weights: bool,
+    pub release_cache_before_load: bool,
+}
+
+pub struct QuantizationPlan {
+    pub global_format: Option<QuantizationFormat>,
+    pub layers: Vec<QuantizedLayerMetadata>,
 }
 ```
 

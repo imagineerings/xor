@@ -3,6 +3,8 @@ pub mod comfy_model_catalog;
 pub mod comfy_model_family;
 pub mod comfy_model_folders;
 pub mod comfy_model_metadata;
+pub mod comfy_quantization;
+pub mod comfy_runtime_policy;
 pub mod controls;
 pub mod graph;
 pub mod graph_validation;
@@ -23,6 +25,8 @@ mod comfy_model_family_tests;
 mod comfy_model_folders_tests;
 #[cfg(test)]
 mod comfy_model_metadata_tests;
+#[cfg(test)]
+mod comfy_runtime_policy_tests;
 #[cfg(test)]
 mod controls_tests;
 #[cfg(test)]
@@ -52,6 +56,14 @@ pub use comfy_model_folders::{
 pub use comfy_model_metadata::{
     ComfyModelMetadataReader, DEFAULT_SAFETENSORS_HEADER_LIMIT_BYTES, ModelMetadataError,
     ModelMetadataSummary, ModelPreviewRef, SafetensorsHeaderMetadata,
+};
+pub use comfy_quantization::{
+    ComfyQuantizationMetadata, QuantizationFormat, QuantizedLayerMetadata,
+};
+pub use comfy_runtime_policy::{
+    BackendSupport, DeviceBackend, MemoryMode, PrecisionPolicy, RuntimePolicyDiagnostic,
+    RuntimePolicyDiagnosticSeverity, RuntimePolicyRequest, RuntimePolicyResolution,
+    RuntimePolicyResolver, SimRuntimePolicy,
 };
 pub use controls::{ControlKeyGroup, ControlParseError, WorldActionControlParser};
 pub use graph::{DataType, DiffusionGraph, GraphEdge, GraphNode, NodePort, PortDirection};
