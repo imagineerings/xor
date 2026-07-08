@@ -32,7 +32,7 @@ Implement an interactive terminal UI mode for sim's CLI using crossterm/ratatui,
   - _Requirements: 6_
   - _writes: crates/cli/src/interactive/slash_commands.rs_
 
-- [ ] 4. Implement configuration wizard
+- [x] 4. Implement configuration wizard
   - Step-by-step wizard for provider setup
   - Input types: text (with secret masking), confirm, select, file
   - Validation per step
