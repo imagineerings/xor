@@ -53,6 +53,18 @@ pub trait ProviderConnector {
   data transfer, unapproved cost, unavailable provider capabilities, unavailable
   models, and quota limits fail inside Sim before credentials or media are read.
 
+### SimProviderSecretStore and SimProviderRedactor
+
+- **Purpose**: Resolve provider credentials through Sim secret references and
+  remove sensitive data from provider payloads before they reach logs, history,
+  diagnostics, or job status.
+- **Native behavior**: Stores provider credential metadata as native
+  `SimProviderSecret*` records, returns secret refs rather than plaintext
+  credentials, emits actionable missing-credential diagnostics, recursively
+  redacts sensitive provider fields, replaces known secret values, and strips
+  signed URLs. Secret support must not serialize workflow JSON plaintext keys
+  or forward credential handling to ComfyUI.
+
 ### ProviderUploadService and ProviderDownloadService
 
 - **Purpose**: Handle source media upload and result import.
@@ -95,6 +107,12 @@ pub struct SimProviderPolicyRequest {
     pub may_incur_cost: bool,
     pub model_id: Option<String>,
     pub estimated_quota_units: u64,
+}
+
+pub struct SimProviderResolvedCredential {
+    pub key: String,
+    pub provider: SimProviderId,
+    pub secret_ref: String,
 }
 ```
 

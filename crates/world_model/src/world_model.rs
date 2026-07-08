@@ -70,6 +70,7 @@ pub mod sim_media_capabilities;
 pub mod sim_packaging_profiles;
 pub mod sim_provider_nodes;
 pub mod sim_provider_policy;
+pub mod sim_provider_secrets;
 pub mod sim_user_data;
 pub mod sim_utility_nodes;
 pub mod sim_video_nodes;
@@ -191,6 +192,8 @@ mod sim_packaging_profiles_tests;
 mod sim_provider_nodes_tests;
 #[cfg(test)]
 mod sim_provider_policy_tests;
+#[cfg(test)]
+mod sim_provider_secrets_tests;
 #[cfg(test)]
 mod sim_user_data_tests;
 #[cfg(test)]
@@ -512,6 +515,12 @@ pub use sim_provider_policy::{
     SIM_PROVIDER_POLICY_QUOTA_EXCEEDED_CODE, SimProviderCapabilityPolicy, SimProviderPolicyContext,
     SimProviderPolicyDecision, SimProviderPolicyDiagnostic, SimProviderPolicyDiagnosticSeverity,
     SimProviderPolicyGate, SimProviderPolicyRequest,
+};
+pub use sim_provider_secrets::{
+    SIM_PROVIDER_REDACTION_PLACEHOLDER, SIM_PROVIDER_SECRET_EMPTY_KEY_CODE,
+    SIM_PROVIDER_SECRET_MISSING_CODE, SIM_PROVIDER_SIGNED_URL_PLACEHOLDER,
+    SimProviderCredentialReport, SimProviderRedactor, SimProviderResolvedCredential,
+    SimProviderSecretDiagnostic, SimProviderSecretEntry, SimProviderSecretStore,
 };
 pub use sim_user_data::{
     SimUserDataDiagnostic, SimUserDataEntry, SimUserDataPathParts, SimUserDataStore,

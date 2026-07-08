@@ -32,10 +32,11 @@ Create a provider-node framework before individual providers. Initial implementa
   - _Requirements: 5.1, 5.2, 5.3_
   - _writes: crates/world_model/src/sim_provider_policy.rs, crates/world_model/src/sim_provider_policy_tests.rs_
 
-- [ ] 3. Implement provider secret redaction
+- [x] 3. Implement provider secret redaction
   - Resolve credentials through Sim secrets and redact credentials, signed URLs, and sensitive payload fields.
+  - Represent secret entries, resolved credentials, redaction, and diagnostics with native `SimProviderSecret*` and `SimProviderRedactor` records.
   - _Requirements: 2.1, 2.2, 2.3_
-  - _writes: crates/world_model/src/comfy_provider_secrets.rs, crates/world_model/src/comfy_provider_redaction_tests.rs_
+  - _writes: crates/world_model/src/sim_provider_secrets.rs, crates/world_model/src/sim_provider_secrets_tests.rs_
 
 - [ ] 4. Implement remote task lifecycle
   - Add connector trait, start/poll/cancel/timeout behavior, remote task ids, provider progress, and normalized terminal states.
