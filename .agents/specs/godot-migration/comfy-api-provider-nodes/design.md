@@ -8,10 +8,10 @@ API provider nodes are normalized as policy-gated world-model harness remote exe
 
 ```mermaid
 flowchart TD
-    Registry[SimProviderNodeRegistry] --> Connector[ProviderConnector]
+    Registry[SimProviderNodeRegistry] --> Connector[SimProviderConnector]
     Connector --> Secrets[Sim Secrets]
     Connector --> Upload[ProviderUploadService]
-    Connector --> Remote[RemoteTaskTracker]
+    Connector --> Remote[SimProviderRemoteTaskTracker]
     Remote --> Download[ProviderDownloadService]
     Download --> Assets[comfy-asset-library]
     Connector --> Policy[SimProviderPolicyGate]
@@ -29,19 +29,22 @@ flowchart TD
   unsupported diagnostics. Registry support must not mean forwarding provider
   execution to ComfyUI.
 
-### ProviderConnector
+### SimProviderConnector
 
 - **Purpose**: Execute provider-specific request lifecycles behind a common interface.
 - **Responsibilities**: Validate inputs, resolve credentials, create requests, poll tasks, cancel tasks, download results, and normalize errors.
+- **Native behavior**: Starts native `SimProviderRemoteTaskHandle` records,
+  polls provider progress into `SimProviderRemoteTaskStatus`, maps provider
+  failures into Sim diagnostics, and models unsupported cancellation locally
+  instead of delegating the lifecycle to ComfyUI.
 
 ```rust
-pub trait ProviderConnector {
-    fn provider(&self) -> ProviderId;
-    fn capabilities(&self) -> Vec<ProviderCapability>;
-    async fn start(&self, request: ProviderNodeRequest) -> Result<RemoteTaskHandle, ProviderError>;
-    async fn poll(&self, task: &RemoteTaskHandle) -> Result<RemoteTaskStatus, ProviderError>;
-    async fn cancel(&self, task: &RemoteTaskHandle) -> Result<CancelResult, ProviderError>;
-    async fn collect_outputs(&self, task: &RemoteTaskHandle) -> Result<Vec<ProviderOutput>, ProviderError>;
+pub trait SimProviderConnector {
+    fn provider_id(&self) -> &SimProviderId;
+    fn capabilities(&self) -> &[SimProviderCapability];
+    fn start(&mut self, request: SimProviderPolicyRequest) -> Result<SimProviderRemoteTaskHandle, SimProviderConnectorError>;
+    fn poll(&mut self, task: &SimProviderRemoteTaskHandle) -> Result<SimProviderRemoteTaskStatus, SimProviderConnectorError>;
+    fn cancel(&mut self, task: &SimProviderRemoteTaskHandle) -> Result<SimProviderRemoteTaskStatus, SimProviderConnectorError>;
 }
 ```
 
@@ -70,10 +73,13 @@ pub trait ProviderConnector {
 - **Purpose**: Handle source media upload and result import.
 - **Responsibilities**: MIME detection, signed URL redaction, retry boundaries, asset registration, and provenance.
 
-### RemoteTaskTracker
+### SimProviderRemoteTaskTracker
 
 - **Purpose**: Track provider async task ids inside Sim job node state.
 - **Responsibilities**: Status polling, timeout, cancellation, provider progress, and terminal state mapping.
+- **Native behavior**: Records provider ids, remote task ids, Comfy node
+  compatibility ids, native handlers, progress, timeouts, terminal states, and
+  diagnostics as `SimProviderRemoteTask*` values owned by Sim.
 
 ## Data Models
 
@@ -113,6 +119,15 @@ pub struct SimProviderResolvedCredential {
     pub key: String,
     pub provider: SimProviderId,
     pub secret_ref: String,
+}
+
+pub enum SimProviderRemoteTaskStatus {
+    Queued,
+    Running { progress: Option<f32>, message: Option<String> },
+    Completed { output_refs: Vec<String> },
+    Failed { message: String },
+    Cancelled { message: String },
+    TimedOut { message: String },
 }
 ```
 

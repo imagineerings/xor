@@ -38,10 +38,11 @@ Create a provider-node framework before individual providers. Initial implementa
   - _Requirements: 2.1, 2.2, 2.3_
   - _writes: crates/world_model/src/sim_provider_secrets.rs, crates/world_model/src/sim_provider_secrets_tests.rs_
 
-- [ ] 4. Implement remote task lifecycle
+- [x] 4. Implement remote task lifecycle
   - Add connector trait, start/poll/cancel/timeout behavior, remote task ids, provider progress, and normalized terminal states.
+  - Represent connector errors, remote task handles, statuses, records, timeout diagnostics, and mock connector behavior with native `SimProvider*` records.
   - _Requirements: 3.1, 3.2, 3.4_
-  - _writes: crates/world_model/src/comfy_provider_connector.rs, crates/world_model/src/comfy_remote_tasks.rs, crates/world_model/src/comfy_remote_tasks_tests.rs_
+  - _writes: crates/world_model/src/sim_provider_connector.rs, crates/world_model/src/sim_provider_remote_tasks.rs, crates/world_model/src/sim_provider_remote_tasks_tests.rs_
 
 - [ ] 5. Implement provider upload/download and output import
   - Upload source media, collect provider outputs, register assets, attach media metadata, and write provenance.

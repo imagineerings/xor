@@ -68,8 +68,10 @@ pub mod sim_launch_profile;
 pub mod sim_mask_nodes;
 pub mod sim_media_capabilities;
 pub mod sim_packaging_profiles;
+pub mod sim_provider_connector;
 pub mod sim_provider_nodes;
 pub mod sim_provider_policy;
+pub mod sim_provider_remote_tasks;
 pub mod sim_provider_secrets;
 pub mod sim_user_data;
 pub mod sim_utility_nodes;
@@ -192,6 +194,8 @@ mod sim_packaging_profiles_tests;
 mod sim_provider_nodes_tests;
 #[cfg(test)]
 mod sim_provider_policy_tests;
+#[cfg(test)]
+mod sim_provider_remote_tasks_tests;
 #[cfg(test)]
 mod sim_provider_secrets_tests;
 #[cfg(test)]
@@ -502,6 +506,11 @@ pub use sim_packaging_profiles::{
     SimPackagingExecutionTarget, SimPackagingProfile, SimPackagingProfileCatalog,
     SimPackagingProfileKind, SimPackagingScope,
 };
+pub use sim_provider_connector::{
+    SIM_PROVIDER_CONNECTOR_CANCEL_UNSUPPORTED_CODE, SIM_PROVIDER_CONNECTOR_POLL_FAILED_CODE,
+    SIM_PROVIDER_CONNECTOR_START_FAILED_CODE, SimMockProviderConnector, SimProviderConnector,
+    SimProviderConnectorError,
+};
 pub use sim_provider_nodes::{
     SIM_PROVIDER_DISABLED_CODE, SIM_PROVIDER_MISSING_CREDENTIAL_CODE,
     SIM_PROVIDER_UNSUPPORTED_CODE, SimProviderCapability, SimProviderCostMetadata, SimProviderId,
@@ -515,6 +524,12 @@ pub use sim_provider_policy::{
     SIM_PROVIDER_POLICY_QUOTA_EXCEEDED_CODE, SimProviderCapabilityPolicy, SimProviderPolicyContext,
     SimProviderPolicyDecision, SimProviderPolicyDiagnostic, SimProviderPolicyDiagnosticSeverity,
     SimProviderPolicyGate, SimProviderPolicyRequest,
+};
+pub use sim_provider_remote_tasks::{
+    SIM_PROVIDER_TASK_MISSING_CODE, SIM_PROVIDER_TASK_TERMINAL_UPDATE_CODE,
+    SIM_PROVIDER_TASK_TIMEOUT_CODE, SimProviderRemoteTaskDiagnostic, SimProviderRemoteTaskHandle,
+    SimProviderRemoteTaskId, SimProviderRemoteTaskRecord, SimProviderRemoteTaskStatus,
+    SimProviderRemoteTaskTracker,
 };
 pub use sim_provider_secrets::{
     SIM_PROVIDER_REDACTION_PLACEHOLDER, SIM_PROVIDER_SECRET_EMPTY_KEY_CODE,
