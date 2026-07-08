@@ -25,7 +25,7 @@ Extend sim's observability infrastructure with Langfuse tracing, OpenTelemetry O
   - _Requirements: 1_
   - _writes: crates/telemetry/src/langfuse.rs_
 
-- [ ] 3. Implement OpenTelemetry OTLP backend
+- [x] 3. Implement OpenTelemetry OTLP backend
   - Extend `crates/telemetry/` with OTel backend
   - Export traces via OTLP protocol
   - Configurable endpoint and auth

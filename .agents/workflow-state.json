@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T16:49:34Z",
+  "updated_at": "2026-07-08T16:54:01Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -574,6 +574,12 @@
       "status": "done",
       "summary": "Task 2: Added telemetry Langfuse backend foundation with LangfuseConfig, typed LLM/tool/agent span builders, trace export payloads, exporter trait, no-op/in-memory exporters, and unit coverage for disabled, unconfigured, and exported spans.",
       "updated_at": "2026-07-08T16:49:34Z"
+    },
+    {
+      "task_identifier": ".agents/specs/goose-migration/observability-analytics/tasks.md:28",
+      "status": "done",
+      "summary": "Task 3: Added telemetry OTLP backend foundation with OtlpConfig, typed spans/events for LLM/tool/agent operations, trace export payloads, exporter trait, no-op/in-memory exporters, and unit coverage for disabled, unconfigured, and exported spans.",
+      "updated_at": "2026-07-08T16:54:01Z"
     }
   ],
   "dependency_notes": [
@@ -619,8 +625,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/observability-analytics",
-      "summary": "Tasks 1-2 are checked complete. language_model_core exposes model-aware token counting with tiktoken-rs plus fallback counting, and telemetry now has a configurable Langfuse backend foundation with typed LLM/tool/agent spans and exporter abstraction. OTel, observation layer, rate limiter extensions, PostHog, tool monitor/inspector, integration, and slice tests remain.",
-      "updated_at": "2026-07-08T16:49:34Z"
+      "summary": "Tasks 1-3 are checked complete. language_model_core exposes model-aware token counting with tiktoken-rs plus fallback counting, and telemetry now has configurable Langfuse and OTLP backend foundations with typed LLM/tool/agent spans and exporter abstractions. Observation layer, rate limiter extensions, PostHog, tool monitor/inspector, integration, and slice tests remain.",
+      "updated_at": "2026-07-08T16:54:01Z"
     },
     {
       "scope": ".agents/specs/godot-migration",
