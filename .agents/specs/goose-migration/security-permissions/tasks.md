@@ -47,7 +47,7 @@ Implement the security inspection system (`crates/security/`) and permission sys
   - _Requirements: 9_
   - _writes: crates/permission/src/store.rs_
 
-- [ ] 7. Implement permission inspector and judge
+- [x] 7. Implement permission inspector and judge
   - Examine tool calls against stored decisions
   - Classify risk level (low/medium/high)
   - Auto-allow low risk, auto-block high risk, prompt for medium
