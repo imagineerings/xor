@@ -68,6 +68,7 @@ pub mod sim_launch_profile;
 pub mod sim_mask_nodes;
 pub mod sim_media_capabilities;
 pub mod sim_packaging_profiles;
+pub mod sim_provider_adapters;
 pub mod sim_provider_connector;
 pub mod sim_provider_io;
 pub mod sim_provider_nodes;
@@ -191,6 +192,8 @@ mod sim_launch_profile_tests;
 mod sim_media_capabilities_tests;
 #[cfg(test)]
 mod sim_packaging_profiles_tests;
+#[cfg(test)]
+mod sim_provider_adapters_tests;
 #[cfg(test)]
 mod sim_provider_io_tests;
 #[cfg(test)]
@@ -508,6 +511,11 @@ pub use sim_packaging_profiles::{
     SIM_PACKAGING_PROFILE_PORTABLE_LIKE, SIM_PACKAGING_PROFILE_REMOTE_WORKER,
     SimPackagingExecutionTarget, SimPackagingProfile, SimPackagingProfileCatalog,
     SimPackagingProfileKind, SimPackagingScope,
+};
+pub use sim_provider_adapters::{
+    SIM_PROVIDER_ADAPTER_UNSUPPORTED_OPERATION_CODE, SimProviderAdapterCatalog,
+    SimProviderAdapterDefinition, SimProviderAdapterDiagnostic, SimProviderAdapterFamily,
+    SimProviderAdapterSkeleton, SimProviderAdapterUnsupportedOperation,
 };
 pub use sim_provider_connector::{
     SIM_PROVIDER_CONNECTOR_CANCEL_UNSUPPORTED_CODE, SIM_PROVIDER_CONNECTOR_POLL_FAILED_CODE,

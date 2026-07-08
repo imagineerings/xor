@@ -38,6 +38,18 @@ flowchart TD
   failures into Sim diagnostics, and models unsupported cancellation locally
   instead of delegating the lifecycle to ComfyUI.
 
+### SimProviderAdapterCatalog and SimProviderAdapterSkeleton
+
+- **Purpose**: Register concrete provider adapter skeletons before provider SDK
+  or HTTP implementations are approved.
+- **Native behavior**: Stores OpenAI, Gemini, Anthropic/OpenRouter,
+  image/video, audio, and 3D adapter families as native
+  `SimProviderAdapter*` records. Adapter skeletons expose native
+  `sim.provider.*` handlers, validate provider ids and capabilities, create
+  Sim-owned remote task handles for supported skeleton operations, and gate
+  unavailable provider operations with structured unsupported diagnostics
+  rather than passing execution through to ComfyUI.
+
 ```rust
 pub trait SimProviderConnector {
     fn provider_id(&self) -> &SimProviderId;

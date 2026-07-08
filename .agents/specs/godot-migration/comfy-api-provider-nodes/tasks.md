@@ -56,10 +56,11 @@ Create a provider-node framework before individual providers. Initial implementa
   - _Requirements: 1.1, 1.3_
   - _writes: crates/world_model/fixtures/comfy/provider_nodes.json, crates/world_model/tests/comfy_provider_catalog.rs_
 
-- [ ] 7. Add concrete connector adapter skeletons
+- [x] 7. Add concrete connector adapter skeletons
   - Add minimal connector modules for OpenAI, Gemini, Anthropic/OpenRouter, image/video providers, audio providers, and 3D providers with unsupported operations gated by diagnostics.
+  - Represent adapter catalog entries, connector skeletons, unsupported operations, and diagnostics with native `SimProviderAdapter*` records instead of provider pass-through modules.
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
-  - _writes: crates/world_model/src/providers/openai.rs, crates/world_model/src/providers/gemini.rs, crates/world_model/src/providers/anthropic.rs, crates/world_model/src/providers/media.rs, crates/world_model/src/providers/audio.rs, crates/world_model/src/providers/three_d.rs_
+  - _writes: crates/world_model/src/sim_provider_adapters.rs, crates/world_model/src/sim_provider_adapters_tests.rs_
 
 ## Notes
 
