@@ -41,7 +41,7 @@ Implement the remaining smaller goose components: session import formats, Nostr 
   - _Requirements: 5_
   - _writes: scripts/_
 
-- [ ] 5. Implement provider error proxy
+- [x] 5. Implement provider error proxy
   - HTTP proxy that intercepts provider API calls
   - Logs request and response details
   - Forwards to actual provider

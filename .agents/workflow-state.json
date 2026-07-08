@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T16:25:00Z",
+  "updated_at": "2026-07-08T16:30:52Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -138,6 +138,17 @@
       "owner": null,
       "summary": "Merged in PR #55.",
       "updated_at": "2026-07-06T18:06:36Z"
+    },
+    {
+      "task_id": "task:12b0070619d1",
+      "task_identifier": ".agents/specs/goose-migration/misc-services/tasks.md:44",
+      "title": "Implement provider error proxy",
+      "linear_identifier": "SIM-28",
+      "linear_url": "https://linear.app/simtropolis/issue/SIM-28/implement-provider-error-proxy",
+      "status": "inactive",
+      "owner": null,
+      "summary": "Implemented locally with a dependency-free Node HTTP proxy that logs redacted request/response details, captures body previews, forwards provider calls, and returns 502 JSON errors for upstream failures. Ready to merge in PR.",
+      "updated_at": "2026-07-08T16:30:52Z"
     },
     {
       "task_id": "task:a3b72dfc0ee5",
@@ -518,6 +529,12 @@
       "updated_at": "2026-07-08T16:25:00Z"
     },
     {
+      "task_identifier": ".agents/specs/goose-migration/misc-services/tasks.md:44",
+      "status": "done",
+      "summary": "Task 5: Added scripts/provider-error-proxy with a dependency-free Node HTTP proxy that forwards provider requests while logging redacted request and response details, body previews, timings, and upstream errors.",
+      "updated_at": "2026-07-08T16:30:52Z"
+    },
+    {
       "task_identifier": ".agents/specs/ci-migration/tasks.md",
       "status": "deprioritized",
       "summary": "All tasks in .agents/specs/ci-migration are deprioritized until every other local workflow task is complete. Do not select CI migration work while non-CI tasks remain available.",
@@ -568,8 +585,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/misc-services",
-      "summary": "Tasks 1-4 are checked complete. Session imports support JSON, Markdown, and Goose legacy formats; Nostr sharing has session event serialization, relay abstraction, publish/import/discovery APIs, and in-memory relay tests; examples cover MCP wiki integration, plugin usage, and frontend tools; scripts now cover Windows builds, OpenAPI validation, diagnostics, database helpers, MCP testing, sub-agent/recipe testing, pre-release checks, and compaction tests. Provider error proxy and slice tests remain.",
-      "updated_at": "2026-07-08T16:25:00Z"
+      "summary": "Tasks 1-5 are checked complete. Session imports support JSON, Markdown, and Goose legacy formats; Nostr sharing has session event serialization, relay abstraction, publish/import/discovery APIs, and in-memory relay tests; examples cover MCP wiki integration, plugin usage, and frontend tools; scripts cover Windows builds, OpenAPI validation, diagnostics, database helpers, MCP testing, sub-agent/recipe testing, pre-release checks, and compaction tests; provider error proxy forwards provider HTTP traffic while logging redacted request/response details. Slice tests remain.",
+      "updated_at": "2026-07-08T16:30:52Z"
     },
     {
       "scope": ".agents/specs/godot-migration",
