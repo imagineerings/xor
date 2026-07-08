@@ -61,6 +61,7 @@ pub mod sim_dependency_review;
 pub mod sim_diagnostics_adapter;
 pub mod sim_feature_flags;
 pub mod sim_launch_profile;
+pub mod sim_media_capabilities;
 pub mod sim_packaging_profiles;
 pub mod sim_user_data;
 pub mod worker_launcher;
@@ -165,6 +166,8 @@ mod sim_diagnostics_adapter_tests;
 mod sim_feature_flags_tests;
 #[cfg(test)]
 mod sim_launch_profile_tests;
+#[cfg(test)]
+mod sim_media_capabilities_tests;
 #[cfg(test)]
 mod sim_packaging_profiles_tests;
 #[cfg(test)]
@@ -428,6 +431,11 @@ pub use sim_launch_profile::{
     SimLaunchDiagnostic, SimLaunchDiagnosticSeverity, SimLaunchProfile, SimLaunchProfileParser,
     SimLoggingLaunchOptions, SimManagerLaunchOptions, SimNetworkLaunchOptions,
     SimPerformanceLaunchOptions,
+};
+pub use sim_media_capabilities::{
+    SIM_MEDIA_DEPENDENCY_REVIEW_REQUIRED_CODE, SIM_MEDIA_UNSUPPORTED_BACKEND_CODE,
+    SimMediaBackendRequirement, SimMediaCapabilityDiagnostic, SimMediaCapabilityGroup,
+    SimMediaNodeCapability, SimMediaNodeCapabilityRegistry, SimMediaPortType,
 };
 pub use sim_packaging_profiles::{
     SIM_PACKAGING_PROFILE_API_DISABLED, SIM_PACKAGING_PROFILE_ASSET_ENABLED,

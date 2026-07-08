@@ -8,7 +8,7 @@ Media node support is organized as harness capability groups rather than one-off
 
 ```mermaid
 flowchart TD
-    Registry[MediaNodeCapabilityRegistry] --> Images[ImageMaskOps]
+    Registry[SimMediaNodeCapabilityRegistry] --> Images[ImageMaskOps]
     Registry --> Video[VideoOps]
     Registry --> Audio[AudioOps]
     Registry --> ThreeD[ThreeDGeometryOps]
@@ -23,10 +23,14 @@ flowchart TD
 
 ## Components and Interfaces
 
-### MediaNodeCapabilityRegistry
+### SimMediaNodeCapabilityRegistry
 
 - **Purpose**: Map Comfy media nodes to Sim capability groups and backend requirements.
 - **Responsibilities**: Capability metadata, unsupported diagnostics, dependency review flags, developer-only flags, and node schema linkage.
+- **Native behavior**: Stores Comfy node IDs as compatibility input
+  identifiers, but maps them to native `SimMedia*` capability records,
+  typed ports, backend diagnostics, and `sim.*` handler ownership. The
+  registry must not mark support by forwarding execution to ComfyUI.
 
 ### ImageMaskOps
 
@@ -56,7 +60,7 @@ flowchart TD
 ## Data Models
 
 ```rust
-pub enum MediaCapabilityGroup {
+pub enum SimMediaCapabilityGroup {
     ImageMask,
     Video,
     Audio,
@@ -65,12 +69,13 @@ pub enum MediaCapabilityGroup {
     Utility,
 }
 
-pub struct MediaNodeCapability {
+pub struct SimMediaNodeCapability {
     pub node_id: NodeTypeId,
-    pub group: MediaCapabilityGroup,
-    pub inputs: Vec<MediaPortType>,
-    pub outputs: Vec<MediaPortType>,
-    pub backend: MediaBackendRequirement,
+    pub group: SimMediaCapabilityGroup,
+    pub inputs: Vec<SimMediaPortType>,
+    pub outputs: Vec<SimMediaPortType>,
+    pub backend: SimMediaBackendRequirement,
+    pub native_sim_handler: String,
     pub developer_only: bool,
 }
 ```

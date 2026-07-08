@@ -20,10 +20,11 @@ Represent media functionality as capability groups and implement deterministic o
 
 ## Tasks
 
-- [ ] 1. Build media node capability registry
+- [x] 1. Build media node capability registry
   - Map Comfy media node modules into image/mask, video, audio, 3D/geometry, analysis/control, and utility groups with backend diagnostics.
+  - Represent capability groups, ports, backend requirements, diagnostics, developer-only visibility, and handler ownership with native `SimMedia*` records.
   - _Requirements: 1.1, 2.2, 3.2, 4.1, 5.1, 6.3_
-  - _writes: crates/world_model/src/comfy_media_capabilities.rs, crates/world_model/src/comfy_media_capabilities_tests.rs_
+  - _writes: crates/world_model/src/sim_media_capabilities.rs, crates/world_model/src/sim_media_capabilities_tests.rs_
 
 - [ ] 2. Implement image, mask, and post-processing node adapters
   - Add deterministic bitmap/mask transforms, batch shape preservation, alpha handling, and GLSL dependency metadata.
