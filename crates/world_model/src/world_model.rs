@@ -1,5 +1,6 @@
 pub mod artifact;
 pub mod comfy_app_mode;
+pub mod comfy_asset_query;
 pub mod comfy_assets;
 pub mod comfy_blueprints;
 pub mod comfy_cache;
@@ -54,6 +55,8 @@ pub mod worker_launcher;
 mod artifact_tests;
 #[cfg(test)]
 mod comfy_app_mode_tests;
+#[cfg(test)]
+mod comfy_asset_query_tests;
 #[cfg(test)]
 mod comfy_assets_tests;
 #[cfg(test)]
@@ -138,6 +141,14 @@ pub use comfy_app_mode::{
     ComfyAppModeBridge, ComfyAppModeControl, ComfyAppModeControlKind, ComfyAppModeControlTarget,
     ComfyAppModeDiagnostic, ComfyAppModeReport, ComfyAppModeUiOwner, INVALID_APP_MODE_CONTROL_CODE,
     INVALID_APP_MODE_METADATA_CODE,
+};
+pub use comfy_asset_query::{
+    ASSET_QUERY_INVALID_CURSOR_CODE, ASSET_QUERY_INVALID_HASH_CODE,
+    ASSET_QUERY_INVALID_METADATA_FILTER_CODE, ASSET_QUERY_INVALID_OWNER_CODE,
+    ASSET_QUERY_INVALID_SORT_CODE, ASSET_QUERY_INVALID_TAG_CODE, ComfyAssetCursor,
+    ComfyAssetListQuery, ComfyAssetMetadataFilter, ComfyAssetMetadataNamespace,
+    ComfyAssetMetadataOperator, ComfyAssetOrder, ComfyAssetOwnerScope, ComfyAssetPagination,
+    ComfyAssetQueryDiagnostic, ComfyAssetSort, ComfyAssetValidatedHash, normalize_asset_tag,
 };
 pub use comfy_assets::{
     ASSET_CONTENT_NOT_FOUND_CODE, ASSET_REFERENCE_NOT_FOUND_CODE, ComfyAssetCacheState,

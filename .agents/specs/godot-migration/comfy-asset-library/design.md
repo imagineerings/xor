@@ -42,6 +42,11 @@ pub trait AssetRepository {
 
 - **Purpose**: Expose Comfy-compatible `/api/assets` and `/api/tags` routes.
 - **Responsibilities**: Query validation, multipart parsing, upload dedupe, download streaming, tag mutation, and error shape normalization.
+- **Native query validation**: Hashes, cursors, metadata filters, sort/order,
+  tags, pagination, and owner scopes are parsed into typed Sim query models
+  before any repository access. Compatibility route adapters may translate
+  legacy parameter names, but they do not forward ComfyUI query strings or
+  rely on ComfyUI validation behavior.
 
 ### AssetSeeder
 
@@ -129,7 +134,8 @@ _For any_ prune operation, references outside known roots SHALL be marked missin
 
 ## Testing Strategy
 
-- Unit tests for hash validation, tag normalization, cursor encoding/decoding, metadata filters, and path confinement.
+- Unit tests for hash validation, tag normalization, cursor encoding/decoding,
+  metadata filters, owner scope resolution, and path confinement.
 - Repository tests for content/reference dedupe, soft delete, owner scoping,
   cache state, provenance ids, and tag histograms.
 - API tests for upload, download, create-from-hash, CRUD, tags, seed status, cancel, and prune.

@@ -26,8 +26,9 @@ Build the asset library as shared storage primitives plus Comfy-compatible route
   - _Requirements: 1.1, 1.2, 1.3, 6.2_
   - _writes: crates/world_model/src/comfy_assets.rs, crates/world_model/src/comfy_assets_tests.rs_
 
-- [ ] 2. Implement asset query validation
+- [x] 2. Implement asset query validation
   - Add hash validation, cursor pagination, metadata filter parsing, sort/order validation, tag normalization, and owner scoping helpers.
+  - Parse compatibility route parameters into native Sim query types and diagnostics without forwarding ComfyUI query strings or treating validation as a compatibility label.
   - _Requirements: 2.1, 3.2, 3.4, 5.1_
   - _writes: crates/world_model/src/comfy_asset_query.rs, crates/world_model/src/comfy_asset_query_tests.rs_
 
