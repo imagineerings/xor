@@ -2,7 +2,10 @@ mod channel_modal;
 mod contact_finder;
 
 use self::channel_modal::ChannelModal;
-use crate::{CollaborationPanelSettings, channel_chat::ChannelChat, channel_view::ChannelView};
+use crate::{
+    CollaborationPanelSettings, channel_chat::ChannelChat, channel_view::ChannelView,
+    draft_store::DraftStore,
+};
 use anyhow::Context as _;
 use call::ActiveCall;
 use channel::{Channel, ChannelEvent, ChannelStore};
@@ -265,6 +268,7 @@ pub struct CollabPanel {
     entries: Vec<ListEntry>,
     selection: Option<usize>,
     channel_store: Entity<ChannelStore>,
+    draft_store: Entity<DraftStore>,
     user_store: Entity<UserStore>,
     client: Arc<Client>,
     project: Entity<Project>,
@@ -407,6 +411,7 @@ impl CollabPanel {
                 channel_editing_state: None,
                 selection: None,
                 channel_store: ChannelStore::global(cx),
+                draft_store: DraftStore::global(cx),
                 notification_store: NotificationStore::global(cx),
                 current_notification_toast: None,
                 mark_as_read_tasks: HashMap::default(),
@@ -432,6 +437,8 @@ impl CollabPanel {
                 .push(cx.observe(&this.channel_store, move |this, _, cx| {
                     this.update_entries(true, cx)
                 }));
+            this.subscriptions
+                .push(cx.observe(&this.draft_store, |_, _, cx| cx.notify()));
             this.subscriptions
                 .push(cx.observe(&active_call, |this, _, cx| this.update_entries(true, cx)));
             this.subscriptions.push(cx.subscribe_in(
@@ -1336,6 +1343,8 @@ impl CollabPanel {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
+        let has_draft = self.draft_store.read(cx).has_draft(channel_id);
+
         ListItem::new("channel-chat")
             .height(rems_from_px(24.))
             .toggle_state(is_selected)
@@ -1352,7 +1361,18 @@ impl CollabPanel {
                             .color(Color::Muted),
                     ),
             )
-            .child(Label::new("chat"))
+            .child(
+                h_flex()
+                    .gap_1()
+                    .child(Label::new("chat"))
+                    .when(has_draft, |this| {
+                        this.child(
+                            Icon::new(IconName::Pencil)
+                                .size(IconSize::XSmall)
+                                .color(Color::Accent),
+                        )
+                    }),
+            )
             .tooltip(Tooltip::text("Open Channel Chat"))
     }
 
@@ -3318,6 +3338,7 @@ impl CollabPanel {
             has_children.then(|| self.collapsed_channels.binary_search(&channel.id).is_err());
 
         let has_notes_notification = channel_store.has_channel_buffer_changed(channel_id);
+        let has_draft = self.draft_store.read(cx).has_draft(channel_id);
 
         const FACEPILE_LIMIT: usize = 3;
         let participants = self.channel_store.read(cx).channel_participants(channel_id);
@@ -3456,6 +3477,7 @@ impl CollabPanel {
                             .child(
                                 h_flex()
                                     .id(channel_id.0 as usize)
+                                    .gap_1()
                                     .child(match string_match {
                                         None => Label::new(channel.name.clone()).into_any_element(),
                                         Some(string_match) => HighlightedLabel::new(
@@ -3463,6 +3485,13 @@ impl CollabPanel {
                                             string_match.positions.clone(),
                                         )
                                         .into_any_element(),
+                                    })
+                                    .when(has_draft, |this| {
+                                        this.child(
+                                            Icon::new(IconName::Pencil)
+                                                .size(IconSize::XSmall)
+                                                .color(Color::Accent),
+                                        )
                                     })
                                     .children(face_pile.map(|face_pile| face_pile.p_1())),
                             )

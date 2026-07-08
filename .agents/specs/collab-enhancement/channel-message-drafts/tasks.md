@@ -69,15 +69,16 @@ Add client-side draft persistence for channel message composition. When a user t
 
 ### Phase 3: Channel sidebar indicators (CollabPanel)
 
-- [ ] 7. Add draft indicator to channel entries
+- [x] 7. Add draft indicator to channel entries
   - In `CollabPanel`, add a `draft_store: Entity<DraftStore>` field, initialized from `DraftStore::global()`.
-  - Subscribe to `DraftStore` events (or observe it) to re-render when drafts change.
+  - Observe `DraftStore` to re-render when drafts change.
   - In `render_channel()`, read `draft_store.has_draft(channel_id)`.
-  - When a draft exists: render a pencil icon (`IconName::FileEdit`) after the channel name, and/or italicize the channel label.
+  - When a draft exists: render a pencil icon (`IconName::Pencil`) after the channel name.
   - When no draft exists: render normally.
-  - Update `render_channel_notes()` similarly if it should also show the indicator.
+  - Update `render_channel_chat()` similarly so the chat entry shows the same draft state.
   - _Requirements: 7.2_
   - _writes: `crates/collab_ui/src/collab_panel.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui collab_panel --features test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui draft_store --features test-support`_
 
 ### Phase 4: Discard draft functionality
 
