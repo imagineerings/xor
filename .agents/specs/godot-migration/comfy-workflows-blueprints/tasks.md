@@ -44,8 +44,9 @@ Import shipped blueprints first, then add workflow persistence and API export, t
   - _Requirements: 3.3_
   - _writes: crates/world_model/src/comfy_workflow_templates.rs, crates/world_model/src/comfy_workflow_templates_tests.rs_
 
-- [ ] 5. Implement node replacement catalog
+- [x] 5. Implement node replacement catalog
   - Store deduped replacement mappings and expose them to graph validation and workflow import.
+  - Preserve replacement source metadata, input/output mappings, duplicate/conflict diagnostics, and graph-rewrite integration as native Sim records without ComfyUI metadata pass-through.
   - _Requirements: 4.1, 4.2, 4.3_
   - _writes: crates/world_model/src/comfy_replacements.rs, crates/world_model/src/comfy_replacements_tests.rs_
 

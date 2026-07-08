@@ -72,6 +72,11 @@ pub trait WorkflowStore {
 
 - **Purpose**: Store node replacement metadata for old workflow compatibility.
 - **Responsibilities**: Register replacement entries, dedupe duplicate mappings, and provide mappings to graph validation.
+- **Native replacement records**: Replacement mappings are stored as Sim-owned
+  catalog entries with source metadata, input/output mappings, duplicate and
+  conflict diagnostics, and a direct bridge to native graph replacement before
+  validation or workflow import. The catalog does not rely on ComfyUI node
+  replacement metadata at runtime.
 
 ### EmbeddedWorkflowExtractor
 
@@ -145,5 +150,5 @@ _For any_ generated file import, metadata extraction failure SHALL NOT block ass
 - Import tests over the full 89-entry `projects/comfy/blueprints` fixture list.
 - Snapshot tests for blueprint catalog entries and native subgraph ids/listings.
 - Round-trip tests for workflow load/save/API export through native Sim records.
-- Replacement tests shared with `comfy-graph-node-runtime/`.
+- Replacement catalog and graph-rewrite tests shared with native graph validation.
 - Metadata extraction tests for supported generated-file metadata containers.

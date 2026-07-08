@@ -22,6 +22,7 @@ pub mod comfy_model_resources;
 pub mod comfy_node_replacement;
 pub mod comfy_nodes;
 pub mod comfy_quantization;
+pub mod comfy_replacements;
 pub mod comfy_routes;
 pub mod comfy_runner_profiles;
 pub mod comfy_runtime_policy;
@@ -88,6 +89,8 @@ mod comfy_model_resources_tests;
 mod comfy_node_replacement_tests;
 #[cfg(test)]
 mod comfy_nodes_tests;
+#[cfg(test)]
+mod comfy_replacements_tests;
 #[cfg(test)]
 mod comfy_routes_tests;
 #[cfg(test)]
@@ -213,6 +216,10 @@ pub use comfy_nodes::{
 };
 pub use comfy_quantization::{
     ComfyQuantizationMetadata, QuantizationFormat, QuantizedLayerMetadata,
+};
+pub use comfy_replacements::{
+    CONFLICTING_REPLACEMENT_MAPPING_CODE, ComfyReplacementCatalog, ComfyReplacementDiagnostic,
+    ComfyReplacementEntry, ComfyReplacementSource, DUPLICATE_REPLACEMENT_MAPPING_CODE,
 };
 pub use comfy_routes::{
     ComfyHttpMethod, ComfyRouteCatalog, ComfyRouteDefinition, ComfyRouteDiagnostic,
