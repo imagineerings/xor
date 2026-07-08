@@ -6,7 +6,7 @@ Implement the remaining smaller goose components: session import formats, Nostr 
 
 ## Tasks
 
-- [ ] 1. Implement session import formats
+- [x] 1. Implement session import formats
   - Define ImportFormat trait
   - Implement import from common formats (JSON, Markdown, Goose legacy)
   - Auto-detection of format from content or file extension

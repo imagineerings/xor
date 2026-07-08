@@ -483,6 +483,12 @@
       "updated_at": "2026-07-08T14:38:39Z"
     },
     {
+      "task_identifier": ".agents/specs/goose-migration/misc-services/tasks.md:9",
+      "status": "done",
+      "summary": "Task 1: Added crates/session import support with an ImportFormat trait, SessionImporter auto-detection, JSON/Markdown/Goose legacy parsers, imported session/message models, validation, and unit coverage for detection and parsing.",
+      "updated_at": "2026-07-08T16:15:00Z"
+    },
+    {
       "task_identifier": ".agents/specs/ci-migration/tasks.md",
       "status": "deprioritized",
       "summary": "All tasks in .agents/specs/ci-migration are deprioritized until every other local workflow task is complete. Do not select CI migration work while non-CI tasks remain available.",
@@ -530,6 +536,11 @@
       "scope": ".agents/specs/goose-migration/documentation",
       "summary": "Tasks 1-9 are checked complete. The documentation slice now has Docusaurus scaffolding, getting-started, feature, configuration, development, blog, tutorial content, automation scripts, and docs CI/deploy workflow.",
       "updated_at": "2026-07-08T14:38:39Z"
+    },
+    {
+      "scope": ".agents/specs/goose-migration/misc-services",
+      "summary": "Task 1 is checked complete. Session imports now support JSON, Markdown, and Goose legacy formats through crates/session with auto-detection and validation. Nostr sharing, examples, scripts, provider error proxy, and slice tests remain.",
+      "updated_at": "2026-07-08T16:15:00Z"
     },
     {
       "scope": ".agents/specs/godot-migration",

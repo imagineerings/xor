@@ -16734,8 +16734,10 @@ dependencies = [
 name = "session"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "db",
  "gpui",
+ "serde",
  "serde_json",
  "util",
  "uuid",

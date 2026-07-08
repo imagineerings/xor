@@ -2,6 +2,8 @@ use db::kvp::KeyValueStore;
 use gpui::{App, AppContext as _, Context, Subscription, Task, WindowId};
 use util::ResultExt;
 
+pub mod import;
+
 pub struct Session {
     session_id: String,
     old_session_id: Option<String>,
