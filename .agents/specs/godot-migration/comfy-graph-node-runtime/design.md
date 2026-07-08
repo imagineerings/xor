@@ -110,6 +110,15 @@ pub struct ExecutionPlan {
     pub dirty_nodes: Vec<NodeId>,
 }
 
+pub struct ComfyNodeExecutionRecord {
+    pub node_id: NodeId,
+    pub node_type: NodeTypeId,
+    pub state: ComfyNodeExecutionState,
+    pub ui_outputs: Vec<UiOutputRecord>,
+    pub provenance: Vec<String>,
+    pub dispatch: Option<ComfyExecutorDispatch>,
+}
+
 pub struct PromptNode {
     pub id: NodeId,
     pub class_type: NodeTypeId,
@@ -155,6 +164,14 @@ execution order, reusable cached nodes, and dirty nodes from Sim graph edges.
 Cache policy models classic reuse, LRU limits, RAM-pressure limits, and disabled
 cache semantics from Sim cache snapshots and deterministic node cache keys
 without relying on ComfyUI execution state.
+
+The node executor adapter is a native Sim execution coordinator. It consumes
+execution plans, records cached, completed, async-pending, list-mapped, blocked,
+interrupted, failed, and skipped node states, preserves UI outputs and
+provenance, stops dependents when upstream nodes cannot complete, and emits
+explicit dispatch records for sampler, conditioning, VAE, latent, model patch,
+diffusion, or world-model node types owned by
+`comfy-diffusion-world-model-runtime/`.
 
 ## Correctness Properties
 

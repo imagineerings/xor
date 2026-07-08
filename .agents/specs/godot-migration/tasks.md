@@ -18,6 +18,7 @@
 - **G6 Provenance**: generated artifact provenance exists before importing generated media/meshes/exports.
 - **G7 Dependency review**: heavy/native/vendored dependencies are reviewed before implementation.
 - **G8 Comfy harness alignment**: world-model harness tasks involving prompts, graphs, samplers, schedulers, conditioning, diffusion/world-model execution, models, assets, media nodes, providers, or extensions reference the applicable Comfy spec or an explicit safety/security/dependency divergence.
+- **G9 Native Comfy recreation**: every supported Comfy-derived feature is implemented as native Sim functionality with Sim records, services, workers, artifacts, provenance, and diagnostics rather than a compatibility label or ComfyUI pass-through.
 
 ## Dependency Waves
 

@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Sim needs a native game development surface for building 2D and 3D games, with Godot-format project and asset compatibility, world-model foundation harness support, and Comfy-aware workflow orchestration — all without copying duplicate game-engine runtime infrastructure. The migration adds project detection, authoring affordances, language support, generation, and serving primitives while preserving Sim ownership of UI, platform, rendering, task execution, agents, media, storage, and project systems. Comfy provides core functionality for the world-model harness, so implementation decisions must evaluate Comfy workflow, graph, sampler, scheduler, conditioning, diffusion/world-model execution, node, model, asset, provider, and extension semantics before adding Sim-only behavior.
+Sim needs a native game development surface for building 2D and 3D games, with Godot-format project and asset compatibility, world-model foundation harness support, and Comfy-aware workflow orchestration — all without copying duplicate game-engine runtime infrastructure. The migration adds project detection, authoring affordances, language support, generation, and serving primitives while preserving Sim ownership of UI, platform, rendering, task execution, agents, media, storage, and project systems. Comfy provides core functionality for the world-model harness, so implementation decisions must evaluate Comfy workflow, graph, sampler, scheduler, conditioning, diffusion/world-model execution, node, model, asset, provider, and extension semantics before adding Sim-only behavior. Every supported Comfy feature and functionality must be recreated as native Sim functionality backed by Sim services, records, workers, artifacts, provenance, and diagnostics rather than represented as a thin compatibility label or passed through to ComfyUI.
 
 ## Glossary
 
@@ -73,6 +73,7 @@ Sim needs a native game development surface for building 2D and 3D games, with G
 6.1 WHEN a graph is edited THEN THE system SHALL validate node types, ports, dependencies, and cycles.
 6.2 WHEN an agent edits a graph THEN THE system SHALL apply the same validation used by the UI.
 6.3 IF graph execution would use an unavailable backend THEN THE system SHALL block execution with diagnostics.
+6.4 WHEN a Comfy-derived graph, node, workflow, asset, provider, extension, sampler, scheduler, conditioning, latent, VAE, model patch, diffusion, or world-model capability is marked supported THEN THE system SHALL implement the capability through native Sim services rather than a compatibility-only marker or ComfyUI pass-through.
 
 ### Requirement 7: Textured 3D Mesh Generation
 

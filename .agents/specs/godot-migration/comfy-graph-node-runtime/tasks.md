@@ -45,9 +45,9 @@ Implement runtime graph compatibility in layers: registry/schema first, validati
   - _Requirements: 3.1, 3.2, 3.3_
   - _writes: crates/world_model/src/comfy_execution_plan.rs, crates/world_model/src/comfy_execution_plan_tests.rs, crates/world_model/src/comfy_cache.rs, crates/world_model/src/comfy_cache_tests.rs_
 
-- [ ] 6. Implement node executor adapter
-  - Support sync, async, list-mapped, interrupted, blocked, cached, and failed execution states with UI output preservation.
-  - Dispatch sampler, scheduler, conditioning, VAE, latent, model patch, diffusion, and world-model execution nodes to `comfy-diffusion-world-model-runtime/`.
+- [x] 6. Implement node executor adapter
+  - Support sync, async, list-mapped, interrupted, blocked, cached, skipped, and failed execution states with UI output preservation as native Sim execution records.
+  - Dispatch sampler, scheduler, conditioning, VAE, latent, model patch, diffusion, and world-model execution nodes to `comfy-diffusion-world-model-runtime/` via explicit native Sim dispatch records rather than ComfyUI pass-through.
   - _Requirements: 3.4, 4.1, 4.2, 4.3, 5.2, 5.4_
   - _writes: crates/world_model/src/comfy_executor.rs, crates/world_model/src/comfy_executor_tests.rs_
 

@@ -3,6 +3,7 @@ pub mod comfy_cache;
 pub mod comfy_conditioning;
 pub mod comfy_execution_plan;
 pub mod comfy_execution_registry;
+pub mod comfy_executor;
 pub mod comfy_graph_validation;
 pub mod comfy_latents;
 pub mod comfy_model_catalog;
@@ -42,6 +43,8 @@ mod comfy_conditioning_tests;
 mod comfy_execution_plan_tests;
 #[cfg(test)]
 mod comfy_execution_registry_tests;
+#[cfg(test)]
+mod comfy_executor_tests;
 #[cfg(test)]
 mod comfy_graph_validation_tests;
 #[cfg(test)]
@@ -99,6 +102,11 @@ pub use comfy_execution_registry::{
     ComfyExecutionRegistry, DivergenceReason, DivergenceRecord, ExecutionBehaviorKey,
     GuidanceCapability, GuidanceMode, ModelFamilyExecutionProfile, SamplerCapability, SamplerKind,
     SchedulerCapability, SchedulerKind,
+};
+pub use comfy_executor::{
+    ComfyExecutionReport, ComfyExecutorDiagnostic, ComfyExecutorDispatch,
+    ComfyNodeExecutionOutcome, ComfyNodeExecutionRecord, ComfyNodeExecutionState,
+    ComfyNodeExecutor, ComfyNodeRuntime, ComfyUiOutput,
 };
 pub use comfy_graph_validation::{ComfyPromptGraphValidator, ComfyValidationCapabilities};
 pub use comfy_latents::{
