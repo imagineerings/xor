@@ -10,6 +10,7 @@ const BLUEPRINTS_MANIFEST: &str = include_str!("../fixtures/comfy/blueprints_man
 const CORE_NODES: &str = include_str!("../fixtures/comfy/core_nodes.json");
 const MODEL_EXECUTION_MANIFEST: &str =
     include_str!("../fixtures/comfy/model_execution_manifest.json");
+const PROVIDER_NODES: &str = include_str!("../fixtures/comfy/provider_nodes.json");
 
 #[test]
 fn compatibility_suite_documents_required_fixture_groups() {
@@ -39,6 +40,7 @@ fn compatibility_suite_fixtures_are_native_sim_records() {
             "model_execution_manifest",
             parse_fixture(MODEL_EXECUTION_MANIFEST),
         ),
+        ("provider_nodes", parse_fixture(PROVIDER_NODES)),
     ] {
         assert_eq!(
             fixture["native_sim_records"], true,
@@ -153,15 +155,11 @@ fn compatibility_suite_covers_node_blueprint_asset_and_media_groups() {
 
 #[test]
 fn compatibility_suite_tracks_future_provider_and_media_fixture_owners() {
-    for owner in [
-        "comfy-api-provider-nodes task 6",
-        "comfy-media-node-pipelines task 1",
-    ] {
-        assert!(
-            README.contains(owner),
-            "fixture README must name future owner {owner}"
-        );
-    }
+    let owner = "comfy-media-node-pipelines task 1";
+    assert!(
+        README.contains(owner),
+        "fixture README must name future owner {owner}"
+    );
 }
 
 fn parse_fixture(fixture: &str) -> Value {

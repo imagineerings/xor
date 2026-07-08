@@ -50,8 +50,9 @@ Create a provider-node framework before individual providers. Initial implementa
   - _Requirements: 3.1, 3.3, 4.1, 4.2, 4.3, 4.4, 4.5_
   - _writes: crates/world_model/src/sim_provider_io.rs, crates/world_model/src/sim_provider_io_tests.rs_
 
-- [ ] 6. Add provider catalog fixtures
+- [x] 6. Add provider catalog fixtures
   - Snapshot Comfy provider families and node ids from `comfy_api_nodes` into a Sim provider catalog fixture.
+  - Represent fixture data as native Sim provider records with explicit `native_sim_records` and no ComfyUI pass-through.
   - _Requirements: 1.1, 1.3_
   - _writes: crates/world_model/fixtures/comfy/provider_nodes.json, crates/world_model/tests/comfy_provider_catalog.rs_
 

@@ -13,9 +13,9 @@ services. They are not approvals for ComfyUI pass-through handlers.
   prompt graph execution against native Sim planning/execution surfaces.
 - blueprint manifest: `blueprints_manifest.json` covers imported workflow
   blueprint records and dependency diagnostics.
-- provider catalog: owned by comfy-api-provider-nodes task 6; until that task
-  lands, provider route status must be classified as planned, cloud-only,
-  external, or unsupported with an explicit reason.
+- provider catalog: `provider_nodes.json` covers native Sim provider records,
+  provider families, Comfy-compatible node ids, capabilities, and unsupported
+  diagnostics without ComfyUI pass-through.
 - asset API: covered by native Sim asset API tests and route snapshot entries
   for upload/download/preview compatibility.
 - media capability groups: current coverage comes from model execution and

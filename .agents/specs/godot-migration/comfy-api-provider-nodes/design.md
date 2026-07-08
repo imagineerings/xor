@@ -186,6 +186,9 @@ _For any_ provider call that may incur cost or transmit project media externally
 ## Testing Strategy
 
 - Registry snapshot tests for provider/node/capability mapping from `projects/comfy/comfy_api_nodes`.
+- Native fixture tests for `provider_nodes.json` that assert Sim provider records,
+  native `sim.provider.*` handlers, unsupported diagnostics, and no ComfyUI
+  pass-through behavior.
 - Unit tests for secret redaction, offline mode, policy approval, and provider error normalization.
 - Mock connector integration tests for upload, create, poll, cancel, download, and asset registration.
 - Provenance tests for image, video, audio, text, vector, and 3D provider outputs.

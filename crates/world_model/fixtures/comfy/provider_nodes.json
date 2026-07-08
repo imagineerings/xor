@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "native_sim_records": true,
+  "comfyui_passthrough": false,
+  "catalog": {
+    "required_providers": [
+      "openai",
+      "gemini",
+      "runway",
+      "elevenlabs",
+      "meshy",
+      "sam3"
+    ],
+    "required_nodes": [
+      "OpenAIImageGenerate",
+      "OpenAILLM",
+      "GeminiPromptEnhance",
+      "RunwayTextToVideo",
+      "ElevenLabsTextToSpeech",
+      "MeshyTextTo3D",
+      "SAM3Segment"
+    ],
+    "required_capabilities": [
+      "TextToImage",
+      "Llm",
+      "PromptEnhancement",
+      "TextToVideo",
+      "TextToSpeech",
+      "TextToThreeD",
+      "ImageEdit"
+    ],
+    "unsupported_nodes": [
+      "SAM3Segment"
+    ]
+  }
+}
