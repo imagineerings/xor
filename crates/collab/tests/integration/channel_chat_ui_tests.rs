@@ -116,6 +116,10 @@ async fn test_channel_chat_view_updates_live_reactions(
         chat.read_with(cx_a, |chat, _| chat.reaction_chip_labels_for_test()),
         vec![vec!["👍 1".to_string()]]
     );
+    assert_eq!(
+        chat.update(cx_a, |chat, cx| chat.reaction_tooltips_for_test(cx)),
+        vec![vec!["user_b".to_string()]]
+    );
 }
 
 #[gpui::test]

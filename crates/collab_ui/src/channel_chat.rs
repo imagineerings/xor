@@ -390,18 +390,7 @@ impl ChannelChat {
         message: &proto::ChannelMessage,
         cx: &mut Context<Self>,
     ) -> gpui::AnyElement {
-        let sender = self
-            .user_store
-            .update(cx, |user_store, cx| {
-                user_store.get_user_optimistic(message.sender_id, cx)
-            })
-            .map(|user| {
-                user.name
-                    .clone()
-                    .filter(|name| !name.is_empty())
-                    .unwrap_or_else(|| user.github_login.to_string())
-            })
-            .unwrap_or_else(|| format!("User {}", message.sender_id));
+        let sender = self.user_display_name(message.sender_id, cx);
         let timestamp = format_timestamp(message.timestamp);
         let edited = message.edited_at.is_some();
 
@@ -459,6 +448,7 @@ impl ChannelChat {
                             let emoji_name = reaction.emoji_name.clone();
                             let reacted_by_me = current_user_id
                                 .is_some_and(|user_id| reaction.user_ids.contains(&user_id));
+                            let tooltip = self.reaction_tooltip(reaction, cx);
                             let label = format!(
                                 "{} {}",
                                 emoji_character(&reaction.emoji_name),
@@ -487,6 +477,7 @@ impl ChannelChat {
                                     gpui::transparent_black()
                                 })
                                 .child(label)
+                                .tooltip(Tooltip::text(tooltip))
                                 .on_click(cx.listener(move |this, _, window, cx| {
                                     this.toggle_reaction(
                                         message_id,
@@ -524,6 +515,33 @@ impl ChannelChat {
                 |this| this.child(self.render_emoji_picker(message.id, cx)),
             )
             .into_any_element()
+    }
+
+    fn user_display_name(&self, user_id: u64, cx: &mut Context<Self>) -> String {
+        self.user_store
+            .update(cx, |user_store, cx| {
+                user_store.get_user_optimistic(user_id, cx)
+            })
+            .map(|user| {
+                user.name
+                    .clone()
+                    .filter(|name| !name.is_empty())
+                    .unwrap_or_else(|| user.github_login.to_string())
+            })
+            .unwrap_or_else(|| format!("User {user_id}"))
+    }
+
+    fn reaction_tooltip(
+        &self,
+        reaction: &proto::ReactionSummary,
+        cx: &mut Context<Self>,
+    ) -> String {
+        reaction
+            .user_ids
+            .iter()
+            .map(|user_id| self.user_display_name(*user_id, cx))
+            .collect::<Vec<_>>()
+            .join(", ")
     }
 
     fn render_emoji_picker(&self, message_id: u64, cx: &mut Context<Self>) -> gpui::AnyElement {
@@ -742,6 +760,19 @@ impl ChannelChat {
                     .collect()
             })
             .collect()
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn reaction_tooltips_for_test(&self, cx: &mut Context<Self>) -> Vec<Vec<String>> {
+        let mut tooltips = Vec::new();
+        for message in &self.messages {
+            let mut message_tooltips = Vec::new();
+            for reaction in &message.reaction_summaries {
+                message_tooltips.push(self.reaction_tooltip(reaction, cx));
+            }
+            tooltips.push(message_tooltips);
+        }
+        tooltips
     }
 
     #[cfg(any(test, feature = "test-support"))]
