@@ -47,6 +47,7 @@ pub mod request;
 pub mod serving;
 pub mod serving_diagnostics;
 pub mod session;
+pub mod sim_3d_nodes;
 pub mod sim_api_schema;
 pub mod sim_asset_api;
 pub mod sim_asset_download;
@@ -148,6 +149,8 @@ mod mesh_tests;
 mod serving_tests;
 #[cfg(test)]
 mod session_tests;
+#[cfg(test)]
+mod sim_3d_nodes_tests;
 #[cfg(test)]
 mod sim_api_schema_tests;
 #[cfg(test)]
@@ -366,6 +369,12 @@ pub use serving_diagnostics::{
     ServingValidator,
 };
 pub use session::{WorldModelCacheMetadata, WorldModelSession, WorldModelSessionState};
+pub use sim_3d_nodes::{
+    SIM_THREE_D_DEPENDENCY_REVIEW_REQUIRED_CODE, SIM_THREE_D_INVALID_GEOMETRY_CODE,
+    SIM_THREE_D_UNSUPPORTED_FORMAT_CODE, SimMeshPipelineDelegation, SimThreeDArtifact,
+    SimThreeDArtifactKind, SimThreeDBackendStatus, SimThreeDMetadata, SimThreeDNodeAdapter,
+    SimThreeDNodeDiagnostic, SimThreeDOperation,
+};
 pub use sim_api_schema::{
     API_SCHEMA_MISSING_REASON_CODE, API_SCHEMA_MISSING_SCHEMA_CODE, SimApiRouteSupport,
     SimApiSchemaCatalog, SimApiSchemaDiagnostic, SimApiSchemaRoute,

@@ -66,6 +66,12 @@ flowchart TD
 
 - **Purpose**: Bridge 3D, geometry, point cloud, and Gaussian splat nodes to Sim 3D artifacts.
 - **Responsibilities**: Artifact registration, preview metadata, mesh delegation, and format diagnostics.
+- **Native behavior**: Uses `SimThreeD*` adapters to register mesh, point
+  cloud, Gaussian splat, depth, normal, camera, and point-map artifacts with
+  provenance and preview metadata. Textured mesh exports produce
+  `SimMeshPipelineDelegation` records backed by `MeshArtifactMetadata`, so mesh
+  lifecycle stays owned by `mesh-generation-pipeline/` rather than a Comfy
+  adapter store.
 
 ### AnalysisControlOps
 
@@ -114,6 +120,12 @@ pub struct SimVideoArtifact {
 pub struct SimAudioArtifact {
     pub reference: String,
     pub metadata: SimAudioMetadata,
+}
+
+pub struct SimThreeDArtifact {
+    pub reference: String,
+    pub kind: SimThreeDArtifactKind,
+    pub metadata: SimThreeDMetadata,
 }
 ```
 

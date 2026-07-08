@@ -44,10 +44,11 @@ Represent media functionality as capability groups and implement deterministic o
   - _Requirements: 3.1, 3.2, 3.3_
   - _writes: crates/world_model/src/sim_audio_nodes.rs, crates/world_model/src/sim_audio_nodes_tests.rs_
 
-- [ ] 5. Implement 3D, geometry, and Gaussian splat adapters
+- [x] 5. Implement 3D, geometry, and Gaussian splat adapters
   - Register 3D artifacts, depth/geometry outputs, point clouds, splats, preview metadata, and mesh lifecycle delegation.
+  - Represent mesh, point cloud, Gaussian splat, depth, normal, camera, point-map, preview, provenance, format diagnostic, and mesh-pipeline delegation state with native `SimThreeD*` records.
   - _Requirements: 4.1, 4.2, 4.3_
-  - _writes: crates/world_model/src/comfy_3d_nodes.rs, crates/world_model/src/comfy_geometry_nodes.rs, crates/world_model/src/comfy_3d_nodes_tests.rs_
+  - _writes: crates/world_model/src/sim_3d_nodes.rs, crates/world_model/src/sim_3d_nodes_tests.rs_
 
 - [ ] 6. Implement analysis and control signal adapters
   - Add typed outputs and graph validation compatibility for canny, pose, bounding boxes, face landmarks, segmentation, detection, depth, optical flow, tracking, and camera controls.
