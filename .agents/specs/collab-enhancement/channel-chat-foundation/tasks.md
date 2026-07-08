@@ -35,13 +35,14 @@ Restore the channel-chat storage, RPC, client, and desktop UI foundation that th
   - _writes: `crates/collab/src/db/queries/channel_messages.rs`_
   - _validated: `cargo fmt -p collab`; `cargo check -p collab`_
 
-- [ ] 4. Add client channel-chat API
-  - [ ] 4.1 Add focused methods for join, leave, send, history, edit, delete, and ack.
-  - [ ] 4.2 Add live event handling for `ChannelMessageSent` and `ChannelMessageUpdate`.
-  - [ ] 4.3 Surface errors to callers instead of swallowing them.
+- [x] 4. Add client channel-chat API
+  - [x] 4.1 Add focused methods for join, leave, send, history, edit, delete, and ack.
+  - [x] 4.2 Add live event handling for `ChannelMessageSent` and `ChannelMessageUpdate`.
+  - [x] 4.3 Surface errors to callers instead of swallowing them.
   - _Requirements: 0.2, 0.3_
   - _writes: `crates/client/src/channel_chat.rs`_
   - _writes: `crates/client/src/client.rs`_
+  - _validated: `cargo fmt -p client`; `cargo check -p client`_
 
 - [ ] 5. Build the desktop channel-chat view
   - [ ] 5.1 Render a scrollable message list with sender, timestamp, and body text.

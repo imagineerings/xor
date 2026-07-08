@@ -1,9 +1,10 @@
 #[cfg(any(test, feature = "test-support"))]
 pub mod test;
 
-pub mod sim_urls;
+pub mod channel_chat;
 mod llm_token;
 mod proxy;
+pub mod sim_urls;
 pub mod telemetry;
 pub mod user;
 
