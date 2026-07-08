@@ -313,6 +313,7 @@ dependencies = [
  "lsp",
  "parking_lot",
  "paths",
+ "posthog",
  "pretty_assertions",
  "project",
  "prompt_store",

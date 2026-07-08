@@ -62,7 +62,7 @@ Extend sim's observability infrastructure with Langfuse tracing, OpenTelemetry O
   - _Requirements: 7, 8_
   - _writes: crates/agent/src/tool_monitor.rs, crates/agent/src/tool_inspector.rs_
 
-- [ ] 8. Integrate observability into agent and providers
+- [x] 8. Integrate observability into agent and providers
   - Hook token counter into provider request path
   - Hook observation layer into agent turn processing
   - Hook rate limiter into provider request path
