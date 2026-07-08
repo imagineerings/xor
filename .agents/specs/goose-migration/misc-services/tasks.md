@@ -49,7 +49,7 @@ Implement the remaining smaller goose components: session import formats, Nostr 
   - _Requirements: 6_
   - _writes: scripts/provider-error-proxy/_
 
-- [ ] 6. Write tests
+- [x] 6. Write tests
   - Import format detection and parsing
   - Nostr event serialization/round-trip
   - Script validation (CI integration)

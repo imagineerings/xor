@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T16:30:52Z",
+  "updated_at": "2026-07-08T16:36:08Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -160,6 +160,17 @@
       "owner": null,
       "summary": "Merged in PR #57.",
       "updated_at": "2026-07-07T00:00:00Z"
+    },
+    {
+      "task_id": "task:ecab924eba6a",
+      "task_identifier": ".agents/specs/goose-migration/misc-services/tasks.md:52",
+      "title": "Write tests",
+      "linear_identifier": "SIM-29",
+      "linear_url": "https://linear.app/simtropolis/issue/SIM-29/write-tests",
+      "status": "inactive",
+      "owner": null,
+      "summary": "Implemented locally with scripts/test-misc-services.sh and scripts/verify-misc-services.js covering session import tests, Nostr sharing tests, script syntax, examples, OpenAPI/diagnostics helpers, and provider proxy helper behavior. Ready to merge in PR.",
+      "updated_at": "2026-07-08T16:36:08Z"
     },
     {
       "task_id": "task:c7d4e5f6a1b2",
@@ -535,6 +546,12 @@
       "updated_at": "2026-07-08T16:30:52Z"
     },
     {
+      "task_identifier": ".agents/specs/goose-migration/misc-services/tasks.md:52",
+      "status": "done",
+      "summary": "Task 6: Added scripts/test-misc-services.sh and scripts/verify-misc-services.js to run focused session import and Nostr tests plus scripted verification for examples, script syntax, OpenAPI/diagnostics helpers, and provider proxy helper behavior.",
+      "updated_at": "2026-07-08T16:36:08Z"
+    },
+    {
       "task_identifier": ".agents/specs/ci-migration/tasks.md",
       "status": "deprioritized",
       "summary": "All tasks in .agents/specs/ci-migration are deprioritized until every other local workflow task is complete. Do not select CI migration work while non-CI tasks remain available.",
@@ -585,8 +602,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/misc-services",
-      "summary": "Tasks 1-5 are checked complete. Session imports support JSON, Markdown, and Goose legacy formats; Nostr sharing has session event serialization, relay abstraction, publish/import/discovery APIs, and in-memory relay tests; examples cover MCP wiki integration, plugin usage, and frontend tools; scripts cover Windows builds, OpenAPI validation, diagnostics, database helpers, MCP testing, sub-agent/recipe testing, pre-release checks, and compaction tests; provider error proxy forwards provider HTTP traffic while logging redacted request/response details. Slice tests remain.",
-      "updated_at": "2026-07-08T16:30:52Z"
+      "summary": "Tasks 1-6 are checked complete. The slice now has session import formats, Nostr sharing, runnable examples, development/CI scripts, a provider error proxy, and a misc-services verification harness that covers focused import/Nostr Rust tests plus scripted example and tool validation.",
+      "updated_at": "2026-07-08T16:36:08Z"
     },
     {
       "scope": ".agents/specs/godot-migration",

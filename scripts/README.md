@@ -76,3 +76,13 @@ scripts/test-compaction.sh
 
 Runs focused tests for automatic compaction settings and agent thread compaction
 behavior.
+
+## Misc-services verification
+
+```sh
+scripts/test-misc-services.sh
+```
+
+Runs the focused session import and Nostr sharing tests, then validates the
+migrated examples, script syntax, OpenAPI/diagnostics helpers, and provider
+error proxy helper behavior.

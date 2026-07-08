@@ -10,6 +10,7 @@ case "$mode" in
     git diff --check
     node scripts/validate-openapi-schema.js --help >/dev/null
     node scripts/diagnostics-viewer.js --help >/dev/null
+    scripts/test-misc-services.sh
     scripts/test-mcp-servers.sh
     ;;
   full)
