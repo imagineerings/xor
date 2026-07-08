@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T20:52:00Z",
+  "updated_at": "2026-07-08T21:08:00Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -688,6 +688,12 @@
       "status": "done",
       "summary": "Task 2: Added terminal rendering primitives for CLI interactive sessions, including Markdown-to-ANSI block/inline rendering, lightweight code keyword highlighting, deterministic spinner frames, conversation rendering, and tool-call state display with arguments and results.",
       "updated_at": "2026-07-08T20:52:00Z"
+    },
+    {
+      "task_identifier": ".agents/specs/goose-migration/text-ui/tasks.md:28",
+      "status": "done",
+      "summary": "Task 3: Added catalog-driven CLI slash command parsing, help text, autocomplete suggestions, TUI-local outcomes for help/clear/save/load/model, and forwarded-agent outcomes for recipe/skill/compact so later interactive wiring can route through shared agent behavior.",
+      "updated_at": "2026-07-08T21:08:00Z"
     }
   ],
   "dependency_notes": [
@@ -743,8 +749,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/text-ui",
-      "summary": "Tasks 1-2 are checked complete. crates/cli now exposes an interactive session/input core plus terminal rendering primitives for Markdown-to-ANSI output, code block highlighting, spinner frames, and tool-call state display. Task 3 can build slash-command parsing/routing on top of this interactive module.",
-      "updated_at": "2026-07-08T20:52:00Z"
+      "summary": "Tasks 1-3 are checked complete. crates/cli now exposes an interactive session/input core, terminal rendering primitives, and catalog-driven slash-command parsing/routing with TUI-local commands plus forwarded agent commands for recipe, skill, and compact. Task 4 can add the configuration wizard without needing more interactive foundation work.",
+      "updated_at": "2026-07-08T21:08:00Z"
     },
     {
       "scope": ".agents/specs/godot-migration",

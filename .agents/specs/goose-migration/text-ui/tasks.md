@@ -25,7 +25,7 @@ Implement an interactive terminal UI mode for sim's CLI using crossterm/ratatui,
   - _Requirements: 4, 7_
   - _writes: crates/cli/src/interactive/renderer.rs, crates/cli/src/interactive/markdown_renderer.rs_
 
-- [ ] 3. Wire interactive mode to shared slash command behavior
+- [x] 3. Wire interactive mode to shared slash command behavior
   - Add TUI-only commands such as `/help`, `/clear`, `/save`, `/load`, and `/model`
   - Reuse agent command paths for `/recipe`, `/skill`, and `/compact` where possible
   - Add autocomplete/suggestions backed by the shared command catalog
