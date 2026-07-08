@@ -10,9 +10,9 @@ API provider nodes are normalized as policy-gated world-model harness remote exe
 flowchart TD
     Registry[SimProviderNodeRegistry] --> Connector[SimProviderConnector]
     Connector --> Secrets[Sim Secrets]
-    Connector --> Upload[ProviderUploadService]
+    Connector --> Upload[SimProviderIoService]
     Connector --> Remote[SimProviderRemoteTaskTracker]
-    Remote --> Download[ProviderDownloadService]
+    Remote --> Download[SimProviderIoService]
     Download --> Assets[comfy-asset-library]
     Connector --> Policy[SimProviderPolicyGate]
 ```
@@ -68,10 +68,15 @@ pub trait SimProviderConnector {
   signed URLs. Secret support must not serialize workflow JSON plaintext keys
   or forward credential handling to ComfyUI.
 
-### ProviderUploadService and ProviderDownloadService
+### SimProviderIoService
 
 - **Purpose**: Handle source media upload and result import.
 - **Responsibilities**: MIME detection, signed URL redaction, retry boundaries, asset registration, and provenance.
+- **Native behavior**: Prepares native `SimProviderUploadRecord` values for
+  provider source media, redacts signed upload and download URLs, imports
+  provider outputs as `SimProviderImportedAsset` records, preserves image,
+  video, audio, text, vector, and 3D MIME metadata, and attaches
+  `SimProviderOutputProvenance` to each imported asset.
 
 ### SimProviderRemoteTaskTracker
 
@@ -128,6 +133,13 @@ pub enum SimProviderRemoteTaskStatus {
     Failed { message: String },
     Cancelled { message: String },
     TimedOut { message: String },
+}
+
+pub struct SimProviderImportedAsset {
+    pub asset_ref: String,
+    pub kind: SimProviderOutputKind,
+    pub mime_type: String,
+    pub provenance: SimProviderOutputProvenance,
 }
 ```
 

@@ -44,10 +44,11 @@ Create a provider-node framework before individual providers. Initial implementa
   - _Requirements: 3.1, 3.2, 3.4_
   - _writes: crates/world_model/src/sim_provider_connector.rs, crates/world_model/src/sim_provider_remote_tasks.rs, crates/world_model/src/sim_provider_remote_tasks_tests.rs_
 
-- [ ] 5. Implement provider upload/download and output import
+- [x] 5. Implement provider upload/download and output import
   - Upload source media, collect provider outputs, register assets, attach media metadata, and write provenance.
+  - Represent uploads, outputs, imported assets, media metadata, signed URL redaction, and output provenance with native `SimProvider*` records.
   - _Requirements: 3.1, 3.3, 4.1, 4.2, 4.3, 4.4, 4.5_
-  - _writes: crates/world_model/src/comfy_provider_io.rs, crates/world_model/src/comfy_provider_io_tests.rs_
+  - _writes: crates/world_model/src/sim_provider_io.rs, crates/world_model/src/sim_provider_io_tests.rs_
 
 - [ ] 6. Add provider catalog fixtures
   - Snapshot Comfy provider families and node ids from `comfy_api_nodes` into a Sim provider catalog fixture.
