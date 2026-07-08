@@ -54,7 +54,7 @@ Implement the security inspection system (`crates/security/`) and permission sys
   - _Requirements: 7, 8_
   - _writes: crates/permission/src/inspector.rs, crates/permission/src/judge.rs_
 
-- [ ] 8. Implement permission confirmation UI (GPUI)
+- [x] 8. Implement permission confirmation UI (GPUI)
   - Confirmation dialog showing tool name, arguments, risk level
   - Allow/Deny/Always-Allow/Always-Deny actions
   - _Requirements: 6_

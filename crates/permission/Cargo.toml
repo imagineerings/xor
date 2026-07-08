@@ -14,7 +14,9 @@ doctest = false
 
 [dependencies]
 anyhow.workspace = true
+gpui.workspace = true
 sqlez.workspace = true
+ui.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

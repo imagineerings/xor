@@ -13004,8 +13004,10 @@ name = "permission"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "gpui",
  "sqlez",
  "tempfile",
+ "ui",
 ]
 
 [[package]]
