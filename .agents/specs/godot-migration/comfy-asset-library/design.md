@@ -23,6 +23,11 @@ flowchart LR
 
 - **Purpose**: Persist asset content metadata, references, tags, and metadata entries.
 - **Responsibilities**: Hash lookup, reference CRUD, owner scoping, soft delete, cache state, and metadata indexing.
+- **Native asset records**: Asset content, owner-scoped references, tag links,
+  metadata entries, soft-delete timestamps, provenance ids, and cache state are
+  stored as Sim-owned repository records. Hash dedupe reuses content while
+  preserving distinct reference metadata, and repository behavior does not
+  depend on ComfyUI's asset database or storage layer.
 
 ```rust
 pub trait AssetRepository {
@@ -125,6 +130,7 @@ _For any_ prune operation, references outside known roots SHALL be marked missin
 ## Testing Strategy
 
 - Unit tests for hash validation, tag normalization, cursor encoding/decoding, metadata filters, and path confinement.
-- Repository tests for content/reference dedupe, soft delete, owner scoping, and tag histograms.
+- Repository tests for content/reference dedupe, soft delete, owner scoping,
+  cache state, provenance ids, and tag histograms.
 - API tests for upload, download, create-from-hash, CRUD, tags, seed status, cancel, and prune.
 - Scanner tests for models/input/output roots, missing files, enrichment, and output registration.

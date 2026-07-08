@@ -20,8 +20,9 @@ Build the asset library as shared storage primitives plus Comfy-compatible route
 
 ## Tasks
 
-- [ ] 1. Implement asset repository models
+- [x] 1. Implement asset repository models
   - Add content records, reference records, tag links, metadata entries, soft delete, owner fields, and cache state.
+  - Preserve content hash dedupe, owner-scoped references, separate mutable reference metadata, provenance ids, soft-delete state, and cache state as native Sim repository records without ComfyUI asset database pass-through.
   - _Requirements: 1.1, 1.2, 1.3, 6.2_
   - _writes: crates/world_model/src/comfy_assets.rs, crates/world_model/src/comfy_assets_tests.rs_
 
