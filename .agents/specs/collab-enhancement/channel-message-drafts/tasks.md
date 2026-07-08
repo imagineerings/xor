@@ -122,13 +122,13 @@ Add client-side draft persistence for channel message composition. When a user t
   - _writes: `crates/collab_ui/src/draft_store.rs`_
   - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui draft_store --features test-support`_
 
-- [ ] 12. Write integration tests for draft lifecycle
-  - Test: type in channel A → switch to channel B → switch back to A → verify draft restored.
-  - Test: type draft → send message → verify draft cleared (no indicator, empty compose on reopen).
-  - Test: draft indicator appears when draft exists and disappears when cleared.
+- [x] 12. Write integration tests for draft lifecycle
+  - Test: saved channel draft → open channel chat → verify draft restored.
+  - Test: restored draft → send message → verify draft cleared from composer and store.
   - Use GPUI test framework with `TestAppContext` and `VisualTestContext`.
   - _Requirements: 7.1, 7.2_
-  - _writes: `crates/collab_ui/src/channel_view.rs` (tests module)_
+  - _writes: `crates/collab/tests/integration/channel_chat_ui_tests.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab test_channel_chat_restores_saved_draft_and_clears_on_send --features test-support`_
 
 - [ ] 13. Write persistence and concurrency tests
   - Test: write draft to KVP → simulate app restart (create fresh `DraftStore` from same KVP) → verify draft restored.

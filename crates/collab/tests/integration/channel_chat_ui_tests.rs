@@ -1,6 +1,7 @@
 use crate::TestServer;
 use client::channel_chat::SendChannelMessage;
-use collab_ui::channel_chat::ChannelChat;
+use collab_ui::{channel_chat::ChannelChat, draft_store::DraftStore};
+use gpui::TaskExt;
 
 #[gpui::test]
 async fn test_channel_chat_view_live_insert_and_send_states(
@@ -69,6 +70,42 @@ async fn test_channel_chat_view_live_insert_and_send_states(
         chat.read_with(cx_a, |chat, _| chat.send_error_for_test())
             .is_some()
     );
+}
+
+#[gpui::test]
+async fn test_channel_chat_restores_saved_draft_and_clears_on_send(
+    cx_a: &mut gpui::TestAppContext,
+    cx_b: &mut gpui::TestAppContext,
+) {
+    let (_server, client_a, _client_b, channel_id) = TestServer::start2(cx_a, cx_b).await;
+    let (workspace, cx_a) = client_a.build_test_workspace(cx_a).await;
+
+    cx_a.update(|_, cx| {
+        let save_draft = DraftStore::global(cx).update(cx, |draft_store, cx| {
+            draft_store.save_draft_in_background(channel_id, "restore me".into(), cx)
+        });
+        save_draft.detach_and_log_err(cx);
+    });
+    cx_a.run_until_parked();
+
+    let chat = cx_a
+        .update(|window, cx| ChannelChat::open(channel_id, workspace.clone(), window, cx))
+        .await
+        .unwrap();
+    cx_a.run_until_parked();
+
+    assert_eq!(
+        chat.read_with(cx_a, |chat, cx| chat.draft_for_test(cx)),
+        "restore me"
+    );
+
+    chat.update_in(cx_a, |chat, window, cx| {
+        chat.send_for_test(window, cx);
+    });
+    cx_a.run_until_parked();
+
+    assert_eq!(chat.read_with(cx_a, |chat, cx| chat.draft_for_test(cx)), "");
+    assert!(!cx_a.update(|_, cx| DraftStore::global(cx).read(cx).has_draft(channel_id)));
 }
 
 #[gpui::test]
