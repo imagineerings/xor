@@ -1,4 +1,5 @@
 pub mod artifact;
+pub mod comfy_execution_registry;
 pub mod comfy_model_catalog;
 pub mod comfy_model_family;
 pub mod comfy_model_folders;
@@ -18,6 +19,8 @@ pub mod session;
 
 #[cfg(test)]
 mod artifact_tests;
+#[cfg(test)]
+mod comfy_execution_registry_tests;
 #[cfg(test)]
 mod comfy_model_catalog_tests;
 #[cfg(test)]
@@ -44,6 +47,11 @@ mod session_tests;
 mod tests;
 
 pub use artifact::{GeneratedWorldArtifact, GeneratedWorldArtifactError};
+pub use comfy_execution_registry::{
+    ComfyExecutionRegistry, DivergenceReason, DivergenceRecord, ExecutionBehaviorKey,
+    GuidanceCapability, GuidanceMode, ModelFamilyExecutionProfile, SamplerCapability, SamplerKind,
+    SchedulerCapability, SchedulerKind,
+};
 pub use comfy_model_catalog::{
     ComfyModelCatalog, ModelCatalogError, ModelCatalogSnapshot, ModelFileSummary, ModelRootSnapshot,
 };

@@ -20,8 +20,8 @@ Implement Comfy model-execution semantics after model catalogs and graph validat
 
 ## Tasks
 
-- [ ] 1. Implement execution capability registry
-  - Add sampler, scheduler, guidance, latent, VAE, patch, model-family, and divergence capability records.
+- [x] 1. Implement execution capability registry
+  - Add native Sim sampler, scheduler, guidance, latent, VAE, patch, model-family, and divergence capability records without passing capability lookup through to ComfyUI.
   - _Requirements: 1.2, 4.1, 4.2, 4.3, 4.4, 6.3_
   - _writes: crates/world_model/src/comfy_execution_registry.rs, crates/world_model/src/comfy_execution_registry_tests.rs_
 

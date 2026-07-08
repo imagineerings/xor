@@ -107,6 +107,13 @@ pub struct ModelFamilyExecutionProfile {
     pub temporal_constraints: Option<TemporalExecutionConstraints>,
 }
 
+pub struct SamplerCapability {
+    pub kind: SamplerKind,
+    pub supported_schedulers: BTreeSet<SchedulerKind>,
+    pub supports_deterministic_noise: bool,
+    pub supports_start_end_steps: bool,
+}
+
 pub struct DivergenceRecord {
     pub behavior: ExecutionBehaviorKey,
     pub comfy_source: SourceReference,
