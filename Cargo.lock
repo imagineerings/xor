@@ -17361,6 +17361,7 @@ dependencies = [
  "serde_json",
  "ui",
  "util",
+ "world_model",
 ]
 
 [[package]]

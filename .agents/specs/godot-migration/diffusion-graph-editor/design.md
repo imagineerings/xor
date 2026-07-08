@@ -3,6 +3,9 @@
 ## Architecture
 
 Use GPUI/app infrastructure for the editor surface and `crates/world_model` graph primitives for validation and execution planning.
+The editor state is a native Sim feature: `DiffusionGraphEditorState` owns the
+graph, validation state, artifact outputs, and execution plan metadata directly
+instead of presenting Comfy graph compatibility labels or pass-through state.
 
 ## Components
 
@@ -10,6 +13,7 @@ Use GPUI/app infrastructure for the editor surface and `crates/world_model` grap
 - `GraphNode`
 - `GraphPort`
 - `GraphValidationReport`
+- `DiffusionGraphEditorState`
 
 ## Correctness Properties
 

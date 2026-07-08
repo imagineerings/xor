@@ -17,7 +17,8 @@ Build editor state and execution wiring on top of the shared world-model graph p
 
 ## Tasks
 
-- [ ] 1. Add graph model, validation, editor state, and execution runner
+- [x] 1. Add graph model, validation, editor state, and execution runner
   - Define graph primitives, validation, editor-facing state, and execution plan outputs.
+  - Represent editor state, validation, artifact outputs, and execution planning with native Sim `DiffusionGraph*` records and block execution until validation succeeds.
   - _Requirements: 1.1, 2.1, 3.1_
   - _writes: crates/world_model/src/graph.rs, crates/world_model/src/graph_validation.rs, crates/sim_apps/src/diffusion_graph.rs_
