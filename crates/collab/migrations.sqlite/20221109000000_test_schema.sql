@@ -285,6 +285,42 @@ CREATE TABLE IF NOT EXISTS "channel_chat_participants" (
 
 CREATE INDEX "index_channel_chat_participants_on_channel_id" ON "channel_chat_participants" ("channel_id");
 
+CREATE TABLE IF NOT EXISTS "channel_messages" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "channel_id" INTEGER NOT NULL REFERENCES channels (id) ON DELETE CASCADE,
+    "sender_id" INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    "body" TEXT NOT NULL,
+    "nonce" BLOB NOT NULL,
+    "reply_to_message_id" INTEGER REFERENCES channel_messages (id) ON DELETE SET NULL,
+    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "edited_at" TIMESTAMP,
+    "deleted_at" TIMESTAMP
+);
+
+CREATE INDEX "index_channel_messages_on_channel_id_and_id" ON "channel_messages" ("channel_id", "id");
+
+CREATE INDEX "index_channel_messages_on_reply_to_message_id" ON "channel_messages" ("reply_to_message_id");
+
+CREATE TABLE IF NOT EXISTS "channel_message_mentions" (
+    "message_id" INTEGER NOT NULL REFERENCES channel_messages (id) ON DELETE CASCADE,
+    "range_start" INTEGER NOT NULL,
+    "range_end" INTEGER NOT NULL,
+    "user_id" INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    PRIMARY KEY ("message_id", "range_start", "range_end", "user_id")
+);
+
+CREATE INDEX "index_channel_message_mentions_on_user_id" ON "channel_message_mentions" ("user_id");
+
+CREATE TABLE IF NOT EXISTS "channel_message_reads" (
+    "channel_id" INTEGER NOT NULL REFERENCES channels (id) ON DELETE CASCADE,
+    "user_id" INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    "message_id" INTEGER NOT NULL REFERENCES channel_messages (id) ON DELETE CASCADE,
+    "updated_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY ("channel_id", "user_id")
+);
+
+CREATE INDEX "index_channel_message_reads_on_message_id" ON "channel_message_reads" ("message_id");
+
 CREATE TABLE "channel_members" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT,
     "channel_id" INTEGER NOT NULL REFERENCES channels (id) ON DELETE CASCADE,

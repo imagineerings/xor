@@ -6,15 +6,17 @@ Restore the channel-chat storage, RPC, client, and desktop UI foundation that th
 
 ## Tasks
 
-- [ ] 1. Add channel message persistence
-  - [ ] 1.1 Create migrations for channel messages, mentions, and read acknowledgements.
-  - [ ] 1.2 Add SeaORM table definitions and id conversions.
-  - [ ] 1.3 Register the new entities with the collab DB module.
+- [x] 1. Add channel message persistence
+  - [x] 1.1 Create migrations for channel messages, mentions, and read acknowledgements.
+  - [x] 1.2 Add SeaORM table definitions and id conversions.
+  - [x] 1.3 Register the new entities with the collab DB module.
   - _Requirements: 0.1_
   - _writes: `crates/collab/migrations/*channel_messages*.sql`_
+  - _writes: `crates/collab/migrations.sqlite/20221109000000_test_schema.sql`_
   - _writes: `crates/collab/src/db/tables/channel_message.rs`_
   - _writes: `crates/collab/src/db/tables/channel_message_mention.rs`_
   - _writes: `crates/collab/src/db/tables/channel_message_read.rs`_
+  - _validated: `cargo fmt -p collab`; `cargo check -p collab`_
 
 - [ ] 2. Implement channel message store queries
   - [ ] 2.1 Implement create, update, delete/tombstone, paginated history, lookup-by-id, and acknowledgement queries.
