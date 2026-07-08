@@ -21,7 +21,7 @@ Implement the remaining smaller goose components: session import formats, Nostr 
   - _Requirements: 3_
   - _writes: crates/nostr_sharing/src/lib.rs_
 
-- [ ] 3. Migrate examples
+- [x] 3. Migrate examples
   - MCP wiki integration example
   - Plugin usage example
   - Frontend tools example

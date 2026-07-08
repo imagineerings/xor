@@ -1,0 +1,20 @@
+{
+  "id": "sim.example.agent-helper",
+  "name": "Example Agent Helper",
+  "version": "0.1.0",
+  "description": "Minimal plugin manifest showing command and MCP server wiring.",
+  "commands": [
+    {
+      "id": "example.sayHello",
+      "title": "Say Hello",
+      "command": "node examples/plugin-usage/run-plugin.js examples/plugin-usage/plugin.json"
+    }
+  ],
+  "mcpServers": [
+    {
+      "id": "example-wiki",
+      "command": "node",
+      "args": ["examples/mcp-wiki-integration/wiki-mcp-server.js"]
+    }
+  ]
+}
