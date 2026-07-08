@@ -279,6 +279,10 @@ pub mod azure {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{Read as _, Write as _};
+    use std::net::TcpListener;
+    use std::sync::mpsc;
+    use std::thread;
 
     #[test]
     fn provider_name_matches_config() {
@@ -538,5 +542,110 @@ mod tests {
 
         let format = AudioFormat::Mp3;
         assert!(!provider.supported_formats().contains(&format));
+    }
+
+    #[test]
+    fn transcribe_posts_audio_and_extracts_text() {
+        let (url, request_rx) = spawn_test_server(
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{\"results\":{\"channels\":[{\"alternatives\":[{\"transcript\":\"test transcript\"}]}]}}",
+        );
+        let provider = CloudDictationProvider::new(CloudDictationConfig {
+            provider: "test".into(),
+            api_url: Some(url),
+            api_key: Some("secret".into()),
+            api_key_header: Some("Authorization".into()),
+            api_key_scheme: Some("Token".into()),
+            language: Some("en".into()),
+            response_field: None,
+        });
+
+        let transcript = block_on_tokio(provider.transcribe(&[1, 2, 3], AudioFormat::Wav))
+            .expect("cloud provider should transcribe mocked response");
+        let request = request_rx
+            .recv()
+            .expect("test server should receive one request");
+
+        assert_eq!(transcript, "test transcript");
+        assert!(request.starts_with("POST /?language=en HTTP/1.1"));
+        assert!(request.contains("content-type: audio/wav"));
+        assert!(request.contains("authorization: Token secret"));
+        assert!(request.ends_with("\r\n\r\n\u{1}\u{2}\u{3}"));
+    }
+
+    #[test]
+    fn transcribe_returns_provider_error_for_api_failure() {
+        let (url, _request_rx) = spawn_test_server(
+            "HTTP/1.1 429 Too Many Requests\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{\"error\":\"rate limited\"}",
+        );
+        let provider = CloudDictationProvider::new(CloudDictationConfig {
+            provider: "test".into(),
+            api_url: Some(url),
+            api_key: None,
+            api_key_header: None,
+            api_key_scheme: None,
+            language: None,
+            response_field: None,
+        });
+
+        let error = block_on_tokio(provider.transcribe(&[1, 2, 3], AudioFormat::Wav))
+            .expect_err("non-success response should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "dictation provider `test` failed: API returned 429: rate limited"
+        );
+    }
+
+    #[test]
+    fn transcribe_rejects_unsupported_format_before_http_request() {
+        let provider = CloudDictationProvider::new(CloudDictationConfig {
+            provider: "test".into(),
+            api_url: Some("http://127.0.0.1:1".into()),
+            api_key: None,
+            api_key_header: None,
+            api_key_scheme: None,
+            language: None,
+            response_field: Some("text".into()),
+        })
+        .with_supported_formats(vec![AudioFormat::Wav]);
+
+        let error = smol::block_on(provider.transcribe(&[1, 2, 3], AudioFormat::Mp3))
+            .expect_err("unsupported format should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "dictation provider `test` does not support audio format Mp3"
+        );
+    }
+
+    fn spawn_test_server(response: &'static str) -> (String, mpsc::Receiver<String>) {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind test server");
+        let address = listener.local_addr().expect("read test server address");
+        let (request_tx, request_rx) = mpsc::channel();
+
+        thread::spawn(move || {
+            let Ok((mut stream, _)) = listener.accept() else {
+                return;
+            };
+            let mut buffer = [0; 4096];
+            let Ok(read) = stream.read(&mut buffer) else {
+                return;
+            };
+            let request = String::from_utf8_lossy(&buffer[..read]).into_owned();
+            request_tx.send(request).expect("send captured request");
+            stream
+                .write_all(response.as_bytes())
+                .expect("write test response");
+        });
+
+        (format!("http://{address}"), request_rx)
+    }
+
+    fn block_on_tokio<T>(future: impl std::future::Future<Output = T>) -> T {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_io()
+            .build()
+            .expect("build tokio test runtime")
+            .block_on(future)
     }
 }

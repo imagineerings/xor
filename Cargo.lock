@@ -5299,7 +5299,9 @@ dependencies = [
  "audio",
  "serde",
  "serde_json",
+ "smol",
  "thiserror 2.0.18",
+ "tokio",
  "zed-reqwest",
 ]
 
@@ -6288,6 +6290,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "eval_harbor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "regex",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "eval_utils"
 version = "0.1.0"
 dependencies = [
@@ -7221,6 +7234,7 @@ dependencies = [
  "smol",
  "tempfile",
  "thiserror 2.0.18",
+ "tokio",
  "uuid",
  "zed-reqwest",
 ]

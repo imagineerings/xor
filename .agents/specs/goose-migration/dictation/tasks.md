@@ -46,7 +46,7 @@ Implement the dictation system with microphone capture (extending `crates/audio/
   - _Requirements: 1, 2_
   - _writes: crates/agent/src/tools/dictation_tool.rs, crates/cli/src/commands/dictation.rs_
 
-- [ ] 7. Write tests
+- [x] 7. Write tests
   - Audio format conversion tests
   - Whisper inference tests with test fixtures
   - Mock cloud provider tests

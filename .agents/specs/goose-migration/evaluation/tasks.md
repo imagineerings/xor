@@ -6,7 +6,7 @@ Implement structured evaluation capabilities: Harbor eval framework (`crates/eva
 
 ## Tasks
 
-- [ ] 1. Create Harbor eval framework crate
+- [x] 1. Create Harbor eval framework crate
   - Define ScenarioDefinition, ScenarioStep, ExpectedOutcome types
   - Implement EvalRunner with scenario loading and execution
   - Implement assertion engine for validating outcomes
@@ -14,14 +14,14 @@ Implement structured evaluation capabilities: Harbor eval framework (`crates/eva
   - _Requirements: 1_
   - _writes: crates/eval_harbor/src/lib.rs, crates/eval_harbor/src/runner.rs, crates/eval_harbor/src/assertion.rs_
 
-- [ ] 2. Implement mock LLM provider for deterministic evals
+- [x] 2. Implement mock LLM provider for deterministic evals
   - Configurable canned responses
   - Record/replay capability
   - Deterministic behavior for reproducible tests
   - _Requirements: 1, 3_
   - _writes: crates/eval_harbor/src/mock_provider.rs_
 
-- [ ] 3. Implement Open Model Gym
+- [x] 3. Implement Open Model Gym
   - Define eval tasks for model comparison
   - Run evaluations across multiple models/providers
   - Produce comparison reports (latency, cost, quality score)

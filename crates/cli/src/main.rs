@@ -897,11 +897,8 @@ mod linux {
 
                 // libexec is the standard, lib/sim is for Arch (and other non-libexec distros),
                 // ./sim is for the target directory in development builds.
-                let possible_locations = [
-                    "../libexec/sim-editor",
-                    "../lib/sim/sim-editor",
-                    "./sim",
-                ];
+                let possible_locations =
+                    ["../libexec/sim-editor", "../lib/sim/sim-editor", "./sim"];
                 possible_locations
                     .iter()
                     .find_map(|p| dir.join(p).canonicalize().ok().filter(|path| path != &cli))
@@ -1081,12 +1078,7 @@ mod flatpak {
             && args.sim.is_none()
         {
             args.sim = Some("/app/libexec/sim-editor".into());
-            unsafe {
-                env::set_var(
-                    "SIM_UPDATE_EXPLANATION",
-                    "Please use flatpak to update sim",
-                )
-            };
+            unsafe { env::set_var("SIM_UPDATE_EXPLANATION", "Please use flatpak to update sim") };
         }
         args
     }
@@ -1243,11 +1235,7 @@ mod windows {
 
                 // ../Sim.exe is the standard, lib/sim is for MSYS2, ./sim.exe is for the target
                 // directory in development builds.
-                let possible_locations = [
-                    "../Sim.exe",
-                    "../lib/sim/sim-editor.exe",
-                    "./sim.exe",
-                ];
+                let possible_locations = ["../Sim.exe", "../lib/sim/sim-editor.exe", "./sim.exe"];
                 possible_locations
                     .iter()
                     .find_map(|p| dir.join(p).canonicalize().ok().filter(|path| path != &cli))

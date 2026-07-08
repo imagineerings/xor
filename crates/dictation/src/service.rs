@@ -260,6 +260,39 @@ fn rms_i16(samples: &[i16]) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::anyhow;
+    use async_trait::async_trait;
+    use std::sync::{Arc, Mutex};
+
+    #[derive(Debug)]
+    struct MockProvider {
+        calls: Arc<Mutex<Vec<(Vec<u8>, AudioFormat)>>>,
+        result: Result<String, String>,
+        formats: Vec<AudioFormat>,
+    }
+
+    #[async_trait]
+    impl DictationProvider for MockProvider {
+        fn name(&self) -> &str {
+            "mock"
+        }
+
+        async fn transcribe(&self, audio: &[u8], format: AudioFormat) -> Result<String> {
+            self.calls
+                .lock()
+                .expect("mock call log should not be poisoned")
+                .push((audio.to_vec(), format));
+            self.result.clone().map_err(|message| anyhow!(message))
+        }
+
+        fn supported_formats(&self) -> Vec<AudioFormat> {
+            self.formats.clone()
+        }
+
+        fn requires_network(&self) -> bool {
+            false
+        }
+    }
 
     #[test]
     fn rms_of_silence_is_zero() {
@@ -351,5 +384,64 @@ mod tests {
         assert!(provider.is_err());
         let error = provider.unwrap_err().to_string();
         assert!(error.contains("cloud_provider configuration is not set"));
+    }
+
+    #[test]
+    fn transcribe_audio_delegates_to_provider() {
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let provider = MockProvider {
+            calls: calls.clone(),
+            result: Ok("hello from mock".to_string()),
+            formats: vec![AudioFormat::Wav],
+        };
+        let service = DictationService::new(Box::new(provider));
+
+        let transcript =
+            smol::block_on(service.transcribe_audio(&[9, 8, 7], AudioFormat::Wav)).unwrap();
+
+        assert_eq!(transcript, "hello from mock");
+        assert_eq!(
+            *calls.lock().expect("mock call log should not be poisoned"),
+            vec![(vec![9, 8, 7], AudioFormat::Wav)]
+        );
+    }
+
+    #[test]
+    fn transcribe_audio_propagates_provider_errors() {
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let provider = MockProvider {
+            calls,
+            result: Err("provider failed".to_string()),
+            formats: vec![AudioFormat::Wav],
+        };
+        let service = DictationService::new(Box::new(provider));
+
+        let error = smol::block_on(service.transcribe_audio(&[1], AudioFormat::Wav))
+            .expect_err("provider error should propagate");
+
+        assert_eq!(error.to_string(), "provider failed");
+    }
+
+    #[test]
+    fn from_config_preserves_cloud_provider_name_and_language() {
+        let config = DictationConfig {
+            provider: crate::DictationProviderName::Cloud("deepgram".into()),
+            language: Some("fr".into()),
+            cloud_provider: Some(crate::CloudDictationConfig {
+                provider: "deepgram".into(),
+                api_url: Some("http://127.0.0.1:1".into()),
+                api_key: Some("key".into()),
+                api_key_header: None,
+                api_key_scheme: None,
+                language: Some("ignored".into()),
+                response_field: None,
+            }),
+            ..Default::default()
+        };
+
+        let service = DictationService::from_config(&config, CaptureConfig::default()).unwrap();
+
+        assert_eq!(service.provider().name(), "deepgram");
+        assert!(service.provider().requires_network());
     }
 }

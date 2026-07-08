@@ -60,7 +60,8 @@ pub fn run(args: impl Iterator<Item = String>) -> Result<()> {
 }
 
 fn cmd_status() -> Result<()> {
-    let config = GatewayConfig::from_env();
+    let config_path = gateway_config_path();
+    let config = GatewayConfig::from_env_and_file(Some(config_path.clone()))?;
     println!("Gateway Status:");
     if config.is_enabled() {
         println!("  Telegram: configured");
@@ -71,6 +72,7 @@ fn cmd_status() -> Result<()> {
     } else {
         println!("  Telegram: not configured (set TELEGRAM_BOT_TOKEN)");
     }
+    println!("  Config file: {}", config_path.display());
     Ok(())
 }
 
@@ -79,6 +81,11 @@ fn cmd_help() -> Result<()> {
     println!();
     println!("Environment variables:");
     println!("  TELEGRAM_BOT_TOKEN  Telegram bot token (required for Telegram gateway)");
+    println!("  GATEWAY_TELEGRAM_POLLING_INTERVAL  Telegram polling interval in seconds");
+    println!("  GATEWAY_PAIRING_FILE  Gateway pairing persistence file");
+    println!();
+    println!("Config file:");
+    println!("  {}", gateway_config_path().display());
     println!();
     println!("Commands:");
     println!("  sim gateway status           Show configuration status");
@@ -90,14 +97,20 @@ fn cmd_help() -> Result<()> {
 }
 
 fn cmd_start(token: &str) -> Result<()> {
+    let config_path = gateway_config_path();
+    let mut config = GatewayConfig::from_env_and_file(Some(config_path.clone()))?;
+    config.telegram_bot_token = Some(token.to_string());
+    if config.pairing_file.is_none() {
+        config.pairing_file = Some(pairing_storage_path());
+    }
+    config.save_to_file(&config_path)?;
+
     println!(
-        "Starting Telegram gateway with bot token: {}...",
+        "Configured Telegram gateway with bot token: {}...",
         &token[..8.min(token.len())]
     );
-    println!("Gateway running in foreground. Press Ctrl+C to stop.");
-    println!();
-    println!("NOTE: Full gateway startup requires integration with the");
-    println!("sim app. This command validates the configuration.");
+    println!("Gateway config written to {}", config_path.display());
+    println!("The Sim app starts configured gateways during startup.");
     Ok(())
 }
 
@@ -139,6 +152,10 @@ fn cmd_pair(subcmd: PairCommand) -> Result<()> {
 
 fn pairing_storage_path() -> PathBuf {
     paths::data_dir().join("gateway_pairings.json")
+}
+
+fn gateway_config_path() -> PathBuf {
+    paths::config_dir().join("gateway.json")
 }
 
 #[cfg(test)]

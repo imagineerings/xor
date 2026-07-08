@@ -1,8 +1,8 @@
 // Disable command line from opening on release mode
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod sim;
 mod reliability;
+mod sim;
 
 // Ensure the binary name stays in sync with APP_NAME so that the paths used
 // at runtime (data dir, config dir, etc.) match what the binary is called.
@@ -46,11 +46,6 @@ use remote::RemoteConnectionOptions;
 use reqwest_client::ReqwestClient;
 
 use assets::Assets;
-use sim::{
-    OpenListener, OpenRequest, RawOpenRequest, app_menus, build_window_options,
-    derive_paths_with_position, edit_prediction_registry, handle_cli_connection,
-    handle_keymap_file_changes, initialize_workspace, open_paths_with_positions,
-};
 use node_runtime::{NodeBinaryOptions, NodeRuntime};
 use parking_lot::Mutex;
 use project::{project_settings::ProjectSettings, trusted_worktrees};
@@ -59,6 +54,11 @@ use recent_projects::{RemoteSettings, open_remote_project};
 use release_channel::{AppCommitSha, AppVersion, ReleaseChannel};
 use session::{AppSession, Session};
 use settings::{BaseKeymap, Settings, SettingsStore, watch_config_file};
+use sim::{
+    OpenListener, OpenRequest, RawOpenRequest, app_menus, build_window_options,
+    derive_paths_with_position, edit_prediction_registry, handle_cli_connection,
+    handle_keymap_file_changes, initialize_workspace, open_paths_with_positions,
+};
 use smol::future::poll_once;
 use std::{
     cell::RefCell,
@@ -300,8 +300,8 @@ fn main() {
     ztracing::init();
 
     let version = option_env!("SIM_BUILD_ID");
-    let app_commit_sha = option_env!("SIM_COMMIT_SHA")
-        .map(|commit_sha| AppCommitSha::new(commit_sha.to_string()));
+    let app_commit_sha =
+        option_env!("SIM_COMMIT_SHA").map(|commit_sha| AppCommitSha::new(commit_sha.to_string()));
     let app_version = AppVersion::load(env!("CARGO_PKG_VERSION"), version, app_commit_sha.clone());
 
     if args.system_specs {
@@ -364,10 +364,7 @@ fn main() {
 
         #[cfg(target_os = "windows")]
         {
-            !crate::sim::windows_only_instance::handle_single_instance(
-                open_listener.clone(),
-                &args,
-            )
+            !crate::sim::windows_only_instance::handle_single_instance(open_listener.clone(), &args)
         }
 
         #[cfg(target_os = "macos")]
@@ -492,6 +489,15 @@ fn main() {
 
         release_channel::init(app_version, cx);
         gpui_tokio::init(cx);
+        let gateway_config_path = paths::config_dir().join("gateway.json");
+        match gateway::GatewayConfig::from_env_and_file(Some(gateway_config_path)) {
+            Ok(config) => {
+                gateway::init(config, cx);
+            }
+            Err(error) => {
+                log::error!("failed to load gateway configuration: {error:#}");
+            }
+        }
         if let Some(app_commit_sha) = app_commit_sha {
             AppCommitSha::set_global(app_commit_sha, cx);
         }
@@ -1342,8 +1348,7 @@ fn handle_open_request(request: OpenRequest, app_state: Arc<AppState>, cx: &mut 
 
     if let Some(connection_options) = request.remote_connection {
         let open_behavior = request.open_behavior;
-        let location =
-            workspace::SerialisimWorkspaceLocation::Remote(connection_options.clone());
+        let location = workspace::SerialisimWorkspaceLocation::Remote(connection_options.clone());
         let base_open_options = sim::open_options_for_request(open_behavior, &location, cx);
         cx.spawn(async move |cx| {
             let paths: Vec<PathBuf> = request.open_paths.into_iter().map(PathBuf::from).collect();

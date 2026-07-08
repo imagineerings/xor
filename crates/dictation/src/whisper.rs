@@ -364,4 +364,71 @@ mod tests {
             }]
         );
     }
+
+    #[test]
+    fn model_manager_reports_missing_model_as_provider_unavailable() {
+        let cache_dir =
+            std::env::temp_dir().join(format!("sim-missing-whisper-model-{}", std::process::id()));
+        let manager = WhisperModelManager::new(&cache_dir);
+
+        let error = manager
+            .ensure_model_cached(WhisperModel::Tiny)
+            .expect_err("missing model should be unavailable");
+
+        assert!(
+            error
+                .to_string()
+                .contains("Whisper model `tiny` is not cached")
+        );
+        assert!(error.to_string().contains("ggml-tiny.bin"));
+    }
+
+    #[test]
+    fn transcribe_requires_cached_model_before_inference() {
+        let cache_dir = std::env::temp_dir().join(format!(
+            "sim-whisper-transcribe-cache-gate-{}",
+            std::process::id()
+        ));
+        let provider = WhisperLocalProvider::new(WhisperConfig::new(WhisperModel::Tiny, cache_dir));
+        let audio = 0_i16.to_le_bytes();
+
+        let error = smol::block_on(provider.transcribe(
+            &audio,
+            AudioFormat::RawPcm {
+                sample_rate: 16_000,
+                channels: 1,
+                bits_per_sample: 16,
+            },
+        ))
+        .expect_err("missing model should stop before inference");
+
+        assert!(
+            error
+                .to_string()
+                .contains("Whisper model `tiny` is not cached")
+        );
+    }
+
+    #[test]
+    fn preprocess_rejects_invalid_raw_pcm_fixtures() {
+        let odd_byte_error =
+            preprocess_raw_pcm(&[1, 2, 3], 16_000, 1, 16).expect_err("odd byte count fails");
+        let zero_channel_error =
+            preprocess_raw_pcm(&[0, 0], 16_000, 0, 16).expect_err("zero channels fail");
+        let bit_depth_error =
+            preprocess_raw_pcm(&[0, 0], 16_000, 1, 24).expect_err("unsupported bit depth fails");
+
+        assert_eq!(
+            odd_byte_error.to_string(),
+            "raw PCM i16 audio must contain an even number of bytes"
+        );
+        assert_eq!(
+            zero_channel_error.to_string(),
+            "raw PCM audio must have at least one channel"
+        );
+        assert_eq!(
+            bit_depth_error.to_string(),
+            "unsupported raw PCM bit depth: 24"
+        );
+    }
 }
