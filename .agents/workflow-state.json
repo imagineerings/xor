@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T18:25:00Z",
+  "updated_at": "2026-07-08T18:35:00Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -622,6 +622,12 @@
       "status": "done",
       "summary": "Task 1: Added crates/security with Pattern, PatternCategory, PatternMatcher, Severity, PatternAction, PatternRegistry, JSON loading helpers, eager regex compilation, active-pattern filtering, contains/exact/regex matching, and focused unit coverage. Linear claim was skipped because external tracker access was blocked by policy.",
       "updated_at": "2026-07-08T18:25:00Z"
+    },
+    {
+      "task_identifier": ".agents/specs/goose-migration/security-permissions/tasks.md:16",
+      "status": "done",
+      "summary": "Task 2: Added AdversaryInspector with default prompt-injection, jailbreak, indirect-instruction, and tool-output instruction patterns; configurable Low/Medium/High sensitivity thresholds; custom registry support; and focused unit coverage for detection, benign input, and sensitivity filtering.",
+      "updated_at": "2026-07-08T18:35:00Z"
     }
   ],
   "dependency_notes": [
@@ -672,8 +678,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/security-permissions",
-      "summary": "Task 1 is checked complete. crates/security now provides a reusable PatternRegistry with serde-loadable regex, contains, and exact matchers for later adversary and egress inspectors. Task 2 can depend on this registry instead of defining its own pattern model.",
-      "updated_at": "2026-07-08T18:25:00Z"
+      "summary": "Tasks 1-2 are checked complete. crates/security now provides a reusable PatternRegistry with serde-loadable regex, contains, and exact matchers, plus AdversaryInspector defaults and configurable sensitivity for prompt injection, jailbreak, indirect-instruction, and tool-output instruction detection. Task 3 can reuse PatternRegistry for egress patterns.",
+      "updated_at": "2026-07-08T18:35:00Z"
     },
     {
       "scope": ".agents/specs/godot-migration",

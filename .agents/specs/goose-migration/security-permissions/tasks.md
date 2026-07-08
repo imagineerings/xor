@@ -13,7 +13,7 @@ Implement the security inspection system (`crates/security/`) and permission sys
   - _Requirements: 5_
   - _writes: crates/security/src/patterns.rs_
 
-- [ ] 2. Implement adversary inspector
+- [x] 2. Implement adversary inspector
   - Detect prompt injection, jailbreak attempts, indirect injection
   - Configurable sensitivity levels
   - Use pattern registry for detection
