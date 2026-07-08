@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T14:03:22Z",
+  "updated_at": "2026-07-08T14:07:56Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -417,6 +417,12 @@
       "updated_at": "2026-07-08T14:03:22Z"
     },
     {
+      "task_identifier": ".agents/specs/goose-migration/documentation/tasks.md:16",
+      "status": "done",
+      "summary": "Task 2: Added Docusaurus getting-started pages under docs/src/getting-started for overview, installation, quickstart, and configuration. Updated the Docusaurus sidebar Welcome section to use the new getting-started category while preserving existing legacy docs pages.",
+      "updated_at": "2026-07-08T14:07:56Z"
+    },
+    {
       "task_identifier": ".agents/specs/ci-migration/tasks.md",
       "status": "deprioritized",
       "summary": "All tasks in .agents/specs/ci-migration are deprioritized until every other local workflow task is complete. Do not select CI migration work while non-CI tasks remain available.",
@@ -462,8 +468,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/documentation",
-      "summary": "Task 1 is checked complete. Docusaurus is initialized as an overlay around the existing docs/src mdBook content with package scripts, config, sidebar, local search configuration, and custom CSS. Remaining documentation tasks should add content directories, blog, tutorials, scripts, and CI before enabling those routes.",
-      "updated_at": "2026-07-08T14:03:22Z"
+      "summary": "Tasks 1-2 are checked complete. Docusaurus is initialized as an overlay around the existing docs/src mdBook content, and new getting-started pages exist under docs/src/getting-started for overview, installation, quickstart, and configuration. Remaining documentation tasks should add feature/configuration/development content, blog, tutorials, scripts, and CI before enabling those routes.",
+      "updated_at": "2026-07-08T14:07:56Z"
     },
     {
       "scope": ".agents/specs/godot-migration",

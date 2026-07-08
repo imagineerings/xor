@@ -5,7 +5,15 @@ const sidebars: SidebarsConfig = {
     {
       type: "category",
       label: "Welcome",
-      items: ["getting-started", "installation", "update", "uninstall", "troubleshooting"],
+      items: [
+        "getting-started/index",
+        "getting-started/installation",
+        "getting-started/quickstart",
+        "getting-started/configuration",
+        "update",
+        "uninstall",
+        "troubleshooting",
+      ],
     },
     {
       type: "category",

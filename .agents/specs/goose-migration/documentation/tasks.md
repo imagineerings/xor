@@ -13,7 +13,7 @@ Set up a Docusaurus-based documentation site for sim with installation guides, c
   - _Requirements: 1_
   - _writes: docs/package.json, docs/docusaurus.config.ts, docs/sidebars.ts_
 
-- [ ] 2. Write getting started documentation
+- [x] 2. Write getting started documentation
   - Installation guide (macOS, Linux, Windows)
   - Quickstart tutorial
   - Configuration guide (providers, extensions)
