@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T20:02:00Z",
+  "updated_at": "2026-07-08T20:12:00Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -670,6 +670,12 @@
       "status": "done",
       "summary": "Task 9: Added agent-facing AgentSecurity and AgentPermissionSystem integration helpers that wrap SecurityScanner input/output scans, PermissionStore/PermissionJudge tool-call checks, and confirmation persistence for future tool execution wiring, with focused agent unit coverage.",
       "updated_at": "2026-07-08T20:02:00Z"
+    },
+    {
+      "task_identifier": ".agents/specs/goose-migration/security-permissions/tasks.md:69",
+      "status": "done",
+      "summary": "Task 10: Added scripts/test-security-permissions.sh to validate security pattern/scanner tests, permission store/inspector/confirmation tests, and agent security/permission integration filters, and wired it into prerelease quick checks.",
+      "updated_at": "2026-07-08T20:12:00Z"
     }
   ],
   "dependency_notes": [
@@ -720,8 +726,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/security-permissions",
-      "summary": "Tasks 1-9 are checked complete. crates/security now provides PatternRegistry, AdversaryInspector, EgressInspector, ClassificationClient, and SecurityScanner aggregation. crates/permission now provides PermissionStore, PermissionJudge, PermissionInspector, and GPUI PermissionConfirmation. crates/agent now exposes AgentSecurity and AgentPermissionSystem helpers for scanner input/output scans, tool-call permission checks, and confirmation persistence. Task 10 can add slice-level validation coverage.",
-      "updated_at": "2026-07-08T20:02:00Z"
+      "summary": "Tasks 1-10 are checked complete. crates/security provides PatternRegistry, AdversaryInspector, EgressInspector, ClassificationClient, and SecurityScanner aggregation. crates/permission provides PermissionStore, PermissionJudge, PermissionInspector, and GPUI PermissionConfirmation. crates/agent exposes AgentSecurity and AgentPermissionSystem helpers. scripts/test-security-permissions.sh validates the delivered slice from prerelease quick checks.",
+      "updated_at": "2026-07-08T20:12:00Z"
     },
     {
       "scope": ".agents/specs/godot-migration",

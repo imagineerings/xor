@@ -66,7 +66,7 @@ Implement the security inspection system (`crates/security/`) and permission sys
   - _Requirements: 1-9_
   - _writes: crates/agent/src/security_integration.rs, crates/agent/src/permission_integration.rs_
 
-- [ ] 10. Write tests
+- [x] 10. Write tests
   - Pattern matching accuracy tests
   - Inspector tests with known-good and known-bad inputs
   - Permission store persistence and expiry tests
