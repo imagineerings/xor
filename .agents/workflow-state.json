@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T19:42:00Z",
+  "updated_at": "2026-07-08T20:02:00Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -664,6 +664,12 @@
       "status": "done",
       "summary": "Task 8: Added GPUI PermissionConfirmation surface with request/action models, tool name, arguments, risk-level, and reason display, Allow/Deny/Always-Allow/Always-Deny buttons, callback plumbing for integration, action-to-stored-decision mapping, and focused unit coverage.",
       "updated_at": "2026-07-08T19:42:00Z"
+    },
+    {
+      "task_identifier": ".agents/specs/goose-migration/security-permissions/tasks.md:63",
+      "status": "done",
+      "summary": "Task 9: Added agent-facing AgentSecurity and AgentPermissionSystem integration helpers that wrap SecurityScanner input/output scans, PermissionStore/PermissionJudge tool-call checks, and confirmation persistence for future tool execution wiring, with focused agent unit coverage.",
+      "updated_at": "2026-07-08T20:02:00Z"
     }
   ],
   "dependency_notes": [
@@ -714,8 +720,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/security-permissions",
-      "summary": "Tasks 1-8 are checked complete. crates/security now provides PatternRegistry, AdversaryInspector, EgressInspector, ClassificationClient, and SecurityScanner aggregation. crates/permission now provides PermissionStore, PermissionJudge, PermissionInspector, and a GPUI PermissionConfirmation surface with four confirmation actions and stored-decision mapping. Task 9 can integrate these pieces into agent processing/tool execution.",
-      "updated_at": "2026-07-08T19:42:00Z"
+      "summary": "Tasks 1-9 are checked complete. crates/security now provides PatternRegistry, AdversaryInspector, EgressInspector, ClassificationClient, and SecurityScanner aggregation. crates/permission now provides PermissionStore, PermissionJudge, PermissionInspector, and GPUI PermissionConfirmation. crates/agent now exposes AgentSecurity and AgentPermissionSystem helpers for scanner input/output scans, tool-call permission checks, and confirmation persistence. Task 10 can add slice-level validation coverage.",
+      "updated_at": "2026-07-08T20:02:00Z"
     },
     {
       "scope": ".agents/specs/godot-migration",

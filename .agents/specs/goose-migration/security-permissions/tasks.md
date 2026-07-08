@@ -60,7 +60,7 @@ Implement the security inspection system (`crates/security/`) and permission sys
   - _Requirements: 6_
   - _writes: crates/permission/src/confirmation.rs_
 
-- [ ] 9. Integrate security scanner and permission system into agent
+- [x] 9. Integrate security scanner and permission system into agent
   - Hook security scanner into agent input/output processing
   - Hook permission inspector into tool execution pipeline (alongside existing tool_permissions.rs)
   - _Requirements: 1-9_
