@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T22:45:00Z",
+  "updated_at": "2026-07-08T22:58:00Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -259,6 +259,17 @@
       "owner": null,
       "summary": "Implemented locally with ACP connection detail snapshots, selected-agent tooltip details for external agents, and richer restart tooltip/status text in agent configuration. Ready to merge in PR.",
       "updated_at": "2026-07-08T22:45:00Z"
+    },
+    {
+      "task_id": "task:goose-desktop-ui-2",
+      "task_identifier": ".agents/specs/goose-migration/desktop-ui/tasks.md:22",
+      "title": "Implement recipe browser panel",
+      "linear_identifier": null,
+      "linear_url": null,
+      "status": "inactive",
+      "owner": null,
+      "summary": "Implemented locally with a GPUI RecipeBrowser component backed by crates/recipe discovery/loading/execution, search filtering, recipe cards, detail metadata, variables/tags display, run confirmation state, and focused unit coverage. Ready to merge in PR.",
+      "updated_at": "2026-07-08T22:58:00Z"
     }
   ],
   "task_notes": [
@@ -795,8 +806,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/desktop-ui",
-      "summary": "Task 1 is checked complete. Agent connection state now exposes ACP metadata and capability details for external agents; the agent panel tooltip and configuration restart tooltip surface those details while reusing the existing restart control. Task 2 can proceed with the recipe browser panel.",
-      "updated_at": "2026-07-08T22:45:00Z"
+      "summary": "Tasks 1-2 are checked complete. Agent connection state now exposes ACP metadata for existing UI surfaces, and agent_ui has a GPUI RecipeBrowser component backed by crates/recipe discovery/loading/execution with filtering, recipe detail, run confirmation, and unit coverage. Task 3 can proceed with scheduling settings.",
+      "updated_at": "2026-07-08T22:58:00Z"
     },
     {
       "scope": ".agents/specs/godot-migration",

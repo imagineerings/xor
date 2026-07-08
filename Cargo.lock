@@ -556,6 +556,7 @@ dependencies = [
  "prompt_store",
  "proto",
  "rand 0.9.4",
+ "recipe",
  "release_channel",
  "remote",
  "remote_connection",

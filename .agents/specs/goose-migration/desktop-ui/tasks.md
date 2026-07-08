@@ -19,7 +19,7 @@ Build GPUI-native views for recipe browsing, scheduling, diagnostics, shared ses
   - _Requirements: 6_
   - _writes: crates/agent_ui/src/agent_connection_store.rs, crates/agent_ui/src/agent_panel.rs_
 
-- [ ] 2. Implement recipe browser panel
+- [x] 2. Implement recipe browser panel
   - Recipe search bar with filtering
   - Scrollable recipe list with cards (name, description, tags)
   - Recipe detail view (steps, variables, metadata)
