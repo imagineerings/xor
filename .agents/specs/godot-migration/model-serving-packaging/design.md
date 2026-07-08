@@ -11,6 +11,12 @@ Use `crates/world_model` serving diagnostics and launcher traits to describe loc
 - `RemoteWorkerConfig`
 - `ModelAssetPolicy`
 
+`WorldModelWorkerLauncher` is a native Sim validation boundary. It models local,
+persistent, and remote worker launch readiness from supplied environment
+metadata, emits stable serving diagnostics for missing Python/packages,
+checkpoints, GPU, disk, endpoint, authentication, capabilities, quota, downloads,
+and dependency review, and does not start worker processes or download assets.
+
 ## Correctness Properties
 
 ### Property 1: No Silent Downloads

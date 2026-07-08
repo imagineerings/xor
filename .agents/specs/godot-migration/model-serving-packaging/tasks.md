@@ -18,7 +18,8 @@ Add diagnostics and launcher models in W2, then defer real local/remote worker l
 
 ## Tasks
 
-- [ ] 1. Add serving diagnostics and worker launcher models
+- [x] 1. Add serving diagnostics and worker launcher models
   - Validate local Python/GPU/checkpoint setup, persistent session configuration, and remote worker metadata.
+  - Keep launch readiness as native Sim diagnostics and model records only; block downloads and heavy dependencies until explicit approval/dependency review without starting worker processes.
   - _Requirements: 1.1, 1.2, 2.1, 2.2, 3.1_
   - _writes: crates/world_model/src/serving.rs, crates/world_model/src/worker_launcher.rs, crates/world_model/src/serving_tests.rs_

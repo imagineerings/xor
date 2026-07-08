@@ -39,6 +39,7 @@ pub mod request;
 pub mod serving;
 pub mod serving_diagnostics;
 pub mod session;
+pub mod worker_launcher;
 
 #[cfg(test)]
 mod artifact_tests;
@@ -250,3 +251,7 @@ pub use serving_diagnostics::{
     ServingValidator,
 };
 pub use session::{WorldModelCacheMetadata, WorldModelSession, WorldModelSessionState};
+pub use worker_launcher::{
+    LocalWorkerEnvironment, PersistentWorkerConfig, RemoteWorkerEnvironment,
+    WorkerLaunchEnvironment, WorkerLaunchMode, WorkerLaunchRequest, WorldModelWorkerLauncher,
+};

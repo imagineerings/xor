@@ -4,6 +4,10 @@ use crate::serving::{
 use crate::serving_diagnostics::{
     DiagnosticCategory, DiagnosticSeverity, ServingDiagnostic, ServingDiagnosticReport,
 };
+use crate::{
+    LocalWorkerEnvironment, PersistentWorkerConfig, RemoteWorkerEnvironment,
+    WorkerLaunchEnvironment, WorkerLaunchMode, WorkerLaunchRequest, WorldModelWorkerLauncher,
+};
 
 // ---------------------------------------------------------------------------
 // ServingBackend
@@ -244,4 +248,141 @@ fn diagnostic_report_round_trip_serde() {
     let restored: ServingDiagnosticReport = serde_json::from_str(&json).expect("deserialize");
     assert!(!restored.is_ready);
     assert_eq!(restored.diagnostics.len(), 1);
+}
+
+#[test]
+fn worker_launcher_reports_missing_local_prerequisites_and_download_review() {
+    let target = ModelServingTarget::new(
+        ServingBackend::Local,
+        ModelProfile::new("sd-xl").with_checkpoint("/models/sdxl.safetensors"),
+    )
+    .with_local_config({
+        let mut config = LocalServingConfig::new()
+            .with_python("/usr/bin/python3")
+            .with_package("torch")
+            .with_checkpoint("/models")
+            .with_gpu_vram(8192)
+            .with_min_disk(20480);
+        config.allow_downloads = true;
+        config
+    });
+    let request = WorkerLaunchRequest::new(target, WorkerLaunchMode::Local);
+    let environment = WorkerLaunchEnvironment::default().with_local(
+        LocalWorkerEnvironment::default()
+            .with_python(false)
+            .with_gpu_vram(4096)
+            .with_disk(1024),
+    );
+
+    let report = WorldModelWorkerLauncher::validate(&request, &environment);
+    let categories = report
+        .errors()
+        .map(|diagnostic| diagnostic.category)
+        .collect::<Vec<_>>();
+
+    assert!(!report.is_ready);
+    assert!(categories.contains(&DiagnosticCategory::Environment));
+    assert!(categories.contains(&DiagnosticCategory::Package));
+    assert!(categories.contains(&DiagnosticCategory::Checkpoint));
+    assert!(categories.contains(&DiagnosticCategory::Gpu));
+    assert!(categories.contains(&DiagnosticCategory::Disk));
+    assert!(categories.contains(&DiagnosticCategory::Download));
+}
+
+#[test]
+fn worker_launcher_accepts_reviewed_local_configuration() {
+    let target = ModelServingTarget::new(
+        ServingBackend::Local,
+        ModelProfile::new("sd-xl").with_checkpoint("/models/sdxl.safetensors"),
+    )
+    .with_local_config({
+        let mut config = LocalServingConfig::new()
+            .with_python("/usr/bin/python3")
+            .with_package("torch")
+            .with_checkpoint("/models")
+            .with_gpu_vram(8192)
+            .with_min_disk(20480);
+        config.allow_downloads = true;
+        config
+    });
+    let request = WorkerLaunchRequest::new(target, WorkerLaunchMode::Local)
+        .with_explicit_download_approval(true)
+        .with_dependency_review(true);
+    let environment = WorkerLaunchEnvironment::default().with_local(
+        LocalWorkerEnvironment::default()
+            .with_python(true)
+            .with_package("torch")
+            .with_checkpoint(true)
+            .with_gpu_vram(12288)
+            .with_disk(32768),
+    );
+
+    let report = WorldModelWorkerLauncher::validate(&request, &environment);
+
+    assert!(report.is_ready);
+    assert!(report.errors().next().is_none());
+}
+
+#[test]
+fn worker_launcher_validates_persistent_session_configuration() {
+    let target = ModelServingTarget::new(ServingBackend::Local, ModelProfile::new("wan"))
+        .with_local_config(LocalServingConfig::new().with_python("/usr/bin/python3"));
+    let environment = WorkerLaunchEnvironment::default().with_local(
+        LocalWorkerEnvironment::default()
+            .with_python(true)
+            .with_disk(1024),
+    );
+    let missing = WorkerLaunchRequest::new(target.clone(), WorkerLaunchMode::Persistent);
+
+    let missing_report = WorldModelWorkerLauncher::validate(&missing, &environment);
+    assert!(!missing_report.is_ready);
+    assert!(
+        missing_report
+            .errors()
+            .any(|diagnostic| diagnostic.message.contains("session configuration"))
+    );
+
+    let request = WorkerLaunchRequest::new(target, WorkerLaunchMode::Persistent)
+        .with_persistent_config(
+            PersistentWorkerConfig::new("session-a")
+                .with_fast_inference(true)
+                .with_cache_key("wan-cache")
+                .with_shutdown_after_idle_secs(60),
+        );
+    let report = WorldModelWorkerLauncher::validate(&request, &environment);
+
+    assert!(report.is_ready);
+    assert!(report.warnings().next().is_none());
+}
+
+#[test]
+fn worker_launcher_validates_remote_worker_metadata() {
+    let target = ModelServingTarget::new(ServingBackend::Remote, ModelProfile::new("sd-xl"))
+        .with_remote_config(
+            RemoteServingConfig::new()
+                .with_endpoint("https://worker.example.test")
+                .with_auth("bearer")
+                .with_capability("text-to-image")
+                .with_capability("video"),
+        );
+    let environment = WorkerLaunchEnvironment::default().with_remote(
+        RemoteWorkerEnvironment::default()
+            .with_endpoint_reachable(true)
+            .with_auth(true)
+            .with_capability("text-to-image")
+            .with_quota_remaining(0),
+    );
+
+    let report = WorldModelWorkerLauncher::validate(
+        &WorkerLaunchRequest::new(target, WorkerLaunchMode::Remote),
+        &environment,
+    );
+    let categories = report
+        .errors()
+        .map(|diagnostic| diagnostic.category)
+        .collect::<Vec<_>>();
+
+    assert!(!report.is_ready);
+    assert!(categories.contains(&DiagnosticCategory::Capability));
+    assert!(categories.contains(&DiagnosticCategory::Quota));
 }
