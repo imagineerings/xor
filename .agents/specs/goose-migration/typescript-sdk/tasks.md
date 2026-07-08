@@ -57,7 +57,7 @@ Implement a TypeScript SDK as an npm package that provides programmatic access t
   - _Requirements: 5_
   - _writes: ui/sdk/src/resolve-binary.ts_
 
-- [ ] 8. Implement ACP transport (stdio)
+- [x] 8. Implement ACP transport (stdio)
   - Spawn sim binary as subprocess
   - ACP protocol communication over stdio
   - Process lifecycle management

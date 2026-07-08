@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T13:43:22Z",
+  "updated_at": "2026-07-08T13:49:48Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -193,6 +193,17 @@
       "owner": null,
       "summary": "Completed by workflow command.",
       "updated_at": "2026-07-08T10:24:56.755Z"
+    },
+    {
+      "task_id": "task:9838525e3160",
+      "task_identifier": ".agents/specs/goose-migration/typescript-sdk/tasks.md:60",
+      "title": "Implement ACP transport (stdio)",
+      "linear_identifier": "SIM-25",
+      "linear_url": "https://linear.app/simtropolis/issue/SIM-25/implement-acp-transport-stdio",
+      "status": "inactive",
+      "owner": null,
+      "summary": "Implemented locally; completion command reported no non-terminal Linear issue for the task.",
+      "updated_at": "2026-07-08T13:49:48Z"
     }
   ],
   "task_notes": [
@@ -377,6 +388,12 @@
       "updated_at": "2026-07-08T13:43:22Z"
     },
     {
+      "task_identifier": ".agents/specs/goose-migration/typescript-sdk/tasks.md:60",
+      "status": "done",
+      "summary": "Task 8: Added ui/sdk/src/acp-transport.ts with AcpTransport for resolver-backed subprocess launch, line-delimited JSON-RPC over stdio, request/response correlation, notifications, timeouts, aborts, process exit callbacks, and cleanup. Exported the transport from ui/sdk/src/index.ts.",
+      "updated_at": "2026-07-08T13:49:48Z"
+    },
+    {
       "task_identifier": ".agents/specs/ci-migration/tasks.md",
       "status": "deprioritized",
       "summary": "All tasks in .agents/specs/ci-migration are deprioritized until every other local workflow task is complete. Do not select CI migration work while non-CI tasks remain available.",
@@ -417,8 +434,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/typescript-sdk",
-      "summary": "Tasks 1-7 are checked complete. Future SDK implementation tasks can build from ui/sdk with @sim/sdk package metadata, strict TypeScript config, generated API types, fetch-based HttpTransport, HttpStreamClient SSE support, GooseClient facade, MCPAppsClient, client capability declaration helpers, and BinaryResolver. Full tsc validation still requires installing ui/sdk dev dependencies.",
-      "updated_at": "2026-07-08T13:43:22Z"
+      "summary": "Tasks 1-8 are checked complete. Future SDK implementation tasks can build from ui/sdk with @sim/sdk package metadata, strict TypeScript config, generated API types, fetch-based HttpTransport, HttpStreamClient SSE support, GooseClient facade, MCPAppsClient, client capability declaration helpers, BinaryResolver, and AcpTransport for stdio JSON-RPC process communication. Full tsc validation still requires installing ui/sdk dev dependencies.",
+      "updated_at": "2026-07-08T13:49:48Z"
     },
     {
       "scope": ".agents/specs/godot-migration",
