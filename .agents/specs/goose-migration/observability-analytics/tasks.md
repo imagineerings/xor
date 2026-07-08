@@ -18,7 +18,7 @@ Extend sim's observability infrastructure with Langfuse tracing, OpenTelemetry O
   - _Requirements: 6_
   - _writes: crates/language_model_core/src/token_counter.rs_
 
-- [ ] 2. Implement Langfuse tracing backend
+- [x] 2. Implement Langfuse tracing backend
   - Extend `crates/telemetry/` with Langfuse backend
   - Create spans for LLM calls, tool calls, agent turns
   - Configurable via settings (endpoint, API keys, enable/disable)

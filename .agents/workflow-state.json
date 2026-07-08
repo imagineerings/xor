@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T16:44:21Z",
+  "updated_at": "2026-07-08T16:49:34Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -568,6 +568,12 @@
       "status": "done",
       "summary": "Task 1: Added language_model_core token counting with TokenCounter, TikTokenCounter backed by tiktoken-rs, CharacterTokenCounter fallback, ModelTokenCounter model selection, message counting helpers, and focused unit coverage.",
       "updated_at": "2026-07-08T16:44:21Z"
+    },
+    {
+      "task_identifier": ".agents/specs/goose-migration/observability-analytics/tasks.md:21",
+      "status": "done",
+      "summary": "Task 2: Added telemetry Langfuse backend foundation with LangfuseConfig, typed LLM/tool/agent span builders, trace export payloads, exporter trait, no-op/in-memory exporters, and unit coverage for disabled, unconfigured, and exported spans.",
+      "updated_at": "2026-07-08T16:49:34Z"
     }
   ],
   "dependency_notes": [
@@ -613,8 +619,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/observability-analytics",
-      "summary": "Task 1 is checked complete. language_model_core now exposes model-aware token counting with tiktoken-rs for known models and a character-count fallback for unknown models. Langfuse, OTel, observation layer, rate limiter extensions, PostHog, tool monitor/inspector, integration, and slice tests remain.",
-      "updated_at": "2026-07-08T16:44:21Z"
+      "summary": "Tasks 1-2 are checked complete. language_model_core exposes model-aware token counting with tiktoken-rs plus fallback counting, and telemetry now has a configurable Langfuse backend foundation with typed LLM/tool/agent spans and exporter abstraction. OTel, observation layer, rate limiter extensions, PostHog, tool monitor/inspector, integration, and slice tests remain.",
+      "updated_at": "2026-07-08T16:49:34Z"
     },
     {
       "scope": ".agents/specs/godot-migration",
