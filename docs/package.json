@@ -8,7 +8,9 @@
     "build": "docusaurus build",
     "clear": "docusaurus clear",
     "serve": "docusaurus serve",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check:links": "bash scripts/check-links.sh",
+    "check:spelling": "bash scripts/spell-check.sh"
   },
   "dependencies": {
     "@docusaurus/core": "^3.8.1",

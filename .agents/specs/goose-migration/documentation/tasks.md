@@ -54,7 +54,7 @@ Set up a Docusaurus-based documentation site for sim with installation guides, c
   - _Requirements: 3_
   - _writes: docs/tutorials/_
 
-- [ ] 8. Set up automation scripts
+- [x] 8. Set up automation scripts
   - Build script
   - Link checker
   - Spell checker
