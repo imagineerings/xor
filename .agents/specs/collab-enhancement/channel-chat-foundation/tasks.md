@@ -26,12 +26,14 @@ Restore the channel-chat storage, RPC, client, and desktop UI foundation that th
   - _writes: `crates/collab/src/db/queries/channel_messages.rs`_
   - _validated: `cargo fmt -p collab`; `cargo check -p collab`_
 
-- [ ] 3. Restore server channel-chat RPC handlers
-  - [ ] 3.1 Replace removed-chat errors in `send_channel_message`, `join_channel_chat`, `leave_channel_chat`, `get_channel_messages`, `get_channel_messages_by_id`, `update_channel_message`, `remove_channel_message`, and `acknowledge_channel_message`.
-  - [ ] 3.2 Track active participants with `channel_chat_participants`.
-  - [ ] 3.3 Broadcast `ChannelMessageSent` and `ChannelMessageUpdate` to active participants.
+- [x] 3. Restore server channel-chat RPC handlers
+  - [x] 3.1 Replace removed-chat errors in `send_channel_message`, `join_channel_chat`, `leave_channel_chat`, `get_channel_messages`, `get_channel_messages_by_id`, `update_channel_message`, `remove_channel_message`, and `acknowledge_channel_message`.
+  - [x] 3.2 Track active participants with `channel_chat_participants`.
+  - [x] 3.3 Broadcast `ChannelMessageSent` and `ChannelMessageUpdate` to active participants.
   - _Requirements: 0.2, 0.4_
   - _writes: `crates/collab/src/rpc.rs`_
+  - _writes: `crates/collab/src/db/queries/channel_messages.rs`_
+  - _validated: `cargo fmt -p collab`; `cargo check -p collab`_
 
 - [ ] 4. Add client channel-chat API
   - [ ] 4.1 Add focused methods for join, leave, send, history, edit, delete, and ack.

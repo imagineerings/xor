@@ -1,14 +1,15 @@
 mod connection_pool;
 
 use crate::api::{CloudflareIpCountryHeader, SystemIdHeader};
+use crate::db::queries::channel_messages::{ChannelMessageUpdate, NewChannelMessage};
 use crate::entities::User;
 use crate::{
     AppState, Error, Result, auth,
     db::{
         self, BufferId, Capability, Channel, ChannelId, ChannelRole, ChannelsForUser, Database,
-        InviteMemberResult, MembershipUpdated, NotificationId, ProjectId, RejoinedProject,
-        RemoveChannelMemberResult, RespondToChannelInvite, RoomId, ServerId, SharedThreadId,
-        UserId,
+        InviteMemberResult, MembershipUpdated, MessageId, NotificationId, ProjectId,
+        RejoinedProject, RemoveChannelMemberResult, RespondToChannelInvite, RoomId, ServerId,
+        SharedThreadId, UserId,
     },
     executor::Executor,
 };
@@ -31,7 +32,7 @@ use axum::{
     routing::get,
 };
 use collections::{HashSet, TypeIdHashMap};
-pub use connection_pool::{SimVersion, ConnectionPool};
+pub use connection_pool::{ConnectionPool, SimVersion};
 use core::fmt::{self, Debug, Formatter};
 use futures::TryFutureExt as _;
 use rpc::proto::split_repository_update;
@@ -3658,36 +3659,88 @@ fn send_notifications(
 
 /// Send a message to the channel
 async fn send_channel_message(
-    _request: proto::SendChannelMessage,
-    _response: Response<proto::SendChannelMessage>,
-    _session: MessageContext,
+    request: proto::SendChannelMessage,
+    response: Response<proto::SendChannelMessage>,
+    session: MessageContext,
 ) -> Result<()> {
-    Err(anyhow!("chat has been removed in the latest version of Sim").into())
+    let channel_id = ChannelId::from_proto(request.channel_id);
+    let message = session
+        .db()
+        .await
+        .create_channel_message(NewChannelMessage {
+            channel_id,
+            sender_id: session.user_id(),
+            body: request.body,
+            nonce: request.nonce.context("missing channel message nonce")?,
+            mentions: request.mentions,
+            reply_to_message_id: request.reply_to_message_id.map(MessageId::from_proto),
+        })
+        .await?;
+
+    response.send(proto::SendChannelMessageResponse {
+        message: Some(message.clone()),
+    })?;
+    broadcast_channel_message_sent(&session, channel_id, message).await
 }
 
 /// Delete a channel message
 async fn remove_channel_message(
-    _request: proto::RemoveChannelMessage,
-    _response: Response<proto::RemoveChannelMessage>,
-    _session: MessageContext,
+    request: proto::RemoveChannelMessage,
+    response: Response<proto::RemoveChannelMessage>,
+    session: MessageContext,
 ) -> Result<()> {
-    Err(anyhow!("chat has been removed in the latest version of Sim").into())
+    let channel_id = ChannelId::from_proto(request.channel_id);
+    let message = session
+        .db()
+        .await
+        .delete_channel_message(
+            channel_id,
+            MessageId::from_proto(request.message_id),
+            session.user_id(),
+        )
+        .await?;
+
+    response.send(proto::Ack {})?;
+    broadcast_channel_message_update(&session, channel_id, message).await
 }
 
 async fn update_channel_message(
-    _request: proto::UpdateChannelMessage,
-    _response: Response<proto::UpdateChannelMessage>,
-    _session: MessageContext,
+    request: proto::UpdateChannelMessage,
+    response: Response<proto::UpdateChannelMessage>,
+    session: MessageContext,
 ) -> Result<()> {
-    Err(anyhow!("chat has been removed in the latest version of Sim").into())
+    let channel_id = ChannelId::from_proto(request.channel_id);
+    let message = session
+        .db()
+        .await
+        .update_channel_message(ChannelMessageUpdate {
+            channel_id,
+            message_id: MessageId::from_proto(request.message_id),
+            editor_id: session.user_id(),
+            body: request.body,
+            nonce: request.nonce.context("missing channel message nonce")?,
+            mentions: request.mentions,
+        })
+        .await?;
+
+    response.send(proto::Ack {})?;
+    broadcast_channel_message_update(&session, channel_id, message).await
 }
 
 /// Mark a channel message as read
 async fn acknowledge_channel_message(
-    _request: proto::AckChannelMessage,
-    _session: MessageContext,
+    request: proto::AckChannelMessage,
+    session: MessageContext,
 ) -> Result<()> {
-    Err(anyhow!("chat has been removed in the latest version of Sim").into())
+    session
+        .db()
+        .await
+        .acknowledge_channel_message(
+            ChannelId::from_proto(request.channel_id),
+            session.user_id(),
+            MessageId::from_proto(request.message_id),
+        )
+        .await
 }
 
 /// Mark a buffer version as synced
@@ -3711,37 +3764,132 @@ async fn acknowledge_buffer_version(
 
 /// Start receiving chat updates for a channel
 async fn join_channel_chat(
-    _request: proto::JoinChannelChat,
-    _response: Response<proto::JoinChannelChat>,
-    _session: MessageContext,
+    request: proto::JoinChannelChat,
+    response: Response<proto::JoinChannelChat>,
+    session: MessageContext,
 ) -> Result<()> {
-    Err(anyhow!("chat has been removed in the latest version of Sim").into())
+    let channel_id = ChannelId::from_proto(request.channel_id);
+    let (messages, role) = session
+        .db()
+        .await
+        .join_channel_chat(channel_id, session.user_id(), session.connection_id)
+        .await?;
+    session
+        .connection_pool()
+        .await
+        .subscribe_to_channel(session.user_id(), channel_id, role);
+    response.send(proto::JoinChannelChatResponse {
+        messages,
+        done: true,
+    })
 }
 
 /// Stop receiving chat updates for a channel
 async fn leave_channel_chat(
-    _request: proto::LeaveChannelChat,
-    _session: MessageContext,
+    request: proto::LeaveChannelChat,
+    session: MessageContext,
 ) -> Result<()> {
-    Err(anyhow!("chat has been removed in the latest version of Sim").into())
+    let channel_id = ChannelId::from_proto(request.channel_id);
+    session
+        .db()
+        .await
+        .leave_channel_chat(channel_id, session.user_id(), session.connection_id)
+        .await
 }
 
 /// Retrieve the chat history for a channel
 async fn get_channel_messages(
-    _request: proto::GetChannelMessages,
-    _response: Response<proto::GetChannelMessages>,
-    _session: MessageContext,
+    request: proto::GetChannelMessages,
+    response: Response<proto::GetChannelMessages>,
+    session: MessageContext,
 ) -> Result<()> {
-    Err(anyhow!("chat has been removed in the latest version of Sim").into())
+    const CHANNEL_MESSAGE_PAGE_SIZE: usize = 50;
+
+    let before_message_id = if request.before_message_id == 0 {
+        None
+    } else {
+        Some(MessageId::from_proto(request.before_message_id))
+    };
+    let messages = session
+        .db()
+        .await
+        .get_channel_messages(
+            ChannelId::from_proto(request.channel_id),
+            session.user_id(),
+            before_message_id,
+            CHANNEL_MESSAGE_PAGE_SIZE,
+        )
+        .await?;
+    let done = messages.len() < CHANNEL_MESSAGE_PAGE_SIZE;
+    response.send(proto::GetChannelMessagesResponse { messages, done })
 }
 
 /// Retrieve specific chat messages
 async fn get_channel_messages_by_id(
-    _request: proto::GetChannelMessagesById,
-    _response: Response<proto::GetChannelMessagesById>,
-    _session: MessageContext,
+    request: proto::GetChannelMessagesById,
+    response: Response<proto::GetChannelMessagesById>,
+    session: MessageContext,
 ) -> Result<()> {
-    Err(anyhow!("chat has been removed in the latest version of Sim").into())
+    let messages = session
+        .db()
+        .await
+        .get_channel_messages_by_id(
+            request
+                .message_ids
+                .into_iter()
+                .map(MessageId::from_proto)
+                .collect(),
+            session.user_id(),
+        )
+        .await?;
+    response.send(proto::GetChannelMessagesResponse {
+        messages,
+        done: true,
+    })
+}
+
+async fn broadcast_channel_message_sent(
+    session: &MessageContext,
+    channel_id: ChannelId,
+    message: proto::ChannelMessage,
+) -> Result<()> {
+    let connection_ids = session
+        .db()
+        .await
+        .channel_chat_participant_connection_ids(channel_id)
+        .await?;
+    for connection_id in connection_ids {
+        session.peer.send(
+            connection_id,
+            proto::ChannelMessageSent {
+                channel_id: channel_id.to_proto(),
+                message: Some(message.clone()),
+            },
+        )?;
+    }
+    Ok(())
+}
+
+async fn broadcast_channel_message_update(
+    session: &MessageContext,
+    channel_id: ChannelId,
+    message: proto::ChannelMessage,
+) -> Result<()> {
+    let connection_ids = session
+        .db()
+        .await
+        .channel_chat_participant_connection_ids(channel_id)
+        .await?;
+    for connection_id in connection_ids {
+        session.peer.send(
+            connection_id,
+            proto::ChannelMessageUpdate {
+                channel_id: channel_id.to_proto(),
+                message: Some(message.clone()),
+            },
+        )?;
+    }
+    Ok(())
 }
 
 /// Retrieve the current users notifications

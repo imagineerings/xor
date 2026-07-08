@@ -2,6 +2,7 @@ use super::*;
 use anyhow::{Context as _, anyhow};
 
 const NONCE_LEN: usize = 16;
+const DEFAULT_CHANNEL_MESSAGE_LIMIT: usize = 50;
 
 pub struct NewChannelMessage {
     pub channel_id: ChannelId,
@@ -22,6 +23,87 @@ pub struct ChannelMessageUpdate {
 }
 
 impl Database {
+    pub async fn join_channel_chat(
+        &self,
+        channel_id: ChannelId,
+        user_id: UserId,
+        connection: ConnectionId,
+    ) -> Result<(Vec<proto::ChannelMessage>, ChannelRole)> {
+        self.transaction(|tx| async move {
+            let channel = self.get_channel_internal(channel_id, &tx).await?;
+            let role = self
+                .check_user_is_channel_participant(&channel, user_id, &tx)
+                .await?;
+
+            channel_chat_participant::Entity::delete_many()
+                .filter(channel_chat_participant::Column::ChannelId.eq(channel_id))
+                .filter(channel_chat_participant::Column::ConnectionId.eq(connection.id as i32))
+                .filter(
+                    channel_chat_participant::Column::ConnectionServerId
+                        .eq(ServerId(connection.owner_id as i32)),
+                )
+                .exec(&*tx)
+                .await?;
+
+            channel_chat_participant::ActiveModel {
+                id: ActiveValue::NotSet,
+                channel_id: ActiveValue::Set(channel_id),
+                user_id: ActiveValue::Set(user_id),
+                connection_id: ActiveValue::Set(connection.id as i32),
+                connection_server_id: ActiveValue::Set(ServerId(connection.owner_id as i32)),
+            }
+            .insert(&*tx)
+            .await?;
+
+            let mut rows = channel_message::Entity::find()
+                .filter(channel_message::Column::ChannelId.eq(channel_id))
+                .order_by_desc(channel_message::Column::Id)
+                .limit(DEFAULT_CHANNEL_MESSAGE_LIMIT as u64)
+                .all(&*tx)
+                .await?;
+            rows.reverse();
+            let messages = self.channel_messages_to_proto(rows, &tx).await?;
+            Ok((messages, role))
+        })
+        .await
+    }
+
+    pub async fn leave_channel_chat(
+        &self,
+        channel_id: ChannelId,
+        user_id: UserId,
+        connection: ConnectionId,
+    ) -> Result<()> {
+        self.transaction(|tx| async move {
+            channel_chat_participant::Entity::delete_many()
+                .filter(channel_chat_participant::Column::ChannelId.eq(channel_id))
+                .filter(channel_chat_participant::Column::UserId.eq(user_id))
+                .filter(channel_chat_participant::Column::ConnectionId.eq(connection.id as i32))
+                .filter(
+                    channel_chat_participant::Column::ConnectionServerId
+                        .eq(ServerId(connection.owner_id as i32)),
+                )
+                .exec(&*tx)
+                .await?;
+            Ok(())
+        })
+        .await
+    }
+
+    pub async fn channel_chat_participant_connection_ids(
+        &self,
+        channel_id: ChannelId,
+    ) -> Result<Vec<ConnectionId>> {
+        self.transaction(|tx| async move {
+            let rows = channel_chat_participant::Entity::find()
+                .filter(channel_chat_participant::Column::ChannelId.eq(channel_id))
+                .all(&*tx)
+                .await?;
+            Ok(rows.into_iter().map(|row| row.connection()).collect())
+        })
+        .await
+    }
+
     pub async fn create_channel_message(
         &self,
         message: NewChannelMessage,
