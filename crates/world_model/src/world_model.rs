@@ -3,6 +3,7 @@ pub mod comfy_cache;
 pub mod comfy_cancellation;
 pub mod comfy_conditioning;
 pub mod comfy_control;
+pub mod comfy_events;
 pub mod comfy_execution_plan;
 pub mod comfy_execution_registry;
 pub mod comfy_executor;
@@ -28,6 +29,7 @@ pub mod comfy_schema;
 pub mod comfy_vae;
 pub mod comfy_worker_execution;
 pub mod comfy_world_model_profiles;
+pub mod comfy_ws;
 pub mod controls;
 pub mod graph;
 pub mod graph_validation;
@@ -91,6 +93,8 @@ mod comfy_schema_tests;
 #[cfg(test)]
 mod comfy_worker_execution_tests;
 #[cfg(test)]
+mod comfy_ws_tests;
+#[cfg(test)]
 mod controls_tests;
 #[cfg(test)]
 mod graph_tests;
@@ -121,6 +125,10 @@ pub use comfy_control::{
     ComfyJobSummary, ComfyPromptId, ComfyRuntimeEvent, HistoryAction, INVALID_PROMPT_ID_CODE,
     PreviewPayload, PromptExtraData, PromptSubmission, PromptSubmissionResponse, QueueAction,
     QueueNumber, QueueStatus,
+};
+pub use comfy_events::{
+    ComfyExecutionEventTranslator, ComfyWebSocketEventName, ComfyWebSocketFrame,
+    ComfyWebSocketPayload, LEGACY_PREVIEW_FEATURE, PREVIEW_METADATA_FEATURE,
 };
 pub use comfy_execution_plan::{ComfyExecutionPlanner, ExecutionPlan, ExecutionPlanRequest};
 pub use comfy_execution_registry::{
@@ -218,6 +226,10 @@ pub use comfy_worker_execution::{
 };
 pub use comfy_world_model_profiles::{
     ComfyWorldModelProfileBuilder, WorldModelProfileDiagnostic, WorldModelRunnerProfile,
+};
+pub use comfy_ws::{
+    ComfyClientSessionId, ComfyWebSocketConnect, ComfyWebSocketSession,
+    ComfyWebSocketSessionRegistry,
 };
 pub use controls::{ControlKeyGroup, ControlParseError, WorldActionControlParser};
 pub use graph::{DataType, DiffusionGraph, GraphEdge, GraphNode, NodePort, PortDirection};

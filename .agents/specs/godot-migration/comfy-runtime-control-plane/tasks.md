@@ -50,8 +50,9 @@ Build the control plane as a protocol adapter over Sim task, HTTP, WebSocket, me
   - _Requirements: 2.3, 2.4_
   - _writes: crates/world_model/src/comfy_cancellation.rs, crates/world_model/src/comfy_cancellation_tests.rs_
 
-- [ ] 6. Implement WebSocket session and event translation
-  - Add session ids, feature flag negotiation, initial queue status, status events, executing events, progress events, and preview event selection.
+- [x] 6. Implement WebSocket session and event translation
+  - Add session ids, feature flag negotiation, initial queue status, status events, executing events, progress events, and preview event selection as native Sim realtime records.
+  - Translate Sim runtime events into typed WebSocket frames with metadata-vs-legacy preview selection instead of proxying a ComfyUI WebSocket server.
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
   - _writes: crates/world_model/src/comfy_ws.rs, crates/world_model/src/comfy_events.rs, crates/world_model/src/comfy_ws_tests.rs_
 

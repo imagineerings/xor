@@ -65,6 +65,10 @@ pub trait ComfyRouteAdapter {
 
 - **Purpose**: Maintain Comfy-compatible realtime sessions.
 - **Responsibilities**: Assign client ids, persist per-client feature flags, send initial queue status, and serialize execution events.
+- **Native session registry**: Sessions are Sim-owned records keyed by client
+  session id. Connect creates or reuses a session, stores the requested client
+  id, emits initial queue status from `SimJobBridge`, and negotiates feature
+  flags against Sim-supported realtime capabilities.
 - **Interface contract**:
 
 ```rust
@@ -79,6 +83,10 @@ pub trait ComfyWebSocketAdapter {
 
 - **Purpose**: Convert Sim execution events into Comfy event names and binary preview event ids.
 - **Responsibilities**: Emit `status`, `executing`, `progress`, `feature_flags`, legacy preview image events, and metadata preview events.
+- **Preview selection**: Sim runtime events are translated into typed WebSocket
+  frames. Clients that negotiated preview metadata receive JSON metadata
+  previews; clients without that support receive legacy binary preview frames.
+  Translation does not proxy a ComfyUI WebSocket server.
 
 ### ComfyHttpSafetyLayer
 
@@ -173,7 +181,7 @@ _For any_ upload, view, or download request, the resolved filesystem path SHALL 
 
 ## Testing Strategy
 
-- Unit tests for prompt id validation, native protocol records, HTTP safety primitives, method-aware `/api` alias routing, Sim job bridge submission/listing/history redaction, idempotent cancellation and targeted interrupt classification, and path confinement.
+- Unit tests for prompt id validation, native protocol records, HTTP safety primitives, method-aware `/api` alias routing, Sim job bridge submission/listing/history redaction, idempotent cancellation and targeted interrupt classification, WebSocket session/feature negotiation and preview frame selection, and path confinement.
 - Integration tests for prompt submission through queue, job status transitions, WebSocket feature negotiation, progress events, and preview metadata negotiation.
 - Compatibility fixtures from `projects/comfy/script_examples` for basic HTTP prompt execution and WebSocket image retrieval.
 - Property tests for route alias equivalence and path traversal rejection.
