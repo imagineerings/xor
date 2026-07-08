@@ -26,7 +26,7 @@ Implement the security inspection system (`crates/security/`) and permission sys
   - _Requirements: 2_
   - _writes: crates/security/src/egress_inspector.rs_
 
-- [ ] 4. Implement classification client
+- [x] 4. Implement classification client
   - Client for content moderation/safety APIs
   - Configurable thresholds and actions
   - Error handling for API unavailability
