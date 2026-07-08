@@ -38,8 +38,9 @@ Build the asset library as shared storage primitives plus Comfy-compatible route
   - _Requirements: 2.1, 2.2, 2.3, 2.5_
   - _writes: crates/world_model/src/comfy_asset_api.rs, crates/world_model/src/comfy_asset_upload.rs, crates/world_model/src/comfy_asset_api_tests.rs_
 
-- [ ] 4. Implement asset download and preview resolution
+- [x] 4. Implement asset download and preview resolution
   - Stream content, force safe content types, resolve preview ids, and hand media preview routing to Sim media.
+  - Resolve downloads and previews from native Sim asset records and Sim media preview routes without forwarding to ComfyUI preview or file handlers.
   - _Requirements: 2.4, 6.1_
   - _writes: crates/world_model/src/comfy_asset_download.rs, crates/world_model/src/comfy_asset_download_tests.rs_
 

@@ -51,6 +51,10 @@ pub trait AssetRepository {
   update, delete, and hash-exists operations execute against Sim repository
   records and owner scopes. Comfy-compatible routes adapt request/response
   shapes only; they do not proxy asset mutations to ComfyUI.
+- **Native download/preview resolution**: Download descriptors resolve from
+  owner-scoped Sim asset records, force safe content types and content
+  disposition, and return Sim media preview routes for preview references
+  instead of forwarding to ComfyUI preview handlers.
 
 ### AssetSeeder
 
@@ -142,5 +146,6 @@ _For any_ prune operation, references outside known roots SHALL be marked missin
   metadata filters, owner scope resolution, and path confinement.
 - Repository tests for content/reference dedupe, soft delete, owner scoping,
   cache state, provenance ids, and tag histograms.
-- API tests for upload, download, create-from-hash, CRUD, tags, seed status, cancel, and prune.
+- API tests for upload, download, create-from-hash, CRUD, preview resolution,
+  tags, seed status, cancel, and prune.
 - Scanner tests for models/input/output roots, missing files, enrichment, and output registration.

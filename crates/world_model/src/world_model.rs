@@ -1,6 +1,7 @@
 pub mod artifact;
 pub mod comfy_app_mode;
 pub mod comfy_asset_api;
+pub mod comfy_asset_download;
 pub mod comfy_asset_query;
 pub mod comfy_asset_upload;
 pub mod comfy_assets;
@@ -59,6 +60,8 @@ mod artifact_tests;
 mod comfy_app_mode_tests;
 #[cfg(test)]
 mod comfy_asset_api_tests;
+#[cfg(test)]
+mod comfy_asset_download_tests;
 #[cfg(test)]
 mod comfy_asset_query_tests;
 #[cfg(test)]
@@ -150,6 +153,12 @@ pub use comfy_asset_api::{
     ASSET_API_FORBIDDEN_CODE, ASSET_API_HASH_NOT_FOUND_CODE, ComfyAssetApi,
     ComfyAssetApiDiagnostic, ComfyAssetListPage, ComfyAssetReferenceDetail,
     ComfyAssetUpdateRequest, missing_content_api_error, missing_reference_api_error,
+};
+pub use comfy_asset_download::{
+    ASSET_DOWNLOAD_FILE_NOT_FOUND_CODE, ASSET_DOWNLOAD_PREVIEW_NOT_FOUND_CODE,
+    ComfyAssetContentDispositionKind, ComfyAssetDownloadResolver, ComfyAssetDownloadResponse,
+    ComfyAssetMediaPreviewRoute, ComfyAssetPreviewResolution, content_disposition,
+    safe_content_type,
 };
 pub use comfy_asset_query::{
     ASSET_QUERY_INVALID_CURSOR_CODE, ASSET_QUERY_INVALID_HASH_CODE,
