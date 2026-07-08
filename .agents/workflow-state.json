@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T10:24:56.756Z",
+  "updated_at": "2026-07-08T10:37:32.657Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": "task:6a9371a824e8",
@@ -198,6 +198,17 @@
       "owner": null,
       "summary": "Completed by workflow command.",
       "updated_at": "2026-07-08T10:24:56.755Z"
+    },
+    {
+      "task_id": "task:622d009360df",
+      "task_identifier": ".agents/specs/ci-migration/tasks.md:39",
+      "title": "Restore `run_bundling.yml`",
+      "linear_identifier": "SIM-24",
+      "linear_url": "https://linear.app/simtropolis/issue/SIM-24/restore-run-bundlingyml",
+      "status": "active",
+      "owner": null,
+      "summary": null,
+      "updated_at": "2026-07-08T10:37:32.657Z"
     }
   ],
   "task_notes": [
