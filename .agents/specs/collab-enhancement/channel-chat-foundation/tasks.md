@@ -71,9 +71,12 @@ Restore the channel-chat storage, RPC, client, and desktop UI foundation that th
   - _writes: `crates/collab/src/services/user_service.rs`_
   - _validated: `cargo fmt -p collab`; `cargo test -p collab --features test-support --test collab_tests channel_chat_tests`_
 
-- [ ] 8. Add client and GPUI tests
-  - [ ] 8.1 Test client request/response conversions and live event application.
-  - [ ] 8.2 Test desktop message rendering, send success, send failure, and live insertion.
+- [x] 8. Add client and GPUI tests
+  - [x] 8.1 Test client request/response conversions and live event application.
+  - [x] 8.2 Test desktop message rendering, send success, send failure, and live insertion.
   - _Requirements: 0.2, 0.3_
-  - _writes: `crates/client/src/channel_chat.rs`_ (tests)
-  - _writes: `crates/collab_ui/src/channel_chat.rs`_ (tests)
+  - _writes: `crates/client/src/client.rs`_ (tests)
+  - _writes: `crates/collab_ui/src/channel_chat.rs`_ (test-support helpers)
+  - _writes: `crates/collab/tests/integration/channel_chat_ui_tests.rs`_
+  - _writes: `crates/collab/tests/integration/collab_tests.rs`_
+  - _validated: `cargo fmt -p client -p collab_ui -p collab`; `cargo test -p client channel_chat --lib`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support --test collab_tests channel_chat_ui_tests`_

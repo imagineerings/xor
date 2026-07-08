@@ -304,6 +304,38 @@ impl ChannelChat {
             .child(Label::new(message.body.clone()).size(LabelSize::Small))
             .into_any_element()
     }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn message_bodies_for_test(&self) -> Vec<String> {
+        self.messages
+            .iter()
+            .map(|message| message.body.clone())
+            .collect()
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn draft_for_test(&self, cx: &App) -> String {
+        self.composer.read(cx).text(cx)
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn send_error_for_test(&self) -> Option<SharedString> {
+        match &self.send_state {
+            SendState::Failed(message) => Some(message.clone()),
+            SendState::Idle | SendState::Sending => None,
+        }
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn set_draft_for_test(&mut self, text: &str, window: &mut Window, cx: &mut Context<Self>) {
+        self.composer
+            .update(cx, |composer, cx| composer.set_text(text, window, cx));
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn send_for_test(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.send(&Confirm, window, cx);
+    }
 }
 
 impl Drop for ChannelChat {

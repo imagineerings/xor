@@ -2003,6 +2003,7 @@ pub fn parse_sim_link(link: &str, cx: &App) -> Option<SimLink> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::channel_chat::{SendChannelMessage, UpdateChannelMessage};
     use crate::test::{FakeServer, parse_authorization_header};
 
     use clock::FakeSystemClock;
@@ -2463,6 +2464,160 @@ mod tests {
         });
         server.send(proto::Ping {});
         done_rx.recv().await.unwrap();
+    }
+
+    #[gpui::test]
+    async fn test_channel_chat_request_conversions(cx: &mut TestAppContext) {
+        init_test(cx);
+        let user_id = 5;
+        let client = cx.update(|cx| {
+            Client::new(
+                Arc::new(FakeSystemClock::new()),
+                FakeHttpClient::with_404_response(),
+                cx,
+            )
+        });
+        let server = FakeServer::for_client(user_id, &client, cx).await;
+
+        let send = cx.spawn({
+            let client = client.clone();
+            move |_| async move {
+                client
+                    .send_channel_message(SendChannelMessage {
+                        channel_id: 7,
+                        body: "hello".to_string(),
+                        nonce: 0x10000000000000002,
+                        mentions: vec![proto::ChatMention {
+                            range: Some(proto::Range { start: 1, end: 4 }),
+                            user_id: 9,
+                        }],
+                        reply_to_message_id: Some(3),
+                    })
+                    .await
+            }
+        });
+        let request = server.receive::<proto::SendChannelMessage>().await.unwrap();
+        assert_eq!(request.payload.channel_id, 7);
+        assert_eq!(request.payload.body, "hello");
+        assert_eq!(
+            request.payload.nonce.clone().map(u128::from),
+            Some(0x10000000000000002)
+        );
+        assert_eq!(request.payload.mentions.len(), 1);
+        assert_eq!(request.payload.reply_to_message_id, Some(3));
+
+        server.respond(
+            request.receipt(),
+            proto::SendChannelMessageResponse {
+                message: Some(proto::ChannelMessage {
+                    id: 11,
+                    body: "hello".to_string(),
+                    timestamp: 12,
+                    sender_id: user_id,
+                    nonce: Some(0x10000000000000002u128.into()),
+                    mentions: Vec::new(),
+                    reply_to_message_id: Some(3),
+                    edited_at: None,
+                }),
+            },
+        );
+        let message = send.await.unwrap();
+        assert_eq!(message.id, 11);
+        assert_eq!(message.body, "hello");
+
+        let update = cx.spawn({
+            let client = client.clone();
+            move |_| async move {
+                client
+                    .update_channel_message(UpdateChannelMessage {
+                        channel_id: 7,
+                        message_id: 11,
+                        body: "edited".to_string(),
+                        nonce: 0x20000000000000003,
+                        mentions: Vec::new(),
+                    })
+                    .await
+            }
+        });
+        let request = server
+            .receive::<proto::UpdateChannelMessage>()
+            .await
+            .unwrap();
+        assert_eq!(request.payload.channel_id, 7);
+        assert_eq!(request.payload.message_id, 11);
+        assert_eq!(request.payload.body, "edited");
+        assert_eq!(
+            request.payload.nonce.clone().map(u128::from),
+            Some(0x20000000000000003)
+        );
+        server.respond(request.receipt(), proto::Ack {});
+        update.await.unwrap();
+
+        client.acknowledge_channel_message(7, 11).unwrap();
+        let request = server.receive::<proto::AckChannelMessage>().await.unwrap();
+        assert_eq!(request.payload.channel_id, 7);
+        assert_eq!(request.payload.message_id, 11);
+    }
+
+    #[gpui::test]
+    async fn test_channel_chat_live_event_handlers(cx: &mut TestAppContext) {
+        init_test(cx);
+        let user_id = 5;
+        let client = cx.update(|cx| {
+            Client::new(
+                Arc::new(FakeSystemClock::new()),
+                FakeHttpClient::with_404_response(),
+                cx,
+            )
+        });
+        let server = FakeServer::for_client(user_id, &client, cx).await;
+        let entity = cx.new(|_| TestEntity::default());
+        let (sent_tx, sent_rx) = async_channel::bounded(1);
+        let (update_tx, update_rx) = async_channel::bounded(1);
+
+        let _sent_subscription =
+            client.add_channel_message_sent_handler(entity.downgrade(), move |_, message, _| {
+                sent_tx.try_send(message.payload).unwrap();
+                async { Ok(()) }
+            });
+        let _update_subscription =
+            client.add_channel_message_update_handler(entity.downgrade(), move |_, message, _| {
+                update_tx.try_send(message.payload).unwrap();
+                async { Ok(()) }
+            });
+
+        server.send(proto::ChannelMessageSent {
+            channel_id: 7,
+            message: Some(proto::ChannelMessage {
+                id: 1,
+                body: "live".to_string(),
+                timestamp: 2,
+                sender_id: user_id,
+                nonce: Some(1u128.into()),
+                mentions: Vec::new(),
+                reply_to_message_id: None,
+                edited_at: None,
+            }),
+        });
+        assert_eq!(sent_rx.recv().await.unwrap().channel_id, 7);
+
+        server.send(proto::ChannelMessageUpdate {
+            channel_id: 7,
+            message: Some(proto::ChannelMessage {
+                id: 1,
+                body: "edited".to_string(),
+                timestamp: 2,
+                sender_id: user_id,
+                nonce: Some(2u128.into()),
+                mentions: Vec::new(),
+                reply_to_message_id: None,
+                edited_at: Some(3),
+            }),
+        });
+        assert_eq!(
+            update_rx.recv().await.unwrap().message.unwrap().body,
+            "edited"
+        );
     }
 
     #[derive(Default)]

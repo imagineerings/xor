@@ -6,6 +6,7 @@ mod agent_sharing_tests;
 mod auto_watch_tests;
 mod channel_buffer_tests;
 mod channel_chat_tests;
+mod channel_chat_ui_tests;
 mod channel_guest_tests;
 mod channel_tests;
 mod collab_panel_tests;
