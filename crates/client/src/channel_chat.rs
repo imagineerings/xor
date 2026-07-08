@@ -70,6 +70,38 @@ impl Client {
         .map(|_: proto::Ack| ())
     }
 
+    pub async fn add_channel_message_reaction(
+        &self,
+        channel_id: u64,
+        message_id: u64,
+        emoji_name: String,
+    ) -> Result<Vec<proto::ReactionSummary>> {
+        let response = self
+            .request(proto::AddReaction {
+                channel_id,
+                message_id,
+                emoji_name,
+            })
+            .await?;
+        Ok(response.reactions)
+    }
+
+    pub async fn remove_channel_message_reaction(
+        &self,
+        channel_id: u64,
+        message_id: u64,
+        emoji_name: String,
+    ) -> Result<Vec<proto::ReactionSummary>> {
+        let response = self
+            .request(proto::RemoveReaction {
+                channel_id,
+                message_id,
+                emoji_name,
+            })
+            .await?;
+        Ok(response.reactions)
+    }
+
     pub fn acknowledge_channel_message(&self, channel_id: u64, message_id: u64) -> Result<()> {
         self.send(proto::AckChannelMessage {
             channel_id,
@@ -124,6 +156,23 @@ impl Client {
         H: 'static
             + Sync
             + Fn(Entity<E>, TypedEnvelope<proto::ChannelMessageUpdate>, AsyncApp) -> F
+            + Send
+            + Sync,
+        F: 'static + Future<Output = Result<()>>,
+    {
+        self.add_message_handler(entity, handler)
+    }
+
+    pub fn add_channel_message_reactions_update_handler<E, H, F>(
+        self: &Arc<Self>,
+        entity: WeakEntity<E>,
+        handler: H,
+    ) -> Subscription
+    where
+        E: 'static,
+        H: 'static
+            + Sync
+            + Fn(Entity<E>, TypedEnvelope<proto::UpdateMessageReactions>, AsyncApp) -> F
             + Send
             + Sync,
         F: 'static + Future<Output = Result<()>>,

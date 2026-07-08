@@ -3,8 +3,11 @@ use client::{
     channel_chat::{SendChannelMessage, UpdateChannelMessage},
     proto,
 };
-use gpui::{BackgroundExecutor, TestAppContext};
+use gpui::{AppContext, BackgroundExecutor, TestAppContext};
 use pretty_assertions::assert_eq;
+
+#[derive(Default)]
+struct ReactionHandlerEntity;
 
 #[gpui::test]
 async fn test_channel_chat_core_flow(
@@ -86,6 +89,206 @@ async fn test_channel_chat_core_flow(
     assert_eq!(deleted.len(), 1);
     assert_eq!(deleted[0].body, "");
     assert!(deleted[0].mentions.is_empty());
+}
+
+#[gpui::test]
+async fn test_channel_chat_reactions_flow(
+    executor: BackgroundExecutor,
+    cx_a: &mut TestAppContext,
+    cx_b: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor.clone()).await;
+    let client_a = server.create_client(cx_a, "user_a").await;
+    let client_b = server.create_client(cx_b, "user_b").await;
+    let channel_id = server
+        .make_channel("chat", None, (&client_a, cx_a), &mut [(&client_b, cx_b)])
+        .await;
+
+    client_a.join_channel_chat(channel_id.0).await.unwrap();
+    client_b.join_channel_chat(channel_id.0).await.unwrap();
+
+    let handler_entity = cx_b.new(|_| ReactionHandlerEntity);
+    let (reaction_tx, reaction_rx) = async_channel::bounded(4);
+    let _reaction_subscription = client_b.add_channel_message_reactions_update_handler(
+        handler_entity.downgrade(),
+        move |_, update, _| {
+            reaction_tx.try_send(update.payload).unwrap();
+            async { Ok(()) }
+        },
+    );
+
+    let sent = client_a
+        .send_channel_message(SendChannelMessage {
+            channel_id: channel_id.0,
+            body: "hello from a".to_string(),
+            nonce: 1,
+            mentions: Vec::new(),
+            reply_to_message_id: None,
+        })
+        .await
+        .unwrap();
+
+    let reactions = client_b
+        .add_channel_message_reaction(channel_id.0, sent.id, "thumbs_up".to_string())
+        .await
+        .unwrap();
+    assert_reactions(&reactions, &[("thumbs_up", &[client_b.user_id().unwrap()])]);
+
+    let update = reaction_rx.recv().await.unwrap();
+    assert_eq!(update.channel_id, channel_id.0);
+    assert_eq!(update.message_id, sent.id);
+    assert_reactions(
+        &update.reactions,
+        &[("thumbs_up", &[client_b.user_id().unwrap()])],
+    );
+
+    let duplicate = client_b
+        .add_channel_message_reaction(channel_id.0, sent.id, "thumbs_up".to_string())
+        .await
+        .unwrap();
+    assert_reactions(&duplicate, &[("thumbs_up", &[client_b.user_id().unwrap()])]);
+
+    let persisted = client_a
+        .get_channel_messages_by_id(vec![sent.id])
+        .await
+        .unwrap()
+        .messages;
+    assert_eq!(persisted.len(), 1);
+    assert_reactions(
+        &persisted[0].reaction_summaries,
+        &[("thumbs_up", &[client_b.user_id().unwrap()])],
+    );
+
+    let removed_missing = client_b
+        .remove_channel_message_reaction(channel_id.0, sent.id, "heart".to_string())
+        .await
+        .unwrap();
+    assert_reactions(
+        &removed_missing,
+        &[("thumbs_up", &[client_b.user_id().unwrap()])],
+    );
+
+    let removed = client_b
+        .remove_channel_message_reaction(channel_id.0, sent.id, "thumbs_up".to_string())
+        .await
+        .unwrap();
+    assert!(removed.is_empty());
+
+    let mut cleared_update = None;
+    for _ in 0..3 {
+        let update = reaction_rx.recv().await.unwrap();
+        if update.reactions.is_empty() {
+            cleared_update = Some(update);
+            break;
+        }
+    }
+    let cleared_update = cleared_update.expect("missing cleared reaction update");
+    assert_eq!(cleared_update.channel_id, channel_id.0);
+    assert_eq!(cleared_update.message_id, sent.id);
+}
+
+#[gpui::test]
+async fn test_channel_chat_reactions_reject_private_channel_access(
+    executor: BackgroundExecutor,
+    cx_a: &mut TestAppContext,
+    cx_b: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor.clone()).await;
+    let client_a = server.create_client(cx_a, "user_a").await;
+    let client_b = server.create_client(cx_b, "user_b").await;
+    let channel_id = server
+        .make_channel("private-chat", None, (&client_a, cx_a), &mut [])
+        .await;
+
+    client_a.join_channel_chat(channel_id.0).await.unwrap();
+    let sent = client_a
+        .send_channel_message(SendChannelMessage {
+            channel_id: channel_id.0,
+            body: "private".to_string(),
+            nonce: 1,
+            mentions: Vec::new(),
+            reply_to_message_id: None,
+        })
+        .await
+        .unwrap();
+
+    assert!(
+        client_b
+            .add_channel_message_reaction(channel_id.0, sent.id, "thumbs_up".to_string())
+            .await
+            .is_err()
+    );
+    assert!(
+        client_b
+            .remove_channel_message_reaction(channel_id.0, sent.id, "thumbs_up".to_string())
+            .await
+            .is_err()
+    );
+}
+
+#[gpui::test]
+async fn test_channel_chat_message_delete_clears_reactions(
+    executor: BackgroundExecutor,
+    cx_a: &mut TestAppContext,
+    cx_b: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor.clone()).await;
+    let client_a = server.create_client(cx_a, "user_a").await;
+    let client_b = server.create_client(cx_b, "user_b").await;
+    let channel_id = server
+        .make_channel("chat", None, (&client_a, cx_a), &mut [(&client_b, cx_b)])
+        .await;
+
+    client_a.join_channel_chat(channel_id.0).await.unwrap();
+    client_b.join_channel_chat(channel_id.0).await.unwrap();
+
+    let handler_entity = cx_b.new(|_| ReactionHandlerEntity);
+    let (reaction_tx, reaction_rx) = async_channel::bounded(4);
+    let _reaction_subscription = client_b.add_channel_message_reactions_update_handler(
+        handler_entity.downgrade(),
+        move |_, update, _| {
+            reaction_tx.try_send(update.payload).unwrap();
+            async { Ok(()) }
+        },
+    );
+
+    let sent = client_a
+        .send_channel_message(SendChannelMessage {
+            channel_id: channel_id.0,
+            body: "hello from a".to_string(),
+            nonce: 1,
+            mentions: Vec::new(),
+            reply_to_message_id: None,
+        })
+        .await
+        .unwrap();
+
+    client_b
+        .add_channel_message_reaction(channel_id.0, sent.id, "thumbs_up".to_string())
+        .await
+        .unwrap();
+    let added_update = reaction_rx.recv().await.unwrap();
+    assert_reactions(
+        &added_update.reactions,
+        &[("thumbs_up", &[client_b.user_id().unwrap()])],
+    );
+
+    client_a
+        .remove_channel_message(channel_id.0, sent.id)
+        .await
+        .unwrap();
+    let cleared_update = reaction_rx.recv().await.unwrap();
+    assert_eq!(cleared_update.channel_id, channel_id.0);
+    assert_eq!(cleared_update.message_id, sent.id);
+    assert!(cleared_update.reactions.is_empty());
+
+    let deleted = client_b
+        .get_channel_messages_by_id(vec![sent.id])
+        .await
+        .unwrap()
+        .messages;
+    assert_eq!(deleted.len(), 1);
+    assert!(deleted[0].reaction_summaries.is_empty());
 }
 
 #[gpui::test]
@@ -184,5 +387,14 @@ fn mention_for(user_id: u64, start: u64, end: u64) -> proto::ChatMention {
     proto::ChatMention {
         range: Some(proto::Range { start, end }),
         user_id,
+    }
+}
+
+fn assert_reactions(reactions: &[proto::ReactionSummary], expected: &[(&str, &[u64])]) {
+    assert_eq!(reactions.len(), expected.len());
+    for (reaction, (emoji_name, user_ids)) in reactions.iter().zip(expected) {
+        assert_eq!(reaction.emoji_name, *emoji_name);
+        assert_eq!(reaction.count, u32::try_from(user_ids.len()).unwrap());
+        assert_eq!(reaction.user_ids, *user_ids);
     }
 }

@@ -45,7 +45,7 @@ Add emoji reaction support to Sim channel messages. This spans five layers: prot
 
 ### Phase 3 — Server: ReactionStore
 
-- [ ] 5. Implement ReactionStore
+- [x] 5. Implement ReactionStore
   - Create `ReactionStore` struct holding a `Pool` reference.
   - Implement `add_reaction(channel_id, message_id, user_id, emoji_name)` → upsert, return the new reaction state for the message.
   - Implement `remove_reaction(channel_id, message_id, user_id, emoji_name)` → delete row, return updated reaction state.
@@ -53,9 +53,11 @@ Add emoji reaction support to Sim channel messages. This spans five layers: prot
   - Implement `delete_message_reactions(message_id)` → bulk delete for message deletion flow.
   - Validate emoji_name is non-empty and within length limit.
   - _Requirements: 2.1, 2.4_
-  - _writes: crates/collab/src/channel/reaction_store.rs_
+  - _writes: `crates/collab/src/db/queries/channel_messages.rs`_
+  - _writes: `crates/collab/src/rpc.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support --test collab_tests channel_chat_tests`_
 
-- [ ] 6. Write unit tests for ReactionStore
+- [x] 6. Write unit tests for ReactionStore
   - Test `add_reaction` creates a row and returns correct summary.
   - Test `add_reaction` is idempotent on duplicate (message_id, user_id, emoji_name).
   - Test `remove_reaction` deletes the row and updates summary.
@@ -63,42 +65,50 @@ Add emoji reaction support to Sim channel messages. This spans five layers: prot
   - Test `get_reactions` returns correct grouped data.
   - Test `delete_message_reactions` removes all reactions for a message.
   - _Requirements: (testing) 2.1_
-  - _writes: crates/collab/src/channel/reaction_store.rs (tests)_
+  - _writes: `crates/collab/tests/integration/channel_chat_tests.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support --test collab_tests channel_chat_tests`_
 
 ### Phase 4 — Server: RPC Handlers
 
-- [ ] 7. Wire AddReaction RPC handler
+- [x] 7. Wire AddReaction RPC handler
   - Register handler for `AddReaction` in the existing RPC dispatch.
   - Validate: channel exists, user is a member of channel, message exists in channel.
   - Call `ReactionStore::add_reaction`.
   - Build and broadcast `UpdateMessageReactions` push to all channel participants.
   - Return success with updated reaction summary.
   - _Requirements: 2.1, 2.2, 2.4_
-  - _writes: crates/collab/src/rpc/reactions.rs_
+  - _writes: `crates/collab/src/rpc.rs`_
+  - _writes: `crates/client/src/channel_chat.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support --test collab_tests channel_chat_tests`_
 
-- [ ] 8. Wire RemoveReaction RPC handler
+- [x] 8. Wire RemoveReaction RPC handler
   - Register handler for `RemoveReaction` in RPC dispatch.
   - Same validation chain as add (channel membership, message ownership).
   - Call `ReactionStore::remove_reaction`.
   - Broadcast `UpdateMessageReactions` to all channel participants.
   - Return success with updated reaction summary.
   - _Requirements: 2.1, 2.2, 2.4_
-  - _writes: crates/collab/src/rpc/reactions.rs_
+  - _writes: `crates/collab/src/rpc.rs`_
+  - _writes: `crates/client/src/channel_chat.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support --test collab_tests channel_chat_tests`_
 
-- [ ] 9. Hook reaction cleanup into message deletion
+- [x] 9. Hook reaction cleanup into message deletion
   - In the existing message-deletion handler, call `ReactionStore::delete_message_reactions` before or after deleting the message.
   - Broadcast `UpdateMessageReactions` with empty reactions to clear client reaction bars.
   - _Requirements: 2.4_
-  - _writes: crates/collab/src/rpc/messages.rs_
+  - _writes: `crates/collab/src/rpc.rs`_
+  - _writes: `crates/collab/src/db/queries/channel_messages.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support --test collab_tests channel_chat_tests`_
 
-- [ ] 10. Write integration tests for RPC handlers
+- [x] 10. Write integration tests for RPC handlers
   - Test full flow: add reaction → assert `UpdateMessageReactions` is broadcast to channel.
   - Test remove reaction → assert updated broadcast.
   - Test add reaction as non-member → assert error.
   - Test double-add from same user → assert idempotent (no duplicate row, same broadcast).
   - Test message deletion → assert reactions cleaned up and broadcast sent.
   - _Requirements: (testing) 2.1, 2.2, 2.4_
-  - _writes: crates/collab/tests/reactions_tests.rs_
+  - _writes: `crates/collab/tests/integration/channel_chat_tests.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support --test collab_tests channel_chat_tests`_
 
 ### Phase 5 — Client: Data Layer
 
@@ -122,12 +132,13 @@ Add emoji reaction support to Sim channel messages. This spans five layers: prot
   - _Requirements: 2.2_
   - _writes: crates/client/src/channel_reactions.rs_
 
-- [ ] 14. Implement add_remove_reaction on client ChannelClient
+- [x] 14. Implement add_remove_reaction on client ChannelClient
   - Add `add_reaction(channel_id, message_id, emoji_name)` method that sends `AddReaction` RPC.
   - Add `remove_reaction(channel_id, message_id, emoji_name)` method that sends `RemoveReaction` RPC.
   - Return the RPC response for error handling.
   - _Requirements: 2.1_
-  - _writes: crates/client/src/channel_reactions.rs_
+  - _writes: `crates/client/src/channel_chat.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support --test collab_tests channel_chat_tests`_
 
 ### Phase 6 — Client: Emoji Picker
 

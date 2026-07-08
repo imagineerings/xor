@@ -458,6 +458,8 @@ impl Server {
             .add_request_handler(send_channel_message)
             .add_request_handler(remove_channel_message)
             .add_request_handler(update_channel_message)
+            .add_request_handler(add_reaction)
+            .add_request_handler(remove_reaction)
             .add_request_handler(get_channel_messages)
             .add_request_handler(get_channel_messages_by_id)
             .add_request_handler(get_notifications)
@@ -3690,18 +3692,16 @@ async fn remove_channel_message(
     session: MessageContext,
 ) -> Result<()> {
     let channel_id = ChannelId::from_proto(request.channel_id);
+    let message_id = MessageId::from_proto(request.message_id);
     let message = session
         .db()
         .await
-        .delete_channel_message(
-            channel_id,
-            MessageId::from_proto(request.message_id),
-            session.user_id(),
-        )
+        .delete_channel_message(channel_id, message_id, session.user_id())
         .await?;
 
     response.send(proto::Ack {})?;
-    broadcast_channel_message_update(&session, channel_id, message).await
+    broadcast_channel_message_update(&session, channel_id, message).await?;
+    broadcast_channel_message_reactions_update(&session, channel_id, message_id, Vec::new()).await
 }
 
 async fn update_channel_message(
@@ -3725,6 +3725,54 @@ async fn update_channel_message(
 
     response.send(proto::Ack {})?;
     broadcast_channel_message_update(&session, channel_id, message).await
+}
+
+async fn add_reaction(
+    request: proto::AddReaction,
+    response: Response<proto::AddReaction>,
+    session: MessageContext,
+) -> Result<()> {
+    let channel_id = ChannelId::from_proto(request.channel_id);
+    let message_id = MessageId::from_proto(request.message_id);
+    let reactions = session
+        .db()
+        .await
+        .insert_channel_message_reaction(
+            channel_id,
+            message_id,
+            session.user_id(),
+            request.emoji_name,
+        )
+        .await?;
+
+    response.send(proto::UpdateMessageReactionsResponse {
+        reactions: reactions.clone(),
+    })?;
+    broadcast_channel_message_reactions_update(&session, channel_id, message_id, reactions).await
+}
+
+async fn remove_reaction(
+    request: proto::RemoveReaction,
+    response: Response<proto::RemoveReaction>,
+    session: MessageContext,
+) -> Result<()> {
+    let channel_id = ChannelId::from_proto(request.channel_id);
+    let message_id = MessageId::from_proto(request.message_id);
+    let reactions = session
+        .db()
+        .await
+        .delete_channel_message_reaction(
+            channel_id,
+            message_id,
+            session.user_id(),
+            request.emoji_name,
+        )
+        .await?;
+
+    response.send(proto::UpdateMessageReactionsResponse {
+        reactions: reactions.clone(),
+    })?;
+    broadcast_channel_message_reactions_update(&session, channel_id, message_id, reactions).await
 }
 
 /// Mark a channel message as read
@@ -3886,6 +3934,30 @@ async fn broadcast_channel_message_update(
             proto::ChannelMessageUpdate {
                 channel_id: channel_id.to_proto(),
                 message: Some(message.clone()),
+            },
+        )?;
+    }
+    Ok(())
+}
+
+async fn broadcast_channel_message_reactions_update(
+    session: &MessageContext,
+    channel_id: ChannelId,
+    message_id: MessageId,
+    reactions: Vec<proto::ReactionSummary>,
+) -> Result<()> {
+    let connection_ids = session
+        .db()
+        .await
+        .channel_chat_participant_connection_ids(channel_id)
+        .await?;
+    for connection_id in connection_ids {
+        session.peer.send(
+            connection_id,
+            proto::UpdateMessageReactions {
+                channel_id: channel_id.to_proto(),
+                message_id: message_id.to_proto(),
+                reactions: reactions.clone(),
             },
         )?;
     }
