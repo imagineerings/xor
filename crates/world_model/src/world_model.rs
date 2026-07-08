@@ -1,5 +1,7 @@
 pub mod artifact;
+pub mod comfy_cache;
 pub mod comfy_conditioning;
+pub mod comfy_execution_plan;
 pub mod comfy_execution_registry;
 pub mod comfy_graph_validation;
 pub mod comfy_latents;
@@ -33,7 +35,11 @@ pub mod session;
 #[cfg(test)]
 mod artifact_tests;
 #[cfg(test)]
+mod comfy_cache_tests;
+#[cfg(test)]
 mod comfy_conditioning_tests;
+#[cfg(test)]
+mod comfy_execution_plan_tests;
 #[cfg(test)]
 mod comfy_execution_registry_tests;
 #[cfg(test)]
@@ -80,6 +86,7 @@ mod session_tests;
 mod tests;
 
 pub use artifact::{GeneratedWorldArtifact, GeneratedWorldArtifactError};
+pub use comfy_cache::{ComfyCachePolicy, NodeCacheEntry, NodeCacheSnapshot, cache_key_for_node};
 pub use comfy_conditioning::{
     AttentionMetadata, ComfyConditioningRuntime, ConditioningArea, ConditioningBundle,
     ConditioningMask, ConditioningRegion, ConditioningRuntimeContext, ConditioningTransform,
@@ -87,6 +94,7 @@ pub use comfy_conditioning::{
     ControlAttachmentKind, EMPTY_BUNDLE_CODE, EMPTY_TENSOR_CODE, EncoderIdentity, EncoderKind,
     InpaintConditioning, PromptMetadata, PromptRole, TensorDescriptor, TensorDtype,
 };
+pub use comfy_execution_plan::{ComfyExecutionPlanner, ExecutionPlan, ExecutionPlanRequest};
 pub use comfy_execution_registry::{
     ComfyExecutionRegistry, DivergenceReason, DivergenceRecord, ExecutionBehaviorKey,
     GuidanceCapability, GuidanceMode, ModelFamilyExecutionProfile, SamplerCapability, SamplerKind,

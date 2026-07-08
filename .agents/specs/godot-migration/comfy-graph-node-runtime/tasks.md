@@ -40,10 +40,10 @@ Implement runtime graph compatibility in layers: registry/schema first, validati
   - _Requirements: 2.1, 2.2, 5.3_
   - _writes: crates/world_model/src/comfy_graph_validation.rs, crates/world_model/src/comfy_graph_validation_tests.rs_
 
-- [ ] 5. Implement execution planning and cache policy
-  - Add dependency closure planning, dirty-node detection, RAM-pressure/classic/LRU/none cache policy models, and cache-key tests.
+- [x] 5. Implement execution planning and cache policy
+  - Add native Sim dependency closure planning, dirty-node detection, RAM-pressure/classic/LRU/none cache policy models, and cache-key tests without relying on ComfyUI execution state.
   - _Requirements: 3.1, 3.2, 3.3_
-  - _writes: crates/world_model/src/comfy_execution_plan.rs, crates/world_model/src/comfy_cache.rs, crates/world_model/src/comfy_cache_tests.rs_
+  - _writes: crates/world_model/src/comfy_execution_plan.rs, crates/world_model/src/comfy_execution_plan_tests.rs, crates/world_model/src/comfy_cache.rs, crates/world_model/src/comfy_cache_tests.rs_
 
 - [ ] 6. Implement node executor adapter
   - Support sync, async, list-mapped, interrupted, blocked, cached, and failed execution states with UI output preservation.

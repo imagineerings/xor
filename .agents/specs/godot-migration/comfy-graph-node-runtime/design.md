@@ -102,6 +102,14 @@ pub struct ComfyValidationCapabilities {
     pub asset_capabilities: BTreeSet<String>,
 }
 
+pub struct ExecutionPlan {
+    pub target_nodes: Vec<NodeId>,
+    pub dependency_closure: Vec<NodeId>,
+    pub execution_order: Vec<NodeId>,
+    pub reusable_nodes: Vec<NodeId>,
+    pub dirty_nodes: Vec<NodeId>,
+}
+
 pub struct PromptNode {
     pub id: NodeId,
     pub class_type: NodeTypeId,
@@ -140,6 +148,13 @@ availability through the enabled Sim registry, required inputs satisfied by
 links or literal Sim metadata, linked port existence, link type compatibility,
 cycles, duplicate links, partial execution targets, and provider/model/asset
 capability gates without passing prompt validation through ComfyUI.
+
+The execution planner and cache policy are native Sim graph scheduling records.
+The planner computes target dependency closures, deterministic dependency-first
+execution order, reusable cached nodes, and dirty nodes from Sim graph edges.
+Cache policy models classic reuse, LRU limits, RAM-pressure limits, and disabled
+cache semantics from Sim cache snapshots and deterministic node cache keys
+without relying on ComfyUI execution state.
 
 ## Correctness Properties
 
