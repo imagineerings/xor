@@ -13,7 +13,7 @@ flowchart LR
     Flags[SimFeatureFlagRegistry] --> Runtime[comfy-runtime-control-plane]
     Schema[SimApiSchemaCatalog] --> Tests[CompatibilityFixtureSuite]
     Deps[SimDependencyReviewGate] --> Packaging[SimPackagingProfileCatalog]
-    Logs[DiagnosticsAdapter] --> SimDiag[Sim Diagnostics]
+    Logs[SimDiagnosticsAdapter] --> SimDiag[Sim Diagnostics]
 ```
 
 ## Components and Interfaces
@@ -77,9 +77,15 @@ flowchart LR
   Sim launch/runtime options and explicitly delegate installer, bundle, and
   platform distribution details to existing Sim packaging systems.
 
-### DiagnosticsAdapter
+### SimDiagnosticsAdapter
 
 - **Purpose**: Expose logs and internal diagnostics through Sim diagnostics without making internal endpoints stable public API.
+- **Responsibilities**: Raw and formatted logs, terminal size metadata,
+  approved folder roots, and recent input/output/temp file summaries.
+- **Native behavior**: Emits `SimDiagnostics*` records, resolves recent files
+  only beneath approved Sim roots, and marks these diagnostic views as internal
+  unstable so Comfy-compatible tooling cannot treat them as a stable public API
+  or ComfyUI pass-through endpoint.
 
 ## Data Models
 
@@ -111,6 +117,11 @@ pub struct SimDependencyReviewGate {
 
 pub struct SimPackagingProfileCatalog {
     pub profiles: Vec<SimPackagingProfile>,
+}
+
+pub struct SimDiagnosticsAdapter {
+    pub approved_roots: BTreeMap<SimDiagnosticRootKind, PathBuf>,
+    pub terminal: Option<SimTerminalMetadata>,
 }
 
 pub enum ComfyRouteSupport {

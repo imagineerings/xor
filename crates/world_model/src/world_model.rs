@@ -58,6 +58,7 @@ pub mod sim_asset_tags;
 pub mod sim_asset_upload;
 pub mod sim_assets;
 pub mod sim_dependency_review;
+pub mod sim_diagnostics_adapter;
 pub mod sim_feature_flags;
 pub mod sim_launch_profile;
 pub mod sim_packaging_profiles;
@@ -158,6 +159,8 @@ mod sim_asset_scanner_tests;
 mod sim_assets_tests;
 #[cfg(test)]
 mod sim_dependency_review_tests;
+#[cfg(test)]
+mod sim_diagnostics_adapter_tests;
 #[cfg(test)]
 mod sim_feature_flags_tests;
 #[cfg(test)]
@@ -402,6 +405,14 @@ pub use sim_dependency_review::{
     SimDependencyKind, SimDependencyProposal, SimDependencyReviewDecision,
     SimDependencyReviewDiagnostic, SimDependencyReviewDiagnosticSeverity, SimDependencyReviewGate,
     SimDependencyReviewRecord, SimDependencyReviewReport, SimDependencyReviewStatus,
+};
+pub use sim_diagnostics_adapter::{
+    SIM_DIAGNOSTIC_PATH_ESCAPE_CODE, SIM_DIAGNOSTIC_UNAPPROVED_ROOT_CODE,
+    SimDiagnosticEndpointStability, SimDiagnosticFolder, SimDiagnosticFolderReport,
+    SimDiagnosticLogEntry, SimDiagnosticLogReport, SimDiagnosticLogStream, SimDiagnosticRecentFile,
+    SimDiagnosticRecentFileKind, SimDiagnosticRecentFilesReport, SimDiagnosticResolvedRecentFile,
+    SimDiagnosticRootKind, SimDiagnosticsAdapter, SimDiagnosticsAdapterDiagnostic,
+    SimTerminalMetadata,
 };
 pub use sim_feature_flags::{
     ASSETS_FLAG, FEATURE_FLAG_CORE_OVERRIDE_CODE, FEATURE_FLAG_INVALID_VALUE_CODE,

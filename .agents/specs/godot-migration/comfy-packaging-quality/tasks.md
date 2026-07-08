@@ -58,10 +58,11 @@ Build cross-cutting migration controls that other Comfy specs depend on: launch 
   - _Requirements: 5.2_
   - _writes: crates/world_model/src/sim_packaging_profiles.rs, crates/world_model/src/sim_packaging_profiles_tests.rs_
 
-- [ ] 7. Implement logs and internal diagnostics adapter
+- [x] 7. Implement logs and internal diagnostics adapter
   - Expose formatted/raw logs, terminal size metadata, approved folder paths, and recent input/output/temp files through Sim diagnostics.
+  - Represent logs, approved roots, recent files, diagnostics, and endpoint stability with native `SimDiagnostics*` records rather than Comfy-labeled pass-through records.
   - _Requirements: 6.1, 6.2, 6.3_
-  - _writes: crates/world_model/src/comfy_diagnostics.rs, crates/world_model/src/comfy_diagnostics_tests.rs_
+  - _writes: crates/world_model/src/sim_diagnostics_adapter.rs, crates/world_model/src/sim_diagnostics_adapter_tests.rs_
 
 ## Notes
 
