@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T13:18:36Z",
+  "updated_at": "2026-07-08T13:23:09Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -341,6 +341,12 @@
       "updated_at": "2026-07-08T13:18:36Z"
     },
     {
+      "task_identifier": ".agents/specs/goose-migration/typescript-sdk/tasks.md:17",
+      "status": "done",
+      "summary": "Task 2: Added ui/sdk/src/http-transport.ts with configurable base URL/auth/timeout/fetch, typed request helpers for status, sessions, messages, recipes, and config endpoints, and SimError, AuthenticationError, and TimeoutError classes. Exported the transport from ui/sdk/src/index.ts.",
+      "updated_at": "2026-07-08T13:23:09Z"
+    },
+    {
       "task_identifier": ".agents/specs/ci-migration/tasks.md",
       "status": "deprioritized",
       "summary": "All tasks in .agents/specs/ci-migration are deprioritized until every other local workflow task is complete. Do not select CI migration work while non-CI tasks remain available.",
@@ -381,8 +387,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/typescript-sdk",
-      "summary": "Task 1 is checked complete. Future SDK implementation tasks can build from ui/sdk with @sim/sdk package metadata, strict TypeScript config, src/index.ts type exports, and src/generated/types.ts API shape scaffolding.",
-      "updated_at": "2026-07-08T13:18:36Z"
+      "summary": "Tasks 1 and 2 are checked complete. Future SDK implementation tasks can build from ui/sdk with @sim/sdk package metadata, strict TypeScript config, generated API types, and a fetch-based HttpTransport. Full tsc validation still requires installing ui/sdk dev dependencies.",
+      "updated_at": "2026-07-08T13:23:09Z"
     },
     {
       "scope": ".agents/specs/godot-migration",

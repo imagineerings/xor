@@ -87,6 +87,19 @@ export interface RecipeOutput {
   metadata?: Record<string, unknown>;
 }
 
+export interface RunRecipeRequest {
+  variables?: Record<string, string>;
+}
+
+export interface ConfigValue {
+  key: string;
+  value: unknown;
+}
+
+export interface HealthStatus {
+  ok: boolean;
+}
+
 export interface MCPTool {
   name: string;
   description?: string;

@@ -14,7 +14,7 @@ Implement a TypeScript SDK as an npm package that provides programmatic access t
   - _Requirements: 6_
   - _writes: ui/sdk/package.json, ui/sdk/tsconfig.json, ui/sdk/src/generated/types.ts_
 
-- [ ] 2. Implement HTTP transport
+- [x] 2. Implement HTTP transport
   - HTTP client with configurable base URL and auth
   - Request/response handling for all API endpoints
   - Error handling with typed errors
