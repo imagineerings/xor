@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T10:55:27.137Z",
+  "updated_at": "2026-07-08T10:57:56.289Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -267,20 +267,8 @@
       ],
       "evidence": [
         "All .agents/specs/ci-migration tasks are deprioritized by current workflow-state policy."
-      ]
-    },
-    {
-      "task_id": "task:6a9371a824e8",
-      "task_identifier": ".agents/specs/goose-migration/dictation/tasks.md:42",
-      "title": "Integrate dictation into agent and UI",
-      "rank": 1,
-      "rationale": "Ready follow-up to completed dictation service work; unlocks user-facing access through agent and CLI surfaces.",
-      "blockers": [],
-      "evidence": [
-        "Tasks 1-5 in dictation are complete",
-        "Task writes do not overlap active cached SIM-11 or SIM-18 work",
-        "SIM-23 is claimed in Linear"
-      ]
+      ],
+      "updated_at": "2026-07-08T10:57:56.289Z"
     }
   ],
   "maintenance": {
