@@ -4,6 +4,7 @@
   "requires_production_weights": false,
   "requires_downloads": false,
   "native_sim_records": true,
+  "comfyui_passthrough": false,
   "workflows": [
     {
       "id": "text_to_image_sdxl",

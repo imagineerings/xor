@@ -50,6 +50,10 @@ flowchart LR
 
 - **Purpose**: Provide automated fixtures for migrated Comfy features.
 - **Responsibilities**: Script examples, route snapshots, node schema snapshots, blueprint manifest, provider catalogs, asset API tests, and media capability snapshots.
+- **Native behavior**: Aggregates fixture coverage that exercises Sim-owned
+  runtime, route, node, workflow, asset, and media records. Future provider and
+  detailed media fixtures remain explicitly assigned to their owning specs until
+  those native Sim features land.
 
 ### DependencyReviewGate
 

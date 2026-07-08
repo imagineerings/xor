@@ -40,8 +40,9 @@ Build cross-cutting migration controls that other Comfy specs depend on: launch 
   - _Requirements: 3.1, 3.3, 3.4_
   - _writes: crates/world_model/src/sim_api_schema.rs, crates/world_model/fixtures/comfy/api_routes.json, crates/world_model/src/sim_api_schema_tests.rs_
 
-- [ ] 4. Build compatibility fixture suite
+- [x] 4. Build compatibility fixture suite
   - Add fixture harnesses for script examples, route snapshots, node schemas, blueprint manifest, provider catalog, asset API, and media capability groups.
+  - Aggregate implemented fixture groups through native Sim records and document future provider/media fixture ownership without treating missing future groups as ComfyUI pass-through coverage.
   - _Requirements: 3.2, 4.1, 4.2, 4.3_
   - _writes: crates/world_model/tests/comfy_compat_suite.rs, crates/world_model/fixtures/comfy/README.md_
 
