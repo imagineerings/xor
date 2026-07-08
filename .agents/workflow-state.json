@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T16:59:00Z",
+  "updated_at": "2026-07-08T18:25:00Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -616,6 +616,12 @@
       "status": "done",
       "summary": "Task 9: Added observability analytics validation script covering token counter, rate limiter, Langfuse/OTLP, observation, PostHog, tool monitor, tool inspector, and AgentObservability integration tests, and wired it into prerelease quick checks.",
       "updated_at": "2026-07-08T18:12:00Z"
+    },
+    {
+      "task_identifier": ".agents/specs/goose-migration/security-permissions/tasks.md:9",
+      "status": "done",
+      "summary": "Task 1: Added crates/security with Pattern, PatternCategory, PatternMatcher, Severity, PatternAction, PatternRegistry, JSON loading helpers, eager regex compilation, active-pattern filtering, contains/exact/regex matching, and focused unit coverage. Linear claim was skipped because external tracker access was blocked by policy.",
+      "updated_at": "2026-07-08T18:25:00Z"
     }
   ],
   "dependency_notes": [
@@ -663,6 +669,11 @@
       "scope": ".agents/specs/goose-migration/observability-analytics",
       "summary": "Tasks 1-9 are checked complete. language_model_core exposes model-aware token counting and optional token-bucket request limiting, language_models has provider default rate-limit configuration, telemetry has configurable Langfuse/OTLP backend foundations plus an observation layer, crates/posthog provides sanitized product analytics capture, agent has monitor/inspector primitives plus AgentObservability integration helpers, and scripts/test-observability-analytics.sh validates the slice from prerelease quick checks.",
       "updated_at": "2026-07-08T18:12:00Z"
+    },
+    {
+      "scope": ".agents/specs/goose-migration/security-permissions",
+      "summary": "Task 1 is checked complete. crates/security now provides a reusable PatternRegistry with serde-loadable regex, contains, and exact matchers for later adversary and egress inspectors. Task 2 can depend on this registry instead of defining its own pattern model.",
+      "updated_at": "2026-07-08T18:25:00Z"
     },
     {
       "scope": ".agents/specs/godot-migration",

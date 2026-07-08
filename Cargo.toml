@@ -187,6 +187,7 @@ members = [
     "crates/rpc",
     "crates/sandbox",
     "crates/scheduler",
+    "crates/security",
     "crates/schema_generator",
     "crates/search",
     "crates/session",
@@ -462,6 +463,7 @@ rope = { path = "crates/rope" }
 rpc = { path = "crates/rpc" }
 scheduler = { path = "crates/scheduler" }
 sandbox = { path = "crates/sandbox" }
+security = { path = "crates/security" }
 search = { path = "crates/search" }
 session = { path = "crates/session" }
 sidebar = { path = "crates/sidebar" }

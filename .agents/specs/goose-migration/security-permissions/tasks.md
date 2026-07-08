@@ -6,7 +6,7 @@ Implement the security inspection system (`crates/security/`) and permission sys
 
 ## Tasks
 
-- [ ] 1. Create security pattern registry
+- [x] 1. Create security pattern registry
   - Define Pattern, PatternCategory, PatternAction types
   - Load patterns from configuration files
   - Compile regex/matcher patterns at load time
