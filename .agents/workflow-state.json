@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T16:36:08Z",
+  "updated_at": "2026-07-08T16:44:21Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -562,6 +562,12 @@
       "status": "ready",
       "summary": "Umbrella tasks are complete. Future Godot migration task selection should prioritize W2 world-model serving substrate, W3 Comfy execution core, and W4 generation pipelines before W7 deferred Godot-origin compatibility unless a deferred task directly unlocks the target product.",
       "updated_at": "2026-07-08T12:00:00.000Z"
+    },
+    {
+      "task_identifier": ".agents/specs/goose-migration/observability-analytics/tasks.md:14",
+      "status": "done",
+      "summary": "Task 1: Added language_model_core token counting with TokenCounter, TikTokenCounter backed by tiktoken-rs, CharacterTokenCounter fallback, ModelTokenCounter model selection, message counting helpers, and focused unit coverage.",
+      "updated_at": "2026-07-08T16:44:21Z"
     }
   ],
   "dependency_notes": [
@@ -604,6 +610,11 @@
       "scope": ".agents/specs/goose-migration/misc-services",
       "summary": "Tasks 1-6 are checked complete. The slice now has session import formats, Nostr sharing, runnable examples, development/CI scripts, a provider error proxy, and a misc-services verification harness that covers focused import/Nostr Rust tests plus scripted example and tool validation.",
       "updated_at": "2026-07-08T16:36:08Z"
+    },
+    {
+      "scope": ".agents/specs/goose-migration/observability-analytics",
+      "summary": "Task 1 is checked complete. language_model_core now exposes model-aware token counting with tiktoken-rs for known models and a character-count fallback for unknown models. Langfuse, OTel, observation layer, rate limiter extensions, PostHog, tool monitor/inspector, integration, and slice tests remain.",
+      "updated_at": "2026-07-08T16:44:21Z"
     },
     {
       "scope": ".agents/specs/godot-migration",

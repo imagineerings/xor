@@ -11,7 +11,7 @@ Extend sim's observability infrastructure with Langfuse tracing, OpenTelemetry O
 
 ## Tasks
 
-- [ ] 1. Implement token counter
+- [x] 1. Implement token counter
   - Create TokenCounter trait with model-aware counting
   - Implement TikTokenCounter using `tiktoken-rs`
   - Fallback character-based counter for unknown models
