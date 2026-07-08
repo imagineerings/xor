@@ -37,7 +37,7 @@ Implement a TypeScript SDK as an npm package that provides programmatic access t
   - _Requirements: 1_
   - _writes: ui/sdk/src/goose-client.ts, ui/sdk/src/index.ts_
 
-- [ ] 5. Implement MCP apps client
+- [x] 5. Implement MCP apps client
   - Tool registration
   - Tool invocation
   - Lifecycle management

@@ -106,6 +106,19 @@ export interface MCPTool {
   input_schema?: unknown;
 }
 
+export interface RegisterMCPToolRequest {
+  tool: MCPTool;
+}
+
+export interface CallMCPToolRequest {
+  name: string;
+  arguments?: unknown;
+}
+
+export interface CallMCPToolResponse {
+  result: unknown;
+}
+
 export interface BinaryResolverOptions {
   customPath?: string;
   version?: string;
