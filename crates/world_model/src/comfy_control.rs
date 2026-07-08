@@ -136,7 +136,7 @@ pub enum HistoryAction {
     Delete { prompt_ids: BTreeSet<ComfyPromptId> },
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub enum ComfyJobStatus {
     Pending,
     Running,

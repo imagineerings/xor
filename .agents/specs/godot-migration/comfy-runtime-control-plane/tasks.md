@@ -38,8 +38,9 @@ Build the control plane as a protocol adapter over Sim task, HTTP, WebSocket, me
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 5.1_
   - _writes: crates/world_model/src/comfy_routes.rs, crates/sim/src/sim.rs, crates/world_model/src/comfy_routes_tests.rs_
 
-- [ ] 4. Implement the Sim job bridge
-  - Map prompt submission, queue snapshots, history reads, job listing, sorting, filtering, and sensitive-data redaction onto Sim jobs.
+- [x] 4. Implement the Sim job bridge
+  - Map prompt submission, queue snapshots, history reads, job listing, sorting, filtering, and sensitive-data redaction onto native Sim job records.
+  - Preserve prompt payloads, queue numbers, client metadata, status, outputs, queue/history removal, and public extra-data summaries in Sim-owned data without ComfyUI pass-through.
   - _Requirements: 2.2, 2.5, 5.2_
   - _writes: crates/world_model/src/comfy_jobs.rs, crates/world_model/src/comfy_jobs_tests.rs_
 

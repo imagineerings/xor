@@ -49,6 +49,12 @@ pub trait ComfyRouteAdapter {
 - **Purpose**: Map Comfy prompt lifecycle operations onto Sim tasks/jobs.
 - **Responsibilities**: Create jobs, expose queue snapshots, normalize job history, cancel pending or running jobs, and remove sensitive extra data from public responses.
 - **Dependencies**: Sim task system, Comfy graph validator, generated artifact store.
+- **Native job bridge**: Prompt submissions become Sim-owned job records with
+  canonical prompt ids, queue numbers, status, client metadata, prompt payloads,
+  outputs, and explicit public extra-data views. Queue snapshots, terminal
+  history, job listings, sorting, filtering, and queue/history removal actions
+  operate on those Sim job records and never expose sensitive prompt extra data
+  or forward lifecycle state to a ComfyUI server.
 
 ### ComfyWebSocketAdapter
 
@@ -162,7 +168,7 @@ _For any_ upload, view, or download request, the resolved filesystem path SHALL 
 
 ## Testing Strategy
 
-- Unit tests for prompt id validation, native protocol records, HTTP safety primitives, method-aware `/api` alias routing, queue redaction, cancel classification, and path confinement.
+- Unit tests for prompt id validation, native protocol records, HTTP safety primitives, method-aware `/api` alias routing, Sim job bridge submission/listing/history redaction, cancel classification, and path confinement.
 - Integration tests for prompt submission through queue, job status transitions, WebSocket feature negotiation, progress events, and preview metadata negotiation.
 - Compatibility fixtures from `projects/comfy/script_examples` for basic HTTP prompt execution and WebSocket image retrieval.
 - Property tests for route alias equivalence and path traversal rejection.

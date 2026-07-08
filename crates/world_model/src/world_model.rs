@@ -7,6 +7,7 @@ pub mod comfy_execution_registry;
 pub mod comfy_executor;
 pub mod comfy_graph_validation;
 pub mod comfy_http_safety;
+pub mod comfy_jobs;
 pub mod comfy_latents;
 pub mod comfy_model_catalog;
 pub mod comfy_model_components;
@@ -54,6 +55,8 @@ mod comfy_executor_tests;
 mod comfy_graph_validation_tests;
 #[cfg(test)]
 mod comfy_http_safety_tests;
+#[cfg(test)]
+mod comfy_jobs_tests;
 #[cfg(test)]
 mod comfy_latents_tests;
 #[cfg(test)]
@@ -128,6 +131,10 @@ pub use comfy_http_safety::{
     ComfyApiNodeMode, ComfyCacheClass, ComfyContentDisposition, ComfyContentSecurityPolicy,
     ComfyHttpSafetyDiagnostic, ComfyOriginCheck, ComfyPathRoots, ORIGIN_MISMATCH_CODE,
     PATH_ESCAPE_CODE, UNKNOWN_ROOT_CODE,
+};
+pub use comfy_jobs::{
+    ComfyJobBridge, ComfyJobBridgeDiagnostic, ComfyJobListFilter, ComfyJobSort, DUPLICATE_JOB_CODE,
+    MISSING_JOB_CODE, SimComfyJobRecord,
 };
 pub use comfy_latents::{
     ComfyLatentRuntime, LatentArtifact, LatentCompressionKind, LatentCompressionMetadata,
