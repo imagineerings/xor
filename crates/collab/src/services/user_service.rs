@@ -273,9 +273,16 @@ mod fake_user_service {
             admin: bool,
             params: NewUserParams,
         ) -> UserId {
+            let db_user_id = match self.database.create_user(admin).await {
+                Ok(user) => Some(user.user_id),
+                Err(error) => {
+                    log::error!("failed to create fake user in test database: {error:?}");
+                    None
+                }
+            };
             let mut state = self.state.lock().await;
 
-            let user_id = state.next_user_id;
+            let user_id = db_user_id.unwrap_or(state.next_user_id);
             let _ = email_address;
             state.users.insert(
                 user_id,
@@ -289,7 +296,7 @@ mod fake_user_service {
                 },
             );
 
-            state.next_user_id = UserId(state.next_user_id.0 + 1);
+            state.next_user_id = UserId(state.next_user_id.0.max(user_id.0) + 1);
 
             user_id
         }

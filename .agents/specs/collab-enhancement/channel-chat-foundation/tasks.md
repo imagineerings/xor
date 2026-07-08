@@ -61,12 +61,15 @@ Restore the channel-chat storage, RPC, client, and desktop UI foundation that th
   - _writes: `crates/collab_ui/src/collab_panel.rs`_
   - _validated: `cargo fmt -p collab_ui`; `cargo check -p collab_ui`_
 
-- [ ] 7. Add server integration tests
-  - [ ] 7.1 Test join, send, history, edit, delete, and ack flows.
-  - [ ] 7.2 Test private channel access rejection.
-  - [ ] 7.3 Test simultaneous sends preserve stable ordering.
+- [x] 7. Add server integration tests
+  - [x] 7.1 Test join, send, history, edit, delete, and ack flows.
+  - [x] 7.2 Test private channel access rejection.
+  - [x] 7.3 Test simultaneous sends preserve stable ordering.
   - _Requirements: 0.1, 0.2, 0.4_
   - _writes: `crates/collab/tests/integration/channel_chat_tests.rs`_
+  - _writes: `crates/collab/tests/integration/collab_tests.rs`_
+  - _writes: `crates/collab/src/services/user_service.rs`_
+  - _validated: `cargo fmt -p collab`; `cargo test -p collab --features test-support --test collab_tests channel_chat_tests`_
 
 - [ ] 8. Add client and GPUI tests
   - [ ] 8.1 Test client request/response conversions and live event application.
