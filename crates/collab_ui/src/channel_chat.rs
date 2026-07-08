@@ -10,8 +10,9 @@ use db::kvp::KeyValueStore;
 use editor::{Editor, EditorEvent};
 use gpui::{
     App, AsyncApp, Context, Entity, EventEmitter, FocusHandle, Focusable, InteractiveElement,
-    Render, SharedString, StatefulInteractiveElement, Subscription as GpuiSubscription, Task,
-    VisualContext as _, WeakEntity, Window, prelude::*,
+    PromptLevel, Render, SharedString, StatefulInteractiveElement,
+    Subscription as GpuiSubscription, Task, VisualContext as _, WeakEntity, Window, actions,
+    prelude::*,
 };
 use menu::Confirm;
 use rpc::{ErrorExt as _, TypedEnvelope};
@@ -34,6 +35,14 @@ const REACTION_UPDATE_ATTEMPTS: usize = 3;
 const REACTION_RETRY_DELAYS: [Duration; REACTION_UPDATE_ATTEMPTS - 1] =
     [Duration::from_millis(250), Duration::from_millis(750)];
 const DRAFT_SAVE_DEBOUNCE: Duration = Duration::from_millis(500);
+
+actions!(
+    channel_chat,
+    [
+        /// Discards the current channel chat draft.
+        DiscardDraft
+    ]
+);
 
 pub fn init(_cx: &mut App) {}
 
@@ -418,6 +427,42 @@ impl ChannelChat {
                     cx.notify();
                 }
             })?;
+            anyhow::Ok(())
+        })
+        .detach_and_log_err(cx);
+    }
+
+    fn discard_draft(&mut self, _: &DiscardDraft, window: &mut Window, cx: &mut Context<Self>) {
+        if self.composer.read(cx).text(cx).is_empty() {
+            return;
+        }
+
+        let answer = window.prompt(
+            PromptLevel::Warning,
+            "Discard draft?",
+            Some("This will clear the unsent message for this channel."),
+            &["Discard", "Cancel"],
+            cx,
+        );
+        let channel_id = self.channel_id;
+
+        cx.spawn_in(window, async move |this, cx| {
+            if answer.await? != 0 {
+                return anyhow::Ok(());
+            }
+
+            this.update_in(cx, |this, window, cx| {
+                this.pending_draft_save.take();
+                let clear_draft = DraftStore::global(cx).update(cx, |draft_store, cx| {
+                    draft_store.clear_draft_in_background(channel_id, cx)
+                });
+                clear_draft.detach_and_log_err(cx);
+                this.composer.update(cx, |composer, cx| {
+                    composer.clear(window, cx);
+                });
+                cx.notify();
+            })?;
+
             anyhow::Ok(())
         })
         .detach_and_log_err(cx);
@@ -992,6 +1037,7 @@ impl Render for ChannelChat {
             .size_full()
             .bg(cx.theme().colors().editor_background)
             .on_action(cx.listener(Self::send))
+            .on_action(cx.listener(Self::discard_draft))
             .child(
                 v_flex()
                     .flex_1()
@@ -1016,7 +1062,22 @@ impl Render for ChannelChat {
                     .p_3()
                     .border_t_1()
                     .border_color(cx.theme().colors().border)
-                    .child(self.composer.clone())
+                    .child(
+                        h_flex()
+                            .gap_2()
+                            .child(div().flex_1().child(self.composer.clone()))
+                            .when(!self.composer.read(cx).text(cx).is_empty(), |this| {
+                                this.child(
+                                    IconButton::new("discard-draft", IconName::Trash)
+                                        .icon_size(IconSize::Small)
+                                        .icon_color(Color::Muted)
+                                        .on_click(cx.listener(|this, _, window, cx| {
+                                            this.discard_draft(&DiscardDraft, window, cx);
+                                        }))
+                                        .tooltip(Tooltip::text("Discard draft")),
+                                )
+                            }),
+                    )
                     .when_some(
                         match &self.send_state {
                             SendState::Failed(message) => Some(message.clone()),

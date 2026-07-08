@@ -82,14 +82,15 @@ Add client-side draft persistence for channel message composition. When a user t
 
 ### Phase 4: Discard draft functionality
 
-- [ ] 8. Implement discard draft with confirmation dialog
-  - Add a `DiscardDraft` action to `ChannelView`.
-  - Bind the action to the `Escape` key (or add a "Discard" button in the compose area).
-  - On trigger, show a confirmation dialog using an existing Sim pattern (e.g., a confirmation toast or modal).
+- [x] 8. Implement discard draft with confirmation dialog
+  - Add a `DiscardDraft` action to `ChannelChat`.
+  - Add a discard button in the compose area instead of binding `Escape`, which is already used by editor cancel flows.
+  - On trigger, show a confirmation dialog using the existing `window.prompt` pattern.
   - On confirm: call `DraftStore::clear_draft(channel_id)` and clear the editor content.
   - On cancel: do nothing; keep draft intact.
   - _Requirements: 7.3_
-  - _writes: `crates/collab_ui/src/channel_view.rs`_
+  - _writes: `crates/collab_ui/src/channel_chat.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_chat --features test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui draft_store --features test-support`_
 
 ### Phase 5: Limits, error handling, and polish
 
