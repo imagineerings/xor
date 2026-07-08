@@ -21,7 +21,7 @@ Implement a TypeScript SDK as an npm package that provides programmatic access t
   - _Requirements: 1_
   - _writes: ui/sdk/src/http-transport.ts_
 
-- [ ] 3. Implement streaming support
+- [x] 3. Implement streaming support
   - SSE client for streaming responses
   - AsyncGenerator-based streaming API
   - Reconnection with backoff
