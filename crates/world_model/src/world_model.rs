@@ -14,6 +14,7 @@ pub mod comfy_runner_profiles;
 pub mod comfy_runtime_policy;
 pub mod comfy_sampling;
 pub mod comfy_vae;
+pub mod comfy_worker_execution;
 pub mod comfy_world_model_profiles;
 pub mod controls;
 pub mod graph;
@@ -51,6 +52,8 @@ mod comfy_runner_profiles_tests;
 mod comfy_runtime_policy_tests;
 #[cfg(test)]
 mod comfy_sampling_tests;
+#[cfg(test)]
+mod comfy_worker_execution_tests;
 #[cfg(test)]
 mod controls_tests;
 #[cfg(test)]
@@ -129,6 +132,11 @@ pub use comfy_sampling::{
 pub use comfy_vae::{
     ComfyVaeRuntime, VaeOperationKind, VaeRuntimeRequest, VaeTilingMetadata,
     VaeValidationDiagnostic,
+};
+pub use comfy_worker_execution::{
+    ComfyWorker, ComfyWorkerExecutionAdapter, WorkerCapabilityProfile, WorkerExecutionDiagnostic,
+    WorkerExecutionReport, WorkerExecutionRequest, WorkerOutputArtifact, WorkerPreview,
+    WorkerTerminalState,
 };
 pub use comfy_world_model_profiles::{
     ComfyWorldModelProfileBuilder, WorldModelProfileDiagnostic, WorldModelRunnerProfile,

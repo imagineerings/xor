@@ -50,8 +50,8 @@ Implement Comfy model-execution semantics after model catalogs and graph validat
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
   - _writes: crates/world_model/src/comfy_runner_profiles.rs, crates/world_model/src/comfy_world_model_profiles.rs, crates/world_model/src/comfy_runner_profiles_tests.rs_
 
-- [ ] 7. Implement worker execution adapter
-  - Send validated sampling requests through Sim worker boundaries with capability checks, progress, previews, cancellation, terminal state mapping, output collection, and provenance updates.
+- [x] 7. Implement worker execution adapter
+  - Send validated sampling requests through native Sim worker boundaries with capability checks, progress, previews, cancellation, terminal state mapping, output collection, and provenance updates.
   - _Requirements: 5.1, 5.2, 5.3, 5.4_
   - _writes: crates/world_model/src/comfy_worker_execution.rs, crates/world_model/src/comfy_worker_execution_tests.rs_
 

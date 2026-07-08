@@ -173,6 +173,23 @@ pub struct WorldModelRunnerProfile {
     pub minimum_frames: u32,
 }
 
+pub struct WorkerExecutionRequest {
+    pub job_id: JobId,
+    pub sampling: SamplingRunRequest,
+    pub previews_requested: bool,
+    pub cancellation_requested: bool,
+}
+
+pub struct WorkerExecutionReport {
+    pub job_id: JobId,
+    pub terminal_state: WorkerTerminalState,
+    pub progress: Vec<SamplingProgress>,
+    pub previews: Vec<WorkerPreview>,
+    pub outputs: Vec<WorkerOutputArtifact>,
+    pub provenance: Vec<ProvenanceRecord>,
+    pub diagnostics: Vec<WorkerExecutionDiagnostic>,
+}
+
 pub struct ModelFamilyExecutionProfile {
     pub family: ModelFamilyId,
     pub media_domain: MediaDomain,
@@ -222,6 +239,11 @@ model-family semantics to Sim runner identifiers for image diffusion,
 video/world-model, audio, 3D, depth, segmentation, and detection families.
 Unsupported families produce explicit diagnostics; video/world-model profiles
 also preserve reference frame, camera, and action-control constraints.
+
+Worker execution is a native Sim boundary. The adapter validates worker
+capabilities for model family, previews, cancellation, and deterministic
+execution before dispatch, then maps worker progress, previews, terminal state,
+outputs, diagnostics, and provenance back into Sim job records.
 
 ## Correctness Properties
 
