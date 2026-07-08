@@ -45,8 +45,8 @@ Implement Comfy model-execution semantics after model catalogs and graph validat
   - _Requirements: 3.2, 3.3, 3.4_
   - _writes: crates/world_model/src/comfy_model_components.rs, crates/world_model/src/comfy_model_patches.rs, crates/world_model/src/comfy_model_patches_tests.rs_
 
-- [ ] 6. Add diffusion and world-model runner profiles
-  - Define runner profiles for supported image diffusion, video/world-model, audio, 3D, geometry, depth, segmentation, and detection families with explicit unsupported diagnostics.
+- [x] 6. Add diffusion and world-model runner profiles
+  - Define native Sim runner profiles for supported image diffusion, video/world-model, audio, 3D, geometry, depth, segmentation, and detection families with explicit unsupported diagnostics.
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
   - _writes: crates/world_model/src/comfy_runner_profiles.rs, crates/world_model/src/comfy_world_model_profiles.rs, crates/world_model/src/comfy_runner_profiles_tests.rs_
 

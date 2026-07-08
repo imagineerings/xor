@@ -156,6 +156,23 @@ pub struct ModelPatchPlan {
     pub patches: Vec<AppliedModelPatch>,
 }
 
+pub struct ComfyRunnerProfile {
+    pub family: ModelFamilyId,
+    pub runner: RunnerKind,
+    pub media: MediaDomain,
+    pub latent_format: LatentFormat,
+    pub execution_profile: ModelFamilyExecutionProfile,
+    pub native_sim_runner: String,
+}
+
+pub struct WorldModelRunnerProfile {
+    pub runner_profile: ComfyRunnerProfile,
+    pub supports_reference_frames: bool,
+    pub supports_camera_controls: bool,
+    pub supports_action_controls: bool,
+    pub minimum_frames: u32,
+}
+
 pub struct ModelFamilyExecutionProfile {
     pub family: ModelFamilyId,
     pub media_domain: MediaDomain,
@@ -199,6 +216,12 @@ category, compatibility, strengths, duplicate ids, and patch support before
 worker execution. Patch application order is deterministic across LoRA,
 hypernetwork, ControlNet, GLIGEN, model patch, model merge, and edit-model
 records, with provenance preserved on every applied patch.
+
+Runner profiles are native Sim execution records. They bind Comfy-compatible
+model-family semantics to Sim runner identifiers for image diffusion,
+video/world-model, audio, 3D, depth, segmentation, and detection families.
+Unsupported families produce explicit diagnostics; video/world-model profiles
+also preserve reference frame, camera, and action-control constraints.
 
 ## Correctness Properties
 

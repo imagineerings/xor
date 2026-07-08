@@ -10,9 +10,11 @@ pub mod comfy_model_metadata;
 pub mod comfy_model_patches;
 pub mod comfy_model_resources;
 pub mod comfy_quantization;
+pub mod comfy_runner_profiles;
 pub mod comfy_runtime_policy;
 pub mod comfy_sampling;
 pub mod comfy_vae;
+pub mod comfy_world_model_profiles;
 pub mod controls;
 pub mod graph;
 pub mod graph_validation;
@@ -43,6 +45,8 @@ mod comfy_model_metadata_tests;
 mod comfy_model_patches_tests;
 #[cfg(test)]
 mod comfy_model_resources_tests;
+#[cfg(test)]
+mod comfy_runner_profiles_tests;
 #[cfg(test)]
 mod comfy_runtime_policy_tests;
 #[cfg(test)]
@@ -109,6 +113,9 @@ pub use comfy_model_resources::{
 pub use comfy_quantization::{
     ComfyQuantizationMetadata, QuantizationFormat, QuantizedLayerMetadata,
 };
+pub use comfy_runner_profiles::{
+    ComfyRunnerProfile, ComfyRunnerProfileRegistry, RunnerKind, RunnerProfileDiagnostic,
+};
 pub use comfy_runtime_policy::{
     BackendSupport, DeviceBackend, MemoryMode, PrecisionPolicy, RuntimePolicyDiagnostic,
     RuntimePolicyDiagnosticSeverity, RuntimePolicyRequest, RuntimePolicyResolution,
@@ -122,6 +129,9 @@ pub use comfy_sampling::{
 pub use comfy_vae::{
     ComfyVaeRuntime, VaeOperationKind, VaeRuntimeRequest, VaeTilingMetadata,
     VaeValidationDiagnostic,
+};
+pub use comfy_world_model_profiles::{
+    ComfyWorldModelProfileBuilder, WorldModelProfileDiagnostic, WorldModelRunnerProfile,
 };
 pub use controls::{ControlKeyGroup, ControlParseError, WorldActionControlParser};
 pub use graph::{DataType, DiffusionGraph, GraphEdge, GraphNode, NodePort, PortDirection};
