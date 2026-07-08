@@ -8,7 +8,6 @@ use std::{ops::Range, rc::Rc, sync::Arc};
 
 use agent::ContextServerRegistry;
 use anyhow::Result;
-use sim_actions::{ExtensionCategoryFilter, OpenBrowser};
 use cloud_api_types::Plan;
 use collections::HashMap;
 use context_server::ContextServerId;
@@ -23,8 +22,8 @@ use gpui::{
 use itertools::Itertools;
 use language::LanguageRegistry;
 use language_model::{
-    SIM_CLOUD_PROVIDER_ID, IconOrSvg, LanguageModelProvider, LanguageModelProviderId,
-    LanguageModelRegistry,
+    IconOrSvg, LanguageModelProvider, LanguageModelProviderId, LanguageModelRegistry,
+    SIM_CLOUD_PROVIDER_ID,
 };
 use language_models::AllLanguageModelSettings;
 use notifications::status_toast::StatusToast;
@@ -33,6 +32,7 @@ use project::{
     context_server_store::{ContextServerConfiguration, ContextServerStatus, ContextServerStore},
 };
 use settings::{Settings, SettingsStore, update_settings_file};
+use sim_actions::{ExtensionCategoryFilter, OpenBrowser};
 use ui::{
     AiSettingItem, AiSettingItemSource, AiSettingItemStatus, ButtonStyle, Chip, ContextMenu,
     ContextMenuEntry, Disclosure, Divider, DividerColor, ElevationIndex, LabelSize, PopoverMenu,
@@ -48,7 +48,7 @@ pub(crate) use manage_profiles_modal::ManageProfilesModal;
 use crate::{
     Agent,
     agent_configuration::add_llm_provider_modal::{AddLlmProviderModal, LlmCompatibleProvider},
-    agent_connection_store::{AgentConnectionStatus, AgentConnectionStore},
+    agent_connection_store::{AcpConnectionDetails, AgentConnectionStatus, AgentConnectionStore},
 };
 
 pub struct AgentConfiguration {
@@ -282,10 +282,7 @@ impl AgentConfiguration {
                                             .map(|this| {
                                                 if is_sim_provider && is_signed_in {
                                                     this.child(
-                                                        self.render_sim_plan_info(
-                                                            current_plan,
-                                                            cx,
-                                                        ),
+                                                        self.render_sim_plan_info(current_plan, cx),
                                                     )
                                                 } else {
                                                     this.when(
@@ -509,11 +506,7 @@ impl AgentConfiguration {
             )
     }
 
-    fn render_sim_plan_info(
-        &self,
-        plan: Option<Plan>,
-        cx: &mut Context<Self>,
-    ) -> impl IntoElement {
+    fn render_sim_plan_info(&self, plan: Option<Plan>, cx: &mut Context<Self>) -> impl IntoElement {
         if let Some(plan) = plan {
             let free_chip_bg = cx
                 .theme()
@@ -1206,13 +1199,14 @@ impl AgentConfiguration {
             id: agent_server_name.clone(),
         };
 
-        let (connection_status, running_version) = {
+        let (connection_status, connection_details) = {
             let connection_store = self.agent_connection_store.read(cx);
             (
                 connection_store.connection_status(&agent, cx),
-                connection_store.agent_version(&agent, cx),
+                connection_store.acp_connection_details(&agent, cx),
             )
         };
+        let detail_label = connection_detail_label(&connection_details);
 
         let restart_button = matches!(
             connection_status,
@@ -1226,7 +1220,10 @@ impl AgentConfiguration {
             .disabled(connection_status == AgentConnectionStatus::Connecting)
             .icon_color(Color::Muted)
             .icon_size(IconSize::Small)
-            .tooltip(Tooltip::text("Restart Agent Connection"))
+            .tooltip(Tooltip::text(format!(
+                "Restart Agent Connection\n\n{}",
+                connection_details.tooltip_text()
+            )))
             .on_click(cx.listener({
                 let agent = agent.clone();
                 move |this, _, _window, cx| {
@@ -1306,10 +1303,30 @@ impl AgentConfiguration {
 
         AiSettingItem::new(id, display_name, status, source_kind)
             .icon(icon)
-            .when_some(running_version, |this, version| this.detail_label(version))
+            .detail_label(detail_label)
             .when_some(restart_button, |this, button| this.action(button))
             .when_some(uninstall_button, |this, button| this.action(button))
     }
+}
+
+fn connection_detail_label(details: &AcpConnectionDetails) -> SharedString {
+    if details.status != AgentConnectionStatus::Connected {
+        return details.summary_label();
+    }
+
+    let mut label = details.summary_label().to_string();
+    let mut capabilities = Vec::new();
+    if details.supports_session_history {
+        capabilities.push("session history");
+    }
+    if details.auth_method_count > 0 {
+        capabilities.push("auth");
+    }
+    if !capabilities.is_empty() {
+        label.push_str(" · ");
+        label.push_str(&capabilities.join(", "));
+    }
+    label.into()
 }
 
 impl Render for AgentConfiguration {

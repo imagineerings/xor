@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T22:30:00Z",
+  "updated_at": "2026-07-08T22:45:00Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -248,6 +248,17 @@
       "owner": null,
       "summary": "Implemented locally with documented scripts for Windows build, OpenAPI validation, diagnostics viewing, database helpers, MCP tests, sub-agent/recipe tests, pre-release checks, and compaction tests. Ready to merge in PR.",
       "updated_at": "2026-07-08T16:25:00Z"
+    },
+    {
+      "task_id": "task:goose-desktop-ui-1",
+      "task_identifier": ".agents/specs/goose-migration/desktop-ui/tasks.md:15",
+      "title": "Extend existing agent connection status UI for ACP details",
+      "linear_identifier": null,
+      "linear_url": null,
+      "status": "inactive",
+      "owner": null,
+      "summary": "Implemented locally with ACP connection detail snapshots, selected-agent tooltip details for external agents, and richer restart tooltip/status text in agent configuration. Ready to merge in PR.",
+      "updated_at": "2026-07-08T22:45:00Z"
     }
   ],
   "task_notes": [
@@ -781,6 +792,11 @@
       "scope": ".agents/specs/goose-migration/text-ui",
       "summary": "Tasks 1-8 are checked complete. crates/cli now exposes an interactive session/input core, terminal rendering primitives, slash-command routing, sim configure, sim extension management, sim onboarding, sim interactive wiring, and scripts/test-text-ui.sh validation wired into prerelease quick checks.",
       "updated_at": "2026-07-08T22:30:00Z"
+    },
+    {
+      "scope": ".agents/specs/goose-migration/desktop-ui",
+      "summary": "Task 1 is checked complete. Agent connection state now exposes ACP metadata and capability details for external agents; the agent panel tooltip and configuration restart tooltip surface those details while reusing the existing restart control. Task 2 can proceed with the recipe browser panel.",
+      "updated_at": "2026-07-08T22:45:00Z"
     },
     {
       "scope": ".agents/specs/godot-migration",

@@ -12,7 +12,7 @@ Build GPUI-native views for recipe browsing, scheduling, diagnostics, shared ses
 
 ## Tasks
 
-- [ ] 1. Extend existing agent connection status UI for ACP details
+- [x] 1. Extend existing agent connection status UI for ACP details
   - Audit existing `AgentConnectionStatus` usage
   - Add Goose-specific ACP details on hover/click
   - Add manual reconnect only if not already covered by existing controls

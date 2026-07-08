@@ -35,6 +35,65 @@ pub enum AgentConnectionStatus {
     Connected,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AcpConnectionDetails {
+    pub status: AgentConnectionStatus,
+    pub agent_id: Option<SharedString>,
+    pub agent_version: Option<SharedString>,
+    pub auth_method_count: usize,
+    pub supports_load_session: bool,
+    pub supports_resume_session: bool,
+    pub supports_close_session: bool,
+    pub supports_session_history: bool,
+}
+
+impl AcpConnectionDetails {
+    pub fn summary_label(&self) -> SharedString {
+        match self.status {
+            AgentConnectionStatus::Disconnected => "ACP disconnected".into(),
+            AgentConnectionStatus::Connecting => "ACP connecting".into(),
+            AgentConnectionStatus::Connected => {
+                let agent = self
+                    .agent_id
+                    .as_ref()
+                    .map(|agent_id| agent_id.to_string())
+                    .unwrap_or_else(|| "agent".to_string());
+                match &self.agent_version {
+                    Some(version) => format!("ACP connected: {agent} ({version})").into(),
+                    None => format!("ACP connected: {agent}").into(),
+                }
+            }
+        }
+    }
+
+    pub fn tooltip_text(&self) -> SharedString {
+        let status = match self.status {
+            AgentConnectionStatus::Disconnected => "Disconnected",
+            AgentConnectionStatus::Connecting => "Connecting",
+            AgentConnectionStatus::Connected => "Connected",
+        };
+        let agent = self
+            .agent_id
+            .as_ref()
+            .map(|agent_id| agent_id.to_string())
+            .unwrap_or_else(|| "unknown".to_string());
+        let version = self
+            .agent_version
+            .as_ref()
+            .map(|version| version.to_string())
+            .unwrap_or_else(|| "unknown".to_string());
+        format!(
+            "ACP status: {status}\nAgent: {agent}\nVersion: {version}\nAuth methods: {}\nSession history: {}\nLoad/resume/close: {}/{}/{}",
+            self.auth_method_count,
+            bool_label(self.supports_session_history),
+            bool_label(self.supports_load_session),
+            bool_label(self.supports_resume_session),
+            bool_label(self.supports_close_session),
+        )
+        .into()
+    }
+}
+
 impl AgentConnectionEntry {
     pub fn wait_for_connection(&self) -> Shared<Task<Result<AgentConnectedState, LoadError>>> {
         match self {
@@ -49,6 +108,44 @@ impl AgentConnectionEntry {
             AgentConnectionEntry::Connecting { .. } => AgentConnectionStatus::Connecting,
             AgentConnectionEntry::Connected(_) => AgentConnectionStatus::Connected,
             AgentConnectionEntry::Error { .. } => AgentConnectionStatus::Disconnected,
+        }
+    }
+
+    pub fn acp_details(&self) -> AcpConnectionDetails {
+        match self {
+            AgentConnectionEntry::Connecting { .. } => AcpConnectionDetails {
+                status: AgentConnectionStatus::Connecting,
+                agent_id: None,
+                agent_version: None,
+                auth_method_count: 0,
+                supports_load_session: false,
+                supports_resume_session: false,
+                supports_close_session: false,
+                supports_session_history: false,
+            },
+            AgentConnectionEntry::Connected(state) => {
+                let connection = &state.connection;
+                AcpConnectionDetails {
+                    status: AgentConnectionStatus::Connected,
+                    agent_id: Some(connection.agent_id().0.clone()),
+                    agent_version: connection.agent_version(),
+                    auth_method_count: connection.auth_methods().len(),
+                    supports_load_session: connection.supports_load_session(),
+                    supports_resume_session: connection.supports_resume_session(),
+                    supports_close_session: connection.supports_close_session(),
+                    supports_session_history: connection.supports_session_history(),
+                }
+            }
+            AgentConnectionEntry::Error { .. } => AcpConnectionDetails {
+                status: AgentConnectionStatus::Disconnected,
+                agent_id: None,
+                agent_version: None,
+                auth_method_count: 0,
+                supports_load_session: false,
+                supports_resume_session: false,
+                supports_close_session: false,
+                supports_session_history: false,
+            },
         }
     }
 }
@@ -96,6 +193,22 @@ impl AgentConnectionStore {
             .get(key)
             .map(|entry| entry.read(cx).status())
             .unwrap_or(AgentConnectionStatus::Disconnected)
+    }
+
+    pub fn acp_connection_details(&self, key: &Agent, cx: &App) -> AcpConnectionDetails {
+        self.entries
+            .get(key)
+            .map(|entry| entry.read(cx).acp_details())
+            .unwrap_or_else(|| AcpConnectionDetails {
+                status: AgentConnectionStatus::Disconnected,
+                agent_id: None,
+                agent_version: None,
+                auth_method_count: 0,
+                supports_load_session: false,
+                supports_resume_session: false,
+                supports_close_session: false,
+                supports_session_history: false,
+            })
     }
 
     pub fn agent_version(&self, key: &Agent, cx: &App) -> Option<SharedString> {
@@ -309,5 +422,57 @@ impl AgentConnectionStore {
             },
         });
         (new_version_rx, loading_status_rx, connect_task)
+    }
+}
+
+fn bool_label(value: bool) -> &'static str {
+    if value { "yes" } else { "no" }
+}
+
+#[cfg(test)]
+mod tests {
+    use acp_thread::StubAgentConnection;
+
+    use super::*;
+
+    #[test]
+    fn connected_acp_details_include_agent_capabilities() {
+        let connection = StubAgentConnection::new()
+            .with_agent_id("test-agent".into())
+            .with_supports_load_session(true);
+        let entry = AgentConnectionEntry::Connected(AgentConnectedState {
+            connection: Rc::new(connection),
+        });
+
+        let details = entry.acp_details();
+
+        assert_eq!(details.status, AgentConnectionStatus::Connected);
+        assert_eq!(
+            details.agent_id.as_ref().map(|id| id.as_str()),
+            Some("test-agent")
+        );
+        assert_eq!(details.agent_version, None);
+        assert!(details.supports_load_session);
+        assert!(!details.supports_close_session);
+        assert!(details.supports_session_history);
+        assert!(details.summary_label().contains("ACP connected"));
+        assert!(
+            details
+                .tooltip_text()
+                .contains("Load/resume/close: yes/no/no")
+        );
+    }
+
+    #[test]
+    fn disconnected_acp_details_are_explicit() {
+        let entry = AgentConnectionEntry::Error {
+            error: LoadError::Other("nope".into()),
+        };
+
+        let details = entry.acp_details();
+
+        assert_eq!(details.status, AgentConnectionStatus::Disconnected);
+        assert_eq!(details.summary_label(), "ACP disconnected");
+        assert!(details.tooltip_text().contains("ACP status: Disconnected"));
     }
 }

@@ -37,7 +37,7 @@ use sim_actions::{
 
 use crate::ExpandMessageEditor;
 use crate::ManageProfiles;
-use crate::agent_connection_store::AgentConnectionStore;
+use crate::agent_connection_store::{AcpConnectionDetails, AgentConnectionStore};
 use crate::completion_provider::{AgentContextSelection, AgentContextSource};
 use crate::terminal_thread_metadata_store::{
     TerminalThreadMetadata, TerminalThreadMetadataStore, compose_terminal_thread_title,
@@ -6000,6 +6000,7 @@ impl AgentPanel {
         } else {
             self.selected_agent.icon()
         };
+        let selected_agent_tooltip = self.selected_agent_acp_tooltip(cx);
         let selected_agent_label_for_tooltip = selected_agent_label.clone();
 
         let selected_agent = div()
@@ -6021,7 +6022,7 @@ impl AgentPanel {
                 Tooltip::with_meta(
                     selected_agent_label_for_tooltip.clone(),
                     None,
-                    "Selected Agent",
+                    selected_agent_tooltip.clone(),
                     cx,
                 )
             });
@@ -6216,6 +6217,25 @@ impl AgentPanel {
             .border_b_1()
             .border_color(cx.theme().colors().border)
             .child(toolbar_content)
+    }
+
+    fn selected_agent_acp_tooltip(&self, cx: &mut Context<Self>) -> SharedString {
+        match self.selected_agent_acp_details(cx) {
+            Some(details) => format!("Selected Agent\n\n{}", details.tooltip_text()).into(),
+            None => "Selected Agent".into(),
+        }
+    }
+
+    fn selected_agent_acp_details(&self, cx: &mut Context<Self>) -> Option<AcpConnectionDetails> {
+        if matches!(self.selected_agent, Agent::Custom { .. }) {
+            Some(
+                self.connection_store()
+                    .read(cx)
+                    .acp_connection_details(&self.selected_agent, cx),
+            )
+        } else {
+            None
+        }
     }
 
     fn should_render_trial_end_upsell(&self, cx: &mut Context<Self>) -> bool {
