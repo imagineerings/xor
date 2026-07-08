@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T06:39:15.099Z",
+  "updated_at": "2026-07-08T10:24:56.756Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": "task:6a9371a824e8",
@@ -194,10 +194,10 @@
       "title": "Integrate dictation into agent and UI",
       "linear_identifier": "SIM-23",
       "linear_url": "https://linear.app/simtropolis/issue/SIM-23/integrate-dictation-into-agent-and-ui",
-      "status": "active",
+      "status": "inactive",
       "owner": null,
-      "summary": "Claimed for implementation; Linear moved to In Progress.",
-      "updated_at": "2026-07-08T06:39:15.099Z"
+      "summary": "Completed by workflow command.",
+      "updated_at": "2026-07-08T10:24:56.755Z"
     }
   ],
   "task_notes": [

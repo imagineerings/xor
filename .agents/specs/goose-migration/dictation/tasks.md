@@ -39,7 +39,7 @@ Implement the dictation system with microphone capture (extending `crates/audio/
   - _Requirements: 1, 2, 3_
   - _writes: crates/dictation/src/service.rs_
 
-- [ ] 6. Integrate dictation into agent and UI
+- [x] 6. Integrate dictation into agent and UI
   - Agent tool for dictation (text input via voice)
   - CLI command for dictation
   - Desktop UI toggle/microphone button
