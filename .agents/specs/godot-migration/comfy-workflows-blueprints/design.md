@@ -82,6 +82,11 @@ pub trait WorkflowStore {
 
 - **Purpose**: Recover prompt/workflow metadata from generated files.
 - **Responsibilities**: Read supported metadata fields, associate recovered workflows with assets, and return non-fatal diagnostics.
+- **Native metadata records**: Embedded prompt/workflow metadata from supported
+  generated PNG, WebP, and FLAC metadata maps is parsed into Sim workflow
+  documents, prompt JSON, source artifact links, provenance updates, and
+  diagnostics. Metadata failures preserve the asset record and are not delegated
+  to ComfyUI image/audio metadata readers.
 
 ## Data Models
 
@@ -151,4 +156,5 @@ _For any_ generated file import, metadata extraction failure SHALL NOT block ass
 - Snapshot tests for blueprint catalog entries and native subgraph ids/listings.
 - Round-trip tests for workflow load/save/API export through native Sim records.
 - Replacement catalog and graph-rewrite tests shared with native graph validation.
-- Metadata extraction tests for supported generated-file metadata containers.
+- Metadata extraction tests for supported generated-file metadata containers and
+  non-fatal asset preservation.

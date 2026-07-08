@@ -4,6 +4,7 @@ pub mod comfy_cache;
 pub mod comfy_cancellation;
 pub mod comfy_conditioning;
 pub mod comfy_control;
+pub mod comfy_embedded_workflow;
 pub mod comfy_events;
 pub mod comfy_execution_plan;
 pub mod comfy_execution_registry;
@@ -59,6 +60,8 @@ mod comfy_cancellation_tests;
 mod comfy_conditioning_tests;
 #[cfg(test)]
 mod comfy_control_tests;
+#[cfg(test)]
+mod comfy_embedded_workflow_tests;
 #[cfg(test)]
 mod comfy_execution_plan_tests;
 #[cfg(test)]
@@ -148,6 +151,11 @@ pub use comfy_control::{
     ComfyJobSummary, ComfyPromptId, ComfyRuntimeEvent, HistoryAction, INVALID_PROMPT_ID_CODE,
     PreviewPayload, PromptExtraData, PromptSubmission, PromptSubmissionResponse, QueueAction,
     QueueNumber, QueueStatus,
+};
+pub use comfy_embedded_workflow::{
+    ComfyEmbeddedWorkflowDiagnostic, ComfyEmbeddedWorkflowExtractor, ComfyEmbeddedWorkflowFormat,
+    ComfyEmbeddedWorkflowReport, INVALID_EMBEDDED_PROMPT_METADATA_CODE,
+    INVALID_EMBEDDED_WORKFLOW_METADATA_CODE, UNSUPPORTED_EMBEDDED_WORKFLOW_FORMAT_CODE,
 };
 pub use comfy_events::{
     ComfyExecutionEventTranslator, ComfyWebSocketEventName, ComfyWebSocketFrame,

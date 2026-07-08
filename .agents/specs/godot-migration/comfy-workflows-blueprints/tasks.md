@@ -50,8 +50,9 @@ Import shipped blueprints first, then add workflow persistence and API export, t
   - _Requirements: 4.1, 4.2, 4.3_
   - _writes: crates/world_model/src/comfy_replacements.rs, crates/world_model/src/comfy_replacements_tests.rs_
 
-- [ ] 6. Implement embedded workflow metadata extraction
+- [x] 6. Implement embedded workflow metadata extraction
   - Extract supported prompt/workflow metadata from generated outputs and link recovered workflows to asset provenance.
+  - Preserve recovered prompt/workflow JSON, source artifact links, provenance updates, supported-format diagnostics, and non-fatal failures as native Sim metadata records without ComfyUI metadata-reader pass-through.
   - _Requirements: 5.1, 5.2, 5.3_
   - _writes: crates/world_model/src/comfy_embedded_workflow.rs, crates/world_model/src/comfy_embedded_workflow_tests.rs_
 
