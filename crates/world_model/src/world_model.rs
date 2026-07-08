@@ -10,6 +10,8 @@ pub mod comfy_events;
 pub mod comfy_execution_plan;
 pub mod comfy_execution_registry;
 pub mod comfy_executor;
+pub mod comfy_extension_diagnostics;
+pub mod comfy_extension_policy;
 pub mod comfy_extensions;
 pub mod comfy_graph_validation;
 pub mod comfy_http_safety;
@@ -103,6 +105,8 @@ mod comfy_execution_plan_tests;
 mod comfy_execution_registry_tests;
 #[cfg(test)]
 mod comfy_executor_tests;
+#[cfg(test)]
+mod comfy_extension_policy_tests;
 #[cfg(test)]
 mod comfy_extensions_tests;
 #[cfg(test)]
@@ -265,6 +269,17 @@ pub use comfy_executor::{
     ComfyExecutionReport, ComfyExecutorDiagnostic, ComfyExecutorDispatch,
     ComfyNodeExecutionOutcome, ComfyNodeExecutionRecord, ComfyNodeExecutionState,
     ComfyNodeExecutor, ComfyNodeRuntime, ComfyUiOutput,
+};
+pub use comfy_extension_diagnostics::{
+    SIM_EXTENSION_POLICY_BLOCKED_CODE, SIM_EXTENSION_POLICY_DISABLED_CODE,
+    SIM_EXTENSION_POLICY_INSTALL_DENIED_CODE, SIM_EXTENSION_POLICY_INSTALL_REVIEW_REQUIRED_CODE,
+    SIM_EXTENSION_POLICY_NETWORK_DENIED_CODE, SIM_EXTENSION_POLICY_SCRIPT_DENIED_CODE,
+    SIM_EXTENSION_POLICY_WEB_ASSET_DENIED_CODE, SimExtensionPolicyDiagnostic,
+    SimExtensionPolicyDiagnosticSeverity,
+};
+pub use comfy_extension_policy::{
+    SimExtensionPermissionReport, SimExtensionPolicy, SimExtensionPolicyDecisionKind,
+    SimExtensionPolicyEvaluation, SimExtensionPolicyRequest,
 };
 pub use comfy_extensions::{
     SIM_EXTENSION_DISABLED_PACK_CODE, SIM_EXTENSION_NOT_WHITELISTED_CODE,

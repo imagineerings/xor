@@ -32,6 +32,11 @@ flowchart TD
 
 - **Purpose**: Decide what each extension may do.
 - **Responsibilities**: Enable/disable, whitelist, script permission, network permission, package install permission, web asset serving, and developer mode.
+- **Native behavior**: Evaluates discovered `SimExtensionRecord` values through
+  native `SimExtensionPolicy*` records, emits structured diagnostics for
+  disabled, blocked, script-denied, web-asset-denied, network-denied, and
+  install-review-required states, and requires explicit install permission plus
+  dependency review before manager-like filesystem or network writes.
 
 ### ExtensionLoader
 

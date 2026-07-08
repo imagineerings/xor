@@ -26,8 +26,9 @@ Build extension support with policy and diagnostics first. Only after disabled a
   - _Requirements: 1.1, 1.2_
   - _writes: crates/world_model/src/comfy_extensions.rs, crates/world_model/src/comfy_extensions_tests.rs_
 
-- [ ] 2. Implement extension policy and diagnostics
+- [x] 2. Implement extension policy and diagnostics
   - Add enable/disable/block/whitelist decisions, script permission, web asset permission, network/install permission, and diagnostic records.
+  - Represent policy decisions, permission reports, install review gates, and diagnostics with native `SimExtensionPolicy*` records.
   - _Requirements: 1.2, 1.3, 1.4, 3.1, 5.3_
   - _writes: crates/world_model/src/comfy_extension_policy.rs, crates/world_model/src/comfy_extension_diagnostics.rs, crates/world_model/src/comfy_extension_policy_tests.rs_
 
