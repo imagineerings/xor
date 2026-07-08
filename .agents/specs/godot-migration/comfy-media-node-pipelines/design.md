@@ -36,6 +36,11 @@ flowchart TD
 
 - **Purpose**: Implement deterministic image, mask, post-processing, and GLSL-backed operations.
 - **Responsibilities**: Tensor/bitmap conversion, metadata preservation, alpha handling, batch shapes, and safe file outputs.
+- **Native behavior**: Uses `SimImage*` and `SimMask*` adapters to preserve
+  image/mask shapes, batches, metadata, save formats, GLSL dependency metadata,
+  and validation diagnostics. Comfy node IDs are accepted as compatibility
+  inputs through the capability registry, but transforms are represented as
+  native Sim media operations.
 
 ### VideoOps
 
@@ -77,6 +82,18 @@ pub struct SimMediaNodeCapability {
     pub backend: SimMediaBackendRequirement,
     pub native_sim_handler: String,
     pub developer_only: bool,
+}
+
+pub struct SimImageArtifact {
+    pub shape: SimImageShape,
+    pub metadata: BTreeMap<String, String>,
+    pub glsl_dependencies: Vec<SimGlslDependency>,
+}
+
+pub struct SimMaskArtifact {
+    pub shape: SimMaskShape,
+    pub inverted: bool,
+    pub feather_radius: u32,
 }
 ```
 

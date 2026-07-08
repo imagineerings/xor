@@ -60,7 +60,9 @@ pub mod sim_assets;
 pub mod sim_dependency_review;
 pub mod sim_diagnostics_adapter;
 pub mod sim_feature_flags;
+pub mod sim_image_nodes;
 pub mod sim_launch_profile;
+pub mod sim_mask_nodes;
 pub mod sim_media_capabilities;
 pub mod sim_packaging_profiles;
 pub mod sim_user_data;
@@ -164,6 +166,8 @@ mod sim_dependency_review_tests;
 mod sim_diagnostics_adapter_tests;
 #[cfg(test)]
 mod sim_feature_flags_tests;
+#[cfg(test)]
+mod sim_image_nodes_tests;
 #[cfg(test)]
 mod sim_launch_profile_tests;
 #[cfg(test)]
@@ -424,6 +428,11 @@ pub use sim_feature_flags::{
     SimFeatureFlagDiagnostic, SimFeatureFlagDiagnosticSeverity, SimFeatureFlagRegistry,
     SimFeatureFlags, SimPackageKind, SimPackageRequirement, UPLOAD_SIZE_FLAG, coerce_flag_value,
 };
+pub use sim_image_nodes::{
+    SIM_IMAGE_INVALID_REGION_CODE, SIM_IMAGE_SHAPE_MISMATCH_CODE, SimGlslDependency,
+    SimImageArtifact, SimImageColorSpace, SimImageFlipAxis, SimImageFormat, SimImageNodeAdapter,
+    SimImageNodeDiagnostic, SimImageRegion, SimImageShape,
+};
 pub use sim_launch_profile::{
     LAUNCH_PROFILE_INVALID_OPTION_CODE, LAUNCH_PROFILE_UNSUPPORTED_OPTION_CODE,
     SimApiNodeLaunchOptions, SimAssetLaunchOptions, SimCacheLaunchOptions,
@@ -431,6 +440,10 @@ pub use sim_launch_profile::{
     SimLaunchDiagnostic, SimLaunchDiagnosticSeverity, SimLaunchProfile, SimLaunchProfileParser,
     SimLoggingLaunchOptions, SimManagerLaunchOptions, SimNetworkLaunchOptions,
     SimPerformanceLaunchOptions,
+};
+pub use sim_mask_nodes::{
+    SIM_MASK_SHAPE_MISMATCH_CODE, SimMaskArtifact, SimMaskNodeAdapter, SimMaskNodeDiagnostic,
+    SimMaskShape,
 };
 pub use sim_media_capabilities::{
     SIM_MEDIA_DEPENDENCY_REVIEW_REQUIRED_CODE, SIM_MEDIA_UNSUPPORTED_BACKEND_CODE,

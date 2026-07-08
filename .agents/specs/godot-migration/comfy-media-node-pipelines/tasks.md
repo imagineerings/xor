@@ -26,10 +26,11 @@ Represent media functionality as capability groups and implement deterministic o
   - _Requirements: 1.1, 2.2, 3.2, 4.1, 5.1, 6.3_
   - _writes: crates/world_model/src/sim_media_capabilities.rs, crates/world_model/src/sim_media_capabilities_tests.rs_
 
-- [ ] 2. Implement image, mask, and post-processing node adapters
+- [x] 2. Implement image, mask, and post-processing node adapters
   - Add deterministic bitmap/mask transforms, batch shape preservation, alpha handling, and GLSL dependency metadata.
+  - Represent image and mask artifacts, shapes, deterministic transforms, save formats, GLSL dependency metadata, and diagnostics with native `SimImage*` and `SimMask*` records.
   - _Requirements: 1.1, 1.2, 1.3_
-  - _writes: crates/world_model/src/comfy_image_nodes.rs, crates/world_model/src/comfy_mask_nodes.rs, crates/world_model/src/comfy_image_nodes_tests.rs_
+  - _writes: crates/world_model/src/sim_image_nodes.rs, crates/world_model/src/sim_mask_nodes.rs, crates/world_model/src/sim_image_nodes_tests.rs_
 
 - [ ] 3. Implement video node adapters and diagnostics
   - Add load/create/save/slice metadata handling and backend diagnostics for interpolation, stitching, merging, upscaling, inpaint, caption, depth, pose, face, and segmentation nodes.
