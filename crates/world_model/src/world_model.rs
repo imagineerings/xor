@@ -29,6 +29,8 @@ pub mod comfy_sampling;
 pub mod comfy_schema;
 pub mod comfy_vae;
 pub mod comfy_worker_execution;
+pub mod comfy_workflow_export;
+pub mod comfy_workflows;
 pub mod comfy_world_model_profiles;
 pub mod comfy_ws;
 pub mod controls;
@@ -96,6 +98,8 @@ mod comfy_sampling_tests;
 mod comfy_schema_tests;
 #[cfg(test)]
 mod comfy_worker_execution_tests;
+#[cfg(test)]
+mod comfy_workflows_tests;
 #[cfg(test)]
 mod comfy_ws_tests;
 #[cfg(test)]
@@ -233,6 +237,13 @@ pub use comfy_worker_execution::{
     ComfyWorker, ComfyWorkerExecutionAdapter, WorkerCapabilityProfile, WorkerExecutionDiagnostic,
     WorkerExecutionReport, WorkerExecutionRequest, WorkerOutputArtifact, WorkerPreview,
     WorkerTerminalState,
+};
+pub use comfy_workflow_export::{
+    ComfyWorkflowApiExporter, ComfyWorkflowExportDiagnostic, INVALID_WORKFLOW_GRAPH_CODE,
+};
+pub use comfy_workflows::{
+    ComfyWorkflowDiagnostic, ComfyWorkflowDocument, ComfyWorkflowId, ComfyWorkflowSource,
+    ComfyWorkflowStore, ComfyWorkflowVersionId, ComfyWorkflowView, WORKFLOW_NOT_FOUND_CODE,
 };
 pub use comfy_world_model_profiles::{
     ComfyWorldModelProfileBuilder, WorldModelProfileDiagnostic, WorldModelRunnerProfile,

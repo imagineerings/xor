@@ -26,8 +26,9 @@ Import shipped blueprints first, then add workflow persistence and API export, t
   - _Requirements: 1.1, 1.2, 1.3_
   - _writes: crates/world_model/src/comfy_blueprints.rs, crates/world_model/fixtures/comfy/blueprints_manifest.json, crates/world_model/src/comfy_blueprints_tests.rs_
 
-- [ ] 2. Implement workflow store and API export
+- [x] 2. Implement workflow store and API export
   - Load/save workflow documents, preserve UI metadata, and emit API prompt graphs for execution.
+  - Preserve workflow source, versions, default view, provenance links, graph JSON, and export diagnostics as native Sim records without ComfyUI pass-through.
   - _Requirements: 2.1, 2.2, 2.3_
   - _writes: crates/world_model/src/comfy_workflows.rs, crates/world_model/src/comfy_workflow_export.rs, crates/world_model/src/comfy_workflows_tests.rs_
 

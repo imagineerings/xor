@@ -33,6 +33,11 @@ flowchart LR
 
 - **Purpose**: Persist workflows and versions in Sim project storage.
 - **Responsibilities**: Load, save, API export, metadata preservation, provenance links, and default view handling.
+- **Native workflow records**: Workflow documents preserve graph JSON, UI
+  metadata, default view, source references, version ids, and optional Sim
+  provenance artifact links. API export converts saved workflow node/link
+  records into the prompt graph shape accepted by the native runtime control
+  plane instead of forwarding export to ComfyUI.
 
 ```rust
 pub trait WorkflowStore {
@@ -123,6 +128,6 @@ _For any_ generated file import, metadata extraction failure SHALL NOT block ass
 
 - Import tests over the full 89-entry `projects/comfy/blueprints` fixture list.
 - Snapshot tests for blueprint catalog entries and subgraph ids.
-- Round-trip tests for workflow load/save/API export.
+- Round-trip tests for workflow load/save/API export through native Sim records.
 - Replacement tests shared with `comfy-graph-node-runtime/`.
 - Metadata extraction tests for supported generated-file metadata containers.
