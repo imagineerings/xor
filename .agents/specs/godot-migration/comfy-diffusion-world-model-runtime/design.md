@@ -100,12 +100,23 @@ pub struct DeterministicRunMetadata {
 }
 
 pub struct ConditioningBundle {
+    pub id: ConditioningBundleId,
     pub encoder: EncoderIdentity,
     pub token_embeddings: TensorDescriptor,
     pub pooled_output: Option<TensorDescriptor>,
-    pub attention_metadata: JsonObject,
+    pub attention_metadata: AttentionMetadata,
+    pub source_prompts: Vec<PromptMetadata>,
     pub regions: Vec<ConditioningRegion>,
     pub control_attachments: Vec<ControlAttachment>,
+    pub transforms: Vec<ConditioningTransform>,
+}
+
+pub struct ConditioningRuntimeContext {
+    pub sampler: SamplerId,
+    pub guidance: GuidanceMode,
+    pub latent_format: LatentFormat,
+    pub backend: DeviceBackend,
+    pub worker_supports_control_attachments: bool,
 }
 
 pub struct ModelFamilyExecutionProfile {
@@ -132,6 +143,12 @@ pub struct DivergenceRecord {
     pub sim_behavior: String,
 }
 ```
+
+Conditioning records are native Sim data structures. They preserve
+Comfy-compatible conditioning semantics for interoperability, but validation and
+worker handoff use typed Sim bundle, tensor, prompt, region, transform, and
+control-attachment records instead of passing opaque Comfy payloads through the
+runtime.
 
 ## Correctness Properties
 

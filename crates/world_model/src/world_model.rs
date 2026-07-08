@@ -1,4 +1,5 @@
 pub mod artifact;
+pub mod comfy_conditioning;
 pub mod comfy_execution_registry;
 pub mod comfy_model_catalog;
 pub mod comfy_model_family;
@@ -20,6 +21,8 @@ pub mod session;
 
 #[cfg(test)]
 mod artifact_tests;
+#[cfg(test)]
+mod comfy_conditioning_tests;
 #[cfg(test)]
 mod comfy_execution_registry_tests;
 #[cfg(test)]
@@ -50,6 +53,13 @@ mod session_tests;
 mod tests;
 
 pub use artifact::{GeneratedWorldArtifact, GeneratedWorldArtifactError};
+pub use comfy_conditioning::{
+    AttentionMetadata, ComfyConditioningRuntime, ConditioningArea, ConditioningBundle,
+    ConditioningMask, ConditioningRegion, ConditioningRuntimeContext, ConditioningTransform,
+    ConditioningTransformKind, ConditioningValidationDiagnostic, ControlAttachment,
+    ControlAttachmentKind, EMPTY_BUNDLE_CODE, EMPTY_TENSOR_CODE, EncoderIdentity, EncoderKind,
+    InpaintConditioning, PromptMetadata, PromptRole, TensorDescriptor, TensorDtype,
+};
 pub use comfy_execution_registry::{
     ComfyExecutionRegistry, DivergenceReason, DivergenceRecord, ExecutionBehaviorKey,
     GuidanceCapability, GuidanceMode, ModelFamilyExecutionProfile, SamplerCapability, SamplerKind,

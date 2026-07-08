@@ -30,8 +30,8 @@ Implement Comfy model-execution semantics after model catalogs and graph validat
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
   - _writes: crates/world_model/src/comfy_sampling.rs, crates/world_model/src/comfy_sampling_tests.rs_
 
-- [ ] 3. Implement conditioning runtime semantics
-  - Preserve text, vision, pooled, attention, area, mask, range, inpaint, ControlNet, GLIGEN, style, unCLIP, IP-adapter, reference, pose, depth, segmentation, and camera/control metadata.
+- [x] 3. Implement conditioning runtime semantics
+  - Preserve text, vision, pooled, attention, area, mask, range, inpaint, ControlNet, GLIGEN, style, unCLIP, IP-adapter, reference, pose, depth, segmentation, and camera/control metadata as native Sim conditioning bundles and validation records rather than Comfy pass-through payloads.
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
   - _writes: crates/world_model/src/comfy_conditioning.rs, crates/world_model/src/comfy_conditioning_tests.rs_
 
