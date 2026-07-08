@@ -5,12 +5,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{
-    ASSET_CONTENT_NOT_FOUND_CODE, ASSET_REFERENCE_NOT_FOUND_CODE, ComfyAssetContentRecord,
-    ComfyAssetDiagnostic, ComfyAssetHash, ComfyAssetListQuery, ComfyAssetMetadataFilter,
-    ComfyAssetMetadataNamespace, ComfyAssetOrder, ComfyAssetOwnerId, ComfyAssetReferenceId,
-    ComfyAssetReferencePatch, ComfyAssetReferenceRecord, ComfyAssetReferenceRequest,
-    ComfyAssetRepository, ComfyAssetSort, ComfyAssetUploadDiagnostic, ComfyAssetUploadRequest,
-    ComfyAssetValidatedHash, normalize_asset_tag,
+    ASSET_CONTENT_NOT_FOUND_CODE, ASSET_REFERENCE_NOT_FOUND_CODE, ComfyAssetCacheState,
+    ComfyAssetContentRecord, ComfyAssetDiagnostic, ComfyAssetHash, ComfyAssetListQuery,
+    ComfyAssetMetadataFilter, ComfyAssetMetadataNamespace, ComfyAssetOrder, ComfyAssetOwnerId,
+    ComfyAssetReferenceId, ComfyAssetReferencePatch, ComfyAssetReferenceRecord,
+    ComfyAssetReferenceRequest, ComfyAssetRepository, ComfyAssetSort, ComfyAssetUploadDiagnostic,
+    ComfyAssetUploadRequest, ComfyAssetValidatedHash, normalize_asset_tag,
 };
 
 pub const ASSET_API_FORBIDDEN_CODE: &str = "world_model.comfy_assets.forbidden";
@@ -62,6 +62,7 @@ pub struct ComfyAssetUpdateRequest {
     pub tags: Option<Vec<String>>,
     pub preview_id: Option<Option<ComfyAssetReferenceId>>,
     pub user_metadata: Option<BTreeMap<String, Value>>,
+    pub cache_state: Option<ComfyAssetCacheState>,
 }
 
 impl ComfyAssetUpdateRequest {
@@ -100,6 +101,11 @@ impl ComfyAssetUpdateRequest {
         self
     }
 
+    pub fn with_cache_state(mut self, cache_state: ComfyAssetCacheState) -> Self {
+        self.cache_state = Some(cache_state);
+        self
+    }
+
     fn into_patch(self) -> ComfyAssetReferencePatch {
         let tags = self
             .tags
@@ -109,6 +115,7 @@ impl ComfyAssetUpdateRequest {
             tags,
             preview_id: self.preview_id,
             user_metadata: self.user_metadata,
+            cache_state: self.cache_state,
         }
     }
 }
@@ -233,6 +240,19 @@ impl ComfyAssetApi {
         self.repository
             .soft_delete_reference(owner_id, reference_id)
             .map_err(Into::into)
+    }
+
+    pub fn update_cache_state(
+        &mut self,
+        owner_id: &ComfyAssetOwnerId,
+        reference_id: &ComfyAssetReferenceId,
+        cache_state: ComfyAssetCacheState,
+    ) -> Result<Option<ComfyAssetReferenceDetail>, ComfyAssetApiDiagnostic> {
+        self.update(
+            owner_id,
+            reference_id,
+            ComfyAssetUpdateRequest::default().with_cache_state(cache_state),
+        )
     }
 
     fn detail_for_reference(

@@ -3,6 +3,8 @@ pub mod comfy_app_mode;
 pub mod comfy_asset_api;
 pub mod comfy_asset_download;
 pub mod comfy_asset_query;
+pub mod comfy_asset_scanner;
+pub mod comfy_asset_seeder;
 pub mod comfy_asset_tags;
 pub mod comfy_asset_upload;
 pub mod comfy_assets;
@@ -66,6 +68,8 @@ mod comfy_asset_api_tests;
 mod comfy_asset_download_tests;
 #[cfg(test)]
 mod comfy_asset_query_tests;
+#[cfg(test)]
+mod comfy_asset_scanner_tests;
 #[cfg(test)]
 mod comfy_assets_tests;
 #[cfg(test)]
@@ -171,6 +175,13 @@ pub use comfy_asset_query::{
     ComfyAssetListQuery, ComfyAssetMetadataFilter, ComfyAssetMetadataNamespace,
     ComfyAssetMetadataOperator, ComfyAssetOrder, ComfyAssetOwnerScope, ComfyAssetPagination,
     ComfyAssetQueryDiagnostic, ComfyAssetSort, ComfyAssetValidatedHash, normalize_asset_tag,
+};
+pub use comfy_asset_scanner::{
+    ComfyAssetFilesystemScanner, ComfyAssetScanRoot, ComfyAssetScanRootKind, ComfyAssetScannedFile,
+};
+pub use comfy_asset_seeder::{
+    ASSET_SEED_MISSING_ROOT_CODE, ComfyAssetSeedDiagnostic, ComfyAssetSeedProgress,
+    ComfyAssetSeedReport, ComfyAssetSeedState, ComfyAssetSeeder,
 };
 pub use comfy_asset_tags::{
     ComfyAssetTagCount, ComfyAssetTagListQuery, ComfyAssetTagMutationReport, ComfyAssetTagService,

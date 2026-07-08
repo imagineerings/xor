@@ -50,8 +50,9 @@ Build the asset library as shared storage primitives plus Comfy-compatible route
   - _Requirements: 3.1, 3.2, 3.3, 5.1, 5.2, 5.3, 5.4_
   - _writes: crates/world_model/src/comfy_asset_tags.rs, crates/world_model/src/comfy_user_data.rs, crates/world_model/src/comfy_user_data_tests.rs_
 
-- [ ] 6. Implement asset seeding and pruning
+- [x] 6. Implement asset seeding and pruning
   - Scan models/input/output roots, report progress, support cancellation, and mark missing references outside known roots.
+  - Register scans and prune missing references through native Sim asset APIs and cache state without invoking ComfyUI scanner or pruning code.
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
   - _writes: crates/world_model/src/comfy_asset_seeder.rs, crates/world_model/src/comfy_asset_scanner.rs, crates/world_model/src/comfy_asset_scanner_tests.rs_
 

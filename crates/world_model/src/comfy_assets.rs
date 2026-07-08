@@ -148,6 +148,7 @@ pub struct ComfyAssetReferencePatch {
     pub tags: Option<BTreeSet<String>>,
     pub preview_id: Option<Option<ComfyAssetReferenceId>>,
     pub user_metadata: Option<BTreeMap<String, serde_json::Value>>,
+    pub cache_state: Option<ComfyAssetCacheState>,
 }
 
 impl ComfyAssetReferencePatch {
@@ -171,11 +172,17 @@ impl ComfyAssetReferencePatch {
         self
     }
 
+    pub fn with_cache_state(mut self, cache_state: ComfyAssetCacheState) -> Self {
+        self.cache_state = Some(cache_state);
+        self
+    }
+
     pub fn is_empty(&self) -> bool {
         self.name.is_none()
             && self.tags.is_none()
             && self.preview_id.is_none()
             && self.user_metadata.is_none()
+            && self.cache_state.is_none()
     }
 }
 
@@ -360,6 +367,9 @@ impl ComfyAssetRepository {
         }
         if let Some(user_metadata) = patch.user_metadata {
             reference.user_metadata = user_metadata;
+        }
+        if let Some(cache_state) = patch.cache_state {
+            reference.cache_state = cache_state;
         }
         reference.updated_at_ms = now;
         Ok(Some(reference.clone()))

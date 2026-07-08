@@ -60,6 +60,10 @@ pub trait AssetRepository {
 
 - **Purpose**: Synchronize filesystem roots into asset records.
 - **Responsibilities**: Scan models/input/output roots, pause during generation, resume after output registration, report progress, cancel, and prune missing references.
+- **Native seeding and pruning**: Model, input, and output root scans
+  register files through Sim asset APIs with progress, cancellation, and
+  diagnostics. Prune marks out-of-root references missing in Sim cache state
+  without deleting content or invoking ComfyUI scanners.
 
 ### MetadataExtractor
 
@@ -152,4 +156,5 @@ _For any_ prune operation, references outside known roots SHALL be marked missin
   cache state, provenance ids, and tag histograms.
 - API tests for upload, download, create-from-hash, CRUD, preview resolution,
   tags, user data, settings, seed status, cancel, and prune.
-- Scanner tests for models/input/output roots, missing files, enrichment, and output registration.
+- Scanner tests for models/input/output roots, missing files, cancellation,
+  pruning, enrichment, and output registration.
