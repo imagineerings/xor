@@ -32,7 +32,7 @@ Extend sim's observability infrastructure with Langfuse tracing, OpenTelemetry O
   - _Requirements: 2_
   - _writes: crates/telemetry/src/otel.rs_
 
-- [ ] 4. Implement observation layer
+- [x] 4. Implement observation layer
   - Record agent turns, tool calls, LLM requests with timing
   - Configurable max observations with circular buffer
   - Export observations to registered telemetry backends
