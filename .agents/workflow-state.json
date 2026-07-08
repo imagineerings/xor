@@ -1,26 +1,21 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T10:37:32.657Z",
+  "updated_at": "2026-07-08T10:55:27.137Z",
   "repo_revision": null,
   "recommendation": {
-    "task_id": "task:6a9371a824e8",
-    "task_identifier": ".agents/specs/goose-migration/dictation/tasks.md:42",
-    "title": "Integrate dictation into agent and UI",
-    "rationale": "Next dictation migration task after microphone capture, provider trait, Whisper, cloud providers, and dictation service are complete. It exposes the completed dictation service through agent and CLI entry points.",
+    "task_id": null,
+    "task_identifier": null,
+    "title": "Deprioritize CI migration tasks",
+    "rationale": "User requested that all tasks under .agents/specs/ci-migration remain deprioritized until all other local workflow tasks are complete.",
     "evidence": [
-      "Dictation tasks 1 through 5 are checked complete in .agents/specs/goose-migration/dictation/tasks.md",
-      "Task 6 writes a narrow agent/CLI integration surface: crates/agent/src/tools/dictation_tool.rs and crates/cli/src/commands/dictation.rs",
-      "Linear issue SIM-23 was created and moved to In Progress"
+      "The previous CI workflow restore is being reverted.",
+      "Future workflow selection should skip .agents/specs/ci-migration tasks while non-CI local tasks remain available."
     ],
     "stale_if_changed": [
-      ".agents/specs/goose-migration/dictation/tasks.md",
-      ".agents/specs/goose-migration/dictation/design.md",
-      ".agents/specs/goose-migration/dictation/requirements.md",
-      "crates/dictation/src/service.rs",
-      "crates/agent/src/tools/dictation_tool.rs",
-      "crates/cli/src/commands/dictation.rs"
+      ".agents/specs/ci-migration/tasks.md",
+      ".agents/workflow-state.json"
     ],
-    "updated_at": "2026-07-08T06:39:15.099Z"
+    "updated_at": "2026-07-08T10:55:27.137Z"
   },
   "task_activity": [
     {
@@ -84,10 +79,10 @@
       "title": "Create post-generation safety check in CI (optional, if xtask cannot be modified)",
       "linear_identifier": "SIM-11",
       "linear_url": "https://linear.app/simtropolis/issue/SIM-11/create-post-generation-safety-check-in-ci-optional-if-xtask-cannot-be",
-      "status": "active",
+      "status": "inactive",
       "owner": null,
-      "summary": null,
-      "updated_at": "2026-07-05T23:02:37.640Z"
+      "summary": "Deprioritized by user request; do not resume CI migration work until all other local workflow tasks are complete.",
+      "updated_at": "2026-07-08T10:55:27.137Z"
     },
     {
       "task_id": "task:b63c03dcd4cb",
@@ -198,17 +193,6 @@
       "owner": null,
       "summary": "Completed by workflow command.",
       "updated_at": "2026-07-08T10:24:56.755Z"
-    },
-    {
-      "task_id": "task:622d009360df",
-      "task_identifier": ".agents/specs/ci-migration/tasks.md:39",
-      "title": "Restore `run_bundling.yml`",
-      "linear_identifier": "SIM-24",
-      "linear_url": "https://linear.app/simtropolis/issue/SIM-24/restore-run-bundlingyml",
-      "status": "active",
-      "owner": null,
-      "summary": null,
-      "updated_at": "2026-07-08T10:37:32.657Z"
     }
   ],
   "task_notes": [
@@ -241,6 +225,12 @@
       "status": "claimed",
       "summary": "Task 2: Create dictation crate with provider trait. Claimed as SIM-16 and implemented with a new dictation crate, provider trait, AudioFormat, DictationConfig, cloud config, and provider error types.",
       "updated_at": "2026-07-05T22:35:06.021Z"
+    },
+    {
+      "task_identifier": ".agents/specs/ci-migration/tasks.md",
+      "status": "deprioritized",
+      "summary": "All tasks in .agents/specs/ci-migration are deprioritized until every other local workflow task is complete. Do not select CI migration work while non-CI tasks remain available.",
+      "updated_at": "2026-07-08T10:55:27.137Z"
     }
   ],
   "dependency_notes": [
@@ -258,9 +248,27 @@
       "scope": ".agents/specs/godot-migration",
       "summary": "W1 shared foundations complete (tasks 1-12). Next ready task is #4 (Godot workspace integration registration, W2). The sub-specs (agentic-game-tools, world-model-runtime, etc.) can be started after task 4 or in parallel where writes don't overlap.",
       "updated_at": "2026-07-07T00:00:00Z"
+    },
+    {
+      "scope": ".agents/specs/ci-migration",
+      "summary": "Deprioritized by user request: skip CI migration tasks until all other specs have no remaining active local tasks. This includes restoring archived workflows such as run_bundling.yml and release_nightly.yml.",
+      "updated_at": "2026-07-08T10:55:27.137Z"
     }
   ],
   "ranked_candidates": [
+    {
+      "task_id": null,
+      "task_identifier": ".agents/specs/ci-migration/tasks.md",
+      "title": "CI migration tasks deprioritized",
+      "rank": 999,
+      "rationale": "Skip CI migration candidates until all other local workflow tasks are complete.",
+      "blockers": [
+        "User-requested priority policy"
+      ],
+      "evidence": [
+        "All .agents/specs/ci-migration tasks are deprioritized by current workflow-state policy."
+      ]
+    },
     {
       "task_id": "task:6a9371a824e8",
       "task_identifier": ".agents/specs/goose-migration/dictation/tasks.md:42",
