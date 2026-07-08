@@ -39,6 +39,30 @@ const TOOLS: &[ToolInfo] = &[
         regex_explanation: "Patterns are matched against the file path being written.",
     },
     ToolInfo {
+        id: "pdf_tool",
+        name: "PDF Tool",
+        description: "PDF document creation and modification operations",
+        regex_explanation: "Patterns are matched against the PDF file path being written or read.",
+    },
+    ToolInfo {
+        id: "docx_tool",
+        name: "DOCX Tool",
+        description: "DOCX document creation and modification operations",
+        regex_explanation: "Patterns are matched against the DOCX file path being written or read.",
+    },
+    ToolInfo {
+        id: "xlsx_tool",
+        name: "XLSX Tool",
+        description: "XLSX workbook creation and read operations",
+        regex_explanation: "Patterns are matched against the XLSX file path being written or read.",
+    },
+    ToolInfo {
+        id: "platform_tool",
+        name: "Platform Tool",
+        description: "Platform-specific desktop operations",
+        regex_explanation: "Patterns are matched against the path passed to the platform operation.",
+    },
+    ToolInfo {
         id: "delete_path",
         name: "Delete Path",
         description: "File and directory deletion",

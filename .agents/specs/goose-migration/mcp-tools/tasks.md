@@ -12,17 +12,17 @@ Implement the MCP tool servers from goose as a combination of native agent tools
   - _Requirements: 6_
   - _writes: crates/mcp_runner/src/lib.rs_
 
-- [ ] 2. Implement Computer Controller native tools
-  - [ ] 2.1 PDF tool — create, read, modify PDFs using `printpdf` or similar
+- [x] 2. Implement Computer Controller native tools
+  - [x] 2.1 PDF tool — create, read, modify PDFs using `printpdf` or similar
     - _Requirements: 1.1_
     - _writes: crates/agent/src/tools/pdf_tool.rs_
-  - [ ] 2.2 DOCX tool — create, read, modify DOCX files
+  - [x] 2.2 DOCX tool — create, read, modify DOCX files
     - _Requirements: 1.2_
     - _writes: crates/agent/src/tools/docx_tool.rs_
-  - [ ] 2.3 XLSX tool — create, read, modify XLSX files
+  - [x] 2.3 XLSX tool — create, read, modify XLSX files
     - _Requirements: 1.3_
     - _writes: crates/agent/src/tools/xlsx_tool.rs_
-  - [ ] 2.4 Platform automation tool — OS-specific operations
+  - [x] 2.4 Platform automation tool — OS-specific operations
     - _Requirements: 1.4_
     - _writes: crates/agent/src/tools/platform_tool.rs_
 

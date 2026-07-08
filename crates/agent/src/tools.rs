@@ -7,6 +7,7 @@ mod create_thread_tool;
 mod delete_path_tool;
 mod diagnostics_tool;
 mod dictation_tool;
+mod docx_tool;
 mod edit_file_tool;
 mod edit_session;
 #[cfg(all(test, feature = "unit-eval"))]
@@ -22,7 +23,9 @@ mod list_agents_and_models_tool;
 mod list_directory_tool;
 mod move_path_tool;
 mod orchestrator;
+mod pdf_tool;
 mod platform_extension_tools;
+mod platform_tool;
 mod read_file_tool;
 mod rename_tool;
 mod skill_tool;
@@ -34,6 +37,7 @@ mod todo;
 mod tool_permissions;
 mod web_search_tool;
 mod write_file_tool;
+mod xlsx_tool;
 
 use crate::AgentTool;
 use feature_flags::{
@@ -78,6 +82,7 @@ pub use create_thread_tool::*;
 pub use delete_path_tool::*;
 pub use diagnostics_tool::*;
 pub use dictation_tool::*;
+pub use docx_tool::*;
 pub use edit_file_tool::*;
 pub use fetch_tool::*;
 pub use final_output_tool::*;
@@ -90,7 +95,9 @@ pub use list_agents_and_models_tool::*;
 pub use list_directory_tool::*;
 pub use move_path_tool::*;
 pub use orchestrator::*;
+pub use pdf_tool::*;
 pub use platform_extension_tools::*;
+pub use platform_tool::*;
 pub use read_file_tool::*;
 pub use rename_tool::*;
 pub use skill_tool::*;
@@ -102,6 +109,7 @@ pub use todo::*;
 pub use tool_permissions::*;
 pub use web_search_tool::*;
 pub use write_file_tool::*;
+pub use xlsx_tool::*;
 
 macro_rules! tools {
     ($($tool:ty),* $(,)?) => {
@@ -199,6 +207,7 @@ tools! {
     DeveloperTool,
     DiagnosticsTool,
     DictationTool,
+    DocxTool,
     EditFileTool,
     FetchTool,
     FinalOutputTool,
@@ -211,6 +220,8 @@ tools! {
     ListDirectoryTool,
     MovePathTool,
     OrchestratorTool,
+    PdfTool,
+    PlatformTool,
     ReadFileTool,
     RenameTool,
     SkillTool,
@@ -222,6 +233,7 @@ tools! {
     SummonTool,
     WebSearchTool,
     WriteFileTool,
+    XlsxTool,
 }
 
 /// Some built-in tools are gated behind a feature flag and only become usable

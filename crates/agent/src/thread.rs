@@ -2,13 +2,14 @@ use crate::{
     AgentHook, AgentHookContext, AgentHooks, AnalyzeTool, ApplyCodeActionTool, AppsTool,
     ChatrecallTool, CodeActionStore, CodeExecutionTool, ContextServerRegistry, CopyPathTool,
     CreateDirectoryTool, CreateThreadTool, DbLanguageModel, DbThread, DeletePathTool,
-    DeveloperTool, DiagnosticsTool, DictationTool, EditFileTool, FetchTool, FinalOutputTool, FindPathTool,
-    FindReferencesTool, GetCodeActionsTool, GoToDefinitionTool, GrepTool, HookFlow,
-    ListAgentsAndModelsTool, ListDirectoryTool, LlmCallHookContext, LlmRequestHookFlow,
-    MovePathTool, OrchestratorTool, ProjectSnapshot, ReadFileTool, RenameTool,
-    SandboxedTerminalTool, SessionHookContext, SpawnAgentTool, SummarizeTool, SummonTool,
-    SystemPromptTemplate, Template, Templates, TerminalTool, TodoTool, TomTool, ToolHookContext,
-    ToolPermissionDecision, WebSearchTool, WriteFileTool, decide_permission_from_settings,
+    DeveloperTool, DiagnosticsTool, DictationTool, DocxTool, EditFileTool, FetchTool,
+    FinalOutputTool, FindPathTool, FindReferencesTool, GetCodeActionsTool, GoToDefinitionTool,
+    GrepTool, HookFlow, ListAgentsAndModelsTool, ListDirectoryTool, LlmCallHookContext,
+    LlmRequestHookFlow, MovePathTool, OrchestratorTool, PdfTool, PlatformTool, ProjectSnapshot,
+    ReadFileTool, RenameTool, SandboxedTerminalTool, SessionHookContext, SpawnAgentTool,
+    SummarizeTool, SummonTool, SystemPromptTemplate, Template, Templates, TerminalTool, TodoTool,
+    TomTool, ToolHookContext, ToolPermissionDecision, WebSearchTool, WriteFileTool, XlsxTool,
+    decide_permission_from_settings,
 };
 use acp_thread::{MentionUri, UserMessageId};
 use action_log::ActionLog;
@@ -38,12 +39,12 @@ use gpui::{
 };
 use heck::ToSnakeCase as _;
 use language_model::{
-    SIM_CLOUD_PROVIDER_ID, CompletionIntent, LanguageModel, LanguageModelCompletionError,
-    LanguageModelCompletionEvent, LanguageModelId, LanguageModelImage, LanguageModelProviderId,
-    LanguageModelRegistry, LanguageModelRequest, LanguageModelRequestMessage,
-    LanguageModelRequestTool, LanguageModelToolResult, LanguageModelToolResultContent,
-    LanguageModelToolSchemaFormat, LanguageModelToolUse, LanguageModelToolUseId, MessageContent,
-    Role, SelectedModel, Speed, StopReason, TokenUsage,
+    CompletionIntent, LanguageModel, LanguageModelCompletionError, LanguageModelCompletionEvent,
+    LanguageModelId, LanguageModelImage, LanguageModelProviderId, LanguageModelRegistry,
+    LanguageModelRequest, LanguageModelRequestMessage, LanguageModelRequestTool,
+    LanguageModelToolResult, LanguageModelToolResultContent, LanguageModelToolSchemaFormat,
+    LanguageModelToolUse, LanguageModelToolUseId, MessageContent, Role, SIM_CLOUD_PROVIDER_ID,
+    SelectedModel, Speed, StopReason, TokenUsage,
 };
 use project::Project;
 use prompt_store::ProjectContext;
@@ -1962,6 +1963,10 @@ impl Thread {
         ));
         self.add_tool(WebSearchTool);
         self.add_tool(DictationTool);
+        self.add_tool(PdfTool);
+        self.add_tool(DocxTool);
+        self.add_tool(XlsxTool);
+        self.add_tool(PlatformTool);
         self.add_tool(FinalOutputTool);
         self.add_tool(CodeExecutionTool);
         self.add_tool(OrchestratorTool);
