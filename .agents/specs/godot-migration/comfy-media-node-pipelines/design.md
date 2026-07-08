@@ -77,6 +77,12 @@ flowchart TD
 
 - **Purpose**: Expose detection, segmentation, depth, pose, flow, and tracking outputs as typed control signals.
 - **Responsibilities**: Port types, backend capability checks, and downstream compatibility validation.
+- **Native behavior**: Uses `SimControlSignal*` adapters to preserve typed
+  outputs for canny, pose, keypoints, bounding boxes, face landmarks,
+  segmentation, detection, depth, geometry, optical flow, camera trajectory,
+  and tracking. Downstream graph checks validate `SimControlTargetKind`
+  compatibility before execution, and backend gaps surface native Sim
+  diagnostics for unsupported or dependency-review-required analysis engines.
 
 ## Data Models
 
@@ -126,6 +132,13 @@ pub struct SimThreeDArtifact {
     pub reference: String,
     pub kind: SimThreeDArtifactKind,
     pub metadata: SimThreeDMetadata,
+}
+
+pub struct SimControlSignalArtifact {
+    pub reference: String,
+    pub kind: SimControlSignalKind,
+    pub port_type: SimMediaPortType,
+    pub metadata: SimControlSignalMetadata,
 }
 ```
 

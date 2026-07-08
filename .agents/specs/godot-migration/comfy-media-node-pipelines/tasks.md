@@ -50,10 +50,11 @@ Represent media functionality as capability groups and implement deterministic o
   - _Requirements: 4.1, 4.2, 4.3_
   - _writes: crates/world_model/src/sim_3d_nodes.rs, crates/world_model/src/sim_3d_nodes_tests.rs_
 
-- [ ] 6. Implement analysis and control signal adapters
+- [x] 6. Implement analysis and control signal adapters
   - Add typed outputs and graph validation compatibility for canny, pose, bounding boxes, face landmarks, segmentation, detection, depth, optical flow, tracking, and camera controls.
+  - Represent analysis output kinds, typed media ports, target compatibility, backend status, metadata, and diagnostics with native `SimControlSignal*` records.
   - _Requirements: 5.1, 5.2_
-  - _writes: crates/world_model/src/comfy_control_signal_nodes.rs, crates/world_model/src/comfy_control_signal_nodes_tests.rs_
+  - _writes: crates/world_model/src/sim_control_signal_nodes.rs, crates/world_model/src/sim_control_signal_nodes_tests.rs_
 
 - [ ] 7. Implement utility and dataset node adapters
   - Add deterministic string, regex, JSON, math, primitive, logic, seed, and path-confined dataset operations.
