@@ -8,7 +8,7 @@ API provider nodes are normalized as policy-gated world-model harness remote exe
 
 ```mermaid
 flowchart TD
-    Registry[ProviderNodeRegistry] --> Connector[ProviderConnector]
+    Registry[SimProviderNodeRegistry] --> Connector[ProviderConnector]
     Connector --> Secrets[Sim Secrets]
     Connector --> Upload[ProviderUploadService]
     Connector --> Remote[RemoteTaskTracker]
@@ -19,10 +19,15 @@ flowchart TD
 
 ## Components and Interfaces
 
-### ProviderNodeRegistry
+### SimProviderNodeRegistry
 
 - **Purpose**: Map Comfy API node ids to provider capabilities and connector implementations.
 - **Responsibilities**: Enabled/disabled policy, node schemas, capability metadata, and unsupported diagnostics.
+- **Native behavior**: Stores Comfy node ids as compatibility keys but exposes
+  native `SimProvider*` definitions, provider ids, capability metadata, schema
+  refs, credential keys, cost/rate metadata, enabled/disabled policy, and
+  unsupported diagnostics. Registry support must not mean forwarding provider
+  execution to ComfyUI.
 
 ### ProviderConnector
 
@@ -57,7 +62,7 @@ pub trait ProviderConnector {
 ## Data Models
 
 ```rust
-pub enum ProviderCapability {
+pub enum SimProviderCapability {
     TextToImage,
     ImageEdit,
     TextToVideo,
@@ -71,9 +76,9 @@ pub enum ProviderCapability {
 }
 
 pub struct ProviderNodeRequest {
-    pub provider: ProviderId,
+    pub provider: SimProviderId,
     pub node_id: NodeId,
-    pub capability: ProviderCapability,
+    pub capability: SimProviderCapability,
     pub inputs: JsonObject,
     pub source_assets: Vec<AssetReferenceId>,
     pub policy_context: ProviderPolicyContext,

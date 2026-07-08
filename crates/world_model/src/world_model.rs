@@ -68,6 +68,7 @@ pub mod sim_launch_profile;
 pub mod sim_mask_nodes;
 pub mod sim_media_capabilities;
 pub mod sim_packaging_profiles;
+pub mod sim_provider_nodes;
 pub mod sim_user_data;
 pub mod sim_utility_nodes;
 pub mod sim_video_nodes;
@@ -185,6 +186,8 @@ mod sim_launch_profile_tests;
 mod sim_media_capabilities_tests;
 #[cfg(test)]
 mod sim_packaging_profiles_tests;
+#[cfg(test)]
+mod sim_provider_nodes_tests;
 #[cfg(test)]
 mod sim_user_data_tests;
 #[cfg(test)]
@@ -492,6 +495,12 @@ pub use sim_packaging_profiles::{
     SIM_PACKAGING_PROFILE_PORTABLE_LIKE, SIM_PACKAGING_PROFILE_REMOTE_WORKER,
     SimPackagingExecutionTarget, SimPackagingProfile, SimPackagingProfileCatalog,
     SimPackagingProfileKind, SimPackagingScope,
+};
+pub use sim_provider_nodes::{
+    SIM_PROVIDER_DISABLED_CODE, SIM_PROVIDER_MISSING_CREDENTIAL_CODE,
+    SIM_PROVIDER_UNSUPPORTED_CODE, SimProviderCapability, SimProviderCostMetadata, SimProviderId,
+    SimProviderNodeAvailability, SimProviderNodeDefinition, SimProviderNodeDiagnostic,
+    SimProviderNodeRegistry,
 };
 pub use sim_user_data::{
     SimUserDataDiagnostic, SimUserDataEntry, SimUserDataPathParts, SimUserDataStore,

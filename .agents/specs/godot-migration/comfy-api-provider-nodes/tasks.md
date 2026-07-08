@@ -20,10 +20,11 @@ Create a provider-node framework before individual providers. Initial implementa
 
 ## Tasks
 
-- [ ] 1. Implement provider node registry
+- [x] 1. Implement provider node registry
   - Add provider ids, capability metadata, Comfy node id mappings, enabled/disabled policy, and unsupported diagnostics.
+  - Represent provider ids, capabilities, schema refs, credentials, cost metadata, availability policy, and diagnostics with native `SimProvider*` records.
   - _Requirements: 1.1, 1.2, 1.3, 4.1, 4.2, 4.3, 4.4, 4.5_
-  - _writes: crates/world_model/src/comfy_provider_nodes.rs, crates/world_model/src/comfy_provider_nodes_tests.rs_
+  - _writes: crates/world_model/src/sim_provider_nodes.rs, crates/world_model/src/sim_provider_nodes_tests.rs_
 
 - [ ] 2. Implement provider policy gate
   - Enforce offline mode, external data approval, cost approval, quotas, and capability availability.
