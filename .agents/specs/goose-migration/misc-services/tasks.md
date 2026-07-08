@@ -29,7 +29,7 @@ Implement the remaining smaller goose components: session import formats, Nostr 
   - _Requirements: 4_
   - _writes: examples/_
 
-- [ ] 4. Migrate development/CI scripts
+- [x] 4. Migrate development/CI scripts
   - Windows build script
   - OpenAPI schema validation script
   - Diagnostics viewer
