@@ -23,6 +23,10 @@ flowchart TD
 
 - **Purpose**: Find candidate node packs in configured roots.
 - **Responsibilities**: Directory and Python-file discovery, disabled suffix handling, whitelist filtering, manager blocklist integration, and deterministic order.
+- **Native behavior**: Produces native `SimExtension*` records for discovered
+  packs, source kinds, root indexes, load order, and skip diagnostics without
+  importing Python modules, executing prestartup scripts, or passing discovery
+  through to ComfyUI.
 
 ### ExtensionPolicy
 

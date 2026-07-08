@@ -10,6 +10,7 @@ pub mod comfy_events;
 pub mod comfy_execution_plan;
 pub mod comfy_execution_registry;
 pub mod comfy_executor;
+pub mod comfy_extensions;
 pub mod comfy_graph_validation;
 pub mod comfy_http_safety;
 pub mod comfy_jobs;
@@ -102,6 +103,8 @@ mod comfy_execution_plan_tests;
 mod comfy_execution_registry_tests;
 #[cfg(test)]
 mod comfy_executor_tests;
+#[cfg(test)]
+mod comfy_extensions_tests;
 #[cfg(test)]
 mod comfy_graph_validation_tests;
 #[cfg(test)]
@@ -262,6 +265,12 @@ pub use comfy_executor::{
     ComfyExecutionReport, ComfyExecutorDiagnostic, ComfyExecutorDispatch,
     ComfyNodeExecutionOutcome, ComfyNodeExecutionRecord, ComfyNodeExecutionState,
     ComfyNodeExecutor, ComfyNodeRuntime, ComfyUiOutput,
+};
+pub use comfy_extensions::{
+    SIM_EXTENSION_DISABLED_PACK_CODE, SIM_EXTENSION_NOT_WHITELISTED_CODE,
+    SIM_EXTENSION_ROOT_UNREADABLE_CODE, SimExtensionDiagnostic, SimExtensionDiscovery,
+    SimExtensionDiscoveryConfig, SimExtensionDiscoveryReport, SimExtensionId, SimExtensionRecord,
+    SimExtensionSourceKind,
 };
 pub use comfy_graph_validation::{ComfyPromptGraphValidator, ComfyValidationCapabilities};
 pub use comfy_http_safety::{

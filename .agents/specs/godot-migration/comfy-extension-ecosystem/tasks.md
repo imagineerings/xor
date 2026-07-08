@@ -20,8 +20,9 @@ Build extension support with policy and diagnostics first. Only after disabled a
 
 ## Tasks
 
-- [ ] 1. Implement extension discovery
+- [x] 1. Implement extension discovery
   - Find Python files and directories, skip disabled packs, apply whitelist filtering, and preserve deterministic load order.
+  - Represent discovered packs, source kinds, load order, and skip diagnostics with native `SimExtension*` records without importing or executing ComfyUI extension code.
   - _Requirements: 1.1, 1.2_
   - _writes: crates/world_model/src/comfy_extensions.rs, crates/world_model/src/comfy_extensions_tests.rs_
 
