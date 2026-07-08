@@ -396,6 +396,11 @@ impl ChannelChat {
 
             this.update_in(cx, |this, window, cx| match send_result {
                 Ok(message) => {
+                    this.pending_draft_save.take();
+                    let clear_draft = DraftStore::global(cx).update(cx, |draft_store, cx| {
+                        draft_store.clear_draft_in_background(channel_id, cx)
+                    });
+                    clear_draft.detach_and_log_err(cx);
                     this.composer.update(cx, |composer, cx| {
                         composer.clear(window, cx);
                     });

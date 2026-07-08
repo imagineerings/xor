@@ -139,6 +139,20 @@ impl DraftStore {
         Ok(())
     }
 
+    pub fn clear_draft_in_background(
+        &mut self,
+        channel_id: ChannelId,
+        cx: &mut Context<Self>,
+    ) -> Task<Result<()>> {
+        self.drafts.remove(&channel_id);
+        if self.active_draft_channel == Some(channel_id) {
+            self.active_draft_channel = None;
+        }
+        let kvp = self.kvp.clone();
+        cx.notify();
+        cx.background_spawn(async move { Self::delete_from_kvp_with(kvp, channel_id).await })
+    }
+
     pub fn has_draft(&self, channel_id: ChannelId) -> bool {
         self.drafts
             .get(&channel_id)
@@ -378,6 +392,35 @@ mod tests {
             .expect("save draft");
         store.clear_draft(channel_id).await.expect("clear draft");
 
+        assert_eq!(
+            kvp.scoped(DRAFT_NAMESPACE)
+                .read(&DraftStore::persist_key(channel_id))
+                .expect("read stored draft"),
+            None
+        );
+    }
+
+    #[gpui::test]
+    async fn clear_draft_in_background_removes_cache_and_kvp(cx: &mut gpui::TestAppContext) {
+        let kvp = KeyValueStore::open_test_db("draft_store_background_clear").await;
+        let channel_id = ChannelId(7);
+        let store = cx.update(|cx| cx.new(|_| DraftStore::new(kvp.clone())));
+
+        let save_task = cx.update(|cx| {
+            store.update(cx, |store, cx| {
+                store.save_draft_in_background(channel_id, "persisted hello".to_string(), cx)
+            })
+        });
+        save_task.await.expect("save draft");
+
+        let clear_task = cx.update(|cx| {
+            store.update(cx, |store, cx| {
+                store.clear_draft_in_background(channel_id, cx)
+            })
+        });
+        clear_task.await.expect("clear draft");
+
+        assert!(!cx.update(|cx| store.read(cx).has_draft(channel_id)));
         assert_eq!(
             kvp.scoped(DRAFT_NAMESPACE)
                 .read(&DraftStore::persist_key(channel_id))

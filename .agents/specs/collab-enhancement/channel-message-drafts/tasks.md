@@ -60,11 +60,12 @@ Add client-side draft persistence for channel message composition. When a user t
   - _writes: `crates/collab_ui/src/channel_chat.rs`, `crates/collab_ui/src/draft_store.rs`_
   - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_chat --features test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui draft_store --features test-support`_
 
-- [ ] 6. Clear draft on send
-  - In the send-message path of `ChannelView`, after successful message submission, call `DraftStore::clear_draft(channel_id)`.
+- [x] 6. Clear draft on send
+  - In the send-message path of `ChannelChat`, after successful message submission, call `DraftStore::clear_draft_in_background(channel_id)`.
   - Clear the pending auto-save task if one exists.
   - _Requirements: 7.1_
-  - _writes: `crates/collab_ui/src/channel_view.rs`_
+  - _writes: `crates/collab_ui/src/channel_chat.rs`, `crates/collab_ui/src/draft_store.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_chat --features test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui draft_store --features test-support`_
 
 ### Phase 3: Channel sidebar indicators (CollabPanel)
 
