@@ -190,6 +190,28 @@ message ChannelMessageUpdate {
   ChannelMessage message = 2;
 }
 
+message AddReaction {
+  uint64 channel_id = 1;
+  uint64 message_id = 2;
+  string emoji_name = 3;
+}
+
+message RemoveReaction {
+  uint64 channel_id = 1;
+  uint64 message_id = 2;
+  string emoji_name = 3;
+}
+
+message UpdateMessageReactions {
+  uint64 channel_id = 1;
+  uint64 message_id = 2;
+  repeated ReactionSummary reactions = 3;
+}
+
+message UpdateMessageReactionsResponse {
+  repeated ReactionSummary reactions = 1;
+}
+
 message GetChannelMessages {
   uint64 channel_id = 1;
   uint64 before_message_id = 2;
@@ -247,11 +269,23 @@ message ChannelMessage {
   repeated ChatMention mentions = 6;
   optional uint64 reply_to_message_id = 7;
   optional uint64 edited_at = 8;
+  repeated ReactionSummary reaction_summaries = 9;
 }
 
 message ChatMention {
   Range range = 1;
   uint64 user_id = 2;
+}
+
+message Reaction {
+  string emoji_name = 1;
+  repeated uint64 user_ids = 2;
+}
+
+message ReactionSummary {
+  string emoji_name = 1;
+  uint32 count = 2;
+  repeated uint64 user_ids = 3;
 }
 
 message RejoinChannelBuffers {

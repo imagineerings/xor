@@ -26,6 +26,7 @@ messages!(
     (ActivateToolchain, Foreground),
     (ActiveToolchain, Foreground),
     (ActiveToolchainResponse, Foreground),
+    (AddReaction, Background),
     (ResolveToolchain, Background),
     (ResolveToolchainResponse, Background),
     (AddNotification, Foreground),
@@ -209,6 +210,7 @@ messages!(
     (ReloadBuffersResponse, Foreground),
     (RemoveChannelMember, Foreground),
     (RemoveChannelMessage, Foreground),
+    (RemoveReaction, Background),
     (RemoveContact, Foreground),
     (RemoveProjectCollaborator, Foreground),
     (RemoveWorktree, Foreground),
@@ -280,6 +282,8 @@ messages!(
     (UpdateFollowers, Foreground),
     (UpdateGitBranch, Background),
     (UpdateLanguageServer, Foreground),
+    (UpdateMessageReactions, Foreground),
+    (UpdateMessageReactionsResponse, Background),
     (UpdateNotification, Foreground),
     (UpdateParticipantLocation, Foreground),
     (UpdateProject, Foreground),
@@ -383,6 +387,7 @@ messages!(
 );
 
 request_messages!(
+    (AddReaction, UpdateMessageReactionsResponse),
     (AllocateWorktreeId, AllocateWorktreeIdResponse),
     (ApplyCodeAction, ApplyCodeActionResponse),
     (
@@ -461,6 +466,7 @@ request_messages!(
     (ReloadBuffers, ReloadBuffersResponse),
     (RemoveChannelMember, Ack),
     (RemoveChannelMessage, Ack),
+    (RemoveReaction, UpdateMessageReactionsResponse),
     (UpdateChannelMessage, Ack),
     (RemoveContact, Ack),
     (RenameChannel, RenameChannelResponse),
@@ -802,6 +808,7 @@ entity_messages!(
     ChannelMessageSent,
     ChannelMessageUpdate,
     RemoveChannelMessage,
+    UpdateMessageReactions,
     UpdateChannelMessage,
     UpdateChannelBuffer,
     UpdateChannelBufferCollaborators,
