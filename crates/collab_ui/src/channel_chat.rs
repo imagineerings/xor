@@ -5,6 +5,7 @@ use client::{
     channel_chat::SendChannelMessage,
     proto::{self, ChannelVisibility},
 };
+use db::kvp::KeyValueStore;
 use editor::Editor;
 use gpui::{
     App, AsyncApp, Context, Entity, EventEmitter, FocusHandle, Focusable, InteractiveElement,
@@ -18,12 +19,16 @@ use std::{
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
-use ui::prelude::*;
+use ui::{Tooltip, prelude::*};
 use util::ResultExt;
 use workspace::{
     Workspace,
     item::{Item, TabContentParams},
 };
+
+const RECENT_EMOJI_NAMESPACE: &str = "channel_chat_recent_emojis";
+const RECENT_EMOJI_KEY: &str = "recent";
+const MAX_RECENT_EMOJIS: usize = 12;
 
 pub fn init(_cx: &mut App) {}
 
@@ -34,10 +39,14 @@ pub struct ChannelChat {
     channel_store: Entity<ChannelStore>,
     workspace: WeakEntity<Workspace>,
     composer: Entity<Editor>,
+    emoji_search: Entity<Editor>,
     messages: Vec<proto::ChannelMessage>,
+    emoji_picker: Option<EmojiPickerState>,
+    recent_emoji_names: Vec<String>,
     send_state: SendState,
     _rpc_subscriptions: Vec<client::Subscription>,
     _composer_subscription: GpuiSubscription,
+    _emoji_search_subscription: GpuiSubscription,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -46,6 +55,79 @@ enum SendState {
     Sending,
     Failed(SharedString),
 }
+
+struct EmojiPickerState {
+    message_id: u64,
+}
+
+struct EmojiDefinition {
+    name: &'static str,
+    character: &'static str,
+    keywords: &'static [&'static str],
+}
+
+const EMOJI_DEFINITIONS: &[EmojiDefinition] = &[
+    EmojiDefinition {
+        name: "thumbs_up",
+        character: "👍",
+        keywords: &["approve", "yes", "like", "plus"],
+    },
+    EmojiDefinition {
+        name: "heart",
+        character: "❤️",
+        keywords: &["love", "favorite", "like"],
+    },
+    EmojiDefinition {
+        name: "laugh",
+        character: "😄",
+        keywords: &["funny", "smile", "happy"],
+    },
+    EmojiDefinition {
+        name: "hooray",
+        character: "🎉",
+        keywords: &["celebrate", "party", "ship"],
+    },
+    EmojiDefinition {
+        name: "eyes",
+        character: "👀",
+        keywords: &["look", "watch", "seen"],
+    },
+    EmojiDefinition {
+        name: "rocket",
+        character: "🚀",
+        keywords: &["ship", "launch", "fast"],
+    },
+    EmojiDefinition {
+        name: "fire",
+        character: "🔥",
+        keywords: &["hot", "great", "lit"],
+    },
+    EmojiDefinition {
+        name: "check",
+        character: "✅",
+        keywords: &["done", "yes", "complete"],
+    },
+    EmojiDefinition {
+        name: "thinking",
+        character: "🤔",
+        keywords: &["question", "consider", "hmm"],
+    },
+    EmojiDefinition {
+        name: "pray",
+        character: "🙏",
+        keywords: &["thanks", "please", "appreciate"],
+    },
+    EmojiDefinition {
+        name: "tada",
+        character: "🎊",
+        keywords: &["celebrate", "confetti", "party"],
+    },
+    EmojiDefinition {
+        name: "mind_blown",
+        character: "🤯",
+        keywords: &["wow", "amazed", "surprise"],
+    },
+];
 
 impl ChannelChat {
     pub fn open(
@@ -117,7 +199,13 @@ impl ChannelChat {
             editor.set_placeholder_text("Message channel", window, cx);
             editor
         });
+        let emoji_search = cx.new(|cx| {
+            let mut editor = Editor::single_line(window, cx);
+            editor.set_placeholder_text("Search emoji", window, cx);
+            editor
+        });
         let _composer_subscription = cx.observe(&composer, |_, _, cx| cx.notify());
+        let _emoji_search_subscription = cx.observe(&emoji_search, |_, _, cx| cx.notify());
         let weak_self = cx.weak_entity();
         let _rpc_subscriptions = vec![
             client.add_channel_message_sent_handler(weak_self.clone(), Self::handle_message_sent),
@@ -128,6 +216,7 @@ impl ChannelChat {
                 Self::handle_message_reactions_update,
             ),
         ];
+        let recent_emoji_names = Self::load_recent_emoji_names(cx);
 
         Self {
             channel_id,
@@ -136,11 +225,29 @@ impl ChannelChat {
             channel_store,
             workspace,
             composer,
+            emoji_search,
             messages,
+            emoji_picker: None,
+            recent_emoji_names,
             send_state: SendState::Idle,
             _rpc_subscriptions,
             _composer_subscription,
+            _emoji_search_subscription,
         }
+    }
+
+    fn load_recent_emoji_names(cx: &App) -> Vec<String> {
+        KeyValueStore::global(cx)
+            .scoped(RECENT_EMOJI_NAMESPACE)
+            .read(RECENT_EMOJI_KEY)
+            .log_err()
+            .flatten()
+            .and_then(|json| serde_json::from_str::<Vec<String>>(&json).log_err())
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|emoji_name| emoji_by_name(emoji_name).is_some())
+            .take(MAX_RECENT_EMOJIS)
+            .collect()
     }
 
     async fn handle_message_sent(
@@ -326,9 +433,7 @@ impl ChannelChat {
                     }),
             )
             .child(Label::new(message.body.clone()).size(LabelSize::Small))
-            .when(!message.reaction_summaries.is_empty(), |this| {
-                this.child(self.render_reactions(message, cx))
-            })
+            .child(self.render_reactions(message, cx))
             .into_any_element()
     }
 
@@ -343,54 +448,229 @@ impl ChannelChat {
             .current_user()
             .map(|user| user.legacy_id);
 
-        h_flex()
+        v_flex()
             .gap_1()
-            .children(message.reaction_summaries.iter().enumerate().map(
-                |(reaction_index, reaction)| {
-                    let message_id = message.id;
-                    let emoji_name = reaction.emoji_name.clone();
-                    let reacted_by_me =
-                        current_user_id.is_some_and(|user_id| reaction.user_ids.contains(&user_id));
-                    let label = format!(
-                        "{} {}",
-                        emoji_character(&reaction.emoji_name),
-                        reaction.count
-                    );
-
-                    div()
-                        .id((
-                            gpui::ElementId::from(("channel-reaction", message.id)),
-                            reaction_index.to_string(),
-                        ))
-                        .px_2()
-                        .py_0p5()
-                        .border_1()
-                        .rounded_md()
-                        .text_size(rems(0.75))
-                        .line_height(rems(1.0))
-                        .border_color(if reacted_by_me {
-                            cx.theme().colors().editor_foreground
-                        } else {
-                            cx.theme().colors().border_variant
-                        })
-                        .bg(if reacted_by_me {
-                            cx.theme().colors().element_hover
-                        } else {
-                            gpui::transparent_black()
-                        })
-                        .child(label)
-                        .on_click(cx.listener(move |this, _, window, cx| {
-                            this.toggle_reaction(
-                                message_id,
-                                emoji_name.clone(),
-                                reacted_by_me,
-                                window,
-                                cx,
+            .child(
+                h_flex()
+                    .gap_1()
+                    .children(message.reaction_summaries.iter().enumerate().map(
+                        |(reaction_index, reaction)| {
+                            let message_id = message.id;
+                            let emoji_name = reaction.emoji_name.clone();
+                            let reacted_by_me = current_user_id
+                                .is_some_and(|user_id| reaction.user_ids.contains(&user_id));
+                            let label = format!(
+                                "{} {}",
+                                emoji_character(&reaction.emoji_name),
+                                reaction.count
                             );
-                        }))
-                },
-            ))
+
+                            div()
+                                .id((
+                                    gpui::ElementId::from(("channel-reaction", message.id)),
+                                    reaction_index.to_string(),
+                                ))
+                                .px_2()
+                                .py_0p5()
+                                .border_1()
+                                .rounded_md()
+                                .text_size(rems(0.75))
+                                .line_height(rems(1.0))
+                                .border_color(if reacted_by_me {
+                                    cx.theme().colors().editor_foreground
+                                } else {
+                                    cx.theme().colors().border_variant
+                                })
+                                .bg(if reacted_by_me {
+                                    cx.theme().colors().element_hover
+                                } else {
+                                    gpui::transparent_black()
+                                })
+                                .child(label)
+                                .on_click(cx.listener(move |this, _, window, cx| {
+                                    this.toggle_reaction(
+                                        message_id,
+                                        emoji_name.clone(),
+                                        reacted_by_me,
+                                        window,
+                                        cx,
+                                    );
+                                }))
+                        },
+                    ))
+                    .child(
+                        IconButton::new(
+                            (
+                                gpui::ElementId::from(("channel-add-reaction", message.id)),
+                                "button",
+                            ),
+                            IconName::Plus,
+                        )
+                        .icon_size(IconSize::XSmall)
+                        .size(ButtonSize::None)
+                        .tooltip(Tooltip::text("Add reaction"))
+                        .on_click(cx.listener({
+                            let message_id = message.id;
+                            move |this, _, window, cx| {
+                                this.open_emoji_picker(message_id, window, cx);
+                            }
+                        })),
+                    ),
+            )
+            .when(
+                self.emoji_picker
+                    .as_ref()
+                    .is_some_and(|picker| picker.message_id == message.id),
+                |this| this.child(self.render_emoji_picker(message.id, cx)),
+            )
             .into_any_element()
+    }
+
+    fn render_emoji_picker(&self, message_id: u64, cx: &mut Context<Self>) -> gpui::AnyElement {
+        let emoji_options = self.filtered_emoji_options(cx);
+
+        v_flex()
+            .id(("channel-emoji-picker", message_id))
+            .gap_2()
+            .mt_1()
+            .p_2()
+            .w(px(248.))
+            .max_h(px(220.))
+            .overflow_y_scroll()
+            .border_1()
+            .rounded_md()
+            .border_color(cx.theme().colors().border)
+            .bg(cx.theme().colors().editor_background)
+            .child(self.emoji_search.clone())
+            .when(emoji_options.is_empty(), |this| {
+                this.child(
+                    Label::new("No emojis found — try a different search")
+                        .size(LabelSize::XSmall)
+                        .color(Color::Muted),
+                )
+            })
+            .when(!emoji_options.is_empty(), |this| {
+                this.child(
+                    h_flex().gap_1().flex_wrap().children(
+                        emoji_options
+                            .into_iter()
+                            .enumerate()
+                            .map(|(emoji_index, emoji)| {
+                                div()
+                                    .id((
+                                        gpui::ElementId::from(("channel-emoji-option", message_id)),
+                                        emoji_index.to_string(),
+                                    ))
+                                    .size(px(28.))
+                                    .rounded_md()
+                                    .text_size(rems(1.0))
+                                    .line_height(rems(1.5))
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .hover(|style| style.bg(cx.theme().colors().element_hover))
+                                    .child(emoji.character)
+                                    .tooltip(Tooltip::text(emoji.name))
+                                    .on_click(cx.listener({
+                                        let emoji_name = emoji.name.to_string();
+                                        move |this, _, window, cx| {
+                                            this.select_emoji_for_message(
+                                                message_id,
+                                                emoji_name.clone(),
+                                                window,
+                                                cx,
+                                            );
+                                        }
+                                    }))
+                            }),
+                    ),
+                )
+            })
+            .into_any_element()
+    }
+
+    fn filtered_emoji_options(&self, cx: &App) -> Vec<&'static EmojiDefinition> {
+        let query = self
+            .emoji_search
+            .read(cx)
+            .text(cx)
+            .trim()
+            .to_ascii_lowercase();
+        let mut emoji_options = EMOJI_DEFINITIONS
+            .iter()
+            .filter(|emoji| {
+                query.is_empty()
+                    || emoji.name.contains(&query)
+                    || emoji
+                        .keywords
+                        .iter()
+                        .any(|keyword| keyword.contains(&query))
+            })
+            .collect::<Vec<_>>();
+
+        emoji_options.sort_by_key(|emoji| {
+            self.recent_emoji_names
+                .iter()
+                .position(|recent| recent == emoji.name)
+                .unwrap_or(MAX_RECENT_EMOJIS + emoji.name.len())
+        });
+        emoji_options
+    }
+
+    fn open_emoji_picker(&mut self, message_id: u64, window: &mut Window, cx: &mut Context<Self>) {
+        let is_current_picker = self
+            .emoji_picker
+            .as_ref()
+            .is_some_and(|picker| picker.message_id == message_id);
+
+        if is_current_picker {
+            self.emoji_picker = None;
+        } else {
+            self.emoji_search
+                .update(cx, |search, cx| search.clear(window, cx));
+            self.emoji_picker = Some(EmojiPickerState { message_id });
+        }
+
+        cx.notify();
+    }
+
+    fn select_emoji_for_message(
+        &mut self,
+        message_id: u64,
+        emoji_name: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if emoji_by_name(&emoji_name).is_none() {
+            return;
+        }
+
+        self.emoji_picker = None;
+        self.remember_recent_emoji(emoji_name.clone(), cx);
+        self.toggle_reaction(message_id, emoji_name, false, window, cx);
+        cx.notify();
+    }
+
+    fn remember_recent_emoji(&mut self, emoji_name: String, cx: &mut Context<Self>) {
+        self.recent_emoji_names
+            .retain(|recent_emoji_name| recent_emoji_name != &emoji_name);
+        self.recent_emoji_names.insert(0, emoji_name);
+        self.recent_emoji_names.truncate(MAX_RECENT_EMOJIS);
+
+        let recent_emoji_names = self.recent_emoji_names.clone();
+        let kvp = KeyValueStore::global(cx);
+        cx.background_spawn(async move {
+            let result: anyhow::Result<()> = async {
+                let json = serde_json::to_string(&recent_emoji_names)?;
+                kvp.scoped(RECENT_EMOJI_NAMESPACE)
+                    .write(RECENT_EMOJI_KEY.to_string(), json)
+                    .await?;
+                Ok(())
+            }
+            .await;
+            result.log_err();
+        })
+        .detach();
     }
 
     fn toggle_reaction(
@@ -462,6 +742,61 @@ impl ChannelChat {
                     .collect()
             })
             .collect()
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn emoji_picker_labels_for_test(&self, cx: &App) -> Vec<String> {
+        self.filtered_emoji_options(cx)
+            .into_iter()
+            .map(|emoji| format!("{} {}", emoji.character, emoji.name))
+            .collect()
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn emoji_picker_empty_for_test(&self, cx: &App) -> bool {
+        self.filtered_emoji_options(cx).is_empty()
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn emoji_picker_open_for_test(&self) -> bool {
+        self.emoji_picker.is_some()
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn recent_emoji_names_for_test(&self) -> Vec<String> {
+        self.recent_emoji_names.clone()
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn open_emoji_picker_for_test(
+        &mut self,
+        message_id: u64,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.open_emoji_picker(message_id, window, cx);
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn set_emoji_search_for_test(
+        &mut self,
+        text: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.emoji_search
+            .update(cx, |search, cx| search.set_text(text, window, cx));
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn select_emoji_for_test(
+        &mut self,
+        message_id: u64,
+        emoji_name: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.select_emoji_for_message(message_id, emoji_name.to_string(), window, cx);
     }
 
     #[cfg(any(test, feature = "test-support"))]
@@ -599,14 +934,15 @@ fn format_timestamp(timestamp: u64) -> String {
 }
 
 fn emoji_character(emoji_name: &str) -> &str {
-    match emoji_name {
-        "thumbs_up" => "👍",
-        "heart" => "❤️",
-        "laugh" => "😄",
-        "hooray" => "🎉",
-        "eyes" => "👀",
-        _ => emoji_name,
-    }
+    emoji_by_name(emoji_name)
+        .map(|emoji| emoji.character)
+        .unwrap_or(emoji_name)
+}
+
+fn emoji_by_name(emoji_name: &str) -> Option<&'static EmojiDefinition> {
+    EMOJI_DEFINITIONS
+        .iter()
+        .find(|emoji| emoji.name == emoji_name)
 }
 
 fn next_nonce(channel_id: ChannelId) -> u128 {
