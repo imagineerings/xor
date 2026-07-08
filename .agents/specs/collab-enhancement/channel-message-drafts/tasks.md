@@ -113,13 +113,14 @@ Add client-side draft persistence for channel message composition. When a user t
 
 ### Phase 6: Tests
 
-- [ ] 11. Write unit tests for `DraftStore`
+- [x] 11. Write unit tests for `DraftStore`
   - Test `save_draft()` / `load_draft()` / `clear_draft()` / `has_draft()` round-trip with in-memory cache.
   - Test persistence round-trip through KVP (write draft, read back, verify body and updated_at).
   - Test `clear_draft()` removes from both cache and KVP.
   - Test `channels_with_drafts()` returns correct channel IDs.
   - _Requirements: 7.1, 7.2, 7.4_
   - _writes: `crates/collab_ui/src/draft_store.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui draft_store --features test-support`_
 
 - [ ] 12. Write integration tests for draft lifecycle
   - Test: type in channel A → switch to channel B → switch back to A → verify draft restored.
