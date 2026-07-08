@@ -52,6 +52,11 @@ flowchart TD
 
 - **Purpose**: Register custom node schemas with `comfy-graph-node-runtime/`.
 - **Responsibilities**: V1 mapping support, modern extension entrypoint support, display names, relative module metadata, and import failure diagnostics.
+- **Native behavior**: Converts V1 `NODE_CLASS_MAPPINGS` and supported modern
+  entrypoint declarations into native `SimCustomNode*` registration records and
+  Sim-owned `ComfyNodeDefinition` values with `ComfyNodeSource::Custom`, while
+  unsupported registration mechanisms produce diagnostics instead of pass-through
+  ComfyUI imports.
 
 ### ExtensionAssetService
 
@@ -65,21 +70,27 @@ flowchart TD
 ## Data Models
 
 ```rust
-pub struct ExtensionRecord {
-    pub id: ExtensionId,
+pub struct SimExtensionRecord {
+    pub id: SimExtensionId,
     pub source_path: PathBuf,
     pub display_name: String,
-    pub policy: ExtensionPolicyDecision,
-    pub nodes: Vec<NodeTypeId>,
-    pub web_dir: Option<PathBuf>,
-    pub diagnostics: Vec<ExtensionDiagnostic>,
+    pub source_kind: SimExtensionSourceKind,
+    pub root_index: usize,
+    pub load_order: usize,
 }
 
-pub enum ExtensionPolicyDecision {
+pub enum SimExtensionPolicyDecisionKind {
     Enabled,
     Disabled,
     Whitelisted,
-    Blocked { reason: String },
+    Blocked,
+}
+
+pub struct SimCustomNodeDeclaration {
+    pub node_id: String,
+    pub class_name: String,
+    pub registration_kind: SimCustomNodeRegistrationKind,
+    pub module: SimCustomNodeModuleMetadata,
 }
 ```
 

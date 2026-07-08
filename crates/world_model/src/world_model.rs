@@ -5,6 +5,7 @@ pub mod comfy_cache;
 pub mod comfy_cancellation;
 pub mod comfy_conditioning;
 pub mod comfy_control;
+pub mod comfy_custom_node_bridge;
 pub mod comfy_embedded_workflow;
 pub mod comfy_events;
 pub mod comfy_execution_plan;
@@ -98,6 +99,8 @@ mod comfy_cancellation_tests;
 mod comfy_conditioning_tests;
 #[cfg(test)]
 mod comfy_control_tests;
+#[cfg(test)]
+mod comfy_custom_node_bridge_tests;
 #[cfg(test)]
 mod comfy_embedded_workflow_tests;
 #[cfg(test)]
@@ -252,6 +255,12 @@ pub use comfy_control::{
     ComfyJobSummary, ComfyPromptId, ComfyRuntimeEvent, HistoryAction, INVALID_PROMPT_ID_CODE,
     PreviewPayload, PromptExtraData, PromptSubmission, PromptSubmissionResponse, QueueAction,
     QueueNumber, QueueStatus,
+};
+pub use comfy_custom_node_bridge::{
+    SIM_CUSTOM_NODE_DUPLICATE_CODE, SIM_CUSTOM_NODE_UNSUPPORTED_REGISTRATION_CODE,
+    SimCustomNodeBridge, SimCustomNodeBridgeDiagnostic, SimCustomNodeDeclaration,
+    SimCustomNodeModuleMetadata, SimCustomNodeRegistrationKind, SimCustomNodeRegistrationRecord,
+    SimCustomNodeRegistrationReport,
 };
 pub use comfy_embedded_workflow::{
     ComfyEmbeddedWorkflowDiagnostic, ComfyEmbeddedWorkflowExtractor, ComfyEmbeddedWorkflowFormat,

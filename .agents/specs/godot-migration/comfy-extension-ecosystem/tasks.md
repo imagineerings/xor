@@ -38,8 +38,9 @@ Build extension support with policy and diagnostics first. Only after disabled a
   - _Requirements: 1.4, 3.1, 3.2, 3.3_
   - _writes: crates/world_model/src/comfy_extension_loader.rs, crates/world_model/src/comfy_extension_loader_tests.rs_
 
-- [ ] 4. Implement custom node registration bridge
+- [x] 4. Implement custom node registration bridge
   - Support V1 mappings and modern extension entrypoints, display names, module metadata, and unsupported registration diagnostics.
+  - Represent custom node declarations, module metadata, registration records, and diagnostics with native `SimCustomNode*` records while registering Sim-owned node definitions.
   - _Requirements: 2.1, 2.2, 2.4_
   - _writes: crates/world_model/src/comfy_custom_node_bridge.rs, crates/world_model/src/comfy_custom_node_bridge_tests.rs_
 
