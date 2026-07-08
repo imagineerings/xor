@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T13:49:48Z",
+  "updated_at": "2026-07-08T13:55:24Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -204,6 +204,17 @@
       "owner": null,
       "summary": "Implemented locally; completion command reported no non-terminal Linear issue for the task.",
       "updated_at": "2026-07-08T13:49:48Z"
+    },
+    {
+      "task_id": "task:7c378cf56b2d",
+      "task_identifier": ".agents/specs/goose-migration/typescript-sdk/tasks.md:67",
+      "title": "Write tests",
+      "linear_identifier": "SIM-26",
+      "linear_url": "https://linear.app/simtropolis/issue/SIM-26/write-tests",
+      "status": "inactive",
+      "owner": null,
+      "summary": "Implemented locally with SDK unit/type tests; completion command should be reconciled after merge if Linear still exposes a terminal transition.",
+      "updated_at": "2026-07-08T13:55:24Z"
     }
   ],
   "task_notes": [
@@ -394,6 +405,12 @@
       "updated_at": "2026-07-08T13:49:48Z"
     },
     {
+      "task_identifier": ".agents/specs/goose-migration/typescript-sdk/tasks.md:67",
+      "status": "done",
+      "summary": "Task 9: Added npm test coverage for HttpTransport request/error handling, HttpStreamClient and SSE parsing, BinaryResolver custom path and missing-binary errors, and generated type payload validation. Added @types/node, package-lock.json, test script, SDK ignore rules, and fixed an HTTP error-message precedence issue found by tsc.",
+      "updated_at": "2026-07-08T13:55:24Z"
+    },
+    {
       "task_identifier": ".agents/specs/ci-migration/tasks.md",
       "status": "deprioritized",
       "summary": "All tasks in .agents/specs/ci-migration are deprioritized until every other local workflow task is complete. Do not select CI migration work while non-CI tasks remain available.",
@@ -434,8 +451,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/typescript-sdk",
-      "summary": "Tasks 1-8 are checked complete. Future SDK implementation tasks can build from ui/sdk with @sim/sdk package metadata, strict TypeScript config, generated API types, fetch-based HttpTransport, HttpStreamClient SSE support, GooseClient facade, MCPAppsClient, client capability declaration helpers, BinaryResolver, and AcpTransport for stdio JSON-RPC process communication. Full tsc validation still requires installing ui/sdk dev dependencies.",
-      "updated_at": "2026-07-08T13:49:48Z"
+      "summary": "Tasks 1-9 are checked complete. The TypeScript SDK slice now has package metadata, strict TypeScript config, generated API types, fetch-based HttpTransport, HttpStreamClient SSE support, GooseClient facade, MCPAppsClient, client capability declaration helpers, BinaryResolver, AcpTransport for stdio JSON-RPC process communication, and npm test coverage for HTTP, streaming, binary resolver, and generated type payloads.",
+      "updated_at": "2026-07-08T13:55:24Z"
     },
     {
       "scope": ".agents/specs/godot-migration",

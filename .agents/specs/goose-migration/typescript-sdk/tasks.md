@@ -64,7 +64,7 @@ Implement a TypeScript SDK as an npm package that provides programmatic access t
   - _Requirements: 1_
   - _writes: ui/sdk/src/acp-transport.ts_
 
-- [ ] 9. Write tests
+- [x] 9. Write tests
   - Unit tests with mock HTTP server
   - Streaming tests with mock SSE
   - Binary resolver platform tests

@@ -194,7 +194,7 @@ export class HttpTransport {
 
   private errorFromResponse(response: Response, payload: unknown): SimError {
     const body = isApiErrorBody(payload) ? payload : undefined;
-    const message = body?.message ?? response.statusText || `HTTP ${response.status}`;
+    const message = body?.message ?? (response.statusText || `HTTP ${response.status}`);
     const options = {
       code: body?.code,
       status: response.status,

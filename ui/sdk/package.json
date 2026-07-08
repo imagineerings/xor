@@ -21,12 +21,14 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test dist/*.test.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "clean": "rm -rf dist"
   },
   "sideEffects": false,
   "dependencies": {},
   "devDependencies": {
+    "@types/node": "^22.10.0",
     "typescript": "^5.7.0"
   }
 }
