@@ -18,12 +18,13 @@ Restore the channel-chat storage, RPC, client, and desktop UI foundation that th
   - _writes: `crates/collab/src/db/tables/channel_message_read.rs`_
   - _validated: `cargo fmt -p collab`; `cargo check -p collab`_
 
-- [ ] 2. Implement channel message store queries
-  - [ ] 2.1 Implement create, update, delete/tombstone, paginated history, lookup-by-id, and acknowledgement queries.
-  - [ ] 2.2 Enforce channel membership before returning or mutating messages.
-  - [ ] 2.3 Convert DB rows to existing `proto::ChannelMessage` values.
+- [x] 2. Implement channel message store queries
+  - [x] 2.1 Implement create, update, delete/tombstone, paginated history, lookup-by-id, and acknowledgement queries.
+  - [x] 2.2 Enforce channel membership before returning or mutating messages.
+  - [x] 2.3 Convert DB rows to existing `proto::ChannelMessage` values.
   - _Requirements: 0.1, 0.2, 0.4_
   - _writes: `crates/collab/src/db/queries/channel_messages.rs`_
+  - _validated: `cargo fmt -p collab`; `cargo check -p collab`_
 
 - [ ] 3. Restore server channel-chat RPC handlers
   - [ ] 3.1 Replace removed-chat errors in `send_channel_message`, `join_channel_chat`, `leave_channel_chat`, `get_channel_messages`, `get_channel_messages_by_id`, `update_channel_message`, `remove_channel_message`, and `acknowledge_channel_message`.

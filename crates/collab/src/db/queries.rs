@@ -1,6 +1,7 @@
 use super::*;
 
 pub mod buffers;
+pub mod channel_messages;
 pub mod channels;
 pub mod contacts;
 pub mod contributors;
