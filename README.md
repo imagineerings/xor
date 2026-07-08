@@ -5,6 +5,8 @@
 
 Welcome to Sim, a high-performance, multiplayer code editor from the creators of [Atom](https://github.com/atom/atom) and [Tree-sitter](https://github.com/tree-sitter/tree-sitter).
 
+Sim currently tracks upstream Zed v1.10.0.
+
 ---
 
 ### Installation

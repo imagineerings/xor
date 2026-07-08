@@ -2,7 +2,7 @@
 description = "The fast, collaborative code editor."
 edition.workspace = true
 name = "sim"
-version = "1.7.2"
+version = "1.10.0"
 publish.workspace = true
 license = "GPL-3.0-or-later"
 authors = ["Sim Team <hi@sim.dev>"]

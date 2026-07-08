@@ -17162,7 +17162,7 @@ dependencies = [
 
 [[package]]
 name = "sim"
-version = "1.7.2"
+version = "1.10.0"
 dependencies = [
  "acp_thread",
  "acp_tools",
