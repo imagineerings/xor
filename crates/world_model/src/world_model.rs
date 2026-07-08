@@ -1,5 +1,6 @@
 pub mod artifact;
 pub mod comfy_cache;
+pub mod comfy_cancellation;
 pub mod comfy_conditioning;
 pub mod comfy_control;
 pub mod comfy_execution_plan;
@@ -41,6 +42,8 @@ pub mod session;
 mod artifact_tests;
 #[cfg(test)]
 mod comfy_cache_tests;
+#[cfg(test)]
+mod comfy_cancellation_tests;
 #[cfg(test)]
 mod comfy_conditioning_tests;
 #[cfg(test)]
@@ -102,6 +105,10 @@ mod tests;
 
 pub use artifact::{GeneratedWorldArtifact, GeneratedWorldArtifactError};
 pub use comfy_cache::{ComfyCachePolicy, NodeCacheEntry, NodeCacheSnapshot, cache_key_for_node};
+pub use comfy_cancellation::{
+    ComfyCancellationAction, ComfyCancellationController, ComfyCancellationMode,
+    ComfyCancellationOutcome, ComfyCancellationReport, ComfyCancellationRequest,
+};
 pub use comfy_conditioning::{
     AttentionMetadata, ComfyConditioningRuntime, ConditioningArea, ConditioningBundle,
     ConditioningMask, ConditioningRegion, ConditioningRuntimeContext, ConditioningTransform,

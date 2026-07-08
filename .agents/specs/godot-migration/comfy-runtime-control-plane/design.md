@@ -55,6 +55,11 @@ pub trait ComfyRouteAdapter {
   history, job listings, sorting, filtering, and queue/history removal actions
   operate on those Sim job records and never expose sensitive prompt extra data
   or forward lifecycle state to a ComfyUI server.
+- **Native cancellation controller**: Cancellation and interrupt requests are
+  classified against Sim job state. Pending jobs are dequeued into cancelled
+  terminal history, running jobs are interrupted into cancelled terminal
+  history, terminal and unknown jobs are explicit non-failing no-ops, and
+  targeted interrupts never cancel unrelated pending jobs.
 
 ### ComfyWebSocketAdapter
 
@@ -168,7 +173,7 @@ _For any_ upload, view, or download request, the resolved filesystem path SHALL 
 
 ## Testing Strategy
 
-- Unit tests for prompt id validation, native protocol records, HTTP safety primitives, method-aware `/api` alias routing, Sim job bridge submission/listing/history redaction, cancel classification, and path confinement.
+- Unit tests for prompt id validation, native protocol records, HTTP safety primitives, method-aware `/api` alias routing, Sim job bridge submission/listing/history redaction, idempotent cancellation and targeted interrupt classification, and path confinement.
 - Integration tests for prompt submission through queue, job status transitions, WebSocket feature negotiation, progress events, and preview metadata negotiation.
 - Compatibility fixtures from `projects/comfy/script_examples` for basic HTTP prompt execution and WebSocket image retrieval.
 - Property tests for route alias equivalence and path traversal rejection.

@@ -44,8 +44,9 @@ Build the control plane as a protocol adapter over Sim task, HTTP, WebSocket, me
   - _Requirements: 2.2, 2.5, 5.2_
   - _writes: crates/world_model/src/comfy_jobs.rs, crates/world_model/src/comfy_jobs_tests.rs_
 
-- [ ] 5. Implement idempotent cancellation and targeted interrupt
-  - Support single and batch cancellation, terminal no-ops, unknown no-ops, pending dequeue, and running interrupt by prompt id.
+- [x] 5. Implement idempotent cancellation and targeted interrupt
+  - Support single and batch cancellation, terminal no-ops, unknown no-ops, pending dequeue, and running interrupt by prompt id as native Sim job-state transitions.
+  - Preserve idempotent reports for repeated requests and keep targeted interrupt scoped to matching running jobs rather than forwarding cancellation to ComfyUI.
   - _Requirements: 2.3, 2.4_
   - _writes: crates/world_model/src/comfy_cancellation.rs, crates/world_model/src/comfy_cancellation_tests.rs_
 
