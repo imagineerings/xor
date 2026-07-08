@@ -6,7 +6,7 @@ Set up a Docusaurus-based documentation site for sim with installation guides, c
 
 ## Tasks
 
-- [ ] 1. Initialize Docusaurus project
+- [x] 1. Initialize Docusaurus project
   - Set up Docusaurus with TypeScript config
   - Configure theme, navigation, and search
   - Set up custom CSS/styling
