@@ -55,6 +55,18 @@ const config: Config = {
         language: ["en"],
       } satisfies LocalSearchOptions,
     ],
+    [
+      "@docusaurus/plugin-content-docs",
+      {
+        id: "tutorials",
+        path: "tutorials",
+        routeBasePath: "tutorials",
+        sidebarPath: "./tutorials/sidebars.ts",
+        editUrl: "https://github.com/simtropolis/sim/edit/main/docs/tutorials/",
+        showLastUpdateAuthor: true,
+        showLastUpdateTime: true,
+      },
+    ],
   ],
   themeConfig: {
     image: "theme/favicon.png",
@@ -68,6 +80,7 @@ const config: Config = {
         { to: "/", label: "Docs", position: "left" },
         { to: "/ai/overview", label: "AI", position: "left" },
         { to: "/extensions", label: "Extensions", position: "left" },
+        { to: "/tutorials", label: "Tutorials", position: "left" },
         { to: "/development", label: "Developers", position: "left" },
         { to: "/blog", label: "Blog", position: "left" },
         {
@@ -86,6 +99,7 @@ const config: Config = {
             { label: "Getting Started", to: "/getting-started" },
             { label: "Installation", to: "/installation" },
             { label: "Troubleshooting", to: "/troubleshooting" },
+            { label: "Tutorials", to: "/tutorials" },
           ],
         },
         {

@@ -48,7 +48,7 @@ Set up a Docusaurus-based documentation site for sim with installation guides, c
   - _Requirements: 2_
   - _writes: docs/blog/_
 
-- [ ] 7. Write tutorials
+- [x] 7. Write tutorials
   - Step-by-step tutorials for common workflows
   - Code examples and expected outputs
   - _Requirements: 3_
