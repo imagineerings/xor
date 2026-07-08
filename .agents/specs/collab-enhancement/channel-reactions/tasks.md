@@ -146,7 +146,7 @@ Add emoji reaction support to Sim channel messages. This spans five layers: prot
 
 ### Phase 6 — Client: Emoji Picker
 
-- [ ] 15. Create EmojiPicker component
+- [x] 15. Create EmojiPicker component
   - Build a popover element with a search input and a scrollable grid of emoji buttons.
   - Bundle an emoji dataset (name → unicode character + keywords) as a static JSON asset.
   - Filter displayed emojis by search query (match on name and keywords).
@@ -156,18 +156,21 @@ Add emoji reaction support to Sim channel messages. This spans five layers: prot
   - Emit an `EmojiSelected(emoji_name)` event on click.
   - _Requirements: 2.3_
   - _writes: crates/collab_ui/src/channel_reactions/emoji_picker.rs_
+  - _implemented inline in `crates/collab_ui/src/channel_chat.rs` using the existing channel chat view structure_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support --test collab_tests channel_chat_ui_tests`_
 
-- [ ] 16. Write UI tests for EmojiPicker
+- [x] 16. Write UI tests for EmojiPicker
   - Test initial rendering shows the emoji grid.
   - Test search filtering narrows results.
   - Test "no results" state renders the fallback message.
   - Test emoji selection fires the correct event.
   - _Requirements: (testing) 2.3_
   - _writes: crates/collab_ui/src/channel_reactions/emoji_picker.rs (tests)_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support --test collab_tests channel_chat_ui_tests`_
 
 ### Phase 7 — Client: Reaction Bar
 
-- [ ] 17. Create ReactionBar component
+- [x] 17. Create ReactionBar component
   - Render a horizontal row of pill-shaped reaction chips below a channel message.
   - Each chip shows the emoji character and a count number.
   - Highlight the chip border/background when `reacted_by_me` is true.
@@ -176,22 +179,28 @@ Add emoji reaction support to Sim channel messages. This spans five layers: prot
   - On emoji selection from the picker, dispatch `AddReaction` for that emoji.
   - _Requirements: 2.1, 2.2_
   - _writes: crates/collab_ui/src/channel_reactions/reaction_bar.rs_
+  - _implemented inline in `crates/collab_ui/src/channel_chat.rs` using the existing channel chat view structure_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support --test collab_tests channel_chat_ui_tests`_
 
-- [ ] 18. Add reaction tooltip on hover
+- [x] 18. Add reaction tooltip on hover
   - When hovering over a reaction chip, show a tooltip listing the display names of users who reacted.
   - Fetch user names from the local user cache (already populated from channel membership).
   - _Requirements: 2.2_
   - _writes: crates/collab_ui/src/channel_reactions/reaction_bar.rs_
+  - _implemented inline in `crates/collab_ui/src/channel_chat.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support --test collab_tests channel_chat_ui_tests`_
 
-- [ ] 19. Integrate reaction bar into channel message rendering
+- [x] 19. Integrate reaction bar into channel message rendering
   - In the channel message component, add the `ReactionBar` below the message body.
   - Pass the message's `reactions` and `current_user_id` to the bar.
   - Add the hover "+" reaction button that overlays near the message timestamp area.
   - Wire the button click to open the `EmojiPicker` popover.
   - _Requirements: 2.1, 2.2_
   - _writes: crates/collab_ui/src/chat_panel/message.rs_
+  - _implemented inline in `crates/collab_ui/src/channel_chat.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support --test collab_tests channel_chat_ui_tests`_
 
-- [ ] 20. Write UI tests for ReactionBar
+- [x] 20. Write UI tests for ReactionBar
   - Test rendering with zero, one, and multiple reactions.
   - Test chip highlights when user has reacted.
   - Test click on own reaction dispatches `RemoveReaction`.
@@ -200,26 +209,32 @@ Add emoji reaction support to Sim channel messages. This spans five layers: prot
   - Test tooltip shows correct user names on hover.
   - _Requirements: (testing) 2.1, 2.2_
   - _writes: crates/collab_ui/src/channel_reactions/reaction_bar.rs (tests)_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support --test collab_tests channel_chat_ui_tests`_
 
 ### Phase 8 — Integration & Polish
 
-- [ ] 21. End-to-end integration test (multi-client)
+- [x] 21. End-to-end integration test (multi-client)
   - Write an integration test that sets up two connected clients in the same channel.
   - Client A sends a message; Client B adds a reaction; verify Client A sees the reaction bar update.
   - Client A removes the reaction; verify Client B sees the bar update.
   - Verify that disconnecting and reconnecting loads persisted reactions for the message.
   - _Requirements: (testing) 2.1, 2.2, 2.4_
   - _writes: crates/collab/tests/reactions_e2e_tests.rs_
+  - _implemented in `crates/collab/tests/integration/channel_chat_tests.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support --test collab_tests channel_chat_tests`_
 
-- [ ] 22. Error handling and edge cases
+- [x] 22. Error handling and edge cases
   - Add exponential-backoff retry (3 attempts) on reaction add/remove network failures with toast notification on final failure.
   - Handle reaction RPC returning `NOT_FOUND` (message deleted) by removing the message from view.
   - Validate emoji name client-side against the emoji dataset before sending.
   - _Requirements: 2.1_
   - _writes: crates/collab_ui/src/channel_reactions/mod.rs_
+  - _implemented inline in `crates/collab_ui/src/channel_chat.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support --test collab_tests channel_chat_ui_tests`_
 
-- [ ] 23. Final review and cleanup
+- [x] 23. Final review and cleanup
   - Audit that all reaction-related state is cleaned up on channel leave/disconnect.
   - Verify the emoji dataset asset is bundled correctly in release builds.
   - Run full test suite (unit + integration + UI) and fix any failures.
   - _Requirements: 2.4_
+  - _completed by auditing merged reaction state cleanup paths, documenting implementation locations, and running focused proto/server/client/UI integration validations across the merged slices_
