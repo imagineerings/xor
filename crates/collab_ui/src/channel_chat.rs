@@ -13,11 +13,11 @@ use gpui::{
     VisualContext as _, WeakEntity, Window, prelude::*,
 };
 use menu::Confirm;
-use rpc::TypedEnvelope;
+use rpc::{ErrorExt as _, TypedEnvelope};
 use std::{
     any::TypeId,
     sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use ui::{Tooltip, prelude::*};
 use util::ResultExt;
@@ -29,6 +29,9 @@ use workspace::{
 const RECENT_EMOJI_NAMESPACE: &str = "channel_chat_recent_emojis";
 const RECENT_EMOJI_KEY: &str = "recent";
 const MAX_RECENT_EMOJIS: usize = 12;
+const REACTION_UPDATE_ATTEMPTS: usize = 3;
+const REACTION_RETRY_DELAYS: [Duration; REACTION_UPDATE_ATTEMPTS - 1] =
+    [Duration::from_millis(250), Duration::from_millis(750)];
 
 pub fn init(_cx: &mut App) {}
 
@@ -699,31 +702,79 @@ impl ChannelChat {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        if emoji_by_name(&emoji_name).is_none() {
+            self.workspace
+                .update(cx, |workspace, cx| {
+                    workspace.show_error(format!("Unsupported reaction emoji: {emoji_name}"), cx);
+                })
+                .log_err();
+            return;
+        }
+
         let client = self.client.clone();
         let workspace = self.workspace.clone();
         let channel_id = self.channel_id;
+        let this = cx.weak_entity();
 
         cx.spawn_in(window, async move |_, cx| {
-            let result = if reacted_by_me {
-                client
-                    .remove_channel_message_reaction(channel_id.0, message_id, emoji_name)
-                    .await
-            } else {
-                client
-                    .add_channel_message_reaction(channel_id.0, message_id, emoji_name)
-                    .await
-            };
+            let mut last_error = None;
+            for attempt in 0..REACTION_UPDATE_ATTEMPTS {
+                let result = if reacted_by_me {
+                    client
+                        .remove_channel_message_reaction(
+                            channel_id.0,
+                            message_id,
+                            emoji_name.clone(),
+                        )
+                        .await
+                } else {
+                    client
+                        .add_channel_message_reaction(channel_id.0, message_id, emoji_name.clone())
+                        .await
+                };
 
-            if let Err(error) = result {
+                match result {
+                    Ok(_) => return anyhow::Ok(()),
+                    Err(error) if is_missing_channel_message_error(&error) => {
+                        this.update(cx, |this, cx| {
+                            this.remove_message(message_id, cx);
+                        })
+                        .log_err();
+                        return anyhow::Ok(());
+                    }
+                    Err(error) => {
+                        last_error = Some(error);
+                        if let Some(delay) = REACTION_RETRY_DELAYS.get(attempt) {
+                            cx.background_executor().timer(*delay).await;
+                        }
+                    }
+                }
+            }
+
+            if let Some(error) = last_error {
                 workspace
                     .update(cx, |workspace, cx| {
-                        workspace.show_error(format!("Failed to update reaction: {error}"), cx);
+                        workspace.show_error(
+                            format!(
+                                "Failed to update reaction after {REACTION_UPDATE_ATTEMPTS} attempts: {error}"
+                            ),
+                            cx,
+                        );
                     })
                     .log_err();
             }
+
             anyhow::Ok(())
         })
         .detach_and_log_err(cx);
+    }
+
+    fn remove_message(&mut self, message_id: u64, cx: &mut Context<Self>) {
+        let original_len = self.messages.len();
+        self.messages.retain(|message| message.id != message_id);
+        if self.messages.len() != original_len {
+            cx.notify();
+        }
     }
 
     #[cfg(any(test, feature = "test-support"))]
@@ -974,6 +1025,13 @@ fn emoji_by_name(emoji_name: &str) -> Option<&'static EmojiDefinition> {
     EMOJI_DEFINITIONS
         .iter()
         .find(|emoji| emoji.name == emoji_name)
+}
+
+fn is_missing_channel_message_error(error: &anyhow::Error) -> bool {
+    let error = error.to_proto();
+    error.code == proto::ErrorCode::Internal as i32
+        && error.message.contains("no channel message")
+        && error.message.contains(" in channel ")
 }
 
 fn next_nonce(channel_id: ChannelId) -> u128 {
