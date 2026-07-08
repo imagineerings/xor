@@ -44,7 +44,7 @@ Implement the MCP tool servers from goose as a combination of native agent tools
     - _Requirements: 3_
     - _writes: crates/mcp_servers/peekaboo/src/server.rs_
 
-- [ ] 5. Implement AutoVisualiser MCP server
+- [x] 5. Implement AutoVisualiser MCP server
   - Create MCP server with visualization tools
   - Implement template rendering for diagrams (Mermaid, SVG, etc.)
   - _Requirements: 4_

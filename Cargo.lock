@@ -10856,6 +10856,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "mcp_autovisualiser"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "mcp_memory"
 version = "0.1.0"
 dependencies = [
