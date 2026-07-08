@@ -42,13 +42,14 @@ Add client-side draft persistence for channel message composition. When a user t
 
 ### Phase 2: Compose area integration (ChannelView)
 
-- [ ] 4. Auto-save draft on content change with 500ms debounce
-  - Add a `pending_draft_save: Option<Task<()>>` field to `ChannelView`.
-  - Subscribe to `EditorEvent::BufferEdited` on the editor.
+- [x] 4. Auto-save draft on content change with 500ms debounce
+  - Add a `pending_draft_save: Option<Task<()>>` field to `ChannelChat`.
+  - Subscribe to `EditorEvent::Edited` on the composer editor.
   - On edit, cancel any pending save task and spawn a new one that waits 500ms via `cx.background_executor().timer(Duration::from_millis(500)).await`, then calls `DraftStore::save_draft(channel_id, body)`.
   - Only save when content is non-empty.
   - _Requirements: 7.1_
-  - _writes: `crates/collab_ui/src/channel_view.rs`_
+  - _writes: `crates/collab_ui/src/channel_chat.rs`, `crates/collab_ui/src/draft_store.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_chat --features test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui draft_store --features test-support`_
 
 - [ ] 5. Restore draft on channel navigation
   - In `ChannelView::new()` (or when the channel buffer loads), call `DraftStore::load_draft(channel_id)`.

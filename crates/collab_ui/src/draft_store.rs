@@ -2,7 +2,7 @@ use anyhow::{Context as _, Result};
 use chrono::{DateTime, Utc};
 use client::ChannelId;
 use db::kvp::KeyValueStore;
-use gpui::{App, AppContext as _, Entity, Global};
+use gpui::{App, AppContext as _, Context, Entity, Global, Task};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use util::ResultExt as _;
@@ -80,6 +80,33 @@ impl DraftStore {
         Ok(())
     }
 
+    pub fn save_draft_in_background(
+        &mut self,
+        channel_id: ChannelId,
+        body: String,
+        cx: &mut Context<Self>,
+    ) -> Task<Result<()>> {
+        self.active_draft_channel = Some(channel_id);
+        let kvp = self.kvp.clone();
+
+        if body.trim().is_empty() {
+            self.drafts.remove(&channel_id);
+            cx.notify();
+            return cx.background_spawn(async move {
+                Self::delete_from_kvp_with(kvp, channel_id).await
+            });
+        }
+
+        let draft = Draft {
+            body,
+            updated_at: Utc::now(),
+        };
+        self.drafts.insert(channel_id, draft.clone());
+        cx.notify();
+
+        cx.background_spawn(async move { Self::write_to_kvp_with(kvp, channel_id, &draft).await })
+    }
+
     pub async fn load_draft(&mut self, channel_id: ChannelId) -> Result<Option<String>> {
         self.active_draft_channel = Some(channel_id);
         if !self.drafts.contains_key(&channel_id) {
@@ -135,7 +162,15 @@ impl DraftStore {
     }
 
     async fn write_to_kvp(&self, channel_id: ChannelId, draft: &Draft) -> Result<()> {
-        let Some(kvp) = self.kvp.as_ref() else {
+        Self::write_to_kvp_with(self.kvp.clone(), channel_id, draft).await
+    }
+
+    async fn write_to_kvp_with(
+        kvp: Option<KeyValueStore>,
+        channel_id: ChannelId,
+        draft: &Draft,
+    ) -> Result<()> {
+        let Some(kvp) = kvp.as_ref() else {
             return Ok(());
         };
         let payload = serde_json::to_string(draft).context("serializing channel draft")?;
@@ -162,7 +197,11 @@ impl DraftStore {
     }
 
     async fn delete_from_kvp(&self, channel_id: ChannelId) -> Result<()> {
-        let Some(kvp) = self.kvp.as_ref() else {
+        Self::delete_from_kvp_with(self.kvp.clone(), channel_id).await
+    }
+
+    async fn delete_from_kvp_with(kvp: Option<KeyValueStore>, channel_id: ChannelId) -> Result<()> {
+        let Some(kvp) = kvp.as_ref() else {
             return Ok(());
         };
         kvp.scoped(DRAFT_NAMESPACE)

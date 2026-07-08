@@ -1,3 +1,4 @@
+use crate::draft_store::DraftStore;
 use anyhow::Result;
 use channel::{Channel, ChannelStore};
 use client::{
@@ -6,7 +7,7 @@ use client::{
     proto::{self, ChannelVisibility},
 };
 use db::kvp::KeyValueStore;
-use editor::Editor;
+use editor::{Editor, EditorEvent};
 use gpui::{
     App, AsyncApp, Context, Entity, EventEmitter, FocusHandle, Focusable, InteractiveElement,
     Render, SharedString, StatefulInteractiveElement, Subscription as GpuiSubscription, Task,
@@ -32,6 +33,7 @@ const MAX_RECENT_EMOJIS: usize = 12;
 const REACTION_UPDATE_ATTEMPTS: usize = 3;
 const REACTION_RETRY_DELAYS: [Duration; REACTION_UPDATE_ATTEMPTS - 1] =
     [Duration::from_millis(250), Duration::from_millis(750)];
+const DRAFT_SAVE_DEBOUNCE: Duration = Duration::from_millis(500);
 
 pub fn init(_cx: &mut App) {}
 
@@ -47,6 +49,7 @@ pub struct ChannelChat {
     emoji_picker: Option<EmojiPickerState>,
     recent_emoji_names: Vec<String>,
     send_state: SendState,
+    pending_draft_save: Option<Task<()>>,
     _rpc_subscriptions: Vec<client::Subscription>,
     _composer_subscription: GpuiSubscription,
     _emoji_search_subscription: GpuiSubscription,
@@ -232,7 +235,12 @@ impl ChannelChat {
             editor.set_placeholder_text("Search emoji", window, cx);
             editor
         });
-        let _composer_subscription = cx.observe(&composer, |_, _, cx| cx.notify());
+        let _composer_subscription = cx.subscribe(&composer, |this, _, event: &EditorEvent, cx| {
+            if matches!(event, EditorEvent::Edited { .. }) {
+                this.schedule_draft_save(cx);
+            }
+            cx.notify();
+        });
         let _emoji_search_subscription = cx.observe(&emoji_search, |_, _, cx| cx.notify());
         let weak_self = cx.weak_entity();
         let _rpc_subscriptions = vec![
@@ -258,6 +266,7 @@ impl ChannelChat {
             emoji_picker: None,
             recent_emoji_names,
             send_state: SendState::Idle,
+            pending_draft_save: None,
             _rpc_subscriptions,
             _composer_subscription,
             _emoji_search_subscription,
@@ -398,6 +407,20 @@ impl ChannelChat {
             anyhow::Ok(())
         })
         .detach_and_log_err(cx);
+    }
+
+    fn schedule_draft_save(&mut self, cx: &mut Context<Self>) {
+        let channel_id = self.channel_id;
+        let body = self.composer.read(cx).text(cx);
+        let draft_store = DraftStore::global(cx);
+
+        self.pending_draft_save = Some(cx.spawn(async move |_, cx| {
+            cx.background_executor().timer(DRAFT_SAVE_DEBOUNCE).await;
+            let save_task = draft_store.update(cx, |draft_store, cx| {
+                draft_store.save_draft_in_background(channel_id, body, cx)
+            });
+            save_task.await.log_err();
+        }));
     }
 
     fn channel(&self, cx: &App) -> Option<Arc<Channel>> {
