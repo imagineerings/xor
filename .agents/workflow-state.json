@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T23:28:00Z",
+  "updated_at": "2026-07-08T23:56:00Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -281,6 +281,17 @@
       "owner": null,
       "summary": "Implemented locally with a GPUI SchedulingSettings view backed by scheduler priority metadata, in-memory schedule configs, create form validation, enable/disable toggles, delete confirmation, task-kind selection, and focused unit coverage. Ready to merge in PR.",
       "updated_at": "2026-07-08T23:28:00Z"
+    },
+    {
+      "task_id": "task:goose-desktop-ui-4",
+      "task_identifier": ".agents/specs/goose-migration/desktop-ui/tasks.md:39",
+      "title": "Extend diagnostics UI with Goose doctor results",
+      "linear_identifier": null,
+      "linear_url": null,
+      "status": "inactive",
+      "owner": null,
+      "summary": "Implemented locally with a GPUI GooseDiagnosticsView backed by crates/doctor checks, pass/warning/fail summaries, expandable remediation details, startup auto-run, manual re-run, doctor result logging, and an AgentPanel diagnostics overlay/menu entry. Ready to merge in PR.",
+      "updated_at": "2026-07-08T23:56:00Z"
     }
   ],
   "task_notes": [
@@ -817,8 +828,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/desktop-ui",
-      "summary": "Tasks 1-3 are checked complete. Agent connection state now exposes ACP metadata for existing UI surfaces; agent_ui has a GPUI RecipeBrowser component backed by crates/recipe discovery/loading/execution; and settings_ui has a SchedulingSettings component with create, toggle, delete-confirmation, and cron/task validation backed by scheduler priority metadata. Task 4 can proceed with Goose doctor diagnostics.",
-      "updated_at": "2026-07-08T23:28:00Z"
+      "summary": "Tasks 1-4 are checked complete. Agent connection state exposes ACP metadata; agent_ui has RecipeBrowser and GooseDiagnosticsView GPUI components; settings_ui has SchedulingSettings; diagnostics now run crates/doctor checks with pass/warning/fail summaries, expandable remediation, logging, auto-run, manual re-run, and AgentPanel overlay access. Task 5 can proceed with shared session support.",
+      "updated_at": "2026-07-08T23:56:00Z"
     },
     {
       "scope": ".agents/specs/godot-migration",

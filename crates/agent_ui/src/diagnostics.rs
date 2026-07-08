@@ -1,12 +1,326 @@
+use std::{collections::HashSet, env, fmt::Write, ops::RangeInclusive, path::Path};
+
 use anyhow::Result;
-use gpui::{App, AppContext as _, Entity, Task};
+use doctor::{
+    Doctor, DoctorCheck, DoctorCheckReport, DoctorReport, DoctorStatus, ExtensionDirectoryCheck,
+    SystemDependencyCheck,
+};
+use gpui::{
+    App, AppContext as _, Context, Entity, EventEmitter, FocusHandle, Focusable, IntoElement,
+    ParentElement, Render, SharedString, Styled, Task, Window,
+};
 use language::{Anchor, BufferSnapshot, DiagnosticEntryRef, DiagnosticSeverity, ToOffset};
 use project::{DiagnosticSummary, Project};
 use rope::Point;
-use std::{fmt::Write, ops::RangeInclusive, path::Path};
 use text::OffsetRangeExt;
+use ui::{
+    Button, ButtonStyle, Color, Divider, DividerColor, Icon, IconName, IconSize, Label, LabelSize,
+    prelude::*,
+};
 use util::ResultExt;
 use util::paths::PathMatcher;
+
+const PROVIDER_ENV_KEYS: &[&str] = &[
+    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
+    "GOOGLE_API_KEY",
+    "GEMINI_API_KEY",
+    "DEEPSEEK_API_KEY",
+    "OPENROUTER_API_KEY",
+];
+
+pub struct GooseDiagnosticsView {
+    report: DoctorReport,
+    expanded_checks: HashSet<String>,
+    focus_handle: FocusHandle,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum GooseDiagnosticsEvent {
+    ChecksRun(DoctorReportSummary),
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct DoctorReportSummary {
+    pub passed: usize,
+    pub warnings: usize,
+    pub failures: usize,
+}
+
+struct ProviderCredentialCheck;
+
+impl DoctorCheck for ProviderCredentialCheck {
+    fn name(&self) -> &str {
+        "provider connectivity"
+    }
+
+    fn run(&self) -> DoctorCheckReport {
+        let configured_keys = PROVIDER_ENV_KEYS
+            .iter()
+            .filter(|key| env::var_os(key).is_some())
+            .copied()
+            .collect::<Vec<_>>();
+
+        if configured_keys.is_empty() {
+            return DoctorCheckReport::warning(
+                self.name(),
+                "No provider credentials were found in the environment.",
+                "Configure at least one provider credential or verify provider settings before starting remote model work.",
+            );
+        }
+
+        DoctorCheckReport::pass(
+            self.name(),
+            format!(
+                "{} provider credential source(s) are configured.",
+                configured_keys.len()
+            ),
+        )
+    }
+}
+
+impl GooseDiagnosticsView {
+    pub fn new(cx: &mut Context<Self>) -> Self {
+        let mut this = Self {
+            report: DoctorReport::default(),
+            expanded_checks: HashSet::default(),
+            focus_handle: cx.focus_handle(),
+        };
+        this.run_checks(cx);
+        this
+    }
+
+    pub fn run_checks(&mut self, cx: &mut Context<Self>) {
+        self.report = run_goose_doctor_checks();
+        let summary = summarize_doctor_report(&self.report);
+        log_doctor_report(&self.report);
+        cx.emit(GooseDiagnosticsEvent::ChecksRun(summary));
+        cx.notify();
+    }
+
+    pub fn toggle_check_details(&mut self, name: &str, cx: &mut Context<Self>) {
+        if !self.expanded_checks.insert(name.to_string()) {
+            self.expanded_checks.remove(name);
+        }
+        cx.notify();
+    }
+
+    fn render_summary(&self) -> impl IntoElement {
+        let summary = summarize_doctor_report(&self.report);
+        h_flex()
+            .gap_2()
+            .child(summary_pill(
+                "Passed",
+                summary.passed,
+                Color::Success,
+                IconName::Check,
+            ))
+            .child(summary_pill(
+                "Warnings",
+                summary.warnings,
+                Color::Warning,
+                IconName::Warning,
+            ))
+            .child(summary_pill(
+                "Failed",
+                summary.failures,
+                Color::Error,
+                IconName::XCircle,
+            ))
+    }
+
+    fn render_check(
+        &self,
+        index: usize,
+        check: &DoctorCheckReport,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        let expanded = self.expanded_checks.contains(&check.name);
+        let name = check.name.clone();
+        let (icon, color, status_label) = status_display(check.status);
+
+        v_flex()
+            .id(("goose-doctor-check", index))
+            .gap_2()
+            .p_3()
+            .border_1()
+            .rounded_sm()
+            .border_color(cx.theme().colors().border)
+            .child(
+                h_flex()
+                    .justify_between()
+                    .gap_2()
+                    .child(
+                        h_flex()
+                            .min_w_0()
+                            .gap_2()
+                            .child(Icon::new(icon).size(IconSize::Small).color(color))
+                            .child(
+                                v_flex()
+                                    .min_w_0()
+                                    .child(Label::new(check.name.clone()))
+                                    .child(
+                                        Label::new(status_label)
+                                            .size(LabelSize::Small)
+                                            .color(color),
+                                    ),
+                            ),
+                    )
+                    .child(
+                        Button::new(
+                            ("toggle-goose-doctor-check", index),
+                            if expanded { "Hide" } else { "Details" },
+                        )
+                        .style(ButtonStyle::Subtle)
+                        .on_click(cx.listener(
+                            move |this, _, _window, cx| {
+                                this.toggle_check_details(&name, cx);
+                            },
+                        )),
+                    ),
+            )
+            .when(expanded, |this| {
+                this.child(
+                    v_flex()
+                        .gap_2()
+                        .child(Label::new(check.message.clone()).size(LabelSize::Small))
+                        .when_some(check.remediation.clone(), |this, remediation| {
+                            this.child(
+                                v_flex()
+                                    .gap_1()
+                                    .child(
+                                        Label::new("Remediation")
+                                            .size(LabelSize::Small)
+                                            .color(Color::Muted),
+                                    )
+                                    .child(
+                                        Label::new(remediation)
+                                            .size(LabelSize::Small)
+                                            .color(Color::Muted),
+                                    ),
+                            )
+                        }),
+                )
+            })
+    }
+}
+
+impl Render for GooseDiagnosticsView {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let check_rows = self
+            .report
+            .checks
+            .iter()
+            .enumerate()
+            .map(|(index, check)| self.render_check(index, check, cx).into_any_element())
+            .collect::<Vec<_>>();
+
+        v_flex()
+            .key_context("GooseDiagnosticsView")
+            .track_focus(&self.focus_handle)
+            .size_full()
+            .gap_4()
+            .p_4()
+            .child(
+                h_flex()
+                    .justify_between()
+                    .gap_3()
+                    .child(
+                        v_flex()
+                            .gap_1()
+                            .child(Label::new("Diagnostics").size(LabelSize::Large))
+                            .child(
+                                Label::new("Startup health checks")
+                                    .size(LabelSize::Small)
+                                    .color(Color::Muted),
+                            ),
+                    )
+                    .child(
+                        Button::new("rerun-goose-doctor", "Re-run")
+                            .style(ButtonStyle::Filled)
+                            .start_icon(Icon::new(IconName::RotateCw).size(IconSize::Small))
+                            .on_click(cx.listener(|this, _, _window, cx| {
+                                this.run_checks(cx);
+                            })),
+                    ),
+            )
+            .child(self.render_summary())
+            .child(Divider::horizontal().color(DividerColor::Border))
+            .child(v_flex().gap_2().children(check_rows))
+    }
+}
+
+impl Focusable for GooseDiagnosticsView {
+    fn focus_handle(&self, _cx: &App) -> FocusHandle {
+        self.focus_handle.clone()
+    }
+}
+
+impl EventEmitter<GooseDiagnosticsEvent> for GooseDiagnosticsView {}
+
+pub fn run_goose_doctor_checks() -> DoctorReport {
+    Doctor::new()
+        .with_check(SystemDependencyCheck::new("git"))
+        .with_check(ExtensionDirectoryCheck::new(
+            paths::extensions_dir().clone(),
+        ))
+        .with_check(ProviderCredentialCheck)
+        .run()
+}
+
+pub fn summarize_doctor_report(report: &DoctorReport) -> DoctorReportSummary {
+    report
+        .checks
+        .iter()
+        .fold(DoctorReportSummary::default(), |mut summary, check| {
+            match check.status {
+                DoctorStatus::Pass => summary.passed += 1,
+                DoctorStatus::Warning => summary.warnings += 1,
+                DoctorStatus::Fail => summary.failures += 1,
+            }
+            summary
+        })
+}
+
+fn log_doctor_report(report: &DoctorReport) {
+    for check in &report.checks {
+        match check.status {
+            DoctorStatus::Pass => {
+                log::info!("doctor check passed: {}: {}", check.name, check.message);
+            }
+            DoctorStatus::Warning => {
+                log::warn!("doctor check warning: {}: {}", check.name, check.message);
+            }
+            DoctorStatus::Fail => {
+                log::error!("doctor check failed: {}: {}", check.name, check.message);
+            }
+        }
+    }
+}
+
+fn summary_pill(
+    label: &'static str,
+    count: usize,
+    color: Color,
+    icon: IconName,
+) -> impl IntoElement {
+    h_flex()
+        .gap_1()
+        .px_2()
+        .py_1()
+        .rounded_sm()
+        .border_1()
+        .child(Icon::new(icon).size(IconSize::XSmall).color(color))
+        .child(Label::new(format!("{label}: {count}")).size(LabelSize::Small))
+}
+
+fn status_display(status: DoctorStatus) -> (IconName, Color, SharedString) {
+    match status {
+        DoctorStatus::Pass => (IconName::Check, Color::Success, "Passing".into()),
+        DoctorStatus::Warning => (IconName::Warning, Color::Warning, "Warning".into()),
+        DoctorStatus::Fail => (IconName::XCircle, Color::Error, "Failed".into()),
+    }
+}
 
 pub fn codeblock_fence_for_path(
     path: Option<&str>,
@@ -249,4 +563,36 @@ fn collect_diagnostic(
 
     writeln!(text, "```").unwrap();
     true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn summarizes_doctor_report_by_status() {
+        let report = DoctorReport {
+            checks: vec![
+                DoctorCheckReport::pass("git", "available"),
+                DoctorCheckReport::warning("extensions", "missing", "create directory"),
+                DoctorCheckReport::fail("provider", "unreachable", "check credentials"),
+            ],
+        };
+
+        assert_eq!(
+            summarize_doctor_report(&report),
+            DoctorReportSummary {
+                passed: 1,
+                warnings: 1,
+                failures: 1
+            }
+        );
+    }
+
+    #[test]
+    fn status_display_matches_doctor_status() {
+        assert_eq!(status_display(DoctorStatus::Pass).1, Color::Success);
+        assert_eq!(status_display(DoctorStatus::Warning).1, Color::Warning);
+        assert_eq!(status_display(DoctorStatus::Fail).1, Color::Error);
+    }
 }

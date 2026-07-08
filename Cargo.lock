@@ -513,6 +513,7 @@ dependencies = [
  "component",
  "context_server",
  "db",
+ "doctor",
  "editor",
  "eval_utils",
  "extension",

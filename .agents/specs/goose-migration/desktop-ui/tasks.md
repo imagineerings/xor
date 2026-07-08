@@ -36,7 +36,7 @@ Build GPUI-native views for recipe browsing, scheduling, diagnostics, shared ses
   - _Requirements: 3_
   - _writes: crates/settings_ui/src/scheduling_settings.rs_
 
-- [ ] 4. Extend diagnostics UI with Goose doctor results
+- [x] 4. Extend diagnostics UI with Goose doctor results
   - Reuse existing diagnostics collection where applicable
   - Run health checks with visual status (pass/warning/fail)
   - Expandable detail per check with remediation steps

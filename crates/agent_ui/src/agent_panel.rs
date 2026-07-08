@@ -39,6 +39,7 @@ use crate::ExpandMessageEditor;
 use crate::ManageProfiles;
 use crate::agent_connection_store::{AcpConnectionDetails, AgentConnectionStore};
 use crate::completion_provider::{AgentContextSelection, AgentContextSource};
+use crate::diagnostics::GooseDiagnosticsView;
 use crate::terminal_thread_metadata_store::{
     TerminalThreadMetadata, TerminalThreadMetadataStore, compose_terminal_thread_title,
     terminal_title_without_prefix,
@@ -1112,6 +1113,7 @@ impl From<AgentThread> for BaseView {
 
 enum OverlayView {
     Configuration,
+    Diagnostics,
 }
 
 enum VisibleSurface<'a> {
@@ -1119,6 +1121,7 @@ enum VisibleSurface<'a> {
     AgentThread(&'a Entity<ConversationView>),
     Terminal(&'a Entity<TerminalView>),
     Configuration(Option<&'a Entity<AgentConfiguration>>),
+    Diagnostics(Option<&'a Entity<GooseDiagnosticsView>>),
 }
 
 enum WhichFontSize {
@@ -1138,7 +1141,7 @@ impl BaseView {
 impl OverlayView {
     pub fn which_font_size_used(&self) -> WhichFontSize {
         match self {
-            OverlayView::Configuration => WhichFontSize::None,
+            OverlayView::Configuration | OverlayView::Diagnostics => WhichFontSize::None,
         }
     }
 }
@@ -1156,6 +1159,7 @@ pub struct AgentPanel {
     context_server_registry: Entity<ContextServerRegistry>,
     configuration: Option<Entity<AgentConfiguration>>,
     configuration_subscription: Option<Subscription>,
+    diagnostics_view: Option<Entity<GooseDiagnosticsView>>,
     focus_handle: FocusHandle,
     base_view: BaseView,
     last_created_entry_kind: AgentPanelEntryKind,
@@ -1563,6 +1567,7 @@ impl AgentPanel {
             connection_store,
             configuration: None,
             configuration_subscription: None,
+            diagnostics_view: None,
             focus_handle: cx.focus_handle(),
             context_server_registry,
             draft_thread: None,
@@ -3607,6 +3612,21 @@ impl AgentPanel {
         }
     }
 
+    fn open_diagnostics(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if matches!(self.overlay_view, Some(OverlayView::Diagnostics)) {
+            self.clear_overlay(true, window, cx);
+            return;
+        }
+
+        self.clear_overlay_state();
+        self.diagnostics_view = Some(cx.new(GooseDiagnosticsView::new));
+        self.set_overlay(OverlayView::Diagnostics, true, window, cx);
+
+        if let Some(diagnostics_view) = self.diagnostics_view.as_ref() {
+            diagnostics_view.focus_handle(cx).focus(window, cx);
+        }
+    }
+
     pub(crate) fn open_active_thread_as_markdown(
         &mut self,
         _: &OpenActiveThreadAsMarkdown,
@@ -4208,6 +4228,7 @@ impl AgentPanel {
         self.overlay_view = None;
         self.configuration_subscription = None;
         self.configuration = None;
+        self.diagnostics_view = None;
     }
 
     fn refresh_base_view_subscriptions(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -4266,6 +4287,9 @@ impl AgentPanel {
             return match overlay_view {
                 OverlayView::Configuration => {
                     VisibleSurface::Configuration(self.configuration.as_ref())
+                }
+                OverlayView::Diagnostics => {
+                    VisibleSurface::Diagnostics(self.diagnostics_view.as_ref())
                 }
             };
         }
@@ -4935,6 +4959,13 @@ impl Focusable for AgentPanel {
                     self.focus_handle.clone()
                 }
             }
+            VisibleSurface::Diagnostics(diagnostics_view) => {
+                if let Some(diagnostics_view) = diagnostics_view {
+                    diagnostics_view.focus_handle(cx)
+                } else {
+                    self.focus_handle.clone()
+                }
+            }
         }
     }
 }
@@ -5456,6 +5487,9 @@ impl AgentPanel {
             VisibleSurface::Configuration(_) => {
                 Label::new("Settings").truncate().into_any_element()
             }
+            VisibleSurface::Diagnostics(_) => {
+                Label::new("Diagnostics").truncate().into_any_element()
+            }
             VisibleSurface::Uninitialized => Label::new("Agent").truncate().into_any_element(),
         };
 
@@ -5576,6 +5610,7 @@ impl AgentPanel {
             .is_some();
 
         let workspace = self.workspace.clone();
+        let panel = cx.entity().downgrade();
 
         PopoverMenu::new("agent-options-menu")
             .trigger_with_tooltip(
@@ -5632,6 +5667,16 @@ impl AgentPanel {
                                 )
                                 .separator()
                                 .header("Context")
+                                .entry("Diagnostics", None, {
+                                    let panel = panel.clone();
+                                    move |window, cx| {
+                                        panel
+                                            .update(cx, |panel, cx| {
+                                                panel.open_diagnostics(window, cx);
+                                            })
+                                            .log_err();
+                                    }
+                                })
                                 .action("Skills", Box::new(ManageSkills));
 
                             if project_agents_md_path.is_some() || global_agents_md_loaded {
@@ -6583,6 +6628,9 @@ impl Render for AgentPanel {
                     .child(self.render_drag_target(cx)),
                 VisibleSurface::Configuration(configuration) => {
                     parent.children(configuration.cloned())
+                }
+                VisibleSurface::Diagnostics(diagnostics_view) => {
+                    parent.children(diagnostics_view.cloned())
                 }
             })
             .children(self.render_trial_end_upsell(window, cx));
