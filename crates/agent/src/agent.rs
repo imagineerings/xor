@@ -20,6 +20,8 @@ mod templates;
 mod tests;
 mod thread;
 mod thread_store;
+mod tool_inspector;
+mod tool_monitor;
 mod tool_permissions;
 mod tools;
 
@@ -42,6 +44,8 @@ pub use sources::*;
 pub use templates::*;
 pub use thread::*;
 pub use thread_store::*;
+pub use tool_inspector::*;
+pub use tool_monitor::*;
 pub use tool_permissions::*;
 pub use tools::*;
 

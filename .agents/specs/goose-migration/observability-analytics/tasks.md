@@ -55,7 +55,7 @@ Extend sim's observability infrastructure with Langfuse tracing, OpenTelemetry O
   - _Requirements: 5_
   - _writes: crates/posthog/src/posthog.rs, crates/posthog/src/client.rs_
 
-- [ ] 7. Implement tool monitor and inspector
+- [x] 7. Implement tool monitor and inspector
   - Record tool invocations with timing and success/failure
   - Aggregate statistics per tool
   - Enumerate registered tools with schemas
