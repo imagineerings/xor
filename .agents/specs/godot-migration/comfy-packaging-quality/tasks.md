@@ -33,10 +33,12 @@ Build cross-cutting migration controls that other Comfy specs depend on: launch 
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
   - _writes: crates/world_model/src/sim_feature_flags.rs, crates/world_model/src/sim_feature_flags_tests.rs_
 
-- [ ] 3. Implement API schema support catalog
+- [x] 3. Implement API schema support catalog
   - Track supported, planned, cloud-only, external, and unsupported route statuses for Comfy/OpenAPI compatibility.
-  - _Requirements: 3.1, 3.3_
-  - _writes: crates/world_model/src/comfy_api_schema.rs, crates/world_model/fixtures/comfy/api_routes.json, crates/world_model/src/comfy_api_schema_tests.rs_
+  - Derive implemented route coverage from Sim-owned route handlers, require schema refs for implemented routes, and require reasons for planned/cloud-only/external/unsupported routes.
+  - Represent schema status with native `SimApiSchema*` records while compatibility adapters translate documented route shape.
+  - _Requirements: 3.1, 3.3, 3.4_
+  - _writes: crates/world_model/src/sim_api_schema.rs, crates/world_model/fixtures/comfy/api_routes.json, crates/world_model/src/sim_api_schema_tests.rs_
 
 - [ ] 4. Build compatibility fixture suite
   - Add fixture harnesses for script examples, route snapshots, node schemas, blueprint manifest, provider catalog, asset API, and media capability groups.

@@ -47,6 +47,7 @@ pub mod request;
 pub mod serving;
 pub mod serving_diagnostics;
 pub mod session;
+pub mod sim_api_schema;
 pub mod sim_asset_api;
 pub mod sim_asset_download;
 pub mod sim_asset_enrichment;
@@ -139,6 +140,8 @@ mod mesh_tests;
 mod serving_tests;
 #[cfg(test)]
 mod session_tests;
+#[cfg(test)]
+mod sim_api_schema_tests;
 #[cfg(test)]
 mod sim_asset_api_tests;
 #[cfg(test)]
@@ -341,6 +344,10 @@ pub use serving_diagnostics::{
     ServingValidator,
 };
 pub use session::{WorldModelCacheMetadata, WorldModelSession, WorldModelSessionState};
+pub use sim_api_schema::{
+    API_SCHEMA_MISSING_REASON_CODE, API_SCHEMA_MISSING_SCHEMA_CODE, SimApiRouteSupport,
+    SimApiSchemaCatalog, SimApiSchemaDiagnostic, SimApiSchemaRoute,
+};
 pub use sim_asset_api::{
     ASSET_API_FORBIDDEN_CODE, ASSET_API_HASH_NOT_FOUND_CODE, SimAssetApi, SimAssetApiDiagnostic,
     SimAssetListPage, SimAssetReferenceDetail, SimAssetUpdateRequest, missing_content_api_error,

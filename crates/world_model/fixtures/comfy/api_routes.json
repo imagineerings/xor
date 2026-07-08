@@ -1,0 +1,124 @@
+{
+  "routes": [
+    {
+      "method": "Get",
+      "path": "/api/embeddings",
+      "support": "Implemented",
+      "native_handler": "model_catalog",
+      "schema_ref": "#/paths/embeddings",
+      "notes": null
+    },
+    {
+      "method": "Get",
+      "path": "/api/extensions",
+      "support": "Implemented",
+      "native_handler": "extension_registry",
+      "schema_ref": "#/paths/extensions",
+      "notes": null
+    },
+    {
+      "method": "Get",
+      "path": "/api/features",
+      "support": "Implemented",
+      "native_handler": "control_plane",
+      "schema_ref": "#/paths/features",
+      "notes": null
+    },
+    {
+      "method": "Get",
+      "path": "/api/history",
+      "support": "Implemented",
+      "native_handler": "job_bridge",
+      "schema_ref": "#/paths/history",
+      "notes": null
+    },
+    {
+      "method": "Get",
+      "path": "/api/history/{prompt_id}",
+      "support": "Implemented",
+      "native_handler": "job_bridge",
+      "schema_ref": "#/paths/history__prompt_id",
+      "notes": null
+    },
+    {
+      "method": "Get",
+      "path": "/api/jobs",
+      "support": "Implemented",
+      "native_handler": "job_bridge",
+      "schema_ref": "#/paths/jobs",
+      "notes": null
+    },
+    {
+      "method": "Get",
+      "path": "/api/models",
+      "support": "Implemented",
+      "native_handler": "model_catalog",
+      "schema_ref": "#/paths/models",
+      "notes": null
+    },
+    {
+      "method": "Get",
+      "path": "/api/models/{folder}",
+      "support": "Implemented",
+      "native_handler": "model_catalog",
+      "schema_ref": "#/paths/models__folder",
+      "notes": null
+    },
+    {
+      "method": "Get",
+      "path": "/api/object_info",
+      "support": "Implemented",
+      "native_handler": "object_info",
+      "schema_ref": "#/paths/object_info",
+      "notes": null
+    },
+    {
+      "method": "Get",
+      "path": "/api/object_info/{node_class}",
+      "support": "Implemented",
+      "native_handler": "object_info",
+      "schema_ref": "#/paths/object_info__node_class",
+      "notes": null
+    },
+    {
+      "method": "Get",
+      "path": "/api/prompt",
+      "support": "Implemented",
+      "native_handler": "job_bridge",
+      "schema_ref": "#/paths/prompt",
+      "notes": null
+    },
+    {
+      "method": "Get",
+      "path": "/api/queue",
+      "support": "Implemented",
+      "native_handler": "job_bridge",
+      "schema_ref": "#/paths/queue",
+      "notes": null
+    },
+    {
+      "method": "Get",
+      "path": "/api/view",
+      "support": "Implemented",
+      "native_handler": "asset_library",
+      "schema_ref": "#/paths/view",
+      "notes": null
+    },
+    {
+      "method": "Post",
+      "path": "/api/prompt",
+      "support": "Implemented",
+      "native_handler": "control_plane",
+      "schema_ref": "#/paths/prompt",
+      "notes": null
+    },
+    {
+      "method": "Post",
+      "path": "/api/upload/image",
+      "support": "Implemented",
+      "native_handler": "asset_library",
+      "schema_ref": "#/paths/upload_image",
+      "notes": null
+    }
+  ]
+}

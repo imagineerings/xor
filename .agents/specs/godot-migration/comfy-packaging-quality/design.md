@@ -11,7 +11,7 @@ flowchart LR
     Config[SimLaunchProfileParser] --> Policy[RuntimeConfigPolicy]
     Policy --> Model[comfy-model-memory-runtime]
     Flags[SimFeatureFlagRegistry] --> Runtime[comfy-runtime-control-plane]
-    Schema[ComfyApiSchemaCatalog] --> Tests[CompatibilityFixtureSuite]
+    Schema[SimApiSchemaCatalog] --> Tests[CompatibilityFixtureSuite]
     Deps[DependencyReviewGate] --> Packaging[PackagingProfileCatalog]
     Logs[DiagnosticsAdapter] --> SimDiag[Sim Diagnostics]
 ```
@@ -37,10 +37,14 @@ flowchart LR
   embedded docs packages. Comfy-compatible route/event adapters may translate
   these values to compatibility payloads, but they do not own the registry.
 
-### ComfyApiSchemaCatalog
+### SimApiSchemaCatalog
 
 - **Purpose**: Track implemented, planned, cloud-only, external, and unsupported Comfy/OpenAPI routes.
 - **Responsibilities**: Schema coverage, route status, request/response fixtures, and compatibility notes.
+- **Native behavior**: Derives implemented route coverage from Sim's native
+  Comfy route catalog, records schema references for supported routes, and
+  classifies documented non-local routes as planned, cloud-only, external, or
+  unsupported with explicit reasons.
 
 ### CompatibilityFixtureSuite
 
@@ -73,6 +77,10 @@ pub struct SimFeatureFlagRegistry {
     pub core_flags: SimFeatureFlags,
     pub cli_flags: SimFeatureFlags,
     pub client_flags: BTreeMap<String, SimFeatureFlags>,
+}
+
+pub struct SimApiSchemaCatalog {
+    pub routes: Vec<SimApiSchemaRoute>,
 }
 
 pub enum ComfyRouteSupport {

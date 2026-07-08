@@ -45,6 +45,7 @@ Sim needs Comfy migration support for launch configuration, feature flags, front
 3.1 WHEN Comfy-compatible APIs are exposed THEN THE system SHALL include OpenAPI or equivalent schema coverage for supported routes.
 3.2 WHEN example scripts are migrated THEN THE system SHALL provide automated fixtures for basic HTTP prompt submission and WebSocket completion/output retrieval.
 3.3 IF a documented OpenAPI route is not implemented locally THEN THE system SHALL mark it as cloud-only, external, unsupported, or planned.
+3.4 WHEN Comfy-compatible API schema status is represented in Sim THEN THE system SHALL use native `SimApiSchema*` implementation types and SHALL NOT expose Sim-owned schema catalogs as `ComfyApiSchema*` pass-through records.
 
 ### Requirement 4: Automated Test Coverage
 
