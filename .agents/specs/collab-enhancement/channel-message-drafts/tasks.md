@@ -14,12 +14,13 @@ Add client-side draft persistence for channel message composition. When a user t
 
 ### Phase 1: DraftStore core
 
-- [ ] 1. Create `DraftStore` data structures and in-memory API
+- [x] 1. Create `DraftStore` data structures and in-memory API
   - Define `Draft` struct with `body: String` and `updated_at: DateTime<Utc>`, with `Serialize`/`Deserialize` derives.
   - Define `DraftStore` struct with `kvp: Entity<KeyValueStore>`, `drafts: HashMap<ChannelId, Draft>` in-memory cache, and `active_draft_channel: Option<ChannelId>`.
   - Implement `save_draft()`, `load_draft()`, `clear_draft()`, `has_draft()`, `channels_with_drafts()` — all operating on the in-memory cache initially.
   - _Requirements: 7.1_
   - _writes: `crates/collab_ui/src/draft_store.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui draft_store --features test-support`_
 
 - [ ] 2. Add KVP persistence layer to `DraftStore`
   - Implement `persist_key(channel_id) -> String` — key format `channel_draft.{channel_id}`.

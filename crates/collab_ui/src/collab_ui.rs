@@ -2,6 +2,7 @@ mod call_stats_modal;
 pub mod channel_chat;
 pub mod channel_view;
 pub mod collab_panel;
+pub mod draft_store;
 pub mod notifications;
 mod panel_settings;
 

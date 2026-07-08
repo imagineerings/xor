@@ -23,6 +23,7 @@ test-support = [
 
     "project/test-support",
     "remote/test-support",
+    "remote_connection/test-support",
     "util/test-support",
     "workspace/test-support",
     "recent_projects/test-support",
