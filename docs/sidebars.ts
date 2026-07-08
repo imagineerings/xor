@@ -66,6 +66,17 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: "category",
+      label: "Features",
+      items: [
+        "features/index",
+        "features/agent",
+        "features/tools",
+        "features/recipes",
+        "features/security-permissions",
+      ],
+    },
+    {
+      type: "category",
       label: "Remote Development",
       items: ["remote-development", "environment", "dev-containers"],
     },

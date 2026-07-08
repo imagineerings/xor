@@ -20,7 +20,7 @@ Set up a Docusaurus-based documentation site for sim with installation guides, c
   - _Requirements: 1_
   - _writes: docs/docs/getting-started/_
 
-- [ ] 3. Write feature documentation
+- [x] 3. Write feature documentation
   - Agent features
   - Tool descriptions
   - Recipe system
