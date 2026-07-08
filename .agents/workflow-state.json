@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T20:12:00Z",
+  "updated_at": "2026-07-08T20:32:00Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -676,6 +676,12 @@
       "status": "done",
       "summary": "Task 10: Added scripts/test-security-permissions.sh to validate security pattern/scanner tests, permission store/inspector/confirmation tests, and agent security/permission integration filters, and wired it into prerelease quick checks.",
       "updated_at": "2026-07-08T20:12:00Z"
+    },
+    {
+      "task_identifier": ".agents/specs/goose-migration/text-ui/tasks.md:13",
+      "status": "done",
+      "summary": "Task 1: Added the CLI interactive session core with ConversationMessage/ConversationRole state, multiline InputEditor editing and history navigation, session input/output transitions, plain-text conversation rendering, and TerminalModeGuard raw-mode setup/teardown semantics.",
+      "updated_at": "2026-07-08T20:32:00Z"
     }
   ],
   "dependency_notes": [
@@ -728,6 +734,11 @@
       "scope": ".agents/specs/goose-migration/security-permissions",
       "summary": "Tasks 1-10 are checked complete. crates/security provides PatternRegistry, AdversaryInspector, EgressInspector, ClassificationClient, and SecurityScanner aggregation. crates/permission provides PermissionStore, PermissionJudge, PermissionInspector, and GPUI PermissionConfirmation. crates/agent exposes AgentSecurity and AgentPermissionSystem helpers. scripts/test-security-permissions.sh validates the delivered slice from prerelease quick checks.",
       "updated_at": "2026-07-08T20:12:00Z"
+    },
+    {
+      "scope": ".agents/specs/goose-migration/text-ui",
+      "summary": "Task 1 is checked complete. crates/cli now exposes an interactive session/input core with conversation state, multiline editing, history navigation, and raw terminal mode guard semantics. Task 2 can build terminal rendering and markdown formatting on top of this module.",
+      "updated_at": "2026-07-08T20:32:00Z"
     },
     {
       "scope": ".agents/specs/godot-migration",

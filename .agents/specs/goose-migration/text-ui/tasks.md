@@ -10,7 +10,7 @@ Implement an interactive terminal UI mode for sim's CLI using crossterm/ratatui,
 
 ## Tasks
 
-- [ ] 1. Implement interactive session core
+- [x] 1. Implement interactive session core
   - Create `InteractiveSession` with conversation state management
   - Implement multiline input with history (up/down navigation)
   - Terminal raw mode setup/teardown

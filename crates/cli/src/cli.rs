@@ -5,6 +5,8 @@ use collections::HashMap;
 pub use ipc_channel::ipc;
 use serde::{Deserialize, Serialize};
 
+pub mod interactive;
+
 #[derive(Serialize, Deserialize)]
 pub struct IpcHandshake {
     pub requests: ipc::IpcSender<CliRequest>,
