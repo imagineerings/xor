@@ -227,6 +227,7 @@ sim_actions.workspace = true
 sim_apps.workspace = true
 sim_env_vars.workspace = true
 sim_game.workspace = true
+world_model.workspace = true
 zlog.workspace = true
 zlog_settings.workspace = true
 

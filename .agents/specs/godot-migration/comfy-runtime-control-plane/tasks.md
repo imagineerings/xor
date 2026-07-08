@@ -32,8 +32,9 @@ Build the control plane as a protocol adapter over Sim task, HTTP, WebSocket, me
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
   - _writes: crates/world_model/src/comfy_http_safety.rs, crates/world_model/src/comfy_http_safety_tests.rs_
 
-- [ ] 3. Register Comfy-compatible route aliases
-  - Register legacy and `/api` paths for prompt, queue, history, jobs, features, model catalog, object info, upload, and view handlers.
+- [x] 3. Register Comfy-compatible route aliases
+  - Register legacy and `/api` paths for prompt, queue, history, jobs, features, model catalog, object info, upload, and view handlers as method-aware native Sim route catalog records.
+  - Preserve distinct handlers for shared paths such as `GET /prompt` and `POST /prompt`, and map aliases to Sim-owned handler domains rather than a ComfyUI server.
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 5.1_
   - _writes: crates/world_model/src/comfy_routes.rs, crates/sim/src/sim.rs, crates/world_model/src/comfy_routes_tests.rs_
 

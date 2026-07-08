@@ -106,6 +106,7 @@ use workspace::{
     CloseIntent, CloseProject, CloseWindow, RestoreBanner, with_active_or_new_workspace,
 };
 use workspace::{Pane, notifications::DetachAndPromptErr};
+use world_model::ComfyRouteCatalog;
 
 const DOCS_URL: &str = "https://sim.dev/docs/";
 const STATUS_URL: &str = "https://status.sim.dev";
@@ -425,6 +426,13 @@ pub fn register_game_integration(app_state: &AppState, _cx: &mut App) {
             route.kind,
         );
     }
+
+    let comfy_route_count = default_comfy_route_catalog().routes().count();
+    log::info!("Comfy control-plane route catalog registered: {comfy_route_count} routes");
+}
+
+pub fn default_comfy_route_catalog() -> ComfyRouteCatalog {
+    ComfyRouteCatalog::default_comfy_routes()
 }
 
 pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {

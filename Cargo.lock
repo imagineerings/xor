@@ -17293,6 +17293,7 @@ dependencies = [
  "windows 0.61.3",
  "windows_resources",
  "workspace",
+ "world_model",
  "zed-reqwest",
  "zlog",
  "zlog_settings",

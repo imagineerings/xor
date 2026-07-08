@@ -27,6 +27,12 @@ The adapter exposes legacy Comfy paths and `/api` aliases. Internally it convert
 - **Purpose**: Register Comfy-compatible HTTP routes against Sim HTTP infrastructure.
 - **Responsibilities**: Parse requests, validate prompt ids, map `/api` aliases, return Comfy-compatible JSON, and enforce route-level safety.
 - **Does not own**: Job execution, asset persistence, model loading, or frontend rendering.
+- **Native route catalog**: Route aliases are method-aware native Sim records in
+  `world_model`. Legacy and `/api` paths resolve to the same owning Sim handler
+  domain, while shared paths such as `GET /prompt` and `POST /prompt` remain
+  distinct operations. The catalog covers prompt submission/status, queue,
+  history, jobs, features, model catalog, object info, upload, view,
+  embeddings, and extensions without registering a ComfyUI web server.
 - **Interface contract**:
 
 ```rust
@@ -156,7 +162,7 @@ _For any_ upload, view, or download request, the resolved filesystem path SHALL 
 
 ## Testing Strategy
 
-- Unit tests for prompt id validation, native protocol records, HTTP safety primitives, `/api` alias routing, queue redaction, cancel classification, and path confinement.
+- Unit tests for prompt id validation, native protocol records, HTTP safety primitives, method-aware `/api` alias routing, queue redaction, cancel classification, and path confinement.
 - Integration tests for prompt submission through queue, job status transitions, WebSocket feature negotiation, progress events, and preview metadata negotiation.
 - Compatibility fixtures from `projects/comfy/script_examples` for basic HTTP prompt execution and WebSocket image retrieval.
 - Property tests for route alias equivalence and path traversal rejection.

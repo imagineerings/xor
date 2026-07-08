@@ -516,6 +516,7 @@ x_ai = { path = "crates/x_ai" }
 sim = { path = "crates/sim" }
 sim_actions = { path = "crates/sim_actions" }
 sim_game = { path = "crates/sim_game" }
+world_model = { path = "crates/world_model" }
 sim_apps = { path = "crates/sim_apps" }
 sim_server = { path = "crates/sim-server" }
 sim_credentials_provider = { path = "crates/sim_credentials_provider" }
