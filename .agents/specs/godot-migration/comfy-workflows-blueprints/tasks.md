@@ -20,8 +20,9 @@ Import shipped blueprints first, then add workflow persistence and API export, t
 
 ## Tasks
 
-- [ ] 1. Import shipped Comfy blueprints
+- [x] 1. Import shipped Comfy blueprints
   - Add importer fixtures for all blueprint JSON files and associated GLSL/helper dependencies.
+  - Preserve shipped names, source paths, graph JSON, categories, attribution, node inventory, dependency diagnostics, and unsupported-node diagnostics as native Sim catalog records without ComfyUI pass-through.
   - _Requirements: 1.1, 1.2, 1.3_
   - _writes: crates/world_model/src/comfy_blueprints.rs, crates/world_model/fixtures/comfy/blueprints_manifest.json, crates/world_model/src/comfy_blueprints_tests.rs_
 

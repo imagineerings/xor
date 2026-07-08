@@ -1,4 +1,5 @@
 pub mod artifact;
+pub mod comfy_blueprints;
 pub mod comfy_cache;
 pub mod comfy_cancellation;
 pub mod comfy_conditioning;
@@ -43,6 +44,8 @@ pub mod worker_launcher;
 
 #[cfg(test)]
 mod artifact_tests;
+#[cfg(test)]
+mod comfy_blueprints_tests;
 #[cfg(test)]
 mod comfy_cache_tests;
 #[cfg(test)]
@@ -109,6 +112,12 @@ mod session_tests;
 mod tests;
 
 pub use artifact::{GeneratedWorldArtifact, GeneratedWorldArtifactError};
+pub use comfy_blueprints::{
+    BLUEPRINT_COUNT_MISMATCH_CODE, ComfyBlueprintCatalog, ComfyBlueprintCategory,
+    ComfyBlueprintDependency, ComfyBlueprintDependencyKind, ComfyBlueprintDiagnostic,
+    ComfyBlueprintRecord, DUPLICATE_BLUEPRINT_CODE, MISSING_BLUEPRINT_DEPENDENCY_CODE,
+    UNSUPPORTED_BLUEPRINT_NODE_CODE,
+};
 pub use comfy_cache::{ComfyCachePolicy, NodeCacheEntry, NodeCacheSnapshot, cache_key_for_node};
 pub use comfy_cancellation::{
     ComfyCancellationAction, ComfyCancellationController, ComfyCancellationMode,

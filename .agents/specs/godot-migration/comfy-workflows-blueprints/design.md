@@ -23,6 +23,11 @@ flowchart LR
 
 - **Purpose**: Import shipped Comfy blueprint JSON and associated GLSL/helper assets.
 - **Responsibilities**: Preserve names, source paths, categories, dependency references, and attribution.
+- **Native catalog**: Shipped blueprint fixtures are normalized into Sim-owned
+  blueprint records with preserved graph JSON, source path, category,
+  dependency records, node type inventory, and attribution. Unsupported nodes or
+  missing dependencies produce diagnostics without dropping the blueprint, and
+  the importer does not call into a ComfyUI catalog.
 
 ### WorkflowStore
 
@@ -116,7 +121,7 @@ _For any_ generated file import, metadata extraction failure SHALL NOT block ass
 
 ## Testing Strategy
 
-- Import tests over the full `projects/comfy/blueprints` fixture list.
+- Import tests over the full 89-entry `projects/comfy/blueprints` fixture list.
 - Snapshot tests for blueprint catalog entries and subgraph ids.
 - Round-trip tests for workflow load/save/API export.
 - Replacement tests shared with `comfy-graph-node-runtime/`.
