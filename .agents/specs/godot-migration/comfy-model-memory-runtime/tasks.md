@@ -30,8 +30,8 @@ Implement the model runtime as catalog and policy primitives first, then connect
   - _Requirements: 2.1_
   - _writes: crates/world_model/src/comfy_model_catalog.rs, crates/world_model/src/comfy_model_catalog_tests.rs_
 
-- [ ] 3. Implement model preview and safetensors metadata reads
-  - Add adjacent preview lookup and bounded safetensors header metadata extraction.
+- [x] 3. Implement model preview and safetensors metadata reads
+  - Add native Sim adjacent preview lookup and bounded safetensors header metadata extraction without loading model weights or passing metadata reads through to ComfyUI.
   - _Requirements: 2.2, 2.3_
   - _writes: crates/world_model/src/comfy_model_metadata.rs, crates/world_model/src/comfy_model_metadata_tests.rs_
 
