@@ -574,6 +574,63 @@ mod tests {
     }
 
     #[gpui::test]
+    async fn background_saves_preserve_independent_channel_drafts(cx: &mut gpui::TestAppContext) {
+        let kvp = KeyValueStore::open_test_db("draft_store_background_independent").await;
+        let store = cx.update(|cx| cx.new(|_| DraftStore::new(kvp.clone())));
+        let channel_a = ChannelId(7);
+        let channel_b = ChannelId(8);
+        let channel_c = ChannelId(9);
+
+        let save_a = cx.update(|cx| {
+            store.update(cx, |store, cx| {
+                store.save_draft_in_background(channel_a, "draft a".to_string(), cx)
+            })
+        });
+        let save_b = cx.update(|cx| {
+            store.update(cx, |store, cx| {
+                store.save_draft_in_background(channel_b, "draft b".to_string(), cx)
+            })
+        });
+        let save_c = cx.update(|cx| {
+            store.update(cx, |store, cx| {
+                store.save_draft_in_background(channel_c, "draft c".to_string(), cx)
+            })
+        });
+
+        save_a.await.expect("save draft a");
+        save_b.await.expect("save draft b");
+        save_c.await.expect("save draft c");
+
+        assert_eq!(
+            cx.update(|cx| store.read(cx).channels_with_drafts()),
+            vec![channel_a, channel_b, channel_c]
+        );
+
+        let mut restarted_store = DraftStore::new(kvp);
+        assert_eq!(
+            restarted_store
+                .load_draft(channel_a)
+                .await
+                .expect("load draft a"),
+            Some("draft a".to_string())
+        );
+        assert_eq!(
+            restarted_store
+                .load_draft(channel_b)
+                .await
+                .expect("load draft b"),
+            Some("draft b".to_string())
+        );
+        assert_eq!(
+            restarted_store
+                .load_draft(channel_c)
+                .await
+                .expect("load draft c"),
+            Some("draft c".to_string())
+        );
+    }
+
+    #[gpui::test]
     async fn init_primes_global_store_from_kvp(cx: &mut gpui::TestAppContext) {
         cx.update(|cx| cx.set_global(db::AppDatabase::test_new()));
         let kvp = cx.update(|cx| KeyValueStore::global(cx));
