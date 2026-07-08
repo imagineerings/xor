@@ -23,6 +23,7 @@ Sim needs Comfy migration support for launch configuration, feature flags, front
 1.1 WHEN a launch profile is parsed THEN THE system SHALL capture listen address, port, TLS, CORS, upload size, base/input/output/temp/user directories, auto-launch, logging, assets, database URL, API nodes, custom nodes, manager mode, feature flags, and compression settings.
 1.2 WHEN device, precision, memory, attention, cache, or performance options are present THEN THE system SHALL pass validated settings to the model runtime policy resolver.
 1.3 IF a launch option is unsupported THEN THE system SHALL report the option, reason, and nearest Sim equivalent.
+1.4 WHEN Comfy-compatible launch options are represented in Sim THEN THE system SHALL use native `SimLaunch*` implementation types and SHALL NOT expose Sim-owned launch profiles as `ComfyLaunch*` pass-through records.
 
 ### Requirement 2: Feature Flags and Frontend Packages
 

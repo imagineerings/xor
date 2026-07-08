@@ -2,13 +2,13 @@
 
 ## Overview
 
-This spec centralizes migration-wide quality controls so other Comfy specs do not each reinvent configuration parsing, feature flags, schema fixtures, dependency review, test strategy, or platform packaging rules. It protects the core Comfy-derived harness behavior rather than defining a user-facing runtime.
+This spec centralizes migration-wide quality controls so other Comfy specs do not each reinvent configuration parsing, feature flags, schema fixtures, dependency review, test strategy, or platform packaging rules. It protects the core Comfy-derived harness behavior rather than defining a user-facing runtime. Comfy compatibility is an input/output contract only; Sim-owned configuration, diagnostics, and launch profile types use native `Sim*` names and do not pass through to ComfyUI launch code.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    Config[ComfyLaunchProfileParser] --> Policy[RuntimeConfigPolicy]
+    Config[SimLaunchProfileParser] --> Policy[RuntimeConfigPolicy]
     Policy --> Model[comfy-model-memory-runtime]
     Flags[FeatureFlagRegistry] --> Runtime[comfy-runtime-control-plane]
     Schema[ComfyApiSchemaCatalog] --> Tests[CompatibilityFixtureSuite]
@@ -18,10 +18,14 @@ flowchart LR
 
 ## Components and Interfaces
 
-### ComfyLaunchProfileParser
+### SimLaunchProfileParser
 
 - **Purpose**: Parse Comfy-compatible launch options into Sim configuration.
 - **Responsibilities**: Networking, directories, upload limits, logging, assets, database, API nodes, custom nodes, manager mode, feature flags, memory, precision, device, cache, and performance options.
+- **Native behavior**: Accepts Comfy-shaped CLI/config options as input, maps
+  supported settings to `SimLaunchProfile` records and `RuntimePolicyRequest`,
+  and accumulates diagnostics for invalid or unsupported options instead of
+  delegating parsing or validation to ComfyUI.
 
 ### FeatureFlagRegistry
 
@@ -50,14 +54,14 @@ flowchart LR
 ## Data Models
 
 ```rust
-pub struct ComfyLaunchProfile {
-    pub network: NetworkLaunchOptions,
-    pub directories: DirectoryLaunchOptions,
+pub struct SimLaunchProfile {
+    pub network: SimNetworkLaunchOptions,
+    pub directories: SimDirectoryLaunchOptions,
     pub features: FeatureFlagSet,
     pub runtime_policy: RuntimePolicyInput,
-    pub assets: AssetLaunchOptions,
-    pub extensions: ExtensionLaunchOptions,
-    pub diagnostics: DiagnosticLaunchOptions,
+    pub assets: SimAssetLaunchOptions,
+    pub extensions: SimExtensionLaunchOptions,
+    pub diagnostics: SimDiagnosticLaunchOptions,
 }
 
 pub enum ComfyRouteSupport {

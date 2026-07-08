@@ -56,6 +56,7 @@ pub mod sim_asset_seeder;
 pub mod sim_asset_tags;
 pub mod sim_asset_upload;
 pub mod sim_assets;
+pub mod sim_launch_profile;
 pub mod sim_user_data;
 pub mod worker_launcher;
 
@@ -149,6 +150,8 @@ mod sim_asset_query_tests;
 mod sim_asset_scanner_tests;
 #[cfg(test)]
 mod sim_assets_tests;
+#[cfg(test)]
+mod sim_launch_profile_tests;
 #[cfg(test)]
 mod sim_user_data_tests;
 #[cfg(test)]
@@ -375,6 +378,14 @@ pub use sim_assets::{
     SimAssetContentId, SimAssetContentRecord, SimAssetDiagnostic, SimAssetHash, SimAssetOwnerId,
     SimAssetReferenceId, SimAssetReferencePatch, SimAssetReferenceRecord, SimAssetReferenceRequest,
     SimAssetRepository,
+};
+pub use sim_launch_profile::{
+    LAUNCH_PROFILE_INVALID_OPTION_CODE, LAUNCH_PROFILE_UNSUPPORTED_OPTION_CODE,
+    SimApiNodeLaunchOptions, SimAssetLaunchOptions, SimCacheLaunchOptions,
+    SimCompressionLaunchOptions, SimCustomNodeLaunchOptions, SimDirectoryLaunchOptions,
+    SimLaunchDiagnostic, SimLaunchDiagnosticSeverity, SimLaunchProfile, SimLaunchProfileParser,
+    SimLoggingLaunchOptions, SimManagerLaunchOptions, SimNetworkLaunchOptions,
+    SimPerformanceLaunchOptions,
 };
 pub use sim_user_data::{
     SimUserDataDiagnostic, SimUserDataEntry, SimUserDataPathParts, SimUserDataStore,

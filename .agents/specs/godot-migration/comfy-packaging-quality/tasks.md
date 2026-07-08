@@ -2,7 +2,7 @@
 
 ## Overview
 
-Build cross-cutting migration controls that other Comfy specs depend on: launch profile parsing, feature flags, schema catalog, compatibility fixtures, dependency gates, packaging profiles, and diagnostics.
+Build cross-cutting migration controls that other Comfy specs depend on: launch profile parsing, feature flags, schema catalog, compatibility fixtures, dependency gates, packaging profiles, and diagnostics. Comfy-compatible inputs are parsed into native Sim records; Sim-owned implementation modules and types use `Sim*` names rather than `Comfy*` pass-through labels.
 
 ## Gates
 
@@ -20,10 +20,11 @@ Build cross-cutting migration controls that other Comfy specs depend on: launch 
 
 ## Tasks
 
-- [ ] 1. Implement Comfy launch profile parser
+- [x] 1. Implement Comfy launch profile parser
   - Parse networking, TLS, CORS, upload limits, directories, auto-launch, logging, assets, database, API nodes, custom nodes, manager, compression, runtime policy, cache, and performance options.
-  - _Requirements: 1.1, 1.2, 1.3_
-  - _writes: crates/world_model/src/comfy_launch_profile.rs, crates/world_model/src/comfy_launch_profile_tests.rs_
+  - Represent parsed launch configuration with native `SimLaunch*` records and diagnostics, while accepting Comfy-compatible option names at the adapter boundary.
+  - _Requirements: 1.1, 1.2, 1.3, 1.4_
+  - _writes: crates/world_model/src/sim_launch_profile.rs, crates/world_model/src/sim_launch_profile_tests.rs_
 
 - [ ] 2. Implement feature flag registry
   - Add typed flag coercion, core flag protection, server feature response, and connection-specific client flag storage.
