@@ -8,7 +8,13 @@ The target product is a cross-platform application for creating 2D and 3D games 
 
 This is not a wholesale port of the classic Godot runtime. Sim should build a world-model engine harness around existing Sim UI, agent, task, media, and project infrastructure, while providing native Sim support for Godot-format projects and assets. Comfy is not a secondary compatibility target in that harness; implementation decisions for world-model graph orchestration, prompt/job lifecycle, model resolution, sampler/scheduler behavior, conditioning, diffusion/world-model execution, generated assets, media nodes, provider calls, and extensions must consult the Comfy-owned specs before introducing Sim-only behavior.
 
-Every Godot-originated feature becomes a native Sim feature. SimScript is the first-class executable Sim language, with natural language as the authoring interface. Task providers for the `godot` binary are first-class Sim task providers. Scene preview routes are first-class Sim preview routes. There is no compatibility shim layer.
+Every Godot-originated feature is modeled as a native Sim equivalent, but Godot compatibility is not the first implementation path. SimScript is the first-class executable Sim language, with natural language as the authoring interface. Legacy `.gd` files and Godot-format assets are migration/import sources, not the primary authoring model. Godot-origin task providers and scene preview routes become native Sim task providers and native Sim preview routes when they are product-enabling. There is no compatibility shim layer.
+
+## Value-First Sequencing
+
+The highest-return path is to complete the Comfy and world-model harness before spending migration effort on Godot-format, Godot runtime, editor, export, XR, physics, networking, or other compatibility work. W2-W4 establish the native generation substrate: model serving diagnostics, Comfy model memory policy, prompt/job control, graph/node execution, sampler/scheduler/conditioning semantics, and generated artifact pipelines. W5 then exposes those capabilities through native Sim authoring, agent tools, natural-language workflows, and SimScript execution.
+
+Godot-origin work is deferred into W7 unless it directly unlocks the target product. A deferred task can move earlier only with an explicit product-enabling reason, such as importing a required source project, surfacing a generated artifact in a Sim workspace, or supporting natural-language-to-SimScript authoring. Deferred does not mean abandoned: it means the feature becomes a native Sim equivalent when it contributes to the Comfy/world-model game-development product.
 
 ## Methodology
 
@@ -40,12 +46,13 @@ Duplication rule: prefer existing Sim crates and extension points before adding 
 | Wave | Focus | Specs / Tasks | Depends On |
 |---|---|---|---|
 | W0 | Planning validation | Spec documents only; no code task starts until G0 passes | None |
-| W1 | Shared foundations | Umbrella tasks 1 -> 8 serially for `Cargo.toml`; after task 1, umbrella tasks 2, 3, 5, 6, 13, and 14 with 2 -> 13 -> 14 serial; after task 8, umbrella tasks 9, 10, 11, and 12; `build-test-docs/` task 1 foundation helpers | G0 |
-| W2 | Sim game compatibility substrate | Umbrella tasks 4 and 7; `engine-core-runtime/`, `language-scripting/`, `game-formats-assets/` metadata tasks, `build-test-docs/` docs/compat work | G1, G2 |
-| W3 | World-model and Comfy serving substrate | `world-model-runtime/`, `model-serving-packaging/`, `comfy-model-memory-runtime/`, W3 portions of `comfy-packaging-quality/`, generated-media routing in `rendering-media/` | G3, G4, G8 |
-| W4 | Authoring, graph UX, and Comfy workflows | `diffusion-graph-editor/`, `unified-authoring-app/`, `comfy-runtime-control-plane/`, `comfy-graph-node-runtime/`, `comfy-diffusion-world-model-runtime/`, W4 portions of `comfy-workflows-blueprints/`, editor affordances, agent graph tools | G2, G3, G5, G8 |
-| W5 | Generation outputs and asset pipelines | `mesh-generation-pipeline/`, `comfy-asset-library/`, `comfy-media-node-pipelines/`, W5 portions of `comfy-workflows-blueprints/`, generated mesh asset integration, previews, export routing | G3, G5, G6, G8 |
-| W6 | External execution hardening | Godot run/export/debug, world-model persistent/remote execution, `comfy-api-provider-nodes/`, `comfy-extension-ecosystem/`, W6 portions of `comfy-packaging-quality/`, XR/physics external task fallbacks | G4, G6, G7, G8 |
+| W1 | Shared foundations | Umbrella tasks 1 -> 14 are complete; `build-test-docs/` task 1 foundation helpers remain available if dependency-review or fixture helpers are needed | G0 |
+| W2 | Value-first world-model serving substrate | `world-model-runtime/`, `model-serving-packaging/`, `comfy-model-memory-runtime/`, W2 portions of `comfy-packaging-quality/`, generated-media diagnostics/routing in `rendering-media/` | G3, G8; G4 before real workers |
+| W3 | Comfy execution core | `comfy-runtime-control-plane/`, `comfy-graph-node-runtime/`, `comfy-diffusion-world-model-runtime/`, W3 portions of `comfy-workflows-blueprints/`, `diffusion-graph-editor/` validation/execution planning | G3, G5, G8; G4 before execution |
+| W4 | Generation outputs and asset pipelines | `mesh-generation-pipeline/`, `comfy-asset-library/`, `comfy-media-node-pipelines/`, W4 portions of `comfy-workflows-blueprints/`, generated mesh/media previews, artifact import, generated asset provenance | G3, G5, G6, G8 |
+| W5 | Product authoring and agentic tools | `agentic-game-tools/`, `unified-authoring-app/`, native SimScript/natural-language authoring work, product editor affordances that consume W2-W4 capabilities | G2, G3, G5, G6, G8 |
+| W6 | Comfy provider, extension, and packaging hardening | `comfy-api-provider-nodes/`, `comfy-extension-ecosystem/`, W6 portions of `comfy-packaging-quality/`, persistent/remote worker hardening, provider policy gates | G4, G6, G7, G8 |
+| W7 | Deferred Godot-origin compatibility | `engine-core-runtime/`, legacy `.gd`/Godot C# parts of `language-scripting/`, legacy `game-formats-assets/`, `platform-export/`, `networking-collaboration/`, `xr-spatial/`, `physics-navigation/`, Godot run/debug/export/editor tasks | G1, G2, and explicit product-enabling dependency |
 
 ## Feature Inventory
 
@@ -82,29 +89,29 @@ Duplication rule: prefer existing Sim crates and extension points before adding 
 
 | Spec | Scope | Current Artifacts | Primary Wave |
 |---|---|---|---|
-| `engine-core-runtime/` | Core metadata, resources, and project model | Requirements + Design + Tasks | W2 |
-| `editor-experience/` | Sim editor workflows for game development | Requirements + Design + Tasks | W4/W6 |
-| `rendering-media/` | Preview/media/shader/generated-media support without rendering-stack duplication | Requirements + Design + Tasks | W3/W5 |
-| `platform-export/` | Godot project run/export task integration | Requirements + Design + Tasks | W6 |
-| `language-scripting/` | SimScript, legacy `.gd`, natural-language authoring, and Godot C# language tooling | Requirements + Design + Tasks | W2 |
-| `game-formats-assets/` | Godot files, scenes, resources, and generated assets | Requirements + Design + Tasks | W2/W5 |
-| `networking-collaboration/` | Godot protocol awareness and debug integration boundaries | Requirements + Design + Tasks | W6 |
-| `xr-spatial/` | XR/spatial docs and metadata boundaries | Requirements + Design + Tasks | W6 |
-| `physics-navigation/` | Physics/navigation documentation and metadata boundaries | Requirements + Design + Tasks | W6 |
-| `build-test-docs/` | Docs ingestion, fixture conversion, third-party policy | Requirements + Design + Tasks | W1/W2 |
-| `unified-authoring-app/` | Cross-platform game authoring app and workspace | Requirements + Design + Tasks | W4 |
-| `world-model-runtime/` | LingBot/Wan world-model harness and interactive runtime | Requirements + Design + Tasks | W3 |
-| `diffusion-graph-editor/` | Graph/node diffusion pipeline authoring and execution | Requirements + Design + Tasks | W4 |
-| `mesh-generation-pipeline/` | Textured 3D mesh generation and export | Requirements + Design + Tasks | W5 |
-| `agentic-game-tools/` | Agent tools for game design, pipeline editing, and asset generation | Requirements + Design + Tasks | W4/W5 |
-| `model-serving-packaging/` | Python worker, model downloads, GPU scheduling, and packaging | Requirements + Design + Tasks | W3/W6 |
-| `comfy-runtime-control-plane/` | Comfy-compatible HTTP/WebSocket prompt, job, queue, progress, preview, and safety APIs | Requirements + Design + Tasks | W4 |
-| `comfy-graph-node-runtime/` | Comfy node schema, graph validation, replacement, execution planning, caching, async/list execution | Requirements + Design + Tasks | W4 |
-| `comfy-model-memory-runtime/` | Comfy model folders, model metadata, family detection, precision, device, and memory policy | Requirements + Design + Tasks | W3 |
-| `comfy-diffusion-world-model-runtime/` | Comfy sampler, scheduler, conditioning, latent/VAE, model patch, diffusion runner, and world-model runner semantics | Requirements + Design + Tasks | W4 |
-| `comfy-asset-library/` | Asset CRUD, upload/download, tags, metadata filters, seed scans, user data, settings, and output enrichment | Requirements + Design + Tasks | W5 |
-| `comfy-workflows-blueprints/` | Blueprint catalog, workflow save/load/export, subgraphs, node replacements, embedded workflow metadata, app-mode metadata | Requirements + Design + Tasks | W4/W5 |
-| `comfy-media-node-pipelines/` | Image, mask, video, audio, 3D, geometry, analysis, control, utility, and dataset node capability migration | Requirements + Design + Tasks | W5 |
+| `engine-core-runtime/` | Core metadata, resources, and project model | Requirements + Design + Tasks | W7 |
+| `editor-experience/` | Sim editor workflows for game development | Requirements + Design + Tasks | W5/W7 |
+| `rendering-media/` | Preview/media/shader/generated-media support without rendering-stack duplication | Requirements + Design + Tasks | W2/W4/W7 |
+| `platform-export/` | Godot project run/export task integration | Requirements + Design + Tasks | W7 |
+| `language-scripting/` | SimScript, legacy `.gd`, natural-language authoring, and Godot C# language tooling | Requirements + Design + Tasks | W5/W7 |
+| `game-formats-assets/` | Godot files, scenes, resources, and generated assets | Requirements + Design + Tasks | W4/W7 |
+| `networking-collaboration/` | Godot protocol awareness and debug integration boundaries | Requirements + Design + Tasks | W7 |
+| `xr-spatial/` | XR/spatial docs and metadata boundaries | Requirements + Design + Tasks | W7 |
+| `physics-navigation/` | Physics/navigation documentation and metadata boundaries | Requirements + Design + Tasks | W7 |
+| `build-test-docs/` | Docs ingestion, fixture conversion, third-party policy | Requirements + Design + Tasks | W1/W7 |
+| `unified-authoring-app/` | Cross-platform game authoring app and workspace | Requirements + Design + Tasks | W5 |
+| `world-model-runtime/` | LingBot/Wan world-model harness and interactive runtime | Requirements + Design + Tasks | W2 |
+| `diffusion-graph-editor/` | Graph/node diffusion pipeline authoring and execution | Requirements + Design + Tasks | W3 |
+| `mesh-generation-pipeline/` | Textured 3D mesh generation and export | Requirements + Design + Tasks | W4 |
+| `agentic-game-tools/` | Agent tools for game design, pipeline editing, and asset generation | Requirements + Design + Tasks | W5 |
+| `model-serving-packaging/` | Python worker, model downloads, GPU scheduling, and packaging | Requirements + Design + Tasks | W2/W6 |
+| `comfy-runtime-control-plane/` | Comfy-compatible HTTP/WebSocket prompt, job, queue, progress, preview, and safety APIs | Requirements + Design + Tasks | W3 |
+| `comfy-graph-node-runtime/` | Comfy node schema, graph validation, replacement, execution planning, caching, async/list execution | Requirements + Design + Tasks | W3 |
+| `comfy-model-memory-runtime/` | Comfy model folders, model metadata, family detection, precision, device, and memory policy | Requirements + Design + Tasks | W2 |
+| `comfy-diffusion-world-model-runtime/` | Comfy sampler, scheduler, conditioning, latent/VAE, model patch, diffusion runner, and world-model runner semantics | Requirements + Design + Tasks | W3 |
+| `comfy-asset-library/` | Asset CRUD, upload/download, tags, metadata filters, seed scans, user data, settings, and output enrichment | Requirements + Design + Tasks | W4 |
+| `comfy-workflows-blueprints/` | Blueprint catalog, workflow save/load/export, subgraphs, node replacements, embedded workflow metadata, app-mode metadata | Requirements + Design + Tasks | W3/W4 |
+| `comfy-media-node-pipelines/` | Image, mask, video, audio, 3D, geometry, analysis, control, utility, and dataset node capability migration | Requirements + Design + Tasks | W4 |
 | `comfy-api-provider-nodes/` | External provider node catalog, secrets, remote task lifecycle, media output import, policy and cost controls | Requirements + Design + Tasks | W6 |
 | `comfy-extension-ecosystem/` | Custom node discovery/loading policy, extension assets, translations, templates, subgraphs, and manager boundary | Requirements + Design + Tasks | W6 |
-| `comfy-packaging-quality/` | Launch profiles, feature flags, frontend package diagnostics, OpenAPI/schema fixtures, tests, dependency review, diagnostics | Requirements + Design + Tasks | W3/W6 |
+| `comfy-packaging-quality/` | Launch profiles, feature flags, frontend package diagnostics, OpenAPI/schema fixtures, tests, dependency review, diagnostics | Requirements + Design + Tasks | W2/W6 |

@@ -13,8 +13,8 @@ Add shared documentation, fixture attribution, and dependency review helpers bef
 
 ## Dependency Waves
 
-- W1 Shared foundations: fixture attribution and dependency review helpers land first.
-- W2 Sim game compatibility substrate: docs and compatibility metadata integrations depend on W1 helpers.
+- W1 Shared foundations: fixture attribution and dependency review helpers land first when another task needs them.
+- W7 Deferred Godot-origin compatibility: docs and compatibility metadata integrations depend on W1 helpers and start only when they unlock target-product work.
 
 ## Tasks
 

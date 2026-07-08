@@ -2,7 +2,7 @@
 
 ## Overview
 
-Integrate Godot executable settings and export presets as external tasks. Platform packaging remains external unless a reviewed Sim dependency is explicitly accepted.
+Integrate Godot executable settings and export presets as W7 external tasks only when they directly support the target product. Platform packaging remains external unless a reviewed Sim dependency is explicitly accepted.
 
 ## Gates
 
@@ -13,7 +13,7 @@ Integrate Godot executable settings and export presets as external tasks. Platfo
 
 ## Dependency Waves
 
-- W6 External execution hardening: executable and export task integration waits for G1 boundary and G2 metadata.
+- W7 Deferred Godot-origin compatibility: executable and export task integration waits for G1 boundary, G2 metadata, and an explicit product-enabling dependency.
 
 ## Tasks
 

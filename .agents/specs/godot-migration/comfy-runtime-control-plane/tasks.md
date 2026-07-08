@@ -13,7 +13,7 @@ Build the control plane as a protocol adapter over Sim task, HTTP, WebSocket, me
 
 ## Dependency Waves
 
-- Global wave: W4 Authoring, graph UX, and Comfy workflows.
+- Global wave: W3 Comfy execution core.
 - Local Wave 1: Tasks 1-2 can start first and may run in parallel.
 - Local Wave 2: Tasks 3-5 depend on route models and safety primitives.
 - Local Wave 3: Tasks 6-7 depend on queue/job bridge and event translation.

@@ -13,7 +13,7 @@ Create a provider-node framework before individual providers. Initial implementa
 
 ## Dependency Waves
 
-- Global wave: W6 External execution hardening.
+- Global wave: W6 Comfy provider, extension, and packaging hardening.
 - Local Wave 1: Tasks 1-3 define provider registry, policy, and secret handling.
 - Local Wave 2: Tasks 4-5 implement lifecycle and output import.
 - Local Wave 3: Tasks 6-7 add provider catalogs and concrete adapter stubs.

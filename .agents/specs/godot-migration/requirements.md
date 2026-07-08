@@ -11,6 +11,7 @@ Sim needs a native game development surface for building 2D and 3D games, with G
 - **Dependency wave**: the ordered implementation phase used to keep shared foundations ahead of dependent integrations.
 - **World-model engine harness**: Sim-managed typed requests, controls, workers, artifacts, and provenance around `projects/world-model`.
 - **Comfy world-model harness substrate**: Sim-managed core protocol, graph, sampler, scheduler, conditioning, diffusion/world-model execution, node, model, asset, provider, blueprint, extension, and packaging behavior derived from `projects/comfy`.
+- **Deferred Godot-origin compatibility**: Godot-format, runtime, editor, export, XR, physics, networking, and legacy language work that is modeled as native Sim functionality but selected later unless it directly supports the target Comfy/world-model game-development product.
 
 ### Requirement 1: Complete Inventory
 
@@ -133,6 +134,7 @@ Sim needs a native game development surface for building 2D and 3D games, with G
 12.2 WHEN a task is selected THEN THE system SHALL identify its dependency wave.
 12.3 IF required gates are unsatisfied THEN THE system SHALL block the task.
 12.4 WHEN the spec pack is validated THEN THE system SHALL confirm every grouped spec has requirements, design, and tasks files.
+12.5 WHEN tasks are selected after shared foundations THEN THE system SHALL apply the value-first sequencing policy before dependency-wave ordering alone.
 
 ### Requirement 13: Comfy Workflow Orchestration Migration
 
@@ -146,3 +148,14 @@ Sim needs a native game development surface for building 2D and 3D games, with G
 13.4 WHEN a world-model harness implementation decision involves graph orchestration, prompt/job lifecycle, model resolution, sampler/scheduler behavior, conditioning, diffusion/world-model execution, asset handling, media nodes, provider calls, or extension loading THEN THE system SHALL consult the applicable Comfy spec before introducing Sim-only behavior.
 13.5 IF Comfy semantics conflict with existing Sim infrastructure THEN THE system SHALL document the decision and preserve Comfy workflow compatibility unless safety, security, dependency, or platform gates require divergence.
 13.6 WHEN local diffusion or world-model execution is implemented THEN THE system SHALL preserve Comfy sampler, scheduler, conditioning, latent, VAE, model patch, guidance, and model-family execution semantics unless a documented gate requires divergence.
+
+### Requirement 14: Value-First Product Sequencing
+
+**User Story:** As a product owner, I want Comfy and world-model harness work completed before lower-value Godot-origin compatibility work so each migration task advances the target native Sim product.
+
+#### Acceptance Criteria
+
+14.1 WHEN migration tasks are ranked after W1 shared foundations THEN THE system SHALL prioritize W2-W4 Comfy and world-model harness tasks ahead of W7 Godot-format, runtime, editor, export, XR, physics, networking, and legacy language tasks.
+14.2 IF a W7 deferred Godot-origin task is selected before available W2-W6 product work is complete THEN THE system SHALL document the product-enabling dependency that justifies the exception.
+14.3 WHEN SimScript or natural-language authoring work is selected THEN THE system SHALL treat natural language as the primary authoring interface and SimScript as the executable game language, while legacy `.gd` and Godot-format support remain migration/import sources.
+14.4 WHEN Comfy provider, extension, or packaging hardening is ranked THEN THE system SHALL keep it behind local W2-W4 harness functionality unless the hardening task blocks worker safety, provenance, policy, or dependency-review gates.

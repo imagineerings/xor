@@ -11,7 +11,11 @@ The game development surface is organized as Sim-native integration layers:
 
 ### Design Principle: Native Integration
 
-Every Godot-originated feature becomes a native Sim feature. There is no compatibility shim layer, no "registrar trait" bridging game features to Sim registries, and no parallel language config type. SimScript is registered as the first-class executable game language via `LanguageRegistry::add` with the same `Language` type used for Rust, Python, and TypeScript; natural language is the authoring interface that produces inspectable SimScript. `sim_game` exports pure-data helpers for external game task templates and game asset preview routes so follow-on task and preview sub-specs can wire them into the native task source and preview action systems without introducing an intermediate compatibility layer.
+Every Godot-originated feature is modeled as a native Sim equivalent. There is no compatibility shim layer, no "registrar trait" bridging game features to Sim registries, and no parallel language config type. SimScript is registered as the first-class executable game language via `LanguageRegistry::add` with the same `Language` type used for Rust, Python, and TypeScript; natural language is the authoring interface that produces inspectable SimScript. Legacy `.gd` files and Godot-format assets are import sources rather than the primary product path. `sim_game` exports pure-data helpers for external game task templates and game asset preview routes so follow-on task and preview sub-specs can wire them into the native task source and preview action systems without introducing an intermediate compatibility layer.
+
+### Design Principle: Value-First Sequencing
+
+The migration gatekeeper ranks available work by target-product value after gates and write conflicts are checked. W2-W4 Comfy/world-model harness tasks should be selected before W7 Godot-origin compatibility tasks. W5 native authoring and agentic tools should consume the harness instead of building around missing execution paths. W6 provider, extension, and packaging hardening remains available when it blocks worker safety, provenance, policy, or dependency review; otherwise it follows the local harness core.
 
 ## Components
 
@@ -135,11 +139,12 @@ pub enum ExecutionGate {
 pub enum DependencyWave {
     PlanningValidation,
     SharedFoundations,
-    SimGameCompatibilitySubstrate,
-    WorldModelAndComfyServingSubstrate,
-    AuthoringGraphUxAndComfyWorkflows,
+    ValueFirstWorldModelServingSubstrate,
+    ComfyExecutionCore,
     GenerationOutputsAndAssetPipelines,
-    ExternalExecutionHardening,
+    ProductAuthoringAndAgenticTools,
+    ComfyProviderExtensionAndPackagingHardening,
+    DeferredGodotOriginCompatibility,
 }
 ```
 
@@ -193,6 +198,18 @@ _For any_ game feature that maps to an existing Sim capability (language support
 
 **Validates: Requirement 2.1**
 
+### Property 9: Value-First Task Selection
+
+_For any_ available post-W1 task set that includes both Comfy/world-model harness work and W7 deferred Godot-origin compatibility work, task selection SHALL rank the Comfy/world-model work first unless the W7 task records an explicit product-enabling dependency.
+
+**Validates: Requirement 12.5, 14.1, 14.2, 14.4**
+
+### Property 10: Native Authoring Priority
+
+_For any_ SimScript or natural-language authoring task, the task SHALL model natural language as the primary authoring interface and SimScript as the executable language, while treating legacy `.gd` and Godot-format support as import/migration inputs.
+
+**Validates: Requirement 14.3**
+
 ## Error Handling
 
 - Missing spec files produce blocking G0 errors.
@@ -203,3 +220,4 @@ _For any_ game feature that maps to an existing Sim capability (language support
 - Heavy/native dependencies without review produce blocking G7 errors.
 - Comfy features without an owning spec or explicit delegation produce blocking G0 errors.
 - World-model harness changes that bypass applicable Comfy specs produce blocking G8 errors.
+- W7 deferred Godot-origin tasks selected ahead of available W2-W6 product work without an explicit product-enabling dependency produce priority-policy errors.

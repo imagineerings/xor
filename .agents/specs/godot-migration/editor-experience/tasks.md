@@ -2,19 +2,19 @@
 
 ## Overview
 
-Add native game-development commands and project-panel affordances in W4, while run and debug templates remain W6 work because they require the external-command boundary.
+Add native game-development commands and project-panel affordances in W5 after the Comfy/world-model harness can power them, while Godot run and debug templates remain W7 work because they require the external-command boundary.
 
 ## Gates
 
 - Start gate: G0 spec consistency, G1 boundary policy, and G2 shared Sim game metadata are satisfied.
 - Validation gate: command registration, project-panel classification, import-link, and run/debug template tests pass.
 - Handoff gate: missing Godot executable and unsupported runtime actions surface setup diagnostics.
-- Completion gate: no run/debug workflow bypasses the W6 external-command path or the G1 runtime boundary policy.
+- Completion gate: no run/debug workflow bypasses the W7 external-command path or the G1 runtime boundary policy.
 
 ## Dependency Waves
 
-- W4 Authoring, graph UX, and Comfy workflows: commands, labels, and import links can start after G2.
-- W6 External execution hardening: run/debug templates wait for external-command diagnostics and task integration.
+- W5 Product authoring and agentic tools: commands, labels, and import links can start after G2 and should consume W2-W4 harness capabilities.
+- W7 Deferred Godot-origin compatibility: run/debug templates wait for external-command diagnostics, task integration, and an explicit product-enabling dependency.
 
 ## Tasks
 

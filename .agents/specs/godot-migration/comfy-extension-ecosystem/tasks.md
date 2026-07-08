@@ -13,7 +13,7 @@ Build extension support with policy and diagnostics first. Only after disabled a
 
 ## Dependency Waves
 
-- Global wave: W6 External execution hardening.
+- Global wave: W6 Comfy provider, extension, and packaging hardening.
 - Local Wave 1: Tasks 1-2 implement discovery and policy.
 - Local Wave 2: Tasks 3-5 implement loading, node registration, and assets.
 - Local Wave 3: Tasks 6-7 implement translations, templates, subgraphs, and manager boundaries.

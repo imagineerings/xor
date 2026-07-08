@@ -24,12 +24,21 @@
 | Wave | Tasks |
 |---|---|
 | W0 Planning validation | Spec documents only; no code task starts until G0 passes |
-| W1 Shared foundations | Umbrella tasks 1 -> 8 serially for `Cargo.toml`; after task 1, tasks 2, 3, 5, 6, 13, and 14, with 2 -> 13 -> 14 serial for inventory/gatekeeper writes; after task 8, tasks 9, 10, 11, and 12 |
-| W2 Sim game compatibility substrate | Umbrella tasks 4 and 7 after G1/G2; grouped `engine-core-runtime`, `language-scripting`, `game-formats-assets`, and `build-test-docs` metadata/docs work |
-| W3 World-model and Comfy serving substrate | grouped `world-model-runtime`, `model-serving-packaging`, `comfy-model-memory-runtime`, W3 portions of `comfy-packaging-quality`, and generated-media diagnostics/routing |
-| W4 Authoring, graph UX, and Comfy workflows | grouped `diffusion-graph-editor`, `unified-authoring-app`, `comfy-runtime-control-plane`, `comfy-graph-node-runtime`, `comfy-diffusion-world-model-runtime`, W4 portions of `comfy-workflows-blueprints`, editor affordances, and graph agent tools |
-| W5 Generation outputs and asset pipelines | grouped `mesh-generation-pipeline`, `comfy-asset-library`, `comfy-media-node-pipelines`, W5 portions of `comfy-workflows-blueprints`, generated mesh assets, generated workflow metadata, and generation agent tools |
-| W6 External execution hardening | grouped `platform-export`, `networking-collaboration`, `xr-spatial`, `physics-navigation`, `comfy-api-provider-nodes`, `comfy-extension-ecosystem`, W6 portions of `comfy-packaging-quality`, and real worker/export/debug hardening |
+| W1 Shared foundations | Umbrella tasks 1 -> 14 are complete and remain prerequisites for new grouped work |
+| W2 Value-first world-model serving substrate | grouped `world-model-runtime`, `model-serving-packaging`, `comfy-model-memory-runtime`, W2 portions of `comfy-packaging-quality`, and generated-media diagnostics/routing |
+| W3 Comfy execution core | grouped `comfy-runtime-control-plane`, `comfy-graph-node-runtime`, `comfy-diffusion-world-model-runtime`, W3 portions of `comfy-workflows-blueprints`, and `diffusion-graph-editor` execution/validation work |
+| W4 Generation outputs and asset pipelines | grouped `mesh-generation-pipeline`, `comfy-asset-library`, `comfy-media-node-pipelines`, W4 portions of `comfy-workflows-blueprints`, generated mesh/media routing, and generated asset provenance |
+| W5 Product authoring and agentic tools | grouped `agentic-game-tools`, `unified-authoring-app`, native SimScript/natural-language authoring work, and editor affordances that consume W2-W4 capabilities |
+| W6 Comfy provider, extension, and packaging hardening | grouped `comfy-api-provider-nodes`, `comfy-extension-ecosystem`, W6 portions of `comfy-packaging-quality`, remote/persistent worker hardening, and provider policy gates |
+| W7 Deferred Godot-origin compatibility | grouped `engine-core-runtime`, legacy parts of `language-scripting`, legacy `game-formats-assets`, `platform-export`, `networking-collaboration`, `xr-spatial`, `physics-navigation`, and Godot run/debug/export/editor tasks; start only when they unblock W2-W6 product work |
+
+## Selection Policy
+
+- After W1, select W2-W4 Comfy and world-model harness tasks before Godot-format/runtime/editor/export tasks.
+- Select W5 product authoring and agentic tools once they can consume W2-W4 substrate instead of building placeholder UI around missing execution paths.
+- Select W6 provider, extension, and packaging hardening after local Comfy/world-model execution paths have their safety and provenance gates, unless a W6 policy gate blocks W2-W4 work.
+- Select W7 deferred Godot-origin compatibility only when the task directly unlocks the native Sim target product, such as importing a required source project, exposing generated assets, or supporting SimScript/natural-language authoring.
+- Treat legacy `.gd` files and Godot-format assets as migration/import sources; native authoring uses natural language as the interface and SimScript as the executable language.
 
 ## Tasks
 
@@ -109,6 +118,7 @@
 - Do not implement tasks that require Godot runtime execution before the external-command task provider exists.
 - Do not implement tasks that require world-model execution before the worker protocol and serving diagnostics exist.
 - Do not execute a task from a later dependency wave until the applicable earlier gates are satisfied.
+- Do not select W7 deferred Godot-origin compatibility while W2-W6 Comfy/world-model product work is available unless the W7 task has an explicit product-enabling dependency note.
 - Do not run tasks with overlapping `_writes:` manifests in parallel unless the grouped spec explicitly marks the overlap as an extension of an already-completed foundation task.
 - Do not add vendored Godot third-party code without updating the relevant design and passing dependency review.
 - Do not treat Comfy as optional UI compatibility for the world-model harness; use the applicable Comfy spec as the functional starting point for prompt, graph, sampler, scheduler, conditioning, diffusion/world-model execution, model, asset, media-node, provider, and extension behavior.

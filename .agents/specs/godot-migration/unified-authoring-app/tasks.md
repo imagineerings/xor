@@ -2,7 +2,7 @@
 
 ## Overview
 
-Build a unified authoring workspace over Godot metadata, graph workflows, world-model requests, generated artifacts, and external run/export tasks.
+Build a unified authoring workspace over graph workflows, world-model requests, generated artifacts, natural-language authoring, and SimScript execution. Godot metadata and external run/export affordances are included only when they unlock the target product.
 
 ## Gates
 
@@ -13,7 +13,7 @@ Build a unified authoring workspace over Godot metadata, graph workflows, world-
 
 ## Dependency Waves
 
-- W4 Authoring, graph UX, and Comfy workflows: authoring workspace routing depends on G2 and G3.
+- W5 Product authoring and agentic tools: authoring workspace routing depends on G2, G3, and the W2-W4 Comfy/world-model harness.
 
 ## Tasks
 

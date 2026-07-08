@@ -13,7 +13,7 @@ Import shipped blueprints first, then add workflow persistence and API export, t
 
 ## Dependency Waves
 
-- Global waves: W4 Authoring, graph UX, and Comfy workflows for Tasks 1-5; W5 Generation outputs and asset pipelines for Tasks 6-7.
+- Global waves: W3 Comfy execution core for Tasks 1-5; W4 Generation outputs and asset pipelines for Tasks 6-7.
 - Local Wave 1: Tasks 1-2 build catalog and workflow store.
 - Local Wave 2: Tasks 3-5 add subgraphs, replacements, and replacement-compatible metadata.
 - Local Wave 3: Tasks 6-7 wire embedded workflow metadata and app-mode metadata into generated-output and authoring integrations.

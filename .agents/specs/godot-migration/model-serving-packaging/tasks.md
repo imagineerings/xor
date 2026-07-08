@@ -2,7 +2,7 @@
 
 ## Overview
 
-Add diagnostics and launcher models in W3, then defer real local/remote worker launch hardening to W6 after safety and dependency gates are in place.
+Add diagnostics and launcher models in W2, then defer real local/remote worker launch hardening to W6 after safety and dependency gates are in place.
 
 ## Gates
 
@@ -13,8 +13,8 @@ Add diagnostics and launcher models in W3, then defer real local/remote worker l
 
 ## Dependency Waves
 
-- W3 World-model and Comfy serving substrate: diagnostics and launcher models produce G4 worker safety.
-- W6 External execution hardening: real worker launch, remote execution, and packaging paths depend on G4 and G7.
+- W2 Value-first world-model serving substrate: diagnostics and launcher models produce G4 worker safety.
+- W6 Comfy provider, extension, and packaging hardening: real worker launch, remote execution, and packaging paths depend on G4 and G7.
 
 ## Tasks
 

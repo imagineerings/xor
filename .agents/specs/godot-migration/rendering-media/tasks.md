@@ -2,7 +2,7 @@
 
 ## Overview
 
-Route Godot media and generated outputs through existing Sim preview/media systems. Generated media diagnostics start in W3, while generated asset previews finish in W5.
+Route generated outputs through existing Sim preview/media systems first; Godot media classification is deferred W7 compatibility unless it unlocks the target product. Generated media diagnostics start in W2, while generated asset previews finish in W4.
 
 ## Gates
 
@@ -13,8 +13,9 @@ Route Godot media and generated outputs through existing Sim preview/media syste
 
 ## Dependency Waves
 
-- W3 World-model and Comfy serving substrate: generated media diagnostics and routing depend on G3 and G4.
-- W5 Generation outputs and asset pipelines: generated-asset previews and artifact import depend on G6 provenance.
+- W2 Value-first world-model serving substrate: generated media diagnostics and routing depend on G3 and G4.
+- W4 Generation outputs and asset pipelines: generated-asset previews and artifact import depend on G6 provenance.
+- W7 Deferred Godot-origin compatibility: Godot media classification starts only when it directly supports import or preview of target-product assets.
 
 ## Tasks
 

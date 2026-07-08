@@ -13,7 +13,7 @@ Represent media functionality as capability groups and implement deterministic o
 
 ## Dependency Waves
 
-- Global wave: W5 Generation outputs and asset pipelines.
+- Global wave: W4 Generation outputs and asset pipelines.
 - Local Wave 1: Task 1 builds capability registry.
 - Local Wave 2: Tasks 2-4 implement image, video, and audio foundations.
 - Local Wave 3: Tasks 5-7 implement 3D, analysis/control, and utility nodes.

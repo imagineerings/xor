@@ -2,7 +2,7 @@
 
 ## Overview
 
-Model world generation requests, controls, sessions, and artifacts as the W3 substrate for later workers, graphs, authoring UI, and generated output imports.
+Model world generation requests, controls, sessions, and artifacts as the W2 value-first substrate for later workers, graphs, authoring UI, and generated output imports.
 
 ## Gates
 
@@ -13,7 +13,7 @@ Model world generation requests, controls, sessions, and artifacts as the W3 sub
 
 ## Dependency Waves
 
-- W3 World-model and Comfy serving substrate: request/control/session/artifact models depend on W1 world-model foundations and feed W4/W5 integrations.
+- W2 Value-first world-model serving substrate: request/control/session/artifact models depend on W1 world-model foundations and feed W3-W5 integrations.
 
 ## Tasks
 

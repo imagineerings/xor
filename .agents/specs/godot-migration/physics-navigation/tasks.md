@@ -2,18 +2,18 @@
 
 ## Overview
 
-Represent physics and navigation as metadata, docs, and external simulation hooks. Godot physics or navigation server execution remains outside Sim runtime.
+Represent physics and navigation as W7 metadata, docs, and external simulation hooks only when they directly support the target product. Godot physics or navigation server execution remains outside Sim runtime.
 
 ## Gates
 
 - Start gate: G0 spec consistency, G1 boundary policy, and G2 shared Sim game metadata are satisfied.
 - Validation gate: runtime exclusion, metadata extraction, docs lookup, and task fallback tests pass.
 - Handoff gate: unsupported physics/navigation execution produces external-command or excluded diagnostics.
-- Completion gate: simulation task fallback work waits for W6 external-command diagnostics and does not embed Godot physics/navigation servers.
+- Completion gate: simulation task fallback work waits for W7 external-command diagnostics and does not embed Godot physics/navigation servers.
 
 ## Dependency Waves
 
-- W6 External execution hardening: metadata-backed fallback hooks wait for G1 and G2.
+- W7 Deferred Godot-origin compatibility: metadata-backed fallback hooks wait for G1, G2, and an explicit product-enabling dependency.
 
 ## Tasks
 

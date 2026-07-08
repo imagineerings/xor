@@ -13,7 +13,7 @@ Implement runtime graph compatibility in layers: registry/schema first, validati
 
 ## Dependency Waves
 
-- Global wave: W4 Authoring, graph UX, and Comfy workflows.
+- Global wave: W3 Comfy execution core.
 - Local Wave 1: Tasks 1-2 define registry and schemas.
 - Local Wave 2: Tasks 3-5 add validation, replacement, and planning.
 - Local Wave 3: Tasks 6-7 add executor integration and compatibility fixtures.

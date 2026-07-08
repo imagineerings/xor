@@ -2,7 +2,7 @@
 
 ## Overview
 
-Build editor state and execution wiring on top of the shared world-model graph primitives. UI behavior stays in W4 and execution remains blocked until graph safety and provenance gates are satisfied.
+Build editor state and execution wiring on top of the shared world-model graph primitives. Graph execution planning belongs to W3, while product UI consumption follows in W5 after graph safety and provenance gates are satisfied.
 
 ## Gates
 
@@ -13,7 +13,7 @@ Build editor state and execution wiring on top of the shared world-model graph p
 
 ## Dependency Waves
 
-- W4 Authoring, graph UX, and Comfy workflows: editor state and graph execution planning depend on W1 world-model graph primitives.
+- W3 Comfy execution core: editor state and graph execution planning depend on W1 world-model graph primitives and G5 graph safety.
 
 ## Tasks
 

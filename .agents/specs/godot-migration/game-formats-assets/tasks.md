@@ -2,7 +2,7 @@
 
 ## Overview
 
-Parse Godot text formats in W2 and defer generated mesh asset registration to W5, where world-model artifact and provenance foundations exist.
+Register generated assets through the W4 world-model artifact path first, and defer Godot text-format parsing to W7 unless a target-product import requires it.
 
 ## Gates
 
@@ -13,8 +13,8 @@ Parse Godot text formats in W2 and defer generated mesh asset registration to W5
 
 ## Dependency Waves
 
-- W2 Sim game compatibility substrate: text format parsing and `.import` metadata linking can start after G2.
-- W5 Generation outputs and asset pipelines: generated mesh asset registration depends on W3 world-model primitives and G6 provenance.
+- W4 Generation outputs and asset pipelines: generated mesh asset registration depends on W2 world-model primitives and G6 provenance.
+- W7 Deferred Godot-origin compatibility: text format parsing and `.import` metadata linking start only when they unlock product-critical imports.
 
 ## Tasks
 

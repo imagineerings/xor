@@ -13,7 +13,7 @@ Implement the model runtime as catalog and policy primitives first, then connect
 
 ## Dependency Waves
 
-- Global wave: W3 World-model and Comfy serving substrate.
+- Global wave: W2 Value-first world-model serving substrate.
 - Local Wave 1: Tasks 1-3 build catalog foundations.
 - Local Wave 2: Tasks 4-5 add model family and runtime policy validation.
 - Local Wave 3: Task 6 integrates resource release and diagnostics.

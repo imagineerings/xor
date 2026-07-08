@@ -13,7 +13,7 @@ Build cross-cutting migration controls that other Comfy specs depend on: launch 
 
 ## Dependency Waves
 
-- Global waves: W3 World-model and Comfy serving substrate for configuration, schemas, fixtures, and diagnostics; W6 External execution hardening for packaging profiles and dependency gates.
+- Global waves: W2 Value-first world-model serving substrate for configuration, schemas, fixtures, and diagnostics; W6 Comfy provider, extension, and packaging hardening for packaging profiles and dependency gates.
 - Local Wave 1: Tasks 1-2 implement configuration and feature flags.
 - Local Wave 2: Tasks 3-5 implement schemas, fixtures, and dependency gates.
 - Local Wave 3: Tasks 6-7 add packaging profiles and diagnostics.

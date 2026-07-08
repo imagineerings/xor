@@ -2,7 +2,7 @@
 
 ## Overview
 
-Register agent tools over existing graph, world-model, and mesh primitives. Graph editing belongs to W4, while generation and import tools move in W5 after worker diagnostics and provenance exist.
+Register agent tools over existing graph, world-model, and mesh primitives after the W2-W4 harness can execute real product flows. Graph editing consumes W3 validation, while generation and import tools move in W5 after worker diagnostics and provenance exist.
 
 ## Gates
 
@@ -13,8 +13,8 @@ Register agent tools over existing graph, world-model, and mesh primitives. Grap
 
 ## Dependency Waves
 
-- W4 Authoring, graph UX, and Comfy workflows: graph editing tools can start after G3 and G5 are satisfied.
-- W5 Generation outputs and asset pipelines: world and mesh generation tools depend on W3 worker diagnostics and G6 provenance.
+- W5 Product authoring and agentic tools: graph editing tools can start after G3 and G5 are satisfied.
+- W5 Product authoring and agentic tools: world and mesh generation tools depend on W2 worker diagnostics, W4 artifact pipelines, and G6 provenance.
 
 ## Tasks
 

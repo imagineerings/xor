@@ -2,7 +2,7 @@
 
 ## Overview
 
-Wire SimScript as the native executable game language and natural language as the authoring interface. No parallel registration types — SimScript uses `LanguageRegistry::add` directly. Legacy `.gd` scripts remains a source-format migration path, but native authoring produces `.simscript` files.
+Wire SimScript as the native executable game language and natural language as the authoring interface. No parallel registration types — SimScript uses `LanguageRegistry::add` directly. Legacy `.gd` scripts remain a W7 source-format migration path, but native authoring produces `.simscript` files.
 
 ## Gates
 
@@ -13,7 +13,8 @@ Wire SimScript as the native executable game language and natural language as th
 
 ## Dependency Waves
 
-- W2 Sim game compatibility substrate: language registration and docs indexing depend on G2 shared metadata.
+- W5 Product authoring and agentic tools: native SimScript and natural-language authoring depend on G2 shared metadata and consume the W2-W4 harness.
+- W7 Deferred Godot-origin compatibility: legacy `.gd`, Godot C#, and Godot API docs indexing start only when they directly support import/migration or SimScript authoring.
 
 ## Tasks
 

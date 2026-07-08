@@ -13,7 +13,7 @@ Build the asset library as shared storage primitives plus Comfy-compatible route
 
 ## Dependency Waves
 
-- Global wave: W5 Generation outputs and asset pipelines.
+- Global wave: W4 Generation outputs and asset pipelines.
 - Local Wave 1: Tasks 1-2 implement data and validation foundations.
 - Local Wave 2: Tasks 3-5 implement APIs and user data.
 - Local Wave 3: Tasks 6-7 implement scanning, enrichment, and generated output registration.

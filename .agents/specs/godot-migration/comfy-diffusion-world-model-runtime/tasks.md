@@ -13,7 +13,7 @@ Implement Comfy model-execution semantics after model catalogs and graph validat
 
 ## Dependency Waves
 
-- Global wave: W4 Authoring, graph UX, and Comfy workflows.
+- Global wave: W3 Comfy execution core.
 - Local Wave 1: Tasks 1-2 define execution capabilities and sampling request construction.
 - Local Wave 2: Tasks 3-5 implement conditioning, latent/VAE, and model patch semantics.
 - Local Wave 3: Tasks 6-8 add world-model runner profiles, worker bridging, and compatibility fixtures.

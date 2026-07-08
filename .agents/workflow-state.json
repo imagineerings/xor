@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T10:57:56.289Z",
+  "updated_at": "2026-07-08T12:00:00.000Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -231,6 +231,12 @@
       "status": "deprioritized",
       "summary": "All tasks in .agents/specs/ci-migration are deprioritized until every other local workflow task is complete. Do not select CI migration work while non-CI tasks remain available.",
       "updated_at": "2026-07-08T10:55:27.137Z"
+    },
+    {
+      "task_identifier": ".agents/specs/godot-migration",
+      "status": "ready",
+      "summary": "Umbrella tasks are complete. Future Godot migration task selection should prioritize W2 world-model serving substrate, W3 Comfy execution core, and W4 generation pipelines before W7 deferred Godot-origin compatibility unless a deferred task directly unlocks the target product.",
+      "updated_at": "2026-07-08T12:00:00.000Z"
     }
   ],
   "dependency_notes": [
@@ -246,8 +252,8 @@
     },
     {
       "scope": ".agents/specs/godot-migration",
-      "summary": "W1 shared foundations complete (tasks 1-12). Next ready task is #4 (Godot workspace integration registration, W2). The sub-specs (agentic-game-tools, world-model-runtime, etc.) can be started after task 4 or in parallel where writes don't overlap.",
-      "updated_at": "2026-07-07T00:00:00Z"
+      "summary": "Umbrella tasks 1-14 are complete. Next work should prioritize W2 world-model serving substrate, W3 Comfy execution core, and W4 generation pipelines; W5 native authoring should consume those capabilities; W7 Godot-origin compatibility is deferred unless it has an explicit product-enabling dependency.",
+      "updated_at": "2026-07-08T12:00:00.000Z"
     },
     {
       "scope": ".agents/specs/ci-migration",

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Keep Godot networking as boundary metadata and optional debug integration. Runtime networking remains excluded unless routed through explicit external task/debug integration.
+Keep Godot networking as W7 boundary metadata and optional debug integration. Runtime networking remains excluded unless routed through explicit external task/debug integration that directly supports the target product.
 
 ## Gates
 
@@ -13,7 +13,7 @@ Keep Godot networking as boundary metadata and optional debug integration. Runti
 
 ## Dependency Waves
 
-- W6 External execution hardening: debug metadata and external task/debug hooks wait for boundary policy and metadata gates.
+- W7 Deferred Godot-origin compatibility: debug metadata and external task/debug hooks wait for boundary policy, metadata gates, and an explicit product-enabling dependency.
 
 ## Tasks
 

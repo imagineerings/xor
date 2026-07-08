@@ -2,7 +2,7 @@
 
 ## Overview
 
-Model mesh requests and artifacts in W5 after shared world-model request and provenance primitives exist. Real generation backends remain blocked by dependency review.
+Model mesh requests and artifacts in W4 after shared world-model request and provenance primitives exist. Real generation backends remain blocked by dependency review.
 
 ## Gates
 
@@ -13,7 +13,7 @@ Model mesh requests and artifacts in W5 after shared world-model request and pro
 
 ## Dependency Waves
 
-- W5 Generation outputs and asset pipelines: mesh request and artifact models depend on W3 world-model foundations and G6 provenance.
+- W4 Generation outputs and asset pipelines: mesh request and artifact models depend on W2 world-model foundations and G6 provenance.
 
 ## Tasks
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Create the Godot metadata substrate without porting runtime execution. This spec produces the G2 shared metadata gate used by later Godot integrations.
+Create the Godot metadata substrate without porting runtime execution only when a target-product import or preview path requires it. This is W7 deferred compatibility because W1 umbrella metadata already satisfies the shared foundations for Comfy/world-model work.
 
 ## Gates
 
@@ -13,7 +13,7 @@ Create the Godot metadata substrate without porting runtime execution. This spec
 
 ## Dependency Waves
 
-- W2 Sim game compatibility substrate: project descriptors and resource metadata start after W1 boundary policy primitives.
+- W7 Deferred Godot-origin compatibility: project descriptors and resource metadata start only with an explicit product-enabling import or preview dependency.
 
 ## Tasks
 
