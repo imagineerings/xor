@@ -91,6 +91,12 @@ pub struct QuantizationPlan {
     pub global_format: Option<QuantizationFormat>,
     pub layers: Vec<QuantizedLayerMetadata>,
 }
+
+pub struct ModelResourceReleaseReport {
+    pub worker_id: String,
+    pub results: Vec<ModelResourceIntentResult>,
+    pub diagnostics: ServingDiagnosticReport,
+}
 ```
 
 ## Correctness Properties
@@ -132,7 +138,7 @@ _For any_ missing model weight or heavy dependency, the system SHALL require exp
 - Unsupported model families block execution with missing capability details.
 - Incompatible device or precision policies block worker start.
 - Quantization metadata parse failures disable quantized execution and report the invalid layer metadata.
-- Resource release failures surface worker diagnostics instead of pretending memory was freed.
+- Resource release failures surface native Sim worker diagnostics instead of pretending memory was freed.
 
 ## Testing Strategy
 

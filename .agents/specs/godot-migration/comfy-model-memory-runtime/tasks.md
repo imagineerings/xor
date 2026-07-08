@@ -45,8 +45,8 @@ Implement the model runtime as catalog and policy primitives first, then connect
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 5.1, 5.2_
   - _writes: crates/world_model/src/comfy_runtime_policy.rs, crates/world_model/src/comfy_quantization.rs, crates/world_model/src/comfy_runtime_policy_tests.rs_
 
-- [ ] 6. Implement model resource release bridge
-  - Wire unload-models and free-memory intents to worker APIs and report success or diagnostic failure.
+- [x] 6. Implement model resource release bridge
+  - Wire native Sim unload-models and free-memory intents to worker APIs and report success or diagnostic failure without passing resource management through to ComfyUI.
   - _Requirements: 5.1, 5.3_
   - _writes: crates/world_model/src/comfy_model_resources.rs, crates/world_model/src/comfy_model_resources_tests.rs_
 
