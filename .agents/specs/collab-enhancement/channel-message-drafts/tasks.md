@@ -94,12 +94,13 @@ Add client-side draft persistence for channel message composition. When a user t
 
 ### Phase 5: Limits, error handling, and polish
 
-- [ ] 9. Enforce storage limit with eviction
+- [x] 9. Enforce storage limit with eviction
   - Define `const MAX_DRAFTS: usize = 50`.
   - In `save_draft()`, after writing, if total cached drafts exceeds `MAX_DRAFTS`, evict the oldest draft(s) by `updated_at`.
   - Evict from both in-memory cache and KVP.
   - _Requirements: 7.4_
   - _writes: `crates/collab_ui/src/draft_store.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui draft_store --features test-support`_
 
 - [ ] 10. Add error handling and logging
   - Wrap KVP read/write calls and log warnings on failure (draft stays in memory only on write failure; compose area starts empty on read failure).

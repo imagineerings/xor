@@ -9,6 +9,7 @@ use util::ResultExt as _;
 
 const DRAFT_NAMESPACE: &str = "channel_drafts";
 const DRAFT_KEY_PREFIX: &str = "channel_draft.";
+const MAX_DRAFTS: usize = 50;
 
 pub fn init(cx: &mut App) {
     DraftStore::init(cx);
@@ -77,6 +78,9 @@ impl DraftStore {
         };
         self.write_to_kvp(channel_id, &draft).await?;
         self.drafts.insert(channel_id, draft);
+        for evicted_channel_id in self.evict_oldest_drafts() {
+            self.delete_from_kvp(evicted_channel_id).await?;
+        }
         Ok(())
     }
 
@@ -102,9 +106,16 @@ impl DraftStore {
             updated_at: Utc::now(),
         };
         self.drafts.insert(channel_id, draft.clone());
+        let evicted_channel_ids = self.evict_oldest_drafts();
         cx.notify();
 
-        cx.background_spawn(async move { Self::write_to_kvp_with(kvp, channel_id, &draft).await })
+        cx.background_spawn(async move {
+            Self::write_to_kvp_with(kvp.clone(), channel_id, &draft).await?;
+            for evicted_channel_id in evicted_channel_ids {
+                Self::delete_from_kvp_with(kvp.clone(), evicted_channel_id).await?;
+            }
+            Ok(())
+        })
     }
 
     pub async fn load_draft(&mut self, channel_id: ChannelId) -> Result<Option<String>> {
@@ -232,6 +243,34 @@ impl DraftStore {
             .context("deleting channel draft")
     }
 
+    fn evict_oldest_drafts(&mut self) -> Vec<ChannelId> {
+        if self.drafts.len() <= MAX_DRAFTS {
+            return Vec::new();
+        }
+
+        let mut drafts_by_age = self
+            .drafts
+            .iter()
+            .map(|(channel_id, draft)| (*channel_id, draft.updated_at))
+            .collect::<Vec<_>>();
+        drafts_by_age.sort_by_key(|(channel_id, updated_at)| (*updated_at, *channel_id));
+
+        let evicted_channel_ids = drafts_by_age
+            .into_iter()
+            .take(self.drafts.len() - MAX_DRAFTS)
+            .map(|(channel_id, _)| channel_id)
+            .collect::<Vec<_>>();
+
+        for channel_id in &evicted_channel_ids {
+            self.drafts.remove(channel_id);
+            if self.active_draft_channel == Some(*channel_id) {
+                self.active_draft_channel = None;
+            }
+        }
+
+        evicted_channel_ids
+    }
+
     fn read_all_from_kvp(kvp: &KeyValueStore) -> Result<HashMap<ChannelId, Draft>> {
         let mut drafts = HashMap::default();
         for (key, payload) in kvp
@@ -262,6 +301,7 @@ impl Global for GlobalDraftStore {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Duration;
 
     #[gpui::test]
     async fn save_and_load_draft_from_memory() {
@@ -345,6 +385,36 @@ mod tests {
     }
 
     #[gpui::test]
+    async fn save_draft_evicts_oldest_memory_entry() {
+        let now = Utc::now();
+        let mut drafts = HashMap::default();
+        for index in 0..MAX_DRAFTS {
+            let channel_id = ChannelId(index as u64);
+            drafts.insert(
+                channel_id,
+                Draft {
+                    body: format!("draft {index}"),
+                    updated_at: now + Duration::seconds(index as i64),
+                },
+            );
+        }
+        let mut store = DraftStore {
+            kvp: None,
+            drafts,
+            active_draft_channel: None,
+        };
+
+        store
+            .save_draft(ChannelId(1000), "newest draft")
+            .await
+            .expect("save newest draft");
+
+        assert_eq!(store.channels_with_drafts().len(), MAX_DRAFTS);
+        assert!(!store.has_draft(ChannelId(0)));
+        assert!(store.has_draft(ChannelId(1000)));
+    }
+
+    #[gpui::test]
     async fn load_draft_falls_back_to_kvp() {
         let kvp = KeyValueStore::open_test_db("draft_store_load").await;
         let channel_id = ChannelId(7);
@@ -377,6 +447,44 @@ mod tests {
         assert_eq!(
             store.cached_draft(channel_id),
             Some("cached hello".to_string())
+        );
+    }
+
+    #[gpui::test]
+    async fn save_draft_evicts_oldest_kvp_entry() {
+        let kvp = KeyValueStore::open_test_db("draft_store_limit").await;
+        let now = Utc::now();
+        let mut drafts = HashMap::default();
+        for index in 0..MAX_DRAFTS {
+            let channel_id = ChannelId(index as u64);
+            let draft = Draft {
+                body: format!("draft {index}"),
+                updated_at: now + Duration::seconds(index as i64),
+            };
+            drafts.insert(channel_id, draft.clone());
+            DraftStore::new(kvp.clone())
+                .write_to_kvp(channel_id, &draft)
+                .await
+                .expect("write seeded draft");
+        }
+        let mut store = DraftStore::new_with_drafts(kvp.clone(), drafts);
+
+        store
+            .save_draft(ChannelId(1000), "newest draft")
+            .await
+            .expect("save newest draft");
+
+        assert_eq!(
+            kvp.scoped(DRAFT_NAMESPACE)
+                .read(&DraftStore::persist_key(ChannelId(0)))
+                .expect("read evicted draft"),
+            None
+        );
+        assert!(
+            kvp.scoped(DRAFT_NAMESPACE)
+                .read(&DraftStore::persist_key(ChannelId(1000)))
+                .expect("read newest draft")
+                .is_some()
         );
     }
 
