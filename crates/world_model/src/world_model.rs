@@ -1,6 +1,7 @@
 pub mod artifact;
 pub mod comfy_cache;
 pub mod comfy_conditioning;
+pub mod comfy_control;
 pub mod comfy_execution_plan;
 pub mod comfy_execution_registry;
 pub mod comfy_executor;
@@ -39,6 +40,8 @@ mod artifact_tests;
 mod comfy_cache_tests;
 #[cfg(test)]
 mod comfy_conditioning_tests;
+#[cfg(test)]
+mod comfy_control_tests;
 #[cfg(test)]
 mod comfy_execution_plan_tests;
 #[cfg(test)]
@@ -96,6 +99,12 @@ pub use comfy_conditioning::{
     ConditioningTransformKind, ConditioningValidationDiagnostic, ControlAttachment,
     ControlAttachmentKind, EMPTY_BUNDLE_CODE, EMPTY_TENSOR_CODE, EncoderIdentity, EncoderKind,
     InpaintConditioning, PromptMetadata, PromptRole, TensorDescriptor, TensorDtype,
+};
+pub use comfy_control::{
+    ClientFeatureNegotiation, ComfyControlDiagnostic, ComfyFeatureFlags, ComfyJobStatus,
+    ComfyJobSummary, ComfyPromptId, ComfyRuntimeEvent, HistoryAction, INVALID_PROMPT_ID_CODE,
+    PreviewPayload, PromptExtraData, PromptSubmission, PromptSubmissionResponse, QueueAction,
+    QueueNumber, QueueStatus,
 };
 pub use comfy_execution_plan::{ComfyExecutionPlanner, ExecutionPlan, ExecutionPlanRequest};
 pub use comfy_execution_registry::{

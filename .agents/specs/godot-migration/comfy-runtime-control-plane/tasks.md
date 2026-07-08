@@ -20,8 +20,9 @@ Build the control plane as a protocol adapter over Sim task, HTTP, WebSocket, me
 
 ## Tasks
 
-- [ ] 1. Define Comfy control-plane protocol models
-  - Add prompt submission, queue action, history action, job summary, feature flag, and runtime event types.
+- [x] 1. Define Comfy control-plane protocol models
+  - Add prompt submission, queue action, history action, job summary, feature flag, and runtime event types as native Sim protocol records.
+  - Validate canonical lowercase hyphenated prompt ids, expose redacted extra data, and preserve progress/preview/feature events without ComfyUI pass-through.
   - _Requirements: 1.1, 1.2, 2.1, 3.2_
   - _writes: crates/world_model/src/comfy_control.rs, crates/world_model/src/comfy_control_tests.rs_
 

@@ -70,6 +70,14 @@ pub trait ComfyWebSocketAdapter {
 
 ## Data Models
 
+Task 1 defines these as native Sim protocol records in `crates/world_model`.
+Prompt ids are validated as canonical lowercase hyphenated UUID strings before
+enqueueing, prompt payloads stay as protocol JSON until graph validation owns
+them, extra data exposes an explicit redacted public view, queue/history actions
+carry typed prompt ids, job summaries model Sim queue state, and runtime events
+carry feature negotiation, execution progress, and preview metadata without
+wrapping or forwarding a ComfyUI server object.
+
 ```rust
 pub struct PromptSubmission {
     pub prompt_id: Option<Uuid>,
@@ -141,7 +149,7 @@ _For any_ upload, view, or download request, the resolved filesystem path SHALL 
 
 ## Testing Strategy
 
-- Unit tests for prompt id validation, `/api` alias routing, queue redaction, cancel classification, and path confinement.
+- Unit tests for prompt id validation, native protocol records, `/api` alias routing, queue redaction, cancel classification, and path confinement.
 - Integration tests for prompt submission through queue, job status transitions, WebSocket feature negotiation, progress events, and preview metadata negotiation.
 - Compatibility fixtures from `projects/comfy/script_examples` for basic HTTP prompt execution and WebSocket image retrieval.
 - Property tests for route alias equivalence and path traversal rejection.
