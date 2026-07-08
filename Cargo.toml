@@ -135,6 +135,7 @@ members = [
     "crates/markdown",
     "crates/markdown_preview",
     "crates/mcp_servers/memory",
+    "crates/mcp_servers/tutorial",
     "crates/mcp_runner",
     "crates/mermaid_render",
         "crates/mobile_tunnel",
@@ -406,6 +407,7 @@ lsp = { path = "crates/lsp" }
 markdown = { path = "crates/markdown" }
 markdown_preview = { path = "crates/markdown_preview" }
 mcp_memory = { path = "crates/mcp_servers/memory" }
+mcp_tutorial = { path = "crates/mcp_servers/tutorial" }
 mermaid_render = { path = "crates/mermaid_render" }
 mcp_runner = { path = "crates/mcp_runner" }
 svg_preview = { path = "crates/svg_preview" }

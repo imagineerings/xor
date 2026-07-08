@@ -50,7 +50,7 @@ Implement the MCP tool servers from goose as a combination of native agent tools
   - _Requirements: 4_
   - _writes: crates/mcp_servers/autovisualiser/src/lib.rs_
 
-- [ ] 6. Implement Tutorial MCP server
+- [x] 6. Implement Tutorial MCP server
   - Create MCP server that loads and guides through markdown tutorials
   - Implement step progression and state tracking
   - _Requirements: 5_
