@@ -63,8 +63,7 @@ pub use user::*;
 
 static SIM_SERVER_URL: LazyLock<Option<String>> =
     LazyLock::new(|| std::env::var("SIM_SERVER_URL").ok());
-static SIM_RPC_URL: LazyLock<Option<String>> =
-    LazyLock::new(|| std::env::var("SIM_RPC_URL").ok());
+static SIM_RPC_URL: LazyLock<Option<String>> = LazyLock::new(|| std::env::var("SIM_RPC_URL").ok());
 
 pub static IMPERSONATE_LOGIN: LazyLock<Option<String>> = LazyLock::new(|| {
     std::env::var("SIM_IMPERSONATE")
@@ -72,8 +71,7 @@ pub static IMPERSONATE_LOGIN: LazyLock<Option<String>> = LazyLock::new(|| {
         .and_then(|s| if s.is_empty() { None } else { Some(s) })
 });
 
-pub static USE_WEB_LOGIN: LazyLock<bool> =
-    LazyLock::new(|| std::env::var("SIM_WEB_LOGIN").is_ok());
+pub static USE_WEB_LOGIN: LazyLock<bool> = LazyLock::new(|| std::env::var("SIM_WEB_LOGIN").is_ok());
 
 pub static ADMIN_API_TOKEN: LazyLock<Option<String>> = LazyLock::new(|| {
     std::env::var("SIM_ADMIN_API_TOKEN")
@@ -2518,6 +2516,7 @@ mod tests {
                     mentions: Vec::new(),
                     reply_to_message_id: Some(3),
                     edited_at: None,
+                    reaction_summaries: Vec::new(),
                 }),
             },
         );
@@ -2597,6 +2596,7 @@ mod tests {
                 mentions: Vec::new(),
                 reply_to_message_id: None,
                 edited_at: None,
+                reaction_summaries: Vec::new(),
             }),
         });
         assert_eq!(sent_rx.recv().await.unwrap().channel_id, 7);
@@ -2612,6 +2612,7 @@ mod tests {
                 mentions: Vec::new(),
                 reply_to_message_id: None,
                 edited_at: Some(3),
+                reaction_summaries: Vec::new(),
             }),
         });
         assert_eq!(

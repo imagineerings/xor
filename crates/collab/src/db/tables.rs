@@ -7,6 +7,7 @@ pub mod channel_chat_participant;
 pub mod channel_member;
 pub mod channel_message;
 pub mod channel_message_mention;
+pub mod channel_message_reaction;
 pub mod channel_message_read;
 pub mod contact;
 pub mod contributor;

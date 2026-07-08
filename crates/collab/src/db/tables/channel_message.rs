@@ -35,6 +35,8 @@ pub enum Relation {
     Mentions,
     #[sea_orm(has_many = "super::channel_message_read::Entity")]
     Reads,
+    #[sea_orm(has_many = "super::channel_message_reaction::Entity")]
+    Reactions,
 }
 
 impl Related<super::channel::Entity> for Entity {
@@ -58,6 +60,12 @@ impl Related<super::channel_message_mention::Entity> for Entity {
 impl Related<super::channel_message_read::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Reads.def()
+    }
+}
+
+impl Related<super::channel_message_reaction::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Reactions.def()
     }
 }
 

@@ -25,18 +25,23 @@ Add emoji reaction support to Sim channel messages. This spans five layers: prot
 
 ### Phase 2 — Database
 
-- [ ] 3. Create channel_reactions migration
+- [x] 3. Create channel_reactions migration
   - Write a SQL migration creating the `channel_reactions` table with columns: `channel_id`, `message_id`, `user_id`, `emoji_name`, `created_at`.
   - Include composite primary key `(message_id, user_id, emoji_name)` and index on `message_id`.
   - Add a `DELETE` cascade trigger or application-level handling so reactions are removed when a channel message is deleted.
   - _Requirements: 2.4_
-  - _writes: migrations/20240625000001_add_channel_reactions.up.sql_
+  - _writes: `crates/collab/migrations/20260708183000_create_channel_message_reactions.sql`_
+  - _writes: `crates/collab/migrations.sqlite/20221109000000_test_schema.sql`_
+  - _writes: `crates/collab/src/db/tables/channel_message_reaction.rs`_
+  - _validated: `cargo fmt -p collab`; `cargo check -p collab`; `git diff --check`_
 
-- [ ] 4. Add reaction query functions to db crate
+- [x] 4. Add reaction query functions to db crate
   - Implement `store::reactions::insert_reaction`, `delete_reaction`, `get_message_reactions`, and `delete_message_reactions` as SQLx queries.
   - Ensure idempotency: `insert_reaction` uses `ON CONFLICT DO NOTHING`, `delete_reaction` is a plain DELETE (no-op if missing).
   - _Requirements: 2.1, 2.4_
-  - _writes: crates/db/src/queries/reactions.rs_
+  - _writes: `crates/collab/src/db/queries/channel_messages.rs`_
+  - _writes: `crates/collab/src/db/tables.rs`_
+  - _validated: `cargo fmt -p collab`; `cargo check -p collab`; `git diff --check`_
 
 ### Phase 3 — Server: ReactionStore
 

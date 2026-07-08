@@ -3,6 +3,7 @@ use anyhow::{Context as _, anyhow};
 
 const NONCE_LEN: usize = 16;
 const DEFAULT_CHANNEL_MESSAGE_LIMIT: usize = 50;
+const MAX_REACTION_EMOJI_NAME_LEN: usize = 100;
 
 pub struct NewChannelMessage {
     pub channel_id: ChannelId,
@@ -205,6 +206,8 @@ impl Database {
                 .exec(&*tx)
                 .await?;
 
+            delete_message_reactions(message_id, &tx).await?;
+
             let deleted = channel_message::Entity::update(channel_message::ActiveModel {
                 id: ActiveValue::Unchanged(message_id),
                 channel_id: ActiveValue::Unchanged(channel_id),
@@ -316,6 +319,92 @@ impl Database {
         .await
     }
 
+    pub async fn insert_channel_message_reaction(
+        &self,
+        channel_id: ChannelId,
+        message_id: MessageId,
+        user_id: UserId,
+        emoji_name: String,
+    ) -> Result<Vec<proto::ReactionSummary>> {
+        validate_reaction_emoji_name(&emoji_name)?;
+
+        self.transaction(|tx| {
+            let emoji_name = emoji_name.clone();
+
+            async move {
+                let channel = self.get_channel_internal(channel_id, &tx).await?;
+                self.check_user_is_channel_participant(&channel, user_id, &tx)
+                    .await?;
+                self.get_channel_message_model(channel_id, message_id, &tx)
+                    .await?;
+
+                use channel_message_reaction::Column;
+                channel_message_reaction::Entity::insert(channel_message_reaction::ActiveModel {
+                    channel_id: ActiveValue::Set(channel_id),
+                    message_id: ActiveValue::Set(message_id),
+                    user_id: ActiveValue::Set(user_id),
+                    emoji_name: ActiveValue::Set(emoji_name),
+                    created_at: ActiveValue::NotSet,
+                })
+                .on_conflict(
+                    OnConflict::columns([Column::MessageId, Column::UserId, Column::EmojiName])
+                        .do_nothing()
+                        .to_owned(),
+                )
+                .exec_without_returning(&*tx)
+                .await?;
+
+                get_message_reactions(message_id, &tx).await
+            }
+        })
+        .await
+    }
+
+    pub async fn delete_channel_message_reaction(
+        &self,
+        channel_id: ChannelId,
+        message_id: MessageId,
+        user_id: UserId,
+        emoji_name: String,
+    ) -> Result<Vec<proto::ReactionSummary>> {
+        validate_reaction_emoji_name(&emoji_name)?;
+
+        self.transaction(|tx| {
+            let emoji_name = emoji_name.clone();
+
+            async move {
+                let channel = self.get_channel_internal(channel_id, &tx).await?;
+                self.check_user_is_channel_participant(&channel, user_id, &tx)
+                    .await?;
+                self.get_channel_message_model(channel_id, message_id, &tx)
+                    .await?;
+
+                channel_message_reaction::Entity::delete_many()
+                    .filter(channel_message_reaction::Column::MessageId.eq(message_id))
+                    .filter(channel_message_reaction::Column::UserId.eq(user_id))
+                    .filter(channel_message_reaction::Column::EmojiName.eq(emoji_name))
+                    .exec(&*tx)
+                    .await?;
+
+                get_message_reactions(message_id, &tx).await
+            }
+        })
+        .await
+    }
+
+    pub async fn get_channel_message_reactions(
+        &self,
+        message_id: MessageId,
+    ) -> Result<Vec<proto::ReactionSummary>> {
+        self.transaction(|tx| async move { get_message_reactions(message_id, &tx).await })
+            .await
+    }
+
+    pub async fn delete_channel_message_reactions(&self, message_id: MessageId) -> Result<()> {
+        self.transaction(|tx| async move { delete_message_reactions(message_id, &tx).await })
+            .await
+    }
+
     async fn get_channel_message_model(
         &self,
         channel_id: ChannelId,
@@ -355,8 +444,12 @@ impl Database {
     ) -> Result<Vec<proto::ChannelMessage>> {
         let mentions_by_message_id =
             mentions_by_message_id(rows.iter().map(|row| row.id), tx).await?;
+        let reactions_by_message_id =
+            reaction_summaries_by_message_id(rows.iter().map(|row| row.id), tx).await?;
         rows.into_iter()
-            .map(|row| channel_message_to_proto(row, &mentions_by_message_id))
+            .map(|row| {
+                channel_message_to_proto(row, &mentions_by_message_id, &reactions_by_message_id)
+            })
             .collect()
     }
 
@@ -366,8 +459,27 @@ impl Database {
         tx: &DatabaseTransaction,
     ) -> Result<proto::ChannelMessage> {
         let mentions_by_message_id = mentions_by_message_id([row.id], tx).await?;
-        channel_message_to_proto(row, &mentions_by_message_id)
+        let reactions_by_message_id = reaction_summaries_by_message_id([row.id], tx).await?;
+        channel_message_to_proto(row, &mentions_by_message_id, &reactions_by_message_id)
     }
+}
+
+async fn get_message_reactions(
+    message_id: MessageId,
+    tx: &DatabaseTransaction,
+) -> Result<Vec<proto::ReactionSummary>> {
+    Ok(reaction_summaries_by_message_id([message_id], tx)
+        .await?
+        .remove(&message_id)
+        .unwrap_or_default())
+}
+
+async fn delete_message_reactions(message_id: MessageId, tx: &DatabaseTransaction) -> Result<()> {
+    channel_message_reaction::Entity::delete_many()
+        .filter(channel_message_reaction::Column::MessageId.eq(message_id))
+        .exec(tx)
+        .await?;
+    Ok(())
 }
 
 async fn insert_mentions(
@@ -451,6 +563,7 @@ async fn mentions_by_message_id(
 fn channel_message_to_proto(
     row: channel_message::Model,
     mentions_by_message_id: &HashMap<MessageId, Vec<proto::ChatMention>>,
+    reactions_by_message_id: &HashMap<MessageId, Vec<proto::ReactionSummary>>,
 ) -> Result<proto::ChannelMessage> {
     Ok(proto::ChannelMessage {
         id: row.id.to_proto(),
@@ -466,7 +579,76 @@ fn channel_message_to_proto(
         edited_at: row
             .edited_at
             .map(|edited_at| edited_at.assume_utc().unix_timestamp() as u64),
+        reaction_summaries: reactions_by_message_id
+            .get(&row.id)
+            .cloned()
+            .unwrap_or_default(),
     })
+}
+
+async fn reaction_summaries_by_message_id(
+    message_ids: impl IntoIterator<Item = MessageId>,
+    tx: &DatabaseTransaction,
+) -> Result<HashMap<MessageId, Vec<proto::ReactionSummary>>> {
+    let message_ids = message_ids.into_iter().collect::<Vec<_>>();
+    if message_ids.is_empty() {
+        return Ok(HashMap::default());
+    }
+
+    let rows = channel_message_reaction::Entity::find()
+        .filter(channel_message_reaction::Column::MessageId.is_in(message_ids))
+        .order_by_asc(channel_message_reaction::Column::MessageId)
+        .order_by_asc(channel_message_reaction::Column::EmojiName)
+        .order_by_asc(channel_message_reaction::Column::UserId)
+        .all(tx)
+        .await?;
+
+    let mut grouped = HashMap::<MessageId, BTreeMap<String, Vec<UserId>>>::default();
+    for row in rows {
+        grouped
+            .entry(row.message_id)
+            .or_default()
+            .entry(row.emoji_name)
+            .or_default()
+            .push(row.user_id);
+    }
+
+    let mut summaries = HashMap::default();
+    for (message_id, reactions_by_emoji) in grouped {
+        summaries.insert(
+            message_id,
+            reactions_by_emoji
+                .into_iter()
+                .map(|(emoji_name, user_ids)| {
+                    let count = user_ids
+                        .len()
+                        .try_into()
+                        .context("too many channel message reactions for one emoji")?;
+                    Ok(proto::ReactionSummary {
+                        emoji_name,
+                        count,
+                        user_ids: user_ids.into_iter().map(UserId::to_proto).collect(),
+                    })
+                })
+                .collect::<Result<Vec<_>>>()?,
+        );
+    }
+    Ok(summaries)
+}
+
+fn validate_reaction_emoji_name(emoji_name: &str) -> Result<()> {
+    if emoji_name.trim().is_empty() {
+        return Err(anyhow!("channel message reaction emoji name is empty").into());
+    }
+
+    if emoji_name.len() > MAX_REACTION_EMOJI_NAME_LEN {
+        return Err(anyhow!(
+            "channel message reaction emoji name exceeds {MAX_REACTION_EMOJI_NAME_LEN} bytes"
+        )
+        .into());
+    }
+
+    Ok(())
 }
 
 fn nonce_to_bytes(nonce: proto::Nonce) -> Vec<u8> {
