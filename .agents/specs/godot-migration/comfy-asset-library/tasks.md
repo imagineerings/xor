@@ -44,8 +44,9 @@ Build the asset library as shared storage primitives plus Comfy-compatible route
   - _Requirements: 2.4, 6.1_
   - _writes: crates/world_model/src/comfy_asset_download.rs, crates/world_model/src/comfy_asset_download_tests.rs_
 
-- [ ] 5. Implement tags and user data
+- [x] 5. Implement tags and user data
   - Add tag add/remove/list/refine and Comfy-compatible user settings and user data file operations.
+  - Implement tags, user files, and settings as native Sim asset/user-storage services without calling ComfyUI tag, settings, or user-data handlers.
   - _Requirements: 3.1, 3.2, 3.3, 5.1, 5.2, 5.3, 5.4_
   - _writes: crates/world_model/src/comfy_asset_tags.rs, crates/world_model/src/comfy_user_data.rs, crates/world_model/src/comfy_user_data_tests.rs_
 

@@ -3,6 +3,7 @@ pub mod comfy_app_mode;
 pub mod comfy_asset_api;
 pub mod comfy_asset_download;
 pub mod comfy_asset_query;
+pub mod comfy_asset_tags;
 pub mod comfy_asset_upload;
 pub mod comfy_assets;
 pub mod comfy_blueprints;
@@ -36,6 +37,7 @@ pub mod comfy_runtime_policy;
 pub mod comfy_sampling;
 pub mod comfy_schema;
 pub mod comfy_subgraphs;
+pub mod comfy_user_data;
 pub mod comfy_vae;
 pub mod comfy_worker_execution;
 pub mod comfy_workflow_export;
@@ -123,6 +125,8 @@ mod comfy_schema_tests;
 #[cfg(test)]
 mod comfy_subgraphs_tests;
 #[cfg(test)]
+mod comfy_user_data_tests;
+#[cfg(test)]
 mod comfy_worker_execution_tests;
 #[cfg(test)]
 mod comfy_workflow_templates_tests;
@@ -167,6 +171,9 @@ pub use comfy_asset_query::{
     ComfyAssetListQuery, ComfyAssetMetadataFilter, ComfyAssetMetadataNamespace,
     ComfyAssetMetadataOperator, ComfyAssetOrder, ComfyAssetOwnerScope, ComfyAssetPagination,
     ComfyAssetQueryDiagnostic, ComfyAssetSort, ComfyAssetValidatedHash, normalize_asset_tag,
+};
+pub use comfy_asset_tags::{
+    ComfyAssetTagCount, ComfyAssetTagListQuery, ComfyAssetTagMutationReport, ComfyAssetTagService,
 };
 pub use comfy_asset_upload::{
     ASSET_UPLOAD_INVALID_FIELD_CODE, ComfyAssetUploadDiagnostic, ComfyAssetUploadRequest,
@@ -303,6 +310,10 @@ pub use comfy_subgraphs::{
     ComfySubgraphDiagnostic, ComfySubgraphId, ComfySubgraphIndex, ComfySubgraphListing,
     ComfySubgraphRecord, ComfySubgraphSource, ComfySubgraphSourceType, DUPLICATE_SUBGRAPH_ID_CODE,
     SUBGRAPH_NOT_FOUND_CODE,
+};
+pub use comfy_user_data::{
+    ComfyUserDataDiagnostic, ComfyUserDataEntry, ComfyUserDataPathParts, ComfyUserDataStore,
+    USER_DATA_FORBIDDEN_CODE, USER_DATA_NOT_FOUND_CODE, normalize_user_path,
 };
 pub use comfy_vae::{
     ComfyVaeRuntime, VaeOperationKind, VaeRuntimeRequest, VaeTilingMetadata,

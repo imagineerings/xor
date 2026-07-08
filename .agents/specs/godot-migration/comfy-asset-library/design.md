@@ -70,6 +70,10 @@ pub trait AssetRepository {
 
 - **Purpose**: Provide Comfy-compatible user files and settings.
 - **Responsibilities**: User resolution, system-user protection, path confinement, list/read/write/move/delete, and settings JSON persistence.
+- **Native tags and user data**: Tag mutation, tag listing, refinement
+  histograms, user files, and settings execute against Sim-owned asset records
+  and user storage paths. Comfy-compatible endpoints adapt names and response
+  shapes only; they do not call ComfyUI tag, settings, or user-data handlers.
 
 ## Data Models
 
@@ -147,5 +151,5 @@ _For any_ prune operation, references outside known roots SHALL be marked missin
 - Repository tests for content/reference dedupe, soft delete, owner scoping,
   cache state, provenance ids, and tag histograms.
 - API tests for upload, download, create-from-hash, CRUD, preview resolution,
-  tags, seed status, cancel, and prune.
+  tags, user data, settings, seed status, cancel, and prune.
 - Scanner tests for models/input/output roots, missing files, enrichment, and output registration.
