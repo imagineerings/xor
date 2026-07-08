@@ -56,10 +56,11 @@ Represent media functionality as capability groups and implement deterministic o
   - _Requirements: 5.1, 5.2_
   - _writes: crates/world_model/src/sim_control_signal_nodes.rs, crates/world_model/src/sim_control_signal_nodes_tests.rs_
 
-- [ ] 7. Implement utility and dataset node adapters
+- [x] 7. Implement utility and dataset node adapters
   - Add deterministic string, regex, JSON, math, primitive, logic, seed, and path-confined dataset operations.
+  - Represent primitive values, logic operations, dataset entries, buckets, source attribution, path diagnostics, and deterministic seeded ordering with native `SimUtility*` and `SimDataset*` records.
   - _Requirements: 6.1, 6.2, 6.3_
-  - _writes: crates/world_model/src/comfy_utility_nodes.rs, crates/world_model/src/comfy_dataset_nodes.rs, crates/world_model/src/comfy_utility_nodes_tests.rs_
+  - _writes: crates/world_model/src/sim_utility_nodes.rs, crates/world_model/src/sim_utility_nodes_tests.rs_
 
 ## Notes
 

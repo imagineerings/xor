@@ -69,6 +69,7 @@ pub mod sim_mask_nodes;
 pub mod sim_media_capabilities;
 pub mod sim_packaging_profiles;
 pub mod sim_user_data;
+pub mod sim_utility_nodes;
 pub mod sim_video_nodes;
 pub mod worker_launcher;
 
@@ -186,6 +187,8 @@ mod sim_media_capabilities_tests;
 mod sim_packaging_profiles_tests;
 #[cfg(test)]
 mod sim_user_data_tests;
+#[cfg(test)]
+mod sim_utility_nodes_tests;
 #[cfg(test)]
 mod sim_video_nodes_tests;
 #[cfg(test)]
@@ -493,6 +496,11 @@ pub use sim_packaging_profiles::{
 pub use sim_user_data::{
     SimUserDataDiagnostic, SimUserDataEntry, SimUserDataPathParts, SimUserDataStore,
     USER_DATA_FORBIDDEN_CODE, USER_DATA_NOT_FOUND_CODE, normalize_user_path,
+};
+pub use sim_utility_nodes::{
+    SIM_UTILITY_DATASET_PATH_CODE, SIM_UTILITY_INVALID_REGEX_CODE, SIM_UTILITY_JSON_PATH_CODE,
+    SIM_UTILITY_MATH_EXPRESSION_CODE, SimDatasetBucket, SimDatasetEntry, SimUtilityDiagnostic,
+    SimUtilityLogicOp, SimUtilityNodeAdapter, SimUtilityValue,
 };
 pub use sim_video_nodes::{
     SIM_VIDEO_DEPENDENCY_REVIEW_REQUIRED_CODE, SIM_VIDEO_INVALID_RANGE_CODE,

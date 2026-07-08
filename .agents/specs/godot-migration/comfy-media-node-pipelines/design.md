@@ -84,6 +84,17 @@ flowchart TD
   compatibility before execution, and backend gaps surface native Sim
   diagnostics for unsupported or dependency-review-required analysis engines.
 
+### UtilityOps
+
+- **Purpose**: Implement deterministic utility and dataset support for media pipelines.
+- **Responsibilities**: String, regex, JSON, math, primitive, logic, seed,
+  switch, dataset shuffle, dedupe, bucket, and training-data preparation.
+- **Native behavior**: Uses `SimUtility*` and `SimDataset*` adapters for
+  deterministic primitive, regex, JSON, math, logic, seed, and switch behavior.
+  Dataset entries are normalized through Sim user-data path confinement,
+  preserve source attribution, and use deterministic ordering for seeded
+  shuffles rather than forwarding dataset work to ComfyUI.
+
 ## Data Models
 
 ```rust
@@ -139,6 +150,14 @@ pub struct SimControlSignalArtifact {
     pub kind: SimControlSignalKind,
     pub port_type: SimMediaPortType,
     pub metadata: SimControlSignalMetadata,
+}
+
+pub struct SimDatasetEntry {
+    pub source_path: PathBuf,
+    pub source_reference: String,
+    pub text: Option<String>,
+    pub bucket: Option<String>,
+    pub attribution: BTreeMap<String, String>,
 }
 ```
 
