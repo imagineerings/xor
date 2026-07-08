@@ -235,6 +235,15 @@ impl ChannelChat {
             editor.set_placeholder_text("Search emoji", window, cx);
             editor
         });
+        let restored_draft = DraftStore::global(cx)
+            .update(cx, |draft_store, _| draft_store.cached_draft(channel_id));
+        if let Some(restored_draft) = restored_draft {
+            composer.update(cx, |composer, cx| {
+                if composer.is_empty(cx) {
+                    composer.set_text(restored_draft, window, cx);
+                }
+            });
+        }
         let _composer_subscription = cx.subscribe(&composer, |this, _, event: &EditorEvent, cx| {
             if matches!(event, EditorEvent::Edited { .. }) {
                 this.schedule_draft_save(cx);

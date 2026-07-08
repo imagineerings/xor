@@ -51,13 +51,14 @@ Add client-side draft persistence for channel message composition. When a user t
   - _writes: `crates/collab_ui/src/channel_chat.rs`, `crates/collab_ui/src/draft_store.rs`_
   - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_chat --features test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui draft_store --features test-support`_
 
-- [ ] 5. Restore draft on channel navigation
-  - In `ChannelView::new()` (or when the channel buffer loads), call `DraftStore::load_draft(channel_id)`.
+- [x] 5. Restore draft on channel navigation
+  - In `ChannelChat::new()` (or when the channel chat loads), call `DraftStore::cached_draft(channel_id)`.
   - If a draft is returned and its body is non-empty, set the editor's text to the draft content.
   - Do not overwrite a draft when the buffer already has content (e.g., a shared channel buffer with existing text). Only pre-fill when the editor is empty.
-  - Track whether a draft was restored to avoid clobbering user input.
+  - Restore before installing the edit subscription to avoid clobbering user input or immediately re-saving the restored draft.
   - _Requirements: 7.1_
-  - _writes: `crates/collab_ui/src/channel_view.rs`_
+  - _writes: `crates/collab_ui/src/channel_chat.rs`, `crates/collab_ui/src/draft_store.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_chat --features test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui draft_store --features test-support`_
 
 - [ ] 6. Clear draft on send
   - In the send-message path of `ChannelView`, after successful message submission, call `DraftStore::clear_draft(channel_id)`.

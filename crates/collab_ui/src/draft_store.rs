@@ -122,6 +122,14 @@ impl DraftStore {
             .filter(|body| !body.trim().is_empty()))
     }
 
+    pub fn cached_draft(&mut self, channel_id: ChannelId) -> Option<String> {
+        self.active_draft_channel = Some(channel_id);
+        self.drafts
+            .get(&channel_id)
+            .map(|draft| draft.body.clone())
+            .filter(|body| !body.trim().is_empty())
+    }
+
     pub async fn clear_draft(&mut self, channel_id: ChannelId) -> Result<()> {
         self.drafts.remove(&channel_id);
         self.delete_from_kvp(channel_id).await?;
@@ -340,6 +348,22 @@ mod tests {
             Some("persisted hello".to_string())
         );
         assert!(store.has_draft(channel_id));
+    }
+
+    #[gpui::test]
+    async fn cached_draft_returns_in_memory_body() {
+        let mut store = DraftStore::memory_only();
+        let channel_id = ChannelId(7);
+
+        store
+            .save_draft(channel_id, "cached hello")
+            .await
+            .expect("save draft");
+
+        assert_eq!(
+            store.cached_draft(channel_id),
+            Some("cached hello".to_string())
+        );
     }
 
     #[gpui::test]
