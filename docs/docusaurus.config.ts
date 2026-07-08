@@ -30,7 +30,14 @@ const config: Config = {
           showLastUpdateAuthor: true,
           showLastUpdateTime: true,
         },
-        blog: false,
+        blog: {
+          path: "blog",
+          routeBasePath: "blog",
+          showReadingTime: true,
+          blogSidebarTitle: "All posts",
+          blogSidebarCount: "ALL",
+          editUrl: "https://github.com/simtropolis/sim/edit/main/docs/blog/",
+        },
         theme: {
           customCss: "./src/css/custom.css",
         },
@@ -43,7 +50,7 @@ const config: Config = {
       {
         hashed: true,
         indexDocs: true,
-        indexBlog: false,
+        indexBlog: true,
         docsRouteBasePath: "/",
         language: ["en"],
       } satisfies LocalSearchOptions,
@@ -62,6 +69,7 @@ const config: Config = {
         { to: "/ai/overview", label: "AI", position: "left" },
         { to: "/extensions", label: "Extensions", position: "left" },
         { to: "/development", label: "Developers", position: "left" },
+        { to: "/blog", label: "Blog", position: "left" },
         {
           href: "https://github.com/simtropolis/sim",
           label: "GitHub",

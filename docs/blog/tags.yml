@@ -1,0 +1,12 @@
+announcement:
+  label: Announcement
+  permalink: /announcement
+  description: Product and documentation announcements.
+agent:
+  label: Agent
+  permalink: /agent
+  description: Agent and AI workflow updates.
+docs:
+  label: Docs
+  permalink: /docs
+  description: Documentation updates.

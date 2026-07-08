@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T14:19:40Z",
+  "updated_at": "2026-07-08T14:23:35Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -441,6 +441,12 @@
       "updated_at": "2026-07-08T14:19:40Z"
     },
     {
+      "task_identifier": ".agents/specs/goose-migration/documentation/tasks.md:45",
+      "status": "done",
+      "summary": "Task 6: Enabled the Docusaurus blog route, local blog search indexing, navbar blog link, blog authors/tags metadata, and initial docs-site and agent-workflows posts.",
+      "updated_at": "2026-07-08T14:23:35Z"
+    },
+    {
       "task_identifier": ".agents/specs/ci-migration/tasks.md",
       "status": "deprioritized",
       "summary": "All tasks in .agents/specs/ci-migration are deprioritized until every other local workflow task is complete. Do not select CI migration work while non-CI tasks remain available.",
@@ -486,8 +492,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/documentation",
-      "summary": "Tasks 1-5 are checked complete. Docusaurus is initialized as an overlay around the existing docs/src mdBook content, with getting-started, feature, configuration, provider, extension/MCP, troubleshooting, development workflow, build, and contributing docs. Remaining documentation tasks should add blog, tutorials, scripts, and CI before enabling those routes.",
-      "updated_at": "2026-07-08T14:19:40Z"
+      "summary": "Tasks 1-6 are checked complete. Docusaurus is initialized as an overlay around the existing docs/src mdBook content, with getting-started, feature, configuration, provider, extension/MCP, troubleshooting, development workflow, build, contributing docs, and an enabled blog with metadata and initial posts. Remaining documentation tasks should add tutorials, scripts, and CI.",
+      "updated_at": "2026-07-08T14:23:35Z"
     },
     {
       "scope": ".agents/specs/godot-migration",

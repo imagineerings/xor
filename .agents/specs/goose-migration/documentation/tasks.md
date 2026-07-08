@@ -42,7 +42,7 @@ Set up a Docusaurus-based documentation site for sim with installation guides, c
   - _Requirements: 1_
   - _writes: docs/docs/development/_
 
-- [ ] 6. Set up blog
+- [x] 6. Set up blog
   - Release notes template
   - Initial blog posts (announcement, feature highlights)
   - _Requirements: 2_
