@@ -1,6 +1,7 @@
 import type {
   AgentMessageResponse,
   AgentStatus,
+  ClientCapabilities,
   ConnectionState,
   CreateSessionOptions,
   GooseClientConfig,
@@ -11,6 +12,7 @@ import type {
   Session,
   StreamEvent,
 } from "./generated/types.js";
+import { createClientCapabilities } from "./client-capabilities.js";
 import { HttpTransport, SimError } from "./http-transport.js";
 import { HttpStreamClient } from "./stream.js";
 
@@ -19,6 +21,7 @@ export type ConnectionStateCallback = (state: ConnectionState) => void;
 export class GooseClient {
   private readonly transport: HttpTransport;
   private readonly streamClient: HttpStreamClient;
+  private readonly capabilities: ClientCapabilities;
   private readonly stateCallbacks = new Set<ConnectionStateCallback>();
   private state: ConnectionState = "disconnected";
 
@@ -45,6 +48,7 @@ export class GooseClient {
       timeout: config.timeout,
       maxRetries: config.maxRetries,
     });
+    this.capabilities = createClientCapabilities(config.capabilities);
   }
 
   connectionState(): ConnectionState {
@@ -59,6 +63,7 @@ export class GooseClient {
   async connect(): Promise<void> {
     this.setState("connecting");
     try {
+      await this.initializeCapabilities();
       await this.transport.getHealth();
       this.setState("connected");
     } catch (error) {
@@ -126,6 +131,19 @@ export class GooseClient {
 
   httpStreamClient(): HttpStreamClient {
     return this.streamClient;
+  }
+
+  clientCapabilities(): ClientCapabilities {
+    return this.capabilities;
+  }
+
+  private async initializeCapabilities(): Promise<void> {
+    try {
+      await this.transport.post<void>("/client/capabilities", this.capabilities);
+    } catch {
+      // Older servers may not expose the capabilities endpoint yet. Health check
+      // remains the compatibility gate for HTTP connections.
+    }
   }
 
   private setState(state: ConnectionState): void {

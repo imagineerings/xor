@@ -44,7 +44,7 @@ Implement a TypeScript SDK as an npm package that provides programmatic access t
   - _Requirements: 3_
   - _writes: ui/sdk/src/mcp-apps.ts_
 
-- [ ] 6. Implement client capabilities
+- [x] 6. Implement client capabilities
   - Declare client capabilities on connection initialization
   - Feature detection and advertisement
   - _Requirements: 4_

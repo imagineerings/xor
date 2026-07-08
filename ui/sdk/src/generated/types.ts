@@ -14,6 +14,7 @@ export interface GooseClientConfig {
   binaryPath?: string;
   timeout?: number;
   maxRetries?: number;
+  capabilities?: Partial<ClientCapabilities>;
 }
 
 export interface ContentBlock {
