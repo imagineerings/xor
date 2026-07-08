@@ -1,30 +1,30 @@
 use serde_json::json;
 
 use crate::{
-    ASSET_API_HASH_NOT_FOUND_CODE, ComfyAssetApi, ComfyAssetListQuery, ComfyAssetOwnerId,
-    ComfyAssetOwnerScope, ComfyAssetReferenceRequest, ComfyAssetUpdateRequest,
-    ComfyAssetUploadRequest, ComfyAssetValidatedHash,
+    ASSET_API_HASH_NOT_FOUND_CODE, SimAssetApi, SimAssetListQuery, SimAssetOwnerId,
+    SimAssetOwnerScope, SimAssetReferenceRequest, SimAssetUpdateRequest, SimAssetUploadRequest,
+    SimAssetValidatedHash,
 };
 
 fn sha256(byte: char) -> String {
     format!("sha256:{}", byte.to_string().repeat(64))
 }
 
-fn owner_scope(owner: &ComfyAssetOwnerId) -> ComfyAssetOwnerScope {
-    ComfyAssetOwnerScope {
+fn owner_scope(owner: &SimAssetOwnerId) -> SimAssetOwnerScope {
+    SimAssetOwnerScope {
         owner_id: owner.clone(),
     }
 }
 
 #[test]
 fn asset_api_uploads_and_lists_owner_scoped_assets() {
-    let owner = ComfyAssetOwnerId::new("user-a");
-    let other_owner = ComfyAssetOwnerId::new("user-b");
-    let mut api = ComfyAssetApi::default();
+    let owner = SimAssetOwnerId::new("user-a");
+    let other_owner = SimAssetOwnerId::new("user-b");
+    let mut api = SimAssetApi::default();
 
     api.upload(
         owner.clone(),
-        ComfyAssetUploadRequest::new("castle.png", 1024)
+        SimAssetUploadRequest::new("castle.png", 1024)
             .expect("upload")
             .with_known_hash(&sha256('a'))
             .expect("hash")
@@ -36,7 +36,7 @@ fn asset_api_uploads_and_lists_owner_scoped_assets() {
     .expect("first upload");
     api.upload(
         other_owner.clone(),
-        ComfyAssetUploadRequest::new("forest.png", 1024)
+        SimAssetUploadRequest::new("forest.png", 1024)
             .expect("upload")
             .with_known_hash(&sha256('b'))
             .expect("hash")
@@ -45,7 +45,7 @@ fn asset_api_uploads_and_lists_owner_scoped_assets() {
     )
     .expect("second upload");
 
-    let query = ComfyAssetListQuery::new(owner_scope(&owner))
+    let query = SimAssetListQuery::new(owner_scope(&owner))
         .with_include_tag("generated output")
         .expect("tag")
         .with_metadata_filter("prompt=\"castle\"")
@@ -60,7 +60,7 @@ fn asset_api_uploads_and_lists_owner_scoped_assets() {
         Some("image/png")
     );
     assert_eq!(
-        api.list(&ComfyAssetListQuery::new(owner_scope(&other_owner)))
+        api.list(&SimAssetListQuery::new(owner_scope(&other_owner)))
             .expect("other list")
             .total,
         1
@@ -69,13 +69,13 @@ fn asset_api_uploads_and_lists_owner_scoped_assets() {
 
 #[test]
 fn asset_api_detail_update_and_delete_enforce_owner_access() {
-    let owner = ComfyAssetOwnerId::new("user-a");
-    let other_owner = ComfyAssetOwnerId::new("user-b");
-    let mut api = ComfyAssetApi::default();
+    let owner = SimAssetOwnerId::new("user-a");
+    let other_owner = SimAssetOwnerId::new("user-b");
+    let mut api = SimAssetApi::default();
     let detail = api
         .upload(
             owner.clone(),
-            ComfyAssetUploadRequest::new("castle.png", 128)
+            SimAssetUploadRequest::new("castle.png", 128)
                 .expect("upload")
                 .with_known_hash(&sha256('c'))
                 .expect("hash"),
@@ -91,7 +91,7 @@ fn asset_api_detail_update_and_delete_enforce_owner_access() {
         api.update(
             &other_owner,
             &detail.reference.id,
-            ComfyAssetUpdateRequest::default().with_name("stolen.png"),
+            SimAssetUpdateRequest::default().with_name("stolen.png"),
         )
         .expect("update")
         .is_none()
@@ -101,7 +101,7 @@ fn asset_api_detail_update_and_delete_enforce_owner_access() {
         .update(
             &owner,
             &detail.reference.id,
-            ComfyAssetUpdateRequest::default()
+            SimAssetUpdateRequest::default()
                 .with_name("renamed.png")
                 .with_tags(["favorite", "Generated Output"])
                 .expect("tags"),
@@ -128,13 +128,13 @@ fn asset_api_detail_update_and_delete_enforce_owner_access() {
 
 #[test]
 fn asset_api_create_from_hash_reuses_existing_content() {
-    let owner = ComfyAssetOwnerId::new("user-a");
-    let hash = ComfyAssetValidatedHash::parse(&sha256('d')).expect("hash");
-    let mut api = ComfyAssetApi::default();
+    let owner = SimAssetOwnerId::new("user-a");
+    let hash = SimAssetValidatedHash::parse(&sha256('d')).expect("hash");
+    let mut api = SimAssetApi::default();
     let uploaded = api
         .upload(
             owner.clone(),
-            ComfyAssetUploadRequest::new("source.png", 512)
+            SimAssetUploadRequest::new("source.png", 512)
                 .expect("upload")
                 .with_known_hash(hash.as_str())
                 .expect("hash"),
@@ -146,7 +146,7 @@ fn asset_api_create_from_hash_reuses_existing_content() {
         .create_from_hash(
             owner,
             &hash,
-            ComfyAssetReferenceRequest::new("linked.png", 512).with_tag("linked"),
+            SimAssetReferenceRequest::new("linked.png", 512).with_tag("linked"),
         )
         .expect("create from hash");
 
@@ -158,15 +158,15 @@ fn asset_api_create_from_hash_reuses_existing_content() {
 
 #[test]
 fn asset_api_create_from_hash_requires_existing_content() {
-    let owner = ComfyAssetOwnerId::new("user-a");
-    let hash = ComfyAssetValidatedHash::parse(&sha256('e')).expect("hash");
-    let mut api = ComfyAssetApi::default();
+    let owner = SimAssetOwnerId::new("user-a");
+    let hash = SimAssetValidatedHash::parse(&sha256('e')).expect("hash");
+    let mut api = SimAssetApi::default();
 
     let error = api
         .create_from_hash(
             owner,
             &hash,
-            ComfyAssetReferenceRequest::new("missing.png", 12),
+            SimAssetReferenceRequest::new("missing.png", 12),
         )
         .expect_err("missing hash should fail");
 
@@ -175,17 +175,17 @@ fn asset_api_create_from_hash_requires_existing_content() {
 
 #[test]
 fn asset_api_paginates_with_native_cursors() {
-    let owner = ComfyAssetOwnerId::new("user-a");
-    let mut api = ComfyAssetApi::default();
+    let owner = SimAssetOwnerId::new("user-a");
+    let mut api = SimAssetApi::default();
     for name in ["alpha.png", "beta.png", "gamma.png"] {
         api.upload(
             owner.clone(),
-            ComfyAssetUploadRequest::new(name, 10).expect("upload"),
+            SimAssetUploadRequest::new(name, 10).expect("upload"),
         )
         .expect("upload");
     }
 
-    let first_query = ComfyAssetListQuery::new(owner_scope(&owner))
+    let first_query = SimAssetListQuery::new(owner_scope(&owner))
         .with_sort("name")
         .expect("sort")
         .with_order("asc")
@@ -193,7 +193,7 @@ fn asset_api_paginates_with_native_cursors() {
         .with_pagination(Some(2), None, None)
         .expect("pagination");
     let first_page = api.list(&first_query).expect("first page");
-    let second_query = ComfyAssetListQuery::new(owner_scope(&owner))
+    let second_query = SimAssetListQuery::new(owner_scope(&owner))
         .with_sort("name")
         .expect("sort")
         .with_order("asc")

@@ -3,12 +3,12 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ComfyAssetApi, ComfyAssetApiDiagnostic, ComfyAssetListQuery, ComfyAssetOrder,
-    ComfyAssetOwnerId, ComfyAssetReferenceId, ComfyAssetUpdateRequest, normalize_asset_tag,
+    SimAssetApi, SimAssetApiDiagnostic, SimAssetListQuery, SimAssetOrder, SimAssetOwnerId,
+    SimAssetReferenceId, SimAssetUpdateRequest, normalize_asset_tag,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetTagMutationReport {
+pub struct SimAssetTagMutationReport {
     pub tag: String,
     pub added: bool,
     pub already_present: bool,
@@ -18,34 +18,34 @@ pub struct ComfyAssetTagMutationReport {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetTagCount {
+pub struct SimAssetTagCount {
     pub tag: String,
     pub count: usize,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetTagListQuery {
-    pub owner_id: ComfyAssetOwnerId,
+pub struct SimAssetTagListQuery {
+    pub owner_id: SimAssetOwnerId,
     pub prefix: Option<String>,
     pub limit: usize,
     pub offset: usize,
-    pub order: ComfyAssetOrder,
+    pub order: SimAssetOrder,
     pub include_zero: bool,
 }
 
-impl ComfyAssetTagListQuery {
-    pub fn new(owner_id: ComfyAssetOwnerId) -> Self {
+impl SimAssetTagListQuery {
+    pub fn new(owner_id: SimAssetOwnerId) -> Self {
         Self {
             owner_id,
             prefix: None,
             limit: 100,
             offset: 0,
-            order: ComfyAssetOrder::Ascending,
+            order: SimAssetOrder::Ascending,
             include_zero: false,
         }
     }
 
-    pub fn with_prefix(mut self, prefix: &str) -> Result<Self, ComfyAssetApiDiagnostic> {
+    pub fn with_prefix(mut self, prefix: &str) -> Result<Self, SimAssetApiDiagnostic> {
         self.prefix = Some(normalize_asset_tag(prefix).map_err(query_error)?);
         Ok(self)
     }
@@ -60,7 +60,7 @@ impl ComfyAssetTagListQuery {
         self
     }
 
-    pub fn with_order(mut self, order: ComfyAssetOrder) -> Self {
+    pub fn with_order(mut self, order: SimAssetOrder) -> Self {
         self.order = order;
         self
     }
@@ -71,21 +71,21 @@ impl ComfyAssetTagListQuery {
     }
 }
 
-pub struct ComfyAssetTagService<'a> {
-    api: &'a mut ComfyAssetApi,
+pub struct SimAssetTagService<'a> {
+    api: &'a mut SimAssetApi,
 }
 
-impl<'a> ComfyAssetTagService<'a> {
-    pub fn new(api: &'a mut ComfyAssetApi) -> Self {
+impl<'a> SimAssetTagService<'a> {
+    pub fn new(api: &'a mut SimAssetApi) -> Self {
         Self { api }
     }
 
     pub fn add_tag(
         &mut self,
-        owner_id: &ComfyAssetOwnerId,
-        reference_id: &ComfyAssetReferenceId,
+        owner_id: &SimAssetOwnerId,
+        reference_id: &SimAssetReferenceId,
         tag: &str,
-    ) -> Result<Option<ComfyAssetTagMutationReport>, ComfyAssetApiDiagnostic> {
+    ) -> Result<Option<SimAssetTagMutationReport>, SimAssetApiDiagnostic> {
         let tag = normalize_asset_tag(tag).map_err(query_error)?;
         let Some(detail) = self.api.detail(owner_id, reference_id)? else {
             return Ok(None);
@@ -101,10 +101,10 @@ impl<'a> ComfyAssetTagService<'a> {
             .update(
                 owner_id,
                 reference_id,
-                ComfyAssetUpdateRequest::default().with_tags(tags.clone())?,
+                SimAssetUpdateRequest::default().with_tags(tags.clone())?,
             )?
             .ok_or_else(|| tag_update_lost_visibility(reference_id.clone()))?;
-        Ok(Some(ComfyAssetTagMutationReport {
+        Ok(Some(SimAssetTagMutationReport {
             tag,
             added: !already_present,
             already_present,
@@ -116,10 +116,10 @@ impl<'a> ComfyAssetTagService<'a> {
 
     pub fn remove_tag(
         &mut self,
-        owner_id: &ComfyAssetOwnerId,
-        reference_id: &ComfyAssetReferenceId,
+        owner_id: &SimAssetOwnerId,
+        reference_id: &SimAssetReferenceId,
         tag: &str,
-    ) -> Result<Option<ComfyAssetTagMutationReport>, ComfyAssetApiDiagnostic> {
+    ) -> Result<Option<SimAssetTagMutationReport>, SimAssetApiDiagnostic> {
         let tag = normalize_asset_tag(tag).map_err(query_error)?;
         let Some(detail) = self.api.detail(owner_id, reference_id)? else {
             return Ok(None);
@@ -133,10 +133,10 @@ impl<'a> ComfyAssetTagService<'a> {
             .update(
                 owner_id,
                 reference_id,
-                ComfyAssetUpdateRequest::default().with_tags(tags.clone())?,
+                SimAssetUpdateRequest::default().with_tags(tags.clone())?,
             )?
             .ok_or_else(|| tag_update_lost_visibility(reference_id.clone()))?;
-        Ok(Some(ComfyAssetTagMutationReport {
+        Ok(Some(SimAssetTagMutationReport {
             tag,
             added: false,
             already_present: false,
@@ -148,9 +148,9 @@ impl<'a> ComfyAssetTagService<'a> {
 
     pub fn list_tags(
         &self,
-        query: &ComfyAssetTagListQuery,
-    ) -> Result<Vec<ComfyAssetTagCount>, ComfyAssetApiDiagnostic> {
-        let list_query = ComfyAssetListQuery::new(crate::ComfyAssetOwnerScope {
+        query: &SimAssetTagListQuery,
+    ) -> Result<Vec<SimAssetTagCount>, SimAssetApiDiagnostic> {
+        let list_query = SimAssetListQuery::new(crate::SimAssetOwnerScope {
             owner_id: query.owner_id.clone(),
         });
         let page = self.api.list(&list_query)?;
@@ -169,7 +169,7 @@ impl<'a> ComfyAssetTagService<'a> {
                         .as_ref()
                         .is_none_or(|prefix| tag.starts_with(prefix))
             })
-            .map(|(tag, count)| ComfyAssetTagCount { tag, count })
+            .map(|(tag, count)| SimAssetTagCount { tag, count })
             .collect::<Vec<_>>();
         sort_tags(&mut tags, query.order);
         Ok(tags
@@ -181,8 +181,8 @@ impl<'a> ComfyAssetTagService<'a> {
 
     pub fn refine_tags(
         &self,
-        query: &ComfyAssetListQuery,
-    ) -> Result<Vec<ComfyAssetTagCount>, ComfyAssetApiDiagnostic> {
+        query: &SimAssetListQuery,
+    ) -> Result<Vec<SimAssetTagCount>, SimAssetApiDiagnostic> {
         let page = self.api.list(query)?;
         let mut counts = BTreeMap::<String, usize>::new();
         for item in page.items {
@@ -192,33 +192,33 @@ impl<'a> ComfyAssetTagService<'a> {
         }
         let mut tags = counts
             .into_iter()
-            .map(|(tag, count)| ComfyAssetTagCount { tag, count })
+            .map(|(tag, count)| SimAssetTagCount { tag, count })
             .collect::<Vec<_>>();
-        sort_tags(&mut tags, ComfyAssetOrder::Ascending);
+        sort_tags(&mut tags, SimAssetOrder::Ascending);
         Ok(tags)
     }
 }
 
-fn sort_tags(tags: &mut [ComfyAssetTagCount], order: ComfyAssetOrder) {
+fn sort_tags(tags: &mut [SimAssetTagCount], order: SimAssetOrder) {
     tags.sort_by(|left, right| {
         let ordering = left.tag.cmp(&right.tag);
         match order {
-            ComfyAssetOrder::Ascending => ordering,
-            ComfyAssetOrder::Descending => ordering.reverse(),
+            SimAssetOrder::Ascending => ordering,
+            SimAssetOrder::Descending => ordering.reverse(),
         }
     });
 }
 
-fn query_error(error: crate::ComfyAssetQueryDiagnostic) -> ComfyAssetApiDiagnostic {
-    ComfyAssetApiDiagnostic {
+fn query_error(error: crate::SimAssetQueryDiagnostic) -> SimAssetApiDiagnostic {
+    SimAssetApiDiagnostic {
         code: error.code,
         reference_id: None,
         message: error.message,
     }
 }
 
-fn tag_update_lost_visibility(reference_id: ComfyAssetReferenceId) -> ComfyAssetApiDiagnostic {
-    ComfyAssetApiDiagnostic {
+fn tag_update_lost_visibility(reference_id: SimAssetReferenceId) -> SimAssetApiDiagnostic {
+    SimAssetApiDiagnostic {
         code: crate::ASSET_API_FORBIDDEN_CODE.to_string(),
         reference_id: Some(reference_id),
         message: "asset reference became inaccessible during tag update".to_string(),

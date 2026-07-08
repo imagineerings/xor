@@ -3,15 +3,15 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
-pub enum ComfyAssetScanRootKind {
+pub enum SimAssetScanRootKind {
     Models,
     Input,
     Output,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetScannedFile {
-    pub root_kind: ComfyAssetScanRootKind,
+pub struct SimAssetScannedFile {
+    pub root_kind: SimAssetScanRootKind,
     pub relative_path: PathBuf,
     pub size_bytes: u64,
     pub mime_type: Option<String>,
@@ -19,9 +19,9 @@ pub struct ComfyAssetScannedFile {
     pub modified_at_ms: Option<u64>,
 }
 
-impl ComfyAssetScannedFile {
+impl SimAssetScannedFile {
     pub fn new(
-        root_kind: ComfyAssetScanRootKind,
+        root_kind: SimAssetScanRootKind,
         relative_path: impl Into<PathBuf>,
         size_bytes: u64,
     ) -> Self {
@@ -52,13 +52,13 @@ impl ComfyAssetScannedFile {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetScanRoot {
-    pub kind: ComfyAssetScanRootKind,
+pub struct SimAssetScanRoot {
+    pub kind: SimAssetScanRootKind,
     pub path: PathBuf,
 }
 
-impl ComfyAssetScanRoot {
-    pub fn new(kind: ComfyAssetScanRootKind, path: impl Into<PathBuf>) -> Self {
+impl SimAssetScanRoot {
+    pub fn new(kind: SimAssetScanRootKind, path: impl Into<PathBuf>) -> Self {
         Self {
             kind,
             path: path.into(),
@@ -67,30 +67,30 @@ impl ComfyAssetScanRoot {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetFilesystemScanner {
-    pub roots: Vec<ComfyAssetScanRoot>,
-    pub files: Vec<ComfyAssetScannedFile>,
+pub struct SimAssetFilesystemScanner {
+    pub roots: Vec<SimAssetScanRoot>,
+    pub files: Vec<SimAssetScannedFile>,
 }
 
-impl ComfyAssetFilesystemScanner {
-    pub fn with_root(mut self, root: ComfyAssetScanRoot) -> Self {
+impl SimAssetFilesystemScanner {
+    pub fn with_root(mut self, root: SimAssetScanRoot) -> Self {
         self.roots.push(root);
         self
     }
 
-    pub fn with_file(mut self, file: ComfyAssetScannedFile) -> Self {
+    pub fn with_file(mut self, file: SimAssetScannedFile) -> Self {
         self.files.push(file);
         self
     }
 
-    pub fn root_path(&self, kind: ComfyAssetScanRootKind) -> Option<&PathBuf> {
+    pub fn root_path(&self, kind: SimAssetScanRootKind) -> Option<&PathBuf> {
         self.roots
             .iter()
             .find(|root| root.kind == kind)
             .map(|root| &root.path)
     }
 
-    pub fn full_path(&self, file: &ComfyAssetScannedFile) -> Option<PathBuf> {
+    pub fn full_path(&self, file: &SimAssetScannedFile) -> Option<PathBuf> {
         self.root_path(file.root_kind)
             .map(|root| root.join(&file.relative_path))
     }

@@ -3,19 +3,19 @@ use std::path::Path;
 use serde_json::json;
 
 use crate::{
-    ComfyAssetApi, ComfyAssetListQuery, ComfyAssetOrder, ComfyAssetOwnerId, ComfyAssetOwnerScope,
-    ComfyAssetTagListQuery, ComfyAssetTagService, ComfyAssetUploadRequest, ComfyUserDataStore,
+    SimAssetApi, SimAssetListQuery, SimAssetOrder, SimAssetOwnerId, SimAssetOwnerScope,
+    SimAssetTagListQuery, SimAssetTagService, SimAssetUploadRequest, SimUserDataStore,
     USER_DATA_FORBIDDEN_CODE, USER_DATA_NOT_FOUND_CODE,
 };
 
 fn upload_asset(
-    api: &mut ComfyAssetApi,
-    owner: &ComfyAssetOwnerId,
+    api: &mut SimAssetApi,
+    owner: &SimAssetOwnerId,
     name: &str,
-) -> crate::ComfyAssetReferenceId {
+) -> crate::SimAssetReferenceId {
     api.upload(
         owner.clone(),
-        ComfyAssetUploadRequest::new(name, 10).expect("upload"),
+        SimAssetUploadRequest::new(name, 10).expect("upload"),
     )
     .expect("upload")
     .reference
@@ -24,15 +24,15 @@ fn upload_asset(
 
 #[test]
 fn tag_service_adds_removes_lists_and_refines_tags_by_owner() {
-    let owner = ComfyAssetOwnerId::new("user-a");
-    let other_owner = ComfyAssetOwnerId::new("user-b");
-    let mut api = ComfyAssetApi::default();
+    let owner = SimAssetOwnerId::new("user-a");
+    let other_owner = SimAssetOwnerId::new("user-b");
+    let mut api = SimAssetApi::default();
     let first = upload_asset(&mut api, &owner, "first.png");
     let second = upload_asset(&mut api, &owner, "second.png");
     let other = upload_asset(&mut api, &other_owner, "other.png");
 
     {
-        let mut tags = ComfyAssetTagService::new(&mut api);
+        let mut tags = SimAssetTagService::new(&mut api);
         let report = tags
             .add_tag(&owner, &first, "Generated Output")
             .expect("add")
@@ -59,17 +59,17 @@ fn tag_service_adds_removes_lists_and_refines_tags_by_owner() {
         );
     }
 
-    let tags = ComfyAssetTagService::new(&mut api);
+    let tags = SimAssetTagService::new(&mut api);
     let listed = tags
         .list_tags(
-            &ComfyAssetTagListQuery::new(owner.clone())
+            &SimAssetTagListQuery::new(owner.clone())
                 .with_prefix("generated")
                 .expect("prefix")
-                .with_order(ComfyAssetOrder::Ascending),
+                .with_order(SimAssetOrder::Ascending),
         )
         .expect("list");
     let refined = tags
-        .refine_tags(&ComfyAssetListQuery::new(ComfyAssetOwnerScope {
+        .refine_tags(&SimAssetListQuery::new(SimAssetOwnerScope {
             owner_id: owner,
         }))
         .expect("refine");
@@ -82,9 +82,9 @@ fn tag_service_adds_removes_lists_and_refines_tags_by_owner() {
 
 #[test]
 fn user_data_store_confines_paths_and_keeps_owners_separate() {
-    let owner = ComfyAssetOwnerId::new("user-a");
-    let other_owner = ComfyAssetOwnerId::new("user-b");
-    let mut store = ComfyUserDataStore::default();
+    let owner = SimAssetOwnerId::new("user-a");
+    let other_owner = SimAssetOwnerId::new("user-b");
+    let mut store = SimUserDataStore::default();
 
     store
         .write_file(owner.clone(), Path::new("workflows/a.json"), b"{}".to_vec())
@@ -125,8 +125,8 @@ fn user_data_store_confines_paths_and_keeps_owners_separate() {
 
 #[test]
 fn user_data_store_moves_deletes_splits_paths_and_persists_settings() {
-    let owner = ComfyAssetOwnerId::new("user-a");
-    let mut store = ComfyUserDataStore::default();
+    let owner = SimAssetOwnerId::new("user-a");
+    let mut store = SimUserDataStore::default();
     store
         .write_file(
             owner.clone(),
@@ -142,7 +142,7 @@ fn user_data_store_moves_deletes_splits_paths_and_persists_settings() {
             Path::new("settings/theme-v2.json"),
         )
         .expect("move");
-    let parts = ComfyUserDataStore::path_parts(Path::new("settings/theme-v2.json")).expect("parts");
+    let parts = SimUserDataStore::path_parts(Path::new("settings/theme-v2.json")).expect("parts");
 
     assert_eq!(moved.file_name, "theme-v2.json");
     assert_eq!(parts.directory, Path::new("settings"));

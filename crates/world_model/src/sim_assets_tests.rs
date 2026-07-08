@@ -1,19 +1,19 @@
 use serde_json::json;
 
 use crate::{
-    ASSET_CONTENT_NOT_FOUND_CODE, ASSET_REFERENCE_NOT_FOUND_CODE, ComfyAssetCacheState,
-    ComfyAssetContentId, ComfyAssetHash, ComfyAssetOwnerId, ComfyAssetReferenceId,
-    ComfyAssetReferenceRequest, ComfyAssetRepository,
+    ASSET_CONTENT_NOT_FOUND_CODE, ASSET_REFERENCE_NOT_FOUND_CODE, SimAssetCacheState,
+    SimAssetContentId, SimAssetHash, SimAssetOwnerId, SimAssetReferenceId,
+    SimAssetReferenceRequest, SimAssetRepository,
 };
 
 #[test]
 fn asset_repository_reuses_content_by_hash_and_preserves_reference_metadata() {
-    let mut repository = ComfyAssetRepository::default();
-    let owner = ComfyAssetOwnerId::new("user-a");
+    let mut repository = SimAssetRepository::default();
+    let owner = SimAssetOwnerId::new("user-a");
 
     let first = repository.create_reference(
         owner.clone(),
-        ComfyAssetReferenceRequest::new("first.png", 1024)
+        SimAssetReferenceRequest::new("first.png", 1024)
             .with_hash("sha256:abc")
             .with_mime_type("image/png")
             .with_tag("generated")
@@ -21,7 +21,7 @@ fn asset_repository_reuses_content_by_hash_and_preserves_reference_metadata() {
     );
     let second = repository.create_reference(
         owner,
-        ComfyAssetReferenceRequest::new("second.png", 1024)
+        SimAssetReferenceRequest::new("second.png", 1024)
             .with_hash("sha256:abc")
             .with_mime_type("image/png")
             .with_tag("favorite")
@@ -38,7 +38,7 @@ fn asset_repository_reuses_content_by_hash_and_preserves_reference_metadata() {
     assert_eq!(second.user_metadata["prompt"], "a forest");
 
     let content = repository
-        .content_by_hash(&ComfyAssetHash::new("sha256:abc"))
+        .content_by_hash(&SimAssetHash::new("sha256:abc"))
         .expect("content should exist");
     assert_eq!(content.size_bytes, 1024);
     assert_eq!(content.mime_type.as_deref(), Some("image/png"));
@@ -46,17 +46,17 @@ fn asset_repository_reuses_content_by_hash_and_preserves_reference_metadata() {
 
 #[test]
 fn asset_repository_scopes_live_references_by_owner() {
-    let mut repository = ComfyAssetRepository::default();
-    let user_a = ComfyAssetOwnerId::new("user-a");
-    let user_b = ComfyAssetOwnerId::new("user-b");
+    let mut repository = SimAssetRepository::default();
+    let user_a = SimAssetOwnerId::new("user-a");
+    let user_b = SimAssetOwnerId::new("user-b");
 
     repository.create_reference(
         user_a.clone(),
-        ComfyAssetReferenceRequest::new("a.png", 12).with_hash("sha256:a"),
+        SimAssetReferenceRequest::new("a.png", 12).with_hash("sha256:a"),
     );
     repository.create_reference(
         user_b.clone(),
-        ComfyAssetReferenceRequest::new("b.png", 12).with_hash("sha256:b"),
+        SimAssetReferenceRequest::new("b.png", 12).with_hash("sha256:b"),
     );
 
     let user_a_refs = repository.references_for_owner(&user_a);
@@ -71,16 +71,16 @@ fn asset_repository_scopes_live_references_by_owner() {
 
 #[test]
 fn asset_repository_soft_delete_preserves_shared_content_and_other_owners() {
-    let mut repository = ComfyAssetRepository::default();
-    let user_a = ComfyAssetOwnerId::new("user-a");
-    let user_b = ComfyAssetOwnerId::new("user-b");
+    let mut repository = SimAssetRepository::default();
+    let user_a = SimAssetOwnerId::new("user-a");
+    let user_b = SimAssetOwnerId::new("user-b");
     let first = repository.create_reference(
         user_a.clone(),
-        ComfyAssetReferenceRequest::new("a.png", 12).with_hash("sha256:shared"),
+        SimAssetReferenceRequest::new("a.png", 12).with_hash("sha256:shared"),
     );
     let second = repository.create_reference(
         user_b.clone(),
-        ComfyAssetReferenceRequest::new("b.png", 12).with_hash("sha256:shared"),
+        SimAssetReferenceRequest::new("b.png", 12).with_hash("sha256:shared"),
     );
 
     assert!(
@@ -108,10 +108,10 @@ fn asset_repository_soft_delete_preserves_shared_content_and_other_owners() {
 
 #[test]
 fn asset_reference_records_cache_state_preview_job_and_provenance() {
-    let mut repository = ComfyAssetRepository::default();
-    let owner = ComfyAssetOwnerId::new("user-a");
-    let preview_id = ComfyAssetReferenceId::new("asset-reference-preview");
-    let cache_state = ComfyAssetCacheState::default()
+    let mut repository = SimAssetRepository::default();
+    let owner = SimAssetOwnerId::new("user-a");
+    let preview_id = SimAssetReferenceId::new("asset-reference-preview");
+    let cache_state = SimAssetCacheState::default()
         .with_file_path("outputs/castle.png")
         .with_modified_at_ms(42)
         .with_enrichment_level(2)
@@ -119,7 +119,7 @@ fn asset_reference_records_cache_state_preview_job_and_provenance() {
 
     let reference = repository.create_reference(
         owner,
-        ComfyAssetReferenceRequest::new("castle.png", 2048)
+        SimAssetReferenceRequest::new("castle.png", 2048)
             .with_hash("sha256:castle")
             .with_preview_id(preview_id.clone())
             .with_job_id("job-1")
@@ -139,13 +139,13 @@ fn asset_reference_records_cache_state_preview_job_and_provenance() {
 
 #[test]
 fn asset_repository_reports_missing_content_and_references() {
-    let repository = ComfyAssetRepository::default();
+    let repository = SimAssetRepository::default();
 
     let content_error = repository
-        .content(&ComfyAssetContentId::new("missing-content"))
+        .content(&SimAssetContentId::new("missing-content"))
         .expect_err("missing content should fail");
     let reference_error = repository
-        .reference(&ComfyAssetReferenceId::new("missing-reference"))
+        .reference(&SimAssetReferenceId::new("missing-reference"))
         .expect_err("missing reference should fail");
 
     assert_eq!(content_error.code, ASSET_CONTENT_NOT_FOUND_CODE);

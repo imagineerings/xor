@@ -1,16 +1,16 @@
 use std::path::Path;
 
 use crate::{
-    ASSET_SEED_MISSING_ROOT_CODE, ComfyAssetApi, ComfyAssetCacheState, ComfyAssetOwnerId,
-    ComfyAssetScanRoot, ComfyAssetScanRootKind, ComfyAssetScannedFile, ComfyAssetSeedState,
-    ComfyAssetSeeder, ComfyAssetUploadRequest,
+    ASSET_SEED_MISSING_ROOT_CODE, SimAssetApi, SimAssetCacheState, SimAssetOwnerId,
+    SimAssetScanRoot, SimAssetScanRootKind, SimAssetScannedFile, SimAssetSeedState, SimAssetSeeder,
+    SimAssetUploadRequest,
 };
 
-fn roots() -> Vec<ComfyAssetScanRoot> {
+fn roots() -> Vec<SimAssetScanRoot> {
     vec![
-        ComfyAssetScanRoot::new(ComfyAssetScanRootKind::Models, "models"),
-        ComfyAssetScanRoot::new(ComfyAssetScanRootKind::Input, "input"),
-        ComfyAssetScanRoot::new(ComfyAssetScanRootKind::Output, "output"),
+        SimAssetScanRoot::new(SimAssetScanRootKind::Models, "models"),
+        SimAssetScanRoot::new(SimAssetScanRootKind::Input, "input"),
+        SimAssetScanRoot::new(SimAssetScanRootKind::Output, "output"),
     ]
 }
 
@@ -20,26 +20,26 @@ fn sha256(byte: char) -> String {
 
 #[test]
 fn seeder_registers_model_input_and_output_files_as_native_assets() {
-    let owner = ComfyAssetOwnerId::new("user-a");
-    let mut api = ComfyAssetApi::default();
+    let owner = SimAssetOwnerId::new("user-a");
+    let mut api = SimAssetApi::default();
     let files = vec![
-        ComfyAssetScannedFile::new(ComfyAssetScanRootKind::Models, "sd/model.safetensors", 42)
+        SimAssetScannedFile::new(SimAssetScanRootKind::Models, "sd/model.safetensors", 42)
             .with_hash(sha256('a'))
             .with_mime_type("application/octet-stream"),
-        ComfyAssetScannedFile::new(ComfyAssetScanRootKind::Input, "prompt.png", 12)
+        SimAssetScannedFile::new(SimAssetScanRootKind::Input, "prompt.png", 12)
             .with_hash(sha256('b'))
             .with_mime_type("image/png"),
-        ComfyAssetScannedFile::new(ComfyAssetScanRootKind::Output, "run/out.png", 24)
+        SimAssetScannedFile::new(SimAssetScanRootKind::Output, "run/out.png", 24)
             .with_hash(sha256('c'))
             .with_mime_type("image/png")
             .with_modified_at_ms(7),
     ];
 
-    let report = ComfyAssetSeeder::new(&mut api, owner.clone(), roots())
+    let report = SimAssetSeeder::new(&mut api, owner.clone(), roots())
         .seed(&files, None)
         .expect("seed");
 
-    assert_eq!(report.progress.state, ComfyAssetSeedState::Completed);
+    assert_eq!(report.progress.state, SimAssetSeedState::Completed);
     assert_eq!(report.progress.scanned, 3);
     assert_eq!(report.progress.created, 3);
     assert_eq!(api.repository().reference_len(), 3);
@@ -58,23 +58,23 @@ fn seeder_registers_model_input_and_output_files_as_native_assets() {
 
 #[test]
 fn seeder_skips_existing_paths_and_reports_missing_roots() {
-    let owner = ComfyAssetOwnerId::new("user-a");
-    let mut api = ComfyAssetApi::default();
+    let owner = SimAssetOwnerId::new("user-a");
+    let mut api = SimAssetApi::default();
     let files = vec![
-        ComfyAssetScannedFile::new(ComfyAssetScanRootKind::Output, "run/out.png", 24)
+        SimAssetScannedFile::new(SimAssetScanRootKind::Output, "run/out.png", 24)
             .with_hash(sha256('d')),
-        ComfyAssetScannedFile::new(ComfyAssetScanRootKind::Input, "input.png", 12)
+        SimAssetScannedFile::new(SimAssetScanRootKind::Input, "input.png", 12)
             .with_hash(sha256('e')),
     ];
-    let partial_roots = vec![ComfyAssetScanRoot::new(
-        ComfyAssetScanRootKind::Output,
+    let partial_roots = vec![SimAssetScanRoot::new(
+        SimAssetScanRootKind::Output,
         "output",
     )];
 
-    let first = ComfyAssetSeeder::new(&mut api, owner.clone(), partial_roots.clone())
+    let first = SimAssetSeeder::new(&mut api, owner.clone(), partial_roots.clone())
         .seed(&files, None)
         .expect("first seed");
-    let second = ComfyAssetSeeder::new(&mut api, owner, partial_roots)
+    let second = SimAssetSeeder::new(&mut api, owner, partial_roots)
         .seed(&files, None)
         .expect("second seed");
 
@@ -87,18 +87,18 @@ fn seeder_skips_existing_paths_and_reports_missing_roots() {
 
 #[test]
 fn seeder_supports_cancellation_without_discarding_created_assets() {
-    let owner = ComfyAssetOwnerId::new("user-a");
-    let mut api = ComfyAssetApi::default();
+    let owner = SimAssetOwnerId::new("user-a");
+    let mut api = SimAssetApi::default();
     let files = vec![
-        ComfyAssetScannedFile::new(ComfyAssetScanRootKind::Output, "a.png", 1),
-        ComfyAssetScannedFile::new(ComfyAssetScanRootKind::Output, "b.png", 1),
+        SimAssetScannedFile::new(SimAssetScanRootKind::Output, "a.png", 1),
+        SimAssetScannedFile::new(SimAssetScanRootKind::Output, "b.png", 1),
     ];
 
-    let report = ComfyAssetSeeder::new(&mut api, owner, roots())
+    let report = SimAssetSeeder::new(&mut api, owner, roots())
         .seed(&files, Some(1))
         .expect("seed");
 
-    assert_eq!(report.progress.state, ComfyAssetSeedState::Cancelled);
+    assert_eq!(report.progress.state, SimAssetSeedState::Cancelled);
     assert_eq!(report.progress.scanned, 1);
     assert_eq!(report.progress.created, 1);
     assert_eq!(api.repository().reference_len(), 1);
@@ -106,27 +106,27 @@ fn seeder_supports_cancellation_without_discarding_created_assets() {
 
 #[test]
 fn prune_marks_references_outside_known_roots_missing_without_deleting_content() {
-    let owner = ComfyAssetOwnerId::new("user-a");
-    let mut api = ComfyAssetApi::default();
+    let owner = SimAssetOwnerId::new("user-a");
+    let mut api = SimAssetApi::default();
     let stale = api
         .upload(
             owner.clone(),
-            ComfyAssetUploadRequest::new("stale.png", 10)
+            SimAssetUploadRequest::new("stale.png", 10)
                 .expect("upload")
                 .with_cache_state(
-                    ComfyAssetCacheState::default().with_file_path("old-output/stale.png"),
+                    SimAssetCacheState::default().with_file_path("old-output/stale.png"),
                 ),
         )
         .expect("upload");
     api.upload(
         owner.clone(),
-        ComfyAssetUploadRequest::new("fresh.png", 10)
+        SimAssetUploadRequest::new("fresh.png", 10)
             .expect("upload")
-            .with_cache_state(ComfyAssetCacheState::default().with_file_path("output/fresh.png")),
+            .with_cache_state(SimAssetCacheState::default().with_file_path("output/fresh.png")),
     )
     .expect("upload");
 
-    let pruned = ComfyAssetSeeder::new(&mut api, owner.clone(), roots())
+    let pruned = SimAssetSeeder::new(&mut api, owner.clone(), roots())
         .prune_missing_outside_roots()
         .expect("prune");
 

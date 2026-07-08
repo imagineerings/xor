@@ -1,27 +1,27 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::{ComfyAssetOwnerId, ComfyAssetReferenceId};
+use crate::{SimAssetOwnerId, SimAssetReferenceId};
 
-pub const ASSET_QUERY_INVALID_CURSOR_CODE: &str = "world_model.comfy_assets.invalid_cursor";
-pub const ASSET_QUERY_INVALID_HASH_CODE: &str = "world_model.comfy_assets.invalid_hash";
+pub const ASSET_QUERY_INVALID_CURSOR_CODE: &str = "world_model.sim_assets.invalid_cursor";
+pub const ASSET_QUERY_INVALID_HASH_CODE: &str = "world_model.sim_assets.invalid_hash";
 pub const ASSET_QUERY_INVALID_METADATA_FILTER_CODE: &str =
-    "world_model.comfy_assets.invalid_metadata_filter";
-pub const ASSET_QUERY_INVALID_OWNER_CODE: &str = "world_model.comfy_assets.invalid_owner";
-pub const ASSET_QUERY_INVALID_SORT_CODE: &str = "world_model.comfy_assets.invalid_sort";
-pub const ASSET_QUERY_INVALID_TAG_CODE: &str = "world_model.comfy_assets.invalid_tag";
+    "world_model.sim_assets.invalid_metadata_filter";
+pub const ASSET_QUERY_INVALID_OWNER_CODE: &str = "world_model.sim_assets.invalid_owner";
+pub const ASSET_QUERY_INVALID_SORT_CODE: &str = "world_model.sim_assets.invalid_sort";
+pub const ASSET_QUERY_INVALID_TAG_CODE: &str = "world_model.sim_assets.invalid_tag";
 
 const DEFAULT_LIMIT: usize = 50;
 const MAX_LIMIT: usize = 500;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetQueryDiagnostic {
+pub struct SimAssetQueryDiagnostic {
     pub code: String,
     pub field: String,
     pub message: String,
 }
 
-impl ComfyAssetQueryDiagnostic {
+impl SimAssetQueryDiagnostic {
     fn new(code: &str, field: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             code: code.to_string(),
@@ -32,10 +32,10 @@ impl ComfyAssetQueryDiagnostic {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetValidatedHash(String);
+pub struct SimAssetValidatedHash(String);
 
-impl ComfyAssetValidatedHash {
-    pub fn parse(value: &str) -> Result<Self, ComfyAssetQueryDiagnostic> {
+impl SimAssetValidatedHash {
+    pub fn parse(value: &str) -> Result<Self, SimAssetQueryDiagnostic> {
         let value = value.trim();
         if value.is_empty() {
             return Err(invalid_hash("hash", "asset hash cannot be empty"));
@@ -79,7 +79,7 @@ impl ComfyAssetValidatedHash {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum ComfyAssetSort {
+pub enum SimAssetSort {
     CreatedAt,
     UpdatedAt,
     Name,
@@ -87,15 +87,15 @@ pub enum ComfyAssetSort {
     Hash,
 }
 
-impl ComfyAssetSort {
-    pub fn parse(value: &str) -> Result<Self, ComfyAssetQueryDiagnostic> {
+impl SimAssetSort {
+    pub fn parse(value: &str) -> Result<Self, SimAssetQueryDiagnostic> {
         match normalize_token(value).as_str() {
             "created_at" | "created" | "createdat" => Ok(Self::CreatedAt),
             "updated_at" | "updated" | "updatedat" => Ok(Self::UpdatedAt),
             "name" => Ok(Self::Name),
             "size" | "size_bytes" | "sizebytes" => Ok(Self::SizeBytes),
             "hash" => Ok(Self::Hash),
-            _ => Err(ComfyAssetQueryDiagnostic::new(
+            _ => Err(SimAssetQueryDiagnostic::new(
                 ASSET_QUERY_INVALID_SORT_CODE,
                 "sort",
                 format!("unsupported asset sort `{value}`"),
@@ -105,17 +105,17 @@ impl ComfyAssetSort {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum ComfyAssetOrder {
+pub enum SimAssetOrder {
     Ascending,
     Descending,
 }
 
-impl ComfyAssetOrder {
-    pub fn parse(value: &str) -> Result<Self, ComfyAssetQueryDiagnostic> {
+impl SimAssetOrder {
+    pub fn parse(value: &str) -> Result<Self, SimAssetQueryDiagnostic> {
         match normalize_token(value).as_str() {
             "asc" | "ascending" => Ok(Self::Ascending),
             "desc" | "descending" => Ok(Self::Descending),
-            _ => Err(ComfyAssetQueryDiagnostic::new(
+            _ => Err(SimAssetQueryDiagnostic::new(
                 ASSET_QUERY_INVALID_SORT_CODE,
                 "order",
                 format!("unsupported asset order `{value}`"),
@@ -125,13 +125,13 @@ impl ComfyAssetOrder {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetCursor {
+pub struct SimAssetCursor {
     pub sort_value: String,
-    pub reference_id: ComfyAssetReferenceId,
+    pub reference_id: SimAssetReferenceId,
 }
 
-impl ComfyAssetCursor {
-    pub fn new(sort_value: impl Into<String>, reference_id: ComfyAssetReferenceId) -> Self {
+impl SimAssetCursor {
+    pub fn new(sort_value: impl Into<String>, reference_id: SimAssetReferenceId) -> Self {
         Self {
             sort_value: sort_value.into(),
             reference_id,
@@ -146,7 +146,7 @@ impl ComfyAssetCursor {
         )
     }
 
-    pub fn decode(value: &str) -> Result<Self, ComfyAssetQueryDiagnostic> {
+    pub fn decode(value: &str) -> Result<Self, SimAssetQueryDiagnostic> {
         let Some(rest) = value.strip_prefix("sim-asset-v1:") else {
             return Err(invalid_cursor("cursor must use the sim-asset-v1 format"));
         };
@@ -163,32 +163,32 @@ impl ComfyAssetCursor {
 
         Ok(Self {
             sort_value: decode_component(sort_value)?,
-            reference_id: ComfyAssetReferenceId::new(decode_component(reference_id)?),
+            reference_id: SimAssetReferenceId::new(decode_component(reference_id)?),
         })
     }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum ComfyAssetMetadataNamespace {
+pub enum SimAssetMetadataNamespace {
     User,
     System,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum ComfyAssetMetadataOperator {
+pub enum SimAssetMetadataOperator {
     Equals,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetMetadataFilter {
-    pub namespace: ComfyAssetMetadataNamespace,
+pub struct SimAssetMetadataFilter {
+    pub namespace: SimAssetMetadataNamespace,
     pub key: String,
-    pub operator: ComfyAssetMetadataOperator,
+    pub operator: SimAssetMetadataOperator,
     pub value: Value,
 }
 
-impl ComfyAssetMetadataFilter {
-    pub fn parse(value: &str) -> Result<Self, ComfyAssetQueryDiagnostic> {
+impl SimAssetMetadataFilter {
+    pub fn parse(value: &str) -> Result<Self, SimAssetQueryDiagnostic> {
         let Some((field, raw_value)) = value.split_once('=') else {
             return Err(invalid_metadata_filter(
                 "metadata filters must use `field=value`",
@@ -202,14 +202,14 @@ impl ComfyAssetMetadataFilter {
         }
 
         let (namespace, key) = match field.split_once('.') {
-            Some(("user", key)) => (ComfyAssetMetadataNamespace::User, key),
-            Some(("system", key)) => (ComfyAssetMetadataNamespace::System, key),
+            Some(("user", key)) => (SimAssetMetadataNamespace::User, key),
+            Some(("system", key)) => (SimAssetMetadataNamespace::System, key),
             Some((namespace, _)) => {
                 return Err(invalid_metadata_filter(format!(
                     "unsupported metadata namespace `{namespace}`"
                 )));
             }
-            None => (ComfyAssetMetadataNamespace::User, field),
+            None => (SimAssetMetadataNamespace::User, field),
         };
         let key = key.trim();
         if key.is_empty() || key.split('.').any(str::is_empty) {
@@ -219,20 +219,20 @@ impl ComfyAssetMetadataFilter {
         Ok(Self {
             namespace,
             key: key.to_string(),
-            operator: ComfyAssetMetadataOperator::Equals,
+            operator: SimAssetMetadataOperator::Equals,
             value: parse_metadata_value(raw_value.trim()),
         })
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetPagination {
+pub struct SimAssetPagination {
     pub limit: usize,
     pub offset: usize,
-    pub cursor: Option<ComfyAssetCursor>,
+    pub cursor: Option<SimAssetCursor>,
 }
 
-impl Default for ComfyAssetPagination {
+impl Default for SimAssetPagination {
     fn default() -> Self {
         Self {
             limit: DEFAULT_LIMIT,
@@ -242,15 +242,15 @@ impl Default for ComfyAssetPagination {
     }
 }
 
-impl ComfyAssetPagination {
+impl SimAssetPagination {
     pub fn new(
         limit: Option<usize>,
         offset: Option<usize>,
         cursor: Option<&str>,
-    ) -> Result<Self, ComfyAssetQueryDiagnostic> {
+    ) -> Result<Self, SimAssetQueryDiagnostic> {
         let limit = limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
         let offset = offset.unwrap_or_default();
-        let cursor = cursor.map(ComfyAssetCursor::decode).transpose()?;
+        let cursor = cursor.map(SimAssetCursor::decode).transpose()?;
         Ok(Self {
             limit,
             offset,
@@ -260,19 +260,19 @@ impl ComfyAssetPagination {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetOwnerScope {
-    pub owner_id: ComfyAssetOwnerId,
+pub struct SimAssetOwnerScope {
+    pub owner_id: SimAssetOwnerId,
 }
 
-impl ComfyAssetOwnerScope {
+impl SimAssetOwnerScope {
     pub fn resolve(
         request_owner_id: Option<&str>,
         authenticated_user_id: Option<&str>,
         multi_user: bool,
-    ) -> Result<Self, ComfyAssetQueryDiagnostic> {
+    ) -> Result<Self, SimAssetQueryDiagnostic> {
         let owner = if multi_user {
             authenticated_user_id.ok_or_else(|| {
-                ComfyAssetQueryDiagnostic::new(
+                SimAssetQueryDiagnostic::new(
                     ASSET_QUERY_INVALID_OWNER_CODE,
                     "owner",
                     "asset queries require an authenticated user in multi-user mode",
@@ -286,7 +286,7 @@ impl ComfyAssetOwnerScope {
 
         let owner = owner.trim();
         if owner.is_empty() || matches!(owner, "system" | "__system__" | "internal") {
-            return Err(ComfyAssetQueryDiagnostic::new(
+            return Err(SimAssetQueryDiagnostic::new(
                 ASSET_QUERY_INVALID_OWNER_CODE,
                 "owner",
                 "asset query owner is not allowed",
@@ -294,26 +294,26 @@ impl ComfyAssetOwnerScope {
         }
 
         Ok(Self {
-            owner_id: ComfyAssetOwnerId::new(owner),
+            owner_id: SimAssetOwnerId::new(owner),
         })
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetListQuery {
-    pub owner_scope: ComfyAssetOwnerScope,
+pub struct SimAssetListQuery {
+    pub owner_scope: SimAssetOwnerScope,
     pub include_tags: Vec<String>,
     pub exclude_tags: Vec<String>,
     pub name_contains: Option<String>,
-    pub metadata_filters: Vec<ComfyAssetMetadataFilter>,
-    pub hash: Option<ComfyAssetValidatedHash>,
-    pub pagination: ComfyAssetPagination,
-    pub sort: ComfyAssetSort,
-    pub order: ComfyAssetOrder,
+    pub metadata_filters: Vec<SimAssetMetadataFilter>,
+    pub hash: Option<SimAssetValidatedHash>,
+    pub pagination: SimAssetPagination,
+    pub sort: SimAssetSort,
+    pub order: SimAssetOrder,
 }
 
-impl ComfyAssetListQuery {
-    pub fn new(owner_scope: ComfyAssetOwnerScope) -> Self {
+impl SimAssetListQuery {
+    pub fn new(owner_scope: SimAssetOwnerScope) -> Self {
         Self {
             owner_scope,
             include_tags: Vec::new(),
@@ -321,20 +321,20 @@ impl ComfyAssetListQuery {
             name_contains: None,
             metadata_filters: Vec::new(),
             hash: None,
-            pagination: ComfyAssetPagination::default(),
-            sort: ComfyAssetSort::CreatedAt,
-            order: ComfyAssetOrder::Descending,
+            pagination: SimAssetPagination::default(),
+            sort: SimAssetSort::CreatedAt,
+            order: SimAssetOrder::Descending,
         }
     }
 
-    pub fn with_include_tag(mut self, tag: &str) -> Result<Self, ComfyAssetQueryDiagnostic> {
+    pub fn with_include_tag(mut self, tag: &str) -> Result<Self, SimAssetQueryDiagnostic> {
         self.include_tags.push(normalize_asset_tag(tag)?);
         self.include_tags.sort();
         self.include_tags.dedup();
         Ok(self)
     }
 
-    pub fn with_exclude_tag(mut self, tag: &str) -> Result<Self, ComfyAssetQueryDiagnostic> {
+    pub fn with_exclude_tag(mut self, tag: &str) -> Result<Self, SimAssetQueryDiagnostic> {
         self.exclude_tags.push(normalize_asset_tag(tag)?);
         self.exclude_tags.sort();
         self.exclude_tags.dedup();
@@ -352,14 +352,14 @@ impl ComfyAssetListQuery {
     pub fn with_metadata_filter(
         mut self,
         metadata_filter: &str,
-    ) -> Result<Self, ComfyAssetQueryDiagnostic> {
+    ) -> Result<Self, SimAssetQueryDiagnostic> {
         self.metadata_filters
-            .push(ComfyAssetMetadataFilter::parse(metadata_filter)?);
+            .push(SimAssetMetadataFilter::parse(metadata_filter)?);
         Ok(self)
     }
 
-    pub fn with_hash(mut self, hash: &str) -> Result<Self, ComfyAssetQueryDiagnostic> {
-        self.hash = Some(ComfyAssetValidatedHash::parse(hash)?);
+    pub fn with_hash(mut self, hash: &str) -> Result<Self, SimAssetQueryDiagnostic> {
+        self.hash = Some(SimAssetValidatedHash::parse(hash)?);
         Ok(self)
     }
 
@@ -368,23 +368,23 @@ impl ComfyAssetListQuery {
         limit: Option<usize>,
         offset: Option<usize>,
         cursor: Option<&str>,
-    ) -> Result<Self, ComfyAssetQueryDiagnostic> {
-        self.pagination = ComfyAssetPagination::new(limit, offset, cursor)?;
+    ) -> Result<Self, SimAssetQueryDiagnostic> {
+        self.pagination = SimAssetPagination::new(limit, offset, cursor)?;
         Ok(self)
     }
 
-    pub fn with_sort(mut self, sort: &str) -> Result<Self, ComfyAssetQueryDiagnostic> {
-        self.sort = ComfyAssetSort::parse(sort)?;
+    pub fn with_sort(mut self, sort: &str) -> Result<Self, SimAssetQueryDiagnostic> {
+        self.sort = SimAssetSort::parse(sort)?;
         Ok(self)
     }
 
-    pub fn with_order(mut self, order: &str) -> Result<Self, ComfyAssetQueryDiagnostic> {
-        self.order = ComfyAssetOrder::parse(order)?;
+    pub fn with_order(mut self, order: &str) -> Result<Self, SimAssetQueryDiagnostic> {
+        self.order = SimAssetOrder::parse(order)?;
         Ok(self)
     }
 }
 
-pub fn normalize_asset_tag(tag: &str) -> Result<String, ComfyAssetQueryDiagnostic> {
+pub fn normalize_asset_tag(tag: &str) -> Result<String, SimAssetQueryDiagnostic> {
     let normalized = tag
         .trim()
         .split_whitespace()
@@ -392,7 +392,7 @@ pub fn normalize_asset_tag(tag: &str) -> Result<String, ComfyAssetQueryDiagnosti
         .join("-")
         .to_ascii_lowercase();
     if normalized.is_empty() {
-        return Err(ComfyAssetQueryDiagnostic::new(
+        return Err(SimAssetQueryDiagnostic::new(
             ASSET_QUERY_INVALID_TAG_CODE,
             "tag",
             "asset tag cannot be empty",
@@ -402,7 +402,7 @@ pub fn normalize_asset_tag(tag: &str) -> Result<String, ComfyAssetQueryDiagnosti
         .bytes()
         .any(|byte| !(byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'/')))
     {
-        return Err(ComfyAssetQueryDiagnostic::new(
+        return Err(SimAssetQueryDiagnostic::new(
             ASSET_QUERY_INVALID_TAG_CODE,
             "tag",
             format!("asset tag `{tag}` contains unsupported characters"),
@@ -411,16 +411,16 @@ pub fn normalize_asset_tag(tag: &str) -> Result<String, ComfyAssetQueryDiagnosti
     Ok(normalized)
 }
 
-fn invalid_hash(field: impl Into<String>, message: impl Into<String>) -> ComfyAssetQueryDiagnostic {
-    ComfyAssetQueryDiagnostic::new(ASSET_QUERY_INVALID_HASH_CODE, field, message)
+fn invalid_hash(field: impl Into<String>, message: impl Into<String>) -> SimAssetQueryDiagnostic {
+    SimAssetQueryDiagnostic::new(ASSET_QUERY_INVALID_HASH_CODE, field, message)
 }
 
-fn invalid_cursor(message: impl Into<String>) -> ComfyAssetQueryDiagnostic {
-    ComfyAssetQueryDiagnostic::new(ASSET_QUERY_INVALID_CURSOR_CODE, "cursor", message)
+fn invalid_cursor(message: impl Into<String>) -> SimAssetQueryDiagnostic {
+    SimAssetQueryDiagnostic::new(ASSET_QUERY_INVALID_CURSOR_CODE, "cursor", message)
 }
 
-fn invalid_metadata_filter(message: impl Into<String>) -> ComfyAssetQueryDiagnostic {
-    ComfyAssetQueryDiagnostic::new(
+fn invalid_metadata_filter(message: impl Into<String>) -> SimAssetQueryDiagnostic {
+    SimAssetQueryDiagnostic::new(
         ASSET_QUERY_INVALID_METADATA_FILTER_CODE,
         "metadata",
         message,
@@ -447,7 +447,7 @@ fn encode_component(value: &str) -> String {
     encoded
 }
 
-fn decode_component(value: &str) -> Result<String, ComfyAssetQueryDiagnostic> {
+fn decode_component(value: &str) -> Result<String, SimAssetQueryDiagnostic> {
     let mut decoded = Vec::new();
     let bytes = value.as_bytes();
     let mut index = 0;

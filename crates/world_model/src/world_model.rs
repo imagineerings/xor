@@ -1,13 +1,5 @@
 pub mod artifact;
 pub mod comfy_app_mode;
-pub mod comfy_asset_api;
-pub mod comfy_asset_download;
-pub mod comfy_asset_query;
-pub mod comfy_asset_scanner;
-pub mod comfy_asset_seeder;
-pub mod comfy_asset_tags;
-pub mod comfy_asset_upload;
-pub mod comfy_assets;
 pub mod comfy_blueprints;
 pub mod comfy_cache;
 pub mod comfy_cancellation;
@@ -39,7 +31,6 @@ pub mod comfy_runtime_policy;
 pub mod comfy_sampling;
 pub mod comfy_schema;
 pub mod comfy_subgraphs;
-pub mod comfy_user_data;
 pub mod comfy_vae;
 pub mod comfy_worker_execution;
 pub mod comfy_workflow_export;
@@ -56,22 +47,22 @@ pub mod request;
 pub mod serving;
 pub mod serving_diagnostics;
 pub mod session;
+pub mod sim_asset_api;
+pub mod sim_asset_download;
+pub mod sim_asset_enrichment;
+pub mod sim_asset_query;
+pub mod sim_asset_scanner;
+pub mod sim_asset_seeder;
+pub mod sim_asset_tags;
+pub mod sim_asset_upload;
+pub mod sim_assets;
+pub mod sim_user_data;
 pub mod worker_launcher;
 
 #[cfg(test)]
 mod artifact_tests;
 #[cfg(test)]
 mod comfy_app_mode_tests;
-#[cfg(test)]
-mod comfy_asset_api_tests;
-#[cfg(test)]
-mod comfy_asset_download_tests;
-#[cfg(test)]
-mod comfy_asset_query_tests;
-#[cfg(test)]
-mod comfy_asset_scanner_tests;
-#[cfg(test)]
-mod comfy_assets_tests;
 #[cfg(test)]
 mod comfy_blueprints_tests;
 #[cfg(test)]
@@ -129,8 +120,6 @@ mod comfy_schema_tests;
 #[cfg(test)]
 mod comfy_subgraphs_tests;
 #[cfg(test)]
-mod comfy_user_data_tests;
-#[cfg(test)]
 mod comfy_worker_execution_tests;
 #[cfg(test)]
 mod comfy_workflow_templates_tests;
@@ -149,6 +138,20 @@ mod serving_tests;
 #[cfg(test)]
 mod session_tests;
 #[cfg(test)]
+mod sim_asset_api_tests;
+#[cfg(test)]
+mod sim_asset_download_tests;
+#[cfg(test)]
+mod sim_asset_enrichment_tests;
+#[cfg(test)]
+mod sim_asset_query_tests;
+#[cfg(test)]
+mod sim_asset_scanner_tests;
+#[cfg(test)]
+mod sim_assets_tests;
+#[cfg(test)]
+mod sim_user_data_tests;
+#[cfg(test)]
 mod tests;
 
 pub use artifact::{GeneratedWorldArtifact, GeneratedWorldArtifactError};
@@ -156,44 +159,6 @@ pub use comfy_app_mode::{
     ComfyAppModeBridge, ComfyAppModeControl, ComfyAppModeControlKind, ComfyAppModeControlTarget,
     ComfyAppModeDiagnostic, ComfyAppModeReport, ComfyAppModeUiOwner, INVALID_APP_MODE_CONTROL_CODE,
     INVALID_APP_MODE_METADATA_CODE,
-};
-pub use comfy_asset_api::{
-    ASSET_API_FORBIDDEN_CODE, ASSET_API_HASH_NOT_FOUND_CODE, ComfyAssetApi,
-    ComfyAssetApiDiagnostic, ComfyAssetListPage, ComfyAssetReferenceDetail,
-    ComfyAssetUpdateRequest, missing_content_api_error, missing_reference_api_error,
-};
-pub use comfy_asset_download::{
-    ASSET_DOWNLOAD_FILE_NOT_FOUND_CODE, ASSET_DOWNLOAD_PREVIEW_NOT_FOUND_CODE,
-    ComfyAssetContentDispositionKind, ComfyAssetDownloadResolver, ComfyAssetDownloadResponse,
-    ComfyAssetMediaPreviewRoute, ComfyAssetPreviewResolution, content_disposition,
-    safe_content_type,
-};
-pub use comfy_asset_query::{
-    ASSET_QUERY_INVALID_CURSOR_CODE, ASSET_QUERY_INVALID_HASH_CODE,
-    ASSET_QUERY_INVALID_METADATA_FILTER_CODE, ASSET_QUERY_INVALID_OWNER_CODE,
-    ASSET_QUERY_INVALID_SORT_CODE, ASSET_QUERY_INVALID_TAG_CODE, ComfyAssetCursor,
-    ComfyAssetListQuery, ComfyAssetMetadataFilter, ComfyAssetMetadataNamespace,
-    ComfyAssetMetadataOperator, ComfyAssetOrder, ComfyAssetOwnerScope, ComfyAssetPagination,
-    ComfyAssetQueryDiagnostic, ComfyAssetSort, ComfyAssetValidatedHash, normalize_asset_tag,
-};
-pub use comfy_asset_scanner::{
-    ComfyAssetFilesystemScanner, ComfyAssetScanRoot, ComfyAssetScanRootKind, ComfyAssetScannedFile,
-};
-pub use comfy_asset_seeder::{
-    ASSET_SEED_MISSING_ROOT_CODE, ComfyAssetSeedDiagnostic, ComfyAssetSeedProgress,
-    ComfyAssetSeedReport, ComfyAssetSeedState, ComfyAssetSeeder,
-};
-pub use comfy_asset_tags::{
-    ComfyAssetTagCount, ComfyAssetTagListQuery, ComfyAssetTagMutationReport, ComfyAssetTagService,
-};
-pub use comfy_asset_upload::{
-    ASSET_UPLOAD_INVALID_FIELD_CODE, ComfyAssetUploadDiagnostic, ComfyAssetUploadRequest,
-};
-pub use comfy_assets::{
-    ASSET_CONTENT_NOT_FOUND_CODE, ASSET_REFERENCE_NOT_FOUND_CODE, ComfyAssetCacheState,
-    ComfyAssetContentId, ComfyAssetContentRecord, ComfyAssetDiagnostic, ComfyAssetHash,
-    ComfyAssetOwnerId, ComfyAssetReferenceId, ComfyAssetReferencePatch, ComfyAssetReferenceRecord,
-    ComfyAssetReferenceRequest, ComfyAssetRepository,
 };
 pub use comfy_blueprints::{
     BLUEPRINT_COUNT_MISMATCH_CODE, ComfyBlueprintCatalog, ComfyBlueprintCategory,
@@ -322,10 +287,6 @@ pub use comfy_subgraphs::{
     ComfySubgraphRecord, ComfySubgraphSource, ComfySubgraphSourceType, DUPLICATE_SUBGRAPH_ID_CODE,
     SUBGRAPH_NOT_FOUND_CODE,
 };
-pub use comfy_user_data::{
-    ComfyUserDataDiagnostic, ComfyUserDataEntry, ComfyUserDataPathParts, ComfyUserDataStore,
-    USER_DATA_FORBIDDEN_CODE, USER_DATA_NOT_FOUND_CODE, normalize_user_path,
-};
 pub use comfy_vae::{
     ComfyVaeRuntime, VaeOperationKind, VaeRuntimeRequest, VaeTilingMetadata,
     VaeValidationDiagnostic,
@@ -374,6 +335,51 @@ pub use serving_diagnostics::{
     ServingValidator,
 };
 pub use session::{WorldModelCacheMetadata, WorldModelSession, WorldModelSessionState};
+pub use sim_asset_api::{
+    ASSET_API_FORBIDDEN_CODE, ASSET_API_HASH_NOT_FOUND_CODE, SimAssetApi, SimAssetApiDiagnostic,
+    SimAssetListPage, SimAssetReferenceDetail, SimAssetUpdateRequest, missing_content_api_error,
+    missing_reference_api_error,
+};
+pub use sim_asset_download::{
+    ASSET_DOWNLOAD_FILE_NOT_FOUND_CODE, ASSET_DOWNLOAD_PREVIEW_NOT_FOUND_CODE,
+    SimAssetContentDispositionKind, SimAssetDownloadResolver, SimAssetDownloadResponse,
+    SimAssetMediaPreviewRoute, SimAssetPreviewResolution, content_disposition, safe_content_type,
+};
+pub use sim_asset_enrichment::{
+    SimAssetEnrichmentJob, SimAssetEnrichmentQueue, SimAssetOutputRegistrar,
+    SimAssetOutputRegistrationRequest,
+};
+pub use sim_asset_query::{
+    ASSET_QUERY_INVALID_CURSOR_CODE, ASSET_QUERY_INVALID_HASH_CODE,
+    ASSET_QUERY_INVALID_METADATA_FILTER_CODE, ASSET_QUERY_INVALID_OWNER_CODE,
+    ASSET_QUERY_INVALID_SORT_CODE, ASSET_QUERY_INVALID_TAG_CODE, SimAssetCursor, SimAssetListQuery,
+    SimAssetMetadataFilter, SimAssetMetadataNamespace, SimAssetMetadataOperator, SimAssetOrder,
+    SimAssetOwnerScope, SimAssetPagination, SimAssetQueryDiagnostic, SimAssetSort,
+    SimAssetValidatedHash, normalize_asset_tag,
+};
+pub use sim_asset_scanner::{
+    SimAssetFilesystemScanner, SimAssetScanRoot, SimAssetScanRootKind, SimAssetScannedFile,
+};
+pub use sim_asset_seeder::{
+    ASSET_SEED_MISSING_ROOT_CODE, SimAssetSeedDiagnostic, SimAssetSeedProgress, SimAssetSeedReport,
+    SimAssetSeedState, SimAssetSeeder,
+};
+pub use sim_asset_tags::{
+    SimAssetTagCount, SimAssetTagListQuery, SimAssetTagMutationReport, SimAssetTagService,
+};
+pub use sim_asset_upload::{
+    ASSET_UPLOAD_INVALID_FIELD_CODE, SimAssetUploadDiagnostic, SimAssetUploadRequest,
+};
+pub use sim_assets::{
+    ASSET_CONTENT_NOT_FOUND_CODE, ASSET_REFERENCE_NOT_FOUND_CODE, SimAssetCacheState,
+    SimAssetContentId, SimAssetContentRecord, SimAssetDiagnostic, SimAssetHash, SimAssetOwnerId,
+    SimAssetReferenceId, SimAssetReferencePatch, SimAssetReferenceRecord, SimAssetReferenceRequest,
+    SimAssetRepository,
+};
+pub use sim_user_data::{
+    SimUserDataDiagnostic, SimUserDataEntry, SimUserDataPathParts, SimUserDataStore,
+    USER_DATA_FORBIDDEN_CODE, USER_DATA_NOT_FOUND_CODE, normalize_user_path,
+};
 pub use worker_launcher::{
     LocalWorkerEnvironment, PersistentWorkerConfig, RemoteWorkerEnvironment,
     WorkerLaunchEnvironment, WorkerLaunchMode, WorkerLaunchRequest, WorldModelWorkerLauncher,

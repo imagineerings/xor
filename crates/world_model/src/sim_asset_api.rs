@@ -5,26 +5,26 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{
-    ASSET_CONTENT_NOT_FOUND_CODE, ASSET_REFERENCE_NOT_FOUND_CODE, ComfyAssetCacheState,
-    ComfyAssetContentRecord, ComfyAssetDiagnostic, ComfyAssetHash, ComfyAssetListQuery,
-    ComfyAssetMetadataFilter, ComfyAssetMetadataNamespace, ComfyAssetOrder, ComfyAssetOwnerId,
-    ComfyAssetReferenceId, ComfyAssetReferencePatch, ComfyAssetReferenceRecord,
-    ComfyAssetReferenceRequest, ComfyAssetRepository, ComfyAssetSort, ComfyAssetUploadDiagnostic,
-    ComfyAssetUploadRequest, ComfyAssetValidatedHash, normalize_asset_tag,
+    ASSET_CONTENT_NOT_FOUND_CODE, ASSET_REFERENCE_NOT_FOUND_CODE, SimAssetCacheState,
+    SimAssetContentRecord, SimAssetDiagnostic, SimAssetHash, SimAssetListQuery,
+    SimAssetMetadataFilter, SimAssetMetadataNamespace, SimAssetOrder, SimAssetOwnerId,
+    SimAssetReferenceId, SimAssetReferencePatch, SimAssetReferenceRecord, SimAssetReferenceRequest,
+    SimAssetRepository, SimAssetSort, SimAssetUploadDiagnostic, SimAssetUploadRequest,
+    SimAssetValidatedHash, normalize_asset_tag,
 };
 
-pub const ASSET_API_FORBIDDEN_CODE: &str = "world_model.comfy_assets.forbidden";
-pub const ASSET_API_HASH_NOT_FOUND_CODE: &str = "world_model.comfy_assets.hash_not_found";
+pub const ASSET_API_FORBIDDEN_CODE: &str = "world_model.sim_assets.forbidden";
+pub const ASSET_API_HASH_NOT_FOUND_CODE: &str = "world_model.sim_assets.hash_not_found";
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetApiDiagnostic {
+pub struct SimAssetApiDiagnostic {
     pub code: String,
-    pub reference_id: Option<ComfyAssetReferenceId>,
+    pub reference_id: Option<SimAssetReferenceId>,
     pub message: String,
 }
 
-impl From<ComfyAssetDiagnostic> for ComfyAssetApiDiagnostic {
-    fn from(error: ComfyAssetDiagnostic) -> Self {
+impl From<SimAssetDiagnostic> for SimAssetApiDiagnostic {
+    fn from(error: SimAssetDiagnostic) -> Self {
         Self {
             code: error.code,
             reference_id: error.reference_id,
@@ -33,8 +33,8 @@ impl From<ComfyAssetDiagnostic> for ComfyAssetApiDiagnostic {
     }
 }
 
-impl From<ComfyAssetUploadDiagnostic> for ComfyAssetApiDiagnostic {
-    fn from(error: ComfyAssetUploadDiagnostic) -> Self {
+impl From<SimAssetUploadDiagnostic> for SimAssetApiDiagnostic {
+    fn from(error: SimAssetUploadDiagnostic) -> Self {
         Self {
             code: error.code,
             reference_id: None,
@@ -44,28 +44,29 @@ impl From<ComfyAssetUploadDiagnostic> for ComfyAssetApiDiagnostic {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetReferenceDetail {
-    pub reference: ComfyAssetReferenceRecord,
-    pub content: ComfyAssetContentRecord,
+pub struct SimAssetReferenceDetail {
+    pub reference: SimAssetReferenceRecord,
+    pub content: SimAssetContentRecord,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetListPage {
-    pub items: Vec<ComfyAssetReferenceDetail>,
+pub struct SimAssetListPage {
+    pub items: Vec<SimAssetReferenceDetail>,
     pub total: usize,
     pub next_cursor: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetUpdateRequest {
+pub struct SimAssetUpdateRequest {
     pub name: Option<String>,
     pub tags: Option<Vec<String>>,
-    pub preview_id: Option<Option<ComfyAssetReferenceId>>,
+    pub preview_id: Option<Option<SimAssetReferenceId>>,
     pub user_metadata: Option<BTreeMap<String, Value>>,
-    pub cache_state: Option<ComfyAssetCacheState>,
+    pub system_metadata: Option<BTreeMap<String, Value>>,
+    pub cache_state: Option<SimAssetCacheState>,
 }
 
-impl ComfyAssetUpdateRequest {
+impl SimAssetUpdateRequest {
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
         self
@@ -74,11 +75,11 @@ impl ComfyAssetUpdateRequest {
     pub fn with_tags(
         mut self,
         tags: impl IntoIterator<Item = impl AsRef<str>>,
-    ) -> Result<Self, ComfyAssetApiDiagnostic> {
+    ) -> Result<Self, SimAssetApiDiagnostic> {
         let mut normalized = Vec::new();
         for tag in tags {
             normalized.push(normalize_asset_tag(tag.as_ref()).map_err(|error| {
-                ComfyAssetApiDiagnostic {
+                SimAssetApiDiagnostic {
                     code: error.code,
                     reference_id: None,
                     message: error.message,
@@ -91,7 +92,7 @@ impl ComfyAssetUpdateRequest {
         Ok(self)
     }
 
-    pub fn with_preview_id(mut self, preview_id: Option<ComfyAssetReferenceId>) -> Self {
+    pub fn with_preview_id(mut self, preview_id: Option<SimAssetReferenceId>) -> Self {
         self.preview_id = Some(preview_id);
         self
     }
@@ -101,43 +102,49 @@ impl ComfyAssetUpdateRequest {
         self
     }
 
-    pub fn with_cache_state(mut self, cache_state: ComfyAssetCacheState) -> Self {
+    pub fn with_system_metadata(mut self, system_metadata: BTreeMap<String, Value>) -> Self {
+        self.system_metadata = Some(system_metadata);
+        self
+    }
+
+    pub fn with_cache_state(mut self, cache_state: SimAssetCacheState) -> Self {
         self.cache_state = Some(cache_state);
         self
     }
 
-    fn into_patch(self) -> ComfyAssetReferencePatch {
+    fn into_patch(self) -> SimAssetReferencePatch {
         let tags = self
             .tags
             .map(|tags| tags.into_iter().collect::<BTreeSet<_>>());
-        ComfyAssetReferencePatch {
+        SimAssetReferencePatch {
             name: self.name,
             tags,
             preview_id: self.preview_id,
             user_metadata: self.user_metadata,
+            system_metadata: self.system_metadata,
             cache_state: self.cache_state,
         }
     }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetApi {
-    repository: ComfyAssetRepository,
+pub struct SimAssetApi {
+    repository: SimAssetRepository,
 }
 
-impl ComfyAssetApi {
-    pub fn new(repository: ComfyAssetRepository) -> Self {
+impl SimAssetApi {
+    pub fn new(repository: SimAssetRepository) -> Self {
         Self { repository }
     }
 
-    pub fn repository(&self) -> &ComfyAssetRepository {
+    pub fn repository(&self) -> &SimAssetRepository {
         &self.repository
     }
 
     pub fn list(
         &self,
-        query: &ComfyAssetListQuery,
-    ) -> Result<ComfyAssetListPage, ComfyAssetApiDiagnostic> {
+        query: &SimAssetListQuery,
+    ) -> Result<SimAssetListPage, SimAssetApiDiagnostic> {
         let mut details = Vec::new();
         for reference in self
             .repository
@@ -162,7 +169,7 @@ impl ComfyAssetApi {
             None
         };
 
-        Ok(ComfyAssetListPage {
+        Ok(SimAssetListPage {
             items,
             total,
             next_cursor,
@@ -171,9 +178,9 @@ impl ComfyAssetApi {
 
     pub fn detail(
         &self,
-        owner_id: &ComfyAssetOwnerId,
-        reference_id: &ComfyAssetReferenceId,
-    ) -> Result<Option<ComfyAssetReferenceDetail>, ComfyAssetApiDiagnostic> {
+        owner_id: &SimAssetOwnerId,
+        reference_id: &SimAssetReferenceId,
+    ) -> Result<Option<SimAssetReferenceDetail>, SimAssetApiDiagnostic> {
         let reference = self.repository.reference(reference_id)?;
         if &reference.owner_id != owner_id || reference.is_deleted() {
             return Ok(None);
@@ -181,20 +188,20 @@ impl ComfyAssetApi {
         Ok(Some(self.detail_for_reference(reference)?))
     }
 
-    pub fn hash_exists(&self, hash: &ComfyAssetValidatedHash) -> bool {
+    pub fn hash_exists(&self, hash: &SimAssetValidatedHash) -> bool {
         self.repository
-            .content_by_hash(&ComfyAssetHash::new(hash.as_str()))
+            .content_by_hash(&SimAssetHash::new(hash.as_str()))
             .is_some()
     }
 
     pub fn create_from_hash(
         &mut self,
-        owner_id: ComfyAssetOwnerId,
-        hash: &ComfyAssetValidatedHash,
-        request: ComfyAssetReferenceRequest,
-    ) -> Result<ComfyAssetReferenceDetail, ComfyAssetApiDiagnostic> {
+        owner_id: SimAssetOwnerId,
+        hash: &SimAssetValidatedHash,
+        request: SimAssetReferenceRequest,
+    ) -> Result<SimAssetReferenceDetail, SimAssetApiDiagnostic> {
         if !self.hash_exists(hash) {
-            return Err(ComfyAssetApiDiagnostic {
+            return Err(SimAssetApiDiagnostic {
                 code: ASSET_API_HASH_NOT_FOUND_CODE.to_string(),
                 reference_id: None,
                 message: format!("asset content hash `{}` was not found", hash.as_str()),
@@ -208,9 +215,9 @@ impl ComfyAssetApi {
 
     pub fn upload(
         &mut self,
-        owner_id: ComfyAssetOwnerId,
-        request: ComfyAssetUploadRequest,
-    ) -> Result<ComfyAssetReferenceDetail, ComfyAssetApiDiagnostic> {
+        owner_id: SimAssetOwnerId,
+        request: SimAssetUploadRequest,
+    ) -> Result<SimAssetReferenceDetail, SimAssetApiDiagnostic> {
         let reference = self
             .repository
             .create_reference(owner_id, request.into_reference_request());
@@ -219,10 +226,10 @@ impl ComfyAssetApi {
 
     pub fn update(
         &mut self,
-        owner_id: &ComfyAssetOwnerId,
-        reference_id: &ComfyAssetReferenceId,
-        request: ComfyAssetUpdateRequest,
-    ) -> Result<Option<ComfyAssetReferenceDetail>, ComfyAssetApiDiagnostic> {
+        owner_id: &SimAssetOwnerId,
+        reference_id: &SimAssetReferenceId,
+        request: SimAssetUpdateRequest,
+    ) -> Result<Option<SimAssetReferenceDetail>, SimAssetApiDiagnostic> {
         let Some(reference) =
             self.repository
                 .update_reference(owner_id, reference_id, request.into_patch())?
@@ -234,9 +241,9 @@ impl ComfyAssetApi {
 
     pub fn delete(
         &mut self,
-        owner_id: &ComfyAssetOwnerId,
-        reference_id: &ComfyAssetReferenceId,
-    ) -> Result<bool, ComfyAssetApiDiagnostic> {
+        owner_id: &SimAssetOwnerId,
+        reference_id: &SimAssetReferenceId,
+    ) -> Result<bool, SimAssetApiDiagnostic> {
         self.repository
             .soft_delete_reference(owner_id, reference_id)
             .map_err(Into::into)
@@ -244,23 +251,23 @@ impl ComfyAssetApi {
 
     pub fn update_cache_state(
         &mut self,
-        owner_id: &ComfyAssetOwnerId,
-        reference_id: &ComfyAssetReferenceId,
-        cache_state: ComfyAssetCacheState,
-    ) -> Result<Option<ComfyAssetReferenceDetail>, ComfyAssetApiDiagnostic> {
+        owner_id: &SimAssetOwnerId,
+        reference_id: &SimAssetReferenceId,
+        cache_state: SimAssetCacheState,
+    ) -> Result<Option<SimAssetReferenceDetail>, SimAssetApiDiagnostic> {
         self.update(
             owner_id,
             reference_id,
-            ComfyAssetUpdateRequest::default().with_cache_state(cache_state),
+            SimAssetUpdateRequest::default().with_cache_state(cache_state),
         )
     }
 
     fn detail_for_reference(
         &self,
-        reference: &ComfyAssetReferenceRecord,
-    ) -> Result<ComfyAssetReferenceDetail, ComfyAssetApiDiagnostic> {
+        reference: &SimAssetReferenceRecord,
+    ) -> Result<SimAssetReferenceDetail, SimAssetApiDiagnostic> {
         let content = self.repository.content(&reference.content_id)?.clone();
-        Ok(ComfyAssetReferenceDetail {
+        Ok(SimAssetReferenceDetail {
             reference: reference.clone(),
             content,
         })
@@ -268,9 +275,9 @@ impl ComfyAssetApi {
 
     fn matches_query(
         &self,
-        reference: &ComfyAssetReferenceRecord,
-        query: &ComfyAssetListQuery,
-    ) -> Result<bool, ComfyAssetApiDiagnostic> {
+        reference: &SimAssetReferenceRecord,
+        query: &SimAssetListQuery,
+    ) -> Result<bool, SimAssetApiDiagnostic> {
         if let Some(name_contains) = &query.name_contains {
             if !reference
                 .name
@@ -303,7 +310,7 @@ impl ComfyAssetApi {
         }
         if let Some(hash) = &query.hash {
             let content = self.repository.content(&reference.content_id)?;
-            if content.hash.as_ref().map(ComfyAssetHash::as_str) != Some(hash.as_str()) {
+            if content.hash.as_ref().map(SimAssetHash::as_str) != Some(hash.as_str()) {
                 return Ok(false);
             }
         }
@@ -311,57 +318,50 @@ impl ComfyAssetApi {
     }
 }
 
-fn metadata_matches(
-    reference: &ComfyAssetReferenceRecord,
-    filter: &ComfyAssetMetadataFilter,
-) -> bool {
+fn metadata_matches(reference: &SimAssetReferenceRecord, filter: &SimAssetMetadataFilter) -> bool {
     let metadata = match filter.namespace {
-        ComfyAssetMetadataNamespace::User => &reference.user_metadata,
-        ComfyAssetMetadataNamespace::System => &reference.system_metadata,
+        SimAssetMetadataNamespace::User => &reference.user_metadata,
+        SimAssetMetadataNamespace::System => &reference.system_metadata,
     };
     metadata.get(&filter.key) == Some(&filter.value)
 }
 
-fn sort_details(
-    details: &mut [ComfyAssetReferenceDetail],
-    sort: ComfyAssetSort,
-    order: ComfyAssetOrder,
-) {
+fn sort_details(details: &mut [SimAssetReferenceDetail], sort: SimAssetSort, order: SimAssetOrder) {
     details.sort_by(|left, right| {
         let ordering = compare_detail(left, right, sort);
         match order {
-            ComfyAssetOrder::Ascending => ordering,
-            ComfyAssetOrder::Descending => ordering.reverse(),
+            SimAssetOrder::Ascending => ordering,
+            SimAssetOrder::Descending => ordering.reverse(),
         }
         .then_with(|| left.reference.id.cmp(&right.reference.id))
     });
 }
 
 fn compare_detail(
-    left: &ComfyAssetReferenceDetail,
-    right: &ComfyAssetReferenceDetail,
-    sort: ComfyAssetSort,
+    left: &SimAssetReferenceDetail,
+    right: &SimAssetReferenceDetail,
+    sort: SimAssetSort,
 ) -> Ordering {
     match sort {
-        ComfyAssetSort::CreatedAt => left
+        SimAssetSort::CreatedAt => left
             .reference
             .created_at_ms
             .cmp(&right.reference.created_at_ms),
-        ComfyAssetSort::UpdatedAt => left
+        SimAssetSort::UpdatedAt => left
             .reference
             .updated_at_ms
             .cmp(&right.reference.updated_at_ms),
-        ComfyAssetSort::Name => left
+        SimAssetSort::Name => left
             .reference
             .name
             .to_ascii_lowercase()
             .cmp(&right.reference.name.to_ascii_lowercase()),
-        ComfyAssetSort::SizeBytes => left.content.size_bytes.cmp(&right.content.size_bytes),
-        ComfyAssetSort::Hash => left.content.hash.cmp(&right.content.hash),
+        SimAssetSort::SizeBytes => left.content.size_bytes.cmp(&right.content.size_bytes),
+        SimAssetSort::Hash => left.content.hash.cmp(&right.content.hash),
     }
 }
 
-fn page_start(details: &[ComfyAssetReferenceDetail], query: &ComfyAssetListQuery) -> usize {
+fn page_start(details: &[SimAssetReferenceDetail], query: &SimAssetListQuery) -> usize {
     let cursor_start = query
         .pagination
         .cursor
@@ -378,40 +378,40 @@ fn page_start(details: &[ComfyAssetReferenceDetail], query: &ComfyAssetListQuery
         .min(details.len())
 }
 
-fn cursor_for_detail(detail: &ComfyAssetReferenceDetail, sort: ComfyAssetSort) -> String {
-    crate::ComfyAssetCursor::new(
+fn cursor_for_detail(detail: &SimAssetReferenceDetail, sort: SimAssetSort) -> String {
+    crate::SimAssetCursor::new(
         sort_value_for_detail(detail, sort),
         detail.reference.id.clone(),
     )
     .encode()
 }
 
-fn sort_value_for_detail(detail: &ComfyAssetReferenceDetail, sort: ComfyAssetSort) -> String {
+fn sort_value_for_detail(detail: &SimAssetReferenceDetail, sort: SimAssetSort) -> String {
     match sort {
-        ComfyAssetSort::CreatedAt => format!("{:020}", detail.reference.created_at_ms),
-        ComfyAssetSort::UpdatedAt => format!("{:020}", detail.reference.updated_at_ms),
-        ComfyAssetSort::Name => detail.reference.name.to_ascii_lowercase(),
-        ComfyAssetSort::SizeBytes => format!("{:020}", detail.content.size_bytes),
-        ComfyAssetSort::Hash => detail
+        SimAssetSort::CreatedAt => format!("{:020}", detail.reference.created_at_ms),
+        SimAssetSort::UpdatedAt => format!("{:020}", detail.reference.updated_at_ms),
+        SimAssetSort::Name => detail.reference.name.to_ascii_lowercase(),
+        SimAssetSort::SizeBytes => format!("{:020}", detail.content.size_bytes),
+        SimAssetSort::Hash => detail
             .content
             .hash
             .as_ref()
-            .map(ComfyAssetHash::as_str)
+            .map(SimAssetHash::as_str)
             .unwrap_or_default()
             .to_string(),
     }
 }
 
-pub fn missing_content_api_error() -> ComfyAssetApiDiagnostic {
-    ComfyAssetApiDiagnostic {
+pub fn missing_content_api_error() -> SimAssetApiDiagnostic {
+    SimAssetApiDiagnostic {
         code: ASSET_CONTENT_NOT_FOUND_CODE.to_string(),
         reference_id: None,
         message: "asset content was not found".to_string(),
     }
 }
 
-pub fn missing_reference_api_error(reference_id: ComfyAssetReferenceId) -> ComfyAssetApiDiagnostic {
-    ComfyAssetApiDiagnostic {
+pub fn missing_reference_api_error(reference_id: SimAssetReferenceId) -> SimAssetApiDiagnostic {
+    SimAssetApiDiagnostic {
         code: ASSET_REFERENCE_NOT_FOUND_CODE.to_string(),
         reference_id: Some(reference_id),
         message: "asset reference was not found".to_string(),

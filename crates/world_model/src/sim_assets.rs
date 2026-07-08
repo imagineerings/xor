@@ -3,13 +3,13 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-pub const ASSET_CONTENT_NOT_FOUND_CODE: &str = "world_model.comfy_assets.content_not_found";
-pub const ASSET_REFERENCE_NOT_FOUND_CODE: &str = "world_model.comfy_assets.reference_not_found";
+pub const ASSET_CONTENT_NOT_FOUND_CODE: &str = "world_model.sim_assets.content_not_found";
+pub const ASSET_REFERENCE_NOT_FOUND_CODE: &str = "world_model.sim_assets.reference_not_found";
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
-pub struct ComfyAssetContentId(String);
+pub struct SimAssetContentId(String);
 
-impl ComfyAssetContentId {
+impl SimAssetContentId {
     pub fn new(value: impl Into<String>) -> Self {
         Self(value.into())
     }
@@ -20,9 +20,9 @@ impl ComfyAssetContentId {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
-pub struct ComfyAssetReferenceId(String);
+pub struct SimAssetReferenceId(String);
 
-impl ComfyAssetReferenceId {
+impl SimAssetReferenceId {
     pub fn new(value: impl Into<String>) -> Self {
         Self(value.into())
     }
@@ -33,9 +33,9 @@ impl ComfyAssetReferenceId {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
-pub struct ComfyAssetOwnerId(String);
+pub struct SimAssetOwnerId(String);
 
-impl ComfyAssetOwnerId {
+impl SimAssetOwnerId {
     pub fn new(value: impl Into<String>) -> Self {
         Self(value.into())
     }
@@ -46,9 +46,9 @@ impl ComfyAssetOwnerId {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
-pub struct ComfyAssetHash(String);
+pub struct SimAssetHash(String);
 
-impl ComfyAssetHash {
+impl SimAssetHash {
     pub fn new(value: impl Into<String>) -> Self {
         Self(value.into())
     }
@@ -59,16 +59,16 @@ impl ComfyAssetHash {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetContentRecord {
-    pub id: ComfyAssetContentId,
-    pub hash: Option<ComfyAssetHash>,
+pub struct SimAssetContentRecord {
+    pub id: SimAssetContentId,
+    pub hash: Option<SimAssetHash>,
     pub size_bytes: u64,
     pub mime_type: Option<String>,
     pub created_at_ms: u64,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetCacheState {
+pub struct SimAssetCacheState {
     pub file_path: Option<PathBuf>,
     pub modified_at_ms: Option<u64>,
     pub is_missing: bool,
@@ -76,7 +76,7 @@ pub struct ComfyAssetCacheState {
     pub enrichment_level: u8,
 }
 
-impl ComfyAssetCacheState {
+impl SimAssetCacheState {
     pub fn with_file_path(mut self, file_path: impl Into<PathBuf>) -> Self {
         self.file_path = Some(file_path.into());
         self
@@ -104,54 +104,55 @@ impl ComfyAssetCacheState {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetReferenceRecord {
-    pub id: ComfyAssetReferenceId,
-    pub content_id: ComfyAssetContentId,
-    pub owner_id: ComfyAssetOwnerId,
+pub struct SimAssetReferenceRecord {
+    pub id: SimAssetReferenceId,
+    pub content_id: SimAssetContentId,
+    pub owner_id: SimAssetOwnerId,
     pub name: String,
     pub tags: BTreeSet<String>,
-    pub preview_id: Option<ComfyAssetReferenceId>,
+    pub preview_id: Option<SimAssetReferenceId>,
     pub user_metadata: BTreeMap<String, serde_json::Value>,
     pub system_metadata: BTreeMap<String, serde_json::Value>,
     pub job_id: Option<String>,
     pub provenance_id: Option<String>,
-    pub cache_state: ComfyAssetCacheState,
+    pub cache_state: SimAssetCacheState,
     pub created_at_ms: u64,
     pub updated_at_ms: u64,
     pub deleted_at_ms: Option<u64>,
 }
 
-impl ComfyAssetReferenceRecord {
+impl SimAssetReferenceRecord {
     pub fn is_deleted(&self) -> bool {
         self.deleted_at_ms.is_some()
     }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetReferenceRequest {
-    pub hash: Option<ComfyAssetHash>,
+pub struct SimAssetReferenceRequest {
+    pub hash: Option<SimAssetHash>,
     pub size_bytes: u64,
     pub mime_type: Option<String>,
     pub name: String,
     pub tags: BTreeSet<String>,
-    pub preview_id: Option<ComfyAssetReferenceId>,
+    pub preview_id: Option<SimAssetReferenceId>,
     pub user_metadata: BTreeMap<String, serde_json::Value>,
     pub system_metadata: BTreeMap<String, serde_json::Value>,
     pub job_id: Option<String>,
     pub provenance_id: Option<String>,
-    pub cache_state: ComfyAssetCacheState,
+    pub cache_state: SimAssetCacheState,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetReferencePatch {
+pub struct SimAssetReferencePatch {
     pub name: Option<String>,
     pub tags: Option<BTreeSet<String>>,
-    pub preview_id: Option<Option<ComfyAssetReferenceId>>,
+    pub preview_id: Option<Option<SimAssetReferenceId>>,
     pub user_metadata: Option<BTreeMap<String, serde_json::Value>>,
-    pub cache_state: Option<ComfyAssetCacheState>,
+    pub system_metadata: Option<BTreeMap<String, serde_json::Value>>,
+    pub cache_state: Option<SimAssetCacheState>,
 }
 
-impl ComfyAssetReferencePatch {
+impl SimAssetReferencePatch {
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
         self
@@ -162,7 +163,7 @@ impl ComfyAssetReferencePatch {
         self
     }
 
-    pub fn with_preview_id(mut self, preview_id: Option<ComfyAssetReferenceId>) -> Self {
+    pub fn with_preview_id(mut self, preview_id: Option<SimAssetReferenceId>) -> Self {
         self.preview_id = Some(preview_id);
         self
     }
@@ -172,7 +173,12 @@ impl ComfyAssetReferencePatch {
         self
     }
 
-    pub fn with_cache_state(mut self, cache_state: ComfyAssetCacheState) -> Self {
+    pub fn with_system_metadata(mut self, metadata: BTreeMap<String, serde_json::Value>) -> Self {
+        self.system_metadata = Some(metadata);
+        self
+    }
+
+    pub fn with_cache_state(mut self, cache_state: SimAssetCacheState) -> Self {
         self.cache_state = Some(cache_state);
         self
     }
@@ -182,11 +188,12 @@ impl ComfyAssetReferencePatch {
             && self.tags.is_none()
             && self.preview_id.is_none()
             && self.user_metadata.is_none()
+            && self.system_metadata.is_none()
             && self.cache_state.is_none()
     }
 }
 
-impl ComfyAssetReferenceRequest {
+impl SimAssetReferenceRequest {
     pub fn new(name: impl Into<String>, size_bytes: u64) -> Self {
         Self {
             name: name.into(),
@@ -196,7 +203,7 @@ impl ComfyAssetReferenceRequest {
     }
 
     pub fn with_hash(mut self, hash: impl Into<String>) -> Self {
-        self.hash = Some(ComfyAssetHash::new(hash));
+        self.hash = Some(SimAssetHash::new(hash));
         self
     }
 
@@ -234,47 +241,47 @@ impl ComfyAssetReferenceRequest {
         self
     }
 
-    pub fn with_preview_id(mut self, preview_id: ComfyAssetReferenceId) -> Self {
+    pub fn with_preview_id(mut self, preview_id: SimAssetReferenceId) -> Self {
         self.preview_id = Some(preview_id);
         self
     }
 
-    pub fn with_cache_state(mut self, cache_state: ComfyAssetCacheState) -> Self {
+    pub fn with_cache_state(mut self, cache_state: SimAssetCacheState) -> Self {
         self.cache_state = cache_state;
         self
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetDiagnostic {
+pub struct SimAssetDiagnostic {
     pub code: String,
-    pub reference_id: Option<ComfyAssetReferenceId>,
-    pub content_id: Option<ComfyAssetContentId>,
+    pub reference_id: Option<SimAssetReferenceId>,
+    pub content_id: Option<SimAssetContentId>,
     pub message: String,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetRepository {
-    content: BTreeMap<ComfyAssetContentId, ComfyAssetContentRecord>,
-    content_by_hash: BTreeMap<ComfyAssetHash, ComfyAssetContentId>,
-    references: BTreeMap<ComfyAssetReferenceId, ComfyAssetReferenceRecord>,
+pub struct SimAssetRepository {
+    content: BTreeMap<SimAssetContentId, SimAssetContentRecord>,
+    content_by_hash: BTreeMap<SimAssetHash, SimAssetContentId>,
+    references: BTreeMap<SimAssetReferenceId, SimAssetReferenceRecord>,
     next_content_id: u64,
     next_reference_id: u64,
     clock_ms: u64,
 }
 
-impl ComfyAssetRepository {
+impl SimAssetRepository {
     pub fn create_reference(
         &mut self,
-        owner_id: ComfyAssetOwnerId,
-        request: ComfyAssetReferenceRequest,
-    ) -> ComfyAssetReferenceRecord {
+        owner_id: SimAssetOwnerId,
+        request: SimAssetReferenceRequest,
+    ) -> SimAssetReferenceRecord {
         let content =
             self.create_or_reuse_content(request.hash, request.size_bytes, request.mime_type);
         self.next_reference_id = self.next_reference_id.saturating_add(1);
         let now = self.next_timestamp();
-        let reference = ComfyAssetReferenceRecord {
-            id: ComfyAssetReferenceId::new(format!("asset-reference-{}", self.next_reference_id)),
+        let reference = SimAssetReferenceRecord {
+            id: SimAssetReferenceId::new(format!("asset-reference-{}", self.next_reference_id)),
             content_id: content.id,
             owner_id,
             name: request.name,
@@ -294,7 +301,7 @@ impl ComfyAssetRepository {
         reference
     }
 
-    pub fn content_by_hash(&self, hash: &ComfyAssetHash) -> Option<&ComfyAssetContentRecord> {
+    pub fn content_by_hash(&self, hash: &SimAssetHash) -> Option<&SimAssetContentRecord> {
         self.content_by_hash
             .get(hash)
             .and_then(|content_id| self.content.get(content_id))
@@ -302,11 +309,11 @@ impl ComfyAssetRepository {
 
     pub fn content(
         &self,
-        content_id: &ComfyAssetContentId,
-    ) -> Result<&ComfyAssetContentRecord, ComfyAssetDiagnostic> {
+        content_id: &SimAssetContentId,
+    ) -> Result<&SimAssetContentRecord, SimAssetDiagnostic> {
         self.content
             .get(content_id)
-            .ok_or_else(|| ComfyAssetDiagnostic {
+            .ok_or_else(|| SimAssetDiagnostic {
                 code: ASSET_CONTENT_NOT_FOUND_CODE.to_string(),
                 reference_id: None,
                 content_id: Some(content_id.clone()),
@@ -316,11 +323,11 @@ impl ComfyAssetRepository {
 
     pub fn reference(
         &self,
-        reference_id: &ComfyAssetReferenceId,
-    ) -> Result<&ComfyAssetReferenceRecord, ComfyAssetDiagnostic> {
+        reference_id: &SimAssetReferenceId,
+    ) -> Result<&SimAssetReferenceRecord, SimAssetDiagnostic> {
         self.references
             .get(reference_id)
-            .ok_or_else(|| ComfyAssetDiagnostic {
+            .ok_or_else(|| SimAssetDiagnostic {
                 code: ASSET_REFERENCE_NOT_FOUND_CODE.to_string(),
                 reference_id: Some(reference_id.clone()),
                 content_id: None,
@@ -330,8 +337,8 @@ impl ComfyAssetRepository {
 
     pub fn references_for_owner(
         &self,
-        owner_id: &ComfyAssetOwnerId,
-    ) -> Vec<&ComfyAssetReferenceRecord> {
+        owner_id: &SimAssetOwnerId,
+    ) -> Vec<&SimAssetReferenceRecord> {
         self.references
             .values()
             .filter(|reference| &reference.owner_id == owner_id && !reference.is_deleted())
@@ -340,13 +347,13 @@ impl ComfyAssetRepository {
 
     pub fn update_reference(
         &mut self,
-        owner_id: &ComfyAssetOwnerId,
-        reference_id: &ComfyAssetReferenceId,
-        patch: ComfyAssetReferencePatch,
-    ) -> Result<Option<ComfyAssetReferenceRecord>, ComfyAssetDiagnostic> {
+        owner_id: &SimAssetOwnerId,
+        reference_id: &SimAssetReferenceId,
+        patch: SimAssetReferencePatch,
+    ) -> Result<Option<SimAssetReferenceRecord>, SimAssetDiagnostic> {
         let now = self.next_timestamp();
         let Some(reference) = self.references.get_mut(reference_id) else {
-            return Err(ComfyAssetDiagnostic {
+            return Err(SimAssetDiagnostic {
                 code: ASSET_REFERENCE_NOT_FOUND_CODE.to_string(),
                 reference_id: Some(reference_id.clone()),
                 content_id: None,
@@ -368,6 +375,9 @@ impl ComfyAssetRepository {
         if let Some(user_metadata) = patch.user_metadata {
             reference.user_metadata = user_metadata;
         }
+        if let Some(system_metadata) = patch.system_metadata {
+            reference.system_metadata = system_metadata;
+        }
         if let Some(cache_state) = patch.cache_state {
             reference.cache_state = cache_state;
         }
@@ -377,12 +387,12 @@ impl ComfyAssetRepository {
 
     pub fn soft_delete_reference(
         &mut self,
-        owner_id: &ComfyAssetOwnerId,
-        reference_id: &ComfyAssetReferenceId,
-    ) -> Result<bool, ComfyAssetDiagnostic> {
+        owner_id: &SimAssetOwnerId,
+        reference_id: &SimAssetReferenceId,
+    ) -> Result<bool, SimAssetDiagnostic> {
         let now = self.next_timestamp();
         let Some(reference) = self.references.get_mut(reference_id) else {
-            return Err(ComfyAssetDiagnostic {
+            return Err(SimAssetDiagnostic {
                 code: ASSET_REFERENCE_NOT_FOUND_CODE.to_string(),
                 reference_id: Some(reference_id.clone()),
                 content_id: None,
@@ -407,10 +417,10 @@ impl ComfyAssetRepository {
 
     fn create_or_reuse_content(
         &mut self,
-        hash: Option<ComfyAssetHash>,
+        hash: Option<SimAssetHash>,
         size_bytes: u64,
         mime_type: Option<String>,
-    ) -> ComfyAssetContentRecord {
+    ) -> SimAssetContentRecord {
         if let Some(hash) = &hash {
             if let Some(content_id) = self.content_by_hash.get(hash) {
                 if let Some(content) = self.content.get(content_id) {
@@ -420,8 +430,8 @@ impl ComfyAssetRepository {
         }
 
         self.next_content_id = self.next_content_id.saturating_add(1);
-        let content = ComfyAssetContentRecord {
-            id: ComfyAssetContentId::new(format!("asset-content-{}", self.next_content_id)),
+        let content = SimAssetContentRecord {
+            id: SimAssetContentId::new(format!("asset-content-{}", self.next_content_id)),
             hash: hash.clone(),
             size_bytes,
             mime_type,

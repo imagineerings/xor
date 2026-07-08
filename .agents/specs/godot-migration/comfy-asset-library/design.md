@@ -2,24 +2,24 @@
 
 ## Overview
 
-The asset library provides the world-model harness asset model and Comfy-compatible asset APIs on top of Sim storage, artifact, and media services. It preserves the useful Comfy split between immutable content and mutable owner-scoped references while avoiding a parallel media preview stack.
+The asset library provides the world-model harness asset model and Comfy-compatible asset APIs on top of Sim storage, artifact, and media services. Every supported Comfy asset behavior is recreated as native Sim functionality: compatibility adapters may preserve external route shapes, but core modules, types, and records use `SimAsset*` and `SimUserData*` names and do not pass through to ComfyUI.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    Api[AssetApiAdapter] --> Service[AssetService]
-    Service --> Store[AssetRepository]
-    Service --> Tags[TagService]
-    Service --> Seed[AssetSeeder]
-    Seed --> Scanner[FilesystemScanner]
+    Api[SimAssetApi] --> Service[SimAssetService]
+    Service --> Store[SimAssetRepository]
+    Service --> Tags[SimAssetTagService]
+    Service --> Seed[SimAssetSeeder]
+    Seed --> Scanner[SimAssetFilesystemScanner]
     Service --> Media[Sim Media Preview]
     Service --> Provenance[Generated Artifact Store]
 ```
 
 ## Components and Interfaces
 
-### AssetRepository
+### SimAssetRepository
 
 - **Purpose**: Persist asset content metadata, references, tags, and metadata entries.
 - **Responsibilities**: Hash lookup, reference CRUD, owner scoping, soft delete, cache state, and metadata indexing.
@@ -30,15 +30,15 @@ flowchart LR
   depend on ComfyUI's asset database or storage layer.
 
 ```rust
-pub trait AssetRepository {
-    fn asset_by_hash(&self, hash: &AssetHash) -> Result<Option<AssetRecord>, AssetError>;
-    fn list_references(&self, query: AssetListQuery) -> Result<AssetListPage, AssetError>;
-    fn create_reference(&self, request: CreateAssetReference) -> Result<AssetReferenceRecord, AssetError>;
-    fn soft_delete_reference(&self, owner: &OwnerId, reference: AssetReferenceId) -> Result<bool, AssetError>;
+pub trait SimAssetRepository {
+    fn asset_by_hash(&self, hash: &SimAssetHash) -> Result<Option<SimAssetContentRecord>, SimAssetDiagnostic>;
+    fn list_references(&self, query: SimAssetListQuery) -> Result<SimAssetListPage, SimAssetDiagnostic>;
+    fn create_reference(&self, request: SimAssetReferenceRequest) -> Result<SimAssetReferenceRecord, SimAssetDiagnostic>;
+    fn soft_delete_reference(&self, owner: &SimAssetOwnerId, reference: &SimAssetReferenceId) -> Result<bool, SimAssetDiagnostic>;
 }
 ```
 
-### AssetApiAdapter
+### SimAssetApi
 
 - **Purpose**: Expose Comfy-compatible `/api/assets` and `/api/tags` routes.
 - **Responsibilities**: Query validation, multipart parsing, upload dedupe, download streaming, tag mutation, and error shape normalization.
@@ -56,7 +56,7 @@ pub trait AssetRepository {
   disposition, and return Sim media preview routes for preview references
   instead of forwarding to ComfyUI preview handlers.
 
-### AssetSeeder
+### SimAssetSeeder
 
 - **Purpose**: Synchronize filesystem roots into asset records.
 - **Responsibilities**: Scan models/input/output roots, pause during generation, resume after output registration, report progress, cancel, and prune missing references.
@@ -65,12 +65,17 @@ pub trait AssetRepository {
   diagnostics. Prune marks out-of-root references missing in Sim cache state
   without deleting content or invoking ComfyUI scanners.
 
-### MetadataExtractor
+### SimAssetOutputRegistrar and SimAssetEnrichmentQueue
 
 - **Purpose**: Extract safe metadata for assets.
 - **Responsibilities**: MIME type, image dimensions, safetensors metadata, filename metadata, and generated artifact metadata links.
+- **Native output enrichment**: Generated outputs register through Sim asset
+  APIs with job ids, provenance ids, optional hashes, cache state, and extracted
+  metadata. Enrichment jobs update Sim system metadata and enrichment levels
+  after execution without calling ComfyUI output registration or metadata
+  extraction handlers.
 
-### UserDataStore
+### SimUserDataStore
 
 - **Purpose**: Provide Comfy-compatible user files and settings.
 - **Responsibilities**: User resolution, system-user protection, path confinement, list/read/write/move/delete, and settings JSON persistence.
@@ -82,21 +87,21 @@ pub trait AssetRepository {
 ## Data Models
 
 ```rust
-pub struct AssetRecord {
-    pub id: AssetId,
-    pub hash: Option<AssetHash>,
+pub struct SimAssetContentRecord {
+    pub id: SimAssetContentId,
+    pub hash: Option<SimAssetHash>,
     pub size_bytes: u64,
     pub mime_type: Option<String>,
     pub created_at: Timestamp,
 }
 
-pub struct AssetReferenceRecord {
-    pub id: AssetReferenceId,
-    pub asset_id: AssetId,
-    pub owner_id: OwnerId,
+pub struct SimAssetReferenceRecord {
+    pub id: SimAssetReferenceId,
+    pub content_id: SimAssetContentId,
+    pub owner_id: SimAssetOwnerId,
     pub name: String,
     pub tags: Vec<TagName>,
-    pub preview_id: Option<AssetReferenceId>,
+    pub preview_id: Option<SimAssetReferenceId>,
     pub user_metadata: JsonObject,
     pub system_metadata: JsonObject,
     pub job_id: Option<Uuid>,

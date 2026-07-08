@@ -3,15 +3,14 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ComfyAssetApi, ComfyAssetApiDiagnostic, ComfyAssetCacheState, ComfyAssetListQuery,
-    ComfyAssetOwnerId, ComfyAssetOwnerScope, ComfyAssetScanRoot, ComfyAssetScannedFile,
-    ComfyAssetUploadRequest,
+    SimAssetApi, SimAssetApiDiagnostic, SimAssetCacheState, SimAssetListQuery, SimAssetOwnerId,
+    SimAssetOwnerScope, SimAssetScanRoot, SimAssetScannedFile, SimAssetUploadRequest,
 };
 
-pub const ASSET_SEED_MISSING_ROOT_CODE: &str = "world_model.comfy_assets.seed_missing_root";
+pub const ASSET_SEED_MISSING_ROOT_CODE: &str = "world_model.sim_assets.seed_missing_root";
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-pub enum ComfyAssetSeedState {
+pub enum SimAssetSeedState {
     #[default]
     Idle,
     Running,
@@ -20,39 +19,39 @@ pub enum ComfyAssetSeedState {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetSeedDiagnostic {
+pub struct SimAssetSeedDiagnostic {
     pub code: String,
     pub path: Option<PathBuf>,
     pub message: String,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetSeedProgress {
+pub struct SimAssetSeedProgress {
     pub scanned: usize,
     pub total: usize,
     pub created: usize,
     pub skipped: usize,
-    pub state: ComfyAssetSeedState,
-    pub errors: Vec<ComfyAssetSeedDiagnostic>,
+    pub state: SimAssetSeedState,
+    pub errors: Vec<SimAssetSeedDiagnostic>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetSeedReport {
-    pub progress: ComfyAssetSeedProgress,
+pub struct SimAssetSeedReport {
+    pub progress: SimAssetSeedProgress,
     pub pruned_missing: usize,
 }
 
-pub struct ComfyAssetSeeder<'a> {
-    api: &'a mut ComfyAssetApi,
-    owner_id: ComfyAssetOwnerId,
-    roots: Vec<ComfyAssetScanRoot>,
+pub struct SimAssetSeeder<'a> {
+    api: &'a mut SimAssetApi,
+    owner_id: SimAssetOwnerId,
+    roots: Vec<SimAssetScanRoot>,
 }
 
-impl<'a> ComfyAssetSeeder<'a> {
+impl<'a> SimAssetSeeder<'a> {
     pub fn new(
-        api: &'a mut ComfyAssetApi,
-        owner_id: ComfyAssetOwnerId,
-        roots: Vec<ComfyAssetScanRoot>,
+        api: &'a mut SimAssetApi,
+        owner_id: SimAssetOwnerId,
+        roots: Vec<SimAssetScanRoot>,
     ) -> Self {
         Self {
             api,
@@ -63,26 +62,26 @@ impl<'a> ComfyAssetSeeder<'a> {
 
     pub fn seed(
         &mut self,
-        files: &[ComfyAssetScannedFile],
+        files: &[SimAssetScannedFile],
         cancel_after: Option<usize>,
-    ) -> Result<ComfyAssetSeedReport, ComfyAssetApiDiagnostic> {
-        let mut progress = ComfyAssetSeedProgress {
+    ) -> Result<SimAssetSeedReport, SimAssetApiDiagnostic> {
+        let mut progress = SimAssetSeedProgress {
             total: files.len(),
-            state: ComfyAssetSeedState::Running,
-            ..ComfyAssetSeedProgress::default()
+            state: SimAssetSeedState::Running,
+            ..SimAssetSeedProgress::default()
         };
 
         for file in files {
             if cancel_after.is_some_and(|limit| progress.scanned >= limit) {
-                progress.state = ComfyAssetSeedState::Cancelled;
-                return Ok(ComfyAssetSeedReport {
+                progress.state = SimAssetSeedState::Cancelled;
+                return Ok(SimAssetSeedReport {
                     progress,
                     pruned_missing: 0,
                 });
             }
             progress.scanned = progress.scanned.saturating_add(1);
             let Some(full_path) = self.full_path(file) else {
-                progress.errors.push(ComfyAssetSeedDiagnostic {
+                progress.errors.push(SimAssetSeedDiagnostic {
                     code: ASSET_SEED_MISSING_ROOT_CODE.to_string(),
                     path: Some(file.relative_path.clone()),
                     message: "asset seed file root is not registered".to_string(),
@@ -98,15 +97,15 @@ impl<'a> ComfyAssetSeeder<'a> {
             progress.created = progress.created.saturating_add(1);
         }
 
-        progress.state = ComfyAssetSeedState::Completed;
-        Ok(ComfyAssetSeedReport {
+        progress.state = SimAssetSeedState::Completed;
+        Ok(SimAssetSeedReport {
             progress,
             pruned_missing: 0,
         })
     }
 
-    pub fn prune_missing_outside_roots(&mut self) -> Result<usize, ComfyAssetApiDiagnostic> {
-        let query = ComfyAssetListQuery::new(ComfyAssetOwnerScope {
+    pub fn prune_missing_outside_roots(&mut self) -> Result<usize, SimAssetApiDiagnostic> {
+        let query = SimAssetListQuery::new(SimAssetOwnerScope {
             owner_id: self.owner_id.clone(),
         });
         let page = self.api.list(&query)?;
@@ -132,17 +131,17 @@ impl<'a> ComfyAssetSeeder<'a> {
 
     fn register_file(
         &mut self,
-        file: &ComfyAssetScannedFile,
+        file: &SimAssetScannedFile,
         full_path: PathBuf,
-    ) -> Result<(), ComfyAssetApiDiagnostic> {
-        let mut cache_state = ComfyAssetCacheState::default()
+    ) -> Result<(), SimAssetApiDiagnostic> {
+        let mut cache_state = SimAssetCacheState::default()
             .with_file_path(full_path)
             .verified();
         if let Some(modified_at_ms) = file.modified_at_ms {
             cache_state = cache_state.with_modified_at_ms(modified_at_ms).verified();
         }
 
-        let mut upload = ComfyAssetUploadRequest::new(
+        let mut upload = SimAssetUploadRequest::new(
             file.relative_path
                 .file_name()
                 .and_then(|file_name| file_name.to_str())
@@ -160,8 +159,8 @@ impl<'a> ComfyAssetSeeder<'a> {
         Ok(())
     }
 
-    fn reference_exists_for_path(&self, full_path: &Path) -> Result<bool, ComfyAssetApiDiagnostic> {
-        let query = ComfyAssetListQuery::new(ComfyAssetOwnerScope {
+    fn reference_exists_for_path(&self, full_path: &Path) -> Result<bool, SimAssetApiDiagnostic> {
+        let query = SimAssetListQuery::new(SimAssetOwnerScope {
             owner_id: self.owner_id.clone(),
         });
         let page = self.api.list(&query)?;
@@ -171,7 +170,7 @@ impl<'a> ComfyAssetSeeder<'a> {
         }))
     }
 
-    fn full_path(&self, file: &ComfyAssetScannedFile) -> Option<PathBuf> {
+    fn full_path(&self, file: &SimAssetScannedFile) -> Option<PathBuf> {
         self.roots
             .iter()
             .find(|root| root.kind == file.root_kind)

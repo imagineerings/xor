@@ -79,3 +79,4 @@ Sim needs Comfy's asset library behavior for generated outputs, uploads, model r
 6.1 IF Sim already has artifact, media preview, user storage, or secret infrastructure THEN THE asset library SHALL adapt those systems rather than adding a parallel storage stack.
 6.2 WHEN asset records reference generated outputs THEN THE system SHALL include shared provenance identifiers.
 6.3 IF the asset database is unavailable while assets are required THEN THE system SHALL fail startup with actionable diagnostics.
+6.4 WHEN a Comfy asset feature is implemented in Sim THEN THE system SHALL expose native implementation types and modules with `SimAsset*` or `SimUserData*` naming and SHALL NOT use `Comfy*` names for Sim-owned records, services, or queues.

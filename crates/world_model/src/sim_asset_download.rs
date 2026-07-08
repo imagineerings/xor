@@ -3,25 +3,24 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ComfyAssetApi, ComfyAssetApiDiagnostic, ComfyAssetContentId, ComfyAssetOwnerId,
-    ComfyAssetReferenceDetail, ComfyAssetReferenceId,
+    SimAssetApi, SimAssetApiDiagnostic, SimAssetContentId, SimAssetOwnerId,
+    SimAssetReferenceDetail, SimAssetReferenceId,
 };
 
 pub const ASSET_DOWNLOAD_FILE_NOT_FOUND_CODE: &str =
-    "world_model.comfy_assets.download_file_not_found";
-pub const ASSET_DOWNLOAD_PREVIEW_NOT_FOUND_CODE: &str =
-    "world_model.comfy_assets.preview_not_found";
+    "world_model.sim_assets.download_file_not_found";
+pub const ASSET_DOWNLOAD_PREVIEW_NOT_FOUND_CODE: &str = "world_model.sim_assets.preview_not_found";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum ComfyAssetContentDispositionKind {
+pub enum SimAssetContentDispositionKind {
     Attachment,
     Inline,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetDownloadResponse {
-    pub reference_id: ComfyAssetReferenceId,
-    pub content_id: ComfyAssetContentId,
+pub struct SimAssetDownloadResponse {
+    pub reference_id: SimAssetReferenceId,
+    pub content_id: SimAssetContentId,
     pub size_bytes: u64,
     pub content_type: String,
     pub content_disposition: String,
@@ -29,35 +28,35 @@ pub struct ComfyAssetDownloadResponse {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetMediaPreviewRoute {
+pub struct SimAssetMediaPreviewRoute {
     pub route_name: String,
-    pub reference_id: ComfyAssetReferenceId,
-    pub content_id: ComfyAssetContentId,
+    pub reference_id: SimAssetReferenceId,
+    pub content_id: SimAssetContentId,
     pub content_type: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ComfyAssetPreviewResolution {
-    pub source_reference_id: ComfyAssetReferenceId,
-    pub preview_reference_id: ComfyAssetReferenceId,
-    pub media_route: ComfyAssetMediaPreviewRoute,
+pub struct SimAssetPreviewResolution {
+    pub source_reference_id: SimAssetReferenceId,
+    pub preview_reference_id: SimAssetReferenceId,
+    pub media_route: SimAssetMediaPreviewRoute,
 }
 
-pub struct ComfyAssetDownloadResolver<'a> {
-    api: &'a ComfyAssetApi,
+pub struct SimAssetDownloadResolver<'a> {
+    api: &'a SimAssetApi,
 }
 
-impl<'a> ComfyAssetDownloadResolver<'a> {
-    pub fn new(api: &'a ComfyAssetApi) -> Self {
+impl<'a> SimAssetDownloadResolver<'a> {
+    pub fn new(api: &'a SimAssetApi) -> Self {
         Self { api }
     }
 
     pub fn download(
         &self,
-        owner_id: &ComfyAssetOwnerId,
-        reference_id: &ComfyAssetReferenceId,
-        disposition: ComfyAssetContentDispositionKind,
-    ) -> Result<Option<ComfyAssetDownloadResponse>, ComfyAssetApiDiagnostic> {
+        owner_id: &SimAssetOwnerId,
+        reference_id: &SimAssetReferenceId,
+        disposition: SimAssetContentDispositionKind,
+    ) -> Result<Option<SimAssetDownloadResponse>, SimAssetApiDiagnostic> {
         let Some(detail) = self.api.detail(owner_id, reference_id)? else {
             return Ok(None);
         };
@@ -65,7 +64,7 @@ impl<'a> ComfyAssetDownloadResolver<'a> {
             return Err(download_file_not_found(&detail));
         }
         let content_type = safe_content_type(detail.content.mime_type.as_deref());
-        Ok(Some(ComfyAssetDownloadResponse {
+        Ok(Some(SimAssetDownloadResponse {
             reference_id: detail.reference.id,
             content_id: detail.content.id,
             size_bytes: detail.content.size_bytes,
@@ -77,9 +76,9 @@ impl<'a> ComfyAssetDownloadResolver<'a> {
 
     pub fn resolve_preview(
         &self,
-        owner_id: &ComfyAssetOwnerId,
-        reference_id: &ComfyAssetReferenceId,
-    ) -> Result<Option<ComfyAssetPreviewResolution>, ComfyAssetApiDiagnostic> {
+        owner_id: &SimAssetOwnerId,
+        reference_id: &SimAssetReferenceId,
+    ) -> Result<Option<SimAssetPreviewResolution>, SimAssetApiDiagnostic> {
         let Some(source) = self.api.detail(owner_id, reference_id)? else {
             return Ok(None);
         };
@@ -102,10 +101,10 @@ impl<'a> ComfyAssetDownloadResolver<'a> {
             return Err(download_file_not_found(&preview));
         }
 
-        Ok(Some(ComfyAssetPreviewResolution {
+        Ok(Some(SimAssetPreviewResolution {
             source_reference_id: source.reference.id,
             preview_reference_id: preview.reference.id.clone(),
-            media_route: ComfyAssetMediaPreviewRoute {
+            media_route: SimAssetMediaPreviewRoute {
                 route_name: "sim.media.preview".to_string(),
                 reference_id: preview.reference.id,
                 content_id: preview.content.id,
@@ -135,13 +134,10 @@ pub fn safe_content_type(mime_type: Option<&str>) -> String {
     .to_string()
 }
 
-pub fn content_disposition(
-    disposition: ComfyAssetContentDispositionKind,
-    file_name: &str,
-) -> String {
+pub fn content_disposition(disposition: SimAssetContentDispositionKind, file_name: &str) -> String {
     let disposition = match disposition {
-        ComfyAssetContentDispositionKind::Attachment => "attachment",
-        ComfyAssetContentDispositionKind::Inline => "inline",
+        SimAssetContentDispositionKind::Attachment => "attachment",
+        SimAssetContentDispositionKind::Inline => "inline",
     };
     format!(
         "{disposition}; filename=\"{}\"",
@@ -164,16 +160,16 @@ fn sanitize_file_name(file_name: &str) -> String {
     }
 }
 
-fn download_file_not_found(detail: &ComfyAssetReferenceDetail) -> ComfyAssetApiDiagnostic {
-    ComfyAssetApiDiagnostic {
+fn download_file_not_found(detail: &SimAssetReferenceDetail) -> SimAssetApiDiagnostic {
+    SimAssetApiDiagnostic {
         code: ASSET_DOWNLOAD_FILE_NOT_FOUND_CODE.to_string(),
         reference_id: Some(detail.reference.id.clone()),
         message: "asset content file was not found".to_string(),
     }
 }
 
-fn preview_not_found(reference_id: ComfyAssetReferenceId) -> ComfyAssetApiDiagnostic {
-    ComfyAssetApiDiagnostic {
+fn preview_not_found(reference_id: SimAssetReferenceId) -> SimAssetApiDiagnostic {
+    SimAssetApiDiagnostic {
         code: ASSET_DOWNLOAD_PREVIEW_NOT_FOUND_CODE.to_string(),
         reference_id: Some(reference_id),
         message: "asset preview reference was not found".to_string(),
