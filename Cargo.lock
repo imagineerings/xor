@@ -16927,6 +16927,7 @@ dependencies = [
  "release_channel",
  "remote",
  "rodio",
+ "scheduler",
  "schemars 1.2.1",
  "search",
  "serde",

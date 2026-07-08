@@ -1,6 +1,7 @@
 mod components;
 mod page_data;
 pub mod pages;
+pub mod scheduling_settings;
 
 use agent_skills::SkillIndex;
 use anyhow::{Context as _, Result};

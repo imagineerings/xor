@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-08T22:58:00Z",
+  "updated_at": "2026-07-08T23:28:00Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -270,6 +270,17 @@
       "owner": null,
       "summary": "Implemented locally with a GPUI RecipeBrowser component backed by crates/recipe discovery/loading/execution, search filtering, recipe cards, detail metadata, variables/tags display, run confirmation state, and focused unit coverage. Ready to merge in PR.",
       "updated_at": "2026-07-08T22:58:00Z"
+    },
+    {
+      "task_id": "task:goose-desktop-ui-3",
+      "task_identifier": ".agents/specs/goose-migration/desktop-ui/tasks.md:31",
+      "title": "Implement scheduling settings view",
+      "linear_identifier": null,
+      "linear_url": null,
+      "status": "inactive",
+      "owner": null,
+      "summary": "Implemented locally with a GPUI SchedulingSettings view backed by scheduler priority metadata, in-memory schedule configs, create form validation, enable/disable toggles, delete confirmation, task-kind selection, and focused unit coverage. Ready to merge in PR.",
+      "updated_at": "2026-07-08T23:28:00Z"
     }
   ],
   "task_notes": [
@@ -806,8 +817,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/desktop-ui",
-      "summary": "Tasks 1-2 are checked complete. Agent connection state now exposes ACP metadata for existing UI surfaces, and agent_ui has a GPUI RecipeBrowser component backed by crates/recipe discovery/loading/execution with filtering, recipe detail, run confirmation, and unit coverage. Task 3 can proceed with scheduling settings.",
-      "updated_at": "2026-07-08T22:58:00Z"
+      "summary": "Tasks 1-3 are checked complete. Agent connection state now exposes ACP metadata for existing UI surfaces; agent_ui has a GPUI RecipeBrowser component backed by crates/recipe discovery/loading/execution; and settings_ui has a SchedulingSettings component with create, toggle, delete-confirmation, and cron/task validation backed by scheduler priority metadata. Task 4 can proceed with Goose doctor diagnostics.",
+      "updated_at": "2026-07-08T23:28:00Z"
     },
     {
       "scope": ".agents/specs/godot-migration",

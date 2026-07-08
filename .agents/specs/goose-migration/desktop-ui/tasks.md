@@ -28,7 +28,7 @@ Build GPUI-native views for recipe browsing, scheduling, diagnostics, shared ses
   - _Requirements: 2_
   - _writes: crates/agent_ui/src/recipe_browser.rs_
 
-- [ ] 3. Implement scheduling settings view
+- [x] 3. Implement scheduling settings view
   - List existing schedules with enable/disable toggle
   - Create schedule form (name, cron expression, task selection)
   - Delete schedule with confirmation

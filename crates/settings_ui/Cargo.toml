@@ -52,6 +52,7 @@ project.workspace = true
 release_channel.workspace = true
 rodio.workspace = true
 schemars.workspace = true
+scheduler.workspace = true
 search.workspace = true
 serde.workspace = true
 serde_json.workspace = true
