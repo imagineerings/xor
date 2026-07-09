@@ -359,15 +359,29 @@ impl Database {
                     .or_insert_with(|| ThreadSummaryAccumulator {
                         reply_count: 0,
                         latest_reply_at: reply.created_at,
+                        latest_reply_id: reply.id,
                         participant_user_ids: BTreeSet::default(),
                     });
                 summary.reply_count = summary
                     .reply_count
                     .checked_add(1)
                     .context("too many channel thread replies")?;
-                summary.latest_reply_at = summary.latest_reply_at.max(reply.created_at);
+                if summary.latest_reply_at < reply.created_at
+                    || (summary.latest_reply_at == reply.created_at
+                        && summary.latest_reply_id < reply.id)
+                {
+                    summary.latest_reply_at = reply.created_at;
+                    summary.latest_reply_id = reply.id;
+                }
                 summary.participant_user_ids.insert(reply.sender_id);
             }
+
+            let last_read_message_id = channel_message_read::Entity::find()
+                .filter(channel_message_read::Column::ChannelId.eq(channel_id))
+                .filter(channel_message_read::Column::UserId.eq(user_id))
+                .one(&*tx)
+                .await?
+                .map(|read| read.message_id);
 
             let mut summaries = summaries_by_root_id
                 .into_iter()
@@ -380,7 +394,8 @@ impl Database {
                         .into_iter()
                         .map(UserId::to_proto)
                         .collect(),
-                    has_unread: false,
+                    has_unread: last_read_message_id
+                        .is_none_or(|message_id| message_id < summary.latest_reply_id),
                 })
                 .collect::<Vec<_>>();
             summaries.sort_by_key(|summary| std::cmp::Reverse(summary.latest_reply_at));
@@ -595,6 +610,7 @@ impl Database {
 struct ThreadSummaryAccumulator {
     reply_count: u32,
     latest_reply_at: PrimitiveDateTime,
+    latest_reply_id: MessageId,
     participant_user_ids: BTreeSet<UserId>,
 }
 

@@ -164,11 +164,20 @@ async fn test_channel_chat_thread_queries(
     assert_eq!(summary.root_message_id, root.id);
     assert_eq!(summary.reply_count, 2);
     assert_eq!(summary.latest_reply_at, reply_b.timestamp);
+    assert!(summary.has_unread);
     let mut participant_user_ids = summary.participant_user_ids.clone();
     participant_user_ids.sort_unstable();
     let mut expected_user_ids = vec![client_a.user_id().unwrap(), client_b.user_id().unwrap()];
     expected_user_ids.sort_unstable();
     assert_eq!(participant_user_ids, expected_user_ids);
+
+    client_a
+        .acknowledge_channel_message(channel_id.0, reply_b.id)
+        .unwrap();
+    executor.run_until_parked();
+    let summaries = client_a.get_threads(channel_id.0).await.unwrap();
+    let summary = summaries.first().expect("missing thread summary");
+    assert!(!summary.has_unread);
 
     assert!(
         client_a

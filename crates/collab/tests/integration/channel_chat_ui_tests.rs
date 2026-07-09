@@ -302,6 +302,10 @@ async fn test_channel_chat_open_thread_appends_live_replies(
         chat.read_with(cx_a, |chat, _| chat.thread_reply_count_for_test(root.id)),
         Some(1)
     );
+    assert_eq!(
+        chat.read_with(cx_a, |chat, _| chat.thread_has_unread_for_test(root.id)),
+        Some(true)
+    );
 
     chat.update_in(cx_a, |chat, window, cx| {
         chat.open_thread_for_test(root.id, window, cx);
@@ -311,6 +315,10 @@ async fn test_channel_chat_open_thread_appends_live_replies(
     assert_eq!(
         chat.read_with(cx_a, |chat, _| chat.thread_reply_bodies_for_test()),
         vec![initial_reply.body.clone()]
+    );
+    assert_eq!(
+        chat.read_with(cx_a, |chat, _| chat.thread_has_unread_for_test(root.id)),
+        Some(false)
     );
 
     let live_reply = client_b

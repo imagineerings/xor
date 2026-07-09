@@ -732,6 +732,7 @@ impl ChannelChat {
                         }
                         thread_panel.load_state = ThreadLoadState::Loaded;
                         thread_panel.replies_done = thread.done;
+                        this.mark_thread_read(root_message_id);
                     }
                     Err(error) => {
                         thread_panel.load_state = ThreadLoadState::Failed(
@@ -754,6 +755,25 @@ impl ChannelChat {
         if self.thread_panel.take().is_some() {
             cx.notify();
         }
+    }
+
+    fn mark_thread_read(&mut self, root_message_id: u64) {
+        let Some(thread_panel) = self.thread_panel.as_ref() else {
+            return;
+        };
+        if thread_panel.root_message_id != root_message_id {
+            return;
+        }
+        let Some(latest_reply_id) = thread_panel.replies.last().map(|reply| reply.id) else {
+            return;
+        };
+
+        if let Some(summary) = self.thread_summaries.get_mut(&root_message_id) {
+            summary.has_unread = false;
+        }
+        self.client
+            .acknowledge_channel_message(self.channel_id.0, latest_reply_id)
+            .log_err();
     }
 
     fn load_earlier_thread_replies(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -1976,6 +1996,13 @@ impl ChannelChat {
         self.thread_summaries
             .get(&root_message_id)
             .map(|summary| summary.reply_count)
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn thread_has_unread_for_test(&self, root_message_id: u64) -> Option<bool> {
+        self.thread_summaries
+            .get(&root_message_id)
+            .map(|summary| summary.has_unread)
     }
 
     #[cfg(any(test, feature = "test-support"))]
