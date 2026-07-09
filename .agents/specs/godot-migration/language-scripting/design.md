@@ -8,9 +8,12 @@ Legacy `.gd` scripts are a migration source format. `.gd` files can be classifie
 
 There is no separate legacy script registration or compatibility registrar type. The language config is constructed from standard `LanguageConfig` metadata (name, extensions, line comments, LSP adapter name) and fed directly into `Language::new` + `LanguageRegistry::add`.
 
+Comfy-era generation intent is recreated as native SimScript authoring intent. Natural language remains an authoring input, never executable source, and no `Comfy*` language or generation record is exposed from the SimScript layer.
+
 ## Components
 
 - `sim_game::simscript_language_config()` — returns metadata for SimScript (name, native/imported extensions, line comment tokens, LSP adapter name). Called from `sim::register_game_integration` to build the native `Language` instance.
+- `SimScriptLanguageSupport` — classifies `.simscript` files as native and `.gd` files as imported migration source.
 - `NaturalLanguageGameAuthoring` — translates creator intent into inspectable SimScript drafts or diffs before execution.
 - `SimGameDocsIndex` — indexes Sim game API documentation, plus Godot API migration/reference docs when needed.
 - `SimScriptLspAdapter` — LSP adapter for SimScript (delegates to existing LSP infrastructure).
@@ -33,4 +36,10 @@ _For any_ SimScript file, Sim SHALL classify and highlight it using the same `La
 
 _For any_ natural-language gameplay instruction, Sim SHALL convert the instruction into inspectable SimScript before execution or application.
 
-**Validates: Requirement 2.1, 2.2, 2.3**
+**Validates: Requirement 2.1, 2.2, 2.3, 2.4**
+
+### Property 4: Docs Scope Separation
+
+_For any_ indexed Godot API reference, Sim SHALL expose it as migration reference docs while keeping Sim game API docs as the primary SimScript surface.
+
+**Validates: Requirement 3.2, 3.3**

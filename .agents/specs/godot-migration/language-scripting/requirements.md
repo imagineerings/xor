@@ -19,6 +19,7 @@ Sim should support SimScript as the native executable game language, with natura
 2.1 WHEN a creator describes gameplay behavior in natural language THEN THE system SHALL produce or update executable SimScript rather than treating the natural language text as executable code.
 2.2 WHEN an agent edits SimScript from a natural-language instruction THEN THE system SHALL show the generated SimScript diff before applying changes.
 2.3 IF a natural-language instruction is ambiguous THEN THE system SHALL request clarification or produce a non-destructive draft.
+2.4 WHEN generation intent originates from Comfy-era workflows THEN THE system SHALL recreate it as native SimScript authoring intent, not as a Comfy pass-through label or executable natural-language prompt.
 
 ### Requirement 3: LSP and Docs
 

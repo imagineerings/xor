@@ -18,7 +18,8 @@ Wire SimScript as the native executable game language and natural language as th
 
 ## Tasks
 
-- [ ] 1. Add SimScript language support
-  - Register SimScript as a native Sim language via `LanguageRegistry::add`, configure SimScript LSP adapter, legacy `.gd` classification, Sim game API docs indexing, and natural-language-to-SimScript draft/diff behavior.
-  - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3_
-  - _writes: crates/languages/src/simscript.rs, crates/sim_game/src/language.rs, crates/sim_game/src/docs.rs_
+- [x] 1. Add SimScript language support
+  - Register SimScript as a native Sim language via `LanguageRegistry::add`, configure SimScript LSP adapter metadata, legacy `.gd` classification, Sim game API docs indexing, and natural-language-to-SimScript draft/diff behavior.
+  - Recreate Comfy-era generation intent as native SimScript authoring intent, not as a thin compatibility label or pass-through.
+  - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.3_
+  - _writes: crates/sim_game/src/language.rs, crates/sim_game/src/language_tests.rs_

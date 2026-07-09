@@ -8,6 +8,7 @@ pub mod generated_assets;
 pub mod imports;
 pub mod integration;
 pub mod inventory;
+pub mod language;
 pub mod media;
 pub mod migration;
 pub mod parser;
@@ -31,6 +32,8 @@ mod imports_tests;
 mod integration_tests;
 #[cfg(test)]
 mod inventory_tests;
+#[cfg(test)]
+mod language_tests;
 #[cfg(test)]
 mod media_tests;
 #[cfg(test)]
@@ -77,6 +80,11 @@ pub use inventory::{
     MigrationDecision, MigrationInventory, MigrationSourceArea, MigrationSpecCoverage,
     MigrationValidationError, MigrationValidationReport, SimGameMigrationInventory,
     SimGameSourcePath,
+};
+pub use language::{
+    NaturalLanguageGameAuthoring, SimGameDocsEntry, SimGameDocsIndex, SimGameDocsScope,
+    SimScriptAuthoringDiagnostic, SimScriptAuthoringDraft, SimScriptAuthoringStatus, SimScriptDiff,
+    SimScriptDiffKind, SimScriptFileClassification, SimScriptFileKind, SimScriptLanguageSupport,
 };
 pub use media::{SimGameMediaClassification, SimGameMediaClassifier, SimGameMediaKind};
 pub use migration::{
