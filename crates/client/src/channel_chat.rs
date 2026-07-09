@@ -21,6 +21,33 @@ pub struct UpdateChannelMessage {
     pub mentions: Vec<proto::ChatMention>,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct ChannelThread {
+    pub root_message: proto::ChannelMessage,
+    pub replies: Vec<proto::ChannelMessage>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ThreadSummary {
+    pub root_message_id: u64,
+    pub reply_count: u32,
+    pub latest_reply_at: u64,
+    pub participant_user_ids: Vec<u64>,
+    pub has_unread: bool,
+}
+
+impl From<proto::ThreadSummary> for ThreadSummary {
+    fn from(summary: proto::ThreadSummary) -> Self {
+        Self {
+            root_message_id: summary.root_message_id,
+            reply_count: summary.reply_count,
+            latest_reply_at: summary.latest_reply_at,
+            participant_user_ids: summary.participant_user_ids,
+            has_unread: summary.has_unread,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ReactionSummary {
     pub emoji_name: SharedString,
@@ -147,6 +174,26 @@ impl Client {
     ) -> Result<proto::GetChannelMessagesResponse> {
         self.request(proto::GetChannelMessagesById { message_ids })
             .await
+    }
+
+    pub async fn get_thread(&self, channel_id: u64, message_id: u64) -> Result<ChannelThread> {
+        let response = self
+            .request(proto::GetThread {
+                channel_id,
+                message_id,
+            })
+            .await?;
+        Ok(ChannelThread {
+            root_message: response
+                .root_message
+                .context("missing thread root message")?,
+            replies: response.replies,
+        })
+    }
+
+    pub async fn get_threads(&self, channel_id: u64) -> Result<Vec<ThreadSummary>> {
+        let response = self.request(proto::GetThreads { channel_id }).await?;
+        Ok(response.threads.into_iter().map(Into::into).collect())
     }
 
     pub fn add_channel_message_sent_handler<E, H, F>(

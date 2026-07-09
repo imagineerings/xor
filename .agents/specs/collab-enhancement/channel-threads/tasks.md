@@ -34,11 +34,13 @@ Add threaded replies to channel messages in Sim. This feature reuses the existin
   - _implemented in existing `crates/collab/src/rpc.rs` channel RPC handler table_
   - _validated: `CARGO_INCREMENTAL=0 cargo check -p collab`; `git diff --check`_
 
-- [ ] 4. Add client-side thread types and RPC dispatch
-  - [ ] 4.1 Define `ThreadSummary` struct in the client crate matching the proto message.
-  - [ ] 4.2 Add `get_thread` and `get_threads` methods to the `Client` struct that send the corresponding RPCs and deserialize responses.
+- [x] 4. Add client-side thread types and RPC dispatch
+  - [x] 4.1 Define `ThreadSummary` struct in the client crate matching the proto message.
+  - [x] 4.2 Add `get_thread` and `get_threads` methods to the `Client` struct that send the corresponding RPCs and deserialize responses.
   - _Requirements: 3.1, 3.4_
   - _writes: `client/src/channel_thread.rs`_
+  - _implemented in existing `crates/client/src/channel_chat.rs` channel client API module_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p client test_channel_chat_request_conversions --features test-support`; `CARGO_INCREMENTAL=0 cargo check -p client`; `git diff --check`_
 
 - [ ] 5. Build the ThreadPanel UI component
   - [ ] 5.1 Create `ThreadPanel` struct with fields: `channel_id`, `root_message`, `replies: Vec<ChannelMessage>`, `compose_editor: Entity<Editor>`, loading state, and error state.

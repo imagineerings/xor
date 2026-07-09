@@ -2567,6 +2567,77 @@ mod tests {
         let request = server.receive::<proto::AckChannelMessage>().await.unwrap();
         assert_eq!(request.payload.channel_id, 7);
         assert_eq!(request.payload.message_id, 11);
+
+        let get_thread = cx.spawn({
+            let client = client.clone();
+            move |_| async move { client.get_thread(7, 11).await }
+        });
+        let request = server.receive::<proto::GetThread>().await.unwrap();
+        assert_eq!(request.payload.channel_id, 7);
+        assert_eq!(request.payload.message_id, 11);
+        server.respond(
+            request.receipt(),
+            proto::GetThreadResponse {
+                root_message: Some(proto::ChannelMessage {
+                    id: 11,
+                    body: "hello".to_string(),
+                    timestamp: 12,
+                    sender_id: user_id,
+                    nonce: Some(0x10000000000000002u128.into()),
+                    mentions: Vec::new(),
+                    reply_to_message_id: None,
+                    edited_at: None,
+                    reaction_summaries: Vec::new(),
+                }),
+                replies: vec![proto::ChannelMessage {
+                    id: 12,
+                    body: "reply".to_string(),
+                    timestamp: 13,
+                    sender_id: user_id,
+                    nonce: Some(0x30000000000000004u128.into()),
+                    mentions: Vec::new(),
+                    reply_to_message_id: Some(11),
+                    edited_at: None,
+                    reaction_summaries: Vec::new(),
+                }],
+            },
+        );
+        let thread = get_thread.await.unwrap();
+        assert_eq!(thread.root_message.id, 11);
+        assert_eq!(thread.replies.len(), 1);
+        assert_eq!(
+            thread
+                .replies
+                .first()
+                .and_then(|reply| reply.reply_to_message_id),
+            Some(11)
+        );
+
+        let get_threads = cx.spawn({
+            let client = client.clone();
+            move |_| async move { client.get_threads(7).await }
+        });
+        let request = server.receive::<proto::GetThreads>().await.unwrap();
+        assert_eq!(request.payload.channel_id, 7);
+        server.respond(
+            request.receipt(),
+            proto::GetThreadsResponse {
+                threads: vec![proto::ThreadSummary {
+                    root_message_id: 11,
+                    reply_count: 1,
+                    latest_reply_at: 13,
+                    participant_user_ids: vec![user_id],
+                    has_unread: true,
+                }],
+            },
+        );
+        let threads = get_threads.await.unwrap();
+        assert_eq!(threads.len(), 1);
+        let thread_summary = threads.first().expect("missing thread summary");
+        assert_eq!(thread_summary.root_message_id, 11);
+        assert_eq!(thread_summary.reply_count, 1);
+        assert_eq!(thread_summary.participant_user_ids, vec![user_id]);
+        assert!(thread_summary.has_unread);
     }
 
     #[gpui::test]
