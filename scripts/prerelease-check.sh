@@ -15,6 +15,7 @@ case "$mode" in
     scripts/test-observability-analytics.sh
     scripts/test-security-permissions.sh
     scripts/test-text-ui.sh
+    scripts/test-desktop-ui.sh
     ;;
   full)
     scripts/prerelease-check.sh quick

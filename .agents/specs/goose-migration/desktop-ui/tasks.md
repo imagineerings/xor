@@ -74,7 +74,7 @@ Build GPUI-native views for recipe browsing, scheduling, diagnostics, shared ses
   - _Requirements: 10_
   - _writes: crates/auto_update_ui/src/auto_update_ui.rs_
 
-- [ ] 9. Write tests
+- [x] 9. Write tests
   - Visual tests for each new GPUI component
   - Component state transition tests
   - Integration tests with mock backends
