@@ -499,7 +499,9 @@ message Envelope {
     GetThreadsResponse get_threads_response = 464;
     ResolveCodeAction resolve_code_action = 465;
     ResolveCodeActionResponse resolve_code_action_response = 466;
-    AckChannelThread ack_channel_thread = 467; // current max
+    AckChannelThread ack_channel_thread = 467;
+    SearchChannelMessages search_channel_messages = 468;
+    SearchChannelMessagesResponse search_channel_messages_response = 469; // current max
   }
 
   reserved 87 to 88;

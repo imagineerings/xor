@@ -292,6 +292,7 @@ CREATE TABLE IF NOT EXISTS "channel_messages" (
     "body" TEXT NOT NULL,
     "nonce" BLOB NOT NULL,
     "reply_to_message_id" INTEGER REFERENCES channel_messages (id) ON DELETE SET NULL,
+    "search_vector" TEXT,
     "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "edited_at" TIMESTAMP,
     "deleted_at" TIMESTAMP
