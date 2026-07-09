@@ -4,7 +4,6 @@ use acp_thread::AgentSessionConfigOptions;
 use agent_client_protocol::schema as acp;
 use agent_servers::AgentServer;
 
-use sim_actions::agent::ToggleModelSelector;
 use collections::HashSet;
 use feature_flags::{AcpBetaFeatureFlag, FeatureFlagAppExt as _};
 use fs::Fs;
@@ -16,10 +15,12 @@ use ordered_float::OrderedFloat;
 use picker::popover_menu::PickerPopoverMenu;
 use picker::{Picker, PickerDelegate};
 use settings::{AgentConfigOptionValue, SettingsStore};
+use sim_actions::agent::ToggleModelSelector;
 use ui::{
     ElevationIndex, IconButton, KeyBinding, ListItem, ListItemSpacing, PopoverMenuHandle, Switch,
     SwitchLabelPosition, ToggleState, Tooltip, prelude::*,
 };
+use unicode_segmentation::UnicodeSegmentation;
 use util::ResultExt as _;
 
 use crate::ui::documentation_aside_side;
@@ -29,6 +30,7 @@ use crate::{
 };
 
 const PICKER_THRESHOLD: usize = 5;
+const TRUNCATED_DISPLAY_NAME_LENGTH: usize = 32;
 
 pub struct ConfigOptionsView {
     config_options: Rc<dyn AgentSessionConfigOptions>,
@@ -425,20 +427,8 @@ impl ConfigOptionSelector {
         } else {
             IconName::ChevronDown
         };
-        const MAX_DISPLAY_NAME_LENGTH: usize = 33;
-        const TRUNCATED_DISPLAY_NAME_LENGTH: usize = 32;
         let value_name = self.current_value_name();
-        let display_name = if value_name.chars().count() > MAX_DISPLAY_NAME_LENGTH {
-            format!(
-                "{}…",
-                value_name
-                    .chars()
-                    .take(TRUNCATED_DISPLAY_NAME_LENGTH)
-                    .collect::<String>()
-            )
-        } else {
-            value_name
-        };
+        let display_name = truncate_config_option_display_name(&value_name);
 
         Button::new(
             ElementId::Name(format!("config-option-{}", option.id.0).into()),
@@ -448,6 +438,20 @@ impl ConfigOptionSelector {
         .color(Color::Muted)
         .end_icon(Icon::new(icon).size(IconSize::XSmall).color(Color::Muted))
         .disabled(self.setting_value)
+    }
+}
+
+fn truncate_config_option_display_name(value_name: &str) -> String {
+    let mut graphemes = value_name.graphemes(true);
+    let truncated = graphemes
+        .by_ref()
+        .take(TRUNCATED_DISPLAY_NAME_LENGTH)
+        .collect::<String>();
+
+    if graphemes.next().is_some() {
+        format!("{truncated}…")
+    } else {
+        truncated
     }
 }
 
@@ -1117,6 +1121,18 @@ mod tests {
     use parking_lot::Mutex;
     use project::{AgentId, Project};
     use std::{any::Any, cell::RefCell};
+
+    #[test]
+    fn truncates_config_option_display_name_by_grapheme() {
+        let composed_name = "e\u{301}".repeat(33);
+        let truncated = truncate_config_option_display_name(&composed_name);
+
+        assert_eq!(truncated, format!("{}…", "e\u{301}".repeat(32)));
+        assert_eq!(
+            truncate_config_option_display_name(&"e\u{301}".repeat(32)),
+            "e\u{301}".repeat(32)
+        );
+    }
 
     #[gpui::test]
     fn cycling_config_option_saves_selected_value_as_default(cx: &mut TestAppContext) {
