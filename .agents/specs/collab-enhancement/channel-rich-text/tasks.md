@@ -18,14 +18,15 @@ The work is ordered to build incrementally: first the rendering pipeline (Markdo
   - [x] 1.3 Verify plain text (no Markdown syntax) renders identically to before — the `markdown` crate passes through plain text unchanged.
   - _Requirements: 1.1, 1.5_
   - _writes: `collab_ui/src/channel_chat/message_bubble.rs`_
-  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab test_channel_chat_view_live_insert_and_send_states --features test-support`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui resolves_only_http_remote_images --features test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab test_channel_chat_view_live_insert_and_send_states --features test-support`_
 
-- [ ] 2. Bind `ChannelMessage` `MarkdownElement` events (links, images)
-  - [ ] 2.1 Wire `on_url_click` on the `MarkdownElement` to open external links in the OS browser via `open::that()` (or similar shell command).
-  - [ ] 2.2 Set `render_links: true` and `render_images: true` in the render options. Wire `image_resolver` to show external images with a click-to-load guard.
-  - [ ] 2.3 Test that clicking a link in a rendered message opens the external browser.
+- [x] 2. Bind `ChannelMessage` `MarkdownElement` events (links, images)
+  - [x] 2.1 Wire `on_url_click` on the `MarkdownElement` to open external links in the OS browser via `open::that()` (or similar shell command).
+  - [x] 2.2 Set `render_links: true` and `render_images: true` in the render options. Wire `image_resolver` to show external images with a click-to-load guard.
+  - [x] 2.3 Test that clicking a link in a rendered message opens the external browser.
   - _Requirements: 1.1, 1.4_
   - _writes: `collab_ui/src/channel_chat/message_bubble.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab test_channel_chat_view_live_insert_and_send_states --features test-support`_
 
 - [ ] 3. Extract a shared Markdown style for channel chat
   - [ ] 3.1 Add a `MarkdownFont::Chat` variant (or reuse `MarkdownFont::Editor`) and create a `channel_chat_markdown_style(window, cx) -> MarkdownStyle` helper that applies chat-appropriate base text size, link colors, and code block styling.
