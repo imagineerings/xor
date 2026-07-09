@@ -1266,7 +1266,17 @@ impl PickerDelegate for RecentProjectsDelegate {
                     .child(
                         IconButton::new(("remove-folder", worktree_id.to_usize()), IconName::Close)
                             .icon_size(IconSize::Small)
-                            .tooltip(Tooltip::text("Remove Folder from Project"))
+                            .tooltip({
+                                let focus_handle = self.focus_handle.clone();
+                                move |_, cx| {
+                                    Tooltip::for_action_in(
+                                        "Remove Folder from Project",
+                                        &RemoveSelected,
+                                        &focus_handle,
+                                        cx,
+                                    )
+                                }
+                            })
                             .on_click(cx.listener(move |picker, _, window, cx| {
                                 let Some(workspace) = picker.delegate.workspace.upgrade() else {
                                     return;
@@ -1428,7 +1438,17 @@ impl PickerDelegate for RecentProjectsDelegate {
                         this.child(
                             IconButton::new("remove_open_project", IconName::Close)
                                 .icon_size(IconSize::Small)
-                                .tooltip(Tooltip::text("Remove Project from Window"))
+                                .tooltip({
+                                    let focus_handle = self.focus_handle.clone();
+                                    move |_, cx| {
+                                        Tooltip::for_action_in(
+                                            "Remove Project from Window",
+                                            &RemoveSelected,
+                                            &focus_handle,
+                                            cx,
+                                        )
+                                    }
+                                })
                                 .on_click({
                                     let project_group_key = project_group_key.clone();
                                     cx.listener(move |picker, _, window, cx| {
@@ -1553,13 +1573,17 @@ impl PickerDelegate for RecentProjectsDelegate {
                         this.child(
                             IconButton::new("add_to_workspace", IconName::FolderOpenAdd)
                                 .icon_size(IconSize::Small)
-                                .tooltip(move |_, cx| {
-                                    Tooltip::with_meta(
-                                        tooltip_title,
-                                        None,
-                                        "As a multi-root folder",
-                                        cx,
-                                    )
+                                .tooltip({
+                                    let focus_handle = focus_handle.clone();
+                                    move |_, cx| {
+                                        Tooltip::with_meta_in(
+                                            tooltip_title,
+                                            Some(&AddToWorkspace),
+                                            "As a multi-root folder",
+                                            &focus_handle,
+                                            cx,
+                                        )
+                                    }
                                 })
                                 .on_click({
                                     let paths_to_add = paths_to_add.clone();
@@ -1579,6 +1603,7 @@ impl PickerDelegate for RecentProjectsDelegate {
                         IconButton::new("alternate_open", secondary_confirm_icon)
                             .icon_size(IconSize::Small)
                             .tooltip({
+                                let focus_handle = focus_handle.clone();
                                 move |_, cx| {
                                     Tooltip::for_action_in(
                                         secondary_confirm_tooltip,
@@ -1598,7 +1623,17 @@ impl PickerDelegate for RecentProjectsDelegate {
                     .child(
                         IconButton::new("delete", IconName::Close)
                             .icon_size(IconSize::Small)
-                            .tooltip(Tooltip::text("Remove from Recent Projects"))
+                            .tooltip({
+                                let focus_handle = focus_handle.clone();
+                                move |_, cx| {
+                                    Tooltip::for_action_in(
+                                        "Remove from Recent Projects",
+                                        &RemoveSelected,
+                                        &focus_handle,
+                                        cx,
+                                    )
+                                }
+                            })
                             .on_click(cx.listener(move |this, _event, window, cx| {
                                 cx.stop_propagation();
                                 window.prevent_default();
