@@ -1,5 +1,5 @@
 use crate::{
-    Client, Subscription,
+    AddBookmark, BookmarkId, ChannelId, Client, Subscription, UpdateBookmark,
     scheduled_message::{ScheduledMessage, ScheduledMessageId},
 };
 use anyhow::{Context as _, Result};
@@ -182,6 +182,60 @@ impl Client {
             .into_iter()
             .map(ScheduledMessage::try_from)
             .collect()
+    }
+
+    pub async fn add_bookmark(&self, bookmark: AddBookmark) -> Result<()> {
+        self.request(proto::AddBookmark {
+            channel_id: bookmark.channel_id.0,
+            label: bookmark.label,
+            r#type: bookmark.bookmark_type as i32,
+            url: bookmark.url,
+            file_id: bookmark.file_id,
+            message_id: bookmark.message_id,
+            description: bookmark.description,
+        })
+        .await
+        .map(|_: proto::Ack| ())
+    }
+
+    pub async fn remove_bookmark(
+        &self,
+        channel_id: ChannelId,
+        bookmark_id: BookmarkId,
+    ) -> Result<()> {
+        self.request(proto::RemoveBookmark {
+            channel_id: channel_id.0,
+            bookmark_id: bookmark_id.to_proto(),
+        })
+        .await
+        .map(|_: proto::Ack| ())
+    }
+
+    pub async fn update_bookmark(&self, bookmark: UpdateBookmark) -> Result<()> {
+        self.request(proto::UpdateBookmark {
+            channel_id: bookmark.channel_id.0,
+            bookmark_id: bookmark.bookmark_id.to_proto(),
+            label: bookmark.label,
+            description: bookmark.description,
+        })
+        .await
+        .map(|_: proto::Ack| ())
+    }
+
+    pub async fn reorder_bookmarks(
+        &self,
+        channel_id: ChannelId,
+        bookmark_ids: Vec<BookmarkId>,
+    ) -> Result<()> {
+        self.request(proto::ReorderBookmarks {
+            channel_id: channel_id.0,
+            bookmark_ids: bookmark_ids
+                .into_iter()
+                .map(BookmarkId::to_proto)
+                .collect(),
+        })
+        .await
+        .map(|_: proto::Ack| ())
     }
 
     pub async fn update_channel_message(&self, message: UpdateChannelMessage) -> Result<()> {

@@ -106,19 +106,21 @@ Add a channel bookmarks feature: a dedicated section in the channel header where
   - _Completed: Refactored bookmark push dispatch into a reusable latest-snapshot sender and added a per-channel 200ms reorder debounce that coalesces rapid reorder RPCs before broadcasting._
   - _Validation: `CARGO_INCREMENTAL=0 cargo check -p client -p collab --features collab/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab test_channel_bookmark_rpc_flow_and_permissions --features collab/test-support -- --nocapture`._
 
-- [ ] 8. Add client-side `Bookmark` model and RPC dispatch
-  - [ ] 8.1 Add `Bookmark` struct in the `client` crate mirroring the protobuf type, with conversions.
+- [x] 8. Add client-side `Bookmark` model and RPC dispatch
+  - [x] 8.1 Add `Bookmark` struct in the `client` crate mirroring the protobuf type, with conversions.
     - _Requirements: 6.1_
     - _writes: client/src/bookmark.rs_
-  - [ ] 8.2 Add methods to the RPC client: `add_bookmark`, `remove_bookmark`, `update_bookmark`, `reorder_bookmarks`, each constructing the proto request and calling the appropriate RPC.
+  - [x] 8.2 Add methods to the RPC client: `add_bookmark`, `remove_bookmark`, `update_bookmark`, `reorder_bookmarks`, each constructing the proto request and calling the appropriate RPC.
     - _Requirements: 6.1_
     - _writes: client/src/rpc.rs_
-  - [ ] 8.3 Handle incoming `UpdateChannelBookmarks` push — update the local bookmarks state for the affected channel.
+  - [x] 8.3 Handle incoming `UpdateChannelBookmarks` push — update the local bookmarks state for the affected channel.
     - _Requirements: 6.4_
     - _writes: client/src/rpc.rs_
-  - [ ] 8.4 Add `BookmarkStore` (client-side) — reactive state holder for bookmarks per channel, observable by UI components.
+  - [x] 8.4 Add `BookmarkStore` (client-side) — reactive state holder for bookmarks per channel, observable by UI components.
     - _Requirements: 6.2_
     - _writes: collab_ui/src/channel_bookmark_store.rs_
+  - _Completed: Added typed client bookmark IDs/model/conversions, bookmark mutation RPC helper methods, and a `ChannelBookmarkStore` that subscribes to `UpdateChannelBookmarks` pushes and exposes observable per-channel bookmark state._
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p client -p collab_ui --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p client bookmark --features client/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui store_replaces_bookmarks_for_channel --features collab_ui/test-support`._
 
 - [ ] 9. Implement `BookmarkBar` component
   - [ ] 9.1 Render the bookmark bar at the top of the channel view (between channel header and message list).

@@ -1,6 +1,7 @@
 #[cfg(any(test, feature = "test-support"))]
 pub mod test;
 
+pub mod bookmark;
 pub mod channel_chat;
 mod llm_token;
 mod proxy;
@@ -57,6 +58,7 @@ use tokio::net::TcpStream;
 use url::Url;
 use util::{ConnectionResult, ResultExt};
 
+pub use bookmark::*;
 pub use llm_token::*;
 pub use rpc::*;
 pub use telemetry_events::Event;

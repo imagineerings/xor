@@ -1,4 +1,5 @@
 mod call_stats_modal;
+pub mod channel_bookmark_store;
 pub mod channel_chat;
 pub mod channel_view;
 pub mod collab_panel;
