@@ -51,7 +51,7 @@ Popular servers available as an extension include:
 ### As Custom Servers
 
 Creating an extension is not the only way to use MCP servers in Sim.
-You can connect them by adding their commands directly to your settings file ([how to edit](../configuring-sim.md#settings-files)), like so:
+You can connect both local and remote MCP servers from **Settings -> AI -> MCP Servers** (also accessible via the {#action agent::OpenSettings} action, then selecting `MCP Servers`). Click `Add Server` in the page header, then choose `Add Local Server` or `Add Remote Server`. Your specified configuration will create entries in your settings file (which you can open with {#action zed::OpenSettingsFile}) similar to the ones below:
 
 ```json [settings]
 {
@@ -71,9 +71,6 @@ You can connect them by adding their commands directly to your settings file ([h
   }
 }
 ```
-
-Alternatively, you can also add a custom server by accessing the Agent Panel's Settings view (also accessible via the {#action agent::OpenSettings} action).
-From there, you can add it through the modal that appears when you click the "Add Custom Server" button.
 
 > Note: When a remote MCP server has no configured `"Authorization"` header, Sim will prompt you to authenticate yourself against the MCP server using the standard MCP OAuth flow.
 

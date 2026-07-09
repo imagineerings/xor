@@ -49,7 +49,7 @@ use crate::terminal_thread_metadata_store::{
 };
 use crate::thread_metadata_store::{ThreadId, ThreadMetadataStore, ThreadMetadataStoreEvent};
 use crate::{
-    AddContextServer, AgentDiffPane, ConversationView, CopyThreadToClipboard, Follow,
+    AgentDiffPane, ConversationView, CopyThreadToClipboard, Follow,
     LoadThreadFromClipboard, NewTerminalThread, NewThread, OpenActiveThreadAsMarkdown,
     OpenAgentDiff, ResetFastModeWarnings, ResetTrialEndUpsell, ResetTrialUpsell,
     ShowAllSidebarThreadMetadata, ShowThreadMetadata, ToggleNewThreadMenu, ToggleOptionsMenu,
@@ -5693,7 +5693,13 @@ impl AgentPanel {
                         if !showing_terminal {
                             menu = menu
                                 .header("MCP Servers")
-                                .action("Add Custom Server…", Box::new(AddContextServer))
+                                .action(
+                                    "Add Server…",
+                                    Box::new(sim_actions::OpenSettingsAt {
+                                        path: "context_servers".to_string(),
+                                        target: None,
+                                    }),
+                                )
                                 .action(
                                     "Install New Servers…",
                                     Box::new(sim_actions::Extensions {
