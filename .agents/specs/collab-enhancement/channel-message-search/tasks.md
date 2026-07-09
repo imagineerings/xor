@@ -213,12 +213,16 @@ Add full-text search across channel messages using PostgreSQL tsvector/tsquery, 
 
 ### Phase 6 — Index Maintenance
 
-- [ ] 17. Handle message edit and delete for search index
+- [x] 17. Handle message edit and delete for search index
   - Verify that the PostgreSQL trigger on UPDATE re-indexes when `body` changes (already covered by trigger)
   - Verify that DELETE cascades — removing a row also removes its search vector (automatic with column removal)
   - Add a `reindex_search` admin endpoint or CLI command that re-runs `UPDATE channel_messages SET search_vector = ...`
   - _Requirements: 5.4_
-  - _writes: crates/collab/src/search_engine.rs_
+  - _writes: crates/collab/src/db/queries/channel_messages.rs_
+  - _writes: crates/collab/src/main.rs_
+  - _writes: crates/collab/tests/integration/db_tests/channel_tests.rs_
+  - _implemented `Database::reindex_channel_message_search` and `collab reindex-channel-message-search`; edit reindexing and delete exclusion are covered by the earlier channel message search integration tests_
+  - _validated: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_reindex_channel_message_search_sqlite -- --nocapture`; full `test_reindex_channel_message_search` cannot run locally because Postgres test setup reports `Connection refused`_
 
 - [ ] 18. Benchmark and tune search performance
   - Add `EXPLAIN ANALYZE` test to confirm GIN index is used for typical queries

@@ -29,10 +29,7 @@ async fn test_channels(db: &Arc<Database>) {
         .await
         .unwrap();
 
-    let crdb_id = db
-        .create_sub_channel("crdb", sim_id, a_id)
-        .await
-        .unwrap();
+    let crdb_id = db.create_sub_channel("crdb", sim_id, a_id).await.unwrap();
     let livestreaming_id = db
         .create_sub_channel("livestreaming", sim_id, a_id)
         .await
@@ -277,8 +274,8 @@ async fn test_channel_thread_db_queries(db: &Arc<Database>) {
         MessageId::from_proto(root.id),
         MessageId::from_proto(reply_b.id),
     )
-        .await
-        .unwrap();
+    .await
+    .unwrap();
     let summaries = db.get_channel_threads(channel_id, reader_id).await.unwrap();
     assert!(
         !summaries
@@ -349,6 +346,22 @@ async fn test_channel_thread_db_queries(db: &Arc<Database>) {
         .await
         .is_err()
     );
+}
+
+test_both_dbs!(
+    test_reindex_channel_message_search,
+    test_reindex_channel_message_search_postgres,
+    test_reindex_channel_message_search_sqlite
+);
+
+async fn test_reindex_channel_message_search(db: &Arc<Database>) {
+    let sender_id = new_test_user(db).await;
+    let channel_id = db.create_root_channel("channel", sender_id).await.unwrap();
+
+    create_test_channel_message(db, channel_id, sender_id, "deploy alpha", 1, None).await;
+    create_test_channel_message(db, channel_id, sender_id, "deploy beta", 2, None).await;
+
+    assert_eq!(db.reindex_channel_message_search().await.unwrap(), 2);
 }
 
 async fn create_test_channel_message(
@@ -523,15 +536,9 @@ async fn test_db_channel_moving(db: &Arc<Database>) {
 
     let sim_id = db.create_root_channel("sim", a_id).await.unwrap();
 
-    let crdb_id = db
-        .create_sub_channel("crdb", sim_id, a_id)
-        .await
-        .unwrap();
+    let crdb_id = db.create_sub_channel("crdb", sim_id, a_id).await.unwrap();
 
-    let gpui2_id = db
-        .create_sub_channel("gpui2", sim_id, a_id)
-        .await
-        .unwrap();
+    let gpui2_id = db.create_sub_channel("gpui2", sim_id, a_id).await.unwrap();
 
     let livestreaming_id = db
         .create_sub_channel("livestreaming", crdb_id, a_id)
@@ -553,10 +560,7 @@ async fn test_db_channel_moving(db: &Arc<Database>) {
             (sim_id, &[]),
             (crdb_id, &[sim_id]),
             (livestreaming_id, &[sim_id, crdb_id]),
-            (
-                livestreaming_sub_id,
-                &[sim_id, crdb_id, livestreaming_id],
-            ),
+            (livestreaming_sub_id, &[sim_id, crdb_id, livestreaming_id]),
             (gpui2_id, &[sim_id]),
         ],
     );
@@ -939,10 +943,7 @@ async fn test_user_is_channel_participant(db: &Arc<Database>) {
     let channels = db.get_channels_for_user(guest).await.unwrap().channels;
     assert_channel_tree(
         channels,
-        &[
-            (sim_channel, &[]),
-            (public_channel_id, &[sim_channel]),
-        ],
+        &[(sim_channel, &[]), (public_channel_id, &[sim_channel])],
     );
     let channels = db.get_channels_for_user(member).await.unwrap().channels;
     assert_channel_tree(
@@ -1110,10 +1111,7 @@ async fn test_user_is_channel_participant(db: &Arc<Database>) {
     let channels = db.get_channels_for_user(guest).await.unwrap().channels;
     assert_channel_tree(
         channels,
-        &[
-            (sim_channel, &[]),
-            (public_channel_id, &[sim_channel]),
-        ],
+        &[(sim_channel, &[]), (public_channel_id, &[sim_channel])],
     )
 }
 

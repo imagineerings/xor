@@ -471,6 +471,31 @@ impl Database {
         .await
     }
 
+    pub async fn reindex_channel_message_search(&self) -> Result<u64> {
+        self.transaction(|tx| async move {
+            let backend = tx.get_database_backend();
+            let sql = match backend {
+                DbBackend::Postgres => {
+                    "UPDATE channel_messages \
+                     SET search_vector = to_tsvector('english', COALESCE(body, ''))"
+                }
+                DbBackend::Sqlite => {
+                    "UPDATE channel_messages \
+                     SET search_vector = COALESCE(body, '')"
+                }
+                DbBackend::MySql => {
+                    return Err(anyhow!("unsupported database backend").into());
+                }
+            };
+
+            let result = tx
+                .execute(Statement::from_sql_and_values(backend, sql, []))
+                .await?;
+            Ok(result.rows_affected())
+        })
+        .await
+    }
+
     pub async fn get_channel_thread(
         &self,
         channel_id: ChannelId,
