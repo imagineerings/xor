@@ -3149,7 +3149,11 @@ impl BackgroundScannerState {
         watcher: &dyn Watcher,
         preserve_repository_watches: bool,
     ) {
-        let removed_descendant_abs_paths = self.remove_path_from_snapshot(path, true);
+        // When the caller preserves repository watches, it intends to re-scan
+        // this subtree and keep its git repositories; pruning them here would
+        // transiently drop and then re-create them with fresh `RepositoryId`s.
+        let prune_repositories = !preserve_repository_watches;
+        let removed_descendant_abs_paths = self.remove_path_from_snapshot(path, prune_repositories);
         self.unwatch_path(
             watcher,
             path,
