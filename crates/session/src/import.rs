@@ -136,7 +136,7 @@ fn normalize_extension(extension: &str) -> String {
 }
 
 pub(crate) fn extension_matches(extension: Option<&str>, candidates: &[&str]) -> bool {
-    extension.is_some_and(|extension| candidates.iter().any(|candidate| extension == *candidate))
+    extension.is_some_and(|extension| candidates.contains(&extension))
 }
 
 #[cfg(test)]

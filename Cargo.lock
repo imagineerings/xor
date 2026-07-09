@@ -352,6 +352,7 @@ dependencies = [
  "uuid",
  "watch",
  "web_search",
+ "world_model",
  "zlog",
  "zstd",
 ]

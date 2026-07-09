@@ -229,12 +229,7 @@ impl LanguageModelCompletionError {
             .strip_prefix("http_")
             .and_then(|code| StatusCode::from_str(code).ok())
         {
-            Self::from_http_status(
-                SIM_CLOUD_PROVIDER_NAME,
-                status_code,
-                message,
-                retry_after,
-            )
+            Self::from_http_status(SIM_CLOUD_PROVIDER_NAME, status_code, message, retry_after)
         } else {
             anyhow!("completion request failed, code: {code}, message: {message}").into()
         }
@@ -643,10 +638,7 @@ mod tests {
 
         assert_eq!(deserialisim.id, original.id);
         assert_eq!(deserialisim.name, original.name);
-        assert_eq!(
-            deserialisim.thought_signature,
-            original.thought_signature
-        );
+        assert_eq!(deserialisim.thought_signature, original.thought_signature);
     }
 
     #[test]

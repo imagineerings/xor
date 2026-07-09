@@ -16,11 +16,13 @@ mod fetch_tool;
 mod final_output_tool;
 mod find_path_tool;
 mod find_references_tool;
+mod game_graph_tool;
 mod get_code_actions_tool;
 mod go_to_definition_tool;
 mod grep_tool;
 mod list_agents_and_models_tool;
 mod list_directory_tool;
+mod mesh_generation_tool;
 mod move_path_tool;
 mod orchestrator;
 mod pdf_tool;
@@ -36,6 +38,7 @@ mod terminal_tool;
 mod todo;
 mod tool_permissions;
 mod web_search_tool;
+mod world_generation_tool;
 mod write_file_tool;
 mod xlsx_tool;
 
@@ -88,11 +91,13 @@ pub use fetch_tool::*;
 pub use final_output_tool::*;
 pub use find_path_tool::*;
 pub use find_references_tool::*;
+pub use game_graph_tool::*;
 pub use get_code_actions_tool::*;
 pub use go_to_definition_tool::*;
 pub use grep_tool::*;
 pub use list_agents_and_models_tool::*;
 pub use list_directory_tool::*;
+pub use mesh_generation_tool::*;
 pub use move_path_tool::*;
 pub use orchestrator::*;
 pub use pdf_tool::*;
@@ -108,6 +113,7 @@ pub use terminal_tool::*;
 pub use todo::*;
 pub use tool_permissions::*;
 pub use web_search_tool::*;
+pub use world_generation_tool::*;
 pub use write_file_tool::*;
 pub use xlsx_tool::*;
 
@@ -218,6 +224,9 @@ tools! {
     GrepTool,
     ListAgentsAndModelsTool,
     ListDirectoryTool,
+    SimGameGraphTool,
+    SimMeshGenerationTool,
+    SimWorldGenerationTool,
     MovePathTool,
     OrchestratorTool,
     PdfTool,

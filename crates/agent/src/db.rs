@@ -3,7 +3,6 @@ use acp_thread::UserMessageId;
 use agent_client_protocol::schema as acp;
 use agent_settings::AgentProfileId;
 use anyhow::{Result, anyhow};
-use sim_env_vars::SIM_STATELESS;
 use chrono::{DateTime, Utc};
 use collections::{HashMap, IndexMap};
 use futures::{FutureExt, future::Shared};
@@ -12,6 +11,7 @@ use indoc::indoc;
 use language_model::Speed;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
+use sim_env_vars::SIM_STATELESS;
 use sqlez::{
     bindable::{Bind, Column},
     connection::Connection,
@@ -161,13 +161,13 @@ impl DbThread {
         match saved_thread_json.get("version") {
             Some(serde_json::Value::String(version)) => match version.as_str() {
                 Self::VERSION => Ok(serde_json::from_value(saved_thread_json)?),
-                _ => Self::upgrade_from_agent_1(
-                    crate::legacy_thread::SerialisimThread::from_json(json)?,
-                ),
+                _ => Self::upgrade_from_agent_1(crate::legacy_thread::SerialisimThread::from_json(
+                    json,
+                )?),
             },
-            _ => Self::upgrade_from_agent_1(crate::legacy_thread::SerialisimThread::from_json(
-                json,
-            )?),
+            _ => {
+                Self::upgrade_from_agent_1(crate::legacy_thread::SerialisimThread::from_json(json)?)
+            }
         }
     }
 

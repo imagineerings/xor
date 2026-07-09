@@ -1,5 +1,6 @@
 use anyhow::{Context as _, Result, bail};
 use sqlez::connection::Connection;
+use std::cmp::Reverse;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -88,7 +89,7 @@ impl PermissionStore {
         candidates.retain(|decision| {
             !decision.is_expired(now) && args_pattern_matches(&decision.args_pattern, args)
         });
-        candidates.sort_by(|left, right| right.args_pattern.len().cmp(&left.args_pattern.len()));
+        candidates.sort_by_key(|decision| Reverse(decision.args_pattern.len()));
         Ok(candidates.into_iter().next())
     }
 

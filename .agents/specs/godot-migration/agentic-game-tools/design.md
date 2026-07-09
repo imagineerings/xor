@@ -4,11 +4,13 @@
 
 Expose graph editing, world generation, and mesh generation through existing Sim agent tool registration. Tools produce diffs and typed requests, not direct unvalidated filesystem mutations.
 
+Agentic game tooling is implemented as native Sim functionality. The tools use `SimGame*`, `SimWorld*`, and `SimMesh*` records that convert into `world_model` graph, world-generation, mesh-generation, and provenance types; they do not expose Comfy compatibility labels or pass requests through to Comfy workflows.
+
 ## Components
 
-- `GraphEditTool`
-- `WorldGenerationTool`
-- `MeshGenerationTool`
+- `SimGameGraphTool`
+- `SimWorldGenerationTool`
+- `SimMeshGenerationTool`
 
 ## Correctness Properties
 

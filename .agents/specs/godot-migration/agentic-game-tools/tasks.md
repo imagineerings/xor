@@ -18,7 +18,8 @@ Register agent tools over existing graph, world-model, and mesh primitives after
 
 ## Tasks
 
-- [ ] 1. Add graph, world generation, and mesh generation agent tools
+- [x] 1. Add graph, world generation, and mesh generation agent tools
   - Register validated tools for graph edits and typed generation requests.
+  - Represent the tools as native Sim `SimGame*`, `SimWorld*`, and `SimMesh*` records that convert into `world_model` graph, generation, mesh, and provenance types.
   - _Requirements: 1.1, 2.1, 2.2_
   - _writes: crates/agent/src/tools/game_graph_tool.rs, crates/agent/src/tools/world_generation_tool.rs, crates/agent/src/tools/mesh_generation_tool.rs_

@@ -6,9 +6,10 @@ use crate::{
     FinalOutputTool, FindPathTool, FindReferencesTool, GetCodeActionsTool, GoToDefinitionTool,
     GrepTool, HookFlow, ListAgentsAndModelsTool, ListDirectoryTool, LlmCallHookContext,
     LlmRequestHookFlow, MovePathTool, OrchestratorTool, PdfTool, PlatformTool, ProjectSnapshot,
-    ReadFileTool, RenameTool, SandboxedTerminalTool, SessionHookContext, SpawnAgentTool,
-    SummarizeTool, SummonTool, SystemPromptTemplate, Template, Templates, TerminalTool, TodoTool,
-    TomTool, ToolHookContext, ToolPermissionDecision, WebSearchTool, WriteFileTool, XlsxTool,
+    ReadFileTool, RenameTool, SandboxedTerminalTool, SessionHookContext, SimGameGraphTool,
+    SimMeshGenerationTool, SimWorldGenerationTool, SpawnAgentTool, SummarizeTool, SummonTool,
+    SystemPromptTemplate, Template, Templates, TerminalTool, TodoTool, TomTool, ToolHookContext,
+    ToolPermissionDecision, WebSearchTool, WriteFileTool, XlsxTool,
     decide_permission_from_settings,
 };
 use acp_thread::{MentionUri, UserMessageId};
@@ -1972,6 +1973,9 @@ impl Thread {
         self.add_tool(OrchestratorTool);
         self.add_tool(SummarizeTool);
         self.add_tool(TodoTool);
+        self.add_tool(SimGameGraphTool);
+        self.add_tool(SimWorldGenerationTool);
+        self.add_tool(SimMeshGenerationTool);
         self.add_tool(AppsTool);
         self.add_tool(ChatrecallTool);
         self.add_tool(SummonTool);

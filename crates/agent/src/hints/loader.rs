@@ -5,7 +5,7 @@ use fs::Fs;
 use futures::StreamExt;
 use util::paths::home_dir;
 
-use super::{SIM_HINTS_FILE_NAMES, GLOBAL_HINTS_DIR_NAME, Hint, HintLoadError, HintSource};
+use super::{GLOBAL_HINTS_DIR_NAME, Hint, HintLoadError, HintSource, SIM_HINTS_FILE_NAMES};
 
 /// Discovers and loads `.simhints` files from global
 /// (`~/.config/sim/hints/`) and project locations.
@@ -20,9 +20,7 @@ impl HintLoader {
 
     /// Returns the path to the global hints directory, if it exists.
     fn global_hints_dir(&self) -> Option<PathBuf> {
-        let config_dir = home_dir()
-            .join(".config/sim")
-            .join(GLOBAL_HINTS_DIR_NAME);
+        let config_dir = home_dir().join(".config/sim").join(GLOBAL_HINTS_DIR_NAME);
         if config_dir.exists() {
             Some(config_dir)
         } else {

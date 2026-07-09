@@ -561,9 +561,7 @@ mod tests {
     use crate::pattern_extraction::extract_terminal_pattern;
     use crate::tools::{DeletePathTool, FetchTool, TerminalTool};
     use crate::{AgentTool, EditFileTool};
-    use agent_settings::{
-        AgentProfileId, SimMode, CompiledRegex, InvalidRegexPattern, ToolRules,
-    };
+    use agent_settings::{AgentProfileId, CompiledRegex, InvalidRegexPattern, SimMode, ToolRules};
     use gpui::px;
     use settings::{DockPosition, NotifyWhenAgentWaiting, PlaySoundWhenAgentDone};
     use std::sync::Arc;
@@ -2275,10 +2273,7 @@ mod tests {
         assert_eq!(normalize_path("a/b/../c"), "a/c");
         assert_eq!(normalize_path("a/./b/c"), "a/b/c");
         assert_eq!(normalize_path("a/b/./c/../d"), "a/b/d");
-        assert_eq!(
-            normalize_path(".sim/settings.json"),
-            ".sim/settings.json"
-        );
+        assert_eq!(normalize_path(".sim/settings.json"), ".sim/settings.json");
         assert_eq!(normalize_path("a/b/c"), "a/b/c");
     }
 
@@ -2403,13 +2398,7 @@ mod tests {
     #[test]
     fn decide_permission_for_path_no_change_when_already_simple() {
         // When path has no `.` or `..` segments, behavior matches decide_permission_from_settings
-        let decision = path_perm(
-            "copy_path",
-            ".sim/settings.json",
-            &["^\\.sim/"],
-            &[],
-            &[],
-        );
+        let decision = path_perm("copy_path", ".sim/settings.json", &["^\\.sim/"], &[], &[]);
         assert!(matches!(decision, ToolPermissionDecision::Deny(_)));
     }
 

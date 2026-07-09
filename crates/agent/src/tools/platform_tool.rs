@@ -218,6 +218,10 @@ fn reveal_command(path: &PathBuf) -> Result<Command> {
 }
 
 fn run_platform_command(mut command: Command) -> Result<()> {
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "platform commands run inside the tool background task, not on the foreground thread"
+    )]
     let output = command
         .output()
         .context("failed to start platform command")?;

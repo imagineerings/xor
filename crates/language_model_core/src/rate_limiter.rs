@@ -144,7 +144,7 @@ impl RateLimiter {
 
             match delay {
                 Some(delay) if !delay.is_zero() => {
-                    Timer::after(delay).await;
+                    wait_for_rate_limit_delay(delay).await;
                 }
                 Some(_) => continue,
                 None => break,
@@ -218,6 +218,14 @@ impl RateLimiterConfig {
         }
         self
     }
+}
+
+async fn wait_for_rate_limit_delay(delay: Duration) {
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "language_model_core rate limiting is not driven by the GPUI test executor"
+    )]
+    Timer::after(delay).await;
 }
 
 impl fmt::Debug for RateLimiter {
@@ -318,7 +326,7 @@ mod tests {
                 limiter.run(async move {
                     let current = active.fetch_add(1, Ordering::SeqCst) + 1;
                     max_active.fetch_max(current, Ordering::SeqCst);
-                    Timer::after(Duration::from_millis(10)).await;
+                    wait_for_rate_limit_delay(Duration::from_millis(10)).await;
                     active.fetch_sub(1, Ordering::SeqCst);
                     Ok(())
                 })

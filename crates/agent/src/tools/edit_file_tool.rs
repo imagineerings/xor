@@ -1215,9 +1215,8 @@ mod tests {
 
         // Test 1: Path with .sim component should require confirmation
         let (stream_tx, mut stream_rx) = ToolCallEventStream::test();
-        let _auth = cx.update(|cx| {
-            edit_tool.authorize(&PathBuf::from(".sim/settings.json"), &stream_tx, cx)
-        });
+        let _auth = cx
+            .update(|cx| edit_tool.authorize(&PathBuf::from(".sim/settings.json"), &stream_tx, cx));
 
         let event = stream_rx.expect_authorization().await;
         assert_eq!(
@@ -1264,9 +1263,8 @@ mod tests {
 
         // 5.1: .sim/settings.json is a sensitive path — still prompts
         let (stream_tx, mut stream_rx) = ToolCallEventStream::test();
-        let _auth = cx.update(|cx| {
-            edit_tool.authorize(&PathBuf::from(".sim/settings.json"), &stream_tx, cx)
-        });
+        let _auth = cx
+            .update(|cx| edit_tool.authorize(&PathBuf::from(".sim/settings.json"), &stream_tx, cx));
         let event = stream_rx.expect_authorization().await;
         assert_eq!(
             event.tool_call.fields.title,
@@ -1918,11 +1916,7 @@ mod tests {
             // Test .sim path with different modes
             let (stream_tx, mut stream_rx) = ToolCallEventStream::test();
             let _auth = cx.update(|cx| {
-                edit_tool.authorize(
-                    &PathBuf::from("project/.sim/settings.json"),
-                    &stream_tx,
-                    cx,
-                )
+                edit_tool.authorize(&PathBuf::from("project/.sim/settings.json"), &stream_tx, cx)
             });
 
             stream_rx.expect_authorization().await;

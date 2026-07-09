@@ -7,7 +7,7 @@ use cloud_llm_client::WebSearchResponse;
 use futures::FutureExt as _;
 use gpui::{App, Task};
 use language_model::{
-    SIM_CLOUD_PROVIDER_ID, LanguageModelProviderId, LanguageModelToolResultContent,
+    LanguageModelProviderId, LanguageModelToolResultContent, SIM_CLOUD_PROVIDER_ID,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
