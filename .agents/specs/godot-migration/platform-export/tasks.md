@@ -2,7 +2,7 @@
 
 ## Overview
 
-Integrate Godot executable settings and export presets as W7 external tasks only when they directly support the target product. Platform packaging remains external unless a reviewed Sim dependency is explicitly accepted.
+Integrate Godot-origin executable settings and export presets as native Sim game task templates only when they directly support the target generative game engine. Platform packaging remains outside Sim unless a reviewed Sim dependency is explicitly accepted.
 
 ## Gates
 
@@ -17,7 +17,7 @@ Integrate Godot executable settings and export presets as W7 external tasks only
 
 ## Tasks
 
-- [ ] 1. Implement Godot executable settings and export task templates
-  - Parse `export_presets.cfg`, resolve executable settings, and create external export tasks.
-  - _Requirements: 1.1, 2.1, 2.2_
+- [x] 1. Implement Godot executable settings and export task templates
+  - Parse `export_presets.cfg`, resolve executable settings, and create native Sim export task records.
+  - _Requirements: 1.1, 1.2, 2.1, 2.2_
   - _writes: crates/sim_game/src/export.rs, crates/sim_game/src/executable.rs, crates/sim_game/src/export_tests.rs_

@@ -2,7 +2,7 @@
 
 ## Architecture
 
-Use existing Sim task execution to invoke configured Godot CLI commands for run/export. Store only preset metadata and diagnostics.
+Use existing Sim task execution to expose native Sim game run/export task templates. Godot export presets are parsed as source metadata only; Sim owns the executable settings, task records, diagnostics, and dependency-review boundary. Platform runtime templates are not migrated.
 
 ## Components
 
@@ -12,8 +12,8 @@ Use existing Sim task execution to invoke configured Godot CLI commands for run/
 
 ## Correctness Properties
 
-### Property 1: External Export
+### Property 1: Native Sim Export Task
 
-_For any_ export request, Sim SHALL invoke configured external tooling rather than migrate Godot platform templates.
+_For any_ export request, Sim SHALL create a native Sim game task template and SHALL NOT migrate Godot platform templates.
 
-**Validates: Requirement 1.1, 2.1**
+**Validates: Requirement 1.1, 1.2, 2.1**

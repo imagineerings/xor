@@ -3,6 +3,8 @@ pub mod dependency_review;
 pub mod diagnostics;
 pub mod docs_ingestion;
 pub mod editor;
+pub mod executable;
+pub mod export;
 pub mod fixtures;
 pub mod formats;
 pub mod generated_assets;
@@ -25,6 +27,8 @@ mod dependency_review_tests;
 mod docs_ingestion_tests;
 #[cfg(test)]
 mod editor_tests;
+#[cfg(test)]
+mod export_tests;
 #[cfg(test)]
 mod fixtures_tests;
 #[cfg(test)]
@@ -70,6 +74,11 @@ pub use docs_ingestion::{
 pub use editor::{
     SimGameCommand, SimGameCommandProvider, SimGameProjectPanelMetadata, SimGameRunDebugTemplate,
     SimGameRunDebugTemplateKind, SimGameSetupDiagnostic,
+};
+pub use executable::{SimGameExecutableDiagnostic, SimGameExecutableSettings};
+pub use export::{
+    SimGameExportPreset, SimGameExportPresetParser, SimGameExportTaskDiagnostic,
+    SimGameExportTaskTemplate,
 };
 pub use fixtures::{
     FixtureAttribution, FixtureAttributionDiagnostic, FixtureAttributionReport,
