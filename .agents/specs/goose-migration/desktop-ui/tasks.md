@@ -60,7 +60,7 @@ Build GPUI-native views for recipe browsing, scheduling, diagnostics, shared ses
   - _Requirements: 2, 4, 6_
   - _writes: crates/agent_ui/src/agent_panel.rs (modifications)_
 
-- [ ] 7. Implement i18n support (if not already present)
+- [x] 7. Implement i18n support (if not already present)
   - Evaluate sim's existing i18n state
   - If absent, introduce lightweight i18n system
   - Mark user-facing strings for translation
