@@ -1153,7 +1153,10 @@ impl ChannelChat {
             .any(|upload| {
                 matches!(
                     upload.status,
-                    UploadStatus::Uploading | UploadStatus::Confirming
+                    UploadStatus::Pending
+                        | UploadStatus::RequestingUrl
+                        | UploadStatus::Uploading
+                        | UploadStatus::Confirming
                 )
             })
     }
@@ -3634,6 +3637,21 @@ impl ChannelChat {
     pub fn formatting_toolbar_visible_for_test(&self, window: &Window, cx: &App) -> bool {
         self.compose_mode == compose_area::ComposeMode::Source
             && self.composer.read(cx).is_focused(window)
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn upload_paths_for_test(&mut self, paths: Vec<PathBuf>, cx: &mut Context<Self>) {
+        self.upload_paths(paths, cx);
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn upload_filenames_for_test(&self, cx: &App) -> Vec<String> {
+        self.upload_manager
+            .read(cx)
+            .uploads_for_channel(self.channel_id)
+            .into_iter()
+            .map(|upload| upload.filename.to_string())
+            .collect()
     }
 
     #[cfg(any(test, feature = "test-support"))]

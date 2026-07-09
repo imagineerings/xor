@@ -2,7 +2,7 @@ use crate::TestServer;
 use client::channel_chat::SendChannelMessage;
 use collab_ui::{channel_chat::ChannelChat, draft_store::DraftStore};
 use gpui::TaskExt;
-use std::time::Duration;
+use std::{fs, path::PathBuf, time::Duration};
 
 #[gpui::test]
 async fn test_channel_chat_view_live_insert_and_send_states(
@@ -108,6 +108,34 @@ async fn test_channel_chat_restores_saved_draft_and_clears_on_send(
 
     assert_eq!(chat.read_with(cx_a, |chat, cx| chat.draft_for_test(cx)), "");
     assert!(!cx_a.update(|_, cx| DraftStore::global(cx).read(cx).has_draft(channel_id)));
+}
+
+#[gpui::test]
+async fn test_channel_chat_file_drop_starts_upload_for_files(
+    cx_a: &mut gpui::TestAppContext,
+    cx_b: &mut gpui::TestAppContext,
+) {
+    let (_server, client_a, _client_b, channel_id) = TestServer::start2(cx_a, cx_b).await;
+    let (workspace, cx_a) = client_a.build_test_workspace(cx_a).await;
+
+    let chat = cx_a
+        .update(|window, cx| ChannelChat::open(channel_id, workspace.clone(), window, cx))
+        .await
+        .unwrap();
+    cx_a.run_until_parked();
+
+    let file_path = write_drop_test_file("dropped.txt", b"drop me");
+    let directory_path = drop_test_root().join("directory");
+    fs::create_dir_all(&directory_path).expect("create dropped directory");
+
+    chat.update(cx_a, |chat, cx| {
+        chat.upload_paths_for_test(vec![file_path, directory_path], cx);
+    });
+
+    assert_eq!(
+        chat.read_with(cx_a, |chat, cx| chat.upload_filenames_for_test(cx)),
+        vec!["dropped.txt".to_string()]
+    );
 }
 
 #[gpui::test]
@@ -732,4 +760,16 @@ async fn test_channel_chat_emoji_picker_adds_reaction(
         chat.read_with(cx_a, |chat, _| chat.reaction_chip_labels_for_test()),
         vec![vec!["❤️ 1".to_string()]]
     );
+}
+
+fn drop_test_root() -> PathBuf {
+    std::env::temp_dir().join(format!("sim-channel-chat-drop-{}", std::process::id()))
+}
+
+fn write_drop_test_file(name: &str, bytes: &[u8]) -> PathBuf {
+    let root = drop_test_root();
+    fs::create_dir_all(&root).expect("create drop test directory");
+    let path = root.join(name);
+    fs::write(&path, bytes).expect("write drop test file");
+    path
 }

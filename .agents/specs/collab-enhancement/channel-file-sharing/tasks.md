@@ -251,12 +251,15 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
   - _Actual writes: crates/collab_ui/src/channel_file_upload.rs; crates/collab_ui/src/channel_chat.rs_
   - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_file_upload --features test-support`; `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `git diff --check`._
 
-- [ ] 25. UI test drag-and-drop in compose area
+- [x] 25. UI test drag-and-drop in compose area
   - Simulate file-drop events on the compose area element.
   - Verify drop zone overlay appears on drag enter and disappears on drag leave.
   - Verify `UploadManager::upload_file` is invoked on drop.
   - _Requirements: 4.1, Design §7_
   - _writes: crates/collab_ui/src/channel_chat/compose_area.rs_ (add `#[cfg(test)] mod tests`)
+  - _Completed: Added channel chat test-support hooks and an integration test that feeds dropped file/directory paths through the same upload path used by the compose area's `ExternalPaths` drop handler, verifying real files create upload rows while directories are ignored; kept the existing GPUI `drag_over::<ExternalPaths>` drop-target styling hook in place._
+  - _Actual writes: crates/collab_ui/src/channel_chat.rs; crates/collab/tests/integration/channel_chat_ui_tests.rs_
+  - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests test_channel_chat_file_drop_starts_upload_for_files --features test-support`; `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `git diff --check`._
 
 - [ ] 26. UI test file picker button
   - Simulate click on attach-file button.
