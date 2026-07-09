@@ -23,6 +23,7 @@ messages!(
     (Ack, Foreground),
     (AckBufferOperation, Background),
     (AckChannelMessage, Background),
+    (AckChannelThread, Background),
     (ActivateToolchain, Foreground),
     (ActiveToolchain, Foreground),
     (ActiveToolchainResponse, Foreground),

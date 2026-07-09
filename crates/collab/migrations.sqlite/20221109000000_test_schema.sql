@@ -321,6 +321,17 @@ CREATE TABLE IF NOT EXISTS "channel_message_reads" (
 
 CREATE INDEX "index_channel_message_reads_on_message_id" ON "channel_message_reads" ("message_id");
 
+CREATE TABLE IF NOT EXISTS "channel_thread_reads" (
+    "channel_id" INTEGER NOT NULL REFERENCES channels (id) ON DELETE CASCADE,
+    "root_message_id" INTEGER NOT NULL REFERENCES channel_messages (id) ON DELETE CASCADE,
+    "user_id" INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    "message_id" INTEGER NOT NULL REFERENCES channel_messages (id) ON DELETE CASCADE,
+    "updated_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY ("channel_id", "root_message_id", "user_id")
+);
+
+CREATE INDEX "index_channel_thread_reads_on_message_id" ON "channel_thread_reads" ("message_id");
+
 CREATE TABLE IF NOT EXISTS "channel_message_reactions" (
     "channel_id" INTEGER NOT NULL REFERENCES channels (id) ON DELETE CASCADE,
     "message_id" INTEGER NOT NULL REFERENCES channel_messages (id) ON DELETE CASCADE,

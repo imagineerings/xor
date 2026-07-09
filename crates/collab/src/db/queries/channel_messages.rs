@@ -376,12 +376,14 @@ impl Database {
                 summary.participant_user_ids.insert(reply.sender_id);
             }
 
-            let last_read_message_id = channel_message_read::Entity::find()
-                .filter(channel_message_read::Column::ChannelId.eq(channel_id))
-                .filter(channel_message_read::Column::UserId.eq(user_id))
-                .one(&*tx)
+            let thread_reads = channel_thread_read::Entity::find()
+                .filter(channel_thread_read::Column::ChannelId.eq(channel_id))
+                .filter(channel_thread_read::Column::UserId.eq(user_id))
+                .all(&*tx)
                 .await?
-                .map(|read| read.message_id);
+                .into_iter()
+                .map(|read| (read.root_message_id, read.message_id))
+                .collect::<HashMap<_, _>>();
 
             let mut summaries = summaries_by_root_id
                 .into_iter()
@@ -394,8 +396,9 @@ impl Database {
                         .into_iter()
                         .map(UserId::to_proto)
                         .collect(),
-                    has_unread: last_read_message_id
-                        .is_none_or(|message_id| message_id < summary.latest_reply_id),
+                    has_unread: thread_reads
+                        .get(&root_message_id)
+                        .is_none_or(|message_id| *message_id < summary.latest_reply_id),
                 })
                 .collect::<Vec<_>>();
             summaries.sort_by_key(|summary| std::cmp::Reverse(summary.latest_reply_at));
@@ -452,6 +455,46 @@ impl Database {
             })
             .on_conflict(
                 OnConflict::columns([Column::ChannelId, Column::UserId])
+                    .update_columns([Column::MessageId, Column::UpdatedAt])
+                    .to_owned(),
+            )
+            .exec_without_returning(&*tx)
+            .await?;
+            Ok(())
+        })
+        .await
+    }
+
+    pub async fn acknowledge_channel_thread(
+        &self,
+        channel_id: ChannelId,
+        user_id: UserId,
+        root_message_id: MessageId,
+        message_id: MessageId,
+    ) -> Result<()> {
+        self.transaction(|tx| async move {
+            let channel = self.get_channel_internal(channel_id, &tx).await?;
+            self.check_user_is_channel_participant(&channel, user_id, &tx)
+                .await?;
+            self.get_channel_message_model(channel_id, root_message_id, &tx)
+                .await?;
+            let reply = self
+                .get_channel_message_model(channel_id, message_id, &tx)
+                .await?;
+            if reply.reply_to_message_id != Some(root_message_id) {
+                Err(anyhow!("message is not a reply in the requested channel thread"))?;
+            }
+
+            use channel_thread_read::Column;
+            channel_thread_read::Entity::insert(channel_thread_read::ActiveModel {
+                channel_id: ActiveValue::Set(channel_id),
+                root_message_id: ActiveValue::Set(root_message_id),
+                user_id: ActiveValue::Set(user_id),
+                message_id: ActiveValue::Set(message_id),
+                updated_at: ActiveValue::Set(now()),
+            })
+            .on_conflict(
+                OnConflict::columns([Column::ChannelId, Column::RootMessageId, Column::UserId])
                     .update_columns([Column::MessageId, Column::UpdatedAt])
                     .to_owned(),
             )

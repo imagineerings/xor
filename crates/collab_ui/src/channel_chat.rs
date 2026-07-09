@@ -772,7 +772,7 @@ impl ChannelChat {
             summary.has_unread = false;
         }
         self.client
-            .acknowledge_channel_message(self.channel_id.0, latest_reply_id)
+            .acknowledge_channel_thread(self.channel_id.0, root_message_id, latest_reply_id)
             .log_err();
     }
 

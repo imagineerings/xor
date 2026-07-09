@@ -63,15 +63,15 @@ Add threaded replies to channel messages in Sim. This feature reuses the existin
   - _implemented in existing `crates/collab_ui/src/channel_chat.rs`_
   - _validated: `CARGO_INCREMENTAL=0 cargo check -p collab_ui`; `git diff --check`_
 
-- [ ] 7. Implement thread unread tracking
-  - [ ] 7.1 Reuse existing channel message read state infrastructure to track per-thread read timestamps.
+- [x] 7. Implement thread unread tracking
+  - [x] 7.1 Reuse existing channel message read state infrastructure to track per-thread read timestamps.
   - [x] 7.2 Compute `has_unread` for thread summaries: replies exist with `created_at > last_read_timestamp` for the current user.
   - [x] 7.3 Mark all replies in a thread as read when the thread panel is opened.
   - [x] 7.4 Update `ThreadIndicator` reactivity when `has_unread` state changes via `cx.notify()`.
   - _Requirements: 3.3_
   - _writes: `collab_ui/src/channel_thread/unread_tracker.rs`_
-  - _implemented channel-read-backed unread summaries in `crates/collab/src/db/queries/channel_messages.rs` and open-thread read clearing in `crates/collab_ui/src/channel_chat.rs`; distinct per-thread persisted read timestamps remain_
-  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support --test collab_tests channel_chat_thread_queries`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support --test collab_tests test_channel_chat_open_thread_appends_live_replies`; `git diff --check`_
+  - _implemented per-thread persisted read summaries in `crates/collab/src/db/queries/channel_messages.rs` and open-thread read clearing in `crates/collab_ui/src/channel_chat.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab -p collab_ui`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support --test collab_tests test_channel_thread_db_queries_sqlite`; `git diff --check`_
 
 - [x] 8. Wire real-time reply updates to the ThreadPanel
   - [x] 8.1 In the `ChannelMessageSent` WebSocket handler, check if the received message has `reply_to_message_id` set and belongs to the currently open thread.

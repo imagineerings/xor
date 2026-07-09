@@ -159,6 +159,19 @@ impl Client {
         })
     }
 
+    pub fn acknowledge_channel_thread(
+        &self,
+        channel_id: u64,
+        root_message_id: u64,
+        message_id: u64,
+    ) -> Result<()> {
+        self.send(proto::AckChannelThread {
+            channel_id,
+            root_message_id,
+            message_id,
+        })
+    }
+
     pub async fn get_channel_messages(
         &self,
         channel_id: u64,

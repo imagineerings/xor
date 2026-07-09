@@ -176,6 +176,12 @@ message AckChannelMessage {
   uint64 message_id = 2;
 }
 
+message AckChannelThread {
+  uint64 channel_id = 1;
+  uint64 root_message_id = 2;
+  uint64 message_id = 3;
+}
+
 message SendChannelMessageResponse {
   ChannelMessage message = 1;
 }

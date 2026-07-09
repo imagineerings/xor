@@ -9,6 +9,7 @@ pub mod channel_message;
 pub mod channel_message_mention;
 pub mod channel_message_reaction;
 pub mod channel_message_read;
+pub mod channel_thread_read;
 pub mod contact;
 pub mod contributor;
 pub mod extension;

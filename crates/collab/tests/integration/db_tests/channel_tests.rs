@@ -259,15 +259,51 @@ async fn test_channel_thread_db_queries(db: &Arc<Database>) {
     );
     assert!(earlier_page.2);
 
-    db.acknowledge_channel_message(channel_id, reader_id, MessageId::from_proto(reply_b.id))
+    let other_root =
+        create_test_channel_message(db, channel_id, sender_id, "other root", 4, None).await;
+    let other_reply = create_test_channel_message(
+        db,
+        channel_id,
+        sender_id,
+        "other reply",
+        5,
+        Some(other_root.id),
+    )
+    .await;
+
+    db.acknowledge_channel_thread(
+        channel_id,
+        reader_id,
+        MessageId::from_proto(root.id),
+        MessageId::from_proto(reply_b.id),
+    )
         .await
         .unwrap();
     let summaries = db.get_channel_threads(channel_id, reader_id).await.unwrap();
     assert!(
         !summaries
-            .first()
+            .iter()
+            .find(|summary| summary.root_message_id == root.id)
             .expect("missing thread summary")
             .has_unread
+    );
+    assert!(
+        summaries
+            .iter()
+            .find(|summary| summary.root_message_id == other_root.id)
+            .expect("missing other thread summary")
+            .has_unread
+    );
+
+    assert!(
+        db.acknowledge_channel_thread(
+            channel_id,
+            reader_id,
+            MessageId::from_proto(root.id),
+            MessageId::from_proto(other_reply.id),
+        )
+        .await
+        .is_err()
     );
 
     assert!(

@@ -473,6 +473,7 @@ impl Server {
             .add_message_handler(unfollow)
             .add_message_handler(update_followers)
             .add_message_handler(acknowledge_channel_message)
+            .add_message_handler(acknowledge_channel_thread)
             .add_message_handler(acknowledge_buffer_version)
             .add_request_handler(forward_mutating_project_request::<proto::Stage>)
             .add_request_handler(forward_mutating_project_request::<proto::Unstage>)
@@ -3789,6 +3790,23 @@ async fn acknowledge_channel_message(
         .acknowledge_channel_message(
             ChannelId::from_proto(request.channel_id),
             session.user_id(),
+            MessageId::from_proto(request.message_id),
+        )
+        .await
+}
+
+/// Mark a channel thread as read through a specific reply
+async fn acknowledge_channel_thread(
+    request: proto::AckChannelThread,
+    session: MessageContext,
+) -> Result<()> {
+    session
+        .db()
+        .await
+        .acknowledge_channel_thread(
+            ChannelId::from_proto(request.channel_id),
+            session.user_id(),
+            MessageId::from_proto(request.root_message_id),
             MessageId::from_proto(request.message_id),
         )
         .await
