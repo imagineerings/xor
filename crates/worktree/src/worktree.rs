@@ -216,7 +216,7 @@ impl WorkDirectory {
     fn path_key(&self) -> PathKey {
         match self {
             WorkDirectory::InProject { relative_path } => PathKey(relative_path.clone()),
-            WorkDirectory::AboveProject { .. } => PathKey(RelPath::empty().into()),
+            WorkDirectory::AboveProject { .. } => PathKey(RelPath::empty_arc()),
         }
     }
 
@@ -441,7 +441,7 @@ impl Worktree {
                     abs_path
                         .file_name()
                         .and_then(|f| f.to_str())
-                        .map_or(RelPath::empty().into(), |f| {
+                        .map_or(RelPath::empty_arc(), |f| {
                             RelPath::unix(f).unwrap().into()
                         }),
                     abs_path.clone(),
@@ -472,7 +472,7 @@ impl Worktree {
             let share_private_files = false;
             if let Some(metadata) = metadata {
                 let mut entry = Entry::new(
-                    RelPath::empty().into(),
+                    RelPath::empty_arc(),
                     &metadata,
                     ProjectEntryId::new(&next_entry_id),
                     snapshot.root_char_bag,
@@ -531,7 +531,7 @@ impl Worktree {
             let mut snapshot = Snapshot::new(
                 WorktreeId::from_proto(worktree.id),
                 RelPath::from_proto(&worktree.root_name)
-                    .unwrap_or_else(|_| RelPath::empty().into()),
+                    .unwrap_or_else(|_| RelPath::empty_arc()),
                 Path::new(&worktree.abs_path).into(),
                 path_style,
             );
@@ -1553,7 +1553,7 @@ impl LocalWorktree {
             }
         }
 
-        lowest_ancestor.unwrap_or_else(|| RelPath::empty().into())
+        lowest_ancestor.unwrap_or_else(|| RelPath::empty_arc())
     }
 
     pub fn create_entry(
@@ -2059,7 +2059,7 @@ impl LocalWorktree {
             .as_path()
             .file_name()
             .and_then(|f| f.to_str())
-            .map_or(RelPath::empty().into(), |f| {
+            .map_or(RelPath::empty_arc(), |f| {
                 RelPath::unix(f).unwrap().into()
             });
         self.snapshot.update_abs_path(new_path, root_name);
@@ -3741,7 +3741,7 @@ impl<S: Summary> Summary for PathSummary<S> {
 
     fn zero(cx: Self::Context<'_>) -> Self {
         Self {
-            max_path: RelPath::empty().into(),
+            max_path: RelPath::empty_arc(),
             item_summary: S::zero(cx),
         }
     }
@@ -3998,7 +3998,7 @@ pub struct PathKey(pub Arc<RelPath>);
 
 impl Default for PathKey {
     fn default() -> Self {
-        Self(RelPath::empty().into())
+        Self(RelPath::empty_arc())
     }
 }
 
