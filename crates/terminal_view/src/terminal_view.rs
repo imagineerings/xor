@@ -138,6 +138,7 @@ pub struct TerminalView {
     cursor_shape: CursorShape,
     blink_manager: Entity<BlinkManager>,
     mode: TerminalMode,
+    show_workspace_actions: Option<bool>,
     blinking_terminal_enabled: bool,
     needs_serialize: bool,
     custom_title: Option<String>,
@@ -289,6 +290,7 @@ impl TerminalView {
             hover: None,
             hover_tooltip_update: Task::ready(()),
             mode: TerminalMode::Standalone,
+            show_workspace_actions: None,
             workspace_id,
             show_breadcrumbs: TerminalSettings::get_global(cx).toolbar.breadcrumbs,
             block_below_cursor: None,
@@ -315,6 +317,16 @@ impl TerminalView {
             max_lines_when_unfocused,
         };
         cx.notify();
+    }
+
+    pub fn set_show_workspace_actions(&mut self, show: bool, cx: &mut Context<Self>) {
+        self.show_workspace_actions = Some(show);
+        cx.notify();
+    }
+
+    fn shows_workspace_actions(&self) -> bool {
+        self.show_workspace_actions
+            .unwrap_or_else(|| !matches!(self.mode, TerminalMode::Embedded { .. }))
     }
 
     const MAX_EMBEDDED_LINES: usize = 1_000;
@@ -509,35 +521,46 @@ impl TerminalView {
             .is_some_and(|terminal_panel| terminal_panel.read(cx).assistant_enabled());
         let context_menu = ContextMenu::build(window, cx, |menu, _, _| {
             menu.context(self.focus_handle.clone())
-                .action("New Terminal", Box::new(NewTerminal::default()))
-                .action(
-                    "New Center Terminal",
-                    Box::new(NewCenterTerminal::default()),
-                )
-                .separator()
+                .when(self.shows_workspace_actions(), |menu| {
+                    menu.action("New Terminal", Box::new(NewTerminal::default()))
+                        .action(
+                            "New Center Terminal",
+                            Box::new(NewCenterTerminal::default()),
+                        )
+                        .separator()
+                })
                 .action("Copy", Box::new(Copy))
-                .action("Paste", Box::new(Paste))
-                .action("Paste Text", Box::new(PasteText))
+                .when(
+                    !matches!(self.mode, TerminalMode::Embedded { .. }),
+                    |menu| {
+                        menu.action("Paste", Box::new(Paste))
+                            .action("Paste Text", Box::new(PasteText))
+                    },
+                )
                 .action("Select All", Box::new(SelectAll))
-                .action("Clear", Box::new(Clear))
+                .when(
+                    !matches!(self.mode, TerminalMode::Embedded { .. }),
+                    |menu| menu.action("Clear", Box::new(Clear)),
+                )
                 .when(
                     assistant_enabled && !matches!(self.mode, TerminalMode::Embedded { .. }),
                     |menu| {
                         menu.separator()
                             .action("Inline Assist", Box::new(InlineAssist::default()))
-                            .when(has_selection, |menu| {
+                            .when(has_selection && self.shows_workspace_actions(), |menu| {
                                 menu.action("Add to Agent Thread", Box::new(AddSelectionToThread))
                             })
                     },
                 )
-                .separator()
-                .action(
-                    "Close Terminal Tab",
-                    Box::new(CloseActiveItem {
-                        save_intent: None,
-                        close_pinned: true,
-                    }),
-                )
+                .when(self.shows_workspace_actions(), |menu| {
+                    menu.separator().action(
+                        "Close Terminal Tab",
+                        Box::new(CloseActiveItem {
+                            save_intent: None,
+                            close_pinned: true,
+                        }),
+                    )
+                })
         });
 
         window.focus(&context_menu.focus_handle(cx), cx);
