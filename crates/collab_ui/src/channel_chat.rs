@@ -9,9 +9,10 @@ use client::{
     ChannelId, Client, UserStore,
     channel_chat::{
         DEFAULT_THREAD_REPLY_LIMIT, ScheduleChannelMessage, SearchChannelMessages,
-        SendChannelMessage, ThreadSummary,
+        SendChannelMessage, ThreadSummary, UpdateScheduledMessage,
     },
     proto::{self, ChannelVisibility},
+    scheduled_message::{ScheduledMessage, ScheduledMessageId},
 };
 use db::kvp::KeyValueStore;
 use editor::{Editor, EditorEvent};
@@ -126,6 +127,7 @@ pub struct ChannelChat {
     message_bodies: HashMap<u64, message_bubble::MessageBody>,
     thread_summaries: HashMap<u64, ThreadSummary>,
     thread_panel: Option<ThreadPanel>,
+    scheduled_messages_panel: Option<ScheduledMessagesPanel>,
     emoji_picker: Option<EmojiPickerState>,
     recent_emoji_names: Vec<String>,
     send_state: SendState,
@@ -157,6 +159,25 @@ struct ThreadPanel {
     send_state: SendState,
 }
 
+struct ScheduledMessagesPanel {
+    channel_id: ChannelId,
+    messages: Vec<ScheduledMessage>,
+    load_state: ScheduledMessagesLoadState,
+    editing_message_id: Option<ScheduledMessageId>,
+    edit_body: Entity<Editor>,
+    edit_schedule_picker: SchedulePicker,
+    saving_message_id: Option<ScheduledMessageId>,
+    cancelling_message_id: Option<ScheduledMessageId>,
+    action_error: Option<SharedString>,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+enum ScheduledMessagesLoadState {
+    Loading,
+    Loaded,
+    Failed(SharedString),
+}
+
 #[derive(Clone)]
 struct SchedulePicker {
     selected_date: NaiveDate,
@@ -182,6 +203,23 @@ impl SchedulePicker {
             active: false,
             validation_error: None,
         }
+    }
+
+    fn from_scheduled_at(scheduled_at: DateTime<Utc>) -> Self {
+        let mut picker = Self::new();
+        picker.set_scheduled_at(scheduled_at);
+        picker
+    }
+
+    fn set_scheduled_at(&mut self, scheduled_at: DateTime<Utc>) {
+        let scheduled_at = scheduled_at.with_timezone(&Local);
+        self.selected_date = scheduled_at.date_naive();
+        self.selected_time = NaiveTime::from_hms_opt(scheduled_at.hour(), scheduled_at.minute(), 0)
+            .unwrap_or(self.selected_time);
+        self.visible_month = month_start(self.selected_date);
+        self.timezone = scheduled_at.offset().to_string();
+        self.active = true;
+        self.validation_error = None;
     }
 
     fn scheduled_at_utc(&self) -> Option<DateTime<Utc>> {
@@ -568,6 +606,7 @@ impl ChannelChat {
             message_bodies: HashMap::default(),
             thread_summaries: HashMap::default(),
             thread_panel: None,
+            scheduled_messages_panel: None,
             emoji_picker: None,
             recent_emoji_names,
             send_state: SendState::Idle,
@@ -1060,7 +1099,347 @@ impl ChannelChat {
             )
     }
 
+    fn open_scheduled_messages_panel(
+        &mut self,
+        _: &ClickEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.scheduled_messages_panel.is_some() {
+            self.scheduled_messages_panel = None;
+            cx.notify();
+            return;
+        }
+
+        let edit_body = cx.new(|cx| {
+            let mut editor = Editor::single_line(window, cx);
+            editor.set_placeholder_text("Message body", window, cx);
+            editor
+        });
+        self.thread_panel = None;
+        self.scheduled_messages_panel = Some(ScheduledMessagesPanel {
+            channel_id: self.channel_id,
+            messages: Vec::new(),
+            load_state: ScheduledMessagesLoadState::Loading,
+            editing_message_id: None,
+            edit_body,
+            edit_schedule_picker: SchedulePicker::new(),
+            saving_message_id: None,
+            cancelling_message_id: None,
+            action_error: None,
+        });
+        self.refresh_scheduled_messages(window, cx);
+    }
+
+    fn close_scheduled_messages_panel(
+        &mut self,
+        _: &ClickEvent,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.scheduled_messages_panel = None;
+        cx.notify();
+    }
+
+    fn refresh_scheduled_messages(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(panel) = self.scheduled_messages_panel.as_mut() else {
+            return;
+        };
+        panel.load_state = ScheduledMessagesLoadState::Loading;
+        panel.action_error = None;
+        let channel_id = panel.channel_id;
+        cx.notify();
+
+        let client = self.client.clone();
+        cx.spawn_in(window, async move |this, cx| {
+            let messages = client.get_scheduled_messages(channel_id.0).await;
+            this.update(cx, |this, cx| {
+                let Some(panel) = this.scheduled_messages_panel.as_mut() else {
+                    return;
+                };
+                if panel.channel_id != channel_id {
+                    return;
+                }
+
+                match messages {
+                    Ok(mut messages) => {
+                        messages.sort_by_key(|message| (message.scheduled_at, message.id));
+                        panel.messages = messages;
+                        panel.load_state = ScheduledMessagesLoadState::Loaded;
+                    }
+                    Err(error) => {
+                        panel.load_state = ScheduledMessagesLoadState::Failed(
+                            format!("Failed to load scheduled messages: {error}").into(),
+                        );
+                    }
+                }
+                cx.notify();
+            })?;
+            anyhow::Ok(())
+        })
+        .detach_and_log_err(cx);
+    }
+
+    fn start_edit_scheduled_message(
+        &mut self,
+        scheduled_message_id: ScheduledMessageId,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(panel) = self.scheduled_messages_panel.as_mut() else {
+            return;
+        };
+        let Some(message) = panel
+            .messages
+            .iter()
+            .find(|message| message.id == scheduled_message_id)
+            .cloned()
+        else {
+            return;
+        };
+
+        panel.editing_message_id = Some(scheduled_message_id);
+        panel.edit_schedule_picker = SchedulePicker::from_scheduled_at(message.scheduled_at);
+        panel.action_error = None;
+        panel
+            .edit_body
+            .update(cx, |editor, cx| editor.set_text(message.body, window, cx));
+        cx.notify();
+    }
+
+    fn cancel_edit_scheduled_message(
+        &mut self,
+        _: &ClickEvent,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(panel) = self.scheduled_messages_panel.as_mut() {
+            panel.editing_message_id = None;
+            panel.action_error = None;
+            cx.notify();
+        }
+    }
+
+    fn select_edit_schedule_date(
+        &mut self,
+        date: NaiveDate,
+        _: &ClickEvent,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(panel) = self.scheduled_messages_panel.as_mut() {
+            panel.edit_schedule_picker.select_date(date);
+            cx.notify();
+        }
+    }
+
+    fn select_edit_schedule_hour(
+        &mut self,
+        hour: u32,
+        _: &ClickEvent,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(panel) = self.scheduled_messages_panel.as_mut() {
+            panel.edit_schedule_picker.set_hour(hour);
+            cx.notify();
+        }
+    }
+
+    fn select_edit_schedule_minute(
+        &mut self,
+        minute: u32,
+        _: &ClickEvent,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(panel) = self.scheduled_messages_panel.as_mut() {
+            panel.edit_schedule_picker.set_minute(minute);
+            cx.notify();
+        }
+    }
+
+    fn show_previous_edit_schedule_month(
+        &mut self,
+        _: &ClickEvent,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(panel) = self.scheduled_messages_panel.as_mut() {
+            panel.edit_schedule_picker.adjust_month(-1);
+            cx.notify();
+        }
+    }
+
+    fn show_next_edit_schedule_month(
+        &mut self,
+        _: &ClickEvent,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(panel) = self.scheduled_messages_panel.as_mut() {
+            panel.edit_schedule_picker.adjust_month(1);
+            cx.notify();
+        }
+    }
+
+    fn save_scheduled_message_edit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(panel) = self.scheduled_messages_panel.as_mut() else {
+            return;
+        };
+        let Some(scheduled_message_id) = panel.editing_message_id else {
+            return;
+        };
+        if panel.saving_message_id.is_some() {
+            return;
+        }
+
+        let body = panel.edit_body.read(cx).text(cx).trim().to_string();
+        if body.is_empty() {
+            panel.action_error = Some(SharedString::from("Message body cannot be empty"));
+            cx.notify();
+            return;
+        }
+        let scheduled_at = match panel.edit_schedule_picker.validate() {
+            Ok(scheduled_at) => scheduled_at,
+            Err(message) => {
+                panel.edit_schedule_picker.validation_error = Some(message);
+                cx.notify();
+                return;
+            }
+        };
+        let Some(message) = panel
+            .messages
+            .iter()
+            .find(|message| message.id == scheduled_message_id)
+            .cloned()
+        else {
+            return;
+        };
+
+        panel.saving_message_id = Some(scheduled_message_id);
+        panel.action_error = None;
+        let channel_id = panel.channel_id;
+        let client = self.client.clone();
+        cx.notify();
+
+        cx.spawn_in(window, async move |this, cx| {
+            let result = client
+                .update_scheduled_message(UpdateScheduledMessage {
+                    scheduled_message_id,
+                    channel_id: channel_id.0,
+                    body: Some(body),
+                    scheduled_at: Some(scheduled_at),
+                    mentions: message.mentions,
+                })
+                .await;
+
+            this.update_in(cx, |this, window, cx| {
+                let Some(panel) = this.scheduled_messages_panel.as_mut() else {
+                    return;
+                };
+                if panel.channel_id != channel_id {
+                    return;
+                }
+
+                panel.saving_message_id = None;
+                match result {
+                    Ok(()) => {
+                        panel.editing_message_id = None;
+                        this.refresh_scheduled_messages(window, cx);
+                    }
+                    Err(error) => {
+                        panel.action_error =
+                            Some(format!("Failed to update scheduled message: {error}").into());
+                        cx.notify();
+                    }
+                }
+            })?;
+            anyhow::Ok(())
+        })
+        .detach_and_log_err(cx);
+    }
+
+    fn confirm_cancel_scheduled_message(
+        &mut self,
+        scheduled_message_id: ScheduledMessageId,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(panel) = self.scheduled_messages_panel.as_ref() else {
+            return;
+        };
+        let channel_id = panel.channel_id;
+        let answer = window.prompt(
+            PromptLevel::Warning,
+            "Cancel scheduled message?",
+            Some("This removes the pending message before it is sent."),
+            &["Cancel message", "Keep"],
+            cx,
+        );
+        let client = self.client.clone();
+
+        cx.spawn_in(window, async move |this, cx| {
+            if answer.await? != 0 {
+                return anyhow::Ok(());
+            }
+
+            this.update(cx, |this, cx| {
+                if let Some(panel) = this.scheduled_messages_panel.as_mut()
+                    && panel.channel_id == channel_id
+                {
+                    panel.cancelling_message_id = Some(scheduled_message_id);
+                    panel.action_error = None;
+                    cx.notify();
+                }
+            })?;
+
+            let result = client
+                .cancel_scheduled_message(channel_id.0, scheduled_message_id)
+                .await;
+
+            this.update(cx, |this, cx| {
+                let should_remove = {
+                    let Some(panel) = this.scheduled_messages_panel.as_mut() else {
+                        return;
+                    };
+                    if panel.channel_id != channel_id {
+                        return;
+                    }
+
+                    panel.cancelling_message_id = None;
+                    match result {
+                        Ok(()) => true,
+                        Err(error) => {
+                            panel.action_error =
+                                Some(format!("Failed to cancel scheduled message: {error}").into());
+                            false
+                        }
+                    }
+                };
+                if should_remove {
+                    this.remove_scheduled_message(scheduled_message_id);
+                }
+                cx.notify();
+            })?;
+            anyhow::Ok(())
+        })
+        .detach_and_log_err(cx);
+    }
+
+    fn remove_scheduled_message(&mut self, scheduled_message_id: ScheduledMessageId) {
+        if let Some(panel) = self.scheduled_messages_panel.as_mut() {
+            panel
+                .messages
+                .retain(|message| message.id != scheduled_message_id);
+            if panel.editing_message_id == Some(scheduled_message_id) {
+                panel.editing_message_id = None;
+            }
+        }
+    }
+
     fn open_thread(&mut self, root_message_id: u64, window: &mut Window, cx: &mut Context<Self>) {
+        self.scheduled_messages_panel = None;
         let compose_editor = cx.new(|cx| {
             let mut editor = Editor::single_line(window, cx);
             editor.set_placeholder_text("Reply in thread", window, cx);
@@ -1158,6 +1537,10 @@ impl ChannelChat {
 
     fn close_thread(&mut self, _: &CloseThread, _: &mut Window, cx: &mut Context<Self>) {
         if self.close_search(cx) {
+            return;
+        }
+        if self.scheduled_messages_panel.take().is_some() {
+            cx.notify();
             return;
         }
         if self.thread_panel.take().is_some() {
@@ -1564,6 +1947,419 @@ impl ChannelChat {
                     }),
             )
             .child(self.rendered_message_body(message, cx).render(window, cx))
+            .into_any_element()
+    }
+
+    fn render_scheduled_messages_panel(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+        let Some(panel) = self.scheduled_messages_panel.as_ref() else {
+            return div().into_any_element();
+        };
+
+        let channel_name = self
+            .channel(cx)
+            .map(|channel| channel.name.clone())
+            .unwrap_or_else(|| SharedString::from("Channel"));
+        let load_state = panel.load_state.clone();
+        let messages = panel.messages.clone();
+        let editing_message_id = panel.editing_message_id;
+        let edit_body = panel.edit_body.clone();
+        let saving_message_id = panel.saving_message_id;
+        let cancelling_message_id = panel.cancelling_message_id;
+        let action_error = panel.action_error.clone();
+
+        v_flex()
+            .id("scheduled-messages-panel")
+            .w(px(380.))
+            .min_w(px(300.))
+            .h_full()
+            .border_l_1()
+            .border_color(cx.theme().colors().border)
+            .bg(cx.theme().colors().editor_background)
+            .child(
+                h_flex()
+                    .justify_between()
+                    .gap_2()
+                    .p_3()
+                    .border_b_1()
+                    .border_color(cx.theme().colors().border)
+                    .child(
+                        v_flex()
+                            .gap_0p5()
+                            .child(
+                                h_flex()
+                                    .gap_2()
+                                    .items_center()
+                                    .child(Icon::new(IconName::Clock).size(IconSize::Small))
+                                    .child(
+                                        Label::new("Scheduled")
+                                            .size(LabelSize::Small)
+                                            .weight(gpui::FontWeight::MEDIUM),
+                                    ),
+                            )
+                            .child(
+                                Label::new(channel_name)
+                                    .size(LabelSize::XSmall)
+                                    .color(Color::Muted),
+                            ),
+                    )
+                    .child(
+                        h_flex()
+                            .gap_1()
+                            .child(
+                                Button::new("refresh-scheduled-messages", "Refresh")
+                                    .label_size(LabelSize::XSmall)
+                                    .disabled(matches!(
+                                        load_state,
+                                        ScheduledMessagesLoadState::Loading
+                                    ))
+                                    .on_click(cx.listener(|this, _, window, cx| {
+                                        this.refresh_scheduled_messages(window, cx);
+                                    })),
+                            )
+                            .child(
+                                IconButton::new("close-scheduled-messages", IconName::Close)
+                                    .icon_size(IconSize::Small)
+                                    .tooltip(Tooltip::text("Close scheduled messages"))
+                                    .on_click(cx.listener(Self::close_scheduled_messages_panel)),
+                            ),
+                    ),
+            )
+            .child(
+                v_flex()
+                    .flex_1()
+                    .id("scheduled-messages-list")
+                    .gap_3()
+                    .p_3()
+                    .overflow_y_scroll()
+                    .when(matches!(load_state, ScheduledMessagesLoadState::Loading), |this| {
+                        this.child(LoadingLabel::new("Loading scheduled messages").color(Color::Muted))
+                    })
+                    .when_some(
+                        match &load_state {
+                            ScheduledMessagesLoadState::Failed(message) => Some(message.clone()),
+                            ScheduledMessagesLoadState::Loading
+                            | ScheduledMessagesLoadState::Loaded => None,
+                        },
+                        |this, message| {
+                            this.child(
+                                Label::new(message)
+                                    .size(LabelSize::Small)
+                                    .color(Color::Error),
+                            )
+                        },
+                    )
+                    .when_some(action_error, |this, message| {
+                        this.child(
+                            Label::new(message)
+                                .size(LabelSize::XSmall)
+                                .color(Color::Error),
+                        )
+                    })
+                    .when(
+                        matches!(load_state, ScheduledMessagesLoadState::Loaded)
+                            && messages.is_empty(),
+                        |this| {
+                            this.child(
+                                v_flex()
+                                    .gap_1()
+                                    .child(
+                                        Label::new("No scheduled messages")
+                                            .size(LabelSize::Small)
+                                            .color(Color::Muted),
+                                    )
+                                    .child(
+                                        Label::new("Messages you schedule from the composer will appear here.")
+                                            .size(LabelSize::XSmall)
+                                            .color(Color::Muted),
+                                    ),
+                            )
+                        },
+                    )
+                    .children(self.render_scheduled_message_rows(
+                        messages,
+                        editing_message_id,
+                        edit_body,
+                        saving_message_id,
+                        cancelling_message_id,
+                        cx,
+                    )),
+            )
+            .into_any_element()
+    }
+
+    fn render_scheduled_message_rows(
+        &mut self,
+        messages: Vec<ScheduledMessage>,
+        editing_message_id: Option<ScheduledMessageId>,
+        edit_body: Entity<Editor>,
+        saving_message_id: Option<ScheduledMessageId>,
+        cancelling_message_id: Option<ScheduledMessageId>,
+        cx: &mut Context<Self>,
+    ) -> Vec<gpui::AnyElement> {
+        let mut rows = Vec::new();
+        let mut last_date = None;
+        for message in messages {
+            let message_date = message.display_time.date_naive();
+            if last_date != Some(message_date) {
+                last_date = Some(message_date);
+                rows.push(
+                    Label::new(message_date.format("%A, %b %-d").to_string())
+                        .size(LabelSize::XSmall)
+                        .color(Color::Muted)
+                        .into_any_element(),
+                );
+            }
+
+            let is_editing = editing_message_id == Some(message.id);
+            rows.push(
+                v_flex()
+                    .gap_2()
+                    .p_3()
+                    .border_1()
+                    .border_color(cx.theme().colors().border)
+                    .rounded_md()
+                    .child(
+                        h_flex()
+                            .justify_between()
+                            .gap_2()
+                            .child(
+                                Label::new(scheduled_message_time_label(&message))
+                                    .size(LabelSize::XSmall)
+                                    .color(Color::Muted),
+                            )
+                            .child(
+                                h_flex()
+                                    .gap_1()
+                                    .when(!is_editing, |this| {
+                                        let message_id = message.id;
+                                        this.child(
+                                            Button::new(
+                                                format!("edit-scheduled-message-{}", message_id.0),
+                                                "Edit",
+                                            )
+                                            .label_size(LabelSize::XSmall)
+                                            .on_click(
+                                                cx.listener(move |this, _, window, cx| {
+                                                    this.start_edit_scheduled_message(
+                                                        message_id, window, cx,
+                                                    );
+                                                }),
+                                            ),
+                                        )
+                                    })
+                                    .child(
+                                        Button::new(
+                                            format!("cancel-scheduled-message-{}", message.id.0),
+                                            "Cancel",
+                                        )
+                                        .label_size(LabelSize::XSmall)
+                                        .disabled(cancelling_message_id == Some(message.id))
+                                        .loading(cancelling_message_id == Some(message.id))
+                                        .on_click(
+                                            cx.listener({
+                                                let message_id = message.id;
+                                                move |this, _, window, cx| {
+                                                    this.confirm_cancel_scheduled_message(
+                                                        message_id, window, cx,
+                                                    );
+                                                }
+                                            }),
+                                        ),
+                                    ),
+                            ),
+                    )
+                    .when(!is_editing, |this| {
+                        this.child(
+                            Label::new(message.body.clone())
+                                .size(LabelSize::Small)
+                                .color(Color::Default),
+                        )
+                    })
+                    .when(is_editing, |this| {
+                        this.child(
+                            v_flex()
+                                .gap_2()
+                                .child(edit_body.clone())
+                                .child(self.render_edit_schedule_calendar(cx))
+                                .child(self.render_edit_schedule_time_picker(cx))
+                                .when_some(
+                                    self.scheduled_messages_panel.as_ref().and_then(|panel| {
+                                        panel.edit_schedule_picker.validation_error.clone()
+                                    }),
+                                    |this, message| {
+                                        this.child(
+                                            Label::new(message)
+                                                .size(LabelSize::XSmall)
+                                                .color(Color::Error),
+                                        )
+                                    },
+                                )
+                                .child(
+                                    h_flex()
+                                        .gap_2()
+                                        .justify_end()
+                                        .child(
+                                            Button::new("cancel-edit-scheduled-message", "Done")
+                                                .style(ButtonStyle::Subtle)
+                                                .label_size(LabelSize::XSmall)
+                                                .on_click(
+                                                    cx.listener(
+                                                        Self::cancel_edit_scheduled_message,
+                                                    ),
+                                                ),
+                                        )
+                                        .child(
+                                            Button::new("save-scheduled-message", "Save")
+                                                .label_size(LabelSize::XSmall)
+                                                .disabled(saving_message_id == Some(message.id))
+                                                .loading(saving_message_id == Some(message.id))
+                                                .on_click(cx.listener(|this, _, window, cx| {
+                                                    this.save_scheduled_message_edit(window, cx);
+                                                })),
+                                        ),
+                                ),
+                        )
+                    })
+                    .into_any_element(),
+            );
+        }
+        rows
+    }
+
+    fn render_edit_schedule_calendar(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let Some(panel) = self.scheduled_messages_panel.as_ref() else {
+            return v_flex().into_any_element();
+        };
+        let month = panel.edit_schedule_picker.visible_month;
+        let selected_date = panel.edit_schedule_picker.selected_date;
+        let first_weekday = month.weekday().num_days_from_monday() as usize;
+        let days_in_month = days_in_month(month);
+        let mut day_cells = Vec::with_capacity(42);
+        for index in 0..42 {
+            let day_number = index as i32 - first_weekday as i32 + 1;
+            let date = if day_number >= 1 && day_number <= days_in_month as i32 {
+                month.with_day(day_number as u32)
+            } else {
+                None
+            };
+            day_cells.push(date);
+        }
+
+        v_flex()
+            .gap_1()
+            .child(
+                h_flex()
+                    .justify_between()
+                    .items_center()
+                    .child(
+                        IconButton::new("edit-schedule-previous-month", IconName::ChevronLeft)
+                            .icon_size(IconSize::Small)
+                            .on_click(cx.listener(Self::show_previous_edit_schedule_month))
+                            .tooltip(Tooltip::text("Previous month")),
+                    )
+                    .child(
+                        Label::new(month.format("%B %Y").to_string())
+                            .size(LabelSize::Small)
+                            .color(Color::Default),
+                    )
+                    .child(
+                        IconButton::new("edit-schedule-next-month", IconName::ChevronRight)
+                            .icon_size(IconSize::Small)
+                            .on_click(cx.listener(Self::show_next_edit_schedule_month))
+                            .tooltip(Tooltip::text("Next month")),
+                    ),
+            )
+            .child(
+                div()
+                    .grid()
+                    .grid_cols(7)
+                    .gap_1()
+                    .children(
+                        ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(|weekday| {
+                            Label::new(weekday)
+                                .size(LabelSize::XSmall)
+                                .color(Color::Muted)
+                                .into_any_element()
+                        }),
+                    )
+                    .children(day_cells.into_iter().map(|date| {
+                        if let Some(date) = date {
+                            Button::new(
+                                format!("edit-schedule-day-{}", date.format("%Y-%m-%d")),
+                                date.day().to_string(),
+                            )
+                            .label_size(LabelSize::XSmall)
+                            .style(if date == selected_date {
+                                ButtonStyle::Tinted(TintColor::Accent)
+                            } else {
+                                ButtonStyle::Subtle
+                            })
+                            .on_click(cx.listener(move |this, event, window, cx| {
+                                this.select_edit_schedule_date(date, event, window, cx);
+                            }))
+                            .into_any_element()
+                        } else {
+                            div().h(px(26.)).into_any_element()
+                        }
+                    })),
+            )
+            .into_any_element()
+    }
+
+    fn render_edit_schedule_time_picker(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let Some(panel) = self.scheduled_messages_panel.as_ref() else {
+            return v_flex().into_any_element();
+        };
+        let selected_hour = panel.edit_schedule_picker.selected_time.hour();
+        let selected_minute = panel.edit_schedule_picker.selected_time.minute();
+        v_flex()
+            .gap_1()
+            .child(
+                Label::new("Time")
+                    .size(LabelSize::XSmall)
+                    .color(Color::Muted),
+            )
+            .child(
+                h_flex()
+                    .gap_2()
+                    .items_center()
+                    .child(h_flex().gap_1().flex_wrap().children((0..24).map(|hour| {
+                        Button::new(("edit-schedule-hour", hour), format!("{hour:02}"))
+                            .label_size(LabelSize::XSmall)
+                            .style(if selected_hour == hour {
+                                ButtonStyle::Tinted(TintColor::Accent)
+                            } else {
+                                ButtonStyle::Subtle
+                            })
+                            .on_click(cx.listener(move |this, event, window, cx| {
+                                this.select_edit_schedule_hour(hour, event, window, cx);
+                            }))
+                            .into_any_element()
+                    })))
+                    .child(div().w(px(1.)).h(px(48.)).bg(cx.theme().colors().border))
+                    .child(
+                        h_flex()
+                            .gap_1()
+                            .flex_wrap()
+                            .children((0..60).step_by(5).map(|minute| {
+                                Button::new(
+                                    ("edit-schedule-minute", minute),
+                                    format!("{minute:02}"),
+                                )
+                                .label_size(LabelSize::XSmall)
+                                .style(if selected_minute == minute {
+                                    ButtonStyle::Tinted(TintColor::Accent)
+                                } else {
+                                    ButtonStyle::Subtle
+                                })
+                                .on_click(cx.listener(
+                                    move |this, event, window, cx| {
+                                        this.select_edit_schedule_minute(minute, event, window, cx);
+                                    },
+                                ))
+                            })),
+                    ),
+            )
             .into_any_element()
     }
 
@@ -2716,6 +3512,9 @@ impl Render for ChannelChat {
             .when(self.thread_panel.is_some(), |this| {
                 this.child(self.render_thread_panel(window, cx))
             })
+            .when(self.scheduled_messages_panel.is_some(), |this| {
+                this.child(self.render_scheduled_messages_panel(cx))
+            })
     }
 }
 
@@ -2770,6 +3569,10 @@ fn schedule_label(timestamp: DateTime<Utc>) -> String {
         .with_timezone(&Local)
         .format("Scheduled for %b %-d, %-I:%M %p")
         .to_string()
+}
+
+fn scheduled_message_time_label(message: &ScheduledMessage) -> String {
+    message.display_time.format("%-I:%M %p").to_string()
 }
 
 fn month_start(date: NaiveDate) -> NaiveDate {

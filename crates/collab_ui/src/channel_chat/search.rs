@@ -527,17 +527,36 @@ impl ChannelChat {
                             .child(Label::new(channel_name).weight(gpui::FontWeight::MEDIUM)),
                     )
                     .child(
-                        IconButton::new("toggle-channel-message-search", IconName::ListFilter)
-                            .icon_size(IconSize::Small)
-                            .icon_color(if self.search_state.active {
-                                Color::Accent
-                            } else {
-                                Color::Muted
-                            })
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.toggle_search(&ToggleSearch, window, cx);
-                            }))
-                            .tooltip(Tooltip::text("Search messages")),
+                        h_flex()
+                            .gap_1()
+                            .items_center()
+                            .child(
+                                IconButton::new("open-scheduled-messages", IconName::Clock)
+                                    .icon_size(IconSize::Small)
+                                    .icon_color(if self.scheduled_messages_panel.is_some() {
+                                        Color::Accent
+                                    } else {
+                                        Color::Muted
+                                    })
+                                    .on_click(cx.listener(Self::open_scheduled_messages_panel))
+                                    .tooltip(Tooltip::text("Scheduled messages")),
+                            )
+                            .child(
+                                IconButton::new(
+                                    "toggle-channel-message-search",
+                                    IconName::ListFilter,
+                                )
+                                .icon_size(IconSize::Small)
+                                .icon_color(if self.search_state.active {
+                                    Color::Accent
+                                } else {
+                                    Color::Muted
+                                })
+                                .on_click(cx.listener(|this, _, window, cx| {
+                                    this.toggle_search(&ToggleSearch, window, cx);
+                                }))
+                                .tooltip(Tooltip::text("Search messages")),
+                            ),
                     ),
             )
             .when(self.search_state.active, |this| {

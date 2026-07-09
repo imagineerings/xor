@@ -94,7 +94,7 @@ Add the ability for channel participants to schedule messages for future deliver
     - _Completed: Added inline `SchedulePicker` state with local date/time selection, UTC conversion, month-grid calendar controls, hour/minute picker controls, lead-time validation, selected-time display, draft clearing, and scheduled-send RPC wiring in the compose area._
     - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui`; `git diff --check`. Attempted `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_chat_key_bindings_parse -- --nocapture`, blocked by unrelated `remote_connection` test-support compile error for non-exhaustive `RemoteConnectionOptions::Mock(_)` handling._
 
-- [ ] 8. Build `ScheduledMessagesPanel` management view
+- [x] 8. Build `ScheduledMessagesPanel` management view
     - Implement `ScheduledMessagesPanel` struct with `channel_id`, `messages`, `loading`, `editing_message_id`, `edit_body`, `edit_scheduled_at`.
     - Implement `refresh()` — calls `GetScheduledMessages` RPC and populates the list.
     - Implement `render()` — renders as a sliding panel or modal with a list of pending messages grouped by date, each showing scheduled time, body preview, and [Edit] [Cancel] buttons.
@@ -105,7 +105,9 @@ Add the ability for channel participants to schedule messages for future deliver
     - Add a "Scheduled" entry in the channel sidebar or header that opens this panel.
     - Handle empty state (no scheduled messages) with a helpful message.
     - _Requirements: 11.2.1, 11.2.2, 11.2.3, 11.2.4_
-    - _writes: collab_ui/src/scheduled_messages_panel.rs_
+    - _writes: collab_ui/src/channel_chat.rs, collab_ui/src/channel_chat/search.rs_
+    - _Completed: Added a channel-header Scheduled drawer that loads pending scheduled messages, groups them by local date, renders loading/error/empty states, supports inline body and date/time edits through the existing scheduled-message RPCs, confirms cancellation, refreshes after saves, and removes cancelled messages from the panel._
+    - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui`; `git diff --check`._
 
 - [ ] 9. Implement sidebar badge for pending scheduled messages
     - On app startup and after relevant RPCs, fetch pending count via `GetScheduledMessages` (or a lightweight count endpoint).
