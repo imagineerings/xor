@@ -4,6 +4,7 @@ pub mod test;
 pub mod channel_chat;
 mod llm_token;
 mod proxy;
+pub mod scheduled_message;
 pub mod sim_urls;
 pub mod telemetry;
 pub mod user;
@@ -2528,6 +2529,7 @@ mod tests {
                     reply_to_message_id: Some(3),
                     edited_at: None,
                     reaction_summaries: Vec::new(),
+                    scheduled_at: None,
                 }),
             },
         );
@@ -2593,6 +2595,7 @@ mod tests {
                     reply_to_message_id: None,
                     edited_at: None,
                     reaction_summaries: Vec::new(),
+                    scheduled_at: None,
                 }),
                 replies: vec![proto::ChannelMessage {
                     id: 12,
@@ -2604,6 +2607,7 @@ mod tests {
                     reply_to_message_id: Some(11),
                     edited_at: None,
                     reaction_summaries: Vec::new(),
+                    scheduled_at: None,
                 }],
                 done: true,
             },
@@ -2686,6 +2690,7 @@ mod tests {
                 reply_to_message_id: None,
                 edited_at: None,
                 reaction_summaries: Vec::new(),
+                scheduled_at: None,
             }),
         });
         assert_eq!(sent_rx.recv().await.unwrap().channel_id, 7);
@@ -2702,6 +2707,7 @@ mod tests {
                 reply_to_message_id: None,
                 edited_at: Some(3),
                 reaction_summaries: Vec::new(),
+                scheduled_at: None,
             }),
         });
         assert_eq!(

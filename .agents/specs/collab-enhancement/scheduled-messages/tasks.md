@@ -71,13 +71,15 @@ Add the ability for channel participants to schedule messages for future deliver
     - _Completed: Added the scheduler loop inline with server startup, reset stale processing rows on start, popped due messages every 10 seconds, delivered via existing channel-message insertion with `scheduled_at`, broadcast channel sends, notified senders of success/failure, and deleted delivered rows._
     - _Validation: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `git diff --check`._
 
-- [ ] 6. Add client-side Rust data models
+- [x] 6. Add client-side Rust data models
     - Define `ScheduledMessageId(u64)` newtype with proto conversion helpers.
     - Define `ScheduledMessage` struct: `id`, `channel_id`, `sender_id`, `body`, `scheduled_at` (UTC), `created_at`, `mentions`, `display_time` (computed local time).
     - Implement `TryFrom<proto::ScheduledMessage>` and `Into<proto::ScheduledMessage>` conversions.
     - Add a `scheduled_at: Option<DateTime<Utc>>` field to the client's `ChannelMessage` model.
     - _Requirements: 11.1, 11.2, 11.4_
     - _writes: client/src/scheduled_message.rs_
+    - _Completed: Added scheduled-message and channel-message client models with UTC/local time conversion, scheduled-message ID helpers, proto conversions, and client RPC helpers for schedule/cancel/update/list._
+    - _Validation: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `CARGO_INCREMENTAL=0 cargo test -p client test_channel_chat -- --nocapture`; `git diff --check`._
 
 - [ ] 7. Build `SchedulePicker` compose-area widget
     - Implement `SchedulePicker` struct with `selected_date`, `selected_time`, `scheduled_at` (local time), `timezone`, `popover_visible`.

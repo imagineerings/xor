@@ -1,5 +1,9 @@
-use crate::{Client, Subscription};
+use crate::{
+    Client, Subscription,
+    scheduled_message::{ScheduledMessage, ScheduledMessageId},
+};
 use anyhow::{Context as _, Result};
+use chrono::{DateTime, Utc};
 use futures::Future;
 use gpui::{AsyncApp, Entity, SharedString, WeakEntity};
 use rpc::{TypedEnvelope, proto};
@@ -20,6 +24,22 @@ pub struct UpdateChannelMessage {
     pub message_id: u64,
     pub body: String,
     pub nonce: u128,
+    pub mentions: Vec<proto::ChatMention>,
+}
+
+pub struct ScheduleChannelMessage {
+    pub channel_id: u64,
+    pub body: String,
+    pub scheduled_at: DateTime<Utc>,
+    pub nonce: u128,
+    pub mentions: Vec<proto::ChatMention>,
+}
+
+pub struct UpdateScheduledMessage {
+    pub scheduled_message_id: ScheduledMessageId,
+    pub channel_id: u64,
+    pub body: Option<String>,
+    pub scheduled_at: Option<DateTime<Utc>>,
     pub mentions: Vec<proto::ChatMention>,
 }
 
@@ -108,6 +128,60 @@ impl Client {
             })
             .await?;
         response.message.context("missing sent channel message")
+    }
+
+    pub async fn schedule_channel_message(
+        &self,
+        message: ScheduleChannelMessage,
+    ) -> Result<ScheduledMessageId> {
+        let response = self
+            .request(proto::ScheduleChannelMessage {
+                channel_id: message.channel_id,
+                body: message.body,
+                scheduled_at: datetime_to_millis(message.scheduled_at),
+                nonce: Some(message.nonce.into()),
+                mentions: message.mentions,
+            })
+            .await?;
+        Ok(ScheduledMessageId::from_proto(
+            response.scheduled_message_id,
+        ))
+    }
+
+    pub async fn cancel_scheduled_message(
+        &self,
+        channel_id: u64,
+        scheduled_message_id: ScheduledMessageId,
+    ) -> Result<()> {
+        self.request(proto::CancelScheduledMessage {
+            channel_id,
+            scheduled_message_id: scheduled_message_id.to_proto(),
+        })
+        .await
+        .map(|_: proto::Ack| ())
+    }
+
+    pub async fn update_scheduled_message(&self, message: UpdateScheduledMessage) -> Result<()> {
+        self.request(proto::UpdateScheduledMessage {
+            scheduled_message_id: message.scheduled_message_id.to_proto(),
+            channel_id: message.channel_id,
+            body: message.body,
+            scheduled_at: message.scheduled_at.map(datetime_to_millis),
+            mentions: message.mentions,
+        })
+        .await
+        .map(|_: proto::Ack| ())
+    }
+
+    pub async fn get_scheduled_messages(&self, channel_id: u64) -> Result<Vec<ScheduledMessage>> {
+        let response = self
+            .request(proto::GetScheduledMessages { channel_id })
+            .await?;
+        response
+            .messages
+            .into_iter()
+            .map(ScheduledMessage::try_from)
+            .collect()
     }
 
     pub async fn update_channel_message(&self, message: UpdateChannelMessage) -> Result<()> {
@@ -304,6 +378,10 @@ impl Client {
     {
         self.add_message_handler(entity, handler)
     }
+}
+
+fn datetime_to_millis(timestamp: DateTime<Utc>) -> u64 {
+    timestamp.timestamp_millis() as u64
 }
 
 #[cfg(test)]
