@@ -287,6 +287,122 @@ impl Database {
         .await
     }
 
+    pub async fn get_channel_thread(
+        &self,
+        channel_id: ChannelId,
+        user_id: UserId,
+        message_id: MessageId,
+    ) -> Result<(proto::ChannelMessage, Vec<proto::ChannelMessage>)> {
+        self.transaction(|tx| async move {
+            let channel = self.get_channel_internal(channel_id, &tx).await?;
+            self.check_user_is_channel_participant(&channel, user_id, &tx)
+                .await?;
+
+            let root_message = self
+                .get_channel_message_model(channel_id, message_id, &tx)
+                .await?;
+            let replies = channel_message::Entity::find()
+                .filter(channel_message::Column::ChannelId.eq(channel_id))
+                .filter(channel_message::Column::ReplyToMessageId.eq(message_id))
+                .order_by_asc(channel_message::Column::CreatedAt)
+                .order_by_asc(channel_message::Column::Id)
+                .all(&*tx)
+                .await?;
+
+            Ok((
+                self.channel_message_to_proto(root_message, &tx).await?,
+                self.channel_messages_to_proto(replies, &tx).await?,
+            ))
+        })
+        .await
+    }
+
+    pub async fn get_channel_threads(
+        &self,
+        channel_id: ChannelId,
+        user_id: UserId,
+    ) -> Result<Vec<proto::ThreadSummary>> {
+        self.transaction(|tx| async move {
+            let channel = self.get_channel_internal(channel_id, &tx).await?;
+            self.check_user_is_channel_participant(&channel, user_id, &tx)
+                .await?;
+
+            let replies = channel_message::Entity::find()
+                .filter(channel_message::Column::ChannelId.eq(channel_id))
+                .filter(channel_message::Column::ReplyToMessageId.is_not_null())
+                .order_by_desc(channel_message::Column::CreatedAt)
+                .order_by_desc(channel_message::Column::Id)
+                .all(&*tx)
+                .await?;
+
+            let mut summaries_by_root_id =
+                HashMap::<MessageId, ThreadSummaryAccumulator>::default();
+            for reply in replies {
+                let Some(root_message_id) = reply.reply_to_message_id else {
+                    continue;
+                };
+
+                let summary = summaries_by_root_id
+                    .entry(root_message_id)
+                    .or_insert_with(|| ThreadSummaryAccumulator {
+                        reply_count: 0,
+                        latest_reply_at: reply.created_at,
+                        participant_user_ids: BTreeSet::default(),
+                    });
+                summary.reply_count = summary
+                    .reply_count
+                    .checked_add(1)
+                    .context("too many channel thread replies")?;
+                summary.latest_reply_at = summary.latest_reply_at.max(reply.created_at);
+                summary.participant_user_ids.insert(reply.sender_id);
+            }
+
+            let mut summaries = summaries_by_root_id
+                .into_iter()
+                .map(|(root_message_id, summary)| proto::ThreadSummary {
+                    root_message_id: root_message_id.to_proto(),
+                    reply_count: summary.reply_count,
+                    latest_reply_at: summary.latest_reply_at.assume_utc().unix_timestamp() as u64,
+                    participant_user_ids: summary
+                        .participant_user_ids
+                        .into_iter()
+                        .map(UserId::to_proto)
+                        .collect(),
+                    has_unread: false,
+                })
+                .collect::<Vec<_>>();
+            summaries.sort_by_key(|summary| std::cmp::Reverse(summary.latest_reply_at));
+            Ok(summaries)
+        })
+        .await
+    }
+
+    pub async fn get_channel_message_reply_count(
+        &self,
+        channel_id: ChannelId,
+        user_id: UserId,
+        message_id: MessageId,
+    ) -> Result<u32> {
+        self.transaction(|tx| async move {
+            let channel = self.get_channel_internal(channel_id, &tx).await?;
+            self.check_user_is_channel_participant(&channel, user_id, &tx)
+                .await?;
+            self.get_channel_message_model(channel_id, message_id, &tx)
+                .await?;
+
+            let reply_count = channel_message::Entity::find()
+                .filter(channel_message::Column::ChannelId.eq(channel_id))
+                .filter(channel_message::Column::ReplyToMessageId.eq(message_id))
+                .count(&*tx)
+                .await?;
+            reply_count
+                .try_into()
+                .context("too many channel thread replies")
+                .map_err(Into::into)
+        })
+        .await
+    }
+
     pub async fn acknowledge_channel_message(
         &self,
         channel_id: ChannelId,
@@ -462,6 +578,12 @@ impl Database {
         let reactions_by_message_id = reaction_summaries_by_message_id([row.id], tx).await?;
         channel_message_to_proto(row, &mentions_by_message_id, &reactions_by_message_id)
     }
+}
+
+struct ThreadSummaryAccumulator {
+    reply_count: u32,
+    latest_reply_at: PrimitiveDateTime,
+    participant_user_ids: BTreeSet<UserId>,
 }
 
 async fn get_message_reactions(

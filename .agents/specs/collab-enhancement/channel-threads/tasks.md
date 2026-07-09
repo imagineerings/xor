@@ -16,12 +16,14 @@ Add threaded replies to channel messages in Sim. This feature reuses the existin
   - _Requirements: 3.1, 3.4_
   - _writes: `proto/src/experiments.proto`_
 
-- [ ] 2. Implement ThreadStore on the server
-  - [ ] 2.1 Write SQL queries for `GetThread` (fetch replies by `reply_to_message_id` ordered chronologically), `GetThreads` (group-by with reply count and latest timestamp), and `GetReplyCount`.
-  - [ ] 2.2 Implement `ThreadStore` struct wrapping `sqlx::PgPool` with methods `get_thread`, `get_threads`, `get_reply_count`.
-  - [ ] 2.3 Add validation: return error if `reply_to_message_id` references a non-existent message.
+- [x] 2. Implement ThreadStore on the server
+  - [x] 2.1 Write SQL queries for `GetThread` (fetch replies by `reply_to_message_id` ordered chronologically), `GetThreads` (group-by with reply count and latest timestamp), and `GetReplyCount`.
+  - [x] 2.2 Implement `ThreadStore` struct wrapping `sqlx::PgPool` with methods `get_thread`, `get_threads`, `get_reply_count`.
+  - [x] 2.3 Add validation: return error if `reply_to_message_id` references a non-existent message.
   - _Requirements: 3.1, 3.4_
   - _writes: `collab/src/db/thread_store.rs`_
+  - _implemented in existing `crates/collab/src/db/queries/channel_messages.rs` `Database` query layer_
+  - _validated: `CARGO_INCREMENTAL=0 cargo check -p collab`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support --test collab_tests channel_chat_tests`; `git diff --check`_
 
 - [ ] 3. Register thread RPC handlers on the server
   - [ ] 3.1 Handle `GetThread` — parse request, call `ThreadStore::get_thread`, build `GetThreadResponse`.
