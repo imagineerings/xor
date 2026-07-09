@@ -172,7 +172,7 @@ async fn test_channel_chat_thread_queries(
     assert_eq!(participant_user_ids, expected_user_ids);
 
     client_a
-        .acknowledge_channel_message(channel_id.0, reply_b.id)
+        .acknowledge_channel_thread(channel_id.0, root.id, reply_b.id)
         .unwrap();
     executor.run_until_parked();
     let summaries = client_a.get_threads(channel_id.0).await.unwrap();

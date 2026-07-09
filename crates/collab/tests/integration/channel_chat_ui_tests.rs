@@ -2,6 +2,7 @@ use crate::TestServer;
 use client::channel_chat::SendChannelMessage;
 use collab_ui::{channel_chat::ChannelChat, draft_store::DraftStore};
 use gpui::TaskExt;
+use std::time::Duration;
 
 #[gpui::test]
 async fn test_channel_chat_view_live_insert_and_send_states(
@@ -381,6 +382,106 @@ async fn test_channel_chat_open_thread_appends_live_replies(
         chat.read_with(cx_a, |chat, _| chat.thread_reply_count_for_test(root.id)),
         Some(2)
     );
+}
+
+#[gpui::test]
+async fn test_channel_chat_thread_deleted_root_placeholder(
+    cx_a: &mut gpui::TestAppContext,
+    cx_b: &mut gpui::TestAppContext,
+) {
+    let (_server, client_a, client_b, channel_id) = TestServer::start2(cx_a, cx_b).await;
+    let (workspace, cx_a) = client_a.build_test_workspace(cx_a).await;
+
+    let root = client_b
+        .client()
+        .send_channel_message(SendChannelMessage {
+            channel_id: channel_id.0,
+            body: "root".to_string(),
+            nonce: 1,
+            mentions: Vec::new(),
+            reply_to_message_id: None,
+        })
+        .await
+        .unwrap();
+    client_b
+        .client()
+        .send_channel_message(SendChannelMessage {
+            channel_id: channel_id.0,
+            body: "reply".to_string(),
+            nonce: 2,
+            mentions: Vec::new(),
+            reply_to_message_id: Some(root.id),
+        })
+        .await
+        .unwrap();
+    client_b
+        .client()
+        .remove_channel_message(channel_id.0, root.id)
+        .await
+        .unwrap();
+
+    let chat = cx_a
+        .update(|window, cx| ChannelChat::open(channel_id, workspace.clone(), window, cx))
+        .await
+        .unwrap();
+    cx_a.run_until_parked();
+
+    chat.update_in(cx_a, |chat, window, cx| {
+        chat.open_thread_for_test(root.id, window, cx);
+    });
+    cx_a.run_until_parked();
+
+    assert!(chat.read_with(cx_a, |chat, _| {
+        chat.thread_deleted_placeholder_visible_for_test()
+    }));
+    assert_eq!(
+        chat.read_with(cx_a, |chat, _| chat.thread_reply_bodies_for_test()),
+        vec!["reply".to_string()]
+    );
+}
+
+#[gpui::test]
+async fn test_channel_chat_thread_load_retry_exhaustion(
+    cx_a: &mut gpui::TestAppContext,
+    cx_b: &mut gpui::TestAppContext,
+) {
+    let (server, client_a, client_b, channel_id) = TestServer::start2(cx_a, cx_b).await;
+    let (workspace, cx_a) = client_a.build_test_workspace(cx_a).await;
+
+    let root = client_b
+        .client()
+        .send_channel_message(SendChannelMessage {
+            channel_id: channel_id.0,
+            body: "root".to_string(),
+            nonce: 1,
+            mentions: Vec::new(),
+            reply_to_message_id: None,
+        })
+        .await
+        .unwrap();
+
+    let chat = cx_a
+        .update(|window, cx| ChannelChat::open(channel_id, workspace.clone(), window, cx))
+        .await
+        .unwrap();
+    cx_a.run_until_parked();
+
+    server.forbid_connections();
+    server.disconnect_client(client_a.client().peer_id().unwrap());
+    cx_a.run_until_parked();
+
+    chat.update_in(cx_a, |chat, window, cx| {
+        chat.open_thread_for_test(root.id, window, cx);
+    });
+    cx_a
+        .background_executor
+        .advance_clock(Duration::from_secs(2));
+    cx_a.run_until_parked();
+
+    let error = chat
+        .read_with(cx_a, |chat, _| chat.thread_load_error_for_test())
+        .expect("missing thread load error");
+    assert!(error.contains("Failed to load thread after 4 attempts"));
 }
 
 #[gpui::test]

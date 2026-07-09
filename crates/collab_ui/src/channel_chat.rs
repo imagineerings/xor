@@ -1166,6 +1166,9 @@ impl ChannelChat {
         let root_message_id = thread_panel.root_message_id;
         let root_message = thread_panel.root_message.clone();
         let root_message_is_missing = thread_panel.root_message.is_none();
+        let root_message_is_deleted = root_message
+            .as_ref()
+            .is_some_and(|root_message| root_message.body.is_empty());
         let replies = thread_panel.replies.clone();
         let replies_done = thread_panel.replies_done;
         let loading_earlier_replies = thread_panel.loading_earlier_replies;
@@ -1223,25 +1226,29 @@ impl ChannelChat {
                     .gap_3()
                     .p_3()
                     .overflow_y_scroll()
-                    .when_some(root_message, |this, root_message| {
-                        this.child(
-                            v_flex()
-                                .gap_2()
-                                .child(
-                                    Label::new("Original message")
-                                        .size(LabelSize::XSmall)
-                                        .color(Color::Muted),
-                                )
-                                .child(self.render_thread_message(
-                                    &root_message,
-                                    false,
-                                    window,
-                                    cx,
-                                )),
-                        )
-                    })
+                    .when_some(
+                        root_message.filter(|root_message| !root_message.body.is_empty()),
+                        |this, root_message| {
+                            this.child(
+                                v_flex()
+                                    .gap_2()
+                                    .child(
+                                        Label::new("Original message")
+                                            .size(LabelSize::XSmall)
+                                            .color(Color::Muted),
+                                    )
+                                    .child(self.render_thread_message(
+                                        &root_message,
+                                        false,
+                                        window,
+                                        cx,
+                                    )),
+                            )
+                        },
+                    )
                     .when(
-                        matches!(load_state, ThreadLoadState::Loaded) && root_message_is_missing,
+                        matches!(load_state, ThreadLoadState::Loaded)
+                            && (root_message_is_missing || root_message_is_deleted),
                         |this| {
                             this.child(
                                 Label::new("This message has been deleted")
@@ -2003,6 +2010,27 @@ impl ChannelChat {
         self.thread_summaries
             .get(&root_message_id)
             .map(|summary| summary.has_unread)
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn thread_deleted_placeholder_visible_for_test(&self) -> bool {
+        self.thread_panel.as_ref().is_some_and(|thread_panel| {
+            matches!(thread_panel.load_state, ThreadLoadState::Loaded)
+                && thread_panel
+                    .root_message
+                    .as_ref()
+                    .is_none_or(|root_message| root_message.body.is_empty())
+        })
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn thread_load_error_for_test(&self) -> Option<SharedString> {
+        self.thread_panel
+            .as_ref()
+            .and_then(|thread_panel| match &thread_panel.load_state {
+                ThreadLoadState::Failed(message) => Some(message.clone()),
+                ThreadLoadState::Loading | ThreadLoadState::Loaded => None,
+            })
     }
 
     #[cfg(any(test, feature = "test-support"))]
