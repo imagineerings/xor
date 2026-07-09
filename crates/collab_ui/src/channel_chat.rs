@@ -10,7 +10,7 @@ use db::kvp::KeyValueStore;
 use editor::{Editor, EditorEvent};
 use gpui::{
     App, AsyncApp, Context, Entity, EventEmitter, FocusHandle, Focusable, InteractiveElement,
-    PromptLevel, Render, SharedString, StatefulInteractiveElement,
+    KeyBinding, PromptLevel, Render, SharedString, StatefulInteractiveElement,
     Subscription as GpuiSubscription, Task, VisualContext as _, WeakEntity, Window, actions,
     prelude::*,
 };
@@ -48,11 +48,32 @@ actions!(
     channel_chat,
     [
         /// Discards the current channel chat draft.
-        DiscardDraft
+        DiscardDraft,
+        /// Applies bold Markdown formatting to the channel chat draft.
+        ToggleBold,
+        /// Applies italic Markdown formatting to the channel chat draft.
+        ToggleItalic,
+        /// Applies inline code Markdown formatting to the channel chat draft.
+        ToggleCode,
+        /// Applies link Markdown formatting to the channel chat draft.
+        ToggleLink,
+        /// Applies blockquote Markdown formatting to the channel chat draft.
+        ToggleBlockquote
     ]
 );
 
-pub fn init(_cx: &mut App) {}
+pub fn init(cx: &mut App) {
+    cx.bind_keys(formatting_key_bindings());
+}
+
+fn formatting_key_bindings() -> [KeyBinding; 4] {
+    [
+        KeyBinding::new("ctrl-b", ToggleBold, Some("ChannelChat")),
+        KeyBinding::new("ctrl-i", ToggleItalic, Some("ChannelChat")),
+        KeyBinding::new("ctrl-`", ToggleCode, Some("ChannelChat")),
+        KeyBinding::new("ctrl-shift-k", ToggleLink, Some("ChannelChat")),
+    ]
+}
 
 pub struct ChannelChat {
     channel_id: ChannelId,
@@ -916,6 +937,42 @@ impl ChannelChat {
         }
     }
 
+    fn format_composer(
+        &mut self,
+        format_kind: formatting_toolbar::FormatKind,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.composer.update(cx, |composer, cx| {
+            formatting_toolbar::apply_format(format_kind, composer, window, cx);
+        });
+    }
+
+    fn toggle_bold(&mut self, _: &ToggleBold, window: &mut Window, cx: &mut Context<Self>) {
+        self.format_composer(formatting_toolbar::FormatKind::Bold, window, cx);
+    }
+
+    fn toggle_italic(&mut self, _: &ToggleItalic, window: &mut Window, cx: &mut Context<Self>) {
+        self.format_composer(formatting_toolbar::FormatKind::Italic, window, cx);
+    }
+
+    fn toggle_code(&mut self, _: &ToggleCode, window: &mut Window, cx: &mut Context<Self>) {
+        self.format_composer(formatting_toolbar::FormatKind::Code, window, cx);
+    }
+
+    fn toggle_link(&mut self, _: &ToggleLink, window: &mut Window, cx: &mut Context<Self>) {
+        self.format_composer(formatting_toolbar::FormatKind::Link, window, cx);
+    }
+
+    fn toggle_blockquote(
+        &mut self,
+        _: &ToggleBlockquote,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.format_composer(formatting_toolbar::FormatKind::Blockquote, window, cx);
+    }
+
     #[cfg(any(test, feature = "test-support"))]
     pub fn message_bodies_for_test(&self) -> Vec<String> {
         self.messages
@@ -1067,6 +1124,11 @@ impl Render for ChannelChat {
             .bg(cx.theme().colors().editor_background)
             .on_action(cx.listener(Self::send))
             .on_action(cx.listener(Self::discard_draft))
+            .on_action(cx.listener(Self::toggle_bold))
+            .on_action(cx.listener(Self::toggle_italic))
+            .on_action(cx.listener(Self::toggle_code))
+            .on_action(cx.listener(Self::toggle_link))
+            .on_action(cx.listener(Self::toggle_blockquote))
             .child(
                 v_flex()
                     .flex_1()
@@ -1202,4 +1264,14 @@ fn next_nonce(channel_id: ChannelId) -> u128 {
         Err(_) => 0,
     };
     nanos ^ u128::from(channel_id.0)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn formatting_shortcut_key_bindings_parse() {
+        let bindings = super::formatting_key_bindings();
+
+        assert_eq!(bindings.len(), 4);
+    }
 }

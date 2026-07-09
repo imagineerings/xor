@@ -45,12 +45,13 @@ The work is ordered to build incrementally: first the rendering pipeline (Markdo
   - _writes: `collab_ui/src/channel_chat/formatting_toolbar.rs`_
   - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui formatting_toolbar --features test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab test_channel_chat_view_live_insert_and_send_states --features test-support`_
 
-- [ ] 5. Wire keyboard shortcuts for formatting actions
-  - [ ] 5.1 Register `actions!` for `ToggleBold`, `ToggleItalic`, `ToggleCode`, `ToggleLink`, `ToggleBlockquote` in the compose area.
-  - [ ] 5.2 Bind Ctrl+B → bold, Ctrl+I → italic, Ctrl+` → code, Ctrl+Shift+K → link.
-  - [ ] 5.3 Each action calls `FormattingToolbar::apply_format` with the corresponding `FormatKind`.
+- [x] 5. Wire keyboard shortcuts for formatting actions
+  - [x] 5.1 Register `actions!` for `ToggleBold`, `ToggleItalic`, `ToggleCode`, `ToggleLink`, `ToggleBlockquote` in the compose area.
+  - [x] 5.2 Bind Ctrl+B → bold, Ctrl+I → italic, Ctrl+` → code, Ctrl+Shift+K → link.
+  - [x] 5.3 Each action calls `FormattingToolbar::apply_format` with the corresponding `FormatKind`.
   - _Requirements: 1.2_
   - _writes: `collab_ui/src/channel_chat/formatting_toolbar.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui formatting --features test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab test_channel_chat_view_live_insert_and_send_states --features test-support`_
 
 - [ ] 6. Add the Source/Preview toggle to the ComposeArea
   - [ ] 6.1 Define `ComposeMode` enum: `Source` and `Preview`.
