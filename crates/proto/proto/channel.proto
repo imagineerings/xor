@@ -253,6 +253,7 @@ message SearchResult {
   string channel_name = 2;
   string sender_name = 3;
   repeated uint64 match_positions = 4;
+  uint64 channel_id = 5;
 }
 
 message GetThread {

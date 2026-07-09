@@ -40,6 +40,7 @@ pub struct SearchChannelMessagesParams {
 
 pub struct ChannelMessageSearchResult {
     pub message: proto::ChannelMessage,
+    pub channel_id: ChannelId,
     pub channel_name: String,
     pub sender_id: UserId,
     pub match_positions: Vec<u64>,
@@ -458,6 +459,7 @@ impl Database {
                         .map(|(row, message)| ChannelMessageSearchResult {
                             match_positions: match_positions(&message.body, &truncated_query),
                             message,
+                            channel_id: row.channel_id,
                             channel_name: row.channel_name,
                             sender_id: row.sender_id,
                         })

@@ -4003,6 +4003,7 @@ async fn search_channel_messages(
                     .get(&result.sender_id)
                     .cloned()
                     .unwrap_or_else(|| result.sender_id.to_string()),
+                channel_id: result.channel_id.to_proto(),
                 channel_name: result.channel_name,
                 message: Some(result.message),
                 match_positions: result.match_positions,

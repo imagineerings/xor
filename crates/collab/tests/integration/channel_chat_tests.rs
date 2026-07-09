@@ -714,6 +714,12 @@ async fn test_channel_message_search_filters_and_access(
             .iter()
             .all(|result| result.channel_name == "general")
     );
+    assert!(
+        response
+            .results
+            .iter()
+            .all(|result| result.channel_id == general.0)
+    );
 
     let response = client_b
         .search_channel_messages(SearchChannelMessages {

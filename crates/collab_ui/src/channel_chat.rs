@@ -3,7 +3,9 @@ use anyhow::Result;
 use channel::{Channel, ChannelStore};
 use client::{
     ChannelId, Client, UserStore,
-    channel_chat::{DEFAULT_THREAD_REPLY_LIMIT, SendChannelMessage, ThreadSummary},
+    channel_chat::{
+        DEFAULT_THREAD_REPLY_LIMIT, SearchChannelMessages, SendChannelMessage, ThreadSummary,
+    },
     proto::{self, ChannelVisibility},
 };
 use db::kvp::KeyValueStore;
@@ -40,6 +42,8 @@ mod markdown_style;
 mod message_bubble;
 #[path = "channel_chat/sanitize.rs"]
 mod sanitize;
+#[path = "channel_chat/search.rs"]
+mod search;
 
 const RECENT_EMOJI_NAMESPACE: &str = "channel_chat_recent_emojis";
 const RECENT_EMOJI_KEY: &str = "recent";
@@ -53,6 +57,8 @@ const THREAD_LOAD_RETRY_DELAYS: [Duration; 3] = [
     Duration::from_secs(1),
 ];
 const DRAFT_SAVE_DEBOUNCE: Duration = Duration::from_millis(500);
+const SEARCH_DEBOUNCE: Duration = Duration::from_millis(300);
+const SEARCH_PAGE_SIZE: u32 = 20;
 
 actions!(
     channel_chat,
@@ -71,6 +77,8 @@ actions!(
         ToggleBlockquote,
         /// Toggles the channel chat draft between source and preview modes.
         TogglePreview,
+        /// Toggles channel message search.
+        ToggleSearch,
         /// Closes the open channel message thread.
         CloseThread
     ]
@@ -80,13 +88,14 @@ pub fn init(cx: &mut App) {
     cx.bind_keys(channel_chat_key_bindings());
 }
 
-fn channel_chat_key_bindings() -> [KeyBinding; 6] {
+fn channel_chat_key_bindings() -> [KeyBinding; 7] {
     [
         KeyBinding::new("ctrl-b", ToggleBold, Some("ChannelChat")),
         KeyBinding::new("ctrl-i", ToggleItalic, Some("ChannelChat")),
         KeyBinding::new("ctrl-`", ToggleCode, Some("ChannelChat")),
         KeyBinding::new("ctrl-shift-k", ToggleLink, Some("ChannelChat")),
         KeyBinding::new("ctrl-shift-p", TogglePreview, Some("ChannelChat")),
+        KeyBinding::new("cmd-f", ToggleSearch, Some("ChannelChat")),
         KeyBinding::new("escape", CloseThread, Some("ChannelChat")),
     ]
 }
@@ -100,6 +109,9 @@ pub struct ChannelChat {
     composer: Entity<Editor>,
     compose_mode: compose_area::ComposeMode,
     compose_preview: Option<compose_area::PreviewBody>,
+    search_editor: Entity<Editor>,
+    search_state: search::SearchState,
+    pending_search: Option<Task<()>>,
     emoji_search: Entity<Editor>,
     messages: Vec<proto::ChannelMessage>,
     message_bodies: HashMap<u64, message_bubble::MessageBody>,
@@ -111,6 +123,7 @@ pub struct ChannelChat {
     pending_draft_save: Option<Task<()>>,
     _rpc_subscriptions: Vec<client::Subscription>,
     _composer_subscription: GpuiSubscription,
+    _search_subscription: GpuiSubscription,
     _emoji_search_subscription: GpuiSubscription,
 }
 
@@ -377,6 +390,15 @@ impl ChannelChat {
             editor.set_placeholder_text("Search emoji", window, cx);
             editor
         });
+        let search_editor = cx.new(|cx| {
+            let mut editor = Editor::single_line(window, cx);
+            editor.set_placeholder_text(
+                "Search messages... (in:, from:, before:, after:)",
+                window,
+                cx,
+            );
+            editor
+        });
         let restored_draft = DraftStore::global(cx)
             .update(cx, |draft_store, _| draft_store.cached_draft(channel_id));
         if let Some(restored_draft) = restored_draft {
@@ -392,6 +414,15 @@ impl ChannelChat {
             }
             cx.notify();
         });
+        let _search_subscription =
+            cx.subscribe(&search_editor, |this, _, event: &EditorEvent, cx| {
+                if matches!(
+                    event,
+                    EditorEvent::Edited { .. } | EditorEvent::BufferEdited
+                ) {
+                    this.schedule_search(cx);
+                }
+            });
         let _emoji_search_subscription = cx.observe(&emoji_search, |_, _, cx| cx.notify());
         let weak_self = cx.weak_entity();
         let _rpc_subscriptions = vec![
@@ -427,6 +458,9 @@ impl ChannelChat {
             composer,
             compose_mode: compose_area::ComposeMode::Source,
             compose_preview: None,
+            search_editor,
+            search_state: search::SearchState::default(),
+            pending_search: None,
             emoji_search,
             messages,
             message_bodies: HashMap::default(),
@@ -438,6 +472,7 @@ impl ChannelChat {
             pending_draft_save: None,
             _rpc_subscriptions,
             _composer_subscription,
+            _search_subscription,
             _emoji_search_subscription,
         }
     }
@@ -752,6 +787,9 @@ impl ChannelChat {
     }
 
     fn close_thread(&mut self, _: &CloseThread, _: &mut Window, cx: &mut Context<Self>) {
+        if self.close_search(cx) {
+            return;
+        }
         if self.thread_panel.take().is_some() {
             cx.notify();
         }
@@ -2100,11 +2138,16 @@ impl Render for ChannelChat {
             .on_action(cx.listener(Self::toggle_link))
             .on_action(cx.listener(Self::toggle_blockquote))
             .on_action(cx.listener(Self::toggle_preview))
+            .on_action(cx.listener(Self::toggle_search))
             .on_action(cx.listener(Self::close_thread))
             .child(
                 v_flex()
                     .flex_1()
                     .h_full()
+                    .child(self.render_search_header(window, cx))
+                    .when(self.search_state.active, |this| {
+                        this.child(self.render_search_results_panel(window, cx))
+                    })
                     .child(
                         v_flex()
                             .flex_1()

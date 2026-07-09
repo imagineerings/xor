@@ -109,7 +109,7 @@ Add full-text search across channel messages using PostgreSQL tsvector/tsquery, 
 
 ### Phase 4 — Client UI
 
-- [ ] 9. Build `SearchBar` component in `collab_ui`
+- [x] 9. Build `SearchBar` component in `collab_ui`
   - Create `SearchBar` struct with `editor: Entity<Editor>`, `active_filters: SearchFilters`, `results_panel: Option<Entity<SearchResultsPanel>>`
   - Implement `Render` with a text input styled to match the channel header
   - Add placeholder text: "Search messages… (in:, from:, before:, after:)"
@@ -118,9 +118,12 @@ Add full-text search across channel messages using PostgreSQL tsvector/tsquery, 
   - Clear results when query is empty
   - Show loading spinner while search is in-flight
   - _Requirements: 5.1_
-  - _writes: crates/collab_ui/src/channel_search_bar.rs_
+  - _writes: crates/collab_ui/src/channel_chat.rs_
+  - _writes: crates/collab_ui/src/channel_chat/search.rs_
+  - _implemented as a channel chat search header module with a 300 ms debounce, loading state, empty-query clearing, and inline errors_
+  - _validated: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab -p collab_ui --features collab/test-support,collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui search::tests --features test-support -- --nocapture`_
 
-- [ ] 10. Implement `SearchFilters` parsing and `SearchFilterChip` display
+- [x] 10. Implement `SearchFilters` parsing and `SearchFilterChip` display
   - Implement `parse_filters(query: &str) -> (SearchFilters, String)` that extracts:
     - `in:channel-name` → `SearchFilters.channel_name`
     - `from:username` → `SearchFilters.username`
@@ -131,9 +134,11 @@ Add full-text search across channel messages using PostgreSQL tsvector/tsquery, 
   - Each chip shows the filter label (e.g., "in: general") with an × to remove
   - Removing a chip updates the query text and re-triggers search
   - _Requirements: 5.2_
-  - _writes: crates/collab_ui/src/channel_search_bar.rs_
+  - _writes: crates/collab_ui/src/channel_chat/search.rs_
+  - _implemented with `in:`, `from:`, `before:YYYY-MM-DD`, and `after:YYYY-MM-DD` parsing, quoted literal preservation, removable chips, and date conversion to request timestamps_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui search::tests --features test-support -- --nocapture`_
 
-- [ ] 11. Build `SearchResultsPanel` component
+- [x] 11. Build `SearchResultsPanel` component
   - Create `SearchResultsPanel` struct with `results: Vec<SearchResult>`, `loading: bool`, `done: bool`, `active_query: String`
   - Implement `Render`:
     - "No results found" empty state with suggestions message when done and results empty
@@ -143,14 +148,19 @@ Add full-text search across channel messages using PostgreSQL tsvector/tsquery, 
     - "Load more" button when `done == false`
     - Loading spinner when new page is being fetched
   - _Requirements: 5.3_
-  - _writes: crates/collab_ui/src/channel_search_results_panel.rs_
+  - _writes: crates/collab_ui/src/channel_chat/search.rs_
+  - _implemented with result rows showing channel, sender, timestamp, highlighted body matches, empty state, paginated load more, and loading/error states; surrounding adjacent-message context remains deferred until the server response carries context messages_
+  - _validated: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab -p collab_ui --features collab/test-support,collab_ui/test-support`_
 
-- [ ] 12. Wire `SearchBar` and `SearchResultsPanel` into the channel UI
+- [x] 12. Wire `SearchBar` and `SearchResultsPanel` into the channel UI
   - Add `SearchBar` to the channel header (toggleable via a search icon button or `Cmd-F` keyboard shortcut)
   - Show `SearchResultsPanel` below the channel header when search is active (overlay or inline)
   - Close search and return to normal channel view on `Escape`
   - _Requirements: 5.1, 5.3_
-  - _writes: crates/collab_ui/src/channel.rs_
+  - _writes: crates/collab_ui/src/channel_chat.rs_
+  - _writes: crates/collab_ui/src/channel_chat/search.rs_
+  - _implemented in the channel chat header with a toggle button, `cmd-f` binding, inline results panel, and Escape-to-close behavior_
+  - _validated: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab -p collab_ui --features collab/test-support,collab_ui/test-support`; `git diff --check`_
 
 - [ ] 13. Navigate to message on result click
   - Implement `on_result_clicked` handler that:
