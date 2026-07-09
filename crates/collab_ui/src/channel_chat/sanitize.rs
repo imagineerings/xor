@@ -225,4 +225,139 @@ mod tests {
         assert!(!is_trusted_channel_url("file:///tmp/file"));
         assert!(is_trusted_channel_url("https://example.com"));
     }
+
+    #[gpui::test]
+    fn fuzz_markdown_like_inputs_sanitize_and_enter_rendering_pipeline(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        for input in markdown_like_inputs() {
+            let sanitized = sanitize_channel_markdown(&input);
+
+            assert_sanitized_markdown_invariants(&sanitized.source);
+            cx.update(|cx| {
+                super::super::message_bubble::MessageBody::new(input, cx);
+            });
+            cx.run_until_parked();
+        }
+    }
+
+    fn markdown_like_inputs() -> Vec<String> {
+        let fragments = [
+            "plain text",
+            "**bold**",
+            "_italic_",
+            "`code`",
+            "> quote",
+            "- item",
+            "1. item",
+            "[safe](https://example.com)",
+            "[bad](javascript:alert(1))",
+            "[bad](java\nscript:alert(1))",
+            "![bad](data:image/png;base64,AAAA)",
+            "[file](file:///tmp/file)",
+            "<script>alert(1)</script>",
+            "<img src=x onerror=alert(1)>",
+            "<b>bold</b>",
+            "```rust\nlet value = 1;\n```",
+            "[unterminated](https://example.com",
+            "**unclosed",
+            "emoji 😊 text",
+            "\\[escaped](javascript:alert(1))",
+        ];
+
+        let mut inputs = fragments
+            .iter()
+            .map(|fragment| fragment.to_string())
+            .collect::<Vec<_>>();
+
+        for seed in 0..128_u64 {
+            let mut state = seed.wrapping_add(0x9e37_79b9_7f4a_7c15);
+            let mut input = String::new();
+
+            for _ in 0..8 {
+                state = state
+                    .wrapping_mul(6_364_136_223_846_793_005)
+                    .wrapping_add(1);
+                let fragment_index = (state as usize) % fragments.len();
+                input.push_str(fragments.get(fragment_index).copied().unwrap_or_default());
+                input.push('\n');
+            }
+
+            inputs.push(input);
+        }
+
+        inputs.push("a".repeat(MAX_CHANNEL_MARKDOWN_SOURCE_LEN + 128));
+        inputs
+    }
+
+    fn assert_sanitized_markdown_invariants(source: &str) {
+        assert!(
+            !contains_untrusted_inline_destination(source),
+            "sanitized source retained an unsafe inline destination: {source:?}"
+        );
+        assert!(
+            !contains_unescaped_html_tag(source),
+            "sanitized source retained an unescaped HTML tag: {source:?}"
+        );
+        assert!(
+            !source.to_ascii_lowercase().contains("<script"),
+            "sanitized source retained a raw script tag: {source:?}"
+        );
+    }
+
+    fn contains_untrusted_inline_destination(input: &str) -> bool {
+        let mut index = 0;
+
+        while index < input.len() {
+            let remaining = &input[index..];
+            let label_open_len = if remaining.starts_with("![") {
+                2
+            } else if remaining.starts_with('[') {
+                1
+            } else {
+                index += remaining
+                    .chars()
+                    .next()
+                    .map_or(1, |character| character.len_utf8());
+                continue;
+            };
+
+            let label_start = index + label_open_len;
+            let Some(label_end) = find_unescaped_byte(input, label_start, b']') else {
+                index = label_start;
+                continue;
+            };
+
+            if input.as_bytes().get(label_end + 1) != Some(&b'(') {
+                index = label_end + 1;
+                continue;
+            }
+
+            let destination_start = label_end + 2;
+            let Some(destination_end) = find_link_destination_end(input, destination_start) else {
+                index = destination_start;
+                continue;
+            };
+
+            if has_untrusted_protocol(&input[destination_start..destination_end]) {
+                return true;
+            }
+
+            index = destination_end + 1;
+        }
+
+        false
+    }
+
+    fn contains_unescaped_html_tag(input: &str) -> bool {
+        let mut chars = input.chars().peekable();
+
+        while let Some(character) = chars.next() {
+            if character == '<' && chars.peek().is_some_and(|next| starts_html_tag(*next)) {
+                return true;
+            }
+        }
+
+        false
+    }
 }

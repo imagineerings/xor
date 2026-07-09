@@ -97,9 +97,9 @@ The work is ordered to build incrementally: first the rendering pipeline (Markdo
   - _Requirements: 1.2, 1.3_
   - _writes: `collab_ui/src/channel_chat/compose_area.rs`_ (tests)
 
-- [ ] 11. Add property-based tests for rendering stability
-  - [ ] 11.1 Use `proptest` (or a simple fuzz loop) to generate random Markdown-like strings and feed them through the rendering pipeline.
-  - [ ] 11.2 Assert no panic occurs for any input — the renderer must produce valid GPUI elements or fall back gracefully.
-  - [ ] 11.3 Assert sanitization invariants: no rendered output ever contains raw `<script>`, `javascript:` links, or unescaped HTML tags.
+- [x] 11. Add property-based tests for rendering stability
+  - [x] 11.1 Use `proptest` (or a simple fuzz loop) to generate random Markdown-like strings and feed them through the rendering pipeline.
+  - [x] 11.2 Assert no panic occurs for any input — the renderer must produce valid GPUI elements or fall back gracefully.
+  - [x] 11.3 Assert sanitization invariants: no rendered output ever contains raw `<script>`, `javascript:` links, or unescaped HTML tags.
   - _Requirements: 1.4_
   - _writes: `collab_ui/src/channel_chat/sanitize.rs`_ (fuzz tests)
