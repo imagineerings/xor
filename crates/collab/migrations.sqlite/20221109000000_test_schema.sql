@@ -295,12 +295,39 @@ CREATE TABLE IF NOT EXISTS "channel_messages" (
     "search_vector" TEXT,
     "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "edited_at" TIMESTAMP,
-    "deleted_at" TIMESTAMP
+    "deleted_at" TIMESTAMP,
+    "scheduled_at" TIMESTAMP
 );
 
 CREATE INDEX "index_channel_messages_on_channel_id_and_id" ON "channel_messages" ("channel_id", "id");
 
 CREATE INDEX "index_channel_messages_on_reply_to_message_id" ON "channel_messages" ("reply_to_message_id");
+
+CREATE TABLE IF NOT EXISTS "scheduled_messages" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "channel_id" INTEGER NOT NULL REFERENCES channels (id) ON DELETE CASCADE,
+    "sender_id" INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    "body" TEXT NOT NULL,
+    "scheduled_at" TIMESTAMP NOT NULL,
+    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "state" INTEGER NOT NULL DEFAULT 0,
+    "nonce" BLOB NOT NULL,
+    "mentions" TEXT NOT NULL DEFAULT '[]',
+    "delivered_message_id" INTEGER REFERENCES channel_messages (id) ON DELETE SET NULL,
+    "failure_reason" TEXT,
+    "updated_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX "index_scheduled_messages_on_pending_delivery"
+    ON "scheduled_messages" ("state", "scheduled_at")
+    WHERE "state" = 0;
+
+CREATE INDEX "index_scheduled_messages_on_sender_channel_pending"
+    ON "scheduled_messages" ("sender_id", "channel_id")
+    WHERE "state" = 0;
+
+CREATE UNIQUE INDEX "index_scheduled_messages_on_channel_sender_nonce"
+    ON "scheduled_messages" ("channel_id", "sender_id", "nonce");
 
 CREATE TABLE IF NOT EXISTS "channel_message_mentions" (
     "message_id" INTEGER NOT NULL REFERENCES channel_messages (id) ON DELETE CASCADE,

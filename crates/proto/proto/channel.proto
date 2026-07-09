@@ -256,6 +256,61 @@ message SearchResult {
   uint64 channel_id = 5;
 }
 
+message ScheduleChannelMessage {
+  uint64 channel_id = 1;
+  string body = 2;
+  uint64 scheduled_at = 3;
+  Nonce nonce = 4;
+  repeated ChatMention mentions = 5;
+}
+
+message ScheduleChannelMessageResponse {
+  uint64 scheduled_message_id = 1;
+}
+
+message CancelScheduledMessage {
+  uint64 scheduled_message_id = 1;
+  uint64 channel_id = 2;
+}
+
+message UpdateScheduledMessage {
+  uint64 scheduled_message_id = 1;
+  uint64 channel_id = 2;
+  optional string body = 3;
+  optional uint64 scheduled_at = 4;
+  repeated ChatMention mentions = 5;
+}
+
+message GetScheduledMessages {
+  uint64 channel_id = 1;
+}
+
+message GetScheduledMessagesResponse {
+  repeated ScheduledMessage messages = 1;
+}
+
+message ScheduledMessage {
+  uint64 id = 1;
+  uint64 channel_id = 2;
+  string body = 3;
+  uint64 sender_id = 4;
+  uint64 scheduled_at = 5;
+  uint64 created_at = 6;
+  Nonce nonce = 7;
+  repeated ChatMention mentions = 8;
+}
+
+message ScheduledMessageSent {
+  uint64 channel_id = 1;
+  ChannelMessage message = 2;
+}
+
+message ScheduledMessageFailed {
+  uint64 scheduled_message_id = 1;
+  uint64 channel_id = 2;
+  string reason = 3;
+}
+
 message GetThread {
   uint64 channel_id = 1;
   uint64 message_id = 2;
@@ -329,6 +384,7 @@ message ChannelMessage {
   optional uint64 reply_to_message_id = 7;
   optional uint64 edited_at = 8;
   repeated ReactionSummary reaction_summaries = 9;
+  optional uint64 scheduled_at = 10;
 }
 
 message ChatMention {

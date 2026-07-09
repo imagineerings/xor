@@ -15,6 +15,7 @@ pub struct Model {
     pub created_at: PrimitiveDateTime,
     pub edited_at: Option<PrimitiveDateTime>,
     pub deleted_at: Option<PrimitiveDateTime>,
+    pub scheduled_at: Option<PrimitiveDateTime>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

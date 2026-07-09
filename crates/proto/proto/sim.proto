@@ -501,7 +501,15 @@ message Envelope {
     ResolveCodeActionResponse resolve_code_action_response = 466;
     AckChannelThread ack_channel_thread = 467;
     SearchChannelMessages search_channel_messages = 468;
-    SearchChannelMessagesResponse search_channel_messages_response = 469; // current max
+    SearchChannelMessagesResponse search_channel_messages_response = 469;
+    ScheduleChannelMessage schedule_channel_message = 470;
+    ScheduleChannelMessageResponse schedule_channel_message_response = 471;
+    CancelScheduledMessage cancel_scheduled_message = 472;
+    UpdateScheduledMessage update_scheduled_message = 473;
+    GetScheduledMessages get_scheduled_messages = 474;
+    GetScheduledMessagesResponse get_scheduled_messages_response = 475;
+    ScheduledMessageSent scheduled_message_sent = 476;
+    ScheduledMessageFailed scheduled_message_failed = 477; // current max
   }
 
   reserved 87 to 88;

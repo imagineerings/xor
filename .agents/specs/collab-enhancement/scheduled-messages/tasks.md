@@ -10,19 +10,23 @@ Add the ability for channel participants to schedule messages for future deliver
 
 ## Tasks
 
-- [ ] 1. Define protobuf messages and register in the message framework
+- [x] 1. Define protobuf messages and register in the message framework
     - Add `ScheduleChannelMessage`, `ScheduleChannelMessageResponse`, `CancelScheduledMessage`, `UpdateScheduledMessage`, `GetScheduledMessages`, `GetScheduledMessagesResponse`, `ScheduledMessage`, `ScheduledMessageSent`, `ScheduledMessageFailed` to `channel.proto`.
     - Add `scheduled_at` (optional uint64) to the existing `ChannelMessage` proto.
     - Register all new request messages in the `messages!` macro (background-priority) and push messages in `entity_messages!` (`ScheduledMessageSent`, `ScheduledMessageFailed`).
     - _Requirements: 11.1, 11.2, 11.3_
     - _writes: proto/src/channel.proto, proto/src/proto.rs_
+    - _Completed: Added scheduled-message proto request/response/push messages, registered request mappings, and added `ChannelMessage.scheduled_at` with DB-to-proto hydration._
+    - _Validation: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `git diff --check`._
 
-- [ ] 2. Add database migration for the `scheduled_messages` table
+- [x] 2. Add database migration for the `scheduled_messages` table
     - Create a new migration file with the `CREATE TABLE scheduled_messages (...)` DDL including all columns: `id`, `channel_id` (FK → `channels(id)` ON DELETE CASCADE), `sender_id`, `body`, `scheduled_at`, `created_at`, `state` (SMALLINT), `nonce`, `mentions` (JSONB), `delivered_message_id`, `failure_reason`, `updated_at`.
     - Add partial indexes: `(state, scheduled_at) WHERE state = 0` and `(sender_id, channel_id) WHERE state = 0`.
     - Add a unique index on `(channel_id, sender_id, nonce)` for idempotent scheduling.
     - _Requirements: 11.1, 11.2_
     - _writes: db/migrations/*_scheduled_messages.sql_
+    - _Completed: Added Postgres and SQLite scheduled-message schema, indexes, idempotency constraint, and `channel_messages.scheduled_at` column._
+    - _Validation: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `git diff --check`._
 
 - [ ] 3. Implement `ScheduledMessageStore` (server-side data access layer)
     - Create `ScheduledMessageStore` with `db: Arc<Database>`.

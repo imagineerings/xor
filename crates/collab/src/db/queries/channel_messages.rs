@@ -157,6 +157,7 @@ impl Database {
                     created_at: ActiveValue::NotSet,
                     edited_at: ActiveValue::Set(None),
                     deleted_at: ActiveValue::Set(None),
+                    scheduled_at: ActiveValue::Set(None),
                 }
                 .insert(&*tx)
                 .await?;
@@ -195,6 +196,7 @@ impl Database {
                     created_at: ActiveValue::Unchanged(row.created_at),
                     edited_at: ActiveValue::Set(Some(now())),
                     deleted_at: ActiveValue::Set(None),
+                    scheduled_at: ActiveValue::Unchanged(row.scheduled_at),
                 })
                 .exec(&*tx)
                 .await?;
@@ -241,6 +243,7 @@ impl Database {
                 created_at: ActiveValue::Unchanged(row.created_at),
                 edited_at: ActiveValue::Unchanged(row.edited_at),
                 deleted_at: ActiveValue::Set(Some(now())),
+                scheduled_at: ActiveValue::Unchanged(row.scheduled_at),
             })
             .exec(&*tx)
             .await?;
@@ -416,6 +419,7 @@ impl Database {
                         cm.created_at,
                         cm.edited_at,
                         cm.deleted_at,
+                        cm.scheduled_at,
                         c.name AS channel_name,
                         {rank_expression} AS rank
                     FROM channel_messages cm
@@ -449,6 +453,7 @@ impl Database {
                         created_at: row.created_at,
                         edited_at: row.edited_at,
                         deleted_at: row.deleted_at,
+                        scheduled_at: row.scheduled_at,
                     })
                     .collect();
                 let messages = self.channel_messages_to_proto(messages, &tx).await?;
@@ -872,6 +877,7 @@ struct SearchMessageRow {
     created_at: PrimitiveDateTime,
     edited_at: Option<PrimitiveDateTime>,
     deleted_at: Option<PrimitiveDateTime>,
+    scheduled_at: Option<PrimitiveDateTime>,
     channel_name: String,
     #[allow(dead_code)]
     rank: f64,
@@ -1003,6 +1009,9 @@ fn channel_message_to_proto(
             .get(&row.id)
             .cloned()
             .unwrap_or_default(),
+        scheduled_at: row
+            .scheduled_at
+            .map(|scheduled_at| scheduled_at.assume_utc().unix_timestamp() as u64),
     })
 }
 
