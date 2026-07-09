@@ -596,6 +596,8 @@ impl TestServer {
                 blob_store_access_key: None,
                 blob_store_secret_key: None,
                 blob_store_bucket: None,
+                file_upload_max_file_size: None,
+                file_upload_allowed_mime_types: None,
                 sim_client_checksum_seed: None,
                 kinesis_region: None,
                 kinesis_stream: None,

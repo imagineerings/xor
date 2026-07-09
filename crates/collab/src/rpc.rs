@@ -1,10 +1,11 @@
 mod connection_pool;
 
 use crate::api::{CloudflareIpCountryHeader, SystemIdHeader};
+use crate::db::bookmark_store::{BookmarkStore, BookmarkUpdate, NewBookmark};
+use crate::db::file_store::{FileStore, FileStoreConfig, FileStoreError, NewFileUpload};
 use crate::db::queries::channel_messages::{
     ChannelMessageUpdate, NewChannelMessage, SearchChannelMessagesParams,
 };
-use crate::db::bookmark_store::{BookmarkStore, BookmarkUpdate, NewBookmark};
 use crate::db::scheduled_message_store::{
     NewScheduledMessage, ScheduledMessageStore, ScheduledMessageUpdate,
 };
@@ -94,6 +95,7 @@ const MAX_CONCURRENT_CONNECTIONS: usize = 512;
 const SCHEDULED_MESSAGE_POLL_INTERVAL: Duration = Duration::from_secs(10);
 const SCHEDULED_MESSAGE_STALE_PROCESSING_GRACE: Duration = Duration::from_secs(60);
 const BOOKMARK_REORDER_BROADCAST_DEBOUNCE: Duration = Duration::from_millis(200);
+const DEFAULT_FILE_UPLOAD_MAX_FILE_SIZE: u64 = 100 * 1024 * 1024;
 
 static CONCURRENT_CONNECTIONS: AtomicUsize = AtomicUsize::new(0);
 
@@ -473,6 +475,8 @@ impl Server {
             .add_request_handler(update_scheduled_message)
             .add_request_handler(get_scheduled_messages)
             .add_request_handler(get_bookmarks)
+            .add_request_handler(get_file_upload_url)
+            .add_request_handler(confirm_file_upload)
             .add_request_handler(add_bookmark)
             .add_request_handler(remove_bookmark)
             .add_request_handler(update_bookmark)
@@ -3856,6 +3860,52 @@ async fn get_bookmarks(
     response.send(proto::GetBookmarksResponse { bookmarks })
 }
 
+async fn get_file_upload_url(
+    request: proto::GetFileUploadUrl,
+    response: Response<proto::GetFileUploadUrl>,
+    session: MessageContext,
+) -> Result<()> {
+    let channel_id = ChannelId::from_proto(request.channel_id);
+    ensure_can_upload_files(&session, channel_id).await?;
+    let store = file_store(&session);
+    let upload_url = store
+        .generate_upload_url(NewFileUpload {
+            channel_id,
+            filename: request.filename,
+            file_size: request.file_size,
+            mime_type: request.mime_type,
+            uploader_id: session.user_id(),
+            image_width: None,
+            image_height: None,
+            duration_ms: None,
+        })
+        .await
+        .map_err(file_store_rpc_error)?;
+
+    response.send(proto::GetFileUploadUrlResponse {
+        url: upload_url.url,
+        file_id: upload_url.file_id.to_string(),
+        headers: upload_url.headers,
+    })
+}
+
+async fn confirm_file_upload(
+    request: proto::ConfirmFileUpload,
+    response: Response<proto::ConfirmFileUpload>,
+    session: MessageContext,
+) -> Result<()> {
+    let file_id = uuid::Uuid::parse_str(&request.file_id).context("invalid file id")?;
+    let store = file_store(&session);
+    let attachment = store
+        .confirm_upload(file_id, session.user_id())
+        .await
+        .map_err(file_store_rpc_error)?;
+
+    response.send(proto::ConfirmFileUploadResponse {
+        attachment: Some(attachment.to_proto()),
+    })
+}
+
 async fn add_bookmark(
     request: proto::AddBookmark,
     response: Response<proto::AddBookmark>,
@@ -3863,8 +3913,8 @@ async fn add_bookmark(
 ) -> Result<()> {
     let channel_id = ChannelId::from_proto(request.channel_id);
     ensure_can_edit_bookmarks(&session, channel_id).await?;
-    let bookmark_type = proto::BookmarkType::from_i32(request.r#type)
-        .context("invalid bookmark type")?;
+    let bookmark_type =
+        proto::BookmarkType::from_i32(request.r#type).context("invalid bookmark type")?;
     let store = BookmarkStore::new(session.app_state.db.clone());
     let bookmark = store
         .create(NewBookmark {
@@ -3924,13 +3974,7 @@ async fn remove_bookmark(
         .await?;
     }
     response.send(proto::Ack {})?;
-    broadcast_channel_bookmarks_update(
-        &session,
-        channel_id,
-        bookmarks,
-        vec![bookmark_id],
-    )
-    .await
+    broadcast_channel_bookmarks_update(&session, channel_id, bookmarks, vec![bookmark_id]).await
 }
 
 async fn update_bookmark(
@@ -3985,6 +4029,62 @@ async fn reorder_bookmarks(
     Ok(())
 }
 
+fn file_store(session: &MessageContext) -> FileStore {
+    FileStore::new(
+        session.app_state.db.clone(),
+        session.app_state.blob_store_client.clone(),
+        FileStoreConfig::new(
+            session.app_state.config.blob_store_bucket.clone(),
+            session
+                .app_state
+                .config
+                .file_upload_max_file_size
+                .unwrap_or(DEFAULT_FILE_UPLOAD_MAX_FILE_SIZE),
+            allowed_file_upload_mime_types(
+                session
+                    .app_state
+                    .config
+                    .file_upload_allowed_mime_types
+                    .as_deref(),
+            ),
+        ),
+    )
+}
+
+fn allowed_file_upload_mime_types(allowed_mime_types: Option<&str>) -> Vec<String> {
+    allowed_mime_types
+        .into_iter()
+        .flat_map(|allowed_mime_types| allowed_mime_types.split(','))
+        .map(str::trim)
+        .filter(|allowed_mime_type| !allowed_mime_type.is_empty())
+        .map(ToOwned::to_owned)
+        .collect()
+}
+
+fn file_store_rpc_error(error: Error) -> Error {
+    let Error::Internal(error) = error else {
+        return error;
+    };
+    let Some(file_store_error) = error.downcast_ref::<FileStoreError>() else {
+        return Error::Internal(error);
+    };
+    let message = file_store_error.to_string();
+    let rpc_error = match file_store_error {
+        FileStoreError::FileTooLarge { max_file_size } => ErrorCode::FileTooLarge
+            .with_tag("max_file_size", &max_file_size.to_string())
+            .message(message),
+        FileStoreError::UnsupportedFileType => ErrorCode::UnsupportedFileType.message(message),
+        FileStoreError::StorageUnavailable | FileStoreError::PresignFailed(_) => {
+            ErrorCode::FileStorageUnavailable.message(message)
+        }
+    };
+    Error::from(rpc_error.anyhow())
+}
+
+async fn ensure_can_upload_files(session: &MessageContext, channel_id: ChannelId) -> Result<()> {
+    ensure_can_edit_bookmarks(session, channel_id).await
+}
+
 async fn post_bookmark_system_message(
     session: &MessageContext,
     channel_id: ChannelId,
@@ -4015,10 +4115,7 @@ fn bookmark_type_label(bookmark_type: proto::BookmarkType) -> &'static str {
     }
 }
 
-async fn ensure_can_edit_bookmarks(
-    session: &MessageContext,
-    channel_id: ChannelId,
-) -> Result<()> {
+async fn ensure_can_edit_bookmarks(session: &MessageContext, channel_id: ChannelId) -> Result<()> {
     let db = session.app_state.db.clone();
     let user_id = session.user_id();
     db.transaction(|tx| {
@@ -4038,10 +4135,7 @@ async fn ensure_can_edit_bookmarks(
     .await
 }
 
-async fn ensure_can_read_bookmarks(
-    session: &MessageContext,
-    channel_id: ChannelId,
-) -> Result<()> {
+async fn ensure_can_read_bookmarks(session: &MessageContext, channel_id: ChannelId) -> Result<()> {
     let db = session.app_state.db.clone();
     let user_id = session.user_id();
     db.transaction(|tx| {
@@ -4672,10 +4766,7 @@ async fn broadcast_channel_bookmarks_update(
 
 fn schedule_channel_bookmarks_reorder_broadcast(session: &MessageContext, channel_id: ChannelId) {
     let generation = {
-        let mut pending = session
-            .app_state
-            .pending_bookmark_reorder_broadcasts
-            .lock();
+        let mut pending = session.app_state.pending_bookmark_reorder_broadcasts.lock();
         let generation = pending.entry(channel_id).or_insert(0);
         *generation += 1;
         *generation

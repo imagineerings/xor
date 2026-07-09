@@ -51,13 +51,16 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
   - _Actual writes: crates/collab/src/db/file_store.rs; crates/collab/src/db/tables/channel_file.rs; crates/collab/src/db.rs; crates/collab/src/db/tables.rs_
   - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab --features collab/test-support`; `git diff --check`._
 
-- [ ] 5. Implement server RPC handlers for file upload
+- [x] 5. Implement server RPC handlers for file upload
   - Wire `GetFileUploadUrl` handler calling `FileStore.GenerateUploadUrl`.
   - Wire `ConfirmFileUpload` handler calling `FileStore.ConfirmUpload`.
   - Wire file metadata lookup for existing messages.
   - Return proper error codes (413 for size, 415 for type, 503 for S3 unavailable).
   - _Requirements: 4.1, 4.4_
   - _writes: crates/collab/src/rpc/file_upload.go_
+  - _Completed: Registered Rust `GetFileUploadUrl` and `ConfirmFileUpload` handlers in collab RPC, wired them to `FileStore`, added upload size/type/storage config, enforced channel upload permission and uploader-owned confirmation, and added typed file-upload RPC error codes._
+  - _Actual writes: crates/collab/src/rpc.rs; crates/collab/src/lib.rs; crates/collab/src/db/file_store.rs; crates/collab/tests/integration/test_server.rs; crates/proto/proto/sim.proto_
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `git diff --check`._
 
 - [ ] 6. Implement file cleanup on message deletion
   - When a channel message is deleted, query associated `channel_files` rows.

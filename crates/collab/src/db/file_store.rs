@@ -1,8 +1,9 @@
 use super::*;
 use anyhow::{Context as _, anyhow};
 use aws_sdk_s3::presigning::PresigningConfig;
-use collections::HashMap;
 use rpc::proto;
+use std::collections::HashMap;
+use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
 use time::PrimitiveDateTime;
@@ -37,12 +38,12 @@ impl FileStore {
         let blob_store_client = self
             .blob_store_client
             .as_ref()
-            .context("file storage is not configured")?;
+            .ok_or(FileStoreError::StorageUnavailable)?;
         let bucket = self
             .config
             .storage_bucket
             .as_ref()
-            .context("file storage bucket is not configured")?;
+            .ok_or(FileStoreError::StorageUnavailable)?;
         let file_id = Uuid::new_v4();
         let storage_path = storage_path(request.channel_id, file_id, &request.filename);
         let content_length = i64::try_from(request.file_size)
@@ -58,7 +59,11 @@ impl FileStore {
             .content_length(content_length)
             .presigned(presigning_config)
             .await
-            .context("creating presigned file upload url")?;
+            .map_err(|error| {
+                Error::from(anyhow::Error::new(FileStoreError::PresignFailed(format!(
+                    "creating presigned file upload url: {error}"
+                ))))
+            })?;
 
         let row = channel_file::ActiveModel {
             id: ActiveValue::Set(file_id),
@@ -93,12 +98,17 @@ impl FileStore {
         })
     }
 
-    pub async fn confirm_upload(&self, file_id: Uuid) -> Result<FileAttachment> {
+    pub async fn confirm_upload(
+        &self,
+        file_id: Uuid,
+        uploader_id: UserId,
+    ) -> Result<FileAttachment> {
         let uploaded_at = now();
         let row = self
             .db
             .transaction(|tx| async move {
                 let row = channel_file::Entity::find_by_id(file_id)
+                    .filter(channel_file::Column::UploaderId.eq(uploader_id))
                     .one(&*tx)
                     .await?
                     .context("file upload does not exist")?;
@@ -151,12 +161,12 @@ impl FileStore {
         let blob_store_client = self
             .blob_store_client
             .as_ref()
-            .context("file storage is not configured")?;
+            .ok_or(FileStoreError::StorageUnavailable)?;
         let bucket = self
             .config
             .storage_bucket
             .as_ref()
-            .context("file storage bucket is not configured")?;
+            .ok_or(FileStoreError::StorageUnavailable)?;
         let presigning_config = PresigningConfig::expires_in(self.config.download_url_lifetime)
             .context("creating file download presigning config")?;
         let presigned = blob_store_client
@@ -165,7 +175,11 @@ impl FileStore {
             .key(storage_path)
             .presigned(presigning_config)
             .await
-            .context("creating presigned file download url")?;
+            .map_err(|error| {
+                Error::from(anyhow::Error::new(FileStoreError::PresignFailed(format!(
+                    "creating presigned file download url: {error}"
+                ))))
+            })?;
 
         Ok(presigned.uri().to_string())
     }
@@ -214,6 +228,40 @@ pub struct FileUploadUrl {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FileStoreError {
+    FileTooLarge { max_file_size: u64 },
+    UnsupportedFileType,
+    StorageUnavailable,
+    PresignFailed(String),
+}
+
+impl fmt::Display for FileStoreError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FileStoreError::FileTooLarge { max_file_size } => {
+                write!(
+                    formatter,
+                    "file size exceeds configured limit of {max_file_size} bytes"
+                )
+            }
+            FileStoreError::UnsupportedFileType => formatter.write_str("file type is not allowed"),
+            FileStoreError::StorageUnavailable => {
+                formatter.write_str("file storage is unavailable")
+            }
+            FileStoreError::PresignFailed(message) => formatter.write_str(message),
+        }
+    }
+}
+
+impl std::error::Error for FileStoreError {}
+
+impl From<FileStoreError> for Error {
+    fn from(error: FileStoreError) -> Self {
+        Error::from(anyhow::Error::new(error))
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FileAttachment {
     pub id: Uuid,
     pub filename: String,
@@ -246,10 +294,9 @@ impl FileAttachment {
 
 fn validate_upload(file_size: u64, mime_type: &str, config: &FileStoreConfig) -> Result<()> {
     if file_size > config.max_file_size {
-        return Err(anyhow!(
-            "file size exceeds configured limit of {} bytes",
-            config.max_file_size
-        )
+        return Err(FileStoreError::FileTooLarge {
+            max_file_size: config.max_file_size,
+        }
         .into());
     }
 
@@ -259,7 +306,7 @@ fn validate_upload(file_size: u64, mime_type: &str, config: &FileStoreConfig) ->
             .iter()
             .any(|allowed_mime_type| allowed_mime_type == mime_type)
     {
-        return Err(anyhow!("file type is not allowed").into());
+        return Err(FileStoreError::UnsupportedFileType.into());
     }
 
     Ok(())
