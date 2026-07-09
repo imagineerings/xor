@@ -1,0 +1,909 @@
+{
+  "schema_version": 1,
+  "source_root": "projects/comfy/blueprints",
+  "source_category": "workflows-blueprints",
+  "captured_at": "2026-07-09",
+  "implementation_owner": ".agents/specs/godot-migration/comfy-workflows-blueprints",
+  "native_sim_records": true,
+  "comfyui_passthrough": false,
+  "expected_blueprint_count": 89,
+  "safety": {
+    "model_downloads": {
+      "requires_downloads": false,
+      "mode": "metadata_only",
+      "dependency_review": "not_required"
+    }
+  },
+  "records": [
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Audio Generation (Stable Audio 3 Medium Base)_json:Audio_Generation_(Stable_Audio_3_Medium_Base)",
+      "source_path": "projects/comfy/blueprints/Audio Generation (Stable Audio 3 Medium Base).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Audio Generation (Stable Audio 3 Medium Base)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Audio Generation (Stable Audio 3 Medium)_json:Audio_Generation_(Stable_Audio_3_Medium)",
+      "source_path": "projects/comfy/blueprints/Audio Generation (Stable Audio 3 Medium).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Audio Generation (Stable Audio 3 Medium)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Brightness and Contrast_json:Brightness_and_Contrast",
+      "source_path": "projects/comfy/blueprints/Brightness and Contrast.json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Brightness and Contrast",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Canny to Image (Z-Image-Turbo)_json:Canny_to_Image_(Z-Image-Turbo)",
+      "source_path": "projects/comfy/blueprints/Canny to Image (Z-Image-Turbo).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Canny to Image (Z-Image-Turbo)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Canny to Video (LTX 2_0)_json:Canny_to_Video_(LTX_2_0)",
+      "source_path": "projects/comfy/blueprints/Canny to Video (LTX 2.0).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Canny to Video (LTX 2.0)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Character Replacement (SCAIL-2 Base)_json:Character_Replacement_(SCAIL-2_Base)",
+      "source_path": "projects/comfy/blueprints/Character Replacement (SCAIL-2 Base).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Character Replacement (SCAIL-2 Base)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Character Replacement (SCAIL-2 Extend)_json:Character_Replacement_(SCAIL-2_Extend)",
+      "source_path": "projects/comfy/blueprints/Character Replacement (SCAIL-2 Extend).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Character Replacement (SCAIL-2 Extend)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Chromatic Aberration_json:Chromatic_Aberration",
+      "source_path": "projects/comfy/blueprints/Chromatic Aberration.json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Chromatic Aberration",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Color Adjustment_json:Color_Adjustment",
+      "source_path": "projects/comfy/blueprints/Color Adjustment.json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Color Adjustment",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Color Balance_json:Color_Balance",
+      "source_path": "projects/comfy/blueprints/Color Balance.json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Color Balance",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Color Curves_json:Color_Curves",
+      "source_path": "projects/comfy/blueprints/Color Curves.json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Color Curves",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_ControlNet (Z-Image-Turbo)_json:ControlNet_(Z-Image-Turbo)",
+      "source_path": "projects/comfy/blueprints/ControlNet (Z-Image-Turbo).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "ControlNet (Z-Image-Turbo)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Crop Images 2x2_json:Crop_Images_2x2",
+      "source_path": "projects/comfy/blueprints/Crop Images 2x2.json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Crop Images 2x2",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Crop Images 3x3_json:Crop_Images_3x3",
+      "source_path": "projects/comfy/blueprints/Crop Images 3x3.json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Crop Images 3x3",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Depth to Image (Z-Image-Turbo)_json:Depth_to_Image_(Z-Image-Turbo)",
+      "source_path": "projects/comfy/blueprints/Depth to Image (Z-Image-Turbo).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Depth to Image (Z-Image-Turbo)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Depth to Video (ltx 2_0)_json:Depth_to_Video_(ltx_2_0)",
+      "source_path": "projects/comfy/blueprints/Depth to Video (ltx 2.0).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Depth to Video (ltx 2.0)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Edge-Preserving Blur_json:Edge-Preserving_Blur",
+      "source_path": "projects/comfy/blueprints/Edge-Preserving Blur.json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Edge-Preserving Blur",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Film Grain_json:Film_Grain",
+      "source_path": "projects/comfy/blueprints/Film Grain.json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Film Grain",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_First-Last-Frame to Video (LTX-2_3)_json:First-Last-Frame_to_Video_(LTX-2_3)",
+      "source_path": "projects/comfy/blueprints/First-Last-Frame to Video (LTX-2.3).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "First-Last-Frame to Video (LTX-2.3)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_First-Last-Frame to Video_json:First-Last-Frame_to_Video",
+      "source_path": "projects/comfy/blueprints/First-Last-Frame to Video.json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "First-Last-Frame to Video",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Frame Interpolation_json:Frame_Interpolation",
+      "source_path": "projects/comfy/blueprints/Frame Interpolation.json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Frame Interpolation",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Geometry Estimation (MoGe)_json:Geometry_Estimation_(MoGe)",
+      "source_path": "projects/comfy/blueprints/Geometry Estimation (MoGe).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Geometry Estimation (MoGe)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Get Any Video Frame_json:Get_Any_Video_Frame",
+      "source_path": "projects/comfy/blueprints/Get Any Video Frame.json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Get Any Video Frame",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Glow_json:Glow",
+      "source_path": "projects/comfy/blueprints/Glow.json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Glow",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Hue and Saturation_json:Hue_and_Saturation",
+      "source_path": "projects/comfy/blueprints/Hue and Saturation.json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Hue and Saturation",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Image Blur_json:Image_Blur",
+      "source_path": "projects/comfy/blueprints/Image Blur.json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Image Blur",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Image Captioning (gemini)_json:Image_Captioning_(gemini)",
+      "source_path": "projects/comfy/blueprints/Image Captioning (gemini).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Image Captioning (gemini)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Image Channels_json:Image_Channels",
+      "source_path": "projects/comfy/blueprints/Image Channels.json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Image Channels",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Image Depth Estimation (Depth Anything 3)_json:Image_Depth_Estimation_(Depth_Anything_3)",
+      "source_path": "projects/comfy/blueprints/Image Depth Estimation (Depth Anything 3).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Image Depth Estimation (Depth Anything 3)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Image Depth Estimation (Lotus Depth)_json:Image_Depth_Estimation_(Lotus_Depth)",
+      "source_path": "projects/comfy/blueprints/Image Depth Estimation (Lotus Depth).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Image Depth Estimation (Lotus Depth)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Image Depth Estimation (MoGe)_json:Image_Depth_Estimation_(MoGe)",
+      "source_path": "projects/comfy/blueprints/Image Depth Estimation (MoGe).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Image Depth Estimation (MoGe)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Image Edit (Bernini-R)_json:Image_Edit_(Bernini-R)",
+      "source_path": "projects/comfy/blueprints/Image Edit (Bernini-R).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Image Edit (Bernini-R)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Image Edit (FireRed Image Edit 1_1)_json:Image_Edit_(FireRed_Image_Edit_1_1)",
+      "source_path": "projects/comfy/blueprints/Image Edit (FireRed Image Edit 1.1).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Image Edit (FireRed Image Edit 1.1)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Image Edit (Flux_2 Dev)_json:Image_Edit_(Flux_2_Dev)",
+      "source_path": "projects/comfy/blueprints/Image Edit (Flux.2 Dev).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Image Edit (Flux.2 Dev)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Image Edit (Flux_2 Klein 4B)_json:Image_Edit_(Flux_2_Klein_4B)",
+      "source_path": "projects/comfy/blueprints/Image Edit (Flux.2 Klein 4B).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Image Edit (Flux.2 Klein 4B)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Image Edit (LongCat Image Edit)_json:Image_Edit_(LongCat_Image_Edit)",
+      "source_path": "projects/comfy/blueprints/Image Edit (LongCat Image Edit).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Image Edit (LongCat Image Edit)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Image Edit (Qwen 2509)_json:Image_Edit_(Qwen_2509)",
+      "source_path": "projects/comfy/blueprints/Image Edit (Qwen 2509).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Image Edit (Qwen 2509)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Image Edit (Qwen 2511)_json:Image_Edit_(Qwen_2511)",
+      "source_path": "projects/comfy/blueprints/Image Edit (Qwen 2511).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Image Edit (Qwen 2511)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Image Face Detection (Mediapipe)_json:Image_Face_Detection_(Mediapipe)",
+      "source_path": "projects/comfy/blueprints/Image Face Detection (Mediapipe).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Image Face Detection (Mediapipe)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Image Inpainting (Flux_1 Fill Dev)_json:Image_Inpainting_(Flux_1_Fill_Dev)",
+      "source_path": "projects/comfy/blueprints/Image Inpainting (Flux.1 Fill Dev).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Image Inpainting (Flux.1 Fill Dev)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Image Inpainting (Qwen-image)_json:Image_Inpainting_(Qwen-image)",
+      "source_path": "projects/comfy/blueprints/Image Inpainting (Qwen-image).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Image Inpainting (Qwen-image)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Image Levels_json:Image_Levels",
+      "source_path": "projects/comfy/blueprints/Image Levels.json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Image Levels",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Image Outpainting (Qwen-Image)_json:Image_Outpainting_(Qwen-Image)",
+      "source_path": "projects/comfy/blueprints/Image Outpainting (Qwen-Image).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Image Outpainting (Qwen-Image)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Image Segmentation (SAM3)_json:Image_Segmentation_(SAM3)",
+      "source_path": "projects/comfy/blueprints/Image Segmentation (SAM3).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Image Segmentation (SAM3)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Image Upscale(Z-image-Turbo)_json:Image_Upscale(Z-image-Turbo)",
+      "source_path": "projects/comfy/blueprints/Image Upscale(Z-image-Turbo).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Image Upscale(Z-image-Turbo)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Image to Gaussian Splat (TripoSplat)_json:Image_to_Gaussian_Splat_(TripoSplat)",
+      "source_path": "projects/comfy/blueprints/Image to Gaussian Splat (TripoSplat).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Image to Gaussian Splat (TripoSplat)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Image to Layers(Qwen-Image-Layered)_json:Image_to_Layers(Qwen-Image-Layered)",
+      "source_path": "projects/comfy/blueprints/Image to Layers(Qwen-Image-Layered).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Image to Layers(Qwen-Image-Layered)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Image to Model (Hunyuan3d 2_1)_json:Image_to_Model_(Hunyuan3d_2_1)",
+      "source_path": "projects/comfy/blueprints/Image to Model (Hunyuan3d 2.1).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Image to Model (Hunyuan3d 2.1)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Image to Pose Map (SDPose Multi-Person)_json:Image_to_Pose_Map_(SDPose_Multi-Person)",
+      "source_path": "projects/comfy/blueprints/Image to Pose Map (SDPose Multi-Person).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Image to Pose Map (SDPose Multi-Person)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Image to Pose Map (SDPose-OOD)_json:Image_to_Pose_Map_(SDPose-OOD)",
+      "source_path": "projects/comfy/blueprints/Image to Pose Map (SDPose-OOD).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Image to Pose Map (SDPose-OOD)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Image to Video (LTX-2_3)_json:Image_to_Video_(LTX-2_3)",
+      "source_path": "projects/comfy/blueprints/Image to Video (LTX-2.3).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Image to Video (LTX-2.3)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Image to Video (Wan 2_2)_json:Image_to_Video_(Wan_2_2)",
+      "source_path": "projects/comfy/blueprints/Image to Video (Wan 2.2).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Image to Video (Wan 2.2)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Merge Videos_json:Merge_Videos",
+      "source_path": "projects/comfy/blueprints/Merge Videos.json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Merge Videos",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Pose to Image (Z-Image-Turbo)_json:Pose_to_Image_(Z-Image-Turbo)",
+      "source_path": "projects/comfy/blueprints/Pose to Image (Z-Image-Turbo).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Pose to Image (Z-Image-Turbo)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Pose to Video (LTX 2_0)_json:Pose_to_Video_(LTX_2_0)",
+      "source_path": "projects/comfy/blueprints/Pose to Video (LTX 2.0).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Pose to Video (LTX 2.0)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Prompt Enhance_json:Prompt_Enhance",
+      "source_path": "projects/comfy/blueprints/Prompt Enhance.json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Prompt Enhance",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Remove Background (BiRefNet)_json:Remove_Background_(BiRefNet)",
+      "source_path": "projects/comfy/blueprints/Remove Background (BiRefNet).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Remove Background (BiRefNet)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Select Per-Line Text by Index_json:Select_Per-Line_Text_by_Index",
+      "source_path": "projects/comfy/blueprints/Select Per-Line Text by Index.json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Select Per-Line Text by Index",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Sharpen_json:Sharpen",
+      "source_path": "projects/comfy/blueprints/Sharpen.json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Sharpen",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Split Image Grid to Tiles_json:Split_Image_Grid_to_Tiles",
+      "source_path": "projects/comfy/blueprints/Split Image Grid to Tiles.json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Split Image Grid to Tiles",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Text to Audio (ACE-Step 1_5)_json:Text_to_Audio_(ACE-Step_1_5)",
+      "source_path": "projects/comfy/blueprints/Text to Audio (ACE-Step 1.5).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Text to Audio (ACE-Step 1.5)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Text to Image (Anima Base 1_0)_json:Text_to_Image_(Anima_Base_1_0)",
+      "source_path": "projects/comfy/blueprints/Text to Image (Anima Base 1.0).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Text to Image (Anima Base 1.0)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Text to Image (Anima)_json:Text_to_Image_(Anima)",
+      "source_path": "projects/comfy/blueprints/Text to Image (Anima).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Text to Image (Anima)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Text to Image (Ernie Image Turbo)_json:Text_to_Image_(Ernie_Image_Turbo)",
+      "source_path": "projects/comfy/blueprints/Text to Image (Ernie Image Turbo).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Text to Image (Ernie Image Turbo)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Text to Image (Ernie Image)_json:Text_to_Image_(Ernie_Image)",
+      "source_path": "projects/comfy/blueprints/Text to Image (Ernie Image).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Text to Image (Ernie Image)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Text to Image (Flux_1 Dev)_json:Text_to_Image_(Flux_1_Dev)",
+      "source_path": "projects/comfy/blueprints/Text to Image (Flux.1 Dev).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Text to Image (Flux.1 Dev)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Text to Image (Flux_1 Krea Dev)_json:Text_to_Image_(Flux_1_Krea_Dev)",
+      "source_path": "projects/comfy/blueprints/Text to Image (Flux.1 Krea Dev).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Text to Image (Flux.1 Krea Dev)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Text to Image (Flux_2 Dev)_json:Text_to_Image_(Flux_2_Dev)",
+      "source_path": "projects/comfy/blueprints/Text to Image (Flux.2 Dev).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Text to Image (Flux.2 Dev)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Text to Image (Ideogram v4)_json:Text_to_Image_(Ideogram_v4)",
+      "source_path": "projects/comfy/blueprints/Text to Image (Ideogram v4).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Text to Image (Ideogram v4)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Text to Image (NetaYume Lumina)_json:Text_to_Image_(NetaYume_Lumina)",
+      "source_path": "projects/comfy/blueprints/Text to Image (NetaYume Lumina).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Text to Image (NetaYume Lumina)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Text to Image (Qwen-Image 2512)_json:Text_to_Image_(Qwen-Image_2512)",
+      "source_path": "projects/comfy/blueprints/Text to Image (Qwen-Image 2512).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Text to Image (Qwen-Image 2512)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Text to Image (Qwen-Image)_json:Text_to_Image_(Qwen-Image)",
+      "source_path": "projects/comfy/blueprints/Text to Image (Qwen-Image).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Text to Image (Qwen-Image)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Text to Image (Z-Image-Base)_json:Text_to_Image_(Z-Image-Base)",
+      "source_path": "projects/comfy/blueprints/Text to Image (Z-Image-Base).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Text to Image (Z-Image-Base)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Text to Image (Z-Image-Turbo)_json:Text_to_Image_(Z-Image-Turbo)",
+      "source_path": "projects/comfy/blueprints/Text to Image (Z-Image-Turbo).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Text to Image (Z-Image-Turbo)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Text to Image_json:Text_to_Image",
+      "source_path": "projects/comfy/blueprints/Text to Image.json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Text to Image",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Text to Video (LTX-2_3)_json:Text_to_Video_(LTX-2_3)",
+      "source_path": "projects/comfy/blueprints/Text to Video (LTX-2.3).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Text to Video (LTX-2.3)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Text to Video (Wan 2_2)_json:Text_to_Video_(Wan_2_2)",
+      "source_path": "projects/comfy/blueprints/Text to Video (Wan 2.2).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Text to Video (Wan 2.2)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Unsharp Mask_json:Unsharp_Mask",
+      "source_path": "projects/comfy/blueprints/Unsharp Mask.json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Unsharp Mask",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Video Captioning (Gemini)_json:Video_Captioning_(Gemini)",
+      "source_path": "projects/comfy/blueprints/Video Captioning (Gemini).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Video Captioning (Gemini)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Video Depth Estimation (Depth Anything 3)_json:Video_Depth_Estimation_(Depth_Anything_3)",
+      "source_path": "projects/comfy/blueprints/Video Depth Estimation (Depth Anything 3).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Video Depth Estimation (Depth Anything 3)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Video Depth Estimation (MoGe)_json:Video_Depth_Estimation_(MoGe)",
+      "source_path": "projects/comfy/blueprints/Video Depth Estimation (MoGe).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Video Depth Estimation (MoGe)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Video Edit (Bernini-R)_json:Video_Edit_(Bernini-R)",
+      "source_path": "projects/comfy/blueprints/Video Edit (Bernini-R).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Video Edit (Bernini-R)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Video Face Detection (Mediapipe)_json:Video_Face_Detection_(Mediapipe)",
+      "source_path": "projects/comfy/blueprints/Video Face Detection (Mediapipe).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Video Face Detection (Mediapipe)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Video Inpaint (VOID)_json:Video_Inpaint_(VOID)",
+      "source_path": "projects/comfy/blueprints/Video Inpaint (VOID).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Video Inpaint (VOID)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Video Inpainting (Wan2_1 VACE)_json:Video_Inpainting_(Wan2_1_VACE)",
+      "source_path": "projects/comfy/blueprints/Video Inpainting (Wan2.1 VACE).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Video Inpainting (Wan2.1 VACE)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Video Segmentation (SAM3)_json:Video_Segmentation_(SAM3)",
+      "source_path": "projects/comfy/blueprints/Video Segmentation (SAM3).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Video Segmentation (SAM3)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Video Stitch_json:Video_Stitch",
+      "source_path": "projects/comfy/blueprints/Video Stitch.json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Video Stitch",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Video Upscale(GAN x4)_json:Video_Upscale(GAN_x4)",
+      "source_path": "projects/comfy/blueprints/Video Upscale(GAN x4).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Video Upscale(GAN x4)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    },
+    {
+      "source_id": "blueprint:projects_comfy_blueprints_Video to Pose Map (SDPose Multi-Person)_json:Video_to_Pose_Map_(SDPose_Multi-Person)",
+      "source_path": "projects/comfy/blueprints/Video to Pose Map (SDPose Multi-Person).json",
+      "source_kind": "Blueprint",
+      "blueprint_name": "Video to Pose Map (SDPose Multi-Person)",
+      "native_surface": "blueprint-catalog",
+      "evidence_module": "crates/world_model/src/comfy_blueprints.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    }
+  ]
+}

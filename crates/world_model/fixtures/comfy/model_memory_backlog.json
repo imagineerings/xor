@@ -1,0 +1,417 @@
+{
+  "schema_version": 1,
+  "source_path": "projects/comfy/comfy/supported_models.py",
+  "folder_source_path": "projects/comfy/folder_paths.py",
+  "captured_at": "2026-07-09",
+  "implementation_owner": ".agents/specs/godot-migration/comfy-model-memory-runtime",
+  "native_sim_records": true,
+  "comfyui_passthrough": false,
+  "requires_downloads": false,
+  "dependency_review": "not_required",
+  "model_families": [
+    {
+      "source_family": "ACEStep",
+      "metadata_only": true
+    },
+    {
+      "source_family": "ACEStep15",
+      "metadata_only": true
+    },
+    {
+      "source_family": "Anima",
+      "metadata_only": true
+    },
+    {
+      "source_family": "AuraFlow",
+      "metadata_only": true
+    },
+    {
+      "source_family": "Boogu",
+      "metadata_only": true
+    },
+    {
+      "source_family": "Chroma",
+      "metadata_only": true
+    },
+    {
+      "source_family": "ChromaRadiance",
+      "metadata_only": true
+    },
+    {
+      "source_family": "CogVideoX_I2V",
+      "metadata_only": true
+    },
+    {
+      "source_family": "CogVideoX_Inpaint",
+      "metadata_only": true
+    },
+    {
+      "source_family": "CogVideoX_T2V",
+      "metadata_only": true
+    },
+    {
+      "source_family": "CosmosI2V",
+      "metadata_only": true
+    },
+    {
+      "source_family": "CosmosI2VPredict2",
+      "metadata_only": true
+    },
+    {
+      "source_family": "CosmosT2IPredict2",
+      "metadata_only": true
+    },
+    {
+      "source_family": "CosmosT2V",
+      "metadata_only": true
+    },
+    {
+      "source_family": "DepthAnything3",
+      "metadata_only": true
+    },
+    {
+      "source_family": "ErnieImage",
+      "metadata_only": true
+    },
+    {
+      "source_family": "Flux",
+      "metadata_only": true
+    },
+    {
+      "source_family": "Flux2",
+      "metadata_only": true
+    },
+    {
+      "source_family": "FluxInpaint",
+      "metadata_only": true
+    },
+    {
+      "source_family": "FluxSchnell",
+      "metadata_only": true
+    },
+    {
+      "source_family": "GenmoMochi",
+      "metadata_only": true
+    },
+    {
+      "source_family": "HiDream",
+      "metadata_only": true
+    },
+    {
+      "source_family": "HiDreamO1",
+      "metadata_only": true
+    },
+    {
+      "source_family": "Hunyuan3Dv2",
+      "metadata_only": true
+    },
+    {
+      "source_family": "Hunyuan3Dv2_1",
+      "metadata_only": true
+    },
+    {
+      "source_family": "Hunyuan3Dv2mini",
+      "metadata_only": true
+    },
+    {
+      "source_family": "HunyuanDiT",
+      "metadata_only": true
+    },
+    {
+      "source_family": "HunyuanDiT1",
+      "metadata_only": true
+    },
+    {
+      "source_family": "HunyuanImage21",
+      "metadata_only": true
+    },
+    {
+      "source_family": "HunyuanImage21Refiner",
+      "metadata_only": true
+    },
+    {
+      "source_family": "HunyuanVideo",
+      "metadata_only": true
+    },
+    {
+      "source_family": "HunyuanVideo15",
+      "metadata_only": true
+    },
+    {
+      "source_family": "HunyuanVideo15_SR_Distilled",
+      "metadata_only": true
+    },
+    {
+      "source_family": "HunyuanVideoI2V",
+      "metadata_only": true
+    },
+    {
+      "source_family": "HunyuanVideoSkyreelsI2V",
+      "metadata_only": true
+    },
+    {
+      "source_family": "Ideogram4",
+      "metadata_only": true
+    },
+    {
+      "source_family": "KOALA_1B",
+      "metadata_only": true
+    },
+    {
+      "source_family": "KOALA_700M",
+      "metadata_only": true
+    },
+    {
+      "source_family": "Kandinsky5",
+      "metadata_only": true
+    },
+    {
+      "source_family": "Kandinsky5Image",
+      "metadata_only": true
+    },
+    {
+      "source_family": "Krea2",
+      "metadata_only": true
+    },
+    {
+      "source_family": "LTXAV",
+      "metadata_only": true
+    },
+    {
+      "source_family": "LTXV",
+      "metadata_only": true
+    },
+    {
+      "source_family": "Lens",
+      "metadata_only": true
+    },
+    {
+      "source_family": "LongCatImage",
+      "metadata_only": true
+    },
+    {
+      "source_family": "LotusD",
+      "metadata_only": true
+    },
+    {
+      "source_family": "Lumina2",
+      "metadata_only": true
+    },
+    {
+      "source_family": "Omnigen2",
+      "metadata_only": true
+    },
+    {
+      "source_family": "PiD",
+      "metadata_only": true
+    },
+    {
+      "source_family": "PixArtAlpha",
+      "metadata_only": true
+    },
+    {
+      "source_family": "PixArtSigma",
+      "metadata_only": true
+    },
+    {
+      "source_family": "PixelDiTT2I",
+      "metadata_only": true
+    },
+    {
+      "source_family": "QwenImage",
+      "metadata_only": true
+    },
+    {
+      "source_family": "RT_DETR_v4",
+      "metadata_only": true
+    },
+    {
+      "source_family": "SAM3",
+      "metadata_only": true
+    },
+    {
+      "source_family": "SAM31",
+      "metadata_only": true
+    },
+    {
+      "source_family": "SD15",
+      "metadata_only": true
+    },
+    {
+      "source_family": "SD15_instructpix2pix",
+      "metadata_only": true
+    },
+    {
+      "source_family": "SD20",
+      "metadata_only": true
+    },
+    {
+      "source_family": "SD21UnclipH",
+      "metadata_only": true
+    },
+    {
+      "source_family": "SD21UnclipL",
+      "metadata_only": true
+    },
+    {
+      "source_family": "SD3",
+      "metadata_only": true
+    },
+    {
+      "source_family": "SDXL",
+      "metadata_only": true
+    },
+    {
+      "source_family": "SDXLRefiner",
+      "metadata_only": true
+    },
+    {
+      "source_family": "SDXL_instructpix2pix",
+      "metadata_only": true
+    },
+    {
+      "source_family": "SD_X4Upscaler",
+      "metadata_only": true
+    },
+    {
+      "source_family": "SSD1B",
+      "metadata_only": true
+    },
+    {
+      "source_family": "SV3D_p",
+      "metadata_only": true
+    },
+    {
+      "source_family": "SV3D_u",
+      "metadata_only": true
+    },
+    {
+      "source_family": "SVD_img2vid",
+      "metadata_only": true
+    },
+    {
+      "source_family": "Segmind_Vega",
+      "metadata_only": true
+    },
+    {
+      "source_family": "StableAudio",
+      "metadata_only": true
+    },
+    {
+      "source_family": "StableAudio3",
+      "metadata_only": true
+    },
+    {
+      "source_family": "Stable_Cascade_B",
+      "metadata_only": true
+    },
+    {
+      "source_family": "Stable_Cascade_C",
+      "metadata_only": true
+    },
+    {
+      "source_family": "Stable_Zero123",
+      "metadata_only": true
+    },
+    {
+      "source_family": "TripoSplat",
+      "metadata_only": true
+    },
+    {
+      "source_family": "WAN21_Camera",
+      "metadata_only": true
+    },
+    {
+      "source_family": "WAN21_CausalAR_T2V",
+      "metadata_only": true
+    },
+    {
+      "source_family": "WAN21_FlowRVS",
+      "metadata_only": true
+    },
+    {
+      "source_family": "WAN21_FunControl2V",
+      "metadata_only": true
+    },
+    {
+      "source_family": "WAN21_HuMo",
+      "metadata_only": true
+    },
+    {
+      "source_family": "WAN21_I2V",
+      "metadata_only": true
+    },
+    {
+      "source_family": "WAN21_SCAIL",
+      "metadata_only": true
+    },
+    {
+      "source_family": "WAN21_SCAIL2",
+      "metadata_only": true
+    },
+    {
+      "source_family": "WAN21_T2V",
+      "metadata_only": true
+    },
+    {
+      "source_family": "WAN21_Vace",
+      "metadata_only": true
+    },
+    {
+      "source_family": "WAN22_Animate",
+      "metadata_only": true
+    },
+    {
+      "source_family": "WAN22_Camera",
+      "metadata_only": true
+    },
+    {
+      "source_family": "WAN22_S2V",
+      "metadata_only": true
+    },
+    {
+      "source_family": "WAN22_T2V",
+      "metadata_only": true
+    },
+    {
+      "source_family": "WAN22_WanDancer",
+      "metadata_only": true
+    },
+    {
+      "source_family": "ZImage",
+      "metadata_only": true
+    },
+    {
+      "source_family": "ZImagePixelSpace",
+      "metadata_only": true
+    }
+  ],
+  "model_folders": [
+    "audio_encoders",
+    "background_removal",
+    "checkpoints",
+    "classifiers",
+    "clip_vision",
+    "configs",
+    "controlnet",
+    "custom_nodes",
+    "detection",
+    "diffusers",
+    "diffusion_models",
+    "embeddings",
+    "frame_interpolation",
+    "geometry_estimation",
+    "gligen",
+    "hypernetworks",
+    "latent_upscale_models",
+    "loras",
+    "model_patches",
+    "optical_flow",
+    "photomaker",
+    "style_models",
+    "text_encoders",
+    "upscale_models",
+    "vae",
+    "vae_approx"
+  ]
+}

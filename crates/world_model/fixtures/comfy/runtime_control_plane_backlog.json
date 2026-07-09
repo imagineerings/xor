@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "source_path": "projects/comfy/server.py",
+  "source_category": "runtime-control-plane",
+  "captured_at": "2026-07-09",
+  "implementation_owner": ".agents/specs/godot-migration/comfy-runtime-control-plane",
+  "native_sim_records": true,
+  "comfyui_passthrough": false,
+  "expected_routes": [
+    { "method": "Get", "path": "/", "kind": "Root" },
+    { "method": "Get", "path": "/settings", "kind": "AppSettingsRead" },
+    { "method": "Post", "path": "/settings", "kind": "AppSettingsWrite" },
+    { "method": "Get", "path": "/settings/{id}", "kind": "AppSettingRead" },
+    { "method": "Post", "path": "/settings/{id}", "kind": "AppSettingWrite" },
+    { "method": "Get", "path": "/i18n", "kind": "I18n" },
+    { "method": "Get", "path": "/workflow_templates", "kind": "WorkflowTemplates" },
+    { "method": "Get", "path": "/experiment/models", "kind": "ExperimentModels" },
+    { "method": "Get", "path": "/experiment/models/{folder}", "kind": "ExperimentModelsByFolder" },
+    { "method": "Get", "path": "/experiment/models/preview/{folder}/{path_index}/{filename}", "kind": "ExperimentModelPreview" },
+    { "method": "Get", "path": "/node_replacements", "kind": "NodeReplacements" },
+    { "method": "Get", "path": "/global_subgraphs", "kind": "GlobalSubgraphs" },
+    { "method": "Get", "path": "/global_subgraphs/{id}", "kind": "GlobalSubgraphById" },
+    { "method": "Get", "path": "/userdata", "kind": "UserDataList" },
+    { "method": "Get", "path": "/userdata/{file}", "kind": "UserDataRead" },
+    { "method": "Post", "path": "/userdata/{file}", "kind": "UserDataWrite" },
+    { "method": "Delete", "path": "/userdata/{file}", "kind": "UserDataDelete" },
+    { "method": "Post", "path": "/userdata/{file}/move/{dest}", "kind": "UserDataMove" },
+    { "method": "Get", "path": "/users", "kind": "UsersRead" },
+    { "method": "Post", "path": "/users", "kind": "UsersWrite" },
+    { "method": "Get", "path": "/v2/userdata", "kind": "V2UserData" },
+    { "method": "Get", "path": "/jobs", "kind": "Jobs" },
+    { "method": "Get", "path": "/jobs/{job_id}", "kind": "JobById" },
+    { "method": "Post", "path": "/jobs/cancel", "kind": "JobCancel" },
+    { "method": "Post", "path": "/jobs/{job_id}/cancel", "kind": "JobCancelById" },
+    { "method": "Get", "path": "/embeddings", "kind": "Embeddings" },
+    { "method": "Get", "path": "/extensions", "kind": "Extensions" },
+    { "method": "Get", "path": "/features", "kind": "Features" },
+    { "method": "Get", "path": "/history", "kind": "History" },
+    { "method": "Get", "path": "/history/{prompt_id}", "kind": "HistoryByPromptId" },
+    { "method": "Post", "path": "/history", "kind": "HistoryAction" },
+    { "method": "Get", "path": "/models", "kind": "Models" },
+    { "method": "Get", "path": "/models/{folder}", "kind": "ModelsByFolder" },
+    { "method": "Get", "path": "/object_info", "kind": "ObjectInfo" },
+    { "method": "Get", "path": "/object_info/{node_class}", "kind": "ObjectInfoByNodeClass" },
+    { "method": "Get", "path": "/prompt", "kind": "PromptStatus" },
+    { "method": "Post", "path": "/prompt", "kind": "PromptSubmission" },
+    { "method": "Get", "path": "/queue", "kind": "Queue" },
+    { "method": "Post", "path": "/queue", "kind": "QueueAction" },
+    { "method": "Get", "path": "/system_stats", "kind": "SystemStats" },
+    { "method": "Get", "path": "/view", "kind": "View" },
+    { "method": "Get", "path": "/view_metadata/{folder_name}", "kind": "ViewMetadataByFolder" },
+    { "method": "Post", "path": "/interrupt", "kind": "Interrupt" },
+    { "method": "Post", "path": "/free", "kind": "FreeResources" },
+    { "method": "Post", "path": "/upload/image", "kind": "Upload" },
+    { "method": "Post", "path": "/upload/mask", "kind": "UploadMask" },
+    { "method": "Get", "path": "/ws", "kind": "WebSocket" }
+  ],
+  "settings": {
+    "preview_format": "metadata",
+    "external_frontend_allowed": false
+  },
+  "users": [
+    { "user_id": "default", "display_name": "Default User", "is_current": true }
+  ],
+  "system_stats": {
+    "platform": "sim-fixture",
+    "python_embedded": false,
+    "features": {
+      "preview_metadata": true,
+      "api_nodes": false
+    }
+  }
+}

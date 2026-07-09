@@ -3,10 +3,30 @@ use std::collections::BTreeSet;
 use crate::{
     BLUEPRINT_COUNT_MISMATCH_CODE, ComfyBlueprintCatalog, ComfyBlueprintCategory,
     ComfyBlueprintDependencyKind, MISSING_BLUEPRINT_DEPENDENCY_CODE,
-    UNSUPPORTED_BLUEPRINT_NODE_CODE,
+    SimWorkflowBlueprintBacklogCatalog, UNSUPPORTED_BLUEPRINT_NODE_CODE,
 };
 
 const BLUEPRINTS_MANIFEST: &str = include_str!("../fixtures/comfy/blueprints_manifest.json");
+const WORKFLOWS_BLUEPRINTS_BACKLOG: &str =
+    include_str!("../fixtures/comfy/workflows_blueprints_backlog.json");
+
+#[test]
+fn workflow_blueprint_backlog_fixture_matches_native_blueprint_catalog() {
+    let backlog: SimWorkflowBlueprintBacklogCatalog =
+        serde_json::from_str(WORKFLOWS_BLUEPRINTS_BACKLOG).expect("backlog fixture parses");
+    backlog
+        .validate()
+        .expect("backlog fixture should be internally valid");
+
+    let catalog = blueprint_catalog_with_all_dependencies();
+    let catalog_names = catalog
+        .records()
+        .map(|record| record.name.clone())
+        .collect::<BTreeSet<_>>();
+
+    assert_eq!(backlog.records.len(), 89);
+    assert_eq!(backlog.blueprint_names(), catalog_names);
+}
 
 #[test]
 fn blueprint_manifest_imports_all_shipped_blueprints_as_native_records() {

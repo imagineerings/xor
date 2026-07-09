@@ -42,14 +42,15 @@ Duplication rule: prefer existing Sim crates and extension points before adding 
 | G6 | Provenance | Importing generated videos, meshes, textures, or exports | Artifact store preserves prompt, graph node, model settings, controls, source assets, and output paths |
 | G7 | Dependency review | New vendored, native, heavy model, media, or mesh dependency | Review records license, maintenance, security, binary-size, and platform impact |
 | G8 | Comfy harness alignment | World-model harness or Comfy-adjacent implementation decisions | Applicable Comfy spec is referenced, or safety/security/dependency/platform divergence is documented |
-| G9 | Native Comfy recreation | Comfy-derived feature implementation | Supported Comfy-derived behavior is implemented with native Sim functionality, `Sim*` implementation names, and no ComfyUI pass-through |
+| G9 | Sim coverage gate | Comfy-derived feature implementation | Committed inventory and coverage ledger fixtures validate source ownership, native Sim evidence, unsupported/divergent reasons, and owner-spec task alignment |
+| G10 | Comfy full coverage | Comfy-derived feature implementation and spec completion | Sim source inventory and coverage ledger map every Comfy source feature to exactly one owner, missing items have owner-specific implementation tasks, implemented items have evidence, and unsupported/divergent items have reasons |
 
 ## Dependency Waves
 
 | Wave | Focus | Specs / Tasks | Depends On |
 |---|---|---|---|
 | W0 | Planning validation | Spec documents only; no code task starts until G0 passes | None |
-| W1 | Shared foundations | Umbrella tasks 1 -> 14 are complete; `build-test-docs/` task 1 foundation helpers remain available if dependency-review or fixture helpers are needed | G0 |
+| W1 | Shared foundations | Umbrella tasks 1 -> 14 are complete; `comfy-full-port-coverage/` source inventory and coverage ledger tasks; `build-test-docs/` task 1 foundation helpers remain available if dependency-review or fixture helpers are needed | G0 |
 | W2 | Value-first world-model serving substrate | `world-model-runtime/`, `model-serving-packaging/`, `comfy-model-memory-runtime/`, W2 portions of `comfy-packaging-quality/`, generated-media diagnostics/routing in `rendering-media/` | G3, G8, G9; G4 before real workers |
 | W3 | Comfy execution core | `comfy-runtime-control-plane/`, `comfy-graph-node-runtime/`, `comfy-diffusion-world-model-runtime/`, W3 portions of `comfy-workflows-blueprints/`, `diffusion-graph-editor/` validation/execution planning | G3, G5, G8, G9; G4 before execution |
 | W4 | Generation outputs and asset pipelines | `mesh-generation-pipeline/`, `comfy-asset-library/`, `comfy-media-node-pipelines/`, W4 portions of `comfy-workflows-blueprints/`, generated mesh/media previews, artifact import, generated asset provenance | G3, G5, G6, G8, G9 |
@@ -77,6 +78,7 @@ Duplication rule: prefer existing Sim crates and extension points before adding 
 | Mesh generation pipeline | textured 3D mesh generation | media/project preview | New mesh request/artifact/export pipeline | `mesh-generation-pipeline/` |
 | Agentic game tools | graph edits, generation, asset tools | agent tool registry | Add game-specific tools | `agentic-game-tools/` |
 | Model serving and packaging | Python env, weights, GPU, remote workers | task/process diagnostics | Add serving diagnostics and launcher traits | `model-serving-packaging/` |
+| Comfy full port coverage | `projects/comfy` source tree inventory, existing Comfy specs, Sim subsystems | Spec gatekeeper, source fixtures, coverage ledger, owner task annotations | Add complete source-to-owner coverage, anti-duplication gates, and `_CoverageOwner:` manifest alignment | `comfy-full-port-coverage/` |
 | Comfy runtime control plane | `projects/comfy/server.py`, prompt queue, jobs, WebSocket events | Sim task, HTTP, WebSocket, media, and artifact systems | Add protocol adapter; do not port aiohttp app | `comfy-runtime-control-plane/` |
 | Comfy graph/node runtime | `projects/comfy/nodes.py`, `comfy_execution/`, `comfy_extras/` | `crates/world_model`, diffusion graph primitives | Add Comfy schema, validation, execution, caching compatibility | `comfy-graph-node-runtime/` |
 | Comfy model and memory runtime | `folder_paths.py`, `comfy/supported_models.py`, quantization/memory modules | model serving diagnostics, asset catalog | Add model folder catalog, model family detection, precision/device/memory policy | `comfy-model-memory-runtime/` |
@@ -108,6 +110,7 @@ Duplication rule: prefer existing Sim crates and extension points before adding 
 | `mesh-generation-pipeline/` | Textured 3D mesh generation and export | Requirements + Design + Tasks | W4 |
 | `agentic-game-tools/` | Agent tools for game design, pipeline editing, and asset generation | Requirements + Design + Tasks | W5 |
 | `model-serving-packaging/` | Python worker, model downloads, GPU scheduling, and packaging | Requirements + Design + Tasks | W2/W6 |
+| `comfy-full-port-coverage/` | Source inventory, ownership ledger, owner task annotations, parity evidence rules, product sequencing, and anti-duplication coverage gates for all Comfy features | Requirements + Design + Tasks | W0/W1 |
 | `comfy-runtime-control-plane/` | Comfy-compatible HTTP/WebSocket prompt, job, queue, progress, preview, and safety APIs | Requirements + Design + Tasks | W3 |
 | `comfy-graph-node-runtime/` | Comfy node schema, graph validation, replacement, execution planning, caching, async/list execution | Requirements + Design + Tasks | W3 |
 | `comfy-model-memory-runtime/` | Comfy model folders, model metadata, family detection, precision, device, and memory policy | Requirements + Design + Tasks | W2 |

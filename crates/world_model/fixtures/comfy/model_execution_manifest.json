@@ -1,10 +1,29 @@
 {
   "schema_version": 1,
+  "source_root": "projects/comfy",
+  "captured_at": "2026-07-09",
+  "implementation_owner": ".agents/specs/godot-migration/comfy-diffusion-world-model-runtime",
   "runner": "mock",
   "requires_production_weights": false,
   "requires_downloads": false,
   "native_sim_records": true,
   "comfyui_passthrough": false,
+  "safety": {
+    "model_downloads": {
+      "requires_downloads": false,
+      "mode": "metadata_only",
+      "dependency_review": "not_required"
+    },
+    "media_codecs": {
+      "requires_native_codecs": false,
+      "mode": "metadata_only",
+      "dependency_review": "not_required"
+    },
+    "mock_runner": {
+      "mode": "mock",
+      "dependency_review": "not_required"
+    }
+  },
   "workflows": [
     {
       "id": "text_to_image_sdxl",

@@ -1,3 +1,4 @@
+mod comfy_inventory;
 mod tasks;
 mod workspace;
 
@@ -27,6 +28,8 @@ enum CliCommand {
     WebExamples(tasks::web_examples::WebExamplesArgs),
     Workflows(tasks::workflows::GenerateWorkflowArgs),
     CheckWorkflows(tasks::workflow_checks::WorkflowValidationArgs),
+    /// Regenerates the Comfy source inventory fixture from a local checkout.
+    ComfyInventory(comfy_inventory::ComfyInventoryArgs),
 }
 
 fn main() -> Result<()> {
@@ -44,5 +47,6 @@ fn main() -> Result<()> {
         CliCommand::WebExamples(args) => tasks::web_examples::run_web_examples(args),
         CliCommand::Workflows(args) => tasks::workflows::run_workflows(args),
         CliCommand::CheckWorkflows(args) => tasks::workflow_checks::validate(args),
+        CliCommand::ComfyInventory(args) => comfy_inventory::run(args),
     }
 }

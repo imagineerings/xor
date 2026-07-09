@@ -27,9 +27,12 @@ pub enum ModelCategory {
     ModelPatches,
     AudioEncoders,
     BackgroundRemoval,
+    Classifiers,
+    CustomNodes,
     FrameInterpolation,
     GeometryEstimation,
     OpticalFlow,
+    PhotoMaker,
     Detection,
 }
 
@@ -55,9 +58,12 @@ impl ModelCategory {
             Self::ModelPatches => "model_patches",
             Self::AudioEncoders => "audio_encoders",
             Self::BackgroundRemoval => "background_removal",
+            Self::Classifiers => "classifiers",
+            Self::CustomNodes => "custom_nodes",
             Self::FrameInterpolation => "frame_interpolation",
             Self::GeometryEstimation => "geometry_estimation",
             Self::OpticalFlow => "optical_flow",
+            Self::PhotoMaker => "photomaker",
             Self::Detection => "detection",
         }
     }
@@ -83,9 +89,12 @@ impl ModelCategory {
             Self::ModelPatches,
             Self::AudioEncoders,
             Self::BackgroundRemoval,
+            Self::Classifiers,
+            Self::CustomNodes,
             Self::FrameInterpolation,
             Self::GeometryEstimation,
             Self::OpticalFlow,
+            Self::PhotoMaker,
             Self::Detection,
         ]
     }
@@ -377,11 +386,14 @@ fn legacy_names(category: ModelCategory) -> Vec<&'static str> {
         ModelCategory::ModelPatches => vec!["model_patch", "model_patches"],
         ModelCategory::AudioEncoders => vec!["audio_encoder", "audio_encoders"],
         ModelCategory::BackgroundRemoval => vec!["background_removal", "birefnet", "rembg"],
+        ModelCategory::Classifiers => vec!["classifier", "classifiers"],
+        ModelCategory::CustomNodes => vec!["custom_node", "custom_nodes"],
         ModelCategory::FrameInterpolation => vec!["frame_interpolation", "rife"],
         ModelCategory::GeometryEstimation => {
             vec!["geometry_estimation", "depth_anything", "normal_estimation"]
         }
         ModelCategory::OpticalFlow => vec!["optical_flow", "raft"],
+        ModelCategory::PhotoMaker => vec!["photomaker", "photo_maker"],
         ModelCategory::Detection => vec!["detection", "detectors", "ultralytics", "yolo"],
     }
 }

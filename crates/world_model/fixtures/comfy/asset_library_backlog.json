@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "source_root": "projects/comfy",
+  "source_category": "asset-library",
+  "captured_at": "2026-07-09",
+  "implementation_owner": ".agents/specs/godot-migration/comfy-asset-library",
+  "native_sim_records": true,
+  "comfyui_passthrough": false,
+  "safety": {
+    "storage": {
+      "mode": "native_sim_records",
+      "dependency_review": "not_required"
+    },
+    "fixture_nodes": {
+      "mode": "metadata_only",
+      "dependency_review": "not_required"
+    }
+  },
+  "records": [
+    {
+      "source_id": "extranode:projects_comfy_comfy_extras_nodes_logic_py:ComboOutputTestNode",
+      "source_path": "projects/comfy/comfy_extras/nodes_logic.py",
+      "source_kind": "ExtraNode",
+      "node_name": "ComboOutputTestNode",
+      "native_surface": "asset-output-registration",
+      "evidence_module": "crates/world_model/src/sim_asset_enrichment.rs",
+      "evidence_kind": "metadata-only",
+      "metadata_only": true
+    }
+  ]
+}

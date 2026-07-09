@@ -1,7 +1,18 @@
 {
   "schema_version": 1,
+  "source_root": "projects/comfy/comfy_api_nodes",
+  "captured_at": "2026-07-09",
+  "implementation_owner": ".agents/specs/godot-migration/comfy-api-provider-nodes",
   "native_sim_records": true,
   "comfyui_passthrough": false,
+  "safety": {
+    "provider_api_keys": {
+      "requires_secret": true,
+      "mode": "mock_secret_records",
+      "dependency_review": "not_required",
+      "diagnostic_code": "sim.provider.requires_policy"
+    }
+  },
   "catalog": {
     "required_providers": [
       "openai",
@@ -31,6 +42,13 @@
     ],
     "unsupported_nodes": [
       "SAM3Segment"
+    ],
+    "unsupported_diagnostics": [
+      {
+        "node": "SAM3Segment",
+        "diagnostic_code": "sim.provider.unsupported_without_connector_policy",
+        "boundary_reason": "SAM3 provider execution requires connector policy, API key handling, and remote task safety review before native execution."
+      }
     ]
   }
 }

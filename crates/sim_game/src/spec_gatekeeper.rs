@@ -1,13 +1,14 @@
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
 };
 
 use serde::{Deserialize, Serialize};
+use world_model::SimSourceInventory;
 
 use crate::{
-    MigrationInventory, MigrationValidationError, MigrationValidationReport,
+    MigrationInventory, MigrationValidationError, MigrationValidationReport, SimCoverageLedger,
     SimGameMigrationInventory,
 };
 
@@ -90,14 +91,18 @@ const COMFY_HARNESS_KEYWORDS: &[&str] = &[
     "packaging",
 ];
 
+const SIM_COVERAGE_FIXTURE_DIR: &str = "crates/world_model/fixtures/comfy";
+const SIM_SOURCE_INVENTORY_FIXTURE: &str = "source_inventory.json";
+const SIM_COVERAGE_LEDGER_FIXTURE: &str = "coverage_ledger.json";
+
 // ---------------------------------------------------------------------------
-// Execution gates (G0 – G8)
+// Execution gates (G0 – G9)
 // ---------------------------------------------------------------------------
 
 /// Execution gates that block implementation work until satisfied.
 ///
 /// Variants correspond to the numbered gates in the migration umbrella plan:
-/// G0 (SpecConsistency) through G8 (ComfyHarnessAlignment).
+/// G0 (SpecConsistency) through G9 (SimCoverage).
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum ExecutionGate {
     /// G0: Spec consistency – requirements, design, and tasks files exist.
@@ -123,10 +128,13 @@ pub enum ExecutionGate {
     /// G8: Comfy harness alignment – world-model harness changes reference
     /// applicable Comfy spec or document divergence.
     ComfyHarnessAlignment,
+    /// G9: Sim coverage – Comfy source inventory items have one coverage
+    /// owner, status, source path, and implementation evidence when needed.
+    SimCoverage,
 }
 
 impl ExecutionGate {
-    /// Returns the G0–G8 label for this gate.
+    /// Returns the G0–G9 label for this gate.
     pub fn label(&self) -> &'static str {
         match self {
             Self::SpecConsistency => "G0",
@@ -138,6 +146,7 @@ impl ExecutionGate {
             Self::Provenance => "G6",
             Self::DependencyReview => "G7",
             Self::ComfyHarnessAlignment => "G8",
+            Self::SimCoverage => "G9",
         }
     }
 }
@@ -428,6 +437,7 @@ impl SpecGatekeeper {
 
                 let mut description_lines = Vec::new();
                 let mut has_comfy_ref = false;
+                let mut has_coverage_owner = false;
                 let mut has_divergence = false;
 
                 while j < lines.len() {
@@ -441,6 +451,9 @@ impl SpecGatekeeper {
                     // Check for Comfy reference or divergence annotation.
                     if stripped.contains("_ComfyRef:") {
                         has_comfy_ref = true;
+                    }
+                    if stripped.contains("_CoverageOwner:") {
+                        has_coverage_owner = true;
                     }
                     // Accept "_Divergence:" and variants like "_SafetyDivergence:" or
                     // "_PerformanceDivergence:" by matching the suffix without the
@@ -459,7 +472,7 @@ impl SpecGatekeeper {
 
                 // If the task already has a Comfy ref or divergence, skip
                 // keyword checks.
-                if has_comfy_ref || has_divergence {
+                if has_comfy_ref || has_coverage_owner || has_divergence {
                     i = j;
                     continue;
                 }
@@ -570,6 +583,75 @@ impl SpecGatekeeper {
         }
     }
 
+    pub fn validate_sim_coverage(root: &SpecRoot, report: &mut MigrationValidationReport) {
+        let Some(fixture_dir) = find_sim_coverage_fixture_dir(root.as_path()) else {
+            return;
+        };
+
+        let Some(inventory) = read_sim_source_inventory_fixture(
+            &fixture_dir.join(SIM_SOURCE_INVENTORY_FIXTURE),
+            report,
+        ) else {
+            return;
+        };
+        let Some(ledger) = read_sim_coverage_ledger_fixture(
+            &fixture_dir.join(SIM_COVERAGE_LEDGER_FIXTURE),
+            report,
+        ) else {
+            return;
+        };
+
+        validate_sim_coverage_records(&inventory, &ledger, report);
+        Self::check_sim_coverage_task_owner_alignment(root, &ledger, report);
+    }
+
+    pub fn check_sim_coverage_task_owner_alignment(
+        root: &SpecRoot,
+        ledger: &SimCoverageLedger,
+        report: &mut MigrationValidationReport,
+    ) {
+        let entries = match fs::read_dir(&root.path) {
+            Ok(entries) => entries,
+            Err(_) => return,
+        };
+
+        let owner_paths = ledger
+            .records
+            .iter()
+            .filter_map(|record| Some((record.owner?, record.owner_path.as_str())))
+            .collect::<BTreeMap<_, _>>();
+
+        for entry in entries.flatten() {
+            if !entry.file_type().is_ok_and(|file_type| file_type.is_dir()) {
+                continue;
+            }
+
+            let spec_name = entry.file_name().to_string_lossy().to_string();
+            let tasks_path = entry.path().join("tasks.md");
+            let Ok(content) = fs::read_to_string(tasks_path) else {
+                continue;
+            };
+
+            let Some(expected_owner_path) = owner_paths
+                .values()
+                .copied()
+                .find(|owner_path| owner_path.ends_with(&spec_name))
+            else {
+                continue;
+            };
+
+            for (task, owner_path) in parse_task_coverage_owner_annotations(&content) {
+                if owner_path != expected_owner_path {
+                    report.push(MigrationValidationError::SimCoverageTaskOwnerMismatch {
+                        task,
+                        spec: spec_name.clone(),
+                        owner_path,
+                    });
+                }
+            }
+        }
+    }
+
     /// Parse tasks.md file path and call `parse_task_manifests` on its
     /// content.  If the file cannot be read, no task errors are reported
     /// (the file itself is validated elsewhere).
@@ -662,6 +744,9 @@ impl MigrationGatekeeper for SpecGatekeeper {
             // Check that world-model harness tasks touching Comfy behaviors
             // reference an applicable Comfy spec or document divergence.
             Self::check_world_model_harness_alignment(root, &mut report);
+
+            // Check committed Sim source inventory and coverage ledger fixtures.
+            Self::validate_sim_coverage(root, &mut report);
         }
 
         report
@@ -692,6 +777,159 @@ impl MigrationGatekeeper for SpecGatekeeper {
             GateDecision::Blocked(unsatisfied)
         }
     }
+}
+
+fn find_sim_coverage_fixture_dir(root: &Path) -> Option<PathBuf> {
+    for ancestor in root.ancestors() {
+        let candidate = ancestor.join(SIM_COVERAGE_FIXTURE_DIR);
+        if candidate.is_dir() {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
+fn read_sim_source_inventory_fixture(
+    path: &Path,
+    report: &mut MigrationValidationReport,
+) -> Option<SimSourceInventory> {
+    read_json_fixture(path, SIM_SOURCE_INVENTORY_FIXTURE, report)
+}
+
+fn read_sim_coverage_ledger_fixture(
+    path: &Path,
+    report: &mut MigrationValidationReport,
+) -> Option<SimCoverageLedger> {
+    read_json_fixture(path, SIM_COVERAGE_LEDGER_FIXTURE, report)
+}
+
+fn read_json_fixture<T>(
+    path: &Path,
+    fixture: &str,
+    report: &mut MigrationValidationReport,
+) -> Option<T>
+where
+    T: for<'de> Deserialize<'de>,
+{
+    let content = match fs::read_to_string(path) {
+        Ok(content) => content,
+        Err(_) => {
+            report.push(MigrationValidationError::MissingSimCoverageFixture {
+                fixture: fixture.to_string(),
+            });
+            return None;
+        }
+    };
+
+    match serde_json::from_str(&content) {
+        Ok(value) => Some(value),
+        Err(error) => {
+            report.push(MigrationValidationError::InvalidSimCoverageFixture {
+                fixture: fixture.to_string(),
+                message: error.to_string(),
+            });
+            None
+        }
+    }
+}
+
+fn validate_sim_coverage_records(
+    inventory: &SimSourceInventory,
+    ledger: &SimCoverageLedger,
+    report: &mut MigrationValidationReport,
+) {
+    for diagnostic in ledger.validate() {
+        report.push(MigrationValidationError::SimCoverageGateFailure {
+            code: diagnostic.code,
+            source_id: diagnostic.source_id,
+            message: diagnostic.message,
+        });
+    }
+
+    let inventory_items = inventory
+        .items
+        .iter()
+        .map(|item| (item.source_id.as_str(), item))
+        .collect::<BTreeMap<_, _>>();
+    let ledger_records = ledger
+        .records
+        .iter()
+        .map(|record| (record.source_id.as_str(), record))
+        .collect::<BTreeMap<_, _>>();
+
+    for (source_id, item) in &inventory_items {
+        let Some(record) = ledger_records.get(source_id) else {
+            report.push(MigrationValidationError::MissingSimCoverageRecord {
+                source_id: (*source_id).to_string(),
+            });
+            continue;
+        };
+
+        if record.source_path.trim().is_empty() || record.source_path != item.source_path {
+            report.push(MigrationValidationError::SimCoverageSourceMismatch {
+                source_id: (*source_id).to_string(),
+                field: "source_path".to_string(),
+            });
+        }
+        if record.source_kind != item.source_kind {
+            report.push(MigrationValidationError::SimCoverageSourceMismatch {
+                source_id: (*source_id).to_string(),
+                field: "source_kind".to_string(),
+            });
+        }
+    }
+
+    for source_id in ledger_records.keys() {
+        if !inventory_items.contains_key(source_id) {
+            report.push(MigrationValidationError::StaleSimCoverageRecord {
+                source_id: (*source_id).to_string(),
+            });
+        }
+    }
+}
+
+fn parse_task_coverage_owner_annotations(content: &str) -> Vec<(String, String)> {
+    let lines = content.lines().collect::<Vec<_>>();
+    let mut annotations = Vec::new();
+    let mut index = 0;
+
+    while index < lines.len() {
+        let line = lines[index];
+        let trimmed = line.trim_start();
+        let task_marker = trimmed
+            .strip_prefix("- [ ] ")
+            .or_else(|| trimmed.strip_prefix("- [x] "));
+
+        let Some(task_title) = task_marker else {
+            index += 1;
+            continue;
+        };
+
+        let task_name = task_title.trim().to_string();
+        let base_indent = line.chars().position(|c| c != ' ').unwrap_or(0);
+        let mut next_index = index + 1;
+
+        while next_index < lines.len() {
+            let next = lines[next_index];
+            let indent = next.chars().position(|c| c != ' ').unwrap_or(0);
+            if indent <= base_indent && !next.trim().is_empty() {
+                break;
+            }
+
+            if let Some(owner_path) = next
+                .trim()
+                .strip_prefix("- _CoverageOwner:")
+                .map(|value| value.strip_suffix('_').unwrap_or(value))
+            {
+                annotations.push((task_name.clone(), owner_path.trim().to_string()));
+            }
+            next_index += 1;
+        }
+
+        index = next_index;
+    }
+
+    annotations
 }
 
 // ---------------------------------------------------------------------------

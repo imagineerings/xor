@@ -6,10 +6,12 @@ use std::{
 };
 
 use pretty_assertions::assert_eq;
+use world_model::{SimSourceInventory, SimSourceItem, SimSourceKind};
 
 use crate::{
     ExecutionGate, GateDecision, MigrationGatekeeper, MigrationTaskRef, MigrationValidationError,
-    MigrationValidationReport, SpecGatekeeper, SpecRoot,
+    MigrationValidationReport, SimCoverageLedger, SimCoverageOwner, SimCoverageRecord,
+    SimCoverageStatus, SpecGatekeeper, SpecRoot,
 };
 
 // ---------------------------------------------------------------------------
@@ -26,6 +28,13 @@ fn create_spec_root(name: &str) -> PathBuf {
     path
 }
 
+fn create_repo_shaped_spec_root(name: &str) -> (PathBuf, PathBuf) {
+    let repo_root = create_spec_root(name);
+    let spec_root = repo_root.join(".agents/specs/godot-migration");
+    fs::create_dir_all(&spec_root).expect("failed to create repo-shaped spec root");
+    (repo_root, spec_root)
+}
+
 fn create_grouped_spec(spec_root: &Path, name: &str) {
     let spec_path = spec_root.join(name);
     fs::create_dir_all(&spec_path).expect("failed to create grouped spec directory");
@@ -38,6 +47,51 @@ fn create_grouped_spec(spec_root: &Path, name: &str) {
 /// Write a tasks.md with explicit `_Requirements:` and `_writes:` lines.
 fn write_tasks_with_manifests(spec_path: &Path, content: &str) {
     fs::write(spec_path.join("tasks.md"), content).expect("failed to write tasks.md");
+}
+
+fn write_coverage_fixtures(
+    repo_root: &Path,
+    inventory: &SimSourceInventory,
+    ledger: &SimCoverageLedger,
+) {
+    let fixture_dir = repo_root.join("crates/world_model/fixtures/comfy");
+    fs::create_dir_all(&fixture_dir).expect("failed to create coverage fixture directory");
+    fs::write(
+        fixture_dir.join("source_inventory.json"),
+        serde_json::to_string_pretty(inventory).expect("failed to serialize inventory"),
+    )
+    .expect("failed to write source inventory fixture");
+    fs::write(
+        fixture_dir.join("coverage_ledger.json"),
+        serde_json::to_string_pretty(ledger).expect("failed to serialize coverage ledger"),
+    )
+    .expect("failed to write coverage ledger fixture");
+}
+
+fn sample_inventory() -> SimSourceInventory {
+    SimSourceInventory::new(1, "projects/comfy", "2026-07-09", [sample_source_item()])
+}
+
+fn sample_source_item() -> SimSourceItem {
+    SimSourceItem::classified(
+        SimSourceKind::Route,
+        "projects/comfy/server.py",
+        "POST /prompt",
+    )
+}
+
+fn sample_ledger() -> SimCoverageLedger {
+    let source_item = sample_source_item();
+    SimCoverageLedger::new(
+        1,
+        [SimCoverageRecord::new(
+            source_item.source_id,
+            source_item.source_path,
+            source_item.source_kind,
+            SimCoverageStatus::Planned,
+        )
+        .with_owner(SimCoverageOwner::RuntimeControlPlane)],
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -324,6 +378,23 @@ fn blocks_task_when_multiple_gates_unsatisfied() {
     }
 }
 
+#[test]
+fn blocks_task_when_sim_coverage_gate_is_unsatisfied() {
+    let task = MigrationTaskRef::new("task-9", "comfy-api-provider-nodes")
+        .with_gates(BTreeSet::from([ExecutionGate::SimCoverage]));
+    let gatekeeper = SpecGatekeeper::default();
+    let decision = gatekeeper.can_execute_task(&task, &BTreeSet::new());
+
+    match decision {
+        GateDecision::Blocked(reasons) => {
+            assert_eq!(reasons.len(), 1);
+            assert!(reasons[0].contains("G9"));
+            assert!(reasons[0].contains("SimCoverage"));
+        }
+        GateDecision::Allowed => panic!("expected SimCoverage gate to block task"),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // ExecutionGate label tests
 // ---------------------------------------------------------------------------
@@ -339,6 +410,7 @@ fn execution_gate_labels_match_expected_pattern() {
     assert_eq!(ExecutionGate::Provenance.label(), "G6");
     assert_eq!(ExecutionGate::DependencyReview.label(), "G7");
     assert_eq!(ExecutionGate::ComfyHarnessAlignment.label(), "G8");
+    assert_eq!(ExecutionGate::SimCoverage.label(), "G9");
 }
 
 // ---------------------------------------------------------------------------
@@ -610,6 +682,23 @@ fn accepts_comfy_keyword_with_explicit_comfy_ref() {
 }
 
 #[test]
+fn accepts_comfy_keyword_with_coverage_owner() {
+    let content = r#"# Tasks
+
+- [ ] 1. Configure media pipeline
+  - Set up the media processing pipeline.
+  - _CoverageOwner: .agents/specs/godot-migration/comfy-media-node-pipelines_
+"#;
+    let mut report = MigrationValidationReport::default();
+    SpecGatekeeper::check_comfy_harness_alignment(content, "world-model-runtime", &mut report);
+
+    assert!(
+        report.is_valid(),
+        "Expected no errors when _CoverageOwner: is present, got: {report:?}"
+    );
+}
+
+#[test]
 fn accepts_comfy_keyword_with_divergence() {
     let content = r#"# Tasks
 
@@ -705,5 +794,125 @@ fn validates_spec_pack_with_comfy_checks_enabled() {
     assert!(
         report.is_valid(),
         "Expected no errors with all Comfy specs present, got: {report:?}"
+    );
+}
+
+#[test]
+fn validates_sim_coverage_fixtures_from_repo_root() {
+    let (repo_root, spec_root) = create_repo_shaped_spec_root("sim-coverage-valid");
+    write_coverage_fixtures(&repo_root, &sample_inventory(), &sample_ledger());
+
+    let mut report = MigrationValidationReport::default();
+    SpecGatekeeper::validate_sim_coverage(&SpecRoot::new(spec_root), &mut report);
+
+    assert!(
+        report.is_valid(),
+        "expected valid coverage fixtures, got {report:?}"
+    );
+}
+
+#[test]
+fn reports_missing_sim_coverage_fixture_when_fixture_dir_exists() {
+    let (repo_root, spec_root) = create_repo_shaped_spec_root("sim-coverage-missing-ledger");
+    let fixture_dir = repo_root.join("crates/world_model/fixtures/comfy");
+    fs::create_dir_all(&fixture_dir).expect("failed to create fixture dir");
+    fs::write(
+        fixture_dir.join("source_inventory.json"),
+        serde_json::to_string_pretty(&sample_inventory()).expect("failed to serialize inventory"),
+    )
+    .expect("failed to write inventory");
+
+    let mut report = MigrationValidationReport::default();
+    SpecGatekeeper::validate_sim_coverage(&SpecRoot::new(spec_root), &mut report);
+
+    assert!(
+        report
+            .errors
+            .contains(&MigrationValidationError::MissingSimCoverageFixture {
+                fixture: "coverage_ledger.json".to_string(),
+            })
+    );
+}
+
+#[test]
+fn reports_missing_sim_coverage_record() {
+    let (repo_root, spec_root) = create_repo_shaped_spec_root("sim-coverage-missing-record");
+    write_coverage_fixtures(
+        &repo_root,
+        &sample_inventory(),
+        &SimCoverageLedger::new(1, []),
+    );
+
+    let mut report = MigrationValidationReport::default();
+    SpecGatekeeper::validate_sim_coverage(&SpecRoot::new(spec_root), &mut report);
+
+    let source_item = sample_source_item();
+    assert!(
+        report
+            .errors
+            .contains(&MigrationValidationError::MissingSimCoverageRecord {
+                source_id: source_item.source_id,
+            })
+    );
+}
+
+#[test]
+fn reports_stale_sim_coverage_record() {
+    let (repo_root, spec_root) = create_repo_shaped_spec_root("sim-coverage-stale-record");
+    let stale_ledger = SimCoverageLedger::new(
+        1,
+        [SimCoverageRecord::new(
+            "route:stale:removed",
+            "projects/comfy/removed.py",
+            SimSourceKind::Route,
+            SimCoverageStatus::Planned,
+        )
+        .with_owner(SimCoverageOwner::RuntimeControlPlane)],
+    );
+    write_coverage_fixtures(
+        &repo_root,
+        &SimSourceInventory::new(1, "projects/comfy", "2026-07-09", []),
+        &stale_ledger,
+    );
+
+    let mut report = MigrationValidationReport::default();
+    SpecGatekeeper::validate_sim_coverage(&SpecRoot::new(spec_root), &mut report);
+
+    assert!(
+        report
+            .errors
+            .contains(&MigrationValidationError::StaleSimCoverageRecord {
+                source_id: "route:stale:removed".to_string(),
+            })
+    );
+}
+
+#[test]
+fn reports_sim_coverage_task_owner_mismatch() {
+    let (repo_root, spec_root) = create_repo_shaped_spec_root("sim-coverage-owner-mismatch");
+    write_coverage_fixtures(&repo_root, &sample_inventory(), &sample_ledger());
+    create_comfy_spec_dir(&spec_root, "comfy-runtime-control-plane");
+    write_tasks_with_manifests(
+        &spec_root.join("comfy-runtime-control-plane"),
+        r#"# Tasks
+
+- [ ] 1. Port prompt route
+  - _Requirements: 4.1_
+  - _writes: crates/world_model/src/comfy_routes.rs
+  - _CoverageOwner: .agents/specs/godot-migration/comfy-graph-node-runtime_
+"#,
+    );
+
+    let mut report = MigrationValidationReport::default();
+    SpecGatekeeper::validate_sim_coverage(&SpecRoot::new(spec_root), &mut report);
+
+    assert!(
+        report
+            .errors
+            .contains(&MigrationValidationError::SimCoverageTaskOwnerMismatch {
+                task: "1. Port prompt route".to_string(),
+                spec: "comfy-runtime-control-plane".to_string(),
+                owner_path: ".agents/specs/godot-migration/comfy-graph-node-runtime".to_string(),
+            })
     );
 }

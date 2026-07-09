@@ -99,7 +99,13 @@ fn registry_search_matches_aliases_and_hides_disabled_nodes() {
             .iter()
             .any(|node| node.id == "CheckpointLoaderSimple")
     );
-    assert!(registry.search("artifact").is_empty());
+    let artifact_matches = registry.search("artifact");
+    assert!(
+        artifact_matches
+            .iter()
+            .any(|node| node.id == "PreviewImage" || node.id == "SaveImageWebsocket")
+    );
+    assert!(artifact_matches.iter().all(|node| node.id != "SaveImage"));
 }
 
 #[test]

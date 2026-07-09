@@ -150,6 +150,133 @@ pub struct DivergenceRecord {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct SimDiffusionWorldModelBacklogCatalog {
+    pub schema_version: u32,
+    pub source_root: String,
+    pub source_category: String,
+    pub captured_at: String,
+    pub implementation_owner: String,
+    pub native_sim_records: bool,
+    pub comfyui_passthrough: bool,
+    pub requires_downloads: bool,
+    pub dependency_review: String,
+    pub records: Vec<SimDiffusionWorldModelBacklogRecord>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct SimDiffusionWorldModelBacklogRecord {
+    pub source_id: String,
+    pub source_path: String,
+    pub source_kind: String,
+    pub node_name: String,
+    pub native_surface: String,
+    pub evidence_module: String,
+    pub evidence_kind: String,
+    pub metadata_only: bool,
+    pub requires_dependency_review: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct SimDiffusionWorldModelBacklogDiagnostic {
+    pub code: String,
+    pub message: String,
+}
+
+impl SimDiffusionWorldModelBacklogCatalog {
+    pub fn validate(&self) -> Result<(), Vec<SimDiffusionWorldModelBacklogDiagnostic>> {
+        let mut diagnostics = Vec::new();
+
+        if self.schema_version != 1 {
+            diagnostics.push(sim_backlog_diagnostic(
+                "sim.diffusion_world_model_backlog.invalid_schema",
+                "diffusion/world-model backlog fixture must use schema version 1",
+            ));
+        }
+        if self.source_root != "projects/comfy" {
+            diagnostics.push(sim_backlog_diagnostic(
+                "sim.diffusion_world_model_backlog.invalid_source_root",
+                "diffusion/world-model backlog fixture must preserve projects/comfy attribution",
+            ));
+        }
+        if !self.native_sim_records || self.comfyui_passthrough {
+            diagnostics.push(sim_backlog_diagnostic(
+                "sim.diffusion_world_model_backlog.not_native",
+                "diffusion/world-model backlog fixture must describe native Sim records only",
+            ));
+        }
+        if self.requires_downloads || self.dependency_review != "not_required" {
+            diagnostics.push(sim_backlog_diagnostic(
+                "sim.diffusion_world_model_backlog.unsafe_dependency",
+                "metadata-only backlog fixture must not require downloads or dependency review",
+            ));
+        }
+        if self.records.is_empty() {
+            diagnostics.push(sim_backlog_diagnostic(
+                "sim.diffusion_world_model_backlog.empty",
+                "diffusion/world-model backlog fixture must include covered source records",
+            ));
+        }
+
+        let mut source_ids = BTreeSet::new();
+        for record in &self.records {
+            if !source_ids.insert(&record.source_id) {
+                diagnostics.push(sim_backlog_diagnostic(
+                    "sim.diffusion_world_model_backlog.duplicate_record",
+                    format!("duplicate source id `{}`", record.source_id),
+                ));
+            }
+            if !record.source_path.starts_with("projects/comfy") {
+                diagnostics.push(sim_backlog_diagnostic(
+                    "sim.diffusion_world_model_backlog.invalid_source_path",
+                    format!(
+                        "source path `{}` does not preserve projects/comfy attribution",
+                        record.source_path
+                    ),
+                ));
+            }
+            if record.node_name.is_empty()
+                || record.native_surface.is_empty()
+                || record.evidence_module.is_empty()
+                || record.evidence_kind.is_empty()
+            {
+                diagnostics.push(sim_backlog_diagnostic(
+                    "sim.diffusion_world_model_backlog.missing_evidence",
+                    format!(
+                        "record `{}` is missing native Sim evidence metadata",
+                        record.source_id
+                    ),
+                ));
+            }
+            if !record.metadata_only || record.requires_dependency_review {
+                diagnostics.push(sim_backlog_diagnostic(
+                    "sim.diffusion_world_model_backlog.unsafe_record",
+                    format!("record `{}` must stay metadata-only until dependency review enables real workers", record.source_id),
+                ));
+            }
+        }
+
+        if diagnostics.is_empty() {
+            Ok(())
+        } else {
+            Err(diagnostics)
+        }
+    }
+
+    pub fn records_by_surface(
+        &self,
+    ) -> BTreeMap<String, Vec<&SimDiffusionWorldModelBacklogRecord>> {
+        let mut records = BTreeMap::new();
+        for record in &self.records {
+            records
+                .entry(record.native_surface.clone())
+                .or_insert_with(Vec::new)
+                .push(record);
+        }
+        records
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ComfyExecutionRegistry {
     samplers: BTreeMap<SamplerKind, SamplerCapability>,
     sampler_aliases: BTreeMap<String, SamplerKind>,
@@ -159,6 +286,16 @@ pub struct ComfyExecutionRegistry {
     guidance_aliases: BTreeMap<String, GuidanceMode>,
     model_families: BTreeMap<ModelFamilyKind, ModelFamilyExecutionProfile>,
     divergences: BTreeMap<ExecutionBehaviorKey, DivergenceRecord>,
+}
+
+fn sim_backlog_diagnostic(
+    code: impl Into<String>,
+    message: impl Into<String>,
+) -> SimDiffusionWorldModelBacklogDiagnostic {
+    SimDiffusionWorldModelBacklogDiagnostic {
+        code: code.into(),
+        message: message.into(),
+    }
 }
 
 impl ComfyExecutionRegistry {

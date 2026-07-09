@@ -6,7 +6,7 @@ Implement runtime graph compatibility in layers: registry/schema first, validati
 
 ## Gates
 
-- Start gate: G0 spec consistency, G3 shared world-model foundations, G5 graph safety, and G8 Comfy harness alignment are satisfied.
+- Start gate: G0 spec consistency, G3 shared world-model foundations, G5 graph safety, and G8 Comfy harness alignment, G9 Sim coverage are satisfied.
 - Validation gate: graph validation tests, cache policy tests, replacement tests, and object-info compatibility tests pass.
 - Handoff gate: unsupported node classes have import diagnostics and are not silently exposed.
 - Completion gate: invalid graphs cannot enqueue and valid graph plans are deterministic.
@@ -24,38 +24,56 @@ Implement runtime graph compatibility in layers: registry/schema first, validati
   - Store node definitions, display metadata, categories, API-node markers, and disabled-node policy as native Sim registry records rather than forwarding object-info lookup to Comfy.
   - _Requirements: 1.1, 1.2, 1.3_
   - _writes: crates/world_model/src/comfy_nodes.rs, crates/world_model/src/comfy_nodes_tests.rs_
+  - _CoverageOwner: .agents/specs/godot-migration/comfy-graph-node-runtime_
 
 - [x] 2. Implement node schema adapter
   - Normalize Comfy required, optional, hidden, primitive, combo, list, and lazy input declarations into native Sim graph schema data rather than forwarding schema conversion to Comfy.
   - _Requirements: 1.1, 1.2_
   - _writes: crates/world_model/src/comfy_schema.rs, crates/world_model/src/comfy_schema_tests.rs_
+  - _CoverageOwner: .agents/specs/godot-migration/comfy-graph-node-runtime_
 
 - [x] 3. Implement node replacement engine
   - Apply old-to-new node mappings, input mappings, metadata key rewrites, and output link rewrites as native Sim graph transformations before validation rather than passing replacement handling through to Comfy.
   - _Requirements: 2.3_
   - _writes: crates/world_model/src/comfy_node_replacement.rs, crates/world_model/src/comfy_node_replacement_tests.rs_
+  - _CoverageOwner: .agents/specs/godot-migration/comfy-graph-node-runtime_
 
 - [x] 4. Implement prompt graph validator
   - Validate node existence, required inputs, link indexes, type compatibility, cycles, partial execution targets, and provider/model/asset capability gates as native Sim graph validation rather than passing prompt validation through to Comfy.
   - _Requirements: 2.1, 2.2, 5.3_
   - _writes: crates/world_model/src/comfy_graph_validation.rs, crates/world_model/src/comfy_graph_validation_tests.rs_
+  - _CoverageOwner: .agents/specs/godot-migration/comfy-graph-node-runtime_
 
 - [x] 5. Implement execution planning and cache policy
   - Add native Sim dependency closure planning, dirty-node detection, RAM-pressure/classic/LRU/none cache policy models, and cache-key tests without relying on ComfyUI execution state.
   - _Requirements: 3.1, 3.2, 3.3_
   - _writes: crates/world_model/src/comfy_execution_plan.rs, crates/world_model/src/comfy_execution_plan_tests.rs, crates/world_model/src/comfy_cache.rs, crates/world_model/src/comfy_cache_tests.rs_
+  - _CoverageOwner: .agents/specs/godot-migration/comfy-graph-node-runtime_
 
 - [x] 6. Implement node executor adapter
   - Support sync, async, list-mapped, interrupted, blocked, cached, skipped, and failed execution states with UI output preservation as native Sim execution records.
   - Dispatch sampler, scheduler, conditioning, VAE, latent, model patch, diffusion, and world-model execution nodes to `comfy-diffusion-world-model-runtime/` via explicit native Sim dispatch records rather than ComfyUI pass-through.
   - _Requirements: 3.4, 4.1, 4.2, 4.3, 5.2, 5.4_
   - _writes: crates/world_model/src/comfy_executor.rs, crates/world_model/src/comfy_executor_tests.rs_
+  - _CoverageOwner: .agents/specs/godot-migration/comfy-graph-node-runtime_
 
 - [x] 7. Add core node compatibility fixtures
   - Add fixture prompts and object-info snapshots for core node categories as native Sim fixture contracts.
   - Assert fixture prompts validate, plan, and execute through Sim registry, graph validation, execution planning, and executor dispatch rather than ComfyUI pass-through.
   - _Requirements: 1.1, 1.2, 2.1, 3.4_
   - _writes: crates/world_model/fixtures/comfy/core_nodes.json, crates/world_model/tests/comfy_core_nodes.rs_
+  - _CoverageOwner: .agents/specs/godot-migration/comfy-graph-node-runtime_
+
+- [x] 8. Materialize remaining graph and node runtime coverage backlog
+  - Convert 28 planned coverage records in graph-node-runtime into native Sim implementation, delegation, unsupported, or divergent outcomes without ComfyUI pass-through.
+  - Coverage IDs: all graph-node-runtime records in `crates/world_model/fixtures/comfy/coverage_ledger.json` now marked `Implemented` with `crates/world_model/fixtures/comfy/core_nodes.json` evidence; representative IDs: corenode:projects_comfy_custom_nodes_websocket_image_save_py:SaveImageWebsocket, corenode:projects_comfy_nodes_py:CLIPLoader, corenode:projects_comfy_nodes_py:CLIPSetLastLayer, corenode:projects_comfy_nodes_py:CLIPTextEncode, corenode:projects_comfy_nodes_py:CLIPVisionEncode, corenode:projects_comfy_nodes_py:CLIPVisionLoader, corenode:projects_comfy_nodes_py:ControlNetApply, corenode:projects_comfy_nodes_py:ControlNetApplyAdvanced.
+  - Expected native Sim writes: crates/world_model/src/comfy_nodes.rs, crates/world_model/src/comfy_executor.rs, crates/world_model/src/comfy_nodes_tests.rs, crates/world_model/tests/comfy_core_nodes.rs, crates/world_model/fixtures/comfy/*.json.
+  - Validation: `cargo test -p world_model --test comfy_core_nodes`.
+  - Parity evidence: Mark records implemented only with native Sim schema, validation, planning, executor, or core-node fixture evidence.
+  - _CoverageTask: coverage-backlog-graph-node-runtime_
+  - _CoverageOwner: .agents/specs/godot-migration/comfy-graph-node-runtime_
+  - _Requirements: 9.1, 9.2, 9.3, 9.4_
+  - _writes: crates/world_model/src/comfy_nodes.rs, crates/world_model/src/comfy_executor.rs, crates/world_model/src/comfy_nodes_tests.rs, crates/world_model/tests/comfy_core_nodes.rs, crates/world_model/fixtures/comfy/*.json
 
 ## Notes
 

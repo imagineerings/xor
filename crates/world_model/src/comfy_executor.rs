@@ -257,7 +257,29 @@ fn is_terminal_failure(state: ComfyNodeExecutionState) -> bool {
 fn requires_diffusion_world_model_dispatch(node_type: &str) -> bool {
     matches!(
         node_type,
-        "KSampler" | "VAEDecode" | "VAEEncode" | "LoraLoader" | "ControlNetApply"
+        "CLIPLoader"
+            | "CLIPSetLastLayer"
+            | "CLIPTextEncode"
+            | "CLIPVisionEncode"
+            | "CLIPVisionLoader"
+            | "ControlNetApply"
+            | "ControlNetApplyAdvanced"
+            | "ControlNetLoader"
+            | "DiffControlNetLoader"
+            | "DiffusersLoader"
+            | "DualCLIPLoader"
+            | "GLIGENLoader"
+            | "GLIGENTextBoxApply"
+            | "InpaintModelConditioning"
+            | "KSampler"
+            | "LoraLoader"
+            | "StyleModelApply"
+            | "StyleModelLoader"
+            | "UNETLoader"
+            | "VAEDecode"
+            | "VAEDecodeTiled"
+            | "VAEEncode"
+            | "VAELoader"
     )
 }
 

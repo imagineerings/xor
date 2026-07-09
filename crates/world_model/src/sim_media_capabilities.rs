@@ -7,6 +7,127 @@ pub const SIM_MEDIA_DEPENDENCY_REVIEW_REQUIRED_CODE: &str =
 pub const SIM_MEDIA_UNSUPPORTED_BACKEND_CODE: &str =
     "world_model.media_capability.unsupported_backend";
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct SimMediaNodeBacklogCatalog {
+    pub schema_version: u32,
+    pub source_root: String,
+    pub source_category: String,
+    pub captured_at: String,
+    pub implementation_owner: String,
+    pub native_sim_records: bool,
+    pub comfyui_passthrough: bool,
+    pub expected_record_count: usize,
+    pub records: Vec<SimMediaNodeBacklogRecord>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct SimMediaNodeBacklogRecord {
+    pub source_id: String,
+    pub source_path: String,
+    pub source_kind: String,
+    pub node_name: String,
+    pub native_group: SimMediaCapabilityGroup,
+    pub native_surface: String,
+    pub evidence_module: String,
+    pub evidence_kind: String,
+    pub metadata_only: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct SimMediaNodeBacklogDiagnostic {
+    pub code: String,
+    pub message: String,
+}
+
+impl SimMediaNodeBacklogCatalog {
+    pub fn validate(&self) -> Result<(), Vec<SimMediaNodeBacklogDiagnostic>> {
+        let mut diagnostics = Vec::new();
+
+        if self.schema_version != 1 {
+            diagnostics.push(sim_media_backlog_diagnostic(
+                "world_model.media_capability.backlog.invalid_schema",
+                "media backlog fixture must use schema version 1",
+            ));
+        }
+        if self.source_root != "projects/comfy/comfy_extras" {
+            diagnostics.push(sim_media_backlog_diagnostic(
+                "world_model.media_capability.backlog.invalid_source_root",
+                "media backlog fixture must preserve comfy_extras source attribution",
+            ));
+        }
+        if !self.native_sim_records || self.comfyui_passthrough {
+            diagnostics.push(sim_media_backlog_diagnostic(
+                "world_model.media_capability.backlog.not_native",
+                "media backlog fixture must describe native Sim records only",
+            ));
+        }
+        if self.records.len() != self.expected_record_count {
+            diagnostics.push(sim_media_backlog_diagnostic(
+                "world_model.media_capability.backlog.count_mismatch",
+                format!(
+                    "expected {} media backlog records but found {}",
+                    self.expected_record_count,
+                    self.records.len()
+                ),
+            ));
+        }
+
+        let mut source_ids = BTreeSet::new();
+        for record in &self.records {
+            if !source_ids.insert(&record.source_id) {
+                diagnostics.push(sim_media_backlog_diagnostic(
+                    "world_model.media_capability.backlog.duplicate_record",
+                    format!("duplicate source id `{}`", record.source_id),
+                ));
+            }
+            if !record
+                .source_path
+                .starts_with("projects/comfy/comfy_extras/")
+            {
+                diagnostics.push(sim_media_backlog_diagnostic(
+                    "world_model.media_capability.backlog.invalid_source_path",
+                    format!(
+                        "source path `{}` does not preserve comfy_extras attribution",
+                        record.source_path
+                    ),
+                ));
+            }
+            if record.node_name.is_empty()
+                || record.native_surface.is_empty()
+                || record.evidence_module.is_empty()
+                || record.evidence_kind.is_empty()
+            {
+                diagnostics.push(sim_media_backlog_diagnostic(
+                    "world_model.media_capability.backlog.missing_evidence",
+                    format!("record `{}` is missing media evidence", record.source_id),
+                ));
+            }
+            if !record.metadata_only {
+                diagnostics.push(sim_media_backlog_diagnostic(
+                    "world_model.media_capability.backlog.not_metadata_only",
+                    format!(
+                        "record `{}` must stay metadata-only until its backend policy is reviewed",
+                        record.source_id
+                    ),
+                ));
+            }
+        }
+
+        if diagnostics.is_empty() {
+            Ok(())
+        } else {
+            Err(diagnostics)
+        }
+    }
+
+    pub fn groups(&self) -> BTreeSet<SimMediaCapabilityGroup> {
+        self.records
+            .iter()
+            .map(|record| record.native_group)
+            .collect()
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum SimMediaCapabilityGroup {
     ImageMask,
@@ -187,6 +308,16 @@ fn capability_diagnostic(
         | SimMediaBackendRequirement::SimAssetService
         | SimMediaBackendRequirement::SimMediaService
         | SimMediaBackendRequirement::MeshPipelineDelegation => None,
+    }
+}
+
+fn sim_media_backlog_diagnostic(
+    code: impl Into<String>,
+    message: impl Into<String>,
+) -> SimMediaNodeBacklogDiagnostic {
+    SimMediaNodeBacklogDiagnostic {
+        code: code.into(),
+        message: message.into(),
     }
 }
 

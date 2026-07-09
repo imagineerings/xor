@@ -1,8 +1,17 @@
 {
   "schema_version": 1,
   "source_root": "projects/comfy/blueprints",
+  "captured_at": "2026-07-09",
+  "implementation_owner": ".agents/specs/godot-migration/comfy-workflows-blueprints",
   "native_sim_records": true,
   "comfyui_passthrough": false,
+  "safety": {
+    "model_downloads": {
+      "requires_downloads": false,
+      "mode": "metadata_only",
+      "dependency_review": "not_required"
+    }
+  },
   "expected_blueprint_count": 89,
   "blueprints": [
     {

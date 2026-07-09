@@ -5,9 +5,43 @@ use std::{
 };
 
 use crate::{
-    SIM_EXTENSION_DISABLED_PACK_CODE, SIM_EXTENSION_NOT_WHITELISTED_CODE, SimExtensionDiscovery,
-    SimExtensionDiscoveryConfig, SimExtensionId, SimExtensionSourceKind,
+    SIM_EXTENSION_DISABLED_PACK_CODE, SIM_EXTENSION_NOT_WHITELISTED_CODE,
+    SimExtensionBacklogCatalog, SimExtensionDiscovery, SimExtensionDiscoveryConfig, SimExtensionId,
+    SimExtensionSourceKind,
 };
+
+const EXTENSION_BACKLOG: &str = include_str!("../fixtures/comfy/extension_backlog.json");
+
+#[test]
+fn extension_backlog_fixture_maps_hooks_to_native_sim_extension_surfaces() {
+    let backlog: SimExtensionBacklogCatalog =
+        serde_json::from_str(EXTENSION_BACKLOG).expect("extension backlog fixture parses");
+    backlog
+        .validate()
+        .expect("extension backlog fixture should be internally valid");
+
+    assert_eq!(backlog.records.len(), 149);
+    for required in [
+        "extension-asset-route",
+        "extension-registration-policy",
+        "extension-discovery-loader",
+    ] {
+        assert!(
+            backlog.surfaces().contains(required),
+            "missing extension surface {required}"
+        );
+    }
+    for record in backlog.records {
+        assert!(record.metadata_only);
+        assert!(!record.executes_extension_code);
+        assert!(
+            record
+                .evidence_module
+                .starts_with("crates/world_model/src/comfy_")
+        );
+        assert_eq!(record.evidence_kind, "metadata-only");
+    }
+}
 
 #[test]
 fn extension_discovery_finds_python_files_and_directories_in_deterministic_order() {

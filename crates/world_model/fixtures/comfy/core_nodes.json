@@ -1,34 +1,69 @@
 {
   "schema_version": 1,
+  "source_path": "projects/comfy/nodes.py",
+  "captured_at": "2026-07-09",
+  "implementation_owner": ".agents/specs/godot-migration/comfy-graph-node-runtime",
   "native_sim_records": true,
   "comfyui_passthrough": false,
+  "safety": {
+    "model_downloads": {
+      "requires_downloads": false,
+      "dependency_review": "not_required"
+    },
+    "mock_runner": {
+      "mode": "metadata_only",
+      "dependency_review": "not_required"
+    }
+  },
   "object_info": {
-    "minimum_node_count": 18,
+    "minimum_node_count": 35,
     "required_nodes": [
-      "CheckpointLoaderSimple",
+      "CLIPLoader",
+      "CLIPSetLastLayer",
       "CLIPTextEncode",
-      "KSampler",
-      "VAEDecode",
-      "VAEEncode",
-      "LoadImage",
-      "SaveImage",
-      "EmptyLatentImage",
-      "LatentUpscale",
-      "SetLatentNoiseMask",
-      "LoraLoader",
-      "ControlNetLoader",
+      "CLIPVisionEncode",
+      "CLIPVisionLoader",
+      "CheckpointLoaderSimple",
       "ControlNetApply",
+      "ControlNetApplyAdvanced",
+      "ControlNetLoader",
+      "DiffControlNetLoader",
+      "DiffusersLoader",
+      "DualCLIPLoader",
+      "EmptyImage",
+      "EmptyLatentImage",
       "GLIGENLoader",
       "GLIGENTextBoxApply",
+      "ImageBatch",
+      "ImageInvert",
+      "ImagePadForOutpaint",
+      "ImageScale",
+      "ImageScaleBy",
       "InpaintModelConditioning",
-      "VAELoader",
-      "VAEDecodeTiled"
+      "KSampler",
+      "LatentUpscale",
+      "LoadImage",
+      "LoadImageMask",
+      "LoadImageOutput",
+      "LoraLoader",
+      "PreviewImage",
+      "SaveImage",
+      "SaveImageWebsocket",
+      "SetLatentNoiseMask",
+      "StyleModelApply",
+      "StyleModelLoader",
+      "UNETLoader",
+      "VAEDecode",
+      "VAEDecodeTiled",
+      "VAEEncode",
+      "VAELoader"
     ],
     "required_categories": [
       "conditioning",
       "conditioning/controlnet",
       "conditioning/gligen",
       "conditioning/inpaint",
+      "conditioning/style",
       "image",
       "latent",
       "latent/inpaint",
@@ -41,69 +76,789 @@
       "id": "text_to_image",
       "target_node": 6,
       "nodes": [
-        { "id": 1, "type": "CheckpointLoaderSimple", "literals": { "ckpt_name": "sdxl.safetensors" } },
-        { "id": 2, "type": "CLIPTextEncode", "literals": { "text": "quiet mossy courtyard" } },
-        { "id": 3, "type": "CLIPTextEncode", "literals": { "text": "" } },
-        { "id": 4, "type": "EmptyLatentImage", "literals": { "width": "1024", "height": "1024", "batch_size": "1" } },
-        { "id": 5, "type": "KSampler", "literals": { "seed": "42", "steps": "20", "sampler_name": "euler", "scheduler": "normal" } },
-        { "id": 6, "type": "VAEDecode", "literals": {} },
-        { "id": 7, "type": "SaveImage", "literals": { "filename_prefix": "sim-native" } }
+        {
+          "id": 1,
+          "type": "CheckpointLoaderSimple",
+          "literals": {
+            "ckpt_name": "sdxl.safetensors"
+          }
+        },
+        {
+          "id": 2,
+          "type": "CLIPTextEncode",
+          "literals": {
+            "text": "quiet mossy courtyard"
+          }
+        },
+        {
+          "id": 3,
+          "type": "CLIPTextEncode",
+          "literals": {
+            "text": ""
+          }
+        },
+        {
+          "id": 4,
+          "type": "EmptyLatentImage",
+          "literals": {
+            "width": "1024",
+            "height": "1024",
+            "batch_size": "1"
+          }
+        },
+        {
+          "id": 5,
+          "type": "KSampler",
+          "literals": {
+            "seed": "42",
+            "steps": "20",
+            "sampler_name": "euler",
+            "scheduler": "normal"
+          }
+        },
+        {
+          "id": 6,
+          "type": "VAEDecode",
+          "literals": {}
+        },
+        {
+          "id": 7,
+          "type": "SaveImage",
+          "literals": {
+            "filename_prefix": "sim-native"
+          }
+        }
       ],
       "edges": [
-        { "from": 1, "from_port": "CLIP", "to": 2, "to_port": "clip" },
-        { "from": 1, "from_port": "CLIP", "to": 3, "to_port": "clip" },
-        { "from": 1, "from_port": "MODEL", "to": 5, "to_port": "model" },
-        { "from": 2, "from_port": "CONDITIONING", "to": 5, "to_port": "positive" },
-        { "from": 3, "from_port": "CONDITIONING", "to": 5, "to_port": "negative" },
-        { "from": 4, "from_port": "LATENT", "to": 5, "to_port": "latent_image" },
-        { "from": 5, "from_port": "LATENT", "to": 6, "to_port": "samples" },
-        { "from": 1, "from_port": "VAE", "to": 6, "to_port": "vae" },
-        { "from": 6, "from_port": "IMAGE", "to": 7, "to_port": "images" }
+        {
+          "from": 1,
+          "from_port": "CLIP",
+          "to": 2,
+          "to_port": "clip"
+        },
+        {
+          "from": 1,
+          "from_port": "CLIP",
+          "to": 3,
+          "to_port": "clip"
+        },
+        {
+          "from": 1,
+          "from_port": "MODEL",
+          "to": 5,
+          "to_port": "model"
+        },
+        {
+          "from": 2,
+          "from_port": "CONDITIONING",
+          "to": 5,
+          "to_port": "positive"
+        },
+        {
+          "from": 3,
+          "from_port": "CONDITIONING",
+          "to": 5,
+          "to_port": "negative"
+        },
+        {
+          "from": 4,
+          "from_port": "LATENT",
+          "to": 5,
+          "to_port": "latent_image"
+        },
+        {
+          "from": 5,
+          "from_port": "LATENT",
+          "to": 6,
+          "to_port": "samples"
+        },
+        {
+          "from": 1,
+          "from_port": "VAE",
+          "to": 6,
+          "to_port": "vae"
+        },
+        {
+          "from": 6,
+          "from_port": "IMAGE",
+          "to": 7,
+          "to_port": "images"
+        }
       ],
-      "expected_dispatch_nodes": [5, 6]
+      "expected_dispatch_nodes": [
+        2,
+        3,
+        5,
+        6
+      ]
     },
     {
       "id": "controlnet_gligen_inpaint",
       "target_node": 12,
       "nodes": [
-        { "id": 1, "type": "CheckpointLoaderSimple", "literals": { "ckpt_name": "sdxl.safetensors" } },
-        { "id": 2, "type": "LoadImage", "literals": { "image": "control.png" } },
-        { "id": 3, "type": "CLIPTextEncode", "literals": { "text": "cabinet of curiosities" } },
-        { "id": 4, "type": "ControlNetLoader", "literals": { "control_net_name": "canny.safetensors" } },
-        { "id": 5, "type": "ControlNetApply", "literals": { "strength": "0.8" } },
-        { "id": 6, "type": "GLIGENLoader", "literals": { "gligen_name": "gligen.safetensors" } },
-        { "id": 7, "type": "GLIGENTextBoxApply", "literals": { "text": "window", "width": "256", "height": "256", "x": "64", "y": "64" } },
-        { "id": 8, "type": "VAEEncode", "literals": {} },
-        { "id": 9, "type": "SetLatentNoiseMask", "literals": {} },
-        { "id": 10, "type": "InpaintModelConditioning", "literals": {} },
-        { "id": 11, "type": "KSampler", "literals": { "seed": "7", "steps": "12", "sampler_name": "dpmpp_2m", "scheduler": "karras" } },
-        { "id": 12, "type": "VAEDecodeTiled", "literals": { "tile_size": "512" } }
+        {
+          "id": 1,
+          "type": "CheckpointLoaderSimple",
+          "literals": {
+            "ckpt_name": "sdxl.safetensors"
+          }
+        },
+        {
+          "id": 2,
+          "type": "LoadImage",
+          "literals": {
+            "image": "control.png"
+          }
+        },
+        {
+          "id": 3,
+          "type": "CLIPTextEncode",
+          "literals": {
+            "text": "cabinet of curiosities"
+          }
+        },
+        {
+          "id": 4,
+          "type": "ControlNetLoader",
+          "literals": {
+            "control_net_name": "canny.safetensors"
+          }
+        },
+        {
+          "id": 5,
+          "type": "ControlNetApply",
+          "literals": {
+            "strength": "0.8"
+          }
+        },
+        {
+          "id": 6,
+          "type": "GLIGENLoader",
+          "literals": {
+            "gligen_name": "gligen.safetensors"
+          }
+        },
+        {
+          "id": 7,
+          "type": "GLIGENTextBoxApply",
+          "literals": {
+            "text": "window",
+            "width": "256",
+            "height": "256",
+            "x": "64",
+            "y": "64"
+          }
+        },
+        {
+          "id": 8,
+          "type": "VAEEncode",
+          "literals": {}
+        },
+        {
+          "id": 9,
+          "type": "SetLatentNoiseMask",
+          "literals": {}
+        },
+        {
+          "id": 10,
+          "type": "InpaintModelConditioning",
+          "literals": {}
+        },
+        {
+          "id": 11,
+          "type": "KSampler",
+          "literals": {
+            "seed": "7",
+            "steps": "12",
+            "sampler_name": "dpmpp_2m",
+            "scheduler": "karras"
+          }
+        },
+        {
+          "id": 12,
+          "type": "VAEDecodeTiled",
+          "literals": {
+            "tile_size": "512"
+          }
+        }
       ],
       "edges": [
-        { "from": 1, "from_port": "CLIP", "to": 3, "to_port": "clip" },
-        { "from": 3, "from_port": "CONDITIONING", "to": 5, "to_port": "conditioning" },
-        { "from": 4, "from_port": "CONTROL_NET", "to": 5, "to_port": "control_net" },
-        { "from": 2, "from_port": "IMAGE", "to": 5, "to_port": "image" },
-        { "from": 5, "from_port": "CONDITIONING", "to": 7, "to_port": "conditioning" },
-        { "from": 1, "from_port": "CLIP", "to": 7, "to_port": "clip" },
-        { "from": 6, "from_port": "GLIGEN", "to": 7, "to_port": "gligen" },
-        { "from": 2, "from_port": "IMAGE", "to": 8, "to_port": "pixels" },
-        { "from": 1, "from_port": "VAE", "to": 8, "to_port": "vae" },
-        { "from": 8, "from_port": "LATENT", "to": 9, "to_port": "samples" },
-        { "from": 2, "from_port": "MASK", "to": 9, "to_port": "mask" },
-        { "from": 7, "from_port": "CONDITIONING", "to": 10, "to_port": "positive" },
-        { "from": 3, "from_port": "CONDITIONING", "to": 10, "to_port": "negative" },
-        { "from": 2, "from_port": "IMAGE", "to": 10, "to_port": "pixels" },
-        { "from": 1, "from_port": "VAE", "to": 10, "to_port": "vae" },
-        { "from": 2, "from_port": "MASK", "to": 10, "to_port": "mask" },
-        { "from": 1, "from_port": "MODEL", "to": 11, "to_port": "model" },
-        { "from": 10, "from_port": "POSITIVE", "to": 11, "to_port": "positive" },
-        { "from": 10, "from_port": "NEGATIVE", "to": 11, "to_port": "negative" },
-        { "from": 9, "from_port": "LATENT", "to": 11, "to_port": "latent_image" },
-        { "from": 11, "from_port": "LATENT", "to": 12, "to_port": "samples" },
-        { "from": 1, "from_port": "VAE", "to": 12, "to_port": "vae" }
+        {
+          "from": 1,
+          "from_port": "CLIP",
+          "to": 3,
+          "to_port": "clip"
+        },
+        {
+          "from": 3,
+          "from_port": "CONDITIONING",
+          "to": 5,
+          "to_port": "conditioning"
+        },
+        {
+          "from": 4,
+          "from_port": "CONTROL_NET",
+          "to": 5,
+          "to_port": "control_net"
+        },
+        {
+          "from": 2,
+          "from_port": "IMAGE",
+          "to": 5,
+          "to_port": "image"
+        },
+        {
+          "from": 5,
+          "from_port": "CONDITIONING",
+          "to": 7,
+          "to_port": "conditioning"
+        },
+        {
+          "from": 1,
+          "from_port": "CLIP",
+          "to": 7,
+          "to_port": "clip"
+        },
+        {
+          "from": 6,
+          "from_port": "GLIGEN",
+          "to": 7,
+          "to_port": "gligen"
+        },
+        {
+          "from": 2,
+          "from_port": "IMAGE",
+          "to": 8,
+          "to_port": "pixels"
+        },
+        {
+          "from": 1,
+          "from_port": "VAE",
+          "to": 8,
+          "to_port": "vae"
+        },
+        {
+          "from": 8,
+          "from_port": "LATENT",
+          "to": 9,
+          "to_port": "samples"
+        },
+        {
+          "from": 2,
+          "from_port": "MASK",
+          "to": 9,
+          "to_port": "mask"
+        },
+        {
+          "from": 7,
+          "from_port": "CONDITIONING",
+          "to": 10,
+          "to_port": "positive"
+        },
+        {
+          "from": 3,
+          "from_port": "CONDITIONING",
+          "to": 10,
+          "to_port": "negative"
+        },
+        {
+          "from": 2,
+          "from_port": "IMAGE",
+          "to": 10,
+          "to_port": "pixels"
+        },
+        {
+          "from": 1,
+          "from_port": "VAE",
+          "to": 10,
+          "to_port": "vae"
+        },
+        {
+          "from": 2,
+          "from_port": "MASK",
+          "to": 10,
+          "to_port": "mask"
+        },
+        {
+          "from": 1,
+          "from_port": "MODEL",
+          "to": 11,
+          "to_port": "model"
+        },
+        {
+          "from": 10,
+          "from_port": "POSITIVE",
+          "to": 11,
+          "to_port": "positive"
+        },
+        {
+          "from": 10,
+          "from_port": "NEGATIVE",
+          "to": 11,
+          "to_port": "negative"
+        },
+        {
+          "from": 9,
+          "from_port": "LATENT",
+          "to": 11,
+          "to_port": "latent_image"
+        },
+        {
+          "from": 11,
+          "from_port": "LATENT",
+          "to": 12,
+          "to_port": "samples"
+        },
+        {
+          "from": 1,
+          "from_port": "VAE",
+          "to": 12,
+          "to_port": "vae"
+        }
       ],
-      "expected_dispatch_nodes": [5, 8, 11]
+      "expected_dispatch_nodes": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        10,
+        11,
+        12
+      ]
+    },
+    {
+      "id": "backlog_image_processing",
+      "target_node": 8,
+      "nodes": [
+        {
+          "id": 1,
+          "type": "LoadImage",
+          "literals": {
+            "image": "source.png"
+          }
+        },
+        {
+          "id": 2,
+          "type": "LoadImageMask",
+          "literals": {
+            "image": "mask.png",
+            "channel": "alpha"
+          }
+        },
+        {
+          "id": 3,
+          "type": "ImageInvert",
+          "literals": {}
+        },
+        {
+          "id": 4,
+          "type": "ImageScale",
+          "literals": {
+            "width": "512",
+            "height": "512",
+            "upscale_method": "nearest-exact",
+            "crop": "disabled"
+          }
+        },
+        {
+          "id": 5,
+          "type": "ImageScaleBy",
+          "literals": {
+            "scale_by": "1.5",
+            "upscale_method": "bicubic"
+          }
+        },
+        {
+          "id": 6,
+          "type": "ImagePadForOutpaint",
+          "literals": {
+            "left": "8",
+            "top": "8",
+            "right": "8",
+            "bottom": "8",
+            "feathering": "4"
+          }
+        },
+        {
+          "id": 7,
+          "type": "ImageBatch",
+          "literals": {}
+        },
+        {
+          "id": 8,
+          "type": "PreviewImage",
+          "literals": {}
+        },
+        {
+          "id": 9,
+          "type": "SaveImageWebsocket",
+          "literals": {}
+        },
+        {
+          "id": 10,
+          "type": "EmptyImage",
+          "literals": {
+            "width": "256",
+            "height": "256",
+            "batch_size": "1",
+            "color": "0"
+          }
+        },
+        {
+          "id": 11,
+          "type": "LoadImageOutput",
+          "literals": {
+            "image": "output.png"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "from": 1,
+          "from_port": "IMAGE",
+          "to": 3,
+          "to_port": "image"
+        },
+        {
+          "from": 3,
+          "from_port": "IMAGE",
+          "to": 4,
+          "to_port": "image"
+        },
+        {
+          "from": 4,
+          "from_port": "IMAGE",
+          "to": 5,
+          "to_port": "image"
+        },
+        {
+          "from": 5,
+          "from_port": "IMAGE",
+          "to": 6,
+          "to_port": "image"
+        },
+        {
+          "from": 6,
+          "from_port": "IMAGE",
+          "to": 7,
+          "to_port": "image1"
+        },
+        {
+          "from": 10,
+          "from_port": "IMAGE",
+          "to": 7,
+          "to_port": "image2"
+        },
+        {
+          "from": 7,
+          "from_port": "IMAGE",
+          "to": 8,
+          "to_port": "images"
+        },
+        {
+          "from": 7,
+          "from_port": "IMAGE",
+          "to": 9,
+          "to_port": "images"
+        }
+      ],
+      "expected_dispatch_nodes": []
+    },
+    {
+      "id": "backlog_model_conditioning_loaders",
+      "target_node": 8,
+      "nodes": [
+        {
+          "id": 1,
+          "type": "CLIPLoader",
+          "literals": {
+            "clip_name": "clip_l.safetensors",
+            "type": "stable_diffusion"
+          }
+        },
+        {
+          "id": 2,
+          "type": "CLIPSetLastLayer",
+          "literals": {
+            "stop_at_clip_layer": "-2"
+          }
+        },
+        {
+          "id": 3,
+          "type": "CLIPTextEncode",
+          "literals": {
+            "text": "polished brass observatory"
+          }
+        },
+        {
+          "id": 4,
+          "type": "CLIPVisionLoader",
+          "literals": {
+            "clip_name": "clip_vision.safetensors"
+          }
+        },
+        {
+          "id": 5,
+          "type": "LoadImage",
+          "literals": {
+            "image": "vision.png"
+          }
+        },
+        {
+          "id": 6,
+          "type": "CLIPVisionEncode",
+          "literals": {}
+        },
+        {
+          "id": 7,
+          "type": "StyleModelLoader",
+          "literals": {
+            "style_model_name": "style.safetensors"
+          }
+        },
+        {
+          "id": 8,
+          "type": "StyleModelApply",
+          "literals": {}
+        },
+        {
+          "id": 9,
+          "type": "UNETLoader",
+          "literals": {
+            "unet_name": "unet.safetensors",
+            "weight_dtype": "default"
+          }
+        },
+        {
+          "id": 10,
+          "type": "DualCLIPLoader",
+          "literals": {
+            "clip_name1": "clip_l.safetensors",
+            "clip_name2": "clip_g.safetensors",
+            "type": "sdxl"
+          }
+        },
+        {
+          "id": 11,
+          "type": "DiffusersLoader",
+          "literals": {
+            "model_path": "metadata-only/diffusers"
+          }
+        },
+        {
+          "id": 12,
+          "type": "SaveImage",
+          "literals": {
+            "filename_prefix": "graph-backlog"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "from": 1,
+          "from_port": "CLIP",
+          "to": 2,
+          "to_port": "clip"
+        },
+        {
+          "from": 2,
+          "from_port": "CLIP",
+          "to": 3,
+          "to_port": "clip"
+        },
+        {
+          "from": 4,
+          "from_port": "CLIP_VISION",
+          "to": 6,
+          "to_port": "clip_vision"
+        },
+        {
+          "from": 5,
+          "from_port": "IMAGE",
+          "to": 6,
+          "to_port": "image"
+        },
+        {
+          "from": 3,
+          "from_port": "CONDITIONING",
+          "to": 8,
+          "to_port": "conditioning"
+        },
+        {
+          "from": 7,
+          "from_port": "STYLE_MODEL",
+          "to": 8,
+          "to_port": "style_model"
+        },
+        {
+          "from": 6,
+          "from_port": "CLIP_VISION_OUTPUT",
+          "to": 8,
+          "to_port": "clip_vision_output"
+        },
+        {
+          "from": 5,
+          "from_port": "IMAGE",
+          "to": 12,
+          "to_port": "images"
+        }
+      ],
+      "expected_dispatch_nodes": [
+        1,
+        2,
+        3,
+        4,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "backlog_controlnet_advanced",
+      "target_node": 7,
+      "nodes": [
+        {
+          "id": 1,
+          "type": "LoadImage",
+          "literals": {
+            "image": "control.png"
+          }
+        },
+        {
+          "id": 2,
+          "type": "CLIPTextEncode",
+          "literals": {
+            "text": "positive"
+          }
+        },
+        {
+          "id": 3,
+          "type": "CLIPTextEncode",
+          "literals": {
+            "text": "negative"
+          }
+        },
+        {
+          "id": 4,
+          "type": "DiffControlNetLoader",
+          "literals": {
+            "control_net_name": "diff-control.safetensors"
+          }
+        },
+        {
+          "id": 5,
+          "type": "ControlNetApplyAdvanced",
+          "literals": {
+            "strength": "0.75",
+            "start_percent": "0.0",
+            "end_percent": "1.0"
+          }
+        },
+        {
+          "id": 6,
+          "type": "GLIGENLoader",
+          "literals": {
+            "gligen_name": "gligen.safetensors"
+          }
+        },
+        {
+          "id": 7,
+          "type": "GLIGENTextBoxApply",
+          "literals": {
+            "text": "window",
+            "width": "128",
+            "height": "128",
+            "x": "32",
+            "y": "32"
+          }
+        },
+        {
+          "id": 8,
+          "type": "PreviewImage",
+          "literals": {}
+        },
+        {
+          "id": 9,
+          "type": "CLIPLoader",
+          "literals": {
+            "clip_name": "clip_l.safetensors",
+            "type": "stable_diffusion"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "from": 4,
+          "from_port": "CONTROL_NET",
+          "to": 5,
+          "to_port": "control_net"
+        },
+        {
+          "from": 2,
+          "from_port": "CONDITIONING",
+          "to": 5,
+          "to_port": "positive"
+        },
+        {
+          "from": 3,
+          "from_port": "CONDITIONING",
+          "to": 5,
+          "to_port": "negative"
+        },
+        {
+          "from": 1,
+          "from_port": "IMAGE",
+          "to": 5,
+          "to_port": "image"
+        },
+        {
+          "from": 5,
+          "from_port": "POSITIVE",
+          "to": 7,
+          "to_port": "conditioning"
+        },
+        {
+          "from": 6,
+          "from_port": "GLIGEN",
+          "to": 7,
+          "to_port": "gligen"
+        },
+        {
+          "from": 1,
+          "from_port": "IMAGE",
+          "to": 8,
+          "to_port": "images"
+        },
+        {
+          "from": 9,
+          "from_port": "CLIP",
+          "to": 2,
+          "to_port": "clip"
+        },
+        {
+          "from": 9,
+          "from_port": "CLIP",
+          "to": 3,
+          "to_port": "clip"
+        },
+        {
+          "from": 9,
+          "from_port": "CLIP",
+          "to": 7,
+          "to_port": "clip"
+        }
+      ],
+      "expected_dispatch_nodes": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        9
+      ]
     }
   ]
 }

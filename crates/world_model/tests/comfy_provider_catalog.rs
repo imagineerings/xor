@@ -1,8 +1,12 @@
 use std::collections::BTreeSet;
 
 use serde::Deserialize;
-use world_model::{SimProviderCapability, SimProviderNodeAvailability, SimProviderNodeRegistry};
+use world_model::{
+    SimProviderBacklogCatalog, SimProviderCapability, SimProviderNodeAvailability,
+    SimProviderNodeRegistry,
+};
 
+const PROVIDER_BACKLOG: &str = include_str!("../fixtures/comfy/provider_backlog.json");
 const PROVIDER_NODES: &str = include_str!("../fixtures/comfy/provider_nodes.json");
 
 #[derive(Debug, Deserialize)]
@@ -19,6 +23,45 @@ struct ProviderCatalog {
     required_nodes: Vec<String>,
     required_capabilities: Vec<String>,
     unsupported_nodes: Vec<String>,
+}
+
+#[test]
+fn provider_backlog_fixture_maps_remaining_nodes_to_native_sim_provider_surfaces() {
+    let backlog: SimProviderBacklogCatalog =
+        serde_json::from_str(PROVIDER_BACKLOG).expect("provider backlog fixture parses");
+    backlog
+        .validate()
+        .expect("provider backlog fixture should be internally valid");
+
+    assert_eq!(backlog.records.len(), 229);
+    for provider_id in [
+        "anthropic",
+        "bfl",
+        "bytedance",
+        "elevenlabs",
+        "gemini",
+        "kling",
+        "luma",
+        "openai",
+        "runway",
+        "tripo",
+    ] {
+        assert!(
+            backlog.provider_ids().contains(provider_id),
+            "missing provider backlog id {provider_id}"
+        );
+    }
+
+    for record in backlog.records {
+        assert!(record.metadata_only);
+        assert!(record.real_calls_policy_gated);
+        assert!(
+            record
+                .evidence_module
+                .starts_with("crates/world_model/src/sim_provider_")
+        );
+        assert_eq!(record.evidence_kind, "metadata-only");
+    }
 }
 
 #[test]

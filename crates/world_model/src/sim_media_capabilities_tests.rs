@@ -1,8 +1,44 @@
 use crate::{
     SIM_MEDIA_DEPENDENCY_REVIEW_REQUIRED_CODE, SIM_MEDIA_UNSUPPORTED_BACKEND_CODE,
-    SimMediaBackendRequirement, SimMediaCapabilityGroup, SimMediaNodeCapabilityRegistry,
-    SimMediaPortType,
+    SimMediaBackendRequirement, SimMediaCapabilityGroup, SimMediaNodeBacklogCatalog,
+    SimMediaNodeCapabilityRegistry, SimMediaPortType,
 };
+
+const MEDIA_NODE_BACKLOG: &str = include_str!("../fixtures/comfy/media_node_backlog.json");
+
+#[test]
+fn media_node_backlog_fixture_maps_remaining_nodes_to_native_sim_groups() {
+    let backlog: SimMediaNodeBacklogCatalog =
+        serde_json::from_str(MEDIA_NODE_BACKLOG).expect("media backlog fixture parses");
+    backlog
+        .validate()
+        .expect("media backlog fixture should be internally valid");
+
+    assert_eq!(backlog.records.len(), 289);
+    for group in [
+        SimMediaCapabilityGroup::ImageMask,
+        SimMediaCapabilityGroup::Video,
+        SimMediaCapabilityGroup::Audio,
+        SimMediaCapabilityGroup::ThreeDGeometry,
+        SimMediaCapabilityGroup::AnalysisControl,
+        SimMediaCapabilityGroup::Utility,
+    ] {
+        assert!(
+            backlog.groups().contains(&group),
+            "missing media backlog group {group:?}"
+        );
+    }
+
+    for record in backlog.records {
+        assert!(record.metadata_only);
+        assert!(
+            record
+                .evidence_module
+                .starts_with("crates/world_model/src/sim_")
+        );
+        assert_eq!(record.evidence_kind, "metadata-only");
+    }
+}
 
 #[test]
 fn media_capability_registry_covers_required_groups_and_nodes() {

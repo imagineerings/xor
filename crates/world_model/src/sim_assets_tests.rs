@@ -2,9 +2,32 @@ use serde_json::json;
 
 use crate::{
     ASSET_CONTENT_NOT_FOUND_CODE, ASSET_REFERENCE_NOT_FOUND_CODE, SimAssetCacheState,
-    SimAssetContentId, SimAssetHash, SimAssetOwnerId, SimAssetReferenceId,
+    SimAssetContentId, SimAssetCoverageCatalog, SimAssetHash, SimAssetOwnerId, SimAssetReferenceId,
     SimAssetReferenceRequest, SimAssetRepository,
 };
+
+const ASSET_LIBRARY_BACKLOG: &str = include_str!("../fixtures/comfy/asset_library_backlog.json");
+
+#[test]
+fn asset_library_backlog_fixture_maps_to_native_sim_output_registration() {
+    let fixture: SimAssetCoverageCatalog =
+        serde_json::from_str(ASSET_LIBRARY_BACKLOG).expect("asset backlog fixture parses");
+    fixture
+        .validate()
+        .expect("asset backlog fixture should be internally valid");
+
+    assert_eq!(fixture.records.len(), 1);
+    assert_eq!(fixture.surfaces().len(), 1);
+    assert!(fixture.surfaces().contains("asset-output-registration"));
+
+    let record = &fixture.records[0];
+    assert_eq!(record.node_name, "ComboOutputTestNode");
+    assert_eq!(
+        record.evidence_module,
+        "crates/world_model/src/sim_asset_enrichment.rs"
+    );
+    assert!(record.metadata_only);
+}
 
 #[test]
 fn asset_repository_reuses_content_by_hash_and_preserves_reference_metadata() {

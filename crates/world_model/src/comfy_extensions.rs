@@ -10,6 +10,127 @@ pub const SIM_EXTENSION_DISABLED_PACK_CODE: &str = "world_model.extensions.disab
 pub const SIM_EXTENSION_NOT_WHITELISTED_CODE: &str = "world_model.extensions.not_whitelisted";
 pub const SIM_EXTENSION_ROOT_UNREADABLE_CODE: &str = "world_model.extensions.root_unreadable";
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct SimExtensionBacklogCatalog {
+    pub schema_version: u32,
+    pub source_root: String,
+    pub source_category: String,
+    pub captured_at: String,
+    pub implementation_owner: String,
+    pub native_sim_records: bool,
+    pub comfyui_passthrough: bool,
+    pub expected_record_count: usize,
+    pub records: Vec<SimExtensionBacklogRecord>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct SimExtensionBacklogRecord {
+    pub source_id: String,
+    pub source_path: String,
+    pub source_kind: String,
+    pub hook_name: String,
+    pub native_surface: String,
+    pub evidence_module: String,
+    pub evidence_kind: String,
+    pub executes_extension_code: bool,
+    pub metadata_only: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct SimExtensionBacklogDiagnostic {
+    pub code: String,
+    pub message: String,
+}
+
+impl SimExtensionBacklogCatalog {
+    pub fn validate(&self) -> Result<(), Vec<SimExtensionBacklogDiagnostic>> {
+        let mut diagnostics = Vec::new();
+
+        if self.schema_version != 1 {
+            diagnostics.push(sim_extension_backlog_diagnostic(
+                "world_model.extensions.backlog.invalid_schema",
+                "extension backlog fixture must use schema version 1",
+            ));
+        }
+        if self.source_root != "projects/comfy" {
+            diagnostics.push(sim_extension_backlog_diagnostic(
+                "world_model.extensions.backlog.invalid_source_root",
+                "extension backlog fixture must preserve projects/comfy source attribution",
+            ));
+        }
+        if !self.native_sim_records || self.comfyui_passthrough {
+            diagnostics.push(sim_extension_backlog_diagnostic(
+                "world_model.extensions.backlog.not_native",
+                "extension backlog fixture must describe native Sim records only",
+            ));
+        }
+        if self.records.len() != self.expected_record_count {
+            diagnostics.push(sim_extension_backlog_diagnostic(
+                "world_model.extensions.backlog.count_mismatch",
+                format!(
+                    "expected {} extension backlog records but found {}",
+                    self.expected_record_count,
+                    self.records.len()
+                ),
+            ));
+        }
+
+        let mut source_ids = BTreeSet::new();
+        for record in &self.records {
+            if !source_ids.insert(&record.source_id) {
+                diagnostics.push(sim_extension_backlog_diagnostic(
+                    "world_model.extensions.backlog.duplicate_record",
+                    format!("duplicate extension source id `{}`", record.source_id),
+                ));
+            }
+            if !record.source_path.starts_with("projects/comfy/") {
+                diagnostics.push(sim_extension_backlog_diagnostic(
+                    "world_model.extensions.backlog.invalid_source_path",
+                    format!(
+                        "source path `{}` does not preserve projects/comfy attribution",
+                        record.source_path
+                    ),
+                ));
+            }
+            if record.hook_name.is_empty()
+                || record.native_surface.is_empty()
+                || record.evidence_module.is_empty()
+                || record.evidence_kind.is_empty()
+            {
+                diagnostics.push(sim_extension_backlog_diagnostic(
+                    "world_model.extensions.backlog.missing_evidence",
+                    format!(
+                        "record `{}` is missing extension evidence",
+                        record.source_id
+                    ),
+                ));
+            }
+            if record.executes_extension_code || !record.metadata_only {
+                diagnostics.push(sim_extension_backlog_diagnostic(
+                    "world_model.extensions.backlog.unsafe_record",
+                    format!(
+                        "record `{}` must stay metadata-only and must not execute extension code",
+                        record.source_id
+                    ),
+                ));
+            }
+        }
+
+        if diagnostics.is_empty() {
+            Ok(())
+        } else {
+            Err(diagnostics)
+        }
+    }
+
+    pub fn surfaces(&self) -> BTreeSet<String> {
+        self.records
+            .iter()
+            .map(|record| record.native_surface.clone())
+            .collect()
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct SimExtensionId(String);
 
@@ -280,5 +401,15 @@ fn display_name(file_name: &str, source_kind: SimExtensionSourceKind) -> String 
             .and_then(|stem| stem.to_str())
             .unwrap_or(file_name)
             .to_string(),
+    }
+}
+
+fn sim_extension_backlog_diagnostic(
+    code: impl Into<String>,
+    message: impl Into<String>,
+) -> SimExtensionBacklogDiagnostic {
+    SimExtensionBacklogDiagnostic {
+        code: code.into(),
+        message: message.into(),
     }
 }

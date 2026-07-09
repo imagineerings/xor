@@ -85,6 +85,7 @@ pub mod sim_provider_nodes;
 pub mod sim_provider_policy;
 pub mod sim_provider_remote_tasks;
 pub mod sim_provider_secrets;
+pub mod sim_source_inventory;
 pub mod sim_user_data;
 pub mod sim_utility_nodes;
 pub mod sim_video_nodes;
@@ -231,6 +232,8 @@ mod sim_provider_remote_tasks_tests;
 #[cfg(test)]
 mod sim_provider_secrets_tests;
 #[cfg(test)]
+mod sim_source_inventory_tests;
+#[cfg(test)]
 mod sim_user_data_tests;
 #[cfg(test)]
 mod sim_utility_nodes_tests;
@@ -249,7 +252,8 @@ pub use comfy_blueprints::{
     BLUEPRINT_COUNT_MISMATCH_CODE, ComfyBlueprintCatalog, ComfyBlueprintCategory,
     ComfyBlueprintDependency, ComfyBlueprintDependencyKind, ComfyBlueprintDiagnostic,
     ComfyBlueprintRecord, DUPLICATE_BLUEPRINT_CODE, MISSING_BLUEPRINT_DEPENDENCY_CODE,
-    UNSUPPORTED_BLUEPRINT_NODE_CODE,
+    SimWorkflowBlueprintBacklogCatalog, SimWorkflowBlueprintBacklogDiagnostic,
+    SimWorkflowBlueprintBacklogRecord, UNSUPPORTED_BLUEPRINT_NODE_CODE,
 };
 pub use comfy_cache::{ComfyCachePolicy, NodeCacheEntry, NodeCacheSnapshot, cache_key_for_node};
 pub use comfy_cancellation::{
@@ -267,7 +271,9 @@ pub use comfy_control::{
     ClientFeatureNegotiation, ComfyControlDiagnostic, ComfyFeatureFlags, ComfyJobStatus,
     ComfyJobSummary, ComfyPromptId, ComfyRuntimeEvent, HistoryAction, INVALID_PROMPT_ID_CODE,
     PreviewPayload, PromptExtraData, PromptSubmission, PromptSubmissionResponse, QueueAction,
-    QueueNumber, QueueStatus,
+    QueueNumber, QueueStatus, SimControlPlaneDeviceStats, SimControlPlaneRouteCapability,
+    SimControlPlaneSettingsStore, SimControlPlaneSystemStats, SimControlPlaneUser,
+    SimControlPlaneUserRegistry,
 };
 pub use comfy_custom_node_bridge::{
     SIM_CUSTOM_NODE_DUPLICATE_CODE, SIM_CUSTOM_NODE_UNSUPPORTED_REGISTRATION_CODE,
@@ -288,7 +294,8 @@ pub use comfy_execution_plan::{ComfyExecutionPlanner, ExecutionPlan, ExecutionPl
 pub use comfy_execution_registry::{
     ComfyExecutionRegistry, DivergenceReason, DivergenceRecord, ExecutionBehaviorKey,
     GuidanceCapability, GuidanceMode, ModelFamilyExecutionProfile, SamplerCapability, SamplerKind,
-    SchedulerCapability, SchedulerKind,
+    SchedulerCapability, SchedulerKind, SimDiffusionWorldModelBacklogCatalog,
+    SimDiffusionWorldModelBacklogDiagnostic, SimDiffusionWorldModelBacklogRecord,
 };
 pub use comfy_executor::{
     ComfyExecutionReport, ComfyExecutorDiagnostic, ComfyExecutorDispatch,
@@ -332,7 +339,8 @@ pub use comfy_extension_templates::{
 };
 pub use comfy_extensions::{
     SIM_EXTENSION_DISABLED_PACK_CODE, SIM_EXTENSION_NOT_WHITELISTED_CODE,
-    SIM_EXTENSION_ROOT_UNREADABLE_CODE, SimExtensionDiagnostic, SimExtensionDiscovery,
+    SIM_EXTENSION_ROOT_UNREADABLE_CODE, SimExtensionBacklogCatalog, SimExtensionBacklogDiagnostic,
+    SimExtensionBacklogRecord, SimExtensionDiagnostic, SimExtensionDiscovery,
     SimExtensionDiscoveryConfig, SimExtensionDiscoveryReport, SimExtensionId, SimExtensionRecord,
     SimExtensionSourceKind,
 };
@@ -366,7 +374,7 @@ pub use comfy_model_components::{
 pub use comfy_model_family::{
     AdapterKind, ComfyModelFamilyDetector, ConditioningMode, LatentFormat, ModelFamilyCapability,
     ModelFamilyDiagnostic, ModelFamilyKind, ModelFamilyProfile, ModelMediaCapability,
-    TextEncoderRequirement, VaeRequirement,
+    SimModelFamilyCatalog, SimModelFamilyRecord, TextEncoderRequirement, VaeRequirement,
 };
 pub use comfy_model_folders::{
     ComfyModelFolderRegistry, ExtraModelPathConfig, ExtraModelPathRoot, ModelCategory,
@@ -525,9 +533,9 @@ pub use sim_asset_upload::{
 };
 pub use sim_assets::{
     ASSET_CONTENT_NOT_FOUND_CODE, ASSET_REFERENCE_NOT_FOUND_CODE, SimAssetCacheState,
-    SimAssetContentId, SimAssetContentRecord, SimAssetDiagnostic, SimAssetHash, SimAssetOwnerId,
-    SimAssetReferenceId, SimAssetReferencePatch, SimAssetReferenceRecord, SimAssetReferenceRequest,
-    SimAssetRepository,
+    SimAssetContentId, SimAssetContentRecord, SimAssetCoverageCatalog, SimAssetCoverageDiagnostic,
+    SimAssetCoverageRecord, SimAssetDiagnostic, SimAssetHash, SimAssetOwnerId, SimAssetReferenceId,
+    SimAssetReferencePatch, SimAssetReferenceRecord, SimAssetReferenceRequest, SimAssetRepository,
 };
 pub use sim_audio_nodes::{
     SIM_AUDIO_DEPENDENCY_REVIEW_REQUIRED_CODE, SIM_AUDIO_INVALID_CHANNEL_CODE,
@@ -586,6 +594,7 @@ pub use sim_mask_nodes::{
 pub use sim_media_capabilities::{
     SIM_MEDIA_DEPENDENCY_REVIEW_REQUIRED_CODE, SIM_MEDIA_UNSUPPORTED_BACKEND_CODE,
     SimMediaBackendRequirement, SimMediaCapabilityDiagnostic, SimMediaCapabilityGroup,
+    SimMediaNodeBacklogCatalog, SimMediaNodeBacklogDiagnostic, SimMediaNodeBacklogRecord,
     SimMediaNodeCapability, SimMediaNodeCapabilityRegistry, SimMediaPortType,
 };
 pub use sim_packaging_profiles::{
@@ -594,7 +603,8 @@ pub use sim_packaging_profiles::{
     SIM_PACKAGING_PROFILE_CUSTOM_NODE_DISABLED, SIM_PACKAGING_PROFILE_METAL_GPU,
     SIM_PACKAGING_PROFILE_PORTABLE_LIKE, SIM_PACKAGING_PROFILE_REMOTE_WORKER,
     SimPackagingExecutionTarget, SimPackagingProfile, SimPackagingProfileCatalog,
-    SimPackagingProfileKind, SimPackagingScope,
+    SimPackagingProfileKind, SimPackagingQualityBacklogCatalog,
+    SimPackagingQualityBacklogDiagnostic, SimPackagingQualityBacklogRecord, SimPackagingScope,
 };
 pub use sim_provider_adapters::{
     SIM_PROVIDER_ADAPTER_UNSUPPORTED_OPERATION_CODE, SimProviderAdapterCatalog,
@@ -614,7 +624,8 @@ pub use sim_provider_io::{
 };
 pub use sim_provider_nodes::{
     SIM_PROVIDER_DISABLED_CODE, SIM_PROVIDER_MISSING_CREDENTIAL_CODE,
-    SIM_PROVIDER_UNSUPPORTED_CODE, SimProviderCapability, SimProviderCostMetadata, SimProviderId,
+    SIM_PROVIDER_UNSUPPORTED_CODE, SimProviderBacklogCatalog, SimProviderBacklogDiagnostic,
+    SimProviderBacklogRecord, SimProviderCapability, SimProviderCostMetadata, SimProviderId,
     SimProviderNodeAvailability, SimProviderNodeDefinition, SimProviderNodeDiagnostic,
     SimProviderNodeRegistry,
 };
@@ -637,6 +648,10 @@ pub use sim_provider_secrets::{
     SIM_PROVIDER_SECRET_MISSING_CODE, SIM_PROVIDER_SIGNED_URL_PLACEHOLDER,
     SimProviderCredentialReport, SimProviderRedactor, SimProviderResolvedCredential,
     SimProviderSecretDiagnostic, SimProviderSecretEntry, SimProviderSecretStore,
+};
+pub use sim_source_inventory::{
+    SimSourceDiagnostic, SimSourceDiagnosticSeverity, SimSourceExtractionStatus,
+    SimSourceInventory, SimSourceInventorySummary, SimSourceItem, SimSourceKind,
 };
 pub use sim_user_data::{
     SimUserDataDiagnostic, SimUserDataEntry, SimUserDataPathParts, SimUserDataStore,

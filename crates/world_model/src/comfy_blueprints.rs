@@ -8,6 +8,133 @@ pub const MISSING_BLUEPRINT_DEPENDENCY_CODE: &str =
     "world_model.comfy_blueprints.missing_dependency";
 pub const UNSUPPORTED_BLUEPRINT_NODE_CODE: &str = "world_model.comfy_blueprints.unsupported_node";
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct SimWorkflowBlueprintBacklogCatalog {
+    pub schema_version: u32,
+    pub source_root: String,
+    pub source_category: String,
+    pub captured_at: String,
+    pub implementation_owner: String,
+    pub native_sim_records: bool,
+    pub comfyui_passthrough: bool,
+    pub expected_blueprint_count: usize,
+    pub records: Vec<SimWorkflowBlueprintBacklogRecord>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct SimWorkflowBlueprintBacklogRecord {
+    pub source_id: String,
+    pub source_path: String,
+    pub source_kind: String,
+    pub blueprint_name: String,
+    pub native_surface: String,
+    pub evidence_module: String,
+    pub evidence_kind: String,
+    pub metadata_only: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct SimWorkflowBlueprintBacklogDiagnostic {
+    pub code: String,
+    pub message: String,
+}
+
+impl SimWorkflowBlueprintBacklogCatalog {
+    pub fn validate(&self) -> Result<(), Vec<SimWorkflowBlueprintBacklogDiagnostic>> {
+        let mut diagnostics = Vec::new();
+
+        if self.schema_version != 1 {
+            diagnostics.push(sim_workflow_blueprint_backlog_diagnostic(
+                "world_model.comfy_blueprints.backlog.invalid_schema",
+                "workflow/blueprint backlog fixture must use schema version 1",
+            ));
+        }
+        if self.source_root != "projects/comfy/blueprints" {
+            diagnostics.push(sim_workflow_blueprint_backlog_diagnostic(
+                "world_model.comfy_blueprints.backlog.invalid_source_root",
+                "workflow/blueprint backlog fixture must preserve blueprint source attribution",
+            ));
+        }
+        if !self.native_sim_records || self.comfyui_passthrough {
+            diagnostics.push(sim_workflow_blueprint_backlog_diagnostic(
+                "world_model.comfy_blueprints.backlog.not_native",
+                "workflow/blueprint backlog fixture must describe native Sim records only",
+            ));
+        }
+        if self.records.len() != self.expected_blueprint_count {
+            diagnostics.push(sim_workflow_blueprint_backlog_diagnostic(
+                "world_model.comfy_blueprints.backlog.count_mismatch",
+                format!(
+                    "expected {} blueprint backlog records but found {}",
+                    self.expected_blueprint_count,
+                    self.records.len()
+                ),
+            ));
+        }
+
+        let mut source_ids = BTreeSet::new();
+        let mut source_paths = BTreeSet::new();
+        for record in &self.records {
+            if !source_ids.insert(&record.source_id) {
+                diagnostics.push(sim_workflow_blueprint_backlog_diagnostic(
+                    "world_model.comfy_blueprints.backlog.duplicate_source_id",
+                    format!("duplicate source id `{}`", record.source_id),
+                ));
+            }
+            if !source_paths.insert(&record.source_path) {
+                diagnostics.push(sim_workflow_blueprint_backlog_diagnostic(
+                    "world_model.comfy_blueprints.backlog.duplicate_source_path",
+                    format!("duplicate source path `{}`", record.source_path),
+                ));
+            }
+            if !record.source_path.starts_with("projects/comfy/blueprints/") {
+                diagnostics.push(sim_workflow_blueprint_backlog_diagnostic(
+                    "world_model.comfy_blueprints.backlog.invalid_source_path",
+                    format!(
+                        "source path `{}` does not preserve blueprint attribution",
+                        record.source_path
+                    ),
+                ));
+            }
+            if record.blueprint_name.is_empty()
+                || record.native_surface.is_empty()
+                || record.evidence_module.is_empty()
+                || record.evidence_kind.is_empty()
+            {
+                diagnostics.push(sim_workflow_blueprint_backlog_diagnostic(
+                    "world_model.comfy_blueprints.backlog.missing_evidence",
+                    format!(
+                        "record `{}` is missing blueprint evidence",
+                        record.source_id
+                    ),
+                ));
+            }
+            if !record.metadata_only {
+                diagnostics.push(sim_workflow_blueprint_backlog_diagnostic(
+                    "world_model.comfy_blueprints.backlog.not_metadata_only",
+                    format!(
+                        "record `{}` must stay metadata-only because shipped blueprints can reference gated nodes",
+                        record.source_id
+                    ),
+                ));
+            }
+        }
+
+        if diagnostics.is_empty() {
+            Ok(())
+        } else {
+            Err(diagnostics)
+        }
+    }
+
+    pub fn blueprint_names(&self) -> BTreeSet<String> {
+        self.records
+            .iter()
+            .map(|record| record.blueprint_name.clone())
+            .collect()
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub enum ComfyBlueprintCategory {
     Image,
@@ -230,4 +357,14 @@ struct BlueprintFixture {
 struct BlueprintDependencyFixture {
     kind: String,
     source_path: String,
+}
+
+fn sim_workflow_blueprint_backlog_diagnostic(
+    code: impl Into<String>,
+    message: impl Into<String>,
+) -> SimWorkflowBlueprintBacklogDiagnostic {
+    SimWorkflowBlueprintBacklogDiagnostic {
+        code: code.into(),
+        message: message.into(),
+    }
 }

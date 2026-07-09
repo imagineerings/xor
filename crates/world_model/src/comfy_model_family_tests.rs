@@ -3,11 +3,32 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use serde::Deserialize;
+
 use crate::{
     AdapterKind, ComfyModelCatalog, ComfyModelFamilyDetector, ComfyModelFolderRegistry,
     ConditioningMode, LatentFormat, ModelCategory, ModelFamilyDiagnostic, ModelFamilyKind,
-    ModelMediaCapability, SafetensorsHeaderMetadata, TextEncoderRequirement, VaeRequirement,
+    ModelMediaCapability, SafetensorsHeaderMetadata, SimModelFamilyCatalog, SimModelFamilyRecord,
+    TextEncoderRequirement, VaeRequirement,
 };
+
+const MODEL_MEMORY_BACKLOG: &str = include_str!("../fixtures/comfy/model_memory_backlog.json");
+
+#[derive(Debug, Deserialize)]
+struct ModelMemoryBacklogFixture {
+    schema_version: u32,
+    native_sim_records: bool,
+    comfyui_passthrough: bool,
+    requires_downloads: bool,
+    model_families: Vec<ModelMemoryFamilyFixture>,
+    model_folders: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ModelMemoryFamilyFixture {
+    source_family: String,
+    metadata_only: bool,
+}
 
 #[test]
 fn detector_recognizes_sdxl_from_safetensors_metadata() {
@@ -233,6 +254,53 @@ fn detector_reports_unsupported_model_family_diagnostic() {
                 .to_string(),
         }
     );
+}
+
+#[test]
+fn model_memory_backlog_fixture_maps_all_families_and_folders_to_native_records() {
+    let fixture: ModelMemoryBacklogFixture =
+        serde_json::from_str(MODEL_MEMORY_BACKLOG).expect("model memory fixture parses");
+    assert_eq!(fixture.schema_version, 1);
+    assert!(fixture.native_sim_records);
+    assert!(!fixture.comfyui_passthrough);
+    assert!(!fixture.requires_downloads);
+    assert_eq!(fixture.model_families.len(), 94);
+    assert_eq!(fixture.model_folders.len(), 26);
+
+    let detector = ComfyModelFamilyDetector::new();
+    let catalog =
+        SimModelFamilyCatalog::from_records(fixture.model_families.iter().map(|family| {
+            assert!(family.metadata_only);
+            SimModelFamilyRecord::new(
+                family.source_family.clone(),
+                detector.profile_for_source_family(&family.source_family),
+            )
+        }));
+
+    assert_eq!(catalog.len(), 94);
+    for record in catalog.records() {
+        assert!(!record.requires_download);
+        assert!(!record.dependency_review_required);
+        assert!(
+            record.profile.supports_media(
+                record
+                    .profile
+                    .capability
+                    .media
+                    .iter()
+                    .next()
+                    .copied()
+                    .expect("profile has at least one media capability")
+            )
+        );
+    }
+
+    let registry = ComfyModelFolderRegistry::new("/project/assets");
+    for folder in &fixture.model_folders {
+        registry
+            .category_for_name(folder)
+            .unwrap_or_else(|error| panic!("fixture folder {folder} must resolve: {error}"));
+    }
 }
 
 fn model_file(category: ModelCategory, relative_path: &str) -> crate::ModelFileRef {

@@ -1,8 +1,20 @@
 {
   "schema_version": 1,
   "source": "projects/comfy/script_examples/basic_api_prompt",
+  "captured_at": "2026-07-09",
+  "implementation_owner": ".agents/specs/godot-migration/comfy-runtime-control-plane",
   "native_sim_records": true,
   "comfyui_passthrough": false,
+  "safety": {
+    "provider_api_keys": {
+      "requires_secret": false,
+      "dependency_review": "not_required"
+    },
+    "mock_runner": {
+      "mode": "metadata_only",
+      "dependency_review": "not_required"
+    }
+  },
   "client_id": "fixture-client",
   "prompt_id": "550e8400-e29b-41d4-a716-446655440300",
   "target_node": 3,

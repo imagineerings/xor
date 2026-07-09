@@ -3,9 +3,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde_json::json;
 
 use crate::{
-    ClientFeatureNegotiation, ComfyFeatureFlags, ComfyJobStatus, ComfyJobSummary, ComfyPromptId,
-    ComfyRuntimeEvent, HistoryAction, INVALID_PROMPT_ID_CODE, PreviewPayload, PromptExtraData,
-    PromptSubmission, QueueAction, QueueNumber, QueueStatus,
+    ClientFeatureNegotiation, ComfyFeatureFlags, ComfyHttpMethod, ComfyJobStatus, ComfyJobSummary,
+    ComfyPromptId, ComfyRouteCatalog, ComfyRouteHandler, ComfyRouteKind, ComfyRuntimeEvent,
+    HistoryAction, INVALID_PROMPT_ID_CODE, PreviewPayload, PromptExtraData, PromptSubmission,
+    QueueAction, QueueNumber, QueueStatus, SimControlPlaneDeviceStats,
+    SimControlPlaneRouteCapability, SimControlPlaneSettingsStore, SimControlPlaneSystemStats,
+    SimControlPlaneUser, SimControlPlaneUserRegistry,
 };
 
 #[test]
@@ -148,4 +151,85 @@ fn runtime_events_preserve_feature_flags_progress_and_preview_metadata() {
             ..
         }
     ));
+}
+
+#[test]
+fn app_settings_store_preserves_native_sim_values_by_id() {
+    let mut settings = SimControlPlaneSettingsStore::default();
+    settings.write("preview_format", json!("metadata"));
+    settings.write("external_frontend_allowed", json!(false));
+
+    assert_eq!(settings.read("preview_format"), Some(json!("metadata")));
+    assert_eq!(
+        settings.read_all().get("external_frontend_allowed"),
+        Some(&json!(false))
+    );
+
+    let replaced = settings.replace_all(BTreeMap::from([(
+        "queue_front_default".to_string(),
+        json!(true),
+    )]));
+    assert_eq!(replaced.len(), 1);
+    assert_eq!(settings.read("preview_format"), None);
+}
+
+#[test]
+fn user_registry_tracks_current_user_without_comfyui_session_state() {
+    let mut users = SimControlPlaneUserRegistry::default();
+    users.upsert_user(SimControlPlaneUser::new("default", "Default User"));
+    users.upsert_user(SimControlPlaneUser::new("artist", "World Artist"));
+
+    assert_eq!(users.current_user_id(), Some("default"));
+    let selected = users
+        .select_user("artist")
+        .expect("known user should be selected");
+    assert_eq!(selected.user_id, "artist");
+    assert_eq!(users.current_user_id(), Some("artist"));
+    assert!(
+        users
+            .users()
+            .iter()
+            .any(|user| user.user_id == "artist" && user.is_current)
+    );
+    assert!(users.select_user("missing").is_none());
+}
+
+#[test]
+fn system_stats_are_metadata_only_native_sim_records() {
+    let stats = SimControlPlaneSystemStats::metadata_only("sim-test")
+        .with_feature("api_nodes", false)
+        .with_feature("preview_metadata", true)
+        .with_device(SimControlPlaneDeviceStats {
+            name: "metadata-cpu".to_string(),
+            device_type: "cpu".to_string(),
+            total_memory_bytes: 1024,
+            free_memory_bytes: 512,
+        });
+
+    assert!(!stats.python_embedded);
+    assert!(stats.features.enabled("preview_metadata"));
+    assert!(!stats.features.enabled("api_nodes"));
+    assert_eq!(stats.devices[0].device_type, "cpu");
+}
+
+#[test]
+fn route_capabilities_snapshot_runtime_control_plane_backlog() {
+    let catalog = ComfyRouteCatalog::default_comfy_routes();
+    let capabilities = SimControlPlaneRouteCapability::from_catalog(&catalog);
+
+    assert!(capabilities.iter().any(|capability| {
+        capability.kind == ComfyRouteKind::AppSettingsRead
+            && capability.method == ComfyHttpMethod::Get
+            && capability.handler == ComfyRouteHandler::ControlPlane
+    }));
+    assert!(capabilities.iter().any(|capability| {
+        capability.kind == ComfyRouteKind::UserDataWrite
+            && capability.method == ComfyHttpMethod::Post
+            && capability.handler == ComfyRouteHandler::UserDataStore
+    }));
+    assert!(capabilities.iter().any(|capability| {
+        capability.kind == ComfyRouteKind::WebSocket
+            && capability.path == "/ws"
+            && capability.api_path.is_none()
+    }));
 }

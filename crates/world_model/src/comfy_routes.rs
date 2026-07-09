@@ -8,13 +8,20 @@ pub const MISSING_ROUTE_ALIAS_CODE: &str = "world_model.comfy_routes.missing_ali
 pub enum ComfyHttpMethod {
     Get,
     Post,
+    Delete,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum ComfyRouteKind {
+    AppSettingsRead,
+    AppSettingsWrite,
+    AppSettingRead,
+    AppSettingWrite,
     PromptSubmission,
     Queue,
+    QueueAction,
     History,
+    HistoryAction,
     HistoryByPromptId,
     PromptStatus,
     Features,
@@ -25,8 +32,34 @@ pub enum ComfyRouteKind {
     Embeddings,
     Extensions,
     Jobs,
+    JobById,
+    JobCancel,
+    JobCancelById,
     Upload,
+    UploadMask,
     View,
+    ViewMetadataByFolder,
+    Root,
+    SystemStats,
+    FreeResources,
+    Interrupt,
+    WebSocket,
+    UserDataList,
+    UserDataRead,
+    UserDataWrite,
+    UserDataDelete,
+    UsersRead,
+    UsersWrite,
+    V2UserData,
+    UserDataMove,
+    I18n,
+    WorkflowTemplates,
+    ExperimentModels,
+    ExperimentModelsByFolder,
+    ExperimentModelPreview,
+    NodeReplacements,
+    GlobalSubgraphs,
+    GlobalSubgraphById,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -37,6 +70,8 @@ pub enum ComfyRouteHandler {
     ObjectInfo,
     AssetLibrary,
     ExtensionRegistry,
+    WorkflowRegistry,
+    UserDataStore,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -136,14 +171,21 @@ fn default_routes() -> Vec<ComfyRouteDefinition> {
     use ComfyHttpMethod::{Get, Post};
     use ComfyRouteHandler::{
         AssetLibrary, ControlPlane, ExtensionRegistry, JobBridge, ModelCatalog, ObjectInfo,
+        UserDataStore, WorkflowRegistry,
     };
     use ComfyRouteKind::{
-        Embeddings, Extensions, Features, History, HistoryByPromptId, Jobs, Models, ModelsByFolder,
-        ObjectInfo as ObjectInfoRoute, ObjectInfoByNodeClass, PromptStatus, PromptSubmission,
-        Queue, Upload, View,
+        AppSettingRead, AppSettingWrite, AppSettingsRead, AppSettingsWrite, Embeddings,
+        ExperimentModelPreview, ExperimentModels, ExperimentModelsByFolder, Extensions, Features,
+        FreeResources, GlobalSubgraphById, GlobalSubgraphs, History, HistoryAction,
+        HistoryByPromptId, I18n, Interrupt, JobById, JobCancel, JobCancelById, Jobs, Models,
+        ModelsByFolder, NodeReplacements, ObjectInfo as ObjectInfoRoute, ObjectInfoByNodeClass,
+        PromptStatus, PromptSubmission, Queue, QueueAction, Root, SystemStats, Upload, UploadMask,
+        UserDataDelete, UserDataList, UserDataMove, UserDataRead, UserDataWrite, UsersRead,
+        UsersWrite, V2UserData, View, ViewMetadataByFolder, WebSocket, WorkflowTemplates,
     };
 
     vec![
+        route(Root, Get, "/", None, ControlPlane),
         route(
             PromptSubmission,
             Post,
@@ -151,8 +193,17 @@ fn default_routes() -> Vec<ComfyRouteDefinition> {
             Some("/api/prompt"),
             ControlPlane,
         ),
+        route(PromptStatus, Get, "/prompt", Some("/api/prompt"), JobBridge),
         route(Queue, Get, "/queue", Some("/api/queue"), JobBridge),
+        route(QueueAction, Post, "/queue", Some("/api/queue"), JobBridge),
         route(History, Get, "/history", Some("/api/history"), JobBridge),
+        route(
+            HistoryAction,
+            Post,
+            "/history",
+            Some("/api/history"),
+            JobBridge,
+        ),
         route(
             HistoryByPromptId,
             Get,
@@ -160,7 +211,6 @@ fn default_routes() -> Vec<ComfyRouteDefinition> {
             Some("/api/history/{prompt_id}"),
             JobBridge,
         ),
-        route(PromptStatus, Get, "/prompt", Some("/api/prompt"), JobBridge),
         route(
             Features,
             Get,
@@ -204,7 +254,44 @@ fn default_routes() -> Vec<ComfyRouteDefinition> {
             Some("/api/extensions"),
             ExtensionRegistry,
         ),
+        route(SystemStats, Get, "/system_stats", None, ControlPlane),
+        route(WebSocket, Get, "/ws", None, ControlPlane),
         route(Jobs, Get, "/jobs", Some("/api/jobs"), JobBridge),
+        route(
+            JobById,
+            Get,
+            "/jobs/{job_id}",
+            Some("/api/jobs/{job_id}"),
+            JobBridge,
+        ),
+        route(
+            JobCancel,
+            Post,
+            "/jobs/cancel",
+            Some("/api/jobs/cancel"),
+            JobBridge,
+        ),
+        route(
+            JobCancelById,
+            Post,
+            "/jobs/{job_id}/cancel",
+            Some("/api/jobs/{job_id}/cancel"),
+            JobBridge,
+        ),
+        route(
+            Interrupt,
+            Post,
+            "/interrupt",
+            Some("/api/interrupt"),
+            JobBridge,
+        ),
+        route(
+            FreeResources,
+            Post,
+            "/free",
+            Some("/api/free"),
+            ControlPlane,
+        ),
         route(
             Upload,
             Post,
@@ -212,7 +299,149 @@ fn default_routes() -> Vec<ComfyRouteDefinition> {
             Some("/api/upload/image"),
             AssetLibrary,
         ),
+        route(
+            UploadMask,
+            Post,
+            "/upload/mask",
+            Some("/api/upload/mask"),
+            AssetLibrary,
+        ),
         route(View, Get, "/view", Some("/api/view"), AssetLibrary),
+        route(
+            ViewMetadataByFolder,
+            Get,
+            "/view_metadata/{folder_name}",
+            Some("/api/view_metadata/{folder_name}"),
+            AssetLibrary,
+        ),
+        route(
+            AppSettingsRead,
+            Get,
+            "/settings",
+            Some("/api/settings"),
+            ControlPlane,
+        ),
+        route(
+            AppSettingsWrite,
+            Post,
+            "/settings",
+            Some("/api/settings"),
+            ControlPlane,
+        ),
+        route(
+            AppSettingRead,
+            Get,
+            "/settings/{id}",
+            Some("/api/settings/{id}"),
+            ControlPlane,
+        ),
+        route(
+            AppSettingWrite,
+            Post,
+            "/settings/{id}",
+            Some("/api/settings/{id}"),
+            ControlPlane,
+        ),
+        route(I18n, Get, "/i18n", Some("/api/i18n"), ExtensionRegistry),
+        route(
+            WorkflowTemplates,
+            Get,
+            "/workflow_templates",
+            Some("/api/workflow_templates"),
+            WorkflowRegistry,
+        ),
+        route(
+            ExperimentModels,
+            Get,
+            "/experiment/models",
+            Some("/api/experiment/models"),
+            ModelCatalog,
+        ),
+        route(
+            ExperimentModelsByFolder,
+            Get,
+            "/experiment/models/{folder}",
+            Some("/api/experiment/models/{folder}"),
+            ModelCatalog,
+        ),
+        route(
+            ExperimentModelPreview,
+            Get,
+            "/experiment/models/preview/{folder}/{path_index}/{filename}",
+            Some("/api/experiment/models/preview/{folder}/{path_index}/{filename}"),
+            ModelCatalog,
+        ),
+        route(
+            NodeReplacements,
+            Get,
+            "/node_replacements",
+            Some("/api/node_replacements"),
+            WorkflowRegistry,
+        ),
+        route(
+            GlobalSubgraphs,
+            Get,
+            "/global_subgraphs",
+            Some("/api/global_subgraphs"),
+            WorkflowRegistry,
+        ),
+        route(
+            GlobalSubgraphById,
+            Get,
+            "/global_subgraphs/{id}",
+            Some("/api/global_subgraphs/{id}"),
+            WorkflowRegistry,
+        ),
+        route(
+            UserDataList,
+            Get,
+            "/userdata",
+            Some("/api/userdata"),
+            UserDataStore,
+        ),
+        route(
+            V2UserData,
+            Get,
+            "/v2/userdata",
+            Some("/api/v2/userdata"),
+            UserDataStore,
+        ),
+        route(
+            UserDataRead,
+            Get,
+            "/userdata/{file}",
+            Some("/api/userdata/{file}"),
+            UserDataStore,
+        ),
+        route(
+            UserDataWrite,
+            Post,
+            "/userdata/{file}",
+            Some("/api/userdata/{file}"),
+            UserDataStore,
+        ),
+        route(
+            UserDataDelete,
+            ComfyHttpMethod::Delete,
+            "/userdata/{file}",
+            Some("/api/userdata/{file}"),
+            UserDataStore,
+        ),
+        route(
+            UserDataMove,
+            Post,
+            "/userdata/{file}/move/{dest}",
+            Some("/api/userdata/{file}/move/{dest}"),
+            UserDataStore,
+        ),
+        route(UsersRead, Get, "/users", Some("/api/users"), UserDataStore),
+        route(
+            UsersWrite,
+            Post,
+            "/users",
+            Some("/api/users"),
+            UserDataStore,
+        ),
     ]
 }
 
@@ -235,7 +464,36 @@ fn route(
 fn requires_api_alias(kind: ComfyRouteKind) -> bool {
     matches!(
         kind,
-        ComfyRouteKind::PromptSubmission
+        ComfyRouteKind::AppSettingsRead
+            | ComfyRouteKind::AppSettingsWrite
+            | ComfyRouteKind::AppSettingRead
+            | ComfyRouteKind::AppSettingWrite
+            | ComfyRouteKind::FreeResources
+            | ComfyRouteKind::Interrupt
+            | ComfyRouteKind::UserDataList
+            | ComfyRouteKind::UserDataRead
+            | ComfyRouteKind::UserDataWrite
+            | ComfyRouteKind::UserDataDelete
+            | ComfyRouteKind::UsersRead
+            | ComfyRouteKind::UsersWrite
+            | ComfyRouteKind::V2UserData
+            | ComfyRouteKind::UserDataMove
+            | ComfyRouteKind::I18n
+            | ComfyRouteKind::WorkflowTemplates
+            | ComfyRouteKind::ExperimentModels
+            | ComfyRouteKind::ExperimentModelsByFolder
+            | ComfyRouteKind::ExperimentModelPreview
+            | ComfyRouteKind::NodeReplacements
+            | ComfyRouteKind::GlobalSubgraphs
+            | ComfyRouteKind::GlobalSubgraphById
+            | ComfyRouteKind::JobById
+            | ComfyRouteKind::JobCancel
+            | ComfyRouteKind::JobCancelById
+            | ComfyRouteKind::UploadMask
+            | ComfyRouteKind::ViewMetadataByFolder
+            | ComfyRouteKind::QueueAction
+            | ComfyRouteKind::HistoryAction
+            | ComfyRouteKind::PromptSubmission
             | ComfyRouteKind::Queue
             | ComfyRouteKind::History
             | ComfyRouteKind::HistoryByPromptId

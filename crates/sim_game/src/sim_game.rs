@@ -21,6 +21,7 @@ pub mod parser;
 pub mod physics;
 pub mod project;
 pub mod resource_index;
+pub mod sim_coverage;
 pub mod spatial;
 pub mod spec_gatekeeper;
 pub mod xr;
@@ -61,6 +62,8 @@ mod physics_tests;
 mod project_tests;
 #[cfg(test)]
 mod resource_index_tests;
+#[cfg(test)]
+mod sim_coverage_tests;
 #[cfg(test)]
 mod smoke_tests;
 #[cfg(test)]
@@ -142,6 +145,15 @@ pub use physics::{
 };
 pub use project::{SimGameProjectDiagnostic, SimGameProjectMetadata, SimGameProjectMetadataParser};
 pub use resource_index::{SimGameIndexedResource, SimGameResourceIndex, SimGameResourceParseState};
+pub use sim_coverage::{
+    SIM_COVERAGE_DUPLICATE_OWNER_CODE, SIM_COVERAGE_IMPLEMENTED_WITHOUT_EVIDENCE_CODE,
+    SIM_COVERAGE_INVALID_OWNER_PATH_CODE, SIM_COVERAGE_MISSING_OWNER_CODE,
+    SIM_COVERAGE_UNSUPPORTED_WITHOUT_REASON_CODE, SimCoverageBacklogRef,
+    SimCoverageBoundaryDecision, SimCoverageDependencyGate, SimCoverageDiagnostic,
+    SimCoverageDiagnosticSeverity, SimCoverageEvidence, SimCoverageEvidenceKind, SimCoverageLedger,
+    SimCoverageOwner, SimCoverageOwnerResolver, SimCoverageOwnerSuggestion, SimCoverageRecord,
+    SimCoverageStatus,
+};
 pub use spatial::{
     SimGameSpatialAssetMetadata, SimGameSpatialMetadataExtractor, SimGameSpatialPreviewRoute,
 };

@@ -14,6 +14,131 @@ pub const SIM_PACKAGING_PROFILE_ASSET_ENABLED: &str = "asset-enabled";
 pub const SIM_PACKAGING_PROFILE_PORTABLE_LIKE: &str = "portable-like";
 pub const SIM_PACKAGING_PROFILE_REMOTE_WORKER: &str = "remote-worker";
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct SimPackagingQualityBacklogCatalog {
+    pub schema_version: u32,
+    pub source_root: String,
+    pub source_category: String,
+    pub captured_at: String,
+    pub implementation_owner: String,
+    pub native_sim_records: bool,
+    pub comfyui_passthrough: bool,
+    pub expected_record_count: usize,
+    pub records: Vec<SimPackagingQualityBacklogRecord>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct SimPackagingQualityBacklogRecord {
+    pub source_id: String,
+    pub source_path: String,
+    pub source_kind: String,
+    pub record_name: String,
+    pub native_surface: String,
+    pub evidence_module: String,
+    pub evidence_kind: String,
+    pub dependency_review: String,
+    pub metadata_only: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct SimPackagingQualityBacklogDiagnostic {
+    pub code: String,
+    pub message: String,
+}
+
+impl SimPackagingQualityBacklogCatalog {
+    pub fn validate(&self) -> Result<(), Vec<SimPackagingQualityBacklogDiagnostic>> {
+        let mut diagnostics = Vec::new();
+
+        if self.schema_version != 1 {
+            diagnostics.push(sim_packaging_quality_backlog_diagnostic(
+                "world_model.packaging_quality.backlog.invalid_schema",
+                "packaging quality backlog fixture must use schema version 1",
+            ));
+        }
+        if self.source_root != "projects/comfy" {
+            diagnostics.push(sim_packaging_quality_backlog_diagnostic(
+                "world_model.packaging_quality.backlog.invalid_source_root",
+                "packaging quality backlog fixture must preserve projects/comfy source attribution",
+            ));
+        }
+        if !self.native_sim_records || self.comfyui_passthrough {
+            diagnostics.push(sim_packaging_quality_backlog_diagnostic(
+                "world_model.packaging_quality.backlog.not_native",
+                "packaging quality backlog fixture must describe native Sim records only",
+            ));
+        }
+        if self.records.len() != self.expected_record_count {
+            diagnostics.push(sim_packaging_quality_backlog_diagnostic(
+                "world_model.packaging_quality.backlog.count_mismatch",
+                format!(
+                    "expected {} packaging quality records but found {}",
+                    self.expected_record_count,
+                    self.records.len()
+                ),
+            ));
+        }
+
+        let mut source_ids = BTreeSet::new();
+        for record in &self.records {
+            if !source_ids.insert(&record.source_id) {
+                diagnostics.push(sim_packaging_quality_backlog_diagnostic(
+                    "world_model.packaging_quality.backlog.duplicate_record",
+                    format!(
+                        "duplicate packaging quality source id `{}`",
+                        record.source_id
+                    ),
+                ));
+            }
+            if !record.source_path.starts_with("projects/comfy/") {
+                diagnostics.push(sim_packaging_quality_backlog_diagnostic(
+                    "world_model.packaging_quality.backlog.invalid_source_path",
+                    format!(
+                        "source path `{}` does not preserve projects/comfy attribution",
+                        record.source_path
+                    ),
+                ));
+            }
+            if record.record_name.is_empty()
+                || record.native_surface.is_empty()
+                || record.evidence_module.is_empty()
+                || record.evidence_kind.is_empty()
+                || record.dependency_review.is_empty()
+            {
+                diagnostics.push(sim_packaging_quality_backlog_diagnostic(
+                    "world_model.packaging_quality.backlog.missing_evidence",
+                    format!(
+                        "record `{}` is missing packaging quality evidence",
+                        record.source_id
+                    ),
+                ));
+            }
+            if !record.metadata_only {
+                diagnostics.push(sim_packaging_quality_backlog_diagnostic(
+                    "world_model.packaging_quality.backlog.not_metadata_only",
+                    format!(
+                        "record `{}` must stay metadata-only until selected by native Sim runtime code",
+                        record.source_id
+                    ),
+                ));
+            }
+        }
+
+        if diagnostics.is_empty() {
+            Ok(())
+        } else {
+            Err(diagnostics)
+        }
+    }
+
+    pub fn surfaces(&self) -> BTreeSet<String> {
+        self.records
+            .iter()
+            .map(|record| record.native_surface.clone())
+            .collect()
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum SimPackagingProfileKind {
     CpuOnly,
@@ -253,4 +378,14 @@ fn remote_worker_profile() -> SimPackagingProfile {
     .with_execution_target(SimPackagingExecutionTarget::RemoteWorker)
     .with_packaging_scope(SimPackagingScope::UsesExistingSimPlatformPackaging)
     .with_note("Routes execution to remote worker infrastructure without packaging worker binaries")
+}
+
+fn sim_packaging_quality_backlog_diagnostic(
+    code: impl Into<String>,
+    message: impl Into<String>,
+) -> SimPackagingQualityBacklogDiagnostic {
+    SimPackagingQualityBacklogDiagnostic {
+        code: code.into(),
+        message: message.into(),
+    }
 }

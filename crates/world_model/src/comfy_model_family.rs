@@ -1,4 +1,7 @@
-use std::{collections::BTreeSet, path::PathBuf};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::PathBuf,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -157,6 +160,57 @@ impl ModelFamilyDiagnostic {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct SimModelFamilyRecord {
+    pub source_family: String,
+    pub profile: ModelFamilyProfile,
+    pub requires_download: bool,
+    pub dependency_review_required: bool,
+}
+
+impl SimModelFamilyRecord {
+    pub fn new(source_family: impl Into<String>, profile: ModelFamilyProfile) -> Self {
+        Self {
+            source_family: source_family.into(),
+            profile,
+            requires_download: false,
+            dependency_review_required: false,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct SimModelFamilyCatalog {
+    records: BTreeMap<String, SimModelFamilyRecord>,
+}
+
+impl SimModelFamilyCatalog {
+    pub fn from_records(records: impl IntoIterator<Item = SimModelFamilyRecord>) -> Self {
+        Self {
+            records: records
+                .into_iter()
+                .map(|record| (record.source_family.clone(), record))
+                .collect(),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    pub fn get(&self, source_family: &str) -> Option<&SimModelFamilyRecord> {
+        self.records.get(source_family)
+    }
+
+    pub fn records(&self) -> impl Iterator<Item = &SimModelFamilyRecord> {
+        self.records.values()
+    }
+}
+
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ComfyModelFamilyDetector;
 
@@ -208,6 +262,58 @@ impl ComfyModelFamilyDetector {
         }
 
         Err(ModelFamilyDiagnostic::incompatible_adapter(adapter, base))
+    }
+
+    pub fn profile_for_source_family(&self, source_family: &str) -> ModelFamilyProfile {
+        let normalized = source_family.to_ascii_lowercase();
+        let family = if contains_any(&normalized, &["sdxl", "ssd1b"]) {
+            ModelFamilyKind::StableDiffusionXl
+        } else if contains_any(&normalized, &["sd3"]) {
+            ModelFamilyKind::StableDiffusion3
+        } else if contains_any(&normalized, &["sd15", "sd20", "sd21", "segmind_vega"]) {
+            ModelFamilyKind::StableDiffusion1
+        } else if contains_any(
+            &normalized,
+            &["flux", "chroma", "auraflow", "zimage", "qwen"],
+        ) {
+            ModelFamilyKind::Flux
+        } else if contains_any(
+            &normalized,
+            &[
+                "wan",
+                "cogvideox",
+                "cosmos",
+                "ltx",
+                "mochi",
+                "hunyuanvideo",
+                "svd",
+            ],
+        ) {
+            ModelFamilyKind::WanVideo
+        } else if contains_any(&normalized, &["stableaudio", "ace"]) {
+            ModelFamilyKind::Audio
+        } else if contains_any(&normalized, &["3d", "sv3d", "triposplat", "zero123"]) {
+            ModelFamilyKind::ThreeD
+        } else if contains_any(&normalized, &["sam", "lotus", "pid"]) {
+            ModelFamilyKind::Segmentation
+        } else if contains_any(&normalized, &["depth"]) {
+            ModelFamilyKind::Depth
+        } else if contains_any(&normalized, &["detr", "detection"]) {
+            ModelFamilyKind::Detection
+        } else {
+            ModelFamilyKind::StableDiffusionXl
+        };
+
+        base_profile(
+            &ModelFileRef {
+                category: ModelCategory::Checkpoints,
+                root_index: 0,
+                root: PathBuf::from("models/checkpoints"),
+                relative_path: PathBuf::from(format!("{source_family}.safetensors")),
+                full_path: PathBuf::from(format!("models/checkpoints/{source_family}.safetensors")),
+            },
+            family,
+        )
     }
 
     fn detect_base_model(

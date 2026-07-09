@@ -188,5 +188,7 @@ fn handler_name(handler: ComfyRouteHandler) -> &'static str {
         ComfyRouteHandler::ObjectInfo => "object_info",
         ComfyRouteHandler::AssetLibrary => "asset_library",
         ComfyRouteHandler::ExtensionRegistry => "extension_registry",
+        ComfyRouteHandler::WorkflowRegistry => "workflow_registry",
+        ComfyRouteHandler::UserDataStore => "user_data_store",
     }
 }

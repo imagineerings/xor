@@ -24,3 +24,9 @@ services. They are not approvals for ComfyUI pass-through handlers.
 
 Every fixture that represents implemented behavior must indicate native Sim
 records and must not mark itself as ComfyUI pass-through.
+
+Implemented fixtures also record `captured_at`, a `projects/comfy` source path
+or root, and an implementation owner under `.agents/specs/godot-migration/`.
+Fixtures that stand in for provider API keys, model downloads, media codecs, or
+runtime execution must use mock or metadata-only safety records unless a
+dependency review explicitly approves heavier behavior.

@@ -122,6 +122,33 @@ pub enum MigrationValidationError {
         spec: String,
         keywords: String,
     },
+    MissingSimCoverageFixture {
+        fixture: String,
+    },
+    InvalidSimCoverageFixture {
+        fixture: String,
+        message: String,
+    },
+    SimCoverageGateFailure {
+        code: String,
+        source_id: Option<String>,
+        message: String,
+    },
+    MissingSimCoverageRecord {
+        source_id: String,
+    },
+    StaleSimCoverageRecord {
+        source_id: String,
+    },
+    SimCoverageSourceMismatch {
+        source_id: String,
+        field: String,
+    },
+    SimCoverageTaskOwnerMismatch {
+        task: String,
+        spec: String,
+        owner_path: String,
+    },
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Hash, Serialize, Deserialize)]

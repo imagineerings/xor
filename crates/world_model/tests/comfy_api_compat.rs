@@ -6,10 +6,13 @@ use world_model::{
     ComfyJobBridge, ComfyJobStatus, ComfyPromptId, ComfyRouteCatalog, ComfyRouteKind,
     ComfyRuntimeEvent, ComfyWebSocketEventName, ComfyWebSocketFrame, ComfyWebSocketPayload,
     ComfyWebSocketSessionRegistry, PREVIEW_METADATA_FEATURE, PreviewPayload, PromptExtraData,
-    PromptSubmission, QueueNumber,
+    PromptSubmission, QueueNumber, SimControlPlaneSettingsStore, SimControlPlaneSystemStats,
+    SimControlPlaneUser, SimControlPlaneUserRegistry,
 };
 
 const BASIC_API_PROMPT: &str = include_str!("../fixtures/comfy/basic_api_prompt.json");
+const RUNTIME_CONTROL_PLANE_BACKLOG: &str =
+    include_str!("../fixtures/comfy/runtime_control_plane_backlog.json");
 
 #[derive(Debug, Deserialize)]
 struct BasicApiPromptFixture {
@@ -46,6 +49,34 @@ struct ExpectedFixture {
     mime_type: String,
     preview_width: u32,
     preview_height: u32,
+}
+
+#[derive(Debug, Deserialize)]
+struct RuntimeControlPlaneBacklogFixture {
+    schema_version: u32,
+    source_path: String,
+    source_category: String,
+    implementation_owner: String,
+    native_sim_records: bool,
+    comfyui_passthrough: bool,
+    expected_routes: Vec<ExpectedRouteFixture>,
+    settings: BTreeMap<String, serde_json::Value>,
+    users: Vec<SimControlPlaneUser>,
+    system_stats: SimControlPlaneSystemStatsFixture,
+}
+
+#[derive(Debug, Deserialize)]
+struct ExpectedRouteFixture {
+    method: ComfyHttpMethod,
+    path: String,
+    kind: ComfyRouteKind,
+}
+
+#[derive(Debug, Deserialize)]
+struct SimControlPlaneSystemStatsFixture {
+    platform: String,
+    python_embedded: bool,
+    features: BTreeMap<String, bool>,
 }
 
 #[test]
@@ -258,8 +289,65 @@ fn basic_preview_fixture_falls_back_to_legacy_binary_for_legacy_clients() {
     );
 }
 
+#[test]
+fn runtime_control_plane_backlog_fixture_routes_to_native_sim_records() {
+    let fixture = runtime_control_plane_backlog_fixture();
+    assert_eq!(fixture.schema_version, 1);
+    assert_eq!(fixture.source_path, "projects/comfy/server.py");
+    assert_eq!(fixture.source_category, "runtime-control-plane");
+    assert_eq!(
+        fixture.implementation_owner,
+        ".agents/specs/godot-migration/comfy-runtime-control-plane"
+    );
+    assert!(fixture.native_sim_records);
+    assert!(!fixture.comfyui_passthrough);
+
+    let catalog = ComfyRouteCatalog::default_comfy_routes();
+    for expected in &fixture.expected_routes {
+        let route = catalog
+            .route_for_path(expected.method, &expected.path)
+            .unwrap_or_else(|| panic!("missing route {}", expected.path));
+        assert_eq!(route.kind, expected.kind, "{}", expected.path);
+    }
+    assert_eq!(fixture.expected_routes.len(), 47);
+
+    let mut settings = SimControlPlaneSettingsStore::default();
+    settings.replace_all(fixture.settings);
+    assert_eq!(
+        settings.read("preview_format"),
+        Some(serde_json::Value::String("metadata".to_string()))
+    );
+
+    let mut users = SimControlPlaneUserRegistry::default();
+    for user in fixture.users {
+        users.upsert_user(user);
+    }
+    assert_eq!(users.current_user_id(), Some("default"));
+
+    assert!(!fixture.system_stats.python_embedded);
+    let stats = fixture.system_stats.into_native();
+    assert_eq!(stats.platform, "sim-fixture");
+    assert!(!stats.python_embedded);
+    assert!(stats.features.enabled("preview_metadata"));
+    assert!(!stats.features.enabled("api_nodes"));
+}
+
 fn basic_api_prompt_fixture() -> BasicApiPromptFixture {
     serde_json::from_str(BASIC_API_PROMPT).expect("basic API prompt fixture should parse")
+}
+
+fn runtime_control_plane_backlog_fixture() -> RuntimeControlPlaneBacklogFixture {
+    serde_json::from_str(RUNTIME_CONTROL_PLANE_BACKLOG)
+        .expect("runtime control-plane backlog fixture should parse")
+}
+
+impl SimControlPlaneSystemStatsFixture {
+    fn into_native(self) -> SimControlPlaneSystemStats {
+        self.features.into_iter().fold(
+            SimControlPlaneSystemStats::metadata_only(self.platform),
+            |stats, (feature, enabled)| stats.with_feature(feature, enabled),
+        )
+    }
 }
 
 fn extra_data(fixture: &BasicApiPromptFixture) -> PromptExtraData {
