@@ -292,6 +292,29 @@ async fn test_channel_chat_open_thread_appends_live_replies(
         .await
         .unwrap();
 
+    let other_root = client_b
+        .client()
+        .send_channel_message(SendChannelMessage {
+            channel_id: channel_id.0,
+            body: "other root".to_string(),
+            nonce: 3,
+            mentions: Vec::new(),
+            reply_to_message_id: None,
+        })
+        .await
+        .unwrap();
+    client_b
+        .client()
+        .send_channel_message(SendChannelMessage {
+            channel_id: channel_id.0,
+            body: "other reply".to_string(),
+            nonce: 4,
+            mentions: Vec::new(),
+            reply_to_message_id: Some(other_root.id),
+        })
+        .await
+        .unwrap();
+
     let chat = cx_a
         .update(|window, cx| ChannelChat::open(channel_id, workspace.clone(), window, cx))
         .await
@@ -304,6 +327,10 @@ async fn test_channel_chat_open_thread_appends_live_replies(
     );
     assert_eq!(
         chat.read_with(cx_a, |chat, _| chat.thread_has_unread_for_test(root.id)),
+        Some(true)
+    );
+    assert_eq!(
+        chat.read_with(cx_a, |chat, _| chat.thread_has_unread_for_test(other_root.id)),
         Some(true)
     );
     let thread = client_a
@@ -328,13 +355,17 @@ async fn test_channel_chat_open_thread_appends_live_replies(
         chat.read_with(cx_a, |chat, _| chat.thread_has_unread_for_test(root.id)),
         Some(false)
     );
+    assert_eq!(
+        chat.read_with(cx_a, |chat, _| chat.thread_has_unread_for_test(other_root.id)),
+        Some(true)
+    );
 
     let live_reply = client_b
         .client()
         .send_channel_message(SendChannelMessage {
             channel_id: channel_id.0,
             body: "live reply".to_string(),
-            nonce: 3,
+            nonce: 5,
             mentions: Vec::new(),
             reply_to_message_id: Some(root.id),
         })
