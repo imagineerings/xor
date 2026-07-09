@@ -1,7 +1,9 @@
 mod connection_pool;
 
 use crate::api::{CloudflareIpCountryHeader, SystemIdHeader};
-use crate::db::queries::channel_messages::{ChannelMessageUpdate, NewChannelMessage};
+use crate::db::queries::channel_messages::{
+    ChannelMessageUpdate, NewChannelMessage, SearchChannelMessagesParams,
+};
 use crate::entities::User;
 use crate::{
     AppState, Error, Result, auth,
@@ -31,7 +33,7 @@ use axum::{
     response::IntoResponse,
     routing::get,
 };
-use collections::{HashSet, TypeIdHashMap};
+use collections::{HashMap, HashSet, TypeIdHashMap};
 pub use connection_pool::{ConnectionPool, SimVersion};
 use core::fmt::{self, Debug, Formatter};
 use futures::TryFutureExt as _;
@@ -68,6 +70,7 @@ use std::{
     },
     time::{Duration, Instant},
 };
+use time::PrimitiveDateTime;
 use tokio::sync::{Semaphore, watch};
 use tower::ServiceBuilder;
 use tracing::{
@@ -463,6 +466,7 @@ impl Server {
             .add_request_handler(remove_reaction)
             .add_request_handler(get_channel_messages)
             .add_request_handler(get_channel_messages_by_id)
+            .add_request_handler(search_channel_messages)
             .add_request_handler(get_thread)
             .add_request_handler(get_threads)
             .add_request_handler(get_notifications)
@@ -3917,6 +3921,97 @@ async fn get_channel_messages_by_id(
     })
 }
 
+async fn search_channel_messages(
+    request: proto::SearchChannelMessages,
+    response: Response<proto::SearchChannelMessages>,
+    session: MessageContext,
+) -> Result<()> {
+    let channel_id = (request.channel_id != 0).then(|| ChannelId::from_proto(request.channel_id));
+    let filter_channel_id = if let Some(filter_channel) = request.filter_channel.as_deref() {
+        let channels = session
+            .db()
+            .await
+            .get_channels_for_user(session.user_id())
+            .await?;
+        Some(
+            channels
+                .channels
+                .into_iter()
+                .find(|channel| channel.name == filter_channel)
+                .with_context(|| format!("unknown channel {filter_channel}"))?
+                .id,
+        )
+    } else {
+        None
+    };
+    let filter_sender_id = if let Some(filter_user) = request.filter_user.as_deref() {
+        Some(
+            session
+                .app_state
+                .user_service
+                .get_user_by_github_login(filter_user)
+                .await?
+                .with_context(|| format!("unknown user {filter_user}"))?
+                .id,
+        )
+    } else {
+        None
+    };
+
+    let before_message_id = request.before_message_id.map(MessageId::from_proto);
+    let filter_after = request
+        .filter_after
+        .map(timestamp_to_primitive_datetime)
+        .transpose()?;
+    let filter_before = request
+        .filter_before
+        .map(timestamp_to_primitive_datetime)
+        .transpose()?;
+
+    let (results, done) = session
+        .db()
+        .await
+        .search_channel_messages(
+            session.user_id(),
+            SearchChannelMessagesParams {
+                channel_id,
+                query: request.query,
+                before_message_id,
+                limit: request.limit as usize,
+                filter_channel_id,
+                filter_sender_id,
+                filter_after,
+                filter_before,
+            },
+        )
+        .await?;
+
+    let users = session
+        .app_state
+        .user_service
+        .get_users_by_ids(results.iter().map(|result| result.sender_id).collect())
+        .await?
+        .into_iter()
+        .map(|user| (user.id, user.github_login))
+        .collect::<HashMap<_, _>>();
+
+    response.send(proto::SearchChannelMessagesResponse {
+        results: results
+            .into_iter()
+            .map(|result| proto::SearchResult {
+                sender_name: users
+                    .get(&result.sender_id)
+                    .cloned()
+                    .unwrap_or_else(|| result.sender_id.to_string()),
+                channel_name: result.channel_name,
+                message: Some(result.message),
+                match_positions: result.match_positions,
+            })
+            .collect(),
+        done,
+    })
+}
+
 async fn get_thread(
     request: proto::GetThread,
     response: Response<proto::GetThread>,
@@ -3954,6 +4049,15 @@ async fn get_threads(
         .get_channel_threads(ChannelId::from_proto(request.channel_id), session.user_id())
         .await?;
     response.send(proto::GetThreadsResponse { threads })
+}
+
+fn timestamp_to_primitive_datetime(timestamp: u64) -> Result<PrimitiveDateTime> {
+    let timestamp = timestamp
+        .try_into()
+        .context("search timestamp is out of range")?;
+    let timestamp = time::OffsetDateTime::from_unix_timestamp(timestamp)
+        .context("search timestamp is invalid")?;
+    Ok(PrimitiveDateTime::new(timestamp.date(), timestamp.time()))
 }
 
 async fn broadcast_channel_message_sent(

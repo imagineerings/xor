@@ -23,6 +23,17 @@ pub struct UpdateChannelMessage {
     pub mentions: Vec<proto::ChatMention>,
 }
 
+pub struct SearchChannelMessages {
+    pub channel_id: Option<u64>,
+    pub query: String,
+    pub before_message_id: Option<u64>,
+    pub limit: u32,
+    pub filter_channel: Option<String>,
+    pub filter_user: Option<String>,
+    pub filter_after: Option<u64>,
+    pub filter_before: Option<u64>,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ChannelThread {
     pub root_message: proto::ChannelMessage,
@@ -190,6 +201,23 @@ impl Client {
     ) -> Result<proto::GetChannelMessagesResponse> {
         self.request(proto::GetChannelMessagesById { message_ids })
             .await
+    }
+
+    pub async fn search_channel_messages(
+        &self,
+        search: SearchChannelMessages,
+    ) -> Result<proto::SearchChannelMessagesResponse> {
+        self.request(proto::SearchChannelMessages {
+            channel_id: search.channel_id.unwrap_or_default(),
+            query: search.query,
+            before_message_id: search.before_message_id,
+            limit: search.limit,
+            filter_channel: search.filter_channel,
+            filter_user: search.filter_user,
+            filter_after: search.filter_after,
+            filter_before: search.filter_before,
+        })
+        .await
     }
 
     pub async fn get_thread(&self, channel_id: u64, message_id: u64) -> Result<ChannelThread> {

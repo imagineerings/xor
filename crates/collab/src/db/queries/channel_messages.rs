@@ -1,9 +1,13 @@
 use super::*;
 use anyhow::{Context as _, anyhow};
+use sea_orm::DbBackend;
 
 const NONCE_LEN: usize = 16;
 const DEFAULT_CHANNEL_MESSAGE_LIMIT: usize = 50;
 const MAX_REACTION_EMOJI_NAME_LEN: usize = 100;
+const DEFAULT_SEARCH_LIMIT: usize = 20;
+const MAX_SEARCH_LIMIT: usize = 100;
+const MAX_SEARCH_QUERY_LEN: usize = 200;
 
 pub struct NewChannelMessage {
     pub channel_id: ChannelId,
@@ -21,6 +25,24 @@ pub struct ChannelMessageUpdate {
     pub body: String,
     pub nonce: proto::Nonce,
     pub mentions: Vec<proto::ChatMention>,
+}
+
+pub struct SearchChannelMessagesParams {
+    pub channel_id: Option<ChannelId>,
+    pub query: String,
+    pub before_message_id: Option<MessageId>,
+    pub limit: usize,
+    pub filter_channel_id: Option<ChannelId>,
+    pub filter_sender_id: Option<UserId>,
+    pub filter_after: Option<PrimitiveDateTime>,
+    pub filter_before: Option<PrimitiveDateTime>,
+}
+
+pub struct ChannelMessageSearchResult {
+    pub message: proto::ChannelMessage,
+    pub channel_name: String,
+    pub sender_id: UserId,
+    pub match_positions: Vec<u64>,
 }
 
 impl Database {
@@ -287,6 +309,166 @@ impl Database {
         .await
     }
 
+    pub async fn search_channel_messages(
+        &self,
+        user_id: UserId,
+        params: SearchChannelMessagesParams,
+    ) -> Result<(Vec<ChannelMessageSearchResult>, bool)> {
+        let search_terms = search_terms(&params.query)?;
+        let truncated_query = params
+            .query
+            .chars()
+            .take(MAX_SEARCH_QUERY_LEN)
+            .collect::<String>();
+        let limit = if params.limit == 0 {
+            DEFAULT_SEARCH_LIMIT
+        } else {
+            params.limit.min(MAX_SEARCH_LIMIT)
+        };
+        let row_limit = limit
+            .checked_add(1)
+            .context("channel message search limit overflow")?;
+
+        self.transaction(|tx| {
+            let search_terms = search_terms.clone();
+            let truncated_query = truncated_query.clone();
+
+            async move {
+                let backend = tx.get_database_backend();
+                let mut values = Vec::new();
+                let mut filters = vec![
+                    "member.user_id = $USER_ID".to_string(),
+                    "member.accepted = TRUE".to_string(),
+                    "member.role != 'banned'".to_string(),
+                    "(member.role IN ('admin', 'member') OR c.visibility = 'public')".to_string(),
+                    "cm.deleted_at IS NULL".to_string(),
+                ];
+
+                values.push(user_id.0.into());
+                let user_id_placeholder = placeholder(values.len(), backend);
+
+                if let Some(channel_id) = params.channel_id.or(params.filter_channel_id) {
+                    values.push(channel_id.0.into());
+                    filters.push(format!("cm.channel_id = {}", placeholder(values.len(), backend)));
+                }
+                if let Some(sender_id) = params.filter_sender_id {
+                    values.push(sender_id.0.into());
+                    filters.push(format!("cm.sender_id = {}", placeholder(values.len(), backend)));
+                }
+                if let Some(filter_after) = params.filter_after {
+                    values.push(filter_after.into());
+                    filters.push(format!("cm.created_at >= {}", placeholder(values.len(), backend)));
+                }
+                if let Some(filter_before) = params.filter_before {
+                    values.push(filter_before.into());
+                    filters.push(format!("cm.created_at <= {}", placeholder(values.len(), backend)));
+                }
+                if let Some(before_message_id) = params.before_message_id {
+                    values.push(before_message_id.0.into());
+                    filters.push(format!("cm.id < {}", placeholder(values.len(), backend)));
+                }
+
+                let rank_expression = match backend {
+                    DbBackend::Postgres => {
+                        values.push(tsquery_prefix_query(&search_terms).into());
+                        let query_placeholder = placeholder(values.len(), backend);
+                        filters.push(format!(
+                            "cm.search_vector @@ to_tsquery('english', {query_placeholder})"
+                        ));
+                        format!("ts_rank(cm.search_vector, to_tsquery('english', {query_placeholder}))")
+                    }
+                    DbBackend::Sqlite => {
+                        for term in &search_terms {
+                            values.push(format!("%{term}%").into());
+                            filters.push(format!(
+                                "LOWER(cm.body) LIKE {}",
+                                placeholder(values.len(), backend)
+                            ));
+                        }
+                        "0.0".to_string()
+                    }
+                    other => return Err(anyhow!("unsupported database backend {other:?}").into()),
+                };
+
+                values.push((row_limit as i64).into());
+                let limit_placeholder = placeholder(values.len(), backend);
+
+                let root_channel_id = match backend {
+                    DbBackend::Postgres => {
+                        "CASE WHEN c.parent_path = '' THEN c.id ELSE split_part(c.parent_path, '/', 1)::integer END"
+                    }
+                    DbBackend::Sqlite => {
+                        "CASE WHEN c.parent_path = '' THEN c.id ELSE CAST(substr(c.parent_path, 1, instr(c.parent_path, '/') - 1) AS INTEGER) END"
+                    }
+                    other => return Err(anyhow!("unsupported database backend {other:?}").into()),
+                };
+
+                let sql = format!(
+                    "
+                    SELECT
+                        cm.id,
+                        cm.channel_id,
+                        cm.sender_id,
+                        cm.body,
+                        cm.nonce,
+                        cm.reply_to_message_id,
+                        cm.created_at,
+                        cm.edited_at,
+                        cm.deleted_at,
+                        c.name AS channel_name,
+                        {rank_expression} AS rank
+                    FROM channel_messages cm
+                    JOIN channels c ON c.id = cm.channel_id
+                    JOIN channel_members member
+                        ON member.channel_id = {root_channel_id}
+                    WHERE {}
+                    ORDER BY rank DESC, cm.id DESC
+                    LIMIT {limit_placeholder}
+                    ",
+                    filters.join(" AND ").replace("$USER_ID", &user_id_placeholder)
+                );
+
+                let mut rows = SearchMessageRow::find_by_statement(Statement::from_sql_and_values(
+                    backend, &sql, values,
+                ))
+                .all(&*tx)
+                .await?;
+                let done = rows.len() <= limit;
+                rows.truncate(limit);
+
+                let messages = rows
+                    .iter()
+                    .map(|row| channel_message::Model {
+                        id: row.id,
+                        channel_id: row.channel_id,
+                        sender_id: row.sender_id,
+                        body: row.body.clone(),
+                        nonce: row.nonce.clone(),
+                        reply_to_message_id: row.reply_to_message_id,
+                        created_at: row.created_at,
+                        edited_at: row.edited_at,
+                        deleted_at: row.deleted_at,
+                    })
+                    .collect();
+                let messages = self.channel_messages_to_proto(messages, &tx).await?;
+
+                Ok((
+                    rows.into_iter()
+                        .zip(messages)
+                        .map(|(row, message)| ChannelMessageSearchResult {
+                            match_positions: match_positions(&message.body, &truncated_query),
+                            message,
+                            channel_name: row.channel_name,
+                            sender_id: row.sender_id,
+                        })
+                        .collect(),
+                    done,
+                ))
+            }
+        })
+        .await
+    }
+
     pub async fn get_channel_thread(
         &self,
         channel_id: ChannelId,
@@ -482,7 +664,9 @@ impl Database {
                 .get_channel_message_model(channel_id, message_id, &tx)
                 .await?;
             if reply.reply_to_message_id != Some(root_message_id) {
-                Err(anyhow!("message is not a reply in the requested channel thread"))?;
+                Err(anyhow!(
+                    "message is not a reply in the requested channel thread"
+                ))?;
             }
 
             use channel_thread_read::Column;
@@ -648,6 +832,22 @@ impl Database {
         let reactions_by_message_id = reaction_summaries_by_message_id([row.id], tx).await?;
         channel_message_to_proto(row, &mentions_by_message_id, &reactions_by_message_id)
     }
+}
+
+#[derive(Debug, FromQueryResult)]
+struct SearchMessageRow {
+    id: MessageId,
+    channel_id: ChannelId,
+    sender_id: UserId,
+    body: String,
+    nonce: Vec<u8>,
+    reply_to_message_id: Option<MessageId>,
+    created_at: PrimitiveDateTime,
+    edited_at: Option<PrimitiveDateTime>,
+    deleted_at: Option<PrimitiveDateTime>,
+    channel_name: String,
+    #[allow(dead_code)]
+    rank: f64,
 }
 
 struct ThreadSummaryAccumulator {
@@ -862,4 +1062,57 @@ fn nonce_from_bytes(bytes: &[u8]) -> Result<proto::Nonce> {
 fn now() -> PrimitiveDateTime {
     let now = time::OffsetDateTime::now_utc();
     PrimitiveDateTime::new(now.date(), now.time())
+}
+
+fn placeholder(index: usize, backend: DbBackend) -> String {
+    match backend {
+        DbBackend::Postgres => format!("${index}"),
+        DbBackend::Sqlite => "?".to_string(),
+        DbBackend::MySql => "?".to_string(),
+    }
+}
+
+fn search_terms(query: &str) -> Result<Vec<String>> {
+    let truncated_query = query
+        .chars()
+        .take(MAX_SEARCH_QUERY_LEN)
+        .collect::<String>()
+        .to_lowercase();
+    let terms = truncated_query
+        .split_whitespace()
+        .map(|term| {
+            term.chars()
+                .filter(|character| character.is_alphanumeric())
+                .collect::<String>()
+        })
+        .filter(|term| !term.is_empty())
+        .collect::<Vec<_>>();
+
+    if terms.iter().map(String::len).sum::<usize>() < 2 {
+        return Err(anyhow!("Query must be at least 2 characters").into());
+    }
+
+    Ok(terms)
+}
+
+fn tsquery_prefix_query(terms: &[String]) -> String {
+    terms
+        .iter()
+        .map(|term| format!("{term}:*"))
+        .collect::<Vec<_>>()
+        .join(" & ")
+}
+
+fn match_positions(body: &str, query: &str) -> Vec<u64> {
+    let lower_body = body.to_lowercase();
+    search_terms(query)
+        .unwrap_or_default()
+        .into_iter()
+        .flat_map(|term| {
+            lower_body
+                .match_indices(&term)
+                .filter_map(|(index, _)| index.try_into().ok())
+                .collect::<Vec<u64>>()
+        })
+        .collect()
 }

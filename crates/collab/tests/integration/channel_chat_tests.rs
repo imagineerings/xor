@@ -1,6 +1,8 @@
 use crate::TestServer;
 use client::{
-    channel_chat::{DEFAULT_THREAD_REPLY_LIMIT, SendChannelMessage, UpdateChannelMessage},
+    channel_chat::{
+        DEFAULT_THREAD_REPLY_LIMIT, SearchChannelMessages, SendChannelMessage, UpdateChannelMessage,
+    },
     proto,
 };
 use gpui::{AppContext, BackgroundExecutor, TestAppContext};
@@ -630,6 +632,209 @@ async fn test_channel_chat_rejects_private_channel_access(
 }
 
 #[gpui::test]
+async fn test_channel_message_search_filters_and_access(
+    executor: BackgroundExecutor,
+    cx_a: &mut TestAppContext,
+    cx_b: &mut TestAppContext,
+    cx_c: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor.clone()).await;
+    let client_a = server.create_client(cx_a, "user_a").await;
+    let client_b = server.create_client(cx_b, "user_b").await;
+    let client_c = server.create_client(cx_c, "user_c").await;
+    let general = server
+        .make_channel("general", None, (&client_a, cx_a), &mut [(&client_b, cx_b)])
+        .await;
+    let private = server
+        .make_channel("private", None, (&client_a, cx_a), &mut [])
+        .await;
+
+    client_a.join_channel_chat(general.0).await.unwrap();
+    client_b.join_channel_chat(general.0).await.unwrap();
+    client_a.join_channel_chat(private.0).await.unwrap();
+
+    client_a
+        .send_channel_message(SendChannelMessage {
+            channel_id: general.0,
+            body: "deploy alpha to staging".to_string(),
+            nonce: 1,
+            mentions: Vec::new(),
+            reply_to_message_id: None,
+        })
+        .await
+        .unwrap();
+    client_b
+        .send_channel_message(SendChannelMessage {
+            channel_id: general.0,
+            body: "deploy beta after review".to_string(),
+            nonce: 2,
+            mentions: Vec::new(),
+            reply_to_message_id: None,
+        })
+        .await
+        .unwrap();
+    client_a
+        .send_channel_message(SendChannelMessage {
+            channel_id: private.0,
+            body: "deploy private secret".to_string(),
+            nonce: 3,
+            mentions: Vec::new(),
+            reply_to_message_id: None,
+        })
+        .await
+        .unwrap();
+
+    let response = client_b
+        .search_channel_messages(search("deploy"))
+        .await
+        .unwrap();
+    assert_eq!(
+        result_bodies(&response),
+        vec!["deploy beta after review", "deploy alpha to staging"]
+    );
+    assert!(response.done);
+
+    let response = client_b
+        .search_channel_messages(search("deplo"))
+        .await
+        .unwrap();
+    assert_eq!(response.results.len(), 2);
+
+    let response = client_b
+        .search_channel_messages(SearchChannelMessages {
+            filter_channel: Some("general".to_string()),
+            ..search("deploy")
+        })
+        .await
+        .unwrap();
+    assert_eq!(response.results.len(), 2);
+    assert!(
+        response
+            .results
+            .iter()
+            .all(|result| result.channel_name == "general")
+    );
+
+    let response = client_b
+        .search_channel_messages(SearchChannelMessages {
+            filter_user: Some("user_a".to_string()),
+            ..search("deploy")
+        })
+        .await
+        .unwrap();
+    assert_eq!(result_bodies(&response), vec!["deploy alpha to staging"]);
+    assert_eq!(response.results[0].sender_name, "user_a");
+
+    let response = client_b
+        .search_channel_messages(SearchChannelMessages {
+            filter_channel: Some("general".to_string()),
+            filter_user: Some("user_b".to_string()),
+            ..search("deploy")
+        })
+        .await
+        .unwrap();
+    assert_eq!(result_bodies(&response), vec!["deploy beta after review"]);
+
+    let response = client_b
+        .search_channel_messages(SearchChannelMessages {
+            filter_after: Some(1),
+            ..search("deploy")
+        })
+        .await
+        .unwrap();
+    assert_eq!(response.results.len(), 2);
+
+    let response = client_b
+        .search_channel_messages(SearchChannelMessages {
+            filter_before: Some(1),
+            ..search("deploy")
+        })
+        .await
+        .unwrap();
+    assert!(response.results.is_empty());
+
+    let response = client_c
+        .search_channel_messages(search("deploy"))
+        .await
+        .unwrap();
+    assert!(response.results.is_empty());
+    assert!(response.done);
+
+    let response = client_b
+        .search_channel_messages(SearchChannelMessages {
+            limit: 1,
+            ..search("deploy")
+        })
+        .await
+        .unwrap();
+    assert_eq!(result_bodies(&response), vec!["deploy beta after review"]);
+    assert!(!response.done);
+}
+
+#[gpui::test]
+async fn test_channel_message_search_rejects_short_query_and_tracks_edits(
+    executor: BackgroundExecutor,
+    cx_a: &mut TestAppContext,
+    cx_b: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor.clone()).await;
+    let client_a = server.create_client(cx_a, "user_a").await;
+    let client_b = server.create_client(cx_b, "user_b").await;
+    let channel_id = server
+        .make_channel("chat", None, (&client_a, cx_a), &mut [(&client_b, cx_b)])
+        .await;
+
+    client_a.join_channel_chat(channel_id.0).await.unwrap();
+    client_b.join_channel_chat(channel_id.0).await.unwrap();
+
+    assert!(client_a.search_channel_messages(search("a")).await.is_err());
+
+    let sent = client_a
+        .send_channel_message(SendChannelMessage {
+            channel_id: channel_id.0,
+            body: "original deploy note".to_string(),
+            nonce: 1,
+            mentions: Vec::new(),
+            reply_to_message_id: None,
+        })
+        .await
+        .unwrap();
+
+    client_a
+        .update_channel_message(UpdateChannelMessage {
+            channel_id: channel_id.0,
+            message_id: sent.id,
+            body: "edited launch note".to_string(),
+            nonce: 2,
+            mentions: Vec::new(),
+        })
+        .await
+        .unwrap();
+
+    let response = client_b
+        .search_channel_messages(search("launch"))
+        .await
+        .unwrap();
+    assert_eq!(result_bodies(&response), vec!["edited launch note"]);
+
+    let response = client_b
+        .search_channel_messages(search("deploy"))
+        .await
+        .unwrap();
+    assert!(response.results.is_empty());
+
+    client_a
+        .remove_channel_message(channel_id.0, sent.id)
+        .await
+        .unwrap();
+    let response = client_b
+        .search_channel_messages(search("launch"))
+        .await
+        .unwrap();
+    assert!(response.results.is_empty());
+}
+
+#[gpui::test]
 async fn test_channel_chat_simultaneous_sends_keep_stable_order(
     executor: BackgroundExecutor,
     cx_a: &mut TestAppContext,
@@ -692,6 +897,28 @@ fn mention_for(user_id: u64, start: u64, end: u64) -> proto::ChatMention {
         range: Some(proto::Range { start, end }),
         user_id,
     }
+}
+
+fn search(query: &str) -> SearchChannelMessages {
+    SearchChannelMessages {
+        channel_id: None,
+        query: query.to_string(),
+        before_message_id: None,
+        limit: 20,
+        filter_channel: None,
+        filter_user: None,
+        filter_after: None,
+        filter_before: None,
+    }
+}
+
+fn result_bodies(response: &proto::SearchChannelMessagesResponse) -> Vec<&str> {
+    response
+        .results
+        .iter()
+        .filter_map(|result| result.message.as_ref())
+        .map(|message| message.body.as_str())
+        .collect()
 }
 
 fn assert_reactions(reactions: &[proto::ReactionSummary], expected: &[(&str, &[u64])]) {

@@ -36,7 +36,7 @@ Add full-text search across channel messages using PostgreSQL tsvector/tsquery, 
 
 ### Phase 2 — Server-Side Search Engine
 
-- [ ] 3. Implement `SearchEngine` in the `collab` crate
+- [x] 3. Implement `SearchEngine` in the `collab` crate
   - Create `SearchEngine` struct wrapping a `db::Pool`
   - Define `SearchParams` struct (channel_id, query, before_id, limit, filter_channel, filter_username, filter_after, filter_before)
   - Define `SearchResult` struct (message_id, channel_id, channel_name, body, sender_id, sender_name, created_at, rank)
@@ -48,18 +48,21 @@ Add full-text search across channel messages using PostgreSQL tsvector/tsquery, 
     - Orders by `ts_rank(...) DESC, cm.id DESC`
     - Returns `(results, done)` — `done = true` when fewer rows returned than `limit`
   - _Requirements: 5.1, 5.2_
-  - _writes: crates/collab/src/search_engine.rs_
-  - _tests: crates/collab/src/search_engine.rs_
+  - _writes: `crates/collab/src/db/queries/channel_messages.rs`_
+  - _implemented in the existing channel message query module to reuse message-to-proto conversion and local DB patterns_
+  - _validated: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_channel_message_search -- --nocapture`_
 
-- [ ] 4. Enforce channel access control in server search
+- [x] 4. Enforce channel access control in server search
   - Accept `user_id` in `SearchMessages` to filter accessible channels
   - Join through `channel_participants` table to ensure user is a member
   - Only return messages from channels the user belongs to
   - Return empty result set (not error) when user has no access to any matching channels
   - _Requirements: 5.1_ (Property 5.2)
-  - _writes: crates/collab/src/search_engine.rs_
+  - _writes: `crates/collab/src/db/queries/channel_messages.rs`_
+  - _implemented with root-channel membership and visibility checks matching existing channel participant semantics_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_channel_message_search -- --nocapture`_
 
-- [ ] 5. Wire search RPC handler in the `collab` crate
+- [x] 5. Wire search RPC handler in the `collab` crate
   - Implement `handle_search_channel_messages` on the main RPC handler
   - Deserialise `SearchChannelMessages` → `SearchParams` (resolve `filter_channel` name to channel_id, `filter_user` name to user_id)
   - Parse date strings in `filter_after`/`filter_before` to `DateTime` (ISO 8601)
@@ -67,10 +70,11 @@ Add full-text search across channel messages using PostgreSQL tsvector/tsquery, 
   - Serialise `SearchResult` vec into `SearchChannelMessagesResponse`
   - Handle error cases: invalid date format, unknown channel/user name, database error
   - _Requirements: 5.1, 5.2_
-  - _writes: crates/collab/src/rpc/search_messages.rs_
-  - _tests: crates/collab/src/rpc/search_messages.rs_
+  - _writes: `crates/collab/src/rpc.rs`_
+  - _implemented beside the existing channel message RPC handlers; date filters are accepted as proto timestamps_
+  - _validated: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_channel_message_search -- --nocapture`_
 
-- [ ] 6. Write server integration tests for search
+- [x] 6. Write server integration tests for search
   - Seed test database with a few channels and messages
   - Test plain text search returns correct messages
   - Test `in:` filter narrows to specific channel
@@ -82,22 +86,26 @@ Add full-text search across channel messages using PostgreSQL tsvector/tsquery, 
   - Test access control (user not in channel gets no results)
   - Test edit updates search vector (re-index on UPDATE)
   - _Requirements: 5.1, 5.2, 5.3, 5.4_
-  - _writes: crates/collab/src/search_engine.rs_
-  - _writes: crates/collab/src/rpc/search_messages.rs_
+  - _writes: `crates/collab/tests/integration/channel_chat_tests.rs`_
+  - _covered: plain text search, prefix search, `in:`, `from:`, date filters, combined filters, pagination, short query rejection, access control, edit updates, delete exclusion_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_channel_message_search -- --nocapture`_
 
 ### Phase 3 — Client Search RPC & State
 
-- [ ] 7. Add search request/response types to the `client` crate
+- [x] 7. Add search request/response types to the `client` crate
   - Define `SearchChannelMessagesParams` in the client types
   - Add `search_channel_messages` method on `Client` or `ChannelStore` that sends the RPC and returns results
   - Handle reconnection: re-send search after reconnect if UI still needs results
   - _Requirements: 5.1_
-  - _writes: crates/client/src/channel_store.rs_
+  - _writes: `crates/client/src/channel_chat.rs`_
+  - _implemented as a channel chat client request wrapper returning the generated proto response; UI-level retry/reconnect state remains with the future search UI_
+  - _validated: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_channel_message_search -- --nocapture`_
 
-- [ ] 8. Implement `search_message` RPC call routing in `rpc` crate
+- [x] 8. Implement `search_message` RPC call routing in `rpc` crate
   - Add `SearchChannelMessages` to the RPC dispatch table
   - Ensure the `REQUEST_TYPES`/`RESPONSE_TYPES` tuple list includes the new message pair
-  - _writes: crates/rpc/src/connection.rs_
+  - _implemented by the existing generated proto request/response registration path in `crates/proto/src/proto.rs`; no separate `crates/rpc/src/connection.rs` dispatch table exists for this request_
+  - _validated: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_channel_message_search -- --nocapture`_
 
 ### Phase 4 — Client UI
 
