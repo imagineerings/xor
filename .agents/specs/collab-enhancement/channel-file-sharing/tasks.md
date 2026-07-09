@@ -30,10 +30,12 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
   - _Completed: Verified the repo's `prost` build generates the new file-sharing messages and typed RPC traits from `OUT_DIR` during the proto crate build._
   - _Validation: `CARGO_INCREMENTAL=0 cargo check -p proto`; `CARGO_INCREMENTAL=0 cargo check -p client -p collab --features collab/test-support`._
 
-- [ ] 3. Run database migration to create `channel_files` table
+- [x] 3. Run database migration to create `channel_files` table
   - Write the SQL migration to create `channel_files` (UUID primary key, `channel_id`, `message_id`, `filename`, `file_size`, `mime_type`, `storage_path`, `uploader_id`, `image_width`, `image_height`, `duration_ms`, `created_at`, with foreign keys and indexes).
   - _Requirements: 4.1, 4.3_
   - _writes: crates/collab/src/migrations/YYYYMMDDHHMMSS_create_channel_files.sql_
+  - _Completed: Added the Postgres `channel_files` migration and matching SQLite integration-test schema with channel/message/uploader references, metadata fields, upload confirmation timestamp, and lookup indexes._
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab --features collab/test-support`; `git diff --check`._
 
 ### Phase 2: Server — FileStore & RPC Handlers
 

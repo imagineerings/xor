@@ -347,6 +347,31 @@ CREATE TABLE IF NOT EXISTS "channel_bookmarks" (
 CREATE INDEX "index_channel_bookmarks_on_channel_id_and_sort_order"
     ON "channel_bookmarks" ("channel_id", "sort_order");
 
+CREATE TABLE IF NOT EXISTS "channel_files" (
+    "id" TEXT PRIMARY KEY,
+    "channel_id" INTEGER NOT NULL REFERENCES channels (id) ON DELETE CASCADE,
+    "message_id" INTEGER REFERENCES channel_messages (id) ON DELETE SET NULL,
+    "filename" TEXT NOT NULL,
+    "file_size" INTEGER NOT NULL,
+    "mime_type" TEXT NOT NULL,
+    "storage_path" TEXT NOT NULL,
+    "uploader_id" INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    "image_width" INTEGER,
+    "image_height" INTEGER,
+    "duration_ms" INTEGER,
+    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "uploaded_at" TIMESTAMP
+);
+
+CREATE INDEX "index_channel_files_on_channel_id_and_created_at"
+    ON "channel_files" ("channel_id", "created_at");
+
+CREATE INDEX "index_channel_files_on_message_id"
+    ON "channel_files" ("message_id");
+
+CREATE INDEX "index_channel_files_on_uploader_id"
+    ON "channel_files" ("uploader_id");
+
 CREATE TABLE IF NOT EXISTS "channel_message_mentions" (
     "message_id" INTEGER NOT NULL REFERENCES channel_messages (id) ON DELETE CASCADE,
     "range_start" INTEGER NOT NULL,
