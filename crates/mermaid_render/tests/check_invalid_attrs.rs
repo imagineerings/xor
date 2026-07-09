@@ -280,13 +280,21 @@ fn backslash_n_converted_to_line_break() {
         "Literal \\n should not appear in SVG output"
     );
     assert!(
-        svg.contains(">Layer 7<") && svg.contains(">HTTP, FTP<"),
-        "Label lines should be split into separate <text> elements"
+        svg.contains("Layer")
+            && svg.contains("HTTP,")
+            && svg.contains("FTP")
+            && svg.contains("Encryption"),
+        "Label text should remain present after converting \\n line breaks"
+    );
+    let wrapped_line_count = svg.matches("text-outer-tspan").count();
+    assert!(
+        wrapped_line_count >= 4,
+        "Label lines should be split into native SVG tspan rows, got {wrapped_line_count}"
     );
 }
 
 #[test]
-fn class_diagram_fallback_text_uses_accent_classes() {
+fn class_diagram_label_text_uses_accent_classes() {
     let theme = rgb_theme();
     let source = r#"classDiagram
     class Animal {
@@ -303,32 +311,19 @@ fn class_diagram_fallback_text_uses_accent_classes() {
 
     use quick_xml::events::Event;
     let mut reader = quick_xml::Reader::from_str(&svg);
-    let mut in_fallback = false;
     let mut accent_classes: Vec<String> = Vec::new();
     loop {
         match reader.read_event() {
             Ok(Event::Eof) => break,
-            Ok(Event::Start(e)) => {
-                if e.name().as_ref() == b"g" {
-                    if let Ok(Some(attr)) = e.try_get_attribute("data-merman-foreignobject") {
-                        if attr.value.as_ref() == b"fallback" {
-                            in_fallback = true;
+            Ok(Event::Start(e)) if e.name().as_ref() == b"text" => {
+                if let Ok(Some(class_attr)) = e.try_get_attribute("class") {
+                    let class = class_attr.unescape_value().unwrap_or_default().to_string();
+                    for token in class.split_whitespace() {
+                        if token.starts_with("sim-accent-") {
+                            accent_classes.push(token.to_string());
                         }
                     }
                 }
-                if in_fallback && e.name().as_ref() == b"text" {
-                    if let Ok(Some(class_attr)) = e.try_get_attribute("class") {
-                        let class = class_attr.unescape_value().unwrap_or_default().to_string();
-                        for token in class.split_whitespace() {
-                            if token.starts_with("sim-accent-") {
-                                accent_classes.push(token.to_string());
-                            }
-                        }
-                    }
-                }
-            }
-            Ok(Event::End(e)) if e.name().as_ref() == b"g" => {
-                in_fallback = false;
             }
             _ => {}
         }
@@ -336,7 +331,7 @@ fn class_diagram_fallback_text_uses_accent_classes() {
 
     assert!(
         !accent_classes.is_empty(),
-        "expected sim-accent-N classes on text elements in fallback groups",
+        "expected sim-accent-N classes on label text elements",
     );
 }
 
