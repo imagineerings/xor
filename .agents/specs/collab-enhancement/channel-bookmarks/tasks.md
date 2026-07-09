@@ -97,12 +97,14 @@ Add a channel bookmarks feature: a dedicated section in the channel header where
   - _Completed: Registered and implemented add/remove/update/reorder bookmark RPC handlers, added `UpdateChannelBookmarks` push dispatch to channel participants, added a client-side bookmark update handler hook, and covered the flow through integration tests using push state as the readback path._
   - _Validation: `CARGO_INCREMENTAL=0 cargo check -p client -p collab --features collab/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab test_channel_bookmark_rpc_flow_and_permissions --features collab/test-support -- --nocapture`._
 
-- [ ] 7. Implement `UpdateChannelBookmarks` broadcast
+- [x] 7. Implement `UpdateChannelBookmarks` broadcast
   - After any successful bookmark mutation, build the `UpdateChannelBookmarks` message with current bookmarks and (for deletes) removed IDs.
   - Push to all connected channel members via the existing WebSocket broadcast mechanism.
   - Include a 200ms debounce to coalesce rapid reorder operations.
   - _Requirements: 6.4_
   - _writes: collab/src/rpc/bookmark_rpc.rs_
+  - _Completed: Refactored bookmark push dispatch into a reusable latest-snapshot sender and added a per-channel 200ms reorder debounce that coalesces rapid reorder RPCs before broadcasting._
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p client -p collab --features collab/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab test_channel_bookmark_rpc_flow_and_permissions --features collab/test-support -- --nocapture`._
 
 - [ ] 8. Add client-side `Bookmark` model and RPC dispatch
   - [ ] 8.1 Add `Bookmark` struct in the `client` crate mirroring the protobuf type, with conversions.

@@ -13,7 +13,8 @@ use axum::{
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
 };
-use db::Database;
+use collections::HashMap;
+use db::{ChannelId, Database};
 use executor::Executor;
 use serde::Deserialize;
 use std::sync::Arc;
@@ -215,6 +216,7 @@ pub struct AppState {
     pub livekit_client: Option<Arc<dyn livekit_api::Client>>,
     pub blob_store_client: Option<aws_sdk_s3::Client>,
     pub executor: Executor,
+    pub pending_bookmark_reorder_broadcasts: Arc<parking_lot::Mutex<HashMap<ChannelId, u64>>>,
     pub kinesis_client: Option<::aws_sdk_kinesis::Client>,
     pub user_service: Arc<dyn UserService>,
     pub config: Config,
@@ -255,6 +257,7 @@ impl AppState {
             livekit_client,
             blob_store_client: build_blob_store_client(&config).await.log_err(),
             executor,
+            pending_bookmark_reorder_broadcasts: Default::default(),
             kinesis_client: if config.kinesis_access_key.is_some() {
                 build_kinesis_client(&config).await.log_err()
             } else {

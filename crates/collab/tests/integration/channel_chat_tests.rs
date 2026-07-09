@@ -216,6 +216,18 @@ async fn test_channel_bookmark_rpc_flow_and_permissions(
         })
         .await
         .unwrap();
+    client_a
+        .client()
+        .request(proto::ReorderBookmarks {
+            channel_id: channel_id.0,
+            bookmark_ids: vec![bookmark_id, second_bookmark_id],
+        })
+        .await
+        .unwrap();
+    executor.run_until_parked();
+    assert!(bookmark_rx.try_recv().is_err());
+    executor.advance_clock(StdDuration::from_millis(200));
+    executor.run_until_parked();
     let update = bookmark_rx.recv().await.unwrap();
     assert_eq!(
         update
@@ -223,8 +235,9 @@ async fn test_channel_bookmark_rpc_flow_and_permissions(
             .iter()
             .map(|bookmark| bookmark.id)
             .collect::<Vec<_>>(),
-        vec![second_bookmark_id, bookmark_id]
+        vec![bookmark_id, second_bookmark_id]
     );
+    assert!(bookmark_rx.try_recv().is_err());
 
     let guest_result = client_c
         .client()

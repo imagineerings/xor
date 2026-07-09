@@ -93,6 +93,7 @@ const NOTIFICATION_COUNT_PER_PAGE: usize = 50;
 const MAX_CONCURRENT_CONNECTIONS: usize = 512;
 const SCHEDULED_MESSAGE_POLL_INTERVAL: Duration = Duration::from_secs(10);
 const SCHEDULED_MESSAGE_STALE_PROCESSING_GRACE: Duration = Duration::from_secs(60);
+const BOOKMARK_REORDER_BROADCAST_DEBOUNCE: Duration = Duration::from_millis(200);
 
 static CONCURRENT_CONNECTIONS: AtomicUsize = AtomicUsize::new(0);
 
@@ -3892,9 +3893,9 @@ async fn reorder_bookmarks(
         )
         .await?;
 
-    let bookmarks = store.get_bookmarks(channel_id).await?;
     response.send(proto::Ack {})?;
-    broadcast_channel_bookmarks_update(&session, channel_id, bookmarks, Vec::new()).await
+    schedule_channel_bookmarks_reorder_broadcast(&session, channel_id);
+    Ok(())
 }
 
 async fn ensure_can_edit_bookmarks(
@@ -4516,6 +4517,61 @@ async fn broadcast_channel_bookmarks_update(
     bookmarks: Vec<db::bookmark_store::Bookmark>,
     removed_bookmark_ids: Vec<db::BookmarkId>,
 ) -> Result<()> {
+    send_channel_bookmarks_update(
+        &session.app_state.db,
+        &session.peer,
+        channel_id,
+        bookmarks,
+        removed_bookmark_ids,
+    )
+    .await
+}
+
+fn schedule_channel_bookmarks_reorder_broadcast(session: &MessageContext, channel_id: ChannelId) {
+    let generation = {
+        let mut pending = session
+            .app_state
+            .pending_bookmark_reorder_broadcasts
+            .lock();
+        let generation = pending.entry(channel_id).or_insert(0);
+        *generation += 1;
+        *generation
+    };
+    let app_state = session.app_state.clone();
+    let peer = session.peer.clone();
+    let executor = app_state.executor.clone();
+    executor.clone().spawn_detached(async move {
+        executor.sleep(BOOKMARK_REORDER_BROADCAST_DEBOUNCE).await;
+        let should_broadcast = {
+            let mut pending = app_state.pending_bookmark_reorder_broadcasts.lock();
+            if pending.get(&channel_id).copied() == Some(generation) {
+                pending.remove(&channel_id);
+                true
+            } else {
+                false
+            }
+        };
+        if !should_broadcast {
+            return;
+        }
+
+        let store = BookmarkStore::new(app_state.db.clone());
+        let Some(bookmarks) = store.get_bookmarks(channel_id).await.trace_err() else {
+            return;
+        };
+        send_channel_bookmarks_update(&app_state.db, &peer, channel_id, bookmarks, Vec::new())
+            .await
+            .trace_err();
+    });
+}
+
+async fn send_channel_bookmarks_update(
+    db: &Database,
+    peer: &Peer,
+    channel_id: ChannelId,
+    bookmarks: Vec<db::bookmark_store::Bookmark>,
+    removed_bookmark_ids: Vec<db::BookmarkId>,
+) -> Result<()> {
     let bookmarks = bookmarks
         .into_iter()
         .map(db::bookmark_store::Bookmark::to_proto)
@@ -4524,13 +4580,11 @@ async fn broadcast_channel_bookmarks_update(
         .into_iter()
         .map(db::BookmarkId::to_proto)
         .collect::<Vec<_>>();
-    let connection_ids = session
-        .db()
-        .await
+    let connection_ids = db
         .channel_chat_participant_connection_ids(channel_id)
         .await?;
     for connection_id in connection_ids {
-        session.peer.send(
+        peer.send(
             connection_id,
             proto::UpdateChannelBookmarks {
                 channel_id: channel_id.to_proto(),

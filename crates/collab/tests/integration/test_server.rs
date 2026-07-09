@@ -577,6 +577,7 @@ impl TestServer {
             livekit_client: Some(Arc::new(livekit_test_server.create_api_client())),
             blob_store_client: None,
             executor,
+            pending_bookmark_reorder_broadcasts: Default::default(),
             kinesis_client: None,
             user_service: FakeUserService::new(test_db.db().clone()),
             config: Config {
