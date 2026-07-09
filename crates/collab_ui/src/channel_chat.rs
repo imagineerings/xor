@@ -1929,6 +1929,9 @@ impl ChannelChat {
     ) -> gpui::AnyElement {
         let sender = self.user_display_name(message.sender_id, cx);
         let timestamp = format_timestamp(message.timestamp);
+        let scheduled_label = message
+            .scheduled_at
+            .and_then(format_scheduled_message_label);
         let edited = message.edited_at.is_some();
 
         v_flex()
@@ -1954,6 +1957,21 @@ impl ChannelChat {
                             .size(LabelSize::XSmall)
                             .color(Color::Muted),
                     )
+                    .when_some(scheduled_label, |this, scheduled_label| {
+                        this.child(
+                            h_flex()
+                                .id(format!("scheduled-message-label-{}", message.id))
+                                .gap_1()
+                                .items_center()
+                                .child(Icon::new(IconName::Clock).size(IconSize::XSmall))
+                                .child(
+                                    Label::new(scheduled_label)
+                                        .size(LabelSize::XSmall)
+                                        .color(Color::Muted),
+                                )
+                                .tooltip(Tooltip::text("Scheduled message")),
+                        )
+                    })
                     .when(edited, |this| {
                         this.child(
                             Label::new("edited")
@@ -3664,6 +3682,16 @@ fn format_timestamp(timestamp: u64) -> String {
     let hour = seconds_in_day / 3_600;
     let minute = (seconds_in_day % 3_600) / 60;
     format!("{hour:02}:{minute:02}")
+}
+
+fn format_scheduled_message_label(timestamp: u64) -> Option<String> {
+    let timestamp = timestamp.try_into().ok()?;
+    Some(format!(
+        "scheduled {}",
+        DateTime::<Utc>::from_timestamp_millis(timestamp)?
+            .with_timezone(&Local)
+            .format("%b %-d, %-I:%M %p")
+    ))
 }
 
 fn schedule_label(timestamp: DateTime<Utc>) -> String {

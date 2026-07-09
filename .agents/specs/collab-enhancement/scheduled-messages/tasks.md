@@ -166,8 +166,10 @@ Add the ability for channel participants to schedule messages for future deliver
     - _Requirements: 11.1, 11.2, 11.3_
     - _writes: collab/src/rpc/scheduled_messages.rs_ (amendments)
 
-- [ ] 14. Update `ChannelMessage` model and rendering for the `scheduled_at` label
+- [x] 14. Update `ChannelMessage` model and rendering for the `scheduled_at` label
     - Parse the `scheduled_at` field from `ChannelMessage` proto on the client.
     - When rendering a channel message, if `scheduled_at` is present, show a small "Scheduled" label/tooltip next to the timestamp.
     - _Requirements: 11.1.4_
-    - _writes: client/src/channel_message.rs, collab_ui/src/message_element.rs_
+    - _writes: client/src/scheduled_message.rs, collab_ui/src/channel_chat.rs_
+    - _Completed: `ChannelMessage` already parsed `scheduled_at`; added a muted clock label with local scheduled time and tooltip beside rendered channel-message timestamps._
+    - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui`; `git diff --check`._
