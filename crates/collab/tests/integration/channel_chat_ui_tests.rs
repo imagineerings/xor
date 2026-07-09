@@ -306,6 +306,14 @@ async fn test_channel_chat_open_thread_appends_live_replies(
         chat.read_with(cx_a, |chat, _| chat.thread_has_unread_for_test(root.id)),
         Some(true)
     );
+    let thread = client_a
+        .client()
+        .get_thread(channel_id.0, root.id)
+        .await
+        .unwrap();
+    assert_eq!(thread.root_message.id, root.id);
+    assert_eq!(thread.replies.len(), 1);
+    assert_eq!(thread.replies[0].id, initial_reply.id);
 
     chat.update_in(cx_a, |chat, window, cx| {
         chat.open_thread_for_test(root.id, window, cx);
