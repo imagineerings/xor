@@ -2,7 +2,7 @@
 
 ## Overview
 
-Represent physics and navigation as W7 metadata, docs, and external simulation hooks only when they directly support the target product. Godot physics or navigation server execution remains outside Sim runtime.
+Represent physics and navigation as W7 native Sim metadata, docs, and fallback task records only when they directly support the target generative game engine. Godot physics or navigation server execution remains outside Sim runtime.
 
 ## Gates
 
@@ -17,7 +17,7 @@ Represent physics and navigation as W7 metadata, docs, and external simulation h
 
 ## Tasks
 
-- [ ] 1. Add physics/navigation boundary metadata
-  - Encode runtime exclusions, extract metadata, and provide docs/task fallback hooks.
-  - _Requirements: 1.1, 2.1_
+- [x] 1. Add physics/navigation boundary metadata
+  - Encode runtime exclusions, extract native Sim metadata, and provide docs/task fallback hooks.
+  - _Requirements: 1.1, 1.2, 2.1_
   - _writes: crates/sim_game/src/physics.rs, crates/sim_game/src/navigation.rs, crates/sim_game/src/physics_tests.rs_

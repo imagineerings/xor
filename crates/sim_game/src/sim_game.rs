@@ -15,8 +15,10 @@ pub mod inventory;
 pub mod language;
 pub mod media;
 pub mod migration;
+pub mod navigation;
 pub mod networking;
 pub mod parser;
+pub mod physics;
 pub mod project;
 pub mod resource_index;
 pub mod spec_gatekeeper;
@@ -51,6 +53,8 @@ mod media_tests;
 mod networking_tests;
 #[cfg(test)]
 mod parser_tests;
+#[cfg(test)]
+mod physics_tests;
 #[cfg(test)]
 mod project_tests;
 #[cfg(test)]
@@ -118,6 +122,7 @@ pub use migration::{
     RuntimeBoundaryDecision, SimGameFeatureArea, SimGameMetadata, SimGameProjectDescriptor,
     SimGameProjectFormat, SimGameSourceReference,
 };
+pub use navigation::{SimGameNavigationMetadata, SimGameNavigationMetadataExtractor};
 pub use networking::{
     SimGameNetworkBoundary, SimGameNetworkBoundaryDecision, SimGameNetworkFeature,
     SimGameNetworkFeatureKind,
@@ -125,6 +130,11 @@ pub use networking::{
 pub use parser::{
     LineIndexer, ParseResult, ParseStatus, ParserContext, RecoverableError, line_at,
     position_to_byte_offset,
+};
+pub use physics::{
+    SimGamePhysicsMetadata, SimGamePhysicsMetadataExtractor, SimGameSimulationBoundary,
+    SimGameSimulationBoundaryDecision, SimGameSimulationFallbackTask, SimGameSimulationFeature,
+    SimGameSimulationFeatureKind,
 };
 pub use project::{SimGameProjectDiagnostic, SimGameProjectMetadata, SimGameProjectMetadataParser};
 pub use resource_index::{SimGameIndexedResource, SimGameResourceIndex, SimGameResourceParseState};
