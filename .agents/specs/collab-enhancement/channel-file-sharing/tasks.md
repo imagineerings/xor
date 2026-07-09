@@ -241,12 +241,15 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
   - _Actual writes: crates/collab/tests/integration/channel_chat_tests.rs_
   - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests test_channel_file_upload_lifecycle_rpc --features test-support`; `CARGO_INCREMENTAL=0 cargo check -p proto -p collab --features collab/test-support`; `git diff --check`._
 
-- [ ] 24. Unit-test client `UploadManager`
+- [x] 24. Unit-test client `UploadManager`
   - Test upload state machine: Pending → RequestingUrl → Uploading → Confirming → Complete.
   - Test cancellation transitions cleanly.
   - Test concurrent uploads are tracked separately.
   - _Requirements: 4.1_
   - _writes: crates/collab_ui/src/channel_file_upload.rs_ (add `#[cfg(test)] mod tests`)
+  - _Completed: Added unit coverage for the `UploadManager` state machine, cancellation during upload, and concurrent upload tracking via a private upload backend test seam; added explicit pending/requesting URL states used by the composer progress UI._
+  - _Actual writes: crates/collab_ui/src/channel_file_upload.rs; crates/collab_ui/src/channel_chat.rs_
+  - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_file_upload --features test-support`; `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `git diff --check`._
 
 - [ ] 25. UI test drag-and-drop in compose area
   - Simulate file-drop events on the compose area element.

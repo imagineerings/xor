@@ -3387,7 +3387,10 @@ impl ChannelChat {
             UploadStatus::Failed(_) => cx.theme().status().error,
             UploadStatus::Cancelled => cx.theme().colors().text_muted,
             UploadStatus::Completed => cx.theme().status().success,
-            UploadStatus::Uploading | UploadStatus::Confirming => cx.theme().status().info,
+            UploadStatus::Pending
+            | UploadStatus::RequestingUrl
+            | UploadStatus::Uploading
+            | UploadStatus::Confirming => cx.theme().status().info,
         };
 
         h_flex()
@@ -3435,7 +3438,10 @@ impl ChannelChat {
             .when(
                 matches!(
                     upload.status,
-                    UploadStatus::Uploading | UploadStatus::Confirming
+                    UploadStatus::Pending
+                        | UploadStatus::RequestingUrl
+                        | UploadStatus::Uploading
+                        | UploadStatus::Confirming
                 ),
                 |this| {
                     this.child(
@@ -4621,6 +4627,8 @@ fn current_timestamp_nanos() -> u128 {
 
 fn upload_status_text(status: &UploadStatus, progress: f32) -> SharedString {
     match status {
+        UploadStatus::Pending => "Waiting".to_string(),
+        UploadStatus::RequestingUrl => "Preparing".to_string(),
         UploadStatus::Uploading => format!("{:.0}%", progress * 100.0),
         UploadStatus::Confirming => "Finishing".to_string(),
         UploadStatus::Completed => "Uploaded".to_string(),
@@ -4632,7 +4640,10 @@ fn upload_status_text(status: &UploadStatus, progress: f32) -> SharedString {
 
 fn upload_status_color(status: &UploadStatus) -> Color {
     match status {
-        UploadStatus::Uploading | UploadStatus::Confirming => Color::Info,
+        UploadStatus::Pending
+        | UploadStatus::RequestingUrl
+        | UploadStatus::Uploading
+        | UploadStatus::Confirming => Color::Info,
         UploadStatus::Completed => Color::Success,
         UploadStatus::Failed(_) => Color::Error,
         UploadStatus::Cancelled => Color::Muted,
@@ -4642,7 +4653,9 @@ fn upload_status_color(status: &UploadStatus) -> Color {
 fn upload_error_text(status: &UploadStatus) -> Option<SharedString> {
     match status {
         UploadStatus::Failed(error) => Some(error.clone().into()),
-        UploadStatus::Uploading
+        UploadStatus::Pending
+        | UploadStatus::RequestingUrl
+        | UploadStatus::Uploading
         | UploadStatus::Confirming
         | UploadStatus::Completed
         | UploadStatus::Cancelled => None,
@@ -4652,7 +4665,11 @@ fn upload_error_text(status: &UploadStatus) -> Option<SharedString> {
 fn upload_progress_value(status: &UploadStatus, progress: f32) -> f32 {
     match status {
         UploadStatus::Completed | UploadStatus::Confirming => 1.0,
-        UploadStatus::Failed(_) | UploadStatus::Cancelled | UploadStatus::Uploading => progress,
+        UploadStatus::Pending
+        | UploadStatus::RequestingUrl
+        | UploadStatus::Uploading
+        | UploadStatus::Failed(_)
+        | UploadStatus::Cancelled => progress,
     }
     .clamp(0.0, 1.0)
 }
