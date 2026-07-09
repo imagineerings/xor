@@ -2186,6 +2186,7 @@ impl ChannelChat {
                     }),
             )
             .child(self.rendered_message_body(message, cx).render(window, cx))
+            .child(self.render_message_files(&message.files))
             .child(
                 h_flex().child(
                     Button::new(format!("channel-open-thread-{}", message.id), "Reply")
@@ -2272,6 +2273,22 @@ impl ChannelChat {
                     }),
             )
             .child(self.rendered_message_body(message, cx).render(window, cx))
+            .child(self.render_message_files(&message.files))
+            .into_any_element()
+    }
+
+    fn render_message_files(&self, files: &[proto::FileAttachment]) -> gpui::AnyElement {
+        if files.is_empty() {
+            return div().into_any_element();
+        }
+
+        v_flex()
+            .gap_2()
+            .children(files.iter().cloned().filter_map(|file| {
+                client::FileAttachment::try_from(file)
+                    .log_err()
+                    .map(file_renderer::FileAttachmentRenderer::new)
+            }))
             .into_any_element()
     }
 

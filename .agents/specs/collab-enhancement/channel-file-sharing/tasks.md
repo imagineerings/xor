@@ -187,12 +187,15 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
 
 ### Phase 6: Client — Channel Message Integration
 
-- [ ] 19. Update channel message to display file attachments
+- [x] 19. Update channel message to display file attachments
   - Modify the `ChannelMessage` model to hold `Vec<FileAttachment>` from proto.
   - In channel message rendering, render text content then append `FileAttachmentRenderer` output for each file.
   - Ensure correct layout: text above file previews, visually distinct preview area, no extra spacing when only files.
   - _Requirements: 4.5_
   - _writes: crates/collab_ui/src/channel_chat/message.rs_
+  - _Completed: Rendered proto `ChannelMessage.files` after message text in both main channel messages and thread replies by converting each proto attachment into the client `FileAttachment` model and dispatching to `FileAttachmentRenderer`._
+  - _Actual writes: crates/collab_ui/src/channel_chat.rs; crates/collab_ui/src/channel_chat/file_renderer.rs_
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `cargo test -p collab_ui file_renderer --features collab_ui/test-support`; `rustfmt --edition 2024 --check crates/collab_ui/src/channel_chat.rs crates/collab_ui/src/channel_chat/file_renderer.rs`; `git diff --check`._
 
 - [ ] 20. Wire file attachments into message send flow
   - When composing a message, collect the `FileAttachment` handles from completed uploads.

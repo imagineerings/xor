@@ -1,5 +1,3 @@
-#![allow(dead_code)] // Wired into channel message rendering in the next file-sharing task.
-
 use client::FileAttachment;
 use gpui::{
     AnyElement, App, ImageSource, IntoElement, ParentElement, RenderOnce, Resource, SharedUri,
