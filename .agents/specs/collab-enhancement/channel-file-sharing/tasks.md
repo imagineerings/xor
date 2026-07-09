@@ -75,11 +75,14 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
 
 ### Phase 3: Client — RPC Integration & UploadManager
 
-- [ ] 7. Add Rust client RPC methods for file upload
+- [x] 7. Add Rust client RPC methods for file upload
   - Add `get_file_upload_url` and `confirm_file_upload` methods on the `Client` or `RpcClient` struct.
   - Add `upload_file_to_s3` helper to perform the raw PUT to the presigned URL with progress reporting.
   - _Requirements: 4.1_
   - _writes: crates/client/src/rpc.rs_
+  - _Completed: Added typed client file upload models, `get_file_upload_url`, `upload_file_to_s3`, and `confirm_file_upload` methods using the existing RPC and HTTP client abstractions._
+  - _Actual writes: crates/client/src/file_upload.rs; crates/client/src/channel_chat.rs; crates/client/src/client.rs_
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p client`; `git diff --check`._
 
 - [ ] 8. Implement `UploadManager` entity
   - Create `UploadManager` struct holding `Arc<Client>` and `active_uploads: HashMap<FileId, UploadProgress>`.

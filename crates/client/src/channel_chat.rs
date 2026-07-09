@@ -1,11 +1,13 @@
 use crate::{
-    AddBookmark, Bookmark, BookmarkId, ChannelId, Client, Subscription, UpdateBookmark,
+    AddBookmark, Bookmark, BookmarkId, ChannelId, Client, FileAttachment, FileUploadUrl,
+    GetFileUploadUrl, Subscription, UpdateBookmark,
     scheduled_message::{ScheduledMessage, ScheduledMessageId},
 };
-use anyhow::{Context as _, Result};
+use anyhow::{Context as _, Result, bail};
 use chrono::{DateTime, Utc};
 use futures::Future;
 use gpui::{AsyncApp, Entity, SharedString, WeakEntity};
+use http_client::{AsyncBody, HttpClient as _, Method};
 use rpc::{TypedEnvelope, proto};
 use std::sync::Arc;
 
@@ -195,6 +197,58 @@ impl Client {
             .into_iter()
             .map(Bookmark::try_from)
             .collect()
+    }
+
+    pub async fn get_file_upload_url(&self, request: GetFileUploadUrl) -> Result<FileUploadUrl> {
+        let response = self
+            .request(proto::GetFileUploadUrl {
+                channel_id: request.channel_id.0,
+                filename: request.filename,
+                file_size: request.file_size,
+                mime_type: request.mime_type,
+            })
+            .await?;
+        Ok(response.into())
+    }
+
+    pub async fn upload_file_to_s3(
+        &self,
+        upload_url: &FileUploadUrl,
+        bytes: Vec<u8>,
+        mut report_progress: impl FnMut(u64, u64) + Send,
+    ) -> Result<()> {
+        let total_bytes = bytes.len() as u64;
+        report_progress(0, total_bytes);
+
+        let mut request = http_client::Request::builder()
+            .method(Method::PUT)
+            .uri(upload_url.url.as_str());
+        for (name, value) in &upload_url.headers {
+            request = request.header(name, value);
+        }
+        let response = self
+            .http_client()
+            .send(request.body(AsyncBody::from(bytes))?)
+            .await?;
+
+        if !response.status().is_success() {
+            bail!("file upload failed with status {}", response.status());
+        }
+
+        report_progress(total_bytes, total_bytes);
+        Ok(())
+    }
+
+    pub async fn confirm_file_upload(&self, file_id: impl Into<String>) -> Result<FileAttachment> {
+        let response = self
+            .request(proto::ConfirmFileUpload {
+                file_id: file_id.into(),
+            })
+            .await?;
+        response
+            .attachment
+            .context("missing file attachment")?
+            .try_into()
     }
 
     pub async fn add_bookmark(&self, bookmark: AddBookmark) -> Result<()> {

@@ -3,6 +3,7 @@ pub mod test;
 
 pub mod bookmark;
 pub mod channel_chat;
+pub mod file_upload;
 mod llm_token;
 mod proxy;
 pub mod scheduled_message;
@@ -59,6 +60,7 @@ use url::Url;
 use util::{ConnectionResult, ResultExt};
 
 pub use bookmark::*;
+pub use file_upload::*;
 pub use llm_token::*;
 pub use rpc::*;
 pub use telemetry_events::Event;
