@@ -19,14 +19,15 @@ use markdown::{
     CodeBlockRenderer, CopyButtonVisibility, Markdown, MarkdownElement, MarkdownFont,
     MarkdownOptions, MarkdownStyle,
 };
-use project::Project;
 use project::search::SearchQuery;
+use project::{Project, ProjectPath};
 use settings::{SeedQuerySetting, Settings};
 use theme::{SystemAppearance, Theme, ThemeRegistry};
 use theme_settings::ThemeSettings;
 use ui::{ContextMenu, WithScrollbar, prelude::*, right_click_menu};
 use util::markdown::split_local_url_fragment;
 use workspace::item::{Item, ItemBufferKind, ItemHandle, SaveOptions};
+use workspace::notifications::NotifyResultExt as _;
 use workspace::searchable::{
     Direction, SearchEvent, SearchOptions, SearchToken, SearchableItem, SearchableItemHandle,
 };
@@ -169,7 +170,7 @@ impl MarkdownPreviewView {
         None
     }
 
-    fn create_markdown_view(
+    pub fn create_markdown_view(
         workspace: &mut Workspace,
         editor: Entity<Editor>,
         window: &mut Window,
@@ -185,6 +186,51 @@ impl MarkdownPreviewView {
             window,
             cx,
         )
+    }
+
+    pub fn is_markdown_path(path: impl AsRef<Path>) -> bool {
+        path.as_ref().extension().is_some_and(|extension| {
+            extension.eq_ignore_ascii_case("md") || extension.eq_ignore_ascii_case("markdown")
+        })
+    }
+
+    pub fn open_for_project_path(
+        project_path: ProjectPath,
+        workspace: &mut Workspace,
+        window: &mut Window,
+        cx: &mut Context<Workspace>,
+    ) {
+        let project = workspace.project().clone();
+        let open_buffer_task =
+            project.update(cx, |project, cx| project.open_buffer(project_path, cx));
+
+        cx.spawn_in(window, async move |workspace, mut cx| {
+            if let Some(buffer) = open_buffer_task
+                .await
+                .notify_workspace_async_err(workspace.clone(), &mut cx)
+            {
+                workspace
+                    .update_in(cx, |workspace, window, cx| {
+                        let editor = cx.new(|cx| {
+                            Editor::for_buffer(buffer, Some(project.clone()), window, cx)
+                        });
+                        let preview =
+                            Self::create_markdown_view(workspace, editor.clone(), window, cx);
+                        workspace.active_pane().update(cx, |pane, cx| {
+                            if let Some(existing_view_idx) =
+                                Self::find_existing_independent_preview_item_idx(pane, &editor, cx)
+                            {
+                                pane.activate_item(existing_view_idx, true, true, window, cx);
+                            } else {
+                                pane.add_item(Box::new(preview), true, true, None, window, cx);
+                            }
+                        });
+                        cx.notify();
+                    })
+                    .ok();
+            }
+        })
+        .detach();
     }
 
     fn create_following_markdown_view(
