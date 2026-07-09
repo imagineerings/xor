@@ -585,6 +585,7 @@ enum ErrorCode {
   FileTooLarge = 20;
   UnsupportedFileType = 21;
   FileStorageUnavailable = 22;
+  InvalidFileName = 23;
   reserved 6;
   reserved 14 to 15;
 }

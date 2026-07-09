@@ -17,6 +17,7 @@ pub struct FileStore {
     db: Arc<Database>,
     blob_store_client: Option<aws_sdk_s3::Client>,
     config: FileStoreConfig,
+    test_url_base: Option<String>,
 }
 
 impl FileStore {
@@ -29,41 +30,65 @@ impl FileStore {
             db,
             blob_store_client,
             config,
+            test_url_base: None,
+        }
+    }
+
+    #[cfg(feature = "test-support")]
+    pub fn new_for_tests(
+        db: Arc<Database>,
+        config: FileStoreConfig,
+        test_url_base: impl Into<String>,
+    ) -> Self {
+        Self {
+            db,
+            blob_store_client: None,
+            config,
+            test_url_base: Some(test_url_base.into()),
         }
     }
 
     pub async fn generate_upload_url(&self, request: NewFileUpload) -> Result<FileUploadUrl> {
+        validate_filename(&request.filename)?;
         validate_upload(request.file_size, &request.mime_type, &self.config)?;
 
-        let blob_store_client = self
-            .blob_store_client
-            .as_ref()
-            .ok_or(FileStoreError::StorageUnavailable)?;
-        let bucket = self
-            .config
-            .storage_bucket
-            .as_ref()
-            .ok_or(FileStoreError::StorageUnavailable)?;
         let file_id = Uuid::new_v4();
         let storage_path = storage_path(request.channel_id, file_id, &request.filename);
         let content_length = i64::try_from(request.file_size)
             .context("file size is too large to send to blob storage")?;
-        let presigning_config = PresigningConfig::expires_in(self.config.upload_url_lifetime)
-            .context("creating file upload presigning config")?;
+        let (url, headers) = if let Some(test_url_base) = self.test_url_base.as_deref() {
+            (
+                format!("{}/{}", test_url_base.trim_end_matches('/'), storage_path),
+                HashMap::default(),
+            )
+        } else {
+            let blob_store_client = self
+                .blob_store_client
+                .as_ref()
+                .ok_or(FileStoreError::StorageUnavailable)?;
+            let bucket = self
+                .config
+                .storage_bucket
+                .as_ref()
+                .ok_or(FileStoreError::StorageUnavailable)?;
+            let presigning_config = PresigningConfig::expires_in(self.config.upload_url_lifetime)
+                .context("creating file upload presigning config")?;
 
-        let presigned = blob_store_client
-            .put_object()
-            .bucket(bucket)
-            .key(storage_path.clone())
-            .content_type(request.mime_type.clone())
-            .content_length(content_length)
-            .presigned(presigning_config)
-            .await
-            .map_err(|error| {
-                Error::from(anyhow::Error::new(FileStoreError::PresignFailed(format!(
-                    "creating presigned file upload url: {error}"
-                ))))
-            })?;
+            let presigned = blob_store_client
+                .put_object()
+                .bucket(bucket)
+                .key(storage_path.clone())
+                .content_type(request.mime_type.clone())
+                .content_length(content_length)
+                .presigned(presigning_config)
+                .await
+                .map_err(|error| {
+                    Error::from(anyhow::Error::new(FileStoreError::PresignFailed(format!(
+                        "creating presigned file upload url: {error}"
+                    ))))
+                })?;
+            (presigned.uri().to_string(), presigned_headers(&presigned))
+        };
 
         let row = channel_file::ActiveModel {
             id: ActiveValue::Set(file_id),
@@ -93,8 +118,8 @@ impl FileStore {
 
         Ok(FileUploadUrl {
             file_id,
-            url: presigned.uri().to_string(),
-            headers: presigned_headers(&presigned),
+            url,
+            headers,
         })
     }
 
@@ -261,6 +286,14 @@ impl FileStore {
     }
 
     async fn download_url(&self, storage_path: &str) -> Result<String> {
+        if let Some(test_url_base) = self.test_url_base.as_deref() {
+            return Ok(format!(
+                "{}/{}",
+                test_url_base.trim_end_matches('/'),
+                storage_path
+            ));
+        }
+
         let blob_store_client = self
             .blob_store_client
             .as_ref()
@@ -288,6 +321,10 @@ impl FileStore {
     }
 
     async fn delete_objects(&self, files: &[channel_file::Model]) -> Result<()> {
+        if self.test_url_base.is_some() {
+            return Ok(());
+        }
+
         let blob_store_client = self
             .blob_store_client
             .as_ref()
@@ -361,6 +398,7 @@ pub struct FileUploadUrl {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FileStoreError {
+    EmptyFilename,
     FileTooLarge { max_file_size: u64 },
     UnsupportedFileType,
     StorageUnavailable,
@@ -371,6 +409,7 @@ pub enum FileStoreError {
 impl fmt::Display for FileStoreError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            FileStoreError::EmptyFilename => formatter.write_str("filename cannot be empty"),
             FileStoreError::FileTooLarge { max_file_size } => {
                 write!(
                     formatter,
@@ -424,6 +463,14 @@ impl FileAttachment {
             duration_ms: self.duration_ms,
         }
     }
+}
+
+fn validate_filename(filename: &str) -> Result<()> {
+    if filename.trim().is_empty() {
+        return Err(FileStoreError::EmptyFilename.into());
+    }
+
+    Ok(())
 }
 
 fn validate_upload(file_size: u64, mime_type: &str, config: &FileStoreConfig) -> Result<()> {

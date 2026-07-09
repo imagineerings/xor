@@ -4097,6 +4097,7 @@ fn file_store_rpc_error(error: Error) -> Error {
         FileStoreError::FileTooLarge { max_file_size } => ErrorCode::FileTooLarge
             .with_tag("max_file_size", &max_file_size.to_string())
             .message(message),
+        FileStoreError::EmptyFilename => ErrorCode::InvalidFileName.message(message),
         FileStoreError::UnsupportedFileType => ErrorCode::UnsupportedFileType.message(message),
         FileStoreError::StorageUnavailable
         | FileStoreError::PresignFailed(_)

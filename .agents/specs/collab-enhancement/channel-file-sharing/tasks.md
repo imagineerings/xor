@@ -209,7 +209,7 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
 
 ### Phase 7: Testing
 
-- [ ] 21. Unit-test `FileStore` validation logic
+- [x] 21. Unit-test `FileStore` validation logic
   - Test `GenerateUploadUrl` rejects files exceeding `MaxFileSize`.
   - Test `GenerateUploadUrl` rejects MIME types not in `AllowedTypes`.
   - Test `GenerateUploadUrl` rejects empty filenames.
@@ -218,6 +218,9 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
   - Test `DeleteFile` removes metadata record.
   - _Requirements: 4.4, Design §7_
   - _writes: crates/collab/src/storage/file_store_test.go_
+  - _Completed: Added FileStore DB tests covering max-size, MIME allowlist, empty filename rejection, upload URL row creation, upload confirmation metadata, metadata lookup, attach-to-message, and message-file metadata deletion through a test-support URL-backed FileStore._
+  - _Actual writes: crates/collab/src/db/file_store.rs; crates/collab/tests/integration/db_tests.rs; crates/collab/tests/integration/db_tests/file_store_tests.rs; crates/collab/src/rpc.rs; crates/proto/proto/sim.proto_
+  - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests test_file_store_validation_sqlite --features test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests test_file_store_metadata_lifecycle_sqlite --features test-support`; `CARGO_INCREMENTAL=0 cargo check -p proto -p collab --features collab/test-support`; `git diff --check`._
 
 - [ ] 22. Integration-test upload lifecycle (server-side)
   - Test: upload request → generate URL → confirm → fetch message → verify `FileAttachment` present.
