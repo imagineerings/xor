@@ -97,3 +97,5 @@ Add threaded replies to channel messages in Sim. This feature reuses the existin
   - [ ] 10.6 **Edge-case tests**: Root message deleted before thread opens, network failure retry exhaustion, deep thread pagination.
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
   - _writes: `collab/src/db/thread_store.rs`_ (tests), `collab_ui/src/channel_thread/thread_panel.rs` (tests), `collab_ui/src/channel_thread/thread_indicator.rs` (tests)
+  - _implemented initial client/server integration coverage in `crates/collab/tests/integration/channel_chat_tests.rs`; direct DB unit and UI tests remain_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab test_channel_chat_thread_queries --features test-support --test collab_tests`; `git diff --check`_

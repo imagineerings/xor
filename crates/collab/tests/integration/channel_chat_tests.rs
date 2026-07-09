@@ -92,6 +92,96 @@ async fn test_channel_chat_core_flow(
 }
 
 #[gpui::test]
+async fn test_channel_chat_thread_queries(
+    executor: BackgroundExecutor,
+    cx_a: &mut TestAppContext,
+    cx_b: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor.clone()).await;
+    let client_a = server.create_client(cx_a, "user_a").await;
+    let client_b = server.create_client(cx_b, "user_b").await;
+    let channel_id = server
+        .make_channel("chat", None, (&client_a, cx_a), &mut [(&client_b, cx_b)])
+        .await;
+
+    client_a.join_channel_chat(channel_id.0).await.unwrap();
+    client_b.join_channel_chat(channel_id.0).await.unwrap();
+
+    assert!(client_a.get_threads(channel_id.0).await.unwrap().is_empty());
+
+    let root = client_a
+        .send_channel_message(SendChannelMessage {
+            channel_id: channel_id.0,
+            body: "root".to_string(),
+            nonce: 1,
+            mentions: Vec::new(),
+            reply_to_message_id: None,
+        })
+        .await
+        .unwrap();
+    let reply_a = client_a
+        .send_channel_message(SendChannelMessage {
+            channel_id: channel_id.0,
+            body: "reply from a".to_string(),
+            nonce: 2,
+            mentions: Vec::new(),
+            reply_to_message_id: Some(root.id),
+        })
+        .await
+        .unwrap();
+    let reply_b = client_b
+        .send_channel_message(SendChannelMessage {
+            channel_id: channel_id.0,
+            body: "reply from b".to_string(),
+            nonce: 3,
+            mentions: Vec::new(),
+            reply_to_message_id: Some(root.id),
+        })
+        .await
+        .unwrap();
+
+    let thread = client_b.get_thread(channel_id.0, root.id).await.unwrap();
+    assert_eq!(thread.root_message.id, root.id);
+    assert_eq!(
+        thread
+            .replies
+            .iter()
+            .map(|message| (message.id, message.body.as_str(), message.reply_to_message_id))
+            .collect::<Vec<_>>(),
+        vec![
+            (reply_a.id, "reply from a", Some(root.id)),
+            (reply_b.id, "reply from b", Some(root.id)),
+        ]
+    );
+
+    let summaries = client_a.get_threads(channel_id.0).await.unwrap();
+    assert_eq!(summaries.len(), 1);
+    let summary = summaries.first().expect("missing thread summary");
+    assert_eq!(summary.root_message_id, root.id);
+    assert_eq!(summary.reply_count, 2);
+    assert_eq!(summary.latest_reply_at, reply_b.timestamp);
+    let mut participant_user_ids = summary.participant_user_ids.clone();
+    participant_user_ids.sort_unstable();
+    let mut expected_user_ids = vec![client_a.user_id().unwrap(), client_b.user_id().unwrap()];
+    expected_user_ids.sort_unstable();
+    assert_eq!(participant_user_ids, expected_user_ids);
+
+    assert!(client_a.get_thread(channel_id.0, root.id + 10_000).await.is_err());
+    assert!(
+        client_a
+            .send_channel_message(SendChannelMessage {
+                channel_id: channel_id.0,
+                body: "missing root".to_string(),
+                nonce: 4,
+                mentions: Vec::new(),
+                reply_to_message_id: Some(root.id + 10_000),
+            })
+            .await
+            .is_err()
+    );
+}
+
+#[gpui::test]
 async fn test_channel_chat_reactions_flow(
     executor: BackgroundExecutor,
     cx_a: &mut TestAppContext,
