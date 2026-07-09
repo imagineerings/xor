@@ -425,10 +425,24 @@ impl ConfigOptionSelector {
         } else {
             IconName::ChevronDown
         };
+        const MAX_DISPLAY_NAME_LENGTH: usize = 33;
+        const TRUNCATED_DISPLAY_NAME_LENGTH: usize = 32;
+        let value_name = self.current_value_name();
+        let display_name = if value_name.chars().count() > MAX_DISPLAY_NAME_LENGTH {
+            format!(
+                "{}…",
+                value_name
+                    .chars()
+                    .take(TRUNCATED_DISPLAY_NAME_LENGTH)
+                    .collect::<String>()
+            )
+        } else {
+            value_name
+        };
 
         Button::new(
             ElementId::Name(format!("config-option-{}", option.id.0).into()),
-            self.current_value_name(),
+            display_name,
         )
         .label_size(LabelSize::Small)
         .color(Color::Muted)
