@@ -21,7 +21,9 @@ pub mod parser;
 pub mod physics;
 pub mod project;
 pub mod resource_index;
+pub mod spatial;
 pub mod spec_gatekeeper;
+pub mod xr;
 
 #[cfg(test)]
 mod boundary_tests;
@@ -65,6 +67,8 @@ mod smoke_tests;
 mod spec_gatekeeper_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod xr_tests;
 
 pub use boundary::{DefaultBoundaryPolicy, RuntimeBoundaryPolicy};
 pub use debug_metadata::{SimGameDebugEndpoint, SimGameDebugMetadata, SimGameDebugProtocol};
@@ -138,7 +142,13 @@ pub use physics::{
 };
 pub use project::{SimGameProjectDiagnostic, SimGameProjectMetadata, SimGameProjectMetadataParser};
 pub use resource_index::{SimGameIndexedResource, SimGameResourceIndex, SimGameResourceParseState};
+pub use spatial::{
+    SimGameSpatialAssetMetadata, SimGameSpatialMetadataExtractor, SimGameSpatialPreviewRoute,
+};
 pub use spec_gatekeeper::{
     DependencyWave, ExecutionGate, GateDecision, MigrationGatekeeper, MigrationTaskRef,
     SpecGatekeeper, SpecRoot,
+};
+pub use xr::{
+    SimGameXrBoundary, SimGameXrBoundaryDecision, SimGameXrFeature, SimGameXrFeatureKind,
 };

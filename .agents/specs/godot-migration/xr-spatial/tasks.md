@@ -2,7 +2,7 @@
 
 ## Overview
 
-Keep XR runtime support out of Sim and expose W7 spatial metadata, docs, preview routing, and explicit external fallback hooks only when they directly support the target product.
+Keep XR runtime support out of Sim and expose W7 native Sim spatial metadata, docs, and preview routing only when they directly support the target generative game engine.
 
 ## Gates
 
@@ -17,7 +17,7 @@ Keep XR runtime support out of Sim and expose W7 spatial metadata, docs, preview
 
 ## Tasks
 
-- [ ] 1. Add XR boundary and spatial metadata support
-  - Encode XR runtime exclusions and expose spatial asset metadata/docs hooks.
-  - _Requirements: 1.1, 2.1_
+- [x] 1. Add XR boundary and spatial metadata support
+  - Encode XR runtime exclusions and expose native Sim spatial asset metadata/docs hooks.
+  - _Requirements: 1.1, 1.2, 2.1_
   - _writes: crates/sim_game/src/xr.rs, crates/sim_game/src/spatial.rs, crates/sim_game/src/xr_tests.rs_
