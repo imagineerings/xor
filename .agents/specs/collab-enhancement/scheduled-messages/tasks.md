@@ -153,7 +153,7 @@ Add the ability for channel participants to schedule messages for future deliver
     - _Requirements: 11.1, 11.2, 11.3, 11.4_
     - _writes: collab/src/db/scheduled_message_store.rs (tests module), collab/tests/scheduled_messages_integration.rs_
 
-- [ ] 12. Add client-side UI tests
+- [x] 12. Add client-side UI tests
     - `SchedulePicker` rendering tests: calendar grid renders, time picker renders, validation error shows for invalid times.
     - Send button label changes from "Send" to "Schedule (…)" when time is selected.
     - `ScheduledMessagesPanel` tests: empty state, list with items, edit dialog opens and saves, cancel confirmation works.
@@ -161,6 +161,8 @@ Add the ability for channel participants to schedule messages for future deliver
     - Timezone display test: client stores UTC but renders in local timezone.
     - _Requirements: 11.1.1, 11.2.1, 11.3.1, 11.3.3, 11.4_
     - _writes: collab_ui/src/schedule_picker.rs (tests module), collab_ui/src/scheduled_messages_panel.rs (tests module)_
+    - _Completed: Added inline channel chat UI-state coverage for schedule picker UTC round-tripping and validation errors, selected schedule labels, scheduled message timezone labels, pending scheduled badge labels, and scheduled panel ordering by scheduled time then ID. Enabled the missing `markdown` and `title_bar` test-support dev features required for `collab_ui` tests to compile._
+    - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab_ui schedule_ -- --nocapture`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui scheduled_ -- --nocapture`; `CARGO_INCREMENTAL=0 cargo check -p collab_ui`; `git diff --check`._
 
 - [x] 13. Implement error handling edge cases (server-side)
     - Validation in `schedule_channel_message`: return descriptive errors for out-of-bounds `scheduled_at`, missing channel membership, insufficient permissions.

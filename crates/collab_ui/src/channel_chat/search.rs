@@ -541,13 +541,16 @@ impl ChannelChat {
                                     .on_click(cx.listener(Self::open_scheduled_messages_panel))
                                     .tooltip(Tooltip::text("Scheduled messages")),
                             )
-                            .when(self.pending_scheduled_count > 0, |this| {
-                                this.child(
-                                    Label::new(self.pending_scheduled_count.to_string())
-                                        .size(LabelSize::XSmall)
-                                        .color(Color::Muted),
-                                )
-                            })
+                            .when_some(
+                                pending_scheduled_badge_label(self.pending_scheduled_count),
+                                |this, count| {
+                                    this.child(
+                                        Label::new(count)
+                                            .size(LabelSize::XSmall)
+                                            .color(Color::Muted),
+                                    )
+                                },
+                            )
                             .child(
                                 IconButton::new(
                                     "toggle-channel-message-search",

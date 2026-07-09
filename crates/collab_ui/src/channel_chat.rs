@@ -1036,7 +1036,7 @@ impl ChannelChat {
     }
 
     fn render_schedule_picker(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let selected_label = self.schedule_picker.scheduled_at_utc().map(schedule_label);
+        let selected_label = selected_schedule_label(&self.schedule_picker);
 
         v_flex()
             .gap_2()
@@ -1275,7 +1275,7 @@ impl ChannelChat {
 
                 match messages {
                     Ok(mut messages) => {
-                        messages.sort_by_key(|message| (message.scheduled_at, message.id));
+                        sort_scheduled_messages_for_display(&mut messages);
                         this.pending_scheduled_count = messages.len();
                         panel.messages = messages;
                         panel.load_state = ScheduledMessagesLoadState::Loaded;
@@ -3633,7 +3633,7 @@ impl Render for ChannelChat {
                                             .tooltip(Tooltip::text("Schedule message")),
                                     )
                                     .when_some(
-                                        self.schedule_picker.scheduled_at_utc().map(schedule_label),
+                                        selected_schedule_label(&self.schedule_picker),
                                         |this, label| {
                                             this.child(
                                                 Label::new(label)
@@ -3733,8 +3733,24 @@ fn schedule_label(timestamp: DateTime<Utc>) -> String {
         .to_string()
 }
 
+fn selected_schedule_label(schedule_picker: &SchedulePicker) -> Option<String> {
+    schedule_picker.scheduled_at_utc().map(schedule_label)
+}
+
+fn pending_scheduled_badge_label(pending_scheduled_count: usize) -> Option<String> {
+    if pending_scheduled_count == 0 {
+        None
+    } else {
+        Some(pending_scheduled_count.to_string())
+    }
+}
+
 fn scheduled_message_time_label(message: &ScheduledMessage) -> String {
     message.display_time.format("%-I:%M %p").to_string()
+}
+
+fn sort_scheduled_messages_for_display(messages: &mut [ScheduledMessage]) {
+    messages.sort_by_key(|message| (message.scheduled_at, message.id));
 }
 
 fn month_start(date: NaiveDate) -> NaiveDate {
@@ -3804,6 +3820,8 @@ fn message_nonce(message: &proto::ChannelMessage) -> Option<u128> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
     fn channel_chat_key_bindings_parse() {
         let bindings = super::channel_chat_key_bindings();
@@ -3823,5 +3841,122 @@ mod tests {
                     .first()
                     .is_some_and(|keystroke| keystroke.unparse() == "escape")
         }));
+    }
+
+    #[test]
+    fn schedule_picker_round_trips_selected_utc_time() {
+        let scheduled_at = DateTime::<Utc>::from_timestamp(1_893_456_000, 0).unwrap();
+        let mut picker = SchedulePicker::new();
+
+        picker.set_scheduled_at(scheduled_at);
+
+        assert!(picker.active);
+        assert_eq!(picker.scheduled_at_utc(), Some(scheduled_at));
+        assert_eq!(picker.visible_month, month_start(picker.selected_date));
+        assert!(picker.validation_error.is_none());
+    }
+
+    #[test]
+    fn schedule_picker_validation_enforces_time_bounds() {
+        let mut picker = SchedulePicker::new();
+        assert_eq!(picker.validate().unwrap_err(), "Choose a valid local time");
+
+        picker.set_scheduled_at(Utc::now() - ChronoDuration::minutes(5));
+        assert_eq!(
+            picker.validate().unwrap_err(),
+            "Scheduled messages need at least 1 minute lead time"
+        );
+
+        picker.set_scheduled_at(Utc::now() + ChronoDuration::days(31));
+        assert_eq!(
+            picker.validate().unwrap_err(),
+            "Scheduled messages can be at most 30 days away"
+        );
+
+        picker.set_scheduled_at(Utc::now() + ChronoDuration::minutes(5));
+        assert!(picker.validate().is_ok());
+    }
+
+    #[test]
+    fn scheduled_labels_render_in_local_timezone() {
+        let scheduled_at = DateTime::<Utc>::from_timestamp(1_893_456_000, 0).unwrap();
+        let timestamp = scheduled_at.timestamp_millis() as u64;
+
+        assert_eq!(
+            format_scheduled_message_label(timestamp),
+            Some(format!(
+                "scheduled {}",
+                scheduled_at
+                    .with_timezone(&Local)
+                    .format("%b %-d, %-I:%M %p")
+            ))
+        );
+        assert_eq!(
+            schedule_label(scheduled_at),
+            scheduled_at
+                .with_timezone(&Local)
+                .format("Scheduled for %b %-d, %-I:%M %p")
+                .to_string()
+        );
+    }
+
+    #[test]
+    fn selected_schedule_label_tracks_picker_state() {
+        let scheduled_at = DateTime::<Utc>::from_timestamp(1_893_456_000, 0).unwrap();
+        let mut picker = SchedulePicker::new();
+
+        assert!(selected_schedule_label(&picker).is_none());
+
+        picker.set_scheduled_at(scheduled_at);
+
+        assert_eq!(
+            selected_schedule_label(&picker),
+            Some(schedule_label(scheduled_at))
+        );
+    }
+
+    #[test]
+    fn pending_scheduled_badge_label_hides_zero_count() {
+        assert_eq!(pending_scheduled_badge_label(0), None);
+        assert_eq!(pending_scheduled_badge_label(3), Some("3".to_string()));
+    }
+
+    #[test]
+    fn scheduled_messages_sort_by_time_then_id_for_panel_display() {
+        let earlier = DateTime::<Utc>::from_timestamp(1_893_456_000, 0).unwrap();
+        let later = earlier + ChronoDuration::hours(1);
+        let mut messages = vec![
+            scheduled_message_for_test(3, later, "later"),
+            scheduled_message_for_test(2, earlier, "second"),
+            scheduled_message_for_test(1, earlier, "first"),
+        ];
+
+        sort_scheduled_messages_for_display(&mut messages);
+
+        assert_eq!(
+            messages
+                .iter()
+                .map(|message| (message.id.0, message.body.as_str()))
+                .collect::<Vec<_>>(),
+            vec![(1, "first"), (2, "second"), (3, "later")]
+        );
+    }
+
+    fn scheduled_message_for_test(
+        id: u64,
+        scheduled_at: DateTime<Utc>,
+        body: &str,
+    ) -> ScheduledMessage {
+        ScheduledMessage {
+            id: ScheduledMessageId(id),
+            channel_id: 1,
+            sender_id: 1,
+            body: body.to_string(),
+            scheduled_at,
+            created_at: scheduled_at,
+            nonce: None,
+            mentions: Vec::new(),
+            display_time: scheduled_at.with_timezone(&Local),
+        }
     }
 }
