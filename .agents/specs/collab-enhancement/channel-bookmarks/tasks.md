@@ -160,6 +160,8 @@ Add a channel bookmarks feature: a dedicated section in the channel header where
   - [ ] 10.5 Write UI tests: form validation errors, successful create, successful edit, field population.
     - _Requirements: 6.1_
     - _writes: collab_ui/src/channel_bookmark_form.rs_
+  - _Partial: Added an inline create form for link bookmarks with URL, label, and optional description fields; client-side link validation; submit/cancel states; and pure validation tests. Type selection, file/message create modes, edit mode, and end-to-end UI submission coverage remain open._
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_form --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_bar --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_store --features collab_ui/test-support`._
 
 - [ ] 11. Implement bookmark context menu
   - [ ] 11.1 Show context menu on hover/bookmark click with options: Edit, Delete.

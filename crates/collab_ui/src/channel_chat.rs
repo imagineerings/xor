@@ -1,5 +1,7 @@
 use crate::{
-    channel_bookmark_bar::ChannelBookmarkBar, channel_bookmark_store::ChannelBookmarkStore,
+    channel_bookmark_bar::ChannelBookmarkBar,
+    channel_bookmark_form::{BookmarkForm, BookmarkFormState},
+    channel_bookmark_store::ChannelBookmarkStore,
     draft_store::DraftStore,
 };
 use anyhow::Result;
@@ -129,6 +131,7 @@ pub struct ChannelChat {
     emoji_search: Entity<Editor>,
     bookmark_store: Entity<ChannelBookmarkStore>,
     bookmarks_expanded: bool,
+    bookmark_form: Option<BookmarkForm>,
     messages: Vec<proto::ChannelMessage>,
     message_bodies: HashMap<u64, message_bubble::MessageBody>,
     thread_summaries: HashMap<u64, ThreadSummary>,
@@ -648,6 +651,7 @@ impl ChannelChat {
             emoji_search,
             bookmark_store,
             bookmarks_expanded: false,
+            bookmark_form: None,
             messages,
             message_bodies: HashMap::default(),
             thread_summaries: HashMap::default(),
@@ -3506,13 +3510,45 @@ impl ChannelChat {
             .bookmarks(self.channel_id)
             .to_vec();
         let has_overflow = bookmarks.len() > 5;
+        let show_bookmark_section = !bookmarks.is_empty() || self.bookmark_form.is_some();
 
         v_flex()
-            .when(!bookmarks.is_empty(), |this| {
-                this.child(ChannelBookmarkBar::new(
-                    bookmarks,
-                    self.bookmarks_expanded,
-                ))
+            .border_b_1()
+            .border_color(cx.theme().colors().border)
+            .child(
+                h_flex()
+                    .justify_between()
+                    .items_center()
+                    .gap_2()
+                    .px_3()
+                    .py_2()
+                    .child(
+                        Label::new(format!("Bookmarks ({})", bookmarks.len()))
+                            .size(LabelSize::XSmall)
+                            .color(Color::Muted),
+                    )
+                    .child(
+                        Button::new("add-channel-bookmark", "Add")
+                            .style(ButtonStyle::Subtle)
+                            .size(ButtonSize::Compact)
+                            .start_icon(Icon::new(IconName::Plus))
+                            .disabled(self
+                                .bookmark_form
+                                .as_ref()
+                                .is_some_and(BookmarkForm::is_submitting))
+                            .on_click(cx.listener(Self::open_bookmark_form)),
+                    ),
+            )
+            .when(show_bookmark_section, |this| {
+                this.when(!bookmarks.is_empty(), |this| {
+                    this.child(ChannelBookmarkBar::new(
+                        bookmarks,
+                        self.bookmarks_expanded,
+                    ))
+                })
+                .when_some(self.bookmark_form.as_ref(), |this, form| {
+                    this.child(self.render_bookmark_form(form, cx))
+                })
                 .when(has_overflow, |this| {
                     this.child(
                         h_flex()
@@ -3540,6 +3576,130 @@ impl ChannelChat {
                     )
                 })
             })
+    }
+
+    fn render_bookmark_form(
+        &self,
+        form: &BookmarkForm,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        let submitting = form.is_submitting();
+
+        v_flex()
+            .gap_2()
+            .px_3()
+            .pb_2()
+            .child(
+                h_flex()
+                    .gap_2()
+                    .child(div().flex_1().child(form.url_editor.clone()))
+                    .child(div().flex_1().child(form.label_editor.clone())),
+            )
+            .child(form.description_editor.clone())
+            .when_some(
+                match &form.state {
+                    BookmarkFormState::Failed(error) => Some(error.clone()),
+                    BookmarkFormState::Idle | BookmarkFormState::Submitting => None,
+                },
+                |this, error| {
+                    this.child(
+                        Label::new(error)
+                            .size(LabelSize::XSmall)
+                            .color(Color::Error),
+                    )
+                },
+            )
+            .child(
+                h_flex()
+                    .justify_end()
+                    .gap_2()
+                    .child(
+                        Button::new("cancel-channel-bookmark", "Cancel")
+                            .style(ButtonStyle::Subtle)
+                            .size(ButtonSize::Compact)
+                            .disabled(submitting)
+                            .on_click(cx.listener(Self::close_bookmark_form)),
+                    )
+                    .child(
+                        Button::new("submit-channel-bookmark", "Save")
+                            .style(ButtonStyle::Filled)
+                            .size(ButtonSize::Compact)
+                            .disabled(submitting)
+                            .on_click(cx.listener(Self::submit_bookmark_form)),
+                    ),
+            )
+    }
+
+    fn open_bookmark_form(
+        &mut self,
+        _: &ClickEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.bookmark_form.is_none() {
+            self.bookmark_form = Some(BookmarkForm::new(window, cx));
+        }
+        cx.notify();
+    }
+
+    fn close_bookmark_form(
+        &mut self,
+        _: &ClickEvent,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.bookmark_form = None;
+        cx.notify();
+    }
+
+    fn submit_bookmark_form(
+        &mut self,
+        _: &ClickEvent,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(form) = self.bookmark_form.as_mut() else {
+            return;
+        };
+        if form.is_submitting() {
+            return;
+        }
+
+        let bookmark = match form.add_bookmark(self.channel_id, cx) {
+            Ok(bookmark) => bookmark,
+            Err(error) => {
+                form.set_error(error);
+                cx.notify();
+                return;
+            }
+        };
+
+        form.set_submitting();
+        cx.notify();
+
+        cx.spawn({
+            let client = self.client.clone();
+            async move |this, cx| {
+                let result = client.add_bookmark(bookmark).await;
+                this.update(cx, |this, cx| {
+                    match result {
+                        Ok(()) => {
+                            this.bookmark_form = None;
+                        }
+                        Err(error) => {
+                            if let Some(form) = this.bookmark_form.as_mut() {
+                                form.set_error(SharedString::from(format!(
+                                    "Failed to add bookmark: {error:#}"
+                                )));
+                            }
+                        }
+                    }
+                    cx.notify();
+                })?;
+                anyhow::Ok(())
+            }
+        })
+        .detach_and_log_err(cx);
     }
 
     #[cfg(any(test, feature = "test-support"))]
