@@ -156,7 +156,7 @@ Add the ability for channel participants to schedule messages for future deliver
     - _Requirements: 11.1.1, 11.2.1, 11.3.1, 11.3.3, 11.4_
     - _writes: collab_ui/src/schedule_picker.rs (tests module), collab_ui/src/scheduled_messages_panel.rs (tests module)_
 
-- [ ] 13. Implement error handling edge cases (server-side)
+- [x] 13. Implement error handling edge cases (server-side)
     - Validation in `schedule_channel_message`: return descriptive errors for out-of-bounds `scheduled_at`, missing channel membership, insufficient permissions.
     - Server restart recovery: in scheduler startup, reset `processing` → `pending` for rows with `updated_at` older than a configurable grace period (e.g., 60 seconds).
     - Concurrent cancel + delivery: the atomic `UPDATE ... WHERE state = pending` ensures only one wins; handle the case where cancel finds no rows (idempotent).
@@ -164,7 +164,9 @@ Add the ability for channel participants to schedule messages for future deliver
     - Nonce fallback: if `nonce` is absent in the request, generate one server-side with a warning log.
     - Register all new error variants for proper client-side display.
     - _Requirements: 11.1, 11.2, 11.3_
-    - _writes: collab/src/rpc/scheduled_messages.rs_ (amendments)
+    - _writes: collab/src/rpc.rs, collab/src/db/scheduled_message_store.rs_
+    - _Completed: Confirmed existing time-bound validation, stale-processing recovery, atomic pop/cancel behavior, and pending-only update checks; added server-side fallback nonce generation with warning logging and clearer update errors for deleted/delivered, processing, and failed scheduled messages._
+    - _Validation: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `git diff --check`._
 
 - [x] 14. Update `ChannelMessage` model and rendering for the `scheduled_at` label
     - Parse the `scheduled_at` field from `ChannelMessage` proto on the client.

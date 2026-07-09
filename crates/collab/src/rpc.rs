@@ -51,6 +51,7 @@ use futures::{
     stream::{BoxStream, FuturesUnordered},
 };
 use prometheus::{IntGauge, register_int_gauge};
+use rand::Rng as _;
 use rpc::{
     Connection, ConnectionId, ErrorCode, ErrorCodeExt, ErrorExt, Peer, Receipt, TypedEnvelope,
     proto::{
@@ -3716,6 +3717,14 @@ async fn schedule_channel_message(
     session: MessageContext,
 ) -> Result<()> {
     let scheduled_at = timestamp_millis_to_primitive_datetime(request.scheduled_at)?;
+    let nonce = request.nonce.unwrap_or_else(|| {
+        tracing::warn!(
+            channel_id = request.channel_id,
+            user_id = %session.user_id(),
+            "missing scheduled message nonce; generating server-side fallback"
+        );
+        rand::rng().random::<u128>().into()
+    });
     let store = ScheduledMessageStore::new(session.app_state.db.clone());
     let scheduled_message_id = store
         .create(NewScheduledMessage {
@@ -3723,7 +3732,7 @@ async fn schedule_channel_message(
             sender_id: session.user_id(),
             body: request.body,
             scheduled_at,
-            nonce: request.nonce.context("missing scheduled message nonce")?,
+            nonce,
             mentions: request.mentions,
         })
         .await?;

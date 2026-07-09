@@ -116,11 +116,18 @@ impl ScheduledMessageStore {
                     let row = scheduled_message::Entity::find_by_id(update.scheduled_message_id)
                         .one(&*tx)
                         .await?
-                        .context("scheduled message does not exist")?;
+                        .context(
+                            "scheduled message does not exist or has already been delivered",
+                        )?;
 
                     ensure_owner_and_channel(&row, update.sender_id, update.channel_id)?;
                     if row.state != STATE_PENDING {
-                        return Err(anyhow!("scheduled message is not pending").into());
+                        let reason = match row.state {
+                            STATE_PROCESSING => "scheduled message is already being delivered",
+                            STATE_FAILED => "scheduled message has already failed",
+                            _ => "scheduled message is not pending",
+                        };
+                        return Err(anyhow!(reason).into());
                     }
 
                     let updated =
