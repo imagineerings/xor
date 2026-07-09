@@ -1737,30 +1737,66 @@ impl Editor {
 
         let start_row = cmp::min(tail.row(), head.row());
         let end_row = cmp::max(tail.row(), head.row());
-        let start_column = cmp::min(tail.column(), goal_column);
-        let end_column = cmp::max(tail.column(), goal_column);
-        let reversed = start_column < tail.column();
+
+        let text_layout_details = self.text_layout_details(window, cx);
+
+        let font_id = text_layout_details
+            .text_system
+            .resolve_font(&text_layout_details.editor_style.text.font());
+        let font_size = text_layout_details
+            .editor_style
+            .text
+            .font_size
+            .to_pixels(text_layout_details.rem_size);
+        let em_layout_width = text_layout_details
+            .text_system
+            .em_layout_width(font_id, font_size);
+        let x_for_unclipped_point = |point: DisplayPoint| {
+            let line_len = display_map.line_len(point.row());
+            if point.column() > line_len {
+                let end_of_line_x = display_map.x_for_display_point(
+                    DisplayPoint::new(point.row(), line_len),
+                    &text_layout_details,
+                );
+                end_of_line_x + em_layout_width * (point.column() - line_len) as f32
+            } else {
+                display_map.x_for_display_point(point, &text_layout_details)
+            }
+        };
+
+        let tail_x = x_for_unclipped_point(tail);
+        let head_x = x_for_unclipped_point(DisplayPoint::new(head.row(), goal_column));
+        let start_x = tail_x.min(head_x);
+        let end_x = tail_x.max(head_x);
+        let reversed = head_x < tail_x;
 
         let selection_ranges = (start_row.0..=end_row.0)
             .map(DisplayRow)
             .filter_map(|row| {
-                if (matches!(columnar_state, ColumnarSelectionState::FromMouse { .. })
-                    || start_column <= display_map.line_len(row))
-                    && !display_map.is_block_line(row)
+                if display_map.is_block_line(row) {
+                    return None;
+                }
+
+                let layout = display_map.layout_row(row, &text_layout_details);
+                if matches!(columnar_state, ColumnarSelectionState::FromSelection { .. })
+                    && start_x > layout.width
                 {
-                    let start = display_map
-                        .clip_point(DisplayPoint::new(row, start_column), Bias::Left)
-                        .to_point(display_map);
-                    let end = display_map
-                        .clip_point(DisplayPoint::new(row, end_column), Bias::Right)
-                        .to_point(display_map);
-                    if reversed {
-                        Some(end..start)
-                    } else {
-                        Some(start..end)
-                    }
+                    return None;
+                }
+
+                let start_column = layout.closest_index_for_x(start_x) as u32;
+                let end_column = layout.closest_index_for_x(end_x) as u32;
+
+                let start = display_map
+                    .clip_point(DisplayPoint::new(row, start_column), Bias::Left)
+                    .to_point(display_map);
+                let end = display_map
+                    .clip_point(DisplayPoint::new(row, end_column), Bias::Right)
+                    .to_point(display_map);
+                if reversed {
+                    Some(end..start)
                 } else {
-                    None
+                    Some(start..end)
                 }
             })
             .collect::<Vec<_>>();
