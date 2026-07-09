@@ -1,12 +1,18 @@
 use crate::TestServer;
 use client::{
     channel_chat::{
-        DEFAULT_THREAD_REPLY_LIMIT, SearchChannelMessages, SendChannelMessage, UpdateChannelMessage,
+        DEFAULT_THREAD_REPLY_LIMIT, ScheduleChannelMessage, SearchChannelMessages,
+        SendChannelMessage, UpdateChannelMessage,
     },
     proto,
 };
+use collab::db::{
+    ScheduledMessageId as DbScheduledMessageId, scheduled_message_store::ScheduledMessageStore,
+};
 use gpui::{AppContext, BackgroundExecutor, TestAppContext};
 use pretty_assertions::assert_eq;
+use std::time::Duration as StdDuration;
+use time::{Duration as TimeDuration, OffsetDateTime, PrimitiveDateTime};
 
 #[derive(Default)]
 struct ReactionHandlerEntity;
@@ -91,6 +97,133 @@ async fn test_channel_chat_core_flow(
     assert_eq!(deleted.len(), 1);
     assert_eq!(deleted[0].body, "");
     assert!(deleted[0].mentions.is_empty());
+}
+
+#[gpui::test]
+async fn test_scheduled_channel_message_delivers(
+    executor: BackgroundExecutor,
+    cx_a: &mut TestAppContext,
+    cx_b: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor.clone()).await;
+    let client_a = server.create_client(cx_a, "user_a").await;
+    let client_b = server.create_client(cx_b, "user_b").await;
+    let channel_id = server
+        .make_channel("chat", None, (&client_a, cx_a), &mut [(&client_b, cx_b)])
+        .await;
+
+    client_a
+        .client()
+        .join_channel_chat(channel_id.0)
+        .await
+        .unwrap();
+    client_b
+        .client()
+        .join_channel_chat(channel_id.0)
+        .await
+        .unwrap();
+
+    let scheduled_message_id = client_a
+        .client()
+        .schedule_channel_message(ScheduleChannelMessage {
+            channel_id: channel_id.0,
+            body: "scheduled hello".to_string(),
+            scheduled_at: chrono::Utc::now() + chrono::Duration::minutes(5),
+            nonce: 10,
+            mentions: Vec::new(),
+        })
+        .await
+        .unwrap();
+    let store = ScheduledMessageStore::new(server.app_state.db.clone());
+    store
+        .set_scheduled_at_for_test(
+            DbScheduledMessageId::from_proto(scheduled_message_id.to_proto()),
+            primitive_datetime_in(TimeDuration::minutes(-1)),
+        )
+        .await
+        .unwrap();
+
+    executor.advance_clock(StdDuration::from_secs(10));
+    executor.run_until_parked();
+
+    let history = client_b
+        .client()
+        .get_channel_messages(channel_id.0, None)
+        .await
+        .unwrap()
+        .messages;
+    assert_eq!(history.len(), 1);
+    assert_eq!(history[0].body, "scheduled hello");
+    assert!(history[0].scheduled_at.is_some());
+    assert!(
+        client_a
+            .client()
+            .get_scheduled_messages(channel_id.0)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[gpui::test]
+async fn test_cancelled_scheduled_channel_message_does_not_deliver(
+    executor: BackgroundExecutor,
+    cx_a: &mut TestAppContext,
+    cx_b: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor.clone()).await;
+    let client_a = server.create_client(cx_a, "user_a").await;
+    let client_b = server.create_client(cx_b, "user_b").await;
+    let channel_id = server
+        .make_channel("chat", None, (&client_a, cx_a), &mut [(&client_b, cx_b)])
+        .await;
+
+    client_a
+        .client()
+        .join_channel_chat(channel_id.0)
+        .await
+        .unwrap();
+    client_b
+        .client()
+        .join_channel_chat(channel_id.0)
+        .await
+        .unwrap();
+
+    let scheduled_message_id = client_a
+        .client()
+        .schedule_channel_message(ScheduleChannelMessage {
+            channel_id: channel_id.0,
+            body: "cancelled hello".to_string(),
+            scheduled_at: chrono::Utc::now() + chrono::Duration::minutes(5),
+            nonce: 11,
+            mentions: Vec::new(),
+        })
+        .await
+        .unwrap();
+    client_a
+        .client()
+        .cancel_scheduled_message(channel_id.0, scheduled_message_id)
+        .await
+        .unwrap();
+
+    executor.advance_clock(StdDuration::from_secs(10));
+    executor.run_until_parked();
+
+    let history = client_b
+        .client()
+        .get_channel_messages(channel_id.0, None)
+        .await
+        .unwrap()
+        .messages;
+    assert!(history.is_empty());
+    assert!(
+        client_a
+            .client()
+            .get_scheduled_messages(channel_id.0)
+            .await
+            .unwrap()
+            .is_empty()
+    );
 }
 
 #[gpui::test]
@@ -925,6 +1058,11 @@ fn result_bodies(response: &proto::SearchChannelMessagesResponse) -> Vec<&str> {
         .filter_map(|result| result.message.as_ref())
         .map(|message| message.body.as_str())
         .collect()
+}
+
+fn primitive_datetime_in(offset: TimeDuration) -> PrimitiveDateTime {
+    let timestamp = OffsetDateTime::now_utc() + offset;
+    PrimitiveDateTime::new(timestamp.date(), timestamp.time())
 }
 
 fn assert_reactions(reactions: &[proto::ReactionSummary], expected: &[(&str, &[u64])]) {
