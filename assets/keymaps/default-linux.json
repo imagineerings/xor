@@ -1472,7 +1472,6 @@
       "ctrl-m": "notebook::AddCodeBlock",
       "ctrl-shift-m": "notebook::AddMarkdownBlock",
       "ctrl-shift-r": "notebook::RestartKernel",
-      "ctrl-c": "notebook::InterruptKernel",
     },
   },
   {
@@ -1495,7 +1494,6 @@
       "ctrl-m": "notebook::AddCodeBlock",
       "ctrl-shift-m": "notebook::AddMarkdownBlock",
       "ctrl-shift-r": "notebook::RestartKernel",
-      "ctrl-c": "notebook::InterruptKernel",
       "escape": "notebook::EnterCommandMode",
     },
   },
