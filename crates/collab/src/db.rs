@@ -1,4 +1,5 @@
 pub mod bookmark_store;
+pub mod file_store;
 mod ids;
 pub mod queries;
 pub mod scheduled_message_store;

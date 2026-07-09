@@ -39,7 +39,7 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
 
 ### Phase 2: Server — FileStore & RPC Handlers
 
-- [ ] 4. Implement `FileStore` with S3 presigned URL generation
+- [x] 4. Implement `FileStore` with S3 presigned URL generation
   - Create `FileStore` struct with S3 client, DB pool, and config (`MaxFileSize`, `AllowedTypes`, `StorageBucket`).
   - Implement `GenerateUploadUrl`: validate file size and mime type against config, generate S3 presigned upload URL, insert a pending file record into `channel_files`, return URL with headers and file ID.
   - Implement `ConfirmUpload`: mark the file record as uploaded, generate download URL, return `FileAttachment`.
@@ -47,6 +47,9 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
   - Enforce `Property 5.1` (file size) and `Property 5.2` (file type allowlist).
   - _Requirements: 4.1, 4.4_
   - _writes: crates/collab/src/storage/file_store.go_
+  - _Completed: Added a Rust `FileStore` with S3 presigned PUT/GET URL generation, pending `channel_files` inserts, upload confirmation, metadata lookup, file-size/type validation, proto conversion, and a SeaORM `channel_files` entity._
+  - _Actual writes: crates/collab/src/db/file_store.rs; crates/collab/src/db/tables/channel_file.rs; crates/collab/src/db.rs; crates/collab/src/db/tables.rs_
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab --features collab/test-support`; `git diff --check`._
 
 - [ ] 5. Implement server RPC handlers for file upload
   - Wire `GetFileUploadUrl` handler calling `FileStore.GenerateUploadUrl`.

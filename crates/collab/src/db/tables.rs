@@ -5,6 +5,7 @@ pub mod channel;
 pub mod channel_bookmark;
 pub mod channel_buffer_collaborator;
 pub mod channel_chat_participant;
+pub mod channel_file;
 pub mod channel_member;
 pub mod channel_message;
 pub mod channel_message_mention;
