@@ -128,7 +128,7 @@ Add the ability for channel participants to schedule messages for future deliver
     - _Completed: Added typed client subscription helpers for scheduled-message sent/failed pushes, registered channel chat handlers, show workspace toasts for success/failure, remove affected pending messages from the scheduled panel, upsert delivered scheduled messages, and provide a Review toast action that opens and refreshes the scheduled panel._
     - _Validation: `CARGO_INCREMENTAL=0 cargo check -p client -p collab_ui`; `git diff --check`._
 
-- [ ] 11. Add server-side unit and integration tests
+- [x] 11. Add server-side unit and integration tests
     - [x] 11.1 `ScheduledMessageStore` unit tests:
         - `create` — validates time bounds (rejects <1 min and >30 days).
         - `create` — nonce deduplication returns existing ID.
@@ -141,15 +141,15 @@ Add the ability for channel participants to schedule messages for future deliver
         - `reset_stale_processing` — resets stale `processing` rows to `pending`.
         - _Completed: Added scheduled-message DB store tests for time-bound validation, nonce deduplication, owner-only cancel, idempotent non-pending cancel, update validation, non-pending update errors, due-message popping with limits, pending counts, and stale processing reset._
         - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_scheduled_message_create_validation_and_dedup_sqlite -- --nocapture`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_scheduled_message_cancel_ownership_and_pending_state_sqlite -- --nocapture`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_scheduled_message_update_validation_and_pending_state_sqlite -- --nocapture`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_scheduled_message_pop_due_counts_and_stale_reset_sqlite -- --nocapture`. Attempted `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support scheduled_message -- --nocapture`, but local Postgres tests failed because no Postgres server was listening on localhost._
-    - [ ] 11.2 Integration tests (using test server harness):
+    - [x] 11.2 Integration tests (using test server harness):
         - [x] Schedule → confirm row in DB → advance clock → confirm message delivered → confirm row deleted.
         - [x] Schedule → cancel → confirm row deleted and message never delivered.
         - [x] Schedule → sender loses member role before delivery → confirm `ScheduledMessageFailed` push sent.
         - [x] Multiple due messages at same timestamp → confirm all delivered in order.
-        - Server restart with stale `processing` rows → confirm they're reset and re-delivered.
-        - Concurrent cancel + delivery race → confirm at-most-once delivery.
-        - _Progress: Added integration coverage for scheduler-loop delivery, cancel-before-delivery behavior, membership-loss failure pushes, and same-timestamp ordered delivery._
-        - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_scheduled_channel_message_delivers -- --nocapture`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_cancelled_scheduled_channel_message_does_not_deliver -- --nocapture`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_scheduled_channel_message_failure_after_sender_removed -- --nocapture`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_scheduled_channel_messages_due_at_same_time_deliver_in_order -- --nocapture`; `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `git diff --check`._
+        - [x] Server restart with stale `processing` rows → confirm they're reset and re-delivered.
+        - [x] Concurrent cancel + delivery race → confirm at-most-once delivery.
+        - _Completed: Added integration coverage for scheduler-loop delivery, cancel-before-delivery behavior, membership-loss failure pushes, same-timestamp ordered delivery, stale processing reset on restart, and concurrent cancel/delivery at-most-once behavior._
+        - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_scheduled_channel_message_delivers -- --nocapture`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_cancelled_scheduled_channel_message_does_not_deliver -- --nocapture`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_scheduled_channel_message_failure_after_sender_removed -- --nocapture`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_scheduled_channel_messages_due_at_same_time_deliver_in_order -- --nocapture`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_stale_processing_scheduled_message_is_reset_and_delivered_after_restart -- --nocapture`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_concurrent_scheduled_message_cancel_and_delivery_is_at_most_once -- --nocapture`; `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `git diff --check`._
     - _Requirements: 11.1, 11.2, 11.3, 11.4_
     - _writes: collab/src/db/scheduled_message_store.rs (tests module), collab/tests/scheduled_messages_integration.rs_
 
