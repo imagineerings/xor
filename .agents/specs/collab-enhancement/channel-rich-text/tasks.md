@@ -28,11 +28,12 @@ The work is ordered to build incrementally: first the rendering pipeline (Markdo
   - _writes: `collab_ui/src/channel_chat/message_bubble.rs`_
   - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab test_channel_chat_view_live_insert_and_send_states --features test-support`_
 
-- [ ] 3. Extract a shared Markdown style for channel chat
-  - [ ] 3.1 Add a `MarkdownFont::Chat` variant (or reuse `MarkdownFont::Editor`) and create a `channel_chat_markdown_style(window, cx) -> MarkdownStyle` helper that applies chat-appropriate base text size, link colors, and code block styling.
-  - [ ] 3.2 Consume the helper in both the message bubble renderer and the preview pane (added later).
+- [x] 3. Extract a shared Markdown style for channel chat
+  - [x] 3.1 Add a `MarkdownFont::Chat` variant (or reuse `MarkdownFont::Editor`) and create a `channel_chat_markdown_style(window, cx) -> MarkdownStyle` helper that applies chat-appropriate base text size, link colors, and code block styling.
+  - [x] 3.2 Consume the helper in both the message bubble renderer and the preview pane (added later).
   - _Requirements: 1.1_
   - _writes: `collab_ui/src/channel_chat/markdown_style.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab test_channel_chat_view_live_insert_and_send_states --features test-support`_
 
 - [ ] 4. Build the `FormattingToolbar` component
   - [ ] 4.1 Define `FormatKind` enum (`Bold`, `Italic`, `Code`, `Strikethrough`, `Blockquote`, `Link`, `CodeBlock`, `BulletList`, `NumberedList`) with the Markdown syntax each maps to.

@@ -1,5 +1,6 @@
+use super::markdown_style::channel_chat_markdown_style;
 use gpui::{AnyElement, App, Entity, ImageSource, Resource, SharedString, SharedUri, Window};
-use markdown::{Markdown, MarkdownElement, MarkdownFont, MarkdownStyle};
+use markdown::{Markdown, MarkdownElement};
 use ui::prelude::*;
 
 pub(super) struct MessageBody {
@@ -24,7 +25,7 @@ impl MessageBody {
             .child(
                 MarkdownElement::new(
                     self.markdown.clone(),
-                    MarkdownStyle::themed(MarkdownFont::Editor, window, cx),
+                    channel_chat_markdown_style(window, cx),
                 )
                 .on_url_click(|url, _, cx| cx.open_url(&url))
                 .image_resolver(resolve_remote_image),

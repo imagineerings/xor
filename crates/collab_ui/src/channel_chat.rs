@@ -29,6 +29,8 @@ use workspace::{
     item::{Item, TabContentParams},
 };
 
+#[path = "channel_chat/markdown_style.rs"]
+mod markdown_style;
 #[path = "channel_chat/message_bubble.rs"]
 mod message_bubble;
 
