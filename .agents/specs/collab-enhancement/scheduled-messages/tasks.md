@@ -91,6 +91,8 @@ Add the ability for channel participants to schedule messages for future deliver
     - Wire the picker into the existing compose area: when a time is selected, the send button label changes to "Schedule (time)" with a clock icon; clicking sends a `ScheduleChannelMessage` RPC instead of an immediate message.
     - _Requirements: 11.1.1, 11.1.2, 11.3.3, 11.4.1_
     - _writes: collab_ui/src/schedule_picker.rs_
+    - _Progress: Added an inline compose-area clock control with common schedule presets, selected-time display, draft clearing, and scheduled-send RPC wiring. Full calendar/time-picker controls remain._
+    - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui`; `git diff --check`._
 
 - [ ] 8. Build `ScheduledMessagesPanel` management view
     - Implement `ScheduledMessagesPanel` struct with `channel_id`, `messages`, `loading`, `editing_message_id`, `edit_body`, `edit_scheduled_at`.

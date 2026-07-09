@@ -1,18 +1,20 @@
 use crate::draft_store::DraftStore;
 use anyhow::Result;
 use channel::{Channel, ChannelStore};
+use chrono::{DateTime, Duration as ChronoDuration, Local, Utc};
 use client::{
     ChannelId, Client, UserStore,
     channel_chat::{
-        DEFAULT_THREAD_REPLY_LIMIT, SearchChannelMessages, SendChannelMessage, ThreadSummary,
+        DEFAULT_THREAD_REPLY_LIMIT, ScheduleChannelMessage, SearchChannelMessages,
+        SendChannelMessage, ThreadSummary,
     },
     proto::{self, ChannelVisibility},
 };
 use db::kvp::KeyValueStore;
 use editor::{Editor, EditorEvent};
 use gpui::{
-    App, AsyncApp, Context, Entity, EventEmitter, FocusHandle, Focusable, InteractiveElement,
-    KeyBinding, PromptLevel, Render, SharedString, StatefulInteractiveElement,
+    App, AsyncApp, ClickEvent, Context, Entity, EventEmitter, FocusHandle, Focusable,
+    InteractiveElement, KeyBinding, PromptLevel, Render, SharedString, StatefulInteractiveElement,
     Subscription as GpuiSubscription, Task, VisualContext as _, WeakEntity, Window, actions,
     prelude::*,
 };
@@ -124,6 +126,7 @@ pub struct ChannelChat {
     emoji_picker: Option<EmojiPickerState>,
     recent_emoji_names: Vec<String>,
     send_state: SendState,
+    schedule_picker: SchedulePickerState,
     pending_draft_save: Option<Task<()>>,
     _rpc_subscriptions: Vec<client::Subscription>,
     _composer_subscription: GpuiSubscription,
@@ -149,6 +152,12 @@ struct ThreadPanel {
     compose_editor: Entity<Editor>,
     load_state: ThreadLoadState,
     send_state: SendState,
+}
+
+#[derive(Clone, Default)]
+struct SchedulePickerState {
+    visible: bool,
+    scheduled_at: Option<DateTime<Utc>>,
 }
 
 struct ThreadIndicator {
@@ -474,6 +483,7 @@ impl ChannelChat {
             emoji_picker: None,
             recent_emoji_names,
             send_state: SendState::Idle,
+            schedule_picker: SchedulePickerState::default(),
             pending_draft_save: None,
             _rpc_subscriptions,
             _composer_subscription,
@@ -656,19 +666,34 @@ impl ChannelChat {
         self.send_state = SendState::Sending;
         cx.notify();
 
+        let scheduled_at = self.schedule_picker.scheduled_at;
         let client = self.client.clone();
         let channel_id = self.channel_id;
         cx.spawn_in(window, async move |this, cx| {
             let nonce = next_nonce(channel_id);
-            let send_result = client
-                .send_channel_message(SendChannelMessage {
-                    channel_id: channel_id.0,
-                    body,
-                    nonce,
-                    mentions: Vec::new(),
-                    reply_to_message_id: None,
-                })
-                .await;
+            let send_result = if let Some(scheduled_at) = scheduled_at {
+                client
+                    .schedule_channel_message(ScheduleChannelMessage {
+                        channel_id: channel_id.0,
+                        body,
+                        scheduled_at,
+                        nonce,
+                        mentions: Vec::new(),
+                    })
+                    .await
+                    .map(|_| None)
+            } else {
+                client
+                    .send_channel_message(SendChannelMessage {
+                        channel_id: channel_id.0,
+                        body,
+                        nonce,
+                        mentions: Vec::new(),
+                        reply_to_message_id: None,
+                    })
+                    .await
+                    .map(Some)
+            };
 
             this.update_in(cx, |this, window, cx| match send_result {
                 Ok(message) => {
@@ -681,14 +706,24 @@ impl ChannelChat {
                         composer.clear(window, cx);
                     });
                     this.send_state = SendState::Idle;
-                    this.upsert_message(message, cx);
+                    this.schedule_picker.scheduled_at = None;
+                    this.schedule_picker.visible = false;
+                    if let Some(message) = message {
+                        this.upsert_message(message, cx);
+                    }
                 }
                 Err(error) => {
                     let message = SharedString::from(error.to_string());
                     this.send_state = SendState::Failed(message.clone());
+                    let action = if scheduled_at.is_some() {
+                        "schedule"
+                    } else {
+                        "send"
+                    };
                     this.workspace
                         .update(cx, |workspace, cx| {
-                            workspace.show_error(format!("Failed to send message: {message}"), cx);
+                            workspace
+                                .show_error(format!("Failed to {action} message: {message}"), cx);
                         })
                         .log_err();
                     cx.notify();
@@ -697,6 +732,99 @@ impl ChannelChat {
             anyhow::Ok(())
         })
         .detach_and_log_err(cx);
+    }
+
+    fn toggle_schedule_picker(&mut self, _: &ClickEvent, _: &mut Window, cx: &mut Context<Self>) {
+        self.schedule_picker.visible = !self.schedule_picker.visible;
+        cx.notify();
+    }
+
+    fn set_schedule_offset(
+        &mut self,
+        offset: ChronoDuration,
+        _: &ClickEvent,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.schedule_picker.scheduled_at = Some(Utc::now() + offset);
+        self.schedule_picker.visible = false;
+        cx.notify();
+    }
+
+    fn clear_schedule(&mut self, _: &ClickEvent, _: &mut Window, cx: &mut Context<Self>) {
+        self.schedule_picker.scheduled_at = None;
+        self.schedule_picker.visible = false;
+        cx.notify();
+    }
+
+    fn render_schedule_picker(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let selected_label = self
+            .schedule_picker
+            .scheduled_at
+            .map(schedule_label)
+            .unwrap_or_else(|| "Send now".to_string());
+
+        v_flex()
+            .gap_2()
+            .p_2()
+            .rounded_md()
+            .border_1()
+            .border_color(cx.theme().colors().border)
+            .bg(cx.theme().colors().editor_background)
+            .child(
+                h_flex()
+                    .gap_2()
+                    .items_center()
+                    .child(Icon::new(IconName::Clock).size(IconSize::Small))
+                    .child(Label::new(selected_label).size(LabelSize::Small)),
+            )
+            .child(
+                h_flex()
+                    .gap_2()
+                    .child(
+                        Button::new("schedule-in-30-minutes", "30 min").on_click(cx.listener(
+                            |this, event, window, cx| {
+                                this.set_schedule_offset(
+                                    ChronoDuration::minutes(30),
+                                    event,
+                                    window,
+                                    cx,
+                                );
+                            },
+                        )),
+                    )
+                    .child(
+                        Button::new("schedule-in-1-hour", "1 hour").on_click(cx.listener(
+                            |this, event, window, cx| {
+                                this.set_schedule_offset(
+                                    ChronoDuration::hours(1),
+                                    event,
+                                    window,
+                                    cx,
+                                );
+                            },
+                        )),
+                    )
+                    .child(
+                        Button::new("schedule-tomorrow", "Tomorrow").on_click(cx.listener(
+                            |this, event, window, cx| {
+                                this.set_schedule_offset(
+                                    ChronoDuration::days(1),
+                                    event,
+                                    window,
+                                    cx,
+                                );
+                            },
+                        )),
+                    )
+                    .when(self.schedule_picker.scheduled_at.is_some(), |this| {
+                        this.child(
+                            Button::new("clear-schedule", "Clear")
+                                .style(ButtonStyle::Subtle)
+                                .on_click(cx.listener(Self::clear_schedule)),
+                        )
+                    }),
+            )
     }
 
     fn open_thread(&mut self, root_message_id: u64, window: &mut Window, cx: &mut Context<Self>) {
@@ -936,6 +1064,7 @@ impl ChannelChat {
             reply_to_message_id: Some(root_message_id),
             edited_at: None,
             reaction_summaries: Vec::new(),
+            scheduled_at: None,
         };
 
         thread_panel.send_state = SendState::Sending;
@@ -2307,6 +2436,37 @@ impl Render for ChannelChat {
                                         )
                                     }),
                             )
+                            .child(
+                                h_flex()
+                                    .gap_2()
+                                    .items_center()
+                                    .child(
+                                        IconButton::new("toggle-schedule-picker", IconName::Clock)
+                                            .icon_size(IconSize::Small)
+                                            .icon_color(
+                                                if self.schedule_picker.scheduled_at.is_some() {
+                                                    Color::Accent
+                                                } else {
+                                                    Color::Muted
+                                                },
+                                            )
+                                            .on_click(cx.listener(Self::toggle_schedule_picker))
+                                            .tooltip(Tooltip::text("Schedule message")),
+                                    )
+                                    .when_some(
+                                        self.schedule_picker.scheduled_at.map(schedule_label),
+                                        |this, label| {
+                                            this.child(
+                                                Label::new(label)
+                                                    .size(LabelSize::XSmall)
+                                                    .color(Color::Muted),
+                                            )
+                                        },
+                                    ),
+                            )
+                            .when(self.schedule_picker.visible, |this| {
+                                this.child(self.render_schedule_picker(cx))
+                            })
                             .when_some(
                                 match &self.send_state {
                                     SendState::Failed(message) => Some(message.clone()),
@@ -2372,6 +2532,13 @@ fn format_timestamp(timestamp: u64) -> String {
     let hour = seconds_in_day / 3_600;
     let minute = (seconds_in_day % 3_600) / 60;
     format!("{hour:02}:{minute:02}")
+}
+
+fn schedule_label(timestamp: DateTime<Utc>) -> String {
+    timestamp
+        .with_timezone(&Local)
+        .format("Scheduled for %b %-d, %-I:%M %p")
+        .to_string()
 }
 
 fn emoji_character(emoji_name: &str) -> &str {
