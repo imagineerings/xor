@@ -48,6 +48,8 @@ use workspace::{
 
 #[path = "channel_chat/compose_area.rs"]
 mod compose_area;
+#[path = "channel_chat/file_renderer.rs"]
+mod file_renderer;
 #[path = "channel_chat/formatting_toolbar.rs"]
 mod formatting_toolbar;
 #[path = "channel_chat/markdown_style.rs"]

@@ -140,12 +140,15 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
 
 ### Phase 5: Client — File Preview Rendering
 
-- [ ] 13. Implement `FileAttachmentRenderer` with file kind detection
+- [x] 13. Implement `FileAttachmentRenderer` with file kind detection
   - Create `FileAttachmentRenderer` struct.
   - Implement `detect_file_kind(mime_type, filename) -> FileKind` dispatching on MIME type / extension categories: `Image`, `Video`, `Audio`, `Pdf`, `Code`, `Other`.
   - Implement `render(file, window, cx) -> AnyElement` dispatching to per-kind renderers.
   - _Requirements: 4.2_
   - _writes: crates/collab_ui/src/channel_chat/file_renderer.rs_
+  - _Completed: Added a reusable `FileAttachmentRenderer` with MIME/extension-based `FileKind` detection, render dispatch, remote image rendering, and file-card fallback rendering._
+  - _Actual writes: crates/collab_ui/src/channel_chat/file_renderer.rs; crates/collab_ui/src/channel_chat.rs_
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `rustfmt --edition 2024 crates/collab_ui/src/channel_chat.rs crates/collab_ui/src/channel_chat/file_renderer.rs`; `git diff --check`._
 
 - [ ] 14. Render image inline previews
   - Add `render_image_preview`: load and display image using existing `Image` element or `media` crate.
@@ -173,11 +176,14 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
   - _Requirements: 4.2_
   - _writes: crates/collab_ui/src/channel_chat/file_renderer.rs_
 
-- [ ] 18. Render fallback file cards for other types
+- [x] 18. Render fallback file cards for other types
   - Add `render_file_card`: show file type icon, filename, formatted file size, uploader name, download count.
   - Click on filename triggers download.
   - _Requirements: 4.3_
   - _writes: crates/collab_ui/src/channel_chat/file_renderer.rs_
+  - _Completed: Added fallback file cards with kind-specific icons, filename, formatted size, MIME type, uploader id, image/duration metadata when present, and a download action._
+  - _Actual writes: crates/collab_ui/src/channel_chat/file_renderer.rs_
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `rustfmt --edition 2024 crates/collab_ui/src/channel_chat.rs crates/collab_ui/src/channel_chat/file_renderer.rs`; `git diff --check`._
 
 ### Phase 6: Client — Channel Message Integration
 
