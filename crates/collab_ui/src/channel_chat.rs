@@ -2,6 +2,7 @@ use crate::{
     channel_bookmark_bar::ChannelBookmarkBar,
     channel_bookmark_form::{BookmarkForm, BookmarkFormState},
     channel_bookmark_store::ChannelBookmarkStore,
+    channel_file_upload::{UploadManager, UploadProgress, UploadStatus},
     draft_store::DraftStore,
 };
 use anyhow::Result;
@@ -22,10 +23,10 @@ use client::{
 use db::kvp::KeyValueStore;
 use editor::{Editor, EditorEvent};
 use gpui::{
-    App, AsyncApp, ClickEvent, Context, Entity, EventEmitter, FocusHandle, Focusable,
-    InteractiveElement, KeyBinding, PromptLevel, Render, SharedString, StatefulInteractiveElement,
-    Subscription as GpuiSubscription, Task, VisualContext as _, WeakEntity, Window, actions,
-    prelude::*,
+    App, AsyncApp, ClickEvent, Context, Entity, EventEmitter, ExternalPaths, FocusHandle,
+    Focusable, InteractiveElement, KeyBinding, PathPromptOptions, PromptLevel, Render,
+    SharedString, StatefulInteractiveElement, Subscription as GpuiSubscription, Task,
+    VisualContext as _, WeakEntity, Window, actions, prelude::*,
 };
 use menu::{Confirm, SelectNext, SelectPrevious};
 use rpc::{ErrorExt as _, TypedEnvelope};
@@ -33,10 +34,11 @@ use smallvec::SmallVec;
 use std::{
     any::TypeId,
     collections::HashMap,
+    path::PathBuf,
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use ui::{Avatar, Facepile, TintColor, Tooltip, prelude::*};
+use ui::{Avatar, Facepile, ProgressBar, TintColor, Tooltip, prelude::*};
 use util::ResultExt;
 use workspace::{
     Toast, Workspace,
@@ -124,6 +126,7 @@ pub struct ChannelChat {
     composer: Entity<Editor>,
     compose_mode: compose_area::ComposeMode,
     compose_preview: Option<compose_area::PreviewBody>,
+    upload_manager: Entity<UploadManager>,
     search_editor: Entity<Editor>,
     search_state: search::SearchState,
     pending_search: Option<Task<()>>,
@@ -149,6 +152,7 @@ pub struct ChannelChat {
     _search_subscription: GpuiSubscription,
     _emoji_search_subscription: GpuiSubscription,
     _bookmark_store_subscription: GpuiSubscription,
+    _upload_manager_subscription: GpuiSubscription,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -582,6 +586,8 @@ impl ChannelChat {
         let _emoji_search_subscription = cx.observe(&emoji_search, |_, _, cx| cx.notify());
         let bookmark_store = cx.new(|cx| ChannelBookmarkStore::new(client.clone(), cx));
         let _bookmark_store_subscription = cx.observe(&bookmark_store, |_, _, cx| cx.notify());
+        let upload_manager = UploadManager::global(cx);
+        let _upload_manager_subscription = cx.observe(&upload_manager, |_, _, cx| cx.notify());
         let weak_self = cx.weak_entity();
         let _rpc_subscriptions = vec![
             client.add_channel_message_sent_handler(weak_self.clone(), Self::handle_message_sent),
@@ -650,6 +656,7 @@ impl ChannelChat {
             composer,
             compose_mode: compose_area::ComposeMode::Source,
             compose_preview: None,
+            upload_manager,
             search_editor,
             search_state: search::SearchState::default(),
             pending_search: None,
@@ -675,6 +682,7 @@ impl ChannelChat {
             _search_subscription,
             _emoji_search_subscription,
             _bookmark_store_subscription,
+            _upload_manager_subscription,
         }
     }
 
@@ -1010,6 +1018,115 @@ impl ChannelChat {
             anyhow::Ok(())
         })
         .detach_and_log_err(cx);
+    }
+
+    fn open_file_picker(&mut self, _: &ClickEvent, window: &mut Window, cx: &mut Context<Self>) {
+        let paths_receiver = cx.prompt_for_paths(PathPromptOptions {
+            files: true,
+            directories: false,
+            multiple: true,
+            prompt: None,
+        });
+        cx.spawn_in(window, async move |this, cx| {
+            let Ok(paths_result) = paths_receiver.await else {
+                return anyhow::Ok(());
+            };
+            let Some(paths) = paths_result? else {
+                return anyhow::Ok(());
+            };
+            this.update(cx, |this, cx| {
+                this.upload_paths(paths, cx);
+            })?;
+            anyhow::Ok(())
+        })
+        .detach_and_log_err(cx);
+    }
+
+    fn upload_external_paths(
+        &mut self,
+        paths: &ExternalPaths,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.upload_paths(paths.paths().to_vec(), cx);
+        cx.stop_propagation();
+    }
+
+    fn upload_paths(&mut self, paths: Vec<PathBuf>, cx: &mut Context<Self>) {
+        let file_paths = paths
+            .into_iter()
+            .filter(|path| path.is_file())
+            .collect::<Vec<_>>();
+        if file_paths.is_empty() {
+            self.show_upload_error("No files to upload", cx);
+            return;
+        }
+
+        for file_path in file_paths {
+            self.start_file_upload(file_path, cx);
+        }
+        cx.notify();
+    }
+
+    fn start_file_upload(&mut self, file_path: PathBuf, cx: &mut Context<Self>) {
+        let filename = file_path
+            .file_name()
+            .and_then(|filename| filename.to_str())
+            .unwrap_or("file")
+            .to_string();
+        let upload_task = self.upload_manager.update(cx, |upload_manager, cx| {
+            upload_manager.upload_file(self.channel_id, file_path, cx)
+        });
+
+        cx.spawn(async move |this, cx| {
+            if let Err(error) = upload_task.await {
+                if error.to_string() == "file upload cancelled" {
+                    return anyhow::Ok(());
+                }
+                this.update(cx, |this, cx| {
+                    this.show_upload_error(format!("Failed to upload {filename}: {error}"), cx);
+                    cx.notify();
+                })?;
+            }
+            anyhow::Ok(())
+        })
+        .detach_and_log_err(cx);
+    }
+
+    fn cancel_upload(&mut self, file_id: String, cx: &mut Context<Self>) {
+        self.upload_manager.update(cx, |upload_manager, cx| {
+            upload_manager.cancel_upload(&file_id, cx);
+        });
+    }
+
+    fn retry_upload(&mut self, file_id: String, cx: &mut Context<Self>) {
+        let file_path = self.upload_manager.update(cx, |upload_manager, cx| {
+            let file_path = upload_manager
+                .uploads_for_channel(self.channel_id)
+                .into_iter()
+                .find(|upload| upload.file_id == file_id)
+                .map(|upload| upload.file_path);
+            upload_manager.remove_upload(&file_id, cx);
+            file_path
+        });
+        if let Some(file_path) = file_path {
+            self.start_file_upload(file_path, cx);
+        }
+    }
+
+    fn remove_upload(&mut self, file_id: String, cx: &mut Context<Self>) {
+        self.upload_manager.update(cx, |upload_manager, cx| {
+            upload_manager.remove_upload(&file_id, cx);
+        });
+    }
+
+    fn show_upload_error(&self, message: impl Into<String>, cx: &mut App) {
+        let message = message.into();
+        self.workspace
+            .update(cx, |workspace, cx| {
+                workspace.show_error(message, cx);
+            })
+            .log_err();
     }
 
     fn toggle_schedule_picker(&mut self, _: &ClickEvent, _: &mut Window, cx: &mut Context<Self>) {
@@ -3181,6 +3298,136 @@ impl ChannelChat {
         }
     }
 
+    fn render_uploads(&self, cx: &mut Context<Self>) -> gpui::AnyElement {
+        let uploads = self
+            .upload_manager
+            .read(cx)
+            .uploads_for_channel(self.channel_id);
+        v_flex()
+            .gap_1()
+            .children(
+                uploads
+                    .into_iter()
+                    .map(|upload| self.render_upload(upload, cx)),
+            )
+            .into_any_element()
+    }
+
+    fn render_upload(&self, upload: UploadProgress, cx: &mut Context<Self>) -> gpui::AnyElement {
+        let progress = upload_progress_value(&upload.status, upload.progress);
+        let status_text = upload_status_text(&upload.status, progress);
+        let file_id = upload.file_id.clone();
+        let upload_element_id = format!("channel-file-upload-{}", upload.file_id);
+        let progress_element_id = format!("channel-file-upload-progress-{}", upload.file_id);
+        let progress_color = match &upload.status {
+            UploadStatus::Failed(_) => cx.theme().status().error,
+            UploadStatus::Cancelled => cx.theme().colors().text_muted,
+            UploadStatus::Completed => cx.theme().status().success,
+            UploadStatus::Uploading | UploadStatus::Confirming => cx.theme().status().info,
+        };
+
+        h_flex()
+            .id(upload_element_id)
+            .gap_2()
+            .items_center()
+            .px_2()
+            .py_1()
+            .rounded_sm()
+            .border_1()
+            .border_color(cx.theme().colors().border)
+            .child(
+                Icon::new(IconName::File)
+                    .size(IconSize::Small)
+                    .color(Color::Muted),
+            )
+            .child(
+                v_flex()
+                    .flex_1()
+                    .gap_1()
+                    .child(
+                        h_flex()
+                            .gap_2()
+                            .justify_between()
+                            .child(Label::new(upload.filename.clone()).truncate())
+                            .child(
+                                Label::new(status_text)
+                                    .size(LabelSize::XSmall)
+                                    .color(upload_status_color(&upload.status)),
+                            ),
+                    )
+                    .child(
+                        ProgressBar::new(progress_element_id, progress, 1.0, cx)
+                            .fg_color(progress_color),
+                    )
+                    .when_some(upload_error_text(&upload.status), |this, error| {
+                        this.child(
+                            Label::new(error)
+                                .size(LabelSize::XSmall)
+                                .color(Color::Error)
+                                .truncate(),
+                        )
+                    }),
+            )
+            .when(
+                matches!(
+                    upload.status,
+                    UploadStatus::Uploading | UploadStatus::Confirming
+                ),
+                |this| {
+                    this.child(
+                        IconButton::new(
+                            format!("cancel-channel-file-upload-{file_id}"),
+                            IconName::Close,
+                        )
+                        .icon_size(IconSize::XSmall)
+                        .icon_color(Color::Muted)
+                        .on_click(cx.listener({
+                            let file_id = file_id.clone();
+                            move |this, _, _, cx| this.cancel_upload(file_id.clone(), cx)
+                        }))
+                        .tooltip(Tooltip::text("Cancel upload")),
+                    )
+                },
+            )
+            .when(matches!(upload.status, UploadStatus::Failed(_)), |this| {
+                this.child(
+                    IconButton::new(
+                        format!("retry-channel-file-upload-{file_id}"),
+                        IconName::RotateCcw,
+                    )
+                    .icon_size(IconSize::XSmall)
+                    .icon_color(Color::Muted)
+                    .on_click(cx.listener({
+                        let file_id = file_id.clone();
+                        move |this, _, _, cx| this.retry_upload(file_id.clone(), cx)
+                    }))
+                    .tooltip(Tooltip::text("Retry upload")),
+                )
+            })
+            .when(
+                matches!(
+                    upload.status,
+                    UploadStatus::Completed | UploadStatus::Failed(_) | UploadStatus::Cancelled
+                ),
+                |this| {
+                    this.child(
+                        IconButton::new(
+                            format!("remove-channel-file-upload-{file_id}"),
+                            IconName::Close,
+                        )
+                        .icon_size(IconSize::XSmall)
+                        .icon_color(Color::Muted)
+                        .on_click(cx.listener({
+                            let file_id = file_id.clone();
+                            move |this, _, _, cx| this.remove_upload(file_id.clone(), cx)
+                        }))
+                        .tooltip(Tooltip::text("Remove upload")),
+                    )
+                },
+            )
+            .into_any_element()
+    }
+
     #[cfg(any(test, feature = "test-support"))]
     pub fn message_bodies_for_test(&self) -> Vec<String> {
         self.messages
@@ -4033,6 +4280,10 @@ impl Render for ChannelChat {
                             .p_3()
                             .border_t_1()
                             .border_color(cx.theme().colors().border)
+                            .drag_over::<ExternalPaths>(|style, _, _, cx| {
+                                style.bg(cx.theme().colors().drop_target_background)
+                            })
+                            .on_drop(cx.listener(Self::upload_external_paths))
                             .child(
                                 h_flex()
                                     .gap_2()
@@ -4086,10 +4337,25 @@ impl Render for ChannelChat {
                                         )
                                     }),
                             )
+                            .when(
+                                !self
+                                    .upload_manager
+                                    .read(cx)
+                                    .uploads_for_channel(self.channel_id)
+                                    .is_empty(),
+                                |this| this.child(self.render_uploads(cx)),
+                            )
                             .child(
                                 h_flex()
                                     .gap_2()
                                     .items_center()
+                                    .child(
+                                        IconButton::new("attach-channel-file", IconName::Paperclip)
+                                            .icon_size(IconSize::Small)
+                                            .icon_color(Color::Muted)
+                                            .on_click(cx.listener(Self::open_file_picker))
+                                            .tooltip(Tooltip::text("Attach file")),
+                                    )
                                     .child(
                                         IconButton::new("toggle-schedule-picker", IconName::Clock)
                                             .icon_size(IconSize::Small)
@@ -4287,6 +4553,44 @@ fn current_timestamp_nanos() -> u128 {
         Err(_) => 0,
     };
     nanos
+}
+
+fn upload_status_text(status: &UploadStatus, progress: f32) -> SharedString {
+    match status {
+        UploadStatus::Uploading => format!("{:.0}%", progress * 100.0),
+        UploadStatus::Confirming => "Finishing".to_string(),
+        UploadStatus::Completed => "Uploaded".to_string(),
+        UploadStatus::Failed(_) => "Failed".to_string(),
+        UploadStatus::Cancelled => "Cancelled".to_string(),
+    }
+    .into()
+}
+
+fn upload_status_color(status: &UploadStatus) -> Color {
+    match status {
+        UploadStatus::Uploading | UploadStatus::Confirming => Color::Info,
+        UploadStatus::Completed => Color::Success,
+        UploadStatus::Failed(_) => Color::Error,
+        UploadStatus::Cancelled => Color::Muted,
+    }
+}
+
+fn upload_error_text(status: &UploadStatus) -> Option<SharedString> {
+    match status {
+        UploadStatus::Failed(error) => Some(error.clone().into()),
+        UploadStatus::Uploading
+        | UploadStatus::Confirming
+        | UploadStatus::Completed
+        | UploadStatus::Cancelled => None,
+    }
+}
+
+fn upload_progress_value(status: &UploadStatus, progress: f32) -> f32 {
+    match status {
+        UploadStatus::Completed | UploadStatus::Confirming => 1.0,
+        UploadStatus::Failed(_) | UploadStatus::Cancelled | UploadStatus::Uploading => progress,
+    }
+    .clamp(0.0, 1.0)
 }
 
 fn message_nonce(message: &proto::ChannelMessage) -> Option<u128> {

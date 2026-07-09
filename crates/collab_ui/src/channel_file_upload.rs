@@ -80,6 +80,7 @@ impl UploadManager {
                         file_id: file_id.clone(),
                         channel_id,
                         filename: SharedString::from(filename.clone()),
+                        file_path: file_path.clone(),
                         progress: 0.0,
                         status: UploadStatus::Uploading,
                     },
@@ -159,6 +160,7 @@ pub struct UploadProgress {
     pub file_id: FileId,
     pub channel_id: ChannelId,
     pub filename: SharedString,
+    pub file_path: PathBuf,
     pub progress: f32,
     pub status: UploadStatus,
 }

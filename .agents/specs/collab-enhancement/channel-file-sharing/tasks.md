@@ -107,27 +107,36 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
 
 ### Phase 4: Client — Compose Area with Drag-and-Drop & File Picker
 
-- [ ] 10. Add drag-and-drop zone to the message compose area
+- [x] 10. Add drag-and-drop zone to the message compose area
   - Attach GPUI file-drop event handlers to the compose element.
   - Show a drop zone overlay with visual feedback on `on_drag_over` / `on_drag_enter`.
   - On `on_drop`, extract dropped file paths and call `UploadManager::upload_file`.
   - _Requirements: 4.1_
   - _writes: crates/collab_ui/src/channel_chat/compose_area.rs_
+  - _Completed: Added `ExternalPaths` drag-over/drop handling to the channel composer, including drop-target background feedback and dropped-path upload dispatch through the shared `UploadManager`._
+  - _Actual writes: crates/collab_ui/src/channel_chat.rs_
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `rustfmt --edition 2024 crates/collab_ui/src/channel_chat.rs crates/collab_ui/src/channel_file_upload.rs`; `git diff --check`._
 
-- [ ] 11. Add file attachment button and file picker
+- [x] 11. Add file attachment button and file picker
   - Add a paperclip / attach-file icon button to the compose toolbar.
   - On click, open a native file picker dialog (using GPUI file dialog support).
   - On file selection, call `UploadManager::upload_file`.
   - _Requirements: 4.1_
   - _writes: crates/collab_ui/src/channel_chat/compose_area.rs_
+  - _Completed: Added a paperclip icon button to the composer controls that opens GPUI's multi-file picker and uploads selected files through `UploadManager`._
+  - _Actual writes: crates/collab_ui/src/channel_chat.rs_
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `rustfmt --edition 2024 crates/collab_ui/src/channel_chat.rs crates/collab_ui/src/channel_file_upload.rs`; `git diff --check`._
 
-- [ ] 12. Show upload progress in the compose area
+- [x] 12. Show upload progress in the compose area
   - Render upload progress indicators (progress bars) below the compose input for active uploads.
   - Show filenames and progress percentage per file.
   - Handle failed uploads with inline error message and retry affordance.
   - Handle upload cancellation via the `cancel_upload` method.
   - _Requirements: 4.1_
   - _writes: crates/collab_ui/src/channel_chat/compose_area.rs_
+  - _Completed: Rendered per-channel upload rows below the composer with filename, status text, progress bar, cancel, retry, and remove controls, and taught `UploadProgress` to retain the original file path for retry._
+  - _Actual writes: crates/collab_ui/src/channel_chat.rs; crates/collab_ui/src/channel_file_upload.rs_
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `rustfmt --edition 2024 crates/collab_ui/src/channel_chat.rs crates/collab_ui/src/channel_file_upload.rs`; `git diff --check`._
 
 ### Phase 5: Client — File Preview Rendering
 
