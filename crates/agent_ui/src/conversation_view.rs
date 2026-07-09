@@ -6102,6 +6102,7 @@ pub(crate) mod tests {
 
         fn prompt(
             &self,
+            _message_id: UserMessageId,
             _params: acp::PromptRequest,
             _cx: &mut App,
         ) -> Task<gpui::Result<acp::PromptResponse>> {
@@ -6122,7 +6123,7 @@ pub(crate) mod tests {
 
     impl AgentServer for SessionCreationRequestElicitationServer {
         fn logo(&self) -> ui::IconName {
-            ui::IconName::ZedAgent
+            ui::IconName::AiSim
         }
 
         fn agent_id(&self) -> AgentId {
@@ -6231,6 +6232,7 @@ pub(crate) mod tests {
 
         fn prompt(
             &self,
+            _message_id: UserMessageId,
             _params: acp::PromptRequest,
             _cx: &mut App,
         ) -> Task<gpui::Result<acp::PromptResponse>> {
@@ -6250,7 +6252,7 @@ pub(crate) mod tests {
 
     impl AgentServer for ReleaseRequestElicitationServer {
         fn logo(&self) -> ui::IconName {
-            ui::IconName::ZedAgent
+            ui::IconName::AiSim
         }
 
         fn agent_id(&self) -> AgentId {
@@ -6343,6 +6345,7 @@ pub(crate) mod tests {
 
         fn prompt(
             &self,
+            _message_id: UserMessageId,
             _params: acp::PromptRequest,
             _cx: &mut App,
         ) -> Task<gpui::Result<acp::PromptResponse>> {
