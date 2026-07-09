@@ -1,6 +1,9 @@
 use super::{assert_channel_tree_matches, channel_tree, new_test_user};
 use crate::test_both_dbs;
-use collab::db::{Channel, ChannelId, ChannelRole, Database, RoomId};
+use collab::db::{
+    Channel, ChannelId, ChannelRole, Database, MessageId, RoomId,
+    queries::channel_messages::NewChannelMessage,
+};
 use rpc::{
     ConnectionId,
     proto::{self, reorder_channel},
@@ -141,6 +144,195 @@ async fn test_joining_channels(db: &Arc<Database>) {
             .await
             .is_err()
     );
+}
+
+test_both_dbs!(
+    test_channel_thread_db_queries,
+    test_channel_thread_db_queries_postgres,
+    test_channel_thread_db_queries_sqlite
+);
+
+async fn test_channel_thread_db_queries(db: &Arc<Database>) {
+    let sender_id = new_test_user(db).await;
+    let reader_id = new_test_user(db).await;
+    let outsider_id = new_test_user(db).await;
+    let channel_id = db.create_root_channel("channel", sender_id).await.unwrap();
+    db.invite_channel_member(channel_id, reader_id, sender_id, ChannelRole::Member)
+        .await
+        .unwrap();
+    db.respond_to_channel_invite(channel_id, reader_id, true)
+        .await
+        .unwrap();
+
+    let root = create_test_channel_message(db, channel_id, sender_id, "root", 1, None).await;
+    let empty_thread = db
+        .get_channel_thread(
+            channel_id,
+            reader_id,
+            MessageId::from_proto(root.id),
+            None,
+            50,
+        )
+        .await
+        .unwrap();
+    assert_eq!(empty_thread.0.id, root.id);
+    assert!(empty_thread.1.is_empty());
+    assert!(empty_thread.2);
+    assert_eq!(
+        db.get_channel_message_reply_count(channel_id, reader_id, MessageId::from_proto(root.id))
+            .await
+            .unwrap(),
+        0
+    );
+    assert!(
+        db.get_channel_threads(channel_id, reader_id)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+
+    let reply_a =
+        create_test_channel_message(db, channel_id, sender_id, "reply a", 2, Some(root.id)).await;
+    let reply_b =
+        create_test_channel_message(db, channel_id, reader_id, "reply b", 3, Some(root.id)).await;
+
+    let thread = db
+        .get_channel_thread(
+            channel_id,
+            reader_id,
+            MessageId::from_proto(root.id),
+            None,
+            50,
+        )
+        .await
+        .unwrap();
+    assert_eq!(thread.0.id, root.id);
+    assert_eq!(
+        thread
+            .1
+            .iter()
+            .map(|reply| (reply.id, reply.body.as_str(), reply.reply_to_message_id))
+            .collect::<Vec<_>>(),
+        vec![
+            (reply_a.id, "reply a", Some(root.id)),
+            (reply_b.id, "reply b", Some(root.id)),
+        ]
+    );
+    assert!(thread.2);
+    assert_eq!(
+        db.get_channel_message_reply_count(channel_id, reader_id, MessageId::from_proto(root.id))
+            .await
+            .unwrap(),
+        2
+    );
+
+    let summaries = db.get_channel_threads(channel_id, reader_id).await.unwrap();
+    assert_eq!(summaries.len(), 1);
+    let summary = summaries.first().expect("missing thread summary");
+    assert_eq!(summary.root_message_id, root.id);
+    assert_eq!(summary.reply_count, 2);
+    assert_eq!(summary.latest_reply_at, reply_b.timestamp);
+    assert!(summary.has_unread);
+    let mut participant_user_ids = summary.participant_user_ids.clone();
+    participant_user_ids.sort_unstable();
+    let mut expected_participant_user_ids = vec![sender_id.to_proto(), reader_id.to_proto()];
+    expected_participant_user_ids.sort_unstable();
+    assert_eq!(participant_user_ids, expected_participant_user_ids);
+
+    let earlier_page = db
+        .get_channel_thread(
+            channel_id,
+            reader_id,
+            MessageId::from_proto(root.id),
+            Some(MessageId::from_proto(reply_b.id)),
+            50,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        earlier_page
+            .1
+            .iter()
+            .map(|reply| reply.id)
+            .collect::<Vec<_>>(),
+        vec![reply_a.id]
+    );
+    assert!(earlier_page.2);
+
+    db.acknowledge_channel_message(channel_id, reader_id, MessageId::from_proto(reply_b.id))
+        .await
+        .unwrap();
+    let summaries = db.get_channel_threads(channel_id, reader_id).await.unwrap();
+    assert!(
+        !summaries
+            .first()
+            .expect("missing thread summary")
+            .has_unread
+    );
+
+    assert!(
+        db.get_channel_thread(
+            channel_id,
+            reader_id,
+            MessageId::from_proto(root.id + 10_000),
+            None,
+            50,
+        )
+        .await
+        .is_err()
+    );
+    assert!(
+        db.get_channel_thread(
+            channel_id,
+            outsider_id,
+            MessageId::from_proto(root.id),
+            None,
+            50
+        )
+        .await
+        .is_err()
+    );
+    assert!(
+        db.get_channel_message_reply_count(
+            channel_id,
+            reader_id,
+            MessageId::from_proto(root.id + 10_000),
+        )
+        .await
+        .is_err()
+    );
+    assert!(
+        db.create_channel_message(NewChannelMessage {
+            channel_id,
+            sender_id,
+            body: "missing root".to_string(),
+            nonce: 4u128.into(),
+            mentions: Vec::new(),
+            reply_to_message_id: Some(MessageId::from_proto(root.id + 10_000)),
+        })
+        .await
+        .is_err()
+    );
+}
+
+async fn create_test_channel_message(
+    db: &Arc<Database>,
+    channel_id: ChannelId,
+    sender_id: collab::db::UserId,
+    body: &str,
+    nonce: u128,
+    reply_to_message_id: Option<u64>,
+) -> proto::ChannelMessage {
+    db.create_channel_message(NewChannelMessage {
+        channel_id,
+        sender_id,
+        body: body.to_string(),
+        nonce: nonce.into(),
+        mentions: Vec::new(),
+        reply_to_message_id: reply_to_message_id.map(MessageId::from_proto),
+    })
+    .await
+    .unwrap()
 }
 
 test_both_dbs!(
