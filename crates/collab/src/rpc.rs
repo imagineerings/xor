@@ -4,6 +4,7 @@ use crate::api::{CloudflareIpCountryHeader, SystemIdHeader};
 use crate::db::queries::channel_messages::{
     ChannelMessageUpdate, NewChannelMessage, SearchChannelMessagesParams,
 };
+use crate::db::bookmark_store::{BookmarkStore, BookmarkUpdate, NewBookmark};
 use crate::db::scheduled_message_store::{
     NewScheduledMessage, ScheduledMessageStore, ScheduledMessageUpdate,
 };
@@ -470,6 +471,10 @@ impl Server {
             .add_request_handler(cancel_scheduled_message)
             .add_request_handler(update_scheduled_message)
             .add_request_handler(get_scheduled_messages)
+            .add_request_handler(add_bookmark)
+            .add_request_handler(remove_bookmark)
+            .add_request_handler(update_bookmark)
+            .add_request_handler(reorder_bookmarks)
             .add_request_handler(remove_channel_message)
             .add_request_handler(update_channel_message)
             .add_request_handler(add_reaction)
@@ -3796,6 +3801,125 @@ async fn get_scheduled_messages(
     response.send(proto::GetScheduledMessagesResponse { messages })
 }
 
+async fn add_bookmark(
+    request: proto::AddBookmark,
+    response: Response<proto::AddBookmark>,
+    session: MessageContext,
+) -> Result<()> {
+    let channel_id = ChannelId::from_proto(request.channel_id);
+    ensure_can_edit_bookmarks(&session, channel_id).await?;
+    let bookmark_type = proto::BookmarkType::from_i32(request.r#type)
+        .context("invalid bookmark type")?;
+    let store = BookmarkStore::new(session.app_state.db.clone());
+    store
+        .create(NewBookmark {
+            channel_id,
+            label: request.label,
+            description: request.description,
+            bookmark_type,
+            url: request.url,
+            file_id: request.file_id,
+            message_id: request.message_id.map(MessageId::from_proto),
+            created_by: session.user_id(),
+        })
+        .await?;
+
+    let bookmarks = store.get_bookmarks(channel_id).await?;
+    response.send(proto::Ack {})?;
+    broadcast_channel_bookmarks_update(&session, channel_id, bookmarks, Vec::new()).await
+}
+
+async fn remove_bookmark(
+    request: proto::RemoveBookmark,
+    response: Response<proto::RemoveBookmark>,
+    session: MessageContext,
+) -> Result<()> {
+    let channel_id = ChannelId::from_proto(request.channel_id);
+    let bookmark_id = db::BookmarkId::from_proto(request.bookmark_id);
+    ensure_can_edit_bookmarks(&session, channel_id).await?;
+    let store = BookmarkStore::new(session.app_state.db.clone());
+    store.delete(channel_id, bookmark_id).await?;
+
+    let bookmarks = store.get_bookmarks(channel_id).await?;
+    response.send(proto::Ack {})?;
+    broadcast_channel_bookmarks_update(
+        &session,
+        channel_id,
+        bookmarks,
+        vec![bookmark_id],
+    )
+    .await
+}
+
+async fn update_bookmark(
+    request: proto::UpdateBookmark,
+    response: Response<proto::UpdateBookmark>,
+    session: MessageContext,
+) -> Result<()> {
+    let channel_id = ChannelId::from_proto(request.channel_id);
+    ensure_can_edit_bookmarks(&session, channel_id).await?;
+    let store = BookmarkStore::new(session.app_state.db.clone());
+    store
+        .update(BookmarkUpdate {
+            channel_id,
+            bookmark_id: db::BookmarkId::from_proto(request.bookmark_id),
+            label: request.label,
+            description: request.description,
+        })
+        .await?;
+
+    let bookmarks = store.get_bookmarks(channel_id).await?;
+    response.send(proto::Ack {})?;
+    broadcast_channel_bookmarks_update(&session, channel_id, bookmarks, Vec::new()).await
+}
+
+async fn reorder_bookmarks(
+    request: proto::ReorderBookmarks,
+    response: Response<proto::ReorderBookmarks>,
+    session: MessageContext,
+) -> Result<()> {
+    let channel_id = ChannelId::from_proto(request.channel_id);
+    ensure_can_edit_bookmarks(&session, channel_id).await?;
+    let store = BookmarkStore::new(session.app_state.db.clone());
+    store
+        .reorder(
+            channel_id,
+            request
+                .bookmark_ids
+                .into_iter()
+                .map(db::BookmarkId::from_proto)
+                .collect(),
+        )
+        .await?;
+
+    let bookmarks = store.get_bookmarks(channel_id).await?;
+    response.send(proto::Ack {})?;
+    broadcast_channel_bookmarks_update(&session, channel_id, bookmarks, Vec::new()).await
+}
+
+async fn ensure_can_edit_bookmarks(
+    session: &MessageContext,
+    channel_id: ChannelId,
+) -> Result<()> {
+    let db = session.app_state.db.clone();
+    let user_id = session.user_id();
+    db.transaction(|tx| {
+        let db = db.clone();
+
+        async move {
+            let channel = db.get_channel_internal(channel_id, &tx).await?;
+            let role = db.channel_role_for_user(&channel, user_id, &tx).await?;
+            match role {
+                Some(ChannelRole::Admin | ChannelRole::Member) => Ok(()),
+                Some(ChannelRole::Guest | ChannelRole::Talker | ChannelRole::Banned) | None => {
+                    Err(ErrorCode::Forbidden.anyhow())?
+                }
+            }
+        }
+    })
+    .await
+}
+
 /// Delete a channel message
 async fn remove_channel_message(
     request: proto::RemoveChannelMessage,
@@ -4380,6 +4504,38 @@ async fn broadcast_channel_message_reactions_update(
                 channel_id: channel_id.to_proto(),
                 message_id: message_id.to_proto(),
                 reactions: reactions.clone(),
+            },
+        )?;
+    }
+    Ok(())
+}
+
+async fn broadcast_channel_bookmarks_update(
+    session: &MessageContext,
+    channel_id: ChannelId,
+    bookmarks: Vec<db::bookmark_store::Bookmark>,
+    removed_bookmark_ids: Vec<db::BookmarkId>,
+) -> Result<()> {
+    let bookmarks = bookmarks
+        .into_iter()
+        .map(db::bookmark_store::Bookmark::to_proto)
+        .collect::<Vec<_>>();
+    let removed_bookmark_ids = removed_bookmark_ids
+        .into_iter()
+        .map(db::BookmarkId::to_proto)
+        .collect::<Vec<_>>();
+    let connection_ids = session
+        .db()
+        .await
+        .channel_chat_participant_connection_ids(channel_id)
+        .await?;
+    for connection_id in connection_ids {
+        session.peer.send(
+            connection_id,
+            proto::UpdateChannelBookmarks {
+                channel_id: channel_id.to_proto(),
+                bookmarks: bookmarks.clone(),
+                removed_bookmark_ids: removed_bookmark_ids.clone(),
             },
         )?;
     }

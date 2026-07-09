@@ -69,29 +69,33 @@ Add a channel bookmarks feature: a dedicated section in the channel header where
   - _Completed: Added `BookmarkStore`, `BookmarkId`, SeaORM `channel_bookmark` entity, SQLite test schema support, proto conversion, CRUD/list/reorder/delete-channel methods, and integration coverage for empty results, CRUD, repeated/concurrent reorder consistency, cross-channel reorder rejection, and channel cleanup._
   - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab --features collab/test-support`; exact SQLite bookmark store tests passed. Full `test_bookmark_store` both-DB run failed only because local Postgres refused connections._
 
-- [ ] 5. Implement server-side permission checks
+- [x] 5. Implement server-side permission checks
   - Add a helper that validates the requesting user has `Admin` or `Member` role in the target channel.
   - Wire the helper into each bookmark RPC handler before any store operation.
   - Guest role (and unauthenticated) requests receive `403 FORBIDDEN`.
   - _Requirements: 6.1 (AC 6)_
   - _writes: collab/src/rpc/bookmark_permissions.rs_
+  - _Completed: Added a bookmark edit permission helper in the collab RPC layer and wired it before every bookmark mutation handler; Guest/Talker/Banned/non-members receive structured `Forbidden` errors._
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p client -p collab --features collab/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab test_channel_bookmark_rpc_flow_and_permissions --features collab/test-support -- --nocapture`._
 
-- [ ] 6. Implement server RPC handlers
-  - [ ] 6.1 Handle `AddBookmark` — validate permissions, call `BookmarkStore.CreateBookmark`, broadcast `UpdateChannelBookmarks`.
+- [x] 6. Implement server RPC handlers
+  - [x] 6.1 Handle `AddBookmark` — validate permissions, call `BookmarkStore.CreateBookmark`, broadcast `UpdateChannelBookmarks`.
     - _Requirements: 6.1, 6.4_
     - _writes: collab/src/rpc/bookmark_rpc.rs_
-  - [ ] 6.2 Handle `RemoveBookmark` — validate permissions, call `BookmarkStore.DeleteBookmark`, broadcast `UpdateChannelBookmarks`.
+  - [x] 6.2 Handle `RemoveBookmark` — validate permissions, call `BookmarkStore.DeleteBookmark`, broadcast `UpdateChannelBookmarks`.
     - _Requirements: 6.1, 6.4_
     - _writes: collab/src/rpc/bookmark_rpc.rs_
-  - [ ] 6.3 Handle `UpdateBookmark` — validate permissions, call `BookmarkStore.UpdateBookmark`, broadcast `UpdateChannelBookmarks`.
+  - [x] 6.3 Handle `UpdateBookmark` — validate permissions, call `BookmarkStore.UpdateBookmark`, broadcast `UpdateChannelBookmarks`.
     - _Requirements: 6.1, 6.4_
     - _writes: collab/src/rpc/bookmark_rpc.rs_
-  - [ ] 6.4 Handle `ReorderBookmarks` — validate permissions, call `BookmarkStore.ReorderBookmarks`, broadcast `UpdateChannelBookmarks`.
+  - [x] 6.4 Handle `ReorderBookmarks` — validate permissions, call `BookmarkStore.ReorderBookmarks`, broadcast `UpdateChannelBookmarks`.
     - _Requirements: 6.3, 6.4_
     - _writes: collab/src/rpc/bookmark_rpc.rs_
-  - [ ] 6.5 Write integration tests: full RPC flow for create → read → update → delete → reorder, with permission denial verification.
+  - [x] 6.5 Write integration tests: full RPC flow for create → read → update → delete → reorder, with permission denial verification.
     - _Requirements: 6.1, 6.3_
     - _writes: collab/src/rpc/bookmark_rpc.rs_
+  - _Completed: Registered and implemented add/remove/update/reorder bookmark RPC handlers, added `UpdateChannelBookmarks` push dispatch to channel participants, added a client-side bookmark update handler hook, and covered the flow through integration tests using push state as the readback path._
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p client -p collab --features collab/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab test_channel_bookmark_rpc_flow_and_permissions --features collab/test-support -- --nocapture`._
 
 - [ ] 7. Implement `UpdateChannelBookmarks` broadcast
   - After any successful bookmark mutation, build the `UpdateChannelBookmarks` message with current bookmarks and (for deletes) removed IDs.

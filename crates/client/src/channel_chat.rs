@@ -412,6 +412,23 @@ impl Client {
     {
         self.add_message_handler(entity, handler)
     }
+
+    pub fn add_channel_bookmarks_update_handler<E, H, F>(
+        self: &Arc<Self>,
+        entity: WeakEntity<E>,
+        handler: H,
+    ) -> Subscription
+    where
+        E: 'static,
+        H: 'static
+            + Sync
+            + Fn(Entity<E>, TypedEnvelope<proto::UpdateChannelBookmarks>, AsyncApp) -> F
+            + Send
+            + Sync,
+        F: 'static + Future<Output = Result<()>>,
+    {
+        self.add_message_handler(entity, handler)
+    }
 }
 
 fn datetime_to_millis(timestamp: DateTime<Utc>) -> u64 {

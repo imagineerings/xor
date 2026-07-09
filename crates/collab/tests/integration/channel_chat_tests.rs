@@ -8,7 +8,9 @@ use client::{
 };
 use collab::{
     db::{
-        ScheduledMessageId as DbScheduledMessageId, scheduled_message_store::ScheduledMessageStore,
+        ChannelId as DbChannelId, ChannelRole as DbChannelRole,
+        ScheduledMessageId as DbScheduledMessageId, UserId as DbUserId,
+        scheduled_message_store::ScheduledMessageStore,
     },
     rpc::Server,
 };
@@ -22,6 +24,9 @@ struct ReactionHandlerEntity;
 
 #[derive(Default)]
 struct ScheduledMessageHandlerEntity;
+
+#[derive(Default)]
+struct BookmarkHandlerEntity;
 
 #[gpui::test]
 async fn test_channel_chat_core_flow(
@@ -103,6 +108,149 @@ async fn test_channel_chat_core_flow(
     assert_eq!(deleted.len(), 1);
     assert_eq!(deleted[0].body, "");
     assert!(deleted[0].mentions.is_empty());
+}
+
+#[gpui::test]
+async fn test_channel_bookmark_rpc_flow_and_permissions(
+    executor: BackgroundExecutor,
+    cx_a: &mut TestAppContext,
+    cx_b: &mut TestAppContext,
+    cx_c: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor.clone()).await;
+    let client_a = server.create_client(cx_a, "user_a").await;
+    let client_b = server.create_client(cx_b, "user_b").await;
+    let client_c = server.create_client(cx_c, "user_c").await;
+    let channel_id = server
+        .make_channel("chat", None, (&client_a, cx_a), &mut [(&client_b, cx_b)])
+        .await;
+    let db_channel_id = DbChannelId::from_proto(channel_id.0);
+    let guest_id = DbUserId::from_proto(client_c.user_id().unwrap());
+    let admin_id = DbUserId::from_proto(client_a.user_id().unwrap());
+    server
+        .app_state
+        .db
+        .invite_channel_member(db_channel_id, guest_id, admin_id, DbChannelRole::Guest)
+        .await
+        .unwrap();
+    server
+        .app_state
+        .db
+        .respond_to_channel_invite(db_channel_id, guest_id, true)
+        .await
+        .unwrap();
+
+    client_a.join_channel_chat(channel_id.0).await.unwrap();
+    client_b.join_channel_chat(channel_id.0).await.unwrap();
+
+    let handler_entity = cx_b.new(|_| BookmarkHandlerEntity);
+    let (bookmark_tx, bookmark_rx) = async_channel::bounded(8);
+    let _bookmark_subscription = client_b.add_channel_bookmarks_update_handler(
+        handler_entity.downgrade(),
+        move |_, update, _| {
+            bookmark_tx.try_send(update.payload).unwrap();
+            async { Ok(()) }
+        },
+    );
+
+    client_a
+        .client()
+        .request(proto::AddBookmark {
+            channel_id: channel_id.0,
+            label: "Deploy Guide".to_string(),
+            r#type: proto::BookmarkType::BookmarkLink as i32,
+            url: "https://sim.dev/deploy".to_string(),
+            file_id: None,
+            message_id: None,
+            description: Some("How to deploy".to_string()),
+        })
+        .await
+        .unwrap();
+    let update = bookmark_rx.recv().await.unwrap();
+    assert_eq!(update.channel_id, channel_id.0);
+    assert_eq!(update.bookmarks.len(), 1);
+    assert_eq!(update.bookmarks[0].label, "Deploy Guide");
+    assert_eq!(update.removed_bookmark_ids, Vec::<u64>::new());
+    let bookmark_id = update.bookmarks[0].id;
+
+    client_b
+        .client()
+        .request(proto::UpdateBookmark {
+            channel_id: channel_id.0,
+            bookmark_id,
+            label: "Deploy Guide v2".to_string(),
+            description: Some("Updated".to_string()),
+        })
+        .await
+        .unwrap();
+    let update = bookmark_rx.recv().await.unwrap();
+    assert_eq!(update.bookmarks[0].label, "Deploy Guide v2");
+
+    client_a
+        .client()
+        .request(proto::AddBookmark {
+            channel_id: channel_id.0,
+            label: "Runbook".to_string(),
+            r#type: proto::BookmarkType::BookmarkLink as i32,
+            url: "https://sim.dev/runbook".to_string(),
+            file_id: None,
+            message_id: None,
+            description: None,
+        })
+        .await
+        .unwrap();
+    let update = bookmark_rx.recv().await.unwrap();
+    assert_eq!(update.bookmarks.len(), 2);
+    let second_bookmark_id = update
+        .bookmarks
+        .iter()
+        .find(|bookmark| bookmark.label == "Runbook")
+        .unwrap()
+        .id;
+
+    client_a
+        .client()
+        .request(proto::ReorderBookmarks {
+            channel_id: channel_id.0,
+            bookmark_ids: vec![second_bookmark_id, bookmark_id],
+        })
+        .await
+        .unwrap();
+    let update = bookmark_rx.recv().await.unwrap();
+    assert_eq!(
+        update
+            .bookmarks
+            .iter()
+            .map(|bookmark| bookmark.id)
+            .collect::<Vec<_>>(),
+        vec![second_bookmark_id, bookmark_id]
+    );
+
+    let guest_result = client_c
+        .client()
+        .request(proto::AddBookmark {
+            channel_id: channel_id.0,
+            label: "Guest Link".to_string(),
+            r#type: proto::BookmarkType::BookmarkLink as i32,
+            url: "https://sim.dev/guest".to_string(),
+            file_id: None,
+            message_id: None,
+            description: None,
+        })
+        .await;
+    assert!(guest_result.is_err());
+
+    client_a
+        .client()
+        .request(proto::RemoveBookmark {
+            channel_id: channel_id.0,
+            bookmark_id,
+        })
+        .await
+        .unwrap();
+    let update = bookmark_rx.recv().await.unwrap();
+    assert_eq!(update.bookmarks.len(), 1);
+    assert_eq!(update.removed_bookmark_ids, vec![bookmark_id]);
 }
 
 #[gpui::test]
