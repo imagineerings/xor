@@ -14,17 +14,21 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
 
 ### Phase 1: Protocol & Data Layer
 
-- [ ] 1. Define protobuf messages and RPCs
+- [x] 1. Define protobuf messages and RPCs
   - Add `FileAttachment` message, `GetFileUploadUrl` / `GetFileUploadUrlResponse` messages, `ConfirmFileUpload` / `ConfirmFileUploadResponse` messages to the proto schema.
   - Add `repeated FileAttachment files` field to `ChannelMessage`.
   - Register new RPCs in the service definition.
   - _Requirements: 4.1_
   - _writes: proto/src/proto/ffi/channel_messages.proto_
+  - _Completed: Added `FileAttachment`, upload URL and confirm upload messages, `ChannelMessage.files`, envelope variants, and typed request mappings in the live Rust proto schema._
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p proto`; `CARGO_INCREMENTAL=0 cargo check -p client -p collab --features collab/test-support`._
 
-- [ ] 2. Generate Rust protobuf types and RPC stubs
+- [x] 2. Generate Rust protobuf types and RPC stubs
   - Run the proto code generator to produce Rust types for the new messages and RPC client/server traits.
   - _Requirements: 4.1_
   - _writes: crates/proto/src/proto.rs_ (generated)
+  - _Completed: Verified the repo's `prost` build generates the new file-sharing messages and typed RPC traits from `OUT_DIR` during the proto crate build._
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p proto`; `CARGO_INCREMENTAL=0 cargo check -p client -p collab --features collab/test-support`._
 
 - [ ] 3. Run database migration to create `channel_files` table
   - Write the SQL migration to create `channel_files` (UUID primary key, `channel_id`, `message_id`, `filename`, `file_size`, `mime_type`, `storage_path`, `uploader_id`, `image_width`, `image_height`, `duration_ms`, `created_at`, with foreign keys and indexes).

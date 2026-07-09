@@ -1013,6 +1013,7 @@ fn channel_message_to_proto(
         scheduled_at: row
             .scheduled_at
             .map(|scheduled_at| unix_timestamp_millis(scheduled_at)),
+        files: Vec::new(),
     })
 }
 
