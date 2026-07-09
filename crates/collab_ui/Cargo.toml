@@ -21,6 +21,7 @@ test-support = [
     "db/test-support",
     "editor/test-support",
     "gpui/test-support",
+    "markdown/test-support",
     "project/test-support",
     "settings/test-support",
     "util/test-support",

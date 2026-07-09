@@ -80,12 +80,12 @@ The work is ordered to build incrementally: first the rendering pipeline (Markdo
   - _writes: `collab_ui/src/channel_chat/formatting_toolbar.rs`_ (tests module)
   - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui formatting --features test-support`_
 
-- [ ] 9. Add unit tests for Markdown rendering in channel messages
-  - [ ] 9.1 Test `ChannelMessageBubble` rendering of each Markdown construct (bold, italic, code, blockquote, list, heading, link, image).
-  - [ ] 9.2 Test plain text passthrough — messages with no Markdown syntax produce identical output to current plain-text rendering.
-  - [ ] 9.3 Test malformed Markdown (unclosed `**`, stray `>`) renders without panic and with best-effort output.
-  - [ ] 9.4 Test protocol-URL sanitization (`javascript:`, `data:`, `file:`) — links are stripped or rendered as inert text.
-  - [ ] 9.5 Test max-length truncation: messages >10K chars are truncated before rendering.
+- [x] 9. Add unit tests for Markdown rendering in channel messages
+  - [x] 9.1 Test `ChannelMessageBubble` rendering of each Markdown construct (bold, italic, code, blockquote, list, heading, link, image).
+  - [x] 9.2 Test plain text passthrough — messages with no Markdown syntax produce identical output to current plain-text rendering.
+  - [x] 9.3 Test malformed Markdown (unclosed `**`, stray `>`) renders without panic and with best-effort output.
+  - [x] 9.4 Test protocol-URL sanitization (`javascript:`, `data:`, `file:`) — links are stripped or rendered as inert text.
+  - [x] 9.5 Test max-length truncation: messages >10K chars are truncated before rendering.
   - _Requirements: 1.1, 1.4, 1.5_
   - _writes: `collab_ui/src/channel_chat/message_bubble.rs`_ (tests), `collab_ui/src/channel_chat/sanitize.rs`_ (tests)
 
