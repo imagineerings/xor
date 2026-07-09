@@ -16,6 +16,7 @@ pub struct NewChannelMessage {
     pub nonce: proto::Nonce,
     pub mentions: Vec<proto::ChatMention>,
     pub reply_to_message_id: Option<MessageId>,
+    pub scheduled_at: Option<PrimitiveDateTime>,
 }
 
 pub struct ChannelMessageUpdate {
@@ -157,7 +158,7 @@ impl Database {
                     created_at: ActiveValue::NotSet,
                     edited_at: ActiveValue::Set(None),
                     deleted_at: ActiveValue::Set(None),
-                    scheduled_at: ActiveValue::Set(None),
+                    scheduled_at: ActiveValue::Set(message.scheduled_at),
                 }
                 .insert(&*tx)
                 .await?;

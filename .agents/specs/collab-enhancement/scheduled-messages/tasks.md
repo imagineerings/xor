@@ -55,19 +55,21 @@ Add the ability for channel participants to schedule messages for future deliver
     - _Completed: Registered inline RPC handlers for schedule/cancel/update/list, converted scheduled timestamps from Unix milliseconds, delegated validation and ownership checks to `ScheduledMessageStore`, and returned proto responses._
     - _Validation: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `git diff --check`._
 
-- [ ] 5. Implement the `SchedulerLoop` background task
+- [x] 5. Implement the `SchedulerLoop` background task
     - In `Server::start()`, spawn a detached task that runs every 10 seconds.
     - On tick: call `store.pop_due()`, then for each due message execute `deliver_scheduled_message`.
     - Delivery function:
-        - [ ] 5.1 Re-validate sender's channel membership and `can_send_message` permission. If either fails, mark as failed and push `ScheduledMessageFailed` to the sender.
-        - [ ] 5.2 Insert the message as a regular `channel_messages` row via the existing `insert_channel_message` DB function.
-        - [ ] 5.3 Build a `ChannelMessage` proto with the `scheduled_at` field populated.
-        - [ ] 5.4 Broadcast `ChannelMessageSent` to all connected channel members.
-        - [ ] 5.5 Send `ScheduledMessageSent` push specifically to the sender's connection(s).
-        - [ ] 5.6 Call `store.delete_delivered()` on success.
+        - [x] 5.1 Re-validate sender's channel membership and `can_send_message` permission. If either fails, mark as failed and push `ScheduledMessageFailed` to the sender.
+        - [x] 5.2 Insert the message as a regular `channel_messages` row via the existing `insert_channel_message` DB function.
+        - [x] 5.3 Build a `ChannelMessage` proto with the `scheduled_at` field populated.
+        - [x] 5.4 Broadcast `ChannelMessageSent` to all connected channel members.
+        - [x] 5.5 Send `ScheduledMessageSent` push specifically to the sender's connection(s).
+        - [x] 5.6 Call `store.delete_delivered()` on success.
     - On start-up, call `store.reset_stale_processing()` to recover from any crash mid-delivery.
     - _Requirements: 11.1.4, 11.2.4, 11.3.2_
     - _writes: collab/src/scheduler_loop.rs_ (new file)
+    - _Completed: Added the scheduler loop inline with server startup, reset stale processing rows on start, popped due messages every 10 seconds, delivered via existing channel-message insertion with `scheduled_at`, broadcast channel sends, notified senders of success/failure, and deleted delivered rows._
+    - _Validation: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `git diff --check`._
 
 - [ ] 6. Add client-side Rust data models
     - Define `ScheduledMessageId(u64)` newtype with proto conversion helpers.

@@ -89,6 +89,8 @@ pub const CLEANUP_TIMEOUT: Duration = Duration::from_secs(15);
 
 const NOTIFICATION_COUNT_PER_PAGE: usize = 50;
 const MAX_CONCURRENT_CONNECTIONS: usize = 512;
+const SCHEDULED_MESSAGE_POLL_INTERVAL: Duration = Duration::from_secs(10);
+const SCHEDULED_MESSAGE_STALE_PROCESSING_GRACE: Duration = Duration::from_secs(60);
 
 static CONCURRENT_CONNECTIONS: AtomicUsize = AtomicUsize::new(0);
 
@@ -543,8 +545,15 @@ impl Server {
         let timeout = self.app_state.executor.sleep(CLEANUP_TIMEOUT);
         let pool = self.connection_pool.clone();
         let livekit_client = self.app_state.livekit_client.clone();
+        let scheduled_app_state = self.app_state.clone();
+        let scheduled_peer = self.peer.clone();
+        let scheduled_pool = self.connection_pool.clone();
 
         let span = info_span!("start server");
+        self.app_state.executor.spawn_detached(
+            run_scheduled_message_loop(scheduled_app_state, scheduled_peer, scheduled_pool)
+                .instrument(span.clone()),
+        );
         self.app_state.executor.spawn_detached(
             async move {
                 tracing::info!("waiting for cleanup timeout");
@@ -3691,6 +3700,7 @@ async fn send_channel_message(
             nonce: request.nonce.context("missing channel message nonce")?,
             mentions: request.mentions,
             reply_to_message_id: request.reply_to_message_id.map(MessageId::from_proto),
+            scheduled_at: None,
         })
         .await?;
 
@@ -4136,6 +4146,143 @@ async fn get_threads(
     response.send(proto::GetThreadsResponse { threads })
 }
 
+async fn run_scheduled_message_loop(
+    app_state: Arc<AppState>,
+    peer: Arc<Peer>,
+    connection_pool: Arc<parking_lot::Mutex<ConnectionPool>>,
+) {
+    let store = ScheduledMessageStore::new(app_state.db.clone());
+    store
+        .reset_stale_processing(stale_scheduled_message_processing_cutoff())
+        .await
+        .trace_err();
+
+    loop {
+        app_state
+            .executor
+            .sleep(SCHEDULED_MESSAGE_POLL_INTERVAL)
+            .await;
+        deliver_due_scheduled_messages(&app_state, &peer, &connection_pool)
+            .await
+            .trace_err();
+    }
+}
+
+async fn deliver_due_scheduled_messages(
+    app_state: &AppState,
+    peer: &Peer,
+    connection_pool: &parking_lot::Mutex<ConnectionPool>,
+) -> Result<()> {
+    let store = ScheduledMessageStore::new(app_state.db.clone());
+    let messages = store.pop_due().await?;
+
+    for scheduled in messages {
+        let scheduled_message_id = scheduled.id;
+        let channel_id = scheduled.channel_id;
+        let sender_id = scheduled.sender_id;
+        let scheduled_at = scheduled.scheduled_at;
+        let message = app_state
+            .db
+            .create_channel_message(NewChannelMessage {
+                channel_id,
+                sender_id,
+                body: scheduled.body,
+                nonce: scheduled.nonce,
+                mentions: scheduled.mentions,
+                reply_to_message_id: None,
+                scheduled_at: Some(scheduled_at),
+            })
+            .await;
+
+        match message {
+            Ok(message) => {
+                broadcast_channel_message_sent_to_channel(
+                    &app_state.db,
+                    peer,
+                    channel_id,
+                    message.clone(),
+                )
+                .await
+                .trace_err();
+                notify_scheduled_message_sent(
+                    connection_pool,
+                    peer,
+                    sender_id,
+                    channel_id,
+                    message,
+                );
+                store
+                    .delete_delivered(scheduled_message_id)
+                    .await
+                    .trace_err();
+            }
+            Err(error) => {
+                let reason = error.to_string();
+                store
+                    .mark_failed(scheduled_message_id, reason.clone())
+                    .await
+                    .trace_err();
+                notify_scheduled_message_failed(
+                    connection_pool,
+                    peer,
+                    sender_id,
+                    scheduled_message_id,
+                    channel_id,
+                    reason,
+                );
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn notify_scheduled_message_sent(
+    connection_pool: &parking_lot::Mutex<ConnectionPool>,
+    peer: &Peer,
+    sender_id: UserId,
+    channel_id: ChannelId,
+    message: proto::ChannelMessage,
+) {
+    for connection_id in connection_pool.lock().user_connection_ids(sender_id) {
+        peer.send(
+            connection_id,
+            proto::ScheduledMessageSent {
+                channel_id: channel_id.to_proto(),
+                message: Some(message.clone()),
+            },
+        )
+        .trace_err();
+    }
+}
+
+fn notify_scheduled_message_failed(
+    connection_pool: &parking_lot::Mutex<ConnectionPool>,
+    peer: &Peer,
+    sender_id: UserId,
+    scheduled_message_id: db::ScheduledMessageId,
+    channel_id: ChannelId,
+    reason: String,
+) {
+    for connection_id in connection_pool.lock().user_connection_ids(sender_id) {
+        peer.send(
+            connection_id,
+            proto::ScheduledMessageFailed {
+                scheduled_message_id: scheduled_message_id.to_proto(),
+                channel_id: channel_id.to_proto(),
+                reason: reason.clone(),
+            },
+        )
+        .trace_err();
+    }
+}
+
+fn stale_scheduled_message_processing_cutoff() -> PrimitiveDateTime {
+    let now = time::OffsetDateTime::now_utc()
+        - time::Duration::seconds(SCHEDULED_MESSAGE_STALE_PROCESSING_GRACE.as_secs() as i64);
+    PrimitiveDateTime::new(now.date(), now.time())
+}
+
 fn timestamp_to_primitive_datetime(timestamp: u64) -> Result<PrimitiveDateTime> {
     let timestamp = timestamp
         .try_into()
@@ -4159,13 +4306,21 @@ async fn broadcast_channel_message_sent(
     channel_id: ChannelId,
     message: proto::ChannelMessage,
 ) -> Result<()> {
-    let connection_ids = session
-        .db()
-        .await
+    let db = session.db().await;
+    broadcast_channel_message_sent_to_channel(&db, &session.peer, channel_id, message).await
+}
+
+async fn broadcast_channel_message_sent_to_channel(
+    db: &Database,
+    peer: &Peer,
+    channel_id: ChannelId,
+    message: proto::ChannelMessage,
+) -> Result<()> {
+    let connection_ids = db
         .channel_chat_participant_connection_ids(channel_id)
         .await?;
     for connection_id in connection_ids {
-        session.peer.send(
+        peer.send(
             connection_id,
             proto::ChannelMessageSent {
                 channel_id: channel_id.to_proto(),
