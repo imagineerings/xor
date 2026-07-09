@@ -2,7 +2,7 @@
 
 ## Overview
 
-Keep Godot networking as W7 boundary metadata and optional debug integration. Runtime networking remains excluded unless routed through explicit external task/debug integration that directly supports the target product.
+Keep Godot-origin networking as native Sim boundary metadata and optional debug metadata. Runtime networking remains excluded unless represented by native Sim task/debug metadata that directly supports the target generative game engine.
 
 ## Gates
 
@@ -17,7 +17,7 @@ Keep Godot networking as W7 boundary metadata and optional debug integration. Ru
 
 ## Tasks
 
-- [ ] 1. Add networking boundary and debug metadata support
-  - Encode non-migration decisions and model optional debug metadata for task/debug workflows.
-  - _Requirements: 1.1, 2.1_
+- [x] 1. Add networking boundary and debug metadata support
+  - Encode non-migration decisions and model optional native Sim debug metadata for task/debug workflows.
+  - _Requirements: 1.1, 1.2, 2.1_
   - _writes: crates/sim_game/src/networking.rs, crates/sim_game/src/debug_metadata.rs, crates/sim_game/src/networking_tests.rs_

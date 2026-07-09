@@ -1,4 +1,5 @@
 pub mod boundary;
+pub mod debug_metadata;
 pub mod dependency_review;
 pub mod diagnostics;
 pub mod docs_ingestion;
@@ -14,6 +15,7 @@ pub mod inventory;
 pub mod language;
 pub mod media;
 pub mod migration;
+pub mod networking;
 pub mod parser;
 pub mod project;
 pub mod resource_index;
@@ -46,6 +48,8 @@ mod language_tests;
 #[cfg(test)]
 mod media_tests;
 #[cfg(test)]
+mod networking_tests;
+#[cfg(test)]
 mod parser_tests;
 #[cfg(test)]
 mod project_tests;
@@ -59,6 +63,7 @@ mod spec_gatekeeper_tests;
 mod tests;
 
 pub use boundary::{DefaultBoundaryPolicy, RuntimeBoundaryPolicy};
+pub use debug_metadata::{SimGameDebugEndpoint, SimGameDebugMetadata, SimGameDebugProtocol};
 pub use dependency_review::{
     DependencyReviewGate, SimGameDependencyKind, SimGameDependencyProposal,
     SimGameDependencyReviewDecision, SimGameDependencyReviewDiagnostic,
@@ -112,6 +117,10 @@ pub use media::{SimGameMediaClassification, SimGameMediaClassifier, SimGameMedia
 pub use migration::{
     RuntimeBoundaryDecision, SimGameFeatureArea, SimGameMetadata, SimGameProjectDescriptor,
     SimGameProjectFormat, SimGameSourceReference,
+};
+pub use networking::{
+    SimGameNetworkBoundary, SimGameNetworkBoundaryDecision, SimGameNetworkFeature,
+    SimGameNetworkFeatureKind,
 };
 pub use parser::{
     LineIndexer, ParseResult, ParseStatus, ParserContext, RecoverableError, line_at,

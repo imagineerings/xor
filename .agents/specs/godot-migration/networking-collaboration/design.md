@@ -2,7 +2,7 @@
 
 ## Architecture
 
-Keep Sim collaboration, RPC, and debugger infrastructure authoritative. Add optional Godot debug metadata and task fallback models only.
+Keep Sim collaboration, RPC, and debugger infrastructure authoritative. Add native Sim network boundary records and optional native Sim debug metadata only. Godot multiplayer, ENet, UPNP, and packet-peer semantics are source concepts, not protocol adapters.
 
 ## Components
 
@@ -15,4 +15,10 @@ Keep Sim collaboration, RPC, and debugger infrastructure authoritative. Add opti
 
 _For any_ Godot multiplayer, ENet, UPNP, or packet-peer feature, Sim SHALL classify it as excluded unless represented as external debug metadata.
 
-**Validates: Requirement 1.1**
+**Validates: Requirement 1.1, 1.2**
+
+### Property 2: Native Debug Metadata
+
+_For any_ debug endpoint metadata, Sim SHALL preserve endpoint records for task/debug workflows without embedding game-network runtime protocols.
+
+**Validates: Requirement 2.1**
