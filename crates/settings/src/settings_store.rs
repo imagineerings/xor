@@ -13,7 +13,7 @@ use gpui::{
 use paths::{local_settings_file_relative_path, task_file_name};
 use schemars::{JsonSchema, json_schema};
 use serde_json::Value;
-use settings_content::{ActionName, ParseStatus};
+use settings_content::{CommandAliasTarget, ParseStatus};
 use std::{
     any::{Any, TypeId, type_name},
     fmt::Debug,
@@ -938,11 +938,10 @@ impl SettingsStore {
         }
         self.last_user_settings_content = Some(user_settings_content.to_string());
 
-        let (settings, parse_result) = self
-            .parse_and_migrate_sim_settings::<UserSettingsContent>(
-                user_settings_content,
-                SettingsFile::User,
-            );
+        let (settings, parse_result) = self.parse_and_migrate_sim_settings::<UserSettingsContent>(
+            user_settings_content,
+            SettingsFile::User,
+        );
 
         if let Some(settings) = settings {
             self.user_settings = Some(settings);
@@ -1288,9 +1287,9 @@ impl SettingsStore {
         }
 
         if !params.action_names.is_empty() {
-            replace_subschema::<ActionName>(&mut generator, || {
-                ActionName::build_schema(
-                    params.action_names.iter().copied(),
+            replace_subschema::<CommandAliasTarget>(&mut generator, || {
+                CommandAliasTarget::build_schema(
+                    params.action_names,
                     params.action_documentation,
                     params.deprecations,
                     params.deprecation_messages,
