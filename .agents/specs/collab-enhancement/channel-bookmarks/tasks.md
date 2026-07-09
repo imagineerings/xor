@@ -200,13 +200,15 @@ Add a channel bookmarks feature: a dedicated section in the channel header where
     - _Requirements: 6.4 (AC 4)_
     - _writes: collab_ui/src/channel_message.rs_
 
-- [ ] 14. Load bookmarks on channel open
-  - [ ] 14.1 When a channel is opened, fetch existing bookmarks via `GetBookmarks` (or via the initial channel state payload).
+- [x] 14. Load bookmarks on channel open
+  - [x] 14.1 When a channel is opened, fetch existing bookmarks via `GetBookmarks` (or via the initial channel state payload).
     - _Requirements: 6.2 (AC 5)_
     - _writes: client/src/rpc.rs_
-  - [ ] 14.2 Populate `ChannelBookmarkStore` with the loaded bookmarks; `BookmarkBar` renders them on next frame.
+  - [x] 14.2 Populate `ChannelBookmarkStore` with the loaded bookmarks; `BookmarkBar` renders them on next frame.
     - _Requirements: 6.2_
     - _writes: collab_ui/src/channel_bookmark_store.rs_
+  - _Completed: Added a `GetBookmarks` RPC, server read handler with channel-view permission checks, typed client helper, and channel-chat startup load into `ChannelBookmarkStore` so persisted bookmarks render on open._
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab -p collab_ui --features collab/test-support,collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab test_channel_bookmark_rpc_flow_and_permissions --features collab/test-support -- --nocapture`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_store --features collab_ui/test-support`._
 
 - [ ] 15. Add end-to-end tests
   - [ ] 15.1 Full lifecycle test: create bookmark → verify it renders in another client → delete → verify removal in real-time.

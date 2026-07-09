@@ -358,6 +358,14 @@ message ReorderBookmarks {
   repeated uint64 bookmark_ids = 2;
 }
 
+message GetBookmarks {
+  uint64 channel_id = 1;
+}
+
+message GetBookmarksResponse {
+  repeated Bookmark bookmarks = 1;
+}
+
 message UpdateChannelBookmarks {
   uint64 channel_id = 1;
   repeated Bookmark bookmarks = 2;

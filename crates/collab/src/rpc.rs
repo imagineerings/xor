@@ -472,6 +472,7 @@ impl Server {
             .add_request_handler(cancel_scheduled_message)
             .add_request_handler(update_scheduled_message)
             .add_request_handler(get_scheduled_messages)
+            .add_request_handler(get_bookmarks)
             .add_request_handler(add_bookmark)
             .add_request_handler(remove_bookmark)
             .add_request_handler(update_bookmark)
@@ -3802,6 +3803,23 @@ async fn get_scheduled_messages(
     response.send(proto::GetScheduledMessagesResponse { messages })
 }
 
+async fn get_bookmarks(
+    request: proto::GetBookmarks,
+    response: Response<proto::GetBookmarks>,
+    session: MessageContext,
+) -> Result<()> {
+    let channel_id = ChannelId::from_proto(request.channel_id);
+    ensure_can_read_bookmarks(&session, channel_id).await?;
+    let store = BookmarkStore::new(session.app_state.db.clone());
+    let bookmarks = store
+        .get_bookmarks(channel_id)
+        .await?
+        .into_iter()
+        .map(db::bookmark_store::Bookmark::to_proto)
+        .collect();
+    response.send(proto::GetBookmarksResponse { bookmarks })
+}
+
 async fn add_bookmark(
     request: proto::AddBookmark,
     response: Response<proto::AddBookmark>,
@@ -3915,6 +3933,32 @@ async fn ensure_can_edit_bookmarks(
                 Some(ChannelRole::Guest | ChannelRole::Talker | ChannelRole::Banned) | None => {
                     Err(ErrorCode::Forbidden.anyhow())?
                 }
+            }
+        }
+    })
+    .await
+}
+
+async fn ensure_can_read_bookmarks(
+    session: &MessageContext,
+    channel_id: ChannelId,
+) -> Result<()> {
+    let db = session.app_state.db.clone();
+    let user_id = session.user_id();
+    db.transaction(|tx| {
+        let db = db.clone();
+
+        async move {
+            let channel = db.get_channel_internal(channel_id, &tx).await?;
+            let role = db.channel_role_for_user(&channel, user_id, &tx).await?;
+            match role {
+                Some(
+                    ChannelRole::Admin
+                    | ChannelRole::Member
+                    | ChannelRole::Guest
+                    | ChannelRole::Talker,
+                ) => Ok(()),
+                Some(ChannelRole::Banned) | None => Err(ErrorCode::Forbidden.anyhow())?,
             }
         }
     })

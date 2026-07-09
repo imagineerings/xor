@@ -1,5 +1,5 @@
 use crate::{
-    AddBookmark, BookmarkId, ChannelId, Client, Subscription, UpdateBookmark,
+    AddBookmark, Bookmark, BookmarkId, ChannelId, Client, Subscription, UpdateBookmark,
     scheduled_message::{ScheduledMessage, ScheduledMessageId},
 };
 use anyhow::{Context as _, Result};
@@ -181,6 +181,19 @@ impl Client {
             .messages
             .into_iter()
             .map(ScheduledMessage::try_from)
+            .collect()
+    }
+
+    pub async fn get_bookmarks(&self, channel_id: ChannelId) -> Result<Vec<Bookmark>> {
+        let response = self
+            .request(proto::GetBookmarks {
+                channel_id: channel_id.0,
+            })
+            .await?;
+        response
+            .bookmarks
+            .into_iter()
+            .map(Bookmark::try_from)
             .collect()
     }
 

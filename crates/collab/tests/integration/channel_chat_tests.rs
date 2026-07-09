@@ -124,6 +124,13 @@ async fn test_channel_bookmark_rpc_flow_and_permissions(
     let channel_id = server
         .make_channel("chat", None, (&client_a, cx_a), &mut [(&client_b, cx_b)])
         .await;
+    client_a
+        .channel_store()
+        .update(cx_a, |channel_store, cx| {
+            channel_store.set_channel_visibility(channel_id, proto::ChannelVisibility::Public, cx)
+        })
+        .await
+        .unwrap();
     let db_channel_id = DbChannelId::from_proto(channel_id.0);
     let guest_id = DbUserId::from_proto(client_c.user_id().unwrap());
     let admin_id = DbUserId::from_proto(client_a.user_id().unwrap());
@@ -238,6 +245,22 @@ async fn test_channel_bookmark_rpc_flow_and_permissions(
         vec![bookmark_id, second_bookmark_id]
     );
     assert!(bookmark_rx.try_recv().is_err());
+    let fetched_bookmarks = client_b
+        .get_bookmarks(client::ChannelId(channel_id.0))
+        .await
+        .unwrap();
+    assert_eq!(
+        fetched_bookmarks
+            .iter()
+            .map(|bookmark| bookmark.id.to_proto())
+            .collect::<Vec<_>>(),
+        vec![bookmark_id, second_bookmark_id]
+    );
+    let guest_bookmarks = client_c
+        .get_bookmarks(client::ChannelId(channel_id.0))
+        .await
+        .unwrap();
+    assert_eq!(guest_bookmarks.len(), 2);
 
     let guest_result = client_c
         .client()

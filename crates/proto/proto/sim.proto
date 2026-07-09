@@ -514,7 +514,9 @@ message Envelope {
     RemoveBookmark remove_bookmark = 479;
     UpdateBookmark update_bookmark = 480;
     ReorderBookmarks reorder_bookmarks = 481;
-    UpdateChannelBookmarks update_channel_bookmarks = 482; // current max
+    UpdateChannelBookmarks update_channel_bookmarks = 482;
+    GetBookmarks get_bookmarks = 483;
+    GetBookmarksResponse get_bookmarks_response = 484; // current max
   }
 
   reserved 87 to 88;

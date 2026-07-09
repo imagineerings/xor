@@ -617,6 +617,19 @@ impl ChannelChat {
             }
         });
         load_scheduled_count.detach_and_log_err(cx);
+        let load_bookmarks = cx.spawn({
+            let client = client.clone();
+            let channel_id = channel_id;
+            let bookmark_store = bookmark_store.clone();
+            async move |_, cx| {
+                let bookmarks = client.get_bookmarks(channel_id).await?;
+                bookmark_store.update(cx, |bookmark_store, cx| {
+                    bookmark_store.set_bookmarks(channel_id, bookmarks, cx);
+                });
+                anyhow::Ok(())
+            }
+        });
+        load_bookmarks.detach_and_log_err(cx);
         let recent_emoji_names = Self::load_recent_emoji_names(cx);
 
         Self {
