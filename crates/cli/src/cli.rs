@@ -18,13 +18,14 @@ pub struct IpcHandshake {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum OpenBehavior {
-    /// Consult the user's `cli_default_open_behavior` setting to choose between
-    /// `ExistingWindow` or `Classic`.
+    /// Consult the user's `cli_default_open_behavior` setting.
     #[default]
     Default,
     /// Always create a new window. No matching against existing worktrees.
     /// Corresponds to `sim -n`.
     AlwaysNew,
+    /// Create a new window unless opening a subpath of an existing project.
+    PreferNewWindow,
     /// Match broadly including subdirectories, and fall back to any existing
     /// window if no worktree matched. Corresponds to `sim -a`.
     Add,
@@ -49,9 +50,7 @@ pub enum OpenBehavior {
 pub enum CliBehaviorSetting {
     /// Open directories as a new workspace in the current Sim window's sidebar.
     ExistingWindow,
-    /// Classic behavior: open directories in a new window, but reuse an
-    /// existing window when opening files that are already part of an open
-    /// project.
+    /// Open paths in a new window unless they are subpaths of an existing project.
     NewWindow,
 }
 
