@@ -18,7 +18,8 @@ Add shared documentation, fixture attribution, and dependency review helpers bef
 
 ## Tasks
 
-- [ ] 1. Add docs, fixture attribution, and dependency review helpers
-  - Implement docs metadata ingestion, fixture attribution validation, and dependency review records.
-  - _Requirements: 1.1, 2.1, 2.2, 3.1_
+- [x] 1. Add docs, fixture attribution, and dependency review helpers
+  - Implement native Sim docs metadata ingestion, fixture attribution validation, and dependency review records.
+  - Recreate Comfy-era generated fixture attribution as native Sim generated asset metadata, not as a thin compatibility label or pass-through.
+  - _Requirements: 1.1, 2.1, 2.2, 2.3, 3.1, 3.2_
   - _writes: crates/sim_game/src/docs_ingestion.rs, crates/sim_game/src/fixtures.rs, crates/sim_game/src/dependency_review.rs_

@@ -1,5 +1,7 @@
 pub mod boundary;
+pub mod dependency_review;
 pub mod diagnostics;
+pub mod docs_ingestion;
 pub mod fixtures;
 pub mod formats;
 pub mod generated_assets;
@@ -13,6 +15,10 @@ pub mod spec_gatekeeper;
 
 #[cfg(test)]
 mod boundary_tests;
+#[cfg(test)]
+mod dependency_review_tests;
+#[cfg(test)]
+mod docs_ingestion_tests;
 #[cfg(test)]
 mod fixtures_tests;
 #[cfg(test)]
@@ -37,10 +43,22 @@ mod spec_gatekeeper_tests;
 mod tests;
 
 pub use boundary::{DefaultBoundaryPolicy, RuntimeBoundaryPolicy};
+pub use dependency_review::{
+    DependencyReviewGate, SimGameDependencyKind, SimGameDependencyProposal,
+    SimGameDependencyReviewDecision, SimGameDependencyReviewDiagnostic,
+    SimGameDependencyReviewRecord, SimGameDependencyReviewReport, SimGameDependencyReviewStatus,
+};
 pub use diagnostics::{
     DiagnosticCollection, DiagnosticSeverity, SourceDiagnostic, SourcePosition, SourceRange,
 };
-pub use fixtures::{FixtureAttribution, FixtureLicense, FixtureManifest, FixtureSource};
+pub use docs_ingestion::{
+    SimGameDocsIngestion, SimGameDocsIngestionDiagnostic, SimGameDocsIngestionReport,
+    SimGameDocsRecord, SimGameDocsSource,
+};
+pub use fixtures::{
+    FixtureAttribution, FixtureAttributionDiagnostic, FixtureAttributionReport,
+    FixtureAttributionValidator, FixtureLicense, FixtureManifest, FixtureSource,
+};
 pub use formats::{
     SimGameFormatClassification, SimGameFormatClassifier, SimGameFormatDiagnostic,
     SimGameFormatKind, SimGameResourceReference, SimGameTextResourceParse,

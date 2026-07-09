@@ -32,9 +32,9 @@ fn original_source_description() {
 }
 
 #[test]
-fn comfy_export_with_node() {
-    let source = FixtureSource::ComfyExport {
-        workflow_name: "upscale".into(),
+fn sim_generated_asset_with_node() {
+    let source = FixtureSource::SimGeneratedAsset {
+        generation_name: "upscale".into(),
         node_id: Some("KSampler_12".into()),
     };
     let desc = source.description();
@@ -43,9 +43,9 @@ fn comfy_export_with_node() {
 }
 
 #[test]
-fn comfy_export_without_node() {
-    let source = FixtureSource::ComfyExport {
-        workflow_name: "texture-gen".into(),
+fn sim_generated_asset_without_node() {
+    let source = FixtureSource::SimGeneratedAsset {
+        generation_name: "texture-gen".into(),
         node_id: None,
     };
     let desc = source.description();
@@ -190,8 +190,33 @@ fn manifest_validate_accepts_good_fixtures() {
         FixtureSource::Original,
         FixtureLicense::Spdx("MIT".into()),
     ));
-    let errors = manifest.validate();
-    assert!(errors.is_empty());
+    let report = manifest.validate();
+    assert!(report.is_valid());
+}
+
+#[test]
+fn manifest_validate_reports_missing_required_attribution() {
+    let mut manifest = FixtureManifest::new();
+    manifest.push(FixtureAttribution::new(
+        "",
+        FixtureSource::SimGeneratedAsset {
+            generation_name: String::new(),
+            node_id: None,
+        },
+        FixtureLicense::Unlicensed { author: None },
+    ));
+
+    let report = manifest.validate();
+    let fields = report
+        .diagnostics
+        .iter()
+        .map(|diagnostic| diagnostic.field)
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        fields,
+        vec!["fixture_path", "source.generation_name", "license.author"]
+    );
 }
 
 #[test]
