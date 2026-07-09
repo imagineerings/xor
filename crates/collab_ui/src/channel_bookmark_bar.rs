@@ -1,14 +1,17 @@
 use client::Bookmark;
 use gpui::{App, IntoElement, ParentElement as _, RenderOnce, SharedString, Window, div};
 use rpc::proto;
+use std::rc::Rc;
 use ui::{Button, ButtonSize, ButtonStyle, Color, Icon, IconName, Label, Tooltip, prelude::*};
 
 const COLLAPSED_BOOKMARK_LIMIT: usize = 5;
+type DeleteBookmarkHandler = Rc<dyn Fn(Bookmark, &mut Window, &mut App)>;
 
 #[derive(IntoElement)]
 pub struct ChannelBookmarkBar {
     bookmarks: Vec<Bookmark>,
     expanded: bool,
+    on_delete: Option<DeleteBookmarkHandler>,
 }
 
 impl ChannelBookmarkBar {
@@ -16,7 +19,16 @@ impl ChannelBookmarkBar {
         Self {
             bookmarks,
             expanded,
+            on_delete: None,
         }
+    }
+
+    pub fn on_delete(
+        mut self,
+        on_delete: impl Fn(Bookmark, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_delete = Some(Rc::new(on_delete));
+        self
     }
 
     pub fn has_overflow(&self) -> bool {
@@ -34,65 +46,81 @@ impl RenderOnce for ChannelBookmarkBar {
         };
         let hidden_count = count.saturating_sub(visible_count);
 
-        div()
-            .when(count > 0, |this| {
-                this.border_b_1()
-                    .border_color(cx.theme().colors().border)
-                    .px_3()
-                    .py_2()
-                    .child(
-                        h_flex()
-                            .gap_2()
-                            .items_center()
-                            .child(
-                                Label::new(format!("Bookmarks ({count})"))
+        div().when(count > 0, |this| {
+            this.border_b_1()
+                .border_color(cx.theme().colors().border)
+                .px_3()
+                .py_2()
+                .child(
+                    h_flex()
+                        .gap_2()
+                        .items_center()
+                        .child(
+                            Label::new(format!("Bookmarks ({count})"))
+                                .size(LabelSize::XSmall)
+                                .color(Color::Muted),
+                        )
+                        .when(hidden_count > 0, |this| {
+                            this.child(
+                                Label::new(format!("+{hidden_count}"))
                                     .size(LabelSize::XSmall)
                                     .color(Color::Muted),
                             )
-                            .when(hidden_count > 0, |this| {
-                                this.child(
-                                    Label::new(format!("+{hidden_count}"))
-                                        .size(LabelSize::XSmall)
-                                        .color(Color::Muted),
-                                )
-                            }),
-                    )
-                    .child(
-                        h_flex()
-                            .gap_2()
-                            .flex_wrap()
-                            .children(
-                                self.bookmarks
-                                    .into_iter()
-                                    .take(visible_count)
-                                    .map(render_bookmark),
-                            ),
-                    )
-            })
+                        }),
+                )
+                .child(
+                    h_flex().gap_2().flex_wrap().children(
+                        self.bookmarks
+                            .into_iter()
+                            .take(visible_count)
+                            .map(|bookmark| render_bookmark(bookmark, self.on_delete.clone())),
+                    ),
+                )
+        })
     }
 }
 
-fn render_bookmark(bookmark: Bookmark) -> impl IntoElement {
+fn render_bookmark(
+    bookmark: Bookmark,
+    on_delete: Option<DeleteBookmarkHandler>,
+) -> impl IntoElement {
     let id = bookmark.id.to_proto();
     let label = bookmark.label.clone();
     let description = bookmark.description.clone();
     let bookmark_type = bookmark.bookmark_type;
     let url = bookmark.url.to_string();
+    let bookmark_for_delete = bookmark.clone();
 
-    Button::new(("channel-bookmark", id), label.clone())
-        .style(ButtonStyle::Subtle)
-        .size(ButtonSize::Compact)
-        .start_icon(Icon::new(bookmark_icon(bookmark_type)))
-        .truncate(true)
-        .tooltip(Tooltip::text(bookmark_tooltip(
-            label,
-            description,
-            bookmark_type,
-        )))
-        .on_click(move |_, _, cx| {
-            if bookmark_type == proto::BookmarkType::BookmarkLink {
-                cx.open_url(&url);
-            }
+    h_flex()
+        .gap_1()
+        .items_center()
+        .child(
+            Button::new(("channel-bookmark", id), label.clone())
+                .style(ButtonStyle::Subtle)
+                .size(ButtonSize::Compact)
+                .start_icon(Icon::new(bookmark_icon(bookmark_type)))
+                .truncate(true)
+                .tooltip(Tooltip::text(bookmark_tooltip(
+                    label,
+                    description,
+                    bookmark_type,
+                )))
+                .on_click(move |_, _, cx| {
+                    if bookmark_type == proto::BookmarkType::BookmarkLink {
+                        cx.open_url(&url);
+                    }
+                }),
+        )
+        .when_some(on_delete, |this, on_delete| {
+            this.child(
+                IconButton::new(("delete-channel-bookmark", id), IconName::Trash)
+                    .icon_size(IconSize::XSmall)
+                    .icon_color(Color::Muted)
+                    .tooltip(Tooltip::text("Delete bookmark"))
+                    .on_click(move |_, window, cx| {
+                        on_delete(bookmark_for_delete.clone(), window, cx);
+                    }),
+            )
         })
 }
 
@@ -125,8 +153,8 @@ fn bookmark_tooltip(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use client::{BookmarkId, ChannelId};
     use chrono::{TimeZone as _, Utc};
+    use client::{BookmarkId, ChannelId};
 
     #[test]
     fn collapsed_bar_reports_overflow_after_five_bookmarks() {

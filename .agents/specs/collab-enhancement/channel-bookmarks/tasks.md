@@ -173,6 +173,8 @@ Add a channel bookmarks feature: a dedicated section in the channel header where
   - [ ] 11.3 Wire "Delete" to call `remove_bookmark` RPC with confirmation dialog.
     - _Requirements: 6.1_
     - _writes: collab_ui/src/channel_bookmark_bar.rs_
+  - _Partial: Added a compact delete action to each rendered bookmark, confirmation prompt, `remove_bookmark` RPC wiring, and inline delete failure feedback. Full hover/context-menu presentation and edit action remain open._
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_bar --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_form --features collab_ui/test-support`._
 
 - [ ] 12. Implement drag-and-drop reorder
   - [ ] 12.1 Enable drag-and-drop on bookmark items in the `BookmarkBar` when user has edit permission.

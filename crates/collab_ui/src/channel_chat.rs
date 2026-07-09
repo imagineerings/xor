@@ -11,7 +11,7 @@ use chrono::{
     TimeZone as _, Timelike as _, Utc,
 };
 use client::{
-    ChannelId, Client, UserStore,
+    Bookmark, ChannelId, Client, UserStore,
     channel_chat::{
         DEFAULT_THREAD_REPLY_LIMIT, ScheduleChannelMessage, SearchChannelMessages,
         SendChannelMessage, ThreadSummary, UpdateScheduledMessage,
@@ -132,6 +132,7 @@ pub struct ChannelChat {
     bookmark_store: Entity<ChannelBookmarkStore>,
     bookmarks_expanded: bool,
     bookmark_form: Option<BookmarkForm>,
+    bookmark_action_error: Option<SharedString>,
     messages: Vec<proto::ChannelMessage>,
     message_bodies: HashMap<u64, message_bubble::MessageBody>,
     thread_summaries: HashMap<u64, ThreadSummary>,
@@ -652,6 +653,7 @@ impl ChannelChat {
             bookmark_store,
             bookmarks_expanded: false,
             bookmark_form: None,
+            bookmark_action_error: None,
             messages,
             message_bodies: HashMap::default(),
             thread_summaries: HashMap::default(),
@@ -3532,22 +3534,40 @@ impl ChannelChat {
                             .style(ButtonStyle::Subtle)
                             .size(ButtonSize::Compact)
                             .start_icon(Icon::new(IconName::Plus))
-                            .disabled(self
-                                .bookmark_form
-                                .as_ref()
-                                .is_some_and(BookmarkForm::is_submitting))
+                            .disabled(
+                                self.bookmark_form
+                                    .as_ref()
+                                    .is_some_and(BookmarkForm::is_submitting),
+                            )
                             .on_click(cx.listener(Self::open_bookmark_form)),
                     ),
             )
             .when(show_bookmark_section, |this| {
                 this.when(!bookmarks.is_empty(), |this| {
-                    this.child(ChannelBookmarkBar::new(
-                        bookmarks,
-                        self.bookmarks_expanded,
-                    ))
+                    let weak_self = cx.weak_entity();
+                    this.child(
+                        ChannelBookmarkBar::new(bookmarks, self.bookmarks_expanded).on_delete(
+                            move |bookmark, window, cx| {
+                                weak_self
+                                    .update(cx, |this, cx| {
+                                        this.confirm_remove_bookmark(bookmark.clone(), window, cx);
+                                    })
+                                    .log_err();
+                            },
+                        ),
+                    )
                 })
                 .when_some(self.bookmark_form.as_ref(), |this, form| {
                     this.child(self.render_bookmark_form(form, cx))
+                })
+                .when_some(self.bookmark_action_error.clone(), |this, error| {
+                    this.child(
+                        div().px_3().pb_2().child(
+                            Label::new(error)
+                                .size(LabelSize::XSmall)
+                                .color(Color::Error),
+                        ),
+                    )
                 })
                 .when(has_overflow, |this| {
                     this.child(
@@ -3568,10 +3588,12 @@ impl ChannelChat {
                                 )
                                 .style(ButtonStyle::Subtle)
                                 .size(ButtonSize::Compact)
-                                .on_click(cx.listener(|this, _, _, cx| {
-                                    this.bookmarks_expanded = !this.bookmarks_expanded;
-                                    cx.notify();
-                                })),
+                                .on_click(cx.listener(
+                                    |this, _, _, cx| {
+                                        this.bookmarks_expanded = !this.bookmarks_expanded;
+                                        cx.notify();
+                                    },
+                                )),
                             ),
                     )
                 })
@@ -3630,34 +3652,19 @@ impl ChannelChat {
             )
     }
 
-    fn open_bookmark_form(
-        &mut self,
-        _: &ClickEvent,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
+    fn open_bookmark_form(&mut self, _: &ClickEvent, window: &mut Window, cx: &mut Context<Self>) {
         if self.bookmark_form.is_none() {
             self.bookmark_form = Some(BookmarkForm::new(window, cx));
         }
         cx.notify();
     }
 
-    fn close_bookmark_form(
-        &mut self,
-        _: &ClickEvent,
-        _: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
+    fn close_bookmark_form(&mut self, _: &ClickEvent, _: &mut Window, cx: &mut Context<Self>) {
         self.bookmark_form = None;
         cx.notify();
     }
 
-    fn submit_bookmark_form(
-        &mut self,
-        _: &ClickEvent,
-        _: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
+    fn submit_bookmark_form(&mut self, _: &ClickEvent, _: &mut Window, cx: &mut Context<Self>) {
         let Some(form) = self.bookmark_form.as_mut() else {
             return;
         };
@@ -3698,6 +3705,49 @@ impl ChannelChat {
                 })?;
                 anyhow::Ok(())
             }
+        })
+        .detach_and_log_err(cx);
+    }
+
+    fn confirm_remove_bookmark(
+        &mut self,
+        bookmark: Bookmark,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let answer = window.prompt(
+            PromptLevel::Warning,
+            "Delete bookmark?",
+            Some(&format!(
+                "This removes \"{}\" from the channel.",
+                bookmark.label
+            )),
+            &["Delete", "Cancel"],
+            cx,
+        );
+        let client = self.client.clone();
+        let channel_id = self.channel_id;
+        let bookmark_id = bookmark.id;
+
+        cx.spawn_in(window, async move |this, cx| {
+            if answer.await? != 0 {
+                return anyhow::Ok(());
+            }
+
+            this.update(cx, |this, cx| {
+                this.bookmark_action_error = None;
+                cx.notify();
+            })?;
+
+            let result = client.remove_bookmark(channel_id, bookmark_id).await;
+            this.update(cx, |this, cx| {
+                if let Err(error) = result {
+                    this.bookmark_action_error =
+                        Some(format!("Failed to delete bookmark: {error:#}").into());
+                }
+                cx.notify();
+            })?;
+            anyhow::Ok(())
         })
         .detach_and_log_err(cx);
     }
