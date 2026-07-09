@@ -441,9 +441,7 @@ impl Worktree {
                     abs_path
                         .file_name()
                         .and_then(|f| f.to_str())
-                        .map_or(RelPath::empty_arc(), |f| {
-                            RelPath::unix(f).unwrap().into()
-                        }),
+                        .map_or(RelPath::empty_arc(), |f| RelPath::unix(f).unwrap().into()),
                     abs_path.clone(),
                     PathStyle::local(),
                 ),
@@ -530,8 +528,7 @@ impl Worktree {
         cx.new(|cx: &mut Context<Self>| {
             let mut snapshot = Snapshot::new(
                 WorktreeId::from_proto(worktree.id),
-                RelPath::from_proto(&worktree.root_name)
-                    .unwrap_or_else(|_| RelPath::empty_arc()),
+                RelPath::from_proto(&worktree.root_name).unwrap_or_else(|_| RelPath::empty_arc()),
                 Path::new(&worktree.abs_path).into(),
                 path_style,
             );
@@ -601,21 +598,39 @@ impl Worktree {
                         }
 
                         let old_root_repo_common_dir = this.snapshot.root_repo_common_dir.clone();
-                        let mut entries_changed = false;
+                        let mut changed_entries: Vec<(Arc<RelPath>, ProjectEntryId, PathChange)> =
+                            Vec::new();
                         {
                             let mut lock = this.background_snapshot.lock();
-                            this.snapshot = lock.0.clone();
+                            let old_snapshot = mem::replace(&mut this.snapshot, lock.0.clone());
                             for update in lock.1.drain(..) {
-                                entries_changed |= !update.updated_entries.is_empty()
-                                    || !update.removed_entries.is_empty();
+                                for entry_id in &update.removed_entries {
+                                    let entry_id = ProjectEntryId::from_proto(*entry_id);
+                                    if let Some(entry) = old_snapshot.entry_for_id(entry_id) {
+                                        changed_entries.push((
+                                            entry.path.clone(),
+                                            entry_id,
+                                            PathChange::Removed,
+                                        ));
+                                    }
+                                }
+                                for entry in &update.updated_entries {
+                                    if let Some(path) = RelPath::from_proto(&entry.path).log_err() {
+                                        changed_entries.push((
+                                            path,
+                                            ProjectEntryId::from_proto(entry.id),
+                                            PathChange::AddedOrUpdated,
+                                        ));
+                                    }
+                                }
                                 if let Some(tx) = &this.update_observer {
                                     tx.unbounded_send(update).ok();
                                 }
                             }
                         };
 
-                        if entries_changed {
-                            cx.emit(Event::UpdatedEntries(Arc::default()));
+                        if !changed_entries.is_empty() {
+                            cx.emit(Event::UpdatedEntries(changed_entries.into()));
                         }
                         let is_first_update = !this.received_initial_update;
                         this.received_initial_update = true;
@@ -2059,9 +2074,7 @@ impl LocalWorktree {
             .as_path()
             .file_name()
             .and_then(|f| f.to_str())
-            .map_or(RelPath::empty_arc(), |f| {
-                RelPath::unix(f).unwrap().into()
-            });
+            .map_or(RelPath::empty_arc(), |f| RelPath::unix(f).unwrap().into());
         self.snapshot.update_abs_path(new_path, root_name);
         self.restart_background_scanners(cx);
     }
