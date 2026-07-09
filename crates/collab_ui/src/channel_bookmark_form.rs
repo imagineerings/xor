@@ -255,6 +255,19 @@ fn bookmark_target_value(bookmark: &Bookmark) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::{DateTime, Utc};
+    use gpui::{IntoElement, Render, TestAppContext, div};
+    use settings::SettingsStore;
+
+    struct BookmarkFormTestView {
+        form: BookmarkForm,
+    }
+
+    impl Render for BookmarkFormTestView {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div()
+        }
+    }
 
     #[test]
     fn draft_builds_link_bookmark() {
@@ -362,5 +375,147 @@ mod tests {
 
         assert_eq!(label, "Updated runbook");
         assert_eq!(description, None);
+    }
+
+    #[gpui::test]
+    fn create_form_builds_link_bookmark(cx: &mut TestAppContext) {
+        init_test(cx);
+        let (view, cx) = cx.add_window_view(|window, cx| BookmarkFormTestView {
+            form: BookmarkForm::new_create(window, cx),
+        });
+
+        view.update_in(cx, |view, window, cx| {
+            view.form.url_editor.update(cx, |editor, cx| {
+                editor.set_text("https://sim.dev/runbook", window, cx)
+            });
+            view.form
+                .label_editor
+                .update(cx, |editor, cx| editor.set_text("Runbook", window, cx));
+            view.form
+                .description_editor
+                .update(cx, |editor, cx| editor.set_text("Deploy steps", window, cx));
+
+            let bookmark = view.form.add_bookmark(ChannelId(7), cx).unwrap();
+
+            assert_eq!(bookmark.channel_id, ChannelId(7));
+            assert_eq!(bookmark.bookmark_type, proto::BookmarkType::BookmarkLink);
+            assert_eq!(bookmark.url, "https://sim.dev/runbook");
+            assert_eq!(bookmark.label, "Runbook");
+            assert_eq!(bookmark.description.as_deref(), Some("Deploy steps"));
+            assert_eq!(bookmark.file_id, None);
+            assert_eq!(bookmark.message_id, None);
+        });
+    }
+
+    #[gpui::test]
+    fn create_form_validates_editor_contents(cx: &mut TestAppContext) {
+        init_test(cx);
+        let (view, cx) = cx.add_window_view(|window, cx| BookmarkFormTestView {
+            form: BookmarkForm::new_create(window, cx),
+        });
+
+        view.update_in(cx, |view, window, cx| {
+            view.form.url_editor.update(cx, |editor, cx| {
+                editor.set_text("https://sim.dev/runbook", window, cx)
+            });
+
+            let error = view.form.add_bookmark(ChannelId(7), cx).unwrap_err();
+
+            assert_eq!(error, SharedString::from("Enter a label."));
+        });
+    }
+
+    #[gpui::test]
+    fn create_form_switches_type_and_builds_message_bookmark(cx: &mut TestAppContext) {
+        init_test(cx);
+        let (view, cx) = cx.add_window_view(|window, cx| BookmarkFormTestView {
+            form: BookmarkForm::new_create(window, cx),
+        });
+
+        view.update_in(cx, |view, window, cx| {
+            view.form
+                .set_bookmark_type(proto::BookmarkType::BookmarkMessage, window, cx);
+            view.form
+                .url_editor
+                .update(cx, |editor, cx| editor.set_text("42", window, cx));
+            view.form
+                .label_editor
+                .update(cx, |editor, cx| editor.set_text("Decision", window, cx));
+
+            let bookmark = view.form.add_bookmark(ChannelId(7), cx).unwrap();
+
+            assert_eq!(
+                view.form.bookmark_type,
+                proto::BookmarkType::BookmarkMessage
+            );
+            assert_eq!(bookmark.bookmark_type, proto::BookmarkType::BookmarkMessage);
+            assert_eq!(bookmark.url, "");
+            assert_eq!(bookmark.file_id, None);
+            assert_eq!(bookmark.message_id, Some(42));
+        });
+    }
+
+    #[gpui::test]
+    fn edit_form_prefills_fields_and_builds_update(cx: &mut TestAppContext) {
+        init_test(cx);
+        let existing = test_bookmark();
+        let (view, cx) = cx.add_window_view(|window, cx| BookmarkFormTestView {
+            form: BookmarkForm::new_edit(&existing, window, cx),
+        });
+
+        view.update_in(cx, |view, window, cx| {
+            assert!(view.form.is_editing());
+            assert_eq!(view.form.bookmark_type, proto::BookmarkType::BookmarkLink);
+            assert_eq!(
+                view.form.url_editor.read(cx).text(cx),
+                "https://sim.dev/runbook"
+            );
+            assert_eq!(view.form.label_editor.read(cx).text(cx), "Runbook");
+            assert_eq!(
+                view.form.description_editor.read(cx).text(cx),
+                "Deploy steps"
+            );
+
+            view.form.label_editor.update(cx, |editor, cx| {
+                editor.set_text("Updated runbook", window, cx)
+            });
+            view.form
+                .description_editor
+                .update(cx, |editor, cx| editor.set_text("", window, cx));
+            view.form
+                .set_bookmark_type(proto::BookmarkType::BookmarkMessage, window, cx);
+
+            let update = view.form.update_bookmark(ChannelId(7), cx).unwrap();
+
+            assert_eq!(view.form.bookmark_type, proto::BookmarkType::BookmarkLink);
+            assert_eq!(update.channel_id, ChannelId(7));
+            assert_eq!(update.bookmark_id, BookmarkId(3));
+            assert_eq!(update.label, "Updated runbook");
+            assert_eq!(update.description, None);
+        });
+    }
+
+    fn test_bookmark() -> Bookmark {
+        Bookmark {
+            id: BookmarkId(3),
+            channel_id: ChannelId(7),
+            label: SharedString::from("Runbook"),
+            description: Some(SharedString::from("Deploy steps")),
+            bookmark_type: proto::BookmarkType::BookmarkLink,
+            url: SharedString::from("https://sim.dev/runbook"),
+            file_id: None,
+            message_id: None,
+            created_by: 11,
+            created_at: DateTime::<Utc>::from_timestamp_millis(1_725_000_123_456).unwrap(),
+            sort_order: 0,
+        }
+    }
+
+    fn init_test(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            let settings_store = SettingsStore::test(cx);
+            cx.set_global(settings_store);
+            theme_settings::init(theme::LoadThemes::JustBase, cx);
+        });
     }
 }

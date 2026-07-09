@@ -147,7 +147,7 @@ Add a channel bookmarks feature: a dedicated section in the channel header where
   - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_bar --features collab_ui/test-support`._
   - _Completed: The bookmark bar coverage exercises empty, small, collapsed, and expanded counts plus link/file/message click action routing._
 
-- [ ] 10. Implement `BookmarkForm` modal
+- [x] 10. Implement `BookmarkForm` modal
   - [x] 10.1 Build create-mode form with fields: label (required), URL, type selector (Link/File/Message), description (optional).
     - _Requirements: 6.1 (AC 2, 4)_
     - _writes: collab_ui/src/channel_bookmark_form.rs_
@@ -160,7 +160,7 @@ Add a channel bookmarks feature: a dedicated section in the channel header where
   - [x] 10.4 Wire form submission to the appropriate RPC call (create vs update).
     - _Requirements: 6.1 (AC 3)_
     - _writes: collab_ui/src/channel_bookmark_form.rs_
-  - [ ] 10.5 Write UI tests: form validation errors, successful create, successful edit, field population.
+  - [x] 10.5 Write UI tests: form validation errors, successful create, successful edit, field population.
     - _Requirements: 6.1_
     - _writes: collab_ui/src/channel_bookmark_form.rs_
   - _Partial: Added an inline create form for link bookmarks with URL, label, and optional description fields; client-side link validation; submit/cancel states; and pure validation tests. Type selection, file/message create modes, edit mode, and end-to-end UI submission coverage remain open._
@@ -169,6 +169,8 @@ Add a channel bookmarks feature: a dedicated section in the channel header where
   - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_form --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_bar --features collab_ui/test-support`._
   - _Completed: Added create-mode type selection for Link/File/Message bookmarks, target placeholders for URL/File ID/Message ID, typed add-bookmark request generation, and validation for file/message targets._
   - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_form --features collab_ui/test-support -- --nocapture`._
+  - _Completed: Added editor-backed GPUI coverage for create validation, successful link/message create request generation, edit-mode field prefill, and update request generation._
+  - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_form --features collab_ui/test-support -- --nocapture`._
 
 - [ ] 11. Implement bookmark context menu
   - [ ] 11.1 Show context menu on hover/bookmark click with options: Edit, Delete.
