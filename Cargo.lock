@@ -10772,6 +10772,7 @@ name = "markdown_preview"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "buffer_diff",
  "editor",
  "fs",
  "gpui",
