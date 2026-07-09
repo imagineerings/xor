@@ -13,7 +13,6 @@ use crate::{
 use agent_settings::{AgentSettings, UserAgentsMd};
 use anyhow::Context as _;
 use askpass::AskPassDelegate;
-use sim_actions::{DecreaseBufferFontSize, IncreaseBufferFontSize, ResetBufferFontSize};
 use collections::{BTreeMap, HashMap, HashSet};
 use db::kvp::KeyValueStore;
 use editor::{Editor, EditorElement, EditorMode, MultiBuffer, MultiBufferOffset, SizingBehavior};
@@ -64,6 +63,7 @@ use prompt_store::RULES_FILE_NAMES;
 use proto::RpcError;
 use serde::{Deserialize, Serialize};
 use settings::{Settings, SettingsStore, StatusStyle, update_settings_file};
+use sim_actions::{DecreaseBufferFontSize, IncreaseBufferFontSize, ResetBufferFontSize};
 use smallvec::SmallVec;
 use std::future::Future;
 use std::ops::Range;
@@ -5302,15 +5302,36 @@ impl GitPanel {
 
     fn render_history_tab(&self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         v_flex().flex_1().size_full().overflow_hidden().map(|this| {
-            if let Some(history) = self.render_commit_history(window, cx) {
-                this.child(history)
-            } else {
+            let has_repo = self.active_repository.is_some();
+            let has_commits = self
+                .commit_history_shas
+                .as_ref()
+                .is_some_and(|shas| !shas.is_empty());
+            let is_loading = self.commit_history_shas.is_none() && has_repo;
+            if is_loading {
                 this.child(
                     h_flex()
                         .flex_1()
                         .justify_center()
                         .child(Label::new("Loading Commit History…").color(Color::Muted)),
                 )
+            } else if !has_repo || !has_commits {
+                this.child(
+                    h_flex()
+                        .flex_1()
+                        .justify_center()
+                        .child(Label::new("No commits yet").color(Color::Muted)),
+                )
+            } else {
+                match self.render_commit_history(window, cx) {
+                    Some(history) => this.child(history),
+                    None => this.child(
+                        h_flex()
+                            .flex_1()
+                            .justify_center()
+                            .child(Label::new("Failed to load commits").color(Color::Muted)),
+                    ),
+                }
             }
         })
     }
