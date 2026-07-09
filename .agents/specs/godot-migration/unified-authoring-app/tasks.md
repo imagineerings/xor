@@ -17,7 +17,8 @@ Build a unified authoring workspace over graph workflows, world-model requests, 
 
 ## Tasks
 
-- [ ] 1. Add unified game authoring app model
+- [x] 1. Add unified game authoring app model
   - Register the app, define authoring items, route previews, and surface generated artifacts.
+  - Represent workspace items, routes, previews, diagnostics, and generated artifact surfaces with native Sim `SimAuthoring*` and `SimGameAuthoring*` records backed by world-model provenance.
   - _Requirements: 1.1, 1.2, 2.1, 2.2_
   - _writes: crates/sim_apps/src/game_authoring.rs, crates/sim_apps/src/game_authoring_tests.rs_

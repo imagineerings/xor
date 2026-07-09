@@ -17372,6 +17372,7 @@ dependencies = [
  "gpui",
  "serde",
  "serde_json",
+ "sim_game",
  "ui",
  "util",
  "world_model",

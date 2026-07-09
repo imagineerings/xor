@@ -4,12 +4,14 @@
 
 Add a Sim app registry entry for game authoring that composes existing project, media, task, agent, and graph surfaces around Godot/world-model metadata.
 
+Unified authoring is implemented as native Sim functionality. Workspace items, routes, previews, diagnostics, and generated artifact panels use `SimAuthoring*` and `SimGameAuthoring*` records that compose Sim graph, preview, generated asset, and world-model provenance data rather than exposing Comfy compatibility labels or pass-through workflow state.
+
 ## Components
 
-- `GameAuthoringApp`
-- `AuthoringItem`
-- `AuthoringPreviewRoute`
-- `GeneratedArtifactPanel`
+- `SimGameAuthoringApp`
+- `SimAuthoringItem`
+- `SimAuthoringPreviewRoute`
+- `SimGeneratedAssetRecord`
 
 ## Correctness Properties
 
