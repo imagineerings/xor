@@ -462,6 +462,8 @@ impl Server {
             .add_request_handler(remove_reaction)
             .add_request_handler(get_channel_messages)
             .add_request_handler(get_channel_messages_by_id)
+            .add_request_handler(get_thread)
+            .add_request_handler(get_threads)
             .add_request_handler(get_notifications)
             .add_request_handler(mark_notification_as_read)
             .add_request_handler(move_channel)
@@ -3894,6 +3896,39 @@ async fn get_channel_messages_by_id(
         messages,
         done: true,
     })
+}
+
+async fn get_thread(
+    request: proto::GetThread,
+    response: Response<proto::GetThread>,
+    session: MessageContext,
+) -> Result<()> {
+    let (root_message, replies) = session
+        .db()
+        .await
+        .get_channel_thread(
+            ChannelId::from_proto(request.channel_id),
+            session.user_id(),
+            MessageId::from_proto(request.message_id),
+        )
+        .await?;
+    response.send(proto::GetThreadResponse {
+        root_message: Some(root_message),
+        replies,
+    })
+}
+
+async fn get_threads(
+    request: proto::GetThreads,
+    response: Response<proto::GetThreads>,
+    session: MessageContext,
+) -> Result<()> {
+    let threads = session
+        .db()
+        .await
+        .get_channel_threads(ChannelId::from_proto(request.channel_id), session.user_id())
+        .await?;
+    response.send(proto::GetThreadsResponse { threads })
 }
 
 async fn broadcast_channel_message_sent(

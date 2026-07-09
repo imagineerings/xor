@@ -25,12 +25,14 @@ Add threaded replies to channel messages in Sim. This feature reuses the existin
   - _implemented in existing `crates/collab/src/db/queries/channel_messages.rs` `Database` query layer_
   - _validated: `CARGO_INCREMENTAL=0 cargo check -p collab`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support --test collab_tests channel_chat_tests`; `git diff --check`_
 
-- [ ] 3. Register thread RPC handlers on the server
-  - [ ] 3.1 Handle `GetThread` — parse request, call `ThreadStore::get_thread`, build `GetThreadResponse`.
-  - [ ] 3.2 Handle `GetThreads` — parse request, call `ThreadStore::get_threads`, build `GetThreadsResponse`.
-  - [ ] 3.3 Wire handlers into the existing `handle_rpc` dispatch in the channel server.
+- [x] 3. Register thread RPC handlers on the server
+  - [x] 3.1 Handle `GetThread` — parse request, call `ThreadStore::get_thread`, build `GetThreadResponse`.
+  - [x] 3.2 Handle `GetThreads` — parse request, call `ThreadStore::get_threads`, build `GetThreadsResponse`.
+  - [x] 3.3 Wire handlers into the existing `handle_rpc` dispatch in the channel server.
   - _Requirements: 3.1, 3.4_
   - _writes: `collab/src/rpc/channel_rpc.rs`_
+  - _implemented in existing `crates/collab/src/rpc.rs` channel RPC handler table_
+  - _validated: `CARGO_INCREMENTAL=0 cargo check -p collab`; `git diff --check`_
 
 - [ ] 4. Add client-side thread types and RPC dispatch
   - [ ] 4.1 Define `ThreadSummary` struct in the client crate matching the proto message.
