@@ -12,12 +12,13 @@ The work is ordered to build incrementally: first the rendering pipeline (Markdo
 
 ## Tasks
 
-- [ ] 1. Create the channel message rendering module
-  - [ ] 1.1 Define a `ChannelMessageBubble` component (or function) that takes a `ChannelMessage` and returns rendered GPUI elements via `MarkdownElement`. Use `MarkdownStyle::themed(MarkdownFont::Editor, window, cx)` for a chat-appropriate style.
-  - [ ] 1.2 Hook `ChannelMessageBubble` into the channel message list so each message body is rendered through the `markdown` crate instead of as a plain `SharedString`.
-  - [ ] 1.3 Verify plain text (no Markdown syntax) renders identically to before — the `markdown` crate passes through plain text unchanged.
+- [x] 1. Create the channel message rendering module
+  - [x] 1.1 Define a `ChannelMessageBubble` component (or function) that takes a `ChannelMessage` and returns rendered GPUI elements via `MarkdownElement`. Use `MarkdownStyle::themed(MarkdownFont::Editor, window, cx)` for a chat-appropriate style.
+  - [x] 1.2 Hook `ChannelMessageBubble` into the channel message list so each message body is rendered through the `markdown` crate instead of as a plain `SharedString`.
+  - [x] 1.3 Verify plain text (no Markdown syntax) renders identically to before — the `markdown` crate passes through plain text unchanged.
   - _Requirements: 1.1, 1.5_
   - _writes: `collab_ui/src/channel_chat/message_bubble.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab test_channel_chat_view_live_insert_and_send_states --features test-support`_
 
 - [ ] 2. Bind `ChannelMessage` `MarkdownElement` events (links, images)
   - [ ] 2.1 Wire `on_url_click` on the `MarkdownElement` to open external links in the OS browser via `open::that()` (or similar shell command).

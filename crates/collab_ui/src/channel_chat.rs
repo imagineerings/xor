@@ -18,6 +18,7 @@ use menu::Confirm;
 use rpc::{ErrorExt as _, TypedEnvelope};
 use std::{
     any::TypeId,
+    collections::HashMap,
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -27,6 +28,9 @@ use workspace::{
     Workspace,
     item::{Item, TabContentParams},
 };
+
+#[path = "channel_chat/message_bubble.rs"]
+mod message_bubble;
 
 const RECENT_EMOJI_NAMESPACE: &str = "channel_chat_recent_emojis";
 const RECENT_EMOJI_KEY: &str = "recent";
@@ -55,6 +59,7 @@ pub struct ChannelChat {
     composer: Entity<Editor>,
     emoji_search: Entity<Editor>,
     messages: Vec<proto::ChannelMessage>,
+    message_bodies: HashMap<u64, message_bubble::MessageBody>,
     emoji_picker: Option<EmojiPickerState>,
     recent_emoji_names: Vec<String>,
     send_state: SendState,
@@ -281,6 +286,7 @@ impl ChannelChat {
             composer,
             emoji_search,
             messages,
+            message_bodies: HashMap::default(),
             emoji_picker: None,
             recent_emoji_names,
             send_state: SendState::Idle,
@@ -495,9 +501,28 @@ impl ChannelChat {
             .unwrap_or_else(|| "Channel chat".into())
     }
 
-    fn render_message(
-        &self,
+    fn rendered_message_body(
+        &mut self,
         message: &proto::ChannelMessage,
+        cx: &mut Context<Self>,
+    ) -> &message_bubble::MessageBody {
+        match self.message_bodies.entry(message.id) {
+            std::collections::hash_map::Entry::Occupied(mut entry) => {
+                if entry.get().source() != message.body.as_str() {
+                    entry.insert(message_bubble::MessageBody::new(message.body.clone(), cx));
+                }
+                entry.into_mut()
+            }
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                entry.insert(message_bubble::MessageBody::new(message.body.clone(), cx))
+            }
+        }
+    }
+
+    fn render_message(
+        &mut self,
+        message: &proto::ChannelMessage,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) -> gpui::AnyElement {
         let sender = self.user_display_name(message.sender_id, cx);
@@ -531,7 +556,7 @@ impl ChannelChat {
                         )
                     }),
             )
-            .child(Label::new(message.body.clone()).size(LabelSize::Small))
+            .child(self.rendered_message_body(message, cx).render(window, cx))
             .child(self.render_reactions(message, cx))
             .into_any_element()
     }
@@ -1031,7 +1056,7 @@ impl Focusable for ChannelChat {
 }
 
 impl Render for ChannelChat {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         v_flex()
             .key_context("ChannelChat")
             .size_full()
@@ -1052,8 +1077,9 @@ impl Render for ChannelChat {
                     })
                     .children(
                         self.messages
-                            .iter()
-                            .map(|message| self.render_message(message, cx)),
+                            .clone()
+                            .into_iter()
+                            .map(|message| self.render_message(&message, window, cx)),
                     ),
             )
             .child(
