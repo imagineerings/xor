@@ -706,7 +706,7 @@ impl RecentProjects {
                 ProjectPickerStyle::Modal,
             );
 
-            Self::new(delegate, fs, 34., window, cx)
+            Self::new(delegate, fs, 42., window, cx)
         })
     }
 
