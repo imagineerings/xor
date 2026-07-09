@@ -821,6 +821,22 @@ impl CodeCell {
         self.is_executing
     }
 
+    pub fn show_kernel_error(
+        &mut self,
+        error_message: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.outputs.push(Output::ErrorOutput(ErrorView {
+            ename: "Kernel Error".to_string(),
+            evalue: "cell could not be executed".to_string(),
+            traceback: cx.new(|cx| TerminalOutput::from(error_message, window, cx)),
+        }));
+        self.execution_start_time = None;
+        self.is_executing = false;
+        cx.notify();
+    }
+
     pub fn execution_duration(&self) -> Option<Duration> {
         self.execution_duration
     }
