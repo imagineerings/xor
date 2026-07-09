@@ -37,9 +37,12 @@ use sim_actions::{
 
 use crate::ExpandMessageEditor;
 use crate::ManageProfiles;
-use crate::agent_connection_store::{AcpConnectionDetails, AgentConnectionStore};
+use crate::agent_connection_store::{
+    AcpConnectionDetails, AgentConnectionStatus, AgentConnectionStore,
+};
 use crate::completion_provider::{AgentContextSelection, AgentContextSource};
 use crate::diagnostics::GooseDiagnosticsView;
+use crate::recipe_browser::RecipeBrowser;
 use crate::terminal_thread_metadata_store::{
     TerminalThreadMetadata, TerminalThreadMetadataStore, compose_terminal_thread_title,
     terminal_title_without_prefix,
@@ -1114,6 +1117,7 @@ impl From<AgentThread> for BaseView {
 enum OverlayView {
     Configuration,
     Diagnostics,
+    RecipeBrowser,
 }
 
 enum VisibleSurface<'a> {
@@ -1122,6 +1126,7 @@ enum VisibleSurface<'a> {
     Terminal(&'a Entity<TerminalView>),
     Configuration(Option<&'a Entity<AgentConfiguration>>),
     Diagnostics(Option<&'a Entity<GooseDiagnosticsView>>),
+    RecipeBrowser(Option<&'a Entity<RecipeBrowser>>),
 }
 
 enum WhichFontSize {
@@ -1141,7 +1146,9 @@ impl BaseView {
 impl OverlayView {
     pub fn which_font_size_used(&self) -> WhichFontSize {
         match self {
-            OverlayView::Configuration | OverlayView::Diagnostics => WhichFontSize::None,
+            OverlayView::Configuration | OverlayView::Diagnostics | OverlayView::RecipeBrowser => {
+                WhichFontSize::None
+            }
         }
     }
 }
@@ -1160,6 +1167,7 @@ pub struct AgentPanel {
     configuration: Option<Entity<AgentConfiguration>>,
     configuration_subscription: Option<Subscription>,
     diagnostics_view: Option<Entity<GooseDiagnosticsView>>,
+    recipe_browser: Option<Entity<RecipeBrowser>>,
     focus_handle: FocusHandle,
     base_view: BaseView,
     last_created_entry_kind: AgentPanelEntryKind,
@@ -1568,6 +1576,7 @@ impl AgentPanel {
             configuration: None,
             configuration_subscription: None,
             diagnostics_view: None,
+            recipe_browser: None,
             focus_handle: cx.focus_handle(),
             context_server_registry,
             draft_thread: None,
@@ -3627,6 +3636,21 @@ impl AgentPanel {
         }
     }
 
+    fn open_recipe_browser(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if matches!(self.overlay_view, Some(OverlayView::RecipeBrowser)) {
+            self.clear_overlay(true, window, cx);
+            return;
+        }
+
+        self.clear_overlay_state();
+        self.recipe_browser = Some(cx.new(|cx| RecipeBrowser::new(window, cx)));
+        self.set_overlay(OverlayView::RecipeBrowser, true, window, cx);
+
+        if let Some(recipe_browser) = self.recipe_browser.as_ref() {
+            recipe_browser.focus_handle(cx).focus(window, cx);
+        }
+    }
+
     pub(crate) fn open_active_thread_as_markdown(
         &mut self,
         _: &OpenActiveThreadAsMarkdown,
@@ -4229,6 +4253,7 @@ impl AgentPanel {
         self.configuration_subscription = None;
         self.configuration = None;
         self.diagnostics_view = None;
+        self.recipe_browser = None;
     }
 
     fn refresh_base_view_subscriptions(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -4290,6 +4315,9 @@ impl AgentPanel {
                 }
                 OverlayView::Diagnostics => {
                     VisibleSurface::Diagnostics(self.diagnostics_view.as_ref())
+                }
+                OverlayView::RecipeBrowser => {
+                    VisibleSurface::RecipeBrowser(self.recipe_browser.as_ref())
                 }
             };
         }
@@ -4966,6 +4994,13 @@ impl Focusable for AgentPanel {
                     self.focus_handle.clone()
                 }
             }
+            VisibleSurface::RecipeBrowser(recipe_browser) => {
+                if let Some(recipe_browser) = recipe_browser {
+                    recipe_browser.focus_handle(cx)
+                } else {
+                    self.focus_handle.clone()
+                }
+            }
         }
     }
 }
@@ -5490,6 +5525,9 @@ impl AgentPanel {
             VisibleSurface::Diagnostics(_) => {
                 Label::new("Diagnostics").truncate().into_any_element()
             }
+            VisibleSurface::RecipeBrowser(_) => {
+                Label::new("Recipes").truncate().into_any_element()
+            }
             VisibleSurface::Uninitialized => Label::new("Agent").truncate().into_any_element(),
         };
 
@@ -5667,6 +5705,16 @@ impl AgentPanel {
                                 )
                                 .separator()
                                 .header("Context")
+                                .entry("Recipes", None, {
+                                    let panel = panel.clone();
+                                    move |window, cx| {
+                                        panel
+                                            .update(cx, |panel, cx| {
+                                                panel.open_recipe_browser(window, cx);
+                                            })
+                                            .log_err();
+                                    }
+                                })
                                 .entry("Diagnostics", None, {
                                     let panel = panel.clone();
                                     move |window, cx| {
@@ -5771,6 +5819,30 @@ impl AgentPanel {
                     Tooltip::for_action_in("Go Back", &workspace::GoBack, &focus_handle, cx)
                 }
             })
+    }
+
+    fn render_recipe_browser_button(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let is_open = matches!(self.overlay_view, Some(OverlayView::RecipeBrowser));
+
+        IconButton::new("open-recipe-browser", IconName::ListTodo)
+            .icon_size(IconSize::Small)
+            .toggle_state(is_open)
+            .tooltip(Tooltip::text("Recipes"))
+            .on_click(cx.listener(|this, _, window, cx| {
+                this.open_recipe_browser(window, cx);
+            }))
+    }
+
+    fn render_diagnostics_button(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let is_open = matches!(self.overlay_view, Some(OverlayView::Diagnostics));
+
+        IconButton::new("open-agent-diagnostics", IconName::Info)
+            .icon_size(IconSize::Small)
+            .toggle_state(is_open)
+            .tooltip(Tooltip::text("Diagnostics"))
+            .on_click(cx.listener(|this, _, window, cx| {
+                this.open_diagnostics(window, cx);
+            }))
     }
 
     fn render_no_project_state(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -6047,6 +6119,11 @@ impl AgentPanel {
         };
         let selected_agent_tooltip = self.selected_agent_acp_tooltip(cx);
         let selected_agent_label_for_tooltip = selected_agent_label.clone();
+        let selected_agent_connection_color = if showing_terminal {
+            Color::Muted
+        } else {
+            self.selected_agent_connection_color(cx)
+        };
 
         let selected_agent = div()
             .id("selected_agent_icon")
@@ -6054,13 +6131,13 @@ impl AgentPanel {
             .when_some(selected_agent_custom_icon, |this, icon_path| {
                 this.child(
                     Icon::from_external_svg(icon_path)
-                        .color(Color::Muted)
+                        .color(selected_agent_connection_color)
                         .size(IconSize::Small),
                 )
             })
             .when(!has_custom_icon, |this| {
                 this.when_some(selected_agent_builtin_icon, |this, icon| {
-                    this.child(Icon::new(icon).color(Color::Muted))
+                    this.child(Icon::new(icon).color(selected_agent_connection_color))
                 })
             })
             .tooltip(move |_, cx| {
@@ -6140,7 +6217,11 @@ impl AgentPanel {
                 if self.new_thread_menu_handle.is_deployed() {
                     (IconName::ChevronUp, Color::Accent, Color::Accent)
                 } else {
-                    (IconName::ChevronDown, Color::Muted, Color::Default)
+                    (
+                        IconName::ChevronDown,
+                        selected_agent_connection_color,
+                        Color::Default,
+                    )
                 };
 
             let agent_icon = if let Some(icon_path) = selected_agent_custom_icon_for_button {
@@ -6198,6 +6279,8 @@ impl AgentPanel {
                         .gap_1()
                         .pl_1()
                         .pr_1()
+                        .child(self.render_recipe_browser_button(cx))
+                        .child(self.render_diagnostics_button(cx))
                         .child(full_screen_button)
                         .child(self.render_panel_options_menu(window, cx)),
                 )
@@ -6247,6 +6330,8 @@ impl AgentPanel {
                         .pl_1()
                         .pr_1()
                         .when(can_create_entries, |this| this.child(new_thread_menu))
+                        .child(self.render_recipe_browser_button(cx))
+                        .child(self.render_diagnostics_button(cx))
                         .child(full_screen_button)
                         .child(self.render_panel_options_menu(window, cx)),
                 )
@@ -6265,21 +6350,21 @@ impl AgentPanel {
     }
 
     fn selected_agent_acp_tooltip(&self, cx: &mut Context<Self>) -> SharedString {
-        match self.selected_agent_acp_details(cx) {
-            Some(details) => format!("Selected Agent\n\n{}", details.tooltip_text()).into(),
-            None => "Selected Agent".into(),
-        }
+        let details = self.selected_agent_acp_details(cx);
+        format!("Selected Agent\n\n{}", details.tooltip_text()).into()
     }
 
-    fn selected_agent_acp_details(&self, cx: &mut Context<Self>) -> Option<AcpConnectionDetails> {
-        if matches!(self.selected_agent, Agent::Custom { .. }) {
-            Some(
-                self.connection_store()
-                    .read(cx)
-                    .acp_connection_details(&self.selected_agent, cx),
-            )
-        } else {
-            None
+    fn selected_agent_acp_details(&self, cx: &mut Context<Self>) -> AcpConnectionDetails {
+        self.connection_store()
+            .read(cx)
+            .acp_connection_details(&self.selected_agent, cx)
+    }
+
+    fn selected_agent_connection_color(&self, cx: &mut Context<Self>) -> Color {
+        match self.selected_agent_acp_details(cx).status {
+            AgentConnectionStatus::Connected => Color::Success,
+            AgentConnectionStatus::Connecting => Color::Accent,
+            AgentConnectionStatus::Disconnected => Color::Warning,
         }
     }
 
@@ -6631,6 +6716,9 @@ impl Render for AgentPanel {
                 }
                 VisibleSurface::Diagnostics(diagnostics_view) => {
                     parent.children(diagnostics_view.cloned())
+                }
+                VisibleSurface::RecipeBrowser(recipe_browser) => {
+                    parent.children(recipe_browser.cloned())
                 }
             })
             .children(self.render_trial_end_upsell(window, cx));
@@ -9441,6 +9529,33 @@ mod tests {
                 "Settings overlay should be dismissed when invoking NewThread"
             );
             assert!(panel.active_view_is_new_draft(cx));
+        });
+    }
+
+    #[gpui::test]
+    async fn test_recipe_browser_overlay_toggles(cx: &mut TestAppContext) {
+        let (panel, mut cx) = setup_panel(cx).await;
+
+        panel.update_in(&mut cx, |panel, window, cx| {
+            panel.open_recipe_browser(window, cx);
+        });
+        cx.run_until_parked();
+
+        panel.read_with(&cx, |panel, _cx| {
+            assert!(matches!(
+                panel.visible_surface(),
+                VisibleSurface::RecipeBrowser(Some(_))
+            ));
+            assert!(panel.is_overlay_open());
+        });
+
+        panel.update_in(&mut cx, |panel, window, cx| {
+            panel.open_recipe_browser(window, cx);
+        });
+        cx.run_until_parked();
+
+        panel.read_with(&cx, |panel, _cx| {
+            assert!(!panel.is_overlay_open());
         });
     }
 

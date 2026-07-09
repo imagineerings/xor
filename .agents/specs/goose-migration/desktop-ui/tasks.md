@@ -52,7 +52,7 @@ Build GPUI-native views for recipe browsing, scheduling, diagnostics, shared ses
   - _Requirements: 5_
   - _writes: crates/agent/src/shared_session.rs, crates/sim/src/sim/shared_session_handler.rs_
 
-- [ ] 6. Integrate desktop UI features into the agent panel
+- [x] 6. Integrate desktop UI features into the agent panel
   - Add recipe browser button/tab to agent panel header
   - Add connection status indicator to agent panel header
   - Add diagnostics to settings or help menu
