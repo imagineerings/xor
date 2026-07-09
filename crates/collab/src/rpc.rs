@@ -4,6 +4,9 @@ use crate::api::{CloudflareIpCountryHeader, SystemIdHeader};
 use crate::db::queries::channel_messages::{
     ChannelMessageUpdate, NewChannelMessage, SearchChannelMessagesParams,
 };
+use crate::db::scheduled_message_store::{
+    NewScheduledMessage, ScheduledMessageStore, ScheduledMessageUpdate,
+};
 use crate::entities::User;
 use crate::{
     AppState, Error, Result, auth,
@@ -460,6 +463,10 @@ impl Server {
             .add_request_handler(join_channel_chat)
             .add_message_handler(leave_channel_chat)
             .add_request_handler(send_channel_message)
+            .add_request_handler(schedule_channel_message)
+            .add_request_handler(cancel_scheduled_message)
+            .add_request_handler(update_scheduled_message)
+            .add_request_handler(get_scheduled_messages)
             .add_request_handler(remove_channel_message)
             .add_request_handler(update_channel_message)
             .add_request_handler(add_reaction)
@@ -3693,6 +3700,83 @@ async fn send_channel_message(
     broadcast_channel_message_sent(&session, channel_id, message).await
 }
 
+async fn schedule_channel_message(
+    request: proto::ScheduleChannelMessage,
+    response: Response<proto::ScheduleChannelMessage>,
+    session: MessageContext,
+) -> Result<()> {
+    let scheduled_at = timestamp_millis_to_primitive_datetime(request.scheduled_at)?;
+    let store = ScheduledMessageStore::new(session.app_state.db.clone());
+    let scheduled_message_id = store
+        .create(NewScheduledMessage {
+            channel_id: ChannelId::from_proto(request.channel_id),
+            sender_id: session.user_id(),
+            body: request.body,
+            scheduled_at,
+            nonce: request.nonce.context("missing scheduled message nonce")?,
+            mentions: request.mentions,
+        })
+        .await?;
+
+    response.send(proto::ScheduleChannelMessageResponse {
+        scheduled_message_id: scheduled_message_id.to_proto(),
+    })
+}
+
+async fn cancel_scheduled_message(
+    request: proto::CancelScheduledMessage,
+    response: Response<proto::CancelScheduledMessage>,
+    session: MessageContext,
+) -> Result<()> {
+    let store = ScheduledMessageStore::new(session.app_state.db.clone());
+    store
+        .cancel(
+            db::ScheduledMessageId::from_proto(request.scheduled_message_id),
+            ChannelId::from_proto(request.channel_id),
+            session.user_id(),
+        )
+        .await?;
+    response.send(proto::Ack {})
+}
+
+async fn update_scheduled_message(
+    request: proto::UpdateScheduledMessage,
+    response: Response<proto::UpdateScheduledMessage>,
+    session: MessageContext,
+) -> Result<()> {
+    let scheduled_at = request
+        .scheduled_at
+        .map(timestamp_millis_to_primitive_datetime)
+        .transpose()?;
+    let store = ScheduledMessageStore::new(session.app_state.db.clone());
+    store
+        .update(ScheduledMessageUpdate {
+            scheduled_message_id: db::ScheduledMessageId::from_proto(request.scheduled_message_id),
+            channel_id: ChannelId::from_proto(request.channel_id),
+            sender_id: session.user_id(),
+            body: request.body,
+            scheduled_at,
+            mentions: Some(request.mentions),
+        })
+        .await?;
+    response.send(proto::Ack {})
+}
+
+async fn get_scheduled_messages(
+    request: proto::GetScheduledMessages,
+    response: Response<proto::GetScheduledMessages>,
+    session: MessageContext,
+) -> Result<()> {
+    let store = ScheduledMessageStore::new(session.app_state.db.clone());
+    let messages = store
+        .list_for_user(session.user_id(), ChannelId::from_proto(request.channel_id))
+        .await?
+        .into_iter()
+        .map(|message| message.to_proto())
+        .collect();
+    response.send(proto::GetScheduledMessagesResponse { messages })
+}
+
 /// Delete a channel message
 async fn remove_channel_message(
     request: proto::RemoveChannelMessage,
@@ -4058,6 +4142,15 @@ fn timestamp_to_primitive_datetime(timestamp: u64) -> Result<PrimitiveDateTime> 
         .context("search timestamp is out of range")?;
     let timestamp = time::OffsetDateTime::from_unix_timestamp(timestamp)
         .context("search timestamp is invalid")?;
+    Ok(PrimitiveDateTime::new(timestamp.date(), timestamp.time()))
+}
+
+fn timestamp_millis_to_primitive_datetime(timestamp: u64) -> Result<PrimitiveDateTime> {
+    let timestamp = i128::from(timestamp)
+        .checked_mul(1_000_000)
+        .context("scheduled timestamp is out of range")?;
+    let timestamp = time::OffsetDateTime::from_unix_timestamp_nanos(timestamp)
+        .context("scheduled timestamp is invalid")?;
     Ok(PrimitiveDateTime::new(timestamp.date(), timestamp.time()))
 }
 

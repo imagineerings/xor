@@ -44,7 +44,7 @@ Add the ability for channel participants to schedule messages for future deliver
     - _Completed: Added `ScheduledMessageStore`, table entity, `ScheduledMessageId`, CRUD/list/count/failure/recovery methods, time-bound validation, nonce hydration, JSON mention persistence, and atomic due-message popping._
     - _Validation: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `git diff --check`._
 
-- [ ] 4. Implement server RPC handlers
+- [x] 4. Implement server RPC handlers
     - Register handlers in `Server::new()`: `schedule_channel_message`, `cancel_scheduled_message`, `update_scheduled_message`, `get_scheduled_messages`.
     - `schedule_channel_message`: extract params, validate time bounds (≥1 min, ≤30 days), check channel membership/permissions, delegate to `ScheduledMessageStore::create`, return the new ID.
     - `cancel_scheduled_message`: verify sender owns the message via `store.cancel`, return ack.
@@ -52,6 +52,8 @@ Add the ability for channel participants to schedule messages for future deliver
     - `get_scheduled_messages`: delegate to `store.list_for_user`.
     - _Requirements: 11.1, 11.2, 11.4_
     - _writes: collab/src/rpc/scheduled_messages.rs_ (new file or inline in existing handler module)
+    - _Completed: Registered inline RPC handlers for schedule/cancel/update/list, converted scheduled timestamps from Unix milliseconds, delegated validation and ownership checks to `ScheduledMessageStore`, and returned proto responses._
+    - _Validation: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `git diff --check`._
 
 - [ ] 5. Implement the `SchedulerLoop` background task
     - In `Server::start()`, spawn a detached task that runs every 10 seconds.
