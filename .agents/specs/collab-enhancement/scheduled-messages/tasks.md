@@ -81,7 +81,7 @@ Add the ability for channel participants to schedule messages for future deliver
     - _Completed: Added scheduled-message and channel-message client models with UTC/local time conversion, scheduled-message ID helpers, proto conversions, and client RPC helpers for schedule/cancel/update/list._
     - _Validation: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `CARGO_INCREMENTAL=0 cargo test -p client test_channel_chat -- --nocapture`; `git diff --check`._
 
-- [ ] 7. Build `SchedulePicker` compose-area widget
+- [x] 7. Build `SchedulePicker` compose-area widget
     - Implement `SchedulePicker` struct with `selected_date`, `selected_time`, `scheduled_at` (local time), `timezone`, `popover_visible`.
     - Implement `scheduled_at_utc()` — converts local selection to UTC.
     - Implement `render()` — small button next to the send button that toggles a popover.
@@ -91,8 +91,8 @@ Add the ability for channel participants to schedule messages for future deliver
     - Wire the picker into the existing compose area: when a time is selected, the send button label changes to "Schedule (time)" with a clock icon; clicking sends a `ScheduleChannelMessage` RPC instead of an immediate message.
     - _Requirements: 11.1.1, 11.1.2, 11.3.3, 11.4.1_
     - _writes: collab_ui/src/schedule_picker.rs_
-    - _Progress: Added an inline compose-area clock control with common schedule presets, selected-time display, draft clearing, and scheduled-send RPC wiring. Full calendar/time-picker controls remain._
-    - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui`; `git diff --check`._
+    - _Completed: Added inline `SchedulePicker` state with local date/time selection, UTC conversion, month-grid calendar controls, hour/minute picker controls, lead-time validation, selected-time display, draft clearing, and scheduled-send RPC wiring in the compose area._
+    - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui`; `git diff --check`. Attempted `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_chat_key_bindings_parse -- --nocapture`, blocked by unrelated `remote_connection` test-support compile error for non-exhaustive `RemoteConnectionOptions::Mock(_)` handling._
 
 - [ ] 8. Build `ScheduledMessagesPanel` management view
     - Implement `ScheduledMessagesPanel` struct with `channel_id`, `messages`, `loading`, `editing_message_id`, `edit_body`, `edit_scheduled_at`.

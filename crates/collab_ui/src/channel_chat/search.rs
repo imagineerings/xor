@@ -1,5 +1,5 @@
 use super::*;
-use chrono::{NaiveDate, TimeZone as _, Utc};
+use chrono::{NaiveDate, Utc};
 
 #[derive(Default)]
 pub(super) struct SearchState {

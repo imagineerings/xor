@@ -1,7 +1,10 @@
 use crate::draft_store::DraftStore;
 use anyhow::Result;
 use channel::{Channel, ChannelStore};
-use chrono::{DateTime, Duration as ChronoDuration, Local, Utc};
+use chrono::{
+    DateTime, Datelike, Duration as ChronoDuration, Local, LocalResult, NaiveDate, NaiveTime,
+    TimeZone as _, Timelike as _, Utc,
+};
 use client::{
     ChannelId, Client, UserStore,
     channel_chat::{
@@ -27,7 +30,7 @@ use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use ui::{Avatar, Facepile, Tooltip, prelude::*};
+use ui::{Avatar, Facepile, TintColor, Tooltip, prelude::*};
 use util::ResultExt;
 use workspace::{
     Workspace,
@@ -126,7 +129,7 @@ pub struct ChannelChat {
     emoji_picker: Option<EmojiPickerState>,
     recent_emoji_names: Vec<String>,
     send_state: SendState,
-    schedule_picker: SchedulePickerState,
+    schedule_picker: SchedulePicker,
     pending_draft_save: Option<Task<()>>,
     _rpc_subscriptions: Vec<client::Subscription>,
     _composer_subscription: GpuiSubscription,
@@ -154,10 +157,95 @@ struct ThreadPanel {
     send_state: SendState,
 }
 
-#[derive(Clone, Default)]
-struct SchedulePickerState {
-    visible: bool,
-    scheduled_at: Option<DateTime<Utc>>,
+#[derive(Clone)]
+struct SchedulePicker {
+    selected_date: NaiveDate,
+    selected_time: NaiveTime,
+    visible_month: NaiveDate,
+    timezone: String,
+    popover_visible: bool,
+    active: bool,
+    validation_error: Option<SharedString>,
+}
+
+impl SchedulePicker {
+    fn new() -> Self {
+        let now = Local::now() + ChronoDuration::hours(1);
+        let selected_date = now.date_naive();
+        Self {
+            selected_date,
+            selected_time: NaiveTime::from_hms_opt(now.hour(), now.minute(), 0)
+                .unwrap_or(NaiveTime::MIN),
+            visible_month: month_start(selected_date),
+            timezone: now.offset().to_string(),
+            popover_visible: false,
+            active: false,
+            validation_error: None,
+        }
+    }
+
+    fn scheduled_at_utc(&self) -> Option<DateTime<Utc>> {
+        if !self.active {
+            return None;
+        }
+
+        let local = self.selected_date.and_time(self.selected_time);
+        match Local.from_local_datetime(&local) {
+            LocalResult::Single(timestamp) => Some(timestamp.with_timezone(&Utc)),
+            LocalResult::Ambiguous(earliest, _) => Some(earliest.with_timezone(&Utc)),
+            LocalResult::None => None,
+        }
+    }
+
+    fn validate(&self) -> Result<DateTime<Utc>, SharedString> {
+        let scheduled_at = self
+            .scheduled_at_utc()
+            .ok_or_else(|| SharedString::from("Choose a valid local time"))?;
+        let earliest = Utc::now() + ChronoDuration::minutes(1);
+        if scheduled_at < earliest {
+            return Err(SharedString::from(
+                "Scheduled messages need at least 1 minute lead time",
+            ));
+        }
+        let latest = Utc::now() + ChronoDuration::days(30);
+        if scheduled_at > latest {
+            return Err(SharedString::from(
+                "Scheduled messages can be at most 30 days away",
+            ));
+        }
+        Ok(scheduled_at)
+    }
+
+    fn select_date(&mut self, date: NaiveDate) {
+        self.selected_date = date;
+        self.visible_month = month_start(date);
+        self.active = true;
+        self.validation_error = None;
+    }
+
+    fn set_hour(&mut self, hour: u32) {
+        self.selected_time = NaiveTime::from_hms_opt(hour, self.selected_time.minute(), 0)
+            .unwrap_or(self.selected_time);
+        self.active = true;
+        self.validation_error = None;
+    }
+
+    fn set_minute(&mut self, minute: u32) {
+        self.selected_time = NaiveTime::from_hms_opt(self.selected_time.hour(), minute, 0)
+            .unwrap_or(self.selected_time);
+        self.active = true;
+        self.validation_error = None;
+    }
+
+    fn adjust_month(&mut self, delta: i32) {
+        self.visible_month = add_months(self.visible_month, delta);
+    }
+
+    fn clear(&mut self) {
+        self.active = false;
+        self.popover_visible = false;
+        self.validation_error = None;
+    }
 }
 
 struct ThreadIndicator {
@@ -483,7 +571,7 @@ impl ChannelChat {
             emoji_picker: None,
             recent_emoji_names,
             send_state: SendState::Idle,
-            schedule_picker: SchedulePickerState::default(),
+            schedule_picker: SchedulePicker::new(),
             pending_draft_save: None,
             _rpc_subscriptions,
             _composer_subscription,
@@ -666,7 +754,18 @@ impl ChannelChat {
         self.send_state = SendState::Sending;
         cx.notify();
 
-        let scheduled_at = self.schedule_picker.scheduled_at;
+        let scheduled_at = if self.schedule_picker.active {
+            match self.schedule_picker.validate() {
+                Ok(scheduled_at) => Some(scheduled_at),
+                Err(message) => {
+                    self.schedule_picker.validation_error = Some(message);
+                    cx.notify();
+                    return;
+                }
+            }
+        } else {
+            None
+        };
         let client = self.client.clone();
         let channel_id = self.channel_id;
         cx.spawn_in(window, async move |this, cx| {
@@ -706,8 +805,7 @@ impl ChannelChat {
                         composer.clear(window, cx);
                     });
                     this.send_state = SendState::Idle;
-                    this.schedule_picker.scheduled_at = None;
-                    this.schedule_picker.visible = false;
+                    this.schedule_picker.clear();
                     if let Some(message) = message {
                         this.upsert_message(message, cx);
                     }
@@ -735,34 +833,65 @@ impl ChannelChat {
     }
 
     fn toggle_schedule_picker(&mut self, _: &ClickEvent, _: &mut Window, cx: &mut Context<Self>) {
-        self.schedule_picker.visible = !self.schedule_picker.visible;
-        cx.notify();
-    }
-
-    fn set_schedule_offset(
-        &mut self,
-        offset: ChronoDuration,
-        _: &ClickEvent,
-        _: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        self.schedule_picker.scheduled_at = Some(Utc::now() + offset);
-        self.schedule_picker.visible = false;
+        self.schedule_picker.popover_visible = !self.schedule_picker.popover_visible;
         cx.notify();
     }
 
     fn clear_schedule(&mut self, _: &ClickEvent, _: &mut Window, cx: &mut Context<Self>) {
-        self.schedule_picker.scheduled_at = None;
-        self.schedule_picker.visible = false;
+        self.schedule_picker.clear();
+        cx.notify();
+    }
+
+    fn select_schedule_date(
+        &mut self,
+        date: NaiveDate,
+        _: &ClickEvent,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.schedule_picker.select_date(date);
+        cx.notify();
+    }
+
+    fn select_schedule_hour(
+        &mut self,
+        hour: u32,
+        _: &ClickEvent,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.schedule_picker.set_hour(hour);
+        cx.notify();
+    }
+
+    fn select_schedule_minute(
+        &mut self,
+        minute: u32,
+        _: &ClickEvent,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.schedule_picker.set_minute(minute);
+        cx.notify();
+    }
+
+    fn show_previous_schedule_month(
+        &mut self,
+        _: &ClickEvent,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.schedule_picker.adjust_month(-1);
+        cx.notify();
+    }
+
+    fn show_next_schedule_month(&mut self, _: &ClickEvent, _: &mut Window, cx: &mut Context<Self>) {
+        self.schedule_picker.adjust_month(1);
         cx.notify();
     }
 
     fn render_schedule_picker(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let selected_label = self
-            .schedule_picker
-            .scheduled_at
-            .map(schedule_label)
-            .unwrap_or_else(|| "Send now".to_string());
+        let selected_label = self.schedule_picker.scheduled_at_utc().map(schedule_label);
 
         v_flex()
             .gap_2()
@@ -776,54 +905,158 @@ impl ChannelChat {
                     .gap_2()
                     .items_center()
                     .child(Icon::new(IconName::Clock).size(IconSize::Small))
-                    .child(Label::new(selected_label).size(LabelSize::Small)),
+                    .child(
+                        Label::new(selected_label.unwrap_or_else(|| "Send now".to_string()))
+                            .size(LabelSize::Small),
+                    )
+                    .child(
+                        Label::new(format!("Local time ({})", self.schedule_picker.timezone))
+                            .size(LabelSize::XSmall)
+                            .color(Color::Muted),
+                    ),
+            )
+            .child(self.render_schedule_calendar(cx))
+            .child(self.render_schedule_time_picker(cx))
+            .when_some(
+                self.schedule_picker.validation_error.clone(),
+                |this, message| {
+                    this.child(
+                        Label::new(message)
+                            .size(LabelSize::XSmall)
+                            .color(Color::Error),
+                    )
+                },
+            )
+            .when(self.schedule_picker.active, |this| {
+                this.child(
+                    Button::new("clear-schedule", "Clear schedule")
+                        .style(ButtonStyle::Subtle)
+                        .on_click(cx.listener(Self::clear_schedule)),
+                )
+            })
+    }
+
+    fn render_schedule_calendar(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let month = self.schedule_picker.visible_month;
+        let first_weekday = month.weekday().num_days_from_monday() as usize;
+        let days_in_month = days_in_month(month);
+        let mut day_cells = Vec::with_capacity(42);
+        for index in 0..42 {
+            let day_number = index as i32 - first_weekday as i32 + 1;
+            let date = if day_number >= 1 && day_number <= days_in_month as i32 {
+                month.with_day(day_number as u32)
+            } else {
+                None
+            };
+            day_cells.push(date);
+        }
+
+        v_flex()
+            .gap_1()
+            .child(
+                h_flex()
+                    .justify_between()
+                    .items_center()
+                    .child(
+                        IconButton::new("schedule-previous-month", IconName::ChevronLeft)
+                            .icon_size(IconSize::Small)
+                            .on_click(cx.listener(Self::show_previous_schedule_month))
+                            .tooltip(Tooltip::text("Previous month")),
+                    )
+                    .child(
+                        Label::new(month.format("%B %Y").to_string())
+                            .size(LabelSize::Small)
+                            .color(Color::Default),
+                    )
+                    .child(
+                        IconButton::new("schedule-next-month", IconName::ChevronRight)
+                            .icon_size(IconSize::Small)
+                            .on_click(cx.listener(Self::show_next_schedule_month))
+                            .tooltip(Tooltip::text("Next month")),
+                    ),
+            )
+            .child(
+                div()
+                    .grid()
+                    .grid_cols(7)
+                    .gap_1()
+                    .children(
+                        ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(|weekday| {
+                            Label::new(weekday)
+                                .size(LabelSize::XSmall)
+                                .color(Color::Muted)
+                                .into_any_element()
+                        }),
+                    )
+                    .children(day_cells.into_iter().map(|date| {
+                        if let Some(date) = date {
+                            let selected = date == self.schedule_picker.selected_date;
+                            Button::new(
+                                format!("schedule-day-{}", date.format("%Y-%m-%d")),
+                                date.day().to_string(),
+                            )
+                            .label_size(LabelSize::XSmall)
+                            .style(if selected {
+                                ButtonStyle::Tinted(TintColor::Accent)
+                            } else {
+                                ButtonStyle::Subtle
+                            })
+                            .on_click(cx.listener(move |this, event, window, cx| {
+                                this.select_schedule_date(date, event, window, cx);
+                            }))
+                            .into_any_element()
+                        } else {
+                            div().h(px(26.)).into_any_element()
+                        }
+                    })),
+            )
+    }
+
+    fn render_schedule_time_picker(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let selected_hour = self.schedule_picker.selected_time.hour();
+        let selected_minute = self.schedule_picker.selected_time.minute();
+        v_flex()
+            .gap_1()
+            .child(
+                Label::new("Time")
+                    .size(LabelSize::XSmall)
+                    .color(Color::Muted),
             )
             .child(
                 h_flex()
                     .gap_2()
+                    .items_center()
+                    .child(h_flex().gap_1().flex_wrap().children((0..24).map(|hour| {
+                        Button::new(("schedule-hour", hour), format!("{hour:02}"))
+                            .label_size(LabelSize::XSmall)
+                            .style(if selected_hour == hour {
+                                ButtonStyle::Tinted(TintColor::Accent)
+                            } else {
+                                ButtonStyle::Subtle
+                            })
+                            .on_click(cx.listener(move |this, event, window, cx| {
+                                this.select_schedule_hour(hour, event, window, cx);
+                            }))
+                            .into_any_element()
+                    })))
+                    .child(div().w(px(1.)).h(px(48.)).bg(cx.theme().colors().border))
                     .child(
-                        Button::new("schedule-in-30-minutes", "30 min").on_click(cx.listener(
-                            |this, event, window, cx| {
-                                this.set_schedule_offset(
-                                    ChronoDuration::minutes(30),
-                                    event,
-                                    window,
-                                    cx,
-                                );
-                            },
-                        )),
-                    )
-                    .child(
-                        Button::new("schedule-in-1-hour", "1 hour").on_click(cx.listener(
-                            |this, event, window, cx| {
-                                this.set_schedule_offset(
-                                    ChronoDuration::hours(1),
-                                    event,
-                                    window,
-                                    cx,
-                                );
-                            },
-                        )),
-                    )
-                    .child(
-                        Button::new("schedule-tomorrow", "Tomorrow").on_click(cx.listener(
-                            |this, event, window, cx| {
-                                this.set_schedule_offset(
-                                    ChronoDuration::days(1),
-                                    event,
-                                    window,
-                                    cx,
-                                );
-                            },
-                        )),
-                    )
-                    .when(self.schedule_picker.scheduled_at.is_some(), |this| {
-                        this.child(
-                            Button::new("clear-schedule", "Clear")
-                                .style(ButtonStyle::Subtle)
-                                .on_click(cx.listener(Self::clear_schedule)),
-                        )
-                    }),
+                        h_flex()
+                            .gap_1()
+                            .flex_wrap()
+                            .children((0..60).step_by(5).map(|minute| {
+                                Button::new(("schedule-minute", minute), format!("{minute:02}"))
+                                    .label_size(LabelSize::XSmall)
+                                    .style(if selected_minute == minute {
+                                        ButtonStyle::Tinted(TintColor::Accent)
+                                    } else {
+                                        ButtonStyle::Subtle
+                                    })
+                                    .on_click(cx.listener(move |this, event, window, cx| {
+                                        this.select_schedule_minute(minute, event, window, cx);
+                                    }))
+                            })),
+                    ),
             )
     }
 
@@ -2443,18 +2676,16 @@ impl Render for ChannelChat {
                                     .child(
                                         IconButton::new("toggle-schedule-picker", IconName::Clock)
                                             .icon_size(IconSize::Small)
-                                            .icon_color(
-                                                if self.schedule_picker.scheduled_at.is_some() {
-                                                    Color::Accent
-                                                } else {
-                                                    Color::Muted
-                                                },
-                                            )
+                                            .icon_color(if self.schedule_picker.active {
+                                                Color::Accent
+                                            } else {
+                                                Color::Muted
+                                            })
                                             .on_click(cx.listener(Self::toggle_schedule_picker))
                                             .tooltip(Tooltip::text("Schedule message")),
                                     )
                                     .when_some(
-                                        self.schedule_picker.scheduled_at.map(schedule_label),
+                                        self.schedule_picker.scheduled_at_utc().map(schedule_label),
                                         |this, label| {
                                             this.child(
                                                 Label::new(label)
@@ -2464,7 +2695,7 @@ impl Render for ChannelChat {
                                         },
                                     ),
                             )
-                            .when(self.schedule_picker.visible, |this| {
+                            .when(self.schedule_picker.popover_visible, |this| {
                                 this.child(self.render_schedule_picker(cx))
                             })
                             .when_some(
@@ -2541,6 +2772,29 @@ fn schedule_label(timestamp: DateTime<Utc>) -> String {
         .to_string()
 }
 
+fn month_start(date: NaiveDate) -> NaiveDate {
+    date.with_day(1).unwrap_or(date)
+}
+
+fn add_months(date: NaiveDate, delta: i32) -> NaiveDate {
+    let mut year = date.year();
+    let mut month = date.month() as i32 + delta;
+    while month < 1 {
+        year -= 1;
+        month += 12;
+    }
+    while month > 12 {
+        year += 1;
+        month -= 12;
+    }
+    NaiveDate::from_ymd_opt(year, month as u32, 1).unwrap_or(date)
+}
+
+fn days_in_month(month: NaiveDate) -> u32 {
+    let next_month = add_months(month_start(month), 1);
+    (next_month - ChronoDuration::days(1)).day()
+}
+
 fn emoji_character(emoji_name: &str) -> &str {
     emoji_by_name(emoji_name)
         .map(|emoji| emoji.character)
@@ -2589,7 +2843,7 @@ mod tests {
     fn channel_chat_key_bindings_parse() {
         let bindings = super::channel_chat_key_bindings();
 
-        assert_eq!(bindings.len(), 6);
+        assert_eq!(bindings.len(), 10);
         assert!(bindings.iter().any(|binding| {
             binding.action().name().ends_with("TogglePreview")
                 && binding
