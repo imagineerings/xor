@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-09T00:12:00Z",
+  "updated_at": "2026-07-09T00:20:00Z",
   "repo_revision": null,
   "recommendation": {
     "task_id": null,
@@ -325,6 +325,17 @@
       "owner": null,
       "summary": "Implemented locally after confirming no existing i18n crate/pattern: added a lightweight i18n workspace crate with serializable language settings, dynamic JSON catalog loading from files/directories, active-locale lookup with fallback, named-argument interpolation, and constants marking desktop UI strings for translation. Ready to merge in PR.",
       "updated_at": "2026-07-09T00:12:00Z"
+    },
+    {
+      "task_id": "task:goose-desktop-ui-8",
+      "task_identifier": ".agents/specs/goose-migration/desktop-ui/tasks.md:70",
+      "title": "Reconcile and enhance existing auto-update UI",
+      "linear_identifier": null,
+      "linear_url": null,
+      "status": "inactive",
+      "owner": null,
+      "summary": "Implemented locally after auditing existing auto_update/auto_update_ui startup checks, update notifications, and release notes handling. Kept the existing updater flow and added reusable auto_update_ui status details for idle, checking, downloading, installing, updated, and error states with progress severity, detail text, and expected primary actions. Ready to merge in PR.",
+      "updated_at": "2026-07-09T00:20:00Z"
     }
   ],
   "task_notes": [
@@ -861,8 +872,8 @@
     },
     {
       "scope": ".agents/specs/goose-migration/desktop-ui",
-      "summary": "Tasks 1-7 are checked complete. Agent connection state exposes ACP metadata; agent_ui has RecipeBrowser and GooseDiagnosticsView GPUI components integrated into AgentPanel toolbar/menu overlays; settings_ui has SchedulingSettings; diagnostics run crates/doctor checks with pass/warning/fail summaries, expandable remediation, logging, auto-run, and manual re-run; agent/sim support versioned shared-session export/import and sim://session deeplinks; crates/i18n provides dynamic JSON catalogs, fallback lookup, interpolation, and desktop UI string keys. Task 8 can proceed with auto-update UI reconciliation.",
-      "updated_at": "2026-07-09T00:12:00Z"
+      "summary": "Tasks 1-8 are checked complete. Agent connection state exposes ACP metadata; agent_ui has RecipeBrowser and GooseDiagnosticsView GPUI components integrated into AgentPanel toolbar/menu overlays; settings_ui has SchedulingSettings; diagnostics run crates/doctor checks with pass/warning/fail summaries, expandable remediation, logging, auto-run, and manual re-run; agent/sim support versioned shared-session export/import and sim://session deeplinks; crates/i18n provides dynamic JSON catalogs, fallback lookup, interpolation, and desktop UI string keys; auto_update_ui now exposes reusable status details for update progress/completion/error states. Task 9 can proceed with cross-component tests.",
+      "updated_at": "2026-07-09T00:20:00Z"
     },
     {
       "scope": ".agents/specs/godot-migration",

@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use agent_skills::GLOBAL_SKILLS_DIR_DISPLAY;
-use auto_update::{AutoUpdater, release_notes_url};
-use sim_actions::ShowUpdateNotification;
+use auto_update::{AutoUpdateStatus, AutoUpdater, VersionCheckType, release_notes_url};
 use client::sim_urls;
 use db::kvp::Dismissable;
 use editor::{Editor, MultiBuffer};
@@ -15,6 +14,7 @@ use prompt_store::rules_to_skills_migration;
 use release_channel::{AppVersion, ReleaseChannel};
 use semver::Version;
 use serde::Deserialize;
+use sim_actions::ShowUpdateNotification;
 use smol::io::AsyncReadExt;
 use ui::{AnnouncementToast, ListBulletItem, SkillsIllustration, prelude::*};
 use util::{ResultExt as _, maybe};
@@ -34,6 +34,78 @@ actions!(
         ViewReleaseNotesLocally
     ]
 );
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum AutoUpdateStatusSeverity {
+    Neutral,
+    Progress,
+    Success,
+    Error,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AutoUpdateStatusDetails {
+    pub title: SharedString,
+    pub detail: SharedString,
+    pub severity: AutoUpdateStatusSeverity,
+    pub primary_action_label: Option<SharedString>,
+}
+
+pub fn status_details(status: &AutoUpdateStatus) -> AutoUpdateStatusDetails {
+    match status {
+        AutoUpdateStatus::Idle => AutoUpdateStatusDetails {
+            title: "Up to date".into(),
+            detail: "Sim will keep checking for updates automatically.".into(),
+            severity: AutoUpdateStatusSeverity::Neutral,
+            primary_action_label: Some("Check for Updates".into()),
+        },
+        AutoUpdateStatus::Checking => AutoUpdateStatusDetails {
+            title: "Checking for updates".into(),
+            detail: "Looking for the latest Sim release.".into(),
+            severity: AutoUpdateStatusSeverity::Progress,
+            primary_action_label: None,
+        },
+        AutoUpdateStatus::Downloading { version } => AutoUpdateStatusDetails {
+            title: "Downloading update".into(),
+            detail: format!("Downloading {}.", version_label(version)).into(),
+            severity: AutoUpdateStatusSeverity::Progress,
+            primary_action_label: None,
+        },
+        AutoUpdateStatus::Installing { version } => AutoUpdateStatusDetails {
+            title: "Installing update".into(),
+            detail: format!(
+                "Installing {}. Restart Sim to finish when prompted.",
+                version_label(version)
+            )
+            .into(),
+            severity: AutoUpdateStatusSeverity::Progress,
+            primary_action_label: None,
+        },
+        AutoUpdateStatus::Updated { version } => AutoUpdateStatusDetails {
+            title: "Update ready".into(),
+            detail: format!(
+                "{} is installed and ready after restart.",
+                version_label(version)
+            )
+            .into(),
+            severity: AutoUpdateStatusSeverity::Success,
+            primary_action_label: Some("View Release Notes".into()),
+        },
+        AutoUpdateStatus::Errored { error } => AutoUpdateStatusDetails {
+            title: "Update failed".into(),
+            detail: error.to_string().into(),
+            severity: AutoUpdateStatusSeverity::Error,
+            primary_action_label: Some("Check Again".into()),
+        },
+    }
+}
+
+fn version_label(version: &VersionCheckType) -> String {
+    match version {
+        VersionCheckType::Semantic(version) => format!("Sim {version}"),
+        VersionCheckType::Sha(sha) => format!("Sim build {}", sha.short()),
+    }
+}
 
 pub fn init(cx: &mut App) {
     notify_if_app_was_updated(cx);
@@ -396,4 +468,61 @@ pub fn notify_if_app_was_updated(cx: &mut App) {
         anyhow::Ok(())
     })
     .detach();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use release_channel::AppCommitSha;
+
+    #[test]
+    fn status_details_describe_progress_states() {
+        let downloading = status_details(&AutoUpdateStatus::Downloading {
+            version: VersionCheckType::Semantic(Version::new(1, 2, 3)),
+        });
+        assert_eq!(downloading.title.as_ref(), "Downloading update");
+        assert_eq!(downloading.detail.as_ref(), "Downloading Sim 1.2.3.");
+        assert_eq!(downloading.severity, AutoUpdateStatusSeverity::Progress);
+        assert!(downloading.primary_action_label.is_none());
+
+        let installing = status_details(&AutoUpdateStatus::Installing {
+            version: VersionCheckType::Sha(AppCommitSha::new("abcdef123456".to_string())),
+        });
+        assert_eq!(installing.title.as_ref(), "Installing update");
+        assert_eq!(
+            installing.detail.as_ref(),
+            "Installing Sim build abcdef1. Restart Sim to finish when prompted."
+        );
+        assert_eq!(installing.severity, AutoUpdateStatusSeverity::Progress);
+    }
+
+    #[test]
+    fn status_details_expose_completion_and_error_actions() {
+        let updated = status_details(&AutoUpdateStatus::Updated {
+            version: VersionCheckType::Semantic(Version::new(1, 2, 3)),
+        });
+        assert_eq!(updated.title.as_ref(), "Update ready");
+        assert_eq!(updated.severity, AutoUpdateStatusSeverity::Success);
+        assert_eq!(
+            updated
+                .primary_action_label
+                .as_ref()
+                .map(|label| label.as_ref()),
+            Some("View Release Notes")
+        );
+
+        let error = status_details(&AutoUpdateStatus::Errored {
+            error: Arc::new(anyhow::anyhow!("network unavailable")),
+        });
+        assert_eq!(error.title.as_ref(), "Update failed");
+        assert_eq!(error.detail.as_ref(), "network unavailable");
+        assert_eq!(error.severity, AutoUpdateStatusSeverity::Error);
+        assert_eq!(
+            error
+                .primary_action_label
+                .as_ref()
+                .map(|label| label.as_ref()),
+            Some("Check Again")
+        );
+    }
 }

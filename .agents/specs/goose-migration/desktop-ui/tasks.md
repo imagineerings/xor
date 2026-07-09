@@ -67,7 +67,7 @@ Build GPUI-native views for recipe browsing, scheduling, diagnostics, shared ses
   - _Requirements: 9_
   - _writes: crates/i18n/src/lib.rs (if new)_
 
-- [ ] 8. Reconcile and enhance existing auto-update UI
+- [x] 8. Reconcile and enhance existing auto-update UI
   - Audit existing update notifications and release notes handling
   - Add only missing Goose update states or progress details
   - Keep using existing `crates/auto_update/`
