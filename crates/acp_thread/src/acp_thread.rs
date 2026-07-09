@@ -1388,6 +1388,7 @@ impl From<&AcpThread> for ActionLogTelemetry {
 pub enum AcpThreadEvent {
     PromptUpdated,
     NewEntry,
+    StatusChanged,
     TitleUpdated,
     TokenUsageUpdated,
     EntryUpdated(usize),
@@ -2753,6 +2754,9 @@ impl AcpThread {
                 }
 
                 let Ok(response) = response else {
+                    if is_same_turn {
+                        cx.emit(AcpThreadEvent::StatusChanged);
+                    }
                     // tx dropped, just return
                     return Ok(None);
                 };
@@ -2762,6 +2766,9 @@ impl AcpThread {
                         Self::flush_streaming_text(&mut this.streaming_text_buffer, cx);
 
                         if r.stop_reason == acp::StopReason::MaxTokens {
+                            if is_same_turn {
+                                cx.emit(AcpThreadEvent::StatusChanged);
+                            }
                             this.had_error = true;
                             cx.emit(AcpThreadEvent::Error);
                             log::error!("Max tokens reached. Usage: {:?}", this.token_usage);
@@ -2837,10 +2844,16 @@ impl AcpThread {
                             cx.emit(AcpThreadEvent::TokenUsageUpdated);
                         }
 
+                        if is_same_turn {
+                            cx.emit(AcpThreadEvent::StatusChanged);
+                        }
                         cx.emit(AcpThreadEvent::Stopped(r.stop_reason));
                         Ok(Some(r))
                     }
                     Err(e) => {
+                        if is_same_turn {
+                            cx.emit(AcpThreadEvent::StatusChanged);
+                        }
                         Self::flush_streaming_text(&mut this.streaming_text_buffer, cx);
 
                         this.had_error = true;
