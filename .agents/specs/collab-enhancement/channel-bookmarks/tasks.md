@@ -148,13 +148,13 @@ Add a channel bookmarks feature: a dedicated section in the channel header where
   - [ ] 10.1 Build create-mode form with fields: label (required), URL, type selector (Link/File/Message), description (optional).
     - _Requirements: 6.1 (AC 2, 4)_
     - _writes: collab_ui/src/channel_bookmark_form.rs_
-  - [ ] 10.2 Build edit-mode form pre-filled with existing bookmark data.
+  - [x] 10.2 Build edit-mode form pre-filled with existing bookmark data.
     - _Requirements: 6.1 (AC 5)_
     - _writes: collab_ui/src/channel_bookmark_form.rs_
-  - [ ] 10.3 Implement client-side validation: label is required, URL is required for link type, show inline error messages.
+  - [x] 10.3 Implement client-side validation: label is required, URL is required for link type, show inline error messages.
     - _Requirements: 6.1_
     - _writes: collab_ui/src/channel_bookmark_form.rs_
-  - [ ] 10.4 Wire form submission to the appropriate RPC call (create vs update).
+  - [x] 10.4 Wire form submission to the appropriate RPC call (create vs update).
     - _Requirements: 6.1 (AC 3)_
     - _writes: collab_ui/src/channel_bookmark_form.rs_
   - [ ] 10.5 Write UI tests: form validation errors, successful create, successful edit, field population.
@@ -162,12 +162,14 @@ Add a channel bookmarks feature: a dedicated section in the channel header where
     - _writes: collab_ui/src/channel_bookmark_form.rs_
   - _Partial: Added an inline create form for link bookmarks with URL, label, and optional description fields; client-side link validation; submit/cancel states; and pure validation tests. Type selection, file/message create modes, edit mode, and end-to-end UI submission coverage remain open._
   - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_form --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_bar --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_store --features collab_ui/test-support`._
+  - _Completed: Added edit-mode form prefill, label/description update submission via `update_bookmark`, and shared validation for create/update paths._
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_form --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_bar --features collab_ui/test-support`._
 
 - [ ] 11. Implement bookmark context menu
   - [ ] 11.1 Show context menu on hover/bookmark click with options: Edit, Delete.
     - _Requirements: 6.1 (AC 5)_
     - _writes: collab_ui/src/channel_bookmark_bar.rs_
-  - [ ] 11.2 Wire "Edit" to open `BookmarkForm` in edit mode.
+  - [x] 11.2 Wire "Edit" to open `BookmarkForm` in edit mode.
     - _Requirements: 6.1_
     - _writes: collab_ui/src/channel_bookmark_bar.rs_
   - [ ] 11.3 Wire "Delete" to call `remove_bookmark` RPC with confirmation dialog.
@@ -175,6 +177,8 @@ Add a channel bookmarks feature: a dedicated section in the channel header where
     - _writes: collab_ui/src/channel_bookmark_bar.rs_
   - _Partial: Added a compact delete action to each rendered bookmark, confirmation prompt, `remove_bookmark` RPC wiring, and inline delete failure feedback. Full hover/context-menu presentation and edit action remain open._
   - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_bar --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_form --features collab_ui/test-support`._
+  - _Completed: Added a compact edit action to each rendered bookmark and wired it to open `BookmarkForm` in edit mode._
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_form --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_bar --features collab_ui/test-support`._
 
 - [ ] 12. Implement drag-and-drop reorder
   - [ ] 12.1 Enable drag-and-drop on bookmark items in the `BookmarkBar` when user has edit permission.

@@ -1,4 +1,4 @@
-use client::{AddBookmark, ChannelId};
+use client::{AddBookmark, Bookmark, BookmarkId, ChannelId, UpdateBookmark};
 use editor::Editor;
 use gpui::{AppContext as _, Context, Entity, SharedString, Window};
 use rpc::proto;
@@ -7,7 +7,14 @@ pub(crate) struct BookmarkForm {
     pub(crate) url_editor: Entity<Editor>,
     pub(crate) label_editor: Entity<Editor>,
     pub(crate) description_editor: Entity<Editor>,
+    pub(crate) mode: BookmarkFormMode,
     pub(crate) state: BookmarkFormState,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum BookmarkFormMode {
+    Create,
+    Edit { bookmark_id: BookmarkId },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -18,27 +25,59 @@ pub(crate) enum BookmarkFormState {
 }
 
 impl BookmarkForm {
-    pub(crate) fn new(window: &mut Window, cx: &mut Context<impl Sized>) -> Self {
+    pub(crate) fn new_create(window: &mut Window, cx: &mut Context<impl Sized>) -> Self {
+        Self::new(window, None, cx)
+    }
+
+    pub(crate) fn new_edit(
+        bookmark: &Bookmark,
+        window: &mut Window,
+        cx: &mut Context<impl Sized>,
+    ) -> Self {
+        Self::new(window, Some(bookmark), cx)
+    }
+
+    fn new(
+        window: &mut Window,
+        bookmark: Option<&Bookmark>,
+        cx: &mut Context<impl Sized>,
+    ) -> Self {
         let url_editor = cx.new(|cx| {
             let mut editor = Editor::single_line(window, cx);
             editor.set_placeholder_text("URL", window, cx);
+            if let Some(bookmark) = bookmark {
+                editor.set_text(bookmark.url.to_string(), window, cx);
+            }
             editor
         });
         let label_editor = cx.new(|cx| {
             let mut editor = Editor::single_line(window, cx);
             editor.set_placeholder_text("Label", window, cx);
+            if let Some(bookmark) = bookmark {
+                editor.set_text(bookmark.label.to_string(), window, cx);
+            }
             editor
         });
         let description_editor = cx.new(|cx| {
             let mut editor = Editor::single_line(window, cx);
             editor.set_placeholder_text("Description", window, cx);
+            if let Some(description) = bookmark.and_then(|bookmark| bookmark.description.as_ref()) {
+                editor.set_text(description.to_string(), window, cx);
+            }
             editor
         });
+        let mode = match bookmark {
+            Some(bookmark) => BookmarkFormMode::Edit {
+                bookmark_id: bookmark.id,
+            },
+            None => BookmarkFormMode::Create,
+        };
 
         Self {
             url_editor,
             label_editor,
             description_editor,
+            mode,
             state: BookmarkFormState::Idle,
         }
     }
@@ -61,6 +100,33 @@ impl BookmarkForm {
         draft.into_add_bookmark(channel_id)
     }
 
+    pub(crate) fn update_bookmark(
+        &self,
+        channel_id: ChannelId,
+        cx: &mut Context<impl Sized>,
+    ) -> Result<UpdateBookmark, SharedString> {
+        let BookmarkFormMode::Edit { bookmark_id } = self.mode else {
+            return Err(SharedString::from("Select a bookmark to edit."));
+        };
+        let draft = BookmarkFormDraft {
+            url: self.url_editor.read(cx).text(cx).trim().to_string(),
+            label: self.label_editor.read(cx).text(cx).trim().to_string(),
+            description: self
+                .description_editor
+                .read(cx)
+                .text(cx)
+                .trim()
+                .to_string(),
+        };
+        let (label, description) = draft.label_and_description()?;
+        Ok(UpdateBookmark {
+            channel_id,
+            bookmark_id,
+            label,
+            description,
+        })
+    }
+
     pub(crate) fn set_submitting(&mut self) {
         self.state = BookmarkFormState::Submitting;
     }
@@ -71,6 +137,10 @@ impl BookmarkForm {
 
     pub(crate) fn is_submitting(&self) -> bool {
         self.state == BookmarkFormState::Submitting
+    }
+
+    pub(crate) fn is_editing(&self) -> bool {
+        matches!(self.mode, BookmarkFormMode::Edit { .. })
     }
 }
 
@@ -83,9 +153,7 @@ struct BookmarkFormDraft {
 
 impl BookmarkFormDraft {
     fn into_add_bookmark(self, channel_id: ChannelId) -> Result<AddBookmark, SharedString> {
-        if self.label.is_empty() {
-            return Err(SharedString::from("Enter a label."));
-        }
+        let (label, description) = self.label_and_description()?;
         if self.url.is_empty() {
             return Err(SharedString::from("Enter a URL."));
         }
@@ -95,13 +163,24 @@ impl BookmarkFormDraft {
 
         Ok(AddBookmark {
             channel_id,
-            label: self.label,
+            label,
             bookmark_type: proto::BookmarkType::BookmarkLink,
             url: self.url,
             file_id: None,
             message_id: None,
-            description: (!self.description.is_empty()).then_some(self.description),
+            description,
         })
+    }
+
+    fn label_and_description(&self) -> Result<(String, Option<String>), SharedString> {
+        if self.label.is_empty() {
+            return Err(SharedString::from("Enter a label."));
+        }
+
+        Ok((
+            self.label.clone(),
+            (!self.description.is_empty()).then_some(self.description.clone()),
+        ))
     }
 }
 
@@ -154,5 +233,18 @@ mod tests {
         .unwrap_err();
 
         assert_eq!(error, SharedString::from("Enter a label."));
+    }
+
+    #[test]
+    fn draft_builds_bookmark_update() {
+        let draft = BookmarkFormDraft {
+            url: "https://sim.dev/runbook".to_string(),
+            label: "Updated runbook".to_string(),
+            description: String::new(),
+        };
+        let (label, description) = draft.label_and_description().unwrap();
+
+        assert_eq!(label, "Updated runbook");
+        assert_eq!(description, None);
     }
 }

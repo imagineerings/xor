@@ -5,12 +5,14 @@ use std::rc::Rc;
 use ui::{Button, ButtonSize, ButtonStyle, Color, Icon, IconName, Label, Tooltip, prelude::*};
 
 const COLLAPSED_BOOKMARK_LIMIT: usize = 5;
+type EditBookmarkHandler = Rc<dyn Fn(Bookmark, &mut Window, &mut App)>;
 type DeleteBookmarkHandler = Rc<dyn Fn(Bookmark, &mut Window, &mut App)>;
 
 #[derive(IntoElement)]
 pub struct ChannelBookmarkBar {
     bookmarks: Vec<Bookmark>,
     expanded: bool,
+    on_edit: Option<EditBookmarkHandler>,
     on_delete: Option<DeleteBookmarkHandler>,
 }
 
@@ -19,8 +21,14 @@ impl ChannelBookmarkBar {
         Self {
             bookmarks,
             expanded,
+            on_edit: None,
             on_delete: None,
         }
+    }
+
+    pub fn on_edit(mut self, on_edit: impl Fn(Bookmark, &mut Window, &mut App) + 'static) -> Self {
+        self.on_edit = Some(Rc::new(on_edit));
+        self
     }
 
     pub fn on_delete(
@@ -73,7 +81,13 @@ impl RenderOnce for ChannelBookmarkBar {
                         self.bookmarks
                             .into_iter()
                             .take(visible_count)
-                            .map(|bookmark| render_bookmark(bookmark, self.on_delete.clone())),
+                            .map(|bookmark| {
+                                render_bookmark(
+                                    bookmark,
+                                    self.on_edit.clone(),
+                                    self.on_delete.clone(),
+                                )
+                            }),
                     ),
                 )
         })
@@ -82,6 +96,7 @@ impl RenderOnce for ChannelBookmarkBar {
 
 fn render_bookmark(
     bookmark: Bookmark,
+    on_edit: Option<EditBookmarkHandler>,
     on_delete: Option<DeleteBookmarkHandler>,
 ) -> impl IntoElement {
     let id = bookmark.id.to_proto();
@@ -89,6 +104,7 @@ fn render_bookmark(
     let description = bookmark.description.clone();
     let bookmark_type = bookmark.bookmark_type;
     let url = bookmark.url.to_string();
+    let bookmark_for_edit = bookmark.clone();
     let bookmark_for_delete = bookmark.clone();
 
     h_flex()
@@ -111,6 +127,17 @@ fn render_bookmark(
                     }
                 }),
         )
+        .when_some(on_edit, |this, on_edit| {
+            this.child(
+                IconButton::new(("edit-channel-bookmark", id), IconName::Pencil)
+                    .icon_size(IconSize::XSmall)
+                    .icon_color(Color::Muted)
+                    .tooltip(Tooltip::text("Edit bookmark"))
+                    .on_click(move |_, window, cx| {
+                        on_edit(bookmark_for_edit.clone(), window, cx);
+                    }),
+            )
+        })
         .when_some(on_delete, |this, on_delete| {
             this.child(
                 IconButton::new(("delete-channel-bookmark", id), IconName::Trash)

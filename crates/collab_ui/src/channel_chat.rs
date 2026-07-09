@@ -11,7 +11,7 @@ use chrono::{
     TimeZone as _, Timelike as _, Utc,
 };
 use client::{
-    Bookmark, ChannelId, Client, UserStore,
+    AddBookmark, Bookmark, ChannelId, Client, UpdateBookmark, UserStore,
     channel_chat::{
         DEFAULT_THREAD_REPLY_LIMIT, ScheduleChannelMessage, SearchChannelMessages,
         SendChannelMessage, ThreadSummary, UpdateScheduledMessage,
@@ -156,6 +156,11 @@ enum SendState {
     Idle,
     Sending,
     Failed(SharedString),
+}
+
+enum BookmarkFormRequest {
+    Add(AddBookmark),
+    Update(UpdateBookmark),
 }
 
 struct ThreadPanel {
@@ -3546,15 +3551,28 @@ impl ChannelChat {
                 this.when(!bookmarks.is_empty(), |this| {
                     let weak_self = cx.weak_entity();
                     this.child(
-                        ChannelBookmarkBar::new(bookmarks, self.bookmarks_expanded).on_delete(
-                            move |bookmark, window, cx| {
+                        ChannelBookmarkBar::new(bookmarks, self.bookmarks_expanded)
+                            .on_edit({
+                                let weak_self = weak_self.clone();
+                                move |bookmark, window, cx| {
+                                    weak_self
+                                        .update(cx, |this, cx| {
+                                            this.open_edit_bookmark_form(
+                                                bookmark.clone(),
+                                                window,
+                                                cx,
+                                            );
+                                        })
+                                        .log_err();
+                                }
+                            })
+                            .on_delete(move |bookmark, window, cx| {
                                 weak_self
                                     .update(cx, |this, cx| {
                                         this.confirm_remove_bookmark(bookmark.clone(), window, cx);
                                     })
                                     .log_err();
-                            },
-                        ),
+                            }),
                     )
                 })
                 .when_some(self.bookmark_form.as_ref(), |this, form| {
@@ -3611,12 +3629,17 @@ impl ChannelChat {
             .gap_2()
             .px_3()
             .pb_2()
-            .child(
-                h_flex()
-                    .gap_2()
-                    .child(div().flex_1().child(form.url_editor.clone()))
-                    .child(div().flex_1().child(form.label_editor.clone())),
-            )
+            .when(!form.is_editing(), |this| {
+                this.child(
+                    h_flex()
+                        .gap_2()
+                        .child(div().flex_1().child(form.url_editor.clone()))
+                        .child(div().flex_1().child(form.label_editor.clone())),
+                )
+            })
+            .when(form.is_editing(), |this| {
+                this.child(form.label_editor.clone())
+            })
             .child(form.description_editor.clone())
             .when_some(
                 match &form.state {
@@ -3642,20 +3665,34 @@ impl ChannelChat {
                             .disabled(submitting)
                             .on_click(cx.listener(Self::close_bookmark_form)),
                     )
-                    .child(
-                        Button::new("submit-channel-bookmark", "Save")
-                            .style(ButtonStyle::Filled)
-                            .size(ButtonSize::Compact)
-                            .disabled(submitting)
-                            .on_click(cx.listener(Self::submit_bookmark_form)),
-                    ),
+                            .child(
+                                Button::new(
+                                    "submit-channel-bookmark",
+                                    if form.is_editing() { "Save changes" } else { "Save" },
+                                )
+                                .style(ButtonStyle::Filled)
+                                .size(ButtonSize::Compact)
+                                .disabled(submitting)
+                                .on_click(cx.listener(Self::submit_bookmark_form)),
+                            ),
             )
     }
 
     fn open_bookmark_form(&mut self, _: &ClickEvent, window: &mut Window, cx: &mut Context<Self>) {
         if self.bookmark_form.is_none() {
-            self.bookmark_form = Some(BookmarkForm::new(window, cx));
+            self.bookmark_form = Some(BookmarkForm::new_create(window, cx));
         }
+        cx.notify();
+    }
+
+    fn open_edit_bookmark_form(
+        &mut self,
+        bookmark: Bookmark,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.bookmark_form = Some(BookmarkForm::new_edit(&bookmark, window, cx));
+        self.bookmark_action_error = None;
         cx.notify();
     }
 
@@ -3672,8 +3709,12 @@ impl ChannelChat {
             return;
         }
 
-        let bookmark = match form.add_bookmark(self.channel_id, cx) {
-            Ok(bookmark) => bookmark,
+        let request = match if form.is_editing() {
+            form.update_bookmark(self.channel_id, cx).map(BookmarkFormRequest::Update)
+        } else {
+            form.add_bookmark(self.channel_id, cx).map(BookmarkFormRequest::Add)
+        } {
+            Ok(request) => request,
             Err(error) => {
                 form.set_error(error);
                 cx.notify();
@@ -3687,7 +3728,10 @@ impl ChannelChat {
         cx.spawn({
             let client = self.client.clone();
             async move |this, cx| {
-                let result = client.add_bookmark(bookmark).await;
+                let result = match request {
+                    BookmarkFormRequest::Add(bookmark) => client.add_bookmark(bookmark).await,
+                    BookmarkFormRequest::Update(bookmark) => client.update_bookmark(bookmark).await,
+                };
                 this.update(cx, |this, cx| {
                     match result {
                         Ok(()) => {
@@ -3696,7 +3740,7 @@ impl ChannelChat {
                         Err(error) => {
                             if let Some(form) = this.bookmark_form.as_mut() {
                                 form.set_error(SharedString::from(format!(
-                                    "Failed to add bookmark: {error:#}"
+                                    "Failed to save bookmark: {error:#}"
                                 )));
                             }
                         }
