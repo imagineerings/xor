@@ -17,6 +17,9 @@ use time::{Duration as TimeDuration, OffsetDateTime, PrimitiveDateTime};
 #[derive(Default)]
 struct ReactionHandlerEntity;
 
+#[derive(Default)]
+struct ScheduledMessageHandlerEntity;
+
 #[gpui::test]
 async fn test_channel_chat_core_flow(
     executor: BackgroundExecutor,
@@ -216,6 +219,175 @@ async fn test_cancelled_scheduled_channel_message_does_not_deliver(
         .unwrap()
         .messages;
     assert!(history.is_empty());
+    assert!(
+        client_a
+            .client()
+            .get_scheduled_messages(channel_id.0)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[gpui::test]
+async fn test_scheduled_channel_message_failure_after_sender_removed(
+    executor: BackgroundExecutor,
+    cx_a: &mut TestAppContext,
+    cx_b: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor.clone()).await;
+    let client_a = server.create_client(cx_a, "user_a").await;
+    let client_b = server.create_client(cx_b, "user_b").await;
+    let channel_id = server
+        .make_channel("chat", None, (&client_b, cx_b), &mut [(&client_a, cx_a)])
+        .await;
+
+    client_a
+        .client()
+        .join_channel_chat(channel_id.0)
+        .await
+        .unwrap();
+    client_b
+        .client()
+        .join_channel_chat(channel_id.0)
+        .await
+        .unwrap();
+
+    let handler_entity = cx_a.new(|_| ScheduledMessageHandlerEntity);
+    let (failure_tx, failure_rx) = async_channel::bounded(1);
+    let _failure_subscription = client_a.client().add_scheduled_message_failed_handler(
+        handler_entity.downgrade(),
+        move |_, failure, _| {
+            failure_tx.try_send(failure.payload).unwrap();
+            async { Ok(()) }
+        },
+    );
+
+    let scheduled_message_id = client_a
+        .client()
+        .schedule_channel_message(ScheduleChannelMessage {
+            channel_id: channel_id.0,
+            body: "removed sender".to_string(),
+            scheduled_at: chrono::Utc::now() + chrono::Duration::minutes(5),
+            nonce: 12,
+            mentions: Vec::new(),
+        })
+        .await
+        .unwrap();
+    let store = ScheduledMessageStore::new(server.app_state.db.clone());
+    store
+        .set_scheduled_at_for_test(
+            DbScheduledMessageId::from_proto(scheduled_message_id.to_proto()),
+            primitive_datetime_in(TimeDuration::minutes(-1)),
+        )
+        .await
+        .unwrap();
+
+    client_b
+        .channel_store()
+        .update(cx_b, |channel_store, cx| {
+            channel_store.remove_member(channel_id, client_a.user_id().unwrap(), cx)
+        })
+        .await
+        .unwrap();
+    executor.run_until_parked();
+
+    executor.advance_clock(StdDuration::from_secs(10));
+    executor.run_until_parked();
+
+    let failure = failure_rx.recv().await.unwrap();
+    assert_eq!(
+        failure.scheduled_message_id,
+        scheduled_message_id.to_proto()
+    );
+    assert_eq!(failure.channel_id, channel_id.0);
+    assert!(
+        failure.reason.contains("not a channel participant"),
+        "unexpected failure reason: {}",
+        failure.reason
+    );
+    assert!(
+        client_a
+            .client()
+            .get_scheduled_messages(channel_id.0)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        client_b
+            .client()
+            .get_channel_messages(channel_id.0, None)
+            .await
+            .unwrap()
+            .messages
+            .is_empty()
+    );
+}
+
+#[gpui::test]
+async fn test_scheduled_channel_messages_due_at_same_time_deliver_in_order(
+    executor: BackgroundExecutor,
+    cx_a: &mut TestAppContext,
+    cx_b: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor.clone()).await;
+    let client_a = server.create_client(cx_a, "user_a").await;
+    let client_b = server.create_client(cx_b, "user_b").await;
+    let channel_id = server
+        .make_channel("chat", None, (&client_a, cx_a), &mut [(&client_b, cx_b)])
+        .await;
+
+    client_a
+        .client()
+        .join_channel_chat(channel_id.0)
+        .await
+        .unwrap();
+    client_b
+        .client()
+        .join_channel_chat(channel_id.0)
+        .await
+        .unwrap();
+
+    let store = ScheduledMessageStore::new(server.app_state.db.clone());
+    let due_at = primitive_datetime_in(TimeDuration::minutes(-1));
+    for (nonce, body) in [(20, "first due"), (21, "second due"), (22, "third due")] {
+        let scheduled_message_id = client_a
+            .client()
+            .schedule_channel_message(ScheduleChannelMessage {
+                channel_id: channel_id.0,
+                body: body.to_string(),
+                scheduled_at: chrono::Utc::now() + chrono::Duration::minutes(5),
+                nonce,
+                mentions: Vec::new(),
+            })
+            .await
+            .unwrap();
+        store
+            .set_scheduled_at_for_test(
+                DbScheduledMessageId::from_proto(scheduled_message_id.to_proto()),
+                due_at,
+            )
+            .await
+            .unwrap();
+    }
+
+    executor.advance_clock(StdDuration::from_secs(10));
+    executor.run_until_parked();
+
+    let history = client_b
+        .client()
+        .get_channel_messages(channel_id.0, None)
+        .await
+        .unwrap()
+        .messages;
+    assert_eq!(
+        history
+            .iter()
+            .map(|message| message.body.as_str())
+            .collect::<Vec<_>>(),
+        vec!["first due", "second due", "third due"]
+    );
     assert!(
         client_a
             .client()

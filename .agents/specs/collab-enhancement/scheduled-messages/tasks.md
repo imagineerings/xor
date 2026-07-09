@@ -144,12 +144,12 @@ Add the ability for channel participants to schedule messages for future deliver
     - [ ] 11.2 Integration tests (using test server harness):
         - [x] Schedule → confirm row in DB → advance clock → confirm message delivered → confirm row deleted.
         - [x] Schedule → cancel → confirm row deleted and message never delivered.
-        - Schedule → sender loses member role before delivery → confirm `ScheduledMessageFailed` push sent.
-        - Multiple due messages at same timestamp → confirm all delivered in order.
+        - [x] Schedule → sender loses member role before delivery → confirm `ScheduledMessageFailed` push sent.
+        - [x] Multiple due messages at same timestamp → confirm all delivered in order.
         - Server restart with stale `processing` rows → confirm they're reset and re-delivered.
         - Concurrent cancel + delivery race → confirm at-most-once delivery.
-        - _Progress: Added integration coverage for scheduler-loop delivery and cancel-before-delivery behavior._
-        - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_scheduled_channel_message_delivers -- --nocapture`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_cancelled_scheduled_channel_message_does_not_deliver -- --nocapture`; `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `git diff --check`._
+        - _Progress: Added integration coverage for scheduler-loop delivery, cancel-before-delivery behavior, membership-loss failure pushes, and same-timestamp ordered delivery._
+        - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_scheduled_channel_message_delivers -- --nocapture`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_cancelled_scheduled_channel_message_does_not_deliver -- --nocapture`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_scheduled_channel_message_failure_after_sender_removed -- --nocapture`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_scheduled_channel_messages_due_at_same_time_deliver_in_order -- --nocapture`; `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `git diff --check`._
     - _Requirements: 11.1, 11.2, 11.3, 11.4_
     - _writes: collab/src/db/scheduled_message_store.rs (tests module), collab/tests/scheduled_messages_integration.rs_
 
