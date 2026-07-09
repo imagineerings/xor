@@ -84,7 +84,7 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
   - _Actual writes: crates/client/src/file_upload.rs; crates/client/src/channel_chat.rs; crates/client/src/client.rs_
   - _Validation: `CARGO_INCREMENTAL=0 cargo check -p client`; `git diff --check`._
 
-- [ ] 8. Implement `UploadManager` entity
+- [x] 8. Implement `UploadManager` entity
   - Create `UploadManager` struct holding `Arc<Client>` and `active_uploads: HashMap<FileId, UploadProgress>`.
   - Implement `upload_file(channel_id, file_path, cx)` → `Task<Result<FileAttachment>>`: request URL via RPC, upload to S3 with progress, confirm upload via RPC.
   - Implement `uploads_for_channel(channel_id)` for progress bar rendering.
@@ -92,6 +92,9 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
   - Implement `UploadProgress` with `progress: f32` and `UploadStatus` enum.
   - _Requirements: 4.1_
   - _writes: crates/collab_ui/src/channel_file_upload.rs_
+  - _Completed: Added a collab UI `UploadManager` entity that reads local files off the foreground thread, requests presigned upload URLs, uploads through the client helper, confirms completed files, exposes per-channel upload progress, and supports cancelled/failed/completed upload states._
+  - _Actual writes: crates/collab_ui/src/channel_file_upload.rs; crates/collab_ui/src/collab_ui.rs; crates/collab_ui/src/channel_chat.rs_
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `rustfmt --edition 2021 --check crates/collab_ui/src/channel_file_upload.rs`; `git diff --check`._
 
 - [ ] 9. Integrate `UploadManager` into the app
   - Initialize `UploadManager` as an `Entity<UploadManager>` in the app shared state.

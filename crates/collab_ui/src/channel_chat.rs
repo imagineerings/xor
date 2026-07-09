@@ -1850,6 +1850,7 @@ impl ChannelChat {
             edited_at: None,
             reaction_summaries: Vec::new(),
             scheduled_at: None,
+            files: Vec::new(),
         };
 
         thread_panel.send_state = SendState::Sending;

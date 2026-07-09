@@ -3,6 +3,7 @@ pub mod channel_bookmark_bar;
 pub mod channel_bookmark_form;
 pub mod channel_bookmark_store;
 pub mod channel_chat;
+pub mod channel_file_upload;
 pub mod channel_view;
 pub mod collab_panel;
 pub mod draft_store;
