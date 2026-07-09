@@ -4,7 +4,6 @@ mod file_finder_tests;
 use futures::future::join_all;
 pub use open_path_prompt::OpenPathDelegate;
 
-use sim_actions::search::ToggleIncludeIgnored;
 use channel::ChannelStore;
 use client::ChannelId;
 use collections::HashMap;
@@ -28,6 +27,7 @@ use project::{
 };
 use project_panel::project_panel_settings::ProjectPanelSettings;
 use settings::Settings;
+use sim_actions::search::ToggleIncludeIgnored;
 use std::{
     borrow::Cow,
     cmp,
@@ -1876,10 +1876,13 @@ impl PickerDelegate for FileFinderDelegate {
                 .toggle_state(selected)
                 .child(
                     h_flex()
+                        .w_full()
+                        .min_w_0()
+                        .overflow_hidden()
                         .gap_2()
                         .py_px()
-                        .child(file_name_label)
-                        .child(full_path_label),
+                        .child(file_name_label.truncate_middle().flex_1())
+                        .child(full_path_label.truncate_start().flex_shrink()),
                 ),
         )
     }

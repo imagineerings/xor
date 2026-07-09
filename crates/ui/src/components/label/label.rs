@@ -74,6 +74,12 @@ impl Label {
         self
     }
 
+    /// Truncates the label from the middle, keeping the start and end visible.
+    pub fn truncate_middle(mut self) -> Self {
+        self.base = self.base.truncate_middle();
+        self
+    }
+
     /// Wraps the text and truncates it with an ellipsis (`…`) at the end of
     /// the last visible line if it exceeds the given number of lines.
     pub fn line_clamp(mut self, lines: usize) -> Self {

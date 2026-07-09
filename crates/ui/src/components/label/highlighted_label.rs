@@ -77,6 +77,12 @@ impl HighlightedLabel {
         self.base = self.base.truncate_start();
         self
     }
+
+    /// Truncates the label from the middle, keeping the start and end visible.
+    pub fn truncate_middle(mut self) -> Self {
+        self.base = self.base.truncate_middle();
+        self
+    }
 }
 
 impl HighlightedLabel {

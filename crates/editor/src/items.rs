@@ -8,9 +8,6 @@ use crate::{
     scroll::{ScrollAnchor, ScrollOffset},
 };
 use anyhow::{Context as _, Result, anyhow};
-use sim_actions::preview::{
-    markdown::OpenPreview as OpenMarkdownPreview, svg::OpenPreview as OpenSvgPreview,
-};
 use collections::{HashMap, HashSet};
 use file_icons::FileIcons;
 use fs::MTime;
@@ -33,6 +30,9 @@ use project::{
 use rope::TextSummary;
 use rpc::proto::{self, update_view};
 use settings::Settings;
+use sim_actions::preview::{
+    markdown::OpenPreview as OpenMarkdownPreview, svg::OpenPreview as OpenSvgPreview,
+};
 use std::{
     any::{Any, TypeId},
     borrow::Cow,
@@ -783,11 +783,20 @@ impl Item for Editor {
 
         h_flex()
             .gap_2()
+            .when(params.truncate_title_middle, |this| {
+                this.w_full().min_w_0().overflow_hidden()
+            })
             .child(
-                Label::new(util::truncate_and_trailoff(
-                    &self.title(cx),
-                    params.max_title_len.unwrap_or(MAX_TAB_TITLE_LEN),
-                ))
+                Label::new(if params.truncate_title_middle {
+                    self.title(cx).to_string()
+                } else {
+                    util::truncate_and_trailoff(
+                        &self.title(cx),
+                        params.max_title_len.unwrap_or(MAX_TAB_TITLE_LEN),
+                    )
+                })
+                .when(params.truncate_title_middle, |this| this.truncate_middle())
+                .when(params.truncate_title_middle, |this| this.flex_1())
                 .color(label_color)
                 .when(params.preview, |this| this.italic())
                 .when(was_deleted, |this| this.strikethrough()),
@@ -796,6 +805,9 @@ impl Item for Editor {
                 this.child(
                     Label::new(description)
                         .size(LabelSize::XSmall)
+                        .when(params.truncate_title_middle, |this| {
+                            this.truncate_start().flex_shrink()
+                        })
                         .color(Color::Muted),
                 )
             })
@@ -1349,9 +1361,7 @@ impl SerializableItem for Editor {
 
                             if let Some(contents) = contents {
                                 buffer.update(cx, |buffer, cx| {
-                                    restore_serialisim_buffer_contents(
-                                        buffer, contents, mtime, cx,
-                                    );
+                                    restore_serialisim_buffer_contents(buffer, contents, mtime, cx);
                                 });
                             }
 
