@@ -25,6 +25,7 @@ use workspace::AppState;
 // Another comment, nice.
 pub fn init(app_state: &Arc<AppState>, cx: &mut App) {
     call_stats_modal::init(cx);
+    channel_file_upload::init(cx);
     channel_chat::init(cx);
     channel_view::init(cx);
     collab_panel::init(cx);

@@ -1,13 +1,17 @@
 use anyhow::{Context as _, Result, bail};
 use client::{ChannelId, Client, FileAttachment, GetFileUploadUrl};
 use collections::HashMap;
-use gpui::{AppContext as _, Context, SharedString, Task};
+use gpui::{App, AppContext as _, Context, Entity, Global, SharedString, Task};
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
 
 pub type FileId = String;
+
+pub fn init(cx: &mut App) {
+    UploadManager::init(cx);
+}
 
 pub struct UploadManager {
     client: Arc<Client>,
@@ -20,6 +24,16 @@ impl UploadManager {
             client,
             active_uploads: HashMap::default(),
         }
+    }
+
+    pub fn init(cx: &mut App) {
+        let client = Client::global(cx);
+        let manager = cx.new(|_| Self::new(client));
+        cx.set_global(GlobalUploadManager(manager));
+    }
+
+    pub fn global(cx: &App) -> Entity<Self> {
+        cx.global::<GlobalUploadManager>().0.clone()
     }
 
     pub fn upload_file(
@@ -135,6 +149,10 @@ impl UploadManager {
         removed
     }
 }
+
+struct GlobalUploadManager(Entity<UploadManager>);
+
+impl Global for GlobalUploadManager {}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct UploadProgress {

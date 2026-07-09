@@ -96,11 +96,14 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
   - _Actual writes: crates/collab_ui/src/channel_file_upload.rs; crates/collab_ui/src/collab_ui.rs; crates/collab_ui/src/channel_chat.rs_
   - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `rustfmt --edition 2021 --check crates/collab_ui/src/channel_file_upload.rs`; `git diff --check`._
 
-- [ ] 9. Integrate `UploadManager` into the app
+- [x] 9. Integrate `UploadManager` into the app
   - Initialize `UploadManager` as an `Entity<UploadManager>` in the app shared state.
   - Provide access to upload manager from channel contexts.
   - _Requirements: 4.1_
   - _writes: crates/collab_ui/src/app.rs_
+  - _Completed: Registered `UploadManager` during collab UI initialization and exposed `UploadManager::global(cx)` so channel UI code can retrieve the shared upload manager entity._
+  - _Actual writes: crates/collab_ui/src/channel_file_upload.rs; crates/collab_ui/src/collab_ui.rs_
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `rustfmt --edition 2024 --check crates/collab_ui/src/channel_file_upload.rs`; `git diff --check`._
 
 ### Phase 4: Client — Compose Area with Drag-and-Drop & File Picker
 
