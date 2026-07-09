@@ -109,13 +109,15 @@ Add the ability for channel participants to schedule messages for future deliver
     - _Completed: Added a channel-header Scheduled drawer that loads pending scheduled messages, groups them by local date, renders loading/error/empty states, supports inline body and date/time edits through the existing scheduled-message RPCs, confirms cancellation, refreshes after saves, and removes cancelled messages from the panel._
     - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui`; `git diff --check`._
 
-- [ ] 9. Implement sidebar badge for pending scheduled messages
+- [x] 9. Implement sidebar badge for pending scheduled messages
     - On app startup and after relevant RPCs, fetch pending count via `GetScheduledMessages` (or a lightweight count endpoint).
     - Store a `pending_scheduled_count: usize` in the relevant app state.
     - Show a badge (clock icon + count) next to the "Scheduled" entry in the channel sidebar.
     - Update the badge when messages are scheduled, delivered, or cancelled.
     - _Requirements: 11.3.1_
-    - _writes: collab_ui/src/sidebar.rs, collab_ui/src/app_state.rs_
+    - _writes: collab_ui/src/channel_chat.rs, collab_ui/src/channel_chat/search.rs_
+    - _Completed: Added `pending_scheduled_count` to channel chat state, fetch it on chat load via `GetScheduledMessages`, refresh it from scheduled-panel loads, update it after schedule/deliver/fail/cancel events, and render the count beside the channel-header Scheduled control._
+    - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui`; `git diff --check`._
 
 - [x] 10. Wire client-side notifications for `ScheduledMessageSent` and `ScheduledMessageFailed`
     - Register handlers for the two push messages in the WebSocket message dispatcher.

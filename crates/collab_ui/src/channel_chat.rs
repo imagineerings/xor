@@ -129,6 +129,7 @@ pub struct ChannelChat {
     thread_summaries: HashMap<u64, ThreadSummary>,
     thread_panel: Option<ThreadPanel>,
     scheduled_messages_panel: Option<ScheduledMessagesPanel>,
+    pending_scheduled_count: usize,
     emoji_picker: Option<EmojiPickerState>,
     recent_emoji_names: Vec<String>,
     send_state: SendState,
@@ -595,6 +596,19 @@ impl ChannelChat {
             }
         });
         load_thread_summaries.detach_and_log_err(cx);
+        let load_scheduled_count = cx.spawn({
+            let client = client.clone();
+            let channel_id = channel_id.0;
+            async move |this, cx| {
+                let messages = client.get_scheduled_messages(channel_id).await?;
+                this.update(cx, |this, cx| {
+                    this.pending_scheduled_count = messages.len();
+                    cx.notify();
+                })?;
+                anyhow::Ok(())
+            }
+        });
+        load_scheduled_count.detach_and_log_err(cx);
         let recent_emoji_names = Self::load_recent_emoji_names(cx);
 
         Self {
@@ -616,6 +630,7 @@ impl ChannelChat {
             thread_summaries: HashMap::default(),
             thread_panel: None,
             scheduled_messages_panel: None,
+            pending_scheduled_count: 0,
             emoji_picker: None,
             recent_emoji_names,
             send_state: SendState::Idle,
@@ -931,6 +946,10 @@ impl ChannelChat {
                         composer.clear(window, cx);
                     });
                     this.send_state = SendState::Idle;
+                    if scheduled_at.is_some() {
+                        this.pending_scheduled_count =
+                            this.pending_scheduled_count.saturating_add(1);
+                    }
                     this.schedule_picker.clear();
                     if let Some(message) = message {
                         this.upsert_message(message, cx);
@@ -1257,6 +1276,7 @@ impl ChannelChat {
                 match messages {
                     Ok(mut messages) => {
                         messages.sort_by_key(|message| (message.scheduled_at, message.id));
+                        this.pending_scheduled_count = messages.len();
                         panel.messages = messages;
                         panel.load_state = ScheduledMessagesLoadState::Loaded;
                     }
@@ -1522,21 +1542,33 @@ impl ChannelChat {
 
     fn remove_scheduled_message(&mut self, scheduled_message_id: ScheduledMessageId) {
         if let Some(panel) = self.scheduled_messages_panel.as_mut() {
+            let previous_len = panel.messages.len();
             panel
                 .messages
                 .retain(|message| message.id != scheduled_message_id);
+            if panel.messages.len() != previous_len {
+                self.pending_scheduled_count = self.pending_scheduled_count.saturating_sub(1);
+            }
             if panel.editing_message_id == Some(scheduled_message_id) {
                 panel.editing_message_id = None;
             }
+        } else {
+            self.pending_scheduled_count = self.pending_scheduled_count.saturating_sub(1);
         }
     }
 
     fn remove_matching_scheduled_message(&mut self, scheduled_at: u64, body: &str) {
         if let Some(panel) = self.scheduled_messages_panel.as_mut() {
+            let previous_len = panel.messages.len();
             panel.messages.retain(|message| {
                 let message_scheduled_at = u64::try_from(message.scheduled_at.timestamp_millis());
                 !matches!(message_scheduled_at, Ok(message_scheduled_at) if message_scheduled_at == scheduled_at && message.body == body)
             });
+            if panel.messages.len() != previous_len {
+                self.pending_scheduled_count = self.pending_scheduled_count.saturating_sub(1);
+            }
+        } else {
+            self.pending_scheduled_count = self.pending_scheduled_count.saturating_sub(1);
         }
     }
 
