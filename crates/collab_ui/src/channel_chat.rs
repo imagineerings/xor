@@ -1134,6 +1134,89 @@ impl ChannelChat {
     }
 
     #[cfg(any(test, feature = "test-support"))]
+    pub fn toggle_preview_for_test(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.toggle_preview(&TogglePreview, window, cx);
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn focus_composer_for_test(&self, window: &mut Window, cx: &mut Context<Self>) {
+        window.focus(&self.composer.focus_handle(cx), cx);
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn blur_for_test(&self, window: &mut Window) {
+        window.blur();
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn formatting_toolbar_visible_for_test(&self, window: &Window, cx: &App) -> bool {
+        self.compose_mode == compose_area::ComposeMode::Source
+            && self.composer.read(cx).is_focused(window)
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn rendered_message_texts_for_test(
+        this: Entity<Self>,
+        cx: &mut gpui::VisualTestContext,
+    ) -> Vec<String> {
+        let markdowns = cx.update(|_, cx| {
+            this.update(cx, |this, cx| {
+                let messages = this.messages.clone();
+                messages
+                    .iter()
+                    .map(|message| this.rendered_message_body(message, cx).markdown_for_test())
+                    .collect::<Vec<_>>()
+            })
+        });
+
+        markdowns
+            .into_iter()
+            .map(|markdown| {
+                markdown::MarkdownElement::rendered_text(
+                    markdown,
+                    cx,
+                    markdown_style::channel_chat_markdown_style,
+                )
+            })
+            .collect()
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn rendered_compose_preview_for_test(
+        this: Entity<Self>,
+        cx: &mut gpui::VisualTestContext,
+    ) -> Option<String> {
+        let markdown = cx.update(|_, cx| {
+            this.update(cx, |this, cx| {
+                if this.compose_mode != compose_area::ComposeMode::Preview {
+                    return None;
+                }
+
+                let draft = this.composer.read(cx).text(cx);
+                if this
+                    .compose_preview
+                    .as_ref()
+                    .is_none_or(|preview| preview.source() != draft.as_str())
+                {
+                    this.compose_preview = Some(compose_area::PreviewBody::new(draft, cx));
+                }
+
+                this.compose_preview
+                    .as_ref()
+                    .map(compose_area::PreviewBody::markdown_for_test)
+            })
+        });
+
+        markdown.map(|markdown| {
+            markdown::MarkdownElement::rendered_text(
+                markdown,
+                cx,
+                markdown_style::channel_chat_markdown_style,
+            )
+        })
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
     pub fn send_error_for_test(&self) -> Option<SharedString> {
         match &self.send_state {
             SendState::Failed(message) => Some(message.clone()),

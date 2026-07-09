@@ -109,6 +109,88 @@ async fn test_channel_chat_restores_saved_draft_and_clears_on_send(
 }
 
 #[gpui::test]
+async fn test_channel_chat_markdown_preview_toolbar_and_sent_rendering(
+    cx_a: &mut gpui::TestAppContext,
+    cx_b: &mut gpui::TestAppContext,
+) {
+    let (_server, client_a, client_b, channel_id) = TestServer::start2(cx_a, cx_b).await;
+    let (workspace, cx_a) = client_a.build_test_workspace(cx_a).await;
+
+    let chat = cx_a
+        .update(|window, cx| ChannelChat::open(channel_id, workspace.clone(), window, cx))
+        .await
+        .unwrap();
+    cx_a.run_until_parked();
+
+    let markdown_draft = "# Heading\n**bold** [link](https://example.com)";
+    chat.update_in(cx_a, |chat, window, cx| {
+        chat.set_draft_for_test(markdown_draft, window, cx);
+        chat.focus_composer_for_test(window, cx);
+    });
+    cx_a.run_until_parked();
+
+    assert!(chat.update_in(cx_a, |chat, window, cx| {
+        chat.formatting_toolbar_visible_for_test(window, cx)
+    }));
+
+    chat.update_in(cx_a, |chat, window, cx| {
+        chat.toggle_preview_for_test(window, cx);
+    });
+    cx_a.run_until_parked();
+
+    assert_eq!(
+        chat.read_with(cx_a, |chat, _| chat.compose_mode_for_test()),
+        "preview"
+    );
+    assert_eq!(
+        ChannelChat::rendered_compose_preview_for_test(chat.clone(), cx_a),
+        Some("Heading\nbold link".to_string())
+    );
+
+    chat.update_in(cx_a, |chat, window, cx| {
+        chat.toggle_preview_for_test(window, cx);
+    });
+    cx_a.run_until_parked();
+
+    assert_eq!(
+        chat.read_with(cx_a, |chat, _| chat.compose_mode_for_test()),
+        "source"
+    );
+    assert_eq!(
+        chat.read_with(cx_a, |chat, cx| chat.draft_for_test(cx)),
+        markdown_draft
+    );
+
+    chat.update_in(cx_a, |chat, window, cx| {
+        chat.blur_for_test(window);
+        assert!(!chat.formatting_toolbar_visible_for_test(window, cx));
+    });
+    cx_a.run_until_parked();
+
+    client_b
+        .client()
+        .send_channel_message(SendChannelMessage {
+            channel_id: channel_id.0,
+            body: markdown_draft.to_string(),
+            nonce: 1,
+            mentions: Vec::new(),
+            reply_to_message_id: None,
+        })
+        .await
+        .unwrap();
+    cx_a.run_until_parked();
+
+    assert_eq!(
+        chat.read_with(cx_a, |chat, _| chat.message_bodies_for_test()),
+        vec![markdown_draft.to_string()]
+    );
+    assert_eq!(
+        ChannelChat::rendered_message_texts_for_test(chat.clone(), cx_a),
+        vec!["Heading\nbold link".to_string()]
+    );
+}
+
+#[gpui::test]
 async fn test_channel_chat_view_updates_live_reactions(
     cx_a: &mut gpui::TestAppContext,
     cx_b: &mut gpui::TestAppContext,

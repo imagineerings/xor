@@ -63,6 +63,11 @@ impl MessageBody {
             })
             .into_any_element()
     }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub(super) fn markdown_for_test(&self) -> Entity<Markdown> {
+        self.markdown.clone()
+    }
 }
 
 pub(super) fn resolve_remote_image(destination_url: &str) -> Option<ImageSource> {

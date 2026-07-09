@@ -89,11 +89,11 @@ The work is ordered to build incrementally: first the rendering pipeline (Markdo
   - _Requirements: 1.1, 1.4, 1.5_
   - _writes: `collab_ui/src/channel_chat/message_bubble.rs`_ (tests), `collab_ui/src/channel_chat/sanitize.rs`_ (tests)
 
-- [ ] 10. Add integration tests for UI composition
-  - [ ] 10.1 Create a test that opens a channel, types Markdown in the compose editor, switches to preview mode, and verifies the `MarkdownElement` is visible.
-  - [ ] 10.2 Verify that toggling back to source mode preserves the raw Markdown text.
-  - [ ] 10.3 Verify the formatting toolbar appears when the editor is focused and disappears when blurred.
-  - [ ] 10.4 Verify a message with rich Markdown renders correctly in the message list after being sent (simulate via `ChannelMessageSent` event).
+- [x] 10. Add integration tests for UI composition
+  - [x] 10.1 Create a test that opens a channel, types Markdown in the compose editor, switches to preview mode, and verifies the `MarkdownElement` is visible.
+  - [x] 10.2 Verify that toggling back to source mode preserves the raw Markdown text.
+  - [x] 10.3 Verify the formatting toolbar appears when the editor is focused and disappears when blurred.
+  - [x] 10.4 Verify a message with rich Markdown renders correctly in the message list after being sent (simulate via `ChannelMessageSent` event).
   - _Requirements: 1.2, 1.3_
   - _writes: `collab_ui/src/channel_chat/compose_area.rs`_ (tests)
 
