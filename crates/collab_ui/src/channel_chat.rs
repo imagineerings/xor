@@ -3572,6 +3572,16 @@ impl ChannelChat {
                                         this.confirm_remove_bookmark(bookmark.clone(), window, cx);
                                     })
                                     .log_err();
+                            })
+                            .on_open_message({
+                                let weak_self = cx.weak_entity();
+                                move |message_id, _, cx| {
+                                    weak_self
+                                        .update(cx, |this, cx| {
+                                            this.highlight_message_bookmark(message_id, cx);
+                                        })
+                                        .log_err();
+                                }
                             }),
                     )
                 })
@@ -3665,16 +3675,20 @@ impl ChannelChat {
                             .disabled(submitting)
                             .on_click(cx.listener(Self::close_bookmark_form)),
                     )
-                            .child(
-                                Button::new(
-                                    "submit-channel-bookmark",
-                                    if form.is_editing() { "Save changes" } else { "Save" },
-                                )
-                                .style(ButtonStyle::Filled)
-                                .size(ButtonSize::Compact)
-                                .disabled(submitting)
-                                .on_click(cx.listener(Self::submit_bookmark_form)),
-                            ),
+                    .child(
+                        Button::new(
+                            "submit-channel-bookmark",
+                            if form.is_editing() {
+                                "Save changes"
+                            } else {
+                                "Save"
+                            },
+                        )
+                        .style(ButtonStyle::Filled)
+                        .size(ButtonSize::Compact)
+                        .disabled(submitting)
+                        .on_click(cx.listener(Self::submit_bookmark_form)),
+                    ),
             )
     }
 
@@ -3696,6 +3710,15 @@ impl ChannelChat {
         cx.notify();
     }
 
+    fn highlight_message_bookmark(&mut self, message_id: u64, cx: &mut Context<Self>) {
+        if self.messages.iter().any(|message| message.id == message_id) {
+            self.highlighted_search_message_id = Some(message_id);
+        } else {
+            self.bookmark_action_error = Some("Bookmarked message is not loaded.".into());
+        }
+        cx.notify();
+    }
+
     fn close_bookmark_form(&mut self, _: &ClickEvent, _: &mut Window, cx: &mut Context<Self>) {
         self.bookmark_form = None;
         cx.notify();
@@ -3710,9 +3733,11 @@ impl ChannelChat {
         }
 
         let request = match if form.is_editing() {
-            form.update_bookmark(self.channel_id, cx).map(BookmarkFormRequest::Update)
+            form.update_bookmark(self.channel_id, cx)
+                .map(BookmarkFormRequest::Update)
         } else {
-            form.add_bookmark(self.channel_id, cx).map(BookmarkFormRequest::Add)
+            form.add_bookmark(self.channel_id, cx)
+                .map(BookmarkFormRequest::Add)
         } {
             Ok(request) => request,
             Err(error) => {

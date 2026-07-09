@@ -143,6 +143,8 @@ Add a channel bookmarks feature: a dedicated section in the channel header where
     - _writes: collab_ui/src/channel_bookmark_bar.rs_
   - _Completed: Added a compact bookmark bar component, mounted it above channel chat messages, observed `ChannelBookmarkStore` for live updates, and added collapsed/expanded rendering with a Show all/Show less toggle. Link bookmarks open through the platform URL handler; file/message click-through remains open in 9.4._
   - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_bar --features collab_ui/test-support`._
+  - _Partial: Added pure coverage for 0, 3, and 8 bookmark visible/hidden counts plus link/file/message click action selection. Message bookmarks now highlight loaded messages in the channel chat; file bookmark opening remains open until the file-sharing target surface exists._
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_bar --features collab_ui/test-support`._
 
 - [ ] 10. Implement `BookmarkForm` modal
   - [ ] 10.1 Build create-mode form with fields: label (required), URL, type selector (Link/File/Message), description (optional).
@@ -172,7 +174,7 @@ Add a channel bookmarks feature: a dedicated section in the channel header where
   - [x] 11.2 Wire "Edit" to open `BookmarkForm` in edit mode.
     - _Requirements: 6.1_
     - _writes: collab_ui/src/channel_bookmark_bar.rs_
-  - [ ] 11.3 Wire "Delete" to call `remove_bookmark` RPC with confirmation dialog.
+  - [x] 11.3 Wire "Delete" to call `remove_bookmark` RPC with confirmation dialog.
     - _Requirements: 6.1_
     - _writes: collab_ui/src/channel_bookmark_bar.rs_
   - _Partial: Added a compact delete action to each rendered bookmark, confirmation prompt, `remove_bookmark` RPC wiring, and inline delete failure feedback. Full hover/context-menu presentation and edit action remain open._
