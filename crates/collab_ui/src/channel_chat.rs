@@ -121,6 +121,7 @@ struct ThreadPanel {
     root_message_id: u64,
     root_message: Option<proto::ChannelMessage>,
     replies: Vec<proto::ChannelMessage>,
+    pending_reply_nonce: Option<u128>,
     compose_editor: Entity<Editor>,
     load_state: ThreadLoadState,
     send_state: SendState,
@@ -573,6 +574,16 @@ impl ChannelChat {
             .find(|existing| existing.id == reply.id)
         {
             *existing = reply;
+        } else if let Some(existing) = thread_panel.replies.iter_mut().find(|existing| {
+            thread_panel
+                .pending_reply_nonce
+                .is_some_and(|pending_reply_nonce| {
+                    message_nonce(existing) == Some(pending_reply_nonce)
+                })
+                && existing.nonce == reply.nonce
+        }) {
+            *existing = reply;
+            thread_panel.pending_reply_nonce = None;
         } else {
             thread_panel.replies.push(reply);
             thread_panel
@@ -653,6 +664,7 @@ impl ChannelChat {
             root_message_id,
             root_message: existing_root,
             replies: Vec::new(),
+            pending_reply_nonce: None,
             compose_editor,
             load_state: ThreadLoadState::Loading,
             send_state: SendState::Idle,
@@ -673,8 +685,31 @@ impl ChannelChat {
 
                 match thread_result {
                     Ok(thread) => {
+                        let pending_reply = thread_panel.pending_reply_nonce.and_then(|nonce| {
+                            thread_panel
+                                .replies
+                                .iter()
+                                .find(|reply| message_nonce(reply) == Some(nonce))
+                                .cloned()
+                        });
                         thread_panel.root_message = Some(thread.root_message);
                         thread_panel.replies = thread.replies;
+                        if let Some(pending_reply) = pending_reply {
+                            if thread_panel
+                                .replies
+                                .iter()
+                                .any(|reply| reply.nonce == pending_reply.nonce)
+                            {
+                                thread_panel.pending_reply_nonce = None;
+                            } else {
+                                thread_panel.replies.push(pending_reply);
+                                thread_panel
+                                    .replies
+                                    .sort_by_key(|reply| (reply.timestamp, reply.id));
+                            }
+                        } else {
+                            thread_panel.pending_reply_nonce = None;
+                        }
                         thread_panel.load_state = ThreadLoadState::Loaded;
                     }
                     Err(error) => {
@@ -712,19 +747,46 @@ impl ChannelChat {
             return;
         }
 
-        thread_panel.send_state = SendState::Sending;
-        let compose_editor = thread_panel.compose_editor.clone();
         let root_message_id = thread_panel.root_message_id;
         let channel_id = thread_panel.channel_id;
+        let nonce = next_nonce(channel_id);
+        let Some(sender_id) = self
+            .user_store
+            .read(cx)
+            .current_user()
+            .map(|user| user.legacy_id)
+        else {
+            thread_panel.send_state =
+                SendState::Failed(SharedString::from("Current user unavailable"));
+            cx.notify();
+            return;
+        };
+
+        let optimistic_reply = proto::ChannelMessage {
+            id: 0,
+            body: body.clone(),
+            timestamp: current_unix_timestamp(),
+            sender_id,
+            nonce: Some(nonce.into()),
+            mentions: Vec::new(),
+            reply_to_message_id: Some(root_message_id),
+            edited_at: None,
+            reaction_summaries: Vec::new(),
+        };
+
+        thread_panel.send_state = SendState::Sending;
+        thread_panel.pending_reply_nonce = Some(nonce);
+        thread_panel.replies.push(optimistic_reply);
+        let compose_editor = thread_panel.compose_editor.clone();
+        compose_editor.update(cx, |editor, cx| editor.clear(window, cx));
         cx.notify();
 
         let client = self.client.clone();
         cx.spawn_in(window, async move |this, cx| {
-            let nonce = next_nonce(channel_id);
             let send_result = client
                 .send_channel_message(SendChannelMessage {
                     channel_id: channel_id.0,
-                    body,
+                    body: body.clone(),
                     nonce,
                     mentions: Vec::new(),
                     reply_to_message_id: Some(root_message_id),
@@ -733,7 +795,6 @@ impl ChannelChat {
 
             this.update_in(cx, |this, window, cx| match send_result {
                 Ok(message) => {
-                    compose_editor.update(cx, |editor, cx| editor.clear(window, cx));
                     this.upsert_message(message.clone(), cx);
                     if let Some(thread_panel) = this.thread_panel.as_mut()
                         && thread_panel.root_message_id == root_message_id
@@ -748,6 +809,11 @@ impl ChannelChat {
                         && thread_panel.root_message_id == root_message_id
                     {
                         thread_panel.send_state = SendState::Failed(message.clone());
+                        thread_panel
+                            .replies
+                            .retain(|reply| message_nonce(reply) != Some(nonce));
+                        thread_panel.pending_reply_nonce = None;
+                        compose_editor.update(cx, |editor, cx| editor.set_text(body, window, cx));
                     }
                     this.workspace
                         .update(cx, |workspace, cx| {
@@ -926,6 +992,7 @@ impl ChannelChat {
     fn render_thread_message(
         &mut self,
         message: &proto::ChannelMessage,
+        is_pending: bool,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> gpui::AnyElement {
@@ -957,6 +1024,13 @@ impl ChannelChat {
                                 .size(LabelSize::XSmall)
                                 .color(Color::Muted),
                         )
+                    })
+                    .when(is_pending, |this| {
+                        this.child(
+                            Label::new("Sending...")
+                                .size(LabelSize::XSmall)
+                                .color(Color::Muted),
+                        )
                     }),
             )
             .child(self.rendered_message_body(message, cx).render(window, cx))
@@ -974,7 +1048,9 @@ impl ChannelChat {
 
         let root_message_id = thread_panel.root_message_id;
         let root_message = thread_panel.root_message.clone();
+        let root_message_is_missing = thread_panel.root_message.is_none();
         let replies = thread_panel.replies.clone();
+        let pending_reply_nonce = thread_panel.pending_reply_nonce;
         let compose_editor = thread_panel.compose_editor.clone();
         let load_state = thread_panel.load_state.clone();
         let send_state = thread_panel.send_state.clone();
@@ -1037,15 +1113,16 @@ impl ChannelChat {
                                         .size(LabelSize::XSmall)
                                         .color(Color::Muted),
                                 )
-                                .child(self.render_thread_message(&root_message, window, cx)),
+                                .child(self.render_thread_message(
+                                    &root_message,
+                                    false,
+                                    window,
+                                    cx,
+                                )),
                         )
                     })
                     .when(
-                        matches!(load_state, ThreadLoadState::Loaded)
-                            && self
-                                .thread_panel
-                                .as_ref()
-                                .is_none_or(|thread_panel| thread_panel.root_message.is_none()),
+                        matches!(load_state, ThreadLoadState::Loaded) && root_message_is_missing,
                         |this| {
                             this.child(
                                 Label::new("This message has been deleted")
@@ -1080,11 +1157,12 @@ impl ChannelChat {
                             )
                         },
                     )
-                    .children(
-                        replies
-                            .into_iter()
-                            .map(|reply| self.render_thread_message(&reply, window, cx)),
-                    ),
+                    .children(replies.into_iter().map(|reply| {
+                        let is_pending = pending_reply_nonce.is_some_and(|pending_reply_nonce| {
+                            message_nonce(&reply) == Some(pending_reply_nonce)
+                        });
+                        self.render_thread_message(&reply, is_pending, window, cx)
+                    })),
             )
             .child(
                 v_flex()
@@ -1964,11 +2042,26 @@ fn is_missing_channel_message_error(error: &anyhow::Error) -> bool {
 }
 
 fn next_nonce(channel_id: ChannelId) -> u128 {
+    current_timestamp_nanos() ^ u128::from(channel_id.0)
+}
+
+fn current_unix_timestamp() -> u64 {
+    match SystemTime::now().duration_since(UNIX_EPOCH) {
+        Ok(duration) => duration.as_secs(),
+        Err(_) => 0,
+    }
+}
+
+fn current_timestamp_nanos() -> u128 {
     let nanos = match SystemTime::now().duration_since(UNIX_EPOCH) {
         Ok(duration) => duration.as_nanos(),
         Err(_) => 0,
     };
-    nanos ^ u128::from(channel_id.0)
+    nanos
+}
+
+fn message_nonce(message: &proto::ChannelMessage) -> Option<u128> {
+    message.nonce.clone().map(Into::into)
 }
 
 #[cfg(test)]
