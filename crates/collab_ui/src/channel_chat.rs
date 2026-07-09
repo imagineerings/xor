@@ -64,7 +64,9 @@ actions!(
         /// Applies blockquote Markdown formatting to the channel chat draft.
         ToggleBlockquote,
         /// Toggles the channel chat draft between source and preview modes.
-        TogglePreview
+        TogglePreview,
+        /// Closes the open channel message thread.
+        CloseThread
     ]
 );
 
@@ -72,13 +74,14 @@ pub fn init(cx: &mut App) {
     cx.bind_keys(channel_chat_key_bindings());
 }
 
-fn channel_chat_key_bindings() -> [KeyBinding; 5] {
+fn channel_chat_key_bindings() -> [KeyBinding; 6] {
     [
         KeyBinding::new("ctrl-b", ToggleBold, Some("ChannelChat")),
         KeyBinding::new("ctrl-i", ToggleItalic, Some("ChannelChat")),
         KeyBinding::new("ctrl-`", ToggleCode, Some("ChannelChat")),
         KeyBinding::new("ctrl-shift-k", ToggleLink, Some("ChannelChat")),
         KeyBinding::new("ctrl-shift-p", TogglePreview, Some("ChannelChat")),
+        KeyBinding::new("escape", CloseThread, Some("ChannelChat")),
     ]
 }
 
@@ -94,6 +97,7 @@ pub struct ChannelChat {
     emoji_search: Entity<Editor>,
     messages: Vec<proto::ChannelMessage>,
     message_bodies: HashMap<u64, message_bubble::MessageBody>,
+    thread_panel: Option<ThreadPanel>,
     emoji_picker: Option<EmojiPickerState>,
     recent_emoji_names: Vec<String>,
     send_state: SendState,
@@ -107,6 +111,23 @@ pub struct ChannelChat {
 enum SendState {
     Idle,
     Sending,
+    Failed(SharedString),
+}
+
+struct ThreadPanel {
+    channel_id: ChannelId,
+    root_message_id: u64,
+    root_message: Option<proto::ChannelMessage>,
+    replies: Vec<proto::ChannelMessage>,
+    compose_editor: Entity<Editor>,
+    load_state: ThreadLoadState,
+    send_state: SendState,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+enum ThreadLoadState {
+    Loading,
+    Loaded,
     Failed(SharedString),
 }
 
@@ -323,6 +344,7 @@ impl ChannelChat {
             emoji_search,
             messages,
             message_bodies: HashMap::default(),
+            thread_panel: None,
             emoji_picker: None,
             recent_emoji_names,
             send_state: SendState::Idle,
@@ -474,6 +496,142 @@ impl ChannelChat {
         .detach_and_log_err(cx);
     }
 
+    fn open_thread(&mut self, root_message_id: u64, window: &mut Window, cx: &mut Context<Self>) {
+        let compose_editor = cx.new(|cx| {
+            let mut editor = Editor::single_line(window, cx);
+            editor.set_placeholder_text("Reply in thread", window, cx);
+            editor
+        });
+        let existing_root = self
+            .messages
+            .iter()
+            .find(|message| message.id == root_message_id)
+            .cloned();
+        self.thread_panel = Some(ThreadPanel {
+            channel_id: self.channel_id,
+            root_message_id,
+            root_message: existing_root,
+            replies: Vec::new(),
+            compose_editor,
+            load_state: ThreadLoadState::Loading,
+            send_state: SendState::Idle,
+        });
+        cx.notify();
+
+        let client = self.client.clone();
+        let channel_id = self.channel_id;
+        cx.spawn_in(window, async move |this, cx| {
+            let thread_result = client.get_thread(channel_id.0, root_message_id).await;
+            this.update(cx, |this, cx| {
+                let Some(thread_panel) = this.thread_panel.as_mut() else {
+                    return;
+                };
+                if thread_panel.root_message_id != root_message_id {
+                    return;
+                }
+
+                match thread_result {
+                    Ok(thread) => {
+                        thread_panel.root_message = Some(thread.root_message);
+                        thread_panel.replies = thread.replies;
+                        thread_panel.load_state = ThreadLoadState::Loaded;
+                    }
+                    Err(error) => {
+                        thread_panel.load_state = ThreadLoadState::Failed(error.to_string().into());
+                    }
+                }
+                cx.notify();
+            })?;
+            anyhow::Ok(())
+        })
+        .detach_and_log_err(cx);
+    }
+
+    fn close_thread(&mut self, _: &CloseThread, _: &mut Window, cx: &mut Context<Self>) {
+        if self.thread_panel.take().is_some() {
+            cx.notify();
+        }
+    }
+
+    fn send_thread_reply(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(thread_panel) = self.thread_panel.as_mut() else {
+            return;
+        };
+        if thread_panel.send_state == SendState::Sending {
+            return;
+        }
+
+        let body = thread_panel
+            .compose_editor
+            .read(cx)
+            .text(cx)
+            .trim()
+            .to_string();
+        if body.is_empty() {
+            return;
+        }
+
+        thread_panel.send_state = SendState::Sending;
+        let compose_editor = thread_panel.compose_editor.clone();
+        let root_message_id = thread_panel.root_message_id;
+        let channel_id = thread_panel.channel_id;
+        cx.notify();
+
+        let client = self.client.clone();
+        cx.spawn_in(window, async move |this, cx| {
+            let nonce = next_nonce(channel_id);
+            let send_result = client
+                .send_channel_message(SendChannelMessage {
+                    channel_id: channel_id.0,
+                    body,
+                    nonce,
+                    mentions: Vec::new(),
+                    reply_to_message_id: Some(root_message_id),
+                })
+                .await;
+
+            this.update_in(cx, |this, window, cx| match send_result {
+                Ok(message) => {
+                    compose_editor.update(cx, |editor, cx| editor.clear(window, cx));
+                    this.upsert_message(message.clone(), cx);
+                    if let Some(thread_panel) = this.thread_panel.as_mut()
+                        && thread_panel.root_message_id == root_message_id
+                    {
+                        thread_panel.send_state = SendState::Idle;
+                        if !thread_panel
+                            .replies
+                            .iter()
+                            .any(|reply| reply.id == message.id)
+                        {
+                            thread_panel.replies.push(message);
+                            thread_panel
+                                .replies
+                                .sort_by_key(|reply| (reply.timestamp, reply.id));
+                        }
+                    }
+                    cx.notify();
+                }
+                Err(error) => {
+                    let message = SharedString::from(error.to_string());
+                    if let Some(thread_panel) = this.thread_panel.as_mut()
+                        && thread_panel.root_message_id == root_message_id
+                    {
+                        thread_panel.send_state = SendState::Failed(message.clone());
+                    }
+                    this.workspace
+                        .update(cx, |workspace, cx| {
+                            workspace
+                                .show_error(format!("Failed to send thread reply: {message}"), cx);
+                        })
+                        .log_err();
+                    cx.notify();
+                }
+            })?;
+            anyhow::Ok(())
+        })
+        .detach_and_log_err(cx);
+    }
+
     fn discard_draft(&mut self, _: &DiscardDraft, window: &mut Window, cx: &mut Context<Self>) {
         if self.composer.read(cx).text(cx).is_empty() {
             return;
@@ -593,7 +751,209 @@ impl ChannelChat {
                     }),
             )
             .child(self.rendered_message_body(message, cx).render(window, cx))
+            .child(
+                h_flex().child(
+                    Button::new(format!("channel-open-thread-{}", message.id), "Reply")
+                        .label_size(LabelSize::XSmall)
+                        .on_click(cx.listener({
+                            let message_id = message.id;
+                            move |this, _, window, cx| {
+                                this.open_thread(message_id, window, cx);
+                            }
+                        })),
+                ),
+            )
             .child(self.render_reactions(message, cx))
+            .into_any_element()
+    }
+
+    fn render_thread_message(
+        &mut self,
+        message: &proto::ChannelMessage,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> gpui::AnyElement {
+        let sender = self.user_display_name(message.sender_id, cx);
+        let timestamp = format_timestamp(message.timestamp);
+        let edited = message.edited_at.is_some();
+
+        v_flex()
+            .gap_1()
+            .p_2()
+            .rounded_md()
+            .bg(cx.theme().colors().editor_background)
+            .child(
+                h_flex()
+                    .gap_2()
+                    .child(
+                        Label::new(sender)
+                            .size(LabelSize::Small)
+                            .weight(gpui::FontWeight::MEDIUM),
+                    )
+                    .child(
+                        Label::new(timestamp)
+                            .size(LabelSize::XSmall)
+                            .color(Color::Muted),
+                    )
+                    .when(edited, |this| {
+                        this.child(
+                            Label::new("edited")
+                                .size(LabelSize::XSmall)
+                                .color(Color::Muted),
+                        )
+                    }),
+            )
+            .child(self.rendered_message_body(message, cx).render(window, cx))
+            .into_any_element()
+    }
+
+    fn render_thread_panel(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> gpui::AnyElement {
+        let Some(thread_panel) = self.thread_panel.as_ref() else {
+            return div().into_any_element();
+        };
+
+        let root_message_id = thread_panel.root_message_id;
+        let root_message = thread_panel.root_message.clone();
+        let replies = thread_panel.replies.clone();
+        let compose_editor = thread_panel.compose_editor.clone();
+        let load_state = thread_panel.load_state.clone();
+        let send_state = thread_panel.send_state.clone();
+        let channel_name = self
+            .channel(cx)
+            .map(|channel| channel.name.clone())
+            .unwrap_or_else(|| SharedString::from("Channel"));
+
+        v_flex()
+            .id("channel-thread-panel")
+            .w(px(360.))
+            .min_w(px(280.))
+            .h_full()
+            .border_l_1()
+            .border_color(cx.theme().colors().border)
+            .bg(cx.theme().colors().editor_background)
+            .child(
+                h_flex()
+                    .justify_between()
+                    .gap_2()
+                    .p_3()
+                    .border_b_1()
+                    .border_color(cx.theme().colors().border)
+                    .child(
+                        v_flex()
+                            .gap_0p5()
+                            .child(
+                                Label::new("Thread")
+                                    .size(LabelSize::Small)
+                                    .weight(gpui::FontWeight::MEDIUM),
+                            )
+                            .child(
+                                Label::new(channel_name)
+                                    .size(LabelSize::XSmall)
+                                    .color(Color::Muted),
+                            ),
+                    )
+                    .child(
+                        IconButton::new("close-channel-thread", IconName::Close)
+                            .icon_size(IconSize::Small)
+                            .tooltip(Tooltip::text("Close thread"))
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                this.close_thread(&CloseThread, window, cx);
+                            })),
+                    ),
+            )
+            .child(
+                v_flex()
+                    .flex_1()
+                    .id("channel-thread-replies")
+                    .gap_3()
+                    .p_3()
+                    .overflow_y_scroll()
+                    .when_some(root_message, |this, root_message| {
+                        this.child(
+                            v_flex()
+                                .gap_2()
+                                .child(
+                                    Label::new("Original message")
+                                        .size(LabelSize::XSmall)
+                                        .color(Color::Muted),
+                                )
+                                .child(self.render_thread_message(&root_message, window, cx)),
+                        )
+                    })
+                    .when(matches!(load_state, ThreadLoadState::Loading), |this| {
+                        this.child(Label::new("Loading replies...").color(Color::Muted))
+                    })
+                    .when_some(
+                        match &load_state {
+                            ThreadLoadState::Failed(message) => Some(message.clone()),
+                            ThreadLoadState::Loading | ThreadLoadState::Loaded => None,
+                        },
+                        |this, message| {
+                            this.child(
+                                Label::new(message)
+                                    .size(LabelSize::Small)
+                                    .color(Color::Error),
+                            )
+                        },
+                    )
+                    .when(
+                        matches!(load_state, ThreadLoadState::Loaded) && replies.is_empty(),
+                        |this| {
+                            this.child(
+                                Label::new("No replies yet")
+                                    .size(LabelSize::Small)
+                                    .color(Color::Muted),
+                            )
+                        },
+                    )
+                    .children(
+                        replies
+                            .into_iter()
+                            .map(|reply| self.render_thread_message(&reply, window, cx)),
+                    ),
+            )
+            .child(
+                v_flex()
+                    .gap_2()
+                    .p_3()
+                    .border_t_1()
+                    .border_color(cx.theme().colors().border)
+                    .child(compose_editor.clone())
+                    .child(
+                        h_flex()
+                            .justify_between()
+                            .child(
+                                Label::new(format!("Replying to #{root_message_id}"))
+                                    .size(LabelSize::XSmall)
+                                    .color(Color::Muted),
+                            )
+                            .child(
+                                Button::new("send-thread-reply", "Send")
+                                    .label_size(LabelSize::XSmall)
+                                    .disabled(matches!(send_state, SendState::Sending))
+                                    .on_click(cx.listener(|this, _, window, cx| {
+                                        this.send_thread_reply(window, cx);
+                                    })),
+                            ),
+                    )
+                    .when_some(
+                        match &send_state {
+                            SendState::Failed(message) => Some(message.clone()),
+                            SendState::Idle | SendState::Sending => None,
+                        },
+                        |this, message| {
+                            this.child(
+                                Label::new(message)
+                                    .size(LabelSize::XSmall)
+                                    .color(Color::Error),
+                            )
+                        },
+                    ),
+            )
             .into_any_element()
     }
 
@@ -1252,7 +1612,7 @@ impl Focusable for ChannelChat {
 
 impl Render for ChannelChat {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        v_flex()
+        h_flex()
             .key_context("ChannelChat")
             .size_full()
             .bg(cx.theme().colors().editor_background)
@@ -1264,98 +1624,107 @@ impl Render for ChannelChat {
             .on_action(cx.listener(Self::toggle_link))
             .on_action(cx.listener(Self::toggle_blockquote))
             .on_action(cx.listener(Self::toggle_preview))
+            .on_action(cx.listener(Self::close_thread))
             .child(
                 v_flex()
                     .flex_1()
-                    .id("channel-chat-messages")
-                    .overflow_y_scroll()
-                    .when(self.messages.is_empty(), |this| {
-                        this.child(
-                            div()
-                                .p_4()
-                                .child(Label::new("No messages yet").color(Color::Muted)),
-                        )
-                    })
-                    .children(
-                        self.messages
-                            .clone()
-                            .into_iter()
-                            .map(|message| self.render_message(&message, window, cx)),
-                    ),
-            )
-            .child(
-                v_flex()
-                    .gap_2()
-                    .p_3()
-                    .border_t_1()
-                    .border_color(cx.theme().colors().border)
+                    .h_full()
                     .child(
-                        h_flex()
-                            .gap_2()
-                            .justify_between()
-                            .child(div().flex_1().when(
-                                self.compose_mode == compose_area::ComposeMode::Source
-                                    && self.composer.read(cx).is_focused(window),
-                                |this| {
-                                    this.child(
-                                        formatting_toolbar::FormattingToolbar::new(
-                                            self.composer.clone(),
-                                        )
-                                        .render(window, cx),
-                                    )
-                                },
-                            ))
-                            .child(
-                                IconButton::new(
-                                    "toggle-compose-preview",
-                                    self.compose_mode.toggle_icon(),
+                        v_flex()
+                            .flex_1()
+                            .id("channel-chat-messages")
+                            .overflow_y_scroll()
+                            .when(self.messages.is_empty(), |this| {
+                                this.child(
+                                    div()
+                                        .p_4()
+                                        .child(Label::new("No messages yet").color(Color::Muted)),
                                 )
-                                .icon_size(IconSize::Small)
-                                .icon_color(Color::Muted)
-                                .on_click(cx.listener(|this, _, window, cx| {
-                                    this.toggle_preview(&TogglePreview, window, cx);
-                                }))
-                                .tooltip(Tooltip::text(self.compose_mode.toggle_tooltip())),
+                            })
+                            .children(
+                                self.messages
+                                    .clone()
+                                    .into_iter()
+                                    .map(|message| self.render_message(&message, window, cx)),
                             ),
                     )
                     .child(
-                        h_flex()
+                        v_flex()
                             .gap_2()
-                            .child(match self.compose_mode {
-                                compose_area::ComposeMode::Source => div()
-                                    .flex_1()
-                                    .child(self.composer.clone())
-                                    .into_any_element(),
-                                compose_area::ComposeMode::Preview => {
-                                    self.render_compose_preview(window, cx)
-                                }
-                            })
-                            .when(!self.composer.read(cx).text(cx).is_empty(), |this| {
-                                this.child(
-                                    IconButton::new("discard-draft", IconName::Trash)
+                            .p_3()
+                            .border_t_1()
+                            .border_color(cx.theme().colors().border)
+                            .child(
+                                h_flex()
+                                    .gap_2()
+                                    .justify_between()
+                                    .child(div().flex_1().when(
+                                        self.compose_mode == compose_area::ComposeMode::Source
+                                            && self.composer.read(cx).is_focused(window),
+                                        |this| {
+                                            this.child(
+                                                formatting_toolbar::FormattingToolbar::new(
+                                                    self.composer.clone(),
+                                                )
+                                                .render(window, cx),
+                                            )
+                                        },
+                                    ))
+                                    .child(
+                                        IconButton::new(
+                                            "toggle-compose-preview",
+                                            self.compose_mode.toggle_icon(),
+                                        )
                                         .icon_size(IconSize::Small)
                                         .icon_color(Color::Muted)
                                         .on_click(cx.listener(|this, _, window, cx| {
-                                            this.discard_draft(&DiscardDraft, window, cx);
+                                            this.toggle_preview(&TogglePreview, window, cx);
                                         }))
-                                        .tooltip(Tooltip::text("Discard draft")),
-                                )
-                            }),
-                    )
-                    .when_some(
-                        match &self.send_state {
-                            SendState::Failed(message) => Some(message.clone()),
-                            SendState::Idle | SendState::Sending => None,
-                        },
-                        |this, message| {
-                            this.child(
-                                Label::new(message)
-                                    .size(LabelSize::XSmall)
-                                    .color(Color::Error),
+                                        .tooltip(Tooltip::text(self.compose_mode.toggle_tooltip())),
+                                    ),
                             )
-                        },
+                            .child(
+                                h_flex()
+                                    .gap_2()
+                                    .child(match self.compose_mode {
+                                        compose_area::ComposeMode::Source => div()
+                                            .flex_1()
+                                            .child(self.composer.clone())
+                                            .into_any_element(),
+                                        compose_area::ComposeMode::Preview => {
+                                            self.render_compose_preview(window, cx)
+                                        }
+                                    })
+                                    .when(!self.composer.read(cx).text(cx).is_empty(), |this| {
+                                        this.child(
+                                            IconButton::new("discard-draft", IconName::Trash)
+                                                .icon_size(IconSize::Small)
+                                                .icon_color(Color::Muted)
+                                                .on_click(cx.listener(|this, _, window, cx| {
+                                                    this.discard_draft(&DiscardDraft, window, cx);
+                                                }))
+                                                .tooltip(Tooltip::text("Discard draft")),
+                                        )
+                                    }),
+                            )
+                            .when_some(
+                                match &self.send_state {
+                                    SendState::Failed(message) => Some(message.clone()),
+                                    SendState::Idle | SendState::Sending => None,
+                                },
+                                |this, message| {
+                                    this.child(
+                                        Label::new(message)
+                                            .size(LabelSize::XSmall)
+                                            .color(Color::Error),
+                                    )
+                                },
+                            ),
                     ),
             )
+            .when(self.thread_panel.is_some(), |this| {
+                this.child(self.render_thread_panel(window, cx))
+            })
     }
 }
 
