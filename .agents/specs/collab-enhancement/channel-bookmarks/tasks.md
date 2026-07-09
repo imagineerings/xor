@@ -186,18 +186,20 @@ Add a channel bookmarks feature: a dedicated section in the channel header where
   - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_form --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_bar --features collab_ui/test-support`._
 
 - [ ] 12. Implement drag-and-drop reorder
-  - [ ] 12.1 Enable drag-and-drop on bookmark items in the `BookmarkBar` when user has edit permission.
+  - [x] 12.1 Enable drag-and-drop on bookmark items in the `BookmarkBar` when user has edit permission.
     - _Requirements: 6.3 (AC 1)_
     - _writes: collab_ui/src/channel_bookmark_bar.rs_
-  - [ ] 12.2 On drop, build the reordered bookmark ID list and call `reorder_bookmarks` RPC.
+  - [x] 12.2 On drop, build the reordered bookmark ID list and call `reorder_bookmarks` RPC.
     - _Requirements: 6.3 (AC 2)_
     - _writes: collab_ui/src/channel_bookmark_bar.rs_
-  - [ ] 12.3 Optimistically reorder the local bookmarks before the server confirms; roll back on error.
+  - [x] 12.3 Optimistically reorder the local bookmarks before the server confirms; roll back on error.
     - _Requirements: 6.3_
     - _writes: collab_ui/src/channel_bookmark_bar.rs_
   - [ ] 12.4 Write UI tests: drag reorder triggers expected RPC call, optimistic update, rollback on failure.
     - _Requirements: 6.3_
     - _writes: collab_ui/src/channel_bookmark_bar.rs_
+  - _Partial: Bookmark items are draggable and droppable onto other bookmark items; drops compute a reordered ID list, optimistically update `ChannelBookmarkStore`, call `reorder_bookmarks`, and restore the previous list with inline error feedback if the RPC fails. Full drag-event/RPC-failure UI coverage remains open in 12.4._
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_bar --features collab_ui/test-support -- --nocapture`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_store --features collab_ui/test-support -- --nocapture`._
 
 - [ ] 13. Implement channel system messages for bookmark changes
   - [x] 13.1 Post an informational channel message when a bookmark is created (e.g., "Alice pinned a link: Deploy Guide").

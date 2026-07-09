@@ -11,7 +11,7 @@ use chrono::{
     TimeZone as _, Timelike as _, Utc,
 };
 use client::{
-    AddBookmark, Bookmark, ChannelId, Client, UpdateBookmark, UserStore,
+    AddBookmark, Bookmark, BookmarkId, ChannelId, Client, UpdateBookmark, UserStore,
     channel_chat::{
         DEFAULT_THREAD_REPLY_LIMIT, ScheduleChannelMessage, SearchChannelMessages,
         SendChannelMessage, ThreadSummary, UpdateScheduledMessage,
@@ -3591,6 +3591,16 @@ impl ChannelChat {
                                     })
                                     .log_err();
                             })
+                            .on_reorder({
+                                let weak_self = cx.weak_entity();
+                                move |dragged_id, target_id, _, cx| {
+                                    weak_self
+                                        .update(cx, |this, cx| {
+                                            this.reorder_bookmark(dragged_id, target_id, cx);
+                                        })
+                                        .log_err();
+                                }
+                            })
                             .on_open_message({
                                 let weak_self = cx.weak_entity();
                                 move |message_id, _, cx| {
@@ -3781,6 +3791,53 @@ impl ChannelChat {
             self.bookmark_action_error = Some("Bookmarked message is not loaded.".into());
         }
         cx.notify();
+    }
+
+    fn reorder_bookmark(
+        &mut self,
+        dragged_id: BookmarkId,
+        target_id: BookmarkId,
+        cx: &mut Context<Self>,
+    ) {
+        let bookmarks = self
+            .bookmark_store
+            .read(cx)
+            .bookmarks(self.channel_id)
+            .to_vec();
+        let Some(ordered_ids) =
+            crate::channel_bookmark_bar::reordered_bookmark_ids(&bookmarks, dragged_id, target_id)
+        else {
+            return;
+        };
+        let Some(previous_bookmarks) = self.bookmark_store.update(cx, |bookmark_store, cx| {
+            bookmark_store.reorder_bookmarks(self.channel_id, &ordered_ids, cx)
+        }) else {
+            return;
+        };
+
+        self.bookmark_action_error = None;
+        cx.notify();
+
+        cx.spawn({
+            let client = self.client.clone();
+            let channel_id = self.channel_id;
+            let bookmark_store = self.bookmark_store.clone();
+            async move |this, cx| {
+                let result = client.reorder_bookmarks(channel_id, ordered_ids).await;
+                if let Err(error) = result {
+                    bookmark_store.update(cx, |bookmark_store, cx| {
+                        bookmark_store.set_bookmarks(channel_id, previous_bookmarks, cx);
+                    });
+                    this.update(cx, |this, cx| {
+                        this.bookmark_action_error =
+                            Some(format!("Failed to reorder bookmarks: {error:#}").into());
+                        cx.notify();
+                    })?;
+                }
+                anyhow::Ok(())
+            }
+        })
+        .detach_and_log_err(cx);
     }
 
     fn close_bookmark_form(&mut self, _: &ClickEvent, _: &mut Window, cx: &mut Context<Self>) {

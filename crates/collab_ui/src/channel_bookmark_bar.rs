@@ -1,5 +1,8 @@
-use client::Bookmark;
-use gpui::{App, IntoElement, ParentElement as _, RenderOnce, SharedString, Window, div};
+use client::{Bookmark, BookmarkId};
+use gpui::{
+    App, Context, IntoElement, ParentElement as _, Render, RenderOnce, SharedString,
+    StatefulInteractiveElement as _, Window, div,
+};
 use rpc::proto;
 use std::rc::Rc;
 use ui::{Button, ButtonSize, ButtonStyle, Color, Icon, IconName, Label, Tooltip, prelude::*};
@@ -9,6 +12,7 @@ type EditBookmarkHandler = Rc<dyn Fn(Bookmark, &mut Window, &mut App)>;
 type DeleteBookmarkHandler = Rc<dyn Fn(Bookmark, &mut Window, &mut App)>;
 type OpenFileHandler = Rc<dyn Fn(String, &mut Window, &mut App)>;
 type OpenMessageHandler = Rc<dyn Fn(u64, &mut Window, &mut App)>;
+type ReorderBookmarkHandler = Rc<dyn Fn(BookmarkId, BookmarkId, &mut Window, &mut App)>;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BookmarkClickAction {
@@ -26,6 +30,7 @@ pub struct ChannelBookmarkBar {
     on_delete: Option<DeleteBookmarkHandler>,
     on_open_file: Option<OpenFileHandler>,
     on_open_message: Option<OpenMessageHandler>,
+    on_reorder: Option<ReorderBookmarkHandler>,
 }
 
 impl ChannelBookmarkBar {
@@ -37,6 +42,7 @@ impl ChannelBookmarkBar {
             on_delete: None,
             on_open_file: None,
             on_open_message: None,
+            on_reorder: None,
         }
     }
 
@@ -66,6 +72,14 @@ impl ChannelBookmarkBar {
         on_open_message: impl Fn(u64, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_open_message = Some(Rc::new(on_open_message));
+        self
+    }
+
+    pub fn on_reorder(
+        mut self,
+        on_reorder: impl Fn(BookmarkId, BookmarkId, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_reorder = Some(Rc::new(on_reorder));
         self
     }
 
@@ -122,6 +136,7 @@ impl RenderOnce for ChannelBookmarkBar {
                                     self.on_delete.clone(),
                                     self.on_open_file.clone(),
                                     self.on_open_message.clone(),
+                                    self.on_reorder.clone(),
                                 )
                             }),
                     ),
@@ -136,18 +151,47 @@ fn render_bookmark(
     on_delete: Option<DeleteBookmarkHandler>,
     on_open_file: Option<OpenFileHandler>,
     on_open_message: Option<OpenMessageHandler>,
+    on_reorder: Option<ReorderBookmarkHandler>,
 ) -> impl IntoElement {
     let id = bookmark.id.to_proto();
+    let bookmark_id = bookmark.id;
     let label = bookmark.label.clone();
     let description = bookmark.description.clone();
     let bookmark_type = bookmark.bookmark_type;
     let url = bookmark.url.to_string();
     let bookmark_for_edit = bookmark.clone();
     let bookmark_for_delete = bookmark.clone();
+    let bookmark_for_drag = bookmark.clone();
 
     h_flex()
+        .id(("channel-bookmark-row", id))
         .gap_1()
         .items_center()
+        .on_drag(
+            DraggedBookmark {
+                bookmark: bookmark_for_drag,
+            },
+            |dragged_bookmark, _, _, cx| {
+                cx.new(|_| DraggedBookmarkView {
+                    bookmark: dragged_bookmark.bookmark.clone(),
+                })
+            },
+        )
+        .drag_over::<DraggedBookmark>(move |style, dragged_bookmark, _window, cx| {
+            if dragged_bookmark.bookmark.id != bookmark_id {
+                style.bg(cx.theme().colors().ghost_element_hover)
+            } else {
+                style
+            }
+        })
+        .when_some(on_reorder, |this, on_reorder| {
+            this.on_drop(move |dragged_bookmark: &DraggedBookmark, window, cx| {
+                let dragged_id = dragged_bookmark.bookmark.id;
+                if dragged_id != bookmark_id {
+                    on_reorder(dragged_id, bookmark_id, window, cx);
+                }
+            })
+        })
         .child(
             Button::new(("channel-bookmark", id), label.clone())
                 .style(ButtonStyle::Subtle)
@@ -205,6 +249,27 @@ fn render_bookmark(
         })
 }
 
+#[derive(Clone)]
+struct DraggedBookmark {
+    bookmark: Bookmark,
+}
+
+struct DraggedBookmarkView {
+    bookmark: Bookmark,
+}
+
+impl Render for DraggedBookmarkView {
+    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+        h_flex()
+            .gap_1()
+            .items_center()
+            .px_2()
+            .py_1()
+            .child(Icon::new(bookmark_icon(self.bookmark.bookmark_type)))
+            .child(Label::new(self.bookmark.label.clone()).size(LabelSize::Small))
+    }
+}
+
 fn visible_bookmark_count(count: usize, expanded: bool) -> usize {
     if expanded {
         count
@@ -254,6 +319,35 @@ fn bookmark_tooltip(
         }
         _ => SharedString::from(format!("{bookmark_type}: {label}")),
     }
+}
+
+pub fn reordered_bookmark_ids(
+    bookmarks: &[Bookmark],
+    dragged_id: BookmarkId,
+    target_id: BookmarkId,
+) -> Option<Vec<BookmarkId>> {
+    if dragged_id == target_id {
+        return None;
+    }
+
+    let dragged_index = bookmarks
+        .iter()
+        .position(|bookmark| bookmark.id == dragged_id)?;
+    let target_index = bookmarks
+        .iter()
+        .position(|bookmark| bookmark.id == target_id)?;
+    let mut ids = bookmarks
+        .iter()
+        .map(|bookmark| bookmark.id)
+        .collect::<Vec<_>>();
+    let dragged_id = ids.remove(dragged_index);
+    let target_index = if dragged_index < target_index {
+        target_index.saturating_sub(1)
+    } else {
+        target_index
+    };
+    ids.insert(target_index, dragged_id);
+    Some(ids)
 }
 
 #[cfg(test)]
@@ -315,6 +409,34 @@ mod tests {
         assert_eq!(
             bookmark_click_action(proto::BookmarkType::BookmarkMessage, "", None, None),
             BookmarkClickAction::None
+        );
+    }
+
+    #[test]
+    fn reordered_bookmark_ids_moves_dragged_before_target() {
+        let bookmarks = test_bookmarks(4);
+
+        assert_eq!(
+            reordered_bookmark_ids(&bookmarks, BookmarkId(3), BookmarkId(1)).unwrap(),
+            vec![BookmarkId(0), BookmarkId(3), BookmarkId(1), BookmarkId(2)]
+        );
+        assert_eq!(
+            reordered_bookmark_ids(&bookmarks, BookmarkId(1), BookmarkId(3)).unwrap(),
+            vec![BookmarkId(0), BookmarkId(2), BookmarkId(1), BookmarkId(3)]
+        );
+    }
+
+    #[test]
+    fn reordered_bookmark_ids_ignores_noop_and_missing_bookmarks() {
+        let bookmarks = test_bookmarks(3);
+
+        assert_eq!(
+            reordered_bookmark_ids(&bookmarks, BookmarkId(1), BookmarkId(1)),
+            None
+        );
+        assert_eq!(
+            reordered_bookmark_ids(&bookmarks, BookmarkId(7), BookmarkId(1)),
+            None
         );
     }
 
