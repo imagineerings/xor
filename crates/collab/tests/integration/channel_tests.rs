@@ -367,6 +367,60 @@ async fn test_joining_channel_ancestor_member(
 }
 
 #[gpui::test]
+async fn test_channel_call_recovers_from_livekit_connect_failure(
+    executor: BackgroundExecutor,
+    cx_a: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor.clone()).await;
+    let client_a = server.create_client(cx_a, "user_a").await;
+    client_a.initialize_channel_store(cx_a);
+
+    let channel_id = server
+        .make_channel("zed", None, (&client_a, cx_a), &mut [])
+        .await;
+
+    let identity = client_a.user_id().unwrap().to_string();
+    server
+        .test_livekit_server
+        .set_token_revoked(&identity, true);
+
+    let active_call_a = cx_a.read(ActiveCall::global);
+    active_call_a
+        .update(cx_a, |active_call, cx| {
+            active_call.join_channel(channel_id, cx)
+        })
+        .await
+        .unwrap();
+    executor.run_until_parked();
+
+    let room_a =
+        cx_a.read(|cx| active_call_a.read_with(cx, |call, _| call.room().unwrap().clone()));
+    cx_a.read(|cx| {
+        client_a.channel_store().read_with(cx, |channels, _| {
+            assert_participants_eq(
+                channels.channel_participants(channel_id),
+                &[client_a.user_id().unwrap()],
+            );
+        })
+    });
+    cx_a.read(|cx| room_a.read_with(cx, |room, cx| assert!(!room.is_connected(cx))));
+
+    server
+        .test_livekit_server
+        .set_token_revoked(&identity, false);
+    executor.advance_clock(RECONNECT_TIMEOUT);
+    executor.run_until_parked();
+    cx_a.read(|cx| {
+        room_a.read_with(cx, |room, cx| {
+            assert!(
+                room.is_connected(cx),
+                "client should have re-established its LiveKit connection"
+            )
+        })
+    });
+}
+
+#[gpui::test]
 async fn test_channel_room(
     executor: BackgroundExecutor,
     cx_a: &mut TestAppContext,
