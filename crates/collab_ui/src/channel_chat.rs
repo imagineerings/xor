@@ -1,4 +1,7 @@
-use crate::draft_store::DraftStore;
+use crate::{
+    channel_bookmark_bar::ChannelBookmarkBar, channel_bookmark_store::ChannelBookmarkStore,
+    draft_store::DraftStore,
+};
 use anyhow::Result;
 use channel::{Channel, ChannelStore};
 use chrono::{
@@ -124,6 +127,8 @@ pub struct ChannelChat {
     pending_search: Option<Task<()>>,
     highlighted_search_message_id: Option<u64>,
     emoji_search: Entity<Editor>,
+    bookmark_store: Entity<ChannelBookmarkStore>,
+    bookmarks_expanded: bool,
     messages: Vec<proto::ChannelMessage>,
     message_bodies: HashMap<u64, message_bubble::MessageBody>,
     thread_summaries: HashMap<u64, ThreadSummary>,
@@ -139,6 +144,7 @@ pub struct ChannelChat {
     _composer_subscription: GpuiSubscription,
     _search_subscription: GpuiSubscription,
     _emoji_search_subscription: GpuiSubscription,
+    _bookmark_store_subscription: GpuiSubscription,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -565,6 +571,8 @@ impl ChannelChat {
                 }
             });
         let _emoji_search_subscription = cx.observe(&emoji_search, |_, _, cx| cx.notify());
+        let bookmark_store = cx.new(|cx| ChannelBookmarkStore::new(client.clone(), cx));
+        let _bookmark_store_subscription = cx.observe(&bookmark_store, |_, _, cx| cx.notify());
         let weak_self = cx.weak_entity();
         let _rpc_subscriptions = vec![
             client.add_channel_message_sent_handler(weak_self.clone(), Self::handle_message_sent),
@@ -625,6 +633,8 @@ impl ChannelChat {
             pending_search: None,
             highlighted_search_message_id: None,
             emoji_search,
+            bookmark_store,
+            bookmarks_expanded: false,
             messages,
             message_bodies: HashMap::default(),
             thread_summaries: HashMap::default(),
@@ -640,6 +650,7 @@ impl ChannelChat {
             _composer_subscription,
             _search_subscription,
             _emoji_search_subscription,
+            _bookmark_store_subscription,
         }
     }
 
@@ -3475,6 +3486,49 @@ impl ChannelChat {
         self.load_more_search_results(cx);
     }
 
+    fn render_bookmark_bar(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let bookmarks = self
+            .bookmark_store
+            .read(cx)
+            .bookmarks(self.channel_id)
+            .to_vec();
+        let has_overflow = bookmarks.len() > 5;
+
+        v_flex()
+            .when(!bookmarks.is_empty(), |this| {
+                this.child(ChannelBookmarkBar::new(
+                    bookmarks,
+                    self.bookmarks_expanded,
+                ))
+                .when(has_overflow, |this| {
+                    this.child(
+                        h_flex()
+                            .justify_end()
+                            .px_3()
+                            .pb_2()
+                            .border_b_1()
+                            .border_color(cx.theme().colors().border)
+                            .child(
+                                Button::new(
+                                    "toggle-channel-bookmarks",
+                                    if self.bookmarks_expanded {
+                                        "Show less"
+                                    } else {
+                                        "Show all"
+                                    },
+                                )
+                                .style(ButtonStyle::Subtle)
+                                .size(ButtonSize::Compact)
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    this.bookmarks_expanded = !this.bookmarks_expanded;
+                                    cx.notify();
+                                })),
+                            ),
+                    )
+                })
+            })
+    }
+
     #[cfg(any(test, feature = "test-support"))]
     pub fn selected_search_result_index_for_test(&self) -> Option<usize> {
         self.search_state.selected_result_index
@@ -3539,6 +3593,7 @@ impl Render for ChannelChat {
                     .when(self.search_state.active, |this| {
                         this.child(self.render_search_results_panel(window, cx))
                     })
+                    .child(self.render_bookmark_bar(cx))
                     .child(
                         v_flex()
                             .flex_1()

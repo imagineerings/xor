@@ -123,24 +123,26 @@ Add a channel bookmarks feature: a dedicated section in the channel header where
   - _Validation: `CARGO_INCREMENTAL=0 cargo check -p client -p collab_ui --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p client bookmark --features client/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui store_replaces_bookmarks_for_channel --features collab_ui/test-support`._
 
 - [ ] 9. Implement `BookmarkBar` component
-  - [ ] 9.1 Render the bookmark bar at the top of the channel view (between channel header and message list).
+  - [x] 9.1 Render the bookmark bar at the top of the channel view (between channel header and message list).
     - _Requirements: 6.2 (AC 1)_
     - _writes: collab_ui/src/channel_bookmark_bar.rs_
-  - [ ] 9.2 Display bookmark entries: type icon, label, optional description. Truncate long labels.
+  - [x] 9.2 Display bookmark entries: type icon, label, optional description. Truncate long labels.
     - _Requirements: 6.2 (AC 2)_
     - _writes: collab_ui/src/channel_bookmark_bar.rs_
-  - [ ] 9.3 Show bookmark count header with "Show all" expand/collapse toggle when >5 bookmarks.
+  - [x] 9.3 Show bookmark count header with "Show all" expand/collapse toggle when >5 bookmarks.
     - _Requirements: 6.2 (AC 4)_
     - _writes: collab_ui/src/channel_bookmark_bar.rs_
   - [ ] 9.4 Handle click on link-type bookmarks — open URL in default browser. Handle file/message types — open in-app.
     - _Requirements: 6.2 (AC 3)_
     - _writes: collab_ui/src/channel_bookmark_bar.rs_
-  - [ ] 9.5 Wire `BookmarkBar` into the channel view, observe `ChannelBookmarkStore` for updates.
+  - [x] 9.5 Wire `BookmarkBar` into the channel view, observe `ChannelBookmarkStore` for updates.
     - _Requirements: 6.2_
     - _writes: collab_ui/src/channel_view.rs_
   - [ ] 9.6 Write UI tests: rendering with 0, 3, 8 bookmarks; expand/collapse behavior; click handling.
     - _Requirements: 6.2_
     - _writes: collab_ui/src/channel_bookmark_bar.rs_
+  - _Completed: Added a compact bookmark bar component, mounted it above channel chat messages, observed `ChannelBookmarkStore` for live updates, and added collapsed/expanded rendering with a Show all/Show less toggle. Link bookmarks open through the platform URL handler; file/message click-through remains open in 9.4._
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_bar --features collab_ui/test-support`._
 
 - [ ] 10. Implement `BookmarkForm` modal
   - [ ] 10.1 Build create-mode form with fields: label (required), URL, type selector (Link/File/Message), description (optional).
