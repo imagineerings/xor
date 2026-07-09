@@ -226,6 +226,32 @@ message GetChannelMessagesById {
   repeated uint64 message_ids = 1;
 }
 
+message GetThread {
+  uint64 channel_id = 1;
+  uint64 message_id = 2;
+}
+
+message GetThreadResponse {
+  ChannelMessage root_message = 1;
+  repeated ChannelMessage replies = 2;
+}
+
+message GetThreads {
+  uint64 channel_id = 1;
+}
+
+message GetThreadsResponse {
+  repeated ThreadSummary threads = 1;
+}
+
+message ThreadSummary {
+  uint64 root_message_id = 1;
+  uint32 reply_count = 2;
+  uint64 latest_reply_at = 3;
+  repeated uint64 participant_user_ids = 4;
+  bool has_unread = 5;
+}
+
 message MoveChannel {
   uint64 channel_id = 1;
   uint64 to = 2;

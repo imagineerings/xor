@@ -10,7 +10,7 @@ Add threaded replies to channel messages in Sim. This feature reuses the existin
 
 ## Tasks
 
-- [ ] 1. Define new protobuf messages for thread RPCs
+- [x] 1. Define new protobuf messages for thread RPCs
   - Add `GetThread`, `GetThreadResponse`, `GetThreads`, `GetThreadsResponse`, `ThreadSummary` messages to `experiments.proto` (or channel-related proto file).
   - Add `GetThread`/`GetThreads` to the RPC dispatch enum and server handler trait.
   - _Requirements: 3.1, 3.4_

@@ -492,7 +492,11 @@ message Envelope {
     AddReaction add_reaction = 457;
     RemoveReaction remove_reaction = 458;
     UpdateMessageReactions update_message_reactions = 459;
-    UpdateMessageReactionsResponse update_message_reactions_response = 460; // current max
+    UpdateMessageReactionsResponse update_message_reactions_response = 460;
+    GetThread get_thread = 461;
+    GetThreadResponse get_thread_response = 462;
+    GetThreads get_threads = 463;
+    GetThreadsResponse get_threads_response = 464; // current max
   }
 
   reserved 87 to 88;
