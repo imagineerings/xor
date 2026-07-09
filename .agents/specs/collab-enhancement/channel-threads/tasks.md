@@ -72,11 +72,13 @@ Add threaded replies to channel messages in Sim. This feature reuses the existin
   - _writes: `collab_ui/src/channel_thread/unread_tracker.rs`_
 
 - [ ] 8. Wire real-time reply updates to the ThreadPanel
-  - [ ] 8.1 In the `ChannelMessageSent` WebSocket handler, check if the received message has `reply_to_message_id` set and belongs to the currently open thread.
-  - [ ] 8.2 If so, append the new reply to the `ThreadPanel::replies` list and call `cx.notify()`.
-  - [ ] 8.3 If the thread panel is not open, update the relevant `ThreadIndicator`'s reply count and unread state.
+  - [x] 8.1 In the `ChannelMessageSent` WebSocket handler, check if the received message has `reply_to_message_id` set and belongs to the currently open thread.
+  - [x] 8.2 If so, append the new reply to the `ThreadPanel::replies` list and call `cx.notify()`.
+  - [x] 8.3 If the thread panel is not open, update the relevant `ThreadIndicator`'s reply count and unread state.
   - _Requirements: 3.2_
   - _writes: `collab_ui/src/channel_thread/thread_realtime.rs`_
+  - _implemented in existing `crates/collab_ui/src/channel_chat.rs` message upsert path_
+  - _validated: `CARGO_INCREMENTAL=0 cargo check -p collab_ui`; `git diff --check`_
 
 - [ ] 9. Add error handling and edge-case states
   - [ ] 9.1 Show a "This message has been deleted" placeholder if the root message is unavailable.

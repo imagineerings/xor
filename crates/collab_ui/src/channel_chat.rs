@@ -434,6 +434,8 @@ impl ChannelChat {
     }
 
     fn upsert_message(&mut self, message: proto::ChannelMessage, cx: &mut Context<Self>) {
+        let reply_to_message_id = message.reply_to_message_id;
+        let thread_reply = message.clone();
         if let Some(existing) = self
             .messages
             .iter_mut()
@@ -447,6 +449,10 @@ impl ChannelChat {
             self.messages.push(message);
             self.messages
                 .sort_by_key(|message| (message.timestamp, message.id));
+        }
+
+        if let Some(root_message_id) = reply_to_message_id {
+            self.upsert_open_thread_reply(root_message_id, thread_reply);
         }
 
         if let Some(latest_message_id) = self.messages.last().map(|message| message.id) {
@@ -487,6 +493,28 @@ impl ChannelChat {
             summary.participant_user_ids.push(reply.sender_id);
         }
         summary.reply_count = summary.reply_count.saturating_add(1);
+    }
+
+    fn upsert_open_thread_reply(&mut self, root_message_id: u64, reply: proto::ChannelMessage) {
+        let Some(thread_panel) = self.thread_panel.as_mut() else {
+            return;
+        };
+        if thread_panel.root_message_id != root_message_id {
+            return;
+        }
+
+        if let Some(existing) = thread_panel
+            .replies
+            .iter_mut()
+            .find(|existing| existing.id == reply.id)
+        {
+            *existing = reply;
+        } else {
+            thread_panel.replies.push(reply);
+            thread_panel
+                .replies
+                .sort_by_key(|reply| (reply.timestamp, reply.id));
+        }
     }
 
     fn send(&mut self, _: &Confirm, window: &mut Window, cx: &mut Context<Self>) {
@@ -647,16 +675,6 @@ impl ChannelChat {
                         && thread_panel.root_message_id == root_message_id
                     {
                         thread_panel.send_state = SendState::Idle;
-                        if !thread_panel
-                            .replies
-                            .iter()
-                            .any(|reply| reply.id == message.id)
-                        {
-                            thread_panel.replies.push(message);
-                            thread_panel
-                                .replies
-                                .sort_by_key(|reply| (reply.timestamp, reply.id));
-                        }
                     }
                     cx.notify();
                 }
