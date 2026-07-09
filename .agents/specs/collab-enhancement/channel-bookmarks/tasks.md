@@ -206,11 +206,13 @@ Add a channel bookmarks feature: a dedicated section in the channel header where
   - [x] 13.3 Post an informational channel message when a bookmark is updated (label changed).
     - _Requirements: 6.4 (AC 3)_
     - _writes: collab/src/rpc/bookmark_rpc.rs_
-  - [ ] 13.4 Style informational bookmark messages distinctly from regular messages (e.g., italic, muted color, no avatar).
+  - [x] 13.4 Style informational bookmark messages distinctly from regular messages (e.g., italic, muted color, no avatar).
     - _Requirements: 6.4 (AC 4)_
-    - _writes: collab_ui/src/channel_message.rs_
+    - _writes: collab_ui/src/channel_chat.rs_
   - _Partial: Bookmark create, update, and delete operations now post channel messages and broadcast them to channel participants. The messages currently use the existing channel message model/presentation, so distinct visual styling remains open in 13.4._
   - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab --features collab/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab test_channel_bookmark_rpc_flow_and_permissions --features collab/test-support -- --nocapture`._
+  - _Completed: Bookmark activity messages now render as compact muted italic rows with a pin icon and no sender/reply chrome in the channel message list._
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui bookmark_system_message_detection_is_narrow --features collab_ui/test-support -- --nocapture`._
 
 - [x] 14. Load bookmarks on channel open
   - [x] 14.1 When a channel is opened, fetch existing bookmarks via `GetBookmarks` (or via the initial channel state payload).

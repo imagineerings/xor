@@ -1994,6 +1994,24 @@ impl ChannelChat {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> gpui::AnyElement {
+        if is_bookmark_system_message(&message.body) {
+            return h_flex()
+                .gap_2()
+                .items_center()
+                .px_3()
+                .py_2()
+                .border_b_1()
+                .border_color(cx.theme().colors().border_variant)
+                .child(Icon::new(IconName::Pin).size(IconSize::XSmall))
+                .child(
+                    Label::new(message.body.clone())
+                        .size(LabelSize::XSmall)
+                        .color(Color::Muted)
+                        .italic(),
+                )
+                .into_any_element();
+        }
+
         let sender = self.user_display_name(message.sender_id, cx);
         let timestamp = format_timestamp(message.timestamp);
         let scheduled_label = message
@@ -4092,6 +4110,12 @@ fn pending_scheduled_badge_label(pending_scheduled_count: usize) -> Option<Strin
     }
 }
 
+fn is_bookmark_system_message(body: &str) -> bool {
+    (body.starts_with("Pinned a ") && body.contains(" bookmark: "))
+        || body.starts_with("Updated bookmark: ")
+        || body.starts_with("Removed bookmark: ")
+}
+
 fn scheduled_message_time_label(message: &ScheduledMessage) -> String {
     message.display_time.format("%-I:%M %p").to_string()
 }
@@ -4266,6 +4290,30 @@ mod tests {
     fn pending_scheduled_badge_label_hides_zero_count() {
         assert_eq!(pending_scheduled_badge_label(0), None);
         assert_eq!(pending_scheduled_badge_label(3), Some("3".to_string()));
+    }
+
+    #[test]
+    fn bookmark_system_message_detection_is_narrow() {
+        assert!(is_bookmark_system_message(
+            "Pinned a link bookmark: Deploy Guide"
+        ));
+        assert!(is_bookmark_system_message(
+            "Pinned a message bookmark: Design thread"
+        ));
+        assert!(is_bookmark_system_message(
+            "Updated bookmark: Deploy Guide v2"
+        ));
+        assert!(is_bookmark_system_message(
+            "Removed bookmark: Deploy Guide v2"
+        ));
+
+        assert!(!is_bookmark_system_message(
+            "Pinned a link outside the bookmark bar"
+        ));
+        assert!(!is_bookmark_system_message(
+            "Updated my bookmark workflow notes"
+        ));
+        assert!(!is_bookmark_system_message(""));
     }
 
     #[test]
