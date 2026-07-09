@@ -4054,6 +4054,29 @@ async fn reorder_bookmarks(
 }
 
 fn file_store(session: &MessageContext) -> FileStore {
+    #[cfg(feature = "test-support")]
+    if session.app_state.blob_store_client.is_none() {
+        return FileStore::new_for_tests(
+            session.app_state.db.clone(),
+            FileStoreConfig::new(
+                Some("test-bucket".to_string()),
+                session
+                    .app_state
+                    .config
+                    .file_upload_max_file_size
+                    .unwrap_or(DEFAULT_FILE_UPLOAD_MAX_FILE_SIZE),
+                allowed_file_upload_mime_types(
+                    session
+                        .app_state
+                        .config
+                        .file_upload_allowed_mime_types
+                        .as_deref(),
+                ),
+            ),
+            "http://file-store.test",
+        );
+    }
+
     FileStore::new(
         session.app_state.db.clone(),
         session.app_state.blob_store_client.clone(),
@@ -4073,6 +4096,31 @@ fn file_store(session: &MessageContext) -> FileStore {
             ),
         ),
     )
+}
+
+async fn populate_channel_message_files(
+    session: &MessageContext,
+    messages: &mut [proto::ChannelMessage],
+) -> Result<()> {
+    let message_ids = messages
+        .iter()
+        .map(|message| MessageId::from_proto(message.id))
+        .collect::<Vec<_>>();
+    let mut files_by_message_id = file_store(session)
+        .get_message_files(message_ids)
+        .await
+        .map_err(file_store_rpc_error)?;
+
+    for message in messages {
+        message.files = files_by_message_id
+            .remove(&MessageId::from_proto(message.id))
+            .unwrap_or_default()
+            .into_iter()
+            .map(db::file_store::FileAttachment::to_proto)
+            .collect();
+    }
+
+    Ok(())
 }
 
 fn allowed_file_upload_mime_types(allowed_mime_types: Option<&str>) -> Vec<String> {
@@ -4336,11 +4384,12 @@ async fn join_channel_chat(
     session: MessageContext,
 ) -> Result<()> {
     let channel_id = ChannelId::from_proto(request.channel_id);
-    let (messages, role) = session
+    let (mut messages, role) = session
         .db()
         .await
         .join_channel_chat(channel_id, session.user_id(), session.connection_id)
         .await?;
+    populate_channel_message_files(&session, &mut messages).await?;
     session
         .connection_pool()
         .await
@@ -4377,7 +4426,7 @@ async fn get_channel_messages(
     } else {
         Some(MessageId::from_proto(request.before_message_id))
     };
-    let messages = session
+    let mut messages = session
         .db()
         .await
         .get_channel_messages(
@@ -4387,6 +4436,7 @@ async fn get_channel_messages(
             CHANNEL_MESSAGE_PAGE_SIZE,
         )
         .await?;
+    populate_channel_message_files(&session, &mut messages).await?;
     let done = messages.len() < CHANNEL_MESSAGE_PAGE_SIZE;
     response.send(proto::GetChannelMessagesResponse { messages, done })
 }
@@ -4397,7 +4447,7 @@ async fn get_channel_messages_by_id(
     response: Response<proto::GetChannelMessagesById>,
     session: MessageContext,
 ) -> Result<()> {
-    let messages = session
+    let mut messages = session
         .db()
         .await
         .get_channel_messages_by_id(
@@ -4409,6 +4459,7 @@ async fn get_channel_messages_by_id(
             session.user_id(),
         )
         .await?;
+    populate_channel_message_files(&session, &mut messages).await?;
     response.send(proto::GetChannelMessagesResponse {
         messages,
         done: true,

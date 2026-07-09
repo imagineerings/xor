@@ -177,6 +177,44 @@ impl FileStore {
         self.file_attachment_from_row(row).await
     }
 
+    pub async fn get_message_files(
+        &self,
+        message_ids: Vec<MessageId>,
+    ) -> Result<HashMap<MessageId, Vec<FileAttachment>>> {
+        if message_ids.is_empty() {
+            return Ok(HashMap::default());
+        }
+
+        let rows = self
+            .db
+            .transaction(|tx| {
+                let message_ids = message_ids.clone();
+                async move {
+                    channel_file::Entity::find()
+                        .filter(channel_file::Column::MessageId.is_in(message_ids))
+                        .order_by_asc(channel_file::Column::MessageId)
+                        .order_by_asc(channel_file::Column::CreatedAt)
+                        .all(&*tx)
+                        .await
+                        .map_err(Into::into)
+                }
+            })
+            .await?;
+
+        let mut files_by_message_id = HashMap::default();
+        for row in rows {
+            let Some(message_id) = row.message_id else {
+                continue;
+            };
+            let attachment = self.file_attachment_from_row(row).await?;
+            files_by_message_id
+                .entry(message_id)
+                .or_insert_with(Vec::new)
+                .push(attachment);
+        }
+        Ok(files_by_message_id)
+    }
+
     pub async fn attach_files_to_message(
         &self,
         channel_id: ChannelId,

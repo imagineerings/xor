@@ -4,6 +4,7 @@ use client::{
         DEFAULT_THREAD_REPLY_LIMIT, ScheduleChannelMessage, SearchChannelMessages,
         SendChannelMessage, UpdateChannelMessage,
     },
+    file_upload::GetFileUploadUrl,
     proto,
 };
 use collab::{
@@ -16,8 +17,10 @@ use collab::{
 };
 use gpui::{AppContext, BackgroundExecutor, TestAppContext};
 use pretty_assertions::assert_eq;
+use rpc::ErrorExt as _;
 use std::time::Duration as StdDuration;
 use time::{Duration as TimeDuration, OffsetDateTime, PrimitiveDateTime};
+use uuid::Uuid;
 
 #[derive(Default)]
 struct ReactionHandlerEntity;
@@ -112,6 +115,92 @@ async fn test_channel_chat_core_flow(
     assert_eq!(deleted.len(), 1);
     assert_eq!(deleted[0].body, "");
     assert!(deleted[0].mentions.is_empty());
+}
+
+#[gpui::test]
+async fn test_channel_file_upload_lifecycle_rpc(
+    executor: BackgroundExecutor,
+    cx_a: &mut TestAppContext,
+    cx_b: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor.clone()).await;
+    let client_a = server.create_client(cx_a, "user_a").await;
+    let client_b = server.create_client(cx_b, "user_b").await;
+    let channel_id = server
+        .make_channel("chat", None, (&client_a, cx_a), &mut [(&client_b, cx_b)])
+        .await;
+
+    client_a.join_channel_chat(channel_id.0).await.unwrap();
+    client_b.join_channel_chat(channel_id.0).await.unwrap();
+
+    let too_large = client_a
+        .client()
+        .get_file_upload_url(GetFileUploadUrl {
+            channel_id,
+            filename: "too-large.txt".to_string(),
+            file_size: 101 * 1024 * 1024,
+            mime_type: "text/plain".to_string(),
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(too_large.error_code(), proto::ErrorCode::FileTooLarge);
+
+    let missing_file = client_a
+        .client()
+        .confirm_file_upload(Uuid::new_v4().to_string())
+        .await
+        .unwrap_err();
+    assert_eq!(missing_file.error_code(), proto::ErrorCode::Internal);
+
+    let upload = client_a
+        .client()
+        .get_file_upload_url(GetFileUploadUrl {
+            channel_id,
+            filename: "deploy.txt".to_string(),
+            file_size: 12,
+            mime_type: "text/plain".to_string(),
+        })
+        .await
+        .unwrap();
+    assert!(upload.url.contains("file-store.test"));
+    assert!(upload.headers.is_empty());
+
+    let confirmed = client_a
+        .client()
+        .confirm_file_upload(upload.file_id.clone())
+        .await
+        .unwrap();
+    assert_eq!(confirmed.id, upload.file_id);
+    assert_eq!(confirmed.filename, "deploy.txt");
+    assert_eq!(confirmed.file_size, 12);
+    assert_eq!(confirmed.mime_type, "text/plain");
+    assert_eq!(confirmed.uploader_id, client_a.user_id().unwrap());
+    assert!(confirmed.uploaded_at.is_some());
+
+    let sent = client_a
+        .send_channel_message(SendChannelMessage {
+            channel_id: channel_id.0,
+            body: "see attachment".to_string(),
+            nonce: 1,
+            mentions: Vec::new(),
+            reply_to_message_id: None,
+            file_ids: vec![upload.file_id.clone()],
+        })
+        .await
+        .unwrap();
+    assert_eq!(sent.files.len(), 1);
+    assert_eq!(sent.files[0].id, upload.file_id);
+    assert_eq!(sent.files[0].filename, "deploy.txt");
+
+    let history = client_b
+        .get_channel_messages(channel_id.0, None)
+        .await
+        .unwrap()
+        .messages;
+    assert_eq!(history.len(), 1);
+    assert_eq!(history[0].id, sent.id);
+    assert_eq!(history[0].files.len(), 1);
+    assert_eq!(history[0].files[0].id, upload.file_id);
 }
 
 #[gpui::test]

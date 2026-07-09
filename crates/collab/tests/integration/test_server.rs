@@ -12,7 +12,7 @@ use collab::{
     AppState, Config,
     db::UserId,
     executor::Executor,
-    rpc::{SimVersion, CLEANUP_TIMEOUT, Principal, RECONNECT_TIMEOUT, Server},
+    rpc::{CLEANUP_TIMEOUT, Principal, RECONNECT_TIMEOUT, Server, SimVersion},
 };
 use collab_ui::channel_view::ChannelView;
 use collections::{HashMap, HashSet};
@@ -348,6 +348,7 @@ impl TestServer {
             theme_settings::init(theme::LoadThemes::JustBase, cx);
             Project::init(&client, cx);
             client::init(&client, cx);
+            Client::set_global(client.clone(), cx);
             editor::init(cx);
             workspace::init(app_state.clone(), cx);
             call::init(client.clone(), user_store.clone(), cx);

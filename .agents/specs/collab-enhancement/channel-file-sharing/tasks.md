@@ -222,13 +222,16 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
   - _Actual writes: crates/collab/src/db/file_store.rs; crates/collab/tests/integration/db_tests.rs; crates/collab/tests/integration/db_tests/file_store_tests.rs; crates/collab/src/rpc.rs; crates/proto/proto/sim.proto_
   - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests test_file_store_validation_sqlite --features test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests test_file_store_metadata_lifecycle_sqlite --features test-support`; `CARGO_INCREMENTAL=0 cargo check -p proto -p collab --features collab/test-support`; `git diff --check`._
 
-- [ ] 22. Integration-test upload lifecycle (server-side)
+- [x] 22. Integration-test upload lifecycle (server-side)
   - Test: upload request → generate URL → confirm → fetch message → verify `FileAttachment` present.
   - Test: upload oversized file returns 413 error.
   - Test: upload disallowed MIME type returns 415 error.
   - Test: confirm non-existent file ID returns appropriate error.
   - _Requirements: 4.1, 4.4, Design §7_
   - _writes: crates/collab/src/rpc/file_upload_test.go_
+  - _Completed: Added a channel upload lifecycle RPC integration test covering oversized upload rejection, missing upload confirmation failure, upload URL generation, upload confirmation, send-message attachment wiring, and fetched message history retaining `FileAttachment` metadata; added test-server `GlobalClient` initialization and test-support FileStore routing for RPC tests without S3._
+  - _Actual writes: crates/collab/src/db/file_store.rs; crates/collab/src/rpc.rs; crates/collab/tests/integration/channel_chat_tests.rs; crates/collab/tests/integration/test_server.rs_
+  - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests test_channel_file_upload_lifecycle_rpc --features test-support`; `CARGO_INCREMENTAL=0 cargo check -p proto -p collab --features collab/test-support`; `git diff --check`._
 
 - [ ] 23. Integration-test file deletion on message deletion
   - Create message with file attachment, delete message, verify `channel_files` rows are cleaned up and S3 object is deleted (or scheduled for GC).
