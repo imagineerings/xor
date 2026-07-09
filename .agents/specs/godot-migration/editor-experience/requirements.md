@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Sim should expose native game-development editor affordances through existing Sim UI, project, task, command, and debug systems.
+Sim should expose native game-development editor affordances through existing Sim UI, project, task, command, and debug systems. Comfy-era authoring affordances must be recreated as native Sim commands and metadata, not exposed as compatibility labels or pass-through workflows.
 
 ### Requirement 1: Command Integration
 
@@ -10,6 +10,7 @@ Sim should expose native game-development editor affordances through existing Si
 
 1.1 WHEN a Godot project is open THEN THE system SHALL register relevant commands.
 1.2 IF no Godot project is detected THEN THE system SHALL not show Godot-specific commands.
+1.3 WHEN commands originate from migrated Comfy/world-model authoring flows THEN THE system SHALL expose them as native Sim game commands.
 
 ### Requirement 2: Project Panel Affordances
 

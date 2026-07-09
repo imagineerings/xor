@@ -2,6 +2,7 @@ pub mod boundary;
 pub mod dependency_review;
 pub mod diagnostics;
 pub mod docs_ingestion;
+pub mod editor;
 pub mod fixtures;
 pub mod formats;
 pub mod generated_assets;
@@ -20,6 +21,8 @@ mod boundary_tests;
 mod dependency_review_tests;
 #[cfg(test)]
 mod docs_ingestion_tests;
+#[cfg(test)]
+mod editor_tests;
 #[cfg(test)]
 mod fixtures_tests;
 #[cfg(test)]
@@ -57,6 +60,10 @@ pub use diagnostics::{
 pub use docs_ingestion::{
     SimGameDocsIngestion, SimGameDocsIngestionDiagnostic, SimGameDocsIngestionReport,
     SimGameDocsRecord, SimGameDocsSource,
+};
+pub use editor::{
+    SimGameCommand, SimGameCommandProvider, SimGameProjectPanelMetadata, SimGameRunDebugTemplate,
+    SimGameRunDebugTemplateKind, SimGameSetupDiagnostic,
 };
 pub use fixtures::{
     FixtureAttribution, FixtureAttributionDiagnostic, FixtureAttributionReport,

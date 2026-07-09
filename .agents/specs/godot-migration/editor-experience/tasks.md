@@ -18,7 +18,8 @@ Add native game-development commands and project-panel affordances in W5 after t
 
 ## Tasks
 
-- [ ] 1. Add native game editor affordances
+- [x] 1. Add native game editor affordances
   - Register commands, project-panel labels, import links, and external run/debug templates.
-  - _Requirements: 1.1, 1.2, 2.1, 2.2, 3.1, 3.2_
-  - _writes: crates/sim_game/src/editor.rs, crates/sim_game/src/tasks.rs, crates/sim_game/src/editor_tests.rs_
+  - Recreate Comfy/world-model authoring affordances as native Sim game commands and metadata, not as thin compatibility labels or pass-through workflows.
+  - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 3.1, 3.2_
+  - _writes: crates/sim_game/src/editor.rs, crates/sim_game/src/editor_tests.rs_
