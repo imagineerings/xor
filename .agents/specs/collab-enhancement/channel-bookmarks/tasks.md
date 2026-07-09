@@ -235,16 +235,18 @@ Add a channel bookmarks feature: a dedicated section in the channel header where
   - _Completed: Added a `GetBookmarks` RPC, server read handler with channel-view permission checks, typed client helper, and channel-chat startup load into `ChannelBookmarkStore` so persisted bookmarks render on open._
   - _Validation: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab -p collab_ui --features collab/test-support,collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab test_channel_bookmark_rpc_flow_and_permissions --features collab/test-support -- --nocapture`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_store --features collab_ui/test-support`._
 
-- [ ] 15. Add end-to-end tests
-  - [ ] 15.1 Full lifecycle test: create bookmark → verify it renders in another client → delete → verify removal in real-time.
+- [x] 15. Add end-to-end tests
+  - [x] 15.1 Full lifecycle test: create bookmark → verify it renders in another client → delete → verify removal in real-time.
     - _Requirements: 6.1, 6.4_
     - _writes: collab/tests/bookmark_e2e.rs_
-  - [ ] 15.2 Permission enforcement test: guest user attempts add/edit/delete → receives 403.
+  - [x] 15.2 Permission enforcement test: guest user attempts add/edit/delete → receives 403.
     - _Requirements: 6.1 (AC 6)_
     - _writes: collab/tests/bookmark_e2e.rs_
-  - [ ] 15.3 Real-time sync test: two users in same channel; one reorders → the other sees updated order.
+  - [x] 15.3 Real-time sync test: two users in same channel; one reorders → the other sees updated order.
     - _Requirements: 6.3_
     - _writes: collab/tests/bookmark_e2e.rs_
-  - [ ] 15.4 Concurrent reorder test: two admins reorder simultaneously → verify consistent final state.
+  - [x] 15.4 Concurrent reorder test: two admins reorder simultaneously → verify consistent final state.
     - _Requirements: 6.3_
     - _writes: collab/tests/bookmark_e2e.rs_
+  - _Completed: Extended the channel chat integration bookmark flow to cover cross-client create/update/reorder/delete push behavior, guest add/update/reorder/delete denial, persisted readback, and concurrent two-client reorder consistency._
+  - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab test_channel_bookmark_rpc_flow_and_permissions --features collab/test-support -- --nocapture`._

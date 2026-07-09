@@ -303,6 +303,58 @@ async fn test_channel_bookmark_rpc_flow_and_permissions(
         })
         .await;
     assert!(guest_result.is_err());
+    let guest_result = client_c
+        .client()
+        .request(proto::UpdateBookmark {
+            channel_id: channel_id.0,
+            bookmark_id,
+            label: "Guest Update".to_string(),
+            description: None,
+        })
+        .await;
+    assert!(guest_result.is_err());
+    let guest_result = client_c
+        .client()
+        .request(proto::ReorderBookmarks {
+            channel_id: channel_id.0,
+            bookmark_ids: vec![second_bookmark_id, bookmark_id],
+        })
+        .await;
+    assert!(guest_result.is_err());
+    let guest_result = client_c
+        .client()
+        .request(proto::RemoveBookmark {
+            channel_id: channel_id.0,
+            bookmark_id,
+        })
+        .await;
+    assert!(guest_result.is_err());
+
+    let first_concurrent_order = vec![second_bookmark_id, bookmark_id];
+    let second_concurrent_order = vec![bookmark_id, second_bookmark_id];
+    let (first_result, second_result) = futures::join!(
+        client_a.client().request(proto::ReorderBookmarks {
+            channel_id: channel_id.0,
+            bookmark_ids: first_concurrent_order.clone(),
+        }),
+        client_b.client().request(proto::ReorderBookmarks {
+            channel_id: channel_id.0,
+            bookmark_ids: second_concurrent_order.clone(),
+        })
+    );
+    first_result.unwrap();
+    second_result.unwrap();
+    executor.advance_clock(StdDuration::from_millis(200));
+    executor.run_until_parked();
+    let update = bookmark_rx.recv().await.unwrap();
+    let concurrent_order = update
+        .bookmarks
+        .iter()
+        .map(|bookmark| bookmark.id)
+        .collect::<Vec<_>>();
+    assert!(
+        concurrent_order == first_concurrent_order || concurrent_order == second_concurrent_order
+    );
 
     client_a
         .client()
