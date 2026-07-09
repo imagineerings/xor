@@ -13,6 +13,8 @@ pub mod language;
 pub mod media;
 pub mod migration;
 pub mod parser;
+pub mod project;
+pub mod resource_index;
 pub mod spec_gatekeeper;
 
 #[cfg(test)]
@@ -41,6 +43,10 @@ mod language_tests;
 mod media_tests;
 #[cfg(test)]
 mod parser_tests;
+#[cfg(test)]
+mod project_tests;
+#[cfg(test)]
+mod resource_index_tests;
 #[cfg(test)]
 mod smoke_tests;
 #[cfg(test)]
@@ -102,6 +108,8 @@ pub use parser::{
     LineIndexer, ParseResult, ParseStatus, ParserContext, RecoverableError, line_at,
     position_to_byte_offset,
 };
+pub use project::{SimGameProjectDiagnostic, SimGameProjectMetadata, SimGameProjectMetadataParser};
+pub use resource_index::{SimGameIndexedResource, SimGameResourceIndex, SimGameResourceParseState};
 pub use spec_gatekeeper::{
     DependencyWave, ExecutionGate, GateDecision, MigrationGatekeeper, MigrationTaskRef,
     SpecGatekeeper, SpecRoot,

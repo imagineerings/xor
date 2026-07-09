@@ -17,7 +17,8 @@ Create the Godot metadata substrate without porting runtime execution only when 
 
 ## Tasks
 
-- [ ] 1. Implement Godot project and resource metadata
+- [x] 1. Implement Godot project and resource metadata
   - Add project descriptors, resource indexing, diagnostics, and runtime boundary tests.
-  - _Requirements: 1.1, 1.2, 2.1, 2.2, 3.1, 3.2_
+  - Preserve only native Sim generative game-engine metadata required for indexing, preview, and tooling; runtime execution remains external or excluded.
+  - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 3.1, 3.2_
   - _writes: crates/sim_game/src/project.rs, crates/sim_game/src/resource_index.rs, crates/sim_game/src/boundary_tests.rs_
