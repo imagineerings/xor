@@ -29,6 +29,8 @@ use workspace::{
     item::{Item, TabContentParams},
 };
 
+#[path = "channel_chat/formatting_toolbar.rs"]
+mod formatting_toolbar;
 #[path = "channel_chat/markdown_style.rs"]
 mod markdown_style;
 #[path = "channel_chat/message_bubble.rs"]
@@ -1090,6 +1092,12 @@ impl Render for ChannelChat {
                     .p_3()
                     .border_t_1()
                     .border_color(cx.theme().colors().border)
+                    .when(self.composer.read(cx).is_focused(window), |this| {
+                        this.child(
+                            formatting_toolbar::FormattingToolbar::new(self.composer.clone())
+                                .render(window, cx),
+                        )
+                    })
                     .child(
                         h_flex()
                             .gap_2()

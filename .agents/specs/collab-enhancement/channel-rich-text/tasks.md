@@ -35,14 +35,15 @@ The work is ordered to build incrementally: first the rendering pipeline (Markdo
   - _writes: `collab_ui/src/channel_chat/markdown_style.rs`_
   - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab test_channel_chat_view_live_insert_and_send_states --features test-support`_
 
-- [ ] 4. Build the `FormattingToolbar` component
-  - [ ] 4.1 Define `FormatKind` enum (`Bold`, `Italic`, `Code`, `Strikethrough`, `Blockquote`, `Link`, `CodeBlock`, `BulletList`, `NumberedList`) with the Markdown syntax each maps to.
-  - [ ] 4.2 Define `FormatFlags` bitmask for tracking active formatting at cursor position.
-  - [ ] 4.3 Implement `FormattingToolbar` as a GPUI component with styled icon buttons for bold, italic, inline code, link, and blockquote.
-  - [ ] 4.4 Implement `apply_format(format_kind, editor, window, cx)` — inserts/wraps the appropriate Markdown markers around the current selection (or at cursor with placeholder text between markers when nothing is selected).
-  - [ ] 4.5 Render the toolbar as a floating row above the compose editor, visible only when the editor is focused.
+- [x] 4. Build the `FormattingToolbar` component
+  - [x] 4.1 Define `FormatKind` enum (`Bold`, `Italic`, `Code`, `Strikethrough`, `Blockquote`, `Link`, `CodeBlock`, `BulletList`, `NumberedList`) with the Markdown syntax each maps to.
+  - [x] 4.2 Define `FormatFlags` bitmask for tracking active formatting at cursor position.
+  - [x] 4.3 Implement `FormattingToolbar` as a GPUI component with styled icon buttons for bold, italic, inline code, link, and blockquote.
+  - [x] 4.4 Implement `apply_format(format_kind, editor, window, cx)` — inserts/wraps the appropriate Markdown markers around the current selection (or at cursor with placeholder text between markers when nothing is selected).
+  - [x] 4.5 Render the toolbar as a floating row above the compose editor, visible only when the editor is focused.
   - _Requirements: 1.2_
   - _writes: `collab_ui/src/channel_chat/formatting_toolbar.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui formatting_toolbar --features test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab test_channel_chat_view_live_insert_and_send_states --features test-support`_
 
 - [ ] 5. Wire keyboard shortcuts for formatting actions
   - [ ] 5.1 Register `actions!` for `ToggleBold`, `ToggleItalic`, `ToggleCode`, `ToggleLink`, `ToggleBlockquote` in the compose area.
