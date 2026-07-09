@@ -4856,6 +4856,22 @@ impl ThreadView {
             return None;
         }
 
+        if !model.supports_disabling_thinking() {
+            let effort_levels = model.supported_effort_levels();
+            if effort_levels.is_empty() {
+                return None;
+            }
+            return Some(
+                self.render_effort_selector(
+                    effort_levels,
+                    thread.thinking_effort().cloned(),
+                    true,
+                    cx,
+                )
+                .into_any_element(),
+            );
+        }
+
         let thinking = thread.thinking_enabled();
 
         let (tooltip_label, icon, color) = if thinking {
@@ -4883,6 +4899,12 @@ impl ThreadView {
             .on_click(cx.listener(move |this, _, _window, cx| {
                 if let Some(thread) = this.as_native_thread(cx) {
                     thread.update(cx, |thread, cx| {
+                        if thread
+                            .model()
+                            .is_some_and(|model| !model.supports_disabling_thinking())
+                        {
+                            return;
+                        }
                         let enable_thinking = !thread.thinking_enabled();
                         thread.set_thinking_enabled(enable_thinking, cx);
 
@@ -4920,6 +4942,7 @@ impl ThreadView {
         let right_btn = self.render_effort_selector(
             model.supported_effort_levels(),
             thread.thinking_effort().cloned(),
+            false,
             cx,
         );
 
@@ -4934,6 +4957,7 @@ impl ThreadView {
         &self,
         supported_effort_levels: Vec<LanguageModelEffortLevel>,
         selected_effort: Option<String>,
+        standalone: bool,
         cx: &Context<Self>,
     ) -> impl IntoElement {
         let weak_self = cx.weak_entity();
@@ -4999,9 +5023,15 @@ impl ThreadView {
             }
         });
 
+        let trigger = if standalone {
+            ButtonLike::new("effort-selector-trigger")
+        } else {
+            ButtonLike::new_rounded_right("effort-selector-trigger")
+        };
+
         PopoverMenu::new("effort-selector")
             .trigger_with_tooltip(
-                ButtonLike::new_rounded_right("effort-selector-trigger")
+                trigger
                     .selected_style(ButtonStyle::Tinted(TintColor::Accent))
                     .child(Label::new(label).size(LabelSize::Small).color(label_color))
                     .child(Icon::new(icon).size(IconSize::XSmall).color(Color::Muted)),
@@ -10761,7 +10791,9 @@ impl ThreadView {
             let Some(model) = thread_ref.model() else {
                 return;
             };
-            if !model.supports_thinking() || !thread_ref.thinking_enabled() {
+            if !model.supports_thinking()
+                || (!thread_ref.thinking_enabled() && model.supports_disabling_thinking())
+            {
                 return;
             }
             let effort_levels = model.supported_effort_levels();
@@ -10872,7 +10904,12 @@ impl Render for ThreadView {
                 }
                 if let Some(thread) = this.as_native_thread(cx) {
                     thread.update(cx, |thread, cx| {
-                        thread.set_thinking_enabled(!thread.thinking_enabled(), cx);
+                        if thread
+                            .model()
+                            .is_none_or(|model| model.supports_disabling_thinking())
+                        {
+                            thread.set_thinking_enabled(!thread.thinking_enabled(), cx);
+                        }
                     });
                 }
             }))

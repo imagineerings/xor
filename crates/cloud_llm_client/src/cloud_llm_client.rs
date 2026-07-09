@@ -33,8 +33,7 @@ pub const OUTDATED_LLM_TOKEN_HEADER_NAME: &str = "x-sim-outdated-token";
 pub const EDIT_PREDICTIONS_USAGE_LIMIT_HEADER_NAME: &str = "x-sim-edit-predictions-usage-limit";
 
 /// The name of the header used to indicate the usage amount for edit predictions.
-pub const EDIT_PREDICTIONS_USAGE_AMOUNT_HEADER_NAME: &str =
-    "x-sim-edit-predictions-usage-amount";
+pub const EDIT_PREDICTIONS_USAGE_AMOUNT_HEADER_NAME: &str = "x-sim-edit-predictions-usage-amount";
 
 pub const EDIT_PREDICTIONS_RESOURCE_HEADER_VALUE: &str = "edit_predictions";
 
@@ -299,6 +298,12 @@ pub struct LanguageModel {
     pub supports_tools: bool,
     pub supports_images: bool,
     pub supports_thinking: bool,
+    /// Whether thinking can be turned off entirely for this model, allowing
+    /// clients to offer an "off" choice alongside `supported_effort_levels`.
+    /// Some models always think and cannot honor an "off" request. Only
+    /// meaningful when `supports_thinking` is `true`.
+    #[serde(default)]
+    pub supports_disabling_thinking: bool,
     #[serde(default)]
     pub supports_fast_mode: bool,
     pub supported_effort_levels: Vec<SupportedEffortLevel>,
