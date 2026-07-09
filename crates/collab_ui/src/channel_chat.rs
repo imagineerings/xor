@@ -1005,6 +1005,20 @@ impl ChannelChat {
                                 .child(self.render_thread_message(&root_message, window, cx)),
                         )
                     })
+                    .when(
+                        matches!(load_state, ThreadLoadState::Loaded)
+                            && self
+                                .thread_panel
+                                .as_ref()
+                                .is_none_or(|thread_panel| thread_panel.root_message.is_none()),
+                        |this| {
+                            this.child(
+                                Label::new("This message has been deleted")
+                                    .size(LabelSize::Small)
+                                    .color(Color::Muted),
+                            )
+                        },
+                    )
                     .when(matches!(load_state, ThreadLoadState::Loading), |this| {
                         this.child(Label::new("Loading replies...").color(Color::Muted))
                     })

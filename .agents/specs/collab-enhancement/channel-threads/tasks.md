@@ -71,7 +71,7 @@ Add threaded replies to channel messages in Sim. This feature reuses the existin
   - _Requirements: 3.3_
   - _writes: `collab_ui/src/channel_thread/unread_tracker.rs`_
 
-- [ ] 8. Wire real-time reply updates to the ThreadPanel
+- [x] 8. Wire real-time reply updates to the ThreadPanel
   - [x] 8.1 In the `ChannelMessageSent` WebSocket handler, check if the received message has `reply_to_message_id` set and belongs to the currently open thread.
   - [x] 8.2 If so, append the new reply to the `ThreadPanel::replies` list and call `cx.notify()`.
   - [x] 8.3 If the thread panel is not open, update the relevant `ThreadIndicator`'s reply count and unread state.
@@ -81,12 +81,14 @@ Add threaded replies to channel messages in Sim. This feature reuses the existin
   - _validated: `CARGO_INCREMENTAL=0 cargo check -p collab_ui`; `git diff --check`_
 
 - [ ] 9. Add error handling and edge-case states
-  - [ ] 9.1 Show a "This message has been deleted" placeholder if the root message is unavailable.
+  - [x] 9.1 Show a "This message has been deleted" placeholder if the root message is unavailable.
   - [ ] 9.2 Add retry logic with exponential backoff for thread loading failures (max 3 retries), showing a loading spinner during retry and an error state on exhaustion.
   - [ ] 9.3 Implement "Load earlier replies" button when a thread contains 50+ replies, fetching the next page.
   - [ ] 9.4 Handle optimistic reply sending — append locally, reconcile on server ack or revert on error.
   - _Requirements: 3.2_
   - _writes: `collab_ui/src/channel_thread/thread_panel.rs`_
+  - _implemented missing-root placeholder in existing `crates/collab_ui/src/channel_chat.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo check -p collab_ui`; `git diff --check`_
 
 - [ ] 10. Write tests
   - [ ] 10.1 **Unit tests**: `ThreadStore::get_thread`, `ThreadStore::get_threads`, `ThreadStore::get_reply_count` with known message IDs (empty, single reply, multiple replies, non-existent root).
