@@ -1979,6 +1979,33 @@ impl ChannelChat {
     }
 
     #[cfg(any(test, feature = "test-support"))]
+    pub fn thread_draft_for_test(&self, cx: &App) -> String {
+        self.thread_panel
+            .as_ref()
+            .map(|thread_panel| thread_panel.compose_editor.read(cx).text(cx))
+            .unwrap_or_default()
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn set_thread_draft_for_test(
+        &mut self,
+        text: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(thread_panel) = self.thread_panel.as_ref() {
+            thread_panel
+                .compose_editor
+                .update(cx, |composer, cx| composer.set_text(text, window, cx));
+        }
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn send_thread_reply_for_test(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.send_thread_reply(window, cx);
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
     pub fn set_draft_for_test(&mut self, text: &str, window: &mut Window, cx: &mut Context<Self>) {
         self.composer
             .update(cx, |composer, cx| composer.set_text(text, window, cx));
