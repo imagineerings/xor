@@ -53,14 +53,15 @@ The work is ordered to build incrementally: first the rendering pipeline (Markdo
   - _writes: `collab_ui/src/channel_chat/formatting_toolbar.rs`_
   - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui formatting --features test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab test_channel_chat_view_live_insert_and_send_states --features test-support`_
 
-- [ ] 6. Add the Source/Preview toggle to the ComposeArea
-  - [ ] 6.1 Define `ComposeMode` enum: `Source` and `Preview`.
-  - [ ] 6.2 Add a toggle button (icon: eye / pencil) in the compose area header that switches between modes.
-  - [ ] 6.3 In `Preview` mode, hide the text editor and show a live-rendered `MarkdownElement` of the current draft text.
-  - [ ] 6.4 When switching back to `Source` mode, preserve the draft content unchanged.
-  - [ ] 6.5 Bind Ctrl+Shift+P as a keyboard shortcut for toggling modes.
+- [x] 6. Add the Source/Preview toggle to the ComposeArea
+  - [x] 6.1 Define `ComposeMode` enum: `Source` and `Preview`.
+  - [x] 6.2 Add a toggle button (icon: eye / pencil) in the compose area header that switches between modes.
+  - [x] 6.3 In `Preview` mode, hide the text editor and show a live-rendered `MarkdownElement` of the current draft text.
+  - [x] 6.4 When switching back to `Source` mode, preserve the draft content unchanged.
+  - [x] 6.5 Bind Ctrl+Shift+P as a keyboard shortcut for toggling modes.
   - _Requirements: 1.3_
   - _writes: `collab_ui/src/channel_chat/compose_area.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_chat --features test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab test_channel_chat_view_live_insert_and_send_states --features test-support`_
 
 - [ ] 7. Harden Markdown rendering for safety
   - [ ] 7.1 Add a `sanitize_markdown_html(input: &str) -> String` function that strips or escapes raw HTML tags and `javascript:` / `data:` / `file:` protocol URLs before passing the string to the markdown renderer.

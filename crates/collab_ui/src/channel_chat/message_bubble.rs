@@ -34,7 +34,7 @@ impl MessageBody {
     }
 }
 
-fn resolve_remote_image(destination_url: &str) -> Option<ImageSource> {
+pub(super) fn resolve_remote_image(destination_url: &str) -> Option<ImageSource> {
     if destination_url.starts_with("http://") || destination_url.starts_with("https://") {
         Some(ImageSource::Resource(Resource::Uri(SharedUri::from(
             destination_url.to_string(),

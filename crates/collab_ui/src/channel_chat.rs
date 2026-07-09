@@ -29,6 +29,8 @@ use workspace::{
     item::{Item, TabContentParams},
 };
 
+#[path = "channel_chat/compose_area.rs"]
+mod compose_area;
 #[path = "channel_chat/formatting_toolbar.rs"]
 mod formatting_toolbar;
 #[path = "channel_chat/markdown_style.rs"]
@@ -58,20 +60,23 @@ actions!(
         /// Applies link Markdown formatting to the channel chat draft.
         ToggleLink,
         /// Applies blockquote Markdown formatting to the channel chat draft.
-        ToggleBlockquote
+        ToggleBlockquote,
+        /// Toggles the channel chat draft between source and preview modes.
+        TogglePreview
     ]
 );
 
 pub fn init(cx: &mut App) {
-    cx.bind_keys(formatting_key_bindings());
+    cx.bind_keys(channel_chat_key_bindings());
 }
 
-fn formatting_key_bindings() -> [KeyBinding; 4] {
+fn channel_chat_key_bindings() -> [KeyBinding; 5] {
     [
         KeyBinding::new("ctrl-b", ToggleBold, Some("ChannelChat")),
         KeyBinding::new("ctrl-i", ToggleItalic, Some("ChannelChat")),
         KeyBinding::new("ctrl-`", ToggleCode, Some("ChannelChat")),
         KeyBinding::new("ctrl-shift-k", ToggleLink, Some("ChannelChat")),
+        KeyBinding::new("ctrl-shift-p", TogglePreview, Some("ChannelChat")),
     ]
 }
 
@@ -82,6 +87,8 @@ pub struct ChannelChat {
     channel_store: Entity<ChannelStore>,
     workspace: WeakEntity<Workspace>,
     composer: Entity<Editor>,
+    compose_mode: compose_area::ComposeMode,
+    compose_preview: Option<compose_area::PreviewBody>,
     emoji_search: Entity<Editor>,
     messages: Vec<proto::ChannelMessage>,
     message_bodies: HashMap<u64, message_bubble::MessageBody>,
@@ -309,6 +316,8 @@ impl ChannelChat {
             channel_store,
             workspace,
             composer,
+            compose_mode: compose_area::ComposeMode::Source,
+            compose_preview: None,
             emoji_search,
             messages,
             message_bodies: HashMap::default(),
@@ -943,9 +952,13 @@ impl ChannelChat {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        if self.compose_mode == compose_area::ComposeMode::Preview {
+            self.compose_mode = compose_area::ComposeMode::Source;
+        }
         self.composer.update(cx, |composer, cx| {
             formatting_toolbar::apply_format(format_kind, composer, window, cx);
         });
+        window.focus(&self.composer.focus_handle(cx), cx);
     }
 
     fn toggle_bold(&mut self, _: &ToggleBold, window: &mut Window, cx: &mut Context<Self>) {
@@ -971,6 +984,34 @@ impl ChannelChat {
         cx: &mut Context<Self>,
     ) {
         self.format_composer(formatting_toolbar::FormatKind::Blockquote, window, cx);
+    }
+
+    fn toggle_preview(&mut self, _: &TogglePreview, window: &mut Window, cx: &mut Context<Self>) {
+        self.compose_mode = self.compose_mode.toggle();
+        if self.compose_mode == compose_area::ComposeMode::Source {
+            window.focus(&self.composer.focus_handle(cx), cx);
+        }
+        cx.notify();
+    }
+
+    fn render_compose_preview(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> gpui::AnyElement {
+        let draft = self.composer.read(cx).text(cx);
+        if self
+            .compose_preview
+            .as_ref()
+            .is_none_or(|preview| preview.source() != draft.as_str())
+        {
+            self.compose_preview = Some(compose_area::PreviewBody::new(draft, cx));
+        }
+
+        match &self.compose_preview {
+            Some(preview) => preview.render(window, cx),
+            None => div().flex_1().into_any_element(),
+        }
     }
 
     #[cfg(any(test, feature = "test-support"))]
@@ -1083,6 +1124,14 @@ impl ChannelChat {
     }
 
     #[cfg(any(test, feature = "test-support"))]
+    pub fn compose_mode_for_test(&self) -> &'static str {
+        match self.compose_mode {
+            compose_area::ComposeMode::Source => "source",
+            compose_area::ComposeMode::Preview => "preview",
+        }
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
     pub fn send_error_for_test(&self) -> Option<SharedString> {
         match &self.send_state {
             SendState::Failed(message) => Some(message.clone()),
@@ -1129,6 +1178,7 @@ impl Render for ChannelChat {
             .on_action(cx.listener(Self::toggle_code))
             .on_action(cx.listener(Self::toggle_link))
             .on_action(cx.listener(Self::toggle_blockquote))
+            .on_action(cx.listener(Self::toggle_preview))
             .child(
                 v_flex()
                     .flex_1()
@@ -1154,16 +1204,47 @@ impl Render for ChannelChat {
                     .p_3()
                     .border_t_1()
                     .border_color(cx.theme().colors().border)
-                    .when(self.composer.read(cx).is_focused(window), |this| {
-                        this.child(
-                            formatting_toolbar::FormattingToolbar::new(self.composer.clone())
-                                .render(window, cx),
-                        )
-                    })
                     .child(
                         h_flex()
                             .gap_2()
-                            .child(div().flex_1().child(self.composer.clone()))
+                            .justify_between()
+                            .child(div().flex_1().when(
+                                self.compose_mode == compose_area::ComposeMode::Source
+                                    && self.composer.read(cx).is_focused(window),
+                                |this| {
+                                    this.child(
+                                        formatting_toolbar::FormattingToolbar::new(
+                                            self.composer.clone(),
+                                        )
+                                        .render(window, cx),
+                                    )
+                                },
+                            ))
+                            .child(
+                                IconButton::new(
+                                    "toggle-compose-preview",
+                                    self.compose_mode.toggle_icon(),
+                                )
+                                .icon_size(IconSize::Small)
+                                .icon_color(Color::Muted)
+                                .on_click(cx.listener(|this, _, window, cx| {
+                                    this.toggle_preview(&TogglePreview, window, cx);
+                                }))
+                                .tooltip(Tooltip::text(self.compose_mode.toggle_tooltip())),
+                            ),
+                    )
+                    .child(
+                        h_flex()
+                            .gap_2()
+                            .child(match self.compose_mode {
+                                compose_area::ComposeMode::Source => div()
+                                    .flex_1()
+                                    .child(self.composer.clone())
+                                    .into_any_element(),
+                                compose_area::ComposeMode::Preview => {
+                                    self.render_compose_preview(window, cx)
+                                }
+                            })
                             .when(!self.composer.read(cx).text(cx).is_empty(), |this| {
                                 this.child(
                                     IconButton::new("discard-draft", IconName::Trash)
@@ -1269,9 +1350,16 @@ fn next_nonce(channel_id: ChannelId) -> u128 {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn formatting_shortcut_key_bindings_parse() {
-        let bindings = super::formatting_key_bindings();
+    fn channel_chat_key_bindings_parse() {
+        let bindings = super::channel_chat_key_bindings();
 
-        assert_eq!(bindings.len(), 4);
+        assert_eq!(bindings.len(), 5);
+        assert!(bindings.iter().any(|binding| {
+            binding.action().name().ends_with("TogglePreview")
+                && binding
+                    .keystrokes()
+                    .first()
+                    .is_some_and(|keystroke| keystroke.unparse() == "ctrl-shift-p")
+        }));
     }
 }
