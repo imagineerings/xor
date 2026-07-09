@@ -1,9 +1,9 @@
 use acp_thread::{
     AcpThread, AcpThreadEvent, AgentThreadEntry, AssistantMessage, AssistantMessageChunk,
     AuthRequired, ElicitationEntryId, ElicitationStatus, ElicitationStore, LoadError,
-    MaxOutputTokensError, MentionUri, PermissionOptionChoice, PermissionOptions,
-    PermissionPattern, RetryStatus, SelectedPermissionOutcome, ThreadStatus, ToolCall,
-    ToolCallContent, ToolCallStatus, UserMessageId,
+    MaxOutputTokensError, MentionUri, PermissionOptionChoice, PermissionOptions, PermissionPattern,
+    RetryStatus, SelectedPermissionOutcome, ThreadStatus, ToolCall, ToolCallContent,
+    ToolCallStatus, UserMessageId,
 };
 use acp_thread::{AgentConnection, Plan};
 use action_log::{ActionLog, ActionLogTelemetry, DiffStats};
@@ -49,10 +49,10 @@ use crate::conversation_view::elicitation::{
 };
 use crate::message_editor::SessionCapabilities;
 use crate::{AgentThreadSource, DEFAULT_THREAD_TITLE, resolve_agent_image};
-use sim_actions::agent::{Chat, ToggleModelSelector};
 use lru::LruCache;
 use rope::Point;
 use settings::{NotifyWhenAgentWaiting, Settings as _, SettingsStore, ThinkingBlockDisplay};
+use sim_actions::agent::{Chat, ToggleModelSelector};
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -251,6 +251,17 @@ impl ProfileProvider for Entity<agent::Thread> {
 
     fn model_selected(&self, cx: &App) -> bool {
         self.read(cx).model().is_some()
+    }
+
+    fn is_restricted(&self, cx: &App) -> bool {
+        project::trusted_worktrees::TrustedWorktrees::has_restricted_worktrees(
+            &self.read(cx).project().read(cx).worktree_store(),
+            cx,
+        )
+    }
+
+    fn profile_downgraded(&self, cx: &App) -> bool {
+        self.read(cx).profile_was_downgraded()
     }
 }
 

@@ -226,6 +226,10 @@ impl AgentTool for TerminalTool {
         acp::ToolKind::Execute
     }
 
+    fn allow_in_restricted_mode() -> bool {
+        false
+    }
+
     fn initial_title(
         &self,
         input: Result<Self::Input, serde_json::Value>,
@@ -262,6 +266,10 @@ impl AgentTool for SandboxedTerminalTool {
 
     fn kind() -> acp::ToolKind {
         acp::ToolKind::Execute
+    }
+
+    fn allow_in_restricted_mode() -> bool {
+        false
     }
 
     fn initial_title(
