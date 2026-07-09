@@ -3,6 +3,7 @@ mod channel_tests;
 mod db_tests;
 mod extension_tests;
 mod migrations;
+mod scheduled_message_tests;
 
 use std::sync::Arc;
 use std::time::Duration;

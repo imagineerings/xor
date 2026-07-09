@@ -305,6 +305,68 @@ impl ScheduledMessageStore {
             })
             .await
     }
+
+    #[cfg(feature = "test-support")]
+    pub async fn set_state_for_test(
+        &self,
+        scheduled_message_id: ScheduledMessageId,
+        state: i16,
+    ) -> Result<()> {
+        self.db
+            .transaction(|tx| async move {
+                scheduled_message::Entity::update(scheduled_message::ActiveModel {
+                    id: ActiveValue::Unchanged(scheduled_message_id),
+                    state: ActiveValue::Set(state),
+                    updated_at: ActiveValue::Set(now()),
+                    ..Default::default()
+                })
+                .exec(&*tx)
+                .await?;
+                Ok(())
+            })
+            .await
+    }
+
+    #[cfg(feature = "test-support")]
+    pub async fn set_scheduled_at_for_test(
+        &self,
+        scheduled_message_id: ScheduledMessageId,
+        scheduled_at: PrimitiveDateTime,
+    ) -> Result<()> {
+        self.db
+            .transaction(|tx| async move {
+                scheduled_message::Entity::update(scheduled_message::ActiveModel {
+                    id: ActiveValue::Unchanged(scheduled_message_id),
+                    scheduled_at: ActiveValue::Set(scheduled_at),
+                    updated_at: ActiveValue::Set(now()),
+                    ..Default::default()
+                })
+                .exec(&*tx)
+                .await?;
+                Ok(())
+            })
+            .await
+    }
+
+    #[cfg(feature = "test-support")]
+    pub async fn set_updated_at_for_test(
+        &self,
+        scheduled_message_id: ScheduledMessageId,
+        updated_at: PrimitiveDateTime,
+    ) -> Result<()> {
+        self.db
+            .transaction(|tx| async move {
+                scheduled_message::Entity::update(scheduled_message::ActiveModel {
+                    id: ActiveValue::Unchanged(scheduled_message_id),
+                    updated_at: ActiveValue::Set(updated_at),
+                    ..Default::default()
+                })
+                .exec(&*tx)
+                .await?;
+                Ok(())
+            })
+            .await
+    }
 }
 
 pub struct NewScheduledMessage {

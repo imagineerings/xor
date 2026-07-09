@@ -129,7 +129,7 @@ Add the ability for channel participants to schedule messages for future deliver
     - _Validation: `CARGO_INCREMENTAL=0 cargo check -p client -p collab_ui`; `git diff --check`._
 
 - [ ] 11. Add server-side unit and integration tests
-    - [ ] 11.1 `ScheduledMessageStore` unit tests:
+    - [x] 11.1 `ScheduledMessageStore` unit tests:
         - `create` — validates time bounds (rejects <1 min and >30 days).
         - `create` — nonce deduplication returns existing ID.
         - `cancel` — rejects cancel from non-owner; succeeds for owner.
@@ -139,6 +139,8 @@ Add the ability for channel participants to schedule messages for future deliver
         - `pop_due` — atomic state transition, no double-pop.
         - `count_pending_for_user` — correct per-user counts.
         - `reset_stale_processing` — resets stale `processing` rows to `pending`.
+        - _Completed: Added scheduled-message DB store tests for time-bound validation, nonce deduplication, owner-only cancel, idempotent non-pending cancel, update validation, non-pending update errors, due-message popping with limits, pending counts, and stale processing reset._
+        - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_scheduled_message_create_validation_and_dedup_sqlite -- --nocapture`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_scheduled_message_cancel_ownership_and_pending_state_sqlite -- --nocapture`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_scheduled_message_update_validation_and_pending_state_sqlite -- --nocapture`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_scheduled_message_pop_due_counts_and_stale_reset_sqlite -- --nocapture`. Attempted `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support scheduled_message -- --nocapture`, but local Postgres tests failed because no Postgres server was listening on localhost._
     - [ ] 11.2 Integration tests (using test server harness):
         - Schedule → confirm row in DB → advance clock → confirm message delivered → confirm row deleted.
         - Schedule → cancel → confirm row deleted and message never delivered.
