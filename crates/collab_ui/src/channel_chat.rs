@@ -3,7 +3,7 @@ use anyhow::Result;
 use channel::{Channel, ChannelStore};
 use client::{
     ChannelId, Client, UserStore,
-    channel_chat::{SendChannelMessage, ThreadSummary},
+    channel_chat::{DEFAULT_THREAD_REPLY_LIMIT, SendChannelMessage, ThreadSummary},
     proto::{self, ChannelVisibility},
 };
 use db::kvp::KeyValueStore;
@@ -126,6 +126,8 @@ struct ThreadPanel {
     root_message_id: u64,
     root_message: Option<proto::ChannelMessage>,
     replies: Vec<proto::ChannelMessage>,
+    replies_done: bool,
+    loading_earlier_replies: bool,
     pending_reply_nonce: Option<u128>,
     compose_editor: Entity<Editor>,
     load_state: ThreadLoadState,
@@ -669,6 +671,8 @@ impl ChannelChat {
             root_message_id,
             root_message: existing_root,
             replies: Vec::new(),
+            replies_done: true,
+            loading_earlier_replies: false,
             pending_reply_nonce: None,
             compose_editor,
             load_state: ThreadLoadState::Loading,
@@ -727,6 +731,7 @@ impl ChannelChat {
                             thread_panel.pending_reply_nonce = None;
                         }
                         thread_panel.load_state = ThreadLoadState::Loaded;
+                        thread_panel.replies_done = thread.done;
                     }
                     Err(error) => {
                         thread_panel.load_state = ThreadLoadState::Failed(
@@ -749,6 +754,76 @@ impl ChannelChat {
         if self.thread_panel.take().is_some() {
             cx.notify();
         }
+    }
+
+    fn load_earlier_thread_replies(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(thread_panel) = self.thread_panel.as_mut() else {
+            return;
+        };
+        if thread_panel.replies_done || thread_panel.loading_earlier_replies {
+            return;
+        }
+        let Some(before_message_id) = thread_panel.replies.first().map(|reply| reply.id) else {
+            return;
+        };
+
+        thread_panel.loading_earlier_replies = true;
+        let channel_id = thread_panel.channel_id;
+        let root_message_id = thread_panel.root_message_id;
+        cx.notify();
+
+        let client = self.client.clone();
+        let workspace = self.workspace.clone();
+        cx.spawn_in(window, async move |this, cx| {
+            let thread_result = client
+                .get_thread_page(
+                    channel_id.0,
+                    root_message_id,
+                    Some(before_message_id),
+                    DEFAULT_THREAD_REPLY_LIMIT,
+                )
+                .await;
+
+            this.update(cx, |this, cx| {
+                let Some(thread_panel) = this.thread_panel.as_mut() else {
+                    return;
+                };
+                if thread_panel.root_message_id != root_message_id {
+                    return;
+                }
+
+                thread_panel.loading_earlier_replies = false;
+                match thread_result {
+                    Ok(thread) => {
+                        thread_panel.root_message = Some(thread.root_message);
+                        let existing_reply_ids = thread_panel
+                            .replies
+                            .iter()
+                            .map(|reply| reply.id)
+                            .collect::<std::collections::HashSet<_>>();
+                        let earlier_replies = thread
+                            .replies
+                            .into_iter()
+                            .filter(|reply| !existing_reply_ids.contains(&reply.id));
+                        thread_panel.replies.splice(0..0, earlier_replies);
+                        thread_panel.replies_done = thread.done;
+                    }
+                    Err(error) => {
+                        workspace
+                            .update(cx, |workspace, cx| {
+                                workspace.show_error(
+                                    format!("Failed to load earlier thread replies: {error}"),
+                                    cx,
+                                );
+                            })
+                            .log_err();
+                    }
+                }
+                cx.notify();
+            })?;
+            anyhow::Ok(())
+        })
+        .detach_and_log_err(cx);
     }
 
     fn send_thread_reply(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -1072,6 +1147,8 @@ impl ChannelChat {
         let root_message = thread_panel.root_message.clone();
         let root_message_is_missing = thread_panel.root_message.is_none();
         let replies = thread_panel.replies.clone();
+        let replies_done = thread_panel.replies_done;
+        let loading_earlier_replies = thread_panel.loading_earlier_replies;
         let pending_reply_nonce = thread_panel.pending_reply_nonce;
         let compose_editor = thread_panel.compose_editor.clone();
         let load_state = thread_panel.load_state.clone();
@@ -1176,6 +1253,22 @@ impl ChannelChat {
                                 Label::new("No replies yet")
                                     .size(LabelSize::Small)
                                     .color(Color::Muted),
+                            )
+                        },
+                    )
+                    .when(
+                        matches!(load_state, ThreadLoadState::Loaded)
+                            && !replies_done
+                            && !replies.is_empty(),
+                        |this| {
+                            this.child(
+                                Button::new("load-earlier-thread-replies", "Load earlier replies")
+                                    .label_size(LabelSize::XSmall)
+                                    .disabled(loading_earlier_replies)
+                                    .loading(loading_earlier_replies)
+                                    .on_click(cx.listener(|this, _, window, cx| {
+                                        this.load_earlier_thread_replies(window, cx);
+                                    })),
                             )
                         },
                     )

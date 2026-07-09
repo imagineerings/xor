@@ -229,11 +229,14 @@ message GetChannelMessagesById {
 message GetThread {
   uint64 channel_id = 1;
   uint64 message_id = 2;
+  uint64 before_message_id = 3;
+  uint32 limit = 4;
 }
 
 message GetThreadResponse {
   ChannelMessage root_message = 1;
   repeated ChannelMessage replies = 2;
+  bool done = 3;
 }
 
 message GetThreads {

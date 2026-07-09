@@ -292,7 +292,9 @@ impl Database {
         channel_id: ChannelId,
         user_id: UserId,
         message_id: MessageId,
-    ) -> Result<(proto::ChannelMessage, Vec<proto::ChannelMessage>)> {
+        before_message_id: Option<MessageId>,
+        limit: usize,
+    ) -> Result<(proto::ChannelMessage, Vec<proto::ChannelMessage>, bool)> {
         self.transaction(|tx| async move {
             let channel = self.get_channel_internal(channel_id, &tx).await?;
             self.check_user_is_channel_participant(&channel, user_id, &tx)
@@ -301,17 +303,27 @@ impl Database {
             let root_message = self
                 .get_channel_message_model(channel_id, message_id, &tx)
                 .await?;
-            let replies = channel_message::Entity::find()
-                .filter(channel_message::Column::ChannelId.eq(channel_id))
-                .filter(channel_message::Column::ReplyToMessageId.eq(message_id))
-                .order_by_asc(channel_message::Column::CreatedAt)
-                .order_by_asc(channel_message::Column::Id)
+            let mut filter = channel_message::Column::ChannelId
+                .eq(channel_id)
+                .and(channel_message::Column::ReplyToMessageId.eq(message_id));
+            if let Some(before_message_id) = before_message_id {
+                filter = filter.and(channel_message::Column::Id.lt(before_message_id));
+            }
+
+            let mut replies = channel_message::Entity::find()
+                .filter(filter)
+                .order_by_desc(channel_message::Column::Id)
+                .limit(limit.saturating_add(1) as u64)
                 .all(&*tx)
                 .await?;
+            let done = replies.len() <= limit;
+            replies.truncate(limit);
+            replies.reverse();
 
             Ok((
                 self.channel_message_to_proto(root_message, &tx).await?,
                 self.channel_messages_to_proto(replies, &tx).await?,
+                done,
             ))
         })
         .await

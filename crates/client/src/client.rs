@@ -2575,6 +2575,11 @@ mod tests {
         let request = server.receive::<proto::GetThread>().await.unwrap();
         assert_eq!(request.payload.channel_id, 7);
         assert_eq!(request.payload.message_id, 11);
+        assert_eq!(request.payload.before_message_id, 0);
+        assert_eq!(
+            request.payload.limit,
+            crate::channel_chat::DEFAULT_THREAD_REPLY_LIMIT
+        );
         server.respond(
             request.receipt(),
             proto::GetThreadResponse {
@@ -2600,11 +2605,13 @@ mod tests {
                     edited_at: None,
                     reaction_summaries: Vec::new(),
                 }],
+                done: true,
             },
         );
         let thread = get_thread.await.unwrap();
         assert_eq!(thread.root_message.id, 11);
         assert_eq!(thread.replies.len(), 1);
+        assert!(thread.done);
         assert_eq!(
             thread
                 .replies

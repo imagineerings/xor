@@ -1,6 +1,6 @@
 use crate::TestServer;
 use client::{
-    channel_chat::{SendChannelMessage, UpdateChannelMessage},
+    channel_chat::{DEFAULT_THREAD_REPLY_LIMIT, SendChannelMessage, UpdateChannelMessage},
     proto,
 };
 use gpui::{AppContext, BackgroundExecutor, TestAppContext};
@@ -146,7 +146,11 @@ async fn test_channel_chat_thread_queries(
         thread
             .replies
             .iter()
-            .map(|message| (message.id, message.body.as_str(), message.reply_to_message_id))
+            .map(|message| (
+                message.id,
+                message.body.as_str(),
+                message.reply_to_message_id
+            ))
             .collect::<Vec<_>>(),
         vec![
             (reply_a.id, "reply from a", Some(root.id)),
@@ -166,7 +170,12 @@ async fn test_channel_chat_thread_queries(
     expected_user_ids.sort_unstable();
     assert_eq!(participant_user_ids, expected_user_ids);
 
-    assert!(client_a.get_thread(channel_id.0, root.id + 10_000).await.is_err());
+    assert!(
+        client_a
+            .get_thread(channel_id.0, root.id + 10_000)
+            .await
+            .is_err()
+    );
     assert!(
         client_a
             .send_channel_message(SendChannelMessage {
@@ -178,6 +187,83 @@ async fn test_channel_chat_thread_queries(
             })
             .await
             .is_err()
+    );
+}
+
+#[gpui::test]
+async fn test_channel_chat_thread_pagination(
+    executor: BackgroundExecutor,
+    cx_a: &mut TestAppContext,
+    cx_b: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor.clone()).await;
+    let client_a = server.create_client(cx_a, "user_a").await;
+    let client_b = server.create_client(cx_b, "user_b").await;
+    let channel_id = server
+        .make_channel("chat", None, (&client_a, cx_a), &mut [(&client_b, cx_b)])
+        .await;
+
+    client_a.join_channel_chat(channel_id.0).await.unwrap();
+    client_b.join_channel_chat(channel_id.0).await.unwrap();
+
+    let root = client_a
+        .send_channel_message(SendChannelMessage {
+            channel_id: channel_id.0,
+            body: "root".to_string(),
+            nonce: 1,
+            mentions: Vec::new(),
+            reply_to_message_id: None,
+        })
+        .await
+        .unwrap();
+
+    let mut replies = Vec::new();
+    for index in 0..55 {
+        replies.push(
+            client_a
+                .send_channel_message(SendChannelMessage {
+                    channel_id: channel_id.0,
+                    body: format!("reply {index}"),
+                    nonce: 2 + index,
+                    mentions: Vec::new(),
+                    reply_to_message_id: Some(root.id),
+                })
+                .await
+                .unwrap(),
+        );
+    }
+
+    let latest_page = client_b.get_thread(channel_id.0, root.id).await.unwrap();
+    assert_eq!(latest_page.root_message.id, root.id);
+    assert_eq!(
+        latest_page.replies.len(),
+        DEFAULT_THREAD_REPLY_LIMIT as usize
+    );
+    assert!(!latest_page.done);
+    assert_eq!(latest_page.replies.first().unwrap().body, "reply 5");
+    assert_eq!(latest_page.replies.last().unwrap().body, "reply 54");
+
+    let older_page = client_b
+        .get_thread_page(
+            channel_id.0,
+            root.id,
+            latest_page.replies.first().map(|reply| reply.id),
+            DEFAULT_THREAD_REPLY_LIMIT,
+        )
+        .await
+        .unwrap();
+    assert!(older_page.done);
+    assert_eq!(
+        older_page
+            .replies
+            .iter()
+            .map(|reply| reply.body.as_str())
+            .collect::<Vec<_>>(),
+        replies
+            .iter()
+            .take(5)
+            .map(|reply| reply.body.as_str())
+            .collect::<Vec<_>>()
     );
 }
 

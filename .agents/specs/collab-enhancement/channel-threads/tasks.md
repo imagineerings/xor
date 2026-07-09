@@ -80,15 +80,15 @@ Add threaded replies to channel messages in Sim. This feature reuses the existin
   - _implemented in existing `crates/collab_ui/src/channel_chat.rs` message upsert path_
   - _validated: `CARGO_INCREMENTAL=0 cargo check -p collab_ui`; `git diff --check`_
 
-- [ ] 9. Add error handling and edge-case states
+- [x] 9. Add error handling and edge-case states
   - [x] 9.1 Show a "This message has been deleted" placeholder if the root message is unavailable.
   - [x] 9.2 Add retry logic with exponential backoff for thread loading failures (max 3 retries), showing a loading spinner during retry and an error state on exhaustion.
-  - [ ] 9.3 Implement "Load earlier replies" button when a thread contains 50+ replies, fetching the next page.
+  - [x] 9.3 Implement "Load earlier replies" button when a thread contains 50+ replies, fetching the next page.
   - [x] 9.4 Handle optimistic reply sending — append locally, reconcile on server ack or revert on error.
   - _Requirements: 3.2_
   - _writes: `collab_ui/src/channel_thread/thread_panel.rs`_
-  - _implemented missing-root placeholder, load retry, and optimistic reply sending in existing `crates/collab_ui/src/channel_chat.rs`_
-  - _validated: `CARGO_INCREMENTAL=0 cargo check -p collab_ui`; `git diff --check`_
+  - _implemented missing-root placeholder, load retry, reply pagination, and optimistic reply sending in existing `crates/collab_ui/src/channel_chat.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo check -p collab_ui -p client -p collab`; `git diff --check`_
 
 - [ ] 10. Write tests
   - [ ] 10.1 **Unit tests**: `ThreadStore::get_thread`, `ThreadStore::get_threads`, `ThreadStore::get_reply_count` with known message IDs (empty, single reply, multiple replies, non-existent root).

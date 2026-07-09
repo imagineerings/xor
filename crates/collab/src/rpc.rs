@@ -3904,18 +3904,24 @@ async fn get_thread(
     response: Response<proto::GetThread>,
     session: MessageContext,
 ) -> Result<()> {
-    let (root_message, replies) = session
+    let before_message_id =
+        (request.before_message_id != 0).then(|| MessageId::from_proto(request.before_message_id));
+    let limit = (request.limit as usize).clamp(1, 100);
+    let (root_message, replies, done) = session
         .db()
         .await
         .get_channel_thread(
             ChannelId::from_proto(request.channel_id),
             session.user_id(),
             MessageId::from_proto(request.message_id),
+            before_message_id,
+            limit,
         )
         .await?;
     response.send(proto::GetThreadResponse {
         root_message: Some(root_message),
         replies,
+        done,
     })
 }
 

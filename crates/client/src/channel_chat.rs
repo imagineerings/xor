@@ -5,6 +5,8 @@ use gpui::{AsyncApp, Entity, SharedString, WeakEntity};
 use rpc::{TypedEnvelope, proto};
 use std::sync::Arc;
 
+pub const DEFAULT_THREAD_REPLY_LIMIT: u32 = 50;
+
 pub struct SendChannelMessage {
     pub channel_id: u64,
     pub body: String,
@@ -25,6 +27,7 @@ pub struct UpdateChannelMessage {
 pub struct ChannelThread {
     pub root_message: proto::ChannelMessage,
     pub replies: Vec<proto::ChannelMessage>,
+    pub done: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -177,10 +180,23 @@ impl Client {
     }
 
     pub async fn get_thread(&self, channel_id: u64, message_id: u64) -> Result<ChannelThread> {
+        self.get_thread_page(channel_id, message_id, None, DEFAULT_THREAD_REPLY_LIMIT)
+            .await
+    }
+
+    pub async fn get_thread_page(
+        &self,
+        channel_id: u64,
+        message_id: u64,
+        before_message_id: Option<u64>,
+        limit: u32,
+    ) -> Result<ChannelThread> {
         let response = self
             .request(proto::GetThread {
                 channel_id,
                 message_id,
+                before_message_id: before_message_id.unwrap_or_default(),
+                limit,
             })
             .await?;
         Ok(ChannelThread {
@@ -188,6 +204,7 @@ impl Client {
                 .root_message
                 .context("missing thread root message")?,
             replies: response.replies,
+            done: response.done,
         })
     }
 
