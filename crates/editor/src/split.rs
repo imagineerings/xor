@@ -187,15 +187,15 @@ fn patches_for_range<F>(
 where
     F: Fn(&BufferDiffSnapshot, RangeInclusive<Point>, &text::BufferSnapshot) -> Patch<Point>,
 {
-    struct PendingExcerpt {
-        source_buffer_snapshot: language::BufferSnapshot,
+    struct PendingExcerpt<'a> {
+        source_buffer_snapshot: &'a language::BufferSnapshot,
         source_excerpt_range: ExcerptRange<text::Anchor>,
         buffer_point_range: Range<Point>,
     }
 
     let mut result = Vec::new();
     let mut current_buffer_id: Option<BufferId> = None;
-    let mut pending_excerpts: Vec<PendingExcerpt> = Vec::new();
+    let mut pending_excerpts: Vec<PendingExcerpt<'_>> = Vec::new();
     let mut union_context_start: Option<Point> = None;
     let mut union_context_end: Option<Point> = None;
 
@@ -225,7 +225,7 @@ where
         let rhs_buffer = if source_is_lhs {
             target_buffer
         } else {
-            &first.source_buffer_snapshot
+            first.source_buffer_snapshot
         };
 
         let patch = translate_fn(diff, union_start..=union_end, rhs_buffer);
@@ -250,7 +250,7 @@ where
                 result.push(patch_for_excerpt(
                     source_snapshot,
                     target_snapshot,
-                    &excerpt.source_buffer_snapshot,
+                    excerpt.source_buffer_snapshot,
                     target_buffer,
                     source_excerpt_range.clone(),
                     target_excerpt_range.clone(),
