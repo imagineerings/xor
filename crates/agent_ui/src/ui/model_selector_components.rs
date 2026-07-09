@@ -1,5 +1,5 @@
-use sim_actions::agent::ToggleModelSelector;
 use gpui::{Action, ClickEvent, FocusHandle, prelude::*};
+use sim_actions::agent::ToggleModelSelector;
 use ui::{Chip, ElevationIndex, KeyBinding, ListItem, ListItemSpacing, Tooltip, prelude::*};
 
 use crate::CycleFavoriteModels;
@@ -157,7 +157,7 @@ impl RenderOnce for ModelSelectorListItem {
                         this.child(Chip::new(cost_info).tooltip(Tooltip::text(tooltip_text)))
                     }),
             )
-            .end_slot(div().pr_2().when(self.is_selected, |this| {
+            .end_slot(h_flex().pr_2().gap_1p5().when(self.is_selected, |this| {
                 this.child(Icon::new(IconName::Check).color(Color::Accent))
             }))
             .end_slot_on_hover(div().pr_1p5().when_some(self.on_toggle_favorite, {
