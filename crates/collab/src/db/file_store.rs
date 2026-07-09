@@ -152,6 +152,47 @@ impl FileStore {
         self.file_attachment_from_row(row).await
     }
 
+    pub async fn delete_message_files(
+        &self,
+        channel_id: ChannelId,
+        message_id: MessageId,
+    ) -> Result<u64> {
+        let files = self
+            .db
+            .transaction(|tx| async move {
+                channel_file::Entity::find()
+                    .filter(channel_file::Column::ChannelId.eq(channel_id))
+                    .filter(channel_file::Column::MessageId.eq(message_id))
+                    .all(&*tx)
+                    .await
+                    .map_err(Into::into)
+            })
+            .await?;
+
+        if files.is_empty() {
+            return Ok(0);
+        }
+
+        let file_ids = files.iter().map(|file| file.id).collect::<Vec<_>>();
+        let deleted = self
+            .db
+            .transaction(|tx| {
+                let file_ids = file_ids.clone();
+                async move {
+                    channel_file::Entity::delete_many()
+                        .filter(channel_file::Column::Id.is_in(file_ids))
+                        .exec(&*tx)
+                        .await
+                        .map(|result| result.rows_affected)
+                        .map_err(Into::into)
+                }
+            })
+            .await?;
+
+        self.delete_objects(&files).await?;
+        Ok(deleted)
+    }
+
     async fn file_attachment_from_row(&self, row: channel_file::Model) -> Result<FileAttachment> {
         let url = self.download_url(&row.storage_path).await?;
         file_attachment_from_row(row, url)
@@ -182,6 +223,35 @@ impl FileStore {
             })?;
 
         Ok(presigned.uri().to_string())
+    }
+
+    async fn delete_objects(&self, files: &[channel_file::Model]) -> Result<()> {
+        let blob_store_client = self
+            .blob_store_client
+            .as_ref()
+            .ok_or(FileStoreError::StorageUnavailable)?;
+        let bucket = self
+            .config
+            .storage_bucket
+            .as_ref()
+            .ok_or(FileStoreError::StorageUnavailable)?;
+
+        for file in files {
+            blob_store_client
+                .delete_object()
+                .bucket(bucket)
+                .key(&file.storage_path)
+                .send()
+                .await
+                .map_err(|error| {
+                    Error::from(anyhow::Error::new(FileStoreError::DeleteFailed(format!(
+                        "deleting file object {}: {error}",
+                        file.storage_path
+                    ))))
+                })?;
+        }
+
+        Ok(())
     }
 }
 
@@ -233,6 +303,7 @@ pub enum FileStoreError {
     UnsupportedFileType,
     StorageUnavailable,
     PresignFailed(String),
+    DeleteFailed(String),
 }
 
 impl fmt::Display for FileStoreError {
@@ -249,6 +320,7 @@ impl fmt::Display for FileStoreError {
                 formatter.write_str("file storage is unavailable")
             }
             FileStoreError::PresignFailed(message) => formatter.write_str(message),
+            FileStoreError::DeleteFailed(message) => formatter.write_str(message),
         }
     }
 }

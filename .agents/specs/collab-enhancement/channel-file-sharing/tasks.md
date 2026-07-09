@@ -62,13 +62,16 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
   - _Actual writes: crates/collab/src/rpc.rs; crates/collab/src/lib.rs; crates/collab/src/db/file_store.rs; crates/collab/tests/integration/test_server.rs; crates/proto/proto/sim.proto_
   - _Validation: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `git diff --check`._
 
-- [ ] 6. Implement file cleanup on message deletion
+- [x] 6. Implement file cleanup on message deletion
   - When a channel message is deleted, query associated `channel_files` rows.
   - Delete file metadata records from the database (ON DELETE SET NULL or explicit delete).
   - Schedule S3 object deletion (garbage collection or inline delete).
   - _Requirements: 4.5_
   - _writes: crates/collab/src/storage/file_store.go_ (add `DeleteFile`)
   - _writes: crates/collab/src/rpc/channel_messages.go_ (hook into delete path)
+  - _Completed: Added Rust `FileStore::delete_message_files` to remove `channel_files` metadata for a deleted message and attempt S3 object deletion, then hooked channel message deletion to invoke cleanup with logged error visibility._
+  - _Actual writes: crates/collab/src/db/file_store.rs; crates/collab/src/rpc.rs_
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab --features collab/test-support`; `git diff --check`._
 
 ### Phase 3: Client — RPC Integration & UploadManager
 

@@ -4074,9 +4074,9 @@ fn file_store_rpc_error(error: Error) -> Error {
             .with_tag("max_file_size", &max_file_size.to_string())
             .message(message),
         FileStoreError::UnsupportedFileType => ErrorCode::UnsupportedFileType.message(message),
-        FileStoreError::StorageUnavailable | FileStoreError::PresignFailed(_) => {
-            ErrorCode::FileStorageUnavailable.message(message)
-        }
+        FileStoreError::StorageUnavailable
+        | FileStoreError::PresignFailed(_)
+        | FileStoreError::DeleteFailed(_) => ErrorCode::FileStorageUnavailable.message(message),
     };
     Error::from(rpc_error.anyhow())
 }
@@ -4172,6 +4172,10 @@ async fn remove_channel_message(
         .delete_channel_message(channel_id, message_id, session.user_id())
         .await?;
 
+    file_store(&session)
+        .delete_message_files(channel_id, message_id)
+        .await
+        .trace_err();
     response.send(proto::Ack {})?;
     broadcast_channel_message_update(&session, channel_id, message).await?;
     broadcast_channel_message_reactions_update(&session, channel_id, message_id, Vec::new()).await
