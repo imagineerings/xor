@@ -3,6 +3,8 @@ use workspace::Workspace;
 
 pub mod markdown_preview_view;
 
+use crate::markdown_preview_view::MarkdownPreviewView;
+
 pub use sim_actions::preview::markdown::{OpenPreview, OpenPreviewToTheSide};
 
 actions!(
@@ -32,6 +34,8 @@ actions!(
 );
 
 pub fn init(cx: &mut App) {
+    workspace::register_serializable_item::<MarkdownPreviewView>(cx);
+
     cx.observe_new(|workspace: &mut Workspace, window, cx| {
         let Some(window) = window else {
             return;
