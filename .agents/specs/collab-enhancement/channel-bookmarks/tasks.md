@@ -44,28 +44,30 @@ Add a channel bookmarks feature: a dedicated section in the channel header where
   - _Completed: Verified the repo's `prost` build generates and re-exports the new bookmark types from `OUT_DIR` during the proto crate build._
   - _Validation: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `git diff --check`._
 
-- [ ] 4. Implement server `BookmarkStore`
-  - [ ] 4.1 Implement `CreateBookmark` — insert row, return created bookmark with sort_order.
+- [x] 4. Implement server `BookmarkStore`
+  - [x] 4.1 Implement `CreateBookmark` — insert row, return created bookmark with sort_order.
     - _Requirements: 6.1_
     - _writes: collab/src/db/bookmark_store.rs_
-  - [ ] 4.2 Implement `GetBookmarks` — select bookmarks for a channel ordered by `sort_order`.
+  - [x] 4.2 Implement `GetBookmarks` — select bookmarks for a channel ordered by `sort_order`.
     - _Requirements: 6.2_
     - _writes: collab/src/db/bookmark_store.rs_
-  - [ ] 4.3 Implement `UpdateBookmark` — update label/description for a bookmark.
+  - [x] 4.3 Implement `UpdateBookmark` — update label/description for a bookmark.
     - _Requirements: 6.1_
     - _writes: collab/src/db/bookmark_store.rs_
-  - [ ] 4.4 Implement `DeleteBookmark` — delete a single bookmark by channel_id + bookmark_id.
+  - [x] 4.4 Implement `DeleteBookmark` — delete a single bookmark by channel_id + bookmark_id.
     - _Requirements: 6.1_
     - _writes: collab/src/db/bookmark_store.rs_
-  - [ ] 4.5 Implement `ReorderBookmarks` — update sort_order for each bookmark based on position in an ordered ID list.
+  - [x] 4.5 Implement `ReorderBookmarks` — update sort_order for each bookmark based on position in an ordered ID list.
     - _Requirements: 6.3_
     - _writes: collab/src/db/bookmark_store.rs_
-  - [ ] 4.6 Implement `DeleteChannelBookmarks` — delete all bookmarks for a channel (used on channel deletion).
+  - [x] 4.6 Implement `DeleteChannelBookmarks` — delete all bookmarks for a channel (used on channel deletion).
     - _Requirements: 6.1_
     - _writes: collab/src/db/bookmark_store.rs_
-  - [ ] 4.7 Write unit tests for all `BookmarkStore` methods: CRUD, reorder consistency, concurrent reorder, empty result sets.
+  - [x] 4.7 Write unit tests for all `BookmarkStore` methods: CRUD, reorder consistency, concurrent reorder, empty result sets.
     - _Requirements: 6.1, 6.3_
     - _writes: collab/src/db/bookmark_store.rs_
+  - _Completed: Added `BookmarkStore`, `BookmarkId`, SeaORM `channel_bookmark` entity, SQLite test schema support, proto conversion, CRUD/list/reorder/delete-channel methods, and integration coverage for empty results, CRUD, repeated/concurrent reorder consistency, cross-channel reorder rejection, and channel cleanup._
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab --features collab/test-support`; exact SQLite bookmark store tests passed. Full `test_bookmark_store` both-DB run failed only because local Postgres refused connections._
 
 - [ ] 5. Implement server-side permission checks
   - Add a helper that validates the requesting user has `Admin` or `Member` role in the target channel.

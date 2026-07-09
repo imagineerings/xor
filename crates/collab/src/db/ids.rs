@@ -71,6 +71,7 @@ macro_rules! id_type {
 }
 
 id_type!(BufferId);
+id_type!(BookmarkId);
 id_type!(ChannelBufferCollaboratorId);
 id_type!(ChannelChatParticipantId);
 id_type!(ChannelId);

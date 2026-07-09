@@ -2,6 +2,7 @@ pub mod buffer;
 pub mod buffer_operation;
 pub mod buffer_snapshot;
 pub mod channel;
+pub mod channel_bookmark;
 pub mod channel_buffer_collaborator;
 pub mod channel_chat_participant;
 pub mod channel_member;

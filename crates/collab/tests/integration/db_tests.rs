@@ -1,3 +1,4 @@
+mod bookmark_tests;
 mod buffer_tests;
 mod channel_tests;
 mod db_tests;

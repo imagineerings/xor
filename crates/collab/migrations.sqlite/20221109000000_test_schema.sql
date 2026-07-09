@@ -329,6 +329,24 @@ CREATE INDEX "index_scheduled_messages_on_sender_channel_pending"
 CREATE UNIQUE INDEX "index_scheduled_messages_on_channel_sender_nonce"
     ON "scheduled_messages" ("channel_id", "sender_id", "nonce");
 
+CREATE TABLE IF NOT EXISTS "channel_bookmarks" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "channel_id" INTEGER NOT NULL REFERENCES channels (id) ON DELETE CASCADE,
+    "label" TEXT NOT NULL,
+    "description" TEXT,
+    "bookmark_type" INTEGER NOT NULL,
+    "url" TEXT NOT NULL,
+    "file_id" TEXT,
+    "message_id" INTEGER REFERENCES channel_messages (id) ON DELETE SET NULL,
+    "created_by" INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "sort_order" INTEGER NOT NULL
+);
+
+CREATE INDEX "index_channel_bookmarks_on_channel_id_and_sort_order"
+    ON "channel_bookmarks" ("channel_id", "sort_order");
+
 CREATE TABLE IF NOT EXISTS "channel_message_mentions" (
     "message_id" INTEGER NOT NULL REFERENCES channel_messages (id) ON DELETE CASCADE,
     "range_start" INTEGER NOT NULL,
