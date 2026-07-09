@@ -378,6 +378,40 @@ impl Client {
     {
         self.add_message_handler(entity, handler)
     }
+
+    pub fn add_scheduled_message_sent_handler<E, H, F>(
+        self: &Arc<Self>,
+        entity: WeakEntity<E>,
+        handler: H,
+    ) -> Subscription
+    where
+        E: 'static,
+        H: 'static
+            + Sync
+            + Fn(Entity<E>, TypedEnvelope<proto::ScheduledMessageSent>, AsyncApp) -> F
+            + Send
+            + Sync,
+        F: 'static + Future<Output = Result<()>>,
+    {
+        self.add_message_handler(entity, handler)
+    }
+
+    pub fn add_scheduled_message_failed_handler<E, H, F>(
+        self: &Arc<Self>,
+        entity: WeakEntity<E>,
+        handler: H,
+    ) -> Subscription
+    where
+        E: 'static,
+        H: 'static
+            + Sync
+            + Fn(Entity<E>, TypedEnvelope<proto::ScheduledMessageFailed>, AsyncApp) -> F
+            + Send
+            + Sync,
+        F: 'static + Future<Output = Result<()>>,
+    {
+        self.add_message_handler(entity, handler)
+    }
 }
 
 fn datetime_to_millis(timestamp: DateTime<Utc>) -> u64 {

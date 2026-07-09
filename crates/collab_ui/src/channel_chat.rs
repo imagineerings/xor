@@ -34,8 +34,9 @@ use std::{
 use ui::{Avatar, Facepile, TintColor, Tooltip, prelude::*};
 use util::ResultExt;
 use workspace::{
-    Workspace,
+    Toast, Workspace,
     item::{Item, TabContentParams},
+    notifications::NotificationId,
 };
 
 #[path = "channel_chat/compose_area.rs"]
@@ -569,8 +570,16 @@ impl ChannelChat {
             client
                 .add_channel_message_update_handler(weak_self.clone(), Self::handle_message_update),
             client.add_channel_message_reactions_update_handler(
-                weak_self,
+                weak_self.clone(),
                 Self::handle_message_reactions_update,
+            ),
+            client.add_scheduled_message_sent_handler(
+                weak_self.clone(),
+                Self::handle_scheduled_message_sent,
+            ),
+            client.add_scheduled_message_failed_handler(
+                weak_self,
+                Self::handle_scheduled_message_failed,
             ),
         ];
         let load_thread_summaries = cx.spawn({
@@ -659,6 +668,84 @@ impl ChannelChat {
             {
                 this.upsert_message(message, cx);
             }
+        });
+        Ok(())
+    }
+
+    async fn handle_scheduled_message_sent(
+        this: Entity<Self>,
+        message: TypedEnvelope<proto::ScheduledMessageSent>,
+        mut cx: AsyncApp,
+    ) -> Result<()> {
+        this.update(&mut cx, |this, cx| {
+            if message.payload.channel_id != this.channel_id.0 {
+                return;
+            }
+
+            let channel_name = this
+                .channel(cx)
+                .map(|channel| channel.name.clone())
+                .unwrap_or_else(|| SharedString::from("channel"));
+            if let Some(message) = message.payload.message {
+                if let Some(scheduled_at) = message.scheduled_at {
+                    this.remove_matching_scheduled_message(scheduled_at, &message.body);
+                }
+                this.upsert_message(message.clone(), cx);
+                this.workspace
+                    .update(cx, |workspace, cx| {
+                        workspace.show_toast(
+                            Toast::new(
+                                NotificationId::named(
+                                    format!("scheduled-message-sent-{}", message.id).into(),
+                                ),
+                                format!("Your scheduled message was sent to #{channel_name}"),
+                            )
+                            .autohide(),
+                            cx,
+                        );
+                    })
+                    .log_err();
+            }
+            cx.notify();
+        });
+        Ok(())
+    }
+
+    async fn handle_scheduled_message_failed(
+        this: Entity<Self>,
+        message: TypedEnvelope<proto::ScheduledMessageFailed>,
+        mut cx: AsyncApp,
+    ) -> Result<()> {
+        this.update(&mut cx, |this, cx| {
+            if message.payload.channel_id != this.channel_id.0 {
+                return;
+            }
+
+            let scheduled_message_id =
+                ScheduledMessageId::from_proto(message.payload.scheduled_message_id);
+            this.remove_scheduled_message(scheduled_message_id);
+            let reason = message.payload.reason.clone();
+            let channel_name = this
+                .channel(cx)
+                .map(|channel| channel.name.clone())
+                .unwrap_or_else(|| SharedString::from("channel"));
+            let chat = cx.weak_entity();
+            let toast = Toast::new(
+                NotificationId::named(
+                    format!("scheduled-message-failed-{}", scheduled_message_id.0).into(),
+                ),
+                format!("Scheduled message failed in #{channel_name}: {reason}"),
+            )
+            .on_click("Review", move |window, cx| {
+                chat.update(cx, |this, cx| {
+                    this.show_scheduled_messages_panel(window, cx);
+                })
+                .log_err();
+            });
+            this.workspace
+                .update(cx, |workspace, cx| workspace.show_toast(toast, cx))
+                .log_err();
+            cx.notify();
         });
         Ok(())
     }
@@ -1111,23 +1198,29 @@ impl ChannelChat {
             return;
         }
 
+        self.show_scheduled_messages_panel(window, cx);
+    }
+
+    fn show_scheduled_messages_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let edit_body = cx.new(|cx| {
             let mut editor = Editor::single_line(window, cx);
             editor.set_placeholder_text("Message body", window, cx);
             editor
         });
         self.thread_panel = None;
-        self.scheduled_messages_panel = Some(ScheduledMessagesPanel {
-            channel_id: self.channel_id,
-            messages: Vec::new(),
-            load_state: ScheduledMessagesLoadState::Loading,
-            editing_message_id: None,
-            edit_body,
-            edit_schedule_picker: SchedulePicker::new(),
-            saving_message_id: None,
-            cancelling_message_id: None,
-            action_error: None,
-        });
+        if self.scheduled_messages_panel.is_none() {
+            self.scheduled_messages_panel = Some(ScheduledMessagesPanel {
+                channel_id: self.channel_id,
+                messages: Vec::new(),
+                load_state: ScheduledMessagesLoadState::Loading,
+                editing_message_id: None,
+                edit_body,
+                edit_schedule_picker: SchedulePicker::new(),
+                saving_message_id: None,
+                cancelling_message_id: None,
+                action_error: None,
+            });
+        }
         self.refresh_scheduled_messages(window, cx);
     }
 
@@ -1435,6 +1528,15 @@ impl ChannelChat {
             if panel.editing_message_id == Some(scheduled_message_id) {
                 panel.editing_message_id = None;
             }
+        }
+    }
+
+    fn remove_matching_scheduled_message(&mut self, scheduled_at: u64, body: &str) {
+        if let Some(panel) = self.scheduled_messages_panel.as_mut() {
+            panel.messages.retain(|message| {
+                let message_scheduled_at = u64::try_from(message.scheduled_at.timestamp_millis());
+                !matches!(message_scheduled_at, Ok(message_scheduled_at) if message_scheduled_at == scheduled_at && message.body == body)
+            });
         }
     }
 

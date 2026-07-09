@@ -117,12 +117,14 @@ Add the ability for channel participants to schedule messages for future deliver
     - _Requirements: 11.3.1_
     - _writes: collab_ui/src/sidebar.rs, collab_ui/src/app_state.rs_
 
-- [ ] 10. Wire client-side notifications for `ScheduledMessageSent` and `ScheduledMessageFailed`
+- [x] 10. Wire client-side notifications for `ScheduledMessageSent` and `ScheduledMessageFailed`
     - Register handlers for the two push messages in the WebSocket message dispatcher.
     - On `ScheduledMessageSent`: show a toast notification ("Your scheduled message was sent to #channel"), remove the message from the `ScheduledMessagesPanel` list if open, update sidebar badge count.
     - On `ScheduledMessageFailed`: show a toast notification with the failure reason and an action to review/edit the message if still pending.
     - _Requirements: 11.3.2_
-    - _writes: collab_ui/src/notifications.rs_ (or integrate into existing notification handler)
+    - _writes: client/src/channel_chat.rs, collab_ui/src/channel_chat.rs_
+    - _Completed: Added typed client subscription helpers for scheduled-message sent/failed pushes, registered channel chat handlers, show workspace toasts for success/failure, remove affected pending messages from the scheduled panel, upsert delivered scheduled messages, and provide a Review toast action that opens and refreshes the scheduled panel._
+    - _Validation: `CARGO_INCREMENTAL=0 cargo check -p client -p collab_ui`; `git diff --check`._
 
 - [ ] 11. Add server-side unit and integration tests
     - [ ] 11.1 `ScheduledMessageStore` unit tests:
