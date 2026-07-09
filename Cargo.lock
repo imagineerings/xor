@@ -6967,6 +6967,7 @@ dependencies = [
  "thiserror 2.0.18",
  "time",
  "trash",
+ "unicode-normalization",
  "util",
  "windows 0.61.3",
 ]
