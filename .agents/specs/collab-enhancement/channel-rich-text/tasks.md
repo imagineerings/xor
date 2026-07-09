@@ -72,12 +72,13 @@ The work is ordered to build incrementally: first the rendering pipeline (Markdo
   - _writes: `collab_ui/src/channel_chat/sanitize.rs`_
   - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_chat --features test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab test_channel_chat_view_live_insert_and_send_states --features test-support`_
 
-- [ ] 8. Add unit tests for formatting toolbar
-  - [ ] 8.1 Test each `FormatKind::apply_format` on a mock `Editor`: verify correct Markdown wrapping of selected text.
-  - [ ] 8.2 Test empty-selection case: markers inserted with cursor placed between them.
-  - [ ] 8.3 Test keyboard shortcut dispatch invokes the correct `FormatKind`.
+- [x] 8. Add unit tests for formatting toolbar
+  - [x] 8.1 Test each `FormatKind::apply_format` on a mock `Editor`: verify correct Markdown wrapping of selected text.
+  - [x] 8.2 Test empty-selection case: markers inserted with cursor placed between them.
+  - [x] 8.3 Test keyboard shortcut dispatch invokes the correct `FormatKind`.
   - _Requirements: 1.2_
   - _writes: `collab_ui/src/channel_chat/formatting_toolbar.rs`_ (tests module)
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui formatting --features test-support`_
 
 - [ ] 9. Add unit tests for Markdown rendering in channel messages
   - [ ] 9.1 Test `ChannelMessageBubble` rendering of each Markdown construct (bold, italic, code, blockquote, list, heading, link, image).

@@ -290,21 +290,83 @@ mod tests {
     }
 
     #[gpui::test]
-    fn apply_format_wraps_editor_selection(cx: &mut TestAppContext) {
+    fn apply_format_wraps_each_editor_selection(cx: &mut TestAppContext) {
         init_test(cx);
 
-        let editor = cx.add_window(|window, cx| {
-            let buffer = MultiBuffer::build_simple("hello world", cx);
-            Editor::for_multibuffer(buffer, None, window, cx)
-        });
+        for format_kind in FormatKind::ALL {
+            let editor = cx.add_window(|window, cx| {
+                let buffer = MultiBuffer::build_simple("hello world", cx);
+                Editor::for_multibuffer(buffer, None, window, cx)
+            });
 
-        editor
-            .update(cx, |editor, window, cx| {
-                select_ranges(editor, "«ˇhello» world", window, cx);
-                apply_format(FormatKind::Bold, editor, window, cx);
-                assert_text_with_selections(editor, "**«helloˇ»** world", cx);
-            })
-            .expect("window should be alive");
+            editor
+                .update(cx, |editor, window, cx| {
+                    select_ranges(editor, "«ˇhello» world", window, cx);
+                    apply_format(format_kind, editor, window, cx);
+                    assert_text_with_selections(
+                        editor,
+                        &format!("{} world", marked_replacement(format_kind, "hello")),
+                        cx,
+                    );
+                })
+                .expect("window should be alive");
+        }
+    }
+
+    #[gpui::test]
+    fn apply_format_selects_placeholder_for_empty_selection(cx: &mut TestAppContext) {
+        init_test(cx);
+
+        for format_kind in FormatKind::ALL {
+            let editor = cx.add_window(|window, cx| {
+                let buffer = MultiBuffer::build_simple("", cx);
+                Editor::for_multibuffer(buffer, None, window, cx)
+            });
+
+            editor
+                .update(cx, |editor, window, cx| {
+                    select_ranges(editor, "«ˇ»", window, cx);
+                    apply_format(format_kind, editor, window, cx);
+                    assert_text_with_selections(editor, &marked_replacement(format_kind, ""), cx);
+                })
+                .expect("window should be alive");
+        }
+    }
+
+    #[test]
+    fn formatting_shortcuts_dispatch_expected_actions() {
+        let cases = [
+            ("ctrl-b", "ToggleBold"),
+            ("ctrl-i", "ToggleItalic"),
+            ("ctrl-`", "ToggleCode"),
+            ("ctrl-shift-k", "ToggleLink"),
+        ];
+        let bindings = super::super::channel_chat_key_bindings();
+
+        for (keystroke, action_name) in cases {
+            assert!(
+                bindings.iter().any(|binding| {
+                    binding.action().name().ends_with(action_name)
+                        && binding
+                            .keystrokes()
+                            .first()
+                            .is_some_and(|binding_keystroke| {
+                                binding_keystroke.unparse() == keystroke
+                            })
+                }),
+                "missing {keystroke} binding for {action_name}"
+            );
+        }
+    }
+
+    fn marked_replacement(format_kind: FormatKind, selected_text: &str) -> String {
+        let formatted = format_selection(format_kind, selected_text);
+        format!(
+            "{}«{}ˇ»{}",
+            &formatted.replacement[..formatted.selection.start],
+            &formatted.replacement[formatted.selection.clone()],
+            &formatted.replacement[formatted.selection.end..],
+        )
     }
 
     fn init_test(cx: &mut TestAppContext) {
