@@ -3659,10 +3659,36 @@ impl ChannelChat {
             .pb_2()
             .when(!form.is_editing(), |this| {
                 this.child(
-                    h_flex()
+                    v_flex()
                         .gap_2()
-                        .child(div().flex_1().child(form.url_editor.clone()))
-                        .child(div().flex_1().child(form.label_editor.clone())),
+                        .child(
+                            h_flex()
+                                .gap_1()
+                                .child(self.render_bookmark_type_button(
+                                    proto::BookmarkType::BookmarkLink,
+                                    "Link",
+                                    form,
+                                    cx,
+                                ))
+                                .child(self.render_bookmark_type_button(
+                                    proto::BookmarkType::BookmarkFile,
+                                    "File",
+                                    form,
+                                    cx,
+                                ))
+                                .child(self.render_bookmark_type_button(
+                                    proto::BookmarkType::BookmarkMessage,
+                                    "Message",
+                                    form,
+                                    cx,
+                                )),
+                        )
+                        .child(
+                            h_flex()
+                                .gap_2()
+                                .child(div().flex_1().child(form.url_editor.clone()))
+                                .child(div().flex_1().child(form.label_editor.clone())),
+                        ),
                 )
             })
             .when(form.is_editing(), |this| {
@@ -3708,6 +3734,26 @@ impl ChannelChat {
                         .on_click(cx.listener(Self::submit_bookmark_form)),
                     ),
             )
+    }
+
+    fn render_bookmark_type_button(
+        &self,
+        bookmark_type: proto::BookmarkType,
+        label: &'static str,
+        form: &BookmarkForm,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        Button::new(("channel-bookmark-type", bookmark_type as u32), label)
+            .style(ButtonStyle::Subtle)
+            .selected_style(ButtonStyle::Filled)
+            .toggle_state(form.bookmark_type == bookmark_type)
+            .size(ButtonSize::Compact)
+            .on_click(cx.listener(move |this, _, window, cx| {
+                if let Some(form) = this.bookmark_form.as_mut() {
+                    form.set_bookmark_type(bookmark_type, window, cx);
+                }
+                cx.notify();
+            }))
     }
 
     fn open_bookmark_form(&mut self, _: &ClickEvent, window: &mut Window, cx: &mut Context<Self>) {
