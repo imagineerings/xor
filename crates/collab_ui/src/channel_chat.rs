@@ -47,6 +47,11 @@ const MAX_RECENT_EMOJIS: usize = 12;
 const REACTION_UPDATE_ATTEMPTS: usize = 3;
 const REACTION_RETRY_DELAYS: [Duration; REACTION_UPDATE_ATTEMPTS - 1] =
     [Duration::from_millis(250), Duration::from_millis(750)];
+const THREAD_LOAD_RETRY_DELAYS: [Duration; 3] = [
+    Duration::from_millis(250),
+    Duration::from_millis(500),
+    Duration::from_secs(1),
+];
 const DRAFT_SAVE_DEBOUNCE: Duration = Duration::from_millis(500);
 
 actions!(
@@ -674,7 +679,18 @@ impl ChannelChat {
         let client = self.client.clone();
         let channel_id = self.channel_id;
         cx.spawn_in(window, async move |this, cx| {
-            let thread_result = client.get_thread(channel_id.0, root_message_id).await;
+            let mut retries = 0;
+            let thread_result = loop {
+                match client.get_thread(channel_id.0, root_message_id).await {
+                    Ok(thread) => break Ok(thread),
+                    Err(_) if retries < THREAD_LOAD_RETRY_DELAYS.len() => {
+                        let delay = THREAD_LOAD_RETRY_DELAYS[retries];
+                        retries += 1;
+                        cx.background_executor().timer(delay).await;
+                    }
+                    Err(error) => break Err(error),
+                }
+            };
             this.update(cx, |this, cx| {
                 let Some(thread_panel) = this.thread_panel.as_mut() else {
                     return;
@@ -713,7 +729,13 @@ impl ChannelChat {
                         thread_panel.load_state = ThreadLoadState::Loaded;
                     }
                     Err(error) => {
-                        thread_panel.load_state = ThreadLoadState::Failed(error.to_string().into());
+                        thread_panel.load_state = ThreadLoadState::Failed(
+                            format!(
+                                "Failed to load thread after {} attempts: {error}",
+                                THREAD_LOAD_RETRY_DELAYS.len() + 1
+                            )
+                            .into(),
+                        );
                     }
                 }
                 cx.notify();
@@ -1132,7 +1154,7 @@ impl ChannelChat {
                         },
                     )
                     .when(matches!(load_state, ThreadLoadState::Loading), |this| {
-                        this.child(Label::new("Loading replies...").color(Color::Muted))
+                        this.child(LoadingLabel::new("Loading replies").color(Color::Muted))
                     })
                     .when_some(
                         match &load_state {
