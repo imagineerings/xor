@@ -8,7 +8,7 @@ The model runtime is a core harness policy layer around Sim model and worker ser
 
 ```mermaid
 flowchart LR
-    Folders[ComfyModelFolderRegistry] --> Catalog[ModelCatalogService]
+    Folders[SimModelFolderRegistry] --> Catalog[ModelCatalogService]
     Catalog --> Metadata[ModelMetadataReader]
     Metadata --> Detect[ModelFamilyDetector]
     Detect --> Policy[RuntimePolicyResolver]
@@ -18,13 +18,13 @@ flowchart LR
 
 ## Components and Interfaces
 
-### ComfyModelFolderRegistry
+### SimModelFolderRegistry
 
 - **Purpose**: Provide Comfy-compatible model category names and folder roots.
 - **Responsibilities**: Register default folders, merge extra path configs, map legacy folder names, and expose folder roots.
 
 ```rust
-pub trait ComfyModelFolderRegistry {
+pub trait SimModelFolderRegistry {
     fn folders(&self) -> Vec<ModelFolderInfo>;
     fn resolve(&self, category: &ModelCategory, relative_path: &str) -> Result<ModelFileRef, ModelCatalogError>;
     fn add_extra_paths(&mut self, config: ExtraModelPathConfig) -> Result<(), ModelCatalogError>;

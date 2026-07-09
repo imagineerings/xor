@@ -43,7 +43,7 @@ flowchart LR
 pub trait WorkflowStore {
     fn load(&self, id: WorkflowId) -> Result<WorkflowDocument, WorkflowError>;
     fn save(&self, workflow: WorkflowDocument) -> Result<WorkflowVersionId, WorkflowError>;
-    fn export_api_prompt(&self, workflow: &WorkflowDocument) -> Result<ComfyPromptGraph, WorkflowError>;
+    fn export_api_prompt(&self, workflow: &WorkflowDocument) -> Result<SimPromptGraph, WorkflowError>;
 }
 ```
 
@@ -105,7 +105,7 @@ pub trait WorkflowStore {
 pub struct WorkflowDocument {
     pub id: Option<WorkflowId>,
     pub name: String,
-    pub graph: ComfyPromptGraph,
+    pub graph: SimPromptGraph,
     pub ui_metadata: JsonObject,
     pub default_view: WorkflowView,
     pub source: WorkflowSource,

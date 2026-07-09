@@ -9,7 +9,7 @@ This spec makes Comfy's model-execution semantics explicit inside the world-mode
 ```mermaid
 flowchart LR
     Graph[comfy-graph-node-runtime] --> Builder[SamplingRunBuilder]
-    Builder --> Registry[ComfyExecutionRegistry]
+    Builder --> Registry[SimExecutionRegistry]
     Builder --> Conditioning[ConditioningRuntime]
     Builder --> Latents[LatentVaeRuntime]
     Builder --> Patches[ModelPatchPipeline]
@@ -25,13 +25,13 @@ The graph runtime decides which nodes execute and in what order. This runtime tu
 
 ## Components and Interfaces
 
-### ComfyExecutionRegistry
+### SimExecutionRegistry
 
 - **Purpose**: Declare supported sampler, scheduler, guidance, latent, VAE, patch, and model-family execution capabilities.
 - **Responsibilities**: Capability lookup, unsupported diagnostics, family-specific constraints, fixture linkage, and divergence records.
 
 ```rust
-pub trait ComfyExecutionRegistry {
+pub trait SimExecutionRegistry {
     fn sampler(&self, id: &SamplerId) -> Option<SamplerCapability>;
     fn scheduler(&self, id: &SchedulerId) -> Option<SchedulerCapability>;
     fn model_family(&self, family: &ModelFamilyId) -> Option<ModelFamilyExecutionProfile>;
@@ -156,7 +156,7 @@ pub struct ModelPatchPlan {
     pub patches: Vec<AppliedModelPatch>,
 }
 
-pub struct ComfyRunnerProfile {
+pub struct SimRunnerProfile {
     pub family: ModelFamilyId,
     pub runner: RunnerKind,
     pub media: MediaDomain,
@@ -166,7 +166,7 @@ pub struct ComfyRunnerProfile {
 }
 
 pub struct WorldModelRunnerProfile {
-    pub runner_profile: ComfyRunnerProfile,
+    pub runner_profile: SimRunnerProfile,
     pub supports_reference_frames: bool,
     pub supports_camera_controls: bool,
     pub supports_action_controls: bool,

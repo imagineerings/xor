@@ -8,8 +8,8 @@ The control plane is a Sim harness layer for Comfy-compatible HTTP and WebSocket
 
 ```mermaid
 flowchart LR
-    Client[Comfy UI / API Client] --> Routes[ComfyRouteAdapter]
-    Client --> Ws[ComfyWebSocketAdapter]
+    Client[Comfy UI / API Client] --> Routes[SimRouteAdapter]
+    Client --> Ws[SimWebSocketAdapter]
     Routes --> Jobs[SimJobBridge]
     Ws --> Events[ExecutionEventTranslator]
     Jobs --> Graph[comfy-graph-node-runtime]
@@ -22,7 +22,7 @@ The adapter exposes legacy Comfy paths and `/api` aliases. Internally it convert
 
 ## Components and Interfaces
 
-### ComfyRouteAdapter
+### SimRouteAdapter
 
 - **Purpose**: Register Comfy-compatible HTTP routes against Sim HTTP infrastructure.
 - **Responsibilities**: Parse requests, validate prompt ids, map `/api` aliases, return Comfy-compatible JSON, and enforce route-level safety.
@@ -36,11 +36,11 @@ The adapter exposes legacy Comfy paths and `/api` aliases. Internally it convert
 - **Interface contract**:
 
 ```rust
-pub trait ComfyRouteAdapter {
+pub trait SimRouteAdapter {
     fn register_routes(&self, router: &mut SimRouter);
-    fn handle_prompt(&self, request: PromptSubmission) -> Result<PromptSubmissionResponse, ComfyApiError>;
-    fn handle_queue_action(&self, request: QueueAction) -> Result<(), ComfyApiError>;
-    fn handle_history_action(&self, request: HistoryAction) -> Result<(), ComfyApiError>;
+    fn handle_prompt(&self, request: PromptSubmission) -> Result<PromptSubmissionResponse, SimApiError>;
+    fn handle_queue_action(&self, request: QueueAction) -> Result<(), SimApiError>;
+    fn handle_history_action(&self, request: HistoryAction) -> Result<(), SimApiError>;
 }
 ```
 
@@ -61,7 +61,7 @@ pub trait ComfyRouteAdapter {
   history, terminal and unknown jobs are explicit non-failing no-ops, and
   targeted interrupts never cancel unrelated pending jobs.
 
-### ComfyWebSocketAdapter
+### SimWebSocketAdapter
 
 - **Purpose**: Maintain Comfy-compatible realtime sessions.
 - **Responsibilities**: Assign client ids, persist per-client feature flags, send initial queue status, and serialize execution events.
@@ -72,10 +72,10 @@ pub trait ComfyRouteAdapter {
 - **Interface contract**:
 
 ```rust
-pub trait ComfyWebSocketAdapter {
+pub trait SimWebSocketAdapter {
     fn connect(&self, requested_client_id: Option<ClientId>) -> ClientSession;
     fn receive_feature_flags(&self, session: ClientSessionId, flags: ClientFeatureFlags);
-    fn publish(&self, event: ComfyRuntimeEvent);
+    fn publish(&self, event: SimRuntimeEvent);
 }
 ```
 
@@ -99,7 +99,7 @@ pub trait ComfyWebSocketAdapter {
   `comfyui_passthrough: false`; tests fail if compatibility is represented only
   by route labels or hidden ComfyUI proxy behavior.
 
-### ComfyHttpSafetyLayer
+### SimHttpSafetyLayer
 
 - **Purpose**: Preserve Comfy's local-server safety behavior while using Sim middleware.
 - **Responsibilities**: origin checks, CORS policy, CSP when API nodes are disabled, path confinement, safe content disposition, and cache-control classification.
@@ -124,7 +124,7 @@ wrapping or forwarding a ComfyUI server object.
 ```rust
 pub struct PromptSubmission {
     pub prompt_id: Option<Uuid>,
-    pub prompt: ComfyPromptGraph,
+    pub prompt: SimPromptGraph,
     pub number: Option<f64>,
     pub front: bool,
     pub client_id: Option<ClientId>,
@@ -140,7 +140,7 @@ pub enum JobStatus {
     Cancelled,
 }
 
-pub enum ComfyRuntimeEvent {
+pub enum SimRuntimeEvent {
     Status(QueueStatus),
     Executing { prompt_id: Uuid, node_id: Option<NodeId> },
     Progress { prompt_id: Uuid, node_id: NodeId, value: u64, max: u64 },

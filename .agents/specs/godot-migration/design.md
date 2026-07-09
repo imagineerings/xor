@@ -69,16 +69,16 @@ pub trait DiffusionGraphValidator {
 }
 ```
 
-### ComfyHarnessLayer
+### SimHarnessLayer
 
 Owns Comfy-derived world-model harness semantics, protocol adapters, and compatibility catalogs while delegating storage, media, tasks, secrets, UI, model serving, and dependency review to Sim systems.
 
 ```rust
-pub trait ComfyHarnessLayer {
-    fn validate_prompt(&self, prompt: &ComfyPromptGraph) -> ComfyValidationResult;
-    fn route_status(&self, route: &ComfyRouteId) -> ComfyRouteSupport;
-    fn node_capability(&self, node_id: &NodeTypeId) -> Option<ComfyNodeCapability>;
-    fn execution_capability(&self, profile: &ModelFamilyId) -> Option<ComfyExecutionCapability>;
+pub trait SimHarnessLayer {
+    fn validate_prompt(&self, prompt: &SimPromptGraph) -> SimValidationResult;
+    fn route_status(&self, route: &SimRouteId) -> SimRouteSupport;
+    fn node_capability(&self, node_id: &NodeTypeId) -> Option<SimNodeCapability>;
+    fn execution_capability(&self, profile: &ModelFamilyId) -> Option<SimExecutionCapability>;
 }
 ```
 
@@ -135,17 +135,17 @@ pub enum ExecutionGate {
     GraphSafety,
     Provenance,
     DependencyReview,
-    ComfyHarnessAlignment,
+    SimHarnessAlignment,
 }
 
 pub enum DependencyWave {
     PlanningValidation,
     SharedFoundations,
     ValueFirstWorldModelServingSubstrate,
-    ComfyExecutionCore,
+    SimExecutionCore,
     GenerationOutputsAndAssetPipelines,
     ProductAuthoringAndAgenticTools,
-    ComfyProviderExtensionAndPackagingHardening,
+    SimProviderExtensionAndPackagingHardening,
     DeferredGodotOriginCompatibility,
 }
 ```

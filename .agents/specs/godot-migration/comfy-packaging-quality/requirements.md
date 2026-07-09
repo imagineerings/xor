@@ -23,7 +23,7 @@ Sim needs Comfy migration support for launch configuration, feature flags, front
 1.1 WHEN a launch profile is parsed THEN THE system SHALL capture listen address, port, TLS, CORS, upload size, base/input/output/temp/user directories, auto-launch, logging, assets, database URL, API nodes, custom nodes, manager mode, feature flags, and compression settings.
 1.2 WHEN device, precision, memory, attention, cache, or performance options are present THEN THE system SHALL pass validated settings to the model runtime policy resolver.
 1.3 IF a launch option is unsupported THEN THE system SHALL report the option, reason, and nearest Sim equivalent.
-1.4 WHEN Comfy-compatible launch options are represented in Sim THEN THE system SHALL use native `SimLaunch*` implementation types and SHALL NOT expose Sim-owned launch profiles as `ComfyLaunch*` pass-through records.
+1.4 WHEN Comfy-compatible launch options are represented in Sim THEN THE system SHALL use native `SimLaunch*` implementation types and SHALL NOT expose Sim-owned launch profiles as `SimLaunch*` pass-through records.
 
 ### Requirement 2: Feature Flags and Frontend Packages
 
@@ -34,7 +34,7 @@ Sim needs Comfy migration support for launch configuration, feature flags, front
 2.1 WHEN server features are requested THEN THE system SHALL return core flags for preview metadata, upload size, manager support, node replacements, assets, and CLI-provided flags that do not overwrite core flags.
 2.2 WHEN client feature flags are negotiated THEN THE system SHALL store connection-specific flags for event behavior.
 2.3 WHEN frontend, workflow template, or embedded docs packages are missing or outdated THEN THE system SHALL show actionable diagnostics.
-2.4 WHEN Comfy-compatible feature flags are represented in Sim THEN THE system SHALL use native `SimFeatureFlag*` implementation types and SHALL NOT expose Sim-owned flag registries as `ComfyFeatureFlag*` pass-through records.
+2.4 WHEN Comfy-compatible feature flags are represented in Sim THEN THE system SHALL use native `SimFeatureFlag*` implementation types and SHALL NOT expose Sim-owned flag registries as `SimFeatureFlag*` pass-through records.
 
 ### Requirement 3: API Schemas and Examples
 
@@ -45,7 +45,7 @@ Sim needs Comfy migration support for launch configuration, feature flags, front
 3.1 WHEN Comfy-compatible APIs are exposed THEN THE system SHALL include OpenAPI or equivalent schema coverage for supported routes.
 3.2 WHEN example scripts are migrated THEN THE system SHALL provide automated fixtures for basic HTTP prompt submission and WebSocket completion/output retrieval.
 3.3 IF a documented OpenAPI route is not implemented locally THEN THE system SHALL mark it as cloud-only, external, unsupported, or planned.
-3.4 WHEN Comfy-compatible API schema status is represented in Sim THEN THE system SHALL use native `SimApiSchema*` implementation types and SHALL NOT expose Sim-owned schema catalogs as `ComfyApiSchema*` pass-through records.
+3.4 WHEN Comfy-compatible API schema status is represented in Sim THEN THE system SHALL use native `SimApiSchema*` implementation types and SHALL NOT expose Sim-owned schema catalogs as `SimApiSchema*` pass-through records.
 
 ### Requirement 4: Automated Test Coverage
 

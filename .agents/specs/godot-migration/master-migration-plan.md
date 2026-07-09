@@ -10,6 +10,8 @@ This is not a wholesale port of the classic Godot runtime. Sim should build a wo
 
 Every Godot-originated feature is modeled as a native Sim equivalent, but Godot compatibility is not the first implementation path. SimScript is the first-class executable Sim language, with natural language as the authoring interface. Legacy `.gd` files and Godot-format assets are migration/import sources, not the primary authoring model. Godot-origin task providers and scene preview routes become native Sim task providers and native Sim preview routes when they are product-enabling. There is no compatibility shim layer.
 
+Every supported Comfy-derived feature is also recreated as native Sim functionality. Sim-owned records, services, workers, artifacts, states, queues, diagnostics, and registries use `Sim*` names such as `SimAssetSeedState`; `Comfy*` names are reserved for upstream source references, compatibility route shapes, and prose describing the source project.
+
 ## Value-First Sequencing
 
 The highest-return path is to complete the Comfy and world-model harness before spending migration effort on Godot-format, Godot runtime, editor, export, XR, physics, networking, or other compatibility work. W2-W4 establish the native generation substrate: model serving diagnostics, Comfy model memory policy, prompt/job control, graph/node execution, sampler/scheduler/conditioning semantics, and generated artifact pipelines. W5 then exposes those capabilities through native Sim authoring, agent tools, natural-language workflows, and SimScript execution.
@@ -40,6 +42,7 @@ Duplication rule: prefer existing Sim crates and extension points before adding 
 | G6 | Provenance | Importing generated videos, meshes, textures, or exports | Artifact store preserves prompt, graph node, model settings, controls, source assets, and output paths |
 | G7 | Dependency review | New vendored, native, heavy model, media, or mesh dependency | Review records license, maintenance, security, binary-size, and platform impact |
 | G8 | Comfy harness alignment | World-model harness or Comfy-adjacent implementation decisions | Applicable Comfy spec is referenced, or safety/security/dependency/platform divergence is documented |
+| G9 | Native Comfy recreation | Comfy-derived feature implementation | Supported Comfy-derived behavior is implemented with native Sim functionality, `Sim*` implementation names, and no ComfyUI pass-through |
 
 ## Dependency Waves
 
@@ -47,11 +50,11 @@ Duplication rule: prefer existing Sim crates and extension points before adding 
 |---|---|---|---|
 | W0 | Planning validation | Spec documents only; no code task starts until G0 passes | None |
 | W1 | Shared foundations | Umbrella tasks 1 -> 14 are complete; `build-test-docs/` task 1 foundation helpers remain available if dependency-review or fixture helpers are needed | G0 |
-| W2 | Value-first world-model serving substrate | `world-model-runtime/`, `model-serving-packaging/`, `comfy-model-memory-runtime/`, W2 portions of `comfy-packaging-quality/`, generated-media diagnostics/routing in `rendering-media/` | G3, G8; G4 before real workers |
-| W3 | Comfy execution core | `comfy-runtime-control-plane/`, `comfy-graph-node-runtime/`, `comfy-diffusion-world-model-runtime/`, W3 portions of `comfy-workflows-blueprints/`, `diffusion-graph-editor/` validation/execution planning | G3, G5, G8; G4 before execution |
-| W4 | Generation outputs and asset pipelines | `mesh-generation-pipeline/`, `comfy-asset-library/`, `comfy-media-node-pipelines/`, W4 portions of `comfy-workflows-blueprints/`, generated mesh/media previews, artifact import, generated asset provenance | G3, G5, G6, G8 |
-| W5 | Product authoring and agentic tools | `agentic-game-tools/`, `unified-authoring-app/`, native SimScript/natural-language authoring work, product editor affordances that consume W2-W4 capabilities | G2, G3, G5, G6, G8 |
-| W6 | Comfy provider, extension, and packaging hardening | `comfy-api-provider-nodes/`, `comfy-extension-ecosystem/`, W6 portions of `comfy-packaging-quality/`, persistent/remote worker hardening, provider policy gates | G4, G6, G7, G8 |
+| W2 | Value-first world-model serving substrate | `world-model-runtime/`, `model-serving-packaging/`, `comfy-model-memory-runtime/`, W2 portions of `comfy-packaging-quality/`, generated-media diagnostics/routing in `rendering-media/` | G3, G8, G9; G4 before real workers |
+| W3 | Comfy execution core | `comfy-runtime-control-plane/`, `comfy-graph-node-runtime/`, `comfy-diffusion-world-model-runtime/`, W3 portions of `comfy-workflows-blueprints/`, `diffusion-graph-editor/` validation/execution planning | G3, G5, G8, G9; G4 before execution |
+| W4 | Generation outputs and asset pipelines | `mesh-generation-pipeline/`, `comfy-asset-library/`, `comfy-media-node-pipelines/`, W4 portions of `comfy-workflows-blueprints/`, generated mesh/media previews, artifact import, generated asset provenance | G3, G5, G6, G8, G9 |
+| W5 | Product authoring and agentic tools | `agentic-game-tools/`, `unified-authoring-app/`, native SimScript/natural-language authoring work, product editor affordances that consume W2-W4 capabilities | G2, G3, G5, G6, G8, G9 |
+| W6 | Comfy provider, extension, and packaging hardening | `comfy-api-provider-nodes/`, `comfy-extension-ecosystem/`, W6 portions of `comfy-packaging-quality/`, persistent/remote worker hardening, provider policy gates | G4, G6, G7, G8, G9 |
 | W7 | Deferred Godot-origin compatibility | `engine-core-runtime/`, legacy `.gd`/Godot C# parts of `language-scripting/`, legacy `game-formats-assets/`, `platform-export/`, `networking-collaboration/`, `xr-spatial/`, `physics-navigation/`, Godot run/debug/export/editor tasks | G1, G2, and explicit product-enabling dependency |
 
 ## Feature Inventory

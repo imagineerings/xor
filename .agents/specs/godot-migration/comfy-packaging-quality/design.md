@@ -124,7 +124,7 @@ pub struct SimDiagnosticsAdapter {
     pub terminal: Option<SimTerminalMetadata>,
 }
 
-pub enum ComfyRouteSupport {
+pub enum SimRouteSupport {
     Implemented,
     Planned,
     CloudOnly,

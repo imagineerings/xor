@@ -150,6 +150,7 @@ Sim needs a native game development surface for building 2D and 3D games, with G
 13.5 IF Comfy semantics conflict with existing Sim infrastructure THEN THE system SHALL document the decision and preserve Comfy workflow compatibility unless safety, security, dependency, or platform gates require divergence.
 13.6 WHEN local diffusion or world-model execution is implemented THEN THE system SHALL preserve Comfy sampler, scheduler, conditioning, latent, VAE, model patch, guidance, and model-family execution semantics unless a documented gate requires divergence.
 13.7 WHEN Comfy-derived behavior is implemented THEN THE system SHALL recreate the feature as native Sim functionality backed by Sim services and data models, not as a thin compatibility label, hidden pass-through to ComfyUI, or unsupported placeholder.
+13.8 WHEN Sim-owned records, services, workers, artifacts, states, queues, diagnostics, or registries implement Comfy-derived behavior THEN THE system SHALL use `Sim*` naming, for example `SimAssetSeedState`, rather than `Comfy*` naming such as `ComfyAssetSeedState`.
 
 ### Requirement 14: Value-First Product Sequencing
 

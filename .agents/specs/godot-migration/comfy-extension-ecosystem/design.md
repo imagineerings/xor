@@ -55,7 +55,7 @@ flowchart TD
 - **Responsibilities**: V1 mapping support, modern extension entrypoint support, display names, relative module metadata, and import failure diagnostics.
 - **Native behavior**: Converts V1 `NODE_CLASS_MAPPINGS` and supported modern
   entrypoint declarations into native `SimCustomNode*` registration records and
-  Sim-owned `ComfyNodeDefinition` values with `ComfyNodeSource::Custom`, while
+  Sim-owned `SimNodeDefinition` values with `SimNodeSource::Custom`, while
   unsupported registration mechanisms produce diagnostics instead of pass-through
   ComfyUI imports.
 
@@ -86,7 +86,7 @@ flowchart TD
   workflow subgraph index.
 - **Native behavior**: Converts extension declarations into native
   `SimExtensionTemplate*` records before registering them with
-  `ComfyWorkflowTemplateAdapter` and `ComfySubgraphIndex`, preserving native
+  `SimWorkflowTemplateAdapter` and `SimSubgraphIndex`, preserving native
   diagnostics instead of pass-through ComfyUI template loading.
 
 ### ManagerCompatibilityBoundary

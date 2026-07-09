@@ -8,7 +8,7 @@ The runtime models Comfy node scheduling as a typed graph service inside `crates
 
 ```mermaid
 flowchart TD
-    Registry[ComfyNodeRegistry] --> Schema[NodeSchemaAdapter]
+    Registry[SimNodeRegistry] --> Schema[NodeSchemaAdapter]
     Prompt[PromptGraph] --> Replace[NodeReplacementEngine]
     Replace --> Validate[PromptGraphValidator]
     Validate --> Plan[ExecutionPlanner]
@@ -20,14 +20,14 @@ flowchart TD
 
 ## Components and Interfaces
 
-### ComfyNodeRegistry
+### SimNodeRegistry
 
 - **Purpose**: Store enabled node classes and expose stable introspection.
 - **Responsibilities**: Register core, extra, provider, and extension nodes; preserve display metadata; enforce disabled-node policy.
 - **Interface contract**:
 
 ```rust
-pub trait ComfyNodeRegistry {
+pub trait SimNodeRegistry {
     fn register(&mut self, node: NodeDefinition) -> Result<(), NodeRegistryError>;
     fn get(&self, node_id: &NodeTypeId) -> Option<&NodeDefinition>;
     fn object_info(&self, node_id: Option<&NodeTypeId>) -> ObjectInfoResponse;
@@ -96,7 +96,7 @@ pub struct NodeReplacementRule {
     pub output_mappings: BTreeMap<OutputId, OutputId>,
 }
 
-pub struct ComfyValidationCapabilities {
+pub struct SimValidationCapabilities {
     pub providers: BTreeSet<String>,
     pub model_folders: BTreeSet<String>,
     pub asset_capabilities: BTreeSet<String>,
@@ -110,13 +110,13 @@ pub struct ExecutionPlan {
     pub dirty_nodes: Vec<NodeId>,
 }
 
-pub struct ComfyNodeExecutionRecord {
+pub struct SimNodeExecutionRecord {
     pub node_id: NodeId,
     pub node_type: NodeTypeId,
-    pub state: ComfyNodeExecutionState,
+    pub state: SimNodeExecutionState,
     pub ui_outputs: Vec<UiOutputRecord>,
     pub provenance: Vec<String>,
-    pub dispatch: Option<ComfyExecutorDispatch>,
+    pub dispatch: Option<SimExecutorDispatch>,
 }
 
 pub struct PromptNode {
