@@ -1,11 +1,14 @@
 use client::{Bookmark, BookmarkId};
 use gpui::{
-    App, Context, IntoElement, ParentElement as _, Render, RenderOnce, SharedString,
-    StatefulInteractiveElement as _, Window, div,
+    AnyElement, App, Context, Entity, IntoElement, ParentElement as _, Render, RenderOnce,
+    SharedString, StatefulInteractiveElement as _, Window, div,
 };
 use rpc::proto;
 use std::rc::Rc;
-use ui::{Button, ButtonSize, ButtonStyle, Color, Icon, IconName, Label, Tooltip, prelude::*};
+use ui::{
+    Button, ButtonSize, ButtonStyle, Color, ContextMenu, DropdownMenu, DropdownStyle, Icon,
+    IconName, Label, Tooltip, prelude::*,
+};
 
 const COLLAPSED_BOOKMARK_LIMIT: usize = 5;
 type EditBookmarkHandler = Rc<dyn Fn(Bookmark, &mut Window, &mut App)>;
@@ -97,7 +100,7 @@ impl ChannelBookmarkBar {
 }
 
 impl RenderOnce for ChannelBookmarkBar {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let count = self.bookmarks.len();
         let visible_count = visible_bookmark_count(count, self.expanded);
         let hidden_count = count.saturating_sub(visible_count);
@@ -137,6 +140,8 @@ impl RenderOnce for ChannelBookmarkBar {
                                     self.on_open_file.clone(),
                                     self.on_open_message.clone(),
                                     self.on_reorder.clone(),
+                                    window,
+                                    cx,
                                 )
                             }),
                     ),
@@ -152,16 +157,17 @@ fn render_bookmark(
     on_open_file: Option<OpenFileHandler>,
     on_open_message: Option<OpenMessageHandler>,
     on_reorder: Option<ReorderBookmarkHandler>,
-) -> impl IntoElement {
+    window: &mut Window,
+    cx: &mut App,
+) -> AnyElement {
     let id = bookmark.id.to_proto();
     let bookmark_id = bookmark.id;
     let label = bookmark.label.clone();
     let description = bookmark.description.clone();
     let bookmark_type = bookmark.bookmark_type;
     let url = bookmark.url.to_string();
-    let bookmark_for_edit = bookmark.clone();
-    let bookmark_for_delete = bookmark.clone();
     let bookmark_for_drag = bookmark.clone();
+    let action_menu = bookmark_action_menu(bookmark.clone(), on_edit, on_delete, window, cx);
 
     h_flex()
         .id(("channel-bookmark-row", id))
@@ -225,28 +231,61 @@ fn render_bookmark(
                     }
                 }),
         )
-        .when_some(on_edit, |this, on_edit| {
+        .when_some(action_menu, |this, action_menu| {
             this.child(
-                IconButton::new(("edit-channel-bookmark", id), IconName::Pencil)
-                    .icon_size(IconSize::XSmall)
-                    .icon_color(Color::Muted)
-                    .tooltip(Tooltip::text("Edit bookmark"))
-                    .on_click(move |_, window, cx| {
-                        on_edit(bookmark_for_edit.clone(), window, cx);
-                    }),
+                DropdownMenu::new_with_element(
+                    ("channel-bookmark-actions", id),
+                    Icon::new(IconName::Ellipsis)
+                        .size(IconSize::XSmall)
+                        .color(Color::Muted)
+                        .into_any_element(),
+                    action_menu,
+                )
+                .style(DropdownStyle::Subtle)
+                .trigger_size(ButtonSize::Compact)
+                .no_chevron(),
             )
         })
-        .when_some(on_delete, |this, on_delete| {
-            this.child(
-                IconButton::new(("delete-channel-bookmark", id), IconName::Trash)
-                    .icon_size(IconSize::XSmall)
-                    .icon_color(Color::Muted)
-                    .tooltip(Tooltip::text("Delete bookmark"))
-                    .on_click(move |_, window, cx| {
-                        on_delete(bookmark_for_delete.clone(), window, cx);
-                    }),
-            )
-        })
+        .into_any_element()
+}
+
+fn bookmark_action_menu(
+    bookmark: Bookmark,
+    on_edit: Option<EditBookmarkHandler>,
+    on_delete: Option<DeleteBookmarkHandler>,
+    window: &mut Window,
+    cx: &mut App,
+) -> Option<Entity<ContextMenu>> {
+    if bookmark_action_labels(on_edit.is_some(), on_delete.is_some()).is_empty() {
+        return None;
+    }
+
+    Some(ContextMenu::build(window, cx, |mut menu, _, _| {
+        if let Some(on_edit) = on_edit.clone() {
+            let bookmark = bookmark.clone();
+            menu = menu.entry("Edit", None, move |window, cx| {
+                on_edit(bookmark.clone(), window, cx);
+            });
+        }
+        if let Some(on_delete) = on_delete.clone() {
+            let bookmark = bookmark.clone();
+            menu = menu.entry("Delete", None, move |window, cx| {
+                on_delete(bookmark.clone(), window, cx);
+            });
+        }
+        menu
+    }))
+}
+
+fn bookmark_action_labels(has_edit: bool, has_delete: bool) -> Vec<&'static str> {
+    let mut labels = Vec::new();
+    if has_edit {
+        labels.push("Edit");
+    }
+    if has_delete {
+        labels.push("Delete");
+    }
+    labels
 }
 
 #[derive(Clone)]
@@ -410,6 +449,17 @@ mod tests {
             bookmark_click_action(proto::BookmarkType::BookmarkMessage, "", None, None),
             BookmarkClickAction::None
         );
+    }
+
+    #[test]
+    fn bookmark_action_labels_match_available_handlers() {
+        assert_eq!(
+            bookmark_action_labels(false, false),
+            Vec::<&'static str>::new()
+        );
+        assert_eq!(bookmark_action_labels(true, false), vec!["Edit"]);
+        assert_eq!(bookmark_action_labels(false, true), vec!["Delete"]);
+        assert_eq!(bookmark_action_labels(true, true), vec!["Edit", "Delete"]);
     }
 
     #[test]

@@ -172,8 +172,8 @@ Add a channel bookmarks feature: a dedicated section in the channel header where
   - _Completed: Added editor-backed GPUI coverage for create validation, successful link/message create request generation, edit-mode field prefill, and update request generation._
   - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_form --features collab_ui/test-support -- --nocapture`._
 
-- [ ] 11. Implement bookmark context menu
-  - [ ] 11.1 Show context menu on hover/bookmark click with options: Edit, Delete.
+- [x] 11. Implement bookmark context menu
+  - [x] 11.1 Show context menu on hover/bookmark click with options: Edit, Delete.
     - _Requirements: 6.1 (AC 5)_
     - _writes: collab_ui/src/channel_bookmark_bar.rs_
   - [x] 11.2 Wire "Edit" to open `BookmarkForm` in edit mode.
@@ -186,6 +186,8 @@ Add a channel bookmarks feature: a dedicated section in the channel header where
   - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_bar --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_form --features collab_ui/test-support`._
   - _Completed: Added a compact edit action to each rendered bookmark and wired it to open `BookmarkForm` in edit mode._
   - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_form --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_bar --features collab_ui/test-support`._
+  - _Completed: Replaced the always-visible bookmark action buttons with an ellipsis dropdown context menu containing Edit and Delete actions._
+  - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_bar --features collab_ui/test-support -- --nocapture`._
 
 - [x] 12. Implement drag-and-drop reorder
   - [x] 12.1 Enable drag-and-drop on bookmark items in the `BookmarkBar` when user has edit permission.
@@ -205,7 +207,7 @@ Add a channel bookmarks feature: a dedicated section in the channel header where
   - _Completed: Added focused reorder coverage for the drop-derived RPC bookmark ID payload and for restoring the previous bookmark list after an optimistic reorder failure._
   - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_bar --features collab_ui/test-support -- --nocapture`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_store --features collab_ui/test-support -- --nocapture`._
 
-- [ ] 13. Implement channel system messages for bookmark changes
+- [x] 13. Implement channel system messages for bookmark changes
   - [x] 13.1 Post an informational channel message when a bookmark is created (e.g., "Alice pinned a link: Deploy Guide").
     - _Requirements: 6.4 (AC 1)_
     - _writes: collab/src/rpc/bookmark_rpc.rs_
