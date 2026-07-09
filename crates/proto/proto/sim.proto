@@ -509,7 +509,12 @@ message Envelope {
     GetScheduledMessages get_scheduled_messages = 474;
     GetScheduledMessagesResponse get_scheduled_messages_response = 475;
     ScheduledMessageSent scheduled_message_sent = 476;
-    ScheduledMessageFailed scheduled_message_failed = 477; // current max
+    ScheduledMessageFailed scheduled_message_failed = 477;
+    AddBookmark add_bookmark = 478;
+    RemoveBookmark remove_bookmark = 479;
+    UpdateBookmark update_bookmark = 480;
+    ReorderBookmarks reorder_bookmarks = 481;
+    UpdateChannelBookmarks update_channel_bookmarks = 482; // current max
   }
 
   reserved 87 to 88;

@@ -18,25 +18,31 @@ Add a channel bookmarks feature: a dedicated section in the channel header where
 
 ## Tasks
 
-- [ ] 1. Define protobuf messages
+- [x] 1. Define protobuf messages
   - Add `Bookmark` message, `BookmarkType` enum, `AddBookmark`, `RemoveBookmark`, `UpdateBookmark`, and `ReorderBookmarks` RPC request messages.
   - Add `UpdateChannelBookmarks` push message for real-time broadcast.
   - Register new push type in the RPC dispatch table.
   - _Requirements: 6.1_
   - _writes: proto/sim.proto_
+  - _Completed: Added channel bookmark proto model, mutation request messages, bookmark update push message, envelope tags, request mappings, and channel entity routing._
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `git diff --check`._
 
-- [ ] 2. Create database migration
+- [x] 2. Create database migration
   - Add `channel_bookmarks` table with columns: `id`, `channel_id`, `label`, `description`, `bookmark_type`, `url`, `file_id`, `message_id`, `created_by`, `created_at`, `updated_at`, `sort_order`.
   - Add composite index on `(channel_id, sort_order)`.
   - Add `ON DELETE CASCADE` foreign key to `channels(id)`.
   - _Requirements: 6.1, 6.3_
   - _writes: migrations/XXXXXXXXXXXX_create_channel_bookmarks.up.sql_
+  - _Completed: Added the `channel_bookmarks` migration with channel, creator, and optional message references plus the channel/order index._
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `git diff --check`._
 
-- [ ] 3. Generate Rust protobuf types
+- [x] 3. Generate Rust protobuf types
   - Run the protobuf code generation step to produce Rust types for all new messages.
   - Ensure new types are re-exported from the `proto` crate.
   - _Requirements: 6.1_
   - _writes: proto/src/gen/sim.rs_
+  - _Completed: Verified the repo's `prost` build generates and re-exports the new bookmark types from `OUT_DIR` during the proto crate build._
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `git diff --check`._
 
 - [ ] 4. Implement server `BookmarkStore`
   - [ ] 4.1 Implement `CreateBookmark` — insert row, return created bookmark with sort_order.
