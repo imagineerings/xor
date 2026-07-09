@@ -18,7 +18,8 @@ Register generated assets through the W4 world-model artifact path first, and de
 
 ## Tasks
 
-- [ ] 1. Implement Godot format parsing and generated asset registration
+- [x] 1. Implement Godot format parsing and generated asset registration
   - Classify files, parse text resources, link `.import` metadata, and register generated mesh assets.
+  - Represent parsing, import linking, and generated mesh registration with native Sim `SimGame*` and `SimGeneratedAsset*` records backed by `world_model` provenance metadata.
   - _Requirements: 1.1, 2.1, 3.1_
   - _writes: crates/sim_game/src/formats.rs, crates/sim_game/src/imports.rs, crates/sim_game/src/generated_assets.rs_

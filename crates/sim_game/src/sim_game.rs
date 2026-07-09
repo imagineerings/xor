@@ -1,6 +1,9 @@
 pub mod boundary;
 pub mod diagnostics;
 pub mod fixtures;
+pub mod formats;
+pub mod generated_assets;
+pub mod imports;
 pub mod integration;
 pub mod inventory;
 pub mod media;
@@ -12,6 +15,12 @@ pub mod spec_gatekeeper;
 mod boundary_tests;
 #[cfg(test)]
 mod fixtures_tests;
+#[cfg(test)]
+mod formats_tests;
+#[cfg(test)]
+mod generated_assets_tests;
+#[cfg(test)]
+mod imports_tests;
 #[cfg(test)]
 mod integration_tests;
 #[cfg(test)]
@@ -32,6 +41,15 @@ pub use diagnostics::{
     DiagnosticCollection, DiagnosticSeverity, SourceDiagnostic, SourcePosition, SourceRange,
 };
 pub use fixtures::{FixtureAttribution, FixtureLicense, FixtureManifest, FixtureSource};
+pub use formats::{
+    SimGameFormatClassification, SimGameFormatClassifier, SimGameFormatDiagnostic,
+    SimGameFormatKind, SimGameResourceReference, SimGameTextResourceParse,
+    SimGameTextResourceParser,
+};
+pub use generated_assets::{
+    SimGeneratedAssetDiagnostic, SimGeneratedAssetRecord, SimGeneratedAssetRegistry,
+};
+pub use imports::{SimGameImportDiagnostic, SimGameImportLink, SimGameImportMetadataLinker};
 pub use integration::{
     ExternalGameTaskProvider, GameAssetPreviewRoute, PreviewKind, SimScriptLanguageConfig,
     default_game_preview_routes, default_game_task_providers, detect_game_project_roots,

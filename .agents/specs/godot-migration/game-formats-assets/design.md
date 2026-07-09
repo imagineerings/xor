@@ -4,11 +4,14 @@
 
 Use lightweight parsers for text project, scene, resource, and import metadata. Route heavyweight asset parsing to existing preview systems or external tools.
 
+Game format and generated asset handling is implemented as native Sim functionality. Godot-origin text resources are parsed into `SimGame*` records without executing scripts, `.import` metadata is linked by Sim-owned import records, and generated mesh assets register through `SimGeneratedAsset*` records backed by `world_model` mesh/provenance metadata rather than Comfy compatibility labels or pass-through import hooks.
+
 ## Components
 
 - `SimGameFormatClassifier`
 - `SimGameTextResourceParser`
-- `GeneratedAssetRegistry`
+- `SimGameImportMetadataLinker`
+- `SimGeneratedAssetRegistry`
 
 ## Correctness Properties
 
