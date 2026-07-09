@@ -190,6 +190,40 @@ mod tests {
     }
 
     #[gpui::test]
+    fn store_restores_previous_bookmarks_after_failed_reorder(cx: &mut TestAppContext) {
+        let store = cx.new(|_| ChannelBookmarkStore {
+            bookmarks_by_channel: HashMap::default(),
+            _subscription: None,
+        });
+        let channel_id = ChannelId(42);
+        let bookmarks = vec![
+            bookmark_for_test(channel_id, BookmarkId(1), 0),
+            bookmark_for_test(channel_id, BookmarkId(2), 1),
+            bookmark_for_test(channel_id, BookmarkId(3), 2),
+        ];
+        store.update(cx, |store, cx| {
+            store.set_bookmarks(channel_id, bookmarks.clone(), cx);
+        });
+
+        let previous = store.update(cx, |store, cx| {
+            store
+                .reorder_bookmarks(
+                    channel_id,
+                    &[BookmarkId(3), BookmarkId(1), BookmarkId(2)],
+                    cx,
+                )
+                .unwrap()
+        });
+        store.update(cx, |store, cx| {
+            store.set_bookmarks(channel_id, previous, cx);
+        });
+
+        store.read_with(cx, |store, _| {
+            assert_eq!(store.bookmarks(channel_id), bookmarks);
+        });
+    }
+
+    #[gpui::test]
     fn store_rejects_incomplete_reorder(cx: &mut TestAppContext) {
         let store = cx.new(|_| ChannelBookmarkStore {
             bookmarks_by_channel: HashMap::default(),

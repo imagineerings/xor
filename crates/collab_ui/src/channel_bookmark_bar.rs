@@ -427,6 +427,24 @@ mod tests {
     }
 
     #[test]
+    fn reordered_bookmark_ids_builds_reorder_rpc_payload() {
+        let bookmarks = test_bookmarks(5);
+
+        let ordered_ids = reordered_bookmark_ids(&bookmarks, BookmarkId(4), BookmarkId(2)).unwrap();
+
+        assert_eq!(
+            ordered_ids,
+            vec![
+                BookmarkId(0),
+                BookmarkId(1),
+                BookmarkId(4),
+                BookmarkId(2),
+                BookmarkId(3)
+            ]
+        );
+    }
+
+    #[test]
     fn reordered_bookmark_ids_ignores_noop_and_missing_bookmarks() {
         let bookmarks = test_bookmarks(3);
 
