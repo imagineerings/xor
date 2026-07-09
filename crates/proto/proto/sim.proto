@@ -496,7 +496,9 @@ message Envelope {
     GetThread get_thread = 461;
     GetThreadResponse get_thread_response = 462;
     GetThreads get_threads = 463;
-    GetThreadsResponse get_threads_response = 464; // current max
+    GetThreadsResponse get_threads_response = 464;
+    ResolveCodeAction resolve_code_action = 465;
+    ResolveCodeActionResponse resolve_code_action_response = 466; // current max
   }
 
   reserved 87 to 88;
