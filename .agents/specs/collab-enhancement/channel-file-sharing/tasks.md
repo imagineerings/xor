@@ -233,10 +233,13 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
   - _Actual writes: crates/collab/src/db/file_store.rs; crates/collab/src/rpc.rs; crates/collab/tests/integration/channel_chat_tests.rs; crates/collab/tests/integration/test_server.rs_
   - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests test_channel_file_upload_lifecycle_rpc --features test-support`; `CARGO_INCREMENTAL=0 cargo check -p proto -p collab --features collab/test-support`; `git diff --check`._
 
-- [ ] 23. Integration-test file deletion on message deletion
+- [x] 23. Integration-test file deletion on message deletion
   - Create message with file attachment, delete message, verify `channel_files` rows are cleaned up and S3 object is deleted (or scheduled for GC).
   - _Requirements: 4.5, Design Property 5.4_
   - _writes: crates/collab/src/rpc/channel_messages_test.go_
+  - _Completed: Extended the channel file upload lifecycle RPC integration test to delete the attached message through the client RPC and verify the associated `channel_files` metadata row is removed._
+  - _Actual writes: crates/collab/tests/integration/channel_chat_tests.rs_
+  - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests test_channel_file_upload_lifecycle_rpc --features test-support`; `CARGO_INCREMENTAL=0 cargo check -p proto -p collab --features collab/test-support`; `git diff --check`._
 
 - [ ] 24. Unit-test client `UploadManager`
   - Test upload state machine: Pending → RequestingUrl → Uploading → Confirming → Complete.

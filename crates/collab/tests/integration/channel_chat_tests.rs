@@ -10,7 +10,7 @@ use client::{
 use collab::{
     db::{
         ChannelId as DbChannelId, ChannelRole as DbChannelRole,
-        ScheduledMessageId as DbScheduledMessageId, UserId as DbUserId,
+        ScheduledMessageId as DbScheduledMessageId, UserId as DbUserId, channel_file,
         scheduled_message_store::ScheduledMessageStore,
     },
     rpc::Server,
@@ -18,6 +18,7 @@ use collab::{
 use gpui::{AppContext, BackgroundExecutor, TestAppContext};
 use pretty_assertions::assert_eq;
 use rpc::ErrorExt as _;
+use sea_orm::EntityTrait as _;
 use std::time::Duration as StdDuration;
 use time::{Duration as TimeDuration, OffsetDateTime, PrimitiveDateTime};
 use uuid::Uuid;
@@ -201,6 +202,24 @@ async fn test_channel_file_upload_lifecycle_rpc(
     assert_eq!(history[0].id, sent.id);
     assert_eq!(history[0].files.len(), 1);
     assert_eq!(history[0].files[0].id, upload.file_id);
+
+    let file_id = Uuid::parse_str(&upload.file_id).unwrap();
+    client_a
+        .remove_channel_message(channel_id.0, sent.id)
+        .await
+        .unwrap();
+    let stored_file = server
+        .app_state
+        .db
+        .transaction(|tx| async move {
+            channel_file::Entity::find_by_id(file_id)
+                .one(&*tx)
+                .await
+                .map_err(Into::into)
+        })
+        .await
+        .unwrap();
+    assert!(stored_file.is_none());
 }
 
 #[gpui::test]
