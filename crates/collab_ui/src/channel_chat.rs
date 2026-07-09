@@ -2121,6 +2121,72 @@ impl ChannelChat {
     pub fn send_for_test(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.send(&Confirm, window, cx);
     }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn set_search_query_for_test(
+        &mut self,
+        text: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.search_state.active = true;
+        self.search_editor
+            .update(cx, |editor, cx| editor.set_text(text, window, cx));
+        self.schedule_search(cx);
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn search_result_bodies_for_test(&self) -> Vec<String> {
+        self.search_state
+            .results
+            .iter()
+            .filter_map(|result| result.message.as_ref())
+            .map(|message| message.body.clone())
+            .collect()
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn search_error_for_test(&self) -> Option<SharedString> {
+        self.search_state.error.clone()
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn search_done_for_test(&self) -> bool {
+        self.search_state.done
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn search_load_more_visible_for_test(&self) -> bool {
+        !self.search_state.done && !self.search_state.results.is_empty()
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn load_more_search_results_for_test(&mut self, cx: &mut Context<Self>) {
+        self.load_more_search_results(cx);
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn selected_search_result_index_for_test(&self) -> Option<usize> {
+        self.search_state.selected_result_index
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn select_next_search_result_for_test(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.select_next_search_result(&SelectNext, window, cx);
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn select_previous_search_result_for_test(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.select_previous_search_result(&SelectPrevious, window, cx);
+    }
 }
 
 impl Drop for ChannelChat {

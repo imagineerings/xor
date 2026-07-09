@@ -187,24 +187,29 @@ Add full-text search across channel messages using PostgreSQL tsvector/tsquery, 
   - _implemented with Up/Down/Enter bindings scoped to the active search UI, selected-result state, and selected row styling_
   - _validated: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui search::tests --features test-support -- --nocapture`_
 
-- [ ] 15. Handle error states in the UI
+- [x] 15. Handle error states in the UI
   - Show inline error banner for:
     - "Query must be at least 2 characters"
     - "Search timed out, try narrowing your query"
     - "Failed to load search results. [Retry]" button
   - Show "Indexing in progress — some results may be incomplete" banner on first search if migration has not completed
   - _Requirements: 5.1_ (Error Handling §6)
-  - _writes: crates/collab_ui/src/channel_search_results_panel.rs_
+  - _writes: crates/collab_ui/src/channel_chat/search.rs_
+  - _implemented inline short-query and failed-load errors with a Retry button for retryable searches; timeout-specific wording and indexing-progress messaging are deferred because the current RPC does not expose timeout/indexing status separately_
+  - _validated: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_channel_chat_message_search_state_and_pagination -- --nocapture`_
 
-- [ ] 16. Write client-side unit tests
+- [x] 16. Write client-side unit tests
   - Test `SearchFilters::parse_filters` with various query strings (single filter, combined filters, quoted strings, no filters)
   - Test that empty query does not trigger a search request
   - Test that `SearchResultsPanel` renders "No results found" for empty results
   - Test that "Load more" appears when `done == false`
   - Test pagination accumulation (appending results on "Load more")
   - _Requirements: 5.2, 5.3_
-  - _writes: crates/collab_ui/src/channel_search_bar.rs_
-  - _writes: crates/collab_ui/src/channel_search_results_panel.rs_
+  - _writes: crates/collab_ui/src/channel_chat.rs_
+  - _writes: crates/collab_ui/src/channel_chat/search.rs_
+  - _writes: crates/collab/tests/integration/channel_chat_ui_tests.rs_
+  - _covered filter parsing, quoted literal syntax, invalid dates, match highlighting ranges, empty query clearing, short-query errors, no-result state, load-more visibility, pagination accumulation, and keyboard result selection_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui search::tests --features test-support -- --nocapture`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support test_channel_chat_message_search_state_and_pagination -- --nocapture`_
 
 ### Phase 6 — Index Maintenance
 

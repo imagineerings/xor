@@ -12,7 +12,7 @@ pub(super) struct SearchState {
     pub(super) loading: bool,
     pub(super) loading_more: bool,
     pub(super) error: Option<SharedString>,
-    selected_result_index: Option<usize>,
+    pub(super) selected_result_index: Option<usize>,
     pub(super) request_serial: u64,
 }
 
@@ -580,9 +580,23 @@ impl ChannelChat {
             })
             .when_some(self.search_state.error.clone(), |this, error| {
                 this.child(
-                    Label::new(error)
-                        .size(LabelSize::XSmall)
-                        .color(Color::Error),
+                    h_flex()
+                        .gap_2()
+                        .items_center()
+                        .child(
+                            Label::new(error)
+                                .size(LabelSize::XSmall)
+                                .color(Color::Error),
+                        )
+                        .when(self.search_state.clean_query.chars().count() >= 2, |this| {
+                            this.child(
+                                Button::new("retry-channel-message-search", "Retry")
+                                    .label_size(LabelSize::XSmall)
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        this.schedule_search(cx);
+                                    })),
+                            )
+                        }),
                 )
             })
             .into_any_element()

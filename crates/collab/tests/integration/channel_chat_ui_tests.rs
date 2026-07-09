@@ -331,7 +331,8 @@ async fn test_channel_chat_open_thread_appends_live_replies(
         Some(true)
     );
     assert_eq!(
-        chat.read_with(cx_a, |chat, _| chat.thread_has_unread_for_test(other_root.id)),
+        chat.read_with(cx_a, |chat, _| chat
+            .thread_has_unread_for_test(other_root.id)),
         Some(true)
     );
     let thread = client_a
@@ -357,7 +358,8 @@ async fn test_channel_chat_open_thread_appends_live_replies(
         Some(false)
     );
     assert_eq!(
-        chat.read_with(cx_a, |chat, _| chat.thread_has_unread_for_test(other_root.id)),
+        chat.read_with(cx_a, |chat, _| chat
+            .thread_has_unread_for_test(other_root.id)),
         Some(true)
     );
 
@@ -473,8 +475,7 @@ async fn test_channel_chat_thread_load_retry_exhaustion(
     chat.update_in(cx_a, |chat, window, cx| {
         chat.open_thread_for_test(root.id, window, cx);
     });
-    cx_a
-        .background_executor
+    cx_a.background_executor
         .advance_clock(Duration::from_secs(2));
     cx_a.run_until_parked();
 
@@ -482,6 +483,111 @@ async fn test_channel_chat_thread_load_retry_exhaustion(
         .read_with(cx_a, |chat, _| chat.thread_load_error_for_test())
         .expect("missing thread load error");
     assert!(error.contains("Failed to load thread after 4 attempts"));
+}
+
+#[gpui::test]
+async fn test_channel_chat_message_search_state_and_pagination(
+    cx_a: &mut gpui::TestAppContext,
+    cx_b: &mut gpui::TestAppContext,
+) {
+    let (_server, client_a, client_b, channel_id) = TestServer::start2(cx_a, cx_b).await;
+    let (workspace, cx_a) = client_a.build_test_workspace(cx_a).await;
+
+    for index in 0..21 {
+        client_b
+            .client()
+            .send_channel_message(SendChannelMessage {
+                channel_id: channel_id.0,
+                body: format!("deploy item {index:02}"),
+                nonce: index + 1,
+                mentions: Vec::new(),
+                reply_to_message_id: None,
+            })
+            .await
+            .unwrap();
+    }
+
+    let chat = cx_a
+        .update(|window, cx| ChannelChat::open(channel_id, workspace.clone(), window, cx))
+        .await
+        .unwrap();
+    cx_a.run_until_parked();
+
+    chat.update_in(cx_a, |chat, window, cx| {
+        chat.set_search_query_for_test("deploy", window, cx);
+    });
+    cx_a.background_executor
+        .advance_clock(Duration::from_millis(300));
+    cx_a.run_until_parked();
+
+    assert_eq!(
+        chat.read_with(cx_a, |chat, _| chat.search_result_bodies_for_test())
+            .len(),
+        20
+    );
+    assert!(chat.read_with(cx_a, |chat, _| { chat.search_load_more_visible_for_test() }));
+    assert_eq!(
+        chat.read_with(cx_a, |chat, _| chat.selected_search_result_index_for_test()),
+        Some(0)
+    );
+
+    chat.update_in(cx_a, |chat, window, cx| {
+        chat.select_next_search_result_for_test(window, cx);
+    });
+    assert_eq!(
+        chat.read_with(cx_a, |chat, _| chat.selected_search_result_index_for_test()),
+        Some(1)
+    );
+    chat.update_in(cx_a, |chat, window, cx| {
+        chat.select_previous_search_result_for_test(window, cx);
+    });
+    assert_eq!(
+        chat.read_with(cx_a, |chat, _| chat.selected_search_result_index_for_test()),
+        Some(0)
+    );
+
+    chat.update(cx_a, |chat, cx| {
+        chat.load_more_search_results_for_test(cx);
+    });
+    cx_a.run_until_parked();
+
+    assert_eq!(
+        chat.read_with(cx_a, |chat, _| chat.search_result_bodies_for_test())
+            .len(),
+        21
+    );
+    assert!(chat.read_with(cx_a, |chat, _| chat.search_done_for_test()));
+    assert!(!chat.read_with(cx_a, |chat, _| { chat.search_load_more_visible_for_test() }));
+
+    chat.update_in(cx_a, |chat, window, cx| {
+        chat.set_search_query_for_test("missing", window, cx);
+    });
+    cx_a.background_executor
+        .advance_clock(Duration::from_millis(300));
+    cx_a.run_until_parked();
+
+    assert!(chat.read_with(cx_a, |chat, _| {
+        chat.search_result_bodies_for_test().is_empty()
+    }));
+    assert!(chat.read_with(cx_a, |chat, _| chat.search_done_for_test()));
+    assert!(chat.read_with(cx_a, |chat, _| chat.search_error_for_test().is_none()));
+
+    chat.update_in(cx_a, |chat, window, cx| {
+        chat.set_search_query_for_test("d", window, cx);
+    });
+    assert_eq!(
+        chat.read_with(cx_a, |chat, _| chat.search_error_for_test())
+            .as_deref(),
+        Some("Query must be at least 2 characters")
+    );
+
+    chat.update_in(cx_a, |chat, window, cx| {
+        chat.set_search_query_for_test("", window, cx);
+    });
+    assert!(chat.read_with(cx_a, |chat, _| {
+        chat.search_result_bodies_for_test().is_empty()
+    }));
+    assert!(chat.read_with(cx_a, |chat, _| chat.search_error_for_test().is_none()));
 }
 
 #[gpui::test]
