@@ -16,13 +16,14 @@ use gpui::{
 };
 use menu::Confirm;
 use rpc::{ErrorExt as _, TypedEnvelope};
+use smallvec::SmallVec;
 use std::{
     any::TypeId,
     collections::HashMap,
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use ui::{Tooltip, prelude::*};
+use ui::{Avatar, Facepile, Tooltip, prelude::*};
 use util::ResultExt;
 use workspace::{
     Workspace,
@@ -123,6 +124,69 @@ struct ThreadPanel {
     compose_editor: Entity<Editor>,
     load_state: ThreadLoadState,
     send_state: SendState,
+}
+
+struct ThreadIndicator {
+    message_id: u64,
+    reply_count: u32,
+    has_unread: bool,
+    participants: Vec<Arc<client::User>>,
+}
+
+impl ThreadIndicator {
+    fn render(self, cx: &mut Context<ChannelChat>) -> gpui::AnyElement {
+        const FACEPILE_LIMIT: usize = 3;
+
+        let reply_label = if self.reply_count == 1 {
+            "1 reply".to_string()
+        } else {
+            format!("{} replies", self.reply_count)
+        };
+        let extra_count = self.participants.len().saturating_sub(FACEPILE_LIMIT);
+        let faces = self
+            .participants
+            .iter()
+            .take(FACEPILE_LIMIT)
+            .map(|user| {
+                Avatar::new(user.avatar_uri.clone())
+                    .size(px(18.))
+                    .into_any_element()
+            })
+            .collect::<SmallVec<[_; 2]>>();
+        let message_id = self.message_id;
+
+        h_flex()
+            .id(("channel-thread-indicator", message_id))
+            .gap_2()
+            .items_center()
+            .child(
+                Button::new(
+                    format!("channel-thread-indicator-button-{message_id}"),
+                    reply_label,
+                )
+                .label_size(LabelSize::XSmall)
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    this.open_thread(message_id, window, cx);
+                })),
+            )
+            .when(!faces.is_empty(), |this| this.child(Facepile::new(faces)))
+            .when(extra_count > 0, |this| {
+                this.child(
+                    Label::new(format!("+{extra_count}"))
+                        .size(LabelSize::XSmall)
+                        .color(Color::Muted),
+                )
+            })
+            .when(self.has_unread, |this| {
+                this.child(
+                    div()
+                        .size(px(6.))
+                        .rounded_full()
+                        .bg(cx.theme().colors().text_accent),
+                )
+            })
+            .into_any_element()
+    }
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -843,49 +907,20 @@ impl ChannelChat {
             return div().into_any_element();
         }
 
-        let reply_label = if summary.reply_count == 1 {
-            "1 reply".to_string()
-        } else {
-            format!("{} replies", summary.reply_count)
-        };
-        let participant_label = summary
-            .participant_user_ids
-            .iter()
-            .take(3)
-            .map(|user_id| self.user_display_name(*user_id, cx))
-            .collect::<Vec<_>>()
-            .join(", ");
-
-        h_flex()
-            .id(("channel-thread-indicator", message_id))
-            .gap_2()
-            .items_center()
-            .child(
-                Button::new(
-                    format!("channel-thread-indicator-button-{message_id}"),
-                    reply_label,
-                )
-                .label_size(LabelSize::XSmall)
-                .on_click(cx.listener(move |this, _, window, cx| {
-                    this.open_thread(message_id, window, cx);
-                })),
-            )
-            .when(!participant_label.is_empty(), |this| {
-                this.child(
-                    Label::new(participant_label)
-                        .size(LabelSize::XSmall)
-                        .color(Color::Muted),
-                )
-            })
-            .when(summary.has_unread, |this| {
-                this.child(
-                    div()
-                        .size(px(6.))
-                        .rounded_full()
-                        .bg(cx.theme().colors().text_accent),
-                )
-            })
-            .into_any_element()
+        let participants = self.user_store.update(cx, |user_store, cx| {
+            summary
+                .participant_user_ids
+                .iter()
+                .filter_map(|user_id| user_store.get_user_optimistic(*user_id, cx))
+                .collect()
+        });
+        ThreadIndicator {
+            message_id,
+            reply_count: summary.reply_count,
+            has_unread: summary.has_unread,
+            participants,
+        }
+        .render(cx)
     }
 
     fn render_thread_message(
