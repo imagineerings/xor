@@ -1,5 +1,6 @@
 mod ids;
 pub mod queries;
+pub mod scheduled_message_store;
 mod tables;
 
 use crate::{Error, Result};

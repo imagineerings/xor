@@ -1011,7 +1011,7 @@ fn channel_message_to_proto(
             .unwrap_or_default(),
         scheduled_at: row
             .scheduled_at
-            .map(|scheduled_at| scheduled_at.assume_utc().unix_timestamp() as u64),
+            .map(|scheduled_at| unix_timestamp_millis(scheduled_at)),
     })
 }
 
@@ -1098,6 +1098,10 @@ fn nonce_from_bytes(bytes: &[u8]) -> Result<proto::Nonce> {
 fn now() -> PrimitiveDateTime {
     let now = time::OffsetDateTime::now_utc();
     PrimitiveDateTime::new(now.date(), now.time())
+}
+
+fn unix_timestamp_millis(timestamp: PrimitiveDateTime) -> u64 {
+    (timestamp.assume_utc().unix_timestamp_nanos() / 1_000_000) as u64
 }
 
 fn placeholder(index: usize, backend: DbBackend) -> String {

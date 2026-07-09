@@ -25,6 +25,7 @@ pub mod project_repository;
 pub mod project_repository_statuses;
 pub mod room;
 pub mod room_participant;
+pub mod scheduled_message;
 pub mod server;
 pub mod shared_thread;
 pub mod user;

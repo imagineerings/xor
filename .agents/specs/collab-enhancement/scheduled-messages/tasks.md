@@ -28,7 +28,7 @@ Add the ability for channel participants to schedule messages for future deliver
     - _Completed: Added Postgres and SQLite scheduled-message schema, indexes, idempotency constraint, and `channel_messages.scheduled_at` column._
     - _Validation: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `git diff --check`._
 
-- [ ] 3. Implement `ScheduledMessageStore` (server-side data access layer)
+- [x] 3. Implement `ScheduledMessageStore` (server-side data access layer)
     - Create `ScheduledMessageStore` with `db: Arc<Database>`.
     - Implement `create` — validates channel membership server-side, inserts row, returns `ScheduledMessageId`.
     - Implement `cancel` — `DELETE WHERE id = ? AND sender_id = ?`; only the sender may cancel (returns `Result<Option<ScheduledMessage>>`).
@@ -41,6 +41,8 @@ Add the ability for channel participants to schedule messages for future deliver
     - Implement `reset_stale_processing` — resets `state = 0` for rows with `state = 1` and `updated_at` older than a grace period (for crash recovery).
     - _Requirements: 11.1, 11.2, 11.3, 11.4_
     - _writes: collab/src/db/scheduled_message_store.rs_
+    - _Completed: Added `ScheduledMessageStore`, table entity, `ScheduledMessageId`, CRUD/list/count/failure/recovery methods, time-bound validation, nonce hydration, JSON mention persistence, and atomic due-message popping._
+    - _Validation: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `git diff --check`._
 
 - [ ] 4. Implement server RPC handlers
     - Register handlers in `Server::new()`: `schedule_channel_message`, `cancel_scheduled_message`, `update_scheduled_message`, `get_scheduled_messages`.
