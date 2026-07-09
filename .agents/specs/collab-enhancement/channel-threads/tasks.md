@@ -42,16 +42,16 @@ Add threaded replies to channel messages in Sim. This feature reuses the existin
   - _implemented in existing `crates/client/src/channel_chat.rs` channel client API module_
   - _validated: `CARGO_INCREMENTAL=0 cargo test -p client test_channel_chat_request_conversions --features test-support`; `CARGO_INCREMENTAL=0 cargo check -p client`; `git diff --check`_
 
-- [ ] 5. Build the ThreadPanel UI component
+- [x] 5. Build the ThreadPanel UI component
   - [x] 5.1 Create `ThreadPanel` struct with fields: `channel_id`, `root_message`, `replies: Vec<ChannelMessage>`, `compose_editor: Entity<Editor>`, loading state, and error state.
   - [x] 5.2 Implement `Render` for `ThreadPanel` — layout: header (channel name + close button), pinned root message, scrollable reply list, compose input at bottom.
   - [x] 5.3 Implement `open` method that fetches the thread via `Client::get_thread` and populates the panel.
   - [x] 5.4 Implement reply sending from the compose input — build `SendChannelMessage` with `reply_to_message_id` set to the root message ID.
-  - [ ] 5.5 Register `ThreadPanel` as a dockable panel in the workspace (right sidebar), with a toggle action and keyboard shortcut (Escape to close).
+  - [x] 5.5 Register `ThreadPanel` as a dockable panel in the workspace (right sidebar), with a toggle action and keyboard shortcut (Escape to close).
   - _Requirements: 3.2_
   - _writes: `collab_ui/src/channel_thread/thread_panel.rs`_
-  - _implemented initial right-side in-chat panel in existing `crates/collab_ui/src/channel_chat.rs`; workspace dock registration remains_
-  - _validated: `CARGO_INCREMENTAL=0 cargo check -p collab_ui`; `git diff --check`_
+  - _implemented as the `ChannelChat` workspace item's right-side thread panel in existing `crates/collab_ui/src/channel_chat.rs`, with Reply/thread-indicator toggles and Escape-bound close action_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui --features test-support channel_chat_key_bindings_parse`; `git diff --check`_
 
 - [x] 6. Build the ThreadIndicator component
   - [x] 6.1 Create `ThreadIndicator` struct with fields: `message_id`, `reply_count`, `has_unread`, `participants`.

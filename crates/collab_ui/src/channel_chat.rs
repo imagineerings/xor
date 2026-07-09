@@ -2298,13 +2298,20 @@ mod tests {
     fn channel_chat_key_bindings_parse() {
         let bindings = super::channel_chat_key_bindings();
 
-        assert_eq!(bindings.len(), 5);
+        assert_eq!(bindings.len(), 6);
         assert!(bindings.iter().any(|binding| {
             binding.action().name().ends_with("TogglePreview")
                 && binding
                     .keystrokes()
                     .first()
                     .is_some_and(|keystroke| keystroke.unparse() == "ctrl-shift-p")
+        }));
+        assert!(bindings.iter().any(|binding| {
+            binding.action().name().ends_with("CloseThread")
+                && binding
+                    .keystrokes()
+                    .first()
+                    .is_some_and(|keystroke| keystroke.unparse() == "escape")
         }));
     }
 }
