@@ -12,6 +12,7 @@ pub(super) struct SearchState {
     pub(super) loading: bool,
     pub(super) loading_more: bool,
     pub(super) error: Option<SharedString>,
+    selected_result_index: Option<usize>,
     pub(super) request_serial: u64,
 }
 
@@ -199,6 +200,7 @@ impl ChannelChat {
 
         self.search_state.active = false;
         self.search_state.error = None;
+        self.search_state.selected_result_index = None;
         self.search_state.loading = false;
         self.search_state.loading_more = false;
         self.pending_search.take();
@@ -221,6 +223,7 @@ impl ChannelChat {
             self.search_state.loading = false;
             self.search_state.loading_more = false;
             self.search_state.error = Some(error);
+            self.search_state.selected_result_index = None;
             cx.notify();
             return;
         }
@@ -231,6 +234,7 @@ impl ChannelChat {
             self.search_state.loading = false;
             self.search_state.loading_more = false;
             self.search_state.error = None;
+            self.search_state.selected_result_index = None;
             cx.notify();
             return;
         }
@@ -241,6 +245,7 @@ impl ChannelChat {
             self.search_state.loading = false;
             self.search_state.loading_more = false;
             self.search_state.error = Some("Query must be at least 2 characters".into());
+            self.search_state.selected_result_index = None;
             cx.notify();
             return;
         }
@@ -250,6 +255,7 @@ impl ChannelChat {
         self.search_state.loading = true;
         self.search_state.loading_more = false;
         self.search_state.error = None;
+        self.search_state.selected_result_index = None;
         cx.notify();
 
         let client = self.client.clone();
@@ -267,11 +273,14 @@ impl ChannelChat {
                     Ok(response) => {
                         this.search_state.results = response.results;
                         this.search_state.done = response.done;
+                        this.search_state.selected_result_index =
+                            (!this.search_state.results.is_empty()).then_some(0);
                         this.search_state.error = None;
                     }
                     Err(error) => {
                         this.search_state.results.clear();
                         this.search_state.done = true;
+                        this.search_state.selected_result_index = None;
                         this.search_state.error =
                             Some(format!("Failed to load search results: {error}").into());
                     }
@@ -324,8 +333,12 @@ impl ChannelChat {
                 this.search_state.loading_more = false;
                 match result {
                     Ok(response) => {
+                        let had_selection = this.search_state.selected_result_index.is_some();
                         this.search_state.results.extend(response.results);
                         this.search_state.done = response.done;
+                        if !had_selection && !this.search_state.results.is_empty() {
+                            this.search_state.selected_result_index = Some(0);
+                        }
                         this.search_state.error = None;
                     }
                     Err(error) => {
@@ -334,6 +347,115 @@ impl ChannelChat {
                     }
                 }
                 cx.notify();
+            })
+            .log_err();
+        })
+        .detach();
+    }
+
+    pub(super) fn select_next_search_result(
+        &mut self,
+        _: &SelectNext,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if !self.search_state.active || self.search_state.results.is_empty() {
+            return;
+        }
+
+        let last_index = self.search_state.results.len() - 1;
+        self.search_state.selected_result_index = Some(
+            self.search_state
+                .selected_result_index
+                .map(|index| index.saturating_add(1).min(last_index))
+                .unwrap_or(0),
+        );
+        cx.notify();
+    }
+
+    pub(super) fn select_previous_search_result(
+        &mut self,
+        _: &SelectPrevious,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if !self.search_state.active || self.search_state.results.is_empty() {
+            return;
+        }
+
+        self.search_state.selected_result_index = Some(
+            self.search_state
+                .selected_result_index
+                .map(|index| index.saturating_sub(1))
+                .unwrap_or(0),
+        );
+        cx.notify();
+    }
+
+    pub(super) fn open_selected_search_result(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        if !self.search_state.active {
+            return false;
+        }
+
+        let Some(result) = self
+            .search_state
+            .selected_result_index
+            .and_then(|index| self.search_state.results.get(index))
+            .cloned()
+        else {
+            return false;
+        };
+        self.open_search_result(result, window, cx);
+        true
+    }
+
+    fn open_search_result(
+        &mut self,
+        result: proto::SearchResult,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(message_id) = result.message.as_ref().map(|message| message.id) else {
+            return;
+        };
+        let channel_id = ChannelId(result.channel_id);
+        self.close_search(cx);
+
+        if channel_id == self.channel_id {
+            self.highlight_search_message(message_id, cx);
+            return;
+        }
+
+        let Some(workspace) = self.workspace.upgrade() else {
+            return;
+        };
+
+        let open_channel = ChannelChat::open(channel_id, workspace, window, cx);
+        cx.spawn_in(window, async move |_, cx| {
+            let chat = open_channel.await?;
+            chat.update(cx, |chat, cx| {
+                chat.highlight_search_message(message_id, cx);
+            });
+            anyhow::Ok(())
+        })
+        .detach_and_log_err(cx);
+    }
+
+    fn highlight_search_message(&mut self, message_id: u64, cx: &mut Context<Self>) {
+        self.highlighted_search_message_id = Some(message_id);
+        cx.notify();
+
+        cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(Duration::from_secs(2)).await;
+            this.update(cx, |this, cx| {
+                if this.highlighted_search_message_id == Some(message_id) {
+                    this.highlighted_search_message_id = None;
+                    cx.notify();
+                }
             })
             .log_err();
         })
@@ -430,6 +552,7 @@ impl ChannelChat {
         cx: &mut Context<Self>,
     ) -> gpui::AnyElement {
         v_flex()
+            .key_context("ChannelMessageSearch")
             .gap_2()
             .px_3()
             .pb_3()
@@ -585,7 +708,8 @@ impl ChannelChat {
                     .results
                     .clone()
                     .into_iter()
-                    .map(|result| self.render_search_result(result, window, cx)),
+                    .enumerate()
+                    .map(|(index, result)| self.render_search_result(index, result, window, cx)),
             )
             .when(
                 !self.search_state.done && !self.search_state.results.is_empty(),
@@ -613,6 +737,7 @@ impl ChannelChat {
 
     fn render_search_result(
         &mut self,
+        index: usize,
         result: proto::SearchResult,
         _window: &mut Window,
         cx: &mut Context<Self>,
@@ -620,6 +745,7 @@ impl ChannelChat {
         let Some(message) = result.message.as_ref() else {
             return div().into_any_element();
         };
+        let selected = self.search_state.selected_result_index == Some(index);
         let header = format!(
             "#{} · @{} · {}",
             result.channel_name,
@@ -634,7 +760,17 @@ impl ChannelChat {
             .py_2()
             .border_b_1()
             .border_color(cx.theme().colors().border_variant)
+            .when(selected, |this| {
+                this.bg(cx.theme().colors().element_selected)
+                    .border_color(cx.theme().colors().text_accent)
+            })
             .hover(|style| style.bg(cx.theme().colors().element_hover))
+            .on_click(cx.listener({
+                let result = result.clone();
+                move |this, _, window, cx| {
+                    this.open_search_result(result.clone(), window, cx);
+                }
+            }))
             .child(
                 Label::new(header)
                     .size(LabelSize::XSmall)

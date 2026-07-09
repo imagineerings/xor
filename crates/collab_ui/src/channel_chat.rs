@@ -16,7 +16,7 @@ use gpui::{
     Subscription as GpuiSubscription, Task, VisualContext as _, WeakEntity, Window, actions,
     prelude::*,
 };
-use menu::Confirm;
+use menu::{Confirm, SelectNext, SelectPrevious};
 use rpc::{ErrorExt as _, TypedEnvelope};
 use smallvec::SmallVec;
 use std::{
@@ -88,7 +88,7 @@ pub fn init(cx: &mut App) {
     cx.bind_keys(channel_chat_key_bindings());
 }
 
-fn channel_chat_key_bindings() -> [KeyBinding; 7] {
+fn channel_chat_key_bindings() -> [KeyBinding; 10] {
     [
         KeyBinding::new("ctrl-b", ToggleBold, Some("ChannelChat")),
         KeyBinding::new("ctrl-i", ToggleItalic, Some("ChannelChat")),
@@ -97,6 +97,9 @@ fn channel_chat_key_bindings() -> [KeyBinding; 7] {
         KeyBinding::new("ctrl-shift-p", TogglePreview, Some("ChannelChat")),
         KeyBinding::new("cmd-f", ToggleSearch, Some("ChannelChat")),
         KeyBinding::new("escape", CloseThread, Some("ChannelChat")),
+        KeyBinding::new("up", SelectPrevious, Some("ChannelMessageSearch")),
+        KeyBinding::new("down", SelectNext, Some("ChannelMessageSearch")),
+        KeyBinding::new("enter", Confirm, Some("ChannelMessageSearch")),
     ]
 }
 
@@ -112,6 +115,7 @@ pub struct ChannelChat {
     search_editor: Entity<Editor>,
     search_state: search::SearchState,
     pending_search: Option<Task<()>>,
+    highlighted_search_message_id: Option<u64>,
     emoji_search: Entity<Editor>,
     messages: Vec<proto::ChannelMessage>,
     message_bodies: HashMap<u64, message_bubble::MessageBody>,
@@ -461,6 +465,7 @@ impl ChannelChat {
             search_editor,
             search_state: search::SearchState::default(),
             pending_search: None,
+            highlighted_search_message_id: None,
             emoji_search,
             messages,
             message_bodies: HashMap::default(),
@@ -635,6 +640,10 @@ impl ChannelChat {
     }
 
     fn send(&mut self, _: &Confirm, window: &mut Window, cx: &mut Context<Self>) {
+        if self.open_selected_search_result(window, cx) {
+            return;
+        }
+
         if self.send_state == SendState::Sending {
             return;
         }
@@ -1081,6 +1090,10 @@ impl ChannelChat {
             .py_2()
             .border_b_1()
             .border_color(cx.theme().colors().border_variant)
+            .when(
+                self.highlighted_search_message_id == Some(message.id),
+                |this| this.bg(cx.theme().colors().element_selected),
+            )
             .child(
                 h_flex()
                     .gap_2()
@@ -2139,6 +2152,8 @@ impl Render for ChannelChat {
             .on_action(cx.listener(Self::toggle_blockquote))
             .on_action(cx.listener(Self::toggle_preview))
             .on_action(cx.listener(Self::toggle_search))
+            .on_action(cx.listener(Self::select_next_search_result))
+            .on_action(cx.listener(Self::select_previous_search_result))
             .on_action(cx.listener(Self::close_thread))
             .child(
                 v_flex()

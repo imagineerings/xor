@@ -162,7 +162,7 @@ Add full-text search across channel messages using PostgreSQL tsvector/tsquery, 
   - _implemented in the channel chat header with a toggle button, `cmd-f` binding, inline results panel, and Escape-to-close behavior_
   - _validated: `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab -p collab_ui --features collab/test-support,collab_ui/test-support`; `git diff --check`_
 
-- [ ] 13. Navigate to message on result click
+- [x] 13. Navigate to message on result click
   - Implement `on_result_clicked` handler that:
     - Fetches the channel the result belongs to (if not already open)
     - Navigates to the channel
@@ -170,17 +170,22 @@ Add full-text search across channel messages using PostgreSQL tsvector/tsquery, 
     - Highlights the target message briefly (e.g., yellow background fade)
   - Close `SearchResultsPanel` after navigation
   - _Requirements: 5.3_
-  - _writes: crates/collab_ui/src/channel_search_results_panel.rs_
-  - _writes: crates/client/src/channel_store.rs_
+  - _writes: crates/collab_ui/src/channel_chat.rs_
+  - _writes: crates/collab_ui/src/channel_chat/search.rs_
+  - _implemented with result-click and Enter navigation that opens the owning channel via `ChannelChat::open`, closes the search panel, and highlights the target message; no `ChannelStore::scroll_to_message` helper exists yet, so explicit scroll positioning remains a future refinement_
+  - _validated: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features test-support`_
 
 ### Phase 5 — Polish & Edge Cases
 
-- [ ] 14. Add keyboard navigation for search results
+- [x] 14. Add keyboard navigation for search results
   - Support `Up`/`Down` arrow keys to move selection through results
   - Show a subtle focus ring on the selected result
   - `Enter` triggers navigation on the selected result
   - _Requirements: 5.3_
-  - _writes: crates/collab_ui/src/channel_search_results_panel.rs_
+  - _writes: crates/collab_ui/src/channel_chat.rs_
+  - _writes: crates/collab_ui/src/channel_chat/search.rs_
+  - _implemented with Up/Down/Enter bindings scoped to the active search UI, selected-result state, and selected row styling_
+  - _validated: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui search::tests --features test-support -- --nocapture`_
 
 - [ ] 15. Handle error states in the UI
   - Show inline error banner for:
