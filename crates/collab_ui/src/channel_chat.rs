@@ -37,6 +37,8 @@ mod formatting_toolbar;
 mod markdown_style;
 #[path = "channel_chat/message_bubble.rs"]
 mod message_bubble;
+#[path = "channel_chat/sanitize.rs"]
+mod sanitize;
 
 const RECENT_EMOJI_NAMESPACE: &str = "channel_chat_recent_emojis";
 const RECENT_EMOJI_KEY: &str = "recent";

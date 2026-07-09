@@ -63,13 +63,14 @@ The work is ordered to build incrementally: first the rendering pipeline (Markdo
   - _writes: `collab_ui/src/channel_chat/compose_area.rs`_
   - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_chat --features test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab test_channel_chat_view_live_insert_and_send_states --features test-support`_
 
-- [ ] 7. Harden Markdown rendering for safety
-  - [ ] 7.1 Add a `sanitize_markdown_html(input: &str) -> String` function that strips or escapes raw HTML tags and `javascript:` / `data:` / `file:` protocol URLs before passing the string to the markdown renderer.
-  - [ ] 7.2 Ensure `render_markdown` is never called with `parse_html: true` for user-generated channel content.
-  - [ ] 7.3 Add a configurable max length check (e.g., 10K chars) — truncate before rendering and show a "message too long" indicator if exceeded.
-  - [ ] 7.4 Verify that malformed Markdown (unclosed fences, stray punctuation) renders best-effort without panicking.
+- [x] 7. Harden Markdown rendering for safety
+  - [x] 7.1 Add a `sanitize_markdown_html(input: &str) -> String` function that strips or escapes raw HTML tags and `javascript:` / `data:` / `file:` protocol URLs before passing the string to the markdown renderer.
+  - [x] 7.2 Ensure `render_markdown` is never called with `parse_html: true` for user-generated channel content.
+  - [x] 7.3 Add a configurable max length check (e.g., 10K chars) — truncate before rendering and show a "message too long" indicator if exceeded.
+  - [x] 7.4 Verify that malformed Markdown (unclosed fences, stray punctuation) renders best-effort without panicking.
   - _Requirements: 1.4_
   - _writes: `collab_ui/src/channel_chat/sanitize.rs`_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_chat --features test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab test_channel_chat_view_live_insert_and_send_states --features test-support`_
 
 - [ ] 8. Add unit tests for formatting toolbar
   - [ ] 8.1 Test each `FormatKind::apply_format` on a mock `Editor`: verify correct Markdown wrapping of selected text.
