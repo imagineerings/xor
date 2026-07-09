@@ -1095,6 +1095,8 @@ pub struct Editor {
     >,
     last_bounds: Option<Bounds<Pixels>>,
     last_position_map: Option<Rc<PositionMap>>,
+    last_right_margin: Pixels,
+    last_horizontal_scrollbar_visible: bool,
     expect_bounds_change: Option<Bounds<Pixels>>,
     runnables: RunnableData,
     bookmark_store: Option<Entity<BookmarkStore>>,
@@ -2271,6 +2273,8 @@ impl Editor {
             pixel_position_of_newest_cursor: None,
             last_bounds: None,
             last_position_map: None,
+            last_right_margin: Pixels::ZERO,
+            last_horizontal_scrollbar_visible: false,
             expect_bounds_change: None,
             gutter_dimensions: GutterDimensions::default(),
             style: None,
@@ -2679,6 +2683,14 @@ impl Editor {
 
     pub fn last_bounds(&self) -> Option<&Bounds<Pixels>> {
         self.last_bounds.as_ref()
+    }
+
+    pub(crate) fn last_right_margin(&self) -> Pixels {
+        self.last_right_margin
+    }
+
+    pub(crate) fn last_horizontal_scrollbar_visible(&self) -> bool {
+        self.last_horizontal_scrollbar_visible
     }
 
     pub fn working_directory(&self, cx: &App) -> Option<PathBuf> {
