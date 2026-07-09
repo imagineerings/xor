@@ -2506,6 +2506,7 @@ mod tests {
                             user_id: 9,
                         }],
                         reply_to_message_id: Some(3),
+                        file_ids: vec!["file-1".to_string()],
                     })
                     .await
             }
@@ -2519,6 +2520,7 @@ mod tests {
         );
         assert_eq!(request.payload.mentions.len(), 1);
         assert_eq!(request.payload.reply_to_message_id, Some(3));
+        assert_eq!(request.payload.file_ids, vec!["file-1"]);
 
         server.respond(
             request.receipt(),
@@ -2531,6 +2533,7 @@ mod tests {
                     nonce: Some(0x10000000000000002u128.into()),
                     mentions: Vec::new(),
                     reply_to_message_id: Some(3),
+                    files: Vec::new(),
                     edited_at: None,
                     reaction_summaries: Vec::new(),
                     scheduled_at: None,
@@ -2597,6 +2600,7 @@ mod tests {
                     nonce: Some(0x10000000000000002u128.into()),
                     mentions: Vec::new(),
                     reply_to_message_id: None,
+                    files: Vec::new(),
                     edited_at: None,
                     reaction_summaries: Vec::new(),
                     scheduled_at: None,
@@ -2609,6 +2613,7 @@ mod tests {
                     nonce: Some(0x30000000000000004u128.into()),
                     mentions: Vec::new(),
                     reply_to_message_id: Some(11),
+                    files: Vec::new(),
                     edited_at: None,
                     reaction_summaries: Vec::new(),
                     scheduled_at: None,
@@ -2692,6 +2697,7 @@ mod tests {
                 nonce: Some(1u128.into()),
                 mentions: Vec::new(),
                 reply_to_message_id: None,
+                files: Vec::new(),
                 edited_at: None,
                 reaction_summaries: Vec::new(),
                 scheduled_at: None,
@@ -2709,6 +2715,7 @@ mod tests {
                 nonce: Some(2u128.into()),
                 mentions: Vec::new(),
                 reply_to_message_id: None,
+                files: Vec::new(),
                 edited_at: Some(3),
                 reaction_summaries: Vec::new(),
                 scheduled_at: None,

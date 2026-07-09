@@ -152,6 +152,68 @@ impl FileStore {
         self.file_attachment_from_row(row).await
     }
 
+    pub async fn attach_files_to_message(
+        &self,
+        channel_id: ChannelId,
+        message_id: MessageId,
+        uploader_id: UserId,
+        file_ids: Vec<Uuid>,
+    ) -> Result<Vec<FileAttachment>> {
+        if file_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let rows = self
+            .db
+            .transaction(|tx| {
+                let file_ids = file_ids.clone();
+                async move {
+                    let rows = channel_file::Entity::find()
+                        .filter(channel_file::Column::Id.is_in(file_ids.clone()))
+                        .filter(channel_file::Column::ChannelId.eq(channel_id))
+                        .filter(channel_file::Column::UploaderId.eq(uploader_id))
+                        .filter(channel_file::Column::UploadedAt.is_not_null())
+                        .all(&*tx)
+                        .await?;
+
+                    if rows.len() != file_ids.len() {
+                        return Err(Error::from(anyhow!(
+                            "one or more file uploads are unavailable"
+                        )));
+                    }
+
+                    for row in &rows {
+                        channel_file::Entity::update(channel_file::ActiveModel {
+                            id: ActiveValue::Unchanged(row.id),
+                            channel_id: ActiveValue::Unchanged(row.channel_id),
+                            message_id: ActiveValue::Set(Some(message_id)),
+                            filename: ActiveValue::Unchanged(row.filename.clone()),
+                            file_size: ActiveValue::Unchanged(row.file_size),
+                            mime_type: ActiveValue::Unchanged(row.mime_type.clone()),
+                            storage_path: ActiveValue::Unchanged(row.storage_path.clone()),
+                            uploader_id: ActiveValue::Unchanged(row.uploader_id),
+                            image_width: ActiveValue::Unchanged(row.image_width),
+                            image_height: ActiveValue::Unchanged(row.image_height),
+                            duration_ms: ActiveValue::Unchanged(row.duration_ms),
+                            created_at: ActiveValue::Unchanged(row.created_at),
+                            uploaded_at: ActiveValue::Unchanged(row.uploaded_at),
+                        })
+                        .exec(&*tx)
+                        .await?;
+                    }
+
+                    Ok(rows)
+                }
+            })
+            .await?;
+
+        let mut attachments = Vec::with_capacity(rows.len());
+        for row in rows {
+            attachments.push(self.file_attachment_from_row(row).await?);
+        }
+        Ok(attachments)
+    }
+
     pub async fn delete_message_files(
         &self,
         channel_id: ChannelId,

@@ -19,6 +19,7 @@ pub struct SendChannelMessage {
     pub nonce: u128,
     pub mentions: Vec<proto::ChatMention>,
     pub reply_to_message_id: Option<u64>,
+    pub file_ids: Vec<String>,
 }
 
 pub struct UpdateChannelMessage {
@@ -127,6 +128,7 @@ impl Client {
                 nonce: Some(message.nonce.into()),
                 mentions: message.mentions,
                 reply_to_message_id: message.reply_to_message_id,
+                file_ids: message.file_ids,
             })
             .await?;
         response.message.context("missing sent channel message")

@@ -31,6 +31,7 @@ async fn test_channel_chat_view_live_insert_and_send_states(
             nonce: 1,
             mentions: Vec::new(),
             reply_to_message_id: None,
+            file_ids: Vec::new(),
         })
         .await
         .unwrap();
@@ -176,6 +177,7 @@ async fn test_channel_chat_markdown_preview_toolbar_and_sent_rendering(
             nonce: 1,
             mentions: Vec::new(),
             reply_to_message_id: None,
+            file_ids: Vec::new(),
         })
         .await
         .unwrap();
@@ -207,6 +209,7 @@ async fn test_channel_chat_thread_compose_sends_reply(
             nonce: 1,
             mentions: Vec::new(),
             reply_to_message_id: None,
+            file_ids: Vec::new(),
         })
         .await
         .unwrap();
@@ -277,6 +280,7 @@ async fn test_channel_chat_open_thread_appends_live_replies(
             nonce: 1,
             mentions: Vec::new(),
             reply_to_message_id: None,
+            file_ids: Vec::new(),
         })
         .await
         .unwrap();
@@ -289,6 +293,7 @@ async fn test_channel_chat_open_thread_appends_live_replies(
             nonce: 2,
             mentions: Vec::new(),
             reply_to_message_id: Some(root.id),
+            file_ids: Vec::new(),
         })
         .await
         .unwrap();
@@ -301,6 +306,7 @@ async fn test_channel_chat_open_thread_appends_live_replies(
             nonce: 3,
             mentions: Vec::new(),
             reply_to_message_id: None,
+            file_ids: Vec::new(),
         })
         .await
         .unwrap();
@@ -312,6 +318,7 @@ async fn test_channel_chat_open_thread_appends_live_replies(
             nonce: 4,
             mentions: Vec::new(),
             reply_to_message_id: Some(other_root.id),
+            file_ids: Vec::new(),
         })
         .await
         .unwrap();
@@ -371,6 +378,7 @@ async fn test_channel_chat_open_thread_appends_live_replies(
             nonce: 5,
             mentions: Vec::new(),
             reply_to_message_id: Some(root.id),
+            file_ids: Vec::new(),
         })
         .await
         .unwrap();
@@ -402,6 +410,7 @@ async fn test_channel_chat_thread_deleted_root_placeholder(
             nonce: 1,
             mentions: Vec::new(),
             reply_to_message_id: None,
+            file_ids: Vec::new(),
         })
         .await
         .unwrap();
@@ -413,6 +422,7 @@ async fn test_channel_chat_thread_deleted_root_placeholder(
             nonce: 2,
             mentions: Vec::new(),
             reply_to_message_id: Some(root.id),
+            file_ids: Vec::new(),
         })
         .await
         .unwrap();
@@ -458,6 +468,7 @@ async fn test_channel_chat_thread_load_retry_exhaustion(
             nonce: 1,
             mentions: Vec::new(),
             reply_to_message_id: None,
+            file_ids: Vec::new(),
         })
         .await
         .unwrap();
@@ -502,6 +513,7 @@ async fn test_channel_chat_message_search_state_and_pagination(
                 nonce: index + 1,
                 mentions: Vec::new(),
                 reply_to_message_id: None,
+                file_ids: Vec::new(),
             })
             .await
             .unwrap();
@@ -612,6 +624,7 @@ async fn test_channel_chat_view_updates_live_reactions(
             nonce: 1,
             mentions: Vec::new(),
             reply_to_message_id: None,
+            file_ids: Vec::new(),
         })
         .await
         .unwrap();
@@ -663,6 +676,7 @@ async fn test_channel_chat_emoji_picker_adds_reaction(
             nonce: 1,
             mentions: Vec::new(),
             reply_to_message_id: None,
+            file_ids: Vec::new(),
         })
         .await
         .unwrap();

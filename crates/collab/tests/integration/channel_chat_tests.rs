@@ -59,6 +59,7 @@ async fn test_channel_chat_core_flow(
             nonce: 1,
             mentions: vec![mention_for(client_b.user_id().unwrap(), 6, 10)],
             reply_to_message_id: None,
+            file_ids: Vec::new(),
         })
         .await
         .unwrap();
@@ -856,6 +857,7 @@ async fn test_channel_chat_thread_queries(
             nonce: 1,
             mentions: Vec::new(),
             reply_to_message_id: None,
+            file_ids: Vec::new(),
         })
         .await
         .unwrap();
@@ -866,6 +868,7 @@ async fn test_channel_chat_thread_queries(
             nonce: 2,
             mentions: Vec::new(),
             reply_to_message_id: Some(root.id),
+            file_ids: Vec::new(),
         })
         .await
         .unwrap();
@@ -876,6 +879,7 @@ async fn test_channel_chat_thread_queries(
             nonce: 3,
             mentions: Vec::new(),
             reply_to_message_id: Some(root.id),
+            file_ids: Vec::new(),
         })
         .await
         .unwrap();
@@ -933,6 +937,7 @@ async fn test_channel_chat_thread_queries(
                 nonce: 4,
                 mentions: Vec::new(),
                 reply_to_message_id: Some(root.id + 10_000),
+                file_ids: Vec::new(),
             })
             .await
             .is_err()
@@ -962,6 +967,7 @@ async fn test_channel_chat_thread_pagination(
             nonce: 1,
             mentions: Vec::new(),
             reply_to_message_id: None,
+            file_ids: Vec::new(),
         })
         .await
         .unwrap();
@@ -976,6 +982,7 @@ async fn test_channel_chat_thread_pagination(
                     nonce: 2 + index,
                     mentions: Vec::new(),
                     reply_to_message_id: Some(root.id),
+                    file_ids: Vec::new(),
                 })
                 .await
                 .unwrap(),
@@ -1049,6 +1056,7 @@ async fn test_channel_chat_reactions_flow(
             nonce: 1,
             mentions: Vec::new(),
             reply_to_message_id: None,
+            file_ids: Vec::new(),
         })
         .await
         .unwrap();
@@ -1155,6 +1163,7 @@ async fn test_channel_chat_reactions_multi_client_updates_and_reconnect(
             nonce: 1,
             mentions: Vec::new(),
             reply_to_message_id: None,
+            file_ids: Vec::new(),
         })
         .await
         .unwrap();
@@ -1252,6 +1261,7 @@ async fn test_channel_chat_reactions_reject_private_channel_access(
             nonce: 1,
             mentions: Vec::new(),
             reply_to_message_id: None,
+            file_ids: Vec::new(),
         })
         .await
         .unwrap();
@@ -1303,6 +1313,7 @@ async fn test_channel_chat_message_delete_clears_reactions(
             nonce: 1,
             mentions: Vec::new(),
             reply_to_message_id: None,
+            file_ids: Vec::new(),
         })
         .await
         .unwrap();
@@ -1357,6 +1368,7 @@ async fn test_channel_chat_rejects_private_channel_access(
                 nonce: 1,
                 mentions: Vec::new(),
                 reply_to_message_id: None,
+                file_ids: Vec::new(),
             })
             .await
             .is_err()
@@ -1398,6 +1410,7 @@ async fn test_channel_message_search_filters_and_access(
             nonce: 1,
             mentions: Vec::new(),
             reply_to_message_id: None,
+            file_ids: Vec::new(),
         })
         .await
         .unwrap();
@@ -1408,6 +1421,7 @@ async fn test_channel_message_search_filters_and_access(
             nonce: 2,
             mentions: Vec::new(),
             reply_to_message_id: None,
+            file_ids: Vec::new(),
         })
         .await
         .unwrap();
@@ -1418,6 +1432,7 @@ async fn test_channel_message_search_filters_and_access(
             nonce: 3,
             mentions: Vec::new(),
             reply_to_message_id: None,
+            file_ids: Vec::new(),
         })
         .await
         .unwrap();
@@ -1540,6 +1555,7 @@ async fn test_channel_message_search_rejects_short_query_and_tracks_edits(
             nonce: 1,
             mentions: Vec::new(),
             reply_to_message_id: None,
+            file_ids: Vec::new(),
         })
         .await
         .unwrap();
@@ -1600,6 +1616,7 @@ async fn test_channel_chat_simultaneous_sends_keep_stable_order(
         nonce: 1,
         mentions: Vec::new(),
         reply_to_message_id: None,
+        file_ids: Vec::new(),
     });
     let send_b = client_b.send_channel_message(SendChannelMessage {
         channel_id: channel_id.0,
@@ -1607,6 +1624,7 @@ async fn test_channel_chat_simultaneous_sends_keep_stable_order(
         nonce: 2,
         mentions: Vec::new(),
         reply_to_message_id: None,
+        file_ids: Vec::new(),
     });
     let (message_a, message_b) = futures::future::join(send_a, send_b).await;
     let message_a = message_a.unwrap();

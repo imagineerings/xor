@@ -3738,7 +3738,16 @@ async fn send_channel_message(
     session: MessageContext,
 ) -> Result<()> {
     let channel_id = ChannelId::from_proto(request.channel_id);
-    let message = session
+    let file_ids = request
+        .file_ids
+        .iter()
+        .map(|file_id| {
+            uuid::Uuid::parse_str(file_id)
+                .context("invalid file id")
+                .map_err(Error::from)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let mut message = session
         .db()
         .await
         .create_channel_message(NewChannelMessage {
@@ -3751,6 +3760,21 @@ async fn send_channel_message(
             scheduled_at: None,
         })
         .await?;
+    if !file_ids.is_empty() {
+        let attachments = file_store(&session)
+            .attach_files_to_message(
+                channel_id,
+                MessageId::from_proto(message.id),
+                session.user_id(),
+                file_ids,
+            )
+            .await
+            .map_err(file_store_rpc_error)?;
+        message.files = attachments
+            .into_iter()
+            .map(db::file_store::FileAttachment::to_proto)
+            .collect();
+    }
 
     response.send(proto::SendChannelMessageResponse {
         message: Some(message.clone()),

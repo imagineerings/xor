@@ -197,12 +197,15 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
   - _Actual writes: crates/collab_ui/src/channel_chat.rs; crates/collab_ui/src/channel_chat/file_renderer.rs_
   - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `cargo test -p collab_ui file_renderer --features collab_ui/test-support`; `rustfmt --edition 2024 --check crates/collab_ui/src/channel_chat.rs crates/collab_ui/src/channel_chat/file_renderer.rs`; `git diff --check`._
 
-- [ ] 20. Wire file attachments into message send flow
+- [x] 20. Wire file attachments into message send flow
   - When composing a message, collect the `FileAttachment` handles from completed uploads.
   - Include file IDs in the send-message RPC payload.
   - Ensure attached files are sent alongside the message text in a single RPC.
   - _Requirements: 4.1_
   - _writes: crates/collab_ui/src/channel_chat/compose_area.rs_
+  - _Completed: Added `file_ids` to the send-message request contract, attached confirmed uploads to newly-created channel messages on the server, and taught the channel composer to send completed upload IDs with the message while blocking in-flight uploads and clearing sent upload rows._
+  - _Actual writes: crates/proto/proto/channel.proto; crates/client/src/channel_chat.rs; crates/client/src/client.rs; crates/collab/src/db/file_store.rs; crates/collab/src/rpc.rs; crates/collab/tests/integration/channel_chat_tests.rs; crates/collab/tests/integration/channel_chat_ui_tests.rs; crates/collab_ui/src/channel_chat.rs_
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p proto -p client`; `CARGO_INCREMENTAL=0 cargo check -p collab --features collab/test-support`; `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `git diff --check`._
 
 ### Phase 7: Testing
 

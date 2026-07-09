@@ -933,14 +933,22 @@ impl ChannelChat {
         }
 
         let body = self.composer.read(cx).text(cx).trim().to_string();
-        if body.is_empty() {
+        let file_ids = self.completed_upload_file_ids(cx);
+        if self.has_active_uploads(cx) {
+            self.show_upload_error("Wait for uploads to finish before sending.", cx);
+            return;
+        }
+        if body.is_empty() && file_ids.is_empty() {
             return;
         }
 
-        self.send_state = SendState::Sending;
-        cx.notify();
-
         let scheduled_at = if self.schedule_picker.active {
+            if !file_ids.is_empty() {
+                self.schedule_picker.validation_error =
+                    Some("File attachments cannot be scheduled yet.".into());
+                cx.notify();
+                return;
+            }
             match self.schedule_picker.validate() {
                 Ok(scheduled_at) => Some(scheduled_at),
                 Err(message) => {
@@ -954,6 +962,9 @@ impl ChannelChat {
         };
         let client = self.client.clone();
         let channel_id = self.channel_id;
+        let sent_file_ids = file_ids.clone();
+        self.send_state = SendState::Sending;
+        cx.notify();
         cx.spawn_in(window, async move |this, cx| {
             let nonce = next_nonce(channel_id);
             let send_result = if let Some(scheduled_at) = scheduled_at {
@@ -975,6 +986,7 @@ impl ChannelChat {
                         nonce,
                         mentions: Vec::new(),
                         reply_to_message_id: None,
+                        file_ids,
                     })
                     .await
                     .map(Some)
@@ -999,6 +1011,7 @@ impl ChannelChat {
                     if let Some(message) = message {
                         this.upsert_message(message, cx);
                     }
+                    this.remove_completed_uploads(sent_file_ids, cx);
                 }
                 Err(error) => {
                     let message = SharedString::from(error.to_string());
@@ -1119,6 +1132,37 @@ impl ChannelChat {
     fn remove_upload(&mut self, file_id: String, cx: &mut Context<Self>) {
         self.upload_manager.update(cx, |upload_manager, cx| {
             upload_manager.remove_upload(&file_id, cx);
+        });
+    }
+
+    fn completed_upload_file_ids(&self, cx: &App) -> Vec<String> {
+        self.upload_manager
+            .read(cx)
+            .uploads_for_channel(self.channel_id)
+            .into_iter()
+            .filter(|upload| upload.status == UploadStatus::Completed)
+            .map(|upload| upload.file_id)
+            .collect()
+    }
+
+    fn has_active_uploads(&self, cx: &App) -> bool {
+        self.upload_manager
+            .read(cx)
+            .uploads_for_channel(self.channel_id)
+            .into_iter()
+            .any(|upload| {
+                matches!(
+                    upload.status,
+                    UploadStatus::Uploading | UploadStatus::Confirming
+                )
+            })
+    }
+
+    fn remove_completed_uploads(&mut self, file_ids: Vec<String>, cx: &mut Context<Self>) {
+        self.upload_manager.update(cx, |upload_manager, cx| {
+            for file_id in file_ids {
+                upload_manager.remove_upload(&file_id, cx);
+            }
         });
     }
 
@@ -1988,6 +2032,7 @@ impl ChannelChat {
                     nonce,
                     mentions: Vec::new(),
                     reply_to_message_id: Some(root_message_id),
+                    file_ids: Vec::new(),
                 })
                 .await;
 
