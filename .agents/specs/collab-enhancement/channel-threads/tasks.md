@@ -56,10 +56,12 @@ Add threaded replies to channel messages in Sim. This feature reuses the existin
 - [ ] 6. Build the ThreadIndicator component
   - [ ] 6.1 Create `ThreadIndicator` struct with fields: `message_id`, `reply_count`, `has_unread`, `participants`.
   - [ ] 6.2 Implement `Render` — show "N replies" link when `reply_count > 0`, with participant avatar overlays and blue unread dot.
-  - [ ] 6.3 Wire `ThreadIndicator` into the channel message rendering pipeline: display below each message that has replies.
-  - [ ] 6.4 Handle click on the indicator — open/open the thread panel for that root message.
+  - [x] 6.3 Wire `ThreadIndicator` into the channel message rendering pipeline: display below each message that has replies.
+  - [x] 6.4 Handle click on the indicator — open/open the thread panel for that root message.
   - _Requirements: 3.1, 3.3_
   - _writes: `collab_ui/src/channel_thread/thread_indicator.rs`_
+  - _implemented initial inline indicator in existing `crates/collab_ui/src/channel_chat.rs`; separate component struct and avatar overlays remain_
+  - _validated: `CARGO_INCREMENTAL=0 cargo check -p collab_ui`; `git diff --check`_
 
 - [ ] 7. Implement thread unread tracking
   - [ ] 7.1 Reuse existing channel message read state infrastructure to track per-thread read timestamps.

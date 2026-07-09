@@ -3,7 +3,7 @@ use anyhow::Result;
 use channel::{Channel, ChannelStore};
 use client::{
     ChannelId, Client, UserStore,
-    channel_chat::SendChannelMessage,
+    channel_chat::{SendChannelMessage, ThreadSummary},
     proto::{self, ChannelVisibility},
 };
 use db::kvp::KeyValueStore;
@@ -97,6 +97,7 @@ pub struct ChannelChat {
     emoji_search: Entity<Editor>,
     messages: Vec<proto::ChannelMessage>,
     message_bodies: HashMap<u64, message_bubble::MessageBody>,
+    thread_summaries: HashMap<u64, ThreadSummary>,
     thread_panel: Option<ThreadPanel>,
     emoji_picker: Option<EmojiPickerState>,
     recent_emoji_names: Vec<String>,
@@ -330,6 +331,19 @@ impl ChannelChat {
                 Self::handle_message_reactions_update,
             ),
         ];
+        let load_thread_summaries = cx.spawn({
+            let client = client.clone();
+            let channel_id = channel_id.0;
+            async move |this, cx| {
+                let summaries = client.get_threads(channel_id).await?;
+                this.update(cx, |this, cx| {
+                    this.set_thread_summaries(summaries);
+                    cx.notify();
+                })?;
+                anyhow::Ok(())
+            }
+        });
+        load_thread_summaries.detach_and_log_err(cx);
         let recent_emoji_names = Self::load_recent_emoji_names(cx);
 
         Self {
@@ -344,6 +358,7 @@ impl ChannelChat {
             emoji_search,
             messages,
             message_bodies: HashMap::default(),
+            thread_summaries: HashMap::default(),
             thread_panel: None,
             emoji_picker: None,
             recent_emoji_names,
@@ -426,6 +441,9 @@ impl ChannelChat {
         {
             *existing = message;
         } else {
+            if let Some(root_message_id) = message.reply_to_message_id {
+                self.apply_thread_reply_to_summary(root_message_id, &message);
+            }
             self.messages.push(message);
             self.messages
                 .sort_by_key(|message| (message.timestamp, message.id));
@@ -438,6 +456,37 @@ impl ChannelChat {
         }
 
         cx.notify();
+    }
+
+    fn set_thread_summaries(&mut self, summaries: Vec<ThreadSummary>) {
+        self.thread_summaries = summaries
+            .into_iter()
+            .map(|summary| (summary.root_message_id, summary))
+            .collect();
+    }
+
+    fn apply_thread_reply_to_summary(
+        &mut self,
+        root_message_id: u64,
+        reply: &proto::ChannelMessage,
+    ) {
+        let summary = self
+            .thread_summaries
+            .entry(root_message_id)
+            .or_insert_with(|| ThreadSummary {
+                root_message_id,
+                reply_count: 0,
+                latest_reply_at: reply.timestamp,
+                participant_user_ids: Vec::new(),
+                has_unread: false,
+            });
+        if summary.latest_reply_at < reply.timestamp {
+            summary.latest_reply_at = reply.timestamp;
+        }
+        if !summary.participant_user_ids.contains(&reply.sender_id) {
+            summary.participant_user_ids.push(reply.sender_id);
+        }
+        summary.reply_count = summary.reply_count.saturating_add(1);
     }
 
     fn send(&mut self, _: &Confirm, window: &mut Window, cx: &mut Context<Self>) {
@@ -763,7 +812,61 @@ impl ChannelChat {
                         })),
                 ),
             )
+            .child(self.render_thread_indicator(message.id, cx))
             .child(self.render_reactions(message, cx))
+            .into_any_element()
+    }
+
+    fn render_thread_indicator(&self, message_id: u64, cx: &mut Context<Self>) -> gpui::AnyElement {
+        let Some(summary) = self.thread_summaries.get(&message_id) else {
+            return div().into_any_element();
+        };
+        if summary.reply_count == 0 {
+            return div().into_any_element();
+        }
+
+        let reply_label = if summary.reply_count == 1 {
+            "1 reply".to_string()
+        } else {
+            format!("{} replies", summary.reply_count)
+        };
+        let participant_label = summary
+            .participant_user_ids
+            .iter()
+            .take(3)
+            .map(|user_id| self.user_display_name(*user_id, cx))
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        h_flex()
+            .id(("channel-thread-indicator", message_id))
+            .gap_2()
+            .items_center()
+            .child(
+                Button::new(
+                    format!("channel-thread-indicator-button-{message_id}"),
+                    reply_label,
+                )
+                .label_size(LabelSize::XSmall)
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    this.open_thread(message_id, window, cx);
+                })),
+            )
+            .when(!participant_label.is_empty(), |this| {
+                this.child(
+                    Label::new(participant_label)
+                        .size(LabelSize::XSmall)
+                        .color(Color::Muted),
+                )
+            })
+            .when(summary.has_unread, |this| {
+                this.child(
+                    div()
+                        .size(px(6.))
+                        .rounded_full()
+                        .bg(cx.theme().colors().text_accent),
+                )
+            })
             .into_any_element()
     }
 
