@@ -1948,6 +1948,37 @@ impl ChannelChat {
     }
 
     #[cfg(any(test, feature = "test-support"))]
+    pub fn open_thread_for_test(
+        &mut self,
+        root_message_id: u64,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.open_thread(root_message_id, window, cx);
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn thread_reply_bodies_for_test(&self) -> Vec<String> {
+        self.thread_panel
+            .as_ref()
+            .map(|thread_panel| {
+                thread_panel
+                    .replies
+                    .iter()
+                    .map(|reply| reply.body.clone())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn thread_reply_count_for_test(&self, root_message_id: u64) -> Option<u32> {
+        self.thread_summaries
+            .get(&root_message_id)
+            .map(|summary| summary.reply_count)
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
     pub fn set_draft_for_test(&mut self, text: &str, window: &mut Window, cx: &mut Context<Self>) {
         self.composer
             .update(cx, |composer, cx| composer.set_text(text, window, cx));

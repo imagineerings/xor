@@ -95,9 +95,9 @@ Add threaded replies to channel messages in Sim. This feature reuses the existin
   - [ ] 10.2 **Unit tests**: Validation that `reply_to_message_id` referencing a non-existent message returns an error.
   - [ ] 10.3 **Integration tests**: Full flow — send root message → send reply → call `GetThread` → verify reply is returned → verify `ThreadIndicator` shows correct count.
   - [ ] 10.4 **UI tests**: `ThreadPanel` rendering with varying reply counts, unread/read state transitions, compose input interaction and reply submission.
-  - [ ] 10.5 **Real-time tests**: Two simulated clients both viewing the same thread; client A sends a reply; verify client B's panel appends the reply.
+  - [x] 10.5 **Real-time tests**: Two simulated clients both viewing the same thread; client A sends a reply; verify client B's panel appends the reply.
   - [ ] 10.6 **Edge-case tests**: Root message deleted before thread opens, network failure retry exhaustion, deep thread pagination.
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
   - _writes: `collab/src/db/thread_store.rs`_ (tests), `collab_ui/src/channel_thread/thread_panel.rs` (tests), `collab_ui/src/channel_thread/thread_indicator.rs` (tests)
-  - _implemented initial client/server integration coverage in `crates/collab/tests/integration/channel_chat_tests.rs`; direct DB unit and UI tests remain_
-  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab test_channel_chat_thread_queries --features test-support --test collab_tests`; `git diff --check`_
+  - _implemented initial client/server integration coverage in `crates/collab/tests/integration/channel_chat_tests.rs`; realtime open-thread UI coverage in `crates/collab/tests/integration/channel_chat_ui_tests.rs`; direct DB unit and broader UI tests remain_
+  - _validated: `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support --test collab_tests channel_chat_thread`; `CARGO_INCREMENTAL=0 cargo test -p collab --features test-support --test collab_tests test_channel_chat_open_thread_appends_live_replies`; `git diff --check`_

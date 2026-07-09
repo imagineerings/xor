@@ -191,6 +191,82 @@ async fn test_channel_chat_markdown_preview_toolbar_and_sent_rendering(
 }
 
 #[gpui::test]
+async fn test_channel_chat_open_thread_appends_live_replies(
+    cx_a: &mut gpui::TestAppContext,
+    cx_b: &mut gpui::TestAppContext,
+) {
+    let (_server, client_a, client_b, channel_id) = TestServer::start2(cx_a, cx_b).await;
+    let (workspace, cx_a) = client_a.build_test_workspace(cx_a).await;
+
+    let root = client_b
+        .client()
+        .send_channel_message(SendChannelMessage {
+            channel_id: channel_id.0,
+            body: "root".to_string(),
+            nonce: 1,
+            mentions: Vec::new(),
+            reply_to_message_id: None,
+        })
+        .await
+        .unwrap();
+
+    let initial_reply = client_b
+        .client()
+        .send_channel_message(SendChannelMessage {
+            channel_id: channel_id.0,
+            body: "initial reply".to_string(),
+            nonce: 2,
+            mentions: Vec::new(),
+            reply_to_message_id: Some(root.id),
+        })
+        .await
+        .unwrap();
+
+    let chat = cx_a
+        .update(|window, cx| ChannelChat::open(channel_id, workspace.clone(), window, cx))
+        .await
+        .unwrap();
+    cx_a.run_until_parked();
+
+    assert_eq!(
+        chat.read_with(cx_a, |chat, _| chat.thread_reply_count_for_test(root.id)),
+        Some(1)
+    );
+
+    chat.update_in(cx_a, |chat, window, cx| {
+        chat.open_thread_for_test(root.id, window, cx);
+    });
+    cx_a.run_until_parked();
+
+    assert_eq!(
+        chat.read_with(cx_a, |chat, _| chat.thread_reply_bodies_for_test()),
+        vec![initial_reply.body.clone()]
+    );
+
+    let live_reply = client_b
+        .client()
+        .send_channel_message(SendChannelMessage {
+            channel_id: channel_id.0,
+            body: "live reply".to_string(),
+            nonce: 3,
+            mentions: Vec::new(),
+            reply_to_message_id: Some(root.id),
+        })
+        .await
+        .unwrap();
+    cx_a.run_until_parked();
+
+    assert_eq!(
+        chat.read_with(cx_a, |chat, _| chat.thread_reply_bodies_for_test()),
+        vec![initial_reply.body, live_reply.body]
+    );
+    assert_eq!(
+        chat.read_with(cx_a, |chat, _| chat.thread_reply_count_for_test(root.id)),
+        Some(2)
+    );
+}
+
+#[gpui::test]
 async fn test_channel_chat_view_updates_live_reactions(
     cx_a: &mut gpui::TestAppContext,
     cx_b: &mut gpui::TestAppContext,
