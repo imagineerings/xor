@@ -197,18 +197,20 @@ Add a channel bookmarks feature: a dedicated section in the channel header where
     - _writes: collab_ui/src/channel_bookmark_bar.rs_
 
 - [ ] 13. Implement channel system messages for bookmark changes
-  - [ ] 13.1 Post an informational channel message when a bookmark is created (e.g., "Alice pinned a link: Deploy Guide").
+  - [x] 13.1 Post an informational channel message when a bookmark is created (e.g., "Alice pinned a link: Deploy Guide").
     - _Requirements: 6.4 (AC 1)_
     - _writes: collab/src/rpc/bookmark_rpc.rs_
-  - [ ] 13.2 Post an informational channel message when a bookmark is deleted.
+  - [x] 13.2 Post an informational channel message when a bookmark is deleted.
     - _Requirements: 6.4 (AC 2)_
     - _writes: collab/src/rpc/bookmark_rpc.rs_
-  - [ ] 13.3 Post an informational channel message when a bookmark is updated (label changed).
+  - [x] 13.3 Post an informational channel message when a bookmark is updated (label changed).
     - _Requirements: 6.4 (AC 3)_
     - _writes: collab/src/rpc/bookmark_rpc.rs_
   - [ ] 13.4 Style informational bookmark messages distinctly from regular messages (e.g., italic, muted color, no avatar).
     - _Requirements: 6.4 (AC 4)_
     - _writes: collab_ui/src/channel_message.rs_
+  - _Partial: Bookmark create, update, and delete operations now post channel messages and broadcast them to channel participants. The messages currently use the existing channel message model/presentation, so distinct visual styling remains open in 13.4._
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab --features collab/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab test_channel_bookmark_rpc_flow_and_permissions --features collab/test-support -- --nocapture`._
 
 - [x] 14. Load bookmarks on channel open
   - [x] 14.1 When a channel is opened, fetch existing bookmarks via `GetBookmarks` (or via the initial channel state payload).

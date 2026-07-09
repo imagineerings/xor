@@ -3830,7 +3830,7 @@ async fn add_bookmark(
     let bookmark_type = proto::BookmarkType::from_i32(request.r#type)
         .context("invalid bookmark type")?;
     let store = BookmarkStore::new(session.app_state.db.clone());
-    store
+    let bookmark = store
         .create(NewBookmark {
             channel_id,
             label: request.label,
@@ -3844,6 +3844,16 @@ async fn add_bookmark(
         .await?;
 
     let bookmarks = store.get_bookmarks(channel_id).await?;
+    post_bookmark_system_message(
+        &session,
+        channel_id,
+        format!(
+            "Pinned a {} bookmark: {}",
+            bookmark_type_label(bookmark.bookmark_type),
+            bookmark.label
+        ),
+    )
+    .await?;
     response.send(proto::Ack {})?;
     broadcast_channel_bookmarks_update(&session, channel_id, bookmarks, Vec::new()).await
 }
@@ -3857,9 +3867,26 @@ async fn remove_bookmark(
     let bookmark_id = db::BookmarkId::from_proto(request.bookmark_id);
     ensure_can_edit_bookmarks(&session, channel_id).await?;
     let store = BookmarkStore::new(session.app_state.db.clone());
-    store.delete(channel_id, bookmark_id).await?;
+    let bookmark_label = store
+        .get_bookmarks(channel_id)
+        .await?
+        .into_iter()
+        .find(|bookmark| bookmark.id == bookmark_id)
+        .map(|bookmark| bookmark.label);
+    let deleted = store.delete(channel_id, bookmark_id).await?;
 
     let bookmarks = store.get_bookmarks(channel_id).await?;
+    if deleted {
+        post_bookmark_system_message(
+            &session,
+            channel_id,
+            format!(
+                "Removed bookmark: {}",
+                bookmark_label.unwrap_or_else(|| "Untitled bookmark".to_string())
+            ),
+        )
+        .await?;
+    }
     response.send(proto::Ack {})?;
     broadcast_channel_bookmarks_update(
         &session,
@@ -3878,7 +3905,7 @@ async fn update_bookmark(
     let channel_id = ChannelId::from_proto(request.channel_id);
     ensure_can_edit_bookmarks(&session, channel_id).await?;
     let store = BookmarkStore::new(session.app_state.db.clone());
-    store
+    let bookmark = store
         .update(BookmarkUpdate {
             channel_id,
             bookmark_id: db::BookmarkId::from_proto(request.bookmark_id),
@@ -3888,6 +3915,12 @@ async fn update_bookmark(
         .await?;
 
     let bookmarks = store.get_bookmarks(channel_id).await?;
+    post_bookmark_system_message(
+        &session,
+        channel_id,
+        format!("Updated bookmark: {}", bookmark.label),
+    )
+    .await?;
     response.send(proto::Ack {})?;
     broadcast_channel_bookmarks_update(&session, channel_id, bookmarks, Vec::new()).await
 }
@@ -3914,6 +3947,36 @@ async fn reorder_bookmarks(
     response.send(proto::Ack {})?;
     schedule_channel_bookmarks_reorder_broadcast(&session, channel_id);
     Ok(())
+}
+
+async fn post_bookmark_system_message(
+    session: &MessageContext,
+    channel_id: ChannelId,
+    body: String,
+) -> Result<()> {
+    let nonce = rand::rng().random::<u128>().into();
+    let message = session
+        .db()
+        .await
+        .create_channel_message(NewChannelMessage {
+            channel_id,
+            sender_id: session.user_id(),
+            body,
+            nonce,
+            mentions: Vec::new(),
+            reply_to_message_id: None,
+            scheduled_at: None,
+        })
+        .await?;
+    broadcast_channel_message_sent(session, channel_id, message).await
+}
+
+fn bookmark_type_label(bookmark_type: proto::BookmarkType) -> &'static str {
+    match bookmark_type {
+        proto::BookmarkType::BookmarkLink => "link",
+        proto::BookmarkType::BookmarkFile => "file",
+        proto::BookmarkType::BookmarkMessage => "message",
+    }
 }
 
 async fn ensure_can_edit_bookmarks(

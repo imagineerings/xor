@@ -28,6 +28,9 @@ struct ScheduledMessageHandlerEntity;
 #[derive(Default)]
 struct BookmarkHandlerEntity;
 
+#[derive(Default)]
+struct ChannelMessageHandlerEntity;
+
 #[gpui::test]
 async fn test_channel_chat_core_flow(
     executor: BackgroundExecutor,
@@ -159,6 +162,15 @@ async fn test_channel_bookmark_rpc_flow_and_permissions(
             async { Ok(()) }
         },
     );
+    let message_handler_entity = cx_b.new(|_| ChannelMessageHandlerEntity);
+    let (message_tx, message_rx) = async_channel::bounded(8);
+    let _message_subscription = client_b.add_channel_message_sent_handler(
+        message_handler_entity.downgrade(),
+        move |_, message, _| {
+            message_tx.try_send(message.payload).unwrap();
+            async { Ok(()) }
+        },
+    );
 
     client_a
         .client()
@@ -179,6 +191,12 @@ async fn test_channel_bookmark_rpc_flow_and_permissions(
     assert_eq!(update.bookmarks[0].label, "Deploy Guide");
     assert_eq!(update.removed_bookmark_ids, Vec::<u64>::new());
     let bookmark_id = update.bookmarks[0].id;
+    let message = message_rx.recv().await.unwrap();
+    assert_eq!(message.channel_id, channel_id.0);
+    assert_eq!(
+        message.message.as_ref().unwrap().body,
+        "Pinned a link bookmark: Deploy Guide"
+    );
 
     client_b
         .client()
@@ -192,6 +210,11 @@ async fn test_channel_bookmark_rpc_flow_and_permissions(
         .unwrap();
     let update = bookmark_rx.recv().await.unwrap();
     assert_eq!(update.bookmarks[0].label, "Deploy Guide v2");
+    let message = message_rx.recv().await.unwrap();
+    assert_eq!(
+        message.message.as_ref().unwrap().body,
+        "Updated bookmark: Deploy Guide v2"
+    );
 
     client_a
         .client()
@@ -208,6 +231,11 @@ async fn test_channel_bookmark_rpc_flow_and_permissions(
         .unwrap();
     let update = bookmark_rx.recv().await.unwrap();
     assert_eq!(update.bookmarks.len(), 2);
+    let message = message_rx.recv().await.unwrap();
+    assert_eq!(
+        message.message.as_ref().unwrap().body,
+        "Pinned a link bookmark: Runbook"
+    );
     let second_bookmark_id = update
         .bookmarks
         .iter()
@@ -287,6 +315,11 @@ async fn test_channel_bookmark_rpc_flow_and_permissions(
     let update = bookmark_rx.recv().await.unwrap();
     assert_eq!(update.bookmarks.len(), 1);
     assert_eq!(update.removed_bookmark_ids, vec![bookmark_id]);
+    let message = message_rx.recv().await.unwrap();
+    assert_eq!(
+        message.message.as_ref().unwrap().body,
+        "Removed bookmark: Deploy Guide v2"
+    );
 }
 
 #[gpui::test]
