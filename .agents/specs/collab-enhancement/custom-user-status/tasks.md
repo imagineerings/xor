@@ -91,11 +91,13 @@ This plan implements custom user status — emoji + short text labels with optio
   - _Completed: Registered single and batch status push handlers that update contact state and notify observers._
   - _Validation: `cargo check -p client`._
 
-- [ ] 9. Build `StatusDisplay` reusable widget
+- [x] 9. Build `StatusDisplay` reusable widget
   - Create `StatusDisplay` struct with `status: Option<CustomStatus>` in `crates/collab_ui/src/`
   - Implement `RenderOnce` — when `status` is `Some`, renders `{emoji} {text}` in muted/secondary color; when `None`, renders nothing
   - _Requirements: 8.3 (AC 1, AC 2)_
   - _writes: crates/collab_ui/src/status_display.rs_
+  - _Completed: Added a reusable muted status element that renders the optional emoji and text, or nothing when a user has no custom status._
+  - _Validation: `cargo check -p collab_ui`._
 
 - [ ] 10. Build `UserStatusModal` component
   - [ ] 10.1 Define supporting types: `ClearAfterOption` enum (Never, ThirtyMinutes, OneHour, FourHours, Today, ThisWeek) and `StatusPreset` struct (emoji, label, text)
