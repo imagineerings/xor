@@ -77,7 +77,7 @@ The work is organized into 15 incremental tasks, each producing a buildable arti
   - _Requirements: 9.2, P5.3_
   - _edits: crates/collab/src/rpc.rs_
 
-- [ ] 8. Create the client-side GroupStore entity
+- [x] 8. Create the client-side GroupStore entity
   - Create `crates/client/src/groups.rs` with `GroupStore` struct containing `groups: HashMap<u64, Arc<Group>>`, `by_name: HashMap<SharedString, Arc<Group>>`, `user_groups` index, and subscriptions.
   - Create `Group` struct with `id`, `name`, `display_name`, `admin_id`, `member_ids`.
   - Implement `GroupStore::new` — initializes empty, fetches groups via `GetGroups` RPC on first connection.
@@ -90,6 +90,7 @@ The work is organized into 15 incremental tasks, each producing a buildable arti
   - _Requirements: 9.2, P5.10_
   - _writes: crates/client/src/groups.rs_
   - _edits: crates/client/src/lib.rs_
+  - _Completed: Added an entity-backed group cache with initial fetch, live update handling, prefix search, and membership indexes._
 
 - [ ] 9. Integrate groups into @-autocomplete
   - In `crates/collab_ui/src/composer.rs`, extend the autocomplete query to also call `GroupStore::search_groups`.

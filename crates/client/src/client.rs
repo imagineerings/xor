@@ -4,6 +4,7 @@ pub mod test;
 pub mod bookmark;
 pub mod channel_chat;
 pub mod file_upload;
+pub mod groups;
 pub mod message_priority;
 mod llm_token;
 mod proxy;
