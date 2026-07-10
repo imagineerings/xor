@@ -91,11 +91,19 @@ impl PartialEq for User {
 
 impl Eq for User {}
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Contact {
     pub user: Arc<User>,
     pub online: bool,
     pub busy: bool,
+    pub custom_status: Option<CustomStatus>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CustomStatus {
+    pub emoji: Option<SharedString>,
+    pub text: SharedString,
+    pub expires_at: Option<i64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -179,6 +187,8 @@ impl UserStore {
         let rpc_subscriptions = vec![
             client.add_message_handler(cx.weak_entity(), Self::handle_update_contacts),
             client.add_message_handler(cx.weak_entity(), Self::handle_show_contacts),
+            client.add_message_handler(cx.weak_entity(), Self::handle_update_user_status),
+            client.add_message_handler(cx.weak_entity(), Self::handle_update_user_statuses),
         ];
 
         client.sign_out_tx.lock().replace(sign_out_tx);
@@ -342,6 +352,30 @@ impl UserStore {
         Ok(())
     }
 
+    async fn handle_update_user_status(
+        this: Entity<Self>,
+        message: TypedEnvelope<proto::UpdateUserStatus>,
+        mut cx: AsyncApp,
+    ) -> Result<()> {
+        this.update(&mut cx, |this, cx| {
+            this.update_user_status(message.payload.user_id, message.payload.status, cx);
+        });
+        Ok(())
+    }
+
+    async fn handle_update_user_statuses(
+        this: Entity<Self>,
+        message: TypedEnvelope<proto::UpdateUserStatuses>,
+        mut cx: AsyncApp,
+    ) -> Result<()> {
+        this.update(&mut cx, |this, cx| {
+            for update in message.payload.statuses {
+                this.update_user_status(update.user_id, update.status, cx);
+            }
+        });
+        Ok(())
+    }
+
     fn update_contacts(&mut self, message: UpdateContacts, cx: &Context<Self>) -> Task<Result<()>> {
         match message {
             UpdateContacts::Wait(barrier) => {
@@ -464,6 +498,59 @@ impl UserStore {
 
     pub fn contacts(&self) -> &[Arc<Contact>] {
         &self.contacts
+    }
+
+    pub fn update_user_status(
+        &mut self,
+        user_id: u64,
+        status: Option<proto::UserCustomStatus>,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(contact) = self
+            .contacts
+            .iter_mut()
+            .find(|contact| contact.user.legacy_id == user_id)
+        else {
+            return;
+        };
+        Arc::make_mut(contact).custom_status = status.map(|status| CustomStatus {
+            emoji: status.emoji.map(Into::into),
+            text: status.text.into(),
+            expires_at: status.expires_at.map(|expires_at| expires_at as i64),
+        });
+        cx.notify();
+    }
+
+    pub fn set_status(
+        &self,
+        emoji: Option<SharedString>,
+        text: SharedString,
+        clear_after_minutes: Option<u32>,
+        cx: &Context<Self>,
+    ) -> Task<Result<()>> {
+        let client = self.client.upgrade();
+        cx.spawn(async move |_, _| {
+            client
+                .context("can't upgrade client reference")?
+                .request(proto::SetStatus {
+                    emoji: emoji.map(Into::into),
+                    text: text.to_string(),
+                    clear_after_minutes,
+                })
+                .await?;
+            Ok(())
+        })
+    }
+
+    pub fn clear_status(&self, cx: &Context<Self>) -> Task<Result<()>> {
+        let client = self.client.upgrade();
+        cx.spawn(async move |_, _| {
+            client
+                .context("can't upgrade client reference")?
+                .request(proto::ClearStatus {})
+                .await?;
+            Ok(())
+        })
     }
 
     pub fn has_contact(&self, user: &Arc<User>) -> bool {
@@ -1047,6 +1134,7 @@ impl Contact {
             user,
             online: contact.online,
             busy: contact.busy,
+            custom_status: None,
         })
     }
 }

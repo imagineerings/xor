@@ -62,28 +62,34 @@ This plan implements custom user status — emoji + short text labels with optio
   - _Completed: Added a transactional UserStatusStore with portable upsert, idempotent clear, and expired-status deletion APIs, plus SeaORM table metadata and cross-database lifecycle tests._
   - _Validation: `cargo check -p collab --features collab/test-support`. The focused integration test command could not complete because the full harness exhausted local build disk._
 
-- [ ] 6. Extend client `Contact` struct and add `CustomStatus` model
-  - [ ] 6.1 Define `CustomStatus` struct in `crates/client/src/user.rs` with `emoji: Option<SharedString>`, `text: SharedString`, `expires_at: Option<i64>`
+- [x] 6. Extend client `Contact` struct and add `CustomStatus` model
+  - [x] 6.1 Define `CustomStatus` struct in `crates/client/src/user.rs` with `emoji: Option<SharedString>`, `text: SharedString`, `expires_at: Option<i64>`
     - _writes: crates/client/src/user.rs_
-  - [ ] 6.2 Add `custom_status: Option<CustomStatus>` field to the `Contact` struct
+  - [x] 6.2 Add `custom_status: Option<CustomStatus>` field to the `Contact` struct
     - Update all construction sites and pattern matches for `Contact`
     - _Requirements: 8.3 (AC 1)_
     - _writes: crates/client/src/user.rs_
+  - _Completed: Added an optional, cloneable custom-status model to contact state._
+  - _Validation: `cargo check -p client`._
 
-- [ ] 7. Add `UserStore` methods for status management
-  - [ ] 7.1 Implement `update_user_status(&mut self, user_id, status)` on `UserStore` — finds the contact by user_id and sets/clears `custom_status`
+- [x] 7. Add `UserStore` methods for status management
+  - [x] 7.1 Implement `update_user_status(&mut self, user_id, status)` on `UserStore` — finds the contact by user_id and sets/clears `custom_status`
     - _writes: crates/client/src/user.rs_
-  - [ ] 7.2 Implement `set_status(&mut self, emoji, text, clear_after_minutes, cx) -> Task<Result<()>>` — sends `SetStatus` RPC and returns the response
+  - [x] 7.2 Implement `set_status(&mut self, emoji, text, clear_after_minutes, cx) -> Task<Result<()>>` — sends `SetStatus` RPC and returns the response
     - _writes: crates/client/src/user.rs_
-  - [ ] 7.3 Implement `clear_status(&mut self, cx) -> Task<Result<()>>` — sends `ClearStatus` RPC
+  - [x] 7.3 Implement `clear_status(&mut self, cx) -> Task<Result<()>>` — sends `ClearStatus` RPC
     - _writes: crates/client/src/user.rs_
+  - _Completed: Added contact updates plus typed set/clear RPC helpers on UserStore._
+  - _Validation: `cargo check -p client`._
 
-- [ ] 8. Register client message handlers for status pushes
+- [x] 8. Register client message handlers for status pushes
   - In `UserStore::handle_message_to_client` (or equivalent), add handlers for:
     - `UpdateUserStatus` → calls `self.update_user_status(update.user_id, update.status)`
     - `UpdateUserStatuses` → iterates and calls `update_user_status` for each entry
   - _Requirements: 8.3 (AC 3)_
   - _writes: crates/client/src/user.rs_
+  - _Completed: Registered single and batch status push handlers that update contact state and notify observers._
+  - _Validation: `cargo check -p client`._
 
 - [ ] 9. Build `StatusDisplay` reusable widget
   - Create `StatusDisplay` struct with `status: Option<CustomStatus>` in `crates/collab_ui/src/`
