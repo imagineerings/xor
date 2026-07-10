@@ -126,6 +126,62 @@ Print Sim's version and exit:
 sim --version
 ```
 
+### `--completions <SHELL>`
+
+Generate shell completions for the `sim` CLI:
+
+#### Bash
+
+Add to `~/.bashrc`:
+
+```bash
+eval "$(sim --completions bash)"
+```
+
+#### Elvish
+
+Add to `~/.config/elvish/rc.elv`:
+
+```elvish
+set edit:completion:arg-completer[sim] = { |@args|
+    eval (sim --completions elvish | slurp)
+    $edit:completion:arg-completer[sim] $@args
+}
+```
+
+#### Fish
+
+Add to `~/.config/fish/config.fish`:
+
+```fish
+sim --completions fish | source
+```
+
+#### Nushell
+
+Add to `~/.config/nushell/config.nu`:
+
+```nu
+mkdir ($nu.data-dir | path join "vendor/autoload")
+^sim --completions nushell | save --force ($nu.data-dir | path join "vendor/autoload/sim.nu")
+```
+
+#### PowerShell
+
+Add to `$PROFILE`:
+
+```powershell
+(&sim --completions powershell) | Out-String | Invoke-Expression
+```
+
+#### Zsh
+
+Add to `~/.zshrc`:
+
+```zsh
+eval "$(sim --completions zsh)"
+```
+
 ### `--uninstall`
 
 Uninstall Sim and remove all related files (macOS and Linux only):
