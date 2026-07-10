@@ -4,6 +4,7 @@ pub mod db;
 pub mod entities;
 pub mod env;
 pub mod executor;
+pub mod jobs;
 pub mod rpc;
 pub mod services;
 

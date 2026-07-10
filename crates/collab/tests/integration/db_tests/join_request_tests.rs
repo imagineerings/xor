@@ -1,6 +1,10 @@
 use super::new_test_user;
 use crate::test_both_dbs;
-use collab::db::{ChannelId, ChannelRole, Database, UserId, join_request_store::JoinRequestStore};
+use collab::{
+    db::{ChannelId, ChannelRole, Database, UserId, join_request_store::JoinRequestStore},
+    jobs::expire_join_requests_with_ttl,
+};
+use rpc::Notification;
 use std::sync::Arc;
 use time::{Duration, OffsetDateTime, PrimitiveDateTime};
 
@@ -100,6 +104,36 @@ async fn test_join_request_store_expires_requests(db: &Arc<Database>) {
     assert_eq!(expired[0].channel_name, "join-requests");
     assert_eq!(expired[0].user_id, requester_id);
     assert_eq!(store.count_pending_requests(channel_id).await.unwrap(), 0);
+}
+
+test_both_dbs!(
+    test_expire_join_requests_creates_notification,
+    test_expire_join_requests_creates_notification_postgres,
+    test_expire_join_requests_creates_notification_sqlite
+);
+
+async fn test_expire_join_requests_creates_notification(db: &Arc<Database>) {
+    let (store, _, requester_id, channel_id) = setup(db).await;
+    store
+        .request_join(channel_id, requester_id, Some("Please add me".to_string()))
+        .await
+        .unwrap();
+
+    expire_join_requests_with_ttl(db.clone(), Duration::ZERO)
+        .await
+        .unwrap();
+
+    assert_eq!(store.count_pending_requests(channel_id).await.unwrap(), 0);
+    let notifications = db.get_notifications(requester_id, 10, None).await.unwrap();
+    assert_eq!(notifications.len(), 1);
+    assert_eq!(
+        Notification::from_proto(&notifications[0]),
+        Some(Notification::JoinRequestDenied {
+            channel_id: channel_id.to_proto(),
+            channel_name: "join-requests".to_string(),
+            reason: Some("Your join request has expired.".to_string()),
+        })
+    );
 }
 
 async fn setup(db: &Arc<Database>) -> (JoinRequestStore, UserId, UserId, ChannelId) {

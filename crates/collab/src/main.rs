@@ -10,7 +10,7 @@ use axum::{
 use collab::api::CloudflareIpCountryHeader;
 use collab::{
     AppState, Config, Result, api::fetch_extensions_from_blob_store_periodically, db, env,
-    executor::Executor,
+    executor::Executor, jobs::expire_join_requests_periodically,
 };
 use collab::{REVISION, ServiceMode, VERSION};
 use db::Database;
@@ -91,6 +91,7 @@ async fn main() -> Result<()> {
                         .await?;
                     let rpc_server = collab::rpc::Server::new(epoch, state.clone());
                     rpc_server.start().await?;
+                    expire_join_requests_periodically(state.clone());
 
                     app = app.merge(collab::rpc::routes(rpc_server.clone()));
 

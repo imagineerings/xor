@@ -84,11 +84,13 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _Completed: Registered an admin-only pending-request endpoint that returns ordered requester IDs, optional reasons, and request timestamps from `JoinRequestStore`._
   - _Validation: `cargo check -p collab --features collab/test-support`._
 
-- [ ] 8. Implement background expiry job
+- [x] 8. Implement background expiry job
   - Add `expire_join_requests` async function that reads `CHANNEL_JOIN_REQUEST_TTL_SECS` env var (default 7 days), calls `expire_old_requests`, and creates `Notification::JoinRequestDenied` with reason "Your join request has expired." for each expired request.
   - Register the job in the server startup/periodic task scheduler, running every hour.
   - _Requirements: 10.4 (AC 3)_
-  - _writes: crates/collab/src/jobs/expire_join_requests.rs_
+  - _writes: crates/collab/src/jobs.rs_
+  - _Completed: Added an hourly collab-server job that reads `CHANNEL_JOIN_REQUEST_TTL_SECS` (defaulting to seven days), deletes stale requests, and persists an expiry-denial notification for each requester._
+  - _Validation: `cargo check -p collab --features collab/test-support`; `target/debug/deps/collab_tests-9512c50120ff4d19 db_tests::join_request_tests::test_expire_join_requests_creates_notification_sqlite --exact --nocapture`._
 
 - [ ] 9. Extend `UpdateChannels` handling on server
   - After any insert/delete in `channel_join_requests`, compute `PendingRequestCount` per channel and include in `UpdateChannels` broadcast to affected admins.
