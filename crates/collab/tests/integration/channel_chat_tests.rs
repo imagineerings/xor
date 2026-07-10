@@ -285,6 +285,79 @@ async fn test_channel_file_upload_lifecycle_rpc(
 }
 
 #[gpui::test]
+async fn test_custom_status_rpc_validation_and_clear_idempotency(
+    executor: BackgroundExecutor,
+    cx_a: &mut TestAppContext,
+    cx_b: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor).await;
+    let client_a = server.create_client(cx_a, "user_a").await;
+    let _client_b = server.create_client(cx_b, "user_b").await;
+
+    let too_long = client_a
+        .client()
+        .request(proto::SetStatus {
+            emoji: None,
+            text: "a".repeat(101),
+            clear_after_minutes: None,
+        })
+        .await
+        .unwrap_err();
+    assert!(too_long.to_string().contains("between 1 and 100"));
+
+    let invalid_emoji = client_a
+        .client()
+        .request(proto::SetStatus {
+            emoji: Some("not-an-emoji".to_string()),
+            text: "Available".to_string(),
+            clear_after_minutes: None,
+        })
+        .await
+        .unwrap_err();
+    assert!(
+        invalid_emoji
+            .to_string()
+            .contains("emoji is not recognized")
+    );
+
+    let invalid_duration = client_a
+        .client()
+        .request(proto::SetStatus {
+            emoji: Some("📅".to_string()),
+            text: "In a meeting".to_string(),
+            clear_after_minutes: Some(31),
+        })
+        .await
+        .unwrap_err();
+    assert!(
+        invalid_duration
+            .to_string()
+            .contains("unsupported status clear-after duration")
+    );
+
+    client_a
+        .client()
+        .request(proto::SetStatus {
+            emoji: Some("📅".to_string()),
+            text: "  In a meeting  ".to_string(),
+            clear_after_minutes: Some(30),
+        })
+        .await
+        .unwrap();
+
+    client_a
+        .client()
+        .request(proto::ClearStatus {})
+        .await
+        .unwrap();
+    client_a
+        .client()
+        .request(proto::ClearStatus {})
+        .await
+        .unwrap();
+}
+
+#[gpui::test]
 async fn test_channel_bookmark_rpc_flow_and_permissions(
     executor: BackgroundExecutor,
     cx_a: &mut TestAppContext,

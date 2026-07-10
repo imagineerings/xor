@@ -139,10 +139,14 @@ This plan implements custom user status — emoji + short text labels with optio
     - _writes: crates/collab_ui/src/_
 
 - [ ] 12. Write server unit tests
-  - [ ] 12.1 `test_set_status_validation` - rejects text > 100 chars, accepts valid input
+  - [x] 12.1 `test_set_status_validation` - rejects text > 100 chars, accepts valid input
     - _writes: crates/collab/src/rpc.rs_ (tests module)
-  - [ ] 12.2 `test_clear_status_idempotent` - clearing a non-existent status returns success
+    - _Completed: Added an integration-level RPC validation test covering the 100-character text boundary, invalid emoji rejection, unsupported clear-after duration rejection, and a valid status write.
+    - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests test_custom_status_rpc_validation_and_clear_idempotency --features test-support`._
+  - [x] 12.2 `test_clear_status_idempotent` - clearing a non-existent status returns success
     - _writes: crates/collab/src/rpc.rs_ (tests module)
+    - _Completed: Extended the same status RPC test to clear a saved status and repeat the clear request successfully.
+    - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests test_custom_status_rpc_validation_and_clear_idempotency --features test-support`._
   - [ ] 12.3 `test_expiry_sweeper` - expired rows are deleted and broadcasts sent
     - _writes: crates/collab/src/status_expiry_sweeper.rs_ (or separate test file)
   - [ ] 12.4 `test_expiry_sweeper_no_expired` - sweep with no expired rows produces no broadcasts
