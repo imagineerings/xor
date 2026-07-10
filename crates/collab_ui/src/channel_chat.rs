@@ -120,6 +120,15 @@ fn channel_chat_key_bindings() -> [KeyBinding; 10] {
     ]
 }
 
+fn open_bookmarked_file(client: Arc<Client>, file_id: String, cx: &mut App) {
+    cx.spawn(async move |cx| {
+        let url = client.get_file_download_url(file_id).await?;
+        cx.update(|cx| cx.open_url(&url));
+        anyhow::Ok(())
+    })
+    .detach_and_log_err(cx);
+}
+
 pub struct ChannelChat {
     channel_id: ChannelId,
     client: Arc<Client>,
@@ -3975,6 +3984,12 @@ impl ChannelChat {
                                             this.highlight_message_bookmark(message_id, cx);
                                         })
                                         .log_err();
+                                }
+                            })
+                            .on_open_file({
+                                let client = self.client.clone();
+                                move |file_id, _, cx| {
+                                    open_bookmarked_file(client.clone(), file_id, cx);
                                 }
                             }),
                     )

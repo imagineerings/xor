@@ -729,6 +729,7 @@ mod tests {
             image_height: None,
             duration_ms: None,
             thumbnail_url: None,
+            download_count: 0,
         }
     }
 }

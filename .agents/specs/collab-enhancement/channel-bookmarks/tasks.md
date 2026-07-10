@@ -132,7 +132,7 @@ Add a channel bookmarks feature: a dedicated section in the channel header where
   - [x] 9.3 Show bookmark count header with "Show all" expand/collapse toggle when >5 bookmarks.
     - _Requirements: 6.2 (AC 4)_
     - _writes: collab_ui/src/channel_bookmark_bar.rs_
-  - [ ] 9.4 Handle click on link-type bookmarks — open URL in default browser. Handle file/message types — open in-app.
+  - [x] 9.4 Handle click on link-type bookmarks — open URL in default browser. Handle file/message types — open in-app.
     - _Requirements: 6.2 (AC 3)_
     - _writes: collab_ui/src/channel_bookmark_bar.rs_
   - [x] 9.5 Wire `BookmarkBar` into the channel view, observe `ChannelBookmarkStore` for updates.
@@ -145,7 +145,7 @@ Add a channel bookmarks feature: a dedicated section in the channel header where
   - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_bar --features collab_ui/test-support`._
   - _Partial: Added pure coverage for 0, 3, and 8 bookmark visible/hidden counts plus link/file/message click action selection. Message bookmarks now highlight loaded messages in the channel chat; file bookmark opening remains open until the file-sharing target surface exists._
   - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui channel_bookmark_bar --features collab_ui/test-support`._
-  - _Completed: The bookmark bar coverage exercises empty, small, collapsed, and expanded counts plus link/file/message click action routing._
+  - _Completed: The bookmark bar coverage exercises empty, small, collapsed, and expanded counts plus link/file/message click action routing. Link and file bookmarks open their URL or signed file-download URL through the platform handler; message bookmarks highlight the loaded channel message._
 
 - [x] 10. Implement `BookmarkForm` modal
   - [x] 10.1 Build create-mode form with fields: label (required), URL, type selector (Link/File/Message), description (optional).

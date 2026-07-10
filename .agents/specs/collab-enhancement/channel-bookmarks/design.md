@@ -132,7 +132,7 @@ impl BookmarkBar {
 }
 ```
 
-**Integration**: The `BookmarkBar` renders at the top of the channel view, between the channel header and the message list. It is an `Entity<T>` observed by the `ChannelStore`.
+**Integration**: The `BookmarkBar` renders at the top of the channel view, between the channel header and the message list. It is observed through `ChannelBookmarkStore`. Link bookmarks open their URL through the platform handler; file bookmarks request a signed download URL and open it through the same handler; message bookmarks highlight the matching loaded message. <!-- impl: crates/collab_ui/src/channel_chat.rs#render_bookmark_bar -->
 
 ### 3.3 BookmarkForm (Client)
 
