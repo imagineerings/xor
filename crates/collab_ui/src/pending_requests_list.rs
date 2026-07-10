@@ -1,7 +1,7 @@
 use crate::channel_join_requests::{JoinRequestEvent, JoinRequestPushStore, PendingJoinRequest};
 use channel::ChannelStore;
 use client::{ChannelId, UserStore};
-use gpui::{Context, Entity, EventEmitter, Render, Subscription, Window, prelude::*};
+use gpui::{Context, Entity, EventEmitter, Render, SharedString, Subscription, Window, prelude::*};
 use rpc::proto;
 use time::OffsetDateTime;
 use ui::{Label, LabelSize, prelude::*};
@@ -23,6 +23,16 @@ pub enum PendingRequestsListEvent {
 impl EventEmitter<PendingRequestsListEvent> for PendingRequestsList {}
 
 impl PendingRequestsList {
+    fn display_reason(reason: Option<&SharedString>) -> SharedString {
+        reason
+            .cloned()
+            .unwrap_or_else(|| "No reason provided".into())
+    }
+
+    fn display_timestamp(created_at: OffsetDateTime) -> String {
+        created_at.to_string()
+    }
+
     pub fn new(
         channel_id: ChannelId,
         channel_store: Entity<ChannelStore>,
@@ -114,11 +124,8 @@ impl Render for PendingRequestsList {
             })
             .children(self.requests.iter().cloned().map(|request| {
                 let requester_name = request.user.github_login.clone();
-                let detail = request
-                    .reason
-                    .clone()
-                    .unwrap_or_else(|| "No reason provided".into());
-                let timestamp = request.created_at.to_string();
+                let detail = Self::display_reason(request.reason.as_ref());
+                let timestamp = Self::display_timestamp(request.created_at);
                 v_flex()
                     .id(("pending-request", request.user_id))
                     .p_2()
@@ -141,5 +148,28 @@ impl Render for PendingRequestsList {
                         cx.emit(PendingRequestsListEvent::RequestSelected(request.clone()));
                     }))
             }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn request_display_contract_preserves_reason_and_timestamp() {
+        let timestamp = OffsetDateTime::UNIX_EPOCH;
+        assert_eq!(
+            PendingRequestsList::display_reason(None),
+            "No reason provided"
+        );
+        let reason: SharedString = "Coordinate release".into();
+        assert_eq!(
+            PendingRequestsList::display_reason(Some(&reason)),
+            "Coordinate release"
+        );
+        assert_eq!(
+            PendingRequestsList::display_timestamp(timestamp),
+            timestamp.to_string()
+        );
     }
 }

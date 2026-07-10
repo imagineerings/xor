@@ -153,8 +153,10 @@ This plan implements custom user status — emoji + short text labels with optio
   - [ ] 12.4 `test_expiry_sweeper_no_expired` - sweep with no expired rows produces no broadcasts
     - _writes: crates/collab/src/status_expiry_sweeper.rs_
     - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests custom_status_expiry_sweeper_ignores_active_statuses --features test-support` verifies no expired rows are returned; peer broadcast assertion remains open._
-  - [ ] 12.5 `test_set_status_persistence` - verifies upsert creates/updates row correctly
+  - [x] 12.5 `test_set_status_persistence` - verifies upsert creates/updates row correctly
     - _writes: crates/collab/src/db/_ (tests module)
+    - _Completed: Existing SQLite/Postgres lifecycle coverage verifies create, update, expiry, and idempotent delete behavior._
+    - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests test_user_status_store_lifecycle_sqlite --features test-support`._
 
 - [ ] 13. Write client unit tests
   - [x] 13.1 `test_contact_custom_status_field` - `update_user_status` correctly sets/clears `Contact.custom_status`
