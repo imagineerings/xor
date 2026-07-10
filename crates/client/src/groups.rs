@@ -117,13 +117,10 @@ impl GroupStore {
     pub fn new(client: Arc<Client>, cx: &mut Context<Self>) -> Self {
         let subscriptions =
             vec![client.add_message_handler(cx.weak_entity(), Self::handle_update_groups)];
-        let load_groups = cx.spawn({
-            let client = client.clone();
-            async move |this, cx| {
-                let groups = client.request(proto::GetGroups {}).await?.groups;
-                this.update(cx, |this, cx| this.replace_groups(groups, cx))?;
-                Ok(())
-            }
+        let load_groups = cx.spawn(async move |this, cx| {
+            let groups = client.request(proto::GetGroups {}).await?.groups;
+            this.update(cx, |this, cx| this.replace_groups(groups, cx))?;
+            Ok(())
         });
         Self {
             groups: HashMap::default(),

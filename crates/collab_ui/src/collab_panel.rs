@@ -8,6 +8,7 @@ use crate::{
     channel_join_requests::{JoinRequestEvent, JoinRequestPushStore},
     channel_view::ChannelView,
     draft_store::DraftStore,
+    group_management::GroupManagement,
     status_display::StatusDisplay,
     user_status_modal::UserStatusModal,
 };
@@ -2234,6 +2235,25 @@ impl CollabPanel {
         }
     }
 
+    fn show_group_management(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(workspace) = self.workspace.upgrade() {
+            let client = self.client.clone();
+            let user_store = self.user_store.clone();
+            let group_store = workspace.read(cx).app_state().group_store.clone();
+            workspace.update(cx, |workspace, cx| {
+                workspace.toggle_modal(window, cx, |window, cx| {
+                    GroupManagement::new(
+                        client.clone(),
+                        group_store.clone(),
+                        user_store.clone(),
+                        window,
+                        cx,
+                    )
+                });
+            });
+        }
+    }
+
     fn new_root_channel(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.channel_editing_state = Some(ChannelEditingState::Create {
             location: None,
@@ -3171,6 +3191,14 @@ impl CollabPanel {
             Section::Channels => {
                 Some(
                     h_flex()
+                        .child(
+                            IconButton::new("manage-user-groups", IconName::UserGroup)
+                                .icon_size(IconSize::Small)
+                                .on_click(cx.listener(|this, _, window, cx| {
+                                    this.show_group_management(window, cx);
+                                }))
+                                .tooltip(Tooltip::text("Manage User Groups")),
+                        )
                         .child(
                             IconButton::new("filter-occupied-channels", IconName::ListFilter)
                                 .icon_size(IconSize::Small)

@@ -8,6 +8,7 @@ pub mod channel_join_requests;
 pub mod channel_view;
 pub mod collab_panel;
 pub mod draft_store;
+pub mod group_management;
 pub mod notifications;
 mod panel_settings;
 pub mod pending_requests_list;

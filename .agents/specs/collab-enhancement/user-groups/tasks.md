@@ -108,7 +108,7 @@ The work is organized into 15 incremental tasks, each producing a buildable arti
   - _Requirements: 9.2, P5.11_
   - _edits: crates/collab_ui/src/message_bubble.rs_
 
-- [ ] 11. Create the Group Management UI
+- [x] 11. Create the Group Management UI
   - Create `crates/collab_ui/src/group_management.rs` with `GroupManagement` struct and `Render` impl.
   - Implement layout: group list sidebar (name + member count), group detail panel (member list + add/remove controls for admins), create-group dialog (name, display_name, initial member picker).
   - Implement member picker reusing existing user search component.
@@ -117,13 +117,15 @@ The work is organized into 15 incremental tasks, each producing a buildable arti
   - Handle permission toggling: hide add/remove controls for non-admin users.
   - _Requirements: 9.1, 9.3, P5.5, P5.7, P5.8_
   - _writes: crates/collab_ui/src/group_management.rs_
+  - _Completed: Added a live GroupStore-backed modal with group selection, searchable initial and admin member pickers, create/add/remove/leave/delete operations, loading protection, and request error feedback._
 
-- [ ] 12. Connect Group Management UI to the app shell
+- [x] 12. Connect Group Management UI to the app shell
   - Add an entry point to open the group management panel (e.g., from the channel sidebar or a top-level menu action).
   - Register the `GroupManagement` entity and ensure it receives `GroupStore` events so the group list stays up to date.
   - _Requirements: 9.1, 9.3_
   - _edits: crates/collab_ui/src/lib.rs_ (or relevant shell)
   - _edits: crates/collab_ui/src/group_management.rs_
+  - _Completed: Added the Group Management entry point to the Channels header and wired it to the workspace GroupStore._
 
 - [ ] 13. Implement notification dispatch for group @mentions
   - After `expand_group_mentions` produces individual mentions, ensure the existing notification pipeline creates a notification for each online member of the group.

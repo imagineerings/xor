@@ -63,6 +63,7 @@ use util::{ConnectionResult, ResultExt};
 
 pub use bookmark::*;
 pub use file_upload::*;
+pub use groups::*;
 pub use llm_token::*;
 pub use message_priority::*;
 pub use rpc::*;

@@ -457,7 +457,13 @@ fn render_mention(mention: &ChatMention, groups: &GroupStore) -> AnyElement {
 
 ### 3.8 Client-side: Group Management UI
 
-A new panel/dialog accessible from the channel sidebar or a dedicated management view:
+`GroupManagement` is a workspace modal opened from the Channels header. It observes
+the shared `GroupStore`, so group pushes refresh its list and selected detail view.
+It uses `UserStore::fuzzy_search_users` for both initial-member selection and
+admin-only member additions; its mutation controls await the corresponding client
+RPC and show request errors in the modal.
+
+<!-- impl: crates/collab_ui/src/group_management.rs#GroupManagement -->
 
 ```rust
 pub struct GroupManagement {
