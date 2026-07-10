@@ -77,10 +77,11 @@ Add message priority levels (Normal, Important, Urgent) to channel messages in S
   - _Completed: Query updates preserve the stored priority across message edits and deletion records._
   - _Validation: `cargo check -p collab --features collab/test-support`._
 
-- [ ] 12. Add notification preferences store (DND bypass for urgent)
+- [x] 12. Add notification preferences store (DND bypass for urgent)
   - Add `notification_preferences` storage (extend `user_settings` or new store method) for `bypass_dnd_for_urgent` boolean. Default to `false` (respect DND).
   - _Requirements: 12.2_
   - _writes: crates/collab/src/db/user_settings.rs_
+  - _Completed: Added a user-keyed notification preference store with false-by-default reads and an upsert setter for urgent-message DND bypass._
 
 - [ ] 13. Implement `dispatchUrgentNotifications` server function
   - Iterate channel members (excluding sender), check DND preference, create notification row (`kind = "urgent_message"`), push `AddNotification` + `UrgentMessageNotification` to connected clients.

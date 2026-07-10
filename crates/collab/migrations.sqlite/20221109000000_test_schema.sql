@@ -530,6 +530,11 @@ CREATE TABLE "notifications" (
 
 CREATE INDEX "index_notifications_on_recipient_id_is_read_kind_entity_id" ON "notifications" ("recipient_id", "is_read", "kind", "entity_id");
 
+CREATE TABLE "user_notification_preferences" (
+    "user_id" INTEGER PRIMARY KEY REFERENCES "users" ("id") ON DELETE CASCADE,
+    "bypass_dnd_for_urgent" BOOLEAN NOT NULL DEFAULT FALSE
+);
+
 CREATE TABLE contributors (
     user_id INTEGER,
     signed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

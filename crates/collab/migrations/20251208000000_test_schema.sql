@@ -431,6 +431,11 @@ CREATE TABLE public.users (
     name text
 );
 
+CREATE TABLE public.user_notification_preferences (
+    user_id integer PRIMARY KEY REFERENCES public.users(id) ON DELETE CASCADE,
+    bypass_dnd_for_urgent boolean DEFAULT false NOT NULL
+);
+
 CREATE SEQUENCE public.users_id_seq
     AS integer
     START WITH 1
