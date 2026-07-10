@@ -479,6 +479,7 @@ impl Server {
             .add_request_handler(update_scheduled_message)
             .add_request_handler(get_scheduled_messages)
             .add_request_handler(get_bookmarks)
+            .add_request_handler(get_pending_join_requests)
             .add_request_handler(get_file_upload_url)
             .add_request_handler(confirm_file_upload)
             .add_request_handler(get_file_download_url)
@@ -3960,6 +3961,36 @@ async fn get_bookmarks(
         .map(db::bookmark_store::Bookmark::to_proto)
         .collect();
     response.send(proto::GetBookmarksResponse { bookmarks })
+}
+
+async fn get_pending_join_requests(
+    request: proto::GetPendingJoinRequests,
+    response: Response<proto::GetPendingJoinRequests>,
+    session: MessageContext,
+) -> Result<()> {
+    let channel_id = ChannelId::from_proto(request.channel_id);
+    let user_id = session.user_id();
+    let db = session.app_state.db.clone();
+    db.transaction(|tx| {
+        let db = db.clone();
+        async move {
+            let channel = db.get_channel_internal(channel_id, &tx).await?;
+            db.check_user_is_channel_admin(&channel, user_id, &tx).await
+        }
+    })
+    .await?;
+
+    let requests = JoinRequestStore::new(db)
+        .get_pending_requests(channel_id)
+        .await?
+        .into_iter()
+        .map(|request| proto::PendingJoinRequest {
+            user_id: request.user_id.to_proto(),
+            reason: request.reason,
+            created_at: request.created_at.assume_utc().unix_timestamp() as u64,
+        })
+        .collect();
+    response.send(proto::GetPendingJoinRequestsResponse { requests })
 }
 
 async fn request_join_channel(

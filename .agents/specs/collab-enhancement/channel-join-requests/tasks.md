@@ -76,11 +76,13 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _Completed: Registered admin-gated approval and denial handling. The handler resolves the pending request atomically through `JoinRequestStore`, persists an outcome notification for the requester, and pushes `JoinRequestResponded` to active requester connections._
   - _Validation: `cargo check -p collab --features collab/test-support`._
 
-- [ ] 7. Implement `handle_get_pending_join_requests` RPC handler
+- [x] 7. Implement `handle_get_pending_join_requests` RPC handler
   - Verify caller is a channel admin.
   - Call `get_pending_requests` and return the list.
   - _Requirements: 10.4_
-  - _writes: crates/collab/src/api/channel.rs_
+  - _writes: crates/collab/src/rpc.rs_
+  - _Completed: Registered an admin-only pending-request endpoint that returns ordered requester IDs, optional reasons, and request timestamps from `JoinRequestStore`._
+  - _Validation: `cargo check -p collab --features collab/test-support`._
 
 - [ ] 8. Implement background expiry job
   - Add `expire_join_requests` async function that reads `CHANNEL_JOIN_REQUEST_TTL_SECS` env var (default 7 days), calls `expire_old_requests`, and creates `Notification::JoinRequestDenied` with reason "Your join request has expired." for each expired request.
