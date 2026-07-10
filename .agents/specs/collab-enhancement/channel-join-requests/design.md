@@ -187,6 +187,8 @@ func (s *JoinRequestStore) ExpireOldRequests(threshold time.Time) ([]ExpiredRequ
 func (s *JoinRequestStore) CountPendingRequests(channelID uint64) (uint32, error)
 ```
 
+The production implementation uses a SeaORM-backed `JoinRequestStore`. Approval deletes the pending request and writes an accepted `Member` membership in one transaction; an existing invitation or ban is restored to that membership state. Expiry returns the associated channel name for notification delivery. <!-- impl: crates/collab/src/db/join_request_store.rs#JoinRequestStore -->
+
 **Rust (collab crate) integration** — the store methods are called from the RPC handler in `collab/src/api/channel.rs`:
 
 ```rust

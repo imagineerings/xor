@@ -38,7 +38,7 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _Completed: Verified the existing `prost` build generates the new join-request messages from `channel.proto` and exposes them through the `proto` crate during compilation._
   - _Validation: `CARGO_INCREMENTAL=0 cargo check -p proto --features proto/test-support`._
 
-- [ ] 4. Implement server-side `JoinRequestStore`
+- [x] 4. Implement server-side `JoinRequestStore`
   - [ ] 4.1 Implement `request_join` — INSERT into `channel_join_requests`; returns error on UNIQUE violation (duplicate pending request).
   - [ ] 4.2 Implement `pending_join_request_exists` — SELECT COUNT(*) for `(channel_id, user_id)`.
   - [ ] 4.3 Implement `approve_join_request` — DELETE the request row and INSERT a `channel_members` row with `accepted = true`, `role = Member` in a single transaction.
@@ -47,7 +47,9 @@ Add a join request workflow for private channels, enabling non-members to reques
   - [ ] 4.6 Implement `expire_old_requests` — DELETE all rows with `created_at < threshold`, return list of expired `(user_id, channel_id, channel_name)` for notification dispatch.
   - [ ] 4.7 Implement `count_pending_requests` — SELECT COUNT(*) for a channel.
   - _Requirements: 10.1, 10.2, 10.4_
-  - _writes: crates/db/src/join_requests.rs_
+  - _writes: crates/collab/src/db/join_request_store.rs, crates/collab/src/db/tables/channel_join_request.rs_
+  - _Completed: Added transactional request creation, duplicate checks, approval that atomically removes the request and creates or restores an accepted Member membership, denial, ordered pending lists, expiry with channel metadata, and per-channel counts. Added SeaORM table metadata and SQLite integration coverage._
+  - _Validation: `target/debug/deps/collab_tests-9512c50120ff4d19 db_tests::join_request_tests::test_join_request_store_lifecycle_sqlite --exact --nocapture`; `target/debug/deps/collab_tests-9512c50120ff4d19 db_tests::join_request_tests::test_join_request_store_expires_requests_sqlite --exact --nocapture`; `CARGO_INCREMENTAL=0 cargo check -p collab --features collab/test-support`._
 
 - [ ] 5. Implement `handle_request_join` RPC handler
   - Verify channel exists and has `visibility = Members` (otherwise return error: public channels can be joined directly).

@@ -4,6 +4,7 @@ mod channel_tests;
 mod db_tests;
 mod extension_tests;
 mod file_store_tests;
+mod join_request_tests;
 mod migrations;
 mod scheduled_message_tests;
 
