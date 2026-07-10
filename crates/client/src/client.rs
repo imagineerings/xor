@@ -5,8 +5,8 @@ pub mod bookmark;
 pub mod channel_chat;
 pub mod file_upload;
 pub mod groups;
-pub mod message_priority;
 mod llm_token;
+pub mod message_priority;
 mod proxy;
 pub mod scheduled_message;
 pub mod sim_urls;
@@ -2508,6 +2508,7 @@ mod tests {
                         mentions: vec![proto::ChatMention {
                             range: Some(proto::Range { start: 1, end: 4 }),
                             user_id: 9,
+                            group_id: 0,
                         }],
                         reply_to_message_id: Some(3),
                         file_ids: vec!["file-1".to_string()],

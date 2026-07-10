@@ -216,3 +216,42 @@ impl GroupStore {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn search_groups_matches_name_and_display_name_prefixes_case_insensitively() {
+        let engineering = Arc::new(Group {
+            id: 1,
+            name: "eng-team".into(),
+            display_name: "Engineering Team".into(),
+            admin_id: 1,
+            member_ids: Vec::new(),
+        });
+        let design = Arc::new(Group {
+            id: 2,
+            name: "design".into(),
+            display_name: "Product Design".into(),
+            admin_id: 1,
+            member_ids: Vec::new(),
+        });
+        let store = GroupStore {
+            groups: [
+                (engineering.id, engineering.clone()),
+                (design.id, design.clone()),
+            ]
+            .into_iter()
+            .collect(),
+            by_name: HashMap::default(),
+            user_groups: HashMap::default(),
+            _subscriptions: Vec::new(),
+            _load_groups: Task::ready(Ok(())),
+        };
+
+        assert_eq!(store.search_groups("ENG"), vec![engineering]);
+        assert_eq!(store.search_groups("product"), vec![design]);
+        assert!(store.search_groups("marketing").is_empty());
+    }
+}

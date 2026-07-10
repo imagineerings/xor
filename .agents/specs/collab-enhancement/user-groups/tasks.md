@@ -90,7 +90,7 @@ The work is organized into 15 incremental tasks, each producing a buildable arti
   - _Requirements: 9.2, P5.10_
   - _writes: crates/client/src/groups.rs_
   - _edits: crates/client/src/lib.rs_
-  - _Completed: Added an entity-backed group cache with initial fetch, live update handling, prefix search, and membership indexes._
+  - _Completed: Added an entity-backed group cache with initial fetch, live update handling, prefix search, membership indexes, and case-insensitive name/display-name search coverage._
 
 - [ ] 9. Integrate groups into @-autocomplete
   - In `crates/collab_ui/src/composer.rs`, extend the autocomplete query to also call `GroupStore::search_groups`.
