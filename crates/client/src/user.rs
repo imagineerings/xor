@@ -1186,6 +1186,108 @@ impl RequestUsage {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clock::FakeSystemClock;
+    use gpui::TestAppContext;
+    use http_client::FakeHttpClient;
+    use settings::SettingsStore;
+
+    #[gpui::test]
+    fn test_contact_custom_status_field(cx: &mut TestAppContext) {
+        let client = cx.update(|cx| {
+            let settings = SettingsStore::test(cx);
+            cx.set_global(settings);
+            Client::new(
+                Arc::new(FakeSystemClock::new()),
+                FakeHttpClient::with_404_response(),
+                cx,
+            )
+        });
+        let user_store = cx.update(|cx| cx.new(|cx| UserStore::new(client.clone(), cx)));
+
+        user_store.update(cx, |store, cx| {
+            store.contacts.push(Arc::new(Contact {
+                user: Arc::new(User {
+                    legacy_id: 7,
+                    github_login: "user".into(),
+                    avatar_uri: "".into(),
+                    name: Some("User".to_string()),
+                }),
+                online: true,
+                busy: false,
+                custom_status: None,
+            }));
+            store.update_user_status(
+                7,
+                Some(proto::UserCustomStatus {
+                    emoji: Some("📅".to_string()),
+                    text: "In a meeting".to_string(),
+                    expires_at: Some(123),
+                }),
+                cx,
+            );
+        });
+
+        let status = cx.update(|cx| user_store.read(cx).custom_status_for_user(7).unwrap());
+        assert_eq!(status.emoji.as_deref(), Some("📅"));
+        assert_eq!(status.text, "In a meeting");
+        assert_eq!(status.expires_at, Some(123));
+
+        user_store.update(cx, |store, cx| store.update_user_status(7, None, cx));
+        assert!(cx.update(|cx| user_store.read(cx).custom_status_for_user(7).is_none()));
+    }
+
+    #[gpui::test]
+    fn test_update_user_statuses_batch(cx: &mut TestAppContext) {
+        let client = cx.update(|cx| {
+            let settings = SettingsStore::test(cx);
+            cx.set_global(settings);
+            Client::new(
+                Arc::new(FakeSystemClock::new()),
+                FakeHttpClient::with_404_response(),
+                cx,
+            )
+        });
+        let user_store = cx.update(|cx| cx.new(|cx| UserStore::new(client.clone(), cx)));
+
+        user_store.update(cx, |store, cx| {
+            for user_id in [7, 8] {
+                store.contacts.push(Arc::new(Contact {
+                    user: Arc::new(User {
+                        legacy_id: user_id,
+                        github_login: format!("user-{user_id}").into(),
+                        avatar_uri: "".into(),
+                        name: None,
+                    }),
+                    online: true,
+                    busy: false,
+                    custom_status: None,
+                }));
+                store.update_user_status(
+                    user_id,
+                    Some(proto::UserCustomStatus {
+                        emoji: None,
+                        text: format!("Status {user_id}"),
+                        expires_at: None,
+                    }),
+                    cx,
+                );
+            }
+        });
+
+        assert_eq!(
+            cx.update(|cx| user_store.read(cx).custom_status_for_user(7).unwrap().text),
+            "Status 7"
+        );
+        assert_eq!(
+            cx.update(|cx| user_store.read(cx).custom_status_for_user(8).unwrap().text),
+            "Status 8"
+        );
+    }
+}
+
 impl EditPredictionUsage {
     pub fn from_headers(headers: &HeaderMap<HeaderValue>) -> Result<Self> {
         Ok(Self(RequestUsage::from_headers(

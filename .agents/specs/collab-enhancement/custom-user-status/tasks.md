@@ -155,10 +155,14 @@ This plan implements custom user status — emoji + short text labels with optio
     - _writes: crates/collab/src/db/_ (tests module)
 
 - [ ] 13. Write client unit tests
-  - [ ] 13.1 `test_contact_custom_status_field` - `update_user_status` correctly sets/clears `Contact.custom_status`
+  - [x] 13.1 `test_contact_custom_status_field` - `update_user_status` correctly sets/clears `Contact.custom_status`
     - _writes: crates/client/src/user.rs_ (tests module)
-  - [ ] 13.2 `test_update_user_statuses_batch` - batch initialization populates all contacts correctly
+    - _Completed: Added a GPUI client unit test covering custom status conversion, expiry mapping, and clearing a contact status.
+    - _Validation: `CARGO_INCREMENTAL=0 cargo test -p client user::tests --lib`._
+  - [x] 13.2 `test_update_user_statuses_batch` - batch initialization populates all contacts correctly
     - _writes: crates/client/src/user.rs_ (tests module)
+    - _Completed: Added client coverage applying status payloads to multiple contacts and verifying each stored status independently.
+    - _Validation: `CARGO_INCREMENTAL=0 cargo test -p client user::tests --lib`._
   - [x] 13.3 `test_clear_after_duration_parsing` - each `ClearAfterOption` maps to correct minutes value
     - _writes: crates/collab_ui/src/user_status_modal.rs_ (tests module)
     - _Completed: Added unit coverage for every UI clear-after option and its server-validated minute value._
