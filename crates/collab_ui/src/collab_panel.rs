@@ -3686,11 +3686,6 @@ impl CollabPanel {
         };
 
         let notification = entry.notification.clone();
-        let needs_response = matches!(
-            notification,
-            Notification::ContactRequest { .. } | Notification::ChannelInvitation { .. }
-        );
-
         let notification_id = entry.id;
 
         self.current_notification_toast = Some((
@@ -3713,7 +3708,7 @@ impl CollabPanel {
                     cx.new(|cx| CollabNotificationToast {
                         actor,
                         text,
-                        notification: needs_response.then(|| notification),
+                        notification: Some(notification),
                         workspace,
                         collab_panel: collab_panel.clone(),
                         focus_handle: cx.focus_handle(),
@@ -4180,11 +4175,57 @@ impl CollabNotificationToast {
         }
         cx.emit(DismissEvent);
     }
+
+    fn activate(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(notification) = self.notification.clone() else {
+            self.focus_collab_panel(window, cx);
+            cx.emit(DismissEvent);
+            return;
+        };
+
+        match notification {
+            Notification::JoinRequest { channel_id, .. } => {
+                let collab_panel = self.collab_panel.clone();
+                window.defer(cx, move |_window, cx| {
+                    collab_panel
+                        .update_in(cx, |collab_panel, window, cx| {
+                            collab_panel.show_channel_modal(
+                                ChannelId(channel_id),
+                                channel_modal::Mode::ManageMembers,
+                                window,
+                                cx,
+                            );
+                        })
+                        .ok();
+                });
+            }
+            Notification::JoinRequestApproved { channel_id, .. } => {
+                let workspace = self.workspace.clone();
+                window.defer(cx, move |window, cx| {
+                    let Some(workspace) = workspace.upgrade() else {
+                        return;
+                    };
+                    ChannelView::open(ChannelId(channel_id), None, workspace, window, cx)
+                        .detach_and_log_err(cx);
+                });
+            }
+            Notification::ContactRequest { .. }
+            | Notification::ContactRequestAccepted { .. }
+            | Notification::ChannelInvitation { .. }
+            | Notification::JoinRequestDenied { .. } => self.focus_collab_panel(window, cx),
+        }
+        cx.emit(DismissEvent);
+    }
 }
 
 impl Render for CollabNotificationToast {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let needs_response = self.notification.is_some();
+        let needs_response = self.notification.as_ref().is_some_and(|notification| {
+            matches!(
+                notification,
+                Notification::ContactRequest { .. } | Notification::ChannelInvitation { .. }
+            )
+        });
 
         let accept_button = if needs_response {
             Button::new("accept", "Accept").on_click(cx.listener(|this, _, window, cx| {
@@ -4217,8 +4258,7 @@ impl Render for CollabNotificationToast {
         div()
             .id("collab_notification_toast")
             .on_click(cx.listener(|this, _, window, cx| {
-                this.focus_collab_panel(window, cx);
-                cx.emit(DismissEvent);
+                this.activate(window, cx);
             }))
             .child(
                 CollabNotification::new(avatar_uri, accept_button, decline_button)

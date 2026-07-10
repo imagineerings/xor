@@ -184,14 +184,16 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _Completed: Added a Pending Requests tab to channel member management with the live channel-store badge. Selecting an entry opens its detail panel; completed approval or denial reloads the list._
   - _Validation: `cargo check -p collab_ui`._
 
-- [ ] 18. Notification rendering for join request variants
+- [x] 18. Notification rendering for join request variants
   - Add rendering logic for `Notification::JoinRequest` — title: "Join Request", body: "{username} wants to join #{channel}", action: navigate to member management for that channel.
   - Add rendering logic for `Notification::JoinRequestApproved` — title: "Request Approved", body: "You've been added to #{channel}", action: navigate to the channel.
   - Add rendering logic for `Notification::JoinRequestDenied` — title: "Request Denied", body: "Your request to join #{channel} was denied" + reason (if provided), action: dismiss.
   - Wire up `JoinRequestApproved` notification click to navigate to the channel (`open_channel` action).
   - Update `NotificationStore::add_notifications` to extract `requesting_user_id` from `JoinRequest` for proper notification routing.
   - _Requirements: 10.2 (AC 1), 10.3_
-  - _writes: crates/collab_ui/src/notification_store.rs_
+  - _writes: crates/notifications/src/notification_store.rs, crates/collab_ui/src/collab_panel.rs_
+  - _Completed: Join request notifications resolve requester profiles and render channel/reason context. Toast clicks open the channel member-management review flow for admins and open the approved channel for requesters; denied notifications remain dismissible._
+  - _Validation: `cargo check -p collab_ui`._
 
 - [ ] 19. Implement client-side push handler for `JoinRequestAdded` and `JoinRequestResponded`
   - Handle `JoinRequestAdded` push: insert into pending requests store (if admin of the channel), update badge count, show toast notification.
