@@ -1,6 +1,6 @@
 use crate::{
     AddBookmark, Bookmark, BookmarkId, ChannelId, Client, FileAttachment, FileUploadUrl,
-    GetFileUploadUrl, Subscription, UpdateBookmark,
+    GetFileUploadUrl, MessagePriority, Subscription, UpdateBookmark,
     scheduled_message::{ScheduledMessage, ScheduledMessageId},
 };
 use anyhow::{Context as _, Result, bail};
@@ -121,6 +121,15 @@ impl Client {
         &self,
         message: SendChannelMessage,
     ) -> Result<proto::ChannelMessage> {
+        self.send_channel_message_with_priority(message, MessagePriority::Normal)
+            .await
+    }
+
+    pub async fn send_channel_message_with_priority(
+        &self,
+        message: SendChannelMessage,
+        priority: MessagePriority,
+    ) -> Result<proto::ChannelMessage> {
         let response = self
             .request(proto::SendChannelMessage {
                 channel_id: message.channel_id,
@@ -129,7 +138,7 @@ impl Client {
                 mentions: message.mentions,
                 reply_to_message_id: message.reply_to_message_id,
                 file_ids: message.file_ids,
-                priority: None,
+                priority: Some(priority.to_proto()),
             })
             .await?;
         response.message.context("missing sent channel message")

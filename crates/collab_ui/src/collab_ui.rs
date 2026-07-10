@@ -12,6 +12,7 @@ pub mod notifications;
 mod panel_settings;
 pub mod pending_requests_list;
 pub mod priority_badge;
+pub mod priority_selector;
 pub mod request_detail_panel;
 pub mod request_to_join_panel;
 pub mod status_display;

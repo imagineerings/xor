@@ -94,15 +94,17 @@ Add message priority levels (Normal, Important, Urgent) to channel messages in S
 
 ### Phase 3: Client — Priority Composing UI
 
-- [ ] 15. Build `PrioritySelector` component
+- [x] 15. Build `PrioritySelector` component
   - Compact button group (Normal / Important / Urgent) in the compose area. Highlights the selected priority with color cues (amber for Important, red for Urgent).
   - _Requirements: 12.1_
   - _writes: crates/collab_ui/src/priority_selector.rs_
+  - _Completed: Added a compact segmented control with semantic selected colors for Normal, Important, and Urgent._
 
-- [ ] 16. Integrate `PrioritySelector` into `ComposeArea`
+- [x] 16. Integrate `PrioritySelector` into `ComposeArea`
   - Hold `PrioritySelector` state in `ComposeArea`. Pass `selected_priority` into the `SendChannelMessage` RPC call. Render the selector below the message input.
   - _Requirements: 12.1_
   - _writes: crates/collab_ui/src/compose_area.rs_
+  - _Completed: The current ChannelChat compose area stores the selection, sends it with immediate messages, resets it after success, and rejects priority for unsupported scheduled messages._
 
 ### Phase 4: Client — Priority Display
 

@@ -5,6 +5,7 @@ use crate::{
     channel_file_upload::{UploadManager, UploadProgress, UploadStatus},
     draft_store::DraftStore,
     priority_badge::PriorityBadge,
+    priority_selector::PrioritySelector,
     status_display::StatusDisplay,
 };
 use anyhow::Result;
@@ -141,6 +142,7 @@ pub struct ChannelChat {
     composer: Entity<Editor>,
     compose_mode: compose_area::ComposeMode,
     compose_preview: Option<compose_area::PreviewBody>,
+    message_priority: MessagePriority,
     upload_manager: Entity<UploadManager>,
     search_editor: Entity<Editor>,
     search_state: search::SearchState,
@@ -673,6 +675,7 @@ impl ChannelChat {
             composer,
             compose_mode: compose_area::ComposeMode::Source,
             compose_preview: None,
+            message_priority: MessagePriority::Normal,
             upload_manager,
             search_editor,
             search_state: search::SearchState::default(),
@@ -978,6 +981,13 @@ impl ChannelChat {
         let client = self.client.clone();
         let channel_id = self.channel_id;
         let sent_file_ids = file_ids.clone();
+        let priority = self.message_priority;
+        if scheduled_at.is_some() && priority != MessagePriority::Normal {
+            self.schedule_picker.validation_error =
+                Some("Scheduled messages cannot have a priority yet.".into());
+            cx.notify();
+            return;
+        }
         self.send_state = SendState::Sending;
         cx.notify();
         cx.spawn_in(window, async move |this, cx| {
@@ -995,14 +1005,17 @@ impl ChannelChat {
                     .map(|_| None)
             } else {
                 client
-                    .send_channel_message(SendChannelMessage {
-                        channel_id: channel_id.0,
-                        body,
-                        nonce,
-                        mentions: Vec::new(),
-                        reply_to_message_id: None,
-                        file_ids,
-                    })
+                    .send_channel_message_with_priority(
+                        SendChannelMessage {
+                            channel_id: channel_id.0,
+                            body,
+                            nonce,
+                            mentions: Vec::new(),
+                            reply_to_message_id: None,
+                            file_ids,
+                        },
+                        priority,
+                    )
                     .await
                     .map(Some)
             };
@@ -1023,6 +1036,7 @@ impl ChannelChat {
                             this.pending_scheduled_count.saturating_add(1);
                     }
                     this.schedule_picker.clear();
+                    this.message_priority = MessagePriority::Normal;
                     if let Some(message) = message {
                         this.upsert_message(message, cx);
                     }
@@ -4518,6 +4532,20 @@ impl Render for ChannelChat {
                                 h_flex()
                                     .gap_2()
                                     .items_center()
+                                    .child(PrioritySelector::new(self.message_priority).render(
+                                        cx.listener(|this, _, _, cx| {
+                                            this.message_priority = MessagePriority::Normal;
+                                            cx.notify();
+                                        }),
+                                        cx.listener(|this, _, _, cx| {
+                                            this.message_priority = MessagePriority::Important;
+                                            cx.notify();
+                                        }),
+                                        cx.listener(|this, _, _, cx| {
+                                            this.message_priority = MessagePriority::Urgent;
+                                            cx.notify();
+                                        }),
+                                    ))
                                     .child(
                                         IconButton::new("attach-channel-file", IconName::Paperclip)
                                             .icon_size(IconSize::Small)
