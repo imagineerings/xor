@@ -1,5 +1,30 @@
 use super::*;
-use anyhow::{Context as _, anyhow};
+use anyhow::anyhow;
+#[derive(Debug)]
+pub enum GroupError {
+    DuplicateName,
+    EmptyDisplayName,
+    InvalidName,
+    MembershipNotFound,
+    NotFound,
+    TooManyMembers,
+}
+
+impl std::fmt::Display for GroupError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let message = match self {
+            Self::DuplicateName => "group name already exists",
+            Self::EmptyDisplayName => "group display name cannot be empty",
+            Self::InvalidName => "group name must contain only letters, numbers, and hyphens",
+            Self::MembershipNotFound => "group membership not found",
+            Self::NotFound => "group not found",
+            Self::TooManyMembers => "group exceeds maximum member count",
+        };
+        formatter.write_str(message)
+    }
+}
+
+impl std::error::Error for GroupError {}
 
 pub const MAX_GROUP_MEMBERS: usize = 100;
 
@@ -31,7 +56,7 @@ impl Database {
     ) -> Result<GroupWithMembers> {
         validate_group_name(name)?;
         if display_name.trim().is_empty() {
-            return Err(anyhow!("group display name cannot be empty").into());
+            return Err(anyhow!(GroupError::EmptyDisplayName).into());
         }
         let member_ids = group_member_ids(member_ids, admin_id)?;
         let name = name.to_string();
@@ -47,7 +72,7 @@ impl Database {
                     .await?
                     .is_some()
                 {
-                    return Err(anyhow!("group name already exists").into());
+                    return Err(anyhow!(GroupError::DuplicateName).into());
                 }
                 let group = user_group::ActiveModel {
                     id: ActiveValue::NotSet,
@@ -76,7 +101,7 @@ impl Database {
             validate_group_name(name)?;
         }
         if display_name.is_some_and(|display_name| display_name.trim().is_empty()) {
-            return Err(anyhow!("group display name cannot be empty").into());
+            return Err(anyhow!(GroupError::EmptyDisplayName).into());
         }
         let name = name.map(str::to_string);
         let display_name = display_name.map(str::to_string);
@@ -93,7 +118,7 @@ impl Database {
                         .await?
                         .is_some()
                 {
-                    return Err(anyhow!("group name already exists").into());
+                    return Err(anyhow!(GroupError::DuplicateName).into());
                 }
                 let group = user_group::Entity::update(user_group::ActiveModel {
                     id: ActiveValue::Unchanged(group.id),
@@ -123,7 +148,7 @@ impl Database {
                 .exec(&*tx)
                 .await?;
             if result.rows_affected == 0 {
-                return Err(anyhow!("group not found").into());
+                return Err(anyhow!(GroupError::NotFound).into());
             }
             Ok(())
         })
@@ -176,10 +201,7 @@ impl Database {
                     .collect::<Vec<_>>();
                 member_ids.extend(additions);
                 if member_ids.len() > MAX_GROUP_MEMBERS {
-                    return Err(anyhow!(
-                        "group exceeds maximum member count of {MAX_GROUP_MEMBERS}"
-                    )
-                    .into());
+                    return Err(anyhow!(GroupError::TooManyMembers).into());
                 }
                 if !remove_ids.is_empty() {
                     user_group_member::Entity::delete_many()
@@ -209,7 +231,7 @@ impl Database {
                 .exec(&*tx)
                 .await?;
             if result.rows_affected == 0 {
-                return Err(anyhow!("group membership not found").into());
+                return Err(anyhow!(GroupError::MembershipNotFound).into());
             }
             Ok(())
         })
@@ -265,7 +287,7 @@ fn validate_group_name(name: &str) -> Result<()> {
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
     {
-        return Err(anyhow!("group name must contain only letters, numbers, and hyphens").into());
+        return Err(anyhow!(GroupError::InvalidName).into());
     }
     Ok(())
 }
@@ -276,7 +298,7 @@ fn group_member_ids(member_ids: &[UserId], admin_id: UserId) -> Result<Vec<UserI
         member_ids.push(admin_id);
     }
     if member_ids.len() > MAX_GROUP_MEMBERS {
-        return Err(anyhow!("group exceeds maximum member count of {MAX_GROUP_MEMBERS}").into());
+        return Err(anyhow!(GroupError::TooManyMembers).into());
     }
     Ok(member_ids)
 }
@@ -292,7 +314,7 @@ async fn get_group_model(group_id: GroupId, tx: &DatabaseTransaction) -> Result<
     Ok(user_group::Entity::find_by_id(group_id)
         .one(tx)
         .await?
-        .context("group not found")?)
+        .ok_or_else(|| anyhow!(GroupError::NotFound))?)
 }
 
 async fn group_member_ids_for_group(

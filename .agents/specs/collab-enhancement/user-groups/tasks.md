@@ -64,12 +64,14 @@ The work is organized into 15 incremental tasks, each producing a buildable arti
   - _Completed: Implemented the complete database group query surface with validation, uniqueness checks, admin inclusion, membership reconciliation, leave behavior, member lookup, user-group lookup, and count helpers; the existing cross-database group test covers the core invariants and member limits.
   - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests test_group_queries_sqlite --features test-support`; `CARGO_INCREMENTAL=0 cargo check -p collab --features collab/test-support`; `git diff --check`._
 
-- [ ] 6. Register and implement server RPC handlers
+- [x] 6. Register and implement server RPC handlers
   - Register six new request handlers in `rpc.rs`: `create_group`, `update_group`, `delete_group`, `get_groups`, `update_group_members`, `leave_group`.
   - Each handler follows the pattern: validate → call DB → broadcast `UpdateGroups` push to all connections → return response.
   - Add error handling: `ALREADY_EXISTS` for duplicate name, `INVALID_ARGUMENT` for max size, `NOT_FOUND` for missing group/user, `PERMISSION_DENIED` for non-admin membership changes.
   - _Requirements: 9.1, 9.3, P5.1, P5.2, P5.4, P5.5, P5.6, P5.8_
   - _edits: crates/collab/src/rpc.rs_
+  - _Completed: Registered all six group request handlers, added admin authorization, broadcast `UpdateGroups` after mutations, and mapped duplicate names, invalid arguments, missing groups, and permission failures to structured RPC error codes. Added the corresponding error-code values to the shared protocol.
+  - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-rpc-target CARGO_INCREMENTAL=0 cargo check -p collab --features collab/test-support`; `git diff --check`._
 
 - [ ] 7. Implement group mention resolution at message send time
   - Add `expand_group_mentions` function that takes `ChatMention` list, resolves each `group_id` to individual member user IDs via `get_group_member_ids`, and produces a flat list of individual `ChatMention` entries.

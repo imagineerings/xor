@@ -3044,7 +3044,8 @@ async fn create_group(
             session.user_id(),
             &member_ids,
         )
-        .await?;
+        .await
+        .map_err(group_rpc_error)?;
     response.send(proto::CreateGroupResponse {
         group: Some(group.to_proto()),
     })?;
@@ -3072,7 +3073,8 @@ async fn update_group(
             request.name.as_deref(),
             request.display_name.as_deref(),
         )
-        .await?;
+        .await
+        .map_err(group_rpc_error)?;
     response.send(proto::UpdateGroupResponse {
         group: Some(group.to_proto()),
     })?;
@@ -3094,7 +3096,7 @@ async fn delete_group(
     let db = session.db().await;
     let group_id = GroupId::from_proto(request.group_id);
     ensure_group_admin(&db, group_id, session.user_id()).await?;
-    db.delete_group(group_id).await?;
+    db.delete_group(group_id).await.map_err(group_rpc_error)?;
     response.send(proto::DeleteGroupResponse {})?;
     broadcast_groups(
         &session,
@@ -3111,7 +3113,12 @@ async fn get_groups(
     response: Response<proto::GetGroups>,
     session: MessageContext,
 ) -> Result<()> {
-    let groups = session.db().await.get_groups().await?;
+    let groups = session
+        .db()
+        .await
+        .get_groups()
+        .await
+        .map_err(group_rpc_error)?;
     response.send(proto::GetGroupsResponse {
         groups: groups
             .iter()
@@ -3143,7 +3150,8 @@ async fn update_group_members(
         .collect::<Vec<_>>();
     let group = db
         .update_group_members(group_id, &add_ids, &remove_ids)
-        .await?;
+        .await
+        .map_err(group_rpc_error)?;
     response.send(proto::UpdateGroupMembersResponse {
         group: Some(group.to_proto()),
     })?;
@@ -3164,8 +3172,18 @@ async fn leave_group(
 ) -> Result<()> {
     let db = session.db().await;
     let group_id = GroupId::from_proto(request.group_id);
-    db.leave_group(group_id, session.user_id()).await?;
-    let group = db.get_group(group_id).await?.context("group not found")?;
+    db.leave_group(group_id, session.user_id())
+        .await
+        .map_err(group_rpc_error)?;
+    let group = db
+        .get_group(group_id)
+        .await
+        .map_err(group_rpc_error)?
+        .ok_or_else(|| {
+            ErrorCode::NotFound
+                .message("group not found".into())
+                .anyhow()
+        })?;
     response.send(proto::LeaveGroupResponse {})?;
     broadcast_groups(
         &session,
@@ -3178,11 +3196,53 @@ async fn leave_group(
 }
 
 async fn ensure_group_admin(db: &Database, group_id: GroupId, user_id: UserId) -> Result<()> {
-    let group = db.get_group(group_id).await?.context("group not found")?;
+    let group = db
+        .get_group(group_id)
+        .await
+        .map_err(group_rpc_error)?
+        .ok_or_else(|| {
+            ErrorCode::NotFound
+                .message("group not found".into())
+                .anyhow()
+        })?;
     if group.group.admin_id != user_id {
-        return Err(anyhow!("only the group admin can modify this group").into());
+        return Err(ErrorCode::PermissionDenied
+            .message("only the group admin can modify this group".into())
+            .anyhow()
+            .into());
     }
     Ok(())
+}
+
+fn group_rpc_error(error: Error) -> Error {
+    let Error::Internal(error) = error else {
+        return error;
+    };
+    let Some(group_error) = error.downcast_ref::<db::queries::groups::GroupError>() else {
+        return Error::Internal(error);
+    };
+    let (code, message) = match group_error {
+        db::queries::groups::GroupError::DuplicateName => {
+            (ErrorCode::AlreadyExists, "group name already exists")
+        }
+        db::queries::groups::GroupError::EmptyDisplayName => (
+            ErrorCode::InvalidArgument,
+            "group display name cannot be empty",
+        ),
+        db::queries::groups::GroupError::InvalidName => (
+            ErrorCode::InvalidArgument,
+            "group name must contain only letters, numbers, and hyphens",
+        ),
+        db::queries::groups::GroupError::MembershipNotFound => {
+            (ErrorCode::NotFound, "group membership not found")
+        }
+        db::queries::groups::GroupError::NotFound => (ErrorCode::NotFound, "group not found"),
+        db::queries::groups::GroupError::TooManyMembers => (
+            ErrorCode::InvalidArgument,
+            "group exceeds maximum member count",
+        ),
+    };
+    code.anyhow().context(message).into()
 }
 
 async fn broadcast_groups(session: &MessageContext, update: proto::UpdateGroups) -> Result<()> {

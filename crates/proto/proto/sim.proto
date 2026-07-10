@@ -616,6 +616,10 @@ enum ErrorCode {
   UnsupportedFileType = 21;
   FileStorageUnavailable = 22;
   InvalidFileName = 23;
+  AlreadyExists = 24;
+  InvalidArgument = 25;
+  NotFound = 26;
+  PermissionDenied = 27;
   reserved 6;
   reserved 14 to 15;
 }
