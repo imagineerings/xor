@@ -10,6 +10,15 @@ Add a join request workflow for private channels, enabling non-members to reques
 
 ## Tasks
 
+## Portfolio Delivery Phase
+
+**Phase 1: Close near-finished features.** Finish navigation integration, then
+verify the delivered join-request workflow with the remaining focused suites.
+
+- Task 14: integrate `RequestToJoinPanel` into workspace and channel navigation.
+- Tasks 21-25: add unit, integration, concurrency, edge-case, and GPUI UI
+  coverage.
+
 - [x] 1. Define protobuf messages
   - Add `RequestJoinChannel`, `RequestJoinChannelResponse`, `RespondToJoinRequest`, `RespondToJoinRequestResponse` RPC messages.
   - Add `GetPendingJoinRequests`, `GetPendingJoinRequestsResponse`, `PendingJoinRequest` entity messages.

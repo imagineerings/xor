@@ -1,6 +1,6 @@
 use crate::{Channel, ChannelStore};
 use anyhow::Result;
-use client::{SIM_ALWAYS_ACTIVE, ChannelId, Client, Collaborator, UserStore};
+use client::{ChannelId, Client, Collaborator, SIM_ALWAYS_ACTIVE, UserStore};
 use collections::HashMap;
 use gpui::{App, AppContext as _, AsyncApp, Context, Entity, EventEmitter, Task};
 use language::proto::serialize_version;

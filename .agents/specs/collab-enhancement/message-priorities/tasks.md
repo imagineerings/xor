@@ -6,6 +6,16 @@ Add message priority levels (Normal, Important, Urgent) to channel messages in S
 
 ## Tasks
 
+## Portfolio Delivery Phase
+
+**Phase 3: Urgent messaging.** Finish the server-to-client urgent-notification
+path first, then settings and UI feedback, and finally the remaining focused
+and end-to-end coverage.
+
+- Slice A, delivery path: tasks 13-14.
+- Slice B, client controls and feedback: tasks 22-27.
+- Slice C, verification: tasks 28-29 and 31-38.
+
 ### Phase 1: Proto & Data Layer
 
 - [x] 1. Define `ChannelMessagePriority` protobuf enum

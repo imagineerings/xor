@@ -76,7 +76,9 @@ impl From<Bookmark> for proto::Bookmark {
             r#type: bookmark.bookmark_type as i32,
             created_by: bookmark.created_by,
             created_at: bookmark.created_at.timestamp_millis() as u64,
-            description: bookmark.description.map(|description| description.to_string()),
+            description: bookmark
+                .description
+                .map(|description| description.to_string()),
             sort_order: bookmark.sort_order,
         }
     }

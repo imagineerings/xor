@@ -12,6 +12,16 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
 
 ## Tasks
 
+## Portfolio Delivery Phase
+
+**Phase 1: Close near-finished features.** Complete the remaining media renderer
+and validate the full attachment lifecycle before moving on to new collaboration
+capabilities.
+
+- Task 16: render video and audio players.
+- Task 27: test all file renderers.
+- Task 32: add the end-to-end smoke test.
+
 ### Phase 1: Protocol & Data Layer
 
 - [x] 1. Define protobuf messages and RPCs

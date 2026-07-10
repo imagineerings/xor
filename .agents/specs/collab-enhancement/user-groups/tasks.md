@@ -10,6 +10,16 @@ The work is organized into 15 incremental tasks, each producing a buildable arti
 
 ## Tasks
 
+## Portfolio Delivery Phase
+
+**Phase 2: Group mentions.** Deliver the feature in three mergeable vertical
+slices: server persistence and RPCs, message composition and rendering, then
+notification delivery and end-to-end coverage.
+
+- Slice A, server foundation: tasks 5-6.
+- Slice B, mention experience: tasks 7, 9-10.
+- Slice C, delivery and confidence: tasks 13-15.
+
 - [x] 1. Define protobuf messages for User Groups
   - Add `group_id` field to existing `ChatMention` message.
   - Add new messages: `CreateGroup`, `CreateGroupResponse`, `UpdateGroup`, `UpdateGroupResponse`, `DeleteGroup`, `DeleteGroupResponse`, `GetGroups`, `GetGroupsResponse`, `UpdateGroupMembers`, `UpdateGroupMembersResponse`, `LeaveGroup`, `LeaveGroupResponse`, `UpdateGroups`, `UserGroup`.

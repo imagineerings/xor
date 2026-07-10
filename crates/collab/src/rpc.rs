@@ -4319,8 +4319,8 @@ async fn dispatch_group_mention_notifications(
                 }
                 Ok(notifications)
             }
-        })
-        .await?;
+    })
+    .await?;
     let connection_pool = session.connection_pool().await;
     send_notifications(&connection_pool, &session.peer, notifications);
     Ok(())

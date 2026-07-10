@@ -6,6 +6,15 @@ This plan implements custom user status — emoji + short text labels with optio
 
 ## Tasks
 
+## Portfolio Delivery Phase
+
+**Phase 1: Close near-finished features.** Complete the remaining UI integration
+and test coverage before starting a new collaboration subsystem.
+
+- Tasks 11.4-11.5: render statuses in mentions autocomplete and user profiles.
+- Tasks 12-16: complete server, client, GPUI, integration, and property test
+  coverage.
+
 - [x] 1. Define protobuf messages and register in proto layer
   - Add `UserCustomStatus`, `SetStatus`, `SetStatusResponse`, `ClearStatus`, `UpdateUserStatus`, and `UpdateUserStatuses` messages in `crates/proto/proto/sim.proto` with `oneof payload` entries (field numbers 499–504; 250–254 are reserved)
   - Register all messages in `messages!()` macro in `crates/proto/src/proto.rs`

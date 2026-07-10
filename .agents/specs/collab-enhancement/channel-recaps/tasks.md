@@ -22,6 +22,21 @@ The feature is built in five phases, each producing a working increment:
 
 ## Tasks
 
+## Portfolio Delivery Phase
+
+**Phase 4: Channel recaps.** Treat this as a mini-project and merge it in
+vertical increments rather than as one large change.
+
+- Slice A, foundation: tasks 1-5 (protocol, persistence, and native data
+  types).
+- Slice B, recap creation: tasks 6-8 (generation, scheduling, and server
+  endpoints).
+- Slice C, usable experience: tasks 9-14 (client store, client requests, and
+  channel UI).
+- Slice D, delivery controls: tasks 15-17 (notifications and preferences).
+- Slice E, confidence: tasks 18-23 (unit, integration, API, UI, and
+  concurrency coverage).
+
 ### Phase 1: Protobuf, Database Schema, and Data Models
 
 - [ ] 1. Define protobuf messages and RPCs
