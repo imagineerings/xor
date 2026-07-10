@@ -17,6 +17,7 @@ pub struct NewChannelMessage {
     pub mentions: Vec<proto::ChatMention>,
     pub reply_to_message_id: Option<MessageId>,
     pub scheduled_at: Option<PrimitiveDateTime>,
+    pub priority: i16,
 }
 
 pub struct ChannelMessageUpdate {
@@ -159,6 +160,7 @@ impl Database {
                     edited_at: ActiveValue::Set(None),
                     deleted_at: ActiveValue::Set(None),
                     scheduled_at: ActiveValue::Set(message.scheduled_at),
+                    priority: ActiveValue::Set(message.priority),
                 }
                 .insert(&*tx)
                 .await?;
@@ -198,6 +200,7 @@ impl Database {
                     edited_at: ActiveValue::Set(Some(now())),
                     deleted_at: ActiveValue::Set(None),
                     scheduled_at: ActiveValue::Unchanged(row.scheduled_at),
+                    priority: ActiveValue::Unchanged(row.priority),
                 })
                 .exec(&*tx)
                 .await?;
@@ -245,6 +248,7 @@ impl Database {
                 edited_at: ActiveValue::Unchanged(row.edited_at),
                 deleted_at: ActiveValue::Set(Some(now())),
                 scheduled_at: ActiveValue::Unchanged(row.scheduled_at),
+                priority: ActiveValue::Unchanged(row.priority),
             })
             .exec(&*tx)
             .await?;
@@ -421,6 +425,7 @@ impl Database {
                         cm.edited_at,
                         cm.deleted_at,
                         cm.scheduled_at,
+                        cm.priority,
                         c.name AS channel_name,
                         {rank_expression} AS rank
                     FROM channel_messages cm
@@ -455,6 +460,7 @@ impl Database {
                         edited_at: row.edited_at,
                         deleted_at: row.deleted_at,
                         scheduled_at: row.scheduled_at,
+                        priority: row.priority,
                     })
                     .collect();
                 let messages = self.channel_messages_to_proto(messages, &tx).await?;
@@ -879,6 +885,7 @@ struct SearchMessageRow {
     edited_at: Option<PrimitiveDateTime>,
     deleted_at: Option<PrimitiveDateTime>,
     scheduled_at: Option<PrimitiveDateTime>,
+    priority: i16,
     channel_name: String,
     #[allow(dead_code)]
     rank: f64,
@@ -1013,7 +1020,7 @@ fn channel_message_to_proto(
         scheduled_at: row
             .scheduled_at
             .map(|scheduled_at| unix_timestamp_millis(scheduled_at)),
-        priority: 0,
+        priority: row.priority as i32,
         files: Vec::new(),
     })
 }

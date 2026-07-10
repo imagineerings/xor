@@ -53,20 +53,26 @@ Add message priority levels (Normal, Important, Urgent) to channel messages in S
 
 ### Phase 2: Server-Side Logic
 
-- [ ] 9. Add `priority` column read/write to `ChannelMessagesStore`
+- [x] 9. Add `priority` column read/write to `ChannelMessagesStore`
   - Update `InsertMessage` to persist the priority field. Ensure the column defaults to `0` (Normal) for existing rows.
   - _Requirements: 12.1_
   - _writes: crates/collab/src/db/channel_messages.rs_
+  - _Completed: Channel message queries persist and return the priority column; message edits and deletion preserve it unchanged, while internally generated messages default to Normal._
+  - _Validation: `cargo check -p collab --features collab/test-support`._
 
-- [ ] 10. Validate priority on incoming `SendChannelMessage`
+- [x] 10. Validate priority on incoming `SendChannelMessage`
   - Reject invalid priority values with `INVALID_ARGUMENT`. Treat missing/unset priority as Normal (backward compat).
   - _Requirements: 12.1_
   - _writes: crates/collab/src/rpc/channel_handler.rs_
+  - _Completed: Send handling treats omitted priority as Normal and rejects enum values outside Normal, Important, and Urgent before persistence._
+  - _Validation: `cargo check -p collab --features collab/test-support`._
 
-- [ ] 11. Enforce priority immutability on `UpdateChannelMessage`
+- [x] 11. Enforce priority immutability on `UpdateChannelMessage`
   - Ensure the `priority` field is never changed on edit — always preserve the originally stored value.
   - _Requirements: 12.1_
   - _writes: crates/collab/src/rpc/channel_handler.rs_
+  - _Completed: Query updates preserve the stored priority across message edits and deletion records._
+  - _Validation: `cargo check -p collab --features collab/test-support`._
 
 - [ ] 12. Add notification preferences store (DND bypass for urgent)
   - Add `notification_preferences` storage (extend `user_settings` or new store method) for `bypass_dnd_for_urgent` boolean. Default to `false` (respect DND).

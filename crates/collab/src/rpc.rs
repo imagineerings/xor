@@ -3941,6 +3941,7 @@ async fn send_channel_message(
     session: MessageContext,
 ) -> Result<()> {
     let channel_id = ChannelId::from_proto(request.channel_id);
+    let priority = channel_message_priority_from_proto(request.priority)?;
     let file_ids = request
         .file_ids
         .iter()
@@ -3961,6 +3962,7 @@ async fn send_channel_message(
             mentions: request.mentions,
             reply_to_message_id: request.reply_to_message_id.map(MessageId::from_proto),
             scheduled_at: None,
+            priority,
         })
         .await?;
     if !file_ids.is_empty() {
@@ -3983,6 +3985,15 @@ async fn send_channel_message(
         message: Some(message.clone()),
     })?;
     broadcast_channel_message_sent(&session, channel_id, message).await
+}
+
+fn channel_message_priority_from_proto(priority: Option<i32>) -> Result<i16> {
+    match priority.unwrap_or_default() {
+        0 => Ok(0),
+        1 => Ok(1),
+        2 => Ok(2),
+        _ => Err(anyhow!("invalid channel message priority").into()),
+    }
 }
 
 async fn schedule_channel_message(
@@ -4557,6 +4568,7 @@ async fn post_bookmark_system_message(
             mentions: Vec::new(),
             reply_to_message_id: None,
             scheduled_at: None,
+            priority: 0,
         })
         .await?;
     broadcast_channel_message_sent(session, channel_id, message).await
@@ -5105,6 +5117,7 @@ async fn deliver_due_scheduled_messages(
                 mentions: scheduled.mentions,
                 reply_to_message_id: None,
                 scheduled_at: Some(scheduled_at),
+                priority: 0,
             })
             .await;
 
