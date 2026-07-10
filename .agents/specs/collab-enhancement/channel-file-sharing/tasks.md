@@ -261,12 +261,15 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
   - _Actual writes: crates/collab_ui/src/channel_chat.rs; crates/collab/tests/integration/channel_chat_ui_tests.rs_
   - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests test_channel_chat_file_drop_starts_upload_for_files --features test-support`; `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `git diff --check`._
 
-- [ ] 26. UI test file picker button
+- [x] 26. UI test file picker button
   - Simulate click on attach-file button.
   - Verify file picker dialog is opened.
   - Mock file selection and verify upload is started.
   - _Requirements: 4.1, Design §7_
   - _writes: crates/collab_ui/src/channel_chat/compose_area.rs_
+  - _Completed: Added a channel chat test-support hook for the attach-file picker path and an integration test that opens the GPUI path prompt, verifies file-only multi-select options, simulates a selected file, and verifies the selection creates an upload row._
+  - _Actual writes: crates/collab_ui/src/channel_chat.rs; crates/collab/tests/integration/channel_chat_ui_tests.rs_
+  - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests test_channel_chat_file_picker_starts_upload_for_selected_files --features test-support`; `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `git diff --check`._
 
 - [ ] 27. Test all file renderers
   - Test image preview renders correctly for supported formats.

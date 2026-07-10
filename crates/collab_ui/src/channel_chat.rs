@@ -3655,6 +3655,11 @@ impl ChannelChat {
     }
 
     #[cfg(any(test, feature = "test-support"))]
+    pub fn open_file_picker_for_test(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.open_file_picker(&ClickEvent::default(), window, cx);
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
     pub fn rendered_message_texts_for_test(
         this: Entity<Self>,
         cx: &mut gpui::VisualTestContext,

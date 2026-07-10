@@ -139,6 +139,43 @@ async fn test_channel_chat_file_drop_starts_upload_for_files(
 }
 
 #[gpui::test]
+async fn test_channel_chat_file_picker_starts_upload_for_selected_files(
+    cx_a: &mut gpui::TestAppContext,
+    cx_b: &mut gpui::TestAppContext,
+) {
+    let (_server, client_a, _client_b, channel_id) = TestServer::start2(cx_a, cx_b).await;
+    let (workspace, cx_a) = client_a.build_test_workspace(cx_a).await;
+
+    let chat = cx_a
+        .update(|window, cx| ChannelChat::open(channel_id, workspace.clone(), window, cx))
+        .await
+        .unwrap();
+    cx_a.run_until_parked();
+
+    let file_path = write_drop_test_file("picked.txt", b"pick me");
+    chat.update_in(cx_a, |chat, window, cx| {
+        chat.open_file_picker_for_test(window, cx);
+    });
+    assert!(cx_a.did_prompt_for_paths());
+
+    cx_a.simulate_path_prompt_response({
+        let file_path = file_path.clone();
+        move |options| {
+            assert!(options.files);
+            assert!(!options.directories);
+            assert!(options.multiple);
+            Some(vec![file_path])
+        }
+    });
+    cx_a.run_until_parked();
+
+    assert_eq!(
+        chat.read_with(cx_a, |chat, cx| chat.upload_filenames_for_test(cx)),
+        vec!["picked.txt".to_string()]
+    );
+}
+
+#[gpui::test]
 async fn test_channel_chat_markdown_preview_toolbar_and_sent_rendering(
     cx_a: &mut gpui::TestAppContext,
     cx_b: &mut gpui::TestAppContext,
