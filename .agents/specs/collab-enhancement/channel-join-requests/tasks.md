@@ -21,13 +21,15 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _Completed: Added join-request RPC request/response types, admin/requester push messages, pending-request entities, and `UpdateChannels.pending_request_counts`; registered every envelope, request-response pair, and channel-targeted push in the proto dispatch layer._
   - _Validation: `CARGO_INCREMENTAL=0 cargo check -p proto --features proto/test-support`._
 
-- [ ] 2. Database migration
+- [x] 2. Database migration
   - Create `channel_join_requests` table with columns: `id` (BIGINT PK generated), `channel_id` (BIGINT NOT NULL FK references channels ON DELETE CASCADE), `user_id` (BIGINT NOT NULL FK references users ON DELETE CASCADE), `reason` (TEXT NULL), `created_at` (TIMESTAMP NOT NULL DEFAULT NOW()).
   - Add UNIQUE constraint on `(channel_id, user_id)` for duplicate prevention.
   - Add index `idx_join_requests_channel` on `(channel_id)`.
   - Add index `idx_join_requests_created_at` on `(created_at)`.
   - _Requirements: 10.1 (AC 4), 10.4 (AC 3)_
-  - _writes: crates/db/migrations/..._channel_join_requests.sql_
+  - _writes: crates/collab/migrations/..._channel_join_requests.sql, crates/collab/migrations.sqlite/20221109000000_test_schema.sql_
+  - _Completed: Added the production `channel_join_requests` table with cascading channel/user foreign keys, per-user/channel duplicate prevention, and channel/expiry query indexes. Added the equivalent SQLite integration-test schema._
+  - _Validation: `sqlite3 :memory: ".read crates/collab/migrations.sqlite/20221109000000_test_schema.sql"`; `CARGO_INCREMENTAL=0 cargo check -p collab --features collab/test-support`._
 
 - [x] 3. Regenerate proto Rust bindings
   - Run the proto codegen to produce `crates/proto/src/proto.rs` with the new messages.

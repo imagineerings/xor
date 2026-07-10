@@ -374,6 +374,21 @@ CREATE INDEX "index_channel_files_on_message_id"
 CREATE INDEX "index_channel_files_on_uploader_id"
     ON "channel_files" ("uploader_id");
 
+CREATE TABLE IF NOT EXISTS "channel_join_requests" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "channel_id" INTEGER NOT NULL REFERENCES channels (id) ON DELETE CASCADE,
+    "user_id" INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    "reason" TEXT,
+    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE ("channel_id", "user_id")
+);
+
+CREATE INDEX "index_channel_join_requests_on_channel_id"
+    ON "channel_join_requests" ("channel_id");
+
+CREATE INDEX "index_channel_join_requests_on_created_at"
+    ON "channel_join_requests" ("created_at");
+
 CREATE TABLE IF NOT EXISTS "channel_message_mentions" (
     "message_id" INTEGER NOT NULL REFERENCES channel_messages (id) ON DELETE CASCADE,
     "range_start" INTEGER NOT NULL,
