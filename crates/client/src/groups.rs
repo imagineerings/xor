@@ -1,5 +1,5 @@
 use crate::{Client, Subscription};
-use anyhow::Result;
+use anyhow::{Context as _, Result};
 use collections::HashMap;
 use gpui::{AsyncApp, Context, Entity, EventEmitter, SharedString, Task};
 use rpc::{TypedEnvelope, proto};
@@ -41,6 +41,77 @@ pub struct GroupStore {
 }
 
 impl EventEmitter<GroupStoreEvent> for GroupStore {}
+
+impl Client {
+    pub async fn create_group(
+        &self,
+        name: String,
+        display_name: String,
+        member_ids: Vec<u64>,
+    ) -> Result<Group> {
+        let response = self
+            .request(proto::CreateGroup {
+                name,
+                display_name,
+                member_ids,
+            })
+            .await?;
+        response
+            .group
+            .map(Into::into)
+            .context("missing created group")
+    }
+
+    pub async fn update_group(
+        &self,
+        group_id: u64,
+        name: Option<String>,
+        display_name: Option<String>,
+    ) -> Result<Group> {
+        let response = self
+            .request(proto::UpdateGroup {
+                group_id,
+                name,
+                display_name,
+            })
+            .await?;
+        response
+            .group
+            .map(Into::into)
+            .context("missing updated group")
+    }
+
+    pub async fn delete_group(&self, group_id: u64) -> Result<()> {
+        self.request(proto::DeleteGroup { group_id })
+            .await
+            .map(|_: proto::DeleteGroupResponse| ())
+    }
+
+    pub async fn update_group_members(
+        &self,
+        group_id: u64,
+        add_user_ids: Vec<u64>,
+        remove_user_ids: Vec<u64>,
+    ) -> Result<Group> {
+        let response = self
+            .request(proto::UpdateGroupMembers {
+                group_id,
+                add_user_ids,
+                remove_user_ids,
+            })
+            .await?;
+        response
+            .group
+            .map(Into::into)
+            .context("missing updated group")
+    }
+
+    pub async fn leave_group(&self, group_id: u64) -> Result<()> {
+        self.request(proto::LeaveGroup { group_id })
+            .await
+            .map(|_: proto::LeaveGroupResponse| ())
+    }
+}
 
 impl GroupStore {
     pub fn new(client: Arc<Client>, cx: &mut Context<Self>) -> Self {
