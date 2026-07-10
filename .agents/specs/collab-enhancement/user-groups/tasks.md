@@ -43,7 +43,7 @@ The work is organized into 15 incremental tasks, each producing a buildable arti
   - _edits: crates/collab/src/db/tables.rs_
   - _Completed: Added group and membership entities with typed IDs and admin/member/user relations._
 
-- [ ] 5. Implement GroupStore database queries
+- [x] 5. Implement GroupStore database queries
   - Implement `Database` methods in a new `crates/collab/src/db/queries/groups.rs`:
     - `create_group` — validates name uniqueness, name format (`^[a-zA-Z0-9\-]+$`), max size; inserts group + members; auto-adds creator as admin.
     - `update_group` — updates name/display_name with uniqueness check.
@@ -61,6 +61,8 @@ The work is organized into 15 incremental tasks, each producing a buildable arti
   - _Requirements: 9.1, 9.3, P5.1–P5.9_
   - _writes: crates/collab/src/db/queries/groups.rs_
   - _edits: crates/collab/src/db/queries/mod.rs_
+  - _Completed: Implemented the complete database group query surface with validation, uniqueness checks, admin inclusion, membership reconciliation, leave behavior, member lookup, user-group lookup, and count helpers; the existing cross-database group test covers the core invariants and member limits.
+  - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests test_group_queries_sqlite --features test-support`; `CARGO_INCREMENTAL=0 cargo check -p collab --features collab/test-support`; `git diff --check`._
 
 - [ ] 6. Register and implement server RPC handlers
   - Register six new request handlers in `rpc.rs`: `create_group`, `update_group`, `delete_group`, `get_groups`, `update_group_members`, `leave_group`.
