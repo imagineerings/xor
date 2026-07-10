@@ -203,6 +203,40 @@ async fn test_join_request_expiry_approval_race(db: &Arc<Database>) {
 }
 
 test_both_dbs!(
+    test_join_request_request_approval_race,
+    test_join_request_request_approval_race_postgres,
+    test_join_request_request_approval_race_sqlite
+);
+
+async fn test_join_request_request_approval_race(db: &Arc<Database>) {
+    let (store, owner_id, requester_id, channel_id) = setup(db).await;
+    store
+        .request_join(channel_id, requester_id, None)
+        .await
+        .unwrap();
+
+    let (requested, approved) = join(
+        store.request_join(channel_id, requester_id, Some("retry".to_string())),
+        store.approve_join_request(channel_id, requester_id),
+    )
+    .await;
+    let requested = requested.is_ok();
+    let approved = approved.unwrap();
+    assert_eq!(
+        store.count_pending_requests(channel_id).await.unwrap(),
+        requested as u64
+    );
+
+    if approved {
+        let channel = db.get_channel(channel_id, owner_id).await.unwrap();
+        let members = db.get_channel_members(&channel, 10).await.unwrap();
+        assert!(members.iter().any(|member| {
+            member.user_id == requester_id && member.accepted && member.role == ChannelRole::Member
+        }));
+    }
+}
+
+test_both_dbs!(
     test_join_request_channel_delete_cascades,
     test_join_request_channel_delete_cascades_postgres,
     test_join_request_channel_delete_cascades_sqlite
