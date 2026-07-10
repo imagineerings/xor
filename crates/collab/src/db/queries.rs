@@ -6,6 +6,7 @@ pub mod channels;
 pub mod contacts;
 pub mod contributors;
 pub mod extensions;
+pub mod groups;
 pub mod notification_preferences;
 pub mod notifications;
 pub mod projects;
