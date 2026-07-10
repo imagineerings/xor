@@ -218,6 +218,12 @@ This plan implements custom user status — emoji + short text labels with optio
   - [x] 16.1 Property 5.1 (text length) — generate random strings up to 200 chars; verify rejection boundary at 100
     - _Completed: Added a proptest over generated Unicode strings truncated to 200 characters, asserting the exact empty/100-character validation boundary._
     - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --lib rpc::tests --features test-support`._
-  - [ ] 16.2 Property 5.3 (timer expiry) — generate random future timestamps; verify status cleared after timestamp passes
-  - [ ] 16.3 Property 5.4 (clear idempotency) — generate sequences of set/clear operations; verify clear always succeeds
-  - [ ] 16.4 Property 5.9 (one status per user) — generate concurrent `SetStatus` for same user; verify exactly one row exists
+  - [x] 16.2 Property 5.3 (timer expiry) — generate random future timestamps; verify status cleared after timestamp passes
+    - _Completed: Generated future expiry offsets against the SQLite store and verified statuses remain visible before, then clear after, each boundary._
+    - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests property_custom_status_ --features test-support`._
+  - [x] 16.3 Property 5.4 (clear idempotency) — generate sequences of set/clear operations; verify clear always succeeds
+    - _Completed: Generated mixed set/clear sequences and verified every repeated clear remains idempotent against the store._
+    - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests property_custom_status_ --features test-support`._
+  - [x] 16.4 Property 5.9 (one status per user) — generate concurrent `SetStatus` for same user; verify exactly one row exists
+    - _Completed: Generated repeated status values for one user and verified the persistent upsert path retains exactly one latest row._
+    - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests property_custom_status_ --features test-support`._

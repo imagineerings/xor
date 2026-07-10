@@ -1,8 +1,8 @@
-use super::new_test_user;
+use super::{TestDb, new_test_user};
 use crate::test_both_dbs;
-use collab::{
-    db::{Database, user_status_store::UserStatusStore},
-};
+use collab::db::{Database, user_status_store::UserStatusStore};
+use futures::future::join_all;
+use proptest::{prelude::*, strategy::ValueTree, test_runner::TestRunner};
 use std::sync::Arc;
 use time::{Duration, OffsetDateTime, PrimitiveDateTime};
 
@@ -75,9 +75,106 @@ async fn test_user_status_store_expires_statuses(db: &Arc<Database>) {
         .await
         .unwrap();
 
-    assert_eq!(store.delete_expired_custom_statuses(now).await.unwrap(), vec![expired_user_id]);
+    assert_eq!(
+        store.delete_expired_custom_statuses(now).await.unwrap(),
+        vec![expired_user_id]
+    );
     assert!(!store.delete_custom_status(expired_user_id).await.unwrap());
     assert!(store.delete_custom_status(active_user_id).await.unwrap());
+}
+
+#[gpui::test]
+async fn property_custom_status_expiry_boundaries(cx: &mut gpui::TestAppContext) {
+    let test_db = TestDb::sqlite(cx.executor().clone());
+    let db = test_db.db();
+    let user_id = new_test_user(db).await;
+    let store = UserStatusStore::new(db.clone());
+    let mut runner = TestRunner::default();
+    let strategy = 1_i64..3_600_i64;
+
+    for _ in 0..32 {
+        let seconds_until_expiry = strategy.new_tree(&mut runner).unwrap().current();
+        let now = utc_now();
+        let expires_at = now + Duration::seconds(seconds_until_expiry);
+        store
+            .upsert_custom_status(
+                user_id,
+                None,
+                "Testing expiry".to_string(),
+                Some(expires_at),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            store
+                .get_custom_statuses(vec![user_id])
+                .await
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            store
+                .delete_expired_custom_statuses(expires_at + Duration::seconds(1))
+                .await
+                .unwrap(),
+            vec![user_id]
+        );
+    }
+}
+
+#[gpui::test]
+async fn property_custom_status_clear_is_idempotent(cx: &mut gpui::TestAppContext) {
+    let test_db = TestDb::sqlite(cx.executor().clone());
+    let db = test_db.db();
+    let user_id = new_test_user(db).await;
+    let store = UserStatusStore::new(db.clone());
+    let mut runner = TestRunner::default();
+    let strategy = prop::collection::vec(any::<bool>(), 1..20);
+
+    for _ in 0..32 {
+        for set_status in strategy.new_tree(&mut runner).unwrap().current() {
+            if set_status {
+                store
+                    .upsert_custom_status(user_id, None, "Testing clear".to_string(), None)
+                    .await
+                    .unwrap();
+            } else {
+                store.delete_custom_status(user_id).await.unwrap();
+                assert!(!store.delete_custom_status(user_id).await.unwrap());
+            }
+        }
+    }
+}
+
+#[gpui::test]
+async fn property_custom_status_upserts_keep_one_row_per_user(cx: &mut gpui::TestAppContext) {
+    let test_db = TestDb::sqlite(cx.executor().clone());
+    let db = test_db.db();
+    let user_id = new_test_user(db).await;
+    let store = UserStatusStore::new(db.clone());
+    let mut runner = TestRunner::default();
+    let strategy = prop::collection::vec(
+        proptest::string::string_regex("[a-z]{1,16}").unwrap(),
+        1..20,
+    );
+
+    for _ in 0..32 {
+        let status_texts = strategy.new_tree(&mut runner).unwrap().current();
+        let results = join_all(
+            status_texts
+                .iter()
+                .cloned()
+                .map(|status_text| store.upsert_custom_status(user_id, None, status_text, None)),
+        )
+        .await;
+        for result in results {
+            result.unwrap();
+        }
+        let statuses = store.get_custom_statuses(vec![user_id]).await.unwrap();
+        assert_eq!(statuses.len(), 1);
+        assert!(status_texts.contains(&statuses[0].status_text));
+    }
 }
 
 fn utc_now() -> PrimitiveDateTime {

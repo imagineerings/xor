@@ -3795,7 +3795,7 @@ impl CollabPanel {
                 reason,
                 ..
             } => Some(Self::join_request_presentation(
-                user_store.get_cached_user(*requesting_user_id).cloned(),
+                user_store.get_cached_user(*requesting_user_id),
                 channel_name,
                 reason.as_deref(),
             )),
@@ -3855,8 +3855,8 @@ impl CollabPanel {
     ) -> (Option<Arc<User>>, String) {
         let requester_name = requester
             .as_ref()
-            .map(|requester| requester.github_login.as_ref())
-            .unwrap_or("Someone");
+            .map(|requester| requester.github_login.to_string())
+            .unwrap_or_else(|| "Someone".to_string());
         let reason = reason
             .map(|reason| format!(": {reason}"))
             .unwrap_or_default();
