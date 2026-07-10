@@ -164,7 +164,7 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _Completed: Added an admin-only pending-request list that fetches requests, resolves requester profiles, renders their reasons and timestamps, emits typed selection events, and refreshes when a matching `JoinRequestAdded` push arrives._
   - _Validation: `cargo check -p collab_ui`._
 
-- [ ] 16. Implement `RequestDetailPanel`
+- [x] 16. Implement `RequestDetailPanel`
   - Create `RequestDetailPanel` struct with `request: PendingRequestViewModel`, `show_denial_input: bool`, `denial_reason: SharedString`.
   - Implement `Render`: requester profile (avatar, name, username), timestamp (relative format), reason text (or "No reason provided"), Approve button, Deny button.
   - On Deny click: show denial reason text field if not already visible, then send `RespondToJoinRequest(approve: false)`.
@@ -172,6 +172,8 @@ Add a join request workflow for private channels, enabling non-members to reques
   - Call `cx.notify()` after response to trigger parent list refresh.
   - _Requirements: 10.2 (AC 2, AC 3, AC 4)_
   - _writes: crates/collab_ui/src/request_detail_panel.rs_
+  - _Completed: Added requester details, visible reason/timestamp, approve and deny actions with an optional denial reason, response errors, and a completion event for parent refreshes._
+  - _Validation: `cargo check -p collab_ui`._
 
 - [ ] 17. Integrate pending requests tab into channel member management modal
   - Add a new tab "Pending Requests" with badge count from `ChannelStore::pending_request_count`.

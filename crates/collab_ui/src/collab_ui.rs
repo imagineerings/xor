@@ -11,6 +11,7 @@ pub mod draft_store;
 pub mod notifications;
 mod panel_settings;
 pub mod pending_requests_list;
+pub mod request_detail_panel;
 pub mod request_to_join_panel;
 
 use std::{rc::Rc, sync::Arc};
