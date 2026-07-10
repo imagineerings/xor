@@ -1,5 +1,7 @@
 use super::*;
+use crate::priority_badge::PriorityBadge;
 use chrono::{NaiveDate, Utc};
+use client::MessagePriority;
 
 #[derive(Default)]
 pub(super) struct SearchState {
@@ -815,9 +817,17 @@ impl ChannelChat {
                 }
             }))
             .child(
-                Label::new(header)
-                    .size(LabelSize::XSmall)
-                    .color(Color::Muted),
+                h_flex()
+                    .gap_2()
+                    .items_center()
+                    .child(
+                        Label::new(header)
+                            .size(LabelSize::XSmall)
+                            .color(Color::Muted),
+                    )
+                    .child(PriorityBadge::new(MessagePriority::from_proto_value(
+                        message.priority,
+                    ))),
             )
             .child(self.render_search_result_body(&message.body, cx))
             .into_any_element()

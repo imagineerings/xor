@@ -9,6 +9,14 @@ pub enum MessagePriority {
 }
 
 impl MessagePriority {
+    pub fn from_proto_value(priority: i32) -> Self {
+        match priority {
+            1 => Self::Important,
+            2 => Self::Urgent,
+            _ => Self::Normal,
+        }
+    }
+
     pub fn label(self) -> Option<&'static str> {
         match self {
             Self::Normal => None,

@@ -48,10 +48,11 @@ Add message priority levels (Normal, Important, Urgent) to channel messages in S
   - _Completed: Added the shared client priority enum with protocol conversion, labels, and UI-independent color/icon tokens._
   - _Validation: `cargo check -p client`._
 
-- [ ] 8. Add `priority` field to client-side `ChannelMessage` struct
+- [x] 8. Add `priority` field to client-side `ChannelMessage` struct
   - Extend the model with `priority: MessagePriority`, deserialized from proto `ChannelMessage`.
   - _Requirements: 12.1, 12.3_
   - _writes: crates/client/src/channel_message.rs_
+  - _Completed: Channel messages are generated protocol models in this client; priority decoding is centralized in `MessagePriority::from_proto_value`, which treats unrecognized values as Normal._
 
 ### Phase 2: Server-Side Logic
 
@@ -105,30 +106,35 @@ Add message priority levels (Normal, Important, Urgent) to channel messages in S
 
 ### Phase 4: Client — Priority Display
 
-- [ ] 17. Build `PriorityBadge` component
+- [x] 17. Build `PriorityBadge` component
   - Render a colored icon + label before the message timestamp. Normal → nothing. Important → amber `AlertTriangle` icon + "Important". Urgent → red `AlertOctagon` icon + "Urgent".
   - _Requirements: 12.3_
   - _writes: crates/collab_ui/src/priority_badge.rs_
+  - _Completed: Added a shared badge that omits Normal and shows semantic warning/error icon and label treatments for Important and Urgent._
 
-- [ ] 18. Render `PriorityBadge` in the main channel message list
+- [x] 18. Render `PriorityBadge` in the main channel message list
   - Insert `PriorityBadge::render` into each channel message element, before the timestamp. Only messages with non-Normal priority produce a visible badge.
   - _Requirements: 12.3_
   - _writes: crates/collab_ui/src/channel_view.rs_
+  - _Completed: Rendered the badge in the current channel-chat message header before the timestamp._
 
-- [ ] 19. Render `PriorityBadge` in thread replies
+- [x] 19. Render `PriorityBadge` in thread replies
   - Include the badge in each thread reply message, same position as the main channel.
   - _Requirements: 12.4_
   - _writes: crates/collab_ui/src/thread_view.rs_
+  - _Completed: Rendered the same badge in the current thread reply header before the timestamp._
 
-- [ ] 20. Show root-message priority in thread summary badge
+- [x] 20. Show root-message priority in thread summary badge
   - When a thread's root message has Important/Urgent priority, display the priority indicator next to the reply count in the main channel thread summary.
   - _Requirements: 12.4_
   - _writes: crates/collab_ui/src/thread_summary.rs_
+  - _Completed: Thread indicators now include the root message priority beside the reply count._
 
-- [ ] 21. Render `PriorityBadge` in search results
+- [x] 21. Render `PriorityBadge` in search results
   - Include the badge in channel message search result items.
   - _Requirements: 12.3_
   - _writes: crates/collab_ui/src/search_results.rs_
+  - _Completed: Channel message search results now include the shared priority badge._
 
 ### Phase 5: Client — Urgent Notifications
 

@@ -4,6 +4,7 @@ use crate::{
     channel_bookmark_store::ChannelBookmarkStore,
     channel_file_upload::{UploadManager, UploadProgress, UploadStatus},
     draft_store::DraftStore,
+    priority_badge::PriorityBadge,
     status_display::StatusDisplay,
 };
 use anyhow::Result;
@@ -13,7 +14,8 @@ use chrono::{
     TimeZone as _, Timelike as _, Utc,
 };
 use client::{
-    AddBookmark, Bookmark, BookmarkId, ChannelId, Client, UpdateBookmark, UserStore,
+    AddBookmark, Bookmark, BookmarkId, ChannelId, Client, MessagePriority, UpdateBookmark,
+    UserStore,
     channel_chat::{
         DEFAULT_THREAD_REPLY_LIMIT, ScheduleChannelMessage, SearchChannelMessages,
         SendChannelMessage, ThreadSummary, UpdateScheduledMessage,
@@ -324,6 +326,7 @@ struct ThreadIndicator {
     message_id: u64,
     reply_count: u32,
     has_unread: bool,
+    priority: MessagePriority,
     participants: Vec<Arc<client::User>>,
 }
 
@@ -363,6 +366,7 @@ impl ThreadIndicator {
                     this.open_thread(message_id, window, cx);
                 })),
             )
+            .child(PriorityBadge::new(self.priority))
             .when(!faces.is_empty(), |this| this.child(Facepile::new(faces)))
             .when(extra_count > 0, |this| {
                 this.child(
@@ -2028,6 +2032,7 @@ impl ChannelChat {
             reaction_summaries: Vec::new(),
             scheduled_at: None,
             files: Vec::new(),
+            priority: 0,
         };
 
         thread_panel.send_state = SendState::Sending;
@@ -2201,6 +2206,7 @@ impl ChannelChat {
             .scheduled_at
             .and_then(format_scheduled_message_label);
         let edited = message.edited_at.is_some();
+        let priority = MessagePriority::from_proto_value(message.priority);
 
         v_flex()
             .gap_1()
@@ -2226,6 +2232,7 @@ impl ChannelChat {
                                 this.child(StatusDisplay::new(sender_status.clone()))
                             }),
                     )
+                    .child(PriorityBadge::new(priority))
                     .child(
                         Label::new(timestamp)
                             .size(LabelSize::XSmall)
@@ -2292,6 +2299,12 @@ impl ChannelChat {
             message_id,
             reply_count: summary.reply_count,
             has_unread: summary.has_unread,
+            priority: MessagePriority::from_proto_value(
+                self.messages
+                    .iter()
+                    .find(|message| message.id == message_id)
+                    .map_or(0, |message| message.priority),
+            ),
             participants,
         }
         .render(cx)
@@ -2311,6 +2324,7 @@ impl ChannelChat {
             .custom_status_for_user(message.sender_id);
         let timestamp = format_timestamp(message.timestamp);
         let edited = message.edited_at.is_some();
+        let priority = MessagePriority::from_proto_value(message.priority);
 
         v_flex()
             .gap_1()
@@ -2331,6 +2345,7 @@ impl ChannelChat {
                                 this.child(StatusDisplay::new(sender_status.clone()))
                             }),
                     )
+                    .child(PriorityBadge::new(priority))
                     .child(
                         Label::new(timestamp)
                             .size(LabelSize::XSmall)
