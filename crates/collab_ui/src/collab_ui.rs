@@ -10,6 +10,7 @@ pub mod collab_panel;
 pub mod draft_store;
 pub mod notifications;
 mod panel_settings;
+pub mod request_to_join_panel;
 
 use std::{rc::Rc, sync::Arc};
 

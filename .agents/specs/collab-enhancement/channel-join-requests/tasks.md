@@ -129,7 +129,7 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _Completed: Added pending-request count state and lookup to the shared channel store. `UpdateChannels` applies nonzero counts and clears entries when the server sends zero._
   - _Validation: `cargo test -p channel test_pending_join_request_counts`._
 
-- [ ] 13. Implement `RequestToJoinPanel`
+- [x] 13. Implement `RequestToJoinPanel`
   - Create `RequestToJoinPanel` struct with `channel_id`, `reason` (editable `SharedString`), `state: RequestState`.
   - Define `RequestState` enum: `Idle`, `Sending`, `Sent`, `AlreadyRequested`, `Error(SharedString)`.
   - Implement `Render`:
@@ -142,6 +142,8 @@ Add a join request workflow for private channels, enabling non-members to reques
   - Handle `AlreadyRequested` error from the server and transition to `AlreadyRequested` state.
   - _Requirements: 10.1 (AC 1, AC 2, AC 3)_
   - _writes: crates/collab_ui/src/request_to_join_panel.rs_
+  - _Completed: Added a requester panel with an optional reason editor, request RPC submission, sending, sent, duplicate-request, and retryable error states._
+  - _Validation: `cargo check -p collab_ui`._
 
 - [ ] 14. Integrate `RequestToJoinPanel` into workspace/channel navigation
   - In the channel navigation logic (when user clicks a private channel they are not a member of), show `RequestToJoinPanel` instead of `ChannelView`.
