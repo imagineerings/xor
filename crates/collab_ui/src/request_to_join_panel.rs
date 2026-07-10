@@ -1,14 +1,19 @@
 use channel::ChannelStore;
 use client::ChannelId;
 use editor::{Editor, EditorEvent};
-use gpui::{Context, Entity, Render, SharedString, Subscription, Window, prelude::*};
+use gpui::{
+    Context, DismissEvent, Entity, EventEmitter, FocusHandle, Focusable, Render, SharedString,
+    Subscription, Window, prelude::*,
+};
 use rpc::proto;
 use ui::{Button, Label, LabelSize, prelude::*};
+use workspace::ModalView;
 
 pub struct RequestToJoinPanel {
     channel_id: ChannelId,
     reason_editor: Entity<Editor>,
     channel_store: Entity<ChannelStore>,
+    focus_handle: FocusHandle,
     state: RequestState,
     _reason_subscription: Subscription,
 }
@@ -59,6 +64,7 @@ impl RequestToJoinPanel {
             channel_id,
             reason_editor,
             channel_store,
+            focus_handle: cx.focus_handle(),
             state: RequestState::Idle,
             _reason_subscription: reason_subscription,
         }
@@ -97,6 +103,15 @@ impl RequestToJoinPanel {
     }
 }
 
+impl EventEmitter<DismissEvent> for RequestToJoinPanel {}
+impl ModalView for RequestToJoinPanel {}
+
+impl Focusable for RequestToJoinPanel {
+    fn focus_handle(&self, _: &gpui::App) -> FocusHandle {
+        self.focus_handle.clone()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -131,6 +146,10 @@ impl Render for RequestToJoinPanel {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let reason_length = self.reason_editor.read(cx).text(cx).chars().count();
         v_flex()
+            .key_context("RequestToJoinPanel")
+            .track_focus(&self.focus_handle)
+            .elevation_3(cx)
+            .w(rems(30.))
             .size_full()
             .p_4()
             .gap_3()

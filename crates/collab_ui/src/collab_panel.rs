@@ -9,6 +9,7 @@ use crate::{
     channel_view::ChannelView,
     draft_store::DraftStore,
     group_management::GroupManagement,
+    request_to_join_panel::RequestToJoinPanel,
     status_display::StatusDisplay,
     user_status_modal::UserStatusModal,
 };
@@ -2801,6 +2802,23 @@ impl CollabPanel {
             return;
         };
 
+        let channel_store = self.channel_store.clone();
+        let should_request_to_join = {
+            let channel_store = channel_store.read(cx);
+            Self::should_request_to_join(
+                channel_store.channel_role(channel_id),
+                channel_store.is_public_channel(channel_id),
+            )
+        };
+        if should_request_to_join {
+            workspace.update(cx, |workspace, cx| {
+                workspace.toggle_modal(window, cx, |window, cx| {
+                    RequestToJoinPanel::new(channel_id, channel_store.clone(), window, cx)
+                });
+            });
+            return;
+        }
+
         let Some(handle) = window.window_handle().downcast::<MultiWorkspace>() else {
             return;
         };
@@ -2812,6 +2830,10 @@ impl CollabPanel {
             cx,
         )
         .detach_and_prompt_err("Failed to join channel", window, cx, |_, _, _| None)
+    }
+
+    fn should_request_to_join(role: proto::ChannelRole, is_public: bool) -> bool {
+        role == proto::ChannelRole::Guest && !is_public
     }
 
     fn copy_channel_link(&mut self, channel_id: ChannelId, cx: &mut Context<Self>) {
@@ -4503,6 +4525,22 @@ mod tests {
             ),
             Some(ChannelId(42))
         );
+    }
+
+    #[test]
+    fn private_guest_channels_open_the_join_request_panel() {
+        assert!(CollabPanel::should_request_to_join(
+            proto::ChannelRole::Guest,
+            false
+        ));
+        assert!(!CollabPanel::should_request_to_join(
+            proto::ChannelRole::Guest,
+            true
+        ));
+        assert!(!CollabPanel::should_request_to_join(
+            proto::ChannelRole::Member,
+            false
+        ));
     }
 }
 

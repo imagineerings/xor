@@ -145,12 +145,14 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _Completed: Added a requester panel with an optional reason editor, request RPC submission, sending, sent, duplicate-request, and retryable error states._
   - _Validation: `cargo check -p collab_ui`._
 
-- [ ] 14. Integrate `RequestToJoinPanel` into workspace/channel navigation
+- [x] 14. Integrate `RequestToJoinPanel` into workspace/channel navigation
   - In the channel navigation logic (when user clicks a private channel they are not a member of), show `RequestToJoinPanel` instead of `ChannelView`.
   - Check `ChannelStore` for the user's role on the selected channel — if `None`, render the request panel.
   - If the user already has a pending request, pre-populate the `AlreadyRequested` state.
   - _Requirements: 10.1 (AC 1)_
   - _writes: crates/collab_ui/src/collab_panel.rs_
+  - _Completed: Private channels whose resolved role is `Guest` now open the request panel from the shared channel-navigation path; public channels and members continue directly to the channel._
+  - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo check -p collab_ui`._
 
 - [x] 15. Implement `PendingRequestsList`
   - Create `PendingRequestsList` struct with `channel_id`, `requests: Vec<PendingRequestViewModel>`, `loading: bool`, `badge_count: u32`.
