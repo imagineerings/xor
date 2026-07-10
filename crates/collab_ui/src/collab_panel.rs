@@ -3748,6 +3748,20 @@ impl CollabPanel {
                     format!("Your request to join the #{channel_name} channel was denied{reason}"),
                 ))
             }
+            Notification::UrgentMessage {
+                sender_id,
+                message_preview,
+                ..
+            } => {
+                let sender = user_store.get_cached_user(*sender_id)?;
+                Some((
+                    Some(sender.clone()),
+                    format!(
+                        "{} marked a message urgent: {message_preview}",
+                        sender.github_login
+                    ),
+                ))
+            }
         }
     }
 
@@ -4240,7 +4254,8 @@ impl CollabNotificationToast {
                     Notification::ContactRequestAccepted { .. }
                     | Notification::JoinRequest { .. }
                     | Notification::JoinRequestApproved { .. }
-                    | Notification::JoinRequestDenied { .. } => {}
+                    | Notification::JoinRequestDenied { .. }
+                    | Notification::UrgentMessage { .. } => {}
                 })
                 .ok();
         }
@@ -4272,6 +4287,16 @@ impl CollabNotificationToast {
                 });
             }
             Notification::JoinRequestApproved { channel_id, .. } => {
+                let workspace = self.workspace.clone();
+                window.defer(cx, move |window, cx| {
+                    let Some(workspace) = workspace.upgrade() else {
+                        return;
+                    };
+                    ChannelView::open(ChannelId(channel_id), None, workspace, window, cx)
+                        .detach_and_log_err(cx);
+                });
+            }
+            Notification::UrgentMessage { channel_id, .. } => {
                 let workspace = self.workspace.clone();
                 window.defer(cx, move |window, cx| {
                     let Some(workspace) = workspace.upgrade() else {

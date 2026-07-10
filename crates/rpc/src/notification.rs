@@ -51,6 +51,13 @@ pub enum Notification {
         channel_name: String,
         reason: Option<String>,
     },
+    UrgentMessage {
+        #[serde(rename = "entity_id")]
+        message_id: u64,
+        channel_id: u64,
+        sender_id: u64,
+        message_preview: String,
+    },
 }
 
 impl Notification {
@@ -119,6 +126,12 @@ mod tests {
                 channel_id: 100,
                 channel_name: "the-channel".into(),
                 reason: Some("Members only".into()),
+            },
+            Notification::UrgentMessage {
+                message_id: 200,
+                channel_id: 100,
+                sender_id: 50,
+                message_preview: "Please review this now".into(),
             },
         ] {
             let message = notification.to_proto();

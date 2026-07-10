@@ -57,7 +57,8 @@ use futures::{
 use prometheus::{IntGauge, register_int_gauge};
 use rand::Rng as _;
 use rpc::{
-    Connection, ConnectionId, ErrorCode, ErrorCodeExt, ErrorExt, Peer, Receipt, TypedEnvelope,
+    Connection, ConnectionId, ErrorCode, ErrorCodeExt, ErrorExt, Notification, Peer, Receipt,
+    TypedEnvelope,
     proto::{
         self, Ack, AnyTypedEnvelope, EntityMessage, EnvelopedMessage, LiveKitConnectionInfo,
         RequestMessage, ShareProject, UpdateChannelBufferCollaborators,
@@ -3984,7 +3985,83 @@ async fn send_channel_message(
     response.send(proto::SendChannelMessageResponse {
         message: Some(message.clone()),
     })?;
-    broadcast_channel_message_sent(&session, channel_id, message).await
+    broadcast_channel_message_sent(&session, channel_id, message.clone()).await?;
+    if priority == 2 {
+        dispatch_urgent_notifications(&session, channel_id, &message).await?;
+    }
+    Ok(())
+}
+
+async fn dispatch_urgent_notifications(
+    session: &MessageContext,
+    channel_id: ChannelId,
+    message: &proto::ChannelMessage,
+) -> Result<()> {
+    let db = session.db().await;
+    let database = db.0.clone();
+    let channel = db.get_channel(channel_id, session.user_id()).await?;
+    let root_channel_id = channel.root_id();
+    let sender_id = session.user_id();
+    let message_id = MessageId::from_proto(message.id);
+    let message_preview = message.body.chars().take(200).collect::<String>();
+    let notifications = database
+        .transaction(|tx| {
+            let database = database.clone();
+            let message_preview = message_preview.clone();
+            async move {
+                let members = db::channel_member::Entity::find()
+                    .filter(db::channel_member::Column::ChannelId.eq(root_channel_id))
+                    .filter(db::channel_member::Column::Accepted.eq(true))
+                    .all(&*tx)
+                    .await?;
+                let mut notifications = Vec::new();
+                for member in members {
+                    if member.user_id == sender_id {
+                        continue;
+                    }
+                    if let Some(notification) = database
+                        .create_notification(
+                            member.user_id,
+                            Notification::UrgentMessage {
+                                message_id: message_id.to_proto(),
+                                channel_id: channel_id.to_proto(),
+                                sender_id: sender_id.to_proto(),
+                                message_preview: message_preview.clone(),
+                            },
+                            true,
+                            &tx,
+                        )
+                        .await?
+                    {
+                        notifications.push(notification);
+                    }
+                }
+                Ok(notifications)
+            }
+        })
+        .await?;
+
+    let connection_pool = session.connection_pool().await;
+    for (recipient_id, notification) in &notifications {
+        for connection_id in connection_pool.user_connection_ids(*recipient_id) {
+            session.peer.send(
+                connection_id,
+                proto::UrgentMessageNotification {
+                    channel_id: channel_id.to_proto(),
+                    message_id: message_id.to_proto(),
+                    sender_id: sender_id.to_proto(),
+                    message_preview: message_preview.clone(),
+                },
+            )?;
+            session.peer.send(
+                connection_id,
+                proto::AddNotification {
+                    notification: Some(notification.clone()),
+                },
+            )?;
+        }
+    }
+    Ok(())
 }
 
 fn channel_message_priority_from_proto(priority: Option<i32>) -> Result<i16> {

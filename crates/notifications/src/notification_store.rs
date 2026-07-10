@@ -258,6 +258,9 @@ impl NotificationStore {
                 } => {
                     user_ids.push(contact_id);
                 }
+                Notification::UrgentMessage { sender_id, .. } => {
+                    user_ids.push(sender_id);
+                }
                 Notification::JoinRequestApproved { .. }
                 | Notification::JoinRequestDenied { .. } => {}
             }
