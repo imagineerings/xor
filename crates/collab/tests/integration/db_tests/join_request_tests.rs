@@ -4,6 +4,7 @@ use collab::{
     db::{ChannelId, ChannelRole, Database, UserId, join_request_store::JoinRequestStore},
     jobs::expire_join_requests_with_ttl,
 };
+use futures::future::join;
 use rpc::Notification;
 use std::sync::Arc;
 use time::{Duration, OffsetDateTime, PrimitiveDateTime};
@@ -134,6 +135,71 @@ async fn test_expire_join_requests_creates_notification(db: &Arc<Database>) {
             reason: Some("Your join request has expired.".to_string()),
         })
     );
+}
+
+test_both_dbs!(
+    test_join_request_approval_race,
+    test_join_request_approval_race_postgres,
+    test_join_request_approval_race_sqlite
+);
+
+async fn test_join_request_approval_race(db: &Arc<Database>) {
+    let (store, owner_id, requester_id, channel_id) = setup(db).await;
+    store
+        .request_join(channel_id, requester_id, None)
+        .await
+        .unwrap();
+
+    let (first, second) = join(
+        store.approve_join_request(channel_id, requester_id),
+        store.approve_join_request(channel_id, requester_id),
+    )
+    .await;
+    let first = first.unwrap();
+    let second = second.unwrap();
+    assert_ne!(first, second);
+    assert!(store.count_pending_requests(channel_id).await.unwrap() == 0);
+
+    let channel = db.get_channel(channel_id, owner_id).await.unwrap();
+    let members = db.get_channel_members(&channel, 10).await.unwrap();
+    assert_eq!(
+        members
+            .iter()
+            .filter(|member| member.user_id == requester_id && member.accepted)
+            .count(),
+        1
+    );
+}
+
+test_both_dbs!(
+    test_join_request_expiry_approval_race,
+    test_join_request_expiry_approval_race_postgres,
+    test_join_request_expiry_approval_race_sqlite
+);
+
+async fn test_join_request_expiry_approval_race(db: &Arc<Database>) {
+    let (store, owner_id, requester_id, channel_id) = setup(db).await;
+    store
+        .request_join(channel_id, requester_id, None)
+        .await
+        .unwrap();
+
+    let threshold = utc_now() + Duration::seconds(1);
+    let (approved, expired) = join(
+        store.approve_join_request(channel_id, requester_id),
+        store.expire_old_requests(threshold),
+    )
+    .await;
+    assert!(approved.is_ok() || expired.is_ok());
+    assert_eq!(store.count_pending_requests(channel_id).await.unwrap(), 0);
+
+    if approved.unwrap_or(false) {
+        let channel = db.get_channel(channel_id, owner_id).await.unwrap();
+        let members = db.get_channel_members(&channel, 10).await.unwrap();
+        assert!(members.iter().any(|member| {
+            member.user_id == requester_id && member.accepted && member.role == ChannelRole::Member
+        }));
+    }
 }
 
 async fn setup(db: &Arc<Database>) -> (JoinRequestStore, UserId, UserId, ChannelId) {

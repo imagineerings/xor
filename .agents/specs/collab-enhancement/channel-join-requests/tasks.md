@@ -241,9 +241,13 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _writes: crates/collab/tests/channel_join_requests.rs_
 
 - [ ] 23. Concurrency tests
-  - [ ] 23.1 Race: two admins respond simultaneously — both try to approve same request; first succeeds, second gets "request no longer exists"; no duplicate member creation.
+  - [x] 23.1 Race: two admins respond simultaneously — both try to approve same request; first succeeds, second gets "request no longer exists"; no duplicate member creation.
+    - _Completed: Added a SQLite/Postgres store race test proving concurrent approvals produce one success, one no-op, and one accepted membership._
+    - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests join_request_approval_race_sqlite --features test-support`._
   - [ ] 23.2 Race: user requests while admin responds — verify transactional isolation (either request or response wins, never inconsistent state).
-  - [ ] 23.3 Race: expiry job runs while admin responds — verify row-level locking prevents double-processing.
+  - [x] 23.3 Race: expiry job runs while admin responds — verify row-level locking prevents double-processing.
+    - _Completed: Added a concurrent approval/expiry store test proving the request is removed exactly once and approval creates membership only when it wins._
+    - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests join_request_expiry_approval_race_sqlite --features test-support`._
   - _Requirements: 10.2_
   - _writes: crates/collab/tests/channel_join_requests.rs_
 
