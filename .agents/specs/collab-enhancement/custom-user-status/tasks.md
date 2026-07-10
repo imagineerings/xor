@@ -149,8 +149,10 @@ This plan implements custom user status — emoji + short text labels with optio
     - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests test_custom_status_rpc_validation_and_clear_idempotency --features test-support`._
   - [ ] 12.3 `test_expiry_sweeper` - expired rows are deleted and broadcasts sent
     - _writes: crates/collab/src/status_expiry_sweeper.rs_ (or separate test file)
+    - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests custom_status_expiry_sweeper_deletes_expired_statuses --features test-support` verifies expired-row deletion; peer broadcast assertion remains open._
   - [ ] 12.4 `test_expiry_sweeper_no_expired` - sweep with no expired rows produces no broadcasts
     - _writes: crates/collab/src/status_expiry_sweeper.rs_
+    - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests custom_status_expiry_sweeper_ignores_active_statuses --features test-support` verifies no expired rows are returned; peer broadcast assertion remains open._
   - [ ] 12.5 `test_set_status_persistence` - verifies upsert creates/updates row correctly
     - _writes: crates/collab/src/db/_ (tests module)
 

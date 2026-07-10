@@ -12,14 +12,17 @@ use collab::{
     db::{
         ChannelId as DbChannelId, ChannelRole as DbChannelRole, GroupId as DbGroupId,
         ScheduledMessageId as DbScheduledMessageId, UserId as DbUserId, channel_file,
-        scheduled_message_store::ScheduledMessageStore,
+        scheduled_message_store::ScheduledMessageStore, user_status_store::UserStatusStore,
     },
-    rpc::{RECONNECT_TIMEOUT, Server},
+    executor::Executor,
+    rpc::{ConnectionPool, RECONNECT_TIMEOUT, Server},
+    status_expiry_sweeper::StatusExpirySweeper,
 };
 use gpui::{AppContext, BackgroundExecutor, TestAppContext};
 use pretty_assertions::assert_eq;
 use rpc::{ErrorExt as _, Notification};
 use sea_orm::EntityTrait as _;
+use std::sync::Arc;
 use std::time::Duration as StdDuration;
 use time::{Duration as TimeDuration, OffsetDateTime, PrimitiveDateTime};
 use uuid::Uuid;
@@ -237,6 +240,74 @@ async fn join_request_response_requires_channel_admin(
         .await
         .unwrap_err();
     assert!(error.to_string().contains("admin"));
+}
+
+#[gpui::test]
+async fn custom_status_expiry_sweeper_deletes_expired_statuses(
+    executor: BackgroundExecutor,
+    cx: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor.clone()).await;
+    let client = server.create_client(cx, "status-owner").await;
+    let expired_at = OffsetDateTime::now_utc() - TimeDuration::minutes(1);
+    let expired_at = PrimitiveDateTime::new(expired_at.date(), expired_at.time());
+    UserStatusStore::new(server.app_state.db.clone())
+        .upsert_custom_status(
+            DbUserId::from_proto(client.user_id().unwrap()),
+            Some("📅".to_string()),
+            "Expired".to_string(),
+            Some(expired_at),
+        )
+        .await
+        .unwrap();
+
+    let sweeper = StatusExpirySweeper::new(
+        server.app_state.db.clone(),
+        Executor::Deterministic(executor.clone()),
+        rpc::Peer::new(0),
+        Arc::new(parking_lot::Mutex::new(ConnectionPool::default())),
+    );
+    let expired_users = sweeper.sweep().await.unwrap();
+    assert_eq!(
+        expired_users,
+        vec![DbUserId::from_proto(client.user_id().unwrap())]
+    );
+    assert!(
+        UserStatusStore::new(server.app_state.db.clone())
+            .get_custom_statuses(vec![DbUserId::from_proto(client.user_id().unwrap())])
+            .await
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[gpui::test]
+async fn custom_status_expiry_sweeper_ignores_active_statuses(
+    executor: BackgroundExecutor,
+    cx: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor.clone()).await;
+    let client = server.create_client(cx, "status-owner").await;
+    UserStatusStore::new(server.app_state.db.clone())
+        .upsert_custom_status(
+            DbUserId::from_proto(client.user_id().unwrap()),
+            None,
+            "Active".to_string(),
+            Some(PrimitiveDateTime::new(
+                (OffsetDateTime::now_utc() + TimeDuration::hours(1)).date(),
+                (OffsetDateTime::now_utc() + TimeDuration::hours(1)).time(),
+            )),
+        )
+        .await
+        .unwrap();
+
+    let sweeper = StatusExpirySweeper::new(
+        server.app_state.db.clone(),
+        Executor::Deterministic(executor.clone()),
+        rpc::Peer::new(0),
+        Arc::new(parking_lot::Mutex::new(ConnectionPool::default())),
+    );
+    assert!(sweeper.sweep().await.unwrap().is_empty());
 }
 
 #[gpui::test]
