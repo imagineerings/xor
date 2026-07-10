@@ -185,10 +185,11 @@ Add message priority levels (Normal, Important, Urgent) to channel messages in S
   - _Requirements: 12.2_
   - _writes: crates/collab/src/rpc/urgent_notifications.rs (tests module)_
 
-- [ ] 30. Client unit tests: `MessagePriority` enum methods
+- [x] 30. Client unit tests: `MessagePriority` enum methods
   - Verify `color()`, `icon()`, `label()` return correct values for each variant. Verify `From<proto>` conversion.
   - _Requirements: 12.3_
   - _writes: crates/client/src/message_priority.rs (tests module)_
+  - _Completed: Added coverage for display metadata, known protocol conversions, and unknown-value fallback._
 
 - [ ] 31. Client unit tests: `PriorityBadge` rendering
   - GPUI unit test: render each priority level and verify icon presence, text content, and color class.

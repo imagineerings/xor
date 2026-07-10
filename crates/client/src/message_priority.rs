@@ -59,3 +59,63 @@ impl From<proto::ChannelMessagePriority> for MessagePriority {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn priority_display_metadata_matches_each_level() {
+        assert_eq!(MessagePriority::Normal.label(), None);
+        assert_eq!(MessagePriority::Normal.color_token(), None);
+        assert_eq!(MessagePriority::Normal.icon_token(), None);
+
+        assert_eq!(MessagePriority::Important.label(), Some("Important"));
+        assert_eq!(MessagePriority::Important.color_token(), Some("warning"));
+        assert_eq!(
+            MessagePriority::Important.icon_token(),
+            Some("alert-triangle")
+        );
+
+        assert_eq!(MessagePriority::Urgent.label(), Some("Urgent"));
+        assert_eq!(MessagePriority::Urgent.color_token(), Some("error"));
+        assert_eq!(MessagePriority::Urgent.icon_token(), Some("alert-octagon"));
+    }
+
+    #[test]
+    fn priority_protocol_conversion_preserves_known_values() {
+        for (priority, value, proto_priority) in [
+            (
+                MessagePriority::Normal,
+                0,
+                proto::ChannelMessagePriority::Normal,
+            ),
+            (
+                MessagePriority::Important,
+                1,
+                proto::ChannelMessagePriority::Important,
+            ),
+            (
+                MessagePriority::Urgent,
+                2,
+                proto::ChannelMessagePriority::Urgent,
+            ),
+        ] {
+            assert_eq!(priority.to_proto(), value);
+            assert_eq!(MessagePriority::from_proto_value(value), priority);
+            assert_eq!(MessagePriority::from(proto_priority), priority);
+        }
+    }
+
+    #[test]
+    fn unrecognized_protocol_values_default_to_normal() {
+        assert_eq!(
+            MessagePriority::from_proto_value(-1),
+            MessagePriority::Normal
+        );
+        assert_eq!(
+            MessagePriority::from_proto_value(3),
+            MessagePriority::Normal
+        );
+    }
+}

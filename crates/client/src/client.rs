@@ -2539,6 +2539,7 @@ mod tests {
                     edited_at: None,
                     reaction_summaries: Vec::new(),
                     scheduled_at: None,
+                    priority: 0,
                 }),
             },
         );
@@ -2606,6 +2607,7 @@ mod tests {
                     edited_at: None,
                     reaction_summaries: Vec::new(),
                     scheduled_at: None,
+                    priority: 0,
                 }),
                 replies: vec![proto::ChannelMessage {
                     id: 12,
@@ -2619,6 +2621,7 @@ mod tests {
                     edited_at: None,
                     reaction_summaries: Vec::new(),
                     scheduled_at: None,
+                    priority: 0,
                 }],
                 done: true,
             },
@@ -2703,6 +2706,7 @@ mod tests {
                 edited_at: None,
                 reaction_summaries: Vec::new(),
                 scheduled_at: None,
+                priority: 0,
             }),
         });
         assert_eq!(sent_rx.recv().await.unwrap().channel_id, 7);
@@ -2721,6 +2725,7 @@ mod tests {
                 edited_at: Some(3),
                 reaction_summaries: Vec::new(),
                 scheduled_at: None,
+                priority: 0,
             }),
         });
         assert_eq!(
