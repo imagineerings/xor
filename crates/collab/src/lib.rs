@@ -7,6 +7,7 @@ pub mod executor;
 pub mod jobs;
 pub mod rpc;
 pub mod services;
+pub mod status_expiry_sweeper;
 
 use anyhow::Context as _;
 use aws_config::{BehaviorVersion, Region};

@@ -41,7 +41,7 @@ This plan implements custom user status — emoji + short text labels with optio
   - _Completed: Added set/clear handlers with text, emoji, and clear-duration validation; persisted updates through UserStatusStore; and broadcast typed changes to every connected session._
   - _Validation: `cargo check -p collab --features collab/test-support`._
 
-- [ ] 4. Implement `StatusExpirySweeper`
+- [x] 4. Implement `StatusExpirySweeper`
   - Create `StatusExpirySweeper` struct in `crates/collab/src/` with `db: Arc<Database>` and `executor: Executor`
   - Implement `new()`, `start() -> Task<()>` (periodic loop every 30s), and `sweep() -> Result<Vec<UserId>>`
   - `sweep` runs `DELETE FROM user_custom_statuses WHERE expires_at < NOW() RETURNING user_id` and broadcasts `UpdateUserStatus { status: None }` for each cleared user
@@ -49,6 +49,8 @@ This plan implements custom user status — emoji + short text labels with optio
   - Errors are logged but do not halt the sweep loop
   - _Requirements: 8.2 (AC 1)_
   - _writes: crates/collab/src/status_expiry_sweeper.rs, crates/collab/src/main.rs_ (or equivalent server init)
+  - _Completed: Added a 30-second StatusExpirySweeper started with the collab server. It deletes expired statuses through UserStatusStore, broadcasts removal updates to all active sessions, and logs errors without stopping the loop._
+  - _Validation: `cargo check -p collab --features collab/test-support`._
 
 - [x] 5. Add DB query methods for `user_custom_statuses`
   - [x] 5.1 Add `upsert_custom_status(user_id, emoji, text, expires_at)` to the database layer

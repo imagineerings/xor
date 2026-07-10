@@ -589,6 +589,13 @@ impl Server {
             )
             .instrument(span.clone()),
         );
+        crate::status_expiry_sweeper::StatusExpirySweeper::new(
+            self.app_state.db.clone(),
+            self.app_state.executor.clone(),
+            self.peer.clone(),
+            self.connection_pool.clone(),
+        )
+        .start();
         self.app_state.executor.spawn_detached(
             async move {
                 tracing::info!("waiting for cleanup timeout");
