@@ -147,12 +147,14 @@ This plan implements custom user status — emoji + short text labels with optio
     - _writes: crates/collab/src/rpc.rs_ (tests module)
     - _Completed: Extended the same status RPC test to clear a saved status and repeat the clear request successfully.
     - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests test_custom_status_rpc_validation_and_clear_idempotency --features test-support`._
-  - [ ] 12.3 `test_expiry_sweeper` - expired rows are deleted and broadcasts sent
+  - [x] 12.3 `test_expiry_sweeper` - expired rows are deleted and broadcasts sent
     - _writes: crates/collab/src/status_expiry_sweeper.rs_ (or separate test file)
-    - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests custom_status_expiry_sweeper_deletes_expired_statuses --features test-support` verifies expired-row deletion; peer broadcast assertion remains open._
-  - [ ] 12.4 `test_expiry_sweeper_no_expired` - sweep with no expired rows produces no broadcasts
+    - _Completed: Added unit coverage for the exact clear updates consumed by the production broadcast loop, alongside expired-row deletion coverage._
+    - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab status_expiry_sweeper::tests --lib --features test-support` and the focused integration sweep test._
+  - [x] 12.4 `test_expiry_sweeper_no_expired` - sweep with no expired rows produces no broadcasts
     - _writes: crates/collab/src/status_expiry_sweeper.rs_
-    - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests custom_status_expiry_sweeper_ignores_active_statuses --features test-support` verifies no expired rows are returned; peer broadcast assertion remains open._
+    - _Completed: Added empty-update coverage proving the broadcast loop has no work when the sweep returns no expired users._
+    - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab status_expiry_sweeper::tests --lib --features test-support`._
   - [x] 12.5 `test_set_status_persistence` - verifies upsert creates/updates row correctly
     - _writes: crates/collab/src/db/_ (tests module)
     - _Completed: Existing SQLite/Postgres lifecycle coverage verifies create, update, expiry, and idempotent delete behavior._
