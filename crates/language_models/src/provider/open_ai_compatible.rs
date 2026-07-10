@@ -6,9 +6,10 @@ use gpui::{AnyView, App, AsyncApp, Context, Entity, SharedString, Task, TaskExt,
 use http_client::{CustomHeaders, HttpClient};
 use language_model::{
     ApiKeyState, AuthenticateError, EnvVar, IconOrSvg, LanguageModel, LanguageModelCompletionError,
-    LanguageModelCompletionEvent, LanguageModelId, LanguageModelName, LanguageModelProvider,
-    LanguageModelProviderId, LanguageModelProviderName, LanguageModelProviderState,
-    LanguageModelRequest, LanguageModelToolChoice, LanguageModelToolSchemaFormat, RateLimiter,
+    LanguageModelCompletionEvent, LanguageModelEffortLevel, LanguageModelId, LanguageModelName,
+    LanguageModelProvider, LanguageModelProviderId, LanguageModelProviderName,
+    LanguageModelProviderState, LanguageModelRequest, LanguageModelToolChoice,
+    LanguageModelToolSchemaFormat, RateLimiter,
 };
 use menu;
 use open_ai::{
@@ -303,6 +304,33 @@ impl OpenAiCompatibleLanguageModel {
     }
 }
 
+fn default_thinking_reasoning_effort(model: &AvailableModel) -> Option<open_ai::ReasoningEffort> {
+    model
+        .reasoning_effort
+        .filter(|effort| *effort != open_ai::ReasoningEffort::None)
+}
+
+fn supported_thinking_effort_levels(model: &AvailableModel) -> Vec<LanguageModelEffortLevel> {
+    let Some(default_effort) = default_thinking_reasoning_effort(model) else {
+        return Vec::new();
+    };
+
+    [
+        (open_ai::ReasoningEffort::Minimal, "Minimal", "minimal"),
+        (open_ai::ReasoningEffort::Low, "Low", "low"),
+        (open_ai::ReasoningEffort::Medium, "Medium", "medium"),
+        (open_ai::ReasoningEffort::High, "High", "high"),
+        (open_ai::ReasoningEffort::XHigh, "Extra High", "xhigh"),
+    ]
+    .into_iter()
+    .map(|(effort, name, value)| LanguageModelEffortLevel {
+        name: name.into(),
+        value: value.into(),
+        is_default: effort == default_effort,
+    })
+    .collect()
+}
+
 impl LanguageModel for OpenAiCompatibleLanguageModel {
     fn id(&self) -> LanguageModelId {
         self.id.clone()
@@ -347,6 +375,14 @@ impl LanguageModel for OpenAiCompatibleLanguageModel {
 
     fn supports_streaming_tools(&self) -> bool {
         true
+    }
+
+    fn supports_thinking(&self) -> bool {
+        default_thinking_reasoning_effort(&self.model).is_some()
+    }
+
+    fn supported_effort_levels(&self) -> Vec<LanguageModelEffortLevel> {
+        supported_thinking_effort_levels(&self.model)
     }
 
     fn supports_split_token_display(&self) -> bool {
@@ -420,6 +456,69 @@ impl LanguageModel for OpenAiCompatibleLanguageModel {
             }
             .boxed()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn available_model(reasoning_effort: Option<open_ai::ReasoningEffort>) -> AvailableModel {
+        AvailableModel {
+            name: "custom-model".to_string(),
+            display_name: None,
+            max_tokens: 128_000,
+            max_output_tokens: None,
+            max_completion_tokens: None,
+            reasoning_effort,
+            capabilities: ModelCapabilities::default(),
+        }
+    }
+
+    #[test]
+    fn configured_reasoning_effort_supports_thinking() {
+        assert_eq!(
+            default_thinking_reasoning_effort(&available_model(Some(
+                open_ai::ReasoningEffort::High
+            ))),
+            Some(open_ai::ReasoningEffort::High)
+        );
+    }
+
+    #[test]
+    fn missing_or_none_reasoning_effort_does_not_support_thinking() {
+        assert_eq!(
+            default_thinking_reasoning_effort(&available_model(None)),
+            None
+        );
+        assert_eq!(
+            default_thinking_reasoning_effort(&available_model(Some(
+                open_ai::ReasoningEffort::None
+            ))),
+            None
+        );
+    }
+
+    #[test]
+    fn supported_thinking_effort_levels_use_configured_effort_as_default() {
+        let effort_levels = supported_thinking_effort_levels(&available_model(Some(
+            open_ai::ReasoningEffort::High,
+        )));
+
+        assert_eq!(
+            effort_levels
+                .iter()
+                .map(|level| level.value.as_ref())
+                .collect::<Vec<_>>(),
+            ["minimal", "low", "medium", "high", "xhigh"]
+        );
+        assert_eq!(
+            effort_levels
+                .iter()
+                .find(|level| level.is_default)
+                .map(|level| level.value.as_ref()),
+            Some("high")
+        );
     }
 }
 
