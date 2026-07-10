@@ -1,9 +1,15 @@
 use client::FileAttachment;
 use gpui::{
-    AnyElement, App, ImageSource, IntoElement, ParentElement, RenderOnce, Resource, SharedUri,
-    Styled as _, Window, img, px,
+    AnyElement, App, Context, DismissEvent, EventEmitter, FocusHandle, Focusable, ImageSource,
+    IntoElement, ObjectFit, ParentElement, Render, RenderOnce, Resource, SharedUri, Styled as _,
+    Window, img, px,
 };
-use ui::{Button, ButtonStyle, Color, Icon, IconName, IconSize, Label, LabelSize, prelude::*};
+use std::rc::Rc;
+use ui::{
+    Button, ButtonStyle, Color, Icon, IconButton, IconName, IconSize, Label, LabelSize, Tooltip,
+    prelude::*,
+};
+use workspace::ModalView;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum FileKind {
@@ -18,11 +24,20 @@ pub(super) enum FileKind {
 #[derive(IntoElement)]
 pub(super) struct FileAttachmentRenderer {
     file: FileAttachment,
+    on_open_image: Option<ImageOpenHandler>,
 }
 
+type ImageOpenHandler = Rc<dyn Fn(FileAttachment, &mut Window, &mut App)>;
+
 impl FileAttachmentRenderer {
-    pub(super) fn new(file: FileAttachment) -> Self {
-        Self { file }
+    pub(super) fn with_image_open_handler(
+        file: FileAttachment,
+        on_open_image: ImageOpenHandler,
+    ) -> Self {
+        Self {
+            file,
+            on_open_image: Some(on_open_image),
+        }
     }
 
     pub(super) fn detect_file_kind(mime_type: &str, filename: &str) -> FileKind {
@@ -31,7 +46,7 @@ impl FileAttachmentRenderer {
             .rsplit_once('.')
             .map(|(_, extension)| extension.to_ascii_lowercase());
 
-        if mime_type.starts_with("image/") {
+        if mime_type.starts_with("image/") || is_image_extension(extension.as_deref()) {
             return FileKind::Image;
         }
         if mime_type.starts_with("video/") {
@@ -51,17 +66,26 @@ impl FileAttachmentRenderer {
     }
 
     fn render_image_preview(&self, cx: &mut App) -> AnyElement {
+        let file = self.file.clone();
+        let on_open_image = self.on_open_image.clone();
         v_flex()
             .gap_2()
             .child(
                 img(ImageSource::Resource(Resource::Uri(SharedUri::from(
-                    self.file.url.clone(),
+                    file.url.clone(),
                 ))))
+                .id(format!("channel-image-preview-{}", file.id))
                 .max_h(px(220.))
                 .max_w(px(360.))
+                .object_fit(ObjectFit::ScaleDown)
                 .rounded_sm()
                 .border_1()
-                .border_color(cx.theme().colors().border),
+                .border_color(cx.theme().colors().border)
+                .when_some(on_open_image, |this, on_open_image| {
+                    this.cursor_pointer().on_click(move |_, window, cx| {
+                        on_open_image(file.clone(), window, cx);
+                    })
+                }),
             )
             .child(self.render_file_card(cx))
             .into_any_element()
@@ -149,6 +173,81 @@ impl FileAttachmentRenderer {
     }
 }
 
+pub(super) struct ImagePreviewModal {
+    file: FileAttachment,
+    focus_handle: FocusHandle,
+}
+
+impl ImagePreviewModal {
+    pub(super) fn new(file: FileAttachment, cx: &mut Context<Self>) -> Self {
+        Self {
+            file,
+            focus_handle: cx.focus_handle(),
+        }
+    }
+
+    fn dismiss(&mut self, _: &menu::Cancel, _: &mut Window, cx: &mut Context<Self>) {
+        cx.emit(DismissEvent);
+    }
+}
+
+impl EventEmitter<DismissEvent> for ImagePreviewModal {}
+impl ModalView for ImagePreviewModal {
+    fn fade_out_background(&self) -> bool {
+        true
+    }
+}
+
+impl Focusable for ImagePreviewModal {
+    fn focus_handle(&self, _: &App) -> FocusHandle {
+        self.focus_handle.clone()
+    }
+}
+
+impl Render for ImagePreviewModal {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let file = self.file.clone();
+        v_flex()
+            .id("channel-image-preview-modal")
+            .key_context("ChannelImagePreview")
+            .track_focus(&self.focus_handle)
+            .on_action(cx.listener(Self::dismiss))
+            .gap_3()
+            .p_3()
+            .w(px(900.))
+            .max_w(px(900.))
+            .rounded_md()
+            .border_1()
+            .border_color(cx.theme().colors().border)
+            .bg(cx.theme().colors().elevated_surface_background)
+            .child(
+                h_flex()
+                    .w_full()
+                    .justify_between()
+                    .items_center()
+                    .gap_3()
+                    .child(Label::new(file.filename.clone()).truncate())
+                    .child(
+                        IconButton::new("close-channel-image-preview", IconName::Close)
+                            .icon_size(IconSize::Small)
+                            .tooltip(Tooltip::text("Close image preview"))
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                this.dismiss(&menu::Cancel, window, cx);
+                            })),
+                    ),
+            )
+            .child(
+                img(ImageSource::Resource(Resource::Uri(SharedUri::from(
+                    file.url,
+                ))))
+                .w_full()
+                .max_h(px(640.))
+                .object_fit(ObjectFit::ScaleDown)
+                .rounded_sm(),
+            )
+    }
+}
+
 impl RenderOnce for FileAttachmentRenderer {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         match Self::detect_file_kind(&self.file.mime_type, &self.file.filename) {
@@ -170,6 +269,13 @@ fn icon_for_file_kind(file_kind: FileKind) -> IconName {
         FileKind::Code => IconName::FileCode,
         FileKind::Other => IconName::FileGeneric,
     }
+}
+
+fn is_image_extension(extension: Option<&str>) -> bool {
+    matches!(
+        extension,
+        Some("png" | "jpg" | "jpeg" | "gif" | "webp" | "svg")
+    )
 }
 
 fn file_metadata_label(file: &FileAttachment) -> String {
@@ -273,6 +379,20 @@ mod tests {
 
     #[test]
     fn detects_file_kind_from_extension_fallback() {
+        for filename in [
+            "image.png",
+            "image.jpg",
+            "image.jpeg",
+            "image.gif",
+            "image.webp",
+            "image.svg",
+        ] {
+            assert_eq!(
+                FileAttachmentRenderer::detect_file_kind("application/octet-stream", filename),
+                FileKind::Image,
+                "{filename} should render as an image"
+            );
+        }
         assert_eq!(
             FileAttachmentRenderer::detect_file_kind("application/octet-stream", "main.rs"),
             FileKind::Code

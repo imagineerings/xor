@@ -35,6 +35,7 @@ use std::{
     any::TypeId,
     collections::HashMap,
     path::PathBuf,
+    rc::Rc,
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -2330,12 +2331,29 @@ impl ChannelChat {
             return div().into_any_element();
         }
 
+        let workspace = self.workspace.clone();
         v_flex()
             .gap_2()
             .children(files.iter().cloned().filter_map(|file| {
                 client::FileAttachment::try_from(file)
                     .log_err()
-                    .map(file_renderer::FileAttachmentRenderer::new)
+                    .map(|file| {
+                        file_renderer::FileAttachmentRenderer::with_image_open_handler(
+                            file,
+                            Rc::new({
+                                let workspace = workspace.clone();
+                                move |file, window, cx| {
+                                    workspace
+                                        .update(cx, |workspace, cx| {
+                                            workspace.toggle_modal(window, cx, |_, cx| {
+                                                file_renderer::ImagePreviewModal::new(file, cx)
+                                            });
+                                        })
+                                        .log_err();
+                                }
+                            }),
+                        )
+                    })
             }))
             .into_any_element()
     }

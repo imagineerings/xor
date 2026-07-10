@@ -9,7 +9,7 @@ Sim channels currently support only text messages. This design adds file attachm
 - **Storage**: Files are stored on the existing server-side object storage (S3-compatible, similar to existing file storage for editor buffers).
 - **New proto types**: `FileAttachment` message, `channel_id` + `file_id` on `ChannelMessage`, `UploadFile`/`GetFileUploadUrl` RPCs.
 - **File size limits**: Configurable server-side; enforced during upload URL generation.
-- **Preview rendering**: Leverage existing `media` and `image_viewer` crates for inline previews; PDF preview via existing `pdf_preview` component.
+- **Preview rendering**: Render remote image attachments with GPUI's `Image` element. Image previews remain bounded in the message flow and open an in-app workspace modal for larger examination; PDF files render as a file card with an external-view action.
 - **Drag-and-drop**: Use existing GPUI file-drop events on the compose area.
 
 ## 2. Architecture
@@ -29,6 +29,7 @@ flowchart TB
     subgraph Client Display
         I[Channel View] --> J[FileAttachmentRenderer]
         J -->|image| K[Inline Image Preview]
+        K -->|click| K1[Workspace Image Lightbox]
         J -->|PDF| L[PDF Thumbnail + Link]
         J -->|video/audio| M[Media Player]
         J -->|code/text| N[Syntax Highlighted Snippet]
@@ -140,6 +141,11 @@ impl UploadManager {
 ```
 
 ### 3.3 FileAttachmentRenderer (Client)
+
+`FileAttachmentRenderer` detects images from their MIME type or a PNG, JPEG, GIF, WebP, or SVG extension. It renders a bounded remote preview in the message flow. `ChannelChat` supplies a workspace-aware click handler that opens an `ImagePreviewModal` containing the same remote image at a larger, scale-down-constrained size. The modal restores focus when dismissed through its Close control, Escape, or the modal backdrop.
+
+<!-- impl: crates/collab_ui/src/channel_chat/file_renderer.rs#ImagePreviewModal -->
+<!-- impl: crates/collab_ui/src/channel_chat.rs#ChannelChat::render_message_files -->
 
 ```rust
 pub struct FileAttachmentRenderer;
@@ -292,5 +298,5 @@ _For any_ uploaded image file, the server SHALL generate a thumbnail (max 400px 
 
 - **Unit tests**: FileStore.GenerateUploadUrl validation, ConfirmUpload, GetFileMetadata
 - **Integration tests**: Upload file → ConfirmUpload → fetch message → verify FileAttachment exists
-- **UI tests**: Drag-and-drop onto compose area, file picker dialog, progress bar rendering, image preview rendering
+- **UI tests**: Drag-and-drop onto compose area, file picker dialog, progress bar rendering, image preview rendering, and image lightbox opening
 - **Security tests**: Verify presigned URL cannot be used to upload files larger than requested size, verify MIME type spoofing rejection

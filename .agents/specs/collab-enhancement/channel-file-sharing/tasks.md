@@ -150,12 +150,15 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
   - _Actual writes: crates/collab_ui/src/channel_chat/file_renderer.rs; crates/collab_ui/src/channel_chat.rs_
   - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `rustfmt --edition 2024 crates/collab_ui/src/channel_chat.rs crates/collab_ui/src/channel_chat/file_renderer.rs`; `git diff --check`._
 
-- [ ] 14. Render image inline previews
+- [x] 14. Render image inline previews
   - Add `render_image_preview`: load and display image using existing `Image` element or `media` crate.
   - Support PNG, JPEG, GIF, WebP, SVG.
   - Click-to-open lightbox/gallery view for larger examination.
   - _Requirements: 4.2_
   - _writes: crates/collab_ui/src/channel_chat/file_renderer.rs_
+  - _Completed: Added bounded inline previews for PNG, JPEG, GIF, WebP, and SVG attachments, plus an in-app lightbox modal for examining an image at a larger size without leaving the channel._
+  - _Actual writes: crates/collab_ui/src/channel_chat/file_renderer.rs; crates/collab_ui/src/channel_chat.rs_
+  - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab_ui file_renderer --features test-support`; `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `git diff --check`._
 
 - [x] 15. Render PDF thumbnails
   - Add `render_pdf_thumbnail`: show a PDF icon thumbnail with filename and a "View PDF" link/button.
