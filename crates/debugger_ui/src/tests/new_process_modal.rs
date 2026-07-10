@@ -7,7 +7,7 @@ use serde_json::json;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use task::{
-    SimDebugConfig, DebugRequest, DebugScenario, LaunchRequest, SharedTaskContext, TaskContext,
+    DebugRequest, DebugScenario, LaunchRequest, SharedTaskContext, SimDebugConfig, TaskContext,
     VariableName,
 };
 use text::Point;
@@ -112,8 +112,7 @@ async fn test_debug_session_substitutes_variables_and_relativizes_paths(
                         );
 
                         let expected_other_field = if input_path.contains("$SIM_WORKTREE_ROOT") {
-                            input_path
-                                .replace("$SIM_WORKTREE_ROOT", path!("/test/worktree/path"))
+                            input_path.replace("$SIM_WORKTREE_ROOT", path!("/test/worktree/path"))
                         } else {
                             input_path.to_string()
                         };

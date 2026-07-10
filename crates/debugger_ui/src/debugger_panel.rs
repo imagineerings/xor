@@ -22,7 +22,6 @@ use gpui::{
     Subscription, Task, TaskExt, WeakEntity, anchored, deferred,
 };
 
-use sim_actions::debug_panel::ToggleFocus;
 use itertools::Itertools as _;
 use language::Buffer;
 use project::debugger::session::{Session, SessionQuirks, SessionState, SessionStateEvent};
@@ -30,6 +29,7 @@ use project::{DebugScenarioContext, Fs, ProjectPath, TaskSourceKind, WorktreeId}
 use project::{Project, debugger::session::ThreadStatus};
 use rpc::proto::{self};
 use settings::Settings;
+use sim_actions::debug_panel::ToggleFocus;
 use std::sync::{Arc, LazyLock};
 use task::{DebugScenario, SharedTaskContext};
 use tree_sitter::{Query, StreamingIterator as _};
@@ -1463,10 +1463,7 @@ async fn register_session_inner(
     .ok();
     let serialisim_layout = this
         .update(cx, |_, cx| {
-            persistence::get_serialisim_layout(
-                &adapter_name,
-                &db::kvp::KeyValueStore::global(cx),
-            )
+            persistence::get_serialisim_layout(&adapter_name, &db::kvp::KeyValueStore::global(cx))
         })
         .ok()
         .flatten();
@@ -1854,9 +1851,7 @@ impl Render for DebugPanel {
                                         .size(IconSize::Small)
                                         .color(Color::Muted),
                                 )
-                                .on_click(|_, _, cx| {
-                                    cx.open_url("https://sim.dev/docs/debugger")
-                                }),
+                                .on_click(|_, _, cx| cx.open_url("https://sim.dev/docs/debugger")),
                         )
                         .child(
                             Button::new(

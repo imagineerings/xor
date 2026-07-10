@@ -201,10 +201,7 @@ async fn upload_minidump(
             "sentry[tags][channel]",
             metadata.init.release_channel.clone(),
         )
-        .text(
-            "sentry[tags][version]",
-            metadata.init.sim_version.clone(),
-        )
+        .text("sentry[tags][version]", metadata.init.sim_version.clone())
         .text("sentry[tags][binary]", metadata.init.binary.clone())
         .text("sentry[release]", metadata.init.commit_sha.clone())
         .text("platform", "rust");

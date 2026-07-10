@@ -1,9 +1,5 @@
 use agent::ThreadStore;
 use agent_settings::AgentSettings;
-use sim_actions::{
-    agent::ToggleModelSelector,
-    editor::{MoveDown, MoveUp},
-};
 use collections::{HashMap, VecDeque};
 use editor::actions::Paste;
 use editor::code_context_menus::CodeContextMenu;
@@ -22,6 +18,10 @@ use markdown::{HeadingLevelStyles, Markdown, MarkdownElement, MarkdownStyle};
 use parking_lot::Mutex;
 use project::Project;
 use settings::Settings;
+use sim_actions::{
+    agent::ToggleModelSelector,
+    editor::{MoveDown, MoveUp},
+};
 use std::cmp;
 use std::ops::Range;
 use std::rc::Rc;

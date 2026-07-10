@@ -2,7 +2,7 @@ use client::{Client, UserStore};
 use codestral::{CodestralEditPredictionDelegate, load_codestral_api_key};
 use collections::HashMap;
 use copilot::CopilotEditPredictionDelegate;
-use edit_prediction::{SimEditPredictionDelegate, EditPredictionModel};
+use edit_prediction::{EditPredictionModel, SimEditPredictionDelegate};
 use editor::Editor;
 use gpui::{AnyWindowHandle, App, AppContext as _, Context, Entity, WeakEntity};
 use language::{
@@ -116,9 +116,9 @@ fn edit_prediction_provider_config_for_settings(cx: &App) -> Option<EditPredicti
     match provider {
         EditPredictionProvider::None => None,
         EditPredictionProvider::Copilot => Some(EditPredictionProviderConfig::Copilot),
-        EditPredictionProvider::Sim => Some(EditPredictionProviderConfig::Sim(
-            EditPredictionModel::Zeta,
-        )),
+        EditPredictionProvider::Sim => {
+            Some(EditPredictionProviderConfig::Sim(EditPredictionModel::Zeta))
+        }
         EditPredictionProvider::Codestral => Some(EditPredictionProviderConfig::Codestral),
         EditPredictionProvider::Ollama | EditPredictionProvider::OpenAiCompatibleApi => {
             let custom_settings = if provider == EditPredictionProvider::Ollama {
@@ -138,9 +138,7 @@ fn edit_prediction_provider_config_for_settings(cx: &App) -> Option<EditPredicti
             }
 
             if matches!(format, EditPredictionPromptFormat::Zeta(_)) {
-                Some(EditPredictionProviderConfig::Sim(
-                    EditPredictionModel::Zeta,
-                ))
+                Some(EditPredictionProviderConfig::Sim(EditPredictionModel::Zeta))
             } else {
                 Some(EditPredictionProviderConfig::Sim(
                     EditPredictionModel::Fim { format },

@@ -11,11 +11,11 @@ use gpui::{
     TextStyleRefinement, WeakEntity,
 };
 
-use sim_actions::editor::{MoveDown, MoveUp};
 use settings::{
     CenteredPaddingSettings, CodeFade, DelayMs, FontSize, FontWeightContent, InactiveOpacity,
     MinimumContrast,
 };
+use sim_actions::editor::{MoveDown, MoveUp};
 use ui::prelude::*;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]

@@ -1,7 +1,7 @@
-use sim_actions::{debug_panel, dev};
 use collab_ui::collab_panel;
 use gpui::{App, Menu, MenuItem, OsAction};
 use release_channel::ReleaseChannel;
+use sim_actions::{debug_panel, dev};
 use terminal_view::terminal_panel;
 
 pub fn app_menus(cx: &mut App) -> Vec<Menu> {
@@ -76,10 +76,7 @@ pub fn app_menus(cx: &mut App) -> Vec<Menu> {
                     MenuItem::separator(),
                     MenuItem::action("Open Keymap", sim_actions::OpenKeymap),
                     MenuItem::action("Open Keymap File", sim_actions::OpenKeymapFile),
-                    MenuItem::action(
-                        "Open Default Key Bindings",
-                        sim_actions::OpenDefaultKeymap,
-                    ),
+                    MenuItem::action("Open Default Key Bindings", sim_actions::OpenDefaultKeymap),
                     MenuItem::separator(),
                     MenuItem::action(
                         "Select Theme...",
@@ -226,10 +223,7 @@ pub fn app_menus(cx: &mut App) -> Vec<Menu> {
                 MenuItem::action("Back", workspace::GoBack),
                 MenuItem::action("Forward", workspace::GoForward),
                 MenuItem::separator(),
-                MenuItem::action(
-                    "Command Palette...",
-                    sim_actions::command_palette::Toggle,
-                ),
+                MenuItem::action("Command Palette...", sim_actions::command_palette::Toggle),
                 MenuItem::separator(),
                 MenuItem::action("Go to File...", workspace::ToggleFileFinder::default()),
                 // MenuItem::action("Go to Symbol in Project", project_symbols::Toggle),
@@ -300,14 +294,8 @@ pub fn app_menus(cx: &mut App) -> Vec<Menu> {
                 MenuItem::action("View Dependency Licenses", sim_actions::OpenLicenses),
                 MenuItem::action("Show Welcome", onboarding::ShowWelcome),
                 MenuItem::separator(),
-                MenuItem::action(
-                    "File Bug Report...",
-                    sim_actions::feedback::FileBugReport,
-                ),
-                MenuItem::action(
-                    "Request Feature...",
-                    sim_actions::feedback::RequestFeature,
-                ),
+                MenuItem::action("File Bug Report...", sim_actions::feedback::FileBugReport),
+                MenuItem::action("Request Feature...", sim_actions::feedback::RequestFeature),
                 MenuItem::action("Email Us...", sim_actions::feedback::EmailSim),
                 MenuItem::separator(),
                 MenuItem::action(

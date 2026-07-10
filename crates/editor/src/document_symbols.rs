@@ -329,10 +329,10 @@ mod tests {
         time::Duration,
     };
 
-    use sim_actions::editor::{MoveDown, MoveUp};
     use futures::StreamExt as _;
     use gpui::TestAppContext;
     use settings::{DocumentSymbols, SettingsStore};
+    use sim_actions::editor::{MoveDown, MoveUp};
     use util::path;
 
     use crate::{

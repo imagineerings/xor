@@ -479,9 +479,7 @@ async fn test_edit_prediction_invalidation_range(cx: &mut gpui::TestAppContext) 
 }
 
 #[gpui::test]
-async fn test_edit_prediction_jump_disabled_for_non_sim_providers(
-    cx: &mut gpui::TestAppContext,
-) {
+async fn test_edit_prediction_jump_disabled_for_non_sim_providers(cx: &mut gpui::TestAppContext) {
     init_test(cx, |_| {});
 
     let mut cx = EditorTestContext::new(cx).await;

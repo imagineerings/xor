@@ -16,7 +16,6 @@ use editor::{
 use futures_lite::future::yield_now;
 use git::repository::DiffType;
 
-use sim_actions::agent::ReviewBranchDiff;
 use git::{
     Commit, StageAll, StageAndNext, ToggleStaged, UnstageAll, UnstageAndNext, repository::RepoPath,
     status::FileStatus,
@@ -35,6 +34,7 @@ use project::{
     },
 };
 use settings::{Settings, SettingsStore};
+use sim_actions::agent::ReviewBranchDiff;
 use std::any::{Any, TypeId};
 use std::collections::BTreeMap;
 use std::sync::Arc;

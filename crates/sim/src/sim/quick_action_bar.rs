@@ -2,9 +2,6 @@ mod preview;
 mod repl_menu;
 
 use agent_settings::AgentSettings;
-use sim_actions::{
-    agent::AddSelectionToThread, assistant::InlineAssist, outline::ToggleOutline,
-};
 use editor::actions::{
     AddSelectionAbove, AddSelectionBelow, CodeActionSource, DuplicateLineDown, GoToDiagnostic,
     GoToHunk, GoToPreviousDiagnostic, GoToPreviousHunk, MoveLineDown, MoveLineUp, SelectAll,
@@ -21,6 +18,7 @@ use gpui::{
 use project::{DisableAiSettings, project_settings::DiagnosticSeverity};
 use search::{BufferSearchBar, buffer_search};
 use settings::{Settings, SettingsStore};
+use sim_actions::{agent::AddSelectionToThread, assistant::InlineAssist, outline::ToggleOutline};
 use ui::{
     ButtonStyle, ContextMenu, ContextMenuEntry, DocumentationSide, IconButton, IconName, IconSize,
     PopoverMenu, PopoverMenuHandle, Tooltip, prelude::*,

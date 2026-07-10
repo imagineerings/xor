@@ -79,14 +79,14 @@ pub use crate::inline_assistant::InlineAssistant;
 pub use crate::message_editor::MessageEditorEvent;
 pub use crate::thread_metadata_store::ThreadId;
 pub use agent_diff::{AgentDiffPane, AgentDiffToolbar};
-use sim_actions;
-pub use sim_actions::{CreateWorktree, NewWorktreeBranchTarget, SwitchWorktree};
 pub use conversation_view::open_markdown_in_workspace;
 pub use conversation_view::{ConversationView, StateChange};
 pub use external_source_prompt::ExternalSourcePrompt;
 pub(crate) use mode_selector::ModeSelector;
 pub(crate) use model_selector::ModelSelector;
 pub(crate) use model_selector_popover::ModelSelectorPopover;
+use sim_actions;
+pub use sim_actions::{CreateWorktree, NewWorktreeBranchTarget, SwitchWorktree};
 pub use thread_import::{
     AcpThreadImportOnboarding, CrossChannelImportOnboarding, ThreadImportModal,
     channels_with_threads, import_threads_from_other_channels,
@@ -798,8 +798,7 @@ fn update_command_palette_filter(cx: &mut App) {
             filter.hide_namespace("edit_prediction");
 
             filter.hide_action_types(&edit_prediction_actions);
-            filter
-                .hide_action_types(&[TypeId::of::<sim_actions::OpenSimPredictOnboarding>()]);
+            filter.hide_action_types(&[TypeId::of::<sim_actions::OpenSimPredictOnboarding>()]);
         } else {
             if agent_enabled {
                 filter.show_namespace("agent");
@@ -834,8 +833,7 @@ fn update_command_palette_filter(cx: &mut App) {
             }
 
             filter.show_namespace("sim_predict_onboarding");
-            filter
-                .show_action_types(&[TypeId::of::<sim_actions::OpenSimPredictOnboarding>()]);
+            filter.show_action_types(&[TypeId::of::<sim_actions::OpenSimPredictOnboarding>()]);
 
             filter.show_namespace("multi_workspace");
         }

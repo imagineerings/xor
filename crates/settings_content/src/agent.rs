@@ -496,16 +496,36 @@ impl AgentSettingsContent {
         }
     }
 
-    pub fn allow_sandbox_network(&mut self) {
+    pub fn allow_sandbox_all_hosts(&mut self) {
         self.sandbox_permissions
             .get_or_insert_default()
-            .allow_network = Some(true);
+            .allow_all_hosts = Some(true);
+    }
+
+    pub fn sandbox_network_hosts(&self) -> &[String] {
+        self.sandbox_permissions
+            .as_ref()
+            .and_then(|permissions| permissions.network_hosts.as_ref())
+            .map(|hosts| hosts.0.as_slice())
+            .unwrap_or_default()
+    }
+
+    pub fn set_sandbox_network_hosts(&mut self, hosts: Vec<String>) {
+        self.sandbox_permissions
+            .get_or_insert_default()
+            .network_hosts = Some(ExtendingVec(hosts));
     }
 
     pub fn allow_sandbox_fs_write_all(&mut self) {
         self.sandbox_permissions
             .get_or_insert_default()
             .allow_fs_write_all = Some(true);
+    }
+
+    pub fn allow_sandbox_git_access(&mut self) {
+        self.sandbox_permissions
+            .get_or_insert_default()
+            .allow_git_access = Some(true);
     }
 
     pub fn allow_sandbox_unsandboxed(&mut self) {
@@ -805,10 +825,22 @@ pub enum CustomAgentServerSettings {
 #[with_fallible_options]
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom)]
 pub struct SandboxPermissionsContent {
-    /// Whether sandboxed terminal commands may always use outbound network
-    /// access without prompting.
+    /// Whether sandboxed terminal commands may always reach any host over the
+    /// network without prompting.
     /// Default: false
-    pub allow_network: Option<bool>,
+    #[serde(alias = "allow_network")]
+    pub allow_all_hosts: Option<bool>,
+
+    /// Hosts that sandboxed terminal commands may always reach over the
+    /// network without prompting. Each entry is an exact hostname or a
+    /// leading-`*.` subdomain wildcard.
+    /// Default: []
+    pub network_hosts: Option<ExtendingVec<String>>,
+
+    /// Whether sandboxed terminal commands may always access protected Git
+    /// metadata without prompting.
+    /// Default: false
+    pub allow_git_access: Option<bool>,
 
     /// Whether sandboxed terminal commands may always write anywhere on the
     /// filesystem without prompting.
@@ -819,6 +851,10 @@ pub struct SandboxPermissionsContent {
     /// prompting when they request `unsandboxed: true`.
     /// Default: false
     pub allow_unsandboxed: Option<bool>,
+
+    /// Whether terminal sandboxing is turned off entirely.
+    /// Default: false
+    pub disabled: Option<bool>,
 
     /// Directory subtrees that sandboxed terminal commands may always write
     /// to without prompting. Paths written by Sim are absolute.
@@ -1137,13 +1173,24 @@ mod tests {
         let mut settings = AgentSettingsContent::default();
         assert!(settings.sandbox_permissions.is_none());
 
-        settings.allow_sandbox_network();
+        settings.allow_sandbox_all_hosts();
+        settings
+            .set_sandbox_network_hosts(vec!["github.com".to_string(), "*.npmjs.org".to_string()]);
         settings.allow_sandbox_fs_write_all();
         settings.allow_sandbox_unsandboxed();
         settings.add_sandbox_write_path(PathBuf::from("/tmp/build"));
 
         let sandbox_permissions = settings.sandbox_permissions.as_ref().unwrap();
-        assert_eq!(sandbox_permissions.allow_network, Some(true));
+        assert_eq!(sandbox_permissions.allow_all_hosts, Some(true));
+        assert_eq!(
+            sandbox_permissions
+                .network_hosts
+                .as_ref()
+                .unwrap()
+                .0
+                .as_slice(),
+            &["github.com".to_string(), "*.npmjs.org".to_string()]
+        );
         assert_eq!(sandbox_permissions.allow_fs_write_all, Some(true));
         assert_eq!(sandbox_permissions.allow_unsandboxed, Some(true));
         assert_eq!(

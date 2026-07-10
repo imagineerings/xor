@@ -329,8 +329,7 @@ pub fn init(cx: &mut App) {
 
         workspace.register_action(|_, _: &ToggleProjectPanelFocus, window, cx| {
             if Vim::take_count(cx).is_none() {
-                window
-                    .dispatch_action(sim_actions::project_panel::ToggleFocus.boxed_clone(), cx);
+                window.dispatch_action(sim_actions::project_panel::ToggleFocus.boxed_clone(), cx);
             }
         });
 

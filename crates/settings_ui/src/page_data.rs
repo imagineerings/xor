@@ -14,7 +14,7 @@ use crate::{
     SettingsPage, SettingsPageItem, SubPageLink, USER, active_language, all_language_names,
     pages::{
         open_audio_test_window, render_edit_prediction_setup_page, render_mobile_access_setup_page,
-        render_skills_setup_page, render_tool_permissions_setup_page,
+        render_sandbox_settings_page, render_skills_setup_page, render_tool_permissions_setup_page,
     },
 };
 
@@ -7979,6 +7979,19 @@ fn ai_page() -> SettingsPage {
                 in_json: false,
                 files: USER | PROJECT,
                 render: render_skills_setup_page,
+            }),
+            SettingsPageItem::SubPageLink(SubPageLink {
+                title: "Sandbox".into(),
+                r#type: Default::default(),
+                json_path: Some("agent.sandbox_permissions"),
+                description: Some(
+                    "Review and change the elevated terminal sandbox permissions that are always allowed without prompting."
+                        .into(),
+                ),
+                search_aliases: &["sandbox", "network", "hosts", "write paths", "permissions"],
+                in_json: true,
+                files: USER,
+                render: render_sandbox_settings_page,
             }),
             SettingsPageItem::SubPageLink(SubPageLink {
                 title: "Tool Permissions".into(),

@@ -492,9 +492,7 @@ pub fn register(workspace: &mut Workspace) {
             open_with_tab(workspace, GitPickerTab::Branches, window, cx);
         },
     );
-    workspace.register_action(
-        |workspace, _: &sim_actions::git::ViewStash, window, cx| {
-            open_with_tab(workspace, GitPickerTab::Stashes, window, cx);
-        },
-    );
+    workspace.register_action(|workspace, _: &sim_actions::git::ViewStash, window, cx| {
+        open_with_tab(workspace, GitPickerTab::Stashes, window, cx);
+    });
 }

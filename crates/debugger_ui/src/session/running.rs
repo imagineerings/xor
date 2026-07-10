@@ -47,7 +47,7 @@ use serde_json::Value;
 use settings::Settings;
 use stack_frame_list::StackFrameList;
 use task::{
-    SimDebugConfig, BuildTaskDefinition, DebugScenario, SharedTaskContext, Shell, ShellBuilder,
+    BuildTaskDefinition, DebugScenario, SharedTaskContext, Shell, ShellBuilder, SimDebugConfig,
     SpawnInTerminal, TaskContext, substitute_variables_in_str,
 };
 use terminal_view::TerminalView;

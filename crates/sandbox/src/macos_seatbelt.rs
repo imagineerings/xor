@@ -37,10 +37,26 @@ use tempfile::NamedTempFile;
 /// module deliberately doesn't expose).
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct SandboxPermissions {
-    /// Allow network access for the command.
-    pub allow_network: bool,
+    /// Network access policy for the command.
+    pub network: NetworkAccess,
     /// Allow unrestricted filesystem writes.
     pub allow_fs_write: bool,
+}
+
+/// Network-access setting for a sandboxed command.
+///
+/// The default blocks all outbound access. A later host-allowlist layer
+/// confines commands to a local proxy port; unrestricted access is always an
+/// explicit policy value.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum NetworkAccess {
+    /// All outbound network access is blocked.
+    #[default]
+    None,
+    /// Outbound TCP is limited to a local proxy port.
+    LocalhostPort(u16),
+    /// All outbound network access is allowed.
+    All,
 }
 
 /// A Seatbelt config file written to a temporary path on disk, suitable
@@ -66,11 +82,15 @@ impl SeatbeltConfigFile {
     /// false. Pass the project's worktree paths here — not the working
     /// directory of the command, since that is model-controlled and would
     /// let the model widen its own writable scope.
-    pub fn new(writable_directories: &[&Path], permissions: SandboxPermissions) -> Result<Self> {
+    pub fn new(
+        writable_directories: &[&Path],
+        protected_paths: &[&Path],
+        permissions: SandboxPermissions,
+    ) -> Result<Self> {
         let mut file =
             NamedTempFile::new().context("failed to create temporary Seatbelt config file")?;
 
-        let config = generate_seatbelt_config(writable_directories, permissions)?;
+        let config = generate_seatbelt_config(writable_directories, protected_paths, permissions)?;
         file.write_all(config.as_bytes())
             .context("failed to write Seatbelt config")?;
         file.flush().context("failed to flush Seatbelt config")?;
@@ -108,9 +128,10 @@ pub fn wrap_invocation(
     program: &str,
     args: &[String],
     writable_directories: &[&Path],
+    protected_paths: &[&Path],
     permissions: SandboxPermissions,
 ) -> Result<(String, Vec<String>, SeatbeltConfigFile)> {
-    let config_file = SeatbeltConfigFile::new(writable_directories, permissions)?;
+    let config_file = SeatbeltConfigFile::new(writable_directories, protected_paths, permissions)?;
 
     let mut wrapped_args = vec![
         "-f".to_string(),
@@ -146,12 +167,17 @@ pub fn wrap_invocation(
 /// [`SeatbeltConfigFile`] passed to `sandbox-exec -f`.
 fn generate_seatbelt_config(
     writable_directories: &[&Path],
+    protected_paths: &[&Path],
     permissions: SandboxPermissions,
 ) -> Result<String> {
     // Canonicalize each writable path to resolve symlinks (e.g.,
     // /var -> /private/var on macOS). Fall back to the original path if
     // canonicalization fails.
     let canonical_writable_directories: Vec<PathBuf> = writable_directories
+        .iter()
+        .map(|path| path.canonicalize().unwrap_or_else(|_| path.to_path_buf()))
+        .collect();
+    let canonical_protected_paths: Vec<PathBuf> = protected_paths
         .iter()
         .map(|path| path.canonicalize().unwrap_or_else(|_| path.to_path_buf()))
         .collect();
@@ -216,13 +242,33 @@ fn generate_seatbelt_config(
         );
     }
 
-    if permissions.allow_network {
-        config.push_str(
+    for protected_path in canonical_protected_paths {
+        let escaped_path = escape_sandbox_path(&protected_path)?;
+        config.push_str(&format!(
+            r#"
+; Block protected metadata contents unless explicitly approved
+(deny file-read-data file-write*
+    (subpath "{escaped_path}"))
+"#
+        ));
+    }
+
+    match permissions.network {
+        NetworkAccess::None => {}
+        NetworkAccess::All => config.push_str(
             r#"
 ; Allow network access
 (allow network*)
 "#,
-        );
+        ),
+        NetworkAccess::LocalhostPort(port) => config.push_str(&format!(
+            r#"
+; Allow outbound network only to the in-process proxy on localhost
+(allow network-outbound (remote tcp "localhost:{port}"))
+; Allow the sandboxed process to use an ephemeral local source port.
+(allow network-bind (local ip "localhost:*"))
+"#,
+        )),
     }
 
     Ok(config)
@@ -267,7 +313,7 @@ mod tests {
         let config = generate_seatbelt_config(
             &[dir.as_path()],
             SandboxPermissions {
-                allow_network: false,
+                network: NetworkAccess::None,
                 allow_fs_write: true,
             },
         )
@@ -286,7 +332,7 @@ mod tests {
         let config = generate_seatbelt_config(
             &[dir.as_path()],
             SandboxPermissions {
-                allow_network: true,
+                network: NetworkAccess::All,
                 allow_fs_write: false,
             },
         )
@@ -296,6 +342,23 @@ mod tests {
         assert!(config.contains("/Users/test/projects/myproject"));
         assert!(config.contains("(allow file-write*"));
         assert!(!config.contains("; Allow unrestricted filesystem writes"));
+    }
+
+    #[test]
+    fn test_generate_seatbelt_config_localhost_port_narrows_network() {
+        let dir = PathBuf::from("/Users/test/projects/myproject");
+        let config = generate_seatbelt_config(
+            &[dir.as_path()],
+            SandboxPermissions {
+                network: NetworkAccess::LocalhostPort(54321),
+                allow_fs_write: false,
+            },
+        )
+        .unwrap();
+
+        assert!(config.contains("(allow network-outbound (remote tcp \"localhost:54321\"))"));
+        assert!(config.contains("(allow network-bind (local ip \"localhost:*\"))"));
+        assert!(!config.contains("(allow network*)"));
     }
 
     #[test]
@@ -411,7 +474,7 @@ mod tests {
             &["-c".to_string(), "echo test 2>/dev/null".to_string()],
             &[temp_dir.path()],
             SandboxPermissions {
-                allow_network: false,
+                network: NetworkAccess::None,
                 allow_fs_write: true,
             },
         )
@@ -444,7 +507,7 @@ mod tests {
             ],
             &[temp_dir.path()],
             SandboxPermissions {
-                allow_network: false,
+                network: NetworkAccess::None,
                 allow_fs_write: true,
             },
         )
@@ -542,7 +605,7 @@ mod tests {
             ],
             &[project_dir.path()],
             SandboxPermissions {
-                allow_network: false,
+                network: NetworkAccess::None,
                 allow_fs_write: true,
             },
         )

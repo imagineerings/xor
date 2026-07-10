@@ -1,9 +1,9 @@
 use anyhow::Result;
-use sim_apps::{AppRegistry, ChatApp, ClockApp};
 use gpui::{
     Action, AnyElement, App, AsyncWindowContext, Context, Entity, EventEmitter, FocusHandle,
     Focusable, Render, Subscription, WeakEntity, Window, actions,
 };
+use sim_apps::{AppRegistry, ChatApp, ClockApp};
 use ui::prelude::*;
 use workspace::{
     Panel, Workspace,

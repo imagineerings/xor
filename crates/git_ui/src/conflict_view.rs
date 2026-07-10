@@ -1,7 +1,4 @@
 use agent_settings::AgentSettings;
-use sim_actions::agent::{
-    ConflictContent, ResolveConflictedFilesWithAgent, ResolveConflictsWithAgent,
-};
 use collections::{HashMap, HashSet};
 use editor::{
     ConflictsOurs, ConflictsOursMarker, ConflictsOuter, ConflictsTheirs, ConflictsTheirsMarker,
@@ -18,6 +15,9 @@ use project::{
     git_store::{GitStore, GitStoreEvent, RepositoryEvent},
 };
 use settings::Settings;
+use sim_actions::agent::{
+    ConflictContent, ResolveConflictedFilesWithAgent, ResolveConflictsWithAgent,
+};
 use std::{ops::Range, sync::Arc};
 use ui::{ButtonLike, Divider, Tooltip, prelude::*};
 use util::{debug_panic, maybe};
@@ -283,8 +283,8 @@ fn update_conflict_highlighting(
     let ours = buffer.buffer_anchor_range_to_anchor_range(conflict.ours.clone())?;
     let theirs = buffer.buffer_anchor_range_to_anchor_range(conflict.theirs.clone())?;
 
-    let ours_background = cx.theme().colors().version_control_conflict_marker_ours;
-    let theirs_background = cx.theme().colors().version_control_conflict_marker_theirs;
+    let ours_background = |cx: &App| cx.theme().colors().version_control_conflict_marker_ours;
+    let theirs_background = |cx: &App| cx.theme().colors().version_control_conflict_marker_theirs;
 
     let options = RowHighlightOptions {
         include_gutter: true,

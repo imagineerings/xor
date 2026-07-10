@@ -4244,10 +4244,7 @@ async fn test_upsell_dismissed_when_data_collection_choice_in_kv_store(cx: &mut 
     // shown, regardless of whether data collection was accepted or declined.
     for value in &["true", "false"] {
         cx.update(|cx| KeyValueStore::global(cx))
-            .write_kvp(
-                SIM_PREDICT_DATA_COLLECTION_CHOICE.into(),
-                value.to_string(),
-            )
+            .write_kvp(SIM_PREDICT_DATA_COLLECTION_CHOICE.into(), value.to_string())
             .await
             .unwrap();
 
@@ -4278,9 +4275,7 @@ async fn test_upsell_dismissed_when_dismissed_key_set(cx: &mut TestAppContext) {
 
     cx.update(|cx| assert!(!should_show_upsell_modal(cx)));
 
-    kvp.delete_kvp(SimPredictUpsell::KEY.into())
-        .await
-        .unwrap();
+    kvp.delete_kvp(SimPredictUpsell::KEY.into()).await.unwrap();
 }
 
 #[gpui::test]
@@ -4300,9 +4295,7 @@ async fn test_upsell_dismissed_via_dismissable_api(cx: &mut TestAppContext) {
 
     cx.update(|cx| assert!(!should_show_upsell_modal(cx)));
 
-    kvp.delete_kvp(SimPredictUpsell::KEY.into())
-        .await
-        .unwrap();
+    kvp.delete_kvp(SimPredictUpsell::KEY.into()).await.unwrap();
 }
 
 #[ctor::ctor(unsafe)]

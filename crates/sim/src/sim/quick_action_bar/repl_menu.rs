@@ -374,8 +374,7 @@ impl QuickActionBar {
     }
 
     pub fn render_repl_setup(&self, language: &str, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let tooltip: SharedString =
-            SharedString::from(format!("Setup Sim REPL for {}", language));
+        let tooltip: SharedString = SharedString::from(format!("Setup Sim REPL for {}", language));
         Some(
             h_flex()
                 .gap(DynamicSpacing::Base06.rems(cx))

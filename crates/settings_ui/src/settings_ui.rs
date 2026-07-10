@@ -887,6 +887,7 @@ pub struct SettingsWindow {
     shown_errors: HashSet<String>,
     pub(crate) hidden_deleted_skill_directory_paths: HashSet<PathBuf>,
     pub(crate) regex_validation_error: Option<String>,
+    pub(crate) sandbox_host_validation_error: Option<String>,
     last_copied_link_path: Option<&'static str>,
     /// Directory path of the skill whose share link was most recently copied,
     /// used to show a transient "copied" checkmark on its share button.
@@ -1865,6 +1866,7 @@ impl SettingsWindow {
             shown_errors: HashSet::default(),
             hidden_deleted_skill_directory_paths: HashSet::default(),
             regex_validation_error: None,
+            sandbox_host_validation_error: None,
             list_state,
             last_copied_link_path: None,
             last_copied_skill_directory_path: None,
@@ -4007,6 +4009,7 @@ impl SettingsWindow {
         window: &mut Window,
         cx: &mut Context<SettingsWindow>,
     ) {
+        self.sandbox_host_validation_error = None;
         self.sub_page_stack
             .push(SubPage::new(sub_page_link, section_header));
         self.content_focus_handle.focus_handle(cx).focus(window, cx);
@@ -4212,6 +4215,7 @@ impl SettingsWindow {
 
     fn pop_sub_page(&mut self, window: &mut Window, cx: &mut Context<SettingsWindow>) {
         self.regex_validation_error = None;
+        self.sandbox_host_validation_error = None;
         if let Some(popped) = self.sub_page_stack.pop()
             && popped.link.r#type == SubPageType::SkillCreator
         {
@@ -5025,6 +5029,7 @@ pub mod test {
                 shown_errors: HashSet::default(),
                 hidden_deleted_skill_directory_paths: HashSet::default(),
                 regex_validation_error: None,
+                sandbox_host_validation_error: None,
                 last_copied_link_path: None,
                 last_copied_skill_directory_path: None,
                 skill_creator_page: None,
@@ -5154,6 +5159,7 @@ pub mod test {
             shown_errors: HashSet::default(),
             hidden_deleted_skill_directory_paths: HashSet::default(),
             regex_validation_error: None,
+            sandbox_host_validation_error: None,
             last_copied_link_path: None,
             last_copied_skill_directory_path: None,
             skill_creator_page: None,

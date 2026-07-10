@@ -1,7 +1,6 @@
 use std::{cmp::Reverse, sync::Arc};
 
 use agent_settings::AgentSettings;
-use sim_actions::agent::OpenSettings;
 use collections::{HashMap, HashSet, IndexMap};
 use fuzzy::{StringMatch, StringMatchCandidate, match_strings};
 use gpui::{
@@ -15,6 +14,7 @@ use language_model::{
 use ordered_float::OrderedFloat;
 use picker::{Picker, PickerDelegate};
 use settings::Settings;
+use sim_actions::agent::OpenSettings;
 use ui::prelude::*;
 
 use crate::ui::{ModelSelectorFooter, ModelSelectorHeader, ModelSelectorListItem};
@@ -809,11 +809,7 @@ mod tests {
     fn test_favorites_section_appears_when_favorites_exist(_cx: &mut TestAppContext) {
         let recommended_models = create_models(vec![("sim", "claude")]);
         let all_models = create_models_with_favorites(
-            vec![
-                ("sim", "claude"),
-                ("sim", "gemini"),
-                ("openai", "gpt-4"),
-            ],
+            vec![("sim", "claude"), ("sim", "gemini"), ("openai", "gpt-4")],
             vec![("sim", "gemini")],
         );
 
@@ -849,11 +845,7 @@ mod tests {
         let recommended_models =
             create_models_with_favorites(vec![("sim", "claude")], vec![("sim", "claude")]);
         let all_models = create_models_with_favorites(
-            vec![
-                ("sim", "claude"),
-                ("sim", "gemini"),
-                ("openai", "gpt-4"),
-            ],
+            vec![("sim", "claude"), ("sim", "gemini"), ("openai", "gpt-4")],
             vec![("sim", "claude")],
         );
 
@@ -894,19 +886,11 @@ mod tests {
 
         let grouped_models = GroupedModels::new(all_models, recommended_models);
 
-        assert_models_eq(
-            grouped_models.favorites,
-            vec!["sim/gemini", "openai/gpt-4"],
-        );
+        assert_models_eq(grouped_models.favorites, vec!["sim/gemini", "openai/gpt-4"]);
         assert_models_eq(grouped_models.recommended, vec!["sim/claude"]);
         assert_models_eq(
             grouped_models.all.values().flatten().cloned().collect(),
-            vec![
-                "sim/claude",
-                "sim/gemini",
-                "openai/gpt-4",
-                "openai/gpt-3.5",
-            ],
+            vec!["sim/claude", "sim/gemini", "openai/gpt-4", "openai/gpt-3.5"],
         );
     }
 }

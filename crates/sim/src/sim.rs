@@ -93,10 +93,12 @@ use uuid::Uuid;
 use vim_mode_setting::VimModeSetting;
 use workspace::notifications::{NotificationId, dismiss_app_notification, show_app_notification};
 
-use sim_game::{default_game_preview_routes, default_game_task_providers, simscript_language_config};
 use sim_actions::{
-    About, OpenAccountSettings, OpenSimUrl, OpenBrowser, OpenDocs, OpenServerSettings,
-    OpenSettingsFile, OpenStatusPage, Quit,
+    About, OpenAccountSettings, OpenBrowser, OpenDocs, OpenServerSettings, OpenSettingsFile,
+    OpenSimUrl, OpenStatusPage, Quit,
+};
+use sim_game::{
+    default_game_preview_routes, default_game_task_providers, simscript_language_config,
 };
 use workspace::{
     AppState, MultiWorkspace, NewFile, NewWindow, OpenLog, Panel, Toast, Workspace,
@@ -2000,10 +2002,7 @@ fn notify_settings_errors(result: settings::SettingsParseResult, is_user: bool, 
                         .primary_message("Open Settings File")
                         .primary_icon(IconName::Settings)
                         .primary_on_click(|window, cx| {
-                            window.dispatch_action(
-                                sim_actions::OpenSettingsFile.boxed_clone(),
-                                cx,
-                            );
+                            window.dispatch_action(sim_actions::OpenSettingsFile.boxed_clone(), cx);
                             cx.emit(DismissEvent);
                         })
                     })
@@ -5764,12 +5763,8 @@ mod tests {
         // 5. Critical: Verify .sim is actually excluded from worktree
         let worktree = cx.update(|cx| project.read(cx).worktrees(cx).next().unwrap());
 
-        let has_sim_entry = cx.update(|cx| {
-            worktree
-                .read(cx)
-                .entry_for_path(rel_path(".sim"))
-                .is_some()
-        });
+        let has_sim_entry =
+            cx.update(|cx| worktree.read(cx).entry_for_path(rel_path(".sim")).is_some());
 
         eprintln!(
             "Is .sim directory visible in worktree after exclusion: {}",

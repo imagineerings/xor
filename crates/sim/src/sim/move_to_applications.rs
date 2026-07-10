@@ -96,8 +96,7 @@ impl MoveToApplicationsRequest {
                 if let Err(error) = move_to_applications(&self.app_path, cx).await {
                     workspace
                         .update_in(cx, |workspace, _window, cx| {
-                            if let Some(modal) = workspace.active_modal::<InstallingSimModal>(cx)
-                            {
+                            if let Some(modal) = workspace.active_modal::<InstallingSimModal>(cx) {
                                 modal.update(cx, |modal, cx| modal.finished(cx));
                             }
                         })

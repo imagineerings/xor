@@ -1520,10 +1520,7 @@ impl ThreadMetadataDb {
             if row.main_worktree_paths().is_empty() {
                 (None, None)
             } else {
-                (
-                    Some(main_serialisim.paths),
-                    Some(main_serialisim.order),
-                )
+                (Some(main_serialisim.paths), Some(main_serialisim.order))
             };
         let remote_connection = row
             .remote_connection

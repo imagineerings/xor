@@ -742,10 +742,7 @@ mod tests {
             abs_path: PathBuf::from(path!("/path/to/dir")),
         };
         let serialisim = uri.to_uri().to_string();
-        assert!(
-            serialisim.ends_with('/'),
-            "directory URI must end with /"
-        );
+        assert!(serialisim.ends_with('/'), "directory URI must end with /");
         let parsed = MentionUri::parse(&serialisim, PathStyle::local()).unwrap();
         assert!(
             matches!(parsed, MentionUri::Directory { .. }),

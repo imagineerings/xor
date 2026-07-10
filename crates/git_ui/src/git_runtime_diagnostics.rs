@@ -126,11 +126,7 @@ fn sanitize_cmd(cmd: impl IntoIterator<Item = String>) -> Option<Vec<String>> {
         return None;
     }
     let all_redacted = sanitisim.iter().all(|s| s.ends_with("=<redacted>"));
-    if all_redacted {
-        None
-    } else {
-        Some(sanitisim)
-    }
+    if all_redacted { None } else { Some(sanitisim) }
 }
 
 fn redact_env_var_entry(entry: String) -> String {

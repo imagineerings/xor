@@ -1189,10 +1189,9 @@ mod tests {
     fn cycling_boolean_config_option_saves_selected_value_as_default(cx: &mut TestAppContext) {
         let agent_server = Rc::new(TestAgentServer::default());
         let config_options = Rc::new(TestSessionConfigOptions::new(vec![
-            acp::SessionConfigOption::boolean("web_search", "Web Search", false)
-                .category(acp::SessionConfigOptionCategory::Other(
-                    "model_config".to_string(),
-                )),
+            acp::SessionConfigOption::boolean("web_search", "Web Search", false).category(
+                acp::SessionConfigOptionCategory::Other("model_config".to_string()),
+            ),
         ]));
         let fs: Arc<dyn Fs> = FakeFs::new(cx.executor());
 
@@ -1241,10 +1240,9 @@ mod tests {
     fn cycling_hidden_boolean_config_option_is_unhandled(cx: &mut TestAppContext) {
         let agent_server = Rc::new(TestAgentServer::default());
         let config_options = Rc::new(TestSessionConfigOptions::new(vec![
-            acp::SessionConfigOption::boolean("web_search", "Web Search", false)
-                .category(acp::SessionConfigOptionCategory::Other(
-                    "model_config".to_string(),
-                )),
+            acp::SessionConfigOption::boolean("web_search", "Web Search", false).category(
+                acp::SessionConfigOptionCategory::Other("model_config".to_string()),
+            ),
         ]));
         let fs: Arc<dyn Fs> = FakeFs::new(cx.executor());
 

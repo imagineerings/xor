@@ -5,7 +5,6 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use askpass::AskPassDelegate;
-use sim_actions::NewWorktreeBranchTarget;
 use collections::HashSet;
 use fs::Fs;
 use gpui::{
@@ -18,6 +17,7 @@ use project::project_settings::ProjectSettings;
 use project::trusted_worktrees::{PathTrust, TrustedWorktrees};
 use remote::RemoteConnectionOptions;
 use settings::Settings;
+use sim_actions::NewWorktreeBranchTarget;
 use ui::prelude::*;
 use workspace::{
     MultiWorkspace, OpenMode, PreviousWorkspaceState, ToastView, Workspace, dock::DockPosition,

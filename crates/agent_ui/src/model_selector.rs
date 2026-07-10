@@ -5,7 +5,6 @@ use acp_thread::{
 };
 
 use anyhow::Result;
-use sim_actions::agent::OpenSettings;
 use collections::{HashSet, IndexMap};
 use futures::FutureExt;
 use fuzzy::{StringMatchCandidate, match_strings};
@@ -17,6 +16,7 @@ use itertools::Itertools;
 use ordered_float::OrderedFloat;
 use picker::{Picker, PickerDelegate};
 use settings::SettingsStore;
+use sim_actions::agent::OpenSettings;
 use ui::{DocumentationAside, IntoElement, prelude::*};
 use util::ResultExt;
 
@@ -684,10 +684,7 @@ mod tests {
         let results = fuzzy_search(models.clone(), "mini".into(), cx.executor()).await;
         assert_models_eq(
             results,
-            vec![
-                ("sim", vec!["gpt-5-mini"]),
-                ("openai", vec!["gpt-5-mini"]),
-            ],
+            vec![("sim", vec!["gpt-5-mini"]), ("openai", vec!["gpt-5-mini"])],
         );
 
         // Fuzzy search - test with specific model name

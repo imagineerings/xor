@@ -78,7 +78,7 @@ impl EditPredictionResult {
             let empty_edits: Arc<[(Range<Anchor>, Arc<str>)]> = Vec::new().into();
             return Self {
                 id: id.clone(),
-                prediction: Err(EditPredictionRejectReason::InterpolatedEmpty),
+                prediction: Err(EditPredictionRejectReason::InterpolateFailed),
                 display_prediction: Some(EditPrediction {
                     id,
                     edits: empty_edits,
@@ -95,6 +95,27 @@ impl EditPredictionResult {
                 e2e_latency,
             };
         };
+
+        if edits.is_empty() {
+            return Self {
+                id: id.clone(),
+                prediction: Err(EditPredictionRejectReason::InterpolatedEmpty),
+                display_prediction: Some(EditPrediction {
+                    id,
+                    edits,
+                    cursor_position: None,
+                    editable_range,
+                    snapshot: edited_buffer_snapshot.clone(),
+                    edit_preview: EditPreview::unchanged(edited_buffer_snapshot),
+                    buffer: edited_buffer.clone(),
+                    inputs,
+                    model_version: model_version.clone(),
+                    trigger,
+                }),
+                model_version,
+                e2e_latency,
+            };
+        }
 
         let edit_preview = edited_buffer
             .read_with(cx, |buffer, cx| buffer.preview_edits(edits.clone(), cx))
@@ -141,6 +162,7 @@ impl EditPrediction {
         new_snapshot: &TextBufferSnapshot,
     ) -> Option<Vec<(Range<Anchor>, Arc<str>)>> {
         interpolate_edits(&self.snapshot, new_snapshot, &self.edits)
+            .filter(|edits| !edits.is_empty())
     }
 
     pub fn targets_buffer(&self, buffer: &Buffer) -> bool {

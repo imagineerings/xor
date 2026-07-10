@@ -204,6 +204,9 @@ static STARTUP_TIME: OnceLock<Instant> = OnceLock::new();
 fn main() {
     STARTUP_TIME.get_or_init(|| Instant::now());
 
+    #[cfg(target_os = "linux")]
+    sandbox::linux_bubblewrap::run_launcher_if_invoked();
+
     #[cfg(unix)]
     util::prevent_root_execution();
 

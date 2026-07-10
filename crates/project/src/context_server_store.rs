@@ -830,8 +830,7 @@ impl ContextServerStore {
                 if configuration.has_static_auth_header() {
                     None
                 } else {
-                    let credentials_provider =
-                        cx.update(|cx| sim_credentials_provider::global(cx));
+                    let credentials_provider = cx.update(|cx| sim_credentials_provider::global(cx));
                     let http_client = cx.update(|cx| cx.http_client());
 
                     match Self::load_session(&credentials_provider, url, &cx).await {
@@ -1050,8 +1049,7 @@ impl ContextServerStore {
             let configuration = configuration.clone();
             async move |this, cx| {
                 if let Some(server_url) = needs_keychain_check {
-                    let credentials_provider =
-                        cx.update(|cx| sim_credentials_provider::global(cx));
+                    let credentials_provider = cx.update(|cx| sim_credentials_provider::global(cx));
                     let has_keychain_secret =
                         Self::load_client_secret(&credentials_provider, &server_url, cx)
                             .await
@@ -1150,8 +1148,7 @@ impl ContextServerStore {
             async move |this, cx| {
                 // Store the secret if non-empty (empty means public client / skip).
                 if !secret.is_empty() {
-                    let credentials_provider =
-                        cx.update(|cx| sim_credentials_provider::global(cx));
+                    let credentials_provider = cx.update(|cx| sim_credentials_provider::global(cx));
                     if let Err(err) =
                         Self::store_client_secret(&credentials_provider, &server_url, &secret, cx)
                             .await

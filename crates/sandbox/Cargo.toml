@@ -11,6 +11,28 @@ workspace = true
 [lib]
 path = "src/sandbox.rs"
 
+[features]
+wsl-test = []
+
+[[bin]]
+name = "wsl_sandbox_test_helper"
+path = "src/wsl_sandbox_test_helper.rs"
+required-features = ["wsl-test"]
+
 [target.'cfg(target_os = "macos")'.dependencies]
 anyhow.workspace = true
 tempfile.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+anyhow.workspace = true
+libc.workspace = true
+log.workspace = true
+nix = { workspace = true, features = ["fs", "socket", "uio"] }
+
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+tempfile.workspace = true
+
+[target.'cfg(target_os = "windows")'.dependencies]
+anyhow.workspace = true
+log.workspace = true
+smol.workspace = true

@@ -1,5 +1,5 @@
-use sim_actions::remote_debug::{SimulateDisconnect, SimulateTimeout, SimulateTimeoutExhausted};
 use gpui::TaskExt;
+use sim_actions::remote_debug::{SimulateDisconnect, SimulateTimeout, SimulateTimeoutExhausted};
 use workspace::Workspace;
 
 pub fn init(cx: &mut gpui::App) {

@@ -118,6 +118,7 @@ dependencies = [
  "file_icons",
  "futures 0.3.32",
  "gpui",
+ "http_proxy",
  "image",
  "indoc",
  "itertools 0.14.0",
@@ -305,6 +306,7 @@ dependencies = [
  "heck 0.5.0",
  "html_to_markdown",
  "http_client",
+ "http_proxy",
  "indoc",
  "itertools 0.14.0",
  "language",
@@ -326,6 +328,7 @@ dependencies = [
  "regex",
  "reqwest_client",
  "rust-embed",
+ "sandbox",
  "scheduler",
  "schemars 1.2.1",
  "security",
@@ -8643,6 +8646,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "http_proxy"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "futures 0.3.32",
+ "httparse",
+ "idna",
+ "log",
+ "percent-encoding",
+ "proxyvars",
+ "thiserror 2.0.18",
+ "url",
+]
+
+[[package]]
 name = "httparse"
 version = "1.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10780,6 +10799,7 @@ dependencies = [
  "node_runtime",
  "pulldown-cmark 0.13.4",
  "settings",
+ "smallvec 1.15.2",
  "stacksafe",
  "sum_tree",
  "theme",
@@ -11615,6 +11635,7 @@ dependencies = [
  "cfg-if",
  "cfg_aliases 0.2.1",
  "libc",
+ "memoffset",
 ]
 
 [[package]]
@@ -14594,6 +14615,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "proxyvars"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7285bf1ae9f4d28cd9b1100c9a3aab55263ec0aa44e4d439593e528fc1dc1e05"
+dependencies = [
+ "http 1.4.2",
+ "ipnet",
+]
+
+[[package]]
 name = "psm"
 version = "0.1.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -16204,6 +16235,10 @@ name = "sandbox"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "libc",
+ "log",
+ "nix 0.29.0",
+ "smol",
  "tempfile",
 ]
 
@@ -16956,6 +16991,7 @@ dependencies = [
  "gpui",
  "heck 0.5.0",
  "http_client",
+ "http_proxy",
  "itertools 0.14.0",
  "language",
  "log",
@@ -17325,6 +17361,7 @@ dependencies = [
  "repl",
  "reqwest_client",
  "rope",
+ "sandbox",
  "search",
  "semver",
  "serde",

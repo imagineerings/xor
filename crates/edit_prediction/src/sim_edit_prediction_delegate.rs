@@ -222,7 +222,7 @@ impl EditPredictionDelegate for SimEditPredictionDelegate {
 
             let Some(edits) = prediction.interpolate(&snapshot) else {
                 store.reject_current_prediction(
-                    EditPredictionRejectReason::InterpolatedEmpty,
+                    EditPredictionRejectReason::InterpolateFailed,
                     &self.project,
                     cx,
                 );

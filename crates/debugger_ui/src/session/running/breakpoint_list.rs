@@ -5,7 +5,6 @@ use std::{
     time::Duration,
 };
 
-use sim_actions::{ToggleEnableBreakpoint, UnsetBreakpoint};
 use dap::{Capabilities, ExceptionBreakpointsFilter, adapters::DebugAdapterName};
 use db::kvp::KeyValueStore;
 use editor::Editor;
@@ -24,6 +23,7 @@ use project::{
     },
     worktree_store::WorktreeStore,
 };
+use sim_actions::{ToggleEnableBreakpoint, UnsetBreakpoint};
 use ui::{
     Divider, DividerColor, FluentBuilder as _, Indicator, IntoElement, ListItem, Render,
     ScrollAxes, StatefulInteractiveElement, Tooltip, WithScrollbar, prelude::*,

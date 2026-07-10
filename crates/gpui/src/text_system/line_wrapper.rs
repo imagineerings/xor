@@ -477,7 +477,9 @@ impl LineWrapper {
         // is included so it stays attached to the preceding word when wrapping.
         matches!(c, '-' | '_' | '.' | '\'' | '’' | '‘' | '$' | '%' | '@' | '#' | '^' | '~' | ',' | '=' | ':' | ';') ||
         // `⋯` character is special used in Sim, to keep this at the end of the line.
-        matches!(c, '⋯')
+        matches!(c, '⋯') ||
+        // Non-breaking glue characters must remain attached to the preceding word.
+        matches!(c, '\u{202F}' | '\u{00A0}' | '\u{2011}')
     }
 
     #[inline(always)]
@@ -1178,6 +1180,9 @@ mod tests {
         assert_word("more⋯");
         assert_word("won’t");
         assert_word("‘twas");
+        assert_word("a\u{202F}b");
+        assert_word("a\u{00A0}b");
+        assert_word("a\u{2011}b");
 
         // Space
         assert_not_word("foo bar");

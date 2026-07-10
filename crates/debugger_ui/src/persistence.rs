@@ -147,10 +147,7 @@ pub(crate) fn build_serialisim_layout(
     }
 }
 
-pub(crate) fn build_serialisim_pane_layout(
-    pane_group: &Member,
-    cx: &App,
-) -> SerialisimPaneLayout {
+pub(crate) fn build_serialisim_pane_layout(pane_group: &Member, cx: &App) -> SerialisimPaneLayout {
     match pane_group {
         Member::Axis(PaneAxis {
             axis,

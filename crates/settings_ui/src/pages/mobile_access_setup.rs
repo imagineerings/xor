@@ -388,8 +388,7 @@ mod tests {
             }));
             let state = GlobalTunnelState {
                 manager,
-                cached_connection_string: "sim-tunnel://127.0.0.1:9999?token=tok-test"
-                    .to_string(),
+                cached_connection_string: "sim-tunnel://127.0.0.1:9999?token=tok-test".to_string(),
                 // QR image left None to keep test dependencies minimal;
                 // the render function handles this gracefully (skips QR section).
                 cached_qr_render_image: None,
