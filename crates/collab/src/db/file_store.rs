@@ -108,6 +108,7 @@ impl FileStore {
             mime_type: ActiveValue::Set(request.mime_type),
             storage_path: ActiveValue::Set(storage_path),
             thumbnail_storage_path: ActiveValue::Set(None),
+            download_count: ActiveValue::Set(0),
             uploader_id: ActiveValue::Set(request.uploader_id),
             image_width: ActiveValue::Set(request.image_width),
             image_height: ActiveValue::Set(request.image_height),
@@ -162,6 +163,7 @@ impl FileStore {
                     mime_type: ActiveValue::Unchanged(row.mime_type),
                     storage_path: ActiveValue::Unchanged(row.storage_path),
                     thumbnail_storage_path: ActiveValue::Unchanged(row.thumbnail_storage_path),
+                    download_count: ActiveValue::Unchanged(row.download_count),
                     uploader_id: ActiveValue::Unchanged(row.uploader_id),
                     image_width: ActiveValue::Unchanged(row.image_width),
                     image_height: ActiveValue::Unchanged(row.image_height),
@@ -192,6 +194,53 @@ impl FileStore {
             .await?;
 
         self.file_attachment_from_row(row).await
+    }
+
+    pub async fn get_file_download_url(&self, file_id: Uuid) -> Result<FileDownload> {
+        let row = self
+            .db
+            .transaction(|tx| async move {
+                let _row = channel_file::Entity::find_by_id(file_id)
+                    .filter(channel_file::Column::UploadedAt.is_not_null())
+                    .one(&*tx)
+                    .await?
+                    .context("file does not exist")?;
+                channel_file::Entity::update_many()
+                    .col_expr(
+                        channel_file::Column::DownloadCount,
+                        sea_orm::sea_query::Expr::col(channel_file::Column::DownloadCount).add(1),
+                    )
+                    .filter(channel_file::Column::Id.eq(file_id))
+                    .exec(&*tx)
+                    .await?;
+                channel_file::Entity::find_by_id(file_id)
+                    .one(&*tx)
+                    .await?
+                    .context("file does not exist")
+                    .map_err(Into::into)
+            })
+            .await?;
+        let url = self.download_url(&row.storage_path).await?;
+        Ok(FileDownload {
+            channel_id: row.channel_id,
+            url,
+            download_count: u64::try_from(row.download_count)
+                .context("stored download count is negative")?,
+        })
+    }
+
+    pub async fn file_channel_id(&self, file_id: Uuid) -> Result<ChannelId> {
+        self.db
+            .transaction(|tx| async move {
+                channel_file::Entity::find_by_id(file_id)
+                    .filter(channel_file::Column::UploadedAt.is_not_null())
+                    .one(&*tx)
+                    .await?
+                    .context("file does not exist")
+                    .map(|file| file.channel_id)
+                    .map_err(Into::into)
+            })
+            .await
     }
 
     pub async fn get_message_files(
@@ -274,6 +323,7 @@ impl FileStore {
                             thumbnail_storage_path: ActiveValue::Unchanged(
                                 row.thumbnail_storage_path.clone(),
                             ),
+                            download_count: ActiveValue::Unchanged(row.download_count),
                             uploader_id: ActiveValue::Unchanged(row.uploader_id),
                             image_width: ActiveValue::Unchanged(row.image_width),
                             image_height: ActiveValue::Unchanged(row.image_height),
@@ -582,6 +632,7 @@ pub struct FileAttachment {
     pub image_height: Option<u64>,
     pub duration_ms: Option<u64>,
     pub thumbnail_url: Option<String>,
+    pub download_count: u64,
 }
 
 impl FileAttachment {
@@ -598,8 +649,15 @@ impl FileAttachment {
             image_height: self.image_height,
             duration_ms: self.duration_ms,
             thumbnail_url: self.thumbnail_url,
+            download_count: self.download_count,
         }
     }
+}
+
+pub struct FileDownload {
+    pub channel_id: ChannelId,
+    pub url: String,
+    pub download_count: u64,
 }
 
 fn validate_filename(filename: &str) -> Result<()> {
@@ -647,6 +705,8 @@ fn file_attachment_from_row(
         image_height: optional_u64(row.image_height, "stored image height is negative")?,
         duration_ms: optional_u64(row.duration_ms, "stored duration is negative")?,
         thumbnail_url,
+        download_count: u64::try_from(row.download_count)
+            .context("stored download count is negative")?,
     })
 }
 

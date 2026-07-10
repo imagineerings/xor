@@ -3,7 +3,7 @@ use futures::AsyncReadExt as _;
 use gpui::{
     AnyElement, App, Context, DismissEvent, EventEmitter, FocusHandle, Focusable, ImageSource,
     IntoElement, ObjectFit, ParentElement, Render, RenderOnce, Resource, SharedString, SharedUri,
-    Styled as _, Task, Window,
+    Styled as _, Task, TaskExt, Window,
     http_client::{AsyncBody, HttpClient as _},
     img, px,
 };
@@ -106,6 +106,7 @@ impl FileAttachmentRenderer {
 
     fn render_pdf_thumbnail(&self, cx: &mut App) -> AnyElement {
         let file = self.file.clone();
+        let client = self.client.clone();
         h_flex()
             .gap_3()
             .items_center()
@@ -147,7 +148,9 @@ impl FileAttachmentRenderer {
             .child(
                 Button::new(format!("view-channel-pdf-{}", file.id), "View PDF")
                     .style(ButtonStyle::Subtle)
-                    .on_click(move |_, _, cx| cx.open_url(&file.url)),
+                    .on_click(move |_, _, cx| {
+                        open_file_download(client.clone(), file.id.clone(), cx);
+                    }),
             )
             .into_any_element()
     }
@@ -166,6 +169,7 @@ impl FileAttachmentRenderer {
 
     fn render_file_card(&self, cx: &mut App) -> AnyElement {
         let file = self.file.clone();
+        let client = self.client.clone();
         let icon = icon_for_file_kind(Self::detect_file_kind(&file.mime_type, &file.filename));
         h_flex()
             .gap_2()
@@ -192,10 +196,21 @@ impl FileAttachmentRenderer {
             .child(
                 Button::new(format!("download-channel-file-{}", file.id), "Download")
                     .style(ButtonStyle::Subtle)
-                    .on_click(move |_, _, cx| cx.open_url(&file.url)),
+                    .on_click(move |_, _, cx| {
+                        open_file_download(client.clone(), file.id.clone(), cx);
+                    }),
             )
             .into_any_element()
     }
+}
+
+fn open_file_download(client: Arc<Client>, file_id: String, cx: &mut App) {
+    cx.spawn(async move |cx| {
+        let url = client.get_file_download_url(file_id).await?;
+        cx.update(|cx| cx.open_url(&url));
+        anyhow::Ok(())
+    })
+    .detach_and_log_err(cx);
 }
 
 const CODE_PREVIEW_LINE_LIMIT: usize = 24;

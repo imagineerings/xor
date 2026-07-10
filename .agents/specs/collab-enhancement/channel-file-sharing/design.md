@@ -52,6 +52,11 @@ flowchart TB
 | `FileAttachmentRenderer` | Renders file previews in channel messages |
 | `FileStore` (server) | Manages file metadata, S3 upload URLs, storage limits |
 
+Explicit file and PDF download actions request a fresh presigned URL through the authenticated `GetFileDownloadUrl` RPC. The server verifies channel read access and atomically increments `channel_files.download_count` before returning the URL; attachment metadata carries the current count for file cards.
+
+<!-- impl: crates/collab/src/db/file_store.rs#FileStore::get_file_download_url -->
+<!-- impl: crates/collab/src/rpc.rs#get_file_download_url -->
+
 `FileStore::confirm_upload` generates an `image/png` thumbnail for PNG, JPEG, GIF, WebP, and SVG attachments. It stores the thumbnail next to the original object, persists the thumbnail path, and includes a separate presigned URL in `FileAttachment`. The channel renderer uses this URL for the inline preview while retaining the original URL for the image lightbox and downloads.
 
 <!-- impl: crates/collab/src/db/file_store.rs#FileStore::generate_thumbnail -->

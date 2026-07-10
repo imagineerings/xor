@@ -318,13 +318,16 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
   - _Actual writes: crates/collab/src/db/file_store.rs; crates/collab/src/db/tables/channel_file.rs; crates/collab/migrations/20260710100000_add_channel_file_thumbnails.sql; crates/proto/proto/channel.proto; crates/client/src/file_upload.rs; crates/collab_ui/src/channel_chat/file_renderer.rs_
   - _Validation: `cargo test -p collab --test collab_tests thumbnails_are_pngs_bounded_to_400_pixels --features test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui file_renderer --features test-support`; `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `git diff --check`._
 
-- [ ] 31. Add download count tracking
+- [x] 31. Add download count tracking
   - Add `download_count` column to `channel_files` (if not already present in migration).
   - Increment counter when a file is downloaded.
   - Display download count in file card renderer.
   - _Requirements: 4.3_
   - _writes: crates/collab/src/storage/file_store.go_
   - _writes: crates/collab_ui/src/channel_chat/file_renderer.rs_
+  - _Completed: Added a persisted `download_count`, an authenticated URL request that checks channel read access and increments atomically, and client renderer actions that obtain counted URLs before opening explicit file/PDF downloads._
+  - _Actual writes: crates/collab/src/db/file_store.rs; crates/collab/src/rpc.rs; crates/collab/migrations/20260710110000_add_channel_file_download_counts.sql; crates/proto/proto/channel.proto; crates/client/src/channel_chat.rs; crates/collab_ui/src/channel_chat/file_renderer.rs._
+  - _Validation: `target/debug/deps/collab_tests-9512c50120ff4d19 db_tests::file_store_tests::test_file_store_metadata_lifecycle_sqlite --exact`; `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `git diff --check`._
 
 - [ ] 32. End-to-end smoke test
   - Spin up dev environment with S3-compatible storage (e.g. MinIO).

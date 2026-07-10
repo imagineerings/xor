@@ -253,6 +253,15 @@ impl Client {
             .try_into()
     }
 
+    pub async fn get_file_download_url(&self, file_id: impl Into<String>) -> Result<String> {
+        let response = self
+            .request(proto::GetFileDownloadUrl {
+                file_id: file_id.into(),
+            })
+            .await?;
+        Ok(response.url)
+    }
+
     pub async fn add_bookmark(&self, bookmark: AddBookmark) -> Result<()> {
         self.request(proto::AddBookmark {
             channel_id: bookmark.channel_id.0,
@@ -298,10 +307,7 @@ impl Client {
     ) -> Result<()> {
         self.request(proto::ReorderBookmarks {
             channel_id: channel_id.0,
-            bookmark_ids: bookmark_ids
-                .into_iter()
-                .map(BookmarkId::to_proto)
-                .collect(),
+            bookmark_ids: bookmark_ids.into_iter().map(BookmarkId::to_proto).collect(),
         })
         .await
         .map(|_: proto::Ack| ())

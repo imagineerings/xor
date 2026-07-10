@@ -356,6 +356,7 @@ CREATE TABLE IF NOT EXISTS "channel_files" (
     "mime_type" TEXT NOT NULL,
     "storage_path" TEXT NOT NULL,
     "thumbnail_storage_path" TEXT,
+    "download_count" INTEGER NOT NULL DEFAULT 0,
     "uploader_id" INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
     "image_width" INTEGER,
     "image_height" INTEGER,

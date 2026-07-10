@@ -91,7 +91,7 @@ async fn test_file_store_metadata_lifecycle(db: &Arc<Database>) {
     assert!(upload.url.contains("file-store.test"));
     assert!(upload.headers.is_empty());
 
-    let confirmed = file_store
+    let mut confirmed = file_store
         .confirm_upload(upload.file_id, user_id)
         .await
         .unwrap();
@@ -108,6 +108,29 @@ async fn test_file_store_metadata_lifecycle(db: &Arc<Database>) {
 
     let metadata = file_store.get_file_metadata(upload.file_id).await.unwrap();
     assert_eq!(metadata, confirmed);
+
+    let first_download = file_store
+        .get_file_download_url(upload.file_id)
+        .await
+        .unwrap();
+    assert_eq!(first_download.channel_id, channel_id);
+    assert!(first_download.url.contains("file-store.test"));
+    assert_eq!(first_download.download_count, 1);
+
+    let second_download = file_store
+        .get_file_download_url(upload.file_id)
+        .await
+        .unwrap();
+    assert_eq!(second_download.download_count, 2);
+    confirmed.download_count = 2;
+    assert_eq!(
+        file_store
+            .get_file_metadata(upload.file_id)
+            .await
+            .unwrap()
+            .download_count,
+        2
+    );
 
     let message = db
         .create_channel_message(NewChannelMessage {

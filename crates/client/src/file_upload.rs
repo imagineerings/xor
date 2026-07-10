@@ -18,6 +18,7 @@ pub struct FileAttachment {
     pub image_height: Option<u64>,
     pub duration_ms: Option<u64>,
     pub thumbnail_url: Option<String>,
+    pub download_count: u64,
 }
 
 impl TryFrom<proto::FileAttachment> for FileAttachment {
@@ -49,6 +50,7 @@ impl TryFrom<proto::FileAttachment> for FileAttachment {
             image_height: file.image_height,
             duration_ms: file.duration_ms,
             thumbnail_url: file.thumbnail_url,
+            download_count: file.download_count,
         })
     }
 }
@@ -69,6 +71,7 @@ impl From<FileAttachment> for proto::FileAttachment {
             image_height: file.image_height,
             duration_ms: file.duration_ms,
             thumbnail_url: file.thumbnail_url,
+            download_count: file.download_count,
         }
     }
 }
@@ -117,6 +120,7 @@ mod tests {
             image_height: Some(600),
             duration_ms: None,
             thumbnail_url: Some("https://example.com/thumbnail".to_string()),
+            download_count: 3,
         };
 
         let proto = proto::FileAttachment::from(attachment.clone());

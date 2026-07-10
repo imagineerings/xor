@@ -520,7 +520,9 @@ message Envelope {
     GetFileUploadUrl get_file_upload_url = 485;
     GetFileUploadUrlResponse get_file_upload_url_response = 486;
     ConfirmFileUpload confirm_file_upload = 487;
-    ConfirmFileUploadResponse confirm_file_upload_response = 488; // current max
+    ConfirmFileUploadResponse confirm_file_upload_response = 488;
+    GetFileDownloadUrl get_file_download_url = 489;
+    GetFileDownloadUrlResponse get_file_download_url_response = 490; // current max
   }
 
   reserved 87 to 88;

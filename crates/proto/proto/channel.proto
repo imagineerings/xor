@@ -199,6 +199,7 @@ message FileAttachment {
   optional uint64 image_height = 9;
   optional uint64 duration_ms = 10;
   optional string thumbnail_url = 11;
+  uint64 download_count = 12;
 }
 
 message GetFileUploadUrl {
@@ -220,6 +221,15 @@ message ConfirmFileUpload {
 
 message ConfirmFileUploadResponse {
   FileAttachment attachment = 1;
+}
+
+message GetFileDownloadUrl {
+  string file_id = 1;
+}
+
+message GetFileDownloadUrlResponse {
+  string url = 1;
+  uint64 download_count = 2;
 }
 
 message ChannelMessageSent {

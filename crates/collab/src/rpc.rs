@@ -477,6 +477,7 @@ impl Server {
             .add_request_handler(get_bookmarks)
             .add_request_handler(get_file_upload_url)
             .add_request_handler(confirm_file_upload)
+            .add_request_handler(get_file_download_url)
             .add_request_handler(add_bookmark)
             .add_request_handler(remove_bookmark)
             .add_request_handler(update_bookmark)
@@ -3927,6 +3928,29 @@ async fn confirm_file_upload(
 
     response.send(proto::ConfirmFileUploadResponse {
         attachment: Some(attachment.to_proto()),
+    })
+}
+
+async fn get_file_download_url(
+    request: proto::GetFileDownloadUrl,
+    response: Response<proto::GetFileDownloadUrl>,
+    session: MessageContext,
+) -> Result<()> {
+    let file_id = uuid::Uuid::parse_str(&request.file_id).context("invalid file id")?;
+    let store = file_store(&session);
+    let channel_id = store
+        .file_channel_id(file_id)
+        .await
+        .map_err(file_store_rpc_error)?;
+    ensure_can_read_bookmarks(&session, channel_id).await?;
+    let download = store
+        .get_file_download_url(file_id)
+        .await
+        .map_err(file_store_rpc_error)?;
+
+    response.send(proto::GetFileDownloadUrlResponse {
+        url: download.url,
+        download_count: download.download_count,
     })
 }
 
