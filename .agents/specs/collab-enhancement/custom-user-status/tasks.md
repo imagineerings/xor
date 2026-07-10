@@ -137,8 +137,9 @@ This plan implements custom user status — emoji + short text labels with optio
   - [ ] 11.5 Add `StatusDisplay` in user profile popover
     - _Requirements: 8.3 (AC 1)_
     - _writes: crates/collab_ui/src/_
+  - _Phase 1 note: 11.4 and 11.5 remain deferred because this client has neither a mentions autocomplete surface nor a user-profile popover. Adding either would start a new UI subsystem outside the Phase 1 scope._
 
-- [ ] 12. Write server unit tests
+- [x] 12. Write server unit tests
   - [x] 12.1 `test_set_status_validation` - rejects text > 100 chars, accepts valid input
     - _writes: crates/collab/src/rpc.rs_ (tests module)
     - _Completed: Added an integration-level RPC validation test covering the 100-character text boundary, invalid emoji rejection, unsupported clear-after duration rejection, and a valid status write.
@@ -160,7 +161,7 @@ This plan implements custom user status — emoji + short text labels with optio
     - _Completed: Existing SQLite/Postgres lifecycle coverage verifies create, update, expiry, and idempotent delete behavior._
     - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests test_user_status_store_lifecycle_sqlite --features test-support`._
 
-- [ ] 13. Write client unit tests
+- [x] 13. Write client unit tests
   - [x] 13.1 `test_contact_custom_status_field` - `update_user_status` correctly sets/clears `Contact.custom_status`
     - _writes: crates/client/src/user.rs_ (tests module)
     - _Completed: Added a GPUI client unit test covering custom status conversion, expiry mapping, and clearing a contact status.
@@ -174,7 +175,7 @@ This plan implements custom user status — emoji + short text labels with optio
     - _Completed: Added unit coverage for every UI clear-after option and its server-validated minute value._
     - _Validation: `cargo test -p collab_ui clear_after_options_match_server_durations --lib`._
 
-- [ ] 14. Write UI tests
+- [x] 14. Write UI tests
   - [x] 14.1 `UserStatusModal` renders all 7 presets (visible and clickable)
     - _writes: crates/collab_ui/src/user_status_modal.rs_ (tests module)
     - _Completed: Added deterministic preset-contract coverage for all seven labels used by the rendered clickable preset buttons.
@@ -192,7 +193,7 @@ This plan implements custom user status — emoji + short text labels with optio
     - _Completed: Added a pure display-text contract used by StatusDisplay and tests for emoji-plus-text output and the empty state.
     - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab_ui status_display --features test-support`._
 
-- [ ] 15. Write integration tests
+- [x] 15. Write integration tests
   - [x] 15.1 Set status flow — Client A sets status → Server broadcasts → Client B receives and shows it
     - _writes: crates/collab/tests/_
     - _Completed: Added a three-client RPC integration test proving a saved status reaches both peer clients._
@@ -214,7 +215,7 @@ This plan implements custom user status — emoji + short text labels with optio
     - _Completed: The integration test uses three connected clients and verifies set/clear delivery to both peers._
     - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests custom_status_broadcasts_set_and_clear_to_multiple_clients --features test-support`._
 
-- [ ] 16. Write property-based tests
+- [x] 16. Write property-based tests
   - [x] 16.1 Property 5.1 (text length) — generate random strings up to 200 chars; verify rejection boundary at 100
     - _Completed: Added a proptest over generated Unicode strings truncated to 200 characters, asserting the exact empty/100-character validation boundary._
     - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --lib rpc::tests --features test-support`._

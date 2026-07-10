@@ -214,7 +214,7 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _Completed: Enforced a 500-character server-side reason limit and a per-user rolling ten-requests-per-minute limit. The requester panel shows a live character counter and truncates submitted reasons to the server limit._
   - _Validation: `cargo check -p collab --features collab/test-support`; `cargo check -p collab_ui`._
 
-- [ ] 21. Unit tests
+- [x] 21. Unit tests
   - [x] 21.1 `JoinRequestStore` unit tests: `request_join`, `approve_join_request`, `deny_join_request`, `get_pending_requests`, `expire_old_requests`.
     - _Completed: Existing SQLite/Postgres lifecycle and expiry tests cover the store operations and returned metadata._
   - [x] 21.2 Duplicate prevention: call `request_join` twice for same `(channel_id, user_id)` — verify second call returns error.
@@ -233,7 +233,7 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _Requirements: 10.1, 10.2, 10.4_
   - _writes: crates/db/src/join_requests.rs_, _crates/collab_ui/src/request_to_join_panel.rs_, _crates/collab_ui/src/pending_requests_list.rs_, _crates/collab_ui/src/request_detail_panel.rs_
 
-- [ ] 22. Integration tests
+- [x] 22. Integration tests
   - [x] 22.1 Full request flow: non-member requests join → admin receives push → admin fetches pending → admin approves → requester receives approval → requester can join channel.
     - _Completed: Added an integration test covering request persistence, admin pending-list retrieval, approval, and the requester's successful channel join._
     - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests join_request_approve_flow_adds_requester_to_channel --features test-support`._
@@ -248,7 +248,7 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _Requirements: 10.1, 10.2, 10.3, 10.4_
   - _writes: crates/collab/tests/channel_join_requests.rs_
 
-- [ ] 23. Concurrency tests
+- [x] 23. Concurrency tests
   - [x] 23.1 Race: two admins respond simultaneously — both try to approve same request; first succeeds, second gets "request no longer exists"; no duplicate member creation.
     - _Completed: Added a SQLite/Postgres store race test proving concurrent approvals produce one success, one no-op, and one accepted membership._
     - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests join_request_approval_race_sqlite --features test-support`._
@@ -261,7 +261,7 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _Requirements: 10.2_
   - _writes: crates/collab/tests/channel_join_requests.rs_
 
-- [ ] 24. Edge case tests
+- [x] 24. Edge case tests
   - [x] 24.1 Request with very long reason (500+ chars) — verify server truncates at 500.
     - _Completed: Added an RPC integration test proving a 501-character reason is rejected at the server boundary._
     - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests join_request_rejects_reason_over_500_characters --features test-support`._
@@ -277,7 +277,7 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _Requirements: 10.1_
   - _writes: crates/collab/tests/channel_join_requests.rs_
 
-- [ ] 25. GPUI UI tests
+- [x] 25. GPUI UI tests
   - [x] 25.1 `RequestToJoinPanel` rendering tests: verify `Idle` shows button + reason field; `Sent` shows confirmation; `AlreadyRequested` shows pending message.
     - _Completed: State-contract tests cover the three rendered state branches and the normalized reason input used by the view._
     - _Validation: collab_ui test build blocked by missing macOS AudioUnit SDK headers._
