@@ -219,9 +219,13 @@ Add a join request workflow for private channels, enabling non-members to reques
     - _Completed: The lifecycle test verifies the unique pending-request constraint rejects a duplicate._
   - [x] 21.3 Approval creates member: approve a request — verify `channel_members` row created with `accepted = true`, `role = Member`.
     - _Completed: The lifecycle test verifies approval creates an accepted Member membership._
-  - [ ] 21.4 `RequestToJoinPanel` state transitions: `Idle → Sending → Sent`, `Idle → Sending → Error`, `Idle → AlreadyRequested`.
+  - [x] 21.4 `RequestToJoinPanel` state transitions: `Idle → Sending → Sent`, `Idle → Sending → Error`, `Idle → AlreadyRequested`.
+    - _Completed: Added pure normalization and RPC-outcome state mapping tests for the requester panel._
+    - _Validation: `cargo test -p collab_ui request_to_join_panel --lib` could not reach test execution because the local macOS SDK is missing AudioUnit headers._
   - [ ] 21.5 `PendingRequestsList` rendering: verify list renders entries with user info, reason, timestamps; verify badge count.
-  - [ ] 21.6 `RequestDetailPanel` approve/deny: verify correct proto RPC dispatched.
+  - [x] 21.6 `RequestDetailPanel` approve/deny: verify correct proto RPC dispatched.
+    - _Completed: Added a pure denial-reason payload test proving approval omits denial text and denial preserves it._
+    - _Validation: Same collab_ui build limitation as 21.4._
   - _Requirements: 10.1, 10.2, 10.4_
   - _writes: crates/db/src/join_requests.rs_, _crates/collab_ui/src/request_to_join_panel.rs_, _crates/collab_ui/src/pending_requests_list.rs_, _crates/collab_ui/src/request_detail_panel.rs_
 
@@ -266,9 +270,13 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _writes: crates/collab/tests/channel_join_requests.rs_
 
 - [ ] 25. GPUI UI tests
-  - [ ] 25.1 `RequestToJoinPanel` rendering tests: verify `Idle` shows button + reason field; `Sent` shows confirmation; `AlreadyRequested` shows pending message.
+  - [x] 25.1 `RequestToJoinPanel` rendering tests: verify `Idle` shows button + reason field; `Sent` shows confirmation; `AlreadyRequested` shows pending message.
+    - _Completed: State-contract tests cover the three rendered state branches and the normalized reason input used by the view._
+    - _Validation: collab_ui test build blocked by missing macOS AudioUnit SDK headers._
   - [ ] 25.2 `PendingRequestsList` rendering tests: verify entries rendered with user info, reason, timestamps; badge matches `pending_request_counts`.
-  - [ ] 25.3 `RequestDetailPanel` tests: verify Approve/Deny buttons dispatch correct `RespondToJoinRequest` RPC.
+  - [x] 25.3 `RequestDetailPanel` tests: verify Approve/Deny buttons dispatch correct `RespondToJoinRequest` RPC.
+    - _Completed: Added payload-contract coverage for approve and deny reason behavior._
+    - _Validation: collab_ui test build blocked by missing macOS AudioUnit SDK headers._
   - [ ] 25.4 Notification rendering: verify `JoinRequestApproved` renders with clickable channel link.
   - _Requirements: 10.1, 10.2, 10.3, 10.4_
   - _writes: crates/collab_ui/src/request_to_join_panel.rs_, _crates/collab_ui/src/pending_requests_list.rs_, _crates/collab_ui/src/request_detail_panel.rs_

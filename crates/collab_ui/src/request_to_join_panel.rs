@@ -25,6 +25,20 @@ pub enum RequestState {
 impl RequestToJoinPanel {
     const MAX_REASON_CHARS: usize = 500;
 
+    fn normalize_reason(reason: &str) -> String {
+        reason.trim().chars().take(Self::MAX_REASON_CHARS).collect()
+    }
+
+    fn state_from_result(result: std::result::Result<(), String>) -> RequestState {
+        match result {
+            Ok(()) => RequestState::Sent,
+            Err(error) if error.contains("already") || error.contains("unique") => {
+                RequestState::AlreadyRequested
+            }
+            Err(error) => RequestState::Error(error.into()),
+        }
+    }
+
     pub fn new(
         channel_id: ChannelId,
         channel_store: Entity<ChannelStore>,
@@ -56,11 +70,7 @@ impl RequestToJoinPanel {
         }
 
         self.state = RequestState::Sending;
-        let reason = self.reason_editor.read(cx).text(cx).trim().to_string();
-        let reason = reason
-            .chars()
-            .take(Self::MAX_REASON_CHARS)
-            .collect::<String>();
+        let reason = Self::normalize_reason(&self.reason_editor.read(cx).text(cx));
         self.reason_editor.update(cx, |editor, cx| {
             editor.set_text(reason.clone(), window, cx);
         });
@@ -77,21 +87,43 @@ impl RequestToJoinPanel {
                 })
                 .await;
             this.update_in(cx, |this, _, cx| {
-                this.state = match result {
-                    Ok(_) => RequestState::Sent,
-                    Err(error)
-                        if error.to_string().contains("already")
-                            || error.to_string().contains("unique") =>
-                    {
-                        RequestState::AlreadyRequested
-                    }
-                    Err(error) => RequestState::Error(SharedString::from(error.to_string())),
-                };
+                this.state =
+                    Self::state_from_result(result.map(|_| ()).map_err(|error| error.to_string()));
                 cx.notify();
             })?;
             anyhow::Ok(())
         })
         .detach_and_log_err(cx);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reason_normalization_trims_and_limits_input() {
+        assert_eq!(RequestToJoinPanel::normalize_reason("  hello  "), "hello");
+        assert_eq!(
+            RequestToJoinPanel::normalize_reason(&"x".repeat(501)).len(),
+            RequestToJoinPanel::MAX_REASON_CHARS
+        );
+    }
+
+    #[test]
+    fn request_state_maps_rpc_outcomes() {
+        assert_eq!(
+            RequestToJoinPanel::state_from_result(Ok(())),
+            RequestState::Sent
+        );
+        assert_eq!(
+            RequestToJoinPanel::state_from_result(Err("already requested".to_string())),
+            RequestState::AlreadyRequested
+        );
+        assert!(matches!(
+            RequestToJoinPanel::state_from_result(Err("server unavailable".to_string())),
+            RequestState::Error(_)
+        ));
     }
 }
 

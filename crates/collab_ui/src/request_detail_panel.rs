@@ -23,6 +23,10 @@ pub enum RequestDetailPanelEvent {
 impl EventEmitter<RequestDetailPanelEvent> for RequestDetailPanel {}
 
 impl RequestDetailPanel {
+    fn denial_reason(approve: bool, reason: Option<String>) -> Option<String> {
+        (!approve).then_some(reason).flatten()
+    }
+
     pub fn new(
         channel_id: ChannelId,
         request: PendingJoinRequest,
@@ -54,14 +58,13 @@ impl RequestDetailPanel {
             return;
         }
 
-        let denial_reason = (!approve)
-            .then(|| {
-                self.denial_reason_editor
-                    .as_ref()
-                    .map(|editor| editor.read(cx).text(cx).trim().to_string())
-                    .filter(|reason| !reason.is_empty())
-            })
-            .flatten();
+        let denial_reason = Self::denial_reason(
+            approve,
+            self.denial_reason_editor
+                .as_ref()
+                .map(|editor| editor.read(cx).text(cx).trim().to_string())
+                .filter(|reason| !reason.is_empty()),
+        );
         self.responding = true;
         self.response_error = None;
         let client = self.channel_store.read(cx).client();
@@ -89,6 +92,23 @@ impl RequestDetailPanel {
             anyhow::Ok(())
         })
         .detach_and_log_err(cx);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn denial_reason_only_travels_with_denial() {
+        assert_eq!(
+            RequestDetailPanel::denial_reason(false, Some("Needs review".to_string())),
+            Some("Needs review".to_string())
+        );
+        assert_eq!(
+            RequestDetailPanel::denial_reason(true, Some("Ignored".to_string())),
+            None
+        );
     }
 }
 
