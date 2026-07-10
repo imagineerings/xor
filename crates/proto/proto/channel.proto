@@ -210,6 +210,13 @@ message SendChannelMessage {
   repeated ChatMention mentions = 4;
   optional uint64 reply_to_message_id = 5;
   repeated string file_ids = 6;
+  optional ChannelMessagePriority priority = 7;
+}
+
+enum ChannelMessagePriority {
+  ChannelMessagePriorityNormal = 0;
+  ChannelMessagePriorityImportant = 1;
+  ChannelMessagePriorityUrgent = 2;
 }
 
 message RemoveChannelMessage {
@@ -546,6 +553,14 @@ message ChannelMessage {
   repeated ReactionSummary reaction_summaries = 9;
   optional uint64 scheduled_at = 10;
   repeated FileAttachment files = 11;
+  ChannelMessagePriority priority = 12;
+}
+
+message UrgentMessageNotification {
+  uint64 channel_id = 1;
+  uint64 message_id = 2;
+  uint64 sender_id = 3;
+  string message_preview = 4;
 }
 
 message ChatMention {

@@ -537,6 +537,7 @@ message Envelope {
     UpdateUserStatus update_user_status = 502;
     UpdateUserStatuses update_user_statuses = 503;
     UserCustomStatus user_custom_status = 504; // current max
+    UrgentMessageNotification urgent_message_notification = 505; // current max
   }
 
   reserved 87 to 88;

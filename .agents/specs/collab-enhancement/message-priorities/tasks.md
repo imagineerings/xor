@@ -8,29 +8,31 @@ Add message priority levels (Normal, Important, Urgent) to channel messages in S
 
 ### Phase 1: Proto & Data Layer
 
-- [ ] 1. Define `ChannelMessagePriority` protobuf enum
-  - Add the `ChannelMessagePriority` enum (`Normal = 0`, `Important = 1`, `Urgent = 2`) to the proto definitions.
+- [x] 1. Define `ChannelMessagePriority` protobuf enum
+  - Add the `ChannelMessagePriority` enum (`ChannelMessagePriorityNormal = 0`, `ChannelMessagePriorityImportant = 1`, `ChannelMessagePriorityUrgent = 2`) to the proto definitions. The prefixes avoid the package-scoped enum-value collision with existing debugger protocol values.
+  - _Requirements: 12.1_
+  - _writes: crates/proto/proto/channel.proto_
+
+- [x] 2. Extend `SendChannelMessage` proto with priority field
+  - Add optional `ChannelMessagePriority priority = 7` to the `SendChannelMessage` message (`file_ids` already uses field 6).
   - _Requirements: 12.1_
   - _writes: crates/proto/proto/definitions.proto_
 
-- [ ] 2. Extend `SendChannelMessage` proto with priority field
-  - Add optional `ChannelMessagePriority priority = 6` to the `SendChannelMessage` message.
-  - _Requirements: 12.1_
-  - _writes: crates/proto/proto/definitions.proto_
-
-- [ ] 3. Extend `ChannelMessage` proto with priority field
-  - Add `ChannelMessagePriority priority = 9` to the `ChannelMessage` message (defaults to Normal).
+- [x] 3. Extend `ChannelMessage` proto with priority field
+  - Add `ChannelMessagePriority priority = 12` to the `ChannelMessage` message (defaults to Normal; fields 9–11 are already assigned).
   - _Requirements: 12.1, 12.3_
   - _writes: crates/proto/proto/definitions.proto_
 
-- [ ] 4. Define `UrgentMessageNotification` proto message
+- [x] 4. Define `UrgentMessageNotification` proto message
   - New push message with `channel_id`, `message_id`, `sender_id`, `message_preview` fields.
   - _Requirements: 12.2_
   - _writes: crates/proto/proto/definitions.proto_
 
-- [ ] 5. Regenerate Rust proto bindings
+- [x] 5. Regenerate Rust proto bindings
   - Run the proto code generator to produce updated Rust types for all changed/added messages and the new enum.
   - _writes: crates/proto/src/** (auto-generated)_
+  - _Completed: Added priority protocol fields at unused wire IDs, an urgent-message push, and the associated envelope and entity-message registrations._
+  - _Validation: `cargo check -p proto`._
 
 - [ ] 6. Add database migration for priority column
   - `ALTER TABLE channel_messages ADD COLUMN priority SMALLINT NOT NULL DEFAULT 0;` plus index `idx_channel_messages_priority`.
