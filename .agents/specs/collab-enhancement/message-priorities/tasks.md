@@ -34,10 +34,12 @@ Add message priority levels (Normal, Important, Urgent) to channel messages in S
   - _Completed: Added priority protocol fields at unused wire IDs, an urgent-message push, and the associated envelope and entity-message registrations._
   - _Validation: `cargo check -p proto`._
 
-- [ ] 6. Add database migration for priority column
+- [x] 6. Add database migration for priority column
   - `ALTER TABLE channel_messages ADD COLUMN priority SMALLINT NOT NULL DEFAULT 0;` plus index `idx_channel_messages_priority`.
   - _Requirements: 12.1_
-  - _writes: crates/db/migrations/XXXXXXXX_add_message_priority.sql_
+  - _writes: crates/collab/migrations/20260710140000_add_channel_message_priority.sql_
+  - _Completed: Added a non-null Normal-default priority column and priority index in Postgres and the SQLite integration schema._
+  - _Validation: `sqlite3 :memory: ".read crates/collab/migrations.sqlite/20221109000000_test_schema.sql"`; `cargo check -p collab --features collab/test-support`._
 
 - [ ] 7. Define `MessagePriority` Rust enum in the client crate
   - Mirror the proto enum: `Normal`, `Important`, `Urgent` with `color()`, `icon()`, `label()` methods. Implement `From<proto::ChannelMessagePriority>`.

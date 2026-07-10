@@ -296,12 +296,15 @@ CREATE TABLE IF NOT EXISTS "channel_messages" (
     "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "edited_at" TIMESTAMP,
     "deleted_at" TIMESTAMP,
-    "scheduled_at" TIMESTAMP
+    "scheduled_at" TIMESTAMP,
+    "priority" INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX "index_channel_messages_on_channel_id_and_id" ON "channel_messages" ("channel_id", "id");
 
 CREATE INDEX "index_channel_messages_on_reply_to_message_id" ON "channel_messages" ("reply_to_message_id");
+
+CREATE INDEX "index_channel_messages_on_priority" ON "channel_messages" ("priority");
 
 CREATE TABLE IF NOT EXISTS "scheduled_messages" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT,
