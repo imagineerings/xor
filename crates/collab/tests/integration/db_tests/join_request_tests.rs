@@ -202,6 +202,22 @@ async fn test_join_request_expiry_approval_race(db: &Arc<Database>) {
     }
 }
 
+test_both_dbs!(
+    test_join_request_channel_delete_cascades,
+    test_join_request_channel_delete_cascades_postgres,
+    test_join_request_channel_delete_cascades_sqlite
+);
+
+async fn test_join_request_channel_delete_cascades(db: &Arc<Database>) {
+    let (store, owner_id, requester_id, channel_id) = setup(db).await;
+    store
+        .request_join(channel_id, requester_id, None)
+        .await
+        .unwrap();
+    db.delete_channel(channel_id, owner_id).await.unwrap();
+    assert_eq!(store.count_pending_requests(channel_id).await.unwrap(), 0);
+}
+
 async fn setup(db: &Arc<Database>) -> (JoinRequestStore, UserId, UserId, ChannelId) {
     let owner_id = new_test_user(db).await;
     let requester_id = new_test_user(db).await;

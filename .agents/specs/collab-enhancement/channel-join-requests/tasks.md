@@ -252,9 +252,15 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _writes: crates/collab/tests/channel_join_requests.rs_
 
 - [ ] 24. Edge case tests
-  - [ ] 24.1 Request with very long reason (500+ chars) — verify server truncates at 500.
-  - [ ] 24.2 Request for a deleted channel — cascade delete verification.
-  - [ ] 24.3 User requests then is directly invited by admin — `role.is_some()` check prevents duplicate request.
+  - [x] 24.1 Request with very long reason (500+ chars) — verify server truncates at 500.
+    - _Completed: Added an RPC integration test proving a 501-character reason is rejected at the server boundary._
+    - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests join_request_rejects_reason_over_500_characters --features test-support`._
+  - [x] 24.2 Request for a deleted channel — cascade delete verification.
+    - _Completed: Added SQLite/Postgres store coverage proving deleting a channel removes its pending requests._
+    - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests test_join_request_channel_delete_cascades_sqlite --features test-support`._
+  - [x] 24.3 User requests then is directly invited by admin — `role.is_some()` check prevents duplicate request.
+    - _Completed: Added an RPC integration test proving a direct member invitation blocks a duplicate join request._
+    - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests direct_invite_prevents_duplicate_join_request --features test-support`._
   - [ ] 24.4 Notification with missing user (user deleted after request) — graceful handling in notification display.
   - _Requirements: 10.1_
   - _writes: crates/collab/tests/channel_join_requests.rs_

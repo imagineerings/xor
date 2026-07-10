@@ -243,6 +243,75 @@ async fn join_request_response_requires_channel_admin(
 }
 
 #[gpui::test]
+async fn join_request_rejects_reason_over_500_characters(
+    executor: BackgroundExecutor,
+    cx_admin: &mut TestAppContext,
+    cx_requester: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor).await;
+    let admin = server.create_client(cx_admin, "admin").await;
+    let requester = server.create_client(cx_requester, "requester").await;
+    let channel_id = server
+        .make_channel("private-chat", None, (&admin, cx_admin), &mut [])
+        .await;
+
+    let error = requester
+        .client()
+        .request(proto::RequestJoinChannel {
+            channel_id: channel_id.0,
+            reason: Some("x".repeat(501)),
+        })
+        .await
+        .unwrap_err();
+    assert!(error.to_string().contains("at most 500"));
+}
+
+#[gpui::test]
+async fn direct_invite_prevents_duplicate_join_request(
+    executor: BackgroundExecutor,
+    cx_admin: &mut TestAppContext,
+    cx_requester: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor).await;
+    let admin = server.create_client(cx_admin, "admin").await;
+    let requester = server.create_client(cx_requester, "requester").await;
+    let channel_id = server
+        .make_channel("private-chat", None, (&admin, cx_admin), &mut [])
+        .await;
+    server
+        .app_state
+        .db
+        .invite_channel_member(
+            DbChannelId::from_proto(channel_id.0),
+            DbUserId::from_proto(requester.user_id().unwrap()),
+            DbUserId::from_proto(admin.user_id().unwrap()),
+            DbChannelRole::Member,
+        )
+        .await
+        .unwrap();
+    server
+        .app_state
+        .db
+        .respond_to_channel_invite(
+            DbChannelId::from_proto(channel_id.0),
+            DbUserId::from_proto(requester.user_id().unwrap()),
+            true,
+        )
+        .await
+        .unwrap();
+
+    let error = requester
+        .client()
+        .request(proto::RequestJoinChannel {
+            channel_id: channel_id.0,
+            reason: None,
+        })
+        .await
+        .unwrap_err();
+    assert!(error.to_string().contains("already"));
+}
+
+#[gpui::test]
 async fn custom_status_expiry_sweeper_deletes_expired_statuses(
     executor: BackgroundExecutor,
     cx: &mut TestAppContext,
