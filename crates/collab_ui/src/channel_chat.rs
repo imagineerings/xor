@@ -15,8 +15,8 @@ use chrono::{
     TimeZone as _, Timelike as _, Utc,
 };
 use client::{
-    AddBookmark, Bookmark, BookmarkId, ChannelId, Client, MessagePriority, UpdateBookmark,
-    UserStore,
+    AddBookmark, Bookmark, BookmarkId, ChannelId, Client, GroupStore, MessagePriority,
+    UpdateBookmark, UserStore,
     channel_chat::{
         DEFAULT_THREAD_REPLY_LIMIT, ScheduleChannelMessage, SearchChannelMessages,
         SendChannelMessage, ThreadSummary, UpdateScheduledMessage,
@@ -137,6 +137,7 @@ pub struct ChannelChat {
     channel_id: ChannelId,
     client: Arc<Client>,
     user_store: Entity<UserStore>,
+    group_store: Entity<GroupStore>,
     channel_store: Entity<ChannelStore>,
     workspace: WeakEntity<Workspace>,
     composer: Entity<Editor>,
@@ -527,6 +528,7 @@ impl ChannelChat {
     ) -> Task<Result<Entity<Self>>> {
         let client = workspace.read(cx).client().clone();
         let user_store = workspace.read(cx).user_store().clone();
+        let group_store = workspace.read(cx).app_state().group_store.clone();
         let channel_store = ChannelStore::global(cx);
         let weak_workspace = workspace.downgrade();
 
@@ -537,6 +539,7 @@ impl ChannelChat {
                     channel_id,
                     client,
                     user_store,
+                    group_store,
                     channel_store,
                     weak_workspace,
                     response.messages,
@@ -551,6 +554,7 @@ impl ChannelChat {
         channel_id: ChannelId,
         client: Arc<Client>,
         user_store: Entity<UserStore>,
+        group_store: Entity<GroupStore>,
         channel_store: Entity<ChannelStore>,
         workspace: WeakEntity<Workspace>,
         mut messages: Vec<proto::ChannelMessage>,
@@ -670,6 +674,7 @@ impl ChannelChat {
             channel_id,
             client,
             user_store,
+            group_store,
             channel_store,
             workspace,
             composer,
@@ -951,6 +956,7 @@ impl ChannelChat {
         }
 
         let body = self.composer.read(cx).text(cx).trim().to_string();
+        let mentions = self.group_mentions(&body, cx);
         let file_ids = self.completed_upload_file_ids(cx);
         if self.has_active_uploads(cx) {
             self.show_upload_error("Wait for uploads to finish before sending.", cx);
@@ -999,7 +1005,7 @@ impl ChannelChat {
                         body,
                         scheduled_at,
                         nonce,
-                        mentions: Vec::new(),
+                        mentions,
                     })
                     .await
                     .map(|_| None)
@@ -1010,7 +1016,7 @@ impl ChannelChat {
                             channel_id: channel_id.0,
                             body,
                             nonce,
-                            mentions: Vec::new(),
+                            mentions,
                             reply_to_message_id: None,
                             file_ids,
                         },
@@ -1062,6 +1068,38 @@ impl ChannelChat {
             anyhow::Ok(())
         })
         .detach_and_log_err(cx);
+    }
+
+    fn group_mentions(&self, body: &str, cx: &App) -> Vec<proto::ChatMention> {
+        let mut groups = self.group_store.read(cx).all_groups();
+        groups.sort_by(|left, right| right.name.len().cmp(&left.name.len()));
+
+        groups
+            .into_iter()
+            .flat_map(|group| {
+                let group_id = group.id;
+                let mention = format!("@{}", group.name);
+                body.match_indices(&mention)
+                    .filter_map(move |(start, matched)| {
+                        let end = start + matched.len();
+                        let next_character = body[end..].chars().next();
+                        if next_character.is_some_and(|character| {
+                            character.is_ascii_alphanumeric() || character == '-'
+                        }) {
+                            return None;
+                        }
+                        Some(proto::ChatMention {
+                            range: Some(proto::Range {
+                                start: start as u64,
+                                end: end as u64,
+                            }),
+                            user_id: 0,
+                            group_id,
+                        })
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect()
     }
 
     fn open_file_picker(&mut self, _: &ClickEvent, window: &mut Window, cx: &mut Context<Self>) {
