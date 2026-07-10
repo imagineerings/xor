@@ -10,14 +10,16 @@ Add a join request workflow for private channels, enabling non-members to reques
 
 ## Tasks
 
-- [ ] 1. Define protobuf messages
+- [x] 1. Define protobuf messages
   - Add `RequestJoinChannel`, `RequestJoinChannelResponse`, `RespondToJoinRequest`, `RespondToJoinRequestResponse` RPC messages.
   - Add `GetPendingJoinRequests`, `GetPendingJoinRequestsResponse`, `PendingJoinRequest` entity messages.
   - Add `JoinRequestAdded`, `JoinRequestResponded` push messages.
   - Add `PendingRequestCount` message and extend `UpdateChannels` with a `repeated PendingRequestCount pending_request_counts` field (field number 16).
   - Register all new RPCs in the `collab` proto dispatch table.
   - _Requirements: 10.1, 10.2, 10.3, 10.4_
-  - _writes: crates/proto/proto/zed.proto_
+  - _writes: crates/proto/proto/channel.proto, crates/proto/proto/sim.proto, crates/proto/src/proto.rs_
+  - _Completed: Added join-request RPC request/response types, admin/requester push messages, pending-request entities, and `UpdateChannels.pending_request_counts`; registered every envelope, request-response pair, and channel-targeted push in the proto dispatch layer._
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p proto --features proto/test-support`._
 
 - [ ] 2. Database migration
   - Create `channel_join_requests` table with columns: `id` (BIGINT PK generated), `channel_id` (BIGINT NOT NULL FK references channels ON DELETE CASCADE), `user_id` (BIGINT NOT NULL FK references users ON DELETE CASCADE), `reason` (TEXT NULL), `created_at` (TIMESTAMP NOT NULL DEFAULT NOW()).
@@ -27,10 +29,12 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _Requirements: 10.1 (AC 4), 10.4 (AC 3)_
   - _writes: crates/db/migrations/..._channel_join_requests.sql_
 
-- [ ] 3. Regenerate proto Rust bindings
+- [x] 3. Regenerate proto Rust bindings
   - Run the proto codegen to produce `crates/proto/src/proto.rs` with the new messages.
   - Validate that `PendingRequestCount`, `JoinRequestAdded`, `JoinRequestResponded`, and the new RPC types compile.
   - _writes: crates/proto/src/proto.rs_
+  - _Completed: Verified the existing `prost` build generates the new join-request messages from `channel.proto` and exposes them through the `proto` crate during compilation._
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p proto --features proto/test-support`._
 
 - [ ] 4. Implement server-side `JoinRequestStore`
   - [ ] 4.1 Implement `request_join` — INSERT into `channel_join_requests`; returns error on UNIQUE violation (duplicate pending request).

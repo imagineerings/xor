@@ -6,7 +6,7 @@ Sim private channels (`ChannelVisibility::Members`) currently require an explici
 
 **Key decisions:**
 
-- **Proto changes**: New `RequestJoinChannel` and `RespondToJoinRequest` RPC messages, new `JoinRequestAdded` and `JoinRequestResponded` push messages. The existing `UpdateChannels` message gains a `pending_join_requests` field for state sync.
+- **Proto changes**: New `RequestJoinChannel` and `RespondToJoinRequest` RPC messages, new `JoinRequestAdded` and `JoinRequestResponded` push messages. The existing `UpdateChannels` message gains a `pending_request_counts` field for state sync. <!-- impl: crates/proto/proto/channel.proto#UpdateChannels -->
 - **Database**: New `channel_join_requests` table keyed by `(channel_id, user_id)`, with an optional `reason` text field and a `created_at` timestamp. A background expiry job handles auto-rejection after a configurable TTL (default 7 days).
 - **Only Admins can respond**: Following the principle of least privilege, only users with `ChannelRole::Admin` on the target channel can approve or deny join requests. (Future extension: grant this power to members with a "Manage" permission.)
 - **Notifications reuse**: New `Notification` enum variants (`JoinRequest`, `JoinRequestApproved`, `JoinRequestDenied`) follow the existing serde-based notification pattern in `rpc::Notification`.
@@ -99,7 +99,7 @@ message GetPendingJoinRequestsResponse {
 
 message PendingJoinRequest {
     uint64 user_id = 1;
-    string reason = 2;
+    optional string reason = 2;
     uint64 created_at = 3;  // unix timestamp
 }
 
@@ -109,7 +109,7 @@ message PendingJoinRequest {
 message JoinRequestAdded {
     uint64 channel_id = 1;
     uint64 requesting_user_id = 2;
-    string reason = 3;
+    optional string reason = 3;
     uint64 created_at = 4;
 }
 

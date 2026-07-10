@@ -24,9 +24,15 @@ message UpdateChannels {
   repeated uint64 remove_channel_invitations = 6;
   repeated ChannelParticipants channel_participants = 7;
   repeated ChannelBufferVersion latest_channel_buffer_versions = 9;
+  repeated PendingRequestCount pending_request_counts = 16;
 
   reserved 8;
   reserved 10 to 15;
+}
+
+message PendingRequestCount {
+  uint64 channel_id = 1;
+  uint32 count = 2;
 }
 
 message UpdateUserChannels {
@@ -73,6 +79,53 @@ message GetChannelMembers {
 message GetChannelMembersResponse {
   repeated ChannelMember members = 1;
   repeated User users = 2;
+}
+
+message RequestJoinChannel {
+  uint64 channel_id = 1;
+  optional string reason = 2;
+}
+
+message RequestJoinChannelResponse {
+  bool success = 1;
+}
+
+message RespondToJoinRequest {
+  uint64 channel_id = 1;
+  uint64 requesting_user_id = 2;
+  bool approve = 3;
+  optional string denial_reason = 4;
+}
+
+message RespondToJoinRequestResponse {
+  bool success = 1;
+}
+
+message GetPendingJoinRequests {
+  uint64 channel_id = 1;
+}
+
+message GetPendingJoinRequestsResponse {
+  repeated PendingJoinRequest requests = 1;
+}
+
+message PendingJoinRequest {
+  uint64 user_id = 1;
+  optional string reason = 2;
+  uint64 created_at = 3;
+}
+
+message JoinRequestAdded {
+  uint64 channel_id = 1;
+  uint64 requesting_user_id = 2;
+  optional string reason = 3;
+  uint64 created_at = 4;
+}
+
+message JoinRequestResponded {
+  uint64 channel_id = 1;
+  bool approved = 2;
+  optional string denial_reason = 3;
 }
 
 message ChannelMember {

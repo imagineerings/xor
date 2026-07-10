@@ -523,6 +523,14 @@ message Envelope {
     ConfirmFileUploadResponse confirm_file_upload_response = 488;
     GetFileDownloadUrl get_file_download_url = 489;
     GetFileDownloadUrlResponse get_file_download_url_response = 490; // current max
+    RequestJoinChannel request_join_channel = 491;
+    RequestJoinChannelResponse request_join_channel_response = 492;
+    RespondToJoinRequest respond_to_join_request = 493;
+    RespondToJoinRequestResponse respond_to_join_request_response = 494;
+    GetPendingJoinRequests get_pending_join_requests = 495;
+    GetPendingJoinRequestsResponse get_pending_join_requests_response = 496;
+    JoinRequestAdded join_request_added = 497;
+    JoinRequestResponded join_request_responded = 498; // current max
   }
 
   reserved 87 to 88;
