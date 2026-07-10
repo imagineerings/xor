@@ -5,6 +5,7 @@ pub mod join_request_store;
 pub mod queries;
 pub mod scheduled_message_store;
 mod tables;
+pub mod user_status_store;
 
 use crate::{Error, Result};
 use anyhow::{Context as _, anyhow};

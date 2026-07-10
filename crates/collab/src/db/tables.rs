@@ -32,6 +32,7 @@ pub mod scheduled_message;
 pub mod server;
 pub mod shared_thread;
 pub mod user;
+pub mod user_custom_status;
 pub mod worktree;
 pub mod worktree_diagnostic_summary;
 pub mod worktree_entry;

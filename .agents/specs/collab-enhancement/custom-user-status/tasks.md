@@ -48,13 +48,15 @@ This plan implements custom user status — emoji + short text labels with optio
   - _Requirements: 8.2 (AC 1)_
   - _writes: crates/collab/src/status_expiry_sweeper.rs, crates/collab/src/main.rs_ (or equivalent server init)
 
-- [ ] 5. Add DB query methods for `user_custom_statuses`
-  - [ ] 5.1 Add `upsert_custom_status(user_id, emoji, text, expires_at)` to the database layer
+- [x] 5. Add DB query methods for `user_custom_statuses`
+  - [x] 5.1 Add `upsert_custom_status(user_id, emoji, text, expires_at)` to the database layer
     - _writes: crates/collab/src/db/_
-  - [ ] 5.2 Add `delete_custom_status(user_id)` to the database layer
+  - [x] 5.2 Add `delete_custom_status(user_id)` to the database layer
     - _writes: crates/collab/src/db/_
-  - [ ] 5.3 Add `delete_expired_custom_statuses()` → returning cleared user ids
+  - [x] 5.3 Add `delete_expired_custom_statuses()` → returning cleared user ids
     - _writes: crates/collab/src/db/_
+  - _Completed: Added a transactional UserStatusStore with portable upsert, idempotent clear, and expired-status deletion APIs, plus SeaORM table metadata and cross-database lifecycle tests._
+  - _Validation: `cargo check -p collab --features collab/test-support`. The focused integration test command could not complete because the full harness exhausted local build disk._
 
 - [ ] 6. Extend client `Contact` struct and add `CustomStatus` model
   - [ ] 6.1 Define `CustomStatus` struct in `crates/client/src/user.rs` with `emoji: Option<SharedString>`, `text: SharedString`, `expires_at: Option<i64>`
