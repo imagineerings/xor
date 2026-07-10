@@ -258,6 +258,8 @@ impl NotificationStore {
                 } => {
                     user_ids.push(contact_id);
                 }
+                Notification::JoinRequestApproved { .. }
+                | Notification::JoinRequestDenied { .. } => {}
             }
         }
 
