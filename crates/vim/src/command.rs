@@ -1,5 +1,4 @@
 use anyhow::{Result, anyhow};
-use sim_actions::{OpenDocs, RevealTarget};
 use collections::{HashMap, HashSet};
 use command_palette_hooks::{CommandInterceptItem, CommandInterceptResult};
 use editor::{
@@ -21,6 +20,7 @@ use schemars::JsonSchema;
 use search::{BufferSearchBar, SearchOptions};
 use serde::Deserialize;
 use settings::{Settings, SettingsStore};
+use sim_actions::{OpenDocs, RevealTarget};
 use std::{
     iter::Peekable,
     ops::{Deref, Range},
@@ -345,15 +345,6 @@ pub fn register(editor: &mut Editor, cx: &mut Context<Vim>) {
             &["Cancel"],
             cx,
         );
-    });
-
-    Vim::action(editor, cx, |vim, _: &ShellCommand, window, cx| {
-        let Some(workspace) = vim.workspace(window, cx) else {
-            return;
-        };
-        workspace.update(cx, |workspace, cx| {
-            command_palette::CommandPalette::toggle(workspace, "'<,'>!", window, cx);
-        })
     });
 
     Vim::action(editor, cx, |vim, action: &VimSave, window, cx| {
