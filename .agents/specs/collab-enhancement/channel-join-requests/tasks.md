@@ -111,12 +111,14 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _Completed: Added join-request, approval, and denial notification variants with channel entity IDs. Notification loading resolves requesters through `UserStore`; toast rendering includes channel names and optional reasons._
   - _Validation: `cargo test -p rpc`; `cargo check -p collab_ui -p notifications`._
 
-- [ ] 11. Add client-side data models
+- [x] 11. Add client-side data models
   - Define `PendingJoinRequest` struct with `user_id`, `user: Arc<User>`, `reason: Option<SharedString>`, `created_at: OffsetDateTime`.
   - Define `PendingRequestCount` struct with `channel_id: ChannelId`, `count: u32`.
   - Derive appropriate traits (Clone, Debug, etc.).
   - _Requirements: 10.4_
   - _writes: crates/collab_ui/src/channel_join_requests.rs_
+  - _Completed: Added shared pending-request and pending-count client models with the requester user, optional reason, timestamp, channel ID, and count._
+  - _Validation: `cargo check -p collab_ui`._
 
 - [ ] 12. Update `ChannelStore` for pending request counts
   - Add `pending_join_request_counts: HashMap<ChannelId, u32>` field.
