@@ -2235,7 +2235,7 @@ impl ChannelChat {
                     }),
             )
             .child(self.rendered_message_body(message, cx).render(window, cx))
-            .child(self.render_message_files(&message.files))
+            .child(self.render_message_files(&message.files, cx))
             .child(
                 h_flex().child(
                     Button::new(format!("channel-open-thread-{}", message.id), "Reply")
@@ -2322,16 +2322,21 @@ impl ChannelChat {
                     }),
             )
             .child(self.rendered_message_body(message, cx).render(window, cx))
-            .child(self.render_message_files(&message.files))
+            .child(self.render_message_files(&message.files, cx))
             .into_any_element()
     }
 
-    fn render_message_files(&self, files: &[proto::FileAttachment]) -> gpui::AnyElement {
+    fn render_message_files(&self, files: &[proto::FileAttachment], cx: &App) -> gpui::AnyElement {
         if files.is_empty() {
             return div().into_any_element();
         }
 
         let workspace = self.workspace.clone();
+        let language_registry = self
+            .workspace
+            .read_with(cx, |workspace, _| workspace.app_state().languages.clone())
+            .ok();
+        let client = self.client.clone();
         v_flex()
             .gap_2()
             .children(files.iter().cloned().filter_map(|file| {
@@ -2352,6 +2357,8 @@ impl ChannelChat {
                                         .log_err();
                                 }
                             }),
+                            client.clone(),
+                            language_registry.clone(),
                         )
                     })
             }))

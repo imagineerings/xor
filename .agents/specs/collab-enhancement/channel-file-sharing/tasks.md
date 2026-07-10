@@ -176,11 +176,14 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
   - _Requirements: 4.2_
   - _writes: crates/collab_ui/src/channel_chat/file_renderer.rs_
 
-- [ ] 17. Render code snippets with syntax highlighting
+- [x] 17. Render code snippets with syntax highlighting
   - Add `render_code_snippet`: fetch file content, detect language from extension, render first N lines with syntax highlighting.
   - Add "Show more" expand action for files exceeding the preview line limit.
   - _Requirements: 4.2_
   - _writes: crates/collab_ui/src/channel_chat/file_renderer.rs_
+  - _Completed: Added an asynchronous in-channel code preview that fetches attachment content through the existing client HTTP stack, renders the first 24 lines as a language-tagged Markdown code block, and expands longer files in place._
+  - _Actual writes: crates/collab_ui/src/channel_chat/file_renderer.rs; crates/collab_ui/src/channel_chat.rs; crates/collab_ui/Cargo.toml_
+  - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab_ui file_renderer --features test-support`; `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `git diff --check`._
 
 - [x] 18. Render fallback file cards for other types
   - Add `render_file_card`: show file type icon, filename, formatted file size, uploader name, download count.

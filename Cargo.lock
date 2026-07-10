@@ -3560,6 +3560,7 @@ dependencies = [
  "futures 0.3.32",
  "fuzzy",
  "gpui",
+ "language",
  "livekit_client",
  "markdown",
  "menu",

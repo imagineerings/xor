@@ -147,6 +147,10 @@ impl UploadManager {
 <!-- impl: crates/collab_ui/src/channel_chat/file_renderer.rs#ImagePreviewModal -->
 <!-- impl: crates/collab_ui/src/channel_chat.rs#ChannelChat::render_message_files -->
 
+For code attachments, `CodeSnippetPreview` fetches the attachment through the existing client HTTP stack and renders a language-tagged fenced Markdown block with the workspace `LanguageRegistry`. The preview starts at 24 lines and offers an in-place expansion for longer files. Failed requests remain visible as an unavailable preview instead of leaving an empty attachment area.
+
+<!-- impl: crates/collab_ui/src/channel_chat/file_renderer.rs#CodeSnippetPreview -->
+
 ```rust
 pub struct FileAttachmentRenderer;
 
@@ -298,5 +302,5 @@ _For any_ uploaded image file, the server SHALL generate a thumbnail (max 400px 
 
 - **Unit tests**: FileStore.GenerateUploadUrl validation, ConfirmUpload, GetFileMetadata
 - **Integration tests**: Upload file → ConfirmUpload → fetch message → verify FileAttachment exists
-- **UI tests**: Drag-and-drop onto compose area, file picker dialog, progress bar rendering, image preview rendering, and image lightbox opening
+- **UI tests**: Drag-and-drop onto compose area, file picker dialog, progress bar rendering, image preview rendering, image lightbox opening, and code-preview expansion
 - **Security tests**: Verify presigned URL cannot be used to upload files larger than requested size, verify MIME type spoofing rejection

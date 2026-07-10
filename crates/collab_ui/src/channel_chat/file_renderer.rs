@@ -1,14 +1,20 @@
-use client::FileAttachment;
+use client::{Client, FileAttachment};
+use futures::AsyncReadExt as _;
 use gpui::{
     AnyElement, App, Context, DismissEvent, EventEmitter, FocusHandle, Focusable, ImageSource,
-    IntoElement, ObjectFit, ParentElement, Render, RenderOnce, Resource, SharedUri, Styled as _,
-    Window, img, px,
+    IntoElement, ObjectFit, ParentElement, Render, RenderOnce, Resource, SharedString, SharedUri,
+    Styled as _, Task, Window,
+    http_client::{AsyncBody, HttpClient as _},
+    img, px,
 };
-use std::rc::Rc;
+use language::LanguageRegistry;
+use markdown::{CodeBlockRenderer, CopyButtonVisibility, Markdown, MarkdownElement};
+use std::{rc::Rc, sync::Arc};
 use ui::{
     Button, ButtonStyle, Color, Icon, IconButton, IconName, IconSize, Label, LabelSize, Tooltip,
     prelude::*,
 };
+use util::ResultExt;
 use workspace::ModalView;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -25,6 +31,8 @@ pub(super) enum FileKind {
 pub(super) struct FileAttachmentRenderer {
     file: FileAttachment,
     on_open_image: Option<ImageOpenHandler>,
+    client: Arc<Client>,
+    language_registry: Option<Arc<LanguageRegistry>>,
 }
 
 type ImageOpenHandler = Rc<dyn Fn(FileAttachment, &mut Window, &mut App)>;
@@ -33,10 +41,14 @@ impl FileAttachmentRenderer {
     pub(super) fn with_image_open_handler(
         file: FileAttachment,
         on_open_image: ImageOpenHandler,
+        client: Arc<Client>,
+        language_registry: Option<Arc<LanguageRegistry>>,
     ) -> Self {
         Self {
             file,
             on_open_image: Some(on_open_image),
+            client,
+            language_registry,
         }
     }
 
@@ -139,6 +151,18 @@ impl FileAttachmentRenderer {
             .into_any_element()
     }
 
+    fn render_code_snippet(&self, cx: &mut App) -> AnyElement {
+        cx.new(|cx| {
+            CodeSnippetPreview::new(
+                self.file.clone(),
+                self.client.clone(),
+                self.language_registry.clone(),
+                cx,
+            )
+        })
+        .into_any_element()
+    }
+
     fn render_file_card(&self, cx: &mut App) -> AnyElement {
         let file = self.file.clone();
         let icon = icon_for_file_kind(Self::detect_file_kind(&file.mime_type, &file.filename));
@@ -170,6 +194,162 @@ impl FileAttachmentRenderer {
                     .on_click(move |_, _, cx| cx.open_url(&file.url)),
             )
             .into_any_element()
+    }
+}
+
+const CODE_PREVIEW_LINE_LIMIT: usize = 24;
+
+struct CodeSnippetPreview {
+    file: FileAttachment,
+    language_registry: Option<Arc<LanguageRegistry>>,
+    source: CodePreviewSource,
+    expanded: bool,
+    _fetch_task: Task<()>,
+}
+
+enum CodePreviewSource {
+    Loading,
+    Loaded {
+        content: String,
+        markdown: gpui::Entity<Markdown>,
+    },
+    Failed,
+}
+
+impl CodeSnippetPreview {
+    fn new(
+        file: FileAttachment,
+        client: Arc<Client>,
+        language_registry: Option<Arc<LanguageRegistry>>,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        let url = file.url.clone();
+        let fetch_task = cx.spawn(async move |this, cx| {
+            let content = async {
+                let mut response = client
+                    .http_client()
+                    .get(&url, AsyncBody::empty(), true)
+                    .await?;
+                anyhow::ensure!(
+                    response.status().is_success(),
+                    "file preview request failed with status {}",
+                    response.status()
+                );
+                let mut content = String::new();
+                response.body_mut().read_to_string(&mut content).await?;
+                Ok::<_, anyhow::Error>(content)
+            }
+            .await;
+
+            this.update(cx, |this, cx| {
+                this.source = match content {
+                    Ok(content) => {
+                        let markdown = cx.new(|cx| {
+                            Markdown::new(
+                                SharedString::from(code_preview_markdown(
+                                    &content,
+                                    &this.file.filename,
+                                    this.expanded,
+                                )),
+                                this.language_registry.clone(),
+                                None,
+                                cx,
+                            )
+                        });
+                        CodePreviewSource::Loaded { content, markdown }
+                    }
+                    Err(error) => {
+                        Err::<(), _>(error).log_err();
+                        CodePreviewSource::Failed
+                    }
+                };
+                cx.notify();
+            })
+            .log_err();
+        });
+
+        Self {
+            file,
+            language_registry,
+            source: CodePreviewSource::Loading,
+            expanded: false,
+            _fetch_task: fetch_task,
+        }
+    }
+
+    fn show_more(&mut self, _: &gpui::ClickEvent, _: &mut Window, cx: &mut Context<Self>) {
+        let CodePreviewSource::Loaded { content, markdown } = &mut self.source else {
+            return;
+        };
+        self.expanded = true;
+        markdown.update(cx, |markdown, cx| {
+            *markdown = Markdown::new(
+                SharedString::from(code_preview_markdown(&content, &self.file.filename, true)),
+                self.language_registry.clone(),
+                None,
+                cx,
+            );
+        });
+        cx.notify();
+    }
+}
+
+impl Render for CodeSnippetPreview {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let has_more = matches!(
+            &self.source,
+            CodePreviewSource::Loaded { content, .. } if code_line_count(content) > CODE_PREVIEW_LINE_LIMIT
+        );
+
+        v_flex()
+            .gap_2()
+            .max_w(px(640.))
+            .p_2()
+            .rounded_sm()
+            .border_1()
+            .border_color(cx.theme().colors().border)
+            .bg(cx.theme().colors().editor_background)
+            .child(
+                h_flex()
+                    .justify_between()
+                    .gap_2()
+                    .child(Label::new(self.file.filename.clone()).truncate())
+                    .child(
+                        Label::new(file_metadata_label(&self.file))
+                            .size(LabelSize::XSmall)
+                            .color(Color::Muted),
+                    ),
+            )
+            .child(match &self.source {
+                CodePreviewSource::Loading => Label::new("Loading preview...")
+                    .size(LabelSize::XSmall)
+                    .color(Color::Muted)
+                    .into_any_element(),
+                CodePreviewSource::Failed => Label::new("Preview unavailable")
+                    .size(LabelSize::XSmall)
+                    .color(Color::Muted)
+                    .into_any_element(),
+                CodePreviewSource::Loaded { markdown, .. } => MarkdownElement::new(
+                    markdown.clone(),
+                    super::markdown_style::channel_chat_markdown_style(window, cx),
+                )
+                .code_block_renderer(CodeBlockRenderer::Default {
+                    copy_button_visibility: CopyButtonVisibility::VisibleOnHover,
+                    wrap_button_visibility: markdown::WrapButtonVisibility::VisibleOnHover,
+                    border: false,
+                })
+                .into_any_element(),
+            })
+            .when(has_more && !self.expanded, |this| {
+                this.child(
+                    Button::new(
+                        format!("show-more-channel-code-{}", self.file.id),
+                        "Show more",
+                    )
+                    .style(ButtonStyle::Subtle)
+                    .on_click(cx.listener(Self::show_more)),
+                )
+            })
     }
 }
 
@@ -253,9 +433,8 @@ impl RenderOnce for FileAttachmentRenderer {
         match Self::detect_file_kind(&self.file.mime_type, &self.file.filename) {
             FileKind::Image => self.render_image_preview(cx),
             FileKind::Pdf => self.render_pdf_thumbnail(cx),
-            FileKind::Video | FileKind::Audio | FileKind::Code | FileKind::Other => {
-                self.render_file_card(cx)
-            }
+            FileKind::Code => self.render_code_snippet(cx),
+            FileKind::Video | FileKind::Audio | FileKind::Other => self.render_file_card(cx),
         }
     }
 }
@@ -276,6 +455,50 @@ fn is_image_extension(extension: Option<&str>) -> bool {
         extension,
         Some("png" | "jpg" | "jpeg" | "gif" | "webp" | "svg")
     )
+}
+
+fn code_preview_markdown(content: &str, filename: &str, expanded: bool) -> String {
+    let language = code_language(filename);
+    let content = if expanded {
+        content.to_string()
+    } else {
+        content
+            .lines()
+            .take(CODE_PREVIEW_LINE_LIMIT)
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    let fence = "`".repeat(longest_backtick_run(&content).max(3) + 1);
+    format!("{fence}{language}\n{content}\n{fence}")
+}
+
+fn code_language(filename: &str) -> &str {
+    match filename.rsplit_once('.').map(|(_, extension)| extension) {
+        Some("rs") => "rust",
+        Some("py") => "python",
+        Some("js" | "jsx") => "javascript",
+        Some("ts" | "tsx") => "typescript",
+        Some("json") => "json",
+        Some("toml") => "toml",
+        Some("yaml" | "yml") => "yaml",
+        Some("html") => "html",
+        Some("css") => "css",
+        Some("sh") => "bash",
+        Some("sql") => "sql",
+        _ => "text",
+    }
+}
+
+fn code_line_count(content: &str) -> usize {
+    content.lines().count()
+}
+
+fn longest_backtick_run(content: &str) -> usize {
+    content
+        .split(|character| character != '`')
+        .map(str::len)
+        .max()
+        .unwrap_or_default()
 }
 
 fn file_metadata_label(file: &FileAttachment) -> String {
@@ -437,6 +660,29 @@ mod tests {
             file_metadata_label(&file),
             "4.0 KB · video/mp4 · Uploader #7 · 800x600 · 1:05"
         );
+    }
+
+    #[test]
+    fn code_preview_uses_filename_language_and_line_limit() {
+        let content = (0..CODE_PREVIEW_LINE_LIMIT + 1)
+            .map(|line| format!("let value_{line} = {line};"))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let preview = code_preview_markdown(&content, "example.rs", false);
+
+        assert!(preview.starts_with("````rust\n"));
+        assert!(preview.contains("let value_23 = 23;"));
+        assert!(!preview.contains("let value_24 = 24;"));
+        assert_eq!(code_line_count(&content), CODE_PREVIEW_LINE_LIMIT + 1);
+    }
+
+    #[test]
+    fn code_preview_escapes_fences_in_attachment_content() {
+        let preview = code_preview_markdown("```\nnot markdown", "example.rs", true);
+
+        assert!(preview.starts_with("````rust\n"));
+        assert!(preview.ends_with("\n````"));
     }
 
     fn file_attachment(filename: &str, mime_type: &str) -> FileAttachment {
