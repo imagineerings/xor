@@ -65,14 +65,16 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _Completed: Registered `RequestJoinChannel`; it rejects public channels and existing non-banned members, persists the request through `JoinRequestStore`, creates deduplicated admin notifications, and pushes `JoinRequestAdded` to connected admins._
   - _Validation: `cargo check -p collab --features collab/test-support`._
 
-- [ ] 6. Implement `handle_respond_join_request` RPC handler
+- [x] 6. Implement `handle_respond_join_request` RPC handler
   - Verify caller is a channel admin (otherwise return `Forbidden`).
   - Verify the pending request still exists (otherwise return error: already handled or expired).
   - If `approve = true`: call `approve_join_request`, create `Notification::JoinRequestApproved`, broadcast `JoinRequestResponded` push with `approved = true`.
   - If `approve = false`: call `deny_join_request`, create `Notification::JoinRequestDenied` with optional denial reason, broadcast `JoinRequestResponded` push with `approved = false`.
   - Return `RespondToJoinRequestResponse { success: true }`.
   - _Requirements: 10.2, 10.3_
-  - _writes: crates/collab/src/api/channel.rs_
+  - _writes: crates/collab/src/rpc.rs_
+  - _Completed: Registered admin-gated approval and denial handling. The handler resolves the pending request atomically through `JoinRequestStore`, persists an outcome notification for the requester, and pushes `JoinRequestResponded` to active requester connections._
+  - _Validation: `cargo check -p collab --features collab/test-support`._
 
 - [ ] 7. Implement `handle_get_pending_join_requests` RPC handler
   - Verify caller is a channel admin.

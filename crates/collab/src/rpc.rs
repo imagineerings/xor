@@ -454,6 +454,7 @@ impl Server {
             .add_request_handler(request_contact)
             .add_request_handler(remove_contact)
             .add_request_handler(respond_to_contact_request)
+            .add_request_handler(respond_to_join_request)
             .add_request_handler(request_join_channel)
             .add_message_handler(subscribe_to_channels)
             .add_request_handler(create_channel)
@@ -3394,6 +3395,79 @@ async fn get_channel_members(
 
     response.send(proto::GetChannelMembersResponse { members, users })?;
     Ok(())
+}
+
+async fn respond_to_join_request(
+    request: proto::RespondToJoinRequest,
+    response: Response<proto::RespondToJoinRequest>,
+    session: MessageContext,
+) -> Result<()> {
+    let channel_id = ChannelId::from_proto(request.channel_id);
+    let requester_id = UserId::from_proto(request.requesting_user_id);
+    let responder_id = session.user_id();
+    let db = session.app_state.db.clone();
+    let channel = db
+        .transaction(|tx| {
+            let db = db.clone();
+            async move {
+                let channel = db.get_channel_internal(channel_id, &tx).await?;
+                db.check_user_is_channel_admin(&channel, responder_id, &tx)
+                    .await?;
+                Ok(channel)
+            }
+        })
+        .await?;
+
+    let store = JoinRequestStore::new(db.clone());
+    let handled = if request.approve {
+        store.approve_join_request(channel_id, requester_id).await?
+    } else {
+        store.deny_join_request(channel_id, requester_id).await?
+    };
+    if !handled {
+        return Err(anyhow!("join request no longer exists").into());
+    }
+
+    let notification = if request.approve {
+        rpc::Notification::JoinRequestApproved {
+            channel_id: channel_id.to_proto(),
+            channel_name: channel.name.clone(),
+        }
+    } else {
+        rpc::Notification::JoinRequestDenied {
+            channel_id: channel_id.to_proto(),
+            channel_name: channel.name.clone(),
+            reason: request.denial_reason.clone(),
+        }
+    };
+    let notifications = db
+        .transaction(|tx| {
+            let db = db.clone();
+            let notification = notification.clone();
+            async move {
+                Ok(db
+                    .create_notification(requester_id, notification, false, &tx)
+                    .await?
+                    .into_iter()
+                    .collect())
+            }
+        })
+        .await?;
+
+    let connection_pool = session.connection_pool().await;
+    send_notifications(&connection_pool, &session.peer, notifications);
+    for connection_id in connection_pool.user_connection_ids(requester_id) {
+        session.peer.send(
+            connection_id,
+            proto::JoinRequestResponded {
+                channel_id: channel_id.to_proto(),
+                approved: request.approve,
+                denial_reason: request.denial_reason.clone(),
+            },
+        )?;
+    }
+
+    response.send(proto::RespondToJoinRequestResponse { success: true })
 }
 
 /// Accept or decline a channel invitation.

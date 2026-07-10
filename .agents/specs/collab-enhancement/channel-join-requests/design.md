@@ -302,6 +302,8 @@ async fn handle_respond_join_request(
 }
 ```
 
+The production handler verifies the responder is a channel admin before resolving the pending request; it then notifies and pushes the outcome to the requester. <!-- impl: crates/collab/src/rpc.rs#respond_to_join_request -->
+
 ### 3.5 Server-side: Background Expiry Job
 
 ```rust
