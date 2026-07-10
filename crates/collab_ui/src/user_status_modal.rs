@@ -255,3 +255,18 @@ impl Render for UserStatusModal {
             )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::ClearAfterOption;
+
+    #[test]
+    fn clear_after_options_match_server_durations() {
+        assert_eq!(ClearAfterOption::Never.minutes(), None);
+        assert_eq!(ClearAfterOption::ThirtyMinutes.minutes(), Some(30));
+        assert_eq!(ClearAfterOption::OneHour.minutes(), Some(60));
+        assert_eq!(ClearAfterOption::FourHours.minutes(), Some(240));
+        assert_eq!(ClearAfterOption::Today.minutes(), Some(1_440));
+        assert_eq!(ClearAfterOption::ThisWeek.minutes(), Some(10_080));
+    }
+}

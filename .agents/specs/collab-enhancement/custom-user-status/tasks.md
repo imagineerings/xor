@@ -155,8 +155,10 @@ This plan implements custom user status — emoji + short text labels with optio
     - _writes: crates/client/src/user.rs_ (tests module)
   - [ ] 13.2 `test_update_user_statuses_batch` - batch initialization populates all contacts correctly
     - _writes: crates/client/src/user.rs_ (tests module)
-  - [ ] 13.3 `test_clear_after_duration_parsing` - each `ClearAfterOption` maps to correct minutes value
+  - [x] 13.3 `test_clear_after_duration_parsing` - each `ClearAfterOption` maps to correct minutes value
     - _writes: crates/collab_ui/src/user_status_modal.rs_ (tests module)
+    - _Completed: Added unit coverage for every UI clear-after option and its server-validated minute value._
+    - _Validation: `cargo test -p collab_ui clear_after_options_match_server_durations --lib`._
 
 - [ ] 14. Write UI tests
   - [ ] 14.1 `UserStatusModal` renders all 7 presets (visible and clickable)
