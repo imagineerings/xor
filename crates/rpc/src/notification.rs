@@ -32,6 +32,25 @@ pub enum Notification {
         channel_name: String,
         inviter_id: u64,
     },
+    JoinRequest {
+        #[serde(rename = "entity_id")]
+        channel_id: u64,
+        channel_name: String,
+        requesting_user_id: u64,
+        requesting_user_name: String,
+        reason: Option<String>,
+    },
+    JoinRequestApproved {
+        #[serde(rename = "entity_id")]
+        channel_id: u64,
+        channel_name: String,
+    },
+    JoinRequestDenied {
+        #[serde(rename = "entity_id")]
+        channel_id: u64,
+        channel_name: String,
+        reason: Option<String>,
+    },
 }
 
 impl Notification {
@@ -84,6 +103,22 @@ mod tests {
                 channel_id: 100,
                 channel_name: "the-channel".into(),
                 inviter_id: 50,
+            },
+            Notification::JoinRequest {
+                channel_id: 100,
+                channel_name: "the-channel".into(),
+                requesting_user_id: 50,
+                requesting_user_name: "octocat".into(),
+                reason: Some("I can help".into()),
+            },
+            Notification::JoinRequestApproved {
+                channel_id: 100,
+                channel_name: "the-channel".into(),
+            },
+            Notification::JoinRequestDenied {
+                channel_id: 100,
+                channel_name: "the-channel".into(),
+                reason: Some("Members only".into()),
             },
         ] {
             let message = notification.to_proto();

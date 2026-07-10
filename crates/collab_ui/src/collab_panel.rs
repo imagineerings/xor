@@ -3640,6 +3640,43 @@ impl CollabPanel {
                     ),
                 ))
             }
+            Notification::JoinRequest {
+                channel_name,
+                requesting_user_id,
+                reason,
+                ..
+            } => {
+                let requester = user_store.get_cached_user(*requesting_user_id)?;
+                let reason = reason
+                    .as_deref()
+                    .map(|reason| format!(": {reason}"))
+                    .unwrap_or_default();
+                Some((
+                    Some(requester.clone()),
+                    format!(
+                        "{} wants to join the #{channel_name} channel{reason}",
+                        requester.github_login
+                    ),
+                ))
+            }
+            Notification::JoinRequestApproved { channel_name, .. } => Some((
+                None,
+                format!("Your request to join the #{channel_name} channel was approved"),
+            )),
+            Notification::JoinRequestDenied {
+                channel_name,
+                reason,
+                ..
+            } => {
+                let reason = reason
+                    .as_deref()
+                    .map(|reason| format!(": {reason}"))
+                    .unwrap_or_default();
+                Some((
+                    None,
+                    format!("Your request to join the #{channel_name} channel was denied{reason}"),
+                ))
+            }
         }
     }
 
@@ -4134,7 +4171,10 @@ impl CollabNotificationToast {
                     Notification::ChannelInvitation { channel_id, .. } => {
                         collab_panel.respond_to_channel_invite(ChannelId(channel_id), accept, cx);
                     }
-                    Notification::ContactRequestAccepted { .. } => {}
+                    Notification::ContactRequestAccepted { .. }
+                    | Notification::JoinRequest { .. }
+                    | Notification::JoinRequestApproved { .. }
+                    | Notification::JoinRequestDenied { .. } => {}
                 })
                 .ok();
         }

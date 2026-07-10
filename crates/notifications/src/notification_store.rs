@@ -243,6 +243,11 @@ impl NotificationStore {
                 Notification::ChannelInvitation { inviter_id, .. } => {
                     user_ids.push(inviter_id);
                 }
+                Notification::JoinRequest {
+                    requesting_user_id, ..
+                } => {
+                    user_ids.push(requesting_user_id);
+                }
                 Notification::ContactRequest {
                     sender_id: requester_id,
                 } => {
@@ -369,6 +374,9 @@ impl NotificationStore {
                     })
                     .detach();
             }
+            Notification::JoinRequest { .. }
+            | Notification::JoinRequestApproved { .. }
+            | Notification::JoinRequestDenied { .. } => {}
             _ => {}
         }
     }

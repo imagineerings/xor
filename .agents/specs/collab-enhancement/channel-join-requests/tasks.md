@@ -90,7 +90,7 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _Requirements: 10.4 (AC 1)_
   - _writes: crates/collab/src/api/channel.rs_
 
-- [ ] 10. Update `rpc::Notification` enum with join request variants
+- [x] 10. Update `rpc::Notification` enum with join request variants
   - Add `JoinRequest { channel_id, channel_name, requesting_user_id, requesting_user_name, reason }` variant.
   - Add `JoinRequestApproved { channel_id, channel_name }` variant.
   - Add `JoinRequestDenied { channel_id, channel_name, reason }` variant.
@@ -98,6 +98,8 @@ Add a join request workflow for private channels, enabling non-members to reques
   - Update the notification content rendering table (title, body, action) for each new variant.
   - _Requirements: 10.2 (AC 1), 10.3_
   - _writes: crates/rpc/src/notification.rs_
+  - _Completed: Added join-request, approval, and denial notification variants with channel entity IDs. Notification loading resolves requesters through `UserStore`; toast rendering includes channel names and optional reasons._
+  - _Validation: `cargo test -p rpc`; `cargo check -p collab_ui -p notifications`._
 
 - [ ] 11. Add client-side data models
   - Define `PendingJoinRequest` struct with `user_id`, `user: Arc<User>`, `reason: Option<SharedString>`, `created_at: OffsetDateTime`.
