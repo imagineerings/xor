@@ -243,6 +243,8 @@ async fn handle_request_join(
 }
 ```
 
+The production handler validates private-channel eligibility before using `JoinRequestStore`; it then creates notifications for accepted channel admins and pushes `JoinRequestAdded` to their active connections. <!-- impl: crates/collab/src/rpc.rs#request_join_channel -->
+
 ### 3.4 Server-side: RPC Handler for RespondToJoinRequest
 
 ```rust

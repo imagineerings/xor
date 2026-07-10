@@ -3,6 +3,7 @@ mod connection_pool;
 use crate::api::{CloudflareIpCountryHeader, SystemIdHeader};
 use crate::db::bookmark_store::{BookmarkStore, BookmarkUpdate, NewBookmark};
 use crate::db::file_store::{FileStore, FileStoreConfig, FileStoreError, NewFileUpload};
+use crate::db::join_request_store::JoinRequestStore;
 use crate::db::queries::channel_messages::{
     ChannelMessageUpdate, NewChannelMessage, SearchChannelMessagesParams,
 };
@@ -61,6 +62,7 @@ use rpc::{
         RequestMessage, ShareProject, UpdateChannelBufferCollaborators,
     },
 };
+use sea_orm::{ColumnTrait as _, EntityTrait as _, QueryFilter as _};
 use semver::Version;
 use std::{
     any::TypeId,
@@ -452,6 +454,7 @@ impl Server {
             .add_request_handler(request_contact)
             .add_request_handler(remove_contact)
             .add_request_handler(respond_to_contact_request)
+            .add_request_handler(request_join_channel)
             .add_message_handler(subscribe_to_channels)
             .add_request_handler(create_channel)
             .add_request_handler(delete_channel)
@@ -3883,6 +3886,96 @@ async fn get_bookmarks(
         .map(db::bookmark_store::Bookmark::to_proto)
         .collect();
     response.send(proto::GetBookmarksResponse { bookmarks })
+}
+
+async fn request_join_channel(
+    request: proto::RequestJoinChannel,
+    response: Response<proto::RequestJoinChannel>,
+    session: MessageContext,
+) -> Result<()> {
+    let channel_id = ChannelId::from_proto(request.channel_id);
+    let requester_id = session.user_id();
+    let db = session.app_state.db.clone();
+    let channel = db
+        .transaction(|tx| {
+            let db = db.clone();
+            async move {
+                let channel = db.get_channel_internal(channel_id, &tx).await?;
+                if channel.visibility != db::ChannelVisibility::Members {
+                    return Err(anyhow!("public channels can be joined directly").into());
+                }
+                match db
+                    .channel_role_for_user(&channel, requester_id, &tx)
+                    .await?
+                {
+                    Some(ChannelRole::Banned) | None => Ok(channel),
+                    Some(_) => Err(anyhow!("user is already a channel member").into()),
+                }
+            }
+        })
+        .await?;
+
+    let join_request = JoinRequestStore::new(db.clone())
+        .request_join(channel_id, requester_id, request.reason.clone())
+        .await?;
+
+    let root_channel_id = channel.root_id();
+    let (notifications, admin_user_ids) = db
+        .transaction(|tx| {
+            let db = db.clone();
+            let channel_name = channel.name.clone();
+            let reason = request.reason.clone();
+            async move {
+                let admins = db::channel_member::Entity::find()
+                    .filter(db::channel_member::Column::ChannelId.eq(root_channel_id))
+                    .filter(db::channel_member::Column::Accepted.eq(true))
+                    .filter(db::channel_member::Column::Role.eq(ChannelRole::Admin))
+                    .all(&*tx)
+                    .await?;
+                let mut notifications = Vec::new();
+                let mut admin_user_ids = Vec::new();
+                for admin in admins {
+                    admin_user_ids.push(admin.user_id);
+                    if let Some(notification) = db
+                        .create_notification(
+                            admin.user_id,
+                            rpc::Notification::JoinRequest {
+                                channel_id: channel_id.to_proto(),
+                                channel_name: channel_name.clone(),
+                                requesting_user_id: requester_id.to_proto(),
+                                requesting_user_name: requester_id.to_string(),
+                                reason: reason.clone(),
+                            },
+                            true,
+                            &tx,
+                        )
+                        .await?
+                    {
+                        notifications.push(notification);
+                    }
+                }
+                Ok((notifications, admin_user_ids))
+            }
+        })
+        .await?;
+
+    let connection_pool = session.connection_pool().await;
+    send_notifications(&connection_pool, &session.peer, notifications);
+    for admin_user_id in admin_user_ids {
+        for connection_id in connection_pool.user_connection_ids(admin_user_id) {
+            session.peer.send(
+                connection_id,
+                proto::JoinRequestAdded {
+                    channel_id: channel_id.to_proto(),
+                    requesting_user_id: requester_id.to_proto(),
+                    reason: request.reason.clone(),
+                    created_at: join_request.created_at.assume_utc().unix_timestamp() as u64,
+                },
+            )?;
+        }
+    }
+
+    response.send(proto::RequestJoinChannelResponse { success: true })
 }
 
 async fn get_file_upload_url(

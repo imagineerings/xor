@@ -51,7 +51,7 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _Completed: Added transactional request creation, duplicate checks, approval that atomically removes the request and creates or restores an accepted Member membership, denial, ordered pending lists, expiry with channel metadata, and per-channel counts. Added SeaORM table metadata and SQLite integration coverage._
   - _Validation: `target/debug/deps/collab_tests-9512c50120ff4d19 db_tests::join_request_tests::test_join_request_store_lifecycle_sqlite --exact --nocapture`; `target/debug/deps/collab_tests-9512c50120ff4d19 db_tests::join_request_tests::test_join_request_store_expires_requests_sqlite --exact --nocapture`; `CARGO_INCREMENTAL=0 cargo check -p collab --features collab/test-support`._
 
-- [ ] 5. Implement `handle_request_join` RPC handler
+- [x] 5. Implement `handle_request_join` RPC handler
   - Verify channel exists and has `visibility = Members` (otherwise return error: public channels can be joined directly).
   - Verify caller is not already a member (skip banned role).
   - Check for duplicate pending request via `pending_join_request_exists`.
@@ -61,7 +61,9 @@ Add a join request workflow for private channels, enabling non-members to reques
   - Broadcast `JoinRequestAdded` push to all connected admin clients.
   - Return `RequestJoinChannelResponse { success: true }`.
   - _Requirements: 10.1_
-  - _writes: crates/collab/src/api/channel.rs_
+  - _writes: crates/collab/src/rpc.rs_
+  - _Completed: Registered `RequestJoinChannel`; it rejects public channels and existing non-banned members, persists the request through `JoinRequestStore`, creates deduplicated admin notifications, and pushes `JoinRequestAdded` to connected admins._
+  - _Validation: `cargo check -p collab --features collab/test-support`._
 
 - [ ] 6. Implement `handle_respond_join_request` RPC handler
   - Verify caller is a channel admin (otherwise return `Forbidden`).
