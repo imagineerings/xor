@@ -4187,6 +4187,12 @@ async fn send_channel_message(
         })
         .collect::<Result<Vec<_>>>()?;
     let db = session.db().await;
+    let group_mentions = request
+        .mentions
+        .iter()
+        .filter(|mention| mention.group_id != 0)
+        .map(|mention| GroupId::from_proto(mention.group_id))
+        .collect::<Vec<_>>();
     let mentions = expand_group_mentions(&request.mentions, &db).await?;
     let mut message = db
         .create_channel_message(NewChannelMessage {
@@ -4219,10 +4225,69 @@ async fn send_channel_message(
     response.send(proto::SendChannelMessageResponse {
         message: Some(message.clone()),
     })?;
+    drop(db);
     broadcast_channel_message_sent(&session, channel_id, message.clone()).await?;
+    dispatch_group_mention_notifications(&session, channel_id, &group_mentions, &message).await?;
     if priority == 2 {
         dispatch_urgent_notifications(&session, channel_id, &message).await?;
     }
+    Ok(())
+}
+
+async fn dispatch_group_mention_notifications(
+    session: &MessageContext,
+    channel_id: ChannelId,
+    group_mentions: &[GroupId],
+    message: &proto::ChannelMessage,
+) -> Result<()> {
+    let sender_id = session.user_id();
+    let db = session.db().await;
+    let mut recipient_ids = HashSet::default();
+    for group_id in group_mentions.iter().copied().collect::<HashSet<_>>() {
+        for recipient_id in db.get_group_member_ids(group_id).await? {
+            if recipient_id != sender_id {
+                recipient_ids.insert((group_id.to_proto(), recipient_id));
+            }
+        }
+    }
+    if recipient_ids.is_empty() {
+        return Ok(());
+    }
+
+    let database = db.0.clone();
+    let message_preview = message.body.chars().take(200).collect::<String>();
+    let notifications = database
+        .transaction(|tx| {
+            let database = database.clone();
+            let recipient_ids = recipient_ids.clone();
+            let message_preview = message_preview.clone();
+            async move {
+                let mut notifications = Vec::new();
+                for (group_id, recipient_id) in &recipient_ids {
+                    if let Some(notification) = database
+                        .create_notification(
+                            *recipient_id,
+                            Notification::GroupMention {
+                                message_id: message.id,
+                                channel_id: channel_id.to_proto(),
+                                sender_id: sender_id.to_proto(),
+                                group_id: *group_id,
+                                message_preview: message_preview.clone(),
+                            },
+                            true,
+                            &tx,
+                        )
+                        .await?
+                    {
+                        notifications.push(notification);
+                    }
+                }
+                Ok(notifications)
+            }
+        })
+        .await?;
+    let connection_pool = session.connection_pool().await;
+    send_notifications(&connection_pool, &session.peer, notifications);
     Ok(())
 }
 

@@ -18,7 +18,7 @@ use collab::{
 };
 use gpui::{AppContext, BackgroundExecutor, TestAppContext};
 use pretty_assertions::assert_eq;
-use rpc::ErrorExt as _;
+use rpc::{ErrorExt as _, Notification};
 use sea_orm::EntityTrait as _;
 use std::time::Duration as StdDuration;
 use time::{Duration as TimeDuration, OffsetDateTime, PrimitiveDateTime};
@@ -117,6 +117,72 @@ async fn test_channel_chat_core_flow(
     assert_eq!(deleted.len(), 1);
     assert_eq!(deleted[0].body, "");
     assert!(deleted[0].mentions.is_empty());
+}
+
+#[gpui::test]
+async fn group_mentions_create_notifications_for_members_except_sender(
+    executor: BackgroundExecutor,
+    cx_a: &mut TestAppContext,
+    cx_b: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor.clone()).await;
+    let client_a = server.create_client(cx_a, "user_a").await;
+    let client_b = server.create_client(cx_b, "user_b").await;
+    let channel_id = server
+        .make_channel(
+            "mentions",
+            None,
+            (&client_a, cx_a),
+            &mut [(&client_b, cx_b)],
+        )
+        .await;
+
+    let group = client_a
+        .create_group(
+            "eng-team".to_string(),
+            "Engineering".to_string(),
+            vec![client_b.id()],
+        )
+        .await
+        .unwrap();
+    let message = client_a
+        .send_channel_message(SendChannelMessage {
+            channel_id: channel_id.0,
+            body: "@eng-team please review".to_string(),
+            nonce: 1,
+            mentions: vec![proto::ChatMention {
+                range: Some(proto::Range { start: 0, end: 9 }),
+                user_id: 0,
+                group_id: group.id,
+            }],
+            reply_to_message_id: None,
+            file_ids: Vec::new(),
+        })
+        .await
+        .unwrap();
+
+    for _ in 0..5 {
+        executor.run_until_parked();
+    }
+    client_b.notification_store().read_with(cx_b, |store, _| {
+        let entry = (0..store.notification_count())
+            .filter_map(|index| store.notification_at(index))
+            .find(|entry| matches!(entry.notification, Notification::GroupMention { .. }))
+            .unwrap();
+        assert_eq!(
+            entry.notification,
+            Notification::GroupMention {
+                message_id: message.id,
+                channel_id: channel_id.0,
+                sender_id: client_a.id(),
+                group_id: group.id,
+                message_preview: "@eng-team please review".to_string(),
+            }
+        );
+    });
+    client_a.notification_store().read_with(cx_a, |store, _| {
+        assert_eq!(store.notification_count(), 0);
+    });
 }
 
 #[gpui::test]

@@ -3840,6 +3840,20 @@ impl CollabPanel {
                     ),
                 ))
             }
+            Notification::GroupMention {
+                sender_id,
+                message_preview,
+                ..
+            } => {
+                let sender = user_store.get_cached_user(*sender_id)?;
+                Some((
+                    Some(sender.clone()),
+                    format!(
+                        "{} mentioned your group: {message_preview}",
+                        sender.github_login
+                    ),
+                ))
+            }
         }
     }
 
@@ -4333,7 +4347,8 @@ impl CollabNotificationToast {
                     | Notification::JoinRequest { .. }
                     | Notification::JoinRequestApproved { .. }
                     | Notification::JoinRequestDenied { .. }
-                    | Notification::UrgentMessage { .. } => {}
+                    | Notification::UrgentMessage { .. }
+                    | Notification::GroupMention { .. } => {}
                 })
                 .ok();
         }
@@ -4375,6 +4390,16 @@ impl CollabNotificationToast {
                 });
             }
             Notification::UrgentMessage { channel_id, .. } => {
+                let workspace = self.workspace.clone();
+                window.defer(cx, move |window, cx| {
+                    let Some(workspace) = workspace.upgrade() else {
+                        return;
+                    };
+                    ChannelView::open(ChannelId(channel_id), None, workspace, window, cx)
+                        .detach_and_log_err(cx);
+                });
+            }
+            Notification::GroupMention { channel_id, .. } => {
                 let workspace = self.workspace.clone();
                 window.defer(cx, move |window, cx| {
                     let Some(workspace) = workspace.upgrade() else {

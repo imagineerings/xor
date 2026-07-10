@@ -261,6 +261,9 @@ impl NotificationStore {
                 Notification::UrgentMessage { sender_id, .. } => {
                     user_ids.push(sender_id);
                 }
+                Notification::GroupMention { sender_id, .. } => {
+                    user_ids.push(sender_id);
+                }
                 Notification::JoinRequestApproved { .. }
                 | Notification::JoinRequestDenied { .. } => {}
             }
@@ -381,7 +384,8 @@ impl NotificationStore {
             }
             Notification::JoinRequest { .. }
             | Notification::JoinRequestApproved { .. }
-            | Notification::JoinRequestDenied { .. } => {}
+            | Notification::JoinRequestDenied { .. }
+            | Notification::GroupMention { .. } => {}
             _ => {}
         }
     }

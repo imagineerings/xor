@@ -131,12 +131,14 @@ The work is organized into 15 incremental tasks, each producing a buildable arti
   - _edits: crates/collab_ui/src/group_management.rs_
   - _Completed: Added the Group Management entry point to the Channels header and wired it to the workspace GroupStore._
 
-- [ ] 13. Implement notification dispatch for group @mentions
+- [x] 13. Implement notification dispatch for group @mentions
   - After `expand_group_mentions` produces individual mentions, ensure the existing notification pipeline creates a notification for each online member of the group.
   - Exclude the sender from receiving their own notification.
   - Verify that users who have left the group do not receive notifications (resolved at send time by `get_group_member_ids`).
   - _Requirements: 9.2, P5.3_
   - _edits: crates/collab/src/rpc.rs_ (notification integration)
+  - _Completed: Added persisted `GroupMention` notifications for every resolved group member except the sender, delivered through the existing online notification pipeline and opened in the channel UI. Resolution occurs at send time, so departed members are excluded.
+  - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-mention-test-2 CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests group_mentions_create_notifications_for_members_except_sender --features test-support`; `git diff --check`._
 
 - [ ] 14. Write integration tests
   - **Full group lifecycle**: Create group → GetGroups → add members → verify member list → remove members → delete group → verify removed.

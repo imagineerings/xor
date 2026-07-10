@@ -58,6 +58,14 @@ pub enum Notification {
         sender_id: u64,
         message_preview: String,
     },
+    GroupMention {
+        #[serde(rename = "entity_id")]
+        message_id: u64,
+        channel_id: u64,
+        sender_id: u64,
+        group_id: u64,
+        message_preview: String,
+    },
 }
 
 impl Notification {
@@ -132,6 +140,13 @@ mod tests {
                 channel_id: 100,
                 sender_id: 50,
                 message_preview: "Please review this now".into(),
+            },
+            Notification::GroupMention {
+                message_id: 201,
+                channel_id: 100,
+                sender_id: 50,
+                group_id: 7,
+                message_preview: "Please review this together".into(),
             },
         ] {
             let message = notification.to_proto();
