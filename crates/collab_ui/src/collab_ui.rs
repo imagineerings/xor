@@ -14,6 +14,7 @@ pub mod pending_requests_list;
 pub mod request_detail_panel;
 pub mod request_to_join_panel;
 pub mod status_display;
+pub mod user_status_modal;
 
 use std::{rc::Rc, sync::Arc};
 

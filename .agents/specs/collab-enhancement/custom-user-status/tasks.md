@@ -99,19 +99,21 @@ This plan implements custom user status — emoji + short text labels with optio
   - _Completed: Added a reusable muted status element that renders the optional emoji and text, or nothing when a user has no custom status._
   - _Validation: `cargo check -p collab_ui`._
 
-- [ ] 10. Build `UserStatusModal` component
-  - [ ] 10.1 Define supporting types: `ClearAfterOption` enum (Never, ThirtyMinutes, OneHour, FourHours, Today, ThisWeek) and `StatusPreset` struct (emoji, label, text)
+- [x] 10. Build `UserStatusModal` component
+  - [x] 10.1 Define supporting types: `ClearAfterOption` enum (Never, ThirtyMinutes, OneHour, FourHours, Today, ThisWeek) and `StatusPreset` struct (emoji, label, text)
     - _writes: crates/collab_ui/src/user_status_modal.rs_
-  - [ ] 10.2 Implement `UserStatusModal` struct with fields: `emoji`, `text`, `clear_after`, `user_store`, `current_user_id`, `presets`
+  - [x] 10.2 Implement `UserStatusModal` struct with fields: `emoji`, `text`, `clear_after`, `user_store`, `current_user_id`, `presets`
     - _writes: crates/collab_ui/src/user_status_modal.rs_
-  - [ ] 10.3 Implement `UserStatusModal::render` — header, preset grid (2×4 with 7 presets: "In a meeting", "Out sick", "Working remotely", "On vacation", "In a call", "Away", "Busy"), custom section with emoji picker button + text input (max 100 chars with character counter), "Clear after" dropdown, footer with Save + Clear + Cancel buttons
+  - [x] 10.3 Implement `UserStatusModal::render` — header, preset grid (2×4 with 7 presets: "In a meeting", "Out sick", "Working remotely", "On vacation", "In a call", "Away", "Busy"), custom section with emoji picker button + text input (max 100 chars with character counter), "Clear after" dropdown, footer with Save + Clear + Cancel buttons
     - _Requirements: 8.1 (AC 2, AC 4)_
     - _writes: crates/collab_ui/src/user_status_modal.rs_
-  - [ ] 10.4 Implement event handlers: `on_select_preset`, `on_select_emoji`, `on_text_input`, `on_save`, `on_clear`
+  - [x] 10.4 Implement event handlers: `on_select_preset`, `on_select_emoji`, `on_text_input`, `on_save`, `on_clear`
     - `on_save` calls `user_store.set_status(…)` and closes modal
     - `on_clear` calls `user_store.clear_status(…)` and closes modal
     - _Requirements: 8.1 (AC 1, AC 3), 8.2 (AC 2)_
     - _writes: crates/collab_ui/src/user_status_modal.rs_
+  - _Completed: Added a modal with seven presets, editable status text and a live character count, supported clear-after choices, and asynchronous save/clear error handling._
+  - _Validation: `cargo check -p collab_ui`._
 
 - [ ] 11. Wire UI integration points
   - [ ] 11.1 Add "Set a status" menu item to the user avatar context menu (opens `UserStatusModal`)
