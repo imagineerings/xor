@@ -416,10 +416,12 @@ CREATE TABLE IF NOT EXISTS "channel_message_mentions" (
     "range_start" INTEGER NOT NULL,
     "range_end" INTEGER NOT NULL,
     "user_id" INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    "source_group_id" INTEGER REFERENCES user_groups (id) ON DELETE SET NULL,
     PRIMARY KEY ("message_id", "range_start", "range_end", "user_id")
 );
 
 CREATE INDEX "index_channel_message_mentions_on_user_id" ON "channel_message_mentions" ("user_id");
+CREATE INDEX "index_channel_message_mentions_on_source_group_id" ON "channel_message_mentions" ("source_group_id");
 
 CREATE TABLE IF NOT EXISTS "channel_message_reads" (
     "channel_id" INTEGER NOT NULL REFERENCES channels (id) ON DELETE CASCADE,

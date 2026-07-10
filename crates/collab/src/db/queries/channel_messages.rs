@@ -942,6 +942,9 @@ async fn insert_mentions(
                         .context("channel message mention end is out of range")?,
                 ),
                 user_id: ActiveValue::Set(UserId::from_proto(mention.user_id)),
+                source_group_id: ActiveValue::Set(
+                    (mention.group_id != 0).then(|| GroupId::from_proto(mention.group_id)),
+                ),
             })
         })
         .collect::<Result<Vec<_>>>()?;
@@ -973,7 +976,30 @@ async fn mentions_by_message_id(
         .await?;
 
     let mut mentions = HashMap::default();
+    let mut group_mentions = HashSet::default();
     for row in rows {
+        if let Some(group_id) = row.source_group_id {
+            if group_mentions.insert((row.message_id, row.range_start, row.range_end, group_id)) {
+                mentions
+                    .entry(row.message_id)
+                    .or_insert_with(Vec::new)
+                    .push(proto::ChatMention {
+                        range: Some(proto::Range {
+                            start: row
+                                .range_start
+                                .try_into()
+                                .context("stored channel message mention start is negative")?,
+                            end: row
+                                .range_end
+                                .try_into()
+                                .context("stored channel message mention end is negative")?,
+                        }),
+                        user_id: 0,
+                        group_id: group_id.to_proto(),
+                    });
+            }
+            continue;
+        }
         mentions
             .entry(row.message_id)
             .or_insert_with(Vec::new)
@@ -991,6 +1017,15 @@ async fn mentions_by_message_id(
                 user_id: row.user_id.to_proto(),
                 group_id: 0,
             });
+    }
+    for message_mentions in mentions.values_mut() {
+        message_mentions.sort_by_key(|mention| {
+            mention
+                .range
+                .as_ref()
+                .map(|range| (range.start, range.end))
+                .unwrap_or_default()
+        });
     }
     Ok(mentions)
 }

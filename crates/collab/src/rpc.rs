@@ -4255,7 +4255,7 @@ async fn expand_group_mentions(
             expanded.push(proto::ChatMention {
                 range: mention.range.clone(),
                 user_id: user_id.to_proto(),
-                group_id: 0,
+                group_id: mention.group_id,
             });
         }
     }

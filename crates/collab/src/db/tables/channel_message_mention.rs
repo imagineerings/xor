@@ -1,4 +1,4 @@
-use crate::db::{MessageId, UserId};
+use crate::db::{GroupId, MessageId, UserId};
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
@@ -12,6 +12,7 @@ pub struct Model {
     pub range_end: i64,
     #[sea_orm(primary_key)]
     pub user_id: UserId,
+    pub source_group_id: Option<GroupId>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
