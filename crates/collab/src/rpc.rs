@@ -4409,6 +4409,7 @@ fn expand_group_mentions_from_members(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
 
     #[test]
     fn expand_group_mentions_preserves_individual_mentions_and_ranges() {
@@ -4460,6 +4461,36 @@ mod tests {
         }];
 
         assert!(expand_group_mentions_from_members(&mentions, &HashMap::default()).is_err());
+    }
+
+    proptest! {
+        #[test]
+        fn expand_group_mentions_preserves_group_membership_mapping(
+            member_ids in prop::collection::vec(1_u64..10_000, 1..20),
+        ) {
+            let mut member_ids = member_ids
+                .into_iter()
+                .map(UserId::from_proto)
+                .collect::<Vec<_>>();
+            member_ids.sort_unstable();
+            member_ids.dedup();
+            let mentions = [proto::ChatMention {
+                range: Some(proto::Range { start: 2, end: 8 }),
+                user_id: 0,
+                group_id: 7,
+            }];
+            let members = [(GroupId::from_proto(7), member_ids.clone())]
+                .into_iter()
+                .collect();
+
+            let expanded = expand_group_mentions_from_members(&mentions, &members).unwrap();
+
+            prop_assert!(expanded.iter().all(|mention| mention.group_id == 7));
+            prop_assert_eq!(
+                expanded.iter().map(|mention| mention.user_id).collect::<Vec<_>>(),
+                member_ids.iter().map(|id| id.to_proto()).collect::<Vec<_>>(),
+            );
+        }
     }
 }
 

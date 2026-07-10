@@ -220,6 +220,7 @@ impl GroupStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
 
     #[test]
     fn search_groups_matches_name_and_display_name_prefixes_case_insensitively() {
@@ -253,5 +254,26 @@ mod tests {
         assert_eq!(store.search_groups("ENG"), vec![engineering]);
         assert_eq!(store.search_groups("product"), vec![design]);
         assert!(store.search_groups("marketing").is_empty());
+    }
+
+    proptest! {
+        #[test]
+        fn search_groups_is_prefix_closed(name in "[a-z]{1,12}") {
+            let group = Arc::new(Group {
+                id: 1,
+                name: name.clone().into(),
+                display_name: "Team".into(),
+                admin_id: 1,
+                member_ids: Vec::new(),
+            });
+            let store = GroupStore {
+                groups: [(group.id, group.clone())].into_iter().collect(),
+                by_name: HashMap::default(),
+                user_groups: HashMap::default(),
+                _subscriptions: Vec::new(),
+                _load_groups: Task::ready(Ok(())),
+            };
+            prop_assert!(store.search_groups(&name[..1]).contains(&group));
+        }
     }
 }

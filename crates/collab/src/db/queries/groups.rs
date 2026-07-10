@@ -192,17 +192,9 @@ impl Database {
             let remove_ids = remove_ids.clone();
             async move {
                 let group = get_group_model(group_id, &tx).await?;
-                let mut member_ids = group_member_ids_for_group(group_id, &tx).await?;
-                member_ids.retain(|id| !remove_ids.contains(id));
-                let additions = add_ids
-                    .iter()
-                    .copied()
-                    .filter(|id| !member_ids.contains(id))
-                    .collect::<Vec<_>>();
-                member_ids.extend(additions);
-                if member_ids.len() > MAX_GROUP_MEMBERS {
-                    return Err(anyhow!(GroupError::TooManyMembers).into());
-                }
+                let current_member_ids = group_member_ids_for_group(group_id, &tx).await?;
+                let member_ids =
+                    reconcile_group_member_ids(&current_member_ids, &add_ids, &remove_ids)?;
                 if !remove_ids.is_empty() {
                     user_group_member::Entity::delete_many()
                         .filter(user_group_member::Column::GroupId.eq(group_id))
@@ -310,6 +302,27 @@ fn deduplicate_user_ids(member_ids: &[UserId]) -> Vec<UserId> {
     member_ids
 }
 
+fn reconcile_group_member_ids(
+    current_member_ids: &[UserId],
+    add_ids: &[UserId],
+    remove_ids: &[UserId],
+) -> Result<Vec<UserId>> {
+    let mut member_ids = current_member_ids
+        .iter()
+        .copied()
+        .filter(|id| !remove_ids.contains(id))
+        .collect::<Vec<_>>();
+    for user_id in deduplicate_user_ids(add_ids) {
+        if !member_ids.contains(&user_id) {
+            member_ids.push(user_id);
+        }
+    }
+    if member_ids.len() > MAX_GROUP_MEMBERS {
+        return Err(anyhow!(GroupError::TooManyMembers).into());
+    }
+    Ok(member_ids)
+}
+
 async fn get_group_model(group_id: GroupId, tx: &DatabaseTransaction) -> Result<user_group::Model> {
     Ok(user_group::Entity::find_by_id(group_id)
         .one(tx)
@@ -369,4 +382,59 @@ async fn insert_group_members(
 fn current_time() -> time::PrimitiveDateTime {
     let now = time::OffsetDateTime::now_utc();
     time::PrimitiveDateTime::new(now.date(), now.time())
+}
+
+#[cfg(test)]
+mod property_tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn users(values: Vec<u64>) -> Vec<UserId> {
+        values.into_iter().map(UserId::from_proto).collect()
+    }
+
+    proptest! {
+        #[test]
+        fn adding_existing_members_is_idempotent(values in prop::collection::vec(1_u64..10_000, 0..20)) {
+            let current = users(values);
+            let once = reconcile_group_member_ids(&current, &current, &[]).unwrap();
+            let repeatedly = reconcile_group_member_ids(&current, &once, &[]).unwrap();
+            prop_assert_eq!(repeatedly, once);
+        }
+
+        #[test]
+        fn removing_absent_members_is_a_noop(
+            current_values in prop::collection::vec(1_u64..10_000, 0..20),
+            absent_values in prop::collection::vec(20_000_u64..30_000, 0..20),
+        ) {
+            let current = users(current_values);
+            let absent = users(absent_values);
+            prop_assert_eq!(reconcile_group_member_ids(&current, &[], &absent).unwrap(), current);
+        }
+
+        #[test]
+        fn add_then_remove_restores_original_members(
+            current_values in prop::collection::vec(1_u64..10_000, 0..20),
+            added_values in prop::collection::vec(20_000_u64..30_000, 0..20),
+        ) {
+            let current = users(current_values);
+            let added = users(added_values);
+            let after_add = reconcile_group_member_ids(&current, &added, &[]).unwrap();
+            let after_remove = reconcile_group_member_ids(&after_add, &[], &added).unwrap();
+            prop_assert_eq!(after_remove, current);
+        }
+
+        #[test]
+        fn remove_then_add_matches_a_single_add(
+            current_values in prop::collection::vec(1_u64..10_000, 0..20),
+            added_values in prop::collection::vec(20_000_u64..30_000, 0..20),
+        ) {
+            let current = users(current_values);
+            let added = users(added_values);
+            let after_remove = reconcile_group_member_ids(&current, &[], &added).unwrap();
+            let remove_then_add = reconcile_group_member_ids(&after_remove, &added, &[]).unwrap();
+            let add_only = reconcile_group_member_ids(&current, &added, &[]).unwrap();
+            prop_assert_eq!(remove_then_add, add_only);
+        }
+    }
 }

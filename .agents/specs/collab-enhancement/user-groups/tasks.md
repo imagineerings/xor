@@ -155,7 +155,7 @@ The work is organized into 15 incremental tasks, each producing a buildable arti
   - _Requirements: 9.1, 9.2, 9.3, P5.3, P5.7_
   - _writes: crates/collab/tests/group_lifecycle.rs_ (or similar)
 
-- [ ] 15. Write property-based tests
+- [x] 15. Write property-based tests
   - **Idempotent add**: Adding an already-present member N times yields the same state as adding once.
   - **Idempotent remove**: Removing an absent member N times yields the same state as removing once (no-op).
   - **Add-then-remove**: Adding a user then removing them yields the same state as if neither operation occurred.
@@ -164,3 +164,5 @@ The work is organized into 15 incremental tasks, each producing a buildable arti
   - **Autocomplete prefix closure**: Querying the first character of a group's name or display_name yields at least that group in results.
   - _Requirements: P5.6, P5.3, P5.10_
   - _writes: crates/collab/tests/group_properties.rs_ (or alongside query tests)
+  - _Completed: Added proptest coverage for idempotent membership add/remove, add/remove round trips, group mention mapping preservation, and autocomplete prefix closure. The properties exercise the pure reconciliation and expansion helpers used by the database, RPC, and client paths.
+  - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --lib property_tests --features test-support`; `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab rpc::tests --lib --features test-support`; `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p client groups::tests --lib`; `git diff --check`._

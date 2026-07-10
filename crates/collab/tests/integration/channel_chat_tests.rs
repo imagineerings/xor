@@ -10,7 +10,7 @@ use client::{
 };
 use collab::{
     db::{
-        ChannelId as DbChannelId, ChannelRole as DbChannelRole,
+        ChannelId as DbChannelId, ChannelRole as DbChannelRole, GroupId as DbGroupId,
         ScheduledMessageId as DbScheduledMessageId, UserId as DbUserId, channel_file,
         scheduled_message_store::ScheduledMessageStore,
     },
@@ -183,6 +183,78 @@ async fn group_mentions_create_notifications_for_members_except_sender(
     client_a.notification_store().read_with(cx_a, |store, _| {
         assert_eq!(store.notification_count(), 0);
     });
+}
+
+#[gpui::test]
+async fn group_rpc_lifecycle_updates_members_and_deletes_group(
+    executor: BackgroundExecutor,
+    cx_a: &mut TestAppContext,
+    cx_b: &mut TestAppContext,
+    cx_c: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor.clone()).await;
+    let client_a = server.create_client(cx_a, "user_a").await;
+    let client_b = server.create_client(cx_b, "user_b").await;
+    let client_c = server.create_client(cx_c, "user_c").await;
+
+    let group = client_a
+        .create_group(
+            "platform".to_string(),
+            "Platform".to_string(),
+            vec![client_b.id()],
+        )
+        .await
+        .unwrap();
+    let created = server
+        .app_state
+        .db
+        .get_group(DbGroupId::from_proto(group.id))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(created.member_ids.len(), 2);
+    assert!(
+        created
+            .member_ids
+            .contains(&DbUserId::from_proto(client_a.user_id().unwrap()))
+    );
+    assert!(
+        created
+            .member_ids
+            .contains(&DbUserId::from_proto(client_b.user_id().unwrap()))
+    );
+
+    let updated = client_a
+        .update_group_members(group.id, vec![client_c.id()], vec![client_b.id()])
+        .await
+        .unwrap();
+    assert!(updated.member_ids.contains(&client_a.id()));
+    assert!(updated.member_ids.contains(&client_c.id()));
+    assert!(!updated.member_ids.contains(&client_b.id()));
+
+    client_c.leave_group(group.id).await.unwrap();
+    let after_leave = server
+        .app_state
+        .db
+        .get_group(DbGroupId::from_proto(group.id))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        after_leave.member_ids,
+        vec![DbUserId::from_proto(client_a.user_id().unwrap())]
+    );
+
+    client_a.delete_group(group.id).await.unwrap();
+    assert!(
+        server
+            .app_state
+            .db
+            .get_group(DbGroupId::from_proto(group.id))
+            .await
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[gpui::test]
