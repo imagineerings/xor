@@ -213,9 +213,12 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _Validation: `cargo check -p collab --features collab/test-support`; `cargo check -p collab_ui`._
 
 - [ ] 21. Unit tests
-  - [ ] 21.1 `JoinRequestStore` unit tests: `request_join`, `approve_join_request`, `deny_join_request`, `get_pending_requests`, `expire_old_requests`.
-  - [ ] 21.2 Duplicate prevention: call `request_join` twice for same `(channel_id, user_id)` — verify second call returns error.
-  - [ ] 21.3 Approval creates member: approve a request — verify `channel_members` row created with `accepted = true`, `role = Member`.
+  - [x] 21.1 `JoinRequestStore` unit tests: `request_join`, `approve_join_request`, `deny_join_request`, `get_pending_requests`, `expire_old_requests`.
+    - _Completed: Existing SQLite/Postgres lifecycle and expiry tests cover the store operations and returned metadata._
+  - [x] 21.2 Duplicate prevention: call `request_join` twice for same `(channel_id, user_id)` — verify second call returns error.
+    - _Completed: The lifecycle test verifies the unique pending-request constraint rejects a duplicate._
+  - [x] 21.3 Approval creates member: approve a request — verify `channel_members` row created with `accepted = true`, `role = Member`.
+    - _Completed: The lifecycle test verifies approval creates an accepted Member membership._
   - [ ] 21.4 `RequestToJoinPanel` state transitions: `Idle → Sending → Sent`, `Idle → Sending → Error`, `Idle → AlreadyRequested`.
   - [ ] 21.5 `PendingRequestsList` rendering: verify list renders entries with user info, reason, timestamps; verify badge count.
   - [ ] 21.6 `RequestDetailPanel` approve/deny: verify correct proto RPC dispatched.
@@ -225,7 +228,8 @@ Add a join request workflow for private channels, enabling non-members to reques
 - [ ] 22. Integration tests
   - [ ] 22.1 Full request flow: non-member requests join → admin receives push → admin fetches pending → admin approves → requester receives approval → requester can join channel.
   - [ ] 22.2 Denial flow: same as above with `approve = false` → requester receives denial → requester still cannot join.
-  - [ ] 22.3 Expiry flow: create request with past timestamp → run expiry job → verify notification created and request deleted.
+  - [x] 22.3 Expiry flow: create request with past timestamp → run expiry job → verify notification created and request deleted.
+    - _Completed: The database integration test runs the expiry job with zero TTL and verifies both deletion and the expiry denial notification._
   - [ ] 22.4 Admin-only authority: non-admin calls `RespondToJoinRequest` → verify `Forbidden` error.
   - _Requirements: 10.1, 10.2, 10.3, 10.4_
   - _writes: crates/collab/tests/channel_join_requests.rs_
