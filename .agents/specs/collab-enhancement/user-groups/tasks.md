@@ -10,13 +10,14 @@ The work is organized into 15 incremental tasks, each producing a buildable arti
 
 ## Tasks
 
-- [ ] 1. Define protobuf messages for User Groups
+- [x] 1. Define protobuf messages for User Groups
   - Add `group_id` field to existing `ChatMention` message.
   - Add new messages: `CreateGroup`, `CreateGroupResponse`, `UpdateGroup`, `UpdateGroupResponse`, `DeleteGroup`, `DeleteGroupResponse`, `GetGroups`, `GetGroupsResponse`, `UpdateGroupMembers`, `UpdateGroupMembersResponse`, `LeaveGroup`, `LeaveGroupResponse`, `UpdateGroups`, `UserGroup`.
   - Regenerate Rust code from proto definitions.
   - _Requirements: 9.1, 9.2_
   - _writes: crates/proto/proto/channel.proto_
   - _writes: crates/proto/src/... (generated)_
+  - _Completed: Added group CRUD, membership, retrieval, and update-push messages, plus group references on chat mentions._
 
 - [ ] 2. Add ID types for groups
   - Add `GroupId` and `GroupMemberId` using the `id_type!` macro alongside existing ID types.

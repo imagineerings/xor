@@ -538,6 +538,19 @@ message Envelope {
     UpdateUserStatuses update_user_statuses = 503;
     UserCustomStatus user_custom_status = 504; // current max
     UrgentMessageNotification urgent_message_notification = 505; // current max
+    CreateGroup create_group = 506;
+    CreateGroupResponse create_group_response = 507;
+    UpdateGroup update_group = 508;
+    UpdateGroupResponse update_group_response = 509;
+    DeleteGroup delete_group = 510;
+    DeleteGroupResponse delete_group_response = 511;
+    GetGroups get_groups = 512;
+    GetGroupsResponse get_groups_response = 513;
+    UpdateGroupMembers update_group_members = 514;
+    UpdateGroupMembersResponse update_group_members_response = 515;
+    LeaveGroup leave_group = 516;
+    LeaveGroupResponse leave_group_response = 517;
+    UpdateGroups update_groups = 518; // current max
   }
 
   reserved 87 to 88;

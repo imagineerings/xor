@@ -563,9 +563,71 @@ message UrgentMessageNotification {
   string message_preview = 4;
 }
 
+message UserGroup {
+  uint64 id = 1;
+  string name = 2;
+  string display_name = 3;
+  uint64 admin_id = 4;
+  repeated uint64 member_ids = 5;
+}
+
+message CreateGroup {
+  string name = 1;
+  string display_name = 2;
+  repeated uint64 member_ids = 3;
+}
+
+message CreateGroupResponse {
+  UserGroup group = 1;
+}
+
+message UpdateGroup {
+  uint64 group_id = 1;
+  optional string name = 2;
+  optional string display_name = 3;
+}
+
+message UpdateGroupResponse {
+  UserGroup group = 1;
+}
+
+message DeleteGroup {
+  uint64 group_id = 1;
+}
+
+message DeleteGroupResponse {}
+
+message GetGroups {}
+
+message GetGroupsResponse {
+  repeated UserGroup groups = 1;
+}
+
+message UpdateGroupMembers {
+  uint64 group_id = 1;
+  repeated uint64 add_user_ids = 2;
+  repeated uint64 remove_user_ids = 3;
+}
+
+message UpdateGroupMembersResponse {
+  UserGroup group = 1;
+}
+
+message LeaveGroup {
+  uint64 group_id = 1;
+}
+
+message LeaveGroupResponse {}
+
+message UpdateGroups {
+  repeated UserGroup groups = 1;
+  repeated uint64 delete_group_ids = 2;
+}
+
 message ChatMention {
   Range range = 1;
   uint64 user_id = 2;
+  uint64 group_id = 3;
 }
 
 message Reaction {
