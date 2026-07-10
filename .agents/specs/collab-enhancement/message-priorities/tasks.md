@@ -41,10 +41,12 @@ Add message priority levels (Normal, Important, Urgent) to channel messages in S
   - _Completed: Added a non-null Normal-default priority column and priority index in Postgres and the SQLite integration schema._
   - _Validation: `sqlite3 :memory: ".read crates/collab/migrations.sqlite/20221109000000_test_schema.sql"`; `cargo check -p collab --features collab/test-support`._
 
-- [ ] 7. Define `MessagePriority` Rust enum in the client crate
+- [x] 7. Define `MessagePriority` Rust enum in the client crate
   - Mirror the proto enum: `Normal`, `Important`, `Urgent` with `color()`, `icon()`, `label()` methods. Implement `From<proto::ChannelMessagePriority>`.
   - _Requirements: 12.3_
   - _writes: crates/client/src/message_priority.rs_
+  - _Completed: Added the shared client priority enum with protocol conversion, labels, and UI-independent color/icon tokens._
+  - _Validation: `cargo check -p client`._
 
 - [ ] 8. Add `priority` field to client-side `ChannelMessage` struct
   - Extend the model with `priority: MessagePriority`, deserialized from proto `ChannelMessage`.

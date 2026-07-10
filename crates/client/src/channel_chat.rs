@@ -129,6 +129,7 @@ impl Client {
                 mentions: message.mentions,
                 reply_to_message_id: message.reply_to_message_id,
                 file_ids: message.file_ids,
+                priority: None,
             })
             .await?;
         response.message.context("missing sent channel message")
