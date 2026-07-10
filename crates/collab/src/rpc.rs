@@ -3470,7 +3470,24 @@ async fn respond_to_join_request(
         .await?;
 
     let pending_request_count = store.count_pending_requests(channel_id).await?;
-    let connection_pool = session.connection_pool().await;
+    let membership_update = if request.approve {
+        Some(MembershipUpdated {
+            channel_id,
+            new_channels: db.get_channels_for_user(requester_id).await?,
+            removed_channels: Vec::new(),
+        })
+    } else {
+        None
+    };
+    let mut connection_pool = session.connection_pool().await;
+    if let Some(membership_update) = membership_update {
+        notify_membership_updated(
+            &mut connection_pool,
+            membership_update,
+            requester_id,
+            &session.peer,
+        );
+    }
     send_notifications(&connection_pool, &session.peer, notifications);
     send_pending_join_request_count_update(
         &session.peer,
