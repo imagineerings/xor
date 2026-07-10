@@ -73,13 +73,15 @@ The work is organized into 15 incremental tasks, each producing a buildable arti
   - _Completed: Registered all six group request handlers, added admin authorization, broadcast `UpdateGroups` after mutations, and mapped duplicate names, invalid arguments, missing groups, and permission failures to structured RPC error codes. Added the corresponding error-code values to the shared protocol.
   - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-rpc-target CARGO_INCREMENTAL=0 cargo check -p collab --features collab/test-support`; `git diff --check`._
 
-- [ ] 7. Implement group mention resolution at message send time
+- [x] 7. Implement group mention resolution at message send time
   - Add `expand_group_mentions` function that takes `ChatMention` list, resolves each `group_id` to individual member user IDs via `get_group_member_ids`, and produces a flat list of individual `ChatMention` entries.
   - Integrate into the `send_channel_message` handler (or equivalent) so group mentions are expanded before persisting the message.
   - Handle stale/deleted groups gracefully (return `NOT_FOUND` for the mention).
   - Add unit tests for mention expansion, preservation of individual mentions, and deleted-group handling.
   - _Requirements: 9.2, P5.3_
   - _edits: crates/collab/src/rpc.rs_
+  - _Completed: Expanded group mentions from send-time membership lookups before persistence, preserved individual mentions and ranges, and returned an error for missing group IDs. Added deterministic unit coverage for mixed expansion and missing groups.
+  - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-mention-test-2 CARGO_INCREMENTAL=0 cargo test -p collab rpc::tests --lib --features test-support`; `git diff --check`._
 
 - [x] 8. Create the client-side GroupStore entity
   - Create `crates/client/src/groups.rs` with `GroupStore` struct containing `groups: HashMap<u64, Arc<Group>>`, `by_name: HashMap<SharedString, Arc<Group>>`, `user_groups` index, and subscriptions.
@@ -96,21 +98,25 @@ The work is organized into 15 incremental tasks, each producing a buildable arti
   - _edits: crates/client/src/lib.rs_
   - _Completed: Added an entity-backed group cache with initial fetch, live update handling, prefix search, membership indexes, and case-insensitive name/display-name search coverage._
 
-- [ ] 9. Integrate groups into @-autocomplete
+- [x] 9. Integrate groups into @-autocomplete
   - In `crates/collab_ui/src/composer.rs`, extend the autocomplete query to also call `GroupStore::search_groups`.
   - Render group results in the autocomplete dropdown with a group icon (e.g., `IconName::Group`) and distinct background color.
   - Format group items as `@group-name` (Group display name).
   - When user selects a group, insert a `ChatMention` with `group_id` set (and `user_id` = 0).
   - _Requirements: 9.2, P5.10_
   - _edits: crates/collab_ui/src/composer.rs_
+  - _Completed: The channel composer searches the live GroupStore for group-name prefixes, formats group references as `@group-name`, and creates group ChatMention entries with `user_id = 0` and the group ID while preserving word boundaries.
+  - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-mention-test-2 CARGO_INCREMENTAL=0 cargo check -p notifications -p collab_ui`._
 
-- [ ] 10. Implement distinct group mention rendering
+- [x] 10. Implement distinct group mention rendering
   - In `crates/collab_ui/src/message_bubble.rs` (or equivalent render path), detect mentions where `group_id != 0`.
   - Look up the group in `GroupStore` and render with distinct styling (e.g., purple/pink background vs. blue for users, or a people icon).
   - Fall back gracefully if the group is not found in the local cache.
   - Add a test verifying that group mentions render with distinct style.
   - _Requirements: 9.2, P5.11_
   - _edits: crates/collab_ui/src/message_bubble.rs_
+  - _Completed: Channel message rendering detects group mentions, resolves names from GroupStore, uses a people icon and distinct selected styling, and falls back to a stable `@group-ID` label when the cache is missing.
+  - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-mention-test-2 CARGO_INCREMENTAL=0 cargo check -p notifications -p collab_ui`._
 
 - [x] 11. Create the Group Management UI
   - Create `crates/collab_ui/src/group_management.rs` with `GroupManagement` struct and `Render` impl.

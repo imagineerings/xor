@@ -4367,16 +4367,35 @@ async fn expand_group_mentions(
     mentions: &[proto::ChatMention],
     db: &Database,
 ) -> Result<Vec<proto::ChatMention>> {
+    let mut group_members = HashMap::default();
+    for group_id in mentions
+        .iter()
+        .filter(|mention| mention.group_id != 0)
+        .map(|mention| GroupId::from_proto(mention.group_id))
+        .collect::<HashSet<_>>()
+    {
+        group_members.insert(group_id, db.get_group_member_ids(group_id).await?);
+    }
+    Ok(expand_group_mentions_from_members(
+        mentions,
+        &group_members,
+    )?)
+}
+
+fn expand_group_mentions_from_members(
+    mentions: &[proto::ChatMention],
+    group_members: &HashMap<GroupId, Vec<UserId>>,
+) -> anyhow::Result<Vec<proto::ChatMention>> {
     let mut expanded = Vec::new();
     for mention in mentions {
         if mention.group_id == 0 {
             expanded.push(mention.clone());
             continue;
         }
-        for user_id in db
-            .get_group_member_ids(GroupId::from_proto(mention.group_id))
-            .await?
-        {
+        let user_ids = group_members
+            .get(&GroupId::from_proto(mention.group_id))
+            .with_context(|| format!("group {} not found", mention.group_id))?;
+        for user_id in user_ids {
             expanded.push(proto::ChatMention {
                 range: mention.range.clone(),
                 user_id: user_id.to_proto(),
@@ -4385,6 +4404,63 @@ async fn expand_group_mentions(
         }
     }
     Ok(expanded)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn expand_group_mentions_preserves_individual_mentions_and_ranges() {
+        let mentions = vec![
+            proto::ChatMention {
+                range: Some(proto::Range { start: 0, end: 4 }),
+                user_id: 10,
+                group_id: 0,
+            },
+            proto::ChatMention {
+                range: Some(proto::Range { start: 5, end: 9 }),
+                user_id: 0,
+                group_id: 7,
+            },
+        ];
+        let members = [(
+            GroupId::from_proto(7),
+            vec![UserId::from_proto(20), UserId::from_proto(30)],
+        )]
+        .into_iter()
+        .collect();
+
+        let expanded = expand_group_mentions_from_members(&mentions, &members).unwrap();
+
+        assert_eq!(
+            expanded,
+            vec![
+                mentions[0].clone(),
+                proto::ChatMention {
+                    range: mentions[1].range.clone(),
+                    user_id: 20,
+                    group_id: 7,
+                },
+                proto::ChatMention {
+                    range: mentions[1].range.clone(),
+                    user_id: 30,
+                    group_id: 7,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn expand_group_mentions_rejects_missing_groups() {
+        let mentions = [proto::ChatMention {
+            range: Some(proto::Range { start: 0, end: 4 }),
+            user_id: 0,
+            group_id: 99,
+        }];
+
+        assert!(expand_group_mentions_from_members(&mentions, &HashMap::default()).is_err());
+    }
 }
 
 fn channel_message_priority_from_proto(priority: Option<i32>) -> Result<i16> {
