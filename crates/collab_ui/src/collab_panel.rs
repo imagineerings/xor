@@ -9,6 +9,7 @@ use crate::{
     channel_view::ChannelView,
     draft_store::DraftStore,
     status_display::StatusDisplay,
+    user_status_modal::UserStatusModal,
 };
 use anyhow::Context as _;
 use call::ActiveCall;
@@ -1176,10 +1177,22 @@ impl CollabPanel {
         let end_slot = if is_pending {
             Label::new("Calling").color(Color::Muted).into_any_element()
         } else if is_current_user {
-            IconButton::new("leave-call", IconName::Exit)
-                .icon_size(IconSize::Small)
-                .tooltip(Tooltip::text("Leave Call"))
-                .on_click(move |_, window, cx| Self::leave_call(window, cx))
+            h_flex()
+                .gap_1()
+                .child(
+                    IconButton::new("set-status", IconName::Ellipsis)
+                        .icon_size(IconSize::Small)
+                        .tooltip(Tooltip::text("Set a status"))
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            this.show_user_status_modal(window, cx);
+                        })),
+                )
+                .child(
+                    IconButton::new("leave-call", IconName::Exit)
+                        .icon_size(IconSize::Small)
+                        .tooltip(Tooltip::text("Leave Call"))
+                        .on_click(move |_, window, cx| Self::leave_call(window, cx)),
+                )
                 .into_any_element()
         } else if role == proto::ChannelRole::Guest {
             Label::new("Guest").color(Color::Muted).into_any_element()
@@ -2155,6 +2168,17 @@ impl CollabPanel {
                     let mut finder = ContactFinder::new(self.user_store.clone(), window, cx);
                     finder.set_query(self.filter_editor.read(cx).text(cx), window, cx);
                     finder
+                });
+            });
+        }
+    }
+
+    fn show_user_status_modal(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(workspace) = self.workspace.upgrade() {
+            let user_store = self.user_store.clone();
+            workspace.update(cx, |workspace, cx| {
+                workspace.toggle_modal(window, cx, |window, cx| {
+                    UserStatusModal::new(user_store.clone(), window, cx)
                 });
             });
         }

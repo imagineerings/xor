@@ -116,9 +116,11 @@ This plan implements custom user status — emoji + short text labels with optio
   - _Validation: `cargo check -p collab_ui`._
 
 - [ ] 11. Wire UI integration points
-  - [ ] 11.1 Add "Set a status" menu item to the user avatar context menu (opens `UserStatusModal`)
+  - [x] 11.1 Add "Set a status" menu item to the user avatar context menu (opens `UserStatusModal`)
     - _Requirements: 8.1 (AC 1)_
     - _writes: crates/collab_ui/src/_
+    - _Completed: Added a local-user overflow control in the collaboration panel's active-call row that opens UserStatusModal._
+    - _Validation: `cargo check -p collab_ui`._
   - [x] 11.2 Add `StatusDisplay` below user name/avatar in the channel sidebar contact list (`CollabPanel::render_contact`)
     - _Requirements: 8.3 (AC 1)_
     - _writes: crates/collab_ui/src/_
