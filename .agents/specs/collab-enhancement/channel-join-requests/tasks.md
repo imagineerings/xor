@@ -39,13 +39,13 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _Validation: `CARGO_INCREMENTAL=0 cargo check -p proto --features proto/test-support`._
 
 - [x] 4. Implement server-side `JoinRequestStore`
-  - [ ] 4.1 Implement `request_join` — INSERT into `channel_join_requests`; returns error on UNIQUE violation (duplicate pending request).
-  - [ ] 4.2 Implement `pending_join_request_exists` — SELECT COUNT(*) for `(channel_id, user_id)`.
-  - [ ] 4.3 Implement `approve_join_request` — DELETE the request row and INSERT a `channel_members` row with `accepted = true`, `role = Member` in a single transaction.
-  - [ ] 4.4 Implement `deny_join_request` — DELETE the request row.
-  - [ ] 4.5 Implement `get_pending_requests` — SELECT all requests for a channel, JOIN with `users` for display info.
-  - [ ] 4.6 Implement `expire_old_requests` — DELETE all rows with `created_at < threshold`, return list of expired `(user_id, channel_id, channel_name)` for notification dispatch.
-  - [ ] 4.7 Implement `count_pending_requests` — SELECT COUNT(*) for a channel.
+  - [x] 4.1 Implement `request_join` — INSERT into `channel_join_requests`; returns error on UNIQUE violation (duplicate pending request).
+  - [x] 4.2 Implement `pending_join_request_exists` — SELECT COUNT(*) for `(channel_id, user_id)`.
+  - [x] 4.3 Implement `approve_join_request` — DELETE the request row and INSERT a `channel_members` row with `accepted = true`, `role = Member` in a single transaction.
+  - [x] 4.4 Implement `deny_join_request` — DELETE the request row.
+  - [x] 4.5 Implement `get_pending_requests` — SELECT all requests for a channel, JOIN with `users` for display info.
+  - [x] 4.6 Implement `expire_old_requests` — DELETE all rows with `created_at < threshold`, return list of expired `(user_id, channel_id, channel_name)` for notification dispatch.
+  - [x] 4.7 Implement `count_pending_requests` — SELECT COUNT(*) for a channel.
   - _Requirements: 10.1, 10.2, 10.4_
   - _writes: crates/collab/src/db/join_request_store.rs, crates/collab/src/db/tables/channel_join_request.rs_
   - _Completed: Added transactional request creation, duplicate checks, approval that atomically removes the request and creates or restores an accepted Member membership, denial, ordered pending lists, expiry with channel metadata, and per-channel counts. Added SeaORM table metadata and SQLite integration coverage._
@@ -226,11 +226,17 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _writes: crates/db/src/join_requests.rs_, _crates/collab_ui/src/request_to_join_panel.rs_, _crates/collab_ui/src/pending_requests_list.rs_, _crates/collab_ui/src/request_detail_panel.rs_
 
 - [ ] 22. Integration tests
-  - [ ] 22.1 Full request flow: non-member requests join → admin receives push → admin fetches pending → admin approves → requester receives approval → requester can join channel.
-  - [ ] 22.2 Denial flow: same as above with `approve = false` → requester receives denial → requester still cannot join.
+  - [x] 22.1 Full request flow: non-member requests join → admin receives push → admin fetches pending → admin approves → requester receives approval → requester can join channel.
+    - _Completed: Added an integration test covering request persistence, admin pending-list retrieval, approval, and the requester's successful channel join._
+    - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests join_request_approve_flow_adds_requester_to_channel --features test-support`._
+  - [x] 22.2 Denial flow: same as above with `approve = false` → requester receives denial → requester still cannot join.
+    - _Completed: Added an integration test covering denial with a reason and rejection of the subsequent channel join._
+    - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests join_request_deny_flow_keeps_requester_out_of_channel --features test-support`._
   - [x] 22.3 Expiry flow: create request with past timestamp → run expiry job → verify notification created and request deleted.
     - _Completed: The database integration test runs the expiry job with zero TTL and verifies both deletion and the expiry denial notification._
-  - [ ] 22.4 Admin-only authority: non-admin calls `RespondToJoinRequest` → verify `Forbidden` error.
+  - [x] 22.4 Admin-only authority: non-admin calls `RespondToJoinRequest` → verify `Forbidden` error.
+    - _Completed: Added an integration test proving a requester cannot approve its own pending request._
+    - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests join_request_response_requires_channel_admin --features test-support`._
   - _Requirements: 10.1, 10.2, 10.3, 10.4_
   - _writes: crates/collab/tests/channel_join_requests.rs_
 

@@ -1,6 +1,6 @@
 use crate::TestServer;
 use client::{
-    MessagePriority, RECEIVE_TIMEOUT, RECONNECT_TIMEOUT,
+    MessagePriority, RECEIVE_TIMEOUT,
     channel_chat::{
         DEFAULT_THREAD_REPLY_LIMIT, ScheduleChannelMessage, SearchChannelMessages,
         SendChannelMessage, UpdateChannelMessage,
@@ -14,7 +14,7 @@ use collab::{
         ScheduledMessageId as DbScheduledMessageId, UserId as DbUserId, channel_file,
         scheduled_message_store::ScheduledMessageStore,
     },
-    rpc::Server,
+    rpc::{RECONNECT_TIMEOUT, Server},
 };
 use gpui::{AppContext, BackgroundExecutor, TestAppContext};
 use pretty_assertions::assert_eq;
@@ -117,6 +117,126 @@ async fn test_channel_chat_core_flow(
     assert_eq!(deleted.len(), 1);
     assert_eq!(deleted[0].body, "");
     assert!(deleted[0].mentions.is_empty());
+}
+
+#[gpui::test]
+async fn join_request_approve_flow_adds_requester_to_channel(
+    executor: BackgroundExecutor,
+    cx_admin: &mut TestAppContext,
+    cx_requester: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor.clone()).await;
+    let admin = server.create_client(cx_admin, "admin").await;
+    let requester = server.create_client(cx_requester, "requester").await;
+    let channel_id = server
+        .make_channel("private-chat", None, (&admin, cx_admin), &mut [])
+        .await;
+
+    requester
+        .client()
+        .request(proto::RequestJoinChannel {
+            channel_id: channel_id.0,
+            reason: Some("I need access to coordinate releases".to_string()),
+        })
+        .await
+        .unwrap();
+
+    let pending = admin
+        .client()
+        .request(proto::GetPendingJoinRequests {
+            channel_id: channel_id.0,
+        })
+        .await
+        .unwrap();
+    assert_eq!(pending.requests.len(), 1);
+    assert_eq!(pending.requests[0].user_id, requester.user_id().unwrap());
+    assert_eq!(
+        pending.requests[0].reason.as_deref(),
+        Some("I need access to coordinate releases")
+    );
+
+    admin
+        .client()
+        .request(proto::RespondToJoinRequest {
+            channel_id: channel_id.0,
+            requesting_user_id: requester.user_id().unwrap(),
+            approve: true,
+            denial_reason: None,
+        })
+        .await
+        .unwrap();
+
+    requester.join_channel_chat(channel_id.0).await.unwrap();
+}
+
+#[gpui::test]
+async fn join_request_deny_flow_keeps_requester_out_of_channel(
+    executor: BackgroundExecutor,
+    cx_admin: &mut TestAppContext,
+    cx_requester: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor.clone()).await;
+    let admin = server.create_client(cx_admin, "admin").await;
+    let requester = server.create_client(cx_requester, "requester").await;
+    let channel_id = server
+        .make_channel("private-chat", None, (&admin, cx_admin), &mut [])
+        .await;
+
+    requester
+        .client()
+        .request(proto::RequestJoinChannel {
+            channel_id: channel_id.0,
+            reason: Some("Please let me in".to_string()),
+        })
+        .await
+        .unwrap();
+    admin
+        .client()
+        .request(proto::RespondToJoinRequest {
+            channel_id: channel_id.0,
+            requesting_user_id: requester.user_id().unwrap(),
+            approve: false,
+            denial_reason: Some("Please ask an administrator first".to_string()),
+        })
+        .await
+        .unwrap();
+
+    assert!(requester.join_channel_chat(channel_id.0).await.is_err());
+}
+
+#[gpui::test]
+async fn join_request_response_requires_channel_admin(
+    executor: BackgroundExecutor,
+    cx_admin: &mut TestAppContext,
+    cx_requester: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor.clone()).await;
+    let admin = server.create_client(cx_admin, "admin").await;
+    let requester = server.create_client(cx_requester, "requester").await;
+    let channel_id = server
+        .make_channel("private-chat", None, (&admin, cx_admin), &mut [])
+        .await;
+
+    requester
+        .client()
+        .request(proto::RequestJoinChannel {
+            channel_id: channel_id.0,
+            reason: None,
+        })
+        .await
+        .unwrap();
+
+    let error = requester
+        .client()
+        .request(proto::RespondToJoinRequest {
+            channel_id: channel_id.0,
+            requesting_user_id: requester.user_id().unwrap(),
+            approve: true,
+            denial_reason: None,
+        })
+        .await
+        .unwrap_err();
+    assert!(error.to_string().contains("admin"));
 }
 
 #[gpui::test]
