@@ -33,7 +33,7 @@ The work is organized into 15 incremental tasks, each producing a buildable arti
   - _writes: crates/collab/migrations/20260625000000_create_user_groups.sql_
   - _Completed: Added group ownership, unique group-name and membership constraints, cascade cleanup, and member lookup indexing in the production and test schemas._
 
-- [ ] 4. Create SeaORM entity definitions
+- [x] 4. Create SeaORM entity definitions
   - Create `user_group.rs` entity with `Model`, `ActiveModelBehavior`, `Relation` (Members, Admin), and `Related` impl for `user_group_member`.
   - Create `user_group_member.rs` entity with `Model`, `ActiveModelBehavior`, `Relation` (Group, User).
   - Register both modules in `crates/collab/src/db/tables.rs`.
@@ -41,6 +41,7 @@ The work is organized into 15 incremental tasks, each producing a buildable arti
   - _writes: crates/collab/src/db/tables/user_group.rs_
   - _writes: crates/collab/src/db/tables/user_group_member.rs_
   - _edits: crates/collab/src/db/tables.rs_
+  - _Completed: Added group and membership entities with typed IDs and admin/member/user relations._
 
 - [ ] 5. Implement GroupStore database queries
   - Implement `Database` methods in a new `crates/collab/src/db/queries/groups.rs`:

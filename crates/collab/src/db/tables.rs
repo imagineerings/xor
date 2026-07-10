@@ -33,6 +33,8 @@ pub mod server;
 pub mod shared_thread;
 pub mod user;
 pub mod user_custom_status;
+pub mod user_group;
+pub mod user_group_member;
 pub mod user_notification_preference;
 pub mod worktree;
 pub mod worktree_diagnostic_summary;
