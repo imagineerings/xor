@@ -45,7 +45,8 @@ pub use toast_layer::{ToastAction, ToastLayer, ToastView};
 
 use anyhow::{Context as _, Result, anyhow};
 use client::{
-    ChannelId, Client, ErrorExt, ParticipantIndex, Status, TypedEnvelope, User, UserStore,
+    ChannelId, Client, ErrorExt, GroupStore, ParticipantIndex, Status, TypedEnvelope, User,
+    UserStore,
     proto::{self, ErrorCode, PanelId, PeerId},
 };
 use collections::{HashMap, HashSet, TypeIdHashMap, hash_map};
@@ -1108,6 +1109,7 @@ pub struct AppState {
     pub languages: Arc<LanguageRegistry>,
     pub client: Arc<Client>,
     pub user_store: Entity<UserStore>,
+    pub group_store: Entity<GroupStore>,
     pub workspace_store: Entity<WorkspaceStore>,
     pub fs: Arc<dyn fs::Fs>,
     pub build_window_options: fn(Option<Uuid>, &mut App) -> WindowOptions,
@@ -1199,6 +1201,7 @@ impl AppState {
         let client = Client::new(clock, http_client, cx);
         let session = cx.new(|cx| AppSession::new(Session::test(), cx));
         let user_store = cx.new(|cx| UserStore::new(client.clone(), cx));
+        let group_store = cx.new(|cx| GroupStore::new(client.clone(), cx));
         let workspace_store = cx.new(|cx| WorkspaceStore::new(client.clone(), cx));
 
         theme_settings::init(theme::LoadThemes::JustBase, cx);
@@ -1209,6 +1212,7 @@ impl AppState {
             fs,
             languages,
             user_store,
+            group_store,
             workspace_store,
             node_runtime: NodeRuntime::unavailable(),
             build_window_options: |_, _| Default::default(),
@@ -1927,12 +1931,11 @@ impl Workspace {
                 }
             }
 
-            let workspace_id =
-                if let Some(serialisim_workspace) = serialisim_workspace.as_ref() {
-                    serialisim_workspace.id
-                } else {
-                    db.next_id().await.unwrap_or_else(|_| Default::default())
-                };
+            let workspace_id = if let Some(serialisim_workspace) = serialisim_workspace.as_ref() {
+                serialisim_workspace.id
+            } else {
+                db.next_id().await.unwrap_or_else(|_| Default::default())
+            };
 
             let toolchains = db.toolchains(workspace_id).await?;
 
@@ -7334,8 +7337,7 @@ impl Workspace {
             project
                 .update(cx, |project, cx| {
                     project.bookmark_store().update(cx, |bookmark_store, cx| {
-                        bookmark_store
-                            .load_serialisim_bookmarks(serialisim_workspace.bookmarks, cx)
+                        bookmark_store.load_serialisim_bookmarks(serialisim_workspace.bookmarks, cx)
                     })
                 })
                 .await
@@ -7346,10 +7348,8 @@ impl Workspace {
                     project
                         .breakpoint_store()
                         .update(cx, |breakpoint_store, cx| {
-                            breakpoint_store.with_serialisim_breakpoints(
-                                serialisim_workspace.breakpoints,
-                                cx,
-                            )
+                            breakpoint_store
+                                .with_serialisim_breakpoints(serialisim_workspace.breakpoints, cx)
                         })
                 })
                 .await;
@@ -7836,6 +7836,7 @@ impl Workspace {
 
         let client = project.read(cx).client();
         let user_store = project.read(cx).user_store();
+        let group_store = cx.new(|cx| GroupStore::new(client.clone(), cx));
         let workspace_store = cx.new(|cx| WorkspaceStore::new(client.clone(), cx));
         let session = cx.new(|cx| AppSession::new(Session::test(), cx));
         window.activate_window();
@@ -7844,6 +7845,7 @@ impl Workspace {
             workspace_store,
             client,
             user_store,
+            group_store,
             fs: project.read(cx).fs().clone(),
             build_window_options: |_, _| Default::default(),
             node_runtime: NodeRuntime::unavailable(),
@@ -9323,8 +9325,7 @@ pub async fn apply_restored_multiworkspace_state(
         // stale keys from previous sessions get normalized and deduped.
         let mut resolved_groups: Vec<SerialisimProjectGroupState> = Vec::new();
         for serialisim in project_groups.iter().cloned() {
-            let SerialisimProjectGroupState { key, expanded } =
-                serialisim.into_restored_state();
+            let SerialisimProjectGroupState { key, expanded } = serialisim.into_restored_state();
             if key.path_list().paths().is_empty() {
                 continue;
             }
@@ -10517,9 +10518,8 @@ fn deserialize_remote_project(
 
         let serialisim_workspace = db.remote_workspace_for_roots(&paths, remote_connection_id);
 
-        let workspace_id = if let Some(workspace_id) = serialisim_workspace
-            .as_ref()
-            .map(|workspace| workspace.id)
+        let workspace_id = if let Some(workspace_id) =
+            serialisim_workspace.as_ref().map(|workspace| workspace.id)
         {
             workspace_id
         } else {
@@ -16028,8 +16028,8 @@ mod tests {
 
     #[gpui::test]
     async fn test_toggle_theme_mode_persists_and_updates_active_theme(cx: &mut TestAppContext) {
-        use sim_actions::theme::ToggleMode;
         use settings::{ThemeName, ThemeSelection};
+        use sim_actions::theme::ToggleMode;
         use theme::SystemAppearance;
 
         init_test(cx);

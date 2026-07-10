@@ -328,12 +328,14 @@ impl TestServer {
             .register_hosting_provider(Arc::new(git_hosting_providers::Github::public_instance()));
 
         let user_store = cx.new(|cx| UserStore::new(client.clone(), cx));
+        let group_store = cx.new(|cx| client::GroupStore::new(client.clone(), cx));
         let workspace_store = cx.new(|cx| WorkspaceStore::new(client.clone(), cx));
         let language_registry = Arc::new(LanguageRegistry::test(cx.executor()));
         let session = cx.new(|cx| AppSession::new(Session::test(), cx));
         let app_state = Arc::new(workspace::AppState {
             client: client.clone(),
             user_store: user_store.clone(),
+            group_store,
             workspace_store,
             languages: language_registry,
             fs: fs.clone(),

@@ -55,6 +55,7 @@ fn main() {
         client::init(&client, cx);
 
         let user_store = cx.new(|cx| UserStore::new(client.clone(), cx));
+        let group_store = cx.new(|cx| client::GroupStore::new(client.clone(), cx));
         let workspace_store = cx.new(|cx| WorkspaceStore::new(client.clone(), cx));
         let session_id = uuid::Uuid::new_v4().to_string();
         let kvp = db::kvp::KeyValueStore::global(cx);
@@ -68,6 +69,7 @@ fn main() {
             languages,
             client,
             user_store,
+            group_store,
             workspace_store,
             fs,
             build_window_options: |_, _| Default::default(),

@@ -570,6 +570,7 @@ fn main() {
         debug_adapter_extension::init(extension_host_proxy.clone(), cx);
         languages::init(languages.clone(), fs.clone(), node_runtime.clone(), cx);
         let user_store = cx.new(|cx| UserStore::new(client.clone(), cx));
+        let group_store = cx.new(|cx| client::GroupStore::new(client.clone(), cx));
         let workspace_store = cx.new(|cx| WorkspaceStore::new(client.clone(), cx));
 
         language_extension::init(
@@ -655,6 +656,7 @@ fn main() {
             languages,
             client: client.clone(),
             user_store,
+            group_store,
             fs: fs.clone(),
             build_window_options,
             workspace_store,

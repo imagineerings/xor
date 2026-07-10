@@ -99,7 +99,6 @@ use {
     agent_servers::{AgentServer, AgentServerDelegate},
     anyhow::{Context as _, Result},
     assets::Assets,
-    sim_actions::OpenSettingsAt,
     editor::display_map::DisplayRow,
     feature_flags::FeatureFlagAppExt as _,
     git_ui::project_diff::ProjectDiff,
@@ -112,6 +111,7 @@ use {
     project_panel::ProjectPanel,
     settings::{NotifyWhenAgentWaiting, PlaySoundWhenAgentDone, Settings as _},
     settings_ui::SettingsWindow,
+    sim_actions::OpenSettingsAt,
     std::{
         any::Any,
         path::{Path, PathBuf},
@@ -985,6 +985,7 @@ fn init_app_state(cx: &mut App) -> Arc<AppState> {
     let client = client::Client::new(clock, http_client, cx);
     let session = cx.new(|cx| session::AppSession::new(Session::test(), cx));
     let user_store = cx.new(|cx| client::UserStore::new(client.clone(), cx));
+    let group_store = cx.new(|cx| client::GroupStore::new(client.clone(), cx));
     let workspace_store = cx.new(|cx| workspace::WorkspaceStore::new(client.clone(), cx));
 
     theme_settings::init(theme::LoadThemes::JustBase, cx);
@@ -995,6 +996,7 @@ fn init_app_state(cx: &mut App) -> Arc<AppState> {
         fs,
         languages,
         user_store,
+        group_store,
         workspace_store,
         node_runtime: NodeRuntime::unavailable(),
         build_window_options: |_, _| Default::default(),
@@ -2314,9 +2316,9 @@ fn run_tool_permissions_visual_tests(
     _update_baseline: bool,
 ) -> Result<TestResult> {
     use agent_settings::{AgentSettings, CompiledRegex, ToolPermissions, ToolRules};
-    use sim_actions::OpenSettingsAt;
     use collections::HashMap;
     use settings::ToolPermissionMode;
+    use sim_actions::OpenSettingsAt;
 
     // Set up tool permissions with "hi" as both always_deny and always_allow for terminal
     cx.update(|cx| {
