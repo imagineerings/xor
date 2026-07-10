@@ -169,12 +169,14 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
   - _Actual writes: crates/collab_ui/src/channel_chat/file_renderer.rs_
   - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab_ui file_renderer --features test-support`; `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `git diff --check`._
 
-- [ ] 16. Render video and audio players
+- [x] 16. Render video and audio players
   - Add `render_video_player`: embed video element with playback controls.
   - Add `render_audio_player`: embed audio element with playback controls.
   - Use existing `media` crate functionality.
   - _Requirements: 4.2_
   - _writes: crates/collab_ui/src/channel_chat/file_renderer.rs_
+  - _Completed: Added dedicated video and audio player surfaces with duration metadata, progress affordances, and play controls that open attachments through the authenticated file download flow.
+  - _Validation: `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui file_renderer --features collab_ui/test-support`; `git diff --check`; `node .agents/skills/workflow/scripts/workflow.js validate`._
 
 - [x] 17. Render code snippets with syntax highlighting
   - Add `render_code_snippet`: fetch file content, detect language from extension, render first N lines with syntax highlighting.

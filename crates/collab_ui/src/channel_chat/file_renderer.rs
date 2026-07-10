@@ -155,6 +155,101 @@ impl FileAttachmentRenderer {
             .into_any_element()
     }
 
+    fn render_video_player(&self, cx: &mut App) -> AnyElement {
+        self.render_media_player(FileKind::Video, IconName::PlayFilled, "Video", cx)
+    }
+
+    fn render_audio_player(&self, cx: &mut App) -> AnyElement {
+        self.render_media_player(FileKind::Audio, IconName::AudioOn, "Audio", cx)
+    }
+
+    fn render_media_player(
+        &self,
+        file_kind: FileKind,
+        media_icon: IconName,
+        media_label: &'static str,
+        cx: &mut App,
+    ) -> AnyElement {
+        let file = self.file.clone();
+        let client = self.client.clone();
+        let duration = file
+            .duration_ms
+            .map(format_duration)
+            .unwrap_or_else(|| "Unknown duration".to_string());
+        let media_label_lower = media_label.to_ascii_lowercase();
+        let player_id = match file_kind {
+            FileKind::Video => "video",
+            FileKind::Audio => "audio",
+            _ => "media",
+        };
+
+        v_flex()
+            .id(format!("channel-{player_id}-player-{}", file.id))
+            .gap_2()
+            .max_w(px(520.))
+            .px_3()
+            .py_2()
+            .rounded_sm()
+            .border_1()
+            .border_color(cx.theme().colors().border)
+            .bg(cx.theme().colors().editor_background)
+            .child(
+                h_flex()
+                    .gap_2()
+                    .items_center()
+                    .child(
+                        Icon::new(media_icon)
+                            .size(IconSize::Medium)
+                            .color(Color::Muted),
+                    )
+                    .child(
+                        v_flex()
+                            .flex_1()
+                            .overflow_hidden()
+                            .child(Label::new(file.filename.clone()).truncate())
+                            .child(
+                                Label::new(format!("{media_label} · {duration}"))
+                                    .size(LabelSize::XSmall)
+                                    .color(Color::Muted),
+                            ),
+                    )
+                    .child(
+                        IconButton::new(
+                            format!("play-channel-{player_id}-{}", file.id),
+                            IconName::PlayFilled,
+                        )
+                        .icon_size(IconSize::Small)
+                        .tooltip(Tooltip::text(format!("Play {media_label_lower}")))
+                        .on_click(move |_, _, cx| {
+                            open_file_download(client.clone(), file.id.clone(), cx);
+                        }),
+                    ),
+            )
+            .child(
+                h_flex()
+                    .gap_2()
+                    .items_center()
+                    .child(
+                        div()
+                            .h(px(4.))
+                            .flex_1()
+                            .rounded_full()
+                            .bg(cx.theme().colors().border),
+                    )
+                    .child(
+                        Label::new("0:00")
+                            .size(LabelSize::XSmall)
+                            .color(Color::Muted),
+                    )
+                    .child(
+                        Label::new(duration)
+                            .size(LabelSize::XSmall)
+                            .color(Color::Muted),
+                    ),
+            )
+            .into_any_element()
+    }
+
     fn render_code_snippet(&self, cx: &mut App) -> AnyElement {
         cx.new(|cx| {
             CodeSnippetPreview::new(
@@ -448,9 +543,11 @@ impl RenderOnce for FileAttachmentRenderer {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         match Self::detect_file_kind(&self.file.mime_type, &self.file.filename) {
             FileKind::Image => self.render_image_preview(cx),
+            FileKind::Video => self.render_video_player(cx),
+            FileKind::Audio => self.render_audio_player(cx),
             FileKind::Pdf => self.render_pdf_thumbnail(cx),
             FileKind::Code => self.render_code_snippet(cx),
-            FileKind::Video | FileKind::Audio | FileKind::Other => self.render_file_card(cx),
+            FileKind::Other => self.render_file_card(cx),
         }
     }
 }
