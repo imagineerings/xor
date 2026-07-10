@@ -4126,15 +4126,15 @@ async fn send_channel_message(
                 .map_err(Error::from)
         })
         .collect::<Result<Vec<_>>>()?;
-    let mut message = session
-        .db()
-        .await
+    let db = session.db().await;
+    let mentions = expand_group_mentions(&request.mentions, &db).await?;
+    let mut message = db
         .create_channel_message(NewChannelMessage {
             channel_id,
             sender_id: session.user_id(),
             body: request.body,
             nonce: request.nonce.context("missing channel message nonce")?,
-            mentions: request.mentions,
+            mentions,
             reply_to_message_id: request.reply_to_message_id.map(MessageId::from_proto),
             scheduled_at: None,
             priority,
@@ -4236,6 +4236,30 @@ async fn dispatch_urgent_notifications(
         }
     }
     Ok(())
+}
+
+async fn expand_group_mentions(
+    mentions: &[proto::ChatMention],
+    db: &Database,
+) -> Result<Vec<proto::ChatMention>> {
+    let mut expanded = Vec::new();
+    for mention in mentions {
+        if mention.group_id == 0 {
+            expanded.push(mention.clone());
+            continue;
+        }
+        for user_id in db
+            .get_group_member_ids(GroupId::from_proto(mention.group_id))
+            .await?
+        {
+            expanded.push(proto::ChatMention {
+                range: mention.range.clone(),
+                user_id: user_id.to_proto(),
+                group_id: 0,
+            });
+        }
+    }
+    Ok(expanded)
 }
 
 fn channel_message_priority_from_proto(priority: Option<i32>) -> Result<i16> {
