@@ -157,11 +157,14 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
   - _Requirements: 4.2_
   - _writes: crates/collab_ui/src/channel_chat/file_renderer.rs_
 
-- [ ] 15. Render PDF thumbnails
+- [x] 15. Render PDF thumbnails
   - Add `render_pdf_thumbnail`: show a PDF icon thumbnail with filename and a "View PDF" link/button.
   - Open PDF in external viewer or existing PDF preview component on click.
   - _Requirements: 4.2_
   - _writes: crates/collab_ui/src/channel_chat/file_renderer.rs_
+  - _Completed: Added a dedicated PDF thumbnail/card renderer with a PDF icon, filename, metadata, and "View PDF" action that opens the file URL; expanded renderer unit coverage for PDF icon/metadata and metadata enrichment._
+  - _Actual writes: crates/collab_ui/src/channel_chat/file_renderer.rs_
+  - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab_ui file_renderer --features test-support`; `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `git diff --check`._
 
 - [ ] 16. Render video and audio players
   - Add `render_video_player`: embed video element with playback controls.

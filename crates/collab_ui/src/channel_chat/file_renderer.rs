@@ -67,6 +67,54 @@ impl FileAttachmentRenderer {
             .into_any_element()
     }
 
+    fn render_pdf_thumbnail(&self, cx: &mut App) -> AnyElement {
+        let file = self.file.clone();
+        h_flex()
+            .gap_3()
+            .items_center()
+            .max_w(px(420.))
+            .px_3()
+            .py_2()
+            .rounded_sm()
+            .border_1()
+            .border_color(cx.theme().colors().border)
+            .bg(cx.theme().colors().editor_background)
+            .child(
+                div()
+                    .flex_none()
+                    .size(px(40.))
+                    .rounded_sm()
+                    .border_1()
+                    .border_color(cx.theme().colors().border_variant)
+                    .bg(cx.theme().colors().element_background)
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child(
+                        Icon::new(IconName::FileDoc)
+                            .size(IconSize::Medium)
+                            .color(Color::Muted),
+                    ),
+            )
+            .child(
+                v_flex()
+                    .flex_1()
+                    .overflow_hidden()
+                    .child(Label::new(file.filename.clone()).truncate())
+                    .child(
+                        Label::new(file_metadata_label(&file))
+                            .size(LabelSize::XSmall)
+                            .color(Color::Muted),
+                    ),
+            )
+            .child(
+                Button::new(format!("view-channel-pdf-{}", file.id), "View PDF")
+                    .style(ButtonStyle::Subtle)
+                    .on_click(move |_, _, cx| cx.open_url(&file.url)),
+            )
+            .into_any_element()
+    }
+
     fn render_file_card(&self, cx: &mut App) -> AnyElement {
         let file = self.file.clone();
         let icon = icon_for_file_kind(Self::detect_file_kind(&file.mime_type, &file.filename));
@@ -105,11 +153,10 @@ impl RenderOnce for FileAttachmentRenderer {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         match Self::detect_file_kind(&self.file.mime_type, &self.file.filename) {
             FileKind::Image => self.render_image_preview(cx),
-            FileKind::Video
-            | FileKind::Audio
-            | FileKind::Pdf
-            | FileKind::Code
-            | FileKind::Other => self.render_file_card(cx),
+            FileKind::Pdf => self.render_pdf_thumbnail(cx),
+            FileKind::Video | FileKind::Audio | FileKind::Code | FileKind::Other => {
+                self.render_file_card(cx)
+            }
         }
     }
 }
@@ -238,5 +285,52 @@ mod tests {
             FileAttachmentRenderer::detect_file_kind("application/octet-stream", "archive.zip"),
             FileKind::Other
         );
+    }
+
+    #[test]
+    fn pdf_files_use_pdf_icon_and_metadata() {
+        let file = file_attachment("runbook.pdf", "application/pdf");
+
+        assert_eq!(
+            icon_for_file_kind(FileAttachmentRenderer::detect_file_kind(
+                &file.mime_type,
+                &file.filename
+            )),
+            IconName::FileDoc
+        );
+        assert_eq!(
+            file_metadata_label(&file),
+            "4.0 KB · application/pdf · Uploader #7"
+        );
+    }
+
+    #[test]
+    fn metadata_label_includes_image_dimensions_and_duration() {
+        let file = FileAttachment {
+            image_width: Some(800),
+            image_height: Some(600),
+            duration_ms: Some(65_000),
+            ..file_attachment("clip.mp4", "video/mp4")
+        };
+
+        assert_eq!(
+            file_metadata_label(&file),
+            "4.0 KB · video/mp4 · Uploader #7 · 800x600 · 1:05"
+        );
+    }
+
+    fn file_attachment(filename: &str, mime_type: &str) -> FileAttachment {
+        FileAttachment {
+            id: "file-id".to_string(),
+            filename: filename.to_string(),
+            file_size: 4096,
+            mime_type: mime_type.to_string(),
+            url: "https://example.com/file".to_string(),
+            uploader_id: 7,
+            uploaded_at: None,
+            image_width: None,
+            image_height: None,
+            duration_ms: None,
+        }
     }
 }
