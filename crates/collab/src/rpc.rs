@@ -16,7 +16,7 @@ use crate::{
     AppState, Error, Result, auth,
     db::{
         self, BufferId, Capability, Channel, ChannelId, ChannelRole, ChannelsForUser, Database,
-        InviteMemberResult, MembershipUpdated, MessageId, NotificationId, ProjectId,
+        GroupId, InviteMemberResult, MembershipUpdated, MessageId, NotificationId, ProjectId,
         RejoinedProject, RemoveChannelMemberResult, RespondToChannelInvite, RoomId, ServerId,
         SharedThreadId, UserId,
     },
@@ -465,6 +465,12 @@ impl Server {
             .add_request_handler(request_join_channel)
             .add_message_handler(subscribe_to_channels)
             .add_request_handler(create_channel)
+            .add_request_handler(create_group)
+            .add_request_handler(update_group)
+            .add_request_handler(delete_group)
+            .add_request_handler(get_groups)
+            .add_request_handler(update_group_members)
+            .add_request_handler(leave_group)
             .add_request_handler(delete_channel)
             .add_request_handler(invite_channel_member)
             .add_request_handler(remove_channel_member)
@@ -3016,6 +3022,174 @@ async fn subscribe_user_to_channels(user_id: UserId, session: &Session) -> Resul
         session.connection_id,
         build_channels_update(channels_for_user),
     )?;
+    Ok(())
+}
+
+async fn create_group(
+    request: proto::CreateGroup,
+    response: Response<proto::CreateGroup>,
+    session: MessageContext,
+) -> Result<()> {
+    let db = session.db().await;
+    let member_ids = request
+        .member_ids
+        .iter()
+        .copied()
+        .map(UserId::from_proto)
+        .collect::<Vec<_>>();
+    let group = db
+        .create_group(
+            &request.name,
+            &request.display_name,
+            session.user_id(),
+            &member_ids,
+        )
+        .await?;
+    response.send(proto::CreateGroupResponse {
+        group: Some(group.to_proto()),
+    })?;
+    broadcast_groups(
+        &session,
+        proto::UpdateGroups {
+            groups: vec![group.to_proto()],
+            ..Default::default()
+        },
+    )
+    .await
+}
+
+async fn update_group(
+    request: proto::UpdateGroup,
+    response: Response<proto::UpdateGroup>,
+    session: MessageContext,
+) -> Result<()> {
+    let db = session.db().await;
+    let group_id = GroupId::from_proto(request.group_id);
+    ensure_group_admin(&db, group_id, session.user_id()).await?;
+    let group = db
+        .update_group(
+            group_id,
+            request.name.as_deref(),
+            request.display_name.as_deref(),
+        )
+        .await?;
+    response.send(proto::UpdateGroupResponse {
+        group: Some(group.to_proto()),
+    })?;
+    broadcast_groups(
+        &session,
+        proto::UpdateGroups {
+            groups: vec![group.to_proto()],
+            ..Default::default()
+        },
+    )
+    .await
+}
+
+async fn delete_group(
+    request: proto::DeleteGroup,
+    response: Response<proto::DeleteGroup>,
+    session: MessageContext,
+) -> Result<()> {
+    let db = session.db().await;
+    let group_id = GroupId::from_proto(request.group_id);
+    ensure_group_admin(&db, group_id, session.user_id()).await?;
+    db.delete_group(group_id).await?;
+    response.send(proto::DeleteGroupResponse {})?;
+    broadcast_groups(
+        &session,
+        proto::UpdateGroups {
+            delete_group_ids: vec![group_id.to_proto()],
+            ..Default::default()
+        },
+    )
+    .await
+}
+
+async fn get_groups(
+    _: proto::GetGroups,
+    response: Response<proto::GetGroups>,
+    session: MessageContext,
+) -> Result<()> {
+    let groups = session.db().await.get_groups().await?;
+    response.send(proto::GetGroupsResponse {
+        groups: groups
+            .iter()
+            .map(db::queries::groups::GroupWithMembers::to_proto)
+            .collect(),
+    })?;
+    Ok(())
+}
+
+async fn update_group_members(
+    request: proto::UpdateGroupMembers,
+    response: Response<proto::UpdateGroupMembers>,
+    session: MessageContext,
+) -> Result<()> {
+    let db = session.db().await;
+    let group_id = GroupId::from_proto(request.group_id);
+    ensure_group_admin(&db, group_id, session.user_id()).await?;
+    let add_ids = request
+        .add_user_ids
+        .iter()
+        .copied()
+        .map(UserId::from_proto)
+        .collect::<Vec<_>>();
+    let remove_ids = request
+        .remove_user_ids
+        .iter()
+        .copied()
+        .map(UserId::from_proto)
+        .collect::<Vec<_>>();
+    let group = db
+        .update_group_members(group_id, &add_ids, &remove_ids)
+        .await?;
+    response.send(proto::UpdateGroupMembersResponse {
+        group: Some(group.to_proto()),
+    })?;
+    broadcast_groups(
+        &session,
+        proto::UpdateGroups {
+            groups: vec![group.to_proto()],
+            ..Default::default()
+        },
+    )
+    .await
+}
+
+async fn leave_group(
+    request: proto::LeaveGroup,
+    response: Response<proto::LeaveGroup>,
+    session: MessageContext,
+) -> Result<()> {
+    let db = session.db().await;
+    let group_id = GroupId::from_proto(request.group_id);
+    db.leave_group(group_id, session.user_id()).await?;
+    let group = db.get_group(group_id).await?.context("group not found")?;
+    response.send(proto::LeaveGroupResponse {})?;
+    broadcast_groups(
+        &session,
+        proto::UpdateGroups {
+            groups: vec![group.to_proto()],
+            ..Default::default()
+        },
+    )
+    .await
+}
+
+async fn ensure_group_admin(db: &Database, group_id: GroupId, user_id: UserId) -> Result<()> {
+    let group = db.get_group(group_id).await?.context("group not found")?;
+    if group.group.admin_id != user_id {
+        return Err(anyhow!("only the group admin can modify this group").into());
+    }
+    Ok(())
+}
+
+async fn broadcast_groups(session: &MessageContext, update: proto::UpdateGroups) -> Result<()> {
+    let connection_pool = session.connection_pool().await;
+    for connection_id in connection_pool.connection_ids() {
+        session.peer.send(connection_id, update.clone())?;
+    }
     Ok(())
 }
 
