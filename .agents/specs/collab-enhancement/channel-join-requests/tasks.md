@@ -120,12 +120,14 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _Completed: Added shared pending-request and pending-count client models with the requester user, optional reason, timestamp, channel ID, and count._
   - _Validation: `cargo check -p collab_ui`._
 
-- [ ] 12. Update `ChannelStore` for pending request counts
+- [x] 12. Update `ChannelStore` for pending request counts
   - Add `pending_join_request_counts: HashMap<ChannelId, u32>` field.
   - Add `pub fn pending_request_count(&self, channel_id: ChannelId) -> u32`.
   - In `handle_update_channels`, parse `pending_request_counts` from the proto message and update the map (remove entry when count is 0).
   - _Requirements: 10.4 (AC 1)_
-  - _writes: crates/collab_ui/src/channel_store.rs_
+  - _writes: crates/channel/src/channel_store.rs_
+  - _Completed: Added pending-request count state and lookup to the shared channel store. `UpdateChannels` applies nonzero counts and clears entries when the server sends zero._
+  - _Validation: `cargo test -p channel test_pending_join_request_counts`._
 
 - [ ] 13. Implement `RequestToJoinPanel`
   - Create `RequestToJoinPanel` struct with `channel_id`, `reason` (editable `SharedString`), `state: RequestState`.

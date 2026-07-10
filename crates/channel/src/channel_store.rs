@@ -37,6 +37,7 @@ pub struct ChannelStore {
     pub channel_index: ChannelIndex,
     channel_invitations: Vec<Arc<Channel>>,
     channel_participants: HashMap<ChannelId, Vec<Arc<User>>>,
+    pending_join_request_counts: HashMap<ChannelId, u32>,
     channel_states: HashMap<ChannelId, ChannelState>,
     favorite_channel_ids: Vec<ChannelId>,
     outgoing_invites: HashSet<(ChannelId, LegacyUserId)>,
@@ -169,6 +170,13 @@ impl ChannelStore {
         self.favorite_channel_ids.contains(&channel_id)
     }
 
+    pub fn pending_request_count(&self, channel_id: ChannelId) -> u32 {
+        self.pending_join_request_counts
+            .get(&channel_id)
+            .copied()
+            .unwrap_or_default()
+    }
+
     pub fn toggle_favorite_channel(&mut self, channel_id: ChannelId, cx: &mut Context<Self>) {
         if let Some(ix) = self
             .favorite_channel_ids
@@ -219,6 +227,7 @@ impl ChannelStore {
             channel_invitations: Vec::default(),
             channel_index: ChannelIndex::default(),
             channel_participants: Default::default(),
+            pending_join_request_counts: Default::default(),
             outgoing_invites: Default::default(),
             opened_buffers: Default::default(),
             update_channels_tx,
@@ -878,6 +887,7 @@ impl ChannelStore {
         self.channel_index.clear();
         self.channel_invitations.clear();
         self.channel_participants.clear();
+        self.pending_join_request_counts.clear();
         self.channel_index.clear();
         self.outgoing_invites.clear();
         self.disconnect_channel_buffers_task.take();
@@ -1047,6 +1057,7 @@ impl ChannelStore {
         self.channel_invitations.clear();
         self.channel_index.clear();
         self.channel_participants.clear();
+        self.pending_join_request_counts.clear();
         self.outgoing_invites.clear();
         self.opened_buffers.clear();
         self.disconnect_channel_buffers_task = None;
@@ -1058,6 +1069,15 @@ impl ChannelStore {
         payload: proto::UpdateChannels,
         cx: &mut Context<ChannelStore>,
     ) -> Option<Task<Result<()>>> {
+        for pending_request_count in payload.pending_request_counts {
+            let channel_id = ChannelId(pending_request_count.channel_id);
+            if pending_request_count.count == 0 {
+                self.pending_join_request_counts.remove(&channel_id);
+            } else {
+                self.pending_join_request_counts
+                    .insert(channel_id, pending_request_count.count);
+            }
+        }
         if !payload.remove_channel_invitations.is_empty() {
             self.channel_invitations
                 .retain(|channel| !payload.remove_channel_invitations.contains(&channel.id.0));

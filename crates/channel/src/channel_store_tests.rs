@@ -1,5 +1,5 @@
 use super::*;
-use client::{Client, UserStore};
+use client::{ChannelId, Client, UserStore};
 use clock::FakeSystemClock;
 use gpui::{App, AppContext as _, Entity};
 use http_client::FakeHttpClient;
@@ -75,6 +75,43 @@ fn test_update_channels(cx: &mut App) {
             (1, "y".to_string()),
         ],
         cx,
+    );
+}
+
+#[gpui::test]
+fn test_pending_join_request_counts(cx: &mut App) {
+    let channel_store = init_test(cx);
+
+    update_channels(
+        &channel_store,
+        proto::UpdateChannels {
+            pending_request_counts: vec![proto::PendingRequestCount {
+                channel_id: 1,
+                count: 2,
+            }],
+            ..Default::default()
+        },
+        cx,
+    );
+    assert_eq!(
+        channel_store.read_with(cx, |store, _| store.pending_request_count(ChannelId(1))),
+        2
+    );
+
+    update_channels(
+        &channel_store,
+        proto::UpdateChannels {
+            pending_request_counts: vec![proto::PendingRequestCount {
+                channel_id: 1,
+                count: 0,
+            }],
+            ..Default::default()
+        },
+        cx,
+    );
+    assert_eq!(
+        channel_store.read_with(cx, |store, _| store.pending_request_count(ChannelId(1))),
+        0
     );
 }
 
