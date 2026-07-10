@@ -2,6 +2,7 @@ mod connection;
 mod diff;
 mod mention;
 mod terminal;
+pub use ::terminal::HeadlessTerminal;
 use action_log::{ActionLog, ActionLogTelemetry};
 use agent_client_protocol::schema as acp;
 use anyhow::{Context as _, Result, anyhow};
@@ -3894,6 +3895,7 @@ impl AcpThread {
         let project = self.project.clone();
         let language_registry = project.read(cx).languages().clone();
         let is_windows = project.read(cx).path_style(cx).is_windows();
+        let headless = HeadlessTerminal::is_enabled(cx);
 
         let terminal_id = acp::TerminalId::new(Uuid::new_v4().to_string());
         let terminal_task = cx.spawn({
@@ -3907,10 +3909,13 @@ impl AcpThread {
                             .and_then(|r| r.read(cx).default_system_shell())
                     })
                     .unwrap_or_else(|| get_default_system_shell_preferring_bash());
-                let (task_command, task_args) =
-                    ShellBuilder::new(&Shell::Program(shell), is_windows)
-                        .redirect_stdin_to_dev_null()
-                        .build(Some(command.clone()), &args);
+                let mut builder = ShellBuilder::new(&Shell::Program(shell), is_windows);
+                if headless {
+                    builder = builder.non_interactive();
+                }
+                let (task_command, task_args) = builder
+                    .redirect_stdin_to_dev_null()
+                    .build(Some(command.clone()), &args);
                 let (task_command, task_args, sandbox_config) =
                     apply_sandbox_wrap(task_command, task_args, sandbox_wrap)?;
                 let terminal = project

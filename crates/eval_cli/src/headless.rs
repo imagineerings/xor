@@ -116,6 +116,7 @@ pub fn init(cx: &mut App) -> Arc<AgentCliAppState> {
     languages::init(languages.clone(), fs.clone(), node_runtime.clone(), cx);
     prompt_store::init(cx);
     terminal_view::init(cx);
+    cx.set_global(acp_thread::HeadlessTerminal(true));
 
     let stdout_is_a_pty = false;
     let prompt_builder = PromptBuilder::load(fs.clone(), stdout_is_a_pty, cx);
