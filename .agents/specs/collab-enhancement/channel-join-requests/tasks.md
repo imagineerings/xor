@@ -92,11 +92,13 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _Completed: Added an hourly collab-server job that reads `CHANNEL_JOIN_REQUEST_TTL_SECS` (defaulting to seven days), deletes stale requests, and persists an expiry-denial notification for each requester._
   - _Validation: `cargo check -p collab --features collab/test-support`; `target/debug/deps/collab_tests-9512c50120ff4d19 db_tests::join_request_tests::test_expire_join_requests_creates_notification_sqlite --exact --nocapture`._
 
-- [ ] 9. Extend `UpdateChannels` handling on server
+- [x] 9. Extend `UpdateChannels` handling on server
   - After any insert/delete in `channel_join_requests`, compute `PendingRequestCount` per channel and include in `UpdateChannels` broadcast to affected admins.
   - Ensure `UpdateChannels` pushes include the `pending_request_counts` field so admin clients stay in sync.
   - _Requirements: 10.4 (AC 1)_
-  - _writes: crates/collab/src/api/channel.rs_
+  - _writes: crates/collab/src/rpc.rs, crates/collab/src/jobs.rs_
+  - _Completed: Broadcast pending-request counts to connected channel admins after request creation, resolution, and background expiry. The expiry loop now runs with the RPC peer and connection pool so it can keep admin state synchronized._
+  - _Validation: `cargo check -p collab --features collab/test-support`._
 
 - [x] 10. Update `rpc::Notification` enum with join request variants
   - Add `JoinRequest { channel_id, channel_name, requesting_user_id, requesting_user_name, reason }` variant.

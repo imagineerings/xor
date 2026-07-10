@@ -572,6 +572,17 @@ impl Server {
             run_scheduled_message_loop(scheduled_app_state, scheduled_peer, scheduled_pool)
                 .instrument(span.clone()),
         );
+        let join_request_app_state = self.app_state.clone();
+        let join_request_peer = self.peer.clone();
+        let join_request_pool = self.connection_pool.clone();
+        self.app_state.executor.spawn_detached(
+            run_join_request_expiry_loop(
+                join_request_app_state,
+                join_request_peer,
+                join_request_pool,
+            )
+            .instrument(span.clone()),
+        );
         self.app_state.executor.spawn_detached(
             async move {
                 tracing::info!("waiting for cleanup timeout");
@@ -3455,8 +3466,16 @@ async fn respond_to_join_request(
         })
         .await?;
 
+    let pending_request_count = store.count_pending_requests(channel_id).await?;
     let connection_pool = session.connection_pool().await;
     send_notifications(&connection_pool, &session.peer, notifications);
+    send_pending_join_request_count_update(
+        &session.peer,
+        &connection_pool,
+        channel.root_id(),
+        channel_id,
+        pending_request_count,
+    )?;
     for connection_id in connection_pool.user_connection_ids(requester_id) {
         session.peer.send(
             connection_id,
@@ -4064,8 +4083,18 @@ async fn request_join_channel(
         })
         .await?;
 
+    let pending_request_count = JoinRequestStore::new(db.clone())
+        .count_pending_requests(channel_id)
+        .await?;
     let connection_pool = session.connection_pool().await;
     send_notifications(&connection_pool, &session.peer, notifications);
+    send_pending_join_request_count_update(
+        &session.peer,
+        &connection_pool,
+        root_channel_id,
+        channel_id,
+        pending_request_count,
+    )?;
     for admin_user_id in admin_user_ids {
         for connection_id in connection_pool.user_connection_ids(admin_user_id) {
             session.peer.send(
@@ -4841,6 +4870,87 @@ async fn run_scheduled_message_loop(
             .await
             .trace_err();
     }
+}
+
+const JOIN_REQUEST_EXPIRY_INTERVAL: Duration = Duration::from_secs(60 * 60);
+
+async fn run_join_request_expiry_loop(
+    app_state: Arc<AppState>,
+    peer: Arc<Peer>,
+    connection_pool: Arc<parking_lot::Mutex<ConnectionPool>>,
+) {
+    loop {
+        match crate::jobs::expire_join_requests(app_state.db.clone()).await {
+            Ok(expired_requests) => {
+                let mut channel_ids = expired_requests
+                    .into_iter()
+                    .map(|request| request.channel_id)
+                    .collect::<Vec<_>>();
+                channel_ids.sort_unstable();
+                channel_ids.dedup();
+
+                for channel_id in channel_ids {
+                    let result = app_state
+                        .db
+                        .transaction(|tx| {
+                            let db = app_state.db.clone();
+                            async move {
+                                let channel = db.get_channel_internal(channel_id, &tx).await?;
+                                Ok(channel.root_id())
+                            }
+                        })
+                        .await;
+                    match result {
+                        Ok(root_channel_id) => {
+                            let result = JoinRequestStore::new(app_state.db.clone())
+                                .count_pending_requests(channel_id)
+                                .await;
+                            match result {
+                                Ok(count) => {
+                                    send_pending_join_request_count_update(
+                                        &peer,
+                                        &connection_pool.lock(),
+                                        root_channel_id,
+                                        channel_id,
+                                        count,
+                                    )
+                                    .trace_err();
+                                }
+                                Err(error) => {
+                                    log::error!("counting expired join requests: {error}")
+                                }
+                            }
+                        }
+                        Err(error) => log::error!("finding expired join request channel: {error}"),
+                    }
+                }
+            }
+            Err(error) => log::error!("expiring join requests: {error}"),
+        }
+        app_state.executor.sleep(JOIN_REQUEST_EXPIRY_INTERVAL).await;
+    }
+}
+
+fn send_pending_join_request_count_update(
+    peer: &Peer,
+    connection_pool: &ConnectionPool,
+    root_channel_id: ChannelId,
+    channel_id: ChannelId,
+    count: u64,
+) -> Result<()> {
+    let update = proto::UpdateChannels {
+        pending_request_counts: vec![proto::PendingRequestCount {
+            channel_id: channel_id.to_proto(),
+            count: count as u32,
+        }],
+        ..Default::default()
+    };
+    for (connection_id, role) in connection_pool.channel_connection_ids(root_channel_id) {
+        if role == ChannelRole::Admin {
+            peer.send(connection_id, update.clone())?;
+        }
+    }
+    Ok(())
 }
 
 async fn deliver_due_scheduled_messages(

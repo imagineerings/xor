@@ -333,7 +333,7 @@ pub async fn expire_join_requests(db: &Database) -> Result<()> {
 }
 ```
 
-The collab service starts this job when its RPC server starts. It runs immediately and then hourly; invalid or negative `CHANNEL_JOIN_REQUEST_TTL_SECS` values fall back to the seven-day default. <!-- impl: crates/collab/src/jobs.rs#expire_join_requests_periodically -->
+The collab RPC server starts this job. It runs immediately and then hourly; invalid or negative `CHANNEL_JOIN_REQUEST_TTL_SECS` values fall back to the seven-day default. Each expiry also sends the new zero count to connected channel admins. <!-- impl: crates/collab/src/rpc.rs#run_join_request_expiry_loop -->
 
 ### 3.6 Client-side: RequestToJoinPanel
 
