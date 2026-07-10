@@ -1,7 +1,7 @@
 use super::new_test_user;
 use crate::test_both_dbs;
 use collab::{
-    db::{Database, UserId, user_status_store::UserStatusStore},
+    db::{Database, user_status_store::UserStatusStore},
 };
 use std::sync::Arc;
 use time::{Duration, OffsetDateTime, PrimitiveDateTime};

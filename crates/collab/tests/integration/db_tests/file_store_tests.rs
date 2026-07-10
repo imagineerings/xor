@@ -141,6 +141,7 @@ async fn test_file_store_metadata_lifecycle(db: &Arc<Database>) {
             mentions: Vec::new(),
             reply_to_message_id: None,
             scheduled_at: None,
+            priority: 0,
         })
         .await
         .unwrap();

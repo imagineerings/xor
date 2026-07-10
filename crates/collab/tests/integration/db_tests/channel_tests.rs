@@ -343,6 +343,7 @@ async fn test_channel_thread_db_queries(db: &Arc<Database>) {
             mentions: Vec::new(),
             reply_to_message_id: Some(MessageId::from_proto(root.id + 10_000)),
             scheduled_at: None,
+            priority: 0,
         })
         .await
         .is_err()
@@ -381,6 +382,7 @@ async fn create_test_channel_message(
         mentions: Vec::new(),
         reply_to_message_id: reply_to_message_id.map(MessageId::from_proto),
         scheduled_at: None,
+        priority: 0,
     })
     .await
     .unwrap()
