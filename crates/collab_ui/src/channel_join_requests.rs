@@ -1,7 +1,7 @@
 use anyhow::Result;
 use channel::ChannelStore;
 use client::{ChannelId, Subscription, User};
-use gpui::{AsyncApp, Context, Entity, EventEmitter, SharedString};
+use gpui::{App, AppContext as _, AsyncApp, Context, Entity, EventEmitter, Global, SharedString};
 use rpc::{TypedEnvelope, proto};
 use std::sync::Arc;
 use time::OffsetDateTime;
@@ -40,6 +40,16 @@ pub struct JoinRequestPushStore {
 impl EventEmitter<JoinRequestEvent> for JoinRequestPushStore {}
 
 impl JoinRequestPushStore {
+    pub fn init(cx: &mut App) {
+        let channel_store = ChannelStore::global(cx);
+        let store = cx.new(|cx| Self::new(channel_store, cx));
+        cx.set_global(GlobalJoinRequestPushStore(store));
+    }
+
+    pub fn global(cx: &App) -> Entity<Self> {
+        cx.global::<GlobalJoinRequestPushStore>().0.clone()
+    }
+
     pub fn new(channel_store: Entity<ChannelStore>, cx: &mut Context<Self>) -> Self {
         let client = channel_store.read(cx).client();
         let subscriptions = vec![
@@ -88,3 +98,7 @@ impl JoinRequestPushStore {
         Ok(())
     }
 }
+
+struct GlobalJoinRequestPushStore(Entity<JoinRequestPushStore>);
+
+impl Global for GlobalJoinRequestPushStore {}

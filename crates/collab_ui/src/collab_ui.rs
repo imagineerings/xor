@@ -37,6 +37,7 @@ pub fn init(app_state: &Arc<AppState>, cx: &mut App) {
     channel_file_upload::init(cx);
     channel_chat::init(cx);
     channel_view::init(cx);
+    channel_join_requests::JoinRequestPushStore::init(cx);
     collab_panel::init(cx);
     draft_store::init(cx);
     notifications::init(app_state, cx);

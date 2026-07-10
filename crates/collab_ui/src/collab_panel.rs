@@ -421,8 +421,7 @@ impl CollabPanel {
                 selection: None,
                 channel_store: ChannelStore::global(cx),
                 draft_store: DraftStore::global(cx),
-                join_request_push_store: cx
-                    .new(|cx| JoinRequestPushStore::new(ChannelStore::global(cx), cx)),
+                join_request_push_store: JoinRequestPushStore::global(cx),
                 notification_store: NotificationStore::global(cx),
                 current_notification_toast: None,
                 mark_as_read_tasks: HashMap::default(),
