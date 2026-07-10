@@ -3,7 +3,10 @@ mod contact_finder;
 
 use self::channel_modal::ChannelModal;
 use crate::{
-    CollaborationPanelSettings, channel_chat::ChannelChat, channel_view::ChannelView,
+    CollaborationPanelSettings,
+    channel_chat::ChannelChat,
+    channel_join_requests::{JoinRequestEvent, JoinRequestPushStore},
+    channel_view::ChannelView,
     draft_store::DraftStore,
 };
 use anyhow::Context as _;
@@ -269,6 +272,7 @@ pub struct CollabPanel {
     selection: Option<usize>,
     channel_store: Entity<ChannelStore>,
     draft_store: Entity<DraftStore>,
+    join_request_push_store: Entity<JoinRequestPushStore>,
     user_store: Entity<UserStore>,
     client: Arc<Client>,
     project: Entity<Project>,
@@ -412,6 +416,8 @@ impl CollabPanel {
                 selection: None,
                 channel_store: ChannelStore::global(cx),
                 draft_store: DraftStore::global(cx),
+                join_request_push_store: cx
+                    .new(|cx| JoinRequestPushStore::new(ChannelStore::global(cx), cx)),
                 notification_store: NotificationStore::global(cx),
                 current_notification_toast: None,
                 mark_as_read_tasks: HashMap::default(),
@@ -439,6 +445,24 @@ impl CollabPanel {
                 }));
             this.subscriptions
                 .push(cx.observe(&this.draft_store, |_, _, cx| cx.notify()));
+            this.subscriptions.push(cx.subscribe_in(
+                &this.join_request_push_store,
+                window,
+                |this, _, event, window, cx| {
+                    if let JoinRequestEvent::Responded {
+                        channel_id,
+                        approved: true,
+                        ..
+                    } = event
+                    {
+                        let Some(workspace) = this.workspace.upgrade() else {
+                            return;
+                        };
+                        ChannelView::open(*channel_id, None, workspace, window, cx)
+                            .detach_and_log_err(cx);
+                    }
+                },
+            ));
             this.subscriptions
                 .push(cx.observe(&active_call, |this, _, cx| this.update_entries(true, cx)));
             this.subscriptions.push(cx.subscribe_in(
@@ -2506,9 +2530,21 @@ impl CollabPanel {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        self.show_channel_modal_with_pending_requests(channel_id, mode, false, window, cx);
+    }
+
+    fn show_channel_modal_with_pending_requests(
+        &mut self,
+        channel_id: ChannelId,
+        mode: channel_modal::Mode,
+        show_pending_requests: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let workspace = self.workspace.clone();
         let user_store = self.user_store.clone();
         let channel_store = self.channel_store.clone();
+        let join_request_push_store = self.join_request_push_store.clone();
 
         cx.spawn_in(window, async move |_, cx| {
             workspace.update_in(cx, |workspace, window, cx| {
@@ -2516,8 +2552,10 @@ impl CollabPanel {
                     ChannelModal::new(
                         user_store.clone(),
                         channel_store.clone(),
+                        join_request_push_store.clone(),
                         channel_id,
                         mode,
+                        show_pending_requests,
                         window,
                         cx,
                     )
@@ -4189,9 +4227,10 @@ impl CollabNotificationToast {
                 window.defer(cx, move |_window, cx| {
                     collab_panel
                         .update_in(cx, |collab_panel, window, cx| {
-                            collab_panel.show_channel_modal(
+                            collab_panel.show_channel_modal_with_pending_requests(
                                 ChannelId(channel_id),
                                 channel_modal::Mode::ManageMembers,
+                                true,
                                 window,
                                 cx,
                             );

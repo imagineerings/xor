@@ -1,5 +1,8 @@
-use client::{ChannelId, User};
-use gpui::SharedString;
+use anyhow::Result;
+use channel::ChannelStore;
+use client::{ChannelId, Subscription, User};
+use gpui::{AsyncApp, Context, Entity, EventEmitter, SharedString};
+use rpc::{TypedEnvelope, proto};
 use std::sync::Arc;
 use time::OffsetDateTime;
 
@@ -15,4 +18,73 @@ pub struct PendingJoinRequest {
 pub struct PendingRequestCount {
     pub channel_id: ChannelId,
     pub count: u32,
+}
+
+#[derive(Clone, Debug)]
+pub enum JoinRequestEvent {
+    Added {
+        channel_id: ChannelId,
+    },
+    Responded {
+        channel_id: ChannelId,
+        approved: bool,
+        denial_reason: Option<SharedString>,
+    },
+}
+
+pub struct JoinRequestPushStore {
+    channel_store: Entity<ChannelStore>,
+    _subscriptions: Vec<Subscription>,
+}
+
+impl EventEmitter<JoinRequestEvent> for JoinRequestPushStore {}
+
+impl JoinRequestPushStore {
+    pub fn new(channel_store: Entity<ChannelStore>, cx: &mut Context<Self>) -> Self {
+        let client = channel_store.read(cx).client();
+        let subscriptions = vec![
+            client.add_message_handler(cx.weak_entity(), Self::handle_join_request_added),
+            client.add_message_handler(cx.weak_entity(), Self::handle_join_request_responded),
+        ];
+
+        Self {
+            channel_store,
+            _subscriptions: subscriptions,
+        }
+    }
+
+    async fn handle_join_request_added(
+        this: Entity<Self>,
+        envelope: TypedEnvelope<proto::JoinRequestAdded>,
+        mut cx: AsyncApp,
+    ) -> Result<()> {
+        let channel_id = ChannelId(envelope.payload.channel_id);
+        let is_channel_admin = this.read_with(&cx, |this, cx| {
+            this.channel_store.read(cx).is_channel_admin(channel_id)
+        });
+
+        if is_channel_admin {
+            this.update(&mut cx, |_this, cx| {
+                cx.emit(JoinRequestEvent::Added { channel_id });
+            });
+        }
+
+        Ok(())
+    }
+
+    async fn handle_join_request_responded(
+        this: Entity<Self>,
+        envelope: TypedEnvelope<proto::JoinRequestResponded>,
+        mut cx: AsyncApp,
+    ) -> Result<()> {
+        this.update(&mut cx, |_, cx| {
+            cx.emit(JoinRequestEvent::Responded {
+                channel_id: ChannelId(envelope.payload.channel_id),
+                approved: envelope.payload.approved,
+                denial_reason: envelope.payload.denial_reason.map(Into::into),
+            });
+        });
+
+        Ok(())
+    }
 }

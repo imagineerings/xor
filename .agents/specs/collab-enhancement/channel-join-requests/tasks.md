@@ -195,11 +195,13 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _Completed: Join request notifications resolve requester profiles and render channel/reason context. Toast clicks open the channel member-management review flow for admins and open the approved channel for requesters; denied notifications remain dismissible._
   - _Validation: `cargo check -p collab_ui`._
 
-- [ ] 19. Implement client-side push handler for `JoinRequestAdded` and `JoinRequestResponded`
+- [x] 19. Implement client-side push handler for `JoinRequestAdded` and `JoinRequestResponded`
   - Handle `JoinRequestAdded` push: insert into pending requests store (if admin of the channel), update badge count, show toast notification.
   - Handle `JoinRequestResponded` push: if `approved`, navigate to the channel; show toast with outcome.
   - _Requirements: 10.2 (AC 1), 10.3 (AC 3)_
   - _writes: crates/collab_ui/src/channel_join_requests.rs_
+  - _Completed: Added a shared push store owned by the collaboration panel. It emits admin-only request-added events for active review lists and routes requester approvals directly to the channel. Persisted join-request notifications continue to supply the actionable toast and server-synchronized badge count._
+  - _Validation: `cargo check -p collab_ui`._
 
 - [x] 20. Rate limiting and input validation
   - Server-side: enforce max 500 characters on `reason` field in `RequestJoinChannel`.

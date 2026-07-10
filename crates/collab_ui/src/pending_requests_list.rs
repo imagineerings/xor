@@ -1,9 +1,8 @@
-use crate::channel_join_requests::PendingJoinRequest;
-use anyhow::Result;
+use crate::channel_join_requests::{JoinRequestEvent, JoinRequestPushStore, PendingJoinRequest};
 use channel::ChannelStore;
-use client::{ChannelId, Subscription, UserStore};
-use gpui::{AsyncApp, Context, Entity, EventEmitter, Render, Window, prelude::*};
-use rpc::{TypedEnvelope, proto};
+use client::{ChannelId, UserStore};
+use gpui::{Context, Entity, EventEmitter, Render, Subscription, Window, prelude::*};
+use rpc::proto;
 use time::OffsetDateTime;
 use ui::{Label, LabelSize, prelude::*};
 
@@ -28,11 +27,15 @@ impl PendingRequestsList {
         channel_id: ChannelId,
         channel_store: Entity<ChannelStore>,
         user_store: Entity<UserStore>,
+        push_store: Entity<JoinRequestPushStore>,
         cx: &mut Context<Self>,
     ) -> Self {
-        let client = channel_store.read(cx).client();
-        let subscriptions =
-            vec![client.add_message_handler(cx.weak_entity(), Self::handle_join_request_added)];
+        let subscriptions = vec![cx.subscribe(&push_store, |this, _, event, cx| {
+            if matches!(event, JoinRequestEvent::Added { channel_id } if *channel_id == this.channel_id)
+            {
+                this.load_requests(cx);
+            }
+        })];
         let mut this = Self {
             channel_id,
             requests: Vec::new(),
@@ -91,22 +94,6 @@ impl PendingRequestsList {
             anyhow::Ok(())
         })
         .detach_and_log_err(cx);
-    }
-
-    async fn handle_join_request_added(
-        this: Entity<Self>,
-        envelope: TypedEnvelope<proto::JoinRequestAdded>,
-        mut cx: AsyncApp,
-    ) -> Result<()> {
-        let channel_id = ChannelId(envelope.payload.channel_id);
-        let should_refresh = this.read_with(&cx, |this, cx| {
-            this.channel_id == channel_id
-                && this.channel_store.read(cx).is_channel_admin(channel_id)
-        });
-        if should_refresh {
-            this.update(&mut cx, |this, cx| this.load_requests(cx));
-        }
-        Ok(())
     }
 }
 

@@ -1,4 +1,5 @@
 use crate::{
+    channel_join_requests::JoinRequestPushStore,
     pending_requests_list::{PendingRequestsList, PendingRequestsListEvent},
     request_detail_panel::{RequestDetailPanel, RequestDetailPanelEvent},
 };
@@ -47,14 +48,22 @@ impl ChannelModal {
     pub fn new(
         user_store: Entity<UserStore>,
         channel_store: Entity<ChannelStore>,
+        push_store: Entity<JoinRequestPushStore>,
         channel_id: ChannelId,
         mode: Mode,
+        show_pending_requests: bool,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
         cx.observe(&channel_store, |_, _, cx| cx.notify()).detach();
         let pending_requests = cx.new(|cx| {
-            PendingRequestsList::new(channel_id, channel_store.clone(), user_store.clone(), cx)
+            PendingRequestsList::new(
+                channel_id,
+                channel_store.clone(),
+                user_store.clone(),
+                push_store,
+                cx,
+            )
         });
         let channel_modal = cx.entity().downgrade();
         let picker = cx.new(|cx| {
@@ -85,7 +94,7 @@ impl ChannelModal {
             request_detail: None,
             channel_store,
             channel_id,
-            show_pending_requests: false,
+            show_pending_requests,
             _subscriptions: Vec::new(),
         };
         let pending_requests_subscription =
