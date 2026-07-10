@@ -531,6 +531,12 @@ message Envelope {
     GetPendingJoinRequestsResponse get_pending_join_requests_response = 496;
     JoinRequestAdded join_request_added = 497;
     JoinRequestResponded join_request_responded = 498; // current max
+    SetStatus set_status = 499;
+    SetStatusResponse set_status_response = 500;
+    ClearStatus clear_status = 501;
+    UpdateUserStatus update_user_status = 502;
+    UpdateUserStatuses update_user_statuses = 503;
+    UserCustomStatus user_custom_status = 504; // current max
   }
 
   reserved 87 to 88;
@@ -601,6 +607,31 @@ enum ErrorCode {
 }
 
 message EndStream {}
+
+message UserCustomStatus {
+  optional string emoji = 1;
+  string text = 2;
+  optional uint64 expires_at = 3;
+}
+
+message SetStatus {
+  optional string emoji = 1;
+  string text = 2;
+  optional uint32 clear_after_minutes = 3;
+}
+
+message SetStatusResponse {}
+
+message ClearStatus {}
+
+message UpdateUserStatus {
+  uint64 user_id = 1;
+  optional UserCustomStatus status = 2;
+}
+
+message UpdateUserStatuses {
+  repeated UpdateUserStatus statuses = 1;
+}
 
 message Test {
   uint64 id = 1;
