@@ -122,7 +122,7 @@ Add a channel bookmarks feature: a dedicated section in the channel header where
   - _Completed: Added typed client bookmark IDs/model/conversions, bookmark mutation RPC helper methods, and a `ChannelBookmarkStore` that subscribes to `UpdateChannelBookmarks` pushes and exposes observable per-channel bookmark state._
   - _Validation: `CARGO_INCREMENTAL=0 cargo check -p client -p collab_ui --features collab_ui/test-support`; `CARGO_INCREMENTAL=0 cargo test -p client bookmark --features client/test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui store_replaces_bookmarks_for_channel --features collab_ui/test-support`._
 
-- [ ] 9. Implement `BookmarkBar` component
+- [x] 9. Implement `BookmarkBar` component
   - [x] 9.1 Render the bookmark bar at the top of the channel view (between channel header and message list).
     - _Requirements: 6.2 (AC 1)_
     - _writes: collab_ui/src/channel_bookmark_bar.rs_
