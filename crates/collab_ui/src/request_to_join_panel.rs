@@ -1,7 +1,7 @@
 use channel::ChannelStore;
 use client::ChannelId;
-use editor::Editor;
-use gpui::{Context, Entity, Render, SharedString, Window, prelude::*};
+use editor::{Editor, EditorEvent};
+use gpui::{Context, Entity, Render, SharedString, Subscription, Window, prelude::*};
 use rpc::proto;
 use ui::{Button, Label, LabelSize, prelude::*};
 
@@ -10,6 +10,7 @@ pub struct RequestToJoinPanel {
     reason_editor: Entity<Editor>,
     channel_store: Entity<ChannelStore>,
     state: RequestState,
+    _reason_subscription: Subscription,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -22,6 +23,8 @@ pub enum RequestState {
 }
 
 impl RequestToJoinPanel {
+    const MAX_REASON_CHARS: usize = 500;
+
     pub fn new(
         channel_id: ChannelId,
         channel_store: Entity<ChannelStore>,
@@ -33,11 +36,17 @@ impl RequestToJoinPanel {
             editor.set_placeholder_text("Optional message to channel admins", window, cx);
             editor
         });
+        let reason_subscription = cx.subscribe(&reason_editor, |_this, _, event, cx| {
+            if matches!(event, EditorEvent::BufferEdited) {
+                cx.notify();
+            }
+        });
         Self {
             channel_id,
             reason_editor,
             channel_store,
             state: RequestState::Idle,
+            _reason_subscription: reason_subscription,
         }
     }
 
@@ -48,6 +57,13 @@ impl RequestToJoinPanel {
 
         self.state = RequestState::Sending;
         let reason = self.reason_editor.read(cx).text(cx).trim().to_string();
+        let reason = reason
+            .chars()
+            .take(Self::MAX_REASON_CHARS)
+            .collect::<String>();
+        self.reason_editor.update(cx, |editor, cx| {
+            editor.set_text(reason.clone(), window, cx);
+        });
         let reason = (!reason.is_empty()).then_some(reason);
         let channel_id = self.channel_id;
         let client = self.channel_store.read(cx).client();
@@ -81,6 +97,7 @@ impl RequestToJoinPanel {
 
 impl Render for RequestToJoinPanel {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let reason_length = self.reason_editor.read(cx).text(cx).chars().count();
         v_flex()
             .size_full()
             .p_4()
@@ -90,6 +107,11 @@ impl Render for RequestToJoinPanel {
                 RequestState::Idle | RequestState::Sending | RequestState::Error(_) => v_flex()
                     .gap_2()
                     .child(self.reason_editor.clone())
+                    .child(
+                        Label::new(format!("{reason_length}/{}", Self::MAX_REASON_CHARS))
+                            .size(LabelSize::XSmall)
+                            .color(Color::Muted),
+                    )
                     .when_some(
                         match &self.state {
                             RequestState::Error(error) => Some(error.clone()),

@@ -193,12 +193,14 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _Requirements: 10.2 (AC 1), 10.3 (AC 3)_
   - _writes: crates/collab_ui/src/channel_join_requests.rs_
 
-- [ ] 20. Rate limiting and input validation
+- [x] 20. Rate limiting and input validation
   - Server-side: enforce max 500 characters on `reason` field in `RequestJoinChannel`.
   - Client-side: show character counter on reason text field, truncate at 500.
   - Server-side: rate-limit `RequestJoinChannel` per user (e.g., max 10 requests per minute) to prevent abuse.
   - _Requirements: 10.1_
-  - _writes: crates/collab/src/api/channel.rs_, _crates/collab_ui/src/request_to_join_panel.rs_
+  - _writes: crates/collab/src/rpc.rs, crates/collab_ui/src/request_to_join_panel.rs_
+  - _Completed: Enforced a 500-character server-side reason limit and a per-user rolling ten-requests-per-minute limit. The requester panel shows a live character counter and truncates submitted reasons to the server limit._
+  - _Validation: `cargo check -p collab --features collab/test-support`; `cargo check -p collab_ui`._
 
 - [ ] 21. Unit tests
   - [ ] 21.1 `JoinRequestStore` unit tests: `request_join`, `approve_join_request`, `deny_join_request`, `get_pending_requests`, `expire_old_requests`.
