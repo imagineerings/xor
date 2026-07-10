@@ -39,6 +39,7 @@ cloud_api_types.workspace = true
 collections.workspace = true
 dashmap.workspace = true
 envy = "0.4.2"
+emojis.workspace = true
 futures.workspace = true
 gpui.workspace = true
 hex.workspace = true

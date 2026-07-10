@@ -3487,6 +3487,7 @@ dependencies = [
  "dashmap",
  "debugger_ui",
  "editor",
+ "emojis",
  "envy",
  "extension",
  "file_finder",

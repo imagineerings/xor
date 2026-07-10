@@ -24,20 +24,22 @@ This plan implements custom user status — emoji + short text labels with optio
   - _Completed: Added the production and SQLite test-schema tables with cascading user ownership, optional emoji/expiry, timestamps, and an expiry partial index._
   - _Validation: `sqlite3 :memory: ".read crates/collab/migrations.sqlite/20221109000000_test_schema.sql"`; `cargo check -p collab --features collab/test-support`._
 
-- [ ] 3. Implement server-side `handle_set_status` RPC handler
-  - [ ] 3.1 Add `handle_set_status` method to the RPC handler struct in `crates/collab/src/rpc.rs`
+- [x] 3. Implement server-side `handle_set_status` RPC handler
+  - [x] 3.1 Add `handle_set_status` method to the RPC handler struct in `crates/collab/src/rpc.rs`
     - Validate `text` length ≤ 100 chars, validate emoji is recognized, validate `clear_after_minutes` is an allowed value
     - Upsert into `user_custom_statuses` table (compute `expires_at` from `clear_after_minutes` if set)
     - Broadcast `UpdateUserStatus` to all connected sessions
     - Return `SetStatusResponse`
     - _Requirements: 8.1 (AC 2, AC 5)_
     - _writes: crates/collab/src/rpc.rs_
-  - [ ] 3.2 Add `handle_clear_status` method in `crates/collab/src/rpc.rs`
+  - [x] 3.2 Add `handle_clear_status` method in `crates/collab/src/rpc.rs`
     - Delete from `user_custom_statuses WHERE user_id = session.user_id`
     - Broadcast `UpdateUserStatus { user_id, status: None }` to all sessions
     - Return success (idempotent — succeeds even if no status exists)
     - _Requirements: 8.2 (AC 2, AC 3)_
     - _writes: crates/collab/src/rpc.rs_
+  - _Completed: Added set/clear handlers with text, emoji, and clear-duration validation; persisted updates through UserStatusStore; and broadcast typed changes to every connected session._
+  - _Validation: `cargo check -p collab --features collab/test-support`._
 
 - [ ] 4. Implement `StatusExpirySweeper`
   - Create `StatusExpirySweeper` struct in `crates/collab/src/` with `db: Arc<Database>` and `executor: Executor`

@@ -10,6 +10,7 @@ use crate::db::queries::channel_messages::{
 use crate::db::scheduled_message_store::{
     NewScheduledMessage, ScheduledMessageStore, ScheduledMessageUpdate,
 };
+use crate::db::user_status_store::{UserCustomStatus, UserStatusStore};
 use crate::entities::User;
 use crate::{
     AppState, Error, Result, auth,
@@ -457,6 +458,8 @@ impl Server {
             .add_request_handler(request_contact)
             .add_request_handler(remove_contact)
             .add_request_handler(respond_to_contact_request)
+            .add_request_handler(set_status)
+            .add_request_handler(clear_status)
             .add_request_handler(respond_to_join_request)
             .add_request_handler(request_join_channel)
             .add_message_handler(subscribe_to_channels)
@@ -3409,6 +3412,81 @@ async fn get_channel_members(
     let users = users.into_iter().map(proto::User::from).collect();
 
     response.send(proto::GetChannelMembersResponse { members, users })?;
+    Ok(())
+}
+
+const STATUS_CLEAR_AFTER_MINUTES: &[u32] = &[30, 60, 240, 1_440, 10_080];
+
+async fn set_status(
+    request: proto::SetStatus,
+    response: Response<proto::SetStatus>,
+    session: MessageContext,
+) -> Result<()> {
+    let text = request.text.trim();
+    if text.is_empty() || text.chars().count() > 100 {
+        return Err(anyhow!("status text must contain between 1 and 100 characters").into());
+    }
+    if let Some(emoji) = request.emoji.as_deref()
+        && emojis::get(emoji).is_none()
+    {
+        return Err(anyhow!("status emoji is not recognized").into());
+    }
+    if let Some(minutes) = request.clear_after_minutes
+        && !STATUS_CLEAR_AFTER_MINUTES.contains(&minutes)
+    {
+        return Err(anyhow!("unsupported status clear-after duration").into());
+    }
+
+    let now = time::OffsetDateTime::now_utc();
+    let expires_at = request.clear_after_minutes.map(|minutes| {
+        let expires_at = now + Duration::from_secs(u64::from(minutes) * 60);
+        time::PrimitiveDateTime::new(expires_at.date(), expires_at.time())
+    });
+    let status = UserStatusStore::new(session.app_state.db.clone())
+        .upsert_custom_status(
+            session.user_id(),
+            request.emoji.clone(),
+            text.to_string(),
+            expires_at,
+        )
+        .await?;
+    broadcast_user_status_update(&session, session.user_id(), Some(status)).await?;
+    response.send(proto::SetStatusResponse {})?;
+    Ok(())
+}
+
+async fn clear_status(
+    _: proto::ClearStatus,
+    response: Response<proto::ClearStatus>,
+    session: MessageContext,
+) -> Result<()> {
+    UserStatusStore::new(session.app_state.db.clone())
+        .delete_custom_status(session.user_id())
+        .await?;
+    broadcast_user_status_update(&session, session.user_id(), None).await?;
+    response.send(proto::Ack {})?;
+    Ok(())
+}
+
+async fn broadcast_user_status_update(
+    session: &MessageContext,
+    user_id: UserId,
+    status: Option<UserCustomStatus>,
+) -> Result<()> {
+    let update = proto::UpdateUserStatus {
+        user_id: user_id.to_proto(),
+        status: status.map(|status| proto::UserCustomStatus {
+            emoji: status.emoji,
+            text: status.status_text,
+            expires_at: status
+                .expires_at
+                .map(|expires_at| expires_at.assume_utc().unix_timestamp() as u64),
+        }),
+    };
+    let connection_pool = session.connection_pool().await;
+    for connection_id in connection_pool.connection_ids() {
+        session.peer.send(connection_id, update.clone())?;
+    }
     Ok(())
 }
 
