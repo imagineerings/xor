@@ -2259,6 +2259,18 @@ impl ChannelChat {
             .and_then(format_scheduled_message_label);
         let edited = message.edited_at.is_some();
         let priority = MessagePriority::from_proto_value(message.priority);
+        let group_mentions = message
+            .mentions
+            .iter()
+            .filter(|mention| mention.group_id != 0)
+            .map(|mention| {
+                self.group_store
+                    .read(cx)
+                    .group(mention.group_id)
+                    .map(|group| format!("@{}", group.name))
+                    .unwrap_or_else(|| format!("@group-{}", mention.group_id))
+            })
+            .collect::<Vec<_>>();
 
         v_flex()
             .gap_1()
@@ -2313,6 +2325,21 @@ impl ChannelChat {
                         )
                     }),
             )
+            .when(!group_mentions.is_empty(), |this| {
+                this.child(h_flex().gap_1().children(group_mentions.into_iter().map(
+                    |group_name| {
+                        h_flex()
+                            .id(format!("group-mention-{}-{group_name}", message.id))
+                            .gap_1()
+                            .items_center()
+                            .px_1()
+                            .py_0p5()
+                            .bg(cx.theme().colors().element_selected)
+                            .child(Icon::new(IconName::UserGroup).size(IconSize::XSmall))
+                            .child(Label::new(group_name).size(LabelSize::XSmall))
+                    },
+                )))
+            })
             .child(self.rendered_message_body(message, cx).render(window, cx))
             .child(self.render_message_files(&message.files, cx))
             .child(
