@@ -126,9 +126,11 @@ This plan implements custom user status — emoji + short text labels with optio
     - _writes: crates/collab_ui/src/_
     - _Completed: Rendered a muted custom-status line below each contact's name in the collaboration sidebar._
     - _Validation: `cargo check -p collab_ui`._
-  - [ ] 11.3 Add `StatusDisplay` below sender name in message headers (`ChannelView` / message header component)
+  - [x] 11.3 Add `StatusDisplay` below sender name in message headers (`ChannelView` / message header component)
     - _Requirements: 8.3 (AC 1)_
     - _writes: crates/collab_ui/src/_
+    - _Completed: Rendered custom statuses in both main channel-message headers and thread reply headers._
+    - _Validation: `cargo check -p collab_ui`._
   - [ ] 11.4 Add `StatusDisplay` in mentions autocomplete popover rows
     - _Requirements: 8.3 (AC 1)_
     - _writes: crates/collab_ui/src/_

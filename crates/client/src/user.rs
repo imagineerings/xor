@@ -500,6 +500,13 @@ impl UserStore {
         &self.contacts
     }
 
+    pub fn custom_status_for_user(&self, user_id: u64) -> Option<CustomStatus> {
+        self.contacts
+            .iter()
+            .find(|contact| contact.user.legacy_id == user_id)
+            .and_then(|contact| contact.custom_status.clone())
+    }
+
     pub fn update_user_status(
         &mut self,
         user_id: u64,

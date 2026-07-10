@@ -4,6 +4,7 @@ use crate::{
     channel_bookmark_store::ChannelBookmarkStore,
     channel_file_upload::{UploadManager, UploadProgress, UploadStatus},
     draft_store::DraftStore,
+    status_display::StatusDisplay,
 };
 use anyhow::Result;
 use channel::{Channel, ChannelStore};
@@ -2191,6 +2192,10 @@ impl ChannelChat {
         }
 
         let sender = self.user_display_name(message.sender_id, cx);
+        let sender_status = self
+            .user_store
+            .read(cx)
+            .custom_status_for_user(message.sender_id);
         let timestamp = format_timestamp(message.timestamp);
         let scheduled_label = message
             .scheduled_at
@@ -2211,9 +2216,15 @@ impl ChannelChat {
                 h_flex()
                     .gap_2()
                     .child(
-                        Label::new(sender)
-                            .size(LabelSize::Small)
-                            .weight(gpui::FontWeight::MEDIUM),
+                        v_flex()
+                            .child(
+                                Label::new(sender)
+                                    .size(LabelSize::Small)
+                                    .weight(gpui::FontWeight::MEDIUM),
+                            )
+                            .when(sender_status.is_some(), |this| {
+                                this.child(StatusDisplay::new(sender_status.clone()))
+                            }),
                     )
                     .child(
                         Label::new(timestamp)
@@ -2294,6 +2305,10 @@ impl ChannelChat {
         cx: &mut Context<Self>,
     ) -> gpui::AnyElement {
         let sender = self.user_display_name(message.sender_id, cx);
+        let sender_status = self
+            .user_store
+            .read(cx)
+            .custom_status_for_user(message.sender_id);
         let timestamp = format_timestamp(message.timestamp);
         let edited = message.edited_at.is_some();
 
@@ -2306,9 +2321,15 @@ impl ChannelChat {
                 h_flex()
                     .gap_2()
                     .child(
-                        Label::new(sender)
-                            .size(LabelSize::Small)
-                            .weight(gpui::FontWeight::MEDIUM),
+                        v_flex()
+                            .child(
+                                Label::new(sender)
+                                    .size(LabelSize::Small)
+                                    .weight(gpui::FontWeight::MEDIUM),
+                            )
+                            .when(sender_status.is_some(), |this| {
+                                this.child(StatusDisplay::new(sender_status.clone()))
+                            }),
                     )
                     .child(
                         Label::new(timestamp)
