@@ -280,11 +280,14 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
   - _Requirements: 4.2, 4.3, Design §7_
   - _writes: crates/collab_ui/src/channel_chat/file_renderer.rs_ (add `#[cfg(test)] mod tests`)
 
-- [ ] 28. Security test presigned URL constraints
+- [x] 28. Security test presigned URL constraints
   - Verify presigned URL cannot upload files larger than the requested size.
   - Verify client cannot spoof MIME type after URL is generated (server-side enforcement on confirm).
   - _Requirements: 4.4, Design §7_
   - _writes: crates/collab/src/rpc/file_upload_test.go_ (add security test cases)
+  - _Completed: Added FileStore security coverage proving over-limit and MIME-spoof-style upload URL requests are rejected without creating metadata rows, while an accepted upload confirms with exactly the originally requested size and MIME type._
+  - _Actual writes: crates/collab/tests/integration/db_tests/file_store_tests.rs_
+  - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests test_file_store_security_constraints_sqlite --features test-support`; `CARGO_INCREMENTAL=0 cargo check -p collab --features collab/test-support`; `git diff --check`._
 
 ### Phase 8: Configuration & Final Wiring
 

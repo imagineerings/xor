@@ -150,6 +150,79 @@ async fn test_file_store_metadata_lifecycle(db: &Arc<Database>) {
     );
 }
 
+test_both_dbs!(
+    test_file_store_security_constraints,
+    test_file_store_security_constraints_postgres,
+    test_file_store_security_constraints_sqlite
+);
+
+async fn test_file_store_security_constraints(db: &Arc<Database>) {
+    let user_id = new_test_user(db).await;
+    let channel_id = db.create_root_channel("files", user_id).await.unwrap();
+    let file_store = test_file_store(db, 12, vec!["text/plain"]);
+
+    let too_large = expect_file_store_error(
+        file_store
+            .generate_upload_url(new_file_upload(
+                channel_id,
+                user_id,
+                "too-large.txt",
+                13,
+                "text/plain",
+            ))
+            .await,
+    );
+    assert_eq!(
+        too_large,
+        FileStoreError::FileTooLarge { max_file_size: 12 }
+    );
+
+    let spoofed_mime_type = expect_file_store_error(
+        file_store
+            .generate_upload_url(new_file_upload(
+                channel_id,
+                user_id,
+                "spoofed.txt",
+                12,
+                "text/plain; charset=utf-8",
+            ))
+            .await,
+    );
+    assert_eq!(spoofed_mime_type, FileStoreError::UnsupportedFileType);
+
+    let upload = file_store
+        .generate_upload_url(new_file_upload(
+            channel_id,
+            user_id,
+            "deploy.txt",
+            12,
+            "text/plain",
+        ))
+        .await
+        .unwrap();
+    let confirmed = file_store
+        .confirm_upload(upload.file_id, user_id)
+        .await
+        .unwrap();
+    assert_eq!(confirmed.file_size, 12);
+    assert_eq!(confirmed.mime_type, "text/plain");
+
+    let rows = db
+        .transaction(|tx| async move {
+            channel_file::Entity::find()
+                .filter(channel_file::Column::ChannelId.eq(channel_id))
+                .all(&*tx)
+                .await
+                .map_err(Into::into)
+        })
+        .await
+        .unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].id, upload.file_id);
+    assert_eq!(rows[0].file_size, 12);
+    assert_eq!(rows[0].mime_type, "text/plain");
+}
+
 fn test_file_store(
     db: &Arc<Database>,
     max_file_size: u64,
