@@ -80,11 +80,12 @@ impl FileAttachmentRenderer {
     fn render_image_preview(&self, cx: &mut App) -> AnyElement {
         let file = self.file.clone();
         let on_open_image = self.on_open_image.clone();
+        let preview_url = image_preview_url(&file).to_string();
         v_flex()
             .gap_2()
             .child(
                 img(ImageSource::Resource(Resource::Uri(SharedUri::from(
-                    file.url.clone(),
+                    preview_url,
                 ))))
                 .id(format!("channel-image-preview-{}", file.id))
                 .max_h(px(220.))
@@ -457,6 +458,10 @@ fn is_image_extension(extension: Option<&str>) -> bool {
     )
 }
 
+fn image_preview_url(file: &FileAttachment) -> &str {
+    file.thumbnail_url.as_deref().unwrap_or(&file.url)
+}
+
 fn code_preview_markdown(content: &str, filename: &str, expanded: bool) -> String {
     let language = code_language(filename);
     let content = if expanded {
@@ -653,6 +658,7 @@ mod tests {
             image_width: Some(800),
             image_height: Some(600),
             duration_ms: Some(65_000),
+            thumbnail_url: None,
             ..file_attachment("clip.mp4", "video/mp4")
         };
 
@@ -660,6 +666,16 @@ mod tests {
             file_metadata_label(&file),
             "4.0 KB · video/mp4 · Uploader #7 · 800x600 · 1:05"
         );
+    }
+
+    #[test]
+    fn image_preview_prefers_thumbnail_url_when_available() {
+        let file = FileAttachment {
+            thumbnail_url: Some("https://example.com/thumbnail".to_string()),
+            ..file_attachment("diagram.png", "image/png")
+        };
+
+        assert_eq!(image_preview_url(&file), "https://example.com/thumbnail");
     }
 
     #[test]
@@ -697,6 +713,7 @@ mod tests {
             image_width: None,
             image_height: None,
             duration_ms: None,
+            thumbnail_url: None,
         }
     }
 }

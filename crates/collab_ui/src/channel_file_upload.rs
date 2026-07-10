@@ -703,6 +703,7 @@ mod tests {
             image_width: None,
             image_height: None,
             duration_ms: None,
+            thumbnail_url: None,
         }
     }
 }

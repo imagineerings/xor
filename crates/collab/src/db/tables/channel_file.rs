@@ -14,6 +14,7 @@ pub struct Model {
     pub file_size: i64,
     pub mime_type: String,
     pub storage_path: String,
+    pub thumbnail_storage_path: Option<String>,
     pub uploader_id: UserId,
     pub image_width: Option<i32>,
     pub image_height: Option<i32>,

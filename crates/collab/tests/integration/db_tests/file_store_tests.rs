@@ -9,7 +9,7 @@ use collab::{
     },
 };
 use sea_orm::{ColumnTrait as _, EntityTrait as _, QueryFilter as _};
-use std::sync::Arc;
+use std::{io::Cursor, sync::Arc};
 
 test_both_dbs!(
     test_file_store_validation,
@@ -267,6 +267,44 @@ async fn test_file_store_storage_prefix(db: &Arc<Database>) {
         confirmed.url.contains("/tenant-a/uploads/channels/"),
         "download URL did not include normalized storage prefix: {}",
         confirmed.url
+    );
+}
+
+#[test]
+fn generated_image_thumbnails_are_pngs_bounded_to_400_pixels() {
+    let image = image::DynamicImage::ImageRgba8(image::RgbaImage::from_pixel(
+        800,
+        200,
+        image::Rgba([12, 34, 56, 255]),
+    ));
+    let mut source = Cursor::new(Vec::new());
+    image
+        .write_to(&mut source, image::ImageFormat::Png)
+        .unwrap();
+
+    let thumbnail = FileStore::thumbnail_png_for_test(source.get_ref(), "image/png").unwrap();
+    let decoded = image::load_from_memory(&thumbnail).unwrap();
+
+    assert_eq!(decoded.width(), 400);
+    assert_eq!(decoded.height(), 100);
+    assert_eq!(
+        image::guess_format(&thumbnail).unwrap(),
+        image::ImageFormat::Png
+    );
+}
+
+#[test]
+fn generated_svg_thumbnails_are_pngs_bounded_to_400_pixels() {
+    let source = br##"<svg xmlns="http://www.w3.org/2000/svg" width="800" height="200"><rect width="800" height="200" fill="#0c2238"/></svg>"##;
+
+    let thumbnail = FileStore::thumbnail_png_for_test(source, "image/svg+xml").unwrap();
+    let decoded = image::load_from_memory(&thumbnail).unwrap();
+
+    assert_eq!(decoded.width(), 400);
+    assert_eq!(decoded.height(), 100);
+    assert_eq!(
+        image::guess_format(&thumbnail).unwrap(),
+        image::ImageFormat::Png
     );
 }
 

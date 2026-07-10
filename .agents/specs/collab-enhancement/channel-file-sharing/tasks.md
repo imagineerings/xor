@@ -309,11 +309,14 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
   - _Actual writes: crates/collab/src/lib.rs; crates/collab/src/db/file_store.rs; crates/collab/src/rpc.rs; crates/collab/tests/integration/test_server.rs; crates/collab/tests/integration/db_tests/file_store_tests.rs_
   - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests test_file_store_storage_prefix_sqlite --features test-support`; `CARGO_INCREMENTAL=0 cargo check -p collab --features collab/test-support`; `git diff --check`._
 
-- [ ] 30. Verify thumbnail generation for images
+- [x] 30. Verify thumbnail generation for images
   - When an image is uploaded via `ConfirmUpload`, generate a thumbnail (max 400px wide) server-side and store its path.
   - Serve the thumbnail URL for inline previews in the channel.
   - _Requirements: 4.2, Design Property 5.5_
   - _writes: crates/collab/src/storage/file_store.go_ (add thumbnail generation)
+  - _Completed: Confirmed uploads now generate bounded PNG thumbnails for PNG, JPEG, GIF, WebP, and SVG files, store their object path, return a presigned thumbnail URL, and use it for inline rendering while preserving the original URL for full-size views._
+  - _Actual writes: crates/collab/src/db/file_store.rs; crates/collab/src/db/tables/channel_file.rs; crates/collab/migrations/20260710100000_add_channel_file_thumbnails.sql; crates/proto/proto/channel.proto; crates/client/src/file_upload.rs; crates/collab_ui/src/channel_chat/file_renderer.rs_
+  - _Validation: `cargo test -p collab --test collab_tests thumbnails_are_pngs_bounded_to_400_pixels --features test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab_ui file_renderer --features test-support`; `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `git diff --check`._
 
 - [ ] 31. Add download count tracking
   - Add `download_count` column to `channel_files` (if not already present in migration).

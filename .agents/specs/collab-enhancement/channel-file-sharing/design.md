@@ -52,6 +52,11 @@ flowchart TB
 | `FileAttachmentRenderer` | Renders file previews in channel messages |
 | `FileStore` (server) | Manages file metadata, S3 upload URLs, storage limits |
 
+`FileStore::confirm_upload` generates an `image/png` thumbnail for PNG, JPEG, GIF, WebP, and SVG attachments. It stores the thumbnail next to the original object, persists the thumbnail path, and includes a separate presigned URL in `FileAttachment`. The channel renderer uses this URL for the inline preview while retaining the original URL for the image lightbox and downloads.
+
+<!-- impl: crates/collab/src/db/file_store.rs#FileStore::generate_thumbnail -->
+<!-- impl: crates/collab_ui/src/channel_chat/file_renderer.rs#image_preview_url -->
+
 ## 3. Components and Interfaces
 
 ### 3.1 Protobuf Changes

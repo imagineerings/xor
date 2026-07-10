@@ -1,9 +1,12 @@
 use super::*;
 use anyhow::{Context as _, anyhow};
 use aws_sdk_s3::presigning::PresigningConfig;
+use aws_sdk_s3::primitives::ByteStream;
+use image::ImageFormat;
 use rpc::proto;
 use std::collections::HashMap;
 use std::fmt;
+use std::io::Cursor;
 use std::sync::Arc;
 use std::time::Duration;
 use time::PrimitiveDateTime;
@@ -11,6 +14,7 @@ use uuid::Uuid;
 
 const DEFAULT_UPLOAD_URL_LIFETIME: Duration = Duration::from_secs(10 * 60);
 const DEFAULT_DOWNLOAD_URL_LIFETIME: Duration = Duration::from_secs(10 * 60);
+const THUMBNAIL_MAX_WIDTH: u32 = 400;
 
 #[derive(Clone)]
 pub struct FileStore {
@@ -103,6 +107,7 @@ impl FileStore {
             file_size: ActiveValue::Set(content_length),
             mime_type: ActiveValue::Set(request.mime_type),
             storage_path: ActiveValue::Set(storage_path),
+            thumbnail_storage_path: ActiveValue::Set(None),
             uploader_id: ActiveValue::Set(request.uploader_id),
             image_width: ActiveValue::Set(request.image_width),
             image_height: ActiveValue::Set(request.image_height),
@@ -128,6 +133,11 @@ impl FileStore {
         })
     }
 
+    #[cfg(feature = "test-support")]
+    pub fn thumbnail_png_for_test(source: &[u8], mime_type: &str) -> Result<Vec<u8>> {
+        thumbnail_png(source, mime_type)
+    }
+
     pub async fn confirm_upload(
         &self,
         file_id: Uuid,
@@ -151,6 +161,7 @@ impl FileStore {
                     file_size: ActiveValue::Unchanged(row.file_size),
                     mime_type: ActiveValue::Unchanged(row.mime_type),
                     storage_path: ActiveValue::Unchanged(row.storage_path),
+                    thumbnail_storage_path: ActiveValue::Unchanged(row.thumbnail_storage_path),
                     uploader_id: ActiveValue::Unchanged(row.uploader_id),
                     image_width: ActiveValue::Unchanged(row.image_width),
                     image_height: ActiveValue::Unchanged(row.image_height),
@@ -164,7 +175,8 @@ impl FileStore {
             })
             .await?;
 
-        self.file_attachment_from_row(row).await
+        self.generate_thumbnail(&row).await?;
+        self.get_file_metadata(file_id).await
     }
 
     pub async fn get_file_metadata(&self, file_id: Uuid) -> Result<FileAttachment> {
@@ -259,6 +271,9 @@ impl FileStore {
                             file_size: ActiveValue::Unchanged(row.file_size),
                             mime_type: ActiveValue::Unchanged(row.mime_type.clone()),
                             storage_path: ActiveValue::Unchanged(row.storage_path.clone()),
+                            thumbnail_storage_path: ActiveValue::Unchanged(
+                                row.thumbnail_storage_path.clone(),
+                            ),
                             uploader_id: ActiveValue::Unchanged(row.uploader_id),
                             image_width: ActiveValue::Unchanged(row.image_width),
                             image_height: ActiveValue::Unchanged(row.image_height),
@@ -325,7 +340,78 @@ impl FileStore {
 
     async fn file_attachment_from_row(&self, row: channel_file::Model) -> Result<FileAttachment> {
         let url = self.download_url(&row.storage_path).await?;
-        file_attachment_from_row(row, url)
+        let thumbnail_url = match row.thumbnail_storage_path.as_deref() {
+            Some(storage_path) => Some(self.download_url(storage_path).await?),
+            None => None,
+        };
+        file_attachment_from_row(row, url, thumbnail_url)
+    }
+
+    async fn generate_thumbnail(&self, file: &channel_file::Model) -> Result<()> {
+        if !is_thumbnail_image(&file.mime_type) || self.test_url_base.is_some() {
+            return Ok(());
+        }
+
+        let blob_store_client = self
+            .blob_store_client
+            .as_ref()
+            .ok_or(FileStoreError::StorageUnavailable)?;
+        let bucket = self
+            .config
+            .storage_bucket
+            .as_ref()
+            .ok_or(FileStoreError::StorageUnavailable)?;
+        let source = blob_store_client
+            .get_object()
+            .bucket(bucket)
+            .key(&file.storage_path)
+            .send()
+            .await
+            .context("downloading image attachment for thumbnail generation")?
+            .body
+            .collect()
+            .await
+            .context("reading image attachment for thumbnail generation")?
+            .into_bytes();
+        let thumbnail = match thumbnail_png(&source, &file.mime_type) {
+            Ok(thumbnail) => thumbnail,
+            Err(error) => {
+                log::warn!(
+                    "skipping thumbnail for invalid image attachment {}: {error:#}",
+                    file.id
+                );
+                return Ok(());
+            }
+        };
+        let thumbnail_storage_path = thumbnail_storage_path(&file.storage_path);
+
+        blob_store_client
+            .put_object()
+            .bucket(bucket)
+            .key(&thumbnail_storage_path)
+            .content_type("image/png")
+            .body(ByteStream::from(thumbnail))
+            .send()
+            .await
+            .context("uploading image attachment thumbnail")?;
+
+        self.db
+            .transaction(|tx| {
+                let thumbnail_storage_path = thumbnail_storage_path.clone();
+                let file_id = file.id;
+                async move {
+                    channel_file::Entity::update_many()
+                        .col_expr(
+                            channel_file::Column::ThumbnailStoragePath,
+                            sea_orm::sea_query::Expr::value(thumbnail_storage_path),
+                        )
+                        .filter(channel_file::Column::Id.eq(file_id))
+                        .exec(&*tx)
+                        .await?;
+                    Ok(())
+                }
+            })
+            .await
     }
 
     async fn download_url(&self, storage_path: &str) -> Result<String> {
@@ -379,18 +465,21 @@ impl FileStore {
             .ok_or(FileStoreError::StorageUnavailable)?;
 
         for file in files {
-            blob_store_client
-                .delete_object()
-                .bucket(bucket)
-                .key(&file.storage_path)
-                .send()
-                .await
-                .map_err(|error| {
-                    Error::from(anyhow::Error::new(FileStoreError::DeleteFailed(format!(
-                        "deleting file object {}: {error}",
-                        file.storage_path
-                    ))))
-                })?;
+            for storage_path in
+                std::iter::once(&file.storage_path).chain(file.thumbnail_storage_path.iter())
+            {
+                blob_store_client
+                    .delete_object()
+                    .bucket(bucket)
+                    .key(storage_path)
+                    .send()
+                    .await
+                    .map_err(|error| {
+                        Error::from(anyhow::Error::new(FileStoreError::DeleteFailed(format!(
+                            "deleting file object {storage_path}: {error}"
+                        ))))
+                    })?;
+            }
         }
 
         Ok(())
@@ -492,6 +581,7 @@ pub struct FileAttachment {
     pub image_width: Option<u64>,
     pub image_height: Option<u64>,
     pub duration_ms: Option<u64>,
+    pub thumbnail_url: Option<String>,
 }
 
 impl FileAttachment {
@@ -507,6 +597,7 @@ impl FileAttachment {
             image_width: self.image_width,
             image_height: self.image_height,
             duration_ms: self.duration_ms,
+            thumbnail_url: self.thumbnail_url,
         }
     }
 }
@@ -539,7 +630,11 @@ fn validate_upload(file_size: u64, mime_type: &str, config: &FileStoreConfig) ->
     Ok(())
 }
 
-fn file_attachment_from_row(row: channel_file::Model, url: String) -> Result<FileAttachment> {
+fn file_attachment_from_row(
+    row: channel_file::Model,
+    url: String,
+    thumbnail_url: Option<String>,
+) -> Result<FileAttachment> {
     Ok(FileAttachment {
         id: row.id,
         filename: row.filename,
@@ -551,6 +646,7 @@ fn file_attachment_from_row(row: channel_file::Model, url: String) -> Result<Fil
         image_width: optional_u64(row.image_width, "stored image width is negative")?,
         image_height: optional_u64(row.image_height, "stored image height is negative")?,
         duration_ms: optional_u64(row.duration_ms, "stored duration is negative")?,
+        thumbnail_url,
     })
 }
 
@@ -576,6 +672,72 @@ fn storage_path(
     {
         Some(prefix) => format!("{prefix}/{path}"),
         None => path,
+    }
+}
+
+fn thumbnail_storage_path(storage_path: &str) -> String {
+    format!("{storage_path}.thumbnail.png")
+}
+
+fn is_thumbnail_image(mime_type: &str) -> bool {
+    matches!(
+        mime_type,
+        "image/png" | "image/jpeg" | "image/gif" | "image/webp" | "image/svg+xml"
+    )
+}
+
+fn thumbnail_png(source: &[u8], mime_type: &str) -> Result<Vec<u8>> {
+    if mime_type == "image/svg+xml" {
+        return svg_thumbnail_png(source);
+    }
+    let image = image::ImageReader::new(Cursor::new(source))
+        .with_guessed_format()
+        .context("determining image attachment format")?
+        .decode()
+        .context("decoding image attachment")?;
+    let thumbnail = image.thumbnail(THUMBNAIL_MAX_WIDTH, THUMBNAIL_MAX_WIDTH);
+    let mut output = Cursor::new(Vec::new());
+    thumbnail
+        .write_to(&mut output, ImageFormat::Png)
+        .context("encoding image attachment thumbnail")?;
+    Ok(output.into_inner())
+}
+
+fn svg_thumbnail_png(source: &[u8]) -> Result<Vec<u8>> {
+    let tree = usvg::Tree::from_data(source, &usvg::Options::default())
+        .context("parsing SVG attachment")?;
+    let size = tree.size();
+    let scale = (THUMBNAIL_MAX_WIDTH as f32 / size.width())
+        .min(THUMBNAIL_MAX_WIDTH as f32 / size.height())
+        .min(1.0);
+    let width = (size.width() * scale).round() as u32;
+    let height = (size.height() * scale).round() as u32;
+    let mut pixmap =
+        resvg::tiny_skia::Pixmap::new(width, height).context("creating SVG thumbnail canvas")?;
+    resvg::render(
+        &tree,
+        resvg::tiny_skia::Transform::from_scale(scale, scale),
+        &mut pixmap.as_mut(),
+    );
+    unpremultiply_rgba(pixmap.data_mut());
+    let image = image::RgbaImage::from_raw(width, height, pixmap.take())
+        .context("constructing SVG thumbnail image")?;
+    let mut output = Cursor::new(Vec::new());
+    image::DynamicImage::ImageRgba8(image)
+        .write_to(&mut output, ImageFormat::Png)
+        .context("encoding SVG attachment thumbnail")?;
+    Ok(output.into_inner())
+}
+
+fn unpremultiply_rgba(pixels: &mut [u8]) {
+    for pixel in pixels.chunks_exact_mut(4) {
+        let alpha = u16::from(pixel[3]);
+        if alpha == 0 || alpha == u16::from(u8::MAX) {
+            continue;
+        }
+        for component in &mut pixel[..3] {
+            *component = ((u16::from(*component) * u16::from(u8::MAX)) / alpha) as u8;
+        }
     }
 }
 
