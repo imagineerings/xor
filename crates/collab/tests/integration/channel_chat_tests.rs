@@ -672,6 +672,59 @@ async fn test_custom_status_rpc_validation_and_clear_idempotency(
 }
 
 #[gpui::test]
+async fn custom_status_broadcasts_set_and_clear_to_multiple_clients(
+    executor: BackgroundExecutor,
+    cx_a: &mut TestAppContext,
+    cx_b: &mut TestAppContext,
+    cx_c: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor.clone()).await;
+    let client_a = server.create_client(cx_a, "user_a").await;
+    let client_b = server.create_client(cx_b, "user_b").await;
+    let client_c = server.create_client(cx_c, "user_c").await;
+    let mut clients = [
+        (&client_a, &mut *cx_a),
+        (&client_b, &mut *cx_b),
+        (&client_c, &mut *cx_c),
+    ];
+    server.make_contacts(&mut clients).await;
+
+    client_a
+        .client()
+        .request(proto::SetStatus {
+            emoji: Some("📅".to_string()),
+            text: "In a meeting".to_string(),
+            clear_after_minutes: None,
+        })
+        .await
+        .unwrap();
+    for _ in 0..3 {
+        executor.run_until_parked();
+    }
+    for (client, cx) in [(&client_b, &mut *cx_b), (&client_c, &mut *cx_c)] {
+        client.user_store().read_with(cx, |store, _| {
+            let status = store.custom_status_for_user(client_a.id()).unwrap();
+            assert_eq!(status.text, "In a meeting");
+            assert_eq!(status.emoji.as_deref(), Some("📅"));
+        });
+    }
+
+    client_a
+        .client()
+        .request(proto::ClearStatus {})
+        .await
+        .unwrap();
+    for _ in 0..3 {
+        executor.run_until_parked();
+    }
+    for (client, cx) in [(&client_b, &mut *cx_b), (&client_c, &mut *cx_c)] {
+        client.user_store().read_with(cx, |store, _| {
+            assert!(store.custom_status_for_user(client_a.id()).is_none());
+        });
+    }
+}
+
+#[gpui::test]
 async fn test_channel_bookmark_rpc_flow_and_permissions(
     executor: BackgroundExecutor,
     cx_a: &mut TestAppContext,

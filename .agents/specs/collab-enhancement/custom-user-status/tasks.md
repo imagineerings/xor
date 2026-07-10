@@ -187,19 +187,27 @@ This plan implements custom user status — emoji + short text labels with optio
     - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab_ui status_display --features test-support`._
 
 - [ ] 15. Write integration tests
-  - [ ] 15.1 Set status flow — Client A sets status → Server broadcasts → Client B receives and shows it
+  - [x] 15.1 Set status flow — Client A sets status → Server broadcasts → Client B receives and shows it
     - _writes: crates/collab/tests/_
-  - [ ] 15.2 Clear status flow — Client A clears → Server broadcasts → Client B sees removal
+    - _Completed: Added a three-client RPC integration test proving a saved status reaches both peer clients._
+    - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests custom_status_broadcasts_set_and_clear_to_multiple_clients --features test-support`._
+  - [x] 15.2 Clear status flow — Client A clears → Server broadcasts → Client B sees removal
     - _writes: crates/collab/tests/_
+    - _Completed: Extended the same integration test to clear the status and verify both peers remove it._
+    - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests custom_status_broadcasts_set_and_clear_to_multiple_clients --features test-support`._
   - [ ] 15.3 Auto-expiry flow — Set status with short expiry → wait → both clients see it cleared
     - _writes: crates/collab/tests/_
   - [ ] 15.4 Reconnect sync — Client A sets status → Client B reconnects → receives status in initial batch
     - _writes: crates/collab/tests/_
-  - [ ] 15.5 Multiple clients — 3 clients, status update reaches all
+  - [x] 15.5 Multiple clients — 3 clients, status update reaches all
     - _writes: crates/collab/tests/_
+    - _Completed: The integration test uses three connected clients and verifies set/clear delivery to both peers._
+    - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests custom_status_broadcasts_set_and_clear_to_multiple_clients --features test-support`._
 
 - [ ] 16. Write property-based tests
-  - [ ] 16.1 Property 5.1 (text length) — generate random strings up to 200 chars; verify rejection boundary at 100
+  - [x] 16.1 Property 5.1 (text length) — generate random strings up to 200 chars; verify rejection boundary at 100
+    - _Completed: Added a proptest over generated Unicode strings truncated to 200 characters, asserting the exact empty/100-character validation boundary._
+    - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --lib rpc::tests --features test-support`._
   - [ ] 16.2 Property 5.3 (timer expiry) — generate random future timestamps; verify status cleared after timestamp passes
   - [ ] 16.3 Property 5.4 (clear idempotency) — generate sequences of set/clear operations; verify clear always succeeds
   - [ ] 16.4 Property 5.9 (one status per user) — generate concurrent `SetStatus` for same user; verify exactly one row exists

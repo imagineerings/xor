@@ -3659,25 +3659,34 @@ async fn get_channel_members(
 
 const STATUS_CLEAR_AFTER_MINUTES: &[u32] = &[30, 60, 240, 1_440, 10_080];
 
+fn validate_status_request(
+    text: &str,
+    emoji: Option<&str>,
+    clear_after_minutes: Option<u32>,
+) -> Result<()> {
+    if text.is_empty() || text.chars().count() > 100 {
+        return Err(anyhow!("status text must contain between 1 and 100 characters").into());
+    }
+    if let Some(emoji) = emoji
+        && emojis::get(emoji).is_none()
+    {
+        return Err(anyhow!("status emoji is not recognized").into());
+    }
+    if let Some(minutes) = clear_after_minutes
+        && !STATUS_CLEAR_AFTER_MINUTES.contains(&minutes)
+    {
+        return Err(anyhow!("unsupported status clear-after duration").into());
+    }
+    Ok(())
+}
+
 async fn set_status(
     request: proto::SetStatus,
     response: Response<proto::SetStatus>,
     session: MessageContext,
 ) -> Result<()> {
     let text = request.text.trim();
-    if text.is_empty() || text.chars().count() > 100 {
-        return Err(anyhow!("status text must contain between 1 and 100 characters").into());
-    }
-    if let Some(emoji) = request.emoji.as_deref()
-        && emojis::get(emoji).is_none()
-    {
-        return Err(anyhow!("status emoji is not recognized").into());
-    }
-    if let Some(minutes) = request.clear_after_minutes
-        && !STATUS_CLEAR_AFTER_MINUTES.contains(&minutes)
-    {
-        return Err(anyhow!("unsupported status clear-after duration").into());
-    }
+    validate_status_request(text, request.emoji.as_deref(), request.clear_after_minutes)?;
 
     let now = time::OffsetDateTime::now_utc();
     let expires_at = request.clear_after_minutes.map(|minutes| {
@@ -4464,6 +4473,14 @@ mod tests {
     }
 
     proptest! {
+        #[test]
+        fn status_text_validation_matches_the_character_boundary(text in any::<String>()) {
+            let text = text.chars().take(200).collect::<String>();
+            let result = validate_status_request(&text, None, None);
+
+            prop_assert_eq!(result.is_ok(), !text.is_empty() && text.chars().count() <= 100);
+        }
+
         #[test]
         fn expand_group_mentions_preserves_group_membership_mapping(
             member_ids in prop::collection::vec(1_u64..10_000, 1..20),
