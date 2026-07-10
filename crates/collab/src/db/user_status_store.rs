@@ -93,6 +93,33 @@ impl UserStatusStore {
             })
             .await
     }
+
+    pub async fn get_custom_statuses(&self, user_ids: Vec<UserId>) -> Result<Vec<UserCustomStatus>> {
+        if user_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let threshold = now();
+        self.db
+            .transaction(|tx| {
+                let user_ids = user_ids.clone();
+                async move {
+                    Ok(user_custom_status::Entity::find()
+                        .filter(user_custom_status::Column::UserId.is_in(user_ids))
+                        .filter(
+                            Condition::any()
+                                .add(user_custom_status::Column::ExpiresAt.is_null())
+                                .add(user_custom_status::Column::ExpiresAt.gte(threshold)),
+                        )
+                        .all(&*tx)
+                        .await?
+                        .into_iter()
+                        .map(user_custom_status_from_row)
+                        .collect())
+                }
+            })
+            .await
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

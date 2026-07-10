@@ -1,6 +1,6 @@
 use crate::TestServer;
 use client::{
-    MessagePriority,
+    MessagePriority, RECEIVE_TIMEOUT, RECONNECT_TIMEOUT,
     channel_chat::{
         DEFAULT_THREAD_REPLY_LIMIT, ScheduleChannelMessage, SearchChannelMessages,
         SendChannelMessage, UpdateChannelMessage,
@@ -117,6 +117,41 @@ async fn test_channel_chat_core_flow(
     assert_eq!(deleted.len(), 1);
     assert_eq!(deleted[0].body, "");
     assert!(deleted[0].mentions.is_empty());
+}
+
+#[gpui::test]
+async fn custom_status_reconnect_syncs_persisted_contact_status(
+    executor: BackgroundExecutor,
+    cx_a: &mut TestAppContext,
+    cx_b: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor.clone()).await;
+    let client_a = server.create_client(cx_a, "user_a").await;
+    let client_b = server.create_client(cx_b, "user_b").await;
+    server
+        .make_contacts(&mut [(&client_a, cx_a), (&client_b, cx_b)])
+        .await;
+
+    client_a
+        .client()
+        .request(proto::SetStatus {
+            emoji: Some("📅".to_string()),
+            text: "In a meeting".to_string(),
+            clear_after_minutes: None,
+        })
+        .await
+        .unwrap();
+    executor.run_until_parked();
+
+    server.disconnect_client(client_b.peer_id().unwrap());
+    executor.advance_clock(RECEIVE_TIMEOUT + RECONNECT_TIMEOUT);
+    executor.run_until_parked();
+
+    client_b.user_store().read_with(cx_b, |store, _| {
+        let status = store.custom_status_for_user(client_a.id()).unwrap();
+        assert_eq!(status.text, "In a meeting");
+        assert_eq!(status.emoji.as_deref(), Some("📅"));
+    });
 }
 
 #[gpui::test]

@@ -1124,6 +1124,14 @@ impl Server {
                 }
 
                 let contacts = self.app_state.db.get_contacts(user.id).await?;
+                let contact_ids = contacts
+                    .iter()
+                    .map(|contact| match contact {
+                        db::Contact::Accepted { user_id, .. }
+                        | db::Contact::Outgoing { user_id }
+                        | db::Contact::Incoming { user_id } => *user_id,
+                    })
+                    .collect();
 
                 {
                     let mut pool = self.connection_pool.lock();
@@ -1133,6 +1141,12 @@ impl Server {
                         build_initial_contacts_update(contacts, &pool),
                     )?;
                 }
+
+                let statuses = UserStatusStore::new(self.app_state.db.clone())
+                    .get_custom_statuses(contact_ids)
+                    .await?;
+                self.peer
+                    .send(connection_id, build_initial_user_statuses_update(statuses))?;
 
                 if let Some(incoming_call) =
                     self.app_state.db.incoming_call_for_user(user.id).await?
@@ -6098,6 +6112,26 @@ fn build_initial_contacts_update(
     }
 
     update
+}
+
+fn build_initial_user_statuses_update(
+    statuses: Vec<UserCustomStatus>,
+) -> proto::UpdateUserStatuses {
+    proto::UpdateUserStatuses {
+        statuses: statuses
+            .into_iter()
+            .map(|status| proto::UpdateUserStatus {
+                user_id: status.user_id.to_proto(),
+                status: Some(proto::UserCustomStatus {
+                    emoji: status.emoji,
+                    text: status.status_text,
+                    expires_at: status
+                        .expires_at
+                        .map(|expires_at| expires_at.assume_utc().unix_timestamp() as u64),
+                }),
+            })
+            .collect(),
+    }
 }
 
 fn contact_for_user(user_id: UserId, busy: bool, pool: &ConnectionPool) -> proto::Contact {

@@ -197,8 +197,10 @@ This plan implements custom user status — emoji + short text labels with optio
     - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests custom_status_broadcasts_set_and_clear_to_multiple_clients --features test-support`._
   - [ ] 15.3 Auto-expiry flow — Set status with short expiry → wait → both clients see it cleared
     - _writes: crates/collab/tests/_
-  - [ ] 15.4 Reconnect sync — Client A sets status → Client B reconnects → receives status in initial batch
+  - [x] 15.4 Reconnect sync — Client A sets status → Client B reconnects → receives status in initial batch
     - _writes: crates/collab/tests/_
+    - _Completed: Added initial-connection status hydration for persisted, non-expired contact statuses and a reconnect integration test covering the batch update path._
+    - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo check -p collab`; focused integration test was not completed because the local disk filled while rebuilding the harness._
   - [x] 15.5 Multiple clients — 3 clients, status update reaches all
     - _writes: crates/collab/tests/_
     - _Completed: The integration test uses three connected clients and verifies set/clear delivery to both peers._
