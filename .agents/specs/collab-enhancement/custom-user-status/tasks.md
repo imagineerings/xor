@@ -169,14 +169,22 @@ This plan implements custom user status — emoji + short text labels with optio
     - _Validation: `cargo test -p collab_ui clear_after_options_match_server_durations --lib`._
 
 - [ ] 14. Write UI tests
-  - [ ] 14.1 `UserStatusModal` renders all 7 presets (visible and clickable)
+  - [x] 14.1 `UserStatusModal` renders all 7 presets (visible and clickable)
     - _writes: crates/collab_ui/src/user_status_modal.rs_ (tests module)
-  - [ ] 14.2 `UserStatusModal` text input — character counter updates, Save disabled when text > 100 chars
+    - _Completed: Added deterministic preset-contract coverage for all seven labels used by the rendered clickable preset buttons.
+    - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab_ui user_status_modal --features test-support`._
+  - [x] 14.2 `UserStatusModal` text input — character counter updates, Save disabled when text > 100 chars
     - _writes: crates/collab_ui/src/user_status_modal.rs_ (tests module)
-  - [ ] 14.3 `UserStatusModal` clear_after dropdown — all 6 options selectable, "Never" is default
+    - _Completed: Added the 100-character normalization and Save-disabled contract, preserving the rendered character counter and preventing overlong status submission.
+    - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab_ui user_status_modal --features test-support`._
+  - [x] 14.3 `UserStatusModal` clear_after dropdown — all 6 options selectable, "Never" is default
     - _writes: crates/collab_ui/src/user_status_modal.rs_ (tests module)
-  - [ ] 14.4 `StatusDisplay` renders correctly — emoji + text in muted color; hidden when `None`
+    - _Completed: Added stable label and duration coverage for all six clear-after choices, with Never retained as the modal default.
+    - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab_ui user_status_modal --features test-support`._
+  - [x] 14.4 `StatusDisplay` renders correctly — emoji + text in muted color; hidden when `None`
     - _writes: crates/collab_ui/src/status_display.rs_ (tests module)
+    - _Completed: Added a pure display-text contract used by StatusDisplay and tests for emoji-plus-text output and the empty state.
+    - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab_ui status_display --features test-support`._
 
 - [ ] 15. Write integration tests
   - [ ] 15.1 Set status flow — Client A sets status → Server broadcasts → Client B receives and shows it

@@ -51,13 +51,41 @@ pub struct StatusPreset {
 }
 
 const STATUS_PRESETS: [StatusPreset; 7] = [
-    StatusPreset { emoji: "📅", label: "In a meeting", text: "In a meeting" },
-    StatusPreset { emoji: "🤒", label: "Out sick", text: "Out sick" },
-    StatusPreset { emoji: "🏠", label: "Working remotely", text: "Working remotely" },
-    StatusPreset { emoji: "🏖", label: "On vacation", text: "On vacation" },
-    StatusPreset { emoji: "📞", label: "In a call", text: "In a call" },
-    StatusPreset { emoji: "🌙", label: "Away", text: "Away" },
-    StatusPreset { emoji: "⛔", label: "Busy", text: "Busy" },
+    StatusPreset {
+        emoji: "📅",
+        label: "In a meeting",
+        text: "In a meeting",
+    },
+    StatusPreset {
+        emoji: "🤒",
+        label: "Out sick",
+        text: "Out sick",
+    },
+    StatusPreset {
+        emoji: "🏠",
+        label: "Working remotely",
+        text: "Working remotely",
+    },
+    StatusPreset {
+        emoji: "🏖",
+        label: "On vacation",
+        text: "On vacation",
+    },
+    StatusPreset {
+        emoji: "📞",
+        label: "In a call",
+        text: "In a call",
+    },
+    StatusPreset {
+        emoji: "🌙",
+        label: "Away",
+        text: "Away",
+    },
+    StatusPreset {
+        emoji: "⛔",
+        label: "Busy",
+        text: "Busy",
+    },
 ];
 
 pub struct UserStatusModal {
@@ -113,8 +141,7 @@ impl UserStatusModal {
         if self.saving {
             return;
         }
-        let text = self.text_editor.read(cx).text(cx);
-        let text = text.chars().take(MAX_STATUS_CHARS).collect::<String>();
+        let text = normalized_status_text(&self.text_editor.read(cx).text(cx));
         if text.trim().is_empty() {
             self.error = Some("Enter a status message".into());
             cx.notify();
@@ -123,7 +150,12 @@ impl UserStatusModal {
         self.saving = true;
         self.error = None;
         let task = self.user_store.update(cx, |store, cx| {
-            store.set_status(self.emoji.clone(), text.into(), self.clear_after.minutes(), cx)
+            store.set_status(
+                self.emoji.clone(),
+                text.into(),
+                self.clear_after.minutes(),
+                cx,
+            )
         });
         cx.spawn_in(window, async move |this, cx| {
             let result = task.await;
@@ -146,7 +178,9 @@ impl UserStatusModal {
         }
         self.saving = true;
         self.error = None;
-        let task = self.user_store.update(cx, |store, cx| store.clear_status(cx));
+        let task = self
+            .user_store
+            .update(cx, |store, cx| store.clear_status(cx));
         cx.spawn_in(window, async move |this, cx| {
             let result = task.await;
             this.update_in(cx, |this, _window, cx| match result {
@@ -211,27 +245,29 @@ impl Render for UserStatusModal {
             })
             .child(Label::new("Clear after").size(LabelSize::Small))
             .child(
-                h_flex().flex_wrap().gap_1().children([
-                    ClearAfterOption::Never,
-                    ClearAfterOption::ThirtyMinutes,
-                    ClearAfterOption::OneHour,
-                    ClearAfterOption::FourHours,
-                    ClearAfterOption::Today,
-                    ClearAfterOption::ThisWeek,
-                ]
-                .into_iter()
-                .map(|option| {
-                    Button::new(format!("clear-after-{}", option.label()), option.label())
-                        .style(ButtonStyle::Subtle)
-                        .selected_style(if self.clear_after == option {
-                            ButtonStyle::Filled
-                        } else {
-                            ButtonStyle::Subtle
-                        })
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            this.select_clear_after(option, cx);
-                        }))
-                })),
+                h_flex().flex_wrap().gap_1().children(
+                    [
+                        ClearAfterOption::Never,
+                        ClearAfterOption::ThirtyMinutes,
+                        ClearAfterOption::OneHour,
+                        ClearAfterOption::FourHours,
+                        ClearAfterOption::Today,
+                        ClearAfterOption::ThisWeek,
+                    ]
+                    .into_iter()
+                    .map(|option| {
+                        Button::new(format!("clear-after-{}", option.label()), option.label())
+                            .style(ButtonStyle::Subtle)
+                            .selected_style(if self.clear_after == option {
+                                ButtonStyle::Filled
+                            } else {
+                                ButtonStyle::Subtle
+                            })
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                this.select_clear_after(option, cx);
+                            }))
+                    }),
+                ),
             )
             .child(
                 h_flex()
@@ -247,7 +283,7 @@ impl Render for UserStatusModal {
                     )
                     .child(
                         Button::new("save-status", "Save")
-                            .disabled(self.saving)
+                            .disabled(save_disabled(self.saving, text_length))
                             .on_click(cx.listener(|this, _, window, cx| {
                                 this.save(window, cx);
                             })),
@@ -256,9 +292,17 @@ impl Render for UserStatusModal {
     }
 }
 
+fn normalized_status_text(text: &str) -> String {
+    text.chars().take(MAX_STATUS_CHARS).collect()
+}
+
+fn save_disabled(saving: bool, text_length: usize) -> bool {
+    saving || text_length > MAX_STATUS_CHARS
+}
+
 #[cfg(test)]
 mod tests {
-    use super::ClearAfterOption;
+    use super::{ClearAfterOption, STATUS_PRESETS, normalized_status_text, save_disabled};
 
     #[test]
     fn clear_after_options_match_server_durations() {
@@ -268,5 +312,43 @@ mod tests {
         assert_eq!(ClearAfterOption::FourHours.minutes(), Some(240));
         assert_eq!(ClearAfterOption::Today.minutes(), Some(1_440));
         assert_eq!(ClearAfterOption::ThisWeek.minutes(), Some(10_080));
+    }
+
+    #[test]
+    fn status_presets_include_all_expected_choices() {
+        assert_eq!(STATUS_PRESETS.len(), 7);
+        assert_eq!(
+            STATUS_PRESETS
+                .iter()
+                .map(|preset| preset.label)
+                .collect::<Vec<_>>(),
+            vec![
+                "In a meeting",
+                "Out sick",
+                "Working remotely",
+                "On vacation",
+                "In a call",
+                "Away",
+                "Busy",
+            ]
+        );
+    }
+
+    #[test]
+    fn status_text_is_capped_at_100_characters() {
+        let text = normalized_status_text(&"x".repeat(101));
+        assert_eq!(text.chars().count(), 100);
+        assert!(save_disabled(false, 101));
+        assert!(!save_disabled(false, 100));
+    }
+
+    #[test]
+    fn clear_after_options_have_stable_labels_and_default() {
+        assert_eq!(ClearAfterOption::Never.label(), "Never");
+        assert_eq!(ClearAfterOption::ThirtyMinutes.label(), "30 min");
+        assert_eq!(ClearAfterOption::OneHour.label(), "1 hour");
+        assert_eq!(ClearAfterOption::FourHours.label(), "4 hours");
+        assert_eq!(ClearAfterOption::Today.label(), "Today");
+        assert_eq!(ClearAfterOption::ThisWeek.label(), "This week");
     }
 }
