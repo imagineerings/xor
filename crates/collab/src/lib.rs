@@ -15,10 +15,10 @@ use axum::{
     response::IntoResponse,
 };
 use collections::HashMap;
-use db::{ChannelId, Database};
+use db::{ChannelId, Database, UserId};
 use executor::Executor;
 use serde::Deserialize;
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 use util::ResultExt;
 
 use crate::services::{CloudUserService, UserService};
@@ -224,6 +224,7 @@ pub struct AppState {
     pub blob_store_client: Option<aws_sdk_s3::Client>,
     pub executor: Executor,
     pub pending_bookmark_reorder_broadcasts: Arc<parking_lot::Mutex<HashMap<ChannelId, u64>>>,
+    pub join_request_attempts: Arc<parking_lot::Mutex<HashMap<UserId, Vec<Instant>>>>,
     pub kinesis_client: Option<::aws_sdk_kinesis::Client>,
     pub user_service: Arc<dyn UserService>,
     pub config: Config,
@@ -265,6 +266,7 @@ impl AppState {
             blob_store_client: build_blob_store_client(&config).await.log_err(),
             executor,
             pending_bookmark_reorder_broadcasts: Default::default(),
+            join_request_attempts: Default::default(),
             kinesis_client: if config.kinesis_access_key.is_some() {
                 build_kinesis_client(&config).await.log_err()
             } else {

@@ -96,6 +96,9 @@ const NOTIFICATION_COUNT_PER_PAGE: usize = 50;
 const MAX_CONCURRENT_CONNECTIONS: usize = 512;
 const SCHEDULED_MESSAGE_POLL_INTERVAL: Duration = Duration::from_secs(10);
 const SCHEDULED_MESSAGE_STALE_PROCESSING_GRACE: Duration = Duration::from_secs(60);
+const JOIN_REQUEST_REASON_MAX_CHARS: usize = 500;
+const JOIN_REQUEST_RATE_LIMIT: usize = 10;
+const JOIN_REQUEST_RATE_LIMIT_WINDOW: Duration = Duration::from_secs(60);
 const BOOKMARK_REORDER_BROADCAST_DEBOUNCE: Duration = Duration::from_millis(200);
 const DEFAULT_FILE_UPLOAD_MAX_FILE_SIZE: u64 = 100 * 1024 * 1024;
 
@@ -4019,6 +4022,16 @@ async fn request_join_channel(
 ) -> Result<()> {
     let channel_id = ChannelId::from_proto(request.channel_id);
     let requester_id = session.user_id();
+    if request
+        .reason
+        .as_ref()
+        .is_some_and(|reason| reason.chars().count() > JOIN_REQUEST_REASON_MAX_CHARS)
+    {
+        return Err(anyhow!(
+            "join request reasons must be at most {JOIN_REQUEST_REASON_MAX_CHARS} characters"
+        )
+        .into());
+    }
     let db = session.app_state.db.clone();
     let channel = db
         .transaction(|tx| {
@@ -4038,6 +4051,8 @@ async fn request_join_channel(
             }
         })
         .await?;
+
+    check_join_request_rate_limit(&session.app_state, requester_id)?;
 
     let join_request = JoinRequestStore::new(db.clone())
         .request_join(channel_id, requester_id, request.reason.clone())
@@ -4110,6 +4125,18 @@ async fn request_join_channel(
     }
 
     response.send(proto::RequestJoinChannelResponse { success: true })
+}
+
+fn check_join_request_rate_limit(app_state: &AppState, user_id: UserId) -> Result<()> {
+    let now = Instant::now();
+    let mut attempts_by_user = app_state.join_request_attempts.lock();
+    let attempts = attempts_by_user.entry(user_id).or_default();
+    attempts.retain(|attempt| now.duration_since(*attempt) < JOIN_REQUEST_RATE_LIMIT_WINDOW);
+    if attempts.len() >= JOIN_REQUEST_RATE_LIMIT {
+        return Err(anyhow!("too many join requests; try again in a minute").into());
+    }
+    attempts.push(now);
+    Ok(())
 }
 
 async fn get_file_upload_url(
