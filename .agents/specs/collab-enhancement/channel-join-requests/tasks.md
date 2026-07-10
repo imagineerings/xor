@@ -152,7 +152,7 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _Requirements: 10.1 (AC 1)_
   - _writes: crates/collab_ui/src/collab_panel.rs_
 
-- [ ] 15. Implement `PendingRequestsList`
+- [x] 15. Implement `PendingRequestsList`
   - Create `PendingRequestsList` struct with `channel_id`, `requests: Vec<PendingRequestViewModel>`, `loading: bool`, `badge_count: u32`.
   - Define `PendingRequestViewModel` with `user: Arc<User>`, `reason: Option<SharedString>`, `created_at: OffsetDateTime`.
   - Implement `fn new(channel_id, cx)`, `fn load_requests`, and `Render`.
@@ -161,6 +161,8 @@ Add a join request workflow for private channels, enabling non-members to reques
   - Listen for `JoinRequestAdded` push to refresh the list.
   - _Requirements: 10.2 (AC 5), 10.4 (AC 2)_
   - _writes: crates/collab_ui/src/pending_requests_list.rs_
+  - _Completed: Added an admin-only pending-request list that fetches requests, resolves requester profiles, renders their reasons and timestamps, emits typed selection events, and refreshes when a matching `JoinRequestAdded` push arrives._
+  - _Validation: `cargo check -p collab_ui`._
 
 - [ ] 16. Implement `RequestDetailPanel`
   - Create `RequestDetailPanel` struct with `request: PendingRequestViewModel`, `show_denial_input: bool`, `denial_reason: SharedString`.
