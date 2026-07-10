@@ -282,7 +282,7 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
   - _Actual writes: crates/collab_ui/src/channel_chat.rs; crates/collab/tests/integration/channel_chat_ui_tests.rs_
   - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests test_channel_chat_file_picker_starts_upload_for_selected_files --features test-support`; `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `git diff --check`._
 
-- [ ] 27. Test all file renderers
+- [x] 27. Test all file renderers
   - Test image preview renders correctly for supported formats.
   - Test PDF thumbnail renders with expected elements.
   - Test video/audio player renders controls.
@@ -290,6 +290,8 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
   - Test file card shows filename, size, uploader, download count.
   - _Requirements: 4.2, 4.3, Design §7_
   - _writes: crates/collab_ui/src/channel_chat/file_renderer.rs_ (add `#[cfg(test)] mod tests`)
+  - _Completed: Expanded the renderer tests across image, PDF, video, audio, code, and generic file-card paths, including stable media control IDs and displayed download counts; fixed the file metadata label to include the persisted download count.
+  - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab_ui file_renderer --features collab_ui/test-support`; `rustfmt --edition 2024 --check crates/collab_ui/src/channel_chat/file_renderer.rs`; `git diff --check`; `node .agents/skills/workflow/scripts/workflow.js validate`._
 
 - [x] 28. Security test presigned URL constraints
   - Verify presigned URL cannot upload files larger than the requested size.

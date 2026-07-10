@@ -177,11 +177,7 @@ impl FileAttachmentRenderer {
             .map(format_duration)
             .unwrap_or_else(|| "Unknown duration".to_string());
         let media_label_lower = media_label.to_ascii_lowercase();
-        let player_id = match file_kind {
-            FileKind::Video => "video",
-            FileKind::Audio => "audio",
-            _ => "media",
-        };
+        let player_id = media_player_id(file_kind);
 
         v_flex()
             .id(format!("channel-{player_id}-player-{}", file.id))
@@ -215,7 +211,7 @@ impl FileAttachmentRenderer {
                     )
                     .child(
                         IconButton::new(
-                            format!("play-channel-{player_id}-{}", file.id),
+                            media_player_control_id(file_kind, &file.id),
                             IconName::PlayFilled,
                         )
                         .icon_size(IconSize::Small)
@@ -623,6 +619,7 @@ fn file_metadata_label(file: &FileAttachment) -> String {
         format_file_size(file.file_size),
         file.mime_type.clone(),
         format!("Uploader #{}", file.uploader_id),
+        format!("Downloads {}", file.download_count),
     ];
     if let (Some(width), Some(height)) = (file.image_width, file.image_height) {
         parts.push(format!("{width}x{height}"));
@@ -652,6 +649,18 @@ fn format_duration(duration_ms: u64) -> String {
     let minutes = total_seconds / 60;
     let seconds = total_seconds % 60;
     format!("{minutes}:{seconds:02}")
+}
+
+fn media_player_id(file_kind: FileKind) -> &'static str {
+    match file_kind {
+        FileKind::Video => "video",
+        FileKind::Audio => "audio",
+        _ => "media",
+    }
+}
+
+fn media_player_control_id(file_kind: FileKind, file_id: &str) -> String {
+    format!("play-channel-{}-{file_id}", media_player_id(file_kind))
 }
 
 fn is_code_extension(extension: Option<&str>) -> bool {
@@ -760,7 +769,7 @@ mod tests {
         );
         assert_eq!(
             file_metadata_label(&file),
-            "4.0 KB · application/pdf · Uploader #7"
+            "4.0 KB · application/pdf · Uploader #7 · Downloads 0"
         );
     }
 
@@ -776,7 +785,34 @@ mod tests {
 
         assert_eq!(
             file_metadata_label(&file),
-            "4.0 KB · video/mp4 · Uploader #7 · 800x600 · 1:05"
+            "4.0 KB · video/mp4 · Uploader #7 · Downloads 0 · 800x600 · 1:05"
+        );
+    }
+
+    #[test]
+    fn media_players_have_distinct_controls() {
+        assert_eq!(media_player_id(FileKind::Video), "video");
+        assert_eq!(media_player_id(FileKind::Audio), "audio");
+        assert_eq!(
+            media_player_control_id(FileKind::Video, "file-id"),
+            "play-channel-video-file-id"
+        );
+        assert_eq!(
+            media_player_control_id(FileKind::Audio, "file-id"),
+            "play-channel-audio-file-id"
+        );
+    }
+
+    #[test]
+    fn file_metadata_label_includes_download_count() {
+        let file = FileAttachment {
+            download_count: 3,
+            ..file_attachment("archive.zip", "application/zip")
+        };
+
+        assert_eq!(
+            file_metadata_label(&file),
+            "4.0 KB · application/zip · Uploader #7 · Downloads 3"
         );
     }
 
