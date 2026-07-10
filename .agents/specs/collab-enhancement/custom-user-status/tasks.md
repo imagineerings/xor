@@ -15,12 +15,14 @@ This plan implements custom user status — emoji + short text labels with optio
   - _Completed: Added custom-status payloads at the next available envelope fields, preserving the existing reserved range, and registered their message dispatch and request-response mappings._
   - _Validation: `cargo check -p proto`._
 
-- [ ] 2. Create database migration for `user_custom_statuses` table
+- [x] 2. Create database migration for `user_custom_statuses` table
   - Write SQL migration creating the table with `user_id` (PK, FK `users(id)` ON DELETE CASCADE), `emoji` (nullable VARCHAR), `status_text` (NOT NULL VARCHAR), `expires_at` (nullable TIMESTAMP), `updated_at` (TIMESTAMP DEFAULT NOW())
   - Add partial index on `expires_at WHERE expires_at IS NOT NULL`
   - Add the migration file to the migrations directory and register it
   - _Requirements: 8.1 (AC 5)_
   - _writes: crates/collab/migrations/XXXXXX_add_custom_user_status.sql_
+  - _Completed: Added the production and SQLite test-schema tables with cascading user ownership, optional emoji/expiry, timestamps, and an expiry partial index._
+  - _Validation: `sqlite3 :memory: ".read crates/collab/migrations.sqlite/20221109000000_test_schema.sql"`; `cargo check -p collab --features collab/test-support`._
 
 - [ ] 3. Implement server-side `handle_set_status` RPC handler
   - [ ] 3.1 Add `handle_set_status` method to the RPC handler struct in `crates/collab/src/rpc.rs`

@@ -591,3 +591,15 @@ CREATE TABLE IF NOT EXISTS "shared_threads" (
 );
 
 CREATE INDEX "index_shared_threads_user_id" ON "shared_threads" ("user_id");
+
+CREATE TABLE IF NOT EXISTS "user_custom_statuses" (
+    "user_id" INTEGER PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+    "emoji" VARCHAR,
+    "status_text" VARCHAR NOT NULL,
+    "expires_at" TIMESTAMP,
+    "updated_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX "index_user_custom_statuses_on_expires_at"
+    ON "user_custom_statuses" ("expires_at")
+    WHERE "expires_at" IS NOT NULL;
