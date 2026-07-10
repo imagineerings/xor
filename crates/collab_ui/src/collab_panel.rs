@@ -8,6 +8,7 @@ use crate::{
     channel_join_requests::{JoinRequestEvent, JoinRequestPushStore},
     channel_view::ChannelView,
     draft_store::DraftStore,
+    status_display::StatusDisplay,
 };
 use anyhow::Context as _;
 use call::ActiveCall;
@@ -3162,6 +3163,7 @@ impl CollabPanel {
         let online = contact.online;
         let busy = contact.busy || calling;
         let github_login = contact.user.github_login.clone();
+        let custom_status = contact.custom_status.clone();
         let item = ListItem::new(github_login.clone())
             .indent_level(1)
             .indent_step_size(px(20.))
@@ -3170,7 +3172,14 @@ impl CollabPanel {
                 h_flex()
                     .w_full()
                     .justify_between()
-                    .child(render_participant_name_and_handle(&contact.user))
+                    .child(
+                        v_flex()
+                            .min_w_0()
+                            .child(render_participant_name_and_handle(&contact.user))
+                            .when(custom_status.is_some(), |this| {
+                                this.child(StatusDisplay::new(custom_status.clone()))
+                            }),
+                    )
                     .when(calling, |el| {
                         el.child(Label::new("Calling").color(Color::Muted))
                     })

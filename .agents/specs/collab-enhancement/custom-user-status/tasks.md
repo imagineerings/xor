@@ -117,9 +117,11 @@ This plan implements custom user status — emoji + short text labels with optio
   - [ ] 11.1 Add "Set a status" menu item to the user avatar context menu (opens `UserStatusModal`)
     - _Requirements: 8.1 (AC 1)_
     - _writes: crates/collab_ui/src/_
-  - [ ] 11.2 Add `StatusDisplay` below user name/avatar in the channel sidebar contact list (`CollabPanel::render_contact`)
+  - [x] 11.2 Add `StatusDisplay` below user name/avatar in the channel sidebar contact list (`CollabPanel::render_contact`)
     - _Requirements: 8.3 (AC 1)_
     - _writes: crates/collab_ui/src/_
+    - _Completed: Rendered a muted custom-status line below each contact's name in the collaboration sidebar._
+    - _Validation: `cargo check -p collab_ui`._
   - [ ] 11.3 Add `StatusDisplay` below sender name in message headers (`ChannelView` / message header component)
     - _Requirements: 8.3 (AC 1)_
     - _writes: crates/collab_ui/src/_
