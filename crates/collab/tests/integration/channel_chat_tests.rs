@@ -380,6 +380,52 @@ async fn custom_status_expiry_sweeper_ignores_active_statuses(
 }
 
 #[gpui::test]
+async fn custom_status_expiry_clears_connected_peers(
+    executor: BackgroundExecutor,
+    cx_a: &mut TestAppContext,
+    cx_b: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor.clone()).await;
+    let client_a = server.create_client(cx_a, "status-owner").await;
+    let client_b = server.create_client(cx_b, "status-observer").await;
+    server
+        .make_contacts(&mut [(&client_a, cx_a), (&client_b, cx_b)])
+        .await;
+
+    client_a
+        .client()
+        .request(proto::SetStatus {
+            emoji: Some("📅".to_string()),
+            text: "Temporary".to_string(),
+            clear_after_minutes: None,
+        })
+        .await
+        .unwrap();
+    executor.run_until_parked();
+    client_b.user_store().read_with(cx_b, |store, _| {
+        assert!(store.custom_status_for_user(client_a.id()).is_some());
+    });
+
+    let expired_at = OffsetDateTime::now_utc() - TimeDuration::minutes(1);
+    let expired_at = PrimitiveDateTime::new(expired_at.date(), expired_at.time());
+    UserStatusStore::new(server.app_state.db.clone())
+        .upsert_custom_status(
+            DbUserId::from_proto(client_a.user_id().unwrap()),
+            Some("📅".to_string()),
+            "Temporary".to_string(),
+            Some(expired_at),
+        )
+        .await
+        .unwrap();
+
+    server.sweep_expired_statuses().await;
+    executor.run_until_parked();
+    client_b.user_store().read_with(cx_b, |store, _| {
+        assert!(store.custom_status_for_user(client_a.id()).is_none());
+    });
+}
+
+#[gpui::test]
 async fn custom_status_reconnect_syncs_persisted_contact_status(
     executor: BackgroundExecutor,
     cx_a: &mut TestAppContext,

@@ -150,7 +150,7 @@ This plan implements custom user status — emoji + short text labels with optio
   - [x] 12.3 `test_expiry_sweeper` - expired rows are deleted and broadcasts sent
     - _writes: crates/collab/src/status_expiry_sweeper.rs_ (or separate test file)
     - _Completed: Added unit coverage for the exact clear updates consumed by the production broadcast loop, alongside expired-row deletion coverage._
-    - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab status_expiry_sweeper::tests --lib --features test-support` and the focused integration sweep test._
+    - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab status_expiry_sweeper::tests --lib --features test-support` and `custom_status_expiry_clears_connected_peers`._
   - [x] 12.4 `test_expiry_sweeper_no_expired` - sweep with no expired rows produces no broadcasts
     - _writes: crates/collab/src/status_expiry_sweeper.rs_
     - _Completed: Added empty-update coverage proving the broadcast loop has no work when the sweep returns no expired users._
@@ -201,8 +201,10 @@ This plan implements custom user status — emoji + short text labels with optio
     - _writes: crates/collab/tests/_
     - _Completed: Extended the same integration test to clear the status and verify both peers remove it._
     - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests custom_status_broadcasts_set_and_clear_to_multiple_clients --features test-support`._
-  - [ ] 15.3 Auto-expiry flow — Set status with short expiry → wait → both clients see it cleared
+  - [x] 15.3 Auto-expiry flow — Set status with short expiry → wait → both clients see it cleared
     - _writes: crates/collab/tests/_
+    - _Completed: Added a two-client integration test that seeds an expired persisted status, invokes the production server sweeper, and verifies the connected observer clears it._
+    - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests custom_status_expiry_clears_connected_peers --features test-support`._
   - [x] 15.4 Reconnect sync — Client A sets status → Client B reconnects → receives status in initial batch
     - _writes: crates/collab/tests/_
     - _Completed: Added initial-connection status hydration for persisted, non-expired contact statuses and a reconnect integration test covering the batch update path._

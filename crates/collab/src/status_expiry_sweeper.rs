@@ -50,7 +50,7 @@ impl StatusExpirySweeper {
             .await
     }
 
-    async fn sweep_and_broadcast(&self) -> Result<()> {
+    pub async fn sweep_and_broadcast(&self) -> Result<()> {
         let user_ids = self.sweep().await?;
         let connection_pool = self.connection_pool.lock();
         for update in expired_status_updates(&user_ids) {

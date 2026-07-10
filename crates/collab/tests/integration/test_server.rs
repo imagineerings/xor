@@ -85,6 +85,10 @@ pub struct ContactsSummary {
 }
 
 impl TestServer {
+    pub async fn sweep_expired_statuses(&self) {
+        self.server.sweep_expired_statuses().await.unwrap();
+    }
+
     pub async fn start(deterministic: BackgroundExecutor) -> Self {
         static NEXT_LIVEKIT_SERVER_ID: AtomicUsize = AtomicUsize::new(0);
 
