@@ -269,7 +269,9 @@ Add a join request workflow for private channels, enabling non-members to reques
   - [x] 24.3 User requests then is directly invited by admin — `role.is_some()` check prevents duplicate request.
     - _Completed: Added an RPC integration test proving a direct member invitation blocks a duplicate join request._
     - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests direct_invite_prevents_duplicate_join_request --features test-support`._
-  - [ ] 24.4 Notification with missing user (user deleted after request) — graceful handling in notification display.
+  - [x] 24.4 Notification with missing user (user deleted after request) — graceful handling in notification display.
+    - _Completed: Join-request notifications now retain a fallback presentation when the requester is unavailable instead of being dropped._
+    - _Validation: `cargo test -p collab_ui missing_join_request_user_uses_fallback_presentation --lib` is blocked by the local missing AudioUnit SDK headers._
   - _Requirements: 10.1_
   - _writes: crates/collab/tests/channel_join_requests.rs_
 
@@ -283,6 +285,8 @@ Add a join request workflow for private channels, enabling non-members to reques
   - [x] 25.3 `RequestDetailPanel` tests: verify Approve/Deny buttons dispatch correct `RespondToJoinRequest` RPC.
     - _Completed: Added payload-contract coverage for approve and deny reason behavior._
     - _Validation: collab_ui test build blocked by missing macOS AudioUnit SDK headers._
-  - [ ] 25.4 Notification rendering: verify `JoinRequestApproved` renders with clickable channel link.
+  - [x] 25.4 Notification rendering: verify `JoinRequestApproved` renders with clickable channel link.
+    - _Completed: Centralized the channel-open target used by notification activation and added coverage proving approval opens its approved channel._
+    - _Validation: `cargo test -p collab_ui approved_join_request_opens_the_approved_channel --lib` is blocked by the local missing AudioUnit SDK headers._
   - _Requirements: 10.1, 10.2, 10.3, 10.4_
   - _writes: crates/collab_ui/src/request_to_join_panel.rs_, _crates/collab_ui/src/pending_requests_list.rs_, _crates/collab_ui/src/request_detail_panel.rs_

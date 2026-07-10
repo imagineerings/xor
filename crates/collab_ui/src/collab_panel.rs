@@ -3794,20 +3794,11 @@ impl CollabPanel {
                 requesting_user_id,
                 reason,
                 ..
-            } => {
-                let requester = user_store.get_cached_user(*requesting_user_id)?;
-                let reason = reason
-                    .as_deref()
-                    .map(|reason| format!(": {reason}"))
-                    .unwrap_or_default();
-                Some((
-                    Some(requester.clone()),
-                    format!(
-                        "{} wants to join the #{channel_name} channel{reason}",
-                        requester.github_login
-                    ),
-                ))
-            }
+            } => Some(Self::join_request_presentation(
+                user_store.get_cached_user(*requesting_user_id).cloned(),
+                channel_name,
+                reason.as_deref(),
+            )),
             Notification::JoinRequestApproved { channel_name, .. } => Some((
                 None,
                 format!("Your request to join the #{channel_name} channel was approved"),
@@ -3855,6 +3846,24 @@ impl CollabPanel {
                 ))
             }
         }
+    }
+
+    fn join_request_presentation(
+        requester: Option<Arc<User>>,
+        channel_name: &str,
+        reason: Option<&str>,
+    ) -> (Option<Arc<User>>, String) {
+        let requester_name = requester
+            .as_ref()
+            .map(|requester| requester.github_login.as_ref())
+            .unwrap_or("Someone");
+        let reason = reason
+            .map(|reason| format!(": {reason}"))
+            .unwrap_or_default();
+        (
+            requester,
+            format!("{requester_name} wants to join the #{channel_name} channel{reason}"),
+        )
     }
 
     fn add_toast(&mut self, entry: &NotificationEntry, cx: &mut Context<Self>) {
@@ -4362,14 +4371,15 @@ impl CollabNotificationToast {
             return;
         };
 
-        match notification {
+        match &notification {
             Notification::JoinRequest { channel_id, .. } => {
+                let channel_id = ChannelId(*channel_id);
                 let collab_panel = self.collab_panel.clone();
                 window.defer(cx, move |_window, cx| {
                     collab_panel
                         .update_in(cx, |collab_panel, window, cx| {
                             collab_panel.show_channel_modal_with_pending_requests(
-                                ChannelId(channel_id),
+                                channel_id,
                                 channel_modal::Mode::ManageMembers,
                                 true,
                                 window,
@@ -4379,33 +4389,20 @@ impl CollabNotificationToast {
                         .ok();
                 });
             }
-            Notification::JoinRequestApproved { channel_id, .. } => {
+            Notification::JoinRequestApproved { .. }
+            | Notification::UrgentMessage { .. }
+            | Notification::GroupMention { .. } => {
+                let Some(channel_id) = Self::notification_channel_to_open(&notification) else {
+                    self.focus_collab_panel(window, cx);
+                    cx.emit(DismissEvent);
+                    return;
+                };
                 let workspace = self.workspace.clone();
                 window.defer(cx, move |window, cx| {
                     let Some(workspace) = workspace.upgrade() else {
                         return;
                     };
-                    ChannelView::open(ChannelId(channel_id), None, workspace, window, cx)
-                        .detach_and_log_err(cx);
-                });
-            }
-            Notification::UrgentMessage { channel_id, .. } => {
-                let workspace = self.workspace.clone();
-                window.defer(cx, move |window, cx| {
-                    let Some(workspace) = workspace.upgrade() else {
-                        return;
-                    };
-                    ChannelView::open(ChannelId(channel_id), None, workspace, window, cx)
-                        .detach_and_log_err(cx);
-                });
-            }
-            Notification::GroupMention { channel_id, .. } => {
-                let workspace = self.workspace.clone();
-                window.defer(cx, move |window, cx| {
-                    let Some(workspace) = workspace.upgrade() else {
-                        return;
-                    };
-                    ChannelView::open(ChannelId(channel_id), None, workspace, window, cx)
+                    ChannelView::open(channel_id, None, workspace, window, cx)
                         .detach_and_log_err(cx);
                 });
             }
@@ -4415,6 +4412,15 @@ impl CollabNotificationToast {
             | Notification::JoinRequestDenied { .. } => self.focus_collab_panel(window, cx),
         }
         cx.emit(DismissEvent);
+    }
+
+    fn notification_channel_to_open(notification: &Notification) -> Option<ChannelId> {
+        match notification {
+            Notification::JoinRequestApproved { channel_id, .. }
+            | Notification::UrgentMessage { channel_id, .. }
+            | Notification::GroupMention { channel_id, .. } => Some(ChannelId(*channel_id)),
+            _ => None,
+        }
     }
 }
 
@@ -4469,6 +4475,36 @@ impl Render for CollabNotificationToast {
 
 impl EventEmitter<DismissEvent> for CollabNotificationToast {}
 impl EventEmitter<SuppressEvent> for CollabNotificationToast {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn missing_join_request_user_uses_fallback_presentation() {
+        let (requester, text) =
+            CollabPanel::join_request_presentation(None, "private-chat", Some("Please add me"));
+
+        assert!(requester.is_none());
+        assert_eq!(
+            text,
+            "Someone wants to join the #private-chat channel: Please add me"
+        );
+    }
+
+    #[test]
+    fn approved_join_request_opens_the_approved_channel() {
+        assert_eq!(
+            CollabNotificationToast::notification_channel_to_open(
+                &Notification::JoinRequestApproved {
+                    channel_id: 42,
+                    channel_name: "private-chat".to_string(),
+                },
+            ),
+            Some(ChannelId(42))
+        );
+    }
+}
 
 #[cfg(any(test, feature = "test-support"))]
 impl CollabPanel {
