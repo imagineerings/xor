@@ -22,8 +22,8 @@ use editor::{Editor, EditorElement, EditorStyle};
 use feature_flags::{AutoWatchFeatureFlag, FeatureFlagAppExt as _};
 use fuzzy::{StringMatch, StringMatchCandidate, match_strings};
 use gpui::{
-    AnyElement, App, AsyncWindowContext, Bounds, ClickEvent, ClipboardItem, DismissEvent, Div,
-    Empty, Entity, EventEmitter, FocusHandle, Focusable, FontStyle, KeyContext, ListOffset,
+    AnyElement, App, AsyncApp, AsyncWindowContext, Bounds, ClickEvent, ClipboardItem, DismissEvent,
+    Div, Empty, Entity, EventEmitter, FocusHandle, Focusable, FontStyle, KeyContext, ListOffset,
     ListState, MouseDownEvent, Pixels, Point, PromptLevel, SharedString, Subscription, Task,
     TextStyle, WeakEntity, Window, actions, anchored, canvas, deferred, div, fill, list, point,
     prelude::*, px,
@@ -33,7 +33,7 @@ use menu::{Cancel, Confirm, SecondaryConfirm, SelectNext, SelectPrevious};
 use notifications::{NotificationEntry, NotificationEvent, NotificationStore};
 use project::{Fs, Project};
 use rpc::{
-    ErrorCode, ErrorExt,
+    ErrorCode, ErrorExt, TypedEnvelope,
     proto::{self, ChannelVisibility, PeerId, reorder_channel::Direction},
 };
 use serde::{Deserialize, Serialize};
@@ -50,7 +50,7 @@ use ui::{
 use util::{ResultExt, TryFutureExt, maybe};
 use workspace::{
     AutoWatch, CopyRoomId, Deafen, LeaveCall, MultiWorkspace, Mute, OpenChannelNotes,
-    OpenChannelNotesById, ScreenShare, ShareProject, Workspace,
+    OpenChannelNotesById, ScreenShare, ShareProject, Toast, Workspace,
     dock::{DockPosition, Panel, PanelEvent},
     notifications::{
         DetachAndPromptErr, Notification as WorkspaceNotification, NotificationId, NotifyResultExt,
@@ -280,6 +280,7 @@ pub struct CollabPanel {
     project: Entity<Project>,
     match_candidates: Vec<StringMatchCandidate>,
     subscriptions: Vec<Subscription>,
+    rpc_subscriptions: Vec<client::Subscription>,
     collapsed_sections: Vec<Section>,
     collapsed_channels: Vec<ChannelId>,
     filter_occupied_channels: bool,
@@ -426,6 +427,7 @@ impl CollabPanel {
                 user_store: workspace.user_store().clone(),
                 project: workspace.project().clone(),
                 subscriptions: Vec::default(),
+                rpc_subscriptions: Vec::default(),
                 match_candidates: Vec::default(),
                 collapsed_sections: vec![Section::Offline],
                 collapsed_channels: Vec::default(),
@@ -491,9 +493,57 @@ impl CollabPanel {
                 window,
                 Self::on_notification_event,
             ));
+            this.rpc_subscriptions.push(
+                this.client.add_message_handler(
+                    cx.weak_entity(),
+                    Self::handle_urgent_message_notification,
+                ),
+            );
 
             this
         })
+    }
+
+    async fn handle_urgent_message_notification(
+        this: Entity<Self>,
+        envelope: TypedEnvelope<proto::UrgentMessageNotification>,
+        mut cx: AsyncApp,
+    ) -> anyhow::Result<()> {
+        let notification = envelope.payload;
+        this.update(&mut cx, |this, cx| {
+            let sender_name = this
+                .user_store
+                .read(cx)
+                .get_cached_user(notification.sender_id)
+                .map(|user| user.github_login.clone())
+                .unwrap_or_else(|| "Someone".into());
+            let weak_workspace = this.workspace.clone();
+            let channel_id = ChannelId(notification.channel_id);
+            this.workspace
+                .update(cx, |workspace, cx| {
+                    struct UrgentMessageToast;
+
+                    workspace.show_toast(
+                        Toast::new(
+                            NotificationId::unique::<UrgentMessageToast>(),
+                            format!(
+                                "Urgent from {sender_name}: {}",
+                                notification.message_preview
+                            ),
+                        )
+                        .on_click("Open message", move |window, cx| {
+                            let Some(workspace) = weak_workspace.upgrade() else {
+                                return;
+                            };
+                            ChannelView::open(channel_id, None, workspace, window, cx)
+                                .detach_and_log_err(cx);
+                        }),
+                        cx,
+                    );
+                })
+                .ok();
+        });
+        Ok(())
     }
 
     pub async fn load(
