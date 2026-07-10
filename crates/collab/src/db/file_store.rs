@@ -53,7 +53,12 @@ impl FileStore {
         validate_upload(request.file_size, &request.mime_type, &self.config)?;
 
         let file_id = Uuid::new_v4();
-        let storage_path = storage_path(request.channel_id, file_id, &request.filename);
+        let storage_path = storage_path(
+            self.config.storage_prefix.as_deref(),
+            request.channel_id,
+            file_id,
+            &request.filename,
+        );
         let content_length = i64::try_from(request.file_size)
             .context("file size is too large to send to blob storage")?;
         let (url, headers) = if let Some(test_url_base) = self.test_url_base.as_deref() {
@@ -395,6 +400,7 @@ impl FileStore {
 #[derive(Clone)]
 pub struct FileStoreConfig {
     pub storage_bucket: Option<String>,
+    pub storage_prefix: Option<String>,
     pub max_file_size: u64,
     pub allowed_mime_types: Vec<String>,
     pub upload_url_lifetime: Duration,
@@ -404,11 +410,13 @@ pub struct FileStoreConfig {
 impl FileStoreConfig {
     pub fn new(
         storage_bucket: Option<String>,
+        storage_prefix: Option<String>,
         max_file_size: u64,
         allowed_mime_types: Vec<String>,
     ) -> Self {
         Self {
             storage_bucket,
+            storage_prefix,
             max_file_size,
             allowed_mime_types,
             upload_url_lifetime: DEFAULT_UPLOAD_URL_LIFETIME,
@@ -555,8 +563,20 @@ where
         .transpose()
 }
 
-fn storage_path(channel_id: ChannelId, file_id: Uuid, filename: &str) -> String {
-    format!("channels/{channel_id}/files/{file_id}/{filename}")
+fn storage_path(
+    storage_prefix: Option<&str>,
+    channel_id: ChannelId,
+    file_id: Uuid,
+    filename: &str,
+) -> String {
+    let path = format!("channels/{channel_id}/files/{file_id}/{filename}");
+    match storage_prefix
+        .map(|prefix| prefix.trim_matches('/'))
+        .filter(|prefix| !prefix.is_empty())
+    {
+        Some(prefix) => format!("{prefix}/{path}"),
+        None => path,
+    }
 }
 
 fn presigned_headers(

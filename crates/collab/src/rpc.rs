@@ -4060,6 +4060,7 @@ fn file_store(session: &MessageContext) -> FileStore {
             session.app_state.db.clone(),
             FileStoreConfig::new(
                 Some("test-bucket".to_string()),
+                session.app_state.config.file_upload_storage_prefix.clone(),
                 session
                     .app_state
                     .config
@@ -4082,6 +4083,7 @@ fn file_store(session: &MessageContext) -> FileStore {
         session.app_state.blob_store_client.clone(),
         FileStoreConfig::new(
             session.app_state.config.blob_store_bucket.clone(),
+            session.app_state.config.file_upload_storage_prefix.clone(),
             session
                 .app_state
                 .config

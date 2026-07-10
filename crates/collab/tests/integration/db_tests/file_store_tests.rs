@@ -223,6 +223,53 @@ async fn test_file_store_security_constraints(db: &Arc<Database>) {
     assert_eq!(rows[0].mime_type, "text/plain");
 }
 
+test_both_dbs!(
+    test_file_store_storage_prefix,
+    test_file_store_storage_prefix_postgres,
+    test_file_store_storage_prefix_sqlite
+);
+
+async fn test_file_store_storage_prefix(db: &Arc<Database>) {
+    let user_id = new_test_user(db).await;
+    let channel_id = db.create_root_channel("files", user_id).await.unwrap();
+    let file_store = FileStore::new_for_tests(
+        db.clone(),
+        FileStoreConfig::new(
+            Some("test-bucket".to_string()),
+            Some("/tenant-a/uploads/".to_string()),
+            1024,
+            vec!["text/plain".to_string()],
+        ),
+        "http://file-store.test",
+    );
+
+    let upload = file_store
+        .generate_upload_url(new_file_upload(
+            channel_id,
+            user_id,
+            "prefixed.txt",
+            12,
+            "text/plain",
+        ))
+        .await
+        .unwrap();
+    assert!(
+        upload.url.contains("/tenant-a/uploads/channels/"),
+        "upload URL did not include normalized storage prefix: {}",
+        upload.url
+    );
+
+    let confirmed = file_store
+        .confirm_upload(upload.file_id, user_id)
+        .await
+        .unwrap();
+    assert!(
+        confirmed.url.contains("/tenant-a/uploads/channels/"),
+        "download URL did not include normalized storage prefix: {}",
+        confirmed.url
+    );
+}
+
 fn test_file_store(
     db: &Arc<Database>,
     max_file_size: u64,
@@ -232,6 +279,7 @@ fn test_file_store(
         db.clone(),
         FileStoreConfig::new(
             Some("test-bucket".to_string()),
+            None,
             max_file_size,
             allowed_mime_types
                 .into_iter()

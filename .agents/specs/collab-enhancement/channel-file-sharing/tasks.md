@@ -291,11 +291,14 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
 
 ### Phase 8: Configuration & Final Wiring
 
-- [ ] 29. Add server configuration for file storage limits
+- [x] 29. Add server configuration for file storage limits
   - Add `FileStoreConfig` fields to server configuration: `MaxFileSize`, `AllowedTypes`, `StorageBucket`, `StoragePrefix`.
   - Wire configuration into `FileStore` initialisation.
   - _Requirements: 4.4_
   - _writes: crates/collab/src/config.go_
+  - _Completed: Completed the Rust server configuration path by adding `file_upload_storage_prefix`, threading it into `FileStoreConfig` alongside the existing bucket, max-size, and allowed-MIME settings, and using it to prefix stored object keys with normalized path handling._
+  - _Actual writes: crates/collab/src/lib.rs; crates/collab/src/db/file_store.rs; crates/collab/src/rpc.rs; crates/collab/tests/integration/test_server.rs; crates/collab/tests/integration/db_tests/file_store_tests.rs_
+  - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests test_file_store_storage_prefix_sqlite --features test-support`; `CARGO_INCREMENTAL=0 cargo check -p collab --features collab/test-support`; `git diff --check`._
 
 - [ ] 30. Verify thumbnail generation for images
   - When an image is uploaded via `ConfirmUpload`, generate a thumbnail (max 400px wide) server-side and store its path.
