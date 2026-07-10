@@ -175,12 +175,14 @@ Add a join request workflow for private channels, enabling non-members to reques
   - _Completed: Added requester details, visible reason/timestamp, approve and deny actions with an optional denial reason, response errors, and a completion event for parent refreshes._
   - _Validation: `cargo check -p collab_ui`._
 
-- [ ] 17. Integrate pending requests tab into channel member management modal
+- [x] 17. Integrate pending requests tab into channel member management modal
   - Add a new tab "Pending Requests" with badge count from `ChannelStore::pending_request_count`.
   - Show `PendingRequestsList` under the tab.
   - Wire up badge updates so the badge refreshes when `UpdateChannels` brings new `pending_request_counts`.
   - _Requirements: 10.2 (AC 5), 10.4 (AC 1)_
   - _writes: crates/collab_ui/src/channel_member_management.rs_
+  - _Completed: Added a Pending Requests tab to channel member management with the live channel-store badge. Selecting an entry opens its detail panel; completed approval or denial reloads the list._
+  - _Validation: `cargo check -p collab_ui`._
 
 - [ ] 18. Notification rendering for join request variants
   - Add rendering logic for `Notification::JoinRequest` — title: "Join Request", body: "{username} wants to join #{channel}", action: navigate to member management for that channel.

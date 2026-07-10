@@ -1,3 +1,7 @@
+use crate::{
+    pending_requests_list::{PendingRequestsList, PendingRequestsListEvent},
+    request_detail_panel::{RequestDetailPanel, RequestDetailPanelEvent},
+};
 use channel::{ChannelMembership, ChannelStore};
 use client::{
     ChannelId, LegacyUserId, User, UserStore,
@@ -31,8 +35,12 @@ actions!(
 
 pub struct ChannelModal {
     picker: Entity<Picker<ChannelModalDelegate>>,
+    pending_requests: Entity<PendingRequestsList>,
+    request_detail: Option<Entity<RequestDetailPanel>>,
     channel_store: Entity<ChannelStore>,
     channel_id: ChannelId,
+    show_pending_requests: bool,
+    _subscriptions: Vec<Subscription>,
 }
 
 impl ChannelModal {
@@ -45,6 +53,9 @@ impl ChannelModal {
         cx: &mut Context<Self>,
     ) -> Self {
         cx.observe(&channel_store, |_, _, cx| cx.notify()).detach();
+        let pending_requests = cx.new(|cx| {
+            PendingRequestsList::new(channel_id, channel_store.clone(), user_store.clone(), cx)
+        });
         let channel_modal = cx.entity().downgrade();
         let picker = cx.new(|cx| {
             Picker::uniform_list(
@@ -68,14 +79,43 @@ impl ChannelModal {
             .modal(false)
         });
 
-        Self {
+        let mut this = Self {
             picker,
+            pending_requests: pending_requests.clone(),
+            request_detail: None,
             channel_store,
             channel_id,
-        }
+            show_pending_requests: false,
+            _subscriptions: Vec::new(),
+        };
+        let pending_requests_subscription =
+            cx.subscribe(&pending_requests, |this, _, event, cx| {
+                let PendingRequestsListEvent::RequestSelected(request) = event;
+                let request_detail = cx.new(|_| {
+                    RequestDetailPanel::new(
+                        this.channel_id,
+                        request.clone(),
+                        this.channel_store.clone(),
+                    )
+                });
+                let detail_subscription = cx.subscribe(&request_detail, |this, _, event, cx| {
+                    if matches!(event, RequestDetailPanelEvent::Responded) {
+                        this.request_detail = None;
+                        this.pending_requests
+                            .update(cx, |requests, cx| requests.load_requests(cx));
+                        cx.notify();
+                    }
+                });
+                this._subscriptions.push(detail_subscription);
+                this.request_detail = Some(request_detail);
+                cx.notify();
+            });
+        this._subscriptions.push(pending_requests_subscription);
+        this
     }
 
     fn toggle_mode(&mut self, _: &ToggleMode, window: &mut Window, cx: &mut Context<Self>) {
+        self.show_pending_requests = false;
         let mode = match self.picker.read(cx).delegate.mode {
             Mode::ManageMembers => Mode::InviteMembers,
             Mode::InviteMembers => Mode::ManageMembers,
@@ -84,6 +124,7 @@ impl ChannelModal {
     }
 
     fn set_mode(&mut self, mode: Mode, window: &mut Window, cx: &mut Context<Self>) {
+        self.show_pending_requests = false;
         self.picker.update(cx, |picker, cx| {
             let delegate = &mut picker.delegate;
             delegate.mode = mode;
@@ -93,6 +134,14 @@ impl ChannelModal {
             cx.notify()
         });
         cx.notify()
+    }
+
+    fn show_pending_requests(&mut self, cx: &mut Context<Self>) {
+        self.show_pending_requests = true;
+        self.request_detail = None;
+        self.pending_requests
+            .update(cx, |requests, cx| requests.load_requests(cx));
+        cx.notify();
     }
 
     fn set_channel_visibility(
@@ -140,6 +189,7 @@ impl Render for ChannelModal {
         let channel_id = channel.id;
         let visibility = channel.visibility;
         let mode = self.picker.read(cx).delegate.mode;
+        let pending_request_count = channel_store.pending_request_count(self.channel_id);
 
         v_flex()
             .key_context("ChannelModal")
@@ -228,10 +278,34 @@ impl Render for ChannelModal {
                                     .on_click(cx.listener(|this, _, window, cx| {
                                         this.set_mode(Mode::InviteMembers, window, cx);
                                     })),
+                            )
+                            .child(
+                                div()
+                                    .id("pending-requests")
+                                    .px_2()
+                                    .py_1()
+                                    .cursor_pointer()
+                                    .border_b_2()
+                                    .when(self.show_pending_requests, |this| {
+                                        this.border_color(cx.theme().colors().border)
+                                    })
+                                    .child(Label::new(format!(
+                                        "Pending Requests ({pending_request_count})"
+                                    )))
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        this.show_pending_requests(cx);
+                                    })),
                             ),
                     ),
             )
-            .child(self.picker.clone())
+            .child(if self.show_pending_requests {
+                self.request_detail
+                    .clone()
+                    .map(IntoElement::into_any_element)
+                    .unwrap_or_else(|| self.pending_requests.clone().into_any_element())
+            } else {
+                self.picker.clone().into_any_element()
+            })
     }
 }
 
