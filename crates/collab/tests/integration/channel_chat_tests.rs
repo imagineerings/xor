@@ -258,6 +258,182 @@ async fn group_rpc_lifecycle_updates_members_and_deletes_group(
 }
 
 #[gpui::test]
+async fn group_mentions_fan_out_mixed_mentions_and_stop_after_leave(
+    executor: BackgroundExecutor,
+    cx_a: &mut TestAppContext,
+    cx_b: &mut TestAppContext,
+    cx_c: &mut TestAppContext,
+    cx_d: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor.clone()).await;
+    let client_a = server.create_client(cx_a, "user_a").await;
+    let client_b = server.create_client(cx_b, "user_b").await;
+    let client_c = server.create_client(cx_c, "user_c").await;
+    let client_d = server.create_client(cx_d, "user_d").await;
+    let mut channel_members = [
+        (&client_b, &mut *cx_b),
+        (&client_c, &mut *cx_c),
+        (&client_d, &mut *cx_d),
+    ];
+    let channel_id = server
+        .make_channel("mentions", None, (&client_a, cx_a), &mut channel_members)
+        .await;
+
+    let group = client_a
+        .create_group(
+            "eng-team".to_string(),
+            "Engineering".to_string(),
+            vec![client_b.id(), client_c.id(), client_d.id()],
+        )
+        .await
+        .unwrap();
+    let message = client_a
+        .send_channel_message(SendChannelMessage {
+            channel_id: channel_id.0,
+            body: "@eng-team and @user_c".to_string(),
+            nonce: 1,
+            mentions: vec![
+                proto::ChatMention {
+                    range: Some(proto::Range { start: 0, end: 9 }),
+                    user_id: 0,
+                    group_id: group.id,
+                },
+                mention_for(client_c.id(), 14, 21),
+            ],
+            reply_to_message_id: None,
+            file_ids: Vec::new(),
+        })
+        .await
+        .unwrap();
+    assert!(
+        message
+            .mentions
+            .iter()
+            .any(|mention| mention.group_id == group.id)
+    );
+    assert!(
+        message
+            .mentions
+            .iter()
+            .any(|mention| mention.user_id == client_c.id() && mention.group_id == 0)
+    );
+
+    for _ in 0..5 {
+        executor.run_until_parked();
+    }
+    for client in [&client_b, &client_c, &client_d] {
+        client.notification_store().read_with(
+            match client.username.as_str() {
+                "user_b" => cx_b,
+                "user_c" => cx_c,
+                _ => cx_d,
+            },
+            |store, _| {
+                assert_eq!(
+                    (0..store.notification_count())
+                        .filter_map(|index| store.notification_at(index))
+                        .filter(|entry| {
+                            matches!(entry.notification, Notification::GroupMention { .. })
+                        })
+                        .count(),
+                    1
+                );
+            },
+        );
+    }
+
+    client_c.leave_group(group.id).await.unwrap();
+    client_a
+        .send_channel_message(SendChannelMessage {
+            channel_id: channel_id.0,
+            body: "@eng-team follow-up".to_string(),
+            nonce: 2,
+            mentions: vec![proto::ChatMention {
+                range: Some(proto::Range { start: 0, end: 9 }),
+                user_id: 0,
+                group_id: group.id,
+            }],
+            reply_to_message_id: None,
+            file_ids: Vec::new(),
+        })
+        .await
+        .unwrap();
+    for _ in 0..5 {
+        executor.run_until_parked();
+    }
+    client_c.notification_store().read_with(cx_c, |store, _| {
+        assert_eq!(
+            (0..store.notification_count())
+                .filter_map(|index| store.notification_at(index))
+                .filter(|entry| matches!(entry.notification, Notification::GroupMention { .. }))
+                .count(),
+            1
+        );
+    });
+    for (client, cx) in [(&client_b, cx_b), (&client_d, cx_d)] {
+        client.notification_store().read_with(cx, |store, _| {
+            assert_eq!(
+                (0..store.notification_count())
+                    .filter_map(|index| store.notification_at(index))
+                    .filter(|entry| {
+                        matches!(entry.notification, Notification::GroupMention { .. })
+                    })
+                    .count(),
+                2
+            );
+        });
+    }
+}
+
+#[gpui::test]
+async fn concurrent_group_membership_updates_retain_both_additions(
+    executor: BackgroundExecutor,
+    cx_a: &mut TestAppContext,
+    cx_b: &mut TestAppContext,
+    cx_c: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor).await;
+    let client_a = server.create_client(cx_a, "user_a").await;
+    let client_b = server.create_client(cx_b, "user_b").await;
+    let client_c = server.create_client(cx_c, "user_c").await;
+    let group = client_a
+        .create_group("platform".to_string(), "Platform".to_string(), Vec::new())
+        .await
+        .unwrap();
+
+    let (add_b, add_c) = futures::future::join(
+        client_a.update_group_members(group.id, vec![client_b.id()], Vec::new()),
+        client_a.update_group_members(group.id, vec![client_c.id()], Vec::new()),
+    )
+    .await;
+    add_b.unwrap();
+    add_c.unwrap();
+
+    let updated = server
+        .app_state
+        .db
+        .get_group(DbGroupId::from_proto(group.id))
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(
+        updated
+            .member_ids
+            .contains(&DbUserId::from_proto(client_a.user_id().unwrap()))
+    );
+    assert!(
+        updated
+            .member_ids
+            .contains(&DbUserId::from_proto(client_b.user_id().unwrap()))
+    );
+    assert!(
+        updated
+            .member_ids
+            .contains(&DbUserId::from_proto(client_c.user_id().unwrap()))
+    );
+}
+
+#[gpui::test]
 async fn channel_message_priority_persists_and_is_immutable(
     executor: BackgroundExecutor,
     cx_a: &mut TestAppContext,

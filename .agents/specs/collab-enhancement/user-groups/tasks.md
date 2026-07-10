@@ -146,7 +146,7 @@ The work is organized into 15 incremental tasks, each producing a buildable arti
   - _Completed: Added persisted `GroupMention` notifications for every resolved group member except the sender, delivered through the existing online notification pipeline and opened in the channel UI. Resolution occurs at send time, so departed members are excluded.
   - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-mention-test-2 CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests group_mentions_create_notifications_for_members_except_sender --features test-support`; `git diff --check`._
 
-- [ ] 14. Write integration tests
+- [x] 14. Write integration tests
   - **Full group lifecycle**: Create group → GetGroups → add members → verify member list → remove members → delete group → verify removed.
   - **Group @mention in message**: Create group with 3 members → send message with group mention → verify all 3 receive `ChannelMessageSent` + notification.
   - **Mixed mentions**: Send message with both individual user mentions and group mentions → verify both expand correctly.
@@ -154,6 +154,8 @@ The work is organized into 15 incremental tasks, each producing a buildable arti
   - **Concurrent membership add/remove**: Two admins simultaneously add different users → verify both succeed and final member list contains both.
   - _Requirements: 9.1, 9.2, 9.3, P5.3, P5.7_
   - _writes: crates/collab/tests/group_lifecycle.rs_ (or similar)
+  - _Completed: Added integration coverage for group CRUD and membership lifecycle, three-member group mention fan-out, mixed group and individual mention persistence, post-leave notification suppression, and concurrent membership additions.
+  - _Validation: `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests group_rpc_lifecycle_updates_members_and_deletes_group --features test-support`; `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests group_mentions_fan_out_mixed_mentions_and_stop_after_leave --features test-support`; `CARGO_TARGET_DIR=/tmp/sim-group-property-target CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests concurrent_group_membership_updates_retain_both_additions --features test-support`; `git diff --check`._
 
 - [x] 15. Write property-based tests
   - **Idempotent add**: Adding an already-present member N times yields the same state as adding once.
