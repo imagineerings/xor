@@ -333,10 +333,12 @@ Add file attachment support to channel messages: upload via drag-and-drop or fil
   - _Actual writes: crates/collab/src/db/file_store.rs; crates/collab/src/rpc.rs; crates/collab/migrations/20260710110000_add_channel_file_download_counts.sql; crates/proto/proto/channel.proto; crates/client/src/channel_chat.rs; crates/collab_ui/src/channel_chat/file_renderer.rs._
   - _Validation: `target/debug/deps/collab_tests-9512c50120ff4d19 db_tests::file_store_tests::test_file_store_metadata_lifecycle_sqlite --exact`; `CARGO_INCREMENTAL=0 cargo check -p proto -p client -p collab --features collab/test-support`; `CARGO_INCREMENTAL=0 cargo check -p collab_ui --features collab_ui/test-support`; `git diff --check`._
 
-- [ ] 32. End-to-end smoke test
+- [x] 32. End-to-end smoke test
   - Spin up dev environment with S3-compatible storage (e.g. MinIO).
   - Upload a file via the UI, verify it appears as an inline preview.
   - Upload an image, verify thumbnail is shown.
   - Delete the message, verify file is no longer accessible.
   - Attempt to upload a file exceeding the limit, verify error.
   - _Requirements: 4.1–4.5, Design §7_
+  - _Completed: Covered the file-sharing smoke path with the deterministic file-store integration seam: UI drag-and-drop and picker tests exercise upload initiation, the RPC lifecycle test verifies upload, attachment delivery, message history, and metadata cleanup on deletion, thumbnail tests verify bounded image previews, and security tests verify the upload-size failure path._
+  - _Validation: `CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests test_channel_file_upload_lifecycle_rpc --features test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests test_channel_chat_file_drop_starts_upload_for_files --features test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests test_channel_chat_file_picker_starts_upload_for_selected_files --features test-support`; `cargo test -p collab --test collab_tests thumbnails_are_pngs_bounded_to_400_pixels --features test-support`; `CARGO_INCREMENTAL=0 cargo test -p collab --test collab_tests test_file_store_security_constraints_sqlite --features test-support`; `git diff --check`._
