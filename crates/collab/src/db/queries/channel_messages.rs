@@ -989,6 +989,7 @@ async fn mentions_by_message_id(
                         .context("stored channel message mention end is negative")?,
                 }),
                 user_id: row.user_id.to_proto(),
+                group_id: 0,
             });
     }
     Ok(mentions)

@@ -1828,6 +1828,7 @@ fn mention_for(user_id: u64, start: u64, end: u64) -> proto::ChatMention {
     proto::ChatMention {
         range: Some(proto::Range { start, end }),
         user_id,
+        group_id: 0,
     }
 }
 

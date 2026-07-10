@@ -80,6 +80,8 @@ id_type!(ContactId);
 id_type!(ExtensionId);
 id_type!(FlagId);
 id_type!(FollowerId);
+id_type!(GroupId);
+id_type!(GroupMemberId);
 id_type!(HostedProjectId);
 id_type!(JoinRequestId);
 id_type!(MessageId);

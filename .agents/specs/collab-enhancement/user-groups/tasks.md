@@ -19,17 +19,19 @@ The work is organized into 15 incremental tasks, each producing a buildable arti
   - _writes: crates/proto/src/... (generated)_
   - _Completed: Added group CRUD, membership, retrieval, and update-push messages, plus group references on chat mentions._
 
-- [ ] 2. Add ID types for groups
+- [x] 2. Add ID types for groups
   - Add `GroupId` and `GroupMemberId` using the `id_type!` macro alongside existing ID types.
   - _Requirements: 9.1_
   - _writes: crates/collab/src/db/ids.rs_
+  - _Completed: Added typed group and group-member database identifiers._
 
-- [ ] 3. Create database migration for `user_groups` and `user_group_members` tables
+- [x] 3. Create database migration for `user_groups` and `user_group_members` tables
   - Write UP migration: `CREATE TABLE user_groups(...)`, `CREATE TABLE user_group_members(...)`, indexes, unique constraints.
   - Write DOWN migration: `DROP TABLE` statements.
   - Register migration in the migration runner.
   - _Requirements: 9.1, 9.3_
   - _writes: crates/collab/migrations/20260625000000_create_user_groups.sql_
+  - _Completed: Added group ownership, unique group-name and membership constraints, cascade cleanup, and member lookup indexing in the production and test schemas._
 
 - [ ] 4. Create SeaORM entity definitions
   - Create `user_group.rs` entity with `Model`, `ActiveModelBehavior`, `Relation` (Members, Admin), and `Related` impl for `user_group_member`.

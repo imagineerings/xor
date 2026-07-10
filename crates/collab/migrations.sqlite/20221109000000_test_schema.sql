@@ -15,6 +15,25 @@ CREATE TABLE "users" (
 
 CREATE INDEX "index_users_on_email_address" ON "users" ("email_address");
 
+CREATE TABLE "user_groups" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "name" VARCHAR NOT NULL UNIQUE,
+    "display_name" VARCHAR NOT NULL,
+    "admin_id" INTEGER NOT NULL REFERENCES "users" ("id") ON DELETE RESTRICT,
+    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE "user_group_members" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "group_id" INTEGER NOT NULL REFERENCES "user_groups" ("id") ON DELETE CASCADE,
+    "user_id" INTEGER NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
+    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE ("group_id", "user_id")
+);
+
+CREATE INDEX "index_user_group_members_on_user_id" ON "user_group_members" ("user_id");
+
 CREATE TABLE "contacts" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT,
     "user_id_a" INTEGER NOT NULL,

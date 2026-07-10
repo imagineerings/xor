@@ -431,6 +431,42 @@ CREATE TABLE public.users (
     name text
 );
 
+CREATE TABLE public.user_groups (
+    id integer NOT NULL,
+    name character varying NOT NULL,
+    display_name character varying NOT NULL,
+    admin_id integer NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL
+);
+
+CREATE SEQUENCE public.user_groups_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.user_groups_id_seq OWNED BY public.user_groups.id;
+
+CREATE TABLE public.user_group_members (
+    id integer NOT NULL,
+    group_id integer NOT NULL,
+    user_id integer NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL
+);
+
+CREATE SEQUENCE public.user_group_members_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.user_group_members_id_seq OWNED BY public.user_group_members.id;
+
 CREATE TABLE public.user_notification_preferences (
     user_id integer PRIMARY KEY REFERENCES public.users(id) ON DELETE CASCADE,
     bypass_dnd_for_urgent boolean DEFAULT false NOT NULL
