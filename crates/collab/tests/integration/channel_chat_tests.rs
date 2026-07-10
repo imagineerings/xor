@@ -1,5 +1,6 @@
 use crate::TestServer;
 use client::{
+    MessagePriority,
     channel_chat::{
         DEFAULT_THREAD_REPLY_LIMIT, ScheduleChannelMessage, SearchChannelMessages,
         SendChannelMessage, UpdateChannelMessage,
@@ -116,6 +117,67 @@ async fn test_channel_chat_core_flow(
     assert_eq!(deleted.len(), 1);
     assert_eq!(deleted[0].body, "");
     assert!(deleted[0].mentions.is_empty());
+}
+
+#[gpui::test]
+async fn channel_message_priority_persists_and_is_immutable(
+    executor: BackgroundExecutor,
+    cx_a: &mut TestAppContext,
+    cx_b: &mut TestAppContext,
+) {
+    let mut server = TestServer::start(executor.clone()).await;
+    let client_a = server.create_client(cx_a, "user_a").await;
+    let client_b = server.create_client(cx_b, "user_b").await;
+    let channel_id = server
+        .make_channel("chat", None, (&client_a, cx_a), &mut [(&client_b, cx_b)])
+        .await;
+
+    let sent = client_a
+        .send_channel_message_with_priority(
+            SendChannelMessage {
+                channel_id: channel_id.0,
+                body: "please review".to_string(),
+                nonce: 1,
+                mentions: Vec::new(),
+                reply_to_message_id: None,
+                file_ids: Vec::new(),
+            },
+            MessagePriority::Urgent,
+        )
+        .await
+        .unwrap();
+    assert_eq!(sent.priority, proto::ChannelMessagePriority::Urgent as i32);
+
+    let retrieved = client_b
+        .get_channel_messages_by_id(vec![sent.id])
+        .await
+        .unwrap()
+        .messages;
+    assert_eq!(
+        retrieved[0].priority,
+        proto::ChannelMessagePriority::Urgent as i32
+    );
+
+    client_a
+        .update_channel_message(UpdateChannelMessage {
+            channel_id: channel_id.0,
+            message_id: sent.id,
+            body: "please review the updated document".to_string(),
+            nonce: 2,
+            mentions: Vec::new(),
+        })
+        .await
+        .unwrap();
+
+    let updated = client_b
+        .get_channel_messages_by_id(vec![sent.id])
+        .await
+        .unwrap()
+        .messages;
+    assert_eq!(
+        updated[0].priority,
+        proto::ChannelMessagePriority::Urgent as i32
+    );
 }
 
 #[gpui::test]
