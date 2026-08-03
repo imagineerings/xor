@@ -4,7 +4,7 @@ pub mod room;
 
 use anyhow::{Context as _, Result, anyhow};
 use audio::Audio;
-use client::{SIM_ALWAYS_ACTIVE, ChannelId, Client, TypedEnvelope, User, UserStore, proto};
+use client::{ChannelId, Client, SIM_ALWAYS_ACTIVE, TypedEnvelope, User, UserStore, proto};
 use collections::HashSet;
 use futures::{Future, FutureExt, channel::oneshot, future::Shared};
 use gpui::{

@@ -1,5 +1,5 @@
 use crate::{
-    NewFile, Open, OpenMode, PathList, RecentWorkspace, SerialisimWorkspaceLocation,
+    NewFile, Open, OpenMode, PathList, RecentWorkspace, SerializedWorkspaceLocation,
     ToggleWorkspaceSidebar, Workspace, WorkspaceSettings,
     item::{Item, ItemEvent},
     persistence::WorkspaceDb,
@@ -13,12 +13,12 @@ use gpui::{
 use gpui::{WeakEntity, linear_color_stop, linear_gradient};
 use menu::{SelectNext, SelectPrevious};
 
-use sim_actions::{
-    Extensions, OpenKeymap, OpenOnboarding, OpenSettings, assistant::ToggleFocus, command_palette,
-};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use settings::{DefaultOpenBehavior, Settings};
+use sim_actions::{
+    Extensions, OpenKeymap, OpenOnboarding, OpenSettings, assistant::ToggleFocus, command_palette,
+};
 use ui::{ButtonLike, Divider, DividerColor, KeyBinding, Vector, VectorName, prelude::*};
 use util::ResultExt;
 
@@ -303,7 +303,7 @@ impl WelcomePage {
     ) {
         if let Some(recent_workspaces) = &self.recent_workspaces {
             if let Some(workspace) = recent_workspaces.get(action.index) {
-                let is_local = matches!(workspace.location, SerialisimWorkspaceLocation::Local);
+                let is_local = matches!(workspace.location, SerializedWorkspaceLocation::Local);
 
                 if is_local {
                     let paths = workspace.paths.paths().to_vec();
@@ -389,14 +389,14 @@ impl WelcomePage {
         &self,
         project_index: usize,
         tab_index: usize,
-        location: &SerialisimWorkspaceLocation,
+        location: &SerializedWorkspaceLocation,
         paths: &PathList,
     ) -> impl IntoElement {
         let name = project_name(paths);
 
         let (icon, title) = match location {
-            SerialisimWorkspaceLocation::Local => (IconName::Folder, name),
-            SerialisimWorkspaceLocation::Remote(_) => (IconName::Server, name),
+            SerializedWorkspaceLocation::Local => (IconName::Folder, name),
+            SerializedWorkspaceLocation::Remote(_) => (IconName::Server, name),
         };
 
         SectionButton::new(

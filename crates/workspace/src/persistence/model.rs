@@ -1,7 +1,7 @@
-use super::{SerialisimAxis, SerialisimWindowBounds};
+use super::{SerializedAxis, SerializedWindowBounds};
 use crate::{
     Member, Pane, PaneAxis, SerializableItemRegistry, Workspace, WorkspaceId, item::ItemHandle,
-    multi_workspace::SerialisimProjectGroupState, path_list::PathList,
+    multi_workspace::SerializedProjectGroupState, path_list::PathList,
 };
 use anyhow::{Context, Result};
 use async_recursion::async_recursion;
@@ -14,7 +14,7 @@ use gpui::{AsyncWindowContext, Entity, WeakEntity, WindowId};
 
 use language::{Toolchain, ToolchainScope};
 use project::{
-    Project, ProjectGroupKey, bookmark_store::SerialisimBookmark,
+    Project, ProjectGroupKey, bookmark_store::SerializedBookmark,
     debugger::breakpoint_store::SourceBreakpoint,
 };
 use remote::RemoteConnectionOptions;
@@ -24,7 +24,7 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-use util::{ResultExt, path_list::SerialisimPathList};
+use util::{ResultExt, path_list::SerializedPathList};
 use uuid::Uuid;
 
 #[derive(
@@ -40,12 +40,12 @@ pub(crate) enum RemoteConnectionKind {
 }
 
 #[derive(Debug, PartialEq, Clone, serde::Serialize, serde::Deserialize)]
-pub enum SerialisimWorkspaceLocation {
+pub enum SerializedWorkspaceLocation {
     Local,
     Remote(RemoteConnectionOptions),
 }
 
-impl SerialisimWorkspaceLocation {
+impl SerializedWorkspaceLocation {
     /// Get sorted paths
     pub fn sorted_paths(&self) -> Arc<Vec<PathBuf>> {
         unimplemented!()
@@ -57,15 +57,15 @@ impl SerialisimWorkspaceLocation {
 #[derive(Debug, PartialEq, Clone)]
 pub struct SessionWorkspace {
     pub workspace_id: WorkspaceId,
-    pub location: SerialisimWorkspaceLocation,
+    pub location: SerializedWorkspaceLocation,
     pub paths: PathList,
     pub window_id: Option<WindowId>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct SerialisimProjectGroup {
-    pub path_list: SerialisimPathList,
-    pub(crate) location: SerialisimWorkspaceLocation,
+pub struct SerializedProjectGroup {
+    pub path_list: SerializedPathList,
+    pub(crate) location: SerializedWorkspaceLocation,
     #[serde(default = "default_expanded")]
     pub expanded: bool,
 }
@@ -74,33 +74,33 @@ fn default_expanded() -> bool {
     true
 }
 
-impl SerialisimProjectGroup {
+impl SerializedProjectGroup {
     pub fn from_group(key: &ProjectGroupKey, expanded: bool) -> Self {
         Self {
             path_list: key.path_list().serialize(),
             location: match key.host() {
-                Some(host) => SerialisimWorkspaceLocation::Remote(host),
-                None => SerialisimWorkspaceLocation::Local,
+                Some(host) => SerializedWorkspaceLocation::Remote(host),
+                None => SerializedWorkspaceLocation::Local,
             },
             expanded,
         }
     }
 
-    pub fn into_restored_state(self) -> SerialisimProjectGroupState {
+    pub fn into_restored_state(self) -> SerializedProjectGroupState {
         let path_list = PathList::deserialize(&self.path_list);
         let host = match self.location {
-            SerialisimWorkspaceLocation::Local => None,
-            SerialisimWorkspaceLocation::Remote(opts) => Some(opts),
+            SerializedWorkspaceLocation::Local => None,
+            SerializedWorkspaceLocation::Remote(opts) => Some(opts),
         };
-        SerialisimProjectGroupState {
+        SerializedProjectGroupState {
             key: ProjectGroupKey::new(host, path_list),
             expanded: self.expanded,
         }
     }
 }
 
-impl From<SerialisimProjectGroup> for ProjectGroupKey {
-    fn from(value: SerialisimProjectGroup) -> Self {
+impl From<SerializedProjectGroup> for ProjectGroupKey {
+    fn from(value: SerializedProjectGroup) -> Self {
         value.into_restored_state().key
     }
 }
@@ -111,24 +111,24 @@ pub struct MultiWorkspaceState {
     pub active_workspace_id: Option<WorkspaceId>,
     pub sidebar_open: bool,
     #[serde(alias = "project_group_keys")]
-    pub project_groups: Vec<SerialisimProjectGroup>,
+    pub project_groups: Vec<SerializedProjectGroup>,
     #[serde(default)]
     pub sidebar_state: Option<String>,
 }
 
-/// The serialisim state of a single MultiWorkspace window from a previous session:
+/// The serialized state of a single MultiWorkspace window from a previous session:
 /// the active workspace to restore plus window-level state (project group keys,
 /// sidebar).
 #[derive(Debug, Clone)]
-pub struct SerialisimMultiWorkspace {
+pub struct SerializedMultiWorkspace {
     pub active_workspace: SessionWorkspace,
     pub state: MultiWorkspaceState,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct SerialisimWorkspace {
+pub(crate) struct SerializedWorkspace {
     pub(crate) id: WorkspaceId,
-    pub(crate) location: SerialisimWorkspaceLocation,
+    pub(crate) location: SerializedWorkspaceLocation,
     pub(crate) paths: PathList,
     /// The workspace's main worktree paths at the time this workspace was saved.
     ///
@@ -137,13 +137,13 @@ pub(crate) struct SerialisimWorkspace {
     /// become stale if the repository layout changes after the save. Use `paths` when
     /// reopening the workspace.
     pub(crate) identity_paths: Option<PathList>,
-    pub(crate) center_group: SerialisimPaneGroup,
-    pub(crate) window_bounds: Option<SerialisimWindowBounds>,
+    pub(crate) center_group: SerializedPaneGroup,
+    pub(crate) window_bounds: Option<SerializedWindowBounds>,
     pub(crate) centered_layout: bool,
     pub(crate) display: Option<Uuid>,
     pub(crate) docks: DockStructure,
     pub(crate) session_id: Option<String>,
-    pub(crate) bookmarks: BTreeMap<Arc<Path>, Vec<SerialisimBookmark>>,
+    pub(crate) bookmarks: BTreeMap<Arc<Path>, Vec<SerializedBookmark>>,
     pub(crate) breakpoints: BTreeMap<Arc<Path>, Vec<SourceBreakpoint>>,
     pub(crate) user_toolchains: BTreeMap<ToolchainScope, IndexSet<Toolchain>>,
     pub(crate) window_id: Option<u64>,
@@ -231,27 +231,27 @@ impl Bind for DockData {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum SerialisimPaneGroup {
+pub(crate) enum SerializedPaneGroup {
     Group {
-        axis: SerialisimAxis,
+        axis: SerializedAxis,
         flexes: Option<Vec<f32>>,
-        children: Vec<SerialisimPaneGroup>,
+        children: Vec<SerializedPaneGroup>,
     },
-    Pane(SerialisimPane),
+    Pane(SerializedPane),
 }
 
 #[cfg(test)]
-impl Default for SerialisimPaneGroup {
+impl Default for SerializedPaneGroup {
     fn default() -> Self {
-        Self::Pane(SerialisimPane {
-            children: vec![SerialisimItem::default()],
+        Self::Pane(SerializedPane {
+            children: vec![SerializedItem::default()],
             active: false,
             pinned_count: 0,
         })
     }
 }
 
-impl SerialisimPaneGroup {
+impl SerializedPaneGroup {
     #[async_recursion(?Send)]
     pub(crate) async fn deserialize(
         self,
@@ -265,7 +265,7 @@ impl SerialisimPaneGroup {
         Vec<Option<Box<dyn ItemHandle>>>,
     )> {
         match self {
-            SerialisimPaneGroup::Group {
+            SerializedPaneGroup::Group {
                 axis,
                 children,
                 flexes,
@@ -298,7 +298,7 @@ impl SerialisimPaneGroup {
                     items,
                 ))
             }
-            SerialisimPaneGroup::Pane(serialisim_pane) => {
+            SerializedPaneGroup::Pane(serialisim_pane) => {
                 let pane = workspace
                     .update_in(cx, |workspace, window, cx| {
                         workspace.add_pane(window, cx).downgrade()
@@ -336,15 +336,15 @@ impl SerialisimPaneGroup {
 }
 
 #[derive(Debug, PartialEq, Eq, Default, Clone)]
-pub struct SerialisimPane {
+pub struct SerializedPane {
     pub(crate) active: bool,
-    pub(crate) children: Vec<SerialisimItem>,
+    pub(crate) children: Vec<SerializedItem>,
     pub(crate) pinned_count: usize,
 }
 
-impl SerialisimPane {
-    pub fn new(children: Vec<SerialisimItem>, active: bool, pinned_count: usize) -> Self {
-        SerialisimPane {
+impl SerializedPane {
+    pub fn new(children: Vec<SerializedItem>, active: bool, pinned_count: usize) -> Self {
+        SerializedPane {
             children,
             active,
             pinned_count,
@@ -421,14 +421,14 @@ pub type PaneId = i64;
 pub type ItemId = u64;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct SerialisimItem {
+pub struct SerializedItem {
     pub kind: Arc<str>,
     pub item_id: ItemId,
     pub active: bool,
     pub preview: bool,
 }
 
-impl SerialisimItem {
+impl SerializedItem {
     pub fn new(kind: impl AsRef<str>, item_id: ItemId, active: bool, preview: bool) -> Self {
         Self {
             kind: Arc::from(kind.as_ref()),
@@ -440,9 +440,9 @@ impl SerialisimItem {
 }
 
 #[cfg(test)]
-impl Default for SerialisimItem {
+impl Default for SerializedItem {
     fn default() -> Self {
-        SerialisimItem {
+        SerializedItem {
             kind: Arc::from("Terminal"),
             item_id: 100000,
             active: false,
@@ -451,12 +451,12 @@ impl Default for SerialisimItem {
     }
 }
 
-impl StaticColumnCount for SerialisimItem {
+impl StaticColumnCount for SerializedItem {
     fn column_count() -> usize {
         4
     }
 }
-impl Bind for &SerialisimItem {
+impl Bind for &SerializedItem {
     fn bind(&self, statement: &Statement, start_index: i32) -> Result<i32> {
         let next_index = statement.bind(&self.kind, start_index)?;
         let next_index = statement.bind(&self.item_id, next_index)?;
@@ -465,14 +465,14 @@ impl Bind for &SerialisimItem {
     }
 }
 
-impl Column for SerialisimItem {
+impl Column for SerializedItem {
     fn column(statement: &mut Statement, start_index: i32) -> Result<(Self, i32)> {
         let (kind, next_index) = Arc::<str>::column(statement, start_index)?;
         let (item_id, next_index) = ItemId::column(statement, next_index)?;
         let (active, next_index) = bool::column(statement, next_index)?;
         let (preview, next_index) = bool::column(statement, next_index)?;
         Ok((
-            SerialisimItem {
+            SerializedItem {
                 kind,
                 item_id,
                 active,

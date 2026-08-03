@@ -83,13 +83,13 @@ let
   gpu-lib = if withGLES then libglvnd else vulkan-loader;
   commonArgs =
     let
-      simCargoLock = builtins.fromTOML (builtins.readFile ../crates/sim/Cargo.toml);
+      zedCargoLock = builtins.fromTOML (builtins.readFile ../crates/sim/Cargo.toml);
       stdenv' = stdenv;
     in
     rec {
       pname = "sim-editor";
       version =
-        simCargoLock.package.version
+        zedCargoLock.package.version
         + "-nightly"
         + lib.optionalString (commitSha != null) "+${builtins.substring 0 7 commitSha}";
       src = builtins.path {
@@ -358,7 +358,7 @@ craneLib.buildPackage (
           mkdir -p $out/bin $out/libexec
           cp $TARGET_DIR/sim $out/libexec/sim-editor
           cp $TARGET_DIR/cli  $out/bin/sim
-          ln -s $out/bin/sim $out/bin/simitor  # home-manager expects the CLI binary to be here
+          ln -s $out/bin/sim $out/bin/zeditor  # home-manager expects the CLI binary to be here
 
 
           install -D "crates/sim/resources/app-icon-nightly@2x.png" \

@@ -2,8 +2,6 @@ use db::kvp::KeyValueStore;
 use gpui::{App, AppContext as _, Context, Subscription, Task, WindowId};
 use util::ResultExt;
 
-pub mod import;
-
 pub struct Session {
     session_id: String,
     old_session_id: Option<String>,
@@ -72,8 +70,7 @@ impl AppSession {
     pub fn new(session: Session, cx: &Context<Self>) -> Self {
         let _subscriptions = vec![cx.on_app_quit(Self::app_will_quit)];
 
-        #[cfg(not(any(test, feature = "test-support")))]
-        let _serialization_task = {
+        let _serialization_task = if cfg!(not(any(test, feature = "test-support"))) {
             let db = KeyValueStore::global(cx);
             cx.spawn(async move |_, cx| {
                 // Disabled in tests: the infinite loop bypasses "parking forbidden" checks,
@@ -94,10 +91,9 @@ impl AppSession {
                     }
                 }
             })
+        } else {
+            Task::ready(())
         };
-
-        #[cfg(any(test, feature = "test-support"))]
-        let _serialization_task = Task::ready(());
 
         Self {
             session,

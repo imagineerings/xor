@@ -206,7 +206,7 @@ impl Component for AlertModal {
                                         h_flex()
                                             .gap_1()
                                             .child(Icon::new(IconName::Warning).color(Color::Warning))
-                                            .child(Headline::new("Unrecognisim Workspace").size(HeadlineSize::Small))
+                                            .child(Headline::new("Unrecognized Workspace").size(HeadlineSize::Small))
                                     )
                                     .child(
                                         h_flex()

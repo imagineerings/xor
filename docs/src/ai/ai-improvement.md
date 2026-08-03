@@ -61,7 +61,7 @@ and rejection. See [Telemetry](../telemetry.md) for details.
 
 Collected feedback data is stored in Snowflake. Sim periodically reviews this
 data to refine prompts, tools, and product behavior. Stored feedback data is
-anonymisim and stripped of sensitive information such as access tokens, user IDs,
+anonymized and stripped of sensitive information such as access tokens, user IDs,
 and email addresses.
 
 ## Edit Prediction Training Data {#edit-predictions}
@@ -124,7 +124,7 @@ For open source projects where you opted in, Sim may collect:
 
 Collected data is stored in Snowflake. Sim periodically reviews this data to
 select training samples for inclusion in the model training dataset. Included
-data is anonymisim and stripped of sensitive information such as access tokens,
+data is anonymized and stripped of sensitive information such as access tokens,
 user IDs, and email addresses.
 
 The training dataset is publicly available at

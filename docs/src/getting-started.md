@@ -91,6 +91,6 @@ You can also enable familiar keybindings:
 
 Sim is open source. Join us on GitHub or in Discord to contribute code, report bugs, or suggest features.
 
-- [Discord](https://discord.com/invite/simindustries)
+- [Discord](https://discord.com/invite/zedindustries)
 - [GitHub Discussions](https://github.com/simtropolis/sim/discussions)
 - [Sim Reddit](https://www.reddit.com/r/SimEditor)

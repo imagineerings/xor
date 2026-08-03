@@ -4,7 +4,6 @@ pub mod terminal_panel;
 mod terminal_path_like_target;
 pub mod terminal_scrollbar;
 
-use sim_actions::{agent::AddSelectionToThread, assistant::InlineAssist};
 use editor::{
     Editor, EditorSettings, actions::SelectAll, blink_manager::BlinkManager,
     ui_scrollbar_settings_from_raw,
@@ -23,6 +22,7 @@ use serde::Deserialize;
 use settings::{
     SeedQuerySetting, Settings, SettingsStore, TerminalBell, TerminalBlink, WorkingDirectory,
 };
+use sim_actions::{agent::AddSelectionToThread, assistant::InlineAssist};
 use std::{
     any::Any,
     cmp,
@@ -138,6 +138,8 @@ pub struct TerminalView {
     cursor_shape: CursorShape,
     blink_manager: Entity<BlinkManager>,
     mode: TerminalMode,
+    // Explicit override for whether workspace-specific context menu actions are shown.
+    // When `None`, visibility is derived from `mode` (hidden for embedded terminals).
     show_workspace_actions: Option<bool>,
     blinking_terminal_enabled: bool,
     needs_serialize: bool,
@@ -258,14 +260,12 @@ impl TerminalView {
         let blink_manager = cx.new(|cx| {
             BlinkManager::new(
                 CURSOR_BLINK_INTERVAL,
-                CURSOR_BLINK_INTERVAL,
                 |cx| {
                     !matches!(
                         TerminalSettings::get_global(cx).blinking,
                         TerminalBlink::Off
                     )
                 },
-                |_| false,
                 cx,
             )
         });
@@ -319,6 +319,12 @@ impl TerminalView {
         cx.notify();
     }
 
+    /// Explicitly override whether workspace-specific context menu actions (e.g. creating or
+    /// closing terminal tabs, inline assist) are shown.
+    ///
+    /// This lets hosts that aren't workspace panes (such as the agent panel) hide these
+    /// actions without `terminal_view` needing to know about those hosts. When never called,
+    /// visibility is derived from the terminal's `mode`.
     pub fn set_show_workspace_actions(&mut self, show: bool, cx: &mut Context<Self>) {
         self.show_workspace_actions = Some(show);
         cx.notify();
@@ -953,7 +959,7 @@ impl TerminalView {
     pub fn add_paths_to_terminal(&self, paths: &[PathBuf], window: &mut Window, cx: &mut App) {
         let mut text = paths
             .iter()
-            .map(|path| format!(" {path:?}"))
+            .filter_map(|path| Some(format!(" {}", shlex::try_quote(path.to_str()?).ok()?)))
             .collect::<String>();
         text.push(' ');
         window.focus(&self.focus_handle(cx), cx);
@@ -1123,6 +1129,7 @@ fn subscribe_for_terminal_events(
             match event {
                 Event::Wakeup => {
                     cx.notify();
+                    window.invalidate_character_coordinates();
                     cx.emit(Event::Wakeup);
                     cx.emit(ItemEvent::UpdateTab);
                     cx.emit(SearchEvent::MatchesInvalidated);
@@ -2170,7 +2177,7 @@ mod tests {
         let mut text = String::new();
         for path in paths {
             text.push(' ');
-            text.push_str(&format!("{path:?}"));
+            text.push_str(&shlex::try_quote(path.to_str().unwrap()).unwrap());
         }
         text.push(' ');
         text

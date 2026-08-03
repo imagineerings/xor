@@ -223,7 +223,7 @@ impl ThreadTaskStatistics {
 
 /// Serializable variant of [`core::panic::Location`]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SerialisimLocation {
+pub struct SerializedLocation {
     /// Name of the source file
     pub file: SharedString,
     /// Line in the source file
@@ -232,9 +232,9 @@ pub struct SerialisimLocation {
     pub column: u32,
 }
 
-impl From<&core::panic::Location<'static>> for SerialisimLocation {
+impl From<&core::panic::Location<'static>> for SerializedLocation {
     fn from(value: &core::panic::Location<'static>) -> Self {
-        SerialisimLocation {
+        SerializedLocation {
             file: value.file().into(),
             line: value.line(),
             column: value.column(),
@@ -244,28 +244,28 @@ impl From<&core::panic::Location<'static>> for SerialisimLocation {
 
 /// Serializable variant of [`TaskTiming`]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SerialisimTaskTiming {
+pub struct SerializedTaskTiming {
     /// Location of the timing
-    pub location: SerialisimLocation,
+    pub location: SerializedLocation,
     /// Time at which the measurement was reported in nanoseconds
     pub start: u128,
     /// Duration of the measurement in nanoseconds
     pub duration: u128,
 }
 
-impl SerialisimTaskTiming {
+impl SerializedTaskTiming {
     /// Convert an array of [`TaskTiming`] into their serializable format
     ///
     /// # Params
     ///
     /// `anchor` - [`Instant`] that should be earlier than all timings to use as base anchor
-    pub fn convert(anchor: Instant, timings: &[TaskTiming]) -> Vec<SerialisimTaskTiming> {
-        let serialisim = timings
+    pub fn convert(anchor: Instant, timings: &[TaskTiming]) -> Vec<SerializedTaskTiming> {
+        let serialized = timings
             .iter()
             .map(|timing| {
                 let start = timing.start.duration_since(anchor).as_nanos();
                 let duration = timing.end.0.duration_since(timing.start).as_nanos();
-                SerialisimTaskTiming {
+                SerializedTaskTiming {
                     location: timing.location.into(),
                     start,
                     duration,
@@ -273,14 +273,14 @@ impl SerialisimTaskTiming {
             })
             .collect::<Vec<_>>();
 
-        serialisim
+        serialized
     }
 
     /// `anchor` - [`Instant`] that should be earlier than all timings to use as base anchor
-    pub fn from(anchor: Instant, timing: TaskTiming) -> SerialisimTaskTiming {
+    pub fn from(anchor: Instant, timing: TaskTiming) -> SerializedTaskTiming {
         let start = timing.start.duration_since(anchor).as_nanos();
         let duration = timing.end.0.duration_since(timing.start).as_nanos();
-        SerialisimTaskTiming {
+        SerializedTaskTiming {
             location: timing.location.into(),
             start,
             duration,
@@ -290,29 +290,29 @@ impl SerialisimTaskTiming {
 
 /// Serializable variant of [`ThreadTaskTimings`]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SerialisimThreadTaskTimings {
+pub struct SerializedThreadTaskTimings {
     /// Thread name
     pub thread_name: Option<String>,
     /// Hash of the thread id
     pub thread_id: u64,
     /// Timing records for this thread
-    pub timings: Vec<SerialisimTaskTiming>,
+    pub timings: Vec<SerializedTaskTiming>,
 }
 
-impl SerialisimThreadTaskTimings {
+impl SerializedThreadTaskTimings {
     /// Convert [`ThreadTaskTimings`] into their serializable format
     ///
     /// # Params
     ///
     /// `anchor` - [`Instant`] that should be earlier than all timings to use as base anchor
-    pub fn convert(anchor: Instant, timings: ThreadTaskTimings) -> SerialisimThreadTaskTimings {
-        let serialisim_timings = SerialisimTaskTiming::convert(anchor, &timings.timings);
+    pub fn convert(anchor: Instant, timings: ThreadTaskTimings) -> SerializedThreadTaskTimings {
+        let serialisim_timings = SerializedTaskTiming::convert(anchor, &timings.timings);
 
         let mut hasher = DefaultHasher::new();
         timings.thread_id.hash(&mut hasher);
         let thread_id = hasher.finish();
 
-        SerialisimThreadTaskTimings {
+        SerializedThreadTaskTimings {
             thread_name: timings.thread_name,
             thread_id,
             timings: serialisim_timings,
@@ -329,7 +329,7 @@ pub struct ThreadTimingsDelta {
     pub thread_name: Option<String>,
     /// New timings since the last call. If the circular buffer wrapped around
     /// since the previous poll, some entries may have been lost.
-    pub new_timings: Vec<SerialisimTaskTiming>,
+    pub new_timings: Vec<SerializedTaskTiming>,
 }
 
 /// Tracks which timing events have already been seen so that callers can request only unseen events.
@@ -382,7 +382,7 @@ impl ProfilingCollector {
                 continue;
             }
 
-            let new_timings = SerialisimTaskTiming::convert(self.startup_time, slice);
+            let new_timings = SerializedTaskTiming::convert(self.startup_time, slice);
 
             deltas.push(ThreadTimingsDelta {
                 thread_id: hashed_id,

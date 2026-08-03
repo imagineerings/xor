@@ -5,18 +5,18 @@ use std::{
     time::{Duration, Instant},
 };
 
-use sim_actions::OpenPerformanceProfiler;
 use command_palette_hooks::CommandPaletteFilter;
 use gpui::{
     App, AppContext, ClipboardItem, Context, Div, Entity, Hsla, InteractiveElement,
-    ParentElement as _, ProfilingCollector, Render, SerialisimLocation, SerialisimTaskTiming,
-    SerialisimThreadTaskTimings, SharedString, StatefulInteractiveElement, Styled, Task,
+    ParentElement as _, ProfilingCollector, Render, SerializedLocation, SerializedTaskTiming,
+    SerializedThreadTaskTimings, SharedString, StatefulInteractiveElement, Styled, Task,
     TasksIncluded, ThreadTimingsDelta, TitlebarOptions, UniformListScrollHandle, WeakEntity,
     WindowBounds, WindowOptions, div, prelude::FluentBuilder, profiler, px, relative, size,
     uniform_list,
 };
 use rpc::{AnyProtoClient, proto};
 use settings::{RegisterSetting, Settings, SettingsContent, SettingsStore};
+use sim_actions::OpenPerformanceProfiler;
 use std::any::TypeId;
 use util::ResultExt;
 use workspace::{
@@ -177,7 +177,7 @@ fn open_performance_profiler(
 }
 
 struct TimingBar {
-    location: SerialisimLocation,
+    location: SerializedLocation,
     start_nanos: u128,
     duration_nanos: u128,
     color: Hsla,
@@ -186,9 +186,9 @@ struct TimingBar {
 pub struct ProfilerWindow {
     collector: ProfilingCollector,
     source: ProfileSource,
-    timings: Vec<SerialisimThreadTaskTimings>,
+    timings: Vec<SerializedThreadTaskTimings>,
     paused: bool,
-    display_timings: Rc<Vec<SerialisimTaskTiming>>,
+    display_timings: Rc<Vec<SerializedTaskTiming>>,
     include_self_timings: ToggleState,
     autoscroll: bool,
     scroll_handle: UniformListScrollHandle,
@@ -247,7 +247,7 @@ impl ProfilerWindow {
         let include_self = self.include_self_timings.selected();
         let cutoff_nanos = self.now_nanos().saturating_sub(VISIBLE_WINDOW_NANOS);
 
-        let per_thread: Vec<Vec<SerialisimTaskTiming>> = self
+        let per_thread: Vec<Vec<SerializedTaskTiming>> = self
             .timings
             .iter()
             .map(|thread| {
@@ -354,8 +354,8 @@ impl ProfilerWindow {
                     .into_iter()
                     .map(|t| {
                         let location = t.location.unwrap_or_default();
-                        SerialisimTaskTiming {
-                            location: SerialisimLocation {
+                        SerializedTaskTiming {
+                            location: SerializedLocation {
                                 file: SharedString::from(location.file),
                                 line: location.line,
                                 column: location.column,
@@ -574,8 +574,8 @@ impl Render for ProfilerWindow {
                                             return;
                                         }
 
-                                        let serialisim = if this.source.foreground_only() {
-                                            let flat: Vec<&SerialisimTaskTiming> = this
+                                        let serialized = if this.source.foreground_only() {
+                                            let flat: Vec<&SerializedTaskTiming> = this
                                                 .timings
                                                 .iter()
                                                 .flat_map(|t| &t.timings)
@@ -585,7 +585,7 @@ impl Render for ProfilerWindow {
                                             serde_json::to_string(&this.timings)
                                         };
 
-                                        let Some(serialisim) = serialisim.log_err() else {
+                                        let Some(serialized) = serialized.log_err() else {
                                             return;
                                         };
 
@@ -612,7 +612,7 @@ impl Render for ProfilerWindow {
                                                 return;
                                             };
 
-                                            smol::fs::write(path, &serialisim).await.log_err();
+                                            smol::fs::write(path, &serialized).await.log_err();
                                         })
                                         .detach();
                                     })),
@@ -684,10 +684,7 @@ impl Render for ProfilerWindow {
 
 const MAX_VISIBLE_PER_THREAD: usize = 10_000;
 
-fn visible_tail(
-    timings: &[SerialisimTaskTiming],
-    cutoff_nanos: u128,
-) -> &[SerialisimTaskTiming] {
+fn visible_tail(timings: &[SerializedTaskTiming], cutoff_nanos: u128) -> &[SerializedTaskTiming] {
     let len = timings.len();
     let limit = len.min(MAX_VISIBLE_PER_THREAD);
     let search_start = len - limit;
@@ -704,16 +701,16 @@ fn visible_tail(
 }
 
 fn filter_timings(
-    timings: impl Iterator<Item = SerialisimTaskTiming>,
+    timings: impl Iterator<Item = SerializedTaskTiming>,
     include_self: bool,
-) -> Vec<SerialisimTaskTiming> {
+) -> Vec<SerializedTaskTiming> {
     timings
         .filter(|t| t.duration / NANOS_PER_MS >= 1)
         .filter(|t| include_self || !t.location.file.ends_with("miniprofiler_ui.rs"))
         .collect()
 }
 
-fn location_color_index(location: &SerialisimLocation) -> u32 {
+fn location_color_index(location: &SerializedLocation) -> u32 {
     let mut hasher = DefaultHasher::new();
     location.file.hash(&mut hasher);
     location.line.hash(&mut hasher);
@@ -721,9 +718,9 @@ fn location_color_index(location: &SerialisimLocation) -> u32 {
     hasher.finish() as u32
 }
 
-/// Merge K sorted `Vec<SerialisimTaskTiming>` into a single sorted vec.
+/// Merge K sorted `Vec<SerializedTaskTiming>` into a single sorted vec.
 /// Each input vec must already be sorted by `start`.
-fn kway_merge(lists: Vec<Vec<SerialisimTaskTiming>>) -> Vec<SerialisimTaskTiming> {
+fn kway_merge(lists: Vec<Vec<SerializedTaskTiming>>) -> Vec<SerializedTaskTiming> {
     let total_len: usize = lists.iter().map(|l| l.len()).sum();
     let mut result = Vec::with_capacity(total_len);
     let mut cursors = vec![0usize; lists.len()];
@@ -755,10 +752,10 @@ fn kway_merge(lists: Vec<Vec<SerialisimTaskTiming>>) -> Vec<SerialisimTaskTiming
 }
 
 fn append_to_thread(
-    threads: &mut Vec<SerialisimThreadTaskTimings>,
+    threads: &mut Vec<SerializedThreadTaskTimings>,
     thread_id: u64,
     thread_name: Option<String>,
-    new_timings: Vec<SerialisimTaskTiming>,
+    new_timings: Vec<SerializedTaskTiming>,
 ) {
     if let Some(existing) = threads.iter_mut().find(|t| t.thread_id == thread_id) {
         existing.timings.extend(new_timings);
@@ -766,7 +763,7 @@ fn append_to_thread(
             existing.thread_name = thread_name;
         }
     } else {
-        threads.push(SerialisimThreadTaskTimings {
+        threads.push(SerializedThreadTaskTimings {
             thread_name,
             thread_id,
             timings: new_timings,

@@ -1,148 +1,93 @@
 ---
 name: coding
-description: Create a spec for a feature in .agents/specs create/update feature spec/PRD/RFC—requirements, design doc, and implementation tasks checklist. Trigger on spec/specification/PRD/RFC/tech spec, requirements/user story/acceptance criteria/EARS, design doc/architecture, task breakdown/implementation plan/checklist; Requirements/Acceptance/Design/Task.
+description: Define and deliver repository features through traceable specifications under .agents/specs/ and implementation of every resulting task. Use when Codex needs to turn an idea into requirements, design, validation strategy, and working code; implement an existing spec pack; resume unfinished spec tasks; or update specifications while delivering a change. Stop after planning only when the user explicitly requests specification or planning work without implementation.
 ---
 
-# Agent: Spec-Driven Development Workflow
+# Spec-driven delivery
 
-Transform ideas into comprehensive specifications, design documents, and actionable implementation plans.
+Create the smallest spec pack that makes implementation unambiguous. Store it at
+`.agents/specs/{feature-name}/`, using a kebab-case feature name.
 
-## When to use
+## Select the delivery mode
 
-Use this skill when you want a spec pack under `.agents/specs/`:
+- **Specification only:** Create or update only the requested planning artifacts
+  when the user explicitly asks for planning without implementation.
+- **Implement existing specification:** Validate the existing pack, reconcile it
+  with the repository, and complete every pending executable task.
+- **Full delivery:** Define the requirements and design, create executable tasks,
+  then continue through implementation without requiring another prompt.
 
-1. requirements with EARS acceptance criteria,
-2. a design doc with architecture + correctness properties,
-3. an executable tasks checklist.
+When implementation is authorized, do not stop after writing the specification.
+Continue until every executable task is implemented and validated, or until a
+blocking decision, permission, or external dependency prevents further progress.
 
-## Workflow
+## Establish scope
 
-1. **Requirements** → Define what to build (EARS format) → [Details](references/phase-1-requirements.md)
-2. **Design** → How to build it (architecture + correctness properties) → [Details](references/phase-2-design.md)
-3. **Tasks** → Actionable implementation steps → [Details](references/phase-3-tasks.md)
-4. **Execute** → Implement one task at a time → [Details](references/phase-4-execute.md)
+1. Read applicable repository instructions, related specs, relevant code, tests,
+   dependencies, and build commands before proposing behavior or architecture.
+2. Determine which artifacts the user requested and which already exist.
+3. Update only affected artifacts unless the user requests a complete spec pack.
+4. Preserve established repository terminology. Narrative prose may use the
+   user's language, but keep machine-parsed headings, identifiers, and metadata
+   keys exactly as shown in the references.
 
-When implementation work touches `webapp/`, use the `style-guide` skill before
-editing and again during review so React, TypeScript, SCSS, accessibility, i18n,
-testing, Redux, and networking choices follow the Simtropolis web app style
-guide.
+Do not force a new feature through separate conversational gates when the request
+is already clear. Produce all requested artifacts in one pass. Pause after
+requirements only when unresolved choices would materially change the design.
 
-**Storage**: `.agent/specs/{feature-name}/` (kebab-case)
+## Create the artifacts
 
----
+- For requirements work, read
+  [references/requirements.md](references/requirements.md).
+- For architecture or design work, read
+  [references/design.md](references/design.md).
+- For an implementation plan or checklist, read
+  [references/tasks.md](references/tasks.md).
+- For implementation or full delivery, read
+  [references/implementation.md](references/implementation.md).
 
-## Core Rules
+Use only sections relevant to the feature. Do not add empty deployment, data,
+integration, performance, or property-testing sections for template compliance.
 
-- **Sequential phases** — Never skip phases
-- **Explicit approval** — Get user approval after each document
-- **One task at a time** — During execution, focus on single task
-- **Correctness mandatory** — Every design MUST include properties from EARS
-- **Consistency gates mandatory** — Run a quick consistency check before
-  executing a task, and a full consistency pass before marking it complete.
+## Maintain traceability
 
-## Consistency Gates
+Use stable identifiers and maintain this chain for every testable behavior:
 
-Run consistency checks at two points:
+`requirement -> design decision/component -> task -> validation`
 
-1. **Quick start-gate check, before implementation** — Confirm the task is still
-   valid to start. Check prerequisites, dependency wave placement, obvious
-   `_writes:` conflicts, and obvious contradictions between `requirements.md`,
-   `design.md`, and `tasks.md`. If the task is blocked or contradictory, update
-   the spec or ask for clarification before coding.
-2. **Full completion-gate pass, after validation but before marking complete** —
-   Tighten gates based on the actual validation performed, update dependency
-   waves for remaining work, and reconcile all relevant spec documents. Confirm
-   every task reference points to existing requirements, design properties
-   validate those requirements, task reads/writes are accurate, and no document
-   contradicts another. The task may be marked complete only after this pass.
+Classify verification according to the behavior. Use example-based, integration,
+property-based, static, accessibility, performance, or manual verification as
+appropriate. Do not mechanically rewrite every acceptance criterion as a
+universal property.
 
-## Quick Reference
-
-### EARS Acceptance Criteria Format
-
-```
-WHEN [event] THEN THE [system] SHALL [response]
-IF [condition] THEN THE [system] SHALL [response]
-WHILE [state] THE [system] SHALL [response]
-```
-
-### Correctness Property Format
-
-```markdown
-### Property N: [Name]
-
-_For any_ [inputs], [precondition], [system] SHALL [behavior].
-
-**Validates: Requirement X.Y**
-```
-
-### Phase Outputs
-
-| Phase        | Output File       | Key Content                            |
-| ------------ | ----------------- | -------------------------------------- |
-| Requirements | `requirements.md` | User stories + EARS ACs                |
-| Design       | `design.md`       | Architecture + Interfaces + Properties |
-| Tasks        | `tasks.md`        | Checkbox task list                     |
-
-## Workflow Diagram
-
-```mermaid
-stateDiagram-v2
-  [*] --> Requirements
-
-  Requirements --> ReviewReq : Complete
-  ReviewReq --> Requirements : Changes
-  ReviewReq --> Design : Approved
-
-  Design --> ReviewDesign : Complete
-  ReviewDesign --> Design : Changes
-  ReviewDesign --> Tasks : Approved
-
-  Tasks --> ReviewTasks : Complete
-  ReviewTasks --> Tasks : Changes
-  ReviewTasks --> [*] : Approved
-
-  Execute : Execute Single Task
-  [*] --> Execute : Task Request
-  Execute --> [*] : Complete
-```
-
-## Detection Logic
-
-Determine current state by checking:
+Before starting implementation, reconcile all changed documents and run:
 
 ```bash
-# Check for .agent directory
-if [ -d ".agents/specs" ]; then
-  # List features
-  ls .agents/specs/
-
-  # For specific feature, check phase
-  FEATURE="$1"
-  if [ -f ".agents/specs/$FEATURE/requirements.md" ]; then
-    echo "Requirements exists"
-  fi
-  if [ -f ".agents/specs/$FEATURE/design.md" ]; then
-    echo "Design exists"
-  fi
-  if [ -f ".agents/specs/$FEATURE/tasks.md" ]; then
-    echo "Tasks exists - ready for execution"
-  fi
-fi
+python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/{feature-name}
 ```
 
-## Summary
+Add `--require-complete` before implementation or when the user requested a
+complete pack. Requirements are a prerequisite for design, and requirements plus
+design are prerequisites for executable tasks.
 
-Kiro provides a structured, iterative approach to feature development:
+Treat canonical `_reads:` and `_writes:` entries as coordination estimates. Keep
+them current as implementation discovery changes the expected scope.
 
-- Start with **requirements** (what to build)
-- Progress to **design** (how to build it)
-- Create **tasks** (implementation steps)
-- **Execute** tasks one at a time
+## Deliver the implementation
 
-Each phase requires explicit user approval before proceeding, ensuring alignment and quality throughout the development process.
+Use the repository's `workflow` skill when applicable to plan, claim, validate,
+and hand off task packets. Preserve durable task IDs and task state. Execute tasks
+in dependency order, and parallelize only packets whose dependencies and read or
+write sets do not conflict.
 
-## Supporting Files
+For each task, implement the smallest complete increment, run its declared
+validation, and use `living-documentation` when delivered behavior or design
+changes. If implementation invalidates the specification, update and revalidate
+the affected artifacts before continuing. Do not mark a task complete without
+concrete validation evidence.
 
-- [Agent Identity](references/agent-identity.md) — Response style
-- [Workflow Diagrams](references/workflow-diagrams.md) — Visual references
+After all tasks are implemented, rerun pack validation and the smallest relevant
+repository checks. Distinguish locally implemented and validated work from merged
+delivery: publish, land, deploy, or mutate external systems only when authorized.
+Ask first only for expensive, destructive, privileged, or externally mutating
+checks that are not already implied by the requested delivery workflow.

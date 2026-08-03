@@ -138,6 +138,7 @@ impl LabelLike {
     }
 
     /// Truncates overflowing text with an ellipsis (`…`) in the middle if needed.
+    /// Preserves the start and end of the text. Useful for filenames.
     pub fn truncate_middle(mut self) -> Self {
         self.truncate_middle = true;
         self

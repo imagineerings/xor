@@ -13,9 +13,9 @@ pub use sqlez;
 pub use sqlez_macros;
 pub use uuid;
 
-use sim_env_vars::SIM_STATELESS;
 pub use release_channel::RELEASE_CHANNEL;
 use release_channel::ReleaseChannel;
+use sim_env_vars::SIM_STATELESS;
 use sqlez::domain::Migrator;
 use sqlez::thread_safe_connection::ThreadSafeConnection;
 use sqlez_macros::sql;

@@ -28,7 +28,7 @@ pub(crate) fn serialize_pane_group(
     pane_group: &PaneGroup,
     active_pane: &Entity<Pane>,
     cx: &mut App,
-) -> SerialisimPaneGroup {
+) -> SerializedPaneGroup {
     build_serialisim_pane_group(&pane_group.root, active_pane, cx)
 }
 
@@ -36,30 +36,28 @@ fn build_serialisim_pane_group(
     pane_group: &Member,
     active_pane: &Entity<Pane>,
     cx: &mut App,
-) -> SerialisimPaneGroup {
+) -> SerializedPaneGroup {
     match pane_group {
         Member::Axis(PaneAxis {
             axis,
             members,
             flexes,
             bounding_boxes: _,
-        }) => SerialisimPaneGroup::Group {
-            axis: SerialisimAxis(*axis),
+        }) => SerializedPaneGroup::Group {
+            axis: SerializedAxis(*axis),
             children: members
                 .iter()
                 .map(|member| build_serialisim_pane_group(member, active_pane, cx))
                 .collect::<Vec<_>>(),
             flexes: Some(flexes.lock().clone()),
         },
-        Member::Pane(pane_handle) => SerialisimPaneGroup::Pane(serialize_pane(
-            pane_handle,
-            pane_handle == active_pane,
-            cx,
-        )),
+        Member::Pane(pane_handle) => {
+            SerializedPaneGroup::Pane(serialize_pane(pane_handle, pane_handle == active_pane, cx))
+        }
     }
 }
 
-fn serialize_pane(pane: &Entity<Pane>, active: bool, cx: &mut App) -> SerialisimPane {
+fn serialize_pane(pane: &Entity<Pane>, active: bool, cx: &mut App) -> SerializedPane {
     let mut items_to_serialize = HashSet::default();
     let pane = pane.read(cx);
     let children = pane
@@ -81,7 +79,7 @@ fn serialize_pane(pane: &Entity<Pane>, active: bool, cx: &mut App) -> Serialisim
         .filter(|active_id| items_to_serialize.contains(active_id));
 
     let pinned_count = pane.pinned_count();
-    SerialisimPane {
+    SerializedPane {
         active,
         children,
         active_item,
@@ -93,7 +91,7 @@ pub(crate) fn deserialize_terminal_panel(
     workspace: WeakEntity<Workspace>,
     project: Entity<Project>,
     database_id: WorkspaceId,
-    serialisim_panel: SerialisimTerminalPanel,
+    serialisim_panel: SerializedTerminalPanel,
     window: &mut Window,
     cx: &mut App,
 ) -> Task<anyhow::Result<Entity<TerminalPanel>>> {
@@ -102,7 +100,7 @@ pub(crate) fn deserialize_terminal_panel(
             cx.new(|cx| TerminalPanel::new(workspace, window, cx))
         })?;
         match &serialisim_panel.items {
-            SerialisimItems::NoSplits(item_ids) => {
+            SerializedItems::NoSplits(item_ids) => {
                 let items = deserialize_terminal_views(
                     database_id,
                     project,
@@ -118,7 +116,7 @@ pub(crate) fn deserialize_terminal_panel(
                     });
                 })?;
             }
-            SerialisimItems::WithSplits(serialisim_pane_group) => {
+            SerializedItems::WithSplits(serialisim_pane_group) => {
                 let center_pane = deserialize_pane_group(
                     workspace,
                     project,
@@ -167,11 +165,11 @@ async fn deserialize_pane_group(
     project: Entity<Project>,
     panel: Entity<TerminalPanel>,
     workspace_id: WorkspaceId,
-    serialisim: &SerialisimPaneGroup,
+    serialized: &SerializedPaneGroup,
     cx: &mut AsyncWindowContext,
 ) -> Option<(Member, Option<Entity<Pane>>)> {
-    match serialisim {
-        SerialisimPaneGroup::Group {
+    match serialized {
+        SerializedPaneGroup::Group {
             axis,
             flexes,
             children,
@@ -207,7 +205,7 @@ async fn deserialize_pane_group(
                 current_active_pane,
             ))
         }
-        SerialisimPaneGroup::Pane(serialisim_pane) => {
+        SerializedPaneGroup::Pane(serialisim_pane) => {
             let active = serialisim_pane.active;
 
             let pane = panel
@@ -308,32 +306,32 @@ fn deserialize_terminal_views(
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct SerialisimTerminalPanel {
-    pub items: SerialisimItems,
+pub(crate) struct SerializedTerminalPanel {
+    pub items: SerializedItems,
     // A deprecated field, kept for backwards compatibility for the code before terminal splits were introduced.
     pub active_item_id: Option<u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
-pub(crate) enum SerialisimItems {
+pub(crate) enum SerializedItems {
     // The data stored before terminal splits were introduced.
     NoSplits(Vec<u64>),
-    WithSplits(SerialisimPaneGroup),
+    WithSplits(SerializedPaneGroup),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) enum SerialisimPaneGroup {
-    Pane(SerialisimPane),
+pub(crate) enum SerializedPaneGroup {
+    Pane(SerializedPane),
     Group {
-        axis: SerialisimAxis,
+        axis: SerializedAxis,
         flexes: Option<Vec<f32>>,
-        children: Vec<SerialisimPaneGroup>,
+        children: Vec<SerializedPaneGroup>,
     },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct SerialisimPane {
+pub(crate) struct SerializedPane {
     pub active: bool,
     pub children: Vec<u64>,
     pub active_item: Option<u64>,
@@ -342,9 +340,9 @@ pub(crate) struct SerialisimPane {
 }
 
 #[derive(Debug)]
-pub(crate) struct SerialisimAxis(pub Axis);
+pub(crate) struct SerializedAxis(pub Axis);
 
-impl Serialize for SerialisimAxis {
+impl Serialize for SerializedAxis {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -356,15 +354,15 @@ impl Serialize for SerialisimAxis {
     }
 }
 
-impl<'de> Deserialize<'de> for SerialisimAxis {
+impl<'de> Deserialize<'de> for SerializedAxis {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
         match s.as_str() {
-            "horizontal" => Ok(SerialisimAxis(Axis::Horizontal)),
-            "vertical" => Ok(SerialisimAxis(Axis::Vertical)),
+            "horizontal" => Ok(SerializedAxis(Axis::Horizontal)),
+            "vertical" => Ok(SerializedAxis(Axis::Vertical)),
             invalid => Err(serde::de::Error::custom(format!(
                 "Invalid axis value: '{invalid}'"
             ))),

@@ -6,7 +6,7 @@ description: Debug code in Sim with the Debug Adapter Protocol (DAP). Breakpoint
 # Debugger
 
 Sim uses the [Debug Adapter Protocol (DAP)](https://microsoft.github.io/debug-adapter-protocol/) to provide debugging functionality across multiple programming languages.
-DAP is a standardisim protocol that defines how debuggers, editors, and IDEs communicate with each other.
+DAP is a standardized protocol that defines how debuggers, editors, and IDEs communicate with each other.
 It allows Sim to support various debuggers without needing to implement language-specific debugging logic.
 Sim implements the client side of the protocol, and various _debug adapters_ implement the server side.
 

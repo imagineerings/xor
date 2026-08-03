@@ -1,4 +1,4 @@
-use crate::{TestClient, TestError, TestServer, UserTestPlan, randomizedTest, run_randomized_test};
+use crate::{RandomizedTest, TestClient, TestError, TestServer, UserTestPlan, run_randomized_test};
 use anyhow::{Context as _, Result};
 use async_trait::async_trait;
 use call::ActiveCall;
@@ -144,7 +144,7 @@ enum LspRequestKind {
 struct ProjectCollaborationTest;
 
 #[async_trait(?Send)]
-impl randomizedTest for ProjectCollaborationTest {
+impl RandomizedTest for ProjectCollaborationTest {
     type Operation = ClientOperation;
 
     async fn initialize(server: &mut TestServer, users: &[UserTestPlan]) {

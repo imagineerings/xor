@@ -46,11 +46,6 @@ pub struct ProjectContext {
     // fields in sync.
     pub(crate) skills: Vec<SkillSummary>,
     pub(crate) has_skills: bool,
-    /// Merged content from `.simhints` files (global + project), or
-    /// `None` if no hints were found.
-    pub(crate) hints_content: Option<String>,
-    /// Derived flag — `true` when `hints_content` is `Some` and non-empty.
-    pub(crate) has_hints: bool,
 }
 
 impl ProjectContext {
@@ -67,8 +62,6 @@ impl ProjectContext {
                 .to_string(),
             skills: Vec::new(),
             has_skills: false,
-            hints_content: None,
-            has_hints: false,
         }
     }
 
@@ -88,13 +81,6 @@ impl ProjectContext {
 
     pub fn has_skills(&self) -> bool {
         self.has_skills
-    }
-
-    pub fn with_hints(mut self, hints_content: Option<String>) -> Self {
-        let has_hints = hints_content.as_ref().is_some_and(|c| !c.is_empty());
-        self.hints_content = hints_content;
-        self.has_hints = has_hints;
-        self
     }
 }
 

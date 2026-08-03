@@ -328,8 +328,8 @@ impl LspAdapter for RustLspAdapter {
                 .map(|info| &mut info.message)
                 .chain([&mut diagnostic.message])
             {
-                if let Cow::Owned(sanitisim) = REGEX.replace_all(message, "`$1`") {
-                    *message = sanitisim;
+                if let Cow::Owned(sanitized) = REGEX.replace_all(message, "`$1`") {
+                    *message = sanitized;
                 }
             }
         }
@@ -2016,7 +2016,7 @@ mod tests {
                 .await,
             Some(CodeLabel::new(
                 "extern crate sim".to_string(),
-                13..19,
+                13..16,
                 vec![(0..6, highlight_keyword), (7..12, highlight_keyword),],
             ))
         );

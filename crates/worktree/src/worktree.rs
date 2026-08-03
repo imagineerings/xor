@@ -71,7 +71,7 @@ use sum_tree::{Bias, Dimensions, Edit, KeyedItem, SeekTarget, SumTree, Summary, 
 use text::{LineEnding, Rope};
 use util::{
     ResultExt, maybe,
-    paths::{PathMatcher, PathStyle, SanitisimPath, home_dir},
+    paths::{PathMatcher, PathStyle, SanitizedPath, home_dir},
     rel_path::{RelPath, RelPathBuf},
 };
 pub use worktree_settings::WorktreeSettings;
@@ -174,13 +174,14 @@ pub struct RemoteWorktree {
 pub struct Snapshot {
     id: WorktreeId,
     /// The absolute path of the worktree root.
-    abs_path: Arc<SanitisimPath>,
+    abs_path: Arc<SanitizedPath>,
     path_style: PathStyle,
     root_name: Arc<RelPath>,
     root_char_bag: CharBag,
     entries_by_path: SumTree<Entry>,
     entries_by_id: SumTree<PathEntry>,
-    root_repo_common_dir: Option<Arc<SanitisimPath>>,
+    root_repo_common_dir: Option<Arc<SanitizedPath>>,
+    root_repo_is_linked_worktree: bool,
     always_included_entries: Vec<Arc<RelPath>>,
 
     /// A number that increases every time the worktree begins scanning
@@ -364,7 +365,7 @@ enum ScanState {
         scanning: bool,
     },
     RootUpdated {
-        new_path: Arc<SanitisimPath>,
+        new_path: Arc<SanitizedPath>,
     },
     RootDeleted,
 }
@@ -380,7 +381,7 @@ pub enum Event {
     UpdatedEntries(UpdatedEntriesSet),
     UpdatedGitRepositories(UpdatedGitRepositoriesSet),
     UpdatedRootRepoCommonDir {
-        old: Option<Arc<SanitisimPath>>,
+        old: Option<Arc<SanitizedPath>>,
     },
     DeletedEntry(ProjectEntryId),
     /// The worktree root itself has been deleted (for single-file worktrees)
@@ -421,12 +422,18 @@ impl Worktree {
             None
         };
 
-        let root_repo_common_dir = if visible {
-            discover_root_repo_common_dir(&abs_path, fs.as_ref())
+        let (root_repo_common_dir, root_repo_is_linked_worktree) = if visible {
+            discover_root_repo_metadata(&abs_path, fs.as_ref())
                 .await
-                .map(SanitisimPath::from_arc)
+                .map(|(common_dir, is_linked_worktree)| {
+                    (
+                        Some(SanitizedPath::from_arc(common_dir)),
+                        is_linked_worktree,
+                    )
+                })
+                .unwrap_or((None, false))
         } else {
-            None
+            (None, false)
         };
         Ok(cx.new(move |cx: &mut Context<Worktree>| {
             let mut snapshot = LocalSnapshot {
@@ -447,6 +454,7 @@ impl Worktree {
                 root_file_handle,
             };
             snapshot.root_repo_common_dir = root_repo_common_dir;
+            snapshot.root_repo_is_linked_worktree = root_repo_is_linked_worktree;
 
             let worktree_id = snapshot.id();
             let settings_location = Some(SettingsLocation {
@@ -534,7 +542,8 @@ impl Worktree {
 
             snapshot.root_repo_common_dir = worktree
                 .root_repo_common_dir
-                .map(|p| SanitisimPath::new_arc(Path::new(&p)));
+                .map(|p| SanitizedPath::new_arc(Path::new(&p)));
+            snapshot.root_repo_is_linked_worktree = worktree.root_repo_is_linked_worktree;
 
             let background_snapshot = Arc::new(Mutex::new((
                 snapshot.clone(),
@@ -597,10 +606,15 @@ impl Worktree {
                         }
 
                         let old_root_repo_common_dir = this.snapshot.root_repo_common_dir.clone();
+                        let old_root_repo_is_linked_worktree =
+                            this.snapshot.root_repo_is_linked_worktree;
                         let mut changed_entries: Vec<(Arc<RelPath>, ProjectEntryId, PathChange)> =
                             Vec::new();
                         {
                             let mut lock = this.background_snapshot.lock();
+                            // Replace the snapshot, keeping the previous one around so we can
+                            // resolve the paths of removed entries (the new snapshot no longer
+                            // contains them, and the wire format only carries their ids).
                             let old_snapshot = mem::replace(&mut this.snapshot, lock.0.clone());
                             for update in lock.1.drain(..) {
                                 for entry_id in &update.removed_entries {
@@ -614,6 +628,8 @@ impl Worktree {
                                     }
                                 }
                                 for entry in &update.updated_entries {
+                                    // Remote updates don't distinguish creation from
+                                    // modification, so report `AddedOrUpdated`.
                                     if let Some(path) = RelPath::from_proto(&entry.path).log_err() {
                                         changed_entries.push((
                                             path,
@@ -634,6 +650,8 @@ impl Worktree {
                         let is_first_update = !this.received_initial_update;
                         this.received_initial_update = true;
                         if this.snapshot.root_repo_common_dir != old_root_repo_common_dir
+                            || this.snapshot.root_repo_is_linked_worktree
+                                != old_root_repo_is_linked_worktree
                             || (is_first_update && this.snapshot.root_repo_common_dir.is_none())
                         {
                             cx.emit(Event::UpdatedRootRepoCommonDir {
@@ -729,6 +747,7 @@ impl Worktree {
             root_repo_common_dir: self
                 .root_repo_common_dir()
                 .map(|p| p.to_string_lossy().into_owned()),
+            root_repo_is_linked_worktree: self.root_repo_is_linked_worktree(),
         }
     }
 
@@ -755,8 +774,8 @@ impl Worktree {
 
     pub fn abs_path(&self) -> Arc<Path> {
         match self {
-            Worktree::Local(worktree) => SanitisimPath::cast_arc(worktree.abs_path.clone()),
-            Worktree::Remote(worktree) => SanitisimPath::cast_arc(worktree.abs_path.clone()),
+            Worktree::Local(worktree) => SanitizedPath::cast_arc(worktree.abs_path.clone()),
+            Worktree::Remote(worktree) => SanitizedPath::cast_arc(worktree.abs_path.clone()),
         }
     }
 
@@ -1269,13 +1288,28 @@ impl LocalWorktree {
     ) {
         let repo_changes = self.changed_repos(&self.snapshot, &mut new_snapshot);
 
-        new_snapshot.root_repo_common_dir = new_snapshot
+        if let Some((common_dir, is_linked_worktree)) = new_snapshot
             .local_repo_for_work_directory_path(RelPath::empty())
-            .map(|repo| SanitisimPath::from_arc(repo.common_dir_abs_path.clone()));
+            .map(|repo| {
+                (
+                    SanitizedPath::from_arc(repo.common_dir_abs_path.clone()),
+                    repo.repository_dir_abs_path != repo.common_dir_abs_path,
+                )
+            })
+        {
+            new_snapshot.root_repo_common_dir = Some(common_dir);
+            new_snapshot.root_repo_is_linked_worktree = is_linked_worktree;
+        } else {
+            new_snapshot.root_repo_common_dir = None;
+            new_snapshot.root_repo_is_linked_worktree = false;
+        }
 
-        let old_root_repo_common_dir = (self.snapshot.root_repo_common_dir
-            != new_snapshot.root_repo_common_dir)
-            .then(|| self.snapshot.root_repo_common_dir.clone());
+        let root_repo_metadata_changed = self.snapshot.root_repo_common_dir
+            != new_snapshot.root_repo_common_dir
+            || self.snapshot.root_repo_is_linked_worktree
+                != new_snapshot.root_repo_is_linked_worktree;
+        let old_root_repo_common_dir =
+            root_repo_metadata_changed.then(|| self.snapshot.root_repo_common_dir.clone());
         self.snapshot = new_snapshot;
 
         if let Some(share) = self.update_observer.as_mut() {
@@ -2064,7 +2098,7 @@ impl LocalWorktree {
 
     pub fn update_abs_path_and_refresh(
         &mut self,
-        new_path: Arc<SanitisimPath>,
+        new_path: Arc<SanitizedPath>,
         cx: &Context<Worktree>,
     ) {
         self.snapshot.git_repositories = Default::default();
@@ -2344,7 +2378,7 @@ impl Snapshot {
     ) -> Self {
         Snapshot {
             id,
-            abs_path: SanitisimPath::from_arc(abs_path),
+            abs_path: SanitizedPath::from_arc(abs_path),
             path_style,
             root_char_bag: root_name
                 .as_unix_str()
@@ -2356,6 +2390,7 @@ impl Snapshot {
             entries_by_path: Default::default(),
             entries_by_id: Default::default(),
             root_repo_common_dir: None,
+            root_repo_is_linked_worktree: false,
             scan_id: 1,
             completed_scan_id: 0,
         }
@@ -2378,13 +2413,17 @@ impl Snapshot {
     //
     // This is definitely a bug, but it's not clear if we should handle it here or not.
     pub fn abs_path(&self) -> &Arc<Path> {
-        SanitisimPath::cast_arc_ref(&self.abs_path)
+        SanitizedPath::cast_arc_ref(&self.abs_path)
     }
 
     pub fn root_repo_common_dir(&self) -> Option<&Arc<Path>> {
         self.root_repo_common_dir
             .as_ref()
-            .map(SanitisimPath::cast_arc_ref)
+            .map(SanitizedPath::cast_arc_ref)
+    }
+
+    pub fn root_repo_is_linked_worktree(&self) -> bool {
+        self.root_repo_is_linked_worktree
     }
 
     fn build_initial_update(&self, project_id: u64, worktree_id: u64) -> proto::UpdateWorktree {
@@ -2403,6 +2442,7 @@ impl Snapshot {
             root_repo_common_dir: self
                 .root_repo_common_dir()
                 .map(|p| p.to_string_lossy().into_owned()),
+            root_repo_is_linked_worktree: false,
             updated_entries,
             removed_entries: Vec::new(),
             scan_id: self.scan_id as u64,
@@ -2482,7 +2522,7 @@ impl Snapshot {
         Some(removed_entry.path)
     }
 
-    fn update_abs_path(&mut self, abs_path: Arc<SanitisimPath>, root_name: Arc<RelPath>) {
+    fn update_abs_path(&mut self, abs_path: Arc<SanitizedPath>, root_name: Arc<RelPath>) {
         self.abs_path = abs_path;
         if root_name != self.root_name {
             self.root_char_bag = root_name
@@ -2506,7 +2546,7 @@ impl Snapshot {
         );
         if let Some(root_name) = RelPath::from_proto(&update.root_name).log_err() {
             self.update_abs_path(
-                SanitisimPath::new_arc(&Path::new(&update.abs_path)),
+                SanitizedPath::new_arc(&Path::new(&update.abs_path)),
                 root_name,
             );
         }
@@ -2548,11 +2588,21 @@ impl Snapshot {
         self.entries_by_path.edit(entries_by_path_edits, ());
         self.entries_by_id.edit(entries_by_id_edits, ());
 
-        if let Some(dir) = update
+        // A `None` from a completed scan is a real repo removal, whereas a `None`
+        // mid-scan may just mean the sender hasn't registered the root repo yet.
+        match update
             .root_repo_common_dir
-            .map(|p| SanitisimPath::new_arc(Path::new(&p)))
+            .map(|p| SanitizedPath::new_arc(Path::new(&p)))
         {
-            self.root_repo_common_dir = Some(dir);
+            Some(dir) => {
+                self.root_repo_common_dir = Some(dir);
+                self.root_repo_is_linked_worktree = update.root_repo_is_linked_worktree;
+            }
+            None if update.is_last_update => {
+                self.root_repo_common_dir = None;
+                self.root_repo_is_linked_worktree = false;
+            }
+            None => {}
         }
 
         self.scan_id = update.scan_id as usize;
@@ -2785,6 +2835,7 @@ impl LocalSnapshot {
             root_repo_common_dir: self
                 .root_repo_common_dir()
                 .map(|p| p.to_string_lossy().into_owned()),
+            root_repo_is_linked_worktree: self.root_repo_is_linked_worktree,
             updated_entries,
             removed_entries,
             scan_id: self.scan_id as u64,
@@ -3289,7 +3340,7 @@ impl BackgroundScannerState {
         #[cfg(feature = "test-support")]
         self.snapshot.check_invariants(false);
 
-        return removed_dir_abs_paths;
+        removed_dir_abs_paths
     }
 
     async fn insert_git_repository(
@@ -4308,7 +4359,7 @@ impl BackgroundScanner {
         let root_path = self.state.lock().await.snapshot.abs_path.clone();
         let root_canonical_path = self.fs.canonicalize(root_path.as_path()).await;
         let root_canonical_path = match &root_canonical_path {
-            Ok(path) => SanitisimPath::new(path),
+            Ok(path) => SanitizedPath::new(path),
             Err(err) => {
                 log::error!("failed to canonicalize root path {root_path:?}: {err:#}");
                 return true;
@@ -4349,7 +4400,7 @@ impl BackgroundScanner {
 
     fn normalized_events_for_worktree(
         state: &BackgroundScannerState,
-        root_canonical_path: &SanitisimPath,
+        root_canonical_path: &SanitizedPath,
         mut events: Vec<PathEvent>,
     ) -> Vec<PathEvent> {
         if state.symlink_paths_by_target.is_empty() {
@@ -4358,7 +4409,7 @@ impl BackgroundScanner {
         let mut mapped_events = Vec::new();
 
         events.retain(|event| {
-            let abs_path = SanitisimPath::new(&event.path);
+            let abs_path = SanitizedPath::new(&event.path);
 
             let mut best_match: Option<(&Arc<Path>, &SmallVec<[Arc<RelPath>; 1]>)> = None;
             let mut best_depth = 0;
@@ -4412,7 +4463,7 @@ impl BackgroundScanner {
         let root_path = self.state.lock().await.snapshot.abs_path.clone();
         let root_canonical_path = self.fs.canonicalize(root_path.as_path()).await;
         let root_canonical_path = match &root_canonical_path {
-            Ok(path) => SanitisimPath::new(path),
+            Ok(path) => SanitizedPath::new(path),
             Err(err) => {
                 let new_path = self
                     .state
@@ -4428,7 +4479,7 @@ impl BackgroundScanner {
                             None
                         }
                     })
-                    .map(|path| SanitisimPath::new_arc(&path))
+                    .map(|path| SanitizedPath::new_arc(&path))
                     .filter(|new_path| *new_path != root_path);
 
                 if let Some(new_path) = new_path {
@@ -4441,7 +4492,7 @@ impl BackgroundScanner {
                         .unbounded_send(ScanState::RootUpdated { new_path })
                         .ok();
                 } else {
-                    log::error!("root path could not be canonicalisim: {err:#}");
+                    log::error!("root path could not be canonicalized: {err:#}");
 
                     // For single-file worktrees, if we can't canonicalize and the file handle
                     // fallback also failed, the file is gone - close the worktree
@@ -4501,7 +4552,7 @@ impl BackgroundScanner {
             let mut ranges_to_drop = SmallVec::<[Range<usize>; 4]>::new();
 
             for (ix, event) in events.iter().enumerate() {
-                let abs_path = SanitisimPath::new(&event.path);
+                let abs_path = SanitizedPath::new(&event.path);
 
                 let mut dot_git_paths = None;
 
@@ -4606,7 +4657,7 @@ impl BackgroundScanner {
             let mut ranges_to_drop = SmallVec::<[Range<usize>; 4]>::new();
 
             for (ix, event) in events.iter().enumerate() {
-                let abs_path = SanitisimPath::new(&event.path);
+                let abs_path = SanitizedPath::new(&event.path);
                 // TODO: this strips the root case-sensitively, so on a case-insensitive
                 // volume an event whose casing differs from the canonical root is
                 // dropped. Once `fs` exposes per-volume case-sensitivity (e.g. on the
@@ -4849,7 +4900,7 @@ impl BackgroundScanner {
                         loop {
                             select_biased! {
                                 // Process any path refresh requests before moving on to process
-                                // the scan queue, so that user operations are prioritisim.
+                                // the scan queue, so that user operations are prioritized.
                                 request = self.next_scan_request().fuse() => {
                                     let Ok(request) = request else { break };
                                     if !self.process_scan_request(request, true).await {
@@ -5216,8 +5267,8 @@ impl BackgroundScanner {
     /// All list arguments should be sorted before calling this function
     async fn reload_entries_for_paths(
         &self,
-        root_abs_path: &SanitisimPath,
-        root_canonical_path: &SanitisimPath,
+        root_abs_path: &SanitizedPath,
+        root_canonical_path: &SanitizedPath,
         relative_paths: &[Arc<RelPath>],
         abs_paths: Vec<PathBuf>,
         scan_queue_tx: Option<Sender<ScanJob>>,
@@ -5245,7 +5296,7 @@ impl BackgroundScanner {
                             }
                         }
 
-                        anyhow::Ok(Some((metadata, SanitisimPath::new_arc(&canonical_path))))
+                        anyhow::Ok(Some((metadata, SanitizedPath::new_arc(&canonical_path))))
                     } else {
                         Ok(None)
                     }
@@ -5675,11 +5726,11 @@ impl BackgroundScanner {
                     .git_repositories
                     .iter()
                     .find_map(|(_, repo)| {
-                        let dot_git_dir = SanitisimPath::new(&dot_git_dir);
-                        if SanitisimPath::new(repo.common_dir_abs_path.as_ref()) == dot_git_dir
-                            || SanitisimPath::new(repo.repository_dir_abs_path.as_ref())
+                        let dot_git_dir = SanitizedPath::new(&dot_git_dir);
+                        if SanitizedPath::new(repo.common_dir_abs_path.as_ref()) == dot_git_dir
+                            || SanitizedPath::new(repo.repository_dir_abs_path.as_ref())
                                 == dot_git_dir
-                            || SanitisimPath::new(repo.dot_git_abs_path.as_ref()) == dot_git_dir
+                            || SanitizedPath::new(repo.dot_git_abs_path.as_ref()) == dot_git_dir
                         {
                             Some(repo.clone())
                         } else {
@@ -5816,7 +5867,7 @@ impl BackgroundScanner {
 
 async fn discover_ancestor_git_repo(
     fs: Arc<dyn Fs>,
-    root_abs_path: &SanitisimPath,
+    root_abs_path: &SanitizedPath,
 ) -> (
     HashMap<Arc<Path>, (Arc<Gitignore>, bool)>,
     Option<Arc<Gitignore>>,
@@ -5846,7 +5897,7 @@ async fn discover_ancestor_git_repo(
             .is_ok_and(|metadata| metadata.is_some())
         {
             let dot_git_abs_path = if index != 0 {
-                // We canonicalize, since the FS events use the canonicalisim path.
+                // We canonicalize, since the FS events use the canonicalized path.
                 match fs.canonicalize(&ancestor_dot_git).await.log_err() {
                     Some(path) => path,
                     None => continue,
@@ -6616,13 +6667,23 @@ fn resolve_commondir_path(repository_dir_abs_path: &Path, commondir_path: &str) 
 }
 
 pub async fn discover_root_repo_common_dir(root_abs_path: &Path, fs: &dyn Fs) -> Option<Arc<Path>> {
+    discover_root_repo_metadata(root_abs_path, fs)
+        .await
+        .map(|(common_dir, _)| common_dir)
+}
+
+async fn discover_root_repo_metadata(
+    root_abs_path: &Path,
+    fs: &dyn Fs,
+) -> Option<(Arc<Path>, bool)> {
     let root_dot_git = root_abs_path.join(DOT_GIT);
     if !fs.metadata(&root_dot_git).await.is_ok_and(|m| m.is_some()) {
         return None;
     }
     let dot_git_path: Arc<Path> = root_dot_git.into();
-    let (_, common_dir) = discover_git_paths(&dot_git_path, fs).await;
-    Some(common_dir)
+    let (repository_dir, common_dir) = discover_git_paths(&dot_git_path, fs).await;
+    let is_linked_worktree = repository_dir != common_dir;
+    Some((common_dir, is_linked_worktree))
 }
 
 async fn discover_git_paths(dot_git_abs_path: &Arc<Path>, fs: &dyn Fs) -> (Arc<Path>, Arc<Path>) {

@@ -500,7 +500,7 @@ mod tests {
         };
 
         let json = serde_json::to_string(&image_part).unwrap();
-        println!("Serialisim image part: {}", json);
+        println!("Serialized image part: {}", json);
 
         // Verify the structure matches what LM Studio expects
         let expected_structure = r#"{"type":"image_url","image_url":{"url":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="}}"#;
@@ -514,7 +514,7 @@ mod tests {
         };
 
         let json = serde_json::to_string(&text_part).unwrap();
-        println!("Serialisim text part: {}", json);
+        println!("Serialized text part: {}", json);
 
         let expected_structure = r#"{"type":"text","text":"Hello, world!"}"#;
         assert_eq!(json, expected_structure);

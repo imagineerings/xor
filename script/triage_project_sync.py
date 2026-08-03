@@ -427,14 +427,14 @@ def derive_status(issue: IssueData, staff: set[str]) -> tuple[str, str, str]:
                 )
         return STATUS_NEEDS_REPRO_ATTEMPT, "R5a", "no substantive staff comment after reporter's last activity"
 
-    # R3 (state:needs triage) is checked LAST among recognisim state labels.
+    # R3 (state:needs triage) is checked LAST among recognized state labels.
     # If state:needs triage is the only state label, the issue genuinely needs
     # initial labeling. If any other state label is also present, that state
     # has already been matched above and won.
     if "state:needs triage" in L:
         return STATUS_NEEDS_LABELS, "R3", "state:needs triage label present (no other state:* matched)"
 
-    return STATUS_UNKNOWN, "R6", f"open with no recognisim state label (labels: {sorted(L) or '<none>'})"
+    return STATUS_UNKNOWN, "R6", f"open with no recognized state label (labels: {sorted(L) or '<none>'})"
 
 
 def derive_stale_since(

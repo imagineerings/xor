@@ -317,9 +317,7 @@ impl<'de> Deserialize<'de> for SimCustomizationsWrapper {
         let value = Value::deserialize(deserializer)?;
         let sim = value
             .get("sim")
-            .map(|sim_value| {
-                serde_json_lenient::from_value::<SimCustomization>(sim_value.clone())
-            })
+            .map(|sim_value| serde_json_lenient::from_value::<SimCustomization>(sim_value.clone()))
             .transpose()
             .map_err(serde::de::Error::custom)?
             .unwrap_or_default();
@@ -629,10 +627,10 @@ mod test {
     use crate::{
         devcontainer_api::DevContainerError,
         devcontainer_json::{
-            SimCustomization, SimCustomizationsWrapper, ContainerBuild, DevContainer,
-            DevContainerBuildType, FeatureOptions, ForwardPort, HostRequirements, LifecycleCommand,
-            LifecycleScript, MountDefinition, OnAutoForward, PortAttributeProtocol, PortAttributes,
-            ShutdownAction, UserEnvProbe, deserialize_devcontainer_json,
+            ContainerBuild, DevContainer, DevContainerBuildType, FeatureOptions, ForwardPort,
+            HostRequirements, LifecycleCommand, LifecycleScript, MountDefinition, OnAutoForward,
+            PortAttributeProtocol, PortAttributes, ShutdownAction, SimCustomization,
+            SimCustomizationsWrapper, UserEnvProbe, deserialize_devcontainer_json,
         },
     };
 
@@ -685,7 +683,7 @@ mod test {
 
     #[test]
     fn should_deserialize_customizations_without_sim_key() {
-        let json_without_sim = r#"
+        let json_without_zed = r#"
             {
                 "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
                 "customizations": {
@@ -696,7 +694,7 @@ mod test {
             }
         "#;
 
-        let result = deserialize_devcontainer_json(json_without_sim);
+        let result = deserialize_devcontainer_json(json_without_zed);
 
         assert!(
             result.is_ok(),

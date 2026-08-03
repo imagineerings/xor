@@ -107,7 +107,7 @@ impl<'a, I: Iterator<Item = Result<Event<'a>>>> Iterator for StripForeignObject<
             };
 
             // Strip foreignObject elements and their contents (defensive: merman
-            // already removes them, but a stray one cannot be rasterisim).
+            // already removes them, but a stray one cannot be rasterized).
             match &event {
                 Event::Start(e) if e.name().as_ref() == b"foreignObject" => {
                     self.foreign_depth += 1;

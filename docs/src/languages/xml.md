@@ -11,7 +11,7 @@ XML support is available through the [XML extension](https://github.com/sweetppr
 
 ## Configuration
 
-If you have additional file extensions that are not being automatically recognisim as XML just add them to [file_types](../reference/all-settings.md#file-types) in your Sim settings:
+If you have additional file extensions that are not being automatically recognized as XML just add them to [file_types](../reference/all-settings.md#file-types) in your Sim settings:
 
 ```json [settings]
   "file_types": {

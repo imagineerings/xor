@@ -1,7 +1,7 @@
 use gpui::{IntoElement, ParentElement};
 use ui::{List, ListBulletItem, prelude::*};
 
-/// Centralisim definitions for Sim AI plans
+/// Centralized definitions for Sim AI plans
 pub struct PlanDefinitions;
 
 impl PlanDefinitions {
@@ -43,6 +43,12 @@ impl PlanDefinitions {
         List::new()
             .child(ListBulletItem::new("Unlimited edit predictions"))
             .child(ListBulletItem::new("Usage-based billing"))
+    }
+
+    pub fn vip_plan(&self) -> impl IntoElement {
+        List::new()
+            .child(ListBulletItem::new("Unlimited edit predictions"))
+            .child(ListBulletItem::new("Tokens in the Sim agent"))
     }
 
     pub fn student_plan(&self) -> impl IntoElement {

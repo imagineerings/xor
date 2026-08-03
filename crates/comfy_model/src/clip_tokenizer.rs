@@ -1,0 +1,1684 @@
+use crate::{
+    ArtifactKey, ModelStoreError, ModelTokenizerDescriptor, SentencePieceType,
+    VerifiedEmbeddingArchivePayload, VerifiedModelTensorPayload, VerifiedSentencePieceVocabulary,
+    clip::{ClipError, Sd1Tokenizer},
+};
+use comfy_tensor::{CancellationToken, TensorError};
+use std::{collections::BTreeMap, sync::Arc};
+use thiserror::Error;
+
+pub const MAX_NATIVE_PROMPT_BYTES: usize = crate::clip::SD1_MAX_PROMPT_BYTES;
+pub const MAX_NATIVE_WEIGHT_SEGMENTS: usize = crate::clip::SD1_MAX_WEIGHTED_SEGMENTS;
+pub const MAX_NATIVE_TOKEN_SECTIONS: usize = 16_384;
+pub const MAX_NATIVE_PROMPT_BATCH: usize = 64;
+pub const MAX_NATIVE_EMBEDDING_VALUES: usize = crate::formats::MAX_EMBEDDING_ARCHIVE_VALUES;
+const MAX_WEIGHT_NESTING: usize = 128;
+
+fn reserve_tokenizer_values<T>(
+    values: &mut Vec<T>,
+    additional: usize,
+    context: &'static str,
+) -> Result<(), NativeTokenizerError> {
+    values
+        .try_reserve(additional)
+        .map_err(|_| NativeTokenizerError::Allocation(context))
+}
+
+pub const CLIP_TOKENIZER_SOURCE_ROWS: [&str; 12] = [
+    "gen_empty_tokens",
+    "ClipTokenWeightEncoder",
+    "parse_parentheses",
+    "token_weights",
+    "escape_important",
+    "unescape_important",
+    "safe_load_embed_zip",
+    "expand_directory_list",
+    "bundled_embed",
+    "load_embed",
+    "SDTokenizer",
+    "SD1Tokenizer",
+];
+
+pub fn generate_empty_tokens(
+    start_token: Option<u32>,
+    end_token: Option<u32>,
+    pad_token: u32,
+    length: usize,
+) -> Result<Vec<u32>, NativeTokenizerError> {
+    NativePromptTokenizer::empty_token_ids(start_token, end_token, pad_token, length)
+}
+
+pub fn apply_empty_baseline_token_weights(
+    encoded_sections: &[Vec<f32>],
+    empty_baseline: &[f32],
+    section_weights: &[Vec<f32>],
+    hidden_width: usize,
+) -> Result<Vec<Vec<f32>>, NativeTokenizerError> {
+    if hidden_width == 0 || encoded_sections.len() != section_weights.len() {
+        return Err(NativeTokenizerError::InvalidWeightProjection);
+    }
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(encoded_sections.len())
+        .map_err(|_| NativeTokenizerError::Allocation("weighted section outputs"))?;
+    for (encoded, weights) in encoded_sections.iter().zip(section_weights) {
+        let expected = weights.len().checked_mul(hidden_width).ok_or(
+            NativeTokenizerError::ArithmeticOverflow("weighted output shape"),
+        )?;
+        if encoded.len() != expected || empty_baseline.len() != expected {
+            return Err(NativeTokenizerError::InvalidWeightProjection);
+        }
+        let mut weighted = Vec::new();
+        weighted
+            .try_reserve_exact(expected)
+            .map_err(|_| NativeTokenizerError::Allocation("weighted section"))?;
+        for ((encoded_token, empty_token), weight) in encoded
+            .chunks_exact(hidden_width)
+            .zip(empty_baseline.chunks_exact(hidden_width))
+            .zip(weights)
+        {
+            if !weight.is_finite() {
+                return Err(NativeTokenizerError::InvalidWeight(*weight));
+            }
+            for (encoded_value, empty_value) in encoded_token.iter().zip(empty_token) {
+                let value = (*encoded_value - *empty_value).mul_add(*weight, *empty_value);
+                if !value.is_finite() {
+                    return Err(NativeTokenizerError::NonFiniteWeightProjection);
+                }
+                weighted.push(value);
+            }
+        }
+        output.push(weighted);
+    }
+    Ok(output)
+}
+
+fn decode_f32_rows(
+    bytes: &[u8],
+    width: usize,
+    cancellation: &CancellationToken,
+) -> Result<Vec<Arc<[f32]>>, NativeTokenizerError> {
+    let row_bytes = width
+        .checked_mul(4)
+        .ok_or(NativeTokenizerError::ArithmeticOverflow(
+            "embedding row bytes",
+        ))?;
+    if width == 0 || bytes.is_empty() || !bytes.len().is_multiple_of(row_bytes) {
+        return Err(NativeTokenizerError::InvalidEmbeddingShape {
+            values: bytes.len() / 4,
+            width,
+        });
+    }
+    let mut rows = Vec::new();
+    rows.try_reserve_exact(bytes.len() / row_bytes)
+        .map_err(|_| NativeTokenizerError::Allocation("embedding rows"))?;
+    for bytes_row in bytes.chunks_exact(row_bytes) {
+        cancellation.check()?;
+        let mut row = Vec::new();
+        row.try_reserve_exact(width)
+            .map_err(|_| NativeTokenizerError::Allocation("embedding row"))?;
+        for value in bytes_row.chunks_exact(4) {
+            let value = f32::from_le_bytes([value[0], value[1], value[2], value[3]]);
+            if !value.is_finite() {
+                return Err(NativeTokenizerError::NonFiniteEmbedding);
+            }
+            row.push(value);
+        }
+        rows.push(Arc::from(row));
+    }
+    Ok(rows)
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PromptWeightSegment {
+    text: String,
+    weight: f32,
+}
+
+impl PromptWeightSegment {
+    fn checked(text: String, weight: f32) -> Result<Self, NativeTokenizerError> {
+        if !weight.is_finite() {
+            return Err(NativeTokenizerError::InvalidWeight(weight));
+        }
+        Ok(Self { text, weight })
+    }
+
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    pub const fn weight(&self) -> f32 {
+        self.weight
+    }
+}
+
+pub fn parse_prompt_weights(
+    text: &str,
+    cancellation: &CancellationToken,
+) -> Result<Vec<PromptWeightSegment>, NativeTokenizerError> {
+    let escaped = escape_important(text, cancellation)?;
+    let mut output = token_weights(&escaped, 1.0, cancellation)?;
+    for segment in &mut output {
+        segment.text = unescape_important(&segment.text, cancellation)?;
+    }
+    Ok(output)
+}
+
+pub fn escape_important(
+    text: &str,
+    cancellation: &CancellationToken,
+) -> Result<String, NativeTokenizerError> {
+    transform_important(text, true, cancellation)
+}
+
+pub fn unescape_important(
+    text: &str,
+    cancellation: &CancellationToken,
+) -> Result<String, NativeTokenizerError> {
+    transform_important(text, false, cancellation)
+}
+
+fn transform_important(
+    text: &str,
+    escape: bool,
+    cancellation: &CancellationToken,
+) -> Result<String, NativeTokenizerError> {
+    cancellation.check()?;
+    if text.len() > MAX_NATIVE_PROMPT_BYTES {
+        return Err(NativeTokenizerError::PromptTooLarge(text.len()));
+    }
+    let mut transformed = String::new();
+    transformed
+        .try_reserve_exact(text.len())
+        .map_err(|_| NativeTokenizerError::Allocation("important prompt escapes"))?;
+    let mut characters = text.chars().peekable();
+    let mut index = 0_usize;
+    while let Some(character) = characters.next() {
+        if index.is_multiple_of(256) {
+            cancellation.check()?;
+        }
+        index = index
+            .checked_add(1)
+            .ok_or(NativeTokenizerError::ArithmeticOverflow(
+                "important prompt character count",
+            ))?;
+        if escape && character == '\\' {
+            match characters.peek().copied() {
+                Some(')') => {
+                    characters.next();
+                    transformed.push('\0');
+                    transformed.push('\u{1}');
+                    continue;
+                }
+                Some('(') => {
+                    characters.next();
+                    transformed.push('\0');
+                    transformed.push('\u{2}');
+                    continue;
+                }
+                _ => {}
+            }
+        } else if !escape && character == '\0' {
+            match characters.peek().copied() {
+                Some('\u{1}') => {
+                    characters.next();
+                    transformed.push(')');
+                    continue;
+                }
+                Some('\u{2}') => {
+                    characters.next();
+                    transformed.push('(');
+                    continue;
+                }
+                _ => {}
+            }
+        }
+        transformed.push(character);
+    }
+    Ok(transformed)
+}
+
+pub fn token_weights(
+    text: &str,
+    current_weight: f32,
+    cancellation: &CancellationToken,
+) -> Result<Vec<PromptWeightSegment>, NativeTokenizerError> {
+    cancellation.check()?;
+    if text.len() > MAX_NATIVE_PROMPT_BYTES {
+        return Err(NativeTokenizerError::PromptTooLarge(text.len()));
+    }
+    if !current_weight.is_finite() {
+        return Err(NativeTokenizerError::InvalidWeight(current_weight));
+    }
+    let mut output = Vec::new();
+    parse_weighted_inner(text, current_weight, 0, cancellation, &mut output)?;
+    Ok(output)
+}
+
+fn parse_weighted_inner(
+    text: &str,
+    current_weight: f32,
+    depth: usize,
+    cancellation: &CancellationToken,
+    output: &mut Vec<PromptWeightSegment>,
+) -> Result<(), NativeTokenizerError> {
+    cancellation.check()?;
+    if depth > MAX_WEIGHT_NESTING {
+        return Err(NativeTokenizerError::WeightNestingTooDeep(depth));
+    }
+    for item in parse_parentheses(text, cancellation)? {
+        cancellation.check()?;
+        if item.starts_with('(') && item.ends_with(')') && item.len() >= 2 {
+            let mut inner = &item[1..item.len() - 1];
+            let mut weight = current_weight * 1.1;
+            if let Some(colon) = inner.rfind(':').filter(|index| *index > 0) {
+                if let Ok(explicit) = inner[colon + 1..].parse::<f32>() {
+                    if !explicit.is_finite() {
+                        return Err(NativeTokenizerError::InvalidWeight(explicit));
+                    }
+                    weight = explicit;
+                    inner = &inner[..colon];
+                }
+            }
+            parse_weighted_inner(inner, weight, depth + 1, cancellation, output)?;
+        } else {
+            if output.len() == MAX_NATIVE_WEIGHT_SEGMENTS {
+                return Err(NativeTokenizerError::TooManyWeightSegments(
+                    output.len() + 1,
+                ));
+            }
+            output.push(PromptWeightSegment::checked(item, current_weight)?);
+        }
+    }
+    Ok(())
+}
+
+pub fn parse_parentheses(
+    text: &str,
+    cancellation: &CancellationToken,
+) -> Result<Vec<String>, NativeTokenizerError> {
+    cancellation.check()?;
+    if text.len() > MAX_NATIVE_PROMPT_BYTES {
+        return Err(NativeTokenizerError::PromptTooLarge(text.len()));
+    }
+    let mut result = Vec::new();
+    let mut current = String::new();
+    let mut nesting = 0_i64;
+    for (index, character) in text.chars().enumerate() {
+        if index.is_multiple_of(256) {
+            cancellation.check()?;
+        }
+        match character {
+            '(' => {
+                if nesting == 0 && !current.is_empty() {
+                    result.push(std::mem::take(&mut current));
+                }
+                current.push(character);
+                nesting =
+                    nesting
+                        .checked_add(1)
+                        .ok_or(NativeTokenizerError::ArithmeticOverflow(
+                            "parenthesis nesting",
+                        ))?;
+            }
+            ')' => {
+                nesting =
+                    nesting
+                        .checked_sub(1)
+                        .ok_or(NativeTokenizerError::ArithmeticOverflow(
+                            "parenthesis nesting",
+                        ))?;
+                current.push(character);
+                if nesting == 0 {
+                    result.push(std::mem::take(&mut current));
+                }
+            }
+            _ => current.push(character),
+        }
+    }
+    if !current.is_empty() {
+        result.push(current);
+    }
+    Ok(result)
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TokenizerConfiguration {
+    pub maximum_length: usize,
+    pub minimum_length: Option<usize>,
+    pub minimum_padding: Option<usize>,
+    pub pad_to_maximum_length: bool,
+    pub pad_left: bool,
+    pub start_token: Option<u32>,
+    pub end_token: Option<u32>,
+    pub pad_token: u32,
+    pub maximum_word_length: usize,
+    pub disable_weights: bool,
+    pub embedding_width: Option<usize>,
+}
+
+impl TokenizerConfiguration {
+    pub fn checked(self) -> Result<Self, NativeTokenizerError> {
+        if self.maximum_length == 0
+            || self.maximum_length > MAX_NATIVE_PROMPT_BYTES
+            || self.maximum_word_length == 0
+            || self.maximum_word_length > MAX_NATIVE_PROMPT_BYTES
+        {
+            return Err(NativeTokenizerError::InvalidConfiguration(
+                "maximum lengths must be nonzero".to_owned(),
+            ));
+        }
+        if self
+            .embedding_width
+            .is_some_and(|width| width == 0 || width > MAX_NATIVE_EMBEDDING_VALUES)
+        {
+            return Err(NativeTokenizerError::InvalidConfiguration(
+                "embedding width must be nonzero".to_owned(),
+            ));
+        }
+        let required_special = usize::from(self.start_token.is_some())
+            .checked_add(usize::from(self.end_token.is_some()))
+            .ok_or(NativeTokenizerError::ArithmeticOverflow(
+                "special token count",
+            ))?;
+        if self.maximum_length <= required_special {
+            return Err(NativeTokenizerError::InvalidConfiguration(
+                "maximum length has no content capacity".to_owned(),
+            ));
+        }
+        if self
+            .minimum_length
+            .is_some_and(|value| value > MAX_NATIVE_PROMPT_BYTES)
+            || self
+                .minimum_padding
+                .is_some_and(|value| value > MAX_NATIVE_PROMPT_BYTES)
+        {
+            return Err(NativeTokenizerError::InvalidConfiguration(
+                "minimum padding or length exceeds the native bound".to_owned(),
+            ));
+        }
+        Ok(self)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextualInversionEmbedding {
+    artifact_key: ArtifactKey,
+    artifact_sha256: String,
+    width: usize,
+    rows: Vec<Arc<[f32]>>,
+    store_identity: Arc<()>,
+}
+
+impl TextualInversionEmbedding {
+    pub fn from_verified_tensor_payload(
+        payload: VerifiedModelTensorPayload,
+        embedding_key: Option<&str>,
+        width: usize,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, NativeTokenizerError> {
+        cancellation.check()?;
+        if width == 0 || width > MAX_NATIVE_EMBEDDING_VALUES {
+            return Err(NativeTokenizerError::InvalidEmbeddingShape { values: 0, width });
+        }
+        let selected = select_embedding_tensors(&payload, embedding_key, width)?;
+        let mut rows = Vec::new();
+        let mut value_count = 0_usize;
+        for tensor in selected {
+            cancellation.check()?;
+            if tensor.native_dtype() != Some(comfy_tensor::DType::F32) {
+                return Err(NativeTokenizerError::UnsupportedEmbeddingDType(
+                    tensor.data_type().to_owned(),
+                ));
+            }
+            let tensor_values =
+                tensor
+                    .shape()
+                    .iter()
+                    .try_fold(1_u64, |product, dimension| {
+                        product.checked_mul(*dimension).ok_or(
+                            NativeTokenizerError::ArithmeticOverflow("embedding tensor shape"),
+                        )
+                    })?;
+            let tensor_values = usize::try_from(tensor_values)
+                .map_err(|_| NativeTokenizerError::ArithmeticOverflow("embedding tensor values"))?;
+            let expected_bytes =
+                tensor_values
+                    .checked_mul(4)
+                    .ok_or(NativeTokenizerError::ArithmeticOverflow(
+                        "embedding tensor bytes",
+                    ))?;
+            let width_u64 = u64::try_from(width)
+                .map_err(|_| NativeTokenizerError::ArithmeticOverflow("embedding width"))?;
+            if tensor.shape().last().copied() != Some(width_u64)
+                || tensor_values == 0
+                || tensor.bytes().len() != expected_bytes
+            {
+                return Err(NativeTokenizerError::InvalidEmbeddingShape {
+                    values: tensor_values,
+                    width,
+                });
+            }
+            value_count = value_count.checked_add(tensor_values).ok_or(
+                NativeTokenizerError::ArithmeticOverflow("embedding aggregate values"),
+            )?;
+            if value_count > MAX_NATIVE_EMBEDDING_VALUES {
+                return Err(NativeTokenizerError::InvalidEmbeddingShape {
+                    values: value_count,
+                    width,
+                });
+            }
+            rows.try_reserve(tensor_values / width)
+                .map_err(|_| NativeTokenizerError::Allocation("embedding rows"))?;
+            rows.extend(decode_f32_rows(tensor.bytes(), width, cancellation)?);
+        }
+        Self::from_checked_rows(
+            payload.artifact_key().clone(),
+            payload.artifact_sha256().to_owned(),
+            width,
+            rows,
+            payload.store_identity(),
+            cancellation,
+        )
+    }
+
+    pub fn from_verified_archive_payload(
+        payload: VerifiedEmbeddingArchivePayload,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, NativeTokenizerError> {
+        cancellation.check()?;
+        let width = payload.width();
+        let mut rows = Vec::new();
+        rows.try_reserve_exact(payload.rows().len())
+            .map_err(|_| NativeTokenizerError::Allocation("embedding archive rows"))?;
+        rows.extend(payload.rows().iter().cloned());
+        Self::from_checked_rows(
+            payload.artifact_key().clone(),
+            payload.artifact_sha256().to_owned(),
+            width,
+            rows,
+            payload.store_identity(),
+            cancellation,
+        )
+    }
+
+    fn from_checked_rows(
+        artifact_key: ArtifactKey,
+        artifact_sha256: String,
+        width: usize,
+        rows: Vec<Arc<[f32]>>,
+        store_identity: Arc<()>,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, NativeTokenizerError> {
+        cancellation.check()?;
+        let value_count = rows.iter().try_fold(0_usize, |total, row| {
+            if row.len() != width {
+                return Err(NativeTokenizerError::InvalidEmbeddingShape {
+                    values: row.len(),
+                    width,
+                });
+            }
+            if row.iter().any(|value| !value.is_finite()) {
+                return Err(NativeTokenizerError::NonFiniteEmbedding);
+            }
+            total
+                .checked_add(row.len())
+                .ok_or(NativeTokenizerError::ArithmeticOverflow(
+                    "embedding row values",
+                ))
+        })?;
+        if width == 0 || rows.is_empty() || value_count > MAX_NATIVE_EMBEDDING_VALUES {
+            return Err(NativeTokenizerError::InvalidEmbeddingShape {
+                values: value_count,
+                width,
+            });
+        }
+        Ok(Self {
+            artifact_key,
+            artifact_sha256,
+            width,
+            rows,
+            store_identity,
+        })
+    }
+
+    pub fn artifact_key(&self) -> &ArtifactKey {
+        &self.artifact_key
+    }
+
+    pub fn artifact_sha256(&self) -> &str {
+        &self.artifact_sha256
+    }
+
+    fn store_identity(&self) -> &Arc<()> {
+        &self.store_identity
+    }
+
+    pub const fn width(&self) -> usize {
+        self.width
+    }
+
+    pub fn rows(&self) -> &[Arc<[f32]>] {
+        &self.rows
+    }
+}
+
+fn select_embedding_tensors<'a>(
+    payload: &'a VerifiedModelTensorPayload,
+    embedding_key: Option<&str>,
+    width: usize,
+) -> Result<Vec<&'a crate::VerifiedModelTensor>, NativeTokenizerError> {
+    if embedding_key.is_some_and(|key| key.trim().is_empty()) {
+        return Err(NativeTokenizerError::InvalidEmbeddingSelector);
+    }
+    let tensors = payload.tensors();
+    if payload.has_nested_string_to_param() {
+        return tensors
+            .first()
+            .map(singleton_embedding_tensor)
+            .transpose()?
+            .ok_or(NativeTokenizerError::MissingEmbeddingTensor);
+    }
+
+    if let Some(key) = embedding_key
+        && let Some(exact) = tensors.iter().find(|tensor| tensor.name() == key)
+    {
+        return singleton_embedding_tensor(exact);
+    }
+
+    let key_suffix = embedding_key
+        .map(|key| {
+            let mut suffix = String::new();
+            suffix
+                .try_reserve_exact(key.len().saturating_add(1))
+                .map_err(|_| NativeTokenizerError::Allocation("embedding key suffix"))?;
+            suffix.push('.');
+            suffix.push_str(key);
+            Ok::<String, NativeTokenizerError>(suffix)
+        })
+        .transpose()?;
+    for suffix in std::iter::once(".string_to_param.*").chain(key_suffix.as_deref()) {
+        let mut bundled = Vec::new();
+        for tensor in tensors.iter().filter(|tensor| {
+            tensor.name().starts_with("bundle_emb.") && tensor.name().ends_with(suffix)
+        }) {
+            if tensor.shape().last().copied()
+                != Some(
+                    u64::try_from(width)
+                        .map_err(|_| NativeTokenizerError::ArithmeticOverflow("embedding width"))?,
+                )
+            {
+                return Err(NativeTokenizerError::EmbeddingWidthMismatch { expected: width });
+            }
+            bundled
+                .try_reserve(1)
+                .map_err(|_| NativeTokenizerError::Allocation("bundled embedding tensors"))?;
+            bundled.push(tensor);
+        }
+        if !bundled.is_empty() {
+            return Ok(bundled);
+        }
+    }
+    tensors
+        .first()
+        .map(singleton_embedding_tensor)
+        .transpose()?
+        .ok_or(NativeTokenizerError::MissingEmbeddingTensor)
+}
+
+fn singleton_embedding_tensor(
+    tensor: &crate::VerifiedModelTensor,
+) -> Result<Vec<&crate::VerifiedModelTensor>, NativeTokenizerError> {
+    let mut selected = Vec::new();
+    selected
+        .try_reserve_exact(1)
+        .map_err(|_| NativeTokenizerError::Allocation("selected embedding tensor"))?;
+    selected.push(tensor);
+    Ok(selected)
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum NativeTokenValue {
+    Token(u32),
+    Embedding {
+        artifact_key: ArtifactKey,
+        artifact_sha256: String,
+        values: Arc<[f32]>,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct NativeWeightedToken {
+    value: NativeTokenValue,
+    weight: f32,
+    word_id: u64,
+}
+
+impl NativeWeightedToken {
+    fn token(token: u32, weight: f32, word_id: u64) -> Self {
+        Self {
+            value: NativeTokenValue::Token(token),
+            weight,
+            word_id,
+        }
+    }
+
+    pub fn value(&self) -> &NativeTokenValue {
+        &self.value
+    }
+
+    pub const fn weight(&self) -> f32 {
+        self.weight
+    }
+
+    pub const fn word_id(&self) -> u64 {
+        self.word_id
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct NativeTokenSection {
+    tokens: Vec<NativeWeightedToken>,
+}
+
+impl NativeTokenSection {
+    pub fn tokens(&self) -> &[NativeWeightedToken] {
+        &self.tokens
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct NativeTokenizedPrompt {
+    sections: Vec<NativeTokenSection>,
+}
+
+impl NativeTokenizedPrompt {
+    pub fn sections(&self) -> &[NativeTokenSection] {
+        &self.sections
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct SentencePieceTokenizer {
+    entries: Vec<SentencePieceToken>,
+    candidates_by_first: BTreeMap<char, Vec<usize>>,
+    control_tokens: Vec<u32>,
+    byte_tokens: BTreeMap<u8, u32>,
+    unknown_token: u32,
+    artifact_key: ArtifactKey,
+    artifact_sha256: String,
+    store_identity: Arc<()>,
+}
+
+#[derive(Clone, Debug)]
+struct SentencePieceToken {
+    piece: String,
+    score: f32,
+    piece_type: SentencePieceType,
+}
+
+#[derive(Debug)]
+struct SentencePiecePathStep {
+    previous: usize,
+    tokens: Vec<u32>,
+}
+
+impl SentencePieceTokenizer {
+    pub fn from_verified_vocabulary(
+        verified: VerifiedSentencePieceVocabulary,
+    ) -> Result<Self, NativeTokenizerError> {
+        let vocabulary = verified.vocabulary();
+        if vocabulary.entries().is_empty() {
+            return Err(NativeTokenizerError::InvalidVocabulary);
+        }
+        let mut entries = Vec::new();
+        entries
+            .try_reserve_exact(vocabulary.entries().len())
+            .map_err(|_| NativeTokenizerError::Allocation("SentencePiece vocabulary"))?;
+        let mut candidates_by_first = BTreeMap::<char, Vec<usize>>::new();
+        let mut control_tokens = Vec::new();
+        let mut byte_tokens = BTreeMap::new();
+        let mut unknown_token = None;
+        for (index, entry) in vocabulary.entries().iter().enumerate() {
+            let token = u32::try_from(index)
+                .map_err(|_| NativeTokenizerError::ArithmeticOverflow("SentencePiece token ID"))?;
+            match entry.piece_type() {
+                SentencePieceType::Unknown => {
+                    if unknown_token.replace(token).is_some() {
+                        return Err(NativeTokenizerError::InvalidVocabulary);
+                    }
+                }
+                SentencePieceType::Control => {
+                    control_tokens
+                        .try_reserve(1)
+                        .map_err(|_| NativeTokenizerError::Allocation("control token IDs"))?;
+                    control_tokens.push(token);
+                }
+                SentencePieceType::Byte => {
+                    let byte = sentencepiece_byte(entry.piece())?;
+                    if byte_tokens.insert(byte, token).is_some() {
+                        return Err(NativeTokenizerError::InvalidVocabulary);
+                    }
+                }
+                SentencePieceType::Normal | SentencePieceType::UserDefined => {
+                    if entry.piece_type() == SentencePieceType::UserDefined {
+                        control_tokens
+                            .try_reserve(1)
+                            .map_err(|_| NativeTokenizerError::Allocation("special token IDs"))?;
+                        control_tokens.push(token);
+                    }
+                    let first = entry
+                        .piece()
+                        .chars()
+                        .next()
+                        .ok_or(NativeTokenizerError::InvalidVocabulary)?;
+                    let candidates = candidates_by_first.entry(first).or_default();
+                    candidates.try_reserve(1).map_err(|_| {
+                        NativeTokenizerError::Allocation("SentencePiece candidates")
+                    })?;
+                    candidates.push(index);
+                }
+                SentencePieceType::Unused => {}
+            }
+            let mut piece = String::new();
+            piece
+                .try_reserve_exact(entry.piece().len())
+                .map_err(|_| NativeTokenizerError::Allocation("SentencePiece piece"))?;
+            piece.push_str(entry.piece());
+            entries.push(SentencePieceToken {
+                piece,
+                score: entry.score(),
+                piece_type: entry.piece_type(),
+            });
+        }
+        Ok(Self {
+            entries,
+            candidates_by_first,
+            control_tokens,
+            byte_tokens,
+            unknown_token: unknown_token.ok_or(NativeTokenizerError::InvalidVocabulary)?,
+            artifact_key: verified.artifact_key().clone(),
+            artifact_sha256: verified.artifact_sha256().to_owned(),
+            store_identity: verified.store_identity(),
+        })
+    }
+
+    pub fn artifact_key(&self) -> &ArtifactKey {
+        &self.artifact_key
+    }
+
+    pub fn artifact_sha256(&self) -> &str {
+        &self.artifact_sha256
+    }
+
+    pub fn matches_verified_vocabulary(&self, verified: &VerifiedSentencePieceVocabulary) -> bool {
+        self.artifact_key == *verified.artifact_key()
+            && self.artifact_sha256 == verified.artifact_sha256()
+            && Arc::ptr_eq(&self.store_identity, &verified.store_identity())
+    }
+
+    fn encode(
+        &self,
+        text: &str,
+        cancellation: &CancellationToken,
+    ) -> Result<Vec<u32>, NativeTokenizerError> {
+        cancellation.check()?;
+        if text.len() > MAX_NATIVE_PROMPT_BYTES {
+            return Err(NativeTokenizerError::PromptTooLarge(text.len()));
+        }
+        let normalized = normalize_sentencepiece(text)?;
+        if normalized.is_empty() {
+            return Ok(Vec::new());
+        }
+        let positions =
+            normalized
+                .len()
+                .checked_add(1)
+                .ok_or(NativeTokenizerError::ArithmeticOverflow(
+                    "SentencePiece path positions",
+                ))?;
+        let mut scores = Vec::new();
+        scores
+            .try_reserve_exact(positions)
+            .map_err(|_| NativeTokenizerError::Allocation("SentencePiece path scores"))?;
+        scores.resize(positions, f64::NEG_INFINITY);
+        scores[0] = 0.0;
+        let mut paths = Vec::<Option<SentencePiecePathStep>>::new();
+        paths
+            .try_reserve_exact(positions)
+            .map_err(|_| NativeTokenizerError::Allocation("SentencePiece paths"))?;
+        paths.resize_with(positions, || None);
+
+        for offset in 0..normalized.len() {
+            if offset.is_multiple_of(256) {
+                cancellation.check()?;
+            }
+            if !scores[offset].is_finite() || !normalized.is_char_boundary(offset) {
+                continue;
+            }
+            let tail = normalized
+                .get(offset..)
+                .ok_or(NativeTokenizerError::InvalidUtf8Boundary)?;
+            let first = tail
+                .chars()
+                .next()
+                .ok_or(NativeTokenizerError::InvalidUtf8Boundary)?;
+            let mut matched = false;
+            if let Some(candidates) = self.candidates_by_first.get(&first) {
+                for index in candidates {
+                    let candidate = self
+                        .entries
+                        .get(*index)
+                        .ok_or(NativeTokenizerError::InvalidVocabulary)?;
+                    if tail.starts_with(&candidate.piece) {
+                        matched = true;
+                        let end = offset.checked_add(candidate.piece.len()).ok_or(
+                            NativeTokenizerError::ArithmeticOverflow("SentencePiece endpoint"),
+                        )?;
+                        let token = u32::try_from(*index).map_err(|_| {
+                            NativeTokenizerError::ArithmeticOverflow("SentencePiece token ID")
+                        })?;
+                        update_sentencepiece_path(
+                            &mut scores,
+                            &mut paths,
+                            offset,
+                            end,
+                            f64::from(candidate.score),
+                            &[token],
+                        )?;
+                    }
+                }
+            }
+            if matched {
+                continue;
+            }
+            let character_length = first.len_utf8();
+            let end = offset.checked_add(character_length).ok_or(
+                NativeTokenizerError::ArithmeticOverflow("SentencePiece unknown endpoint"),
+            )?;
+            let unknown = self
+                .entries
+                .get(self.unknown_token as usize)
+                .ok_or(NativeTokenizerError::InvalidVocabulary)?;
+            let mut fallback = Vec::new();
+            if self.byte_tokens.len() == 256 {
+                fallback
+                    .try_reserve_exact(character_length)
+                    .map_err(|_| NativeTokenizerError::Allocation("SentencePiece byte fallback"))?;
+                let mut encoded = [0_u8; 4];
+                for byte in first.encode_utf8(&mut encoded).as_bytes() {
+                    fallback.push(
+                        *self
+                            .byte_tokens
+                            .get(byte)
+                            .ok_or(NativeTokenizerError::InvalidVocabulary)?,
+                    );
+                }
+            } else {
+                fallback
+                    .try_reserve_exact(1)
+                    .map_err(|_| NativeTokenizerError::Allocation("SentencePiece unknown token"))?;
+                fallback.push(self.unknown_token);
+            }
+            update_sentencepiece_path(
+                &mut scores,
+                &mut paths,
+                offset,
+                end,
+                f64::from(unknown.score),
+                &fallback,
+            )?;
+        }
+        cancellation.check()?;
+        let mut reversed = Vec::<u32>::new();
+        let mut cursor = normalized.len();
+        while cursor != 0 {
+            let step = paths
+                .get_mut(cursor)
+                .and_then(Option::take)
+                .ok_or(NativeTokenizerError::InvalidVocabulary)?;
+            reversed
+                .try_reserve(step.tokens.len())
+                .map_err(|_| NativeTokenizerError::Allocation("SentencePiece output"))?;
+            reversed.extend(step.tokens.into_iter().rev());
+            cursor = step.previous;
+        }
+        reversed.reverse();
+        Ok(reversed)
+    }
+
+    pub fn decode(
+        &self,
+        tokens: &[u32],
+        skip_special: bool,
+        cancellation: &CancellationToken,
+    ) -> Result<String, NativeTokenizerError> {
+        cancellation.check()?;
+        if tokens.len() > MAX_NATIVE_PROMPT_BYTES {
+            return Err(NativeTokenizerError::TooManyTokenValues(tokens.len()));
+        }
+        let mut decoded = String::new();
+        let mut byte_run = Vec::new();
+        for (index, token) in tokens.iter().enumerate() {
+            if index.is_multiple_of(256) {
+                cancellation.check()?;
+            }
+            let entry = self
+                .entries
+                .get(*token as usize)
+                .ok_or(NativeTokenizerError::UnknownToken(*token))?;
+            if skip_special && self.control_tokens.contains(token) {
+                continue;
+            }
+            if *token == self.unknown_token {
+                flush_sentencepiece_bytes(&mut decoded, &mut byte_run)?;
+                if decoded.len().saturating_add('�'.len_utf8()) > MAX_NATIVE_PROMPT_BYTES {
+                    return Err(NativeTokenizerError::TooManyTokenValues(decoded.len() + 1));
+                }
+                decoded.push('�');
+                continue;
+            }
+            if entry.piece_type == SentencePieceType::Byte {
+                if byte_run.len() == MAX_NATIVE_PROMPT_BYTES {
+                    return Err(NativeTokenizerError::TooManyTokenValues(byte_run.len() + 1));
+                }
+                byte_run
+                    .try_reserve(1)
+                    .map_err(|_| NativeTokenizerError::Allocation("decoded SentencePiece bytes"))?;
+                byte_run.push(sentencepiece_byte(&entry.piece)?);
+            } else {
+                flush_sentencepiece_bytes(&mut decoded, &mut byte_run)?;
+                let decoded_length = decoded.len().checked_add(entry.piece.len()).ok_or(
+                    NativeTokenizerError::ArithmeticOverflow("decoded SentencePiece bytes"),
+                )?;
+                if decoded_length > MAX_NATIVE_PROMPT_BYTES {
+                    return Err(NativeTokenizerError::TooManyTokenValues(decoded_length));
+                }
+                decoded
+                    .try_reserve(entry.piece.len())
+                    .map_err(|_| NativeTokenizerError::Allocation("decoded SentencePiece text"))?;
+                decoded.push_str(&entry.piece);
+            }
+        }
+        flush_sentencepiece_bytes(&mut decoded, &mut byte_run)?;
+        normalize_sentencepiece_decoded_text(&decoded)
+    }
+}
+
+fn normalize_sentencepiece(text: &str) -> Result<String, NativeTokenizerError> {
+    let mut normalized = String::new();
+    normalized
+        .try_reserve(text.len().saturating_add(3))
+        .map_err(|_| NativeTokenizerError::Allocation("normalized SentencePiece prompt"))?;
+    for word in text.split_whitespace() {
+        normalized
+            .try_reserve(word.len().saturating_add(3))
+            .map_err(|_| NativeTokenizerError::Allocation("normalized SentencePiece prompt"))?;
+        normalized.push('▁');
+        normalized.push_str(word);
+        if normalized.len() > MAX_NATIVE_PROMPT_BYTES {
+            return Err(NativeTokenizerError::PromptTooLarge(normalized.len()));
+        }
+    }
+    Ok(normalized)
+}
+
+fn update_sentencepiece_path(
+    scores: &mut [f64],
+    paths: &mut [Option<SentencePiecePathStep>],
+    previous: usize,
+    end: usize,
+    added_score: f64,
+    tokens: &[u32],
+) -> Result<(), NativeTokenizerError> {
+    let score = scores
+        .get(previous)
+        .copied()
+        .ok_or(NativeTokenizerError::InvalidUtf8Boundary)?
+        + added_score;
+    let target_score = scores
+        .get_mut(end)
+        .ok_or(NativeTokenizerError::InvalidUtf8Boundary)?;
+    let replace = score > *target_score
+        || (score == *target_score
+            && paths
+                .get(end)
+                .and_then(Option::as_ref)
+                .is_none_or(|current| tokens < current.tokens.as_slice()));
+    if replace {
+        let mut owned_tokens = Vec::new();
+        owned_tokens
+            .try_reserve_exact(tokens.len())
+            .map_err(|_| NativeTokenizerError::Allocation("SentencePiece path step"))?;
+        owned_tokens.extend_from_slice(tokens);
+        *target_score = score;
+        *paths
+            .get_mut(end)
+            .ok_or(NativeTokenizerError::InvalidUtf8Boundary)? = Some(SentencePiecePathStep {
+            previous,
+            tokens: owned_tokens,
+        });
+    }
+    Ok(())
+}
+
+fn sentencepiece_byte(piece: &str) -> Result<u8, NativeTokenizerError> {
+    let value = piece
+        .strip_prefix("<0x")
+        .and_then(|value| value.strip_suffix('>'))
+        .ok_or(NativeTokenizerError::InvalidVocabulary)?;
+    if value.len() != 2 {
+        return Err(NativeTokenizerError::InvalidVocabulary);
+    }
+    u8::from_str_radix(value, 16).map_err(|_| NativeTokenizerError::InvalidVocabulary)
+}
+
+fn flush_sentencepiece_bytes(
+    decoded: &mut String,
+    byte_run: &mut Vec<u8>,
+) -> Result<(), NativeTokenizerError> {
+    if byte_run.is_empty() {
+        return Ok(());
+    }
+    let text =
+        std::str::from_utf8(byte_run).map_err(|_| NativeTokenizerError::InvalidDecodedUtf8)?;
+    let decoded_length =
+        decoded
+            .len()
+            .checked_add(text.len())
+            .ok_or(NativeTokenizerError::ArithmeticOverflow(
+                "decoded SentencePiece byte run",
+            ))?;
+    if decoded_length > MAX_NATIVE_PROMPT_BYTES {
+        return Err(NativeTokenizerError::TooManyTokenValues(decoded_length));
+    }
+    decoded
+        .try_reserve(text.len())
+        .map_err(|_| NativeTokenizerError::Allocation("decoded SentencePiece byte run"))?;
+    decoded.push_str(text);
+    byte_run.clear();
+    Ok(())
+}
+
+fn normalize_sentencepiece_decoded_text(decoded: &str) -> Result<String, NativeTokenizerError> {
+    let mut output = String::new();
+    output
+        .try_reserve(decoded.len())
+        .map_err(|_| NativeTokenizerError::Allocation("decoded SentencePiece text"))?;
+    let mut leading = true;
+    for character in decoded.chars() {
+        let character = if character == '▁' { ' ' } else { character };
+        if leading && character.is_whitespace() {
+            continue;
+        }
+        leading = false;
+        output.push(character);
+    }
+    Ok(output)
+}
+
+#[derive(Clone, Debug)]
+pub struct ClipBpeTokenizer {
+    tokenizer: Sd1Tokenizer,
+}
+
+impl ClipBpeTokenizer {
+    pub fn from_json_and_merges(
+        descriptor: ModelTokenizerDescriptor,
+        vocabulary_json: &str,
+        merges: &str,
+    ) -> Result<Self, NativeTokenizerError> {
+        Ok(Self {
+            tokenizer: Sd1Tokenizer::from_json_and_merges(descriptor, vocabulary_json, merges)?,
+        })
+    }
+
+    fn encode(
+        &self,
+        text: &str,
+        cancellation: &CancellationToken,
+    ) -> Result<Vec<u32>, NativeTokenizerError> {
+        let encoded = self.tokenizer.encode_content(text, cancellation)?;
+        let mut output = Vec::new();
+        output
+            .try_reserve_exact(encoded.len())
+            .map_err(|_| NativeTokenizerError::Allocation("CLIP content tokens"))?;
+        output.extend(encoded.into_iter().map(|token| token.token()));
+        Ok(output)
+    }
+
+    pub fn decode(
+        &self,
+        tokens: &[u32],
+        skip_special: bool,
+        cancellation: &CancellationToken,
+    ) -> Result<String, NativeTokenizerError> {
+        self.tokenizer
+            .decode(tokens, skip_special, cancellation)
+            .map_err(NativeTokenizerError::from)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum NativeTokenizerFamily {
+    ClipBpe(ClipBpeTokenizer),
+    SentencePiece(SentencePieceTokenizer),
+}
+
+impl NativeTokenizerFamily {
+    fn encode(
+        &self,
+        text: &str,
+        cancellation: &CancellationToken,
+    ) -> Result<Vec<u32>, NativeTokenizerError> {
+        match self {
+            Self::ClipBpe(tokenizer) => tokenizer.encode(text, cancellation),
+            Self::SentencePiece(tokenizer) => tokenizer.encode(text, cancellation),
+        }
+    }
+
+    pub fn decode(
+        &self,
+        tokens: &[u32],
+        skip_special: bool,
+        cancellation: &CancellationToken,
+    ) -> Result<String, NativeTokenizerError> {
+        match self {
+            Self::ClipBpe(tokenizer) => tokenizer.decode(tokens, skip_special, cancellation),
+            Self::SentencePiece(tokenizer) => tokenizer.decode(tokens, skip_special, cancellation),
+        }
+    }
+}
+
+pub struct NativePromptTokenizer {
+    family: NativeTokenizerFamily,
+    configuration: TokenizerConfiguration,
+    embeddings: BTreeMap<String, TextualInversionEmbedding>,
+}
+
+impl NativePromptTokenizer {
+    pub fn empty_token_ids(
+        start_token: Option<u32>,
+        end_token: Option<u32>,
+        pad_token: u32,
+        length: usize,
+    ) -> Result<Vec<u32>, NativeTokenizerError> {
+        let special_count = usize::from(start_token.is_some())
+            .checked_add(usize::from(end_token.is_some()))
+            .ok_or(NativeTokenizerError::ArithmeticOverflow(
+                "empty special tokens",
+            ))?;
+        if length < special_count || length > MAX_NATIVE_PROMPT_BYTES {
+            return Err(NativeTokenizerError::InvalidEmptyTokenLength(length));
+        }
+        let mut output = Vec::new();
+        output
+            .try_reserve_exact(length)
+            .map_err(|_| NativeTokenizerError::Allocation("empty tokens"))?;
+        output.extend(start_token);
+        output.extend(end_token);
+        output.resize(length, pad_token);
+        Ok(output)
+    }
+
+    pub fn checked(
+        family: NativeTokenizerFamily,
+        configuration: TokenizerConfiguration,
+        embeddings: BTreeMap<String, TextualInversionEmbedding>,
+    ) -> Result<Self, NativeTokenizerError> {
+        let configuration = configuration.checked()?;
+        if embeddings.keys().any(|name| name.trim().is_empty()) {
+            return Err(NativeTokenizerError::InvalidEmbeddingName);
+        }
+        if !embeddings.is_empty() {
+            let expected_width = configuration.embedding_width.ok_or_else(|| {
+                NativeTokenizerError::InvalidConfiguration(
+                    "textual inversion requires an explicit embedding width".to_owned(),
+                )
+            })?;
+            if embeddings
+                .values()
+                .any(|embedding| embedding.width() != expected_width)
+            {
+                return Err(NativeTokenizerError::EmbeddingWidthMismatch {
+                    expected: expected_width,
+                });
+            }
+            let first = embeddings
+                .values()
+                .next()
+                .ok_or(NativeTokenizerError::InvalidEmbeddingName)?;
+            if embeddings
+                .values()
+                .any(|embedding| !Arc::ptr_eq(embedding.store_identity(), first.store_identity()))
+            {
+                return Err(NativeTokenizerError::ArtifactMismatch(
+                    first.artifact_key().clone(),
+                ));
+            }
+        }
+        Ok(Self {
+            family,
+            configuration,
+            embeddings,
+        })
+    }
+
+    pub fn tokenize(
+        &self,
+        text: &str,
+        cancellation: &CancellationToken,
+    ) -> Result<NativeTokenizedPrompt, NativeTokenizerError> {
+        cancellation.check()?;
+        if text.len() > MAX_NATIVE_PROMPT_BYTES {
+            return Err(NativeTokenizerError::PromptTooLarge(text.len()));
+        }
+        let segments = if self.configuration.disable_weights {
+            let mut owned_text = String::new();
+            owned_text
+                .try_reserve_exact(text.len())
+                .map_err(|_| NativeTokenizerError::Allocation("unweighted prompt"))?;
+            owned_text.push_str(text);
+            let mut segments = Vec::new();
+            segments
+                .try_reserve_exact(1)
+                .map_err(|_| NativeTokenizerError::Allocation("prompt weight segments"))?;
+            segments.push(PromptWeightSegment::checked(owned_text, 1.0)?);
+            segments
+        } else {
+            parse_prompt_weights(text, cancellation)?
+        };
+        let mut groups = Vec::<Vec<(NativeTokenValue, f32)>>::new();
+        for segment in segments {
+            for part in split_embedding_references(segment.text(), cancellation)? {
+                cancellation.check()?;
+                match part {
+                    PromptPart::Text(text) if !text.is_empty() => {
+                        let encoded = self.family.encode(text, cancellation)?;
+                        if !encoded.is_empty() {
+                            let mut group = Vec::new();
+                            group.try_reserve_exact(encoded.len()).map_err(|_| {
+                                NativeTokenizerError::Allocation("numeric token group")
+                            })?;
+                            group.extend(
+                                encoded.into_iter().map(|token| {
+                                    (NativeTokenValue::Token(token), segment.weight())
+                                }),
+                            );
+                            groups
+                                .try_reserve(1)
+                                .map_err(|_| NativeTokenizerError::Allocation("token groups"))?;
+                            groups.push(group);
+                        }
+                    }
+                    PromptPart::Embedding(name) => {
+                        let (embedding, comma_fallback) = match self.embeddings.get(name) {
+                            Some(embedding) => (Some(embedding), None),
+                            None => {
+                                let stripped = name.trim_matches(',');
+                                if stripped.len() < name.len() {
+                                    (self.embeddings.get(stripped), Some(&name[stripped.len()..]))
+                                } else {
+                                    (None, None)
+                                }
+                            }
+                        };
+                        if let Some(embedding) = embedding {
+                            let mut group = Vec::new();
+                            group
+                                .try_reserve_exact(embedding.rows().len())
+                                .map_err(|_| {
+                                    NativeTokenizerError::Allocation("embedding token group")
+                                })?;
+                            for row in embedding.rows() {
+                                group.push((
+                                    NativeTokenValue::Embedding {
+                                        artifact_key: embedding.artifact_key().clone(),
+                                        artifact_sha256: embedding.artifact_sha256().to_owned(),
+                                        values: row.clone(),
+                                    },
+                                    segment.weight(),
+                                ));
+                            }
+                            groups
+                                .try_reserve(1)
+                                .map_err(|_| NativeTokenizerError::Allocation("token groups"))?;
+                            groups.push(group);
+                        }
+                        if let Some(fallback) = comma_fallback.filter(|text| !text.is_empty()) {
+                            let encoded = self.family.encode(fallback, cancellation)?;
+                            if !encoded.is_empty() {
+                                let mut group = Vec::new();
+                                group.try_reserve_exact(encoded.len()).map_err(|_| {
+                                    NativeTokenizerError::Allocation("fallback token group")
+                                })?;
+                                group.extend(encoded.into_iter().map(|token| {
+                                    (NativeTokenValue::Token(token), segment.weight())
+                                }));
+                                groups.try_reserve(1).map_err(|_| {
+                                    NativeTokenizerError::Allocation("token groups")
+                                })?;
+                                groups.push(group);
+                            }
+                        }
+                    }
+                    PromptPart::Text(_) => {}
+                }
+            }
+        }
+        self.pack(groups, cancellation)
+    }
+
+    pub fn tokenize_list(
+        &self,
+        prompts: &[String],
+        cancellation: &CancellationToken,
+    ) -> Result<Vec<NativeTokenizedPrompt>, NativeTokenizerError> {
+        if prompts.is_empty() || prompts.len() > MAX_NATIVE_PROMPT_BATCH {
+            return Err(NativeTokenizerError::InvalidBatchSize(prompts.len()));
+        }
+        let mut output = Vec::new();
+        output
+            .try_reserve_exact(prompts.len())
+            .map_err(|_| NativeTokenizerError::Allocation("prompt batch"))?;
+        for prompt in prompts {
+            output.push(self.tokenize(prompt, cancellation)?);
+        }
+        Ok(output)
+    }
+
+    fn pack(
+        &self,
+        groups: Vec<Vec<(NativeTokenValue, f32)>>,
+        cancellation: &CancellationToken,
+    ) -> Result<NativeTokenizedPrompt, NativeTokenizerError> {
+        let special_end = usize::from(self.configuration.end_token.is_some());
+        let mut sections = Vec::new();
+        let mut current = self.new_section()?;
+        let mut next_word_id = 1_u64;
+        let mut aggregate_values = 0_usize;
+        for mut group in groups {
+            cancellation.check()?;
+            aggregate_values = aggregate_values.checked_add(group.len()).ok_or(
+                NativeTokenizerError::ArithmeticOverflow("aggregate prompt tokens"),
+            )?;
+            if aggregate_values > MAX_NATIVE_PROMPT_BYTES {
+                return Err(NativeTokenizerError::TooManyTokenValues(aggregate_values));
+            }
+            let empty_section_content_capacity = self
+                .configuration
+                .maximum_length
+                .checked_sub(usize::from(self.configuration.start_token.is_some()))
+                .and_then(|value| value.checked_sub(special_end))
+                .ok_or(NativeTokenizerError::ArithmeticOverflow(
+                    "empty section content capacity",
+                ))?;
+            let large = group.len() >= self.configuration.maximum_word_length
+                || group.len() > empty_section_content_capacity;
+            while !group.is_empty() {
+                let remaining = self
+                    .configuration
+                    .maximum_length
+                    .checked_sub(current.len())
+                    .and_then(|value| value.checked_sub(special_end))
+                    .ok_or(NativeTokenizerError::ArithmeticOverflow("section capacity"))?;
+                if group.len() > remaining {
+                    if large && remaining > 0 {
+                        for (value, weight) in group.drain(..remaining) {
+                            current.push(NativeWeightedToken {
+                                value,
+                                weight,
+                                word_id: next_word_id,
+                            });
+                        }
+                    }
+                    self.finish_section(&mut current, false)?;
+                    reserve_tokenizer_values(&mut sections, 1, "token sections")?;
+                    sections.push(NativeTokenSection { tokens: current });
+                    if sections.len() == MAX_NATIVE_TOKEN_SECTIONS {
+                        return Err(NativeTokenizerError::TooManySections(sections.len() + 1));
+                    }
+                    current = self.new_section()?;
+                } else {
+                    for (value, weight) in group.drain(..) {
+                        current.push(NativeWeightedToken {
+                            value,
+                            weight,
+                            word_id: next_word_id,
+                        });
+                    }
+                }
+            }
+            next_word_id = next_word_id
+                .checked_add(1)
+                .ok_or(NativeTokenizerError::ArithmeticOverflow("word identity"))?;
+        }
+        self.finish_section(&mut current, true)?;
+        reserve_tokenizer_values(&mut sections, 1, "token sections")?;
+        sections.push(NativeTokenSection { tokens: current });
+        let published_values =
+            sections.iter().try_fold(0_usize, |total, section| {
+                total.checked_add(section.tokens.len()).ok_or(
+                    NativeTokenizerError::ArithmeticOverflow("published prompt token values"),
+                )
+            })?;
+        if published_values > MAX_NATIVE_PROMPT_BYTES {
+            return Err(NativeTokenizerError::TooManyTokenValues(published_values));
+        }
+        Ok(NativeTokenizedPrompt { sections })
+    }
+
+    fn new_section(&self) -> Result<Vec<NativeWeightedToken>, NativeTokenizerError> {
+        let mut section = Vec::new();
+        if let Some(token) = self.configuration.start_token {
+            section
+                .try_reserve_exact(1)
+                .map_err(|_| NativeTokenizerError::Allocation("section start token"))?;
+            section.push(NativeWeightedToken::token(token, 1.0, 0));
+        }
+        Ok(section)
+    }
+
+    fn finish_section(
+        &self,
+        section: &mut Vec<NativeWeightedToken>,
+        final_section: bool,
+    ) -> Result<(), NativeTokenizerError> {
+        if let Some(token) = self.configuration.end_token {
+            section
+                .try_reserve(1)
+                .map_err(|_| NativeTokenizerError::Allocation("section end token"))?;
+            section.push(NativeWeightedToken::token(token, 1.0, 0));
+        }
+        if final_section {
+            if let Some(padding) = self.configuration.minimum_padding {
+                self.pad(section, padding)?;
+            }
+        }
+        if self.configuration.pad_to_maximum_length
+            && section.len() < self.configuration.maximum_length
+        {
+            self.pad(section, self.configuration.maximum_length - section.len())?;
+        }
+        if final_section {
+            if let Some(minimum) = self.configuration.minimum_length {
+                if section.len() < minimum {
+                    self.pad(section, minimum - section.len())?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn pad(
+        &self,
+        section: &mut Vec<NativeWeightedToken>,
+        count: usize,
+    ) -> Result<(), NativeTokenizerError> {
+        let padded_length =
+            section
+                .len()
+                .checked_add(count)
+                .ok_or(NativeTokenizerError::ArithmeticOverflow(
+                    "token padding length",
+                ))?;
+        if padded_length > MAX_NATIVE_PROMPT_BYTES {
+            return Err(NativeTokenizerError::TooManyTokenValues(padded_length));
+        }
+        section
+            .try_reserve(count)
+            .map_err(|_| NativeTokenizerError::Allocation("token padding"))?;
+        if self.configuration.pad_left {
+            section.splice(
+                0..0,
+                std::iter::repeat_n(
+                    NativeWeightedToken::token(self.configuration.pad_token, 1.0, 0),
+                    count,
+                ),
+            );
+        } else {
+            section.extend(std::iter::repeat_n(
+                NativeWeightedToken::token(self.configuration.pad_token, 1.0, 0),
+                count,
+            ));
+        }
+        Ok(())
+    }
+}
+
+enum PromptPart<'a> {
+    Text(&'a str),
+    Embedding(&'a str),
+}
+
+fn split_embedding_references<'a>(
+    text: &'a str,
+    cancellation: &CancellationToken,
+) -> Result<Vec<PromptPart<'a>>, NativeTokenizerError> {
+    let mut output = Vec::new();
+    let mut cursor = 0;
+    while let Some((relative, marker_length)) = if cursor == 0 && text.starts_with("embedding:") {
+        Some((0, "embedding:".len()))
+    } else {
+        [
+            text[cursor..]
+                .find(" embedding:")
+                .map(|index| (index, " embedding:".len())),
+            text[cursor..]
+                .find("\nembedding:")
+                .map(|index| (index, "\nembedding:".len())),
+        ]
+        .into_iter()
+        .flatten()
+        .min_by_key(|(index, _)| *index)
+    } {
+        cancellation.check()?;
+        let marker = cursor + relative;
+        if marker > cursor {
+            output
+                .try_reserve(1)
+                .map_err(|_| NativeTokenizerError::Allocation("embedding references"))?;
+            output.push(PromptPart::Text(&text[cursor..marker]));
+        }
+        let name_start = marker + marker_length;
+        let name_end = text[name_start..]
+            .find(char::is_whitespace)
+            .map(|index| name_start + index)
+            .unwrap_or(text.len());
+        output
+            .try_reserve(1)
+            .map_err(|_| NativeTokenizerError::Allocation("embedding references"))?;
+        output.push(PromptPart::Embedding(&text[name_start..name_end]));
+        cursor = name_end;
+    }
+    if cursor < text.len() {
+        output
+            .try_reserve(1)
+            .map_err(|_| NativeTokenizerError::Allocation("embedding references"))?;
+        output.push(PromptPart::Text(&text[cursor..]));
+    }
+    Ok(output)
+}
+
+#[derive(Debug, Error)]
+pub enum NativeTokenizerError {
+    #[error(transparent)]
+    Clip(#[from] ClipError),
+    #[error(transparent)]
+    Tensor(#[from] TensorError),
+    #[error(transparent)]
+    Cancellation(#[from] comfy_types::CancellationError),
+    #[error(transparent)]
+    ModelStore(#[from] ModelStoreError),
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    #[error("prompt byte length exceeds the native bound: {0}")]
+    PromptTooLarge(usize),
+    #[error("prompt has too many weighted segments: {0}")]
+    TooManyWeightSegments(usize),
+    #[error("prompt weighting nesting exceeds the native bound: {0}")]
+    WeightNestingTooDeep(usize),
+    #[error("token weight must be finite, got {0}")]
+    InvalidWeight(f32),
+    #[error("native tokenizer configuration is invalid: {0}")]
+    InvalidConfiguration(String),
+    #[error("native tokenizer vocabulary is invalid")]
+    InvalidVocabulary,
+    #[error("native tokenizer vocabulary JSON is invalid: {0}")]
+    InvalidVocabularyJson(String),
+    #[error("unknown token ID {0}")]
+    UnknownToken(u32),
+    #[error("CLIP vocabulary contains an invalid byte-encoding character {0:?}")]
+    InvalidClipByte(char),
+    #[error("decoded CLIP bytes are not valid UTF-8")]
+    InvalidDecodedUtf8,
+    #[error("invalid UTF-8 token boundary")]
+    InvalidUtf8Boundary,
+    #[error("textual inversion embedding name is invalid")]
+    InvalidEmbeddingName,
+    #[error("embedding tensor selector is invalid")]
+    InvalidEmbeddingSelector,
+    #[error("verified embedding artifact contains no selectable tensor")]
+    MissingEmbeddingTensor,
+    #[error("textual inversion artifact does not match canonical record {0:?}")]
+    ArtifactMismatch(ArtifactKey),
+    #[error("textual inversion embedding has {values} values for width {width}")]
+    InvalidEmbeddingShape { values: usize, width: usize },
+    #[error("textual inversion embedding width does not match required width {expected}")]
+    EmbeddingWidthMismatch { expected: usize },
+    #[error("textual inversion embedding contains a non-finite value")]
+    NonFiniteEmbedding,
+    #[error("textual inversion embedding dtype {0:?} is unsupported")]
+    UnsupportedEmbeddingDType(String),
+    #[error("empty token length is invalid: {0}")]
+    InvalidEmptyTokenLength(usize),
+    #[error("CLIP token-weight projection shape is invalid")]
+    InvalidWeightProjection,
+    #[error("CLIP token-weight projection produced a non-finite value")]
+    NonFiniteWeightProjection,
+    #[error("prompt batch size must be in 1..={MAX_NATIVE_PROMPT_BATCH}, got {0}")]
+    InvalidBatchSize(usize),
+    #[error("prompt requires too many token sections: {0}")]
+    TooManySections(usize),
+    #[error("prompt contains too many token or embedding values: {0}")]
+    TooManyTokenValues(usize),
+    #[error("native tokenizer allocation failed for {0}")]
+    Allocation(&'static str),
+    #[error("native tokenizer arithmetic overflowed while computing {0}")]
+    ArithmeticOverflow(&'static str),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn publication_reserve_failure_is_typed_and_leaves_staging_unchanged() {
+        let mut staged = Vec::<NativeTokenSection>::new();
+        assert!(matches!(
+            reserve_tokenizer_values(&mut staged, usize::MAX, "token sections"),
+            Err(NativeTokenizerError::Allocation("token sections"))
+        ));
+        assert!(staged.is_empty());
+    }
+}

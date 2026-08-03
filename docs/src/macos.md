@@ -104,6 +104,32 @@ If the `sim` command isn't available after installation:
 2. Try reinstalling the CLI via {#action cli::InstallCliBinary} in the command palette
 3. Open a new terminal window to reload your PATH
 
+### Can't install CLI {#cant-install-cli}
+
+{#action cli::InstallCliBinary} writes a `sim` symlink to `/usr/local/bin`, which requires administrator privileges. If your macOS account isn't in the `admin` group, Sim can't create that symlink and will report that it can't install the CLI automatically.
+
+Instead, you can add an alias pointing to the `cli` binary bundled inside the app. The path depends on where Sim is installed:
+
+```sh
+# Default install (Sim in /Applications)
+alias sim="/Applications/Sim.app/Contents/MacOS/cli"
+
+# User install (Sim in ~/Applications)
+alias sim="$HOME/Applications/Sim.app/Contents/MacOS/cli"
+
+# Preview build (Sim Preview in ~/Applications)
+alias sim="$HOME/Applications/Sim Preview.app/Contents/MacOS/cli"
+```
+
+Add the line that matches your install to your shell configuration file. Use `~/.zshrc` for Zsh (the default on modern macOS) or `~/.bashrc` for Bash.
+
+After you restart your shell, you will be able to use `sim` from your terminal:
+
+```sh
+sim .              # Open current folder
+sim file.txt       # Open a file
+```
+
 ### GPU or rendering issues
 
 Sim uses Metal for rendering. If you experience graphical glitches:

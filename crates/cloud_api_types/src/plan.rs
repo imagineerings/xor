@@ -10,6 +10,7 @@ pub enum Plan {
     SimPro,
     SimProTrial,
     SimBusiness,
+    SimVip,
     SimStudent,
 }
 

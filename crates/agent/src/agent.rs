@@ -1,67 +1,38 @@
-mod action_required_manager;
-mod builtin_extensions;
 mod db;
-mod execution_manager;
-mod extension_malware_check;
-mod hints;
-mod hooks;
-mod large_response_handler;
 mod legacy_thread;
 mod native_agent_server;
-mod observability_integration;
 pub mod outline;
 mod pattern_extraction;
-mod permission_integration;
-mod platform_extensions;
 mod sandboxing;
-mod security_integration;
-mod shared_session;
-mod snapshot;
-mod source_roots;
-mod sources;
 mod templates;
 #[cfg(test)]
 mod tests;
 mod thread;
 mod thread_store;
-mod tool_inspector;
-mod tool_monitor;
 mod tool_permissions;
 mod tools;
 
-pub use action_required_manager::*;
-pub use builtin_extensions::*;
 use context_server::ContextServerId;
 pub use db::*;
-pub use execution_manager::*;
-pub use extension_malware_check::*;
-pub use hints::*;
-pub use hooks::*;
 use itertools::Itertools;
 pub use native_agent_server::NativeAgentServer;
-pub use observability_integration::*;
 pub use pattern_extraction::*;
-pub use permission_integration::*;
-pub use platform_extensions::*;
-pub use security_integration::*;
-pub use shared_session::*;
+pub use sandboxing::{
+    ThreadSandbox, sandbox_worktree_writable_paths, settings_sandbox_policy,
+    settings_thread_sandbox,
+};
 pub use shell_command_parser::extract_commands;
-pub use snapshot::*;
-pub use source_roots::*;
-pub use sources::*;
 pub use templates::*;
 pub use thread::*;
 pub use thread_store::*;
-pub use tool_inspector::*;
-pub use tool_monitor::*;
 pub use tool_permissions::*;
 pub use tools::*;
 
 use acp_thread::{
     AcpThread, AgentModelId, AgentModelSelector, AgentSessionInfo, AgentSessionList,
-    AgentSessionListRequest, AgentSessionListResponse, TokenUsageRatio, UserMessageId,
+    AgentSessionListRequest, AgentSessionListResponse, ClientUserMessageId, TokenUsageRatio,
 };
-use agent_client_protocol::schema as acp;
+use agent_client_protocol::schema::v1 as acp;
 use agent_skills::{
     AGENTS_DIR_NAME, MAX_SKILL_DESCRIPTIONS_SIZE, MAX_SKILL_FILE_SIZE, ProjectSkillGroup,
     SKILL_FILE_NAME, Skill, SkillIndex, SkillLoadError, SkillLoadWarning, SkillScopeId,
@@ -197,9 +168,6 @@ impl From<&Skill> for NativeAvailableSkill {
 }
 
 pub const COMPACT_COMMAND_NAME: &str = "compact";
-pub const HELP_COMMAND_NAME: &str = "help";
-pub const CLEAR_COMMAND_NAME: &str = "clear";
-pub const RECIPE_COMMAND_NAME: &str = "recipe";
 
 /// Returns the set of MCP prompt names that must be server-qualified
 /// (`/<server>.<name>`) to stay unambiguous in the slash-command popup: names
@@ -346,6 +314,7 @@ impl LanguageModels {
             }),
             is_latest: model.is_latest(),
             cost: model.model_cost_info().map(|cost| cost.to_shared_string()),
+            disabled: model.is_disabled(),
         }
     }
 
@@ -405,7 +374,10 @@ impl LanguageModels {
                 }
             }
 
-            cx.update(language_models::update_environment_fallback_model);
+            cx.update(|cx| {
+                LanguageModelRegistry::global(cx)
+                    .update(cx, |registry, cx| registry.refresh_fallback_model(cx))
+            });
         })
     }
 }
@@ -693,10 +665,10 @@ impl NativeAgent {
         if let Ok(mut entries) = fs.read_dir(&skills_dir).await {
             while let Some(entry) = entries.next().await {
                 let Ok(path) = entry else { continue };
-                if let Ok(Some(metadata)) = fs.metadata(&path).await {
-                    if metadata.is_dir {
-                        watcher.add(&path).ok();
-                    }
+                if let Ok(Some(metadata)) = fs.metadata(&path).await
+                    && metadata.is_dir
+                {
+                    watcher.add(&path).ok();
                 }
             }
         }
@@ -1053,28 +1025,6 @@ impl NativeAgent {
             })
             .collect::<Vec<_>>();
 
-        // Collect worktree root names and paths for hints loading.
-        let worktree_roots: Vec<(String, PathBuf)> = worktrees
-            .iter()
-            .map(|worktree| {
-                let snapshot = worktree.read(cx);
-                (
-                    snapshot.root_name_str().to_string(),
-                    snapshot.abs_path().to_path_buf(),
-                )
-            })
-            .collect();
-
-        // Load hints (global + project) concurrently with skills.
-        let hints_task = {
-            let hint_fs = fs.clone();
-            let roots = worktree_roots;
-            cx.background_spawn(async move {
-                let loader = HintLoader::new(hint_fs);
-                loader.load_all(&roots).await
-            })
-        };
-
         // Load global skills
         let global_skills_task = {
             let global_skills_dir = global_skills_dir();
@@ -1252,28 +1202,7 @@ impl NativeAgent {
             let (catalog_skills, budget_issues) = select_catalog_skills(&overridden);
             skill_issues.extend(budget_issues);
 
-            // Load hints (global + project) merged together.
-            let (hints, hint_errors) = hints_task.await;
-            if !hint_errors.is_empty() {
-                log::warn!("Hint loading errors: {:?}", hint_errors);
-            }
-
-            // Build hints content from all loaded hints, ordered by
-            // priority (project hints first).
-            let hints_content: String = hints
-                .into_iter()
-                .map(|h| h.content)
-                .collect::<Vec<_>>()
-                .join("\n\n");
-            let hints_content = if hints_content.is_empty() {
-                None
-            } else {
-                Some(hints_content)
-            };
-
-            let project_context = ProjectContext::new(worktrees)
-                .with_skills(catalog_skills)
-                .with_hints(hints_content);
+            let project_context = ProjectContext::new(worktrees).with_skills(catalog_skills);
             (project_context, skills, skill_issues)
         })
     }
@@ -1448,12 +1377,8 @@ impl NativeAgent {
 
         for session in self.sessions.values_mut() {
             session.thread.update(cx, |thread, cx| {
-                if thread.model().is_none() {
-                    if let Some(model) = default_model.clone() {
-                        thread.set_model(model, cx);
-                        cx.notify();
-                    }
-                }
+                thread.ensure_model(default_model.as_ref(), cx);
+
                 if let Some(model) = summarization_model.clone() {
                     if thread.summarization_model().is_none()
                         || matches!(event, language_model::Event::ThreadSummaryModelChanged)
@@ -1577,38 +1502,21 @@ impl NativeAgent {
         let Some(state) = project_state else {
             return Vec::new();
         };
-        let native_commands = [
-            (
-                COMPACT_COMMAND_NAME,
-                "Summarize the conversation so far to free up context",
-            ),
-            (HELP_COMMAND_NAME, "Show available slash commands and usage"),
-            (CLEAR_COMMAND_NAME, "Clear the current conversation"),
-            (
-                RECIPE_COMMAND_NAME,
-                "List or run recipes (e.g. `/recipe release`)",
-            ),
-        ];
-
-        let native_commands = native_commands.into_iter().map(|(name, description)| {
-            acp::AvailableCommand::new(name, description).meta(
-                acp_thread::meta_with_command_category(acp_thread::CommandCategory::Native),
-            )
-        });
+        let compact_command = acp::AvailableCommand::new(
+            COMPACT_COMMAND_NAME,
+            "Summarize the conversation so far to free up context",
+        )
+        .meta(acp_thread::meta_with_command_category(
+            acp_thread::CommandCategory::Native,
+        ));
 
         let registry = state.context_server_registry.read(cx);
 
-        // Reserve the built-in command names so same-named MCP prompts are
-        // force-prefixed (`/<server>.<name>`) and stay reachable: an
-        // unqualified invocation always routes to the native command.
-        let reserved: [&str; 4] = [
-            COMPACT_COMMAND_NAME,
-            HELP_COMMAND_NAME,
-            CLEAR_COMMAND_NAME,
-            RECIPE_COMMAND_NAME,
-        ];
+        // Reserve the built-in command name so a same-named MCP prompt is
+        // force-prefixed (`/<server>.compact`) and stays reachable: an
+        // unqualified `/compact` always routes to the native command.
         let ambiguous_prompt_names = ambiguous_mcp_prompt_names(
-            reserved,
+            [COMPACT_COMMAND_NAME],
             registry.prompts().map(|p| p.prompt.name.as_str()),
         );
 
@@ -1647,7 +1555,9 @@ impl NativeAgent {
             Some(command)
         });
 
-        native_commands.chain(mcp_commands).collect()
+        std::iter::once(compact_command)
+            .chain(mcp_commands)
+            .collect()
     }
 
     pub fn load_thread(
@@ -1911,7 +1821,7 @@ impl NativeAgent {
 
     fn send_mcp_prompt(
         &self,
-        message_id: UserMessageId,
+        client_user_message_id: ClientUserMessageId,
         session_id: acp::SessionId,
         prompt_name: String,
         server_id: ContextServerId,
@@ -1945,7 +1855,7 @@ impl NativeAgent {
 
             thread.update(cx, |thread, cx| {
                 thread.push_acp_user_block(
-                    message_id,
+                    client_user_message_id,
                     original_content.into_iter().skip(1),
                     path_style,
                     cx,
@@ -1958,7 +1868,7 @@ impl NativeAgent {
 
                 match role {
                     context_server::types::Role::User => {
-                        let id = acp_thread::UserMessageId::new();
+                        let id = acp_thread::ClientUserMessageId::new();
 
                         acp_thread.update(cx, |acp_thread, cx| {
                             acp_thread.push_user_content_block_with_indent(
@@ -2018,7 +1928,7 @@ impl NativeAgent {
     /// `/compact` slash command.
     fn send_compact_command(
         &self,
-        message_id: UserMessageId,
+        client_user_message_id: ClientUserMessageId,
         session_id: acp::SessionId,
         cx: &mut Context<Self>,
     ) -> Task<Result<acp::PromptResponse>> {
@@ -2031,7 +1941,8 @@ impl NativeAgent {
                 anyhow::Ok((session.acp_thread.clone(), session.thread.clone()))
             })??;
 
-            let response_stream = thread.update(cx, |thread, cx| thread.compact(message_id, cx))?;
+            let response_stream =
+                thread.update(cx, |thread, cx| thread.compact(client_user_message_id, cx))?;
             acp_thread.update(cx, |acp_thread, cx| {
                 acp_thread.update_token_usage(None, cx);
             });
@@ -2049,114 +1960,6 @@ impl NativeAgent {
         })
     }
 
-    /// Show a help message listing all available slash commands and their
-    /// descriptions. Triggered by the `/help` native slash command.
-    fn send_help_command(
-        &self,
-        session_id: acp::SessionId,
-        cx: &mut Context<Self>,
-    ) -> Task<Result<acp::PromptResponse>> {
-        cx.spawn(async move |this, cx| {
-            let (acp_thread, available_commands) = this.update(cx, |this, _cx| {
-                let session = this
-                    .sessions
-                    .get(&session_id)
-                    .context("Failed to get session")?;
-                let commands = session.acp_thread.read(_cx).available_commands().to_vec();
-                anyhow::Ok((session.acp_thread.clone(), commands))
-            })??;
-
-            let mut help_text = String::from("## Available Commands\n\n");
-            for cmd in &available_commands {
-                help_text.push_str(&format!("- **`/{}`** — {}\n", cmd.name, cmd.description));
-            }
-
-            let (mut tx, rx) = mpsc::unbounded();
-            let _ = tx.start_send(Ok(ThreadEvent::AgentText(help_text)));
-            let _ = tx.start_send(Ok(ThreadEvent::Stop(acp::StopReason::EndTurn)));
-            // Drop the sender so the receiver gets None after the last message.
-            drop(tx);
-
-            cx.update(|cx| {
-                NativeAgentConnection::handle_thread_events(rx, acp_thread.downgrade(), None, cx)
-            })
-            .await
-        })
-    }
-
-    /// Clear all conversation entries in response to the `/clear` native
-    /// slash command. Removes all entries from the ACP thread and shows a
-    /// confirmation message.
-    fn send_clear_command(
-        &self,
-        session_id: acp::SessionId,
-        cx: &mut Context<Self>,
-    ) -> Task<Result<acp::PromptResponse>> {
-        cx.spawn(async move |this, cx| {
-            let acp_thread = this.update(cx, |this, _cx| {
-                let session = this
-                    .sessions
-                    .get(&session_id)
-                    .context("Failed to get session")?;
-                anyhow::Ok(session.acp_thread.clone())
-            })??;
-
-            // Clear all entries from the ACP thread display.
-            acp_thread.update(cx, |thread, cx| thread.clear_entries(cx));
-
-            let (mut tx, rx) = mpsc::unbounded();
-            let _ = tx.start_send(Ok(ThreadEvent::AgentText(
-                "Conversation cleared.".to_string(),
-            )));
-            let _ = tx.start_send(Ok(ThreadEvent::Stop(acp::StopReason::EndTurn)));
-            drop(tx);
-
-            cx.update(|cx| {
-                NativeAgentConnection::handle_thread_events(rx, acp_thread.downgrade(), None, cx)
-            })
-            .await
-        })
-    }
-
-    /// Handle `/recipe` — list available recipes when invoked without an
-    /// argument, or run a named recipe when a recipe name is provided.
-    fn send_recipe_command(
-        &self,
-        _arg: &str,
-        session_id: acp::SessionId,
-        cx: &mut Context<Self>,
-    ) -> Task<Result<acp::PromptResponse>> {
-        let arg = _arg.to_string();
-        cx.spawn(async move |this, cx| {
-            let acp_thread = this.update(cx, |this, _cx| {
-                let session = this
-                    .sessions
-                    .get(&session_id)
-                    .context("Failed to get session")?;
-                anyhow::Ok(session.acp_thread.clone())
-            })??;
-
-            let recipe_text = if arg.is_empty() {
-                build_recipe_list_text()
-            } else {
-                build_recipe_run_text(&arg)
-                // TODO: Full recipe execution in a follow-up.
-                // The recipe engine needs a project-aware initialisation
-                // with appropriate sources (builtin, local, GitHub).
-            };
-
-            let (mut tx, rx) = mpsc::unbounded();
-            let _ = tx.start_send(Ok(ThreadEvent::AgentText(recipe_text)));
-            let _ = tx.start_send(Ok(ThreadEvent::Stop(acp::StopReason::EndTurn)));
-            drop(tx);
-
-            cx.update(|cx| {
-                NativeAgentConnection::handle_thread_events(rx, acp_thread.downgrade(), None, cx)
-            })
-            .await
-        })
-    }
-
     /// Activate a skill in response to a `/skill-name` slash command. The
     /// skill body is wrapped in the same `<skill_content>` envelope the
     /// model-driven `skill` tool uses, so the conversation looks the same
@@ -2167,7 +1970,7 @@ impl NativeAgent {
     /// instructions followed by the user's request.
     fn send_skill_invocation(
         &self,
-        message_id: UserMessageId,
+        client_user_message_id: ClientUserMessageId,
         session_id: acp::SessionId,
         skill: Skill,
         original_content: Vec<acp::ContentBlock>,
@@ -2226,7 +2029,7 @@ impl NativeAgent {
             // the user can see what context was loaded for the skill. The
             // user's own typed message is already rendered by the normal
             // prompt flow, so we don't push it to the UI again here.
-            let injected_id = acp_thread::UserMessageId::new();
+            let injected_id = acp_thread::ClientUserMessageId::new();
             acp_thread.update(cx, |acp_thread, cx| {
                 acp_thread.push_user_content_block_with_indent(
                     Some(injected_id),
@@ -2243,7 +2046,7 @@ impl NativeAgent {
             combined.extend(user_blocks);
 
             thread.update(cx, |thread, cx| {
-                thread.push_acp_user_block(message_id, combined, path_style, cx);
+                thread.push_acp_user_block(client_user_message_id, combined, path_style, cx);
             });
 
             let response_stream = thread.update(cx, |thread, cx| thread.send_existing(cx))?;
@@ -2414,6 +2217,14 @@ impl NativeAgentConnection {
                                 })
                                 .detach();
                             }
+                            ThreadEvent::ToolCallAuthorizationResolved {
+                                tool_call_id,
+                                outcome,
+                            } => {
+                                acp_thread.update(cx, |thread, cx| {
+                                    thread.authorize_tool_call(tool_call_id, outcome, cx);
+                                })?;
+                            }
                             ThreadEvent::ToolCall(tool_call) => {
                                 acp_thread.update(cx, |thread, cx| {
                                     thread.upsert_tool_call(tool_call, cx)
@@ -2518,15 +2329,15 @@ impl<'a> Command<'a> {
         // An empty scope (`/:<name>`) is the qualified form for a
         // global skill — see `SkillSource::scope_prefix`. The name
         // must be non-empty for the colon to be meaningful.
-        if let Some((scope, prompt_name)) = command.rsplit_once(':') {
-            if !prompt_name.is_empty() {
-                return Some(Self {
-                    prompt_name,
-                    arg_value,
-                    explicit_server_id: None,
-                    skill_scope: Some(scope),
-                });
-            }
+        if let Some((scope, prompt_name)) = command.rsplit_once(':')
+            && !prompt_name.is_empty()
+        {
+            return Some(Self {
+                prompt_name,
+                arg_value,
+                explicit_server_id: None,
+                skill_scope: Some(scope),
+            });
         }
 
         if let Some((server_id, prompt_name)) = command.split_once('.') {
@@ -2565,33 +2376,6 @@ fn strip_slash_command_prefix(text: &str) -> String {
     rest.split_once(char::is_whitespace)
         .map(|(_, after)| after.to_string())
         .unwrap_or_default()
-}
-
-/// Build a help-text response for `/recipe` when no recipe name is given.
-fn build_recipe_list_text() -> String {
-    let mut text = String::from("## Recipes\n\n");
-    text.push_str(
-        "Recipes are community-contributed automation workflows. \
-         Use `/recipe <name>` to run a specific recipe.\n\n",
-    );
-    // TODO: Integrate with RecipeEngine::discover_all() to list
-    // available recipes from builtin, local, and GitHub sources.
-    text.push_str(
-        "_Recipe engine is available but source discovery is not yet \
-         wired into the slash command handler._",
-    );
-    text
-}
-
-/// Build a response for `/recipe <name>` indicating the argument was
-/// received but execution is not yet wired through.
-fn build_recipe_run_text(name: &str) -> String {
-    format!(
-        "## Recipe: `{name}`\n\n\
-         Recipe lookup and execution is not yet wired into the \
-         slash command handler. Use the recipe CLI tools to run \
-         this recipe: `goose recipe run {name}`.\n"
-    )
 }
 
 struct NativeAgentModelSelector {
@@ -2838,182 +2622,25 @@ impl acp_thread::AgentConnection for NativeAgentConnection {
         }) as Rc<dyn AgentModelSelector>)
     }
 
+    fn client_user_message_ids(
+        &self,
+        _cx: &App,
+    ) -> Option<Rc<dyn acp_thread::AgentSessionClientUserMessageIds>> {
+        let prompt: Rc<dyn acp_thread::AgentSessionClientUserMessageIds> = Rc::new(self.clone());
+        Some(prompt)
+    }
+
     fn prompt(
         &self,
-        id: acp_thread::UserMessageId,
         params: acp::PromptRequest,
         cx: &mut App,
     ) -> Task<Result<acp::PromptResponse>> {
-        let session_id = params.session_id.clone();
-        log::info!("Received prompt request for session: {}", session_id);
-        log::debug!("Prompt blocks count: {}", params.prompt.len());
-
-        let Some(project_state) = self.0.read(cx).session_project_state(&session_id) else {
-            log::error!("Session not found in prompt: {}", session_id);
-            if self.0.read(cx).sessions.contains_key(&session_id) {
-                log::error!(
-                    "Session found in sessions map, but not in project state: {}",
-                    session_id
-                );
-            }
-            return Task::ready(Err(anyhow::anyhow!("Session not found")));
-        };
-
-        if let Some(parsed_command) = Command::parse(&params.prompt) {
-            if parsed_command.is_unqualified(COMPACT_COMMAND_NAME) {
-                return self.0.update(cx, |agent, cx| {
-                    agent.send_compact_command(id, session_id, cx)
-                });
-            }
-
-            if parsed_command.is_unqualified(HELP_COMMAND_NAME) {
-                return self
-                    .0
-                    .update(cx, |agent, cx| agent.send_help_command(session_id, cx));
-            }
-
-            if parsed_command.is_unqualified(CLEAR_COMMAND_NAME) {
-                return self
-                    .0
-                    .update(cx, |agent, cx| agent.send_clear_command(session_id, cx));
-            }
-
-            if parsed_command.is_unqualified(RECIPE_COMMAND_NAME) {
-                return self.0.update(cx, |agent, cx| {
-                    agent.send_recipe_command(parsed_command.arg_value, session_id, cx)
-                });
-            }
-
-            // Skill scope qualifiers (`/:<name>` and
-            // `/<worktree>:<name>`) use a colon separator that can't
-            // collide with MCP's `/<server>.<name>` grammar. The popup
-            // inserts a qualified form for every skill so picking the
-            // global row unambiguously runs the global skill even when
-            // a same-named project-local one exists.
-            if let Some(scope) = parsed_command.skill_scope {
-                if let Some(skill) = project_state.skills.iter().find(|skill| {
-                    skill.name == parsed_command.prompt_name && skill.source.matches_scope(scope)
-                }) {
-                    let skill = skill.clone();
-                    return self.0.update(cx, |agent, cx| {
-                        agent.send_skill_invocation(
-                            id,
-                            session_id.clone(),
-                            skill,
-                            params.prompt,
-                            cx,
-                        )
-                    });
-                }
-            }
-
-            // MCP prompts and skills both register slash commands. MCP
-            // prompts are checked first — if a user has both an MCP prompt
-            // and a skill with the same name, the MCP prompt wins (matching
-            // the order they appear in the catalog).
-            let registry = project_state.context_server_registry.read(cx);
-
-            let explicit_server_id = parsed_command
-                .explicit_server_id
-                .map(|server_id| ContextServerId(server_id.into()));
-
-            if let Some(prompt) =
-                registry.find_prompt(explicit_server_id.as_ref(), parsed_command.prompt_name)
-            {
-                let arguments = if !parsed_command.arg_value.is_empty() {
-                    if let Some(arg_name) = prompt
-                        .prompt
-                        .arguments
-                        .as_ref()
-                        .and_then(|args| args.first())
-                        .map(|arg| arg.name.clone())
-                    {
-                        HashMap::from_iter([(arg_name, parsed_command.arg_value.to_string())])
-                    } else {
-                        Default::default()
-                    }
-                } else {
-                    Default::default()
-                };
-
-                let prompt_name = prompt.prompt.name.clone();
-                let server_id = prompt.server_id.clone();
-
-                return self.0.update(cx, |agent, cx| {
-                    agent.send_mcp_prompt(
-                        id,
-                        session_id.clone(),
-                        prompt_name,
-                        server_id,
-                        arguments,
-                        params.prompt,
-                        cx,
-                    )
-                });
-            }
-
-            // Unqualified skill match (`/skill-name` with no scope
-            // prefix and no MCP server prefix). Slash commands work
-            // for *all* skills regardless of `disable_model_invocation`
-            // — that flag only hides the skill from the model's catalog.
-            // The user explicitly typed the name, so they get to invoke
-            // it.
-            //
-            // Inlined rather than calling `apply_skill_overrides` so
-            // we don't clone the entire skill list on every prompt
-            // (including prompts like `/help` that aren't skills at
-            // all). The resolution rule matches the override-applied
-            // view: among skills with the matching name, pick the one
-            // with the highest source precedence, so the slash command
-            // picks the same entry the model sees in its catalog.
-            // Ties (e.g. two project-local skills from different
-            // worktrees) resolve to the first in iteration order to
-            // match `apply_skill_overrides`.
-            if parsed_command.explicit_server_id.is_none()
-                && parsed_command.skill_scope.is_none()
-                && !project_state.skills.is_empty()
-            {
-                let prompt_name = parsed_command.prompt_name;
-                let resolved = project_state
-                    .skills
-                    .iter()
-                    .filter(|skill| skill.name == prompt_name)
-                    .reduce(|best, candidate| {
-                        if candidate.source.precedence() > best.source.precedence() {
-                            candidate
-                        } else {
-                            best
-                        }
-                    });
-                if let Some(skill) = resolved {
-                    let skill = skill.clone();
-                    return self.0.update(cx, |agent, cx| {
-                        agent.send_skill_invocation(
-                            id,
-                            session_id.clone(),
-                            skill,
-                            params.prompt,
-                            cx,
-                        )
-                    });
-                }
-            }
-        };
-
-        let path_style = project_state.project.read(cx).path_style(cx);
-
-        self.run_turn(session_id, cx, move |thread, cx| {
-            let content: Vec<UserMessageContent> = params
-                .prompt
-                .into_iter()
-                .map(|block| UserMessageContent::from_content_block(block, path_style))
-                .collect::<Vec<_>>();
-            log::debug!("Converted prompt to message: {} chars", content.len());
-            log::debug!("Message id: {:?}", id);
-            log::debug!("Message content: {:?}", content);
-
-            thread.update(cx, |thread, cx| thread.send(id, content, cx))
-        })
+        acp_thread::AgentSessionClientUserMessageIds::prompt(
+            self,
+            acp_thread::AgentSessionClientUserMessageIds::new_id(self),
+            params,
+            cx,
+        )
     }
 
     fn retry(
@@ -3083,6 +2710,167 @@ impl acp_thread::AgentConnection for NativeAgentConnection {
 
     fn into_any(self: Rc<Self>) -> Rc<dyn Any> {
         self
+    }
+}
+
+impl acp_thread::AgentSessionClientUserMessageIds for NativeAgentConnection {
+    fn prompt(
+        &self,
+        client_user_message_id: acp_thread::ClientUserMessageId,
+        params: acp::PromptRequest,
+        cx: &mut App,
+    ) -> Task<Result<acp::PromptResponse>> {
+        let session_id = params.session_id.clone();
+        log::info!("Received prompt request for session: {}", session_id);
+        log::debug!("Prompt blocks count: {}", params.prompt.len());
+
+        let Some(project_state) = self.0.read(cx).session_project_state(&session_id) else {
+            log::error!("Session not found in prompt: {}", session_id);
+            if self.0.read(cx).sessions.contains_key(&session_id) {
+                log::error!(
+                    "Session found in sessions map, but not in project state: {}",
+                    session_id
+                );
+            }
+            return Task::ready(Err(anyhow::anyhow!("Session not found")));
+        };
+
+        if let Some(parsed_command) = Command::parse(&params.prompt) {
+            if parsed_command.is_unqualified(COMPACT_COMMAND_NAME) {
+                return self.0.update(cx, |agent, cx| {
+                    agent.send_compact_command(client_user_message_id, session_id, cx)
+                });
+            }
+
+            // Skill scope qualifiers (`/:<name>` and
+            // `/<worktree>:<name>`) use a colon separator that can't
+            // collide with MCP's `/<server>.<name>` grammar. The popup
+            // inserts a qualified form for every skill so picking the
+            // global row unambiguously runs the global skill even when
+            // a same-named project-local one exists.
+            if let Some(scope) = parsed_command.skill_scope
+                && let Some(skill) = project_state.skills.iter().find(|skill| {
+                    skill.name == parsed_command.prompt_name && skill.source.matches_scope(scope)
+                })
+            {
+                let skill = skill.clone();
+                return self.0.update(cx, |agent, cx| {
+                    agent.send_skill_invocation(
+                        client_user_message_id,
+                        session_id.clone(),
+                        skill,
+                        params.prompt,
+                        cx,
+                    )
+                });
+            }
+
+            // MCP prompts and skills both register slash commands. MCP
+            // prompts are checked first — if a user has both an MCP prompt
+            // and a skill with the same name, the MCP prompt wins (matching
+            // the order they appear in the catalog).
+            let registry = project_state.context_server_registry.read(cx);
+
+            let explicit_server_id = parsed_command
+                .explicit_server_id
+                .map(|server_id| ContextServerId(server_id.into()));
+
+            if let Some(prompt) =
+                registry.find_prompt(explicit_server_id.as_ref(), parsed_command.prompt_name)
+            {
+                let arguments = if !parsed_command.arg_value.is_empty()
+                    && let Some(arg_name) = prompt
+                        .prompt
+                        .arguments
+                        .as_ref()
+                        .and_then(|args| args.first())
+                        .map(|arg| arg.name.clone())
+                {
+                    HashMap::from_iter([(arg_name, parsed_command.arg_value.to_string())])
+                } else {
+                    Default::default()
+                };
+
+                let prompt_name = prompt.prompt.name.clone();
+                let server_id = prompt.server_id.clone();
+
+                return self.0.update(cx, |agent, cx| {
+                    agent.send_mcp_prompt(
+                        client_user_message_id,
+                        session_id.clone(),
+                        prompt_name,
+                        server_id,
+                        arguments,
+                        params.prompt,
+                        cx,
+                    )
+                });
+            }
+
+            // Unqualified skill match (`/skill-name` with no scope
+            // prefix and no MCP server prefix). Slash commands work
+            // for *all* skills regardless of `disable_model_invocation`
+            // — that flag only hides the skill from the model's catalog.
+            // The user explicitly typed the name, so they get to invoke
+            // it.
+            //
+            // Inlined rather than calling `apply_skill_overrides` so
+            // we don't clone the entire skill list on every prompt
+            // (including prompts like `/help` that aren't skills at
+            // all). The resolution rule matches the override-applied
+            // view: among skills with the matching name, pick the one
+            // with the highest source precedence, so the slash command
+            // picks the same entry the model sees in its catalog.
+            // Ties (e.g. two project-local skills from different
+            // worktrees) resolve to the first in iteration order to
+            // match `apply_skill_overrides`.
+            if parsed_command.explicit_server_id.is_none()
+                && parsed_command.skill_scope.is_none()
+                && !project_state.skills.is_empty()
+            {
+                let prompt_name = parsed_command.prompt_name;
+                let resolved = project_state
+                    .skills
+                    .iter()
+                    .filter(|skill| skill.name == prompt_name)
+                    .reduce(|best, candidate| {
+                        if candidate.source.precedence() > best.source.precedence() {
+                            candidate
+                        } else {
+                            best
+                        }
+                    });
+                if let Some(skill) = resolved {
+                    let skill = skill.clone();
+                    return self.0.update(cx, |agent, cx| {
+                        agent.send_skill_invocation(
+                            client_user_message_id,
+                            session_id.clone(),
+                            skill,
+                            params.prompt,
+                            cx,
+                        )
+                    });
+                }
+            }
+        };
+
+        let path_style = project_state.project.read(cx).path_style(cx);
+
+        self.run_turn(session_id, cx, move |thread, cx| {
+            let content: Vec<UserMessageContent> = params
+                .prompt
+                .into_iter()
+                .map(|block| UserMessageContent::from_content_block(block, path_style))
+                .collect::<Vec<_>>();
+            log::debug!("Converted prompt to message: {} chars", content.len());
+            log::debug!("Client user message id: {:?}", client_user_message_id);
+            log::debug!("Message content: {:?}", content);
+
+            thread.update(cx, |thread, cx| {
+                thread.send(client_user_message_id, content, cx)
+            })
+        })
     }
 }
 
@@ -3185,9 +2973,13 @@ struct NativeAgentSessionTruncate {
 }
 
 impl acp_thread::AgentSessionTruncate for NativeAgentSessionTruncate {
-    fn run(&self, message_id: acp_thread::UserMessageId, cx: &mut App) -> Task<Result<()>> {
+    fn run(
+        &self,
+        client_user_message_id: acp_thread::ClientUserMessageId,
+        cx: &mut App,
+    ) -> Task<Result<()>> {
         match self.thread.update(cx, |thread, cx| {
-            thread.truncate(message_id.clone(), cx)?;
+            thread.truncate(client_user_message_id.clone(), cx)?;
             Ok(thread.latest_token_usage())
         }) {
             Ok(usage) => {
@@ -3343,49 +3135,67 @@ impl ThreadEnvironment for NativeThreadEnvironment {
         sandbox_wrap: Option<acp_thread::SandboxWrap>,
         cx: &mut AsyncApp,
     ) -> Task<Result<Rc<dyn TerminalHandle>>> {
-        // Use a per-thread temp directory for all terminal commands, even when
-        // sandboxing is disabled, so the model can't infer sandbox state from
-        // `$TMPDIR` changing between conversations.
+        // On Seatbelt-style sandboxes (macOS) there's no tmpfs overlay, so to
+        // give the command a writable temp area we point `$TMPDIR`/`$TMP`/
+        // `$TEMP` at a per-thread directory inside the sandbox's writable
+        // scope. Doing this even when sandboxing is disabled keeps `$TMPDIR`
+        // stable so the model can't infer sandbox state from it.
         //
         // Only do this for local projects. For remote projects the temp
         // directory would be created on the client, but the terminal runs on
         // the remote host, so pointing `$TMPDIR` (and the sandbox writable
         // scope) at a client-side path would leak client environment into the
         // remote terminal and reference a directory that doesn't exist there.
+        //
+        // Linux and Windows are excluded: the bwrap sandbox (run directly on
+        // Linux, and via WSL on Windows) already mounts a fresh, writable
+        // `tmpfs` over `/tmp`, so the environment looks like a normal
+        // filesystem with no special `$TMPDIR` (which would only make the
+        // sandbox more obviously Sim-specific). On Windows a per-thread
+        // `$TMPDIR` would also be a Windows path that's meaningless inside
+        // WSL, and adding it to the writable scope would bind a stray
+        // `/mnt/<drive>/...` path.
+        #[cfg_attr(any(target_os = "linux", target_os = "windows"), allow(unused_mut))]
         let mut extra_env = extra_env;
+        #[cfg_attr(any(target_os = "linux", target_os = "windows"), allow(unused_mut))]
         let mut sandbox_wrap = sandbox_wrap;
-        let temp_dir = self.thread.update(cx, |thread, cx| {
-            thread
-                .project()
-                .read(cx)
-                .is_local()
-                .then(|| thread.sandboxed_terminal_temp_dir(cx))
-        });
-        match temp_dir {
-            Ok(Some(Ok(temp_dir))) => {
-                // Canonicalize so the path matches what the sandbox resolves
-                // symlinks to (e.g. `/var` -> `/private/var` on macOS).
-                // `$TMPDIR` and the writable-scope entry below must agree, and
-                // they must agree with the path the kernel actually checks.
-                let temp_dir = temp_dir.canonicalize().unwrap_or(temp_dir);
-                let temp_dir_string = temp_dir.to_string_lossy().into_owned();
-                extra_env.extend([
-                    acp::EnvVariable::new("TMPDIR", &temp_dir_string),
-                    acp::EnvVariable::new("TMP", &temp_dir_string),
-                    acp::EnvVariable::new("TEMP", &temp_dir_string),
-                ]);
-                // The command's `$TMPDIR` must live inside the sandbox's
-                // writable scope. The per-thread temp directory is owned here
-                // (not in the terminal tool that assembles the rest of the
-                // writable set), so add it whenever the command is sandboxed.
-                if let Some(sandbox_wrap) = &mut sandbox_wrap {
-                    sandbox_wrap.writable_paths.push(temp_dir);
+        #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+        {
+            let temp_dir = self.thread.update(cx, |thread, cx| {
+                thread
+                    .project()
+                    .read(cx)
+                    .is_local()
+                    .then(|| thread.sandboxed_terminal_temp_dir(cx))
+            });
+            match temp_dir {
+                Ok(Some(Ok(temp_dir))) => {
+                    // Canonicalize so the path matches what the sandbox
+                    // resolves symlinks to (e.g. `/var` -> `/private/var` on
+                    // macOS). `$TMPDIR` and the writable-scope entry below must
+                    // agree, and they must agree with the path the kernel
+                    // actually checks.
+                    let temp_dir = temp_dir.canonicalize().unwrap_or(temp_dir);
+                    let temp_dir_string = temp_dir.to_string_lossy().into_owned();
+                    extra_env.extend([
+                        acp::EnvVariable::new("TMPDIR", &temp_dir_string),
+                        acp::EnvVariable::new("TMP", &temp_dir_string),
+                        acp::EnvVariable::new("TEMP", &temp_dir_string),
+                    ]);
+                    // The command's `$TMPDIR` must live inside the sandbox's
+                    // writable scope. The per-thread temp directory is owned
+                    // here (not in the terminal tool that assembles the rest
+                    // of the writable set), so add it whenever the command is
+                    // sandboxed.
+                    if let Some(sandbox_wrap) = &mut sandbox_wrap {
+                        sandbox_wrap.writable_paths.push(temp_dir);
+                    }
                 }
-            }
-            Ok(None) => {}
-            Ok(Some(Err(error))) => return Task::ready(Err(error)),
-            Err(error) => return Task::ready(Err(error)),
-        };
+                Ok(None) => {}
+                Ok(Some(Err(error))) => return Task::ready(Err(error)),
+                Err(error) => return Task::ready(Err(error)),
+            };
+        }
         let task = self.acp_thread.update(cx, |thread, cx| {
             thread.create_terminal(
                 command,
@@ -3615,13 +3425,6 @@ impl SubagentHandle for NativeSubagentHandle {
                 .ok();
 
             result
-        })
-    }
-
-    fn cancel(&self, cx: &AsyncApp) -> Task<()> {
-        let acp_thread = self.acp_thread.clone();
-        cx.spawn(async move |cx| {
-            acp_thread.update(cx, |thread, cx| thread.cancel(cx)).await;
         })
     }
 }
@@ -4016,7 +3819,7 @@ mod internal_tests {
         let session_id = cx.update(|cx| acp_thread.read(cx).session_id().clone());
         let thread = cx.update(|cx| native_thread_for_session(&agent, &session_id, cx));
         let model = Arc::new(FakeLanguageModel::default());
-        let old_message_id = UserMessageId::new();
+        let old_message_id = ClientUserMessageId::new();
 
         cx.update(|cx| {
             let path_style = project.read(cx).path_style(cx);
@@ -4032,9 +3835,10 @@ mod internal_tests {
             });
         });
 
-        let compact_message_id = UserMessageId::new();
+        let compact_message_id = ClientUserMessageId::new();
         let prompt_task = cx.update(|cx| {
-            connection.prompt(
+            acp_thread::AgentSessionClientUserMessageIds::prompt(
+                connection.as_ref(),
                 compact_message_id,
                 acp::PromptRequest::new(session_id.clone(), vec!["/compact".into()]),
                 cx,
@@ -4090,7 +3894,7 @@ mod internal_tests {
             let path_style = project.read(cx).path_style(cx);
             thread.update(cx, |thread, cx| {
                 thread.push_acp_user_block(
-                    UserMessageId::new(),
+                    ClientUserMessageId::new(),
                     [acp::ContentBlock::from("hello from the user")],
                     path_style,
                     cx,
@@ -4489,7 +4293,7 @@ mod internal_tests {
         };
 
         // Sanity-check the test setup: the third skill is small enough
-        // that a greedy packer would have squeesim it in alongside the
+        // that a greedy packer would have squeezed it in alongside the
         // first one.
         let leftover_after_first =
             MAX_SKILL_DESCRIPTIONS_SIZE - (first.name.len() + first.description.len());
@@ -5577,7 +5381,7 @@ mod internal_tests {
     /// rejected with a size-limit error and excluded from the loaded
     /// skills, exercising the size guard in `load_project_skills`.
     #[gpui::test]
-    async fn test_oversized_project_skill_reports_error(cx: &mut TestAppContext) {
+    async fn test_oversisim_project_skill_reports_error(cx: &mut TestAppContext) {
         init_test(cx);
         let fs = FakeFs::new(cx.executor());
         let oversized = format!(
@@ -5786,6 +5590,7 @@ mod internal_tests {
                         ui::IconName::SimAssistant
                     )),
                     is_latest: false,
+                    disabled: None,
                     cost: None,
                 }]
             )])
@@ -6254,6 +6059,212 @@ mod internal_tests {
                 reloaded_model.id().0.as_ref(),
                 "custom-model-id",
                 "reloaded thread should have the same model, not fall back to the default"
+            );
+        });
+
+        drop(reloaded_acp_thread);
+    }
+
+    async fn persist_thread_with_fake_corp_model(
+        cx: &mut TestAppContext,
+    ) -> (
+        Entity<NativeAgent>,
+        Rc<NativeAgentConnection>,
+        Entity<Project>,
+        acp::SessionId,
+        Arc<FakeLanguageModelProvider>,
+    ) {
+        let fs = FakeFs::new(cx.executor());
+        fs.insert_tree("/", json!({ "a": {} })).await;
+        let project = Project::test(fs.clone(), [path!("/a").as_ref()], cx).await;
+        let thread_store = cx.new(|cx| ThreadStore::new(cx));
+        let agent = cx
+            .update(|cx| NativeAgent::new(thread_store.clone(), Templates::new(), fs.clone(), cx));
+        let connection = Rc::new(NativeAgentConnection(agent.clone()));
+
+        let model = Arc::new(FakeLanguageModel::with_id_and_thinking(
+            "fake-corp",
+            "custom-model-id",
+            "Custom Model Display Name",
+            false,
+        ));
+        let provider = Arc::new(
+            FakeLanguageModelProvider::new(
+                LanguageModelProviderId::from("fake-corp".to_string()),
+                LanguageModelProviderName::from("Fake Corp".to_string()),
+            )
+            .with_models(vec![model.clone()]),
+        );
+        cx.update(|cx| {
+            LanguageModelRegistry::global(cx).update(cx, |registry, cx| {
+                registry.register_provider(provider.clone(), cx);
+            });
+        });
+        agent.update(cx, |agent, cx| agent.models.refresh_list(cx));
+
+        let acp_thread = cx
+            .update(|cx| {
+                connection.clone().new_session(
+                    project.clone(),
+                    PathList::new(&[Path::new("/a")]),
+                    cx,
+                )
+            })
+            .await
+            .unwrap();
+        let session_id = acp_thread.read_with(cx, |thread, _| thread.session_id().clone());
+
+        let selector = connection.model_selector(&session_id).unwrap();
+        cx.update(|cx| selector.select_model(AgentModelId::new("fake-corp/custom-model-id"), cx))
+            .await
+            .unwrap();
+
+        let send = acp_thread.update(cx, |thread, cx| thread.send(vec!["Hello".into()], cx));
+        let send = cx.foreground_executor().spawn(send);
+        cx.run_until_parked();
+        model.send_last_completion_stream_text_chunk("Response.");
+        model.end_last_completion_stream();
+        send.await.unwrap();
+        cx.run_until_parked();
+
+        cx.update(|cx| connection.clone().close_session(&session_id, cx))
+            .await
+            .unwrap();
+        drop(acp_thread);
+
+        (agent, connection, project, session_id, provider)
+    }
+
+    fn unregister_fake_corp(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            LanguageModelRegistry::global(cx).update(cx, |registry, cx| {
+                registry.unregister_provider(
+                    LanguageModelProviderId::from("fake-corp".to_string()),
+                    cx,
+                );
+            });
+        });
+    }
+
+    #[gpui::test]
+    async fn test_loaded_thread_resolves_model_when_provider_loads_late(cx: &mut TestAppContext) {
+        init_test(cx);
+        let (agent, _connection, project, session_id, provider) =
+            persist_thread_with_fake_corp_model(cx).await;
+
+        // Simulate a restart where the provider hasn't fetched its model list
+        // yet, so the saved selection can't be resolved at load time.
+        unregister_fake_corp(cx);
+
+        let reloaded_acp_thread = agent
+            .update(cx, |agent, cx| {
+                agent.open_thread(session_id.clone(), project.clone(), cx)
+            })
+            .await
+            .unwrap();
+        let thread = agent.read_with(cx, |agent, _| {
+            agent.sessions.get(&session_id).unwrap().thread.clone()
+        });
+        thread.read_with(cx, |thread, _| {
+            assert!(
+                thread.model().is_none(),
+                "should not fall back to an unrelated model"
+            );
+        });
+
+        // The original selection is persisted even while unresolved, so a save
+        // during the window can't overwrite the user's choice with a fallback.
+        let db_thread = thread.read_with(cx, |thread, cx| thread.to_db(cx)).await;
+        let saved = db_thread.model.expect("selection should be persisted");
+        assert_eq!(saved.provider, "fake-corp");
+        assert_eq!(saved.model, "custom-model-id");
+
+        cx.update(|cx| {
+            LanguageModelRegistry::global(cx).update(cx, |registry, cx| {
+                registry.register_provider(provider.clone(), cx);
+            });
+        });
+        cx.run_until_parked();
+
+        thread.read_with(cx, |thread, _| {
+            assert_eq!(
+                thread
+                    .model()
+                    .expect("model should resolve once provider loads")
+                    .id()
+                    .0
+                    .as_ref(),
+                "custom-model-id"
+            );
+        });
+
+        drop(reloaded_acp_thread);
+    }
+
+    #[gpui::test]
+    async fn test_explicit_model_selection_cancels_pending(cx: &mut TestAppContext) {
+        init_test(cx);
+        let (agent, connection, project, session_id, provider) =
+            persist_thread_with_fake_corp_model(cx).await;
+
+        unregister_fake_corp(cx);
+
+        let reloaded_acp_thread = agent
+            .update(cx, |agent, cx| {
+                agent.open_thread(session_id.clone(), project.clone(), cx)
+            })
+            .await
+            .unwrap();
+        let thread = agent.read_with(cx, |agent, _| {
+            agent.sessions.get(&session_id).unwrap().thread.clone()
+        });
+        thread.read_with(cx, |thread, _| {
+            assert!(thread.model().is_none());
+        });
+
+        // The user explicitly picks a different, available model.
+        let other_model = Arc::new(FakeLanguageModel::with_id_and_thinking(
+            "other-corp",
+            "other-model-id",
+            "Other Model",
+            false,
+        ));
+        let other_provider = Arc::new(
+            FakeLanguageModelProvider::new(
+                LanguageModelProviderId::from("other-corp".to_string()),
+                LanguageModelProviderName::from("Other Corp".to_string()),
+            )
+            .with_models(vec![other_model.clone()]),
+        );
+        cx.update(|cx| {
+            LanguageModelRegistry::global(cx).update(cx, |registry, cx| {
+                registry.register_provider(other_provider, cx);
+            });
+        });
+        cx.run_until_parked();
+
+        let selector = connection.model_selector(&session_id).unwrap();
+        cx.update(|cx| selector.select_model(AgentModelId::new("other-corp/other-model-id"), cx))
+            .await
+            .unwrap();
+
+        thread.read_with(cx, |thread, _| {
+            assert_eq!(thread.model().unwrap().id().0.as_ref(), "other-model-id");
+        });
+
+        // The original provider returning must not clobber the explicit choice.
+        cx.update(|cx| {
+            LanguageModelRegistry::global(cx).update(cx, |registry, cx| {
+                registry.register_provider(provider.clone(), cx);
+            });
+        });
+        cx.run_until_parked();
+
+        thread.read_with(cx, |thread, _| {
+            assert_eq!(
+                thread.model().unwrap().id().0.as_ref(),
+                "other-model-id",
+                "a late provider load must not override the explicit selection"
             );
         });
 
@@ -6878,158 +6889,6 @@ mod internal_tests {
         // block, the safe behavior is to return it unchanged rather than
         // silently mangling unrelated user text.
         assert_eq!(strip_slash_command_prefix("hello world"), "hello world",);
-    }
-
-    // ── Command::parse unit tests ──────────────────────────────────────
-
-    /// Helper: wrap a text string in a single-element ContentBlock slice.
-    fn text_block(text: &str) -> Vec<acp::ContentBlock> {
-        vec![acp::ContentBlock::Text(acp::TextContent::new(text))]
-    }
-
-    #[test]
-    fn test_command_parse_simple() {
-        let block = text_block("/help");
-        let cmd = Command::parse(&block).unwrap();
-        assert_eq!(cmd.prompt_name, "help");
-        assert!(cmd.arg_value.is_empty());
-        assert!(cmd.explicit_server_id.is_none());
-        assert!(cmd.skill_scope.is_none());
-    }
-
-    #[test]
-    fn test_command_parse_with_arg() {
-        let block = text_block("/recipe release");
-        let cmd = Command::parse(&block).unwrap();
-        assert_eq!(cmd.prompt_name, "recipe");
-        assert_eq!(cmd.arg_value, "release");
-        assert!(cmd.explicit_server_id.is_none());
-    }
-
-    #[test]
-    fn test_command_parse_trailing_whitespace() {
-        let block = text_block("/compact ");
-        let cmd = Command::parse(&block).unwrap();
-        assert_eq!(cmd.prompt_name, "compact");
-    }
-
-    #[test]
-    fn test_command_parse_leading_whitespace() {
-        // Leading whitespace is allowed; stripped by Command::parse.
-        let block = text_block("  /help");
-        let cmd = Command::parse(&block).unwrap();
-        assert_eq!(cmd.prompt_name, "help");
-    }
-
-    #[test]
-    fn test_command_parse_not_a_command() {
-        let block = text_block("hello world");
-        assert!(Command::parse(&block).is_none());
-    }
-
-    #[test]
-    fn test_command_parse_only_slash_has_empty_name() {
-        // Just "/" yields a command with an empty prompt_name.
-        let block = text_block("/");
-        let cmd = Command::parse(&block).unwrap();
-        assert!(cmd.prompt_name.is_empty());
-        assert!(cmd.arg_value.is_empty());
-    }
-
-    #[test]
-    fn test_command_parse_non_text_block() {
-        // An image block should not be parsed as a command.
-        let blocks = vec![acp::ContentBlock::Image(acp::ImageContent::new(
-            "",
-            "image/png",
-        ))];
-        assert!(Command::parse(&blocks).is_none());
-    }
-
-    #[test]
-    fn test_command_parse_empty_slice() {
-        assert!(Command::parse(&[]).is_none());
-    }
-
-    #[test]
-    fn test_command_parse_mcp_qualified() {
-        // MCP server prefix: /<server>.<prompt>
-        let block = text_block("/filesystem.read");
-        let cmd = Command::parse(&block).unwrap();
-        assert_eq!(cmd.prompt_name, "read");
-        assert_eq!(cmd.explicit_server_id, Some("filesystem"));
-        assert!(cmd.skill_scope.is_none());
-    }
-
-    #[test]
-    fn test_command_parse_mcp_qualified_with_arg() {
-        let block = text_block("/server.prompt arg1");
-        let cmd = Command::parse(&block).unwrap();
-        assert_eq!(cmd.prompt_name, "prompt");
-        assert_eq!(cmd.explicit_server_id, Some("server"));
-        assert_eq!(cmd.arg_value, "arg1");
-    }
-
-    #[test]
-    fn test_command_parse_skill_scope_qualified() {
-        // Skill scope: /<scope>:<name>
-        let block = text_block("/global:my-skill");
-        let cmd = Command::parse(&block).unwrap();
-        assert_eq!(cmd.prompt_name, "my-skill");
-        assert_eq!(cmd.skill_scope, Some("global"));
-        assert!(cmd.explicit_server_id.is_none());
-    }
-
-    #[test]
-    fn test_command_parse_worktree_skill_scope() {
-        let block = text_block("/project-a:lint");
-        let cmd = Command::parse(&block).unwrap();
-        assert_eq!(cmd.prompt_name, "lint");
-        assert_eq!(cmd.skill_scope, Some("project-a"));
-    }
-
-    #[test]
-    fn test_command_parse_scope_colon_only_is_not_skill() {
-        // `/:foo` with an empty scope is the qualified global skill form.
-        let block = text_block("/:global-skill");
-        let cmd = Command::parse(&block).unwrap();
-        assert_eq!(cmd.prompt_name, "global-skill");
-        assert_eq!(cmd.skill_scope, Some(""));
-    }
-
-    #[test]
-    fn test_command_is_unqualified_matches() {
-        let block = text_block("/help");
-        let cmd = Command::parse(&block).unwrap();
-        assert!(cmd.is_unqualified("help"));
-        assert!(!cmd.is_unqualified("compact"));
-    }
-
-    #[test]
-    fn test_command_is_unqualified_rejects_qualified() {
-        let block = text_block("/server.prompt");
-        let cmd = Command::parse(&block).unwrap();
-        assert!(
-            !cmd.is_unqualified("prompt"),
-            "MCP-qualified commands are not unqualified"
-        );
-
-        let block = text_block("/global:skill");
-        let cmd = Command::parse(&block).unwrap();
-        assert!(
-            !cmd.is_unqualified("skill"),
-            "skill-qualified commands are not unqualified"
-        );
-    }
-
-    #[test]
-    fn test_command_parse_mcp_precedence_over_skill() {
-        // `server.name` is the MCP form; `name:name` is the skill form.
-        // A dot should always be parsed as MCP-qualified.
-        let block = text_block("/my.name");
-        let cmd = Command::parse(&block).unwrap();
-        assert_eq!(cmd.explicit_server_id, Some("my"));
-        assert!(cmd.skill_scope.is_none());
     }
 }
 

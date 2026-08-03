@@ -535,11 +535,10 @@ impl NotebookEditor {
         let msg_id = message.header.msg_id.clone();
 
         let send_result = match &mut self.kernel {
-            Kernel::RunningKernel(kernel) => kernel.request_tx().try_send(message).map_err(|err| {
-                format!(
-                    "failed to send execute request to kernel (the kernel process may have died): {err}"
-                )
-            }),
+            Kernel::RunningKernel(kernel) => kernel
+                .request_tx()
+                .try_send(message)
+                .map_err(|err| format!("failed to send execute request to kernel (the kernel process may have died): {err}")),
             Kernel::StartingKernel(_) => Err("the kernel is still starting".to_string()),
             Kernel::ErroredLaunch(error) => Err(format!("the kernel failed to launch: {error}")),
             Kernel::ShuttingDown | Kernel::Shutdown => Err("the kernel is shut down".to_string()),
@@ -1966,6 +1965,9 @@ mod tests {
         ]
     }"#;
 
+    /// When the configured interpreter doesn't exist (e.g. Python isn't installed),
+    /// running a cell must not leave it stuck in the executing state. It should
+    /// instead surface the kernel launch error as an error output on the cell.
     #[gpui::test]
     async fn test_run_cell_with_missing_interpreter_shows_error(cx: &mut TestAppContext) {
         cx.update(|cx| {
@@ -1989,6 +1991,9 @@ mod tests {
             project.worktrees(cx).next().unwrap().read(cx).id()
         });
 
+        // Select a kernel whose interpreter doesn't exist, simulating a machine
+        // where Python isn't installed properly. This is the same path the
+        // kernel picker uses.
         let missing_interpreter = path!("/nonexistent/python3");
         let broken_spec = KernelSpecification::Jupyter(LocalKernelSpecification {
             name: "python3".to_string(),
@@ -2029,13 +2034,22 @@ mod tests {
             .await
             .expect("notebook should parse");
 
+        // Don't render the notebook UI itself: its animated kernel status icon
+        // schedules a new frame on every render, which makes `run_until_parked`
+        // spin forever in tests. The editor entity is created inside an empty
+        // window instead; we are testing execution behavior, not rendering.
         let cx = cx.add_empty_window();
+
+        // Launching a kernel probes real TCP ports on localhost, which the
+        // deterministic test scheduler cannot drive.
         cx.executor().allow_parking();
 
         let editor = cx.update(|window, cx| {
             cx.new(|cx| NotebookEditor::new(project.clone(), notebook_item, window, cx))
         });
 
+        // Creating the editor launches the kernel. Wait for the actual launch
+        // task, which fails because the interpreter cannot be spawned.
         let pending_kernel = editor.read_with(cx, |editor, _| match &editor.kernel {
             Kernel::StartingKernel(task) => task.clone(),
             _ => panic!("kernel should be starting right after the editor is created"),
@@ -2050,6 +2064,7 @@ mod tests {
             );
         });
 
+        // Run the (only) cell via the production action handler.
         editor.update_in(cx, |editor, window, cx| {
             editor.run_current_cell(&Run, window, cx);
         });

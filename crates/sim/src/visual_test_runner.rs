@@ -95,7 +95,7 @@ fn main() {
 #[cfg(target_os = "macos")]
 use {
     acp_thread::{AgentConnection, StubAgentConnection},
-    agent_client_protocol::schema as acp,
+    agent_client_protocol::schema::v1 as acp,
     agent_servers::{AgentServer, AgentServerDelegate},
     anyhow::{Context as _, Result},
     assets::Assets,
@@ -625,7 +625,7 @@ fn run_visual_tests(project_path: PathBuf, update_baseline: bool) -> Result<()> 
     }
 
     // Clean up the main workspace's worktree to stop background scanning tasks
-    // This prevents "root path could not be canonicalisim" errors when main() drops temp_dir
+    // This prevents "root path could not be canonicalized" errors when main() drops temp_dir
     workspace_window
         .update(&mut cx, |workspace, _window, cx| {
             let project = workspace.project().clone();
@@ -985,7 +985,6 @@ fn init_app_state(cx: &mut App) -> Arc<AppState> {
     let client = client::Client::new(clock, http_client, cx);
     let session = cx.new(|cx| session::AppSession::new(Session::test(), cx));
     let user_store = cx.new(|cx| client::UserStore::new(client.clone(), cx));
-    let group_store = cx.new(|cx| client::GroupStore::new(client.clone(), cx));
     let workspace_store = cx.new(|cx| workspace::WorkspaceStore::new(client.clone(), cx));
 
     theme_settings::init(theme::LoadThemes::JustBase, cx);
@@ -996,7 +995,6 @@ fn init_app_state(cx: &mut App) -> Arc<AppState> {
         fs,
         languages,
         user_store,
-        group_store,
         workspace_store,
         node_runtime: NodeRuntime::unavailable(),
         build_window_options: |_, _| Default::default(),
@@ -2261,7 +2259,7 @@ fn run_agent_thread_view_test(
     )?;
 
     // Remove the worktree from the project to stop background scanning tasks
-    // This prevents "root path could not be canonicalisim" errors when we clean up
+    // This prevents "root path could not be canonicalized" errors when we clean up
     workspace_window
         .update(cx, |workspace, _window, cx| {
             let project = workspace.project().clone();
@@ -2440,6 +2438,7 @@ fn run_tool_permissions_visual_tests(
                 "Terminal",
                 "Configure Tool Rules",
                 None,
+                true,
                 settings_ui::pages::render_terminal_tool_config,
                 window,
                 cx,
@@ -2732,7 +2731,6 @@ fn run_multi_workspace_sidebar_visual_tests(
                             request_token_usage: Default::default(),
                             model: None,
                             profile: None,
-                            imported: false,
                             subagent_context: None,
                             speed: None,
                             thinking_enabled: false,
@@ -2740,6 +2738,7 @@ fn run_multi_workspace_sidebar_visual_tests(
                             ui_scroll_position: None,
                             draft_prompt: None,
                             sandboxed_terminal_temp_dir: None,
+                            sandbox_grants: Default::default(),
                         },
                         path_list,
                         cx,
@@ -3506,14 +3505,14 @@ fn run_sidebar_duplicate_project_names_visual_tests(
     //
     // No two projects share a worktree path, so ProjectGroupBuilder will
     // place each in its own group.
-    let code_sim = canonical_temp.join("code").join("sim");
-    let foo_sim = canonical_temp.join("code").join("foo").join("sim");
-    let bar_sim = canonical_temp.join("code").join("bar").join("sim");
-    let baz_sim = canonical_temp.join("code").join("baz").join("sim");
-    std::fs::create_dir_all(&code_sim)?;
-    std::fs::create_dir_all(&foo_sim)?;
-    std::fs::create_dir_all(&bar_sim)?;
-    std::fs::create_dir_all(&baz_sim)?;
+    let code_zed = canonical_temp.join("code").join("sim");
+    let foo_zed = canonical_temp.join("code").join("foo").join("sim");
+    let bar_zed = canonical_temp.join("code").join("bar").join("sim");
+    let baz_zed = canonical_temp.join("code").join("baz").join("sim");
+    std::fs::create_dir_all(&code_zed)?;
+    std::fs::create_dir_all(&foo_zed)?;
+    std::fs::create_dir_all(&bar_zed)?;
+    std::fs::create_dir_all(&baz_zed)?;
 
     cx.update(|cx| {
         cx.update_flags(true, vec!["agent-v2".to_string()]);
@@ -3523,8 +3522,8 @@ fn run_sidebar_duplicate_project_names_visual_tests(
 
     // Two single-worktree projects whose leaf name is "sim"
     {
-        let project1 = create_project_with_worktree(&code_sim, &app_state, cx)?;
-        let project2 = create_project_with_worktree(&foo_sim, &app_state, cx)?;
+        let project1 = create_project_with_worktree(&code_zed, &app_state, cx)?;
+        let project2 = create_project_with_worktree(&foo_zed, &app_state, cx)?;
 
         let window = open_sidebar_test_window(vec![project1, project2], &app_state, cx)?;
 
@@ -3553,13 +3552,13 @@ fn run_sidebar_duplicate_project_names_visual_tests(
     // Each project has a unique set of worktree paths, so they form
     // separate groups. The sidebar must disambiguate all three.
     {
-        let project1 = create_project_with_worktree(&code_sim, &app_state, cx)?;
-        let project2 = create_project_with_worktree(&foo_sim, &app_state, cx)?;
+        let project1 = create_project_with_worktree(&code_zed, &app_state, cx)?;
+        let project2 = create_project_with_worktree(&foo_zed, &app_state, cx)?;
 
-        let project3 = create_project_with_worktree(&bar_sim, &app_state, cx)?;
+        let project3 = create_project_with_worktree(&bar_zed, &app_state, cx)?;
         let add_second_worktree = cx.update(|cx| {
             project3.update(cx, |project, cx| {
-                project.find_or_create_worktree(&baz_sim, true, cx)
+                project.find_or_create_worktree(&baz_zed, true, cx)
             })
         });
         cx.background_executor.allow_parking();

@@ -6,19 +6,20 @@ use futures::{FutureExt, StreamExt, future::BoxFuture};
 use gpui::{AnyView, App, AsyncApp, Context, Entity, SharedString, Task, TaskExt, Window};
 use http_client::{AsyncBody, CustomHeaders, HttpClient, http};
 use language_model::{
-    ApiKeyState, AuthenticateError, EnvVar, IconOrSvg, LanguageModel, LanguageModelCompletionError,
-    LanguageModelCompletionEvent, LanguageModelEffortLevel, LanguageModelId, LanguageModelName,
-    LanguageModelProvider, LanguageModelProviderId, LanguageModelProviderName,
-    LanguageModelProviderState, LanguageModelRequest, LanguageModelToolChoice, RateLimiter,
-    ReasoningEffort, env_var,
+    ApiKeyState, AuthenticateError, ConfigurationViewTargetAgent, EnvVar, IconOrSvg,
+    InlineDescription, LanguageModel, LanguageModelCompletionError, LanguageModelCompletionEvent,
+    LanguageModelEffortLevel, LanguageModelId, LanguageModelName, LanguageModelProvider,
+    LanguageModelProviderId, LanguageModelProviderName, LanguageModelProviderState,
+    LanguageModelRequest, LanguageModelToolChoice, RateLimiter, ReasoningEffort, env_var,
 };
 use opencode::{ApiProtocol, OPENCODE_API_URL, OpenCodeSubscription};
+pub use settings::OpenCodeApiProtocol;
 pub use settings::OpenCodeAvailableModel as AvailableModel;
 use settings::{Settings, SettingsStore, update_settings_file};
 use std::sync::{Arc, LazyLock};
 use strum::IntoEnumIterator;
 use ui::{
-    Banner, ButtonLink, ConfiguredApiCard, List, ListBulletItem, Severity, Switch,
+    Banner, ButtonLink, ConfiguredApiCard, Divider, List, ListBulletItem, Severity, Switch,
     SwitchLabelPosition, ToggleState, prelude::*,
 };
 use ui_input::InputField;
@@ -27,7 +28,8 @@ use util::ResultExt;
 use crate::provider::anthropic::{AnthropicEventMapper, into_anthropic};
 use crate::provider::google::{GoogleEventMapper, into_google};
 use crate::provider::open_ai::{
-    OpenAiEventMapper, OpenAiResponseEventMapper, into_open_ai, into_open_ai_response,
+    ChatCompletionMaxTokensParameter, OpenAiEventMapper, OpenAiResponseEventMapper, into_open_ai,
+    into_open_ai_response,
 };
 
 fn normalize_reasoning_effort(effort: &str) -> Option<ReasoningEffort> {
@@ -37,7 +39,8 @@ fn normalize_reasoning_effort(effort: &str) -> Option<ReasoningEffort> {
         "low" => Some(ReasoningEffort::Low),
         "medium" => Some(ReasoningEffort::Medium),
         "high" => Some(ReasoningEffort::High),
-        "max" | "xhigh" => Some(ReasoningEffort::XHigh),
+        "xhigh" => Some(ReasoningEffort::XHigh),
+        "max" => Some(ReasoningEffort::Max),
         _ => None,
     }
 }
@@ -50,6 +53,7 @@ fn reasoning_effort_display(effort: ReasoningEffort) -> (&'static str, &'static 
         ReasoningEffort::Medium => ("Medium", "medium"),
         ReasoningEffort::High => ("High", "high"),
         ReasoningEffort::XHigh => ("XHigh", "xhigh"),
+        ReasoningEffort::Max => ("Max", "max"),
     }
 }
 
@@ -197,6 +201,12 @@ impl LanguageModelProvider for OpenCodeLanguageModelProvider {
         IconOrSvg::Icon(IconName::AiOpenCode)
     }
 
+    fn inline_description(&self, _cx: &App) -> Option<InlineDescription> {
+        Some(InlineDescription::Text(
+            "To use OpenCode models in Sim, you need an API key.".into(),
+        ))
+    }
+
     fn default_model(&self, cx: &App) -> Option<Arc<dyn LanguageModel>> {
         if Self::subscription_enabled(OpenCodeSubscription::Go, cx) {
             // If both Go and Zen are enabled, prefer Go since it's not pay-as-you-go
@@ -259,12 +269,13 @@ impl LanguageModelProvider for OpenCodeLanguageModelProvider {
         }
 
         for model in &settings.available_models {
-            let protocol = match model.protocol.as_str() {
-                "anthropic" => ApiProtocol::Anthropic,
-                "openai_responses" => ApiProtocol::OpenAiResponses,
-                "openai_chat" => ApiProtocol::OpenAiChat,
-                "google" => ApiProtocol::Google,
-                _ => ApiProtocol::OpenAiChat, // default fallback
+            let protocol = match model.protocol {
+                Some(settings::OpenCodeApiProtocol::Anthropic) => ApiProtocol::Anthropic,
+                Some(settings::OpenCodeApiProtocol::OpenAiResponses) => {
+                    ApiProtocol::OpenAiResponses
+                }
+                Some(settings::OpenCodeApiProtocol::Google) => ApiProtocol::Google,
+                Some(settings::OpenCodeApiProtocol::OpenAiChat) | None => ApiProtocol::OpenAiChat,
             };
             let subscription = match model.subscription {
                 Some(settings::OpenCodeModelSubscription::Go) => OpenCodeSubscription::Go,
@@ -304,7 +315,7 @@ impl LanguageModelProvider for OpenCodeLanguageModelProvider {
 
     fn configuration_view(
         &self,
-        _target_agent: language_model::ConfigurationViewTargetAgent,
+        _target_agent: ConfigurationViewTargetAgent,
         window: &mut Window,
         cx: &mut App,
     ) -> AnyView {
@@ -572,6 +583,12 @@ impl LanguageModel for OpenCodeLanguageModel {
             .is_some_and(|levels| levels.iter().any(|effort| *effort != ReasoningEffort::None))
     }
 
+    fn supports_disabling_thinking(&self) -> bool {
+        self.model
+            .supported_reasoning_effort_levels()
+            .is_some_and(|levels| levels.contains(&ReasoningEffort::None))
+    }
+
     fn supported_effort_levels(&self) -> Vec<LanguageModelEffortLevel> {
         self.model
             .supported_reasoning_effort_levels()
@@ -673,7 +690,7 @@ impl LanguageModel for OpenCodeLanguageModel {
                 let stream =
                     self.stream_anthropic(anthropic_request, http_client, extra_headers, cx);
                 async move {
-                    let mapper = AnthropicEventMapper::new();
+                    let mapper = AnthropicEventMapper::new(PROVIDER_NAME);
                     Ok(mapper.map_stream(stream.await?).boxed())
                 }
                 .boxed()
@@ -690,9 +707,10 @@ impl LanguageModel for OpenCodeLanguageModel {
                 let openai_request = into_open_ai(
                     request,
                     self.model.id(),
-                    false,
+                    true,
                     false,
                     self.model.max_output_tokens(self.subscription),
+                    ChatCompletionMaxTokensParameter::MaxCompletionTokens,
                     reasoning_effort,
                     self.model.interleaved_reasoning(),
                 );
@@ -712,7 +730,7 @@ impl LanguageModel for OpenCodeLanguageModel {
                 let response_request = into_open_ai_response(
                     request,
                     self.model.id(),
-                    false,
+                    true,
                     false,
                     self.model.max_output_tokens(self.subscription),
                     None,
@@ -727,11 +745,14 @@ impl LanguageModel for OpenCodeLanguageModel {
                 .boxed()
             }
             ApiProtocol::Google => {
-                let google_request = into_google(
-                    request,
-                    self.model.id().to_string(),
-                    google_ai::GoogleModelMode::Default,
-                );
+                let mode = if self.supports_thinking() && request.thinking_allowed {
+                    google_ai::GoogleModelMode::Thinking {
+                        budget_tokens: None,
+                    }
+                } else {
+                    google_ai::GoogleModelMode::Default
+                };
+                let google_request = into_google(request, self.model.id().to_string(), mode);
                 let stream = self.stream_google(google_request, http_client, extra_headers, cx);
                 async move {
                     let mapper = GoogleEventMapper::new();
@@ -855,37 +876,12 @@ impl Render for ConfigurationView {
             }
         };
 
-        let api_key_section = if self.should_render_editor(cx) {
-            v_flex()
-                .on_action(cx.listener(Self::save_api_key))
-                .child(Label::new(
-                    "To use OpenCode models in Sim, you need an API key:",
-                ))
-                .child(
-                    List::new()
-                        .child(
-                            ListBulletItem::new("")
-                                .child(Label::new("Sign in and get your key at"))
-                                .child(ButtonLink::new(
-                                    "OpenCode Console",
-                                    "https://opencode.ai/auth",
-                                )),
-                        )
-                        .child(ListBulletItem::new(
-                            "Paste your API key below and hit enter to start using OpenCode",
-                        )),
-                )
-                .child(self.api_key_editor.clone())
-                .child(
-                    Label::new(format!(
-                        "You can also set the {API_KEY_ENV_VAR_NAME} environment variable and restart Sim."
-                    ))
-                    .size(LabelSize::Small)
-                    .color(Color::Muted),
-                )
-                .into_any_element()
+        let is_editing = self.should_render_editor(cx);
+
+        let api_key_control = if is_editing {
+            self.api_key_editor.clone().into_any_element()
         } else {
-            ConfiguredApiCard::new(configured_card_label)
+            ConfiguredApiCard::new("opencode-reset-key", configured_card_label)
                 .disabled(env_var_set)
                 .when(env_var_set, |this| {
                     this.tooltip_label(format!(
@@ -896,8 +892,39 @@ impl Render for ConfigurationView {
                 .into_any_element()
         };
 
+        let api_key_section = v_flex()
+            .on_action(cx.listener(Self::save_api_key))
+            .child(Label::new(
+                "To use OpenCode models in Sim, you need an API key:",
+            ).color(Color::Muted))
+            .child(
+                List::new()
+                    .child(
+                        ListBulletItem::new("")
+                            .child(Label::new("Sign in and get your key at").color(Color::Muted))
+                            .child(ButtonLink::new(
+                                "OpenCode Console",
+                                "https://opencode.ai/auth",
+                            )),
+                    )
+                    .when(is_editing, |this| {
+                        this.child(ListBulletItem::new(
+                            "Paste your API key below and hit enter to start using OpenCode",
+                        ).label_color(Color::Muted))
+                    }),
+            )
+            .child(api_key_control)
+            .child(
+                Label::new(format!(
+                    "You can also set the {API_KEY_ENV_VAR_NAME} environment variable and restart Sim."
+                ))
+                .size(LabelSize::Small)
+                .color(Color::Muted).mt_1p5(),
+            )
+            .into_any_element();
+
         if self.load_credentials_task.is_some() {
-            div().child(Label::new("Loading credentials...")).into_any()
+            Label::new("Loading Credentials…").into_any_element()
         } else {
             let settings = OpenCodeLanguageModelProvider::settings(cx);
             let show_zen = settings.show_zen_models;
@@ -905,12 +932,13 @@ impl Render for ConfigurationView {
             let show_free = settings.show_free_models;
 
             let subscription_toggles = v_flex()
-                .gap_1()
-                .child(Label::new("Subscriptions:").color(Color::Muted))
+                .gap_2()
+                .child(Label::new("Subscriptions"))
                 .child(
                     Switch::new("opencode-show-zen-models", show_zen.into())
-                        .label("Show Zen models")
-                        .label_position(SwitchLabelPosition::End)
+                        .full_width(true)
+                        .label("Show Zen Models")
+                        .label_position(SwitchLabelPosition::Start)
                         .on_click(cx.listener(|this, state, window, cx| {
                             this.set_subscription_enabled(
                                 OpenCodeSubscription::Zen,
@@ -920,10 +948,12 @@ impl Render for ConfigurationView {
                             );
                         })),
                 )
+                .child(Divider::horizontal_dashed())
                 .child(
                     Switch::new("opencode-show-go-models", show_go.into())
+                        .full_width(true)
                         .label("Show Go models")
-                        .label_position(SwitchLabelPosition::End)
+                        .label_position(SwitchLabelPosition::Start)
                         .on_click(cx.listener(|this, state, window, cx| {
                             this.set_subscription_enabled(
                                 OpenCodeSubscription::Go,
@@ -933,10 +963,12 @@ impl Render for ConfigurationView {
                             );
                         })),
                 )
+                .child(Divider::horizontal_dashed())
                 .child(
                     Switch::new("opencode-show-free-models", show_free.into())
+                        .full_width(true)
                         .label("Show Free models")
-                        .label_position(SwitchLabelPosition::End)
+                        .label_position(SwitchLabelPosition::Start)
                         .on_click(cx.listener(|this, state, window, cx| {
                             this.set_subscription_enabled(
                                 OpenCodeSubscription::Free,
@@ -957,8 +989,10 @@ impl Render for ConfigurationView {
 
             v_flex()
                 .size_full()
-                .gap_2()
+                .gap_2p5()
+                .child(Headline::new("OpenCode").size(HeadlineSize::Small))
                 .child(api_key_section)
+                .child(Divider::horizontal())
                 .child(subscription_toggles)
                 .children(no_subscriptions_warning)
                 .into_any()

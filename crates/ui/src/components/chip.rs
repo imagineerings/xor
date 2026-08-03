@@ -147,20 +147,20 @@ impl Component for Chip {
         let chip_examples = vec![
             single_example("Default", Chip::new("Chip Example").into_any_element()),
             single_example(
-                "Customisim Label Color",
+                "Customized Label Color",
                 Chip::new("Chip Example")
                     .label_color(Color::Accent)
                     .into_any_element(),
             ),
             single_example(
-                "Customisim Label Size",
+                "Customized Label Size",
                 Chip::new("Chip Example")
                     .label_size(LabelSize::Large)
                     .label_color(Color::Accent)
                     .into_any_element(),
             ),
             single_example(
-                "Customisim Background Color",
+                "Customized Background Color",
                 Chip::new("Chip Example")
                     .bg_color(cx.theme().colors().text_accent.opacity(0.1))
                     .into_any_element(),

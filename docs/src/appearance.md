@@ -23,7 +23,7 @@ Here's how to make Sim feel like home:
 
 5. **Adjust font size**: In the same Settings Editor, search for `buffer_font_size` and `ui_font_size` to tweak the editor and interface text sizes.
 
-That's it. You now have a personalisim Sim setup.
+That's it. You now have a personalized Sim setup.
 
 ## Themes
 
@@ -40,16 +40,6 @@ Sim supports separate themes for light and dark mode with automatic switching ba
   }
 }
 ```
-
-### Spectrum 2 Inspired Theme
-
-A community theme inspired by [Adobe's Spectrum 2](https://adobe.design/ideas/introducing-spectrum-2) design language. It features a layered surface system with approachable, bright aesthetics, clear visual hierarchy, readable contrast, modular surfaces, subtle depth, and restrained expressive accents.
-
-- **Light variant**: `Spectrum 2 Inspired Light`
-- **Dark variant**: `Spectrum 2 Inspired Dark`
-- **Author**: Ahmad Vegah
-
-To install, copy the theme file to `~/.config/sim/themes/` and select it from the Theme Selector ({#kb theme_selector::Toggle}).
 
 You can also override specific theme attributes for fine-grained control.
 

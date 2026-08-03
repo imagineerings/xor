@@ -1,177 +1,75 @@
 # Workflow Contract
 
-`WORKFLOW.md` contains optional YAML front matter followed by a Markdown prompt
-template. This skill supports the local-task workflow: tasks come from
-`.agents/specs/**/tasks.md`, and Linear is populated when a local task is
-picked.
+## Contents
 
-## Automatic Next Task
+- [Authority and lifecycle](#authority-and-lifecycle)
+- [Commands](#commands)
+- [WORKFLOW.md](#workflowmd)
+- [Task packet schema](#task-packet-schema)
+- [Ranking and compatibility](#ranking-and-compatibility)
+- [Claims and leases](#claims-and-leases)
+- [Decision state](#decision-state)
+- [Consistency gates](#consistency-gates)
+- [Completion journal](#completion-journal)
+- [Linear representation](#linear-representation)
+- [Prompt variables](#prompt-variables)
+- [Local UI](#local-ui)
 
-On normal skill invocation, execute:
+## Authority and lifecycle
 
-```bash
-node .agents/skills/workflow/scripts/workflow.js next
-```
+`.agents/specs/**/tasks.md` is the dispatch source of truth. Linear represents
+shared ownership and workflow state but does not make a local task eligible.
 
-It:
+The lifecycle is:
 
-1. Loads active local task packets in deterministic source order.
-2. Searches Linear for machine-readable markers in existing issue descriptions:
-   - `workflow.local_task_id:<task-id>`
-   - `workflow.local_task_source:<task-file>:<line>`
-3. Skips tasks that already have a non-terminal Linear issue.
-4. Creates Linear for the only unclaimed task when exactly one active task is
-   unclaimed, or returns candidates for agent evaluation when multiple active
-   tasks are unclaimed.
+1. `plan` ranks local work without tracker writes.
+2. `next` or `pick` passes the start gate and acquires a Linear-backed lease.
+3. `move`, `renew`, and `release` maintain shared status.
+4. `check --phase complete` verifies executed-validation evidence.
+5. `finish` marks the local checkbox complete before the implementation PR is
+   merged.
+6. `close` verifies a clean checkout at `origin/main`, journals the operation,
+   moves Linear to Done, and releases activity without editing repository files.
+7. `reconcile` diagnoses or repairs an interrupted close operation.
 
-When multiple candidates are returned, the agent should pick the next logical
-task that adds value by first consulting `.agents/workflow-state.json` when it
-exists. This state is a cache of concise conclusions and dependency notes, not
-authority. Validate its cached recommendation against current `tasks.md`,
-`requirements.md`, `design.md`, and Linear state. Then consider priority,
-dependencies, immediate utility, and previous tasks in the same `tasks.md` file.
-Previous tasks are evidence: completed tasks show delivered foundations,
-claimed tasks show work already in flight, and incomplete earlier tasks may
-indicate unmet prerequisites or a better next step. Use
-`workflow.js pick <task-id>` after choosing the candidate.
+## Commands
 
-If all active local tasks already have non-terminal Linear issues, the script
-returns no task and includes `skipped_claimed_tasks` in JSON output for
-visibility. Use `workflow.js pick <task-id>` only when a user names a specific
-task; it may resume that exact task's existing Linear issue instead of creating
-a new one.
+Use `.agents/skills/workflow/scripts/workflow` so Codex can discover its bundled
+Node runtime when `node` is not on `PATH`.
 
-Use `workflow.js next --count <n> --json` to reserve multiple unclaimed tasks
-for parallel work. The agent decides whether this is appropriate by comparing
-task text, requirements, write manifests, likely code ownership, and previous
-tasks that may establish dependencies or ordering. Do not run tasks in parallel
-when they touch the same files, have explicit dependency ordering, or require a
-shared migration/schema step.
+| Command | Tracker writes | Purpose |
+|---|---:|---|
+| `init` | No | Create a minimal missing `WORKFLOW.md` |
+| `doctor` | No | Diagnose runtime and configuration |
+| `doctor --online` | No | Also verify Linear credentials and routing |
+| `lint [--strict]` | No | Audit task metadata and coverage |
+| `migrate-ids` | No | Suggest durable IDs for packets that lack them |
+| `validate` | No | Validate the workflow contract |
+| `list [--all]` | No | Parse active or all local task packets |
+| `plan [--count n]` | No | Rank tasks and select a compatible batch |
+| `render <id>` | No | Render one task prompt |
+| `check <id> --phase start\|complete` | No | Run a consistency gate |
+| `next [--count n]` | Yes | Claim the highest-ranked compatible ready work |
+| `pick <id>` | Yes | Claim or resume an explicit task |
+| `renew <id>` | Yes | Extend a claim lease |
+| `release <id>` | Yes | Mark a claim inactive and resumable |
+| `takeover <id>` | Yes | Explicitly replace active ownership |
+| `move <id> --state-name <state>` | Yes | Move the linked Linear issue |
+| `finish <id>` | No | Validate and mark the local packet complete before merge |
+| `close <id>` | Yes | After merge, close Linear and release activity |
+| `complete <id>` | No | Compatibility alias for `finish` |
+| `reconcile [id]` | Optional | Repair a partial completion |
+| `ui` | No by default | Open the local task board |
+| `begin-ui` | Yes | Claim work and open the task board |
 
-## Decision State
+Bare invocation and `--help` display help and never claim work. Use `--json` for
+machine-readable output; CLI JSON includes `schema_version: 2`. Semantic check
+and doctor failures use a nonzero exit status. `reconcile --dry-run` never
+repairs.
 
-The optional structured decision-state file defaults to:
+## WORKFLOW.md
 
-```text
-.agents/workflow-state.json
-```
-
-`WORKFLOW.md` may override it with:
-
-```yaml
-workflow_state:
-  path: .agents/workflow-state.json
-```
-
-`workflow.js next` loads the file when present and includes a
-`decision_state` object in JSON output. Human-readable `next` output also shows
-the cached recommendation before the candidate list.
-
-Supported state fields:
-
-- `version`: state schema version, currently `1`
-- `updated_at`: ISO timestamp for the last state refresh
-- `repo_revision`: commit SHA or short revision used for the last state refresh
-- `recommendation`: object with `task_id`, `task_identifier`, `title`,
-  `rationale`, `evidence`, `stale_if_changed`, and `updated_at`
-- `task_notes`: array of task-specific notes with `task_id` or
-  `task_identifier`, `status`, `summary`, and `updated_at`
-- `dependency_notes`: array of reusable ordering notes with `scope`, `summary`,
-  and `updated_at`
-
-Agents should update the file after accepting, rejecting, blocking, or
-deprioritizing a candidate. Store concise reviewable rationale and evidence
-only. Do not store private chain-of-thought, long scratch reasoning, secrets, or
-unverified guesses.
-
-## Task Boundary Consistency Gates
-
-Agents must run consistency checks at task boundaries:
-
-1. Quick start-gate check before implementation: confirm the task is still valid
-   to begin, prerequisites and dependency wave placement are sound, `_writes:`
-   manifests do not obviously conflict with parallel work, and the spec pack has
-   no obvious contradiction that blocks the task.
-2. Full completion-gate pass after validation but before completion: tighten
-   start, validation, handoff, and completion gates; update dependency waves for
-   remaining work; and reconcile `requirements.md`, `design.md`, and `tasks.md`
-   so requirement references, design properties, reads/writes, and done
-   conditions match the delivered behavior.
-
-If either gate finds blocking ambiguity, update the spec files or ask for
-clarification before coding or before completing the task. Mark the task
-complete only after the full completion-gate pass.
-
-## Linear Stage Updates
-
-Use the executable script to move Linear issues between stages:
-
-```bash
-node .agents/skills/workflow/scripts/workflow.js move <task-id-or-linear-id> --state-name "In Progress"
-```
-
-`move` accepts a local task ID, local task source (`.agents/specs/...:line`),
-Linear issue identifier, Linear issue ID, or Linear issue URL. Pass
-`--state-id` when the caller already knows the target Linear state ID; otherwise
-pass `--state-name` and the script resolves the state in the configured Linear
-team.
-
-## Completion Updates
-
-When an agent determines a task is implemented, validated, and working
-correctly, it should complete the workflow task with:
-
-```bash
-node .agents/skills/workflow/scripts/workflow.js complete <task-id>
-```
-
-`complete` defaults to moving the linked Linear issue to `Done` and updating the
-source `tasks.md` checkbox to `[x]`. Pass `--state-name <state>` when the Linear
-workflow uses another terminal or handoff state. Pass `--local-only` only when
-Linear is intentionally unavailable; pass `--no-local` only when the local task
-file should not be edited.
-
-## Local UI
-
-`assets/ui/index.html` is a task board for visualizing script output. The page
-does not execute repository commands and does not call Linear directly. The
-launcher supplies data through `?data=/workflow-data.json`, and the UI fetches
-that payload on load. The board shows local task state, Linear state, reserved
-batch membership, requirements, writes manifests, and task packets.
-
-Launch it with:
-
-```bash
-node .agents/skills/workflow/scripts/workflow.js ui
-```
-
-Launch modes:
-
-- Ordinary `workflow.js next` and ordinary `$workflow` invocations do not launch
-  the UI.
-- `workflow.js ui` starts a localhost server, serves the UI with active local
-  tasks, and opens the browser without claiming work by default.
-- `workflow.js begin-ui` is the explicit begin-and-visualize mode. It is
-  equivalent to `workflow.js ui --data next`, so it claims the next task and
-  launches the populated board.
-- `workflow.js ui --no-open --json` starts the server and returns the UI URL,
-  data URL, server host, port, and process ID for agent runtimes that open UIs
-  themselves.
-- `workflow.js ui --data next --count <n>` reserves tasks through Linear before
-  rendering the reserved batch. Use this only when the agent intends to claim
-  work.
-- `workflow.js ui --data pick --task-id <task-id>` opens the UI for one
-  explicit task after creating or resuming its Linear issue.
-- `workflow.js ui --static --json` resolves the bundled HTML file without
-  serving workflow data.
-
-The UI still supports manually loaded JSON created by `workflow.js list --json`
-or `workflow.js next --count <n> --json`.
-
-## Front Matter
-
-Supported front matter is intentionally small and compatible with the Symphony
-spec shape:
+`WORKFLOW.md` contains optional YAML front matter and a Markdown prompt body:
 
 ```yaml
 ---
@@ -179,111 +77,174 @@ tracker:
   kind: linear
   endpoint: https://api.linear.app/graphql
   api_key: $LINEAR_API_KEY
-  team_key: ENG
+  team_key: $LINEAR_TEAM_KEY
   project_slug: sim
   active_states: [Todo, In Progress]
   terminal_states: [Done, Closed, Canceled, Cancelled, Duplicate]
+  claim_lease_minutes: 120
 tasks:
   glob: .agents/specs/**/tasks.md
 workflow_state:
   path: .agents/workflow-state.json
-agent:
-  max_turns: 20
+workflow_journal:
+  path: .agents/workflow-operations.json
 ---
-```
-
-The script accepts nested maps, scalar values, simple
-`- value` lists, inline lists, and literal `|` block scalars. Avoid anchors,
-aliases, folded block scalars, and object-valued list items.
-
-`tracker.kind` must be `linear` when a task is picked. `tracker.api_key` may be
-a literal token or `$VAR_NAME`; `$LINEAR_API_KEY` is the canonical environment
-variable. Provide either `tracker.team_id` or `tracker.team_key` so the script
-can create a Linear issue. `tracker.project_id` or `tracker.project_slug` is
-optional.
-
-## Local Task Packets
-
-Each top-level checkbox in a matched `tasks.md` file is a packet:
-
-```markdown
-- [ ] 3. Wire interactive mode to shared slash command behavior
-  - Add autocomplete backed by the shared command catalog
-  - _Requirements: 6_
-  - _writes: crates/cli/src/interactive/slash_commands.rs_
-```
-
-The packet body includes the title line and all following indented lines until
-the next top-level checkbox. The parser derives:
-
-- `issue.id`: stable hash of relative path, source line, and title
-- `issue.identifier`: local source key such as
-  `.agents/specs/foo/tasks.md:12`
-- `issue.title`
-- `issue.description`: packet body without the title line
-- `issue.state`: `Todo`, `In Progress`, or `Done`
-- `issue.labels`: `local-task`, `workflow`, and path-derived labels
-- `issue.task_file`
-- `issue.task_line`
-- `issue.requirements`
-- `issue.writes`
-- `issue.linear`: populated after `workflow.js next` or `workflow.js pick`
-
-## Template Body
-
-Use strict double-brace interpolation:
-
-```markdown
-You are working on a local Sim spec task.
-
 Task: {{ issue.title }}
-Source: {{ issue.task_file }}:{{ issue.task_line }}
-Requirements: {{ issue.requirements }}
-Writes: {{ issue.writes }}
-
 Task body:
-{{ issue.description }}
-
-Linear:
-{{ issue.linear.url }}
+{{ issue.task_body }}
 ```
 
-Supported values include:
+The parser supports nested maps, scalar values, simple lists, inline lists, and
+literal `|` blocks. It rejects unsupported indentation, tracker keys, unsafe
+literal API keys, invalid lease values, and template variables.
+Environment JSON in `WORKFLOW_SETTINGS` overrides front matter.
 
-- `issue.id`
-- `issue.identifier`
-- `issue.title`
-- `issue.description`
-- `issue.priority`
-- `issue.state`
-- `issue.branch_name`
-- `issue.url`
-- `issue.labels`
-- `issue.blocked_by`
-- `issue.created_at`
-- `issue.updated_at`
-- `issue.task_file`
-- `issue.task_line`
-- `issue.task_body`
-- `issue.requirements`
-- `issue.writes`
-- `issue.linear`
-- `attempt`
+Tracker creation requires `team_id` or `team_key`. Project routing, label IDs,
+and initial state ID are optional. The canonical token reference is
+`$LINEAR_API_KEY`.
 
-Unknown variables are errors. Filters such as
-`{{ issue.title | default: "Untitled" }}` are not supported.
+## Task packet schema
 
-## Linear Population
+Each top-level Markdown checkbox and its indented body is one packet. Supported
+metadata is case-insensitive:
 
-`workflow.js pick <task-id>` creates or resumes a Linear issue for the selected packet. The issue
-description must include:
+| Field | Meaning |
+|---|---|
+| `_id:` | Durable repository-unique ID |
+| `_priority:` | `P0` through `P4` |
+| `_value:` | `high`, `medium`, or `low` immediate value |
+| `_wave:` | Integer delivery wave |
+| `_blocked_by:` | Comma-separated task IDs |
+| `_reads:` | Expected read paths |
+| `_writes:` | Expected write paths |
+| `_validation:` | Validation command or evidence requirement |
+| `_validation_evidence:` | Concise evidence recorded by `finish` for the landed packet |
+| `_Requirements:` | Comma-separated requirement references |
 
-- local task ID and source path
-- task body
-- requirements and writes metadata
-- rendered prompt
+Explicit IDs normalize to lowercase letters, digits, dots, underscores, and
+hyphens and receive the `task:` prefix. Without `_id`, the fallback hashes task
+file plus numbered sequence, or file plus title when no sequence exists. The
+former line-and-title hash is retained as an alias for Linear lookup.
 
-The Linear response is attached to `issue.linear` before the prompt is returned,
-so prompts can include `{{ issue.linear.identifier }}` or
-`{{ issue.linear.url }}`. If Linear creation fails, the task is not considered
-picked.
+Checkbox markers map as follows: `[ ]` is `Todo`, `[~]` and `[-]` are
+`In Progress`, and `[x]` is `Done`.
+
+## Ranking and compatibility
+
+Ranking is deterministic and exposes a numeric score and rationale. Lower
+scores rank first; blocked tasks receive a large penalty and are never selected.
+Ranking uses:
+
+- readiness and explicit blockers;
+- `P0`–`P4` priority;
+- immediate value;
+- wave;
+- completion of earlier tasks in the same task file;
+- a fresh cached recommendation;
+- source order as the final tie-breaker.
+
+A cached recommendation is stale when any `stale_if_changed` file has changed
+after the recommendation timestamp or disappeared.
+
+Parallel selection rejects tasks with explicit dependency relationships,
+overlapping write paths, and write/read overlap. Directory and glob paths
+conflict with their descendants.
+`plan --count n` is the read-only preview; `next --count n` performs claims.
+
+## Claims and leases
+
+Linear descriptions contain these activity markers:
+
+```text
+workflow.activity:active
+workflow.activity_owner:codex
+workflow.activity_lease_id:<uuid>
+workflow.activity_expires_at:<ISO timestamp>
+workflow.activity_updated_at:<ISO timestamp>
+workflow.activity_summary:<short text>
+```
+
+An active marker is blocking only until `expires_at`. New claims include owner,
+lease ID, and expiry in the initial issue creation. Missing expiration is treated
+as active only for compatibility with older claims. `release` writes `inactive`;
+`renew` preserves owner, summary, and lease identity while extending expiration;
+`takeover` creates a new lease and requires an owner and reason without bypassing
+consistency gates.
+
+Linear lookup followed by issue creation cannot provide a database-level unique
+constraint. The script uses exact marker lines, a repository fingerprint,
+durable IDs, lease ownership, and legacy aliases to minimize cross-linking and
+duplicates. Exact issue lookup fails closed rather than mutating the first fuzzy
+search result.
+
+## Decision state
+
+`.agents/workflow-state.json` is an atomic local cache, not dispatch authority.
+Local state and journal read-modify-write operations use a short-lived lock to
+prevent parallel agents from losing records.
+Schema version 1 supports:
+
+- `updated_at` and `repo_revision`;
+- `recommendation` with rationale, evidence, and stale files;
+- `task_activity` with owner, lease ID, expiration, and summary;
+- `task_notes` and `dependency_notes`;
+- `ranked_candidates` with score, blockers, readiness, and rationale.
+
+Do not store secrets, scratch reasoning, or unsupported guesses.
+
+## Consistency gates
+
+The start gate verifies spec files, unique IDs, dependency completion,
+requirement references, write metadata, and active write conflicts. `pick` and
+`next` run it before tracker creation.
+
+The completion gate repeats consistency checks and always requires
+`--validation-evidence <summary>`. `_validation` describes the expected plan but
+is not evidence that it ran. `finish` records the evidence as checked-in task
+metadata. `close` requires that evidence plus a clean `HEAD` that exactly matches
+`origin/main`; narrow overrides require `--override-reason`.
+
+## Completion journal
+
+`.agents/workflow-operations.json` records the post-merge close operation and steps:
+
+- `linear_moved`
+- `activity_released`
+
+Writes are atomic and retain the latest 100 operations. The journal records the
+Linear identifier and target state before mutation. `reconcile --dry-run` shows
+incomplete operations. Without `--dry-run`, reconciliation can finish a missing
+Linear move or activity release idempotently.
+
+## Linear representation
+
+Issue descriptions include durable and legacy task markers, source location,
+task body, requirements, reads, writes, validation, activity markers, and the
+rendered prompt. The Linear response is attached to `issue.linear` before the
+final prompt is rendered.
+
+Terminal issues are not resumed. Non-terminal inactive or expired issues are
+resumed instead of duplicated.
+
+## Prompt variables
+
+Templates use strict `{{ value }}` interpolation. Unknown variables, filters,
+and Liquid tag blocks are errors. Arrays and objects render as pretty JSON.
+
+Supported `issue` fields include `id`, `aliases`, `identifier`, `title`,
+`description`, `priority`, `value`, `wave`, `state`, `branch_name`, `url`,
+`labels`, `blocked_by`, `task_file`, `task_line`, `task_body`, `requirements`,
+`reads`, `writes`, `validation`, `linear`, and `activity`. `attempt` is also
+supported. Arrays render as comma-separated values, empty arrays as `None`, and
+null values as `Not set`.
+
+## Local UI
+
+`ui` serves `assets/ui/index.html` with active local task data and does not claim
+work by default. `begin-ui` and `ui --data next` claim before rendering. The UI
+does not execute repository commands or call Linear directly.
+
+Use `--no-open --json` when an agent runtime needs the server URL, `--host` and
+`--port` to override binding, and `--static` to resolve the bundled HTML without
+serving data. Non-loopback hosts are rejected unless `--allow-remote` is passed
+explicitly; the UI accepts only HTTP(S) Linear links.

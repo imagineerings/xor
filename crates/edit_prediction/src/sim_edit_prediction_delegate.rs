@@ -229,6 +229,15 @@ impl EditPredictionDelegate for SimEditPredictionDelegate {
                 return None;
             };
 
+            if edits.is_empty() {
+                store.reject_current_prediction(
+                    EditPredictionRejectReason::InterpolatedEmpty,
+                    &self.project,
+                    cx,
+                );
+                return None;
+            }
+
             let cursor_row = cursor_position.to_point(&snapshot).row;
             let (closest_edit_ix, (closest_edit_range, _)) =
                 edits.iter().enumerate().min_by_key(|(_, (range, _))| {

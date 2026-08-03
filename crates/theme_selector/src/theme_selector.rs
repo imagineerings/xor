@@ -1,6 +1,5 @@
 mod icon_theme_selector;
 
-use sim_actions::{ExtensionCategoryFilter, Extensions};
 use fs::Fs;
 use fuzzy::{StringMatch, StringMatchCandidate, match_strings};
 use gpui::{
@@ -9,6 +8,7 @@ use gpui::{
 };
 use picker::{Picker, PickerDelegate};
 use settings::{Settings, SettingsStore, update_settings_file};
+use sim_actions::{ExtensionCategoryFilter, Extensions};
 use std::sync::Arc;
 use theme::{Appearance, SystemAppearance, Theme, ThemeMeta, ThemeRegistry};
 use theme_settings::{
@@ -377,6 +377,10 @@ fn retain_original_opposing_theme(
 
 impl PickerDelegate for ThemeSelectorDelegate {
     type ListItem = ui::ListItem;
+
+    fn name() -> &'static str {
+        "theme selector"
+    }
 
     fn placeholder_text(&self, _window: &mut Window, _cx: &mut App) -> Arc<str> {
         "Select Theme...".into()

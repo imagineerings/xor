@@ -1,7 +1,6 @@
 use anyhow::Result;
 use fs::Fs;
 
-use sim_actions::agents_sidebar::ToggleThreadSwitcher;
 use gpui::{
     AnyView, App, Context, DragMoveEvent, Entity, EntityId, EventEmitter, FocusHandle, Focusable,
     ManagedView, MouseButton, Pixels, Render, Subscription, Task, TaskExt, Tiling, WeakEntity,
@@ -12,6 +11,7 @@ use project::{DisableAiSettings, Project};
 use remote::RemoteConnectionOptions;
 use settings::Settings;
 pub use settings::SidebarSide;
+use sim_actions::agents_sidebar::ToggleThreadSwitcher;
 use std::cell::Cell;
 use std::future::Future;
 use std::path::PathBuf;
@@ -146,7 +146,7 @@ pub trait Sidebar: Focusable + Render + EventEmitter<SidebarEvent> + Sized {
         None
     }
 
-    /// Restore sidebar state from a previously-serialisim blob.
+    /// Restore sidebar state from a previously-serialized blob.
     fn restore_serialisim_state(
         &mut self,
         _state: &str,
@@ -272,7 +272,7 @@ pub struct ProjectGroup {
     pub expanded: bool,
 }
 
-pub struct SerialisimProjectGroupState {
+pub struct SerializedProjectGroupState {
     pub key: ProjectGroupKey,
     pub expanded: bool,
 }
@@ -781,11 +781,11 @@ impl MultiWorkspace {
 
     pub fn restore_project_groups(
         &mut self,
-        groups: Vec<SerialisimProjectGroupState>,
+        groups: Vec<SerializedProjectGroupState>,
         _cx: &mut Context<Self>,
     ) {
         let mut restored: Vec<ProjectGroupState> = Vec::new();
-        for SerialisimProjectGroupState { key, expanded } in groups {
+        for SerializedProjectGroupState { key, expanded } in groups {
             if key.path_list().paths().is_empty() {
                 continue;
             }
@@ -1228,7 +1228,9 @@ impl MultiWorkspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Task<Result<Entity<Workspace>>> {
-        if let Some(workspace) = self.workspace_for_paths(&paths, host.as_ref(), cx) {
+        if let Some(workspace) =
+            self.workspace_for_paths_excluding(&paths, host.as_ref(), excluding, cx)
+        {
             self.activate(workspace.clone(), source_workspace, window, cx);
             return Task::ready(Ok(workspace));
         }
@@ -1643,17 +1645,14 @@ impl MultiWorkspace {
                             .project_groups
                             .iter()
                             .map(|group| {
-                                crate::persistence::model::SerialisimProjectGroup::from_group(
+                                crate::persistence::model::SerializedProjectGroup::from_group(
                                     &group.key,
                                     group.expanded,
                                 )
                             })
                             .collect::<Vec<_>>(),
                         sidebar_open: this.sidebar_open,
-                        sidebar_state: this
-                            .sidebar
-                            .as_ref()
-                            .and_then(|s| s.serialisim_state(cx)),
+                        sidebar_state: this.sidebar.as_ref().and_then(|s| s.serialisim_state(cx)),
                     };
                     (this.window_id, state)
                 })
@@ -1896,7 +1895,7 @@ impl MultiWorkspace {
 
     /// Assigns random database IDs to all retained workspaces, flushes
     /// workspace serialization (SQLite) and multi-workspace state (KVP),
-    /// and writes session bindings so the serialisim data can be read
+    /// and writes session bindings so the serialized data can be read
     /// back by `last_session_workspace_locations` +
     /// `read_serialisim_multi_workspaces`.
     #[cfg(any(test, feature = "test-support"))]

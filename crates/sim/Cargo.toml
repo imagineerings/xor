@@ -2,7 +2,7 @@
 description = "The fast, collaborative code editor."
 edition.workspace = true
 name = "sim"
-version = "1.10.0"
+version = "1.11.3"
 publish.workspace = true
 license = "GPL-3.0-or-later"
 authors = ["Sim Team <hi@sim.dev>"]
@@ -12,10 +12,19 @@ default-run = "sim"
 workspace = true
 
 [features]
+corex = ["comfy_runtime/corex"]
+cuda = ["comfy_runtime/cuda"]
+directml = ["comfy_runtime/directml"]
+metal = ["comfy_runtime/metal"]
+mlu = ["comfy_runtime/mlu"]
+npu = ["comfy_runtime/npu"]
+rocm = ["comfy_runtime/rocm"]
+xpu = ["comfy_runtime/xpu"]
 tracy = ["ztracing/tracy"]
 # LEAK_BACKTRACE=1 cargo run --features sim/track-project-leak --profile release-fast
 track-project-leak = ["gpui/leak-detection"]
 test-support = [
+    "comfy_ui/test-support",
     "gpui/test-support",
     "gpui_platform/screen-capture",
     "dep:image",
@@ -63,6 +72,14 @@ path = "src/visual_test_runner.rs"
 required-features = ["visual-tests"]
 
 [dependencies]
+async-channel.workspace = true
+comfy_api.workspace = true
+comfy_model.workspace = true
+comfy_plugin_host.workspace = true
+comfy_runtime.workspace = true
+comfy_tensor.workspace = true
+comfy_types.workspace = true
+comfy_ui.workspace = true
 acp_tools.workspace = true
 activity_indicator.workspace = true
 agent.workspace = true
@@ -112,7 +129,6 @@ feedback.workspace = true
 file_finder.workspace = true
 fs.workspace = true
 futures.workspace = true
-gateway.workspace = true
 git.workspace = true
 git_hosting_providers.workspace = true
 git_ui = { workspace = true, features = ["call"] }
@@ -125,9 +141,8 @@ image = { workspace = true, optional = true }
 itertools.workspace = true
 semver.workspace = true
 tempfile = { workspace = true, optional = true }
-clock = { workspace = true, optional = true }
+clock.workspace = true
 acp_thread.workspace = true
-sandbox.workspace = true
 action_log = { workspace = true, optional = true }
 agent_servers = { workspace = true, optional = true }
 gpui_tokio.workspace = true
@@ -156,7 +171,6 @@ log.workspace = true
 markdown.workspace = true
 markdown_preview.workspace = true
 menu.workspace = true
-mobile_tunnel.workspace = true
 migrator.workspace = true
 miniprofiler_ui.workspace = true
 mimalloc = { version = "0.1", optional = true }
@@ -181,6 +195,7 @@ repl.workspace = true
 reqwest.workspace = true
 reqwest_client.workspace = true
 rope.workspace = true
+sandbox.workspace = true
 search.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -190,6 +205,7 @@ settings_profile_selector.workspace = true
 settings_ui.workspace = true
 shellexpand.workspace = true
 sidebar.workspace = true
+sim_credentials_provider.workspace = true
 smol.workspace = true
 snippet_provider.workspace = true
 snippets_ui.workspace = true
@@ -225,10 +241,7 @@ web_search_providers.workspace = true
 which_key.workspace = true
 workspace.workspace = true
 sim_actions.workspace = true
-sim_apps.workspace = true
 sim_env_vars.workspace = true
-sim_game.workspace = true
-world_model.workspace = true
 zlog.workspace = true
 zlog_settings.workspace = true
 
@@ -312,4 +325,4 @@ osx_info_plist_exts = ["resources/info/*"]
 osx_url_schemes = ["sim"]
 
 [package.metadata.cargo-machete]
-ignored = ["profiling", "zstd", "tracing", "gateway"]
+ignored = ["profiling", "zstd", "tracing"]

@@ -9,7 +9,7 @@ use util::serde::default_true;
 use util::{ResultExt, truncate_and_remove_front};
 
 use crate::{
-    AttachRequest, SIM_VARIABLE_NAME_PREFIX, ResolvedTask, RevealTarget, Shell, SpawnInTerminal,
+    AttachRequest, ResolvedTask, RevealTarget, SIM_VARIABLE_NAME_PREFIX, Shell, SpawnInTerminal,
     TaskContext, TaskId, VariableName, serde_helpers::non_empty_string_vec,
 };
 

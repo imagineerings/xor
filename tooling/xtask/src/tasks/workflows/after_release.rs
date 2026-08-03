@@ -62,8 +62,11 @@ fn rebuild_releases_page() -> NamedJob {
         named::bash("curl -fX POST \"https://cloud.sim.dev/releases/refresh?expect_tag=$TAG_NAME\"")
     }
 
-    fn redeploy_sim_dev() -> Step<Run> {
-        named::bash("./script/redeploy-vercel").add_env(("VERCEL_TOKEN", vars::VERCEL_TOKEN))
+    fn revalidate_sim_dev() -> Step<Run> {
+        named::bash(
+            "curl -fX GET \"https://sim.dev/api/revalidate?tag=releases\" -H \"Authorization: Bearer $SIM_DEV_REVALIDATE_TOKEN\"",
+        )
+        .add_env(("SIM_DEV_REVALIDATE_TOKEN", vars::SIM_DEV_REVALIDATE_TOKEN))
     }
 
     named::job(
@@ -71,8 +74,7 @@ fn rebuild_releases_page() -> NamedJob {
             .runs_on(runners::LINUX_SMALL)
             .with_repository_owner_guard()
             .add_step(refresh_cloud_releases())
-            .add_step(checkout_repo())
-            .add_step(redeploy_sim_dev()),
+            .add_step(revalidate_sim_dev()),
     )
 }
 
@@ -149,9 +151,9 @@ fn publish_winget() -> NamedJob {
 
     fn set_package_name() -> (Step<Run>, StepOutput) {
         let script = r#"if ($env:IS_PRERELEASE -eq "true") {
-    $PACKAGE_NAME = "SimIndustries.Sim.Preview"
+    $PACKAGE_NAME = "Simtropolis.Sim.Preview"
 } else {
-    $PACKAGE_NAME = "SimIndustries.Sim"
+    $PACKAGE_NAME = "Simtropolis.Sim"
 }
 
 echo "PACKAGE_NAME=$PACKAGE_NAME" >> $env:GITHUB_OUTPUT

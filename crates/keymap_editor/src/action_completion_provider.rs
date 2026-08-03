@@ -59,12 +59,12 @@ impl CompletionProvider for ActionCompletionProvider {
             .iter()
             .enumerate()
             .map(|(ix, &name)| {
-                let humanisim = self
+                let humanized = self
                     .humanisim_names
                     .get(name)
                     .cloned()
                     .unwrap_or_else(|| name.into());
-                StringMatchCandidate::new(ix, &humanisim)
+                StringMatchCandidate::new(ix, &humanized)
             })
             .collect();
 
@@ -90,14 +90,14 @@ impl CompletionProvider for ActionCompletionProvider {
                 .take(50)
                 .map(|m| {
                     let action_name = action_names[m.candidate_id];
-                    let humanisim = humanisim_names
+                    let humanized = humanisim_names
                         .get(action_name)
                         .cloned()
                         .unwrap_or_else(|| action_name.into());
 
                     project::Completion {
                         replace_range: replace_range.clone(),
-                        label: language::CodeLabel::plain(humanisim.to_string(), None),
+                        label: language::CodeLabel::plain(humanized.to_string(), None),
                         new_text: action_name.to_string(),
                         documentation: None,
                         source: project::CompletionSource::Custom,

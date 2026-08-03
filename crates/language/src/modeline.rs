@@ -688,7 +688,7 @@ mod tests {
         let result = parse_modeline(&[content], &[]).unwrap();
 
         // The modeline should parse fdm=expr and fde=getline(v:lnum)=~'{'?'>1':'1'
-        // as extra variables since they're not recognisim settings
+        // as extra variables since they're not recognized settings
         assert_eq!(result.vim_extra_variables.len(), 2);
         assert_eq!(
             result.vim_extra_variables[0],

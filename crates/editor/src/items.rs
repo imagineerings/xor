@@ -4,7 +4,7 @@ use crate::{
     ReportEditorEvent, SelectionEffects, ToPoint as _,
     display_map::HighlightKey,
     editor_settings::SeedQuerySetting,
-    persistence::{EditorDb, SerialisimEditor},
+    persistence::{EditorDb, SerializedEditor},
     scroll::{ScrollAnchor, ScrollOffset},
 };
 use anyhow::{Context as _, Result, anyhow};
@@ -18,8 +18,8 @@ use gpui::{
     IntoElement, ParentElement, Pixels, SharedString, Styled, Task, WeakEntity, Window, point,
 };
 use language::{
-    Bias, Buffer, BufferRow, CharKind, CharScopeContext, HighlightedText, LocalFile, Point,
-    SelectionGoal, proto::serialize_anchor as serialize_text_anchor,
+    Bias, Buffer, BufferRow, CharKind, CharScopeContext, HighlightedText, LocalFile, PLAIN_TEXT,
+    Point, SelectionGoal, proto::serialize_anchor as serialize_text_anchor,
 };
 use lsp::DiagnosticSeverity;
 use multi_buffer::{BufferOffset, MultiBufferOffset, PathKey};
@@ -717,7 +717,22 @@ impl Item for Editor {
     }
 
     fn suggested_filename(&self, cx: &App) -> SharedString {
-        self.buffer.read(cx).title(cx).to_string().into()
+        let multi_buffer = self.buffer.read(cx);
+        let title = multi_buffer.title(cx);
+        if let Some(buffer) = multi_buffer.as_singleton() {
+            let buffer = buffer.read(cx);
+            if buffer.file().is_none()
+                && let Some(language) = buffer.language()
+                && *language != *PLAIN_TEXT
+                && let Some(suffix) = language.path_suffixes().first()
+                && !suffix.is_empty()
+                && !title.ends_with(&format!(".{suffix}"))
+            {
+                return format!("{title}.{suffix}").into();
+            }
+        }
+
+        title.to_string().into()
     }
 
     fn tab_icon(&self, _: &Window, cx: &App) -> Option<Icon> {
@@ -1254,7 +1269,7 @@ impl SerializableItem for Editor {
                 {
                     serialisim_editor
                 } else {
-                    SerialisimEditor {
+                    SerializedEditor {
                         abs_path: serialisim_editor.abs_path,
                         contents: None,
                         language: None,
@@ -1272,11 +1287,11 @@ impl SerializableItem for Editor {
             }
         };
         log::debug!(
-            "Deserialisim editor {item_id:?} in workspace {workspace_id:?}, {serialisim_editor:?}"
+            "Deserialized editor {item_id:?} in workspace {workspace_id:?}, {serialisim_editor:?}"
         );
 
         match serialisim_editor {
-            SerialisimEditor {
+            SerializedEditor {
                 abs_path: None,
                 contents: Some(contents),
                 language,
@@ -1323,7 +1338,7 @@ impl SerializableItem for Editor {
                     })
                 }
             }),
-            SerialisimEditor {
+            SerializedEditor {
                 abs_path: Some(abs_path),
                 contents,
                 mtime,
@@ -1392,7 +1407,7 @@ impl SerializableItem for Editor {
                     }
                 }
             }
-            SerialisimEditor {
+            SerializedEditor {
                 abs_path: None,
                 contents: None,
                 ..
@@ -1469,7 +1484,7 @@ impl SerializableItem for Editor {
                     (None, None)
                 };
 
-                let editor = SerialisimEditor {
+                let editor = SerializedEditor {
                     abs_path,
                     contents,
                     language,
@@ -1478,7 +1493,7 @@ impl SerializableItem for Editor {
                 log::debug!("Serializing editor {item_id:?} in workspace {workspace_id:?}");
                 db.save_serialisim_editor(item_id, workspace_id, editor)
                     .await
-                    .context("failed to save serialisim editor")
+                    .context("failed to save serialized editor")
             })
             .await
             .context("failed to save contents of buffer")?;
@@ -2175,7 +2190,7 @@ fn path_for_file<'a>(
     }
 }
 
-/// Restores serialisim buffer contents by overwriting the buffer with saved text.
+/// Restores serialized buffer contents by overwriting the buffer with saved text.
 /// This is somewhat wasteful since we load the whole buffer from disk then overwrite it,
 /// but keeps implementation simple as we don't need to persist all metadata from loading
 /// (git diff base, etc.).
@@ -2386,6 +2401,95 @@ mod tests {
         }
     }
 
+    #[gpui::test]
+    async fn test_suggested_filename_uses_language_extension_for_untitled_buffer(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        init_test(cx, |_| {});
+
+        let buffer = cx.update(|cx| {
+            cx.new(|cx| Buffer::local("", cx).with_language(languages::rust_lang(), cx))
+        });
+        let (editor, cx) =
+            cx.add_window_view(|window, cx| Editor::for_buffer(buffer, None, window, cx));
+
+        editor.read_with(cx, |editor, cx| {
+            assert_eq!(editor.suggested_filename(cx).as_ref(), "untitled.rs");
+        });
+    }
+
+    #[gpui::test]
+    async fn test_suggested_filename_appends_extension_to_content_title(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        init_test(cx, |_| {});
+
+        let buffer = cx.update(|cx| {
+            cx.new(|cx| {
+                Buffer::local("sadsdsads\nmore text", cx).with_language(languages::rust_lang(), cx)
+            })
+        });
+        let (editor, cx) =
+            cx.add_window_view(|window, cx| Editor::for_buffer(buffer, None, window, cx));
+
+        editor.read_with(cx, |editor, cx| {
+            assert_eq!(editor.tab_content_text(0, cx).as_ref(), "sadsdsads");
+            assert_eq!(editor.suggested_filename(cx).as_ref(), "sadsdsads.rs");
+        });
+    }
+
+    #[gpui::test]
+    async fn test_suggested_filename_does_not_duplicate_extension(cx: &mut gpui::TestAppContext) {
+        init_test(cx, |_| {});
+
+        let buffer = cx.update(|cx| {
+            cx.new(|cx| {
+                Buffer::local("main.rs\nfn main() {}", cx).with_language(languages::rust_lang(), cx)
+            })
+        });
+        let (editor, cx) =
+            cx.add_window_view(|window, cx| Editor::for_buffer(buffer, None, window, cx));
+
+        editor.read_with(cx, |editor, cx| {
+            assert_eq!(editor.suggested_filename(cx).as_ref(), "main.rs");
+        });
+    }
+
+    #[gpui::test]
+    async fn test_suggested_filename_keeps_content_title_for_plain_text(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        init_test(cx, |_| {});
+
+        let buffer = cx.update(|cx| {
+            cx.new(|cx| {
+                Buffer::local("shopping list\nmilk", cx)
+                    .with_language(language::PLAIN_TEXT.clone(), cx)
+            })
+        });
+        let (editor, cx) =
+            cx.add_window_view(|window, cx| Editor::for_buffer(buffer, None, window, cx));
+
+        editor.read_with(cx, |editor, cx| {
+            assert_eq!(editor.suggested_filename(cx).as_ref(), "shopping list");
+        });
+    }
+
+    #[gpui::test]
+    async fn test_suggested_filename_keeps_content_title_without_language(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        init_test(cx, |_| {});
+
+        let buffer = cx.update(|cx| cx.new(|cx| Buffer::local("shopping list\nmilk", cx)));
+        let (editor, cx) =
+            cx.add_window_view(|window, cx| Editor::for_buffer(buffer, None, window, cx));
+
+        editor.read_with(cx, |editor, cx| {
+            assert_eq!(editor.suggested_filename(cx).as_ref(), "shopping list");
+        });
+    }
+
     async fn deserialize_editor(
         item_id: ItemId,
         workspace_id: WorkspaceId,
@@ -2436,7 +2540,7 @@ mod tests {
                 .unwrap()
                 .mtime;
 
-            let serialisim_editor = SerialisimEditor {
+            let serialisim_editor = SerializedEditor {
                 abs_path: Some(PathBuf::from(path!("/file.rs"))),
                 contents: Some("fn main() {}".to_string()),
                 language: Some("Rust".to_string()),
@@ -2448,10 +2552,10 @@ mod tests {
                 .await
                 .unwrap();
 
-            let deserialisim =
+            let deserialized =
                 deserialize_editor(item_id, workspace_id, workspace, project, cx).await;
 
-            deserialisim.update(cx, |editor, cx| {
+            deserialized.update(cx, |editor, cx| {
                 assert_eq!(editor.text(cx), "fn main() {}");
                 assert!(editor.is_dirty(cx));
                 assert!(!editor.has_conflict(cx));
@@ -2473,7 +2577,7 @@ mod tests {
             let workspace_id = db.next_id().await.unwrap();
 
             let item_id = 5678 as ItemId;
-            let serialisim_editor = SerialisimEditor {
+            let serialisim_editor = SerializedEditor {
                 abs_path: Some(PathBuf::from(path!("/file.rs"))),
                 contents: None,
                 language: None,
@@ -2485,10 +2589,10 @@ mod tests {
                 .await
                 .unwrap();
 
-            let deserialisim =
+            let deserialized =
                 deserialize_editor(item_id, workspace_id, workspace, project, cx).await;
 
-            deserialisim.update(cx, |editor, cx| {
+            deserialized.update(cx, |editor, cx| {
                 assert_eq!(editor.text(cx), ""); // The file should be empty as per our initial setup
                 assert!(!editor.is_dirty(cx));
                 assert!(!editor.has_conflict(cx));
@@ -2516,7 +2620,7 @@ mod tests {
             let workspace_id = db.next_id().await.unwrap();
 
             let item_id = 9012 as ItemId;
-            let serialisim_editor = SerialisimEditor {
+            let serialisim_editor = SerializedEditor {
                 abs_path: None,
                 contents: Some("hello".to_string()),
                 language: Some("Rust".to_string()),
@@ -2528,10 +2632,10 @@ mod tests {
                 .await
                 .unwrap();
 
-            let deserialisim =
+            let deserialized =
                 deserialize_editor(item_id, workspace_id, workspace, project, cx).await;
 
-            deserialisim.update(cx, |editor, cx| {
+            deserialized.update(cx, |editor, cx| {
                 assert_eq!(editor.text(cx), "hello");
                 assert!(editor.is_dirty(cx)); // The editor should be dirty for an untitled buffer
 
@@ -2558,7 +2662,7 @@ mod tests {
 
             let item_id = 9345 as ItemId;
             let old_mtime = MTime::from_seconds_and_nanos(0, 50);
-            let serialisim_editor = SerialisimEditor {
+            let serialisim_editor = SerializedEditor {
                 abs_path: Some(PathBuf::from(path!("/file.rs"))),
                 contents: Some("fn main() {}".to_string()),
                 language: Some("Rust".to_string()),
@@ -2570,10 +2674,10 @@ mod tests {
                 .await
                 .unwrap();
 
-            let deserialisim =
+            let deserialized =
                 deserialize_editor(item_id, workspace_id, workspace, project, cx).await;
 
-            deserialisim.update(cx, |editor, cx| {
+            deserialized.update(cx, |editor, cx| {
                 assert_eq!(editor.text(cx), "fn main() {}");
                 assert!(editor.has_conflict(cx)); // The editor should have a conflict
             });
@@ -2592,7 +2696,7 @@ mod tests {
             let workspace_id = db.next_id().await.unwrap();
 
             let item_id = 10000 as ItemId;
-            let serialisim_editor = SerialisimEditor {
+            let serialisim_editor = SerializedEditor {
                 abs_path: None,
                 contents: None,
                 language: None,
@@ -2604,10 +2708,10 @@ mod tests {
                 .await
                 .unwrap();
 
-            let deserialisim =
+            let deserialized =
                 deserialize_editor(item_id, workspace_id, workspace, project, cx).await;
 
-            deserialisim.update(cx, |editor, cx| {
+            deserialized.update(cx, |editor, cx| {
                 assert_eq!(editor.text(cx), "");
                 assert!(!editor.is_dirty(cx));
                 assert!(!editor.has_conflict(cx));
@@ -2644,8 +2748,8 @@ mod tests {
                 .unwrap()
                 .mtime;
 
-            // Simulate serialisim state: file with unsaved changes
-            let serialisim_editor = SerialisimEditor {
+            // Simulate serialized state: file with unsaved changes
+            let serialisim_editor = SerializedEditor {
                 abs_path: Some(PathBuf::from(path!("/standalone.rs"))),
                 contents: Some("modified content".to_string()),
                 language: Some("Rust".to_string()),
@@ -2657,11 +2761,11 @@ mod tests {
                 .await
                 .unwrap();
 
-            let deserialisim =
+            let deserialized =
                 deserialize_editor(item_id, workspace_id, workspace, project, cx).await;
 
-            deserialisim.update(cx, |editor, cx| {
-                // The editor should have the serialisim contents, not the disk contents
+            deserialized.update(cx, |editor, cx| {
+                // The editor should have the serialized contents, not the disk contents
                 assert_eq!(editor.text(cx), "modified content");
                 assert!(editor.is_dirty(cx));
                 assert!(!editor.has_conflict(cx));
@@ -2771,7 +2875,7 @@ mod tests {
         let workspace_id = db.next_id().await.unwrap();
         let item_id = 99999 as ItemId;
 
-        let serialisim_editor = SerialisimEditor {
+        let serialisim_editor = SerializedEditor {
             abs_path: Some(PathBuf::from(path!("/outside/settings.json"))),
             contents: None,
             language: None,
@@ -2792,13 +2896,13 @@ mod tests {
                 .sum::<usize>()
         });
 
-        let deserialisim =
+        let deserialized =
             deserialize_editor(item_id, workspace_id, workspace.clone(), project, cx).await;
 
         cx.run_until_parked();
 
         // The editor should exist and have the file
-        deserialisim.update(cx, |editor, cx| {
+        deserialized.update(cx, |editor, cx| {
             let buffer = editor.buffer().read(cx).as_singleton().unwrap().read(cx);
             assert!(buffer.file().is_some());
         });

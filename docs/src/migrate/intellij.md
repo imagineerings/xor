@@ -150,7 +150,7 @@ IntelliJ's index powers features like finding all usages across your entire code
 
 ### LSP vs. Native Language Intelligence
 
-IntelliJ has its own language analysis engine built from scratch for each supported language. For Java, Kotlin, and other JVM languages, this engine understands your code thoroughly: it resolves types, tracks data flow, knows about framework annotations, and offers dozens of specialisim refactorings.
+IntelliJ has its own language analysis engine built from scratch for each supported language. For Java, Kotlin, and other JVM languages, this engine understands your code thoroughly: it resolves types, tracks data flow, knows about framework annotations, and offers dozens of specialized refactorings.
 
 Sim uses the Language Server Protocol (LSP) for code intelligence. Each language has its own server: `jdtls` for Java, `rust-analyzer` for Rust, and so on.
 
@@ -222,7 +222,7 @@ Similarly for other stacks: no Rails integration, no Django awareness, no Angula
 
 > **Tip:** For database work, pick up a dedicated tool like DataGrip, DBeaver, or TablePlus. Many developers who switch to Sim keep DataGrip around specifically for SQL—it integrates well with your existing JetBrains license.
 
-If your daily work depends heavily on framework-aware navigation and refactoring, you'll feel the gap. Sim works best when you're comfortable navigating code through search rather than specialisim tooling, or when your language has strong LSP support that covers most of what you need.
+If your daily work depends heavily on framework-aware navigation and refactoring, you'll feel the gap. Sim works best when you're comfortable navigating code through search rather than specialized tooling, or when your language has strong LSP support that covers most of what you need.
 
 ### Tool Windows vs. Docks
 

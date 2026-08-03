@@ -16,6 +16,7 @@ const DEFAULT_SETTINGS = {
   workflow_path: "WORKFLOW.md",
   tasks_glob: ".agents/specs/**/tasks.md",
   workflow_state_path: ".agents/workflow-state.json",
+  workflow_journal_path: ".agents/workflow-operations.json",
   linear_endpoint: DEFAULT_LINEAR_ENDPOINT,
   linear_api_key: "$LINEAR_API_KEY",
   linear_team_id: "",
@@ -27,6 +28,7 @@ const DEFAULT_SETTINGS = {
   active_states: ["Todo", "In Progress"],
   terminal_states: ["Done", "Closed", "Cancelled", "Canceled", "Duplicate"],
   resume_existing: true,
+  claim_lease_minutes: 120,
 };
 
 function parseSettings() {
@@ -64,8 +66,10 @@ function workflowSettings(settings) {
     if (Array.isArray(tracker.active_states)) mapped.active_states = tracker.active_states;
     if (Array.isArray(tracker.terminal_states)) mapped.terminal_states = tracker.terminal_states;
     if (typeof tracker.resume_existing === "boolean") mapped.resume_existing = tracker.resume_existing;
+    if (Number.isInteger(tracker.claim_lease_minutes)) mapped.claim_lease_minutes = tracker.claim_lease_minutes;
     if (tasks.glob) mapped.tasks_glob = tasks.glob;
     if (workflow.config.workflow_state?.path) mapped.workflow_state_path = workflow.config.workflow_state.path;
+    if (workflow.config.workflow_journal?.path) mapped.workflow_journal_path = workflow.config.workflow_journal.path;
 
     return mapped;
   } catch (_error) {
@@ -79,6 +83,15 @@ function repositoryRoot(settings) {
     return path.resolve(os.homedir(), configured.slice(1));
   }
   return path.resolve(configured);
+}
+
+function defaultWorkflowOwner() {
+  return (
+    process.env.WORKFLOW_OWNER ||
+    process.env.CODEX_THREAD_ID ||
+    process.env.GITHUB_ACTOR ||
+    `${process.env.USER || "codex"}@${os.hostname()}`
+  );
 }
 
 function workflowPath(settings, override) {
@@ -241,6 +254,9 @@ function parseYamlScalar(value) {
 }
 
 function parseCliArgs(argv) {
+  if (argv.length === 0 || argv.includes("--help") || argv.includes("-h")) {
+    return { command: "help", positional: [], args: {} };
+  }
   const args = {};
   const positional = [];
   for (let index = 0; index < argv.length; index += 1) {
@@ -258,7 +274,7 @@ function parseCliArgs(argv) {
     args[key] = parseCliValue(next);
     index += 1;
   }
-  return { command: positional[0] || "next", positional: positional.slice(1), args };
+  return { command: positional[0] || "help", positional: positional.slice(1), args };
 }
 
 function parseCliValue(value) {
@@ -269,10 +285,73 @@ function parseCliValue(value) {
   return value;
 }
 
+function validateCliOptions(command, args) {
+  const allowed = new Set([
+    "active_only", "all", "allow_remote", "attempt", "count", "data", "dry_run", "file", "force", "host", "issue", "issue_id",
+    "json", "lease_id", "lease_minutes", "limit", "no_open", "online", "open", "override_merge", "override_reason",
+    "override_validation", "owner", "phase", "port", "print", "source", "state", "state_id", "state_name",
+    "static", "status", "strict", "summary", "takeover", "task", "task_id", "ttl_ms", "ui_path",
+    "validation_evidence", "verbose", "workflow_path",
+  ]);
+  const unknown = Object.keys(args).filter((key) => !allowed.has(key));
+  if (unknown.length > 0) throw new Error(`Unknown option(s): ${unknown.map((key) => `--${key.replace(/_/g, "-")}`).join(", ")}`);
+  if (args.force && command !== "init") throw new Error("--force is supported only by workflow init; use narrowly scoped override flags elsewhere.");
+  for (const field of ["count", "limit", "lease_minutes"]) {
+    if (args[field] != null && (!Number.isInteger(args[field]) || args[field] <= 0)) {
+      throw new Error(`--${field.replace(/_/g, "-")} must be a positive integer.`);
+    }
+  }
+}
+
 function validateWorkflowContract(workflow) {
+  const allowedConfigKeys = new Set(["tracker", "tasks", "workflow_state", "workflow_journal"]);
+  const unknownConfigKeys = Object.keys(workflow.config).filter((key) => !allowedConfigKeys.has(key));
+  if (unknownConfigKeys.length > 0) {
+    throw new Error(`workflow_validation_error: unknown top-level field(s): ${unknownConfigKeys.join(", ")}`);
+  }
   const tracker = workflow.config.tracker || {};
+  const allowedTrackerKeys = new Set([
+    "kind", "endpoint", "api_key", "team_id", "team_key", "project_id", "project_slug", "state_id",
+    "label_ids", "active_states", "terminal_states", "resume_existing", "claim_lease_minutes",
+  ]);
+  const unknownTrackerKeys = Object.keys(tracker).filter((key) => !allowedTrackerKeys.has(key));
+  if (unknownTrackerKeys.length > 0) {
+    throw new Error(`workflow_validation_error: unknown tracker field(s): ${unknownTrackerKeys.join(", ")}`);
+  }
   if (tracker.kind && tracker.kind !== "linear") {
     throw new Error(`workflow_validation_error: tracker.kind must be linear, got ${tracker.kind}`);
+  }
+  if (tracker.api_key && (typeof tracker.api_key !== "string" || !/^\$[A-Za-z_][A-Za-z0-9_]*$/.test(tracker.api_key))) {
+    throw new Error("workflow_validation_error: tracker.api_key must be an environment reference such as $LINEAR_API_KEY");
+  }
+  if (tracker.claim_lease_minutes != null && (!Number.isInteger(tracker.claim_lease_minutes) || tracker.claim_lease_minutes <= 0)) {
+    throw new Error("workflow_validation_error: tracker.claim_lease_minutes must be a positive integer");
+  }
+  for (const field of ["active_states", "terminal_states", "label_ids"]) {
+    if (tracker[field] != null && !Array.isArray(tracker[field])) {
+      throw new Error(`workflow_validation_error: tracker.${field} must be a list`);
+    }
+  }
+  const tasks = workflow.config.tasks || {};
+  const unknownTaskKeys = Object.keys(tasks).filter((key) => key !== "glob");
+  if (unknownTaskKeys.length > 0) {
+    throw new Error(`workflow_validation_error: unknown tasks field(s): ${unknownTaskKeys.join(", ")}`);
+  }
+  if (tasks.glob != null && typeof tasks.glob !== "string") {
+    throw new Error("workflow_validation_error: tasks.glob must be a string");
+  }
+  for (const section of ["workflow_state", "workflow_journal"]) {
+    const config = workflow.config[section] || {};
+    const unknownKeys = Object.keys(config).filter((key) => key !== "path");
+    if (unknownKeys.length > 0) {
+      throw new Error(`workflow_validation_error: unknown ${section} field(s): ${unknownKeys.join(", ")}`);
+    }
+    if (config.path != null && typeof config.path !== "string") {
+      throw new Error(`workflow_validation_error: ${section}.path must be a string`);
+    }
+  }
+  if (!workflow.prompt_template?.trim()) {
+    throw new Error("workflow_validation_error: prompt template must not be empty");
   }
 
   const template = workflow.prompt_template || "";
@@ -284,10 +363,14 @@ function validateWorkflowContract(workflow) {
 
   const allowedIssueFields = new Set([
     "id",
+    "explicit_id",
+    "aliases",
     "identifier",
     "title",
     "description",
     "priority",
+    "value",
+    "wave",
     "state",
     "branch_name",
     "url",
@@ -300,7 +383,11 @@ function validateWorkflowContract(workflow) {
     "task_body",
     "requirements",
     "writes",
+    "reads",
+    "validation",
+    "validation_evidence",
     "linear",
+    "activity",
   ]);
 
   const matches = template.matchAll(/\{\{\s*([^}]+?)\s*\}\}/g);
@@ -320,6 +407,17 @@ function validateWorkflowContract(workflow) {
   return workflow;
 }
 
+function publicWorkflow(workflow) {
+  const tracker = { ...(workflow.config.tracker || {}) };
+  if (tracker.api_key) {
+    tracker.api_key = typeof tracker.api_key === "string" && tracker.api_key.startsWith("$") ? tracker.api_key : "<redacted>";
+  }
+  return {
+    ...workflow,
+    config: { ...workflow.config, tracker },
+  };
+}
+
 function listTasks(settings) {
   const root = repositoryRoot(settings);
   return findTaskFiles(root, settings.tasks_glob || DEFAULT_SETTINGS.tasks_glob)
@@ -332,24 +430,47 @@ function listTasks(settings) {
 
 function findTaskFiles(root, glob) {
   const normalized = glob.replace(/\\/g, "/");
-  if (!normalized.includes("*")) {
+  if (!/[?*]/.test(normalized)) {
     const filePath = path.resolve(root, normalized);
     return fs.existsSync(filePath) ? [filePath] : [];
   }
 
-  const [prefix, suffixWithGlob] = normalized.split("**");
-  const baseDir = path.resolve(root, prefix || ".");
-  const suffix = suffixWithGlob.replace(/^\//, "").replace(/\*/g, "");
+  const wildcardIndex = normalized.search(/[?*]/);
+  const prefixEnd = normalized.lastIndexOf("/", wildcardIndex);
+  const basePrefix = prefixEnd >= 0 ? normalized.slice(0, prefixEnd) : ".";
+  const baseDir = path.resolve(root, basePrefix);
   if (!fs.existsSync(baseDir)) return [];
 
   const files = [];
+  const matcher = globToRegExp(normalized);
   walkFiles(baseDir, (filePath) => {
-    const relative = path.relative(baseDir, filePath).replace(/\\/g, "/");
-    if (!suffix || relative.endsWith(suffix)) {
-      files.push(filePath);
-    }
+    const relative = path.relative(root, filePath).replace(/\\/g, "/");
+    if (matcher.test(relative)) files.push(filePath);
   });
   return files;
+}
+
+function globToRegExp(glob) {
+  let pattern = "^";
+  for (let index = 0; index < glob.length; index += 1) {
+    const character = glob[index];
+    if (character === "*" && glob[index + 1] === "*") {
+      if (glob[index + 2] === "/") {
+        pattern += "(?:.*/)?";
+        index += 2;
+      } else {
+        pattern += ".*";
+        index += 1;
+      }
+    } else if (character === "*") {
+      pattern += "[^/]*";
+    } else if (character === "?") {
+      pattern += "[^/]";
+    } else {
+      pattern += character.replace(/[|\\{}()[\]^$+?.]/g, "\\$&");
+    }
+  }
+  return new RegExp(`${pattern}$`);
 }
 
 function walkFiles(directory, visit) {
@@ -372,23 +493,36 @@ function parseTaskFile(filePath, root) {
 
   function finishCurrent() {
     if (!current) return;
-    const requirements = extractMetadata(current.bodyLines, "_Requirements:");
-    const writes = extractMetadata(current.bodyLines, "_writes:");
+    const requirements = splitMetadataValues(extractMetadata(current.bodyLines, "_Requirements:"));
+    const writes = splitMetadataValues(extractMetadata(current.bodyLines, "_writes:"));
+    const reads = splitMetadataValues(extractMetadata(current.bodyLines, "_reads:"));
+    const validations = extractMetadata(current.bodyLines, "_validation:");
+    const validationEvidence = extractMetadata(current.bodyLines, "_validation_evidence:");
+    const explicitId = extractSingleMetadata(current.bodyLines, "_id:");
+    const explicitPriority = extractSingleMetadata(current.bodyLines, "_priority:");
+    const blockedBy = splitMetadataValues(extractMetadata(current.bodyLines, "_blocked_by:"));
+    const waveValue = extractSingleMetadata(current.bodyLines, "_wave:");
+    const value = extractSingleMetadata(current.bodyLines, "_value:");
     const description = current.bodyLines.join("\n").trim();
     const taskBody = [current.originalLine, ...current.bodyLines].join("\n").trim();
-    const id = stableTaskId(relativePath, current.line, current.title);
+    const id = stableTaskId(relativePath, current.sequence, current.title, explicitId);
+    const legacyId = legacyTaskId(relativePath, current.line, current.title);
 
     tasks.push({
       id,
+      explicit_id: Boolean(explicitId),
+      aliases: legacyId === id ? [] : [legacyId],
       identifier: `${relativePath}:${current.line}`,
       title: current.title,
       description,
-      priority: extractPriority(current.title),
+      priority: normalizePriority(explicitPriority) || extractPriority(current.title),
+      value: normalizeValue(value),
+      wave: parseOptionalInteger(waveValue),
       state: markerState(current.marker),
       branch_name: null,
       url: null,
       labels: taskLabels(relativePath),
-      blocked_by: [],
+      blocked_by: blockedBy,
       created_at: null,
       updated_at: null,
       task_file: relativePath,
@@ -396,7 +530,11 @@ function parseTaskFile(filePath, root) {
       task_body: taskBody,
       requirements,
       writes,
+      reads,
+      validation: validations,
+      validation_evidence: validationEvidence,
       linear: emptyLinearIssue(),
+      activity: { owner: null, expires_at: null, lease_id: null, status: null },
     });
     current = null;
   }
@@ -406,10 +544,13 @@ function parseTaskFile(filePath, root) {
     const match = line.match(/^- \[([ xX~-])\]\s+(.+)$/);
     if (match) {
       finishCurrent();
-      const title = match[2].trim().replace(/^\d+[\.)]\s*/, "");
+      const rawTitle = match[2].trim();
+      const sequenceMatch = rawTitle.match(/^(\d+(?:\.\d+)*)[\.)]\s*/);
+      const title = rawTitle.replace(/^\d+(?:\.\d+)*[\.)]\s*/, "");
       current = {
         marker: match[1],
         title,
+        sequence: sequenceMatch?.[1] || null,
         originalLine: line,
         line: index + 1,
         bodyLines: [],
@@ -432,15 +573,43 @@ function parseTaskFile(filePath, root) {
 
 function extractMetadata(lines, prefix) {
   const values = [];
-  const normalizedPrefix = prefix.toLowerCase();
+  const normalizedPrefix = prefix.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`^\\s*-\\s+${normalizedPrefix}`, "i");
   for (const line of lines) {
+    if (!pattern.test(line)) continue;
     const trimmed = line.trim();
-    const start = trimmed.toLowerCase().indexOf(normalizedPrefix);
-    if (start === -1) continue;
+    const start = trimmed.toLowerCase().indexOf(prefix.toLowerCase());
     const afterPrefix = trimmed.slice(start + prefix.length).trim();
     values.push(afterPrefix.replace(/^_+|_+$/g, "").trim());
   }
   return values;
+}
+
+function extractSingleMetadata(lines, prefix) {
+  return extractMetadata(lines, prefix)[0] || null;
+}
+
+function splitMetadataValues(values) {
+  return values
+    .flatMap((value) => value.split(","))
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+function parseOptionalInteger(value) {
+  if (value == null || value === "") return null;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizePriority(value) {
+  const normalized = String(value || "").trim().toUpperCase();
+  return /^P[0-4]$/.test(normalized) ? normalized : null;
+}
+
+function normalizeValue(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return ["high", "medium", "low"].includes(normalized) ? normalized : null;
 }
 
 function extractPriority(title) {
@@ -455,7 +624,21 @@ function markerState(marker) {
   return "Todo";
 }
 
-function stableTaskId(relativePath, line, title) {
+function stableTaskId(relativePath, sequence, title, explicitId) {
+  if (explicitId) {
+    const normalized = explicitId
+      .toLowerCase()
+      .replace(/[^a-z0-9._-]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    if (!normalized) throw new Error(`Invalid empty workflow task ID in ${relativePath}: ${title}`);
+    return `task:${normalized}`;
+  }
+  const semanticKey = sequence ? `${relativePath}:sequence:${sequence}` : `${relativePath}:title:${title}`;
+  const digest = crypto.createHash("sha1").update(semanticKey).digest("hex").slice(0, 12);
+  return `task:${digest}`;
+}
+
+function legacyTaskId(relativePath, line, title) {
   const digest = crypto.createHash("sha1").update(`${relativePath}:${line}:${title}`).digest("hex").slice(0, 12);
   return `task:${digest}`;
 }
@@ -486,8 +669,10 @@ function loadWorkflowState(settings, options = {}) {
       path: relativePath,
       exists: false,
       recommendation: null,
+      task_activity: [],
       task_notes: [],
       dependency_notes: [],
+      ranked_candidates: [],
     };
   }
 
@@ -500,8 +685,10 @@ function loadWorkflowState(settings, options = {}) {
       exists: true,
       error: `workflow_state_parse_error: ${error.message}`,
       recommendation: null,
+      task_activity: [],
       task_notes: [],
       dependency_notes: [],
+      ranked_candidates: [],
     };
   }
 
@@ -540,6 +727,8 @@ function normalizeTaskActivity(activity) {
     status,
     owner: activity.owner || null,
     summary: activity.summary || null,
+    lease_id: activity.lease_id || null,
+    expires_at: activity.expires_at || null,
     updated_at: activity.updated_at || null,
   };
 }
@@ -554,8 +743,79 @@ function saveWorkflowState(settings, state) {
   const filePath = workflowStatePath(settings);
   const { path: _path, exists: _exists, error: _error, ...serializable } = state;
   serializable.updated_at = new Date().toISOString();
+  atomicWriteJson(filePath, serializable);
+}
+
+function atomicWriteJson(filePath, value) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, `${JSON.stringify(serializable, null, 2)}\n`, "utf8");
+  const temporaryPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(temporaryPath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+  fs.renameSync(temporaryPath, filePath);
+}
+
+function withFileLock(filePath, callback) {
+  const lockPath = `${filePath}.lock`;
+  const startedAt = Date.now();
+  let descriptor = null;
+  while (descriptor === null) {
+    try {
+      fs.mkdirSync(path.dirname(lockPath), { recursive: true });
+      descriptor = fs.openSync(lockPath, "wx");
+      fs.writeFileSync(descriptor, `${process.pid}\n`, "utf8");
+    } catch (error) {
+      if (error.code !== "EEXIST") throw error;
+      try {
+        if (Date.now() - fs.statSync(lockPath).mtimeMs > 30_000) fs.unlinkSync(lockPath);
+      } catch (statError) {
+        if (statError.code !== "ENOENT") throw statError;
+      }
+      if (Date.now() - startedAt > 5_000) throw new Error(`workflow_lock_timeout: ${lockPath}`);
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25);
+    }
+  }
+  try {
+    return callback();
+  } finally {
+    fs.closeSync(descriptor);
+    try {
+      fs.unlinkSync(lockPath);
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+  }
+}
+
+function workflowJournalPath(settings) {
+  const configured = settings.workflow_journal_path || DEFAULT_SETTINGS.workflow_journal_path;
+  return path.isAbsolute(configured) ? configured : path.resolve(repositoryRoot(settings), configured);
+}
+
+function loadWorkflowJournal(settings) {
+  const filePath = workflowJournalPath(settings);
+  if (!fs.existsSync(filePath)) return { version: 1, operations: [] };
+  try {
+    const value = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    return { version: 1, operations: Array.isArray(value.operations) ? value.operations : [] };
+  } catch (error) {
+    throw new Error(`workflow_journal_parse_error: ${error.message}`);
+  }
+}
+
+function updateWorkflowOperation(settings, operationId, patch) {
+  const filePath = workflowJournalPath(settings);
+  return withFileLock(filePath, () => {
+    const journal = loadWorkflowJournal(settings);
+    const index = journal.operations.findIndex((operation) => operation.id === operationId);
+    const now = new Date().toISOString();
+    if (index === -1) {
+      journal.operations.push({ id: operationId, created_at: now, updated_at: now, ...patch });
+    } else {
+      journal.operations[index] = { ...journal.operations[index], ...patch, updated_at: now };
+    }
+    journal.operations = journal.operations.slice(-100);
+    atomicWriteJson(filePath, journal);
+    return journal.operations.find((operation) => operation.id === operationId);
+  });
 }
 
 function findTaskActivity(state, task, issue = null) {
@@ -575,42 +835,64 @@ function upsertTaskActivity(settings, task, issue, status, options = {}) {
     throw new Error(`Unsupported task activity status: ${status}`);
   }
 
-  const state = loadWorkflowState(settings);
-  if (state.error) {
-    throw new Error(state.error);
-  }
-
-  const existingIndex = (state.task_activity || []).findIndex((activity) => {
-    return (
-      (activity.task_id && activity.task_id === task.id) ||
-      (activity.task_identifier && activity.task_identifier === task.identifier) ||
-      (issue?.identifier && activity.linear_identifier === issue.identifier)
-    );
+  return withFileLock(workflowStatePath(settings), () => {
+    const state = loadWorkflowState(settings);
+    if (state.error) throw new Error(state.error);
+    const existingIndex = (state.task_activity || []).findIndex((activity) => {
+      return (
+        (activity.task_id && activity.task_id === task.id) ||
+        (activity.task_identifier && activity.task_identifier === task.identifier) ||
+        (issue?.identifier && activity.linear_identifier === issue.identifier)
+      );
+    });
+    const existing = existingIndex >= 0 ? state.task_activity[existingIndex] : null;
+    const record = buildTaskActivity(settings, task, issue, normalizedStatus, options, existing);
+    if (existingIndex >= 0) state.task_activity[existingIndex] = record;
+    else state.task_activity = [...(state.task_activity || []), record];
+    saveWorkflowState(settings, state);
+    return record;
   });
+}
 
-  const record = {
+function buildTaskActivity(settings, task, issue, normalizedStatus, options = {}, existing = null) {
+  const now = new Date().toISOString();
+  return {
     task_id: task.id,
     task_identifier: task.identifier,
     title: task.title,
     linear_identifier: issue?.identifier || task.linear?.identifier || null,
     linear_url: issue?.url || task.linear?.url || null,
     status: normalizedStatus,
-    owner: options.owner || null,
-    summary: options.summary || null,
-    updated_at: new Date().toISOString(),
+    owner: options.owner ?? existing?.owner ?? null,
+    summary: options.summary ?? existing?.summary ?? null,
+    lease_id:
+      normalizedStatus === "active"
+        ? options.lease_id || (options.new_lease ? null : existing?.lease_id) || crypto.randomUUID()
+        : options.lease_id || null,
+    expires_at:
+      normalizedStatus === "active"
+        ? options.expires_at || new Date(Date.now() + Math.max(1, options.lease_minutes || settings.claim_lease_minutes || 120) * 60_000).toISOString()
+        : null,
+    updated_at: options.updated_at || now,
   };
+}
 
-  if (existingIndex >= 0) {
-    state.task_activity[existingIndex] = {
-      ...state.task_activity[existingIndex],
-      ...record,
-    };
-  } else {
-    state.task_activity = [...(state.task_activity || []), record];
-  }
-
-  saveWorkflowState(settings, state);
-  return record;
+function saveTaskActivity(settings, record) {
+  return withFileLock(workflowStatePath(settings), () => {
+    const state = loadWorkflowState(settings);
+    if (state.error) throw new Error(state.error);
+    const existingIndex = (state.task_activity || []).findIndex((activity) => {
+      return (
+        (activity.task_id && activity.task_id === record.task_id) ||
+        (activity.task_identifier && activity.task_identifier === record.task_identifier) ||
+        (record.linear_identifier && activity.linear_identifier === record.linear_identifier)
+      );
+    });
+    if (existingIndex >= 0) state.task_activity[existingIndex] = record;
+    else state.task_activity = [...(state.task_activity || []), record];
+    saveWorkflowState(settings, state);
+    return record;
+  });
 }
 
 function claimedTaskStatus(settings, task, issue) {
@@ -619,8 +901,8 @@ function claimedTaskStatus(settings, task, issue) {
     return {
       activity: linearActivity,
       source: "linear",
-      is_active: linearActivity.status === "active",
-      is_inactive: linearActivity.status === "inactive",
+      is_active: isActivityActive(linearActivity),
+      is_inactive: !isActivityActive(linearActivity),
     };
   }
 
@@ -629,9 +911,16 @@ function claimedTaskStatus(settings, task, issue) {
   return {
     activity,
     source: activity ? "workflow_state" : "missing",
-    is_active: activity?.status === "active",
-    is_inactive: activity?.status === "inactive" || !activity,
+    is_active: isActivityActive(activity),
+    is_inactive: !isActivityActive(activity),
   };
+}
+
+function isActivityActive(activity) {
+  if (!activity || activity.status !== "active") return false;
+  if (!activity.expires_at) return true;
+  const expiresAt = Date.parse(activity.expires_at);
+  return Number.isFinite(expiresAt) && expiresAt > Date.now();
 }
 
 function parseLinearWorkflowActivity(description) {
@@ -645,6 +934,8 @@ function parseLinearWorkflowActivity(description) {
     if (key === "workflow.activity") values.status = normalizeActivityStatus(value);
     if (key === "workflow.activity_owner") values.owner = value || null;
     if (key === "workflow.activity_summary") values.summary = value || null;
+    if (key === "workflow.activity_lease_id") values.lease_id = value || null;
+    if (key === "workflow.activity_expires_at") values.expires_at = value || null;
     if (key === "workflow.activity_updated_at") values.updated_at = value || null;
   }
   if (!values.status) return null;
@@ -657,6 +948,8 @@ function parseLinearWorkflowActivity(description) {
     status: values.status,
     owner: values.owner || null,
     summary: values.summary || null,
+    lease_id: values.lease_id || null,
+    expires_at: values.expires_at || null,
     updated_at: values.updated_at || null,
   };
 }
@@ -671,6 +964,8 @@ function syncTaskActivityRecord(task, issue, activity) {
     status: activity.status,
     owner: activity.owner || null,
     summary: activity.summary || null,
+    lease_id: activity.lease_id || null,
+    expires_at: activity.expires_at || null,
     updated_at: activity.updated_at || new Date().toISOString(),
   };
 }
@@ -732,6 +1027,7 @@ function summarizeWorkflowState(state, tasks) {
       : null,
     relevant_task_notes: relevantTaskNotes,
     dependency_notes: state.dependency_notes.slice(0, 12),
+    ranked_candidates: state.ranked_candidates.slice(0, 15),
   };
 }
 
@@ -745,12 +1041,139 @@ function findRecommendedTask(tasks, recommendation) {
 
 function findTask(settings, taskId) {
   const task = listTasks(settings).find((candidate) => {
-    return candidate.id === taskId || candidate.identifier === taskId;
+    return candidate.id === taskId || candidate.identifier === taskId || candidate.aliases?.includes(taskId);
   });
   if (!task) {
     throw new Error(`Local task not found: ${taskId}`);
   }
   return task;
+}
+
+function checkTaskConsistency(settings, task, phase = "start", options = {}) {
+  const root = repositoryRoot(settings);
+  const specDirectory = path.dirname(path.resolve(root, task.task_file));
+  const requirementsPath = path.join(specDirectory, "requirements.md");
+  const designPath = path.join(specDirectory, "design.md");
+  const allTasks = listTasks(settings);
+  const errors = [];
+  const warnings = [];
+  const checks = [];
+
+  function record(name, passed, detail, severity = "error") {
+    checks.push({ name, passed, detail, severity });
+    if (!passed) (severity === "warning" ? warnings : errors).push(detail);
+  }
+
+  record(
+    "requirements_file",
+    fs.existsSync(requirementsPath),
+    fs.existsSync(requirementsPath) ? path.relative(root, requirementsPath) : `Missing ${path.relative(root, requirementsPath)}`,
+  );
+  record(
+    "design_file",
+    fs.existsSync(designPath),
+    fs.existsSync(designPath) ? path.relative(root, designPath) : `Missing ${path.relative(root, designPath)}`,
+  );
+  record(
+    "writes_manifest",
+    task.writes.length > 0,
+    task.writes.length > 0 ? `${task.writes.length} declared write path(s)` : `Task ${task.id} has no _writes metadata.`,
+    "warning",
+  );
+
+  const duplicateIds = allTasks.filter((candidate) => candidate.id === task.id);
+  record(
+    "durable_id_unique",
+    duplicateIds.length === 1,
+    duplicateIds.length === 1 ? `Task ID ${task.id} is unique.` : `Task ID ${task.id} is not unique.`,
+  );
+
+  const blockers = task.blocked_by.filter((dependency) => {
+    const match = findTaskByAnyId(allTasks, dependency);
+    return !match || match.state !== "Done";
+  });
+  record("dependencies", blockers.length === 0, blockers.length === 0 ? "All dependencies are complete." : `Unmet dependencies: ${blockers.join(", ")}`);
+
+  if (fs.existsSync(requirementsPath) && task.requirements.length > 0) {
+    const requirementsText = fs.readFileSync(requirementsPath, "utf8");
+    const requirementReferences = parseRequirementReferences(requirementsText);
+    const missingRequirements = task.requirements.filter(
+      (requirement) => !requirementReferences.has(String(requirement).trim()),
+    );
+    record(
+      "requirement_references",
+      missingRequirements.length === 0,
+      missingRequirements.length === 0 ? "All requirement references resolve." : `Unknown requirement references: ${missingRequirements.join(", ")}`,
+    );
+  }
+
+  const state = loadWorkflowState(settings);
+  if (!state.error) {
+    const activeConflicts = (state.task_activity || [])
+      .filter((activity) => isActivityActive(activity))
+      .map((activity) => findTaskByAnyId(allTasks, activity.task_id || activity.task_identifier))
+      .filter((candidate) => candidate && candidate.id !== task.id && tasksConflict(task, candidate));
+    record(
+      "active_write_conflicts",
+      activeConflicts.length === 0,
+      activeConflicts.length === 0 ? "No active write conflicts." : `Active write conflicts: ${activeConflicts.map((candidate) => candidate.id).join(", ")}`,
+    );
+  } else {
+    record("workflow_state", false, state.error, "warning");
+  }
+
+  if (phase === "complete") {
+    const validationEvidence = options.validation_evidence || options.evidence || null;
+    record(
+      "validation_evidence",
+      Boolean(validationEvidence),
+      validationEvidence || "Completion requires --validation-evidence <summary>; _validation is only the expected plan.",
+    );
+    record(
+      "implementation_state",
+      task.state !== "Done",
+      task.state !== "Done" ? `Task ${task.id} is not yet complete.` : `Task ${task.id} is already complete.`,
+      "warning",
+    );
+  }
+
+  return {
+    action: "checked",
+    phase,
+    task,
+    passed: errors.length === 0,
+    errors,
+    warnings,
+    checks,
+  };
+}
+
+function parseRequirementReferences(text) {
+  const references = new Set();
+  let currentRequirement = null;
+  let inAcceptanceCriteria = false;
+  for (const line of String(text || "").split(/\r?\n/)) {
+    const requirement = line.match(/^#{1,6}\s+Requirement\s+([A-Za-z0-9_-]+)(?:\s*:|\s|$)/i);
+    if (requirement) {
+      currentRequirement = requirement[1];
+      inAcceptanceCriteria = false;
+      references.add(currentRequirement);
+      continue;
+    }
+    if (/^#{1,6}\s+Acceptance Criteria\s*$/i.test(line)) {
+      inAcceptanceCriteria = true;
+      continue;
+    }
+    if (/^#{1,6}\s+/.test(line)) {
+      inAcceptanceCriteria = false;
+      continue;
+    }
+    if (currentRequirement && inAcceptanceCriteria) {
+      const criterion = line.match(/^\s*(\d+)[.)]\s+/);
+      if (criterion) references.add(`${currentRequirement}.${criterion[1]}`);
+    }
+  }
+  return references;
 }
 
 function emptyLinearIssue() {
@@ -773,7 +1196,8 @@ function renderTemplate(template, issue, attempt) {
     if (value === undefined) {
       throw new Error(`template_render_error: unknown variable ${expression.trim()}`);
     }
-    if (value === null) return "";
+    if (value === null) return "Not set";
+    if (Array.isArray(value)) return value.length > 0 ? value.join(", ") : "None";
     if (typeof value === "object") return JSON.stringify(value, null, 2);
     return String(value);
   });
@@ -803,11 +1227,11 @@ function resolveTemplateValue(expression, scope) {
   return value;
 }
 
-async function populateLinear(settings, task, preliminaryPrompt) {
+async function populateLinear(settings, task, preliminaryPrompt, activity) {
   validateLinearSettings(settings);
   const teamId = await resolveLinearTeamId(settings);
   const projectId = await resolveLinearProjectId(settings);
-  const description = linearIssueDescription(task, preliminaryPrompt);
+  const description = linearIssueDescription(settings, task, preliminaryPrompt, activity);
   const input = {
     teamId,
     title: task.title,
@@ -911,14 +1335,14 @@ async function linear(settings, query, variables = {}) {
   return payload.data;
 }
 
-function linearIssueDescription(task, _prompt) {
-  return [
+function linearIssueDescription(settings, task, prompt, activity = null) {
+  const description = [
     "Workflow picked this local Sim spec task.",
     "",
     workflowTaskMarker(task),
+    ...(task.aliases || []).map((alias) => `workflow.local_task_alias:${alias}`),
     workflowSourceMarker(task),
-    "workflow.activity:active",
-    `workflow.activity_updated_at:${new Date().toISOString()}`,
+    workflowRepositoryMarker(settings),
     "",
     `Task: ${task.title}`,
     `Source: ${task.task_file}:${task.task_line}`,
@@ -931,7 +1355,27 @@ function linearIssueDescription(task, _prompt) {
     "",
     "Expected writes:",
     formatList(task.writes),
+    "",
+    "Expected reads:",
+    formatList(task.reads),
+    "",
+    "Validation:",
+    formatList(task.validation),
+    "",
+    "Rendered prompt:",
+    prompt || "N/A",
   ].join("\n");
+  return withLinearActivityMarkers(
+    description,
+    activity || {
+      status: "inactive",
+      updated_at: new Date().toISOString(),
+      owner: null,
+      summary: "Issue created before a claim was acquired.",
+      lease_id: null,
+      expires_at: null,
+    },
+  );
 }
 
 function formatList(values) {
@@ -945,6 +1389,8 @@ function withLinearActivityMarkers(description, activity) {
     "workflow.activity_updated_at": activity.updated_at || new Date().toISOString(),
     "workflow.activity_owner": activity.owner || null,
     "workflow.activity_summary": activity.summary || null,
+    "workflow.activity_lease_id": activity.lease_id || null,
+    "workflow.activity_expires_at": activity.expires_at || null,
   };
 
   let lines = String(description || "")
@@ -1018,102 +1464,258 @@ function groupReadinessLabel(groupInfo) {
   if (groupInfo.previousDone) return "ready (previous tasks done)";
   if (groupInfo.previousNone) return "ready (no dependencies)";
   if (groupInfo.previousPartial)
-    return `waiting on ${groupInfo.totalPrevious - groupInfo.donePrevious} previous task${groupInfo.totalPrevious - groupInfo.donePrevious !== 1 ? "s" : ""}`;
+    return `ordering penalty: ${groupInfo.totalPrevious - groupInfo.donePrevious} previous task${groupInfo.totalPrevious - groupInfo.donePrevious !== 1 ? "s" : ""} unfinished`;
   return "unknown";
 }
 
 function rankCandidates(tasks, settings) {
-  if (tasks.length <= 1) return tasks;
-
   const state = loadWorkflowState(settings);
   const allTasks = listTasks(settings);
   const priorityOrder = { P0: 0, P1: 1, P2: 2, P3: 3, P4: 4 };
-
-  const groups = {};
-  for (const task of tasks) {
-    const dir = path.dirname(task.task_file);
-    if (!groups[dir]) groups[dir] = [];
-    groups[dir].push(task);
-  }
-
-  const groupInfo = {};
-  for (const [dir, groupTasks] of Object.entries(groups)) {
-    const allInDir = allTasks
-      .filter((t) => path.dirname(t.task_file) === dir)
-      .sort((a, b) => a.task_line - b.task_line);
-
-    const firstLine = Math.min(...groupTasks.map((t) => t.task_line));
-    const previousTasks = allInDir.filter((t) => t.task_line < firstLine);
-    const doneCount = previousTasks.filter((t) => (t.state || "").toLowerCase() === "done").length;
-
-    let depNote = null;
-    if (state.dependency_notes) {
-      for (const note of state.dependency_notes) {
-        if (note.scope) {
-          const normalizedScope = note.scope.replace(/^\.[\\/]/, "");
-          if (dir === normalizedScope || dir.endsWith("/" + normalizedScope) || dir.includes(normalizedScope)) {
-            depNote = note;
-            break;
-          }
-        }
-      }
-    }
-
-    groupInfo[dir] = {
-      previousDone: previousTasks.length > 0 && doneCount === previousTasks.length,
-      previousPartial: doneCount > 0 && doneCount < previousTasks.length,
-      previousNone: previousTasks.length === 0,
-      totalPrevious: previousTasks.length,
-      donePrevious: doneCount,
-      depNote,
+  const recommendationFresh = isRecommendationFresh(settings, state.recommendation);
+  const scored = tasks.map((task) => {
+    const previousTasks = allTasks.filter(
+      (candidate) => candidate.task_file === task.task_file && candidate.task_line < task.task_line,
+    );
+    const donePrevious = previousTasks.filter((candidate) => candidate.state === "Done").length;
+    const blockers = task.blocked_by.filter((dependency) => {
+      const match = findTaskByAnyId(allTasks, dependency);
+      return !match || match.state !== "Done";
+    });
+    const scoreParts = {
+      priority: (priorityOrder[task.priority] ?? 5) * 20,
+      value: task.value === "high" ? -20 : task.value === "low" ? 20 : 0,
+      wave: task.wave == null ? 0 : task.wave * 5,
+      previous: previousTasks.length === 0 || donePrevious === previousTasks.length ? 0 : 25,
+      recommendation:
+        recommendationFresh && findRecommendedTask([task], state.recommendation) ? -30 : 0,
+      blocked: blockers.length > 0 ? 1000 : 0,
     };
-  }
-
-  function groupScore(dir) {
-    const info = groupInfo[dir];
-    if (info.previousDone) return 0;
-    if (info.previousNone) return 20;
-    if (info.previousPartial) return 50;
-    return 100;
-  }
-
-  const sortedDirs = Object.keys(groups).sort((a, b) => {
-    const scoreA = groupScore(a);
-    const scoreB = groupScore(b);
-    if (scoreA !== scoreB) return scoreA - scoreB;
-
-    const bestPrioA = Math.min(...groups[a].map((t) => priorityOrder[t.priority] ?? 5));
-    const bestPrioB = Math.min(...groups[b].map((t) => priorityOrder[t.priority] ?? 5));
-    if (bestPrioA !== bestPrioB) return bestPrioA - bestPrioB;
-
-    return Math.min(...groups[a].map((t) => t.task_line)) - Math.min(...groups[b].map((t) => t.task_line));
+    const score = Object.values(scoreParts).reduce((sum, value) => sum + value, 0);
+    return {
+      ...task,
+      ready: blockers.length === 0,
+      blockers,
+      score,
+      score_parts: scoreParts,
+      rank_rationale: rankingRationale(task, blockers, previousTasks, donePrevious, recommendationFresh, state),
+      group: path.dirname(task.task_file),
+      group_info: {
+        previousDone: previousTasks.length > 0 && donePrevious === previousTasks.length,
+        previousPartial: donePrevious > 0 && donePrevious < previousTasks.length,
+        previousNone: previousTasks.length === 0,
+        totalPrevious: previousTasks.length,
+        donePrevious,
+      },
+    };
   });
 
-  const ranked = [];
-  let globalRank = 0;
-  for (const dir of sortedDirs) {
-    const dirTasks = [...groups[dir]].sort((a, b) => {
-      const aPrio = priorityOrder[a.priority] ?? 5;
-      const bPrio = priorityOrder[b.priority] ?? 5;
-      if (aPrio !== bPrio) return aPrio - bPrio;
-      return a.task_line - b.task_line;
-    });
-
-    for (const task of dirTasks) {
-      globalRank++;
-      ranked.push({
-        ...task,
-        rank: globalRank,
-        group: dir,
-        group_info: groupInfo[dir],
-      });
-    }
-  }
-
-  return ranked;
+  return scored
+    .sort((left, right) => {
+      if (left.ready !== right.ready) return left.ready ? -1 : 1;
+      if (left.score !== right.score) return left.score - right.score;
+      const pathOrder = left.task_file.localeCompare(right.task_file);
+      return pathOrder || left.task_line - right.task_line;
+    })
+    .map((task, index) => ({ ...task, rank: index + 1 }));
 }
 
-async function pickNextTask(settings, workflow, tasks, attempt) {
+function findTaskByAnyId(tasks, value) {
+  const normalized = String(value || "");
+  return (
+    tasks.find((task) => {
+      return (
+        task.id === normalized ||
+        task.identifier === normalized ||
+        task.aliases?.includes(normalized) ||
+        task.id === `task:${normalized}`
+      );
+    }) || null
+  );
+}
+
+function isRecommendationFresh(settings, recommendation) {
+  if (!recommendation) return false;
+  const updatedAt = Date.parse(recommendation.updated_at || "");
+  if (!Number.isFinite(updatedAt)) return false;
+  return !(recommendation.stale_if_changed || []).some((relativePath) => {
+    const filePath = path.resolve(repositoryRoot(settings), relativePath);
+    try {
+      return fs.statSync(filePath).mtimeMs > updatedAt;
+    } catch {
+      return true;
+    }
+  });
+}
+
+function rankingRationale(task, blockers, previousTasks, donePrevious, recommendationFresh, state) {
+  const reasons = [];
+  if (task.priority) reasons.push(`priority ${task.priority}`);
+  if (task.value) reasons.push(`${task.value} immediate value`);
+  if (task.wave != null) reasons.push(`wave ${task.wave}`);
+  if (blockers.length > 0) reasons.push(`blocked by ${blockers.join(", ")}`);
+  if (previousTasks.length > 0) reasons.push(`${donePrevious}/${previousTasks.length} previous tasks done`);
+  if (recommendationFresh && findRecommendedTask([task], state.recommendation)) reasons.push("fresh cached recommendation");
+  return reasons.length > 0 ? reasons : ["deterministic source order"];
+}
+
+function normalizeManifestPath(value) {
+  const normalized = String(value || "").replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/$/, "");
+  const wildcardIndex = normalized.search(/[?*\[]/);
+  if (wildcardIndex === -1) return normalized;
+  const directoryEnd = normalized.lastIndexOf("/", wildcardIndex);
+  return directoryEnd >= 0 ? normalized.slice(0, directoryEnd) : ".";
+}
+
+function manifestPathsOverlap(leftPaths, rightPaths) {
+  return leftPaths.some((leftPath) => {
+    const normalizedLeft = normalizeManifestPath(leftPath);
+    return rightPaths.some((rightPath) => {
+      const normalizedRight = normalizeManifestPath(rightPath);
+      return (
+        normalizedLeft === normalizedRight ||
+        normalizedLeft.startsWith(`${normalizedRight}/`) ||
+        normalizedRight.startsWith(`${normalizedLeft}/`)
+      );
+    });
+  });
+}
+
+function writePathsOverlap(left, right) {
+  return manifestPathsOverlap(left.writes, right.writes);
+}
+
+function tasksConflict(left, right) {
+  const dependencyConflict =
+    left.blocked_by.some((value) => findTaskByAnyId([right], value)) ||
+    right.blocked_by.some((value) => findTaskByAnyId([left], value));
+  const manifestConflict =
+    writePathsOverlap(left, right) ||
+    manifestPathsOverlap(left.writes, right.reads || []) ||
+    manifestPathsOverlap(right.writes, left.reads || []);
+  return dependencyConflict || manifestConflict;
+}
+
+function selectCompatibleCandidates(ranked, count) {
+  const selected = [];
+  const rejected = [];
+  for (const task of ranked) {
+    if (!task.ready) {
+      rejected.push({ task, reason: `blocked by ${task.blockers.join(", ")}` });
+      continue;
+    }
+    const conflict = selected.find((candidate) => tasksConflict(task, candidate));
+    if (conflict) {
+      rejected.push({ task, reason: `conflicts with ${conflict.id}` });
+      continue;
+    }
+    if (selected.length < count) selected.push(task);
+  }
+  return { selected, rejected };
+}
+
+function planTasks(settings, options = {}) {
+  const tasks = activeTasks(settings, listTasks(settings));
+  const ranked = rankCandidates(tasks, settings);
+  const count = Math.max(1, options.count || 1);
+  const compatibility = selectCompatibleCandidates(ranked, count);
+  const displayLimit = Math.max(1, options.limit || 200);
+  const serializeTask = options.verbose ? (task) => task : taskPlanSummary;
+  return attachWorkflowState(
+    settings,
+    {
+      action: "planned",
+      recommended: compatibility.selected[0] ? serializeTask(compatibility.selected[0]) : null,
+      selected: compatibility.selected.map(serializeTask),
+      candidates: ranked.slice(0, displayLimit).map(serializeTask),
+      rejected: compatibility.rejected.map(({ task, reason }) => ({ task_id: task.id, reason })),
+      requested_count: count,
+      selected_count: compatibility.selected.length,
+      total_candidates: ranked.length,
+      count,
+      scoring: { direction: "lower_is_better", blocked_penalty: 1000 },
+      read_only: true,
+    },
+    tasks,
+  );
+}
+
+function taskPlanSummary(task) {
+  return {
+    id: task.id,
+    explicit_id: task.explicit_id,
+    identifier: task.identifier,
+    task_file: task.task_file,
+    task_line: task.task_line,
+    title: task.title,
+    priority: task.priority,
+    value: task.value,
+    wave: task.wave,
+    state: task.state,
+    blocked_by: task.blocked_by,
+    requirements: task.requirements,
+    reads: task.reads,
+    writes: task.writes,
+    validation: task.validation,
+    validation_evidence: task.validation_evidence,
+    ready: task.ready,
+    blockers: task.blockers,
+    score: task.score,
+    score_parts: task.score_parts,
+    rank_rationale: task.rank_rationale,
+    group: task.group,
+    group_info: task.group_info,
+    rank: task.rank,
+  };
+}
+
+function recordDecisionState(settings, selected, ranked, rationale) {
+  withFileLock(workflowStatePath(settings), () => {
+    const state = loadWorkflowState(settings);
+    if (state.error) throw new Error(state.error);
+    const now = new Date().toISOString();
+    state.recommendation = selected
+      ? {
+          task_id: selected.id,
+          task_identifier: selected.identifier,
+          title: selected.title,
+          rationale,
+          evidence: selected.rank_rationale || [],
+          stale_if_changed: [
+            selected.task_file,
+            path.join(path.dirname(selected.task_file), "requirements.md"),
+            path.join(path.dirname(selected.task_file), "design.md"),
+          ],
+          updated_at: now,
+        }
+      : null;
+    state.ranked_candidates = ranked.slice(0, 15).map((task) => ({
+      task_id: task.id,
+      task_identifier: task.identifier,
+      rank: task.rank,
+      score: task.score,
+      ready: task.ready,
+      blockers: task.blockers,
+      rationale: task.rank_rationale,
+    }));
+    state.repo_revision = currentRevision(settings);
+    saveWorkflowState(settings, state);
+  });
+}
+
+function currentRevision(settings) {
+  try {
+    return childProcess.execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: repositoryRoot(settings),
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return null;
+  }
+}
+
+async function pickNextTask(settings, workflow, tasks, attempt, options = {}) {
   if (tasks.length === 0) {
     return {
       task: null,
@@ -1130,6 +1732,7 @@ async function pickNextTask(settings, workflow, tasks, attempt) {
   const skippedClaimedTasks = [];
 
   for (const task of ranked) {
+    if (!task.ready) continue;
     const existing = await findExistingLinearIssue(settings, task);
     if (!existing) {
       candidates.push(task);
@@ -1146,6 +1749,9 @@ async function pickNextTask(settings, workflow, tasks, attempt) {
       existingIssue: existing,
       existingChecked: true,
       markActive: true,
+      owner: options.owner,
+      summary: options.summary,
+      lease_minutes: options.lease_minutes,
     });
     return {
       task: picked.task,
@@ -1158,11 +1764,15 @@ async function pickNextTask(settings, workflow, tasks, attempt) {
     };
   }
 
-  if (candidates.length === 1) {
+  if (candidates.length >= 1) {
     const picked = await pickTask(settings, workflow, candidates[0], attempt, {
       existingChecked: true,
       markActive: true,
+      owner: options.owner,
+      summary: options.summary,
+      lease_minutes: options.lease_minutes,
     });
+    recordDecisionState(settings, candidates[0], ranked, "Selected the highest-ranked ready unclaimed task.");
     return {
       task: picked.task,
       prompt: picked.prompt,
@@ -1174,27 +1784,27 @@ async function pickNextTask(settings, workflow, tasks, attempt) {
   }
 
   if (candidates.length === 0) {
+    const reason = skippedClaimedTasks.length > 0
+      ? "All ready local tasks are already claimed."
+      : "No ready tasks found. Inspect `workflow plan --json` for blockers.";
     return {
       task: null,
       prompt: null,
       action: "none",
       duplicate_prevented: skippedClaimedTasks.length > 0,
       skipped_claimed_tasks: skippedClaimedTasks,
-      reason: "All active local tasks are already claimed and marked active in workflow state.",
+      reason,
     };
   }
 
   return {
     task: null,
     prompt: null,
-    action: "evaluate",
+    action: "none",
     duplicate_prevented: skippedClaimedTasks.length > 0,
-    candidates,
+    candidates: [],
     skipped_claimed_tasks: skippedClaimedTasks,
-    reason:
-      `${candidates.length} unclaimed tasks available. ` +
-      "Top candidates ranked by priority and dependency order. " +
-      "Pick one with: node .agents/skills/workflow/scripts/workflow.js pick <task-id>",
+    reason: "No ready unclaimed tasks found. Inspect `workflow plan --json` for blockers.",
   };
 }
 
@@ -1212,13 +1822,20 @@ function skippedClaimedTask(task, issue, activity = null) {
   };
 }
 
-async function pickNextTasks(settings, workflow, tasks, attempt, count) {
+async function pickNextTasks(settings, workflow, tasks, attempt, count, options = {}) {
   const ranked = rankCandidates(tasks, settings);
   const pickedTasks = [];
   const skippedClaimedTasks = [];
+  const rejectedConflicts = [];
 
   for (const task of ranked) {
     if (pickedTasks.length >= count) break;
+    if (!task.ready) continue;
+    const conflict = pickedTasks.find((picked) => tasksConflict(task, picked.task));
+    if (conflict) {
+      rejectedConflicts.push({ task_id: task.id, reason: `conflicts with ${conflict.task.id}` });
+      continue;
+    }
     const existing = await findExistingLinearIssue(settings, task);
     const claimed = existing ? claimedTaskStatus(settings, task, existing) : null;
     if (existing && claimed?.is_active) {
@@ -1230,6 +1847,9 @@ async function pickNextTasks(settings, workflow, tasks, attempt, count) {
       existingIssue: existing,
       existingChecked: true,
       markActive: true,
+      owner: options.owner,
+      summary: options.summary,
+      lease_minutes: options.lease_minutes,
     });
     pickedTasks.push({
       task: picked.task,
@@ -1237,6 +1857,15 @@ async function pickNextTasks(settings, workflow, tasks, attempt, count) {
       action: picked.action,
       duplicate_prevented: skippedClaimedTasks.length > 0,
     });
+  }
+
+  if (pickedTasks.length > 0) {
+    recordDecisionState(
+      settings,
+      pickedTasks[0].task,
+      ranked,
+      `Selected ${pickedTasks.length} compatible ready task${pickedTasks.length === 1 ? "" : "s"}.`,
+    );
   }
 
   return {
@@ -1248,11 +1877,22 @@ async function pickNextTasks(settings, workflow, tasks, attempt, count) {
     action: pickedTasks.length > 0 ? "created_batch" : "none",
     duplicate_prevented: skippedClaimedTasks.length > 0,
     skipped_claimed_tasks: skippedClaimedTasks,
-    reason: pickedTasks.length > 0 ? null : "All active local tasks already have non-terminal Linear issues.",
+    rejected_conflicts: rejectedConflicts,
+    reason: pickedTasks.length > 0 ? null : "No ready unclaimed compatible tasks found.",
   };
 }
 
 async function pickTask(settings, workflow, task, attempt, options = {}) {
+  const gate = checkTaskConsistency(settings, task, "start", options);
+  if (!gate.passed) {
+    throw new Error(`workflow_start_gate_failed: ${gate.errors.join("; ")}`);
+  }
+  const linearConflicts = await findActiveLinearConflicts(settings, task);
+  if (linearConflicts.length > 0) {
+    throw new Error(
+      `workflow_start_gate_failed: active Linear-backed conflicts: ${linearConflicts.map((conflict) => conflict.task.id).join(", ")}`,
+    );
+  }
   const existing =
     options.existingIssue ||
     (settings.resume_existing !== false && !options.existingChecked
@@ -1261,7 +1901,7 @@ async function pickTask(settings, workflow, task, attempt, options = {}) {
 
   if (existing) {
     const claimed = claimedTaskStatus(settings, task, existing);
-    if (claimed.is_active && !options.force) {
+    if (claimed.is_active && !options.takeover) {
       return {
         task: null,
         prompt: null,
@@ -1269,43 +1909,75 @@ async function pickTask(settings, workflow, task, attempt, options = {}) {
         duplicate_prevented: true,
         reason:
           `Task ${task.identifier} is already claimed by ${existing.identifier || "a Linear issue"} ` +
-          "and marked active in workflow state. Pass --force to take it over.",
+          "and marked active in workflow state. Use takeover with an owner and reason to replace it.",
         skipped_claimed_tasks: [skippedClaimedTask(task, existing, claimed.activity)],
       };
     }
 
     attachLinearIssue(task, existing);
+    let activeRecord = claimed.activity;
     if (options.markActive !== false) {
-      const activity = upsertTaskActivity(settings, task, existing, "active", {
+      const priorState = loadWorkflowState(settings);
+      const priorActivity = priorState.error ? null : findTaskActivity(priorState, task, existing);
+      const activity = buildTaskActivity(settings, task, existing, "active", {
         owner: options.owner || null,
         summary: options.summary || null,
-      });
+        lease_minutes: options.lease_minutes || settings.claim_lease_minutes,
+        new_lease: Boolean(options.takeover),
+      }, priorActivity);
       await updateLinearIssueActivity(settings, existing, activity);
+      saveTaskActivity(settings, activity);
+      activeRecord = activity;
     }
+    task.activity = activeRecord || null;
     return {
       task,
       prompt: renderTemplate(workflow.prompt_template, task, attempt),
       action: claimed.is_inactive ? "resumed_inactive" : "resumed",
       duplicate_prevented: true,
+      gate,
     };
   }
 
   const preliminaryPrompt = renderTemplate(workflow.prompt_template, task, attempt);
-  const issue = await populateLinear(settings, task, preliminaryPrompt);
+  const provisionalActivity = buildTaskActivity(settings, task, null, "active", {
+    owner: options.owner || null,
+    summary: options.summary || null,
+    lease_minutes: options.lease_minutes || settings.claim_lease_minutes,
+    new_lease: true,
+  });
+  const issue = await populateLinear(settings, task, preliminaryPrompt, provisionalActivity);
   attachLinearIssue(task, issue);
   if (options.markActive !== false) {
-    const activity = upsertTaskActivity(settings, task, issue, "active", {
-      owner: options.owner || null,
-      summary: options.summary || null,
-    });
-    await updateLinearIssueActivity(settings, issue, activity);
+    const activity = {
+      ...provisionalActivity,
+      linear_identifier: issue.identifier || null,
+      linear_url: issue.url || null,
+    };
+    saveTaskActivity(settings, activity);
+    task.activity = activity;
   }
   return {
     task,
     prompt: renderTemplate(workflow.prompt_template, task, attempt),
     action: "created",
     duplicate_prevented: false,
+    gate,
   };
+}
+
+async function findActiveLinearConflicts(settings, task) {
+  const candidates = activeTasks(settings, listTasks(settings)).filter(
+    (candidate) => candidate.id !== task.id && tasksConflict(task, candidate),
+  );
+  const conflicts = [];
+  for (const candidate of candidates) {
+    const issue = await findExistingLinearIssue(settings, candidate);
+    if (!issue) continue;
+    const claimed = claimedTaskStatus(settings, candidate, issue);
+    if (claimed.is_active) conflicts.push({ task: candidate, issue, activity: claimed.activity });
+  }
+  return conflicts;
 }
 
 function attachLinearIssue(task, issue) {
@@ -1339,8 +2011,9 @@ async function findExistingLinearIssue(settings, task) {
     }`;
   const issues = [];
   const seen = new Set();
-  for (const term of [task.id, task.identifier]) {
-    const data = await linear(settings, query, { term });
+  const terms = [task.id, ...(task.aliases || []), task.identifier];
+  const results = await Promise.all(terms.map((term) => linear(settings, query, { term })));
+  for (const data of results) {
     for (const issue of data.searchIssues?.nodes || []) {
       if (seen.has(issue.id)) continue;
       seen.add(issue.id);
@@ -1356,7 +2029,13 @@ async function findExistingLinearIssue(settings, task) {
       const description = issue.description || "";
       const state = (issue.state?.name || "").toLowerCase();
       if (terminal.has(state)) return false;
-      return description.includes(workflowTaskMarker(task)) || description.includes(sourceMarker);
+      const repositoryMarker = workflowRepositoryMarker(settings);
+      const repositoryMatches = !descriptionHasWorkflowMarkers(description, "workflow.repository:") || descriptionHasMarker(description, repositoryMarker);
+      return (
+        repositoryMatches &&
+        (workflowTaskMarkers(task).some((marker) => descriptionHasMarker(description, marker)) ||
+          descriptionHasMarker(description, sourceMarker))
+      );
     }) || null
   );
 }
@@ -1365,8 +2044,46 @@ function workflowTaskMarker(task) {
   return `workflow.local_task_id:${task.id}`;
 }
 
+function workflowTaskMarkers(task) {
+  return [
+    `workflow.local_task_id:${task.id}`,
+    ...(task.aliases || []).flatMap((id) => [
+      `workflow.local_task_alias:${id}`,
+      `workflow.local_task_id:${id}`,
+    ]),
+  ];
+}
+
 function workflowSourceMarker(task) {
   return `workflow.local_task_source:${task.identifier}`;
+}
+
+function workflowRepositoryMarker(settings) {
+  const root = repositoryRoot(settings);
+  let identity = path.basename(root);
+  try {
+    identity = childProcess.execFileSync("git", ["config", "--get", "remote.origin.url"], {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim() || identity;
+  } catch (_error) {
+    // A stable repository directory name is safer than an absolute machine-local path.
+  }
+  const digest = crypto.createHash("sha256").update(identity.toLowerCase()).digest("hex").slice(0, 16);
+  return `workflow.repository:${digest}`;
+}
+
+function descriptionHasMarker(description, marker) {
+  return String(description || "")
+    .split(/\r?\n/)
+    .some((line) => line.trim() === marker);
+}
+
+function descriptionHasWorkflowMarkers(description, prefix) {
+  return String(description || "")
+    .split(/\r?\n/)
+    .some((line) => line.trim().startsWith(prefix));
 }
 
 async function moveLinearIssue(settings, args) {
@@ -1418,7 +2135,7 @@ async function resolveLinearIssueForMove(settings, args) {
   }
 
   const task = listTasks(settings).find((candidate) => {
-    return candidate.id === key || candidate.identifier === key;
+    return candidate.id === key || candidate.identifier === key || candidate.aliases?.includes(key);
   });
   if (task) {
     const issue = await findExistingLinearIssue(settings, task);
@@ -1442,10 +2159,9 @@ async function resolveLinearIssueForMove(settings, args) {
       }
     }`;
   const data = await linear(settings, query, { term: key });
-  const issue =
-    (data.searchIssues?.nodes || []).find((candidate) => {
-      return candidate.id === key || candidate.identifier === key || candidate.url === key;
-    }) || data.searchIssues?.nodes?.[0];
+  const issue = (data.searchIssues?.nodes || []).find((candidate) => {
+    return candidate.id === key || candidate.identifier === key || candidate.url === key;
+  });
   if (!issue) {
     throw new Error(`Linear issue not found: ${key}`);
   }
@@ -1471,34 +2187,25 @@ async function resolveLinearStateId(settings, stateName) {
 
 function checkMergedToMain(settings) {
   const root = repositoryRoot(settings);
-
   try {
-    const currentBranch = childProcess
-      .execSync("git rev-parse --abbrev-ref HEAD", { cwd: root, encoding: "utf8", stdio: "pipe" })
-      .trim();
-    if (currentBranch === "main") return true;
-  } catch {
-    return null;
-  }
-
-  try {
-    childProcess.execSync("git rev-parse --verify origin/main", {
+    const head = childProcess.execFileSync("git", ["rev-parse", "HEAD"], {
       cwd: root,
       encoding: "utf8",
-      stdio: "pipe",
-    });
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    const originMain = childProcess.execFileSync("git", ["rev-parse", "--verify", "origin/main"], {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    const status = childProcess.execFileSync("git", ["status", "--porcelain"], {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    return head === originMain && status.length === 0;
   } catch {
     return null;
-  }
-
-  try {
-    childProcess.execSync("git merge-base --is-ancestor HEAD origin/main", {
-      cwd: root,
-      stdio: "pipe",
-    });
-    return true;
-  } catch {
-    return false;
   }
 }
 
@@ -1516,7 +2223,9 @@ async function updateTaskActivity(settings, args) {
   }
 
   const tasks = listTasks(settings);
-  let task = tasks.find((candidate) => candidate.id === key || candidate.identifier === key);
+  let task = tasks.find(
+    (candidate) => candidate.id === key || candidate.identifier === key || candidate.aliases?.includes(key),
+  );
   let issue = null;
 
   if (task) {
@@ -1533,11 +2242,17 @@ async function updateTaskActivity(settings, args) {
   }
 
   attachLinearIssue(task, issue);
-  const activity = upsertTaskActivity(settings, task, issue, status, {
-    owner: args.owner || null,
-    summary: args.summary || null,
-  });
+  const state = loadWorkflowState(settings);
+  const previousActivity = state.error ? null : findTaskActivity(state, task, issue);
+  const activity = buildTaskActivity(settings, task, issue, status, {
+    owner: args.owner,
+    summary: args.summary,
+    lease_minutes: args.lease_minutes || settings.claim_lease_minutes,
+    lease_id: args.lease_id,
+    new_lease: Boolean(args.takeover),
+  }, previousActivity);
   const updatedIssue = await updateLinearIssueActivity(settings, issue, activity);
+  saveTaskActivity(settings, activity);
   attachLinearIssue(task, updatedIssue);
 
   return {
@@ -1560,93 +2275,437 @@ async function findTaskForLinearIssue(settings, issue, tasks = listTasks(setting
   const data = await linear(settings, query, { id: issue.identifier || issue.id });
   const description = data.issue?.description || "";
   return tasks.find((task) => {
-    return description.includes(workflowTaskMarker(task)) || description.includes(workflowSourceMarker(task));
+    return (
+      workflowTaskMarkers(task).some((marker) => descriptionHasMarker(description, marker)) ||
+      descriptionHasMarker(description, workflowSourceMarker(task))
+    );
   });
 }
 
-async function completeTask(settings, args) {
+function finishTask(settings, args) {
   const taskId = args.task_id || args.issue || args.issue_id;
   if (!taskId) {
-    throw new Error("Missing task identifier. Pass complete <task-id>.");
+    throw new Error("Missing task identifier. Pass finish <task-id>.");
   }
-
   const task = findTask(settings, taskId);
-
-  if (!args.force) {
-    const merged = checkMergedToMain(settings);
-    if (merged === false) {
-      throw new Error(
-        "Task cannot be completed: the current branch has not been merged into main. " +
-          "Complete the PR process first (commit → push → open PR → land/merge to main), " +
-          "then run complete again. To override this check, pass --force.",
-      );
-    }
-    if (merged === null) {
-      console.warn(
-        "Warning: could not verify merge status (not a git repository or no origin/main remote). " +
-          "Proceeding with completion. Pass --force to silence this warning.",
-      );
-    }
+  const gate = checkTaskConsistency(settings, task, "complete", args);
+  if (!gate.passed && !args.override_validation) {
+    throw new Error(`workflow_completion_gate_failed: ${gate.errors.join("; ")}`);
   }
-
-  let linear = null;
-  if (!args.local_only) {
-    linear = await moveLinearIssue(settings, {
-      ...args,
-      issue: task.id,
-      state_name: args.state_name || args.state || "Done",
-    });
+  if (args.override_validation && !args.override_reason) {
+    throw new Error("--override-validation requires --override-reason <reason>.");
   }
-
-  const local = args.no_local
-    ? { updated: false, reason: "Local checkbox update skipped by --no-local." }
-    : updateLocalTaskCheckbox(settings, task, "Done");
-
-  let activity = null;
-  if (linear?.issue) {
-    activity = upsertTaskActivity(settings, task, linear.issue, "inactive", {
-      summary: "Completed by workflow command.",
-    });
-    await updateLinearIssueActivity(settings, linear.issue, activity);
-  }
-
+  const evidence = updateLocalTaskValidationEvidence(settings, task, args.validation_evidence || args.override_reason);
+  const local = updateLocalTaskCheckbox(settings, task, "Done");
   return {
-    action: "completed",
+    action: "finished",
     task: findTask(settings, task.id),
     local,
+    evidence,
+    gate,
+    validation_evidence: evidence.evidence,
+    override_reason: args.override_reason || null,
+    next: "Commit the completed task packet with the implementation, land the PR, sync origin/main, then run workflow close.",
+  };
+}
+
+async function closeTask(settings, args) {
+  const taskId = args.task_id || args.issue || args.issue_id;
+  if (!taskId) throw new Error("Missing task identifier. Pass close <task-id>.");
+  if (args.override_merge && !args.override_reason) {
+    throw new Error("--override-merge requires --override-reason <reason>.");
+  }
+  const task = findTask(settings, taskId);
+  if (task.state !== "Done") {
+    throw new Error(`Task ${task.id} is not finished locally. Run finish before committing and landing the PR.`);
+  }
+  if (task.validation_evidence.length === 0 && !args.override_validation) {
+    throw new Error(`Task ${task.id} has no checked-in _validation_evidence. Run finish before merge.`);
+  }
+  if (args.override_validation && !args.override_reason) {
+    throw new Error("--override-validation requires --override-reason <reason>.");
+  }
+  if (!args.override_merge) {
+    const merged = checkMergedToMain(settings);
+    if (merged !== true) {
+      throw new Error(
+        "Task cannot be closed because HEAD is not a clean, exact match for origin/main. " +
+          "Fetch and switch to the merged main branch, or use --override-merge with --override-reason after manual verification.",
+      );
+    }
+  }
+  const operationId = crypto.randomUUID();
+  const existingIssue = await findExistingLinearIssue(settings, task);
+  if (!existingIssue) throw new Error(`No non-terminal Linear issue found for ${task.id}.`);
+  updateWorkflowOperation(settings, operationId, {
+    kind: "close",
+    task_id: task.id,
+    task_identifier: task.identifier,
+    linear_identifier: existingIssue.identifier,
+    target_state: args.state_name || args.state || "Done",
+    validation_evidence: args.validation_evidence || task.validation_evidence.join("; ") || args.override_reason || null,
+    override_reason: args.override_reason || null,
+    status: "started",
+    steps: [],
+  });
+  const linear = await moveLinearIssue(settings, {
+    issue: existingIssue.identifier,
+    state_name: args.state_name || args.state || "Done",
+  });
+  updateWorkflowOperation(settings, operationId, { status: "in_progress", steps: ["linear_moved"] });
+  const priorState = loadWorkflowState(settings);
+  const priorActivity = priorState.error ? null : findTaskActivity(priorState, task, linear.issue);
+  const activity = buildTaskActivity(settings, task, linear.issue, "inactive", {
+    owner: priorActivity?.owner,
+    summary: "Closed after merge by workflow command.",
+  }, priorActivity);
+  await updateLinearIssueActivity(settings, linear.issue, activity);
+  saveTaskActivity(settings, activity);
+  updateWorkflowOperation(settings, operationId, {
+    status: "completed",
+    steps: ["linear_moved", "activity_released"],
+  });
+  return {
+    action: "closed",
+    task,
     linear,
     activity,
+    operation_id: operationId,
+  };
+}
+
+function completeTask(settings, args) {
+  return finishTask(settings, args);
+}
+
+async function reconcileWorkflow(settings, args = {}) {
+  const journal = loadWorkflowJournal(settings);
+  const incomplete = journal.operations.filter((operation) => operation.status !== "completed");
+  const results = [];
+  for (const operation of incomplete) {
+    if (args.task_id && operation.task_id !== args.task_id && operation.task_identifier !== args.task_id) continue;
+    const steps = new Set(operation.steps || []);
+    const result = { operation_id: operation.id, task_id: operation.task_id, actions: [], repaired: false };
+    if (operation.kind !== "close") {
+      result.actions.push("Unsupported operation kind; inspect manually.");
+      results.push(result);
+      continue;
+    }
+
+    const task = findTask(settings, operation.task_id || operation.task_identifier);
+    if (!steps.has("linear_moved")) {
+      result.actions.push("Move the linked Linear issue to Done.");
+      if (!args.dry_run) {
+        await moveLinearIssue(settings, {
+          issue: operation.linear_identifier || task.id,
+          state_name: operation.target_state || args.state_name || "Done",
+        });
+        steps.add("linear_moved");
+        result.repaired = true;
+      }
+    }
+    if (steps.has("linear_moved") && !steps.has("activity_released")) {
+      result.actions.push("Release the Linear-backed activity lease.");
+      if (!args.dry_run) {
+        const issue = await resolveLinearIssueForMove(settings, { issue: operation.linear_identifier });
+        const activity = buildTaskActivity(settings, task, issue, "inactive", {
+          summary: "Recovered lease release after close.",
+        });
+        await updateLinearIssueActivity(settings, issue, activity);
+        saveTaskActivity(settings, activity);
+        steps.add("activity_released");
+        result.repaired = true;
+      }
+    }
+    if (!args.dry_run && steps.has("linear_moved") && steps.has("activity_released")) {
+      updateWorkflowOperation(settings, operation.id, { status: "completed", steps: [...steps] });
+    }
+    results.push(result);
+  }
+  return { action: "reconciled", dry_run: Boolean(args.dry_run), incomplete: results };
+}
+
+function defaultWorkflowFile() {
+  return `---
+tracker:
+  kind: linear
+  api_key: $LINEAR_API_KEY
+  team_key: $LINEAR_TEAM_KEY
+  active_states: [Todo, In Progress]
+  terminal_states: [Done, Closed, Canceled, Cancelled, Duplicate]
+  claim_lease_minutes: 120
+tasks:
+  glob: .agents/specs/**/tasks.md
+workflow_state:
+  path: .agents/workflow-state.json
+workflow_journal:
+  path: .agents/workflow-operations.json
+---
+You are working on a local Sim spec task.
+
+Task: {{ issue.title }}
+Task ID: {{ issue.id }}
+Source: {{ issue.task_file }}:{{ issue.task_line }}
+Priority: {{ issue.priority }}
+Blocked by: {{ issue.blocked_by }}
+Requirements: {{ issue.requirements }}
+Reads: {{ issue.reads }}
+Writes: {{ issue.writes }}
+Validation: {{ issue.validation }}
+Owner: {{ issue.activity.owner }}
+Lease expires: {{ issue.activity.expires_at }}
+
+Task body:
+{{ issue.task_body }}
+
+Linear: {{ issue.linear.url }}
+
+During work, renew the lease before it expires. If work stops, release it with
+a concise summary. Before merge, run workflow finish with validation evidence.
+After the merged main branch is synced locally, run workflow close.
+`;
+}
+
+function initializeWorkflow(settings, args = {}) {
+  const filePath = workflowPath(settings, args.workflow_path);
+  if (fs.existsSync(filePath) && !args.force) {
+    return { action: "unchanged", path: filePath, reason: "WORKFLOW.md already exists." };
+  }
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, defaultWorkflowFile(), "utf8");
+  const workflow = validateWorkflowContract(parseWorkflow(filePath));
+  return { action: "initialized", path: filePath, validation: { valid: true }, workflow };
+}
+
+function doctorWorkflow(settings) {
+  const checks = [];
+  function add(name, passed, detail, severity = "error") {
+    checks.push({ name, passed, detail, severity });
+  }
+  add("node", Number.parseInt(process.versions.node.split(".")[0], 10) >= 18, `Node ${process.versions.node}`);
+  try {
+    validateWorkflowContract(parseWorkflow(workflowPath(settings)));
+    add("workflow", true, workflowPath(settings));
+  } catch (error) {
+    add("workflow", false, error.message);
+  }
+  let tasks = [];
+  try {
+    tasks = listTasks(settings);
+    add("tasks", tasks.length > 0, `${tasks.length} task packets found`);
+    const explicitCount = tasks.filter((task) => task.explicit_id).length;
+    add(
+      "durable_ids",
+      explicitCount === tasks.length,
+      `${explicitCount}/${tasks.length} tasks declare explicit _id metadata`,
+      "warning",
+    );
+  } catch (error) {
+    add("tasks", false, error.message);
+  }
+  try {
+    const team = settings.linear_team_id || resolveEnvReference(settings.linear_team_key, "linear_team_key");
+    if (!team) throw new Error("Configure tracker.team_id or tracker.team_key");
+    add("linear_team", true, settings.linear_team_id ? "Configured by ID" : `Configured as ${team}`);
+  } catch (error) {
+    add("linear_team", false, error.message);
+  }
+  try {
+    resolveEnvReference(settings.linear_api_key, "linear_api_key");
+    add("linear_token", true, "Configured (not displayed)");
+  } catch (error) {
+    add("linear_token", false, error.message);
+  }
+  const revision = currentRevision(settings);
+  add("git", Boolean(revision), revision || "Git revision unavailable");
+  const errors = checks.filter((check) => !check.passed && check.severity === "error");
+  const passed = (name) => checks.find((check) => check.name === name)?.passed === true;
+  const capabilities = {
+    can_plan: passed("node") && passed("workflow") && passed("tasks"),
+    can_claim:
+      passed("node") && passed("workflow") && passed("tasks") && passed("linear_team") && passed("linear_token"),
+    can_complete:
+      passed("node") && passed("workflow") && passed("tasks") && passed("linear_team") && passed("linear_token") && passed("git"),
+  };
+  return { action: "diagnosed", healthy: errors.length === 0, capabilities, checks };
+}
+
+async function doctorWorkflowOnline(settings) {
+  const result = doctorWorkflow(settings);
+  try {
+    const teamId = await resolveLinearTeamId(settings);
+    result.checks.push({ name: "linear_online", passed: true, detail: `Connected to team ${teamId}`, severity: "error" });
+    if (settings.linear_project_id || settings.linear_project_slug) await resolveLinearProjectId(settings);
+  } catch (error) {
+    result.checks.push({ name: "linear_online", passed: false, detail: error.message, severity: "error" });
+    result.healthy = false;
+    result.capabilities.can_claim = false;
+    result.capabilities.can_complete = false;
+  }
+  result.online = true;
+  return result;
+}
+
+function lintTasks(settings, args = {}) {
+  const tasks = listTasks(settings);
+  const active = activeTasks(settings, tasks);
+  const fields = [
+    "explicit_id", "priority", "value", "wave", "blocked_by", "reads", "writes", "validation",
+    "validation_evidence", "requirements",
+  ];
+  const coverage = Object.fromEntries(
+    fields.map((field) => {
+      const present = (task) => Array.isArray(task[field]) ? task[field].length > 0 : task[field] != null && task[field] !== false;
+      return [field, {
+        total: tasks.filter(present).length,
+        active: active.filter(present).length,
+        task_count: tasks.length,
+        active_task_count: active.length,
+      }];
+    }),
+  );
+  const duplicateIds = [...new Set(tasks.map((task) => task.id).filter((id, index, ids) => ids.indexOf(id) !== index))];
+  const diagnostics = [];
+  for (const task of active) {
+    if (!task.explicit_id) diagnostics.push({ severity: args.strict ? "error" : "warning", task: task.identifier, message: "Missing explicit _id metadata." });
+    if (task.writes.length === 0) diagnostics.push({ severity: "error", task: task.identifier, message: "Missing _writes metadata." });
+    if (task.validation.length === 0) diagnostics.push({ severity: args.strict ? "error" : "warning", task: task.identifier, message: "Missing _validation plan." });
+    for (const manifestPath of [...task.reads, ...task.writes]) {
+      if (path.isAbsolute(manifestPath) || manifestPath.startsWith("~") || manifestPath.split("/").includes("..")) {
+        diagnostics.push({ severity: "error", task: task.identifier, message: `Manifest path must be repository-relative: ${manifestPath}` });
+      }
+    }
+    const requirementsPath = path.resolve(repositoryRoot(settings), path.dirname(task.task_file), "requirements.md");
+    if (fs.existsSync(requirementsPath)) {
+      const references = parseRequirementReferences(fs.readFileSync(requirementsPath, "utf8"));
+      for (const requirement of task.requirements) {
+        if (!references.has(requirement)) diagnostics.push({ severity: "error", task: task.identifier, message: `Unknown requirement reference: ${requirement}` });
+      }
+    }
+  }
+  for (const id of duplicateIds) diagnostics.push({ severity: "error", task: id, message: "Duplicate task ID." });
+  const errors = diagnostics.filter((diagnostic) => diagnostic.severity === "error");
+  return {
+    action: "linted",
+    passed: errors.length === 0,
+    strict: Boolean(args.strict),
+    task_count: tasks.length,
+    active_task_count: active.length,
+    coverage,
+    diagnostics,
+  };
+}
+
+function suggestTaskIds(settings) {
+  const tasks = listTasks(settings).filter((task) => !task.explicit_id);
+  const used = new Set(listTasks(settings).filter((task) => task.explicit_id).map((task) => task.id));
+  const suggestions = tasks.map((task) => {
+    const spec = path.basename(path.dirname(task.task_file));
+    const base = `${spec}-${task.title}`
+      .toLowerCase()
+      .replace(/[^a-z0-9._-]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    let id = base || "task";
+    let suffix = 2;
+    while (used.has(`task:${id}`)) {
+      id = `${base}-${suffix}`;
+      suffix += 1;
+    }
+    used.add(`task:${id}`);
+    return {
+      task: task.identifier,
+      current_id: task.id,
+      suggested_id: id,
+      metadata: `  - _id: ${id}_`,
+    };
+  });
+  return {
+    action: "suggested_ids",
+    read_only: true,
+    count: suggestions.length,
+    warning: "Add IDs before first claim. For claimed tasks, preserve prior markers and coordinate a tracker migration.",
+    suggestions,
   };
 }
 
 function updateLocalTaskCheckbox(settings, task, stateName) {
   const root = repositoryRoot(settings);
   const filePath = path.resolve(root, task.task_file);
+  const currentTasks = parseTaskFile(filePath, root).filter((candidate) => candidate.id === task.id);
+  if (currentTasks.length !== 1) {
+    throw new Error(`Task ${task.id} could not be uniquely located before updating ${task.task_file}.`);
+  }
+  const currentTask = currentTasks[0];
   const text = fs.readFileSync(filePath, "utf8");
   const newline = text.includes("\r\n") ? "\r\n" : "\n";
   const lines = text.split(/\r?\n/);
-  const lineIndex = task.task_line - 1;
+  const lineIndex = currentTask.task_line - 1;
   const line = lines[lineIndex];
   if (line === undefined) {
     throw new Error(`Task source line not found: ${task.identifier}`);
   }
 
   const marker = localMarkerForState(stateName);
+  const currentMarker = line.match(/^- \[([ xX~-])\]/)?.[1];
+  if (currentMarker && markerState(currentMarker) === markerState(marker)) {
+    return {
+      updated: false,
+      state: stateName,
+      task_file: currentTask.task_file,
+      task_line: currentTask.task_line,
+      before: line,
+      after: line,
+      reason: "Task checkbox already has the requested state.",
+    };
+  }
   const updatedLine = line.replace(/^- \[[ xX~-]\]/, `- [${marker}]`);
   if (updatedLine === line) {
     throw new Error(`Task source line is not a top-level checkbox: ${task.identifier}`);
   }
 
   lines[lineIndex] = updatedLine;
-  fs.writeFileSync(filePath, lines.join(newline), "utf8");
+  const temporaryPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(temporaryPath, lines.join(newline), "utf8");
+  fs.renameSync(temporaryPath, filePath);
   return {
     updated: true,
     state: stateName,
-    task_file: task.task_file,
-    task_line: task.task_line,
+    task_file: currentTask.task_file,
+    task_line: currentTask.task_line,
     before: line,
     after: updatedLine,
   };
+}
+
+function updateLocalTaskValidationEvidence(settings, task, evidence) {
+  const summary = String(evidence || "").replace(/\s+/g, " ").trim();
+  if (!summary) throw new Error("Validation evidence must not be empty.");
+  const root = repositoryRoot(settings);
+  const filePath = path.resolve(root, task.task_file);
+  const currentTasks = parseTaskFile(filePath, root).filter((candidate) => candidate.id === task.id);
+  if (currentTasks.length !== 1) throw new Error(`Task ${task.id} could not be uniquely located before recording evidence.`);
+  const currentTask = currentTasks[0];
+  const text = fs.readFileSync(filePath, "utf8");
+  const newline = text.includes("\r\n") ? "\r\n" : "\n";
+  const lines = text.split(/\r?\n/);
+  const start = currentTask.task_line;
+  let end = lines.length;
+  for (let index = start; index < lines.length; index += 1) {
+    if (/^- \[[ xX~-]\]\s+/.test(lines[index]) || (lines[index].trim() && !/^\s/.test(lines[index]))) {
+      end = index;
+      break;
+    }
+  }
+  const existingIndex = lines.findIndex((line, index) => {
+    return index >= start && index < end && /^\s*-\s+_validation_evidence:/i.test(line.trim());
+  });
+  const evidenceLine = `  - _validation_evidence: ${summary}_`;
+  if (existingIndex >= 0) lines[existingIndex] = evidenceLine;
+  else lines.splice(end, 0, evidenceLine);
+  const temporaryPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(temporaryPath, lines.join(newline), "utf8");
+  fs.renameSync(temporaryPath, filePath);
+  return { updated: true, task_file: currentTask.task_file, evidence: summary };
 }
 
 function localMarkerForState(stateName) {
@@ -1656,8 +2715,42 @@ function localMarkerForState(stateName) {
   return "~";
 }
 
-async function callTool(name, args) {
+async function callTool(name, args = {}) {
   const settings = parseSettings();
+  if (name === "workflow_init") {
+    return initializeWorkflow(settings, args);
+  }
+
+  if (name === "workflow_doctor") {
+    return args.online ? doctorWorkflowOnline(settings) : doctorWorkflow(settings);
+  }
+
+  const validatedWorkflow = validateWorkflowContract(parseWorkflow(workflowPath(settings, args.workflow_path)));
+
+  if (name === "workflow_lint") {
+    return lintTasks(settings, args);
+  }
+
+  if (name === "workflow_suggest_ids") {
+    return suggestTaskIds(settings);
+  }
+
+  if (name === "workflow_plan") {
+    return planTasks(settings, args);
+  }
+
+  if (name === "workflow_check") {
+    const task = findTask(settings, args.task_id);
+    if (!["start", "complete"].includes(args.phase || "start")) {
+      throw new Error("Unsupported check phase. Use --phase start or --phase complete.");
+    }
+    return checkTaskConsistency(settings, task, args.phase || "start", args);
+  }
+
+  if (name === "workflow_reconcile") {
+    return reconcileWorkflow(settings, args);
+  }
+
   if (name === "workflow_launch_ui") {
     return launchWorkflowUi(settings, args);
   }
@@ -1667,9 +2760,9 @@ async function callTool(name, args) {
   }
 
   if (name === "workflow_validate_workflow") {
-    const workflow = validateWorkflowContract(parseWorkflow(workflowPath(settings, args.workflow_path)));
+    const workflow = validatedWorkflow;
     return {
-      workflow,
+      workflow: publicWorkflow(workflow),
       validation: { valid: true },
     };
   }
@@ -1689,17 +2782,21 @@ async function callTool(name, args) {
     return {
       task,
       prompt: renderTemplate(workflow.prompt_template, task, args.attempt ?? null),
-      workflow: { path: workflow.path, config: workflow.config },
+      workflow: { path: workflow.path, config: publicWorkflow(workflow).config },
     };
   }
 
   if (name === "workflow_pick_task") {
+    if (args.takeover && (!args.owner || !args.override_reason)) {
+      throw new Error("takeover requires --owner <name> and --override-reason <reason>.");
+    }
     const task = findTask(settings, args.task_id);
     const workflow = validateWorkflowContract(parseWorkflow(workflowPath(settings)));
     const picked = await pickTask(settings, workflow, task, args.attempt ?? null, {
-      force: Boolean(args.force),
-      owner: args.owner || null,
+      takeover: Boolean(args.takeover),
+      owner: args.owner || defaultWorkflowOwner(),
       summary: args.summary || null,
+      lease_minutes: args.lease_minutes || settings.claim_lease_minutes,
     });
     return {
       task: picked.task,
@@ -1708,21 +2805,27 @@ async function callTool(name, args) {
       action: picked.action,
       reason: picked.reason || null,
       skipped_claimed_tasks: picked.skipped_claimed_tasks || [],
-      workflow: { path: workflow.path, config: workflow.config },
+      gate: picked.gate || null,
+      workflow: { path: workflow.path, config: publicWorkflow(workflow).config },
     };
   }
 
   if (name === "workflow_next_task") {
     const workflow = validateWorkflowContract(parseWorkflow(workflowPath(settings)));
-    const tasks = activeTasks(settings, listTasks(settings)).slice(0, args.limit || 200);
+    const tasks = activeTasks(settings, listTasks(settings));
     const count = Math.max(1, args.count || 1);
+    const claimOptions = {
+      owner: args.owner || defaultWorkflowOwner(),
+      summary: args.summary || null,
+      lease_minutes: args.lease_minutes || settings.claim_lease_minutes,
+    };
     const picked =
       count === 1
-        ? await pickNextTask(settings, workflow, tasks, args.attempt ?? null)
-        : await pickNextTasks(settings, workflow, tasks, args.attempt ?? null, count);
+        ? await pickNextTask(settings, workflow, tasks, args.attempt ?? null, claimOptions)
+        : await pickNextTasks(settings, workflow, tasks, args.attempt ?? null, count, claimOptions);
     return {
       ...attachWorkflowState(settings, picked, tasks),
-      workflow: { path: workflow.path, config: workflow.config },
+      workflow: { path: workflow.path, config: publicWorkflow(workflow).config },
     };
   }
 
@@ -1732,6 +2835,14 @@ async function callTool(name, args) {
 
   if (name === "workflow_complete_task") {
     return completeTask(settings, args);
+  }
+
+  if (name === "workflow_finish_task") {
+    return finishTask(settings, args);
+  }
+
+  if (name === "workflow_close_task") {
+    return closeTask(settings, args);
   }
 
   if (name === "workflow_update_activity") {
@@ -1760,6 +2871,7 @@ async function launchWorkflowUi(settings, args = {}) {
   }
 
   const host = String(args.host || "127.0.0.1");
+  validateUiHost(host, args.allow_remote);
   const port = await resolveUiPort(host, args.port);
   const dataSource = String(args.data || args.source || "list");
   const serverArgs = {
@@ -1772,6 +2884,7 @@ async function launchWorkflowUi(settings, args = {}) {
     task_id: args.task_id,
     attempt: args.attempt,
     ttl_ms: args.ttl_ms,
+    allow_remote: args.allow_remote,
     ui_path: htmlPath,
   };
   const serverProcess = childProcess.spawn(
@@ -1825,6 +2938,7 @@ async function serveWorkflowUi(settings, args = {}) {
   }
 
   const host = String(args.host || "127.0.0.1");
+  validateUiHost(host, args.allow_remote);
   const port = Number(args.port || 0);
   const ttlMs = Number(args.ttl_ms || 4 * 60 * 60 * 1000);
   const payload = await buildUiPayload(settings, args);
@@ -1874,6 +2988,13 @@ async function serveWorkflowUi(settings, args = {}) {
   }
 }
 
+function validateUiHost(host, allowRemote) {
+  const loopback = new Set(["127.0.0.1", "localhost", "::1"]);
+  if (!loopback.has(host) && !allowRemote) {
+    throw new Error("Refusing to expose workflow task data on a non-loopback host without --allow-remote.");
+  }
+}
+
 async function buildUiPayload(settings, args = {}) {
   const dataSource = String(args.data || args.source || "list");
   if (dataSource === "none") {
@@ -1886,12 +3007,17 @@ async function buildUiPayload(settings, args = {}) {
 
   if (dataSource === "next") {
     const workflow = validateWorkflowContract(parseWorkflow(workflowPath(settings)));
-    const tasks = activeTasks(settings, listTasks(settings)).slice(0, args.limit || 200);
+    const tasks = activeTasks(settings, listTasks(settings));
     const count = Math.max(1, args.count || 1);
+    const claimOptions = {
+      owner: args.owner || defaultWorkflowOwner(),
+      summary: args.summary || null,
+      lease_minutes: args.lease_minutes || settings.claim_lease_minutes,
+    };
     const picked =
       count === 1
-        ? await pickNextTask(settings, workflow, tasks, args.attempt ?? null)
-        : await pickNextTasks(settings, workflow, tasks, args.attempt ?? null, count);
+        ? await pickNextTask(settings, workflow, tasks, args.attempt ?? null, claimOptions)
+        : await pickNextTasks(settings, workflow, tasks, args.attempt ?? null, count, claimOptions);
     return {
       ...attachWorkflowState(settings, picked, tasks),
       ui: { data_source: dataSource, generated_at: new Date().toISOString() },
@@ -1904,7 +3030,11 @@ async function buildUiPayload(settings, args = {}) {
     if (!taskId) throw new Error("workflow ui --data pick requires --task-id <task-id>");
     const task = findTask(settings, taskId);
     const workflow = validateWorkflowContract(parseWorkflow(workflowPath(settings)));
-    const picked = await pickTask(settings, workflow, task, args.attempt ?? null);
+    const picked = await pickTask(settings, workflow, task, args.attempt ?? null, {
+      owner: args.owner || defaultWorkflowOwner(),
+      summary: args.summary || null,
+      lease_minutes: args.lease_minutes || settings.claim_lease_minutes,
+    });
     return {
       task: picked.task,
       prompt: picked.prompt,
@@ -1921,11 +3051,11 @@ async function buildUiPayload(settings, args = {}) {
 
   const tasks = listTasks(settings);
   const filtered = args.active_only === false ? tasks : activeTasks(settings, tasks);
-  return {
-    tasks: filtered.slice(0, args.limit || 500),
-    total: filtered.length,
-    ui: { data_source: dataSource, generated_at: new Date().toISOString() },
-  };
+  return attachWorkflowState(settings, {
+      tasks: filtered.slice(0, args.limit || 500),
+      total: filtered.length,
+      ui: { data_source: dataSource, generated_at: new Date().toISOString() },
+    }, filtered);
 }
 
 function respond(response, status, contentType, body) {
@@ -1995,10 +3125,32 @@ function platformLauncher(url) {
 
 async function runCli(argv) {
   const { command, positional, args } = parseCliArgs(argv);
+  validateCliOptions(command, args);
   let result;
 
   if (command === "next") {
     result = await callTool("workflow_next_task", args);
+  } else if (command === "plan") {
+    result = await callTool("workflow_plan", args);
+  } else if (command === "init") {
+    result = await callTool("workflow_init", args);
+  } else if (command === "doctor") {
+    result = await callTool("workflow_doctor", args);
+  } else if (command === "lint") {
+    result = await callTool("workflow_lint", args);
+  } else if (command === "migrate-ids") {
+    result = await callTool("workflow_suggest_ids", args);
+  } else if (command === "check") {
+    result = await callTool("workflow_check", {
+      ...args,
+      task_id: args.task_id || positional[0],
+      phase: args.phase || positional[1] || "start",
+    });
+  } else if (command === "reconcile") {
+    result = await callTool("workflow_reconcile", {
+      ...args,
+      task_id: args.task_id || positional[0],
+    });
   } else if (command === "move") {
     result = await callTool("workflow_move_linear", {
       ...args,
@@ -2009,17 +3161,39 @@ async function runCli(argv) {
       ...args,
       task_id: args.task_id || args.issue || args.issue_id || positional[0],
     });
+  } else if (command === "finish") {
+    result = await callTool("workflow_finish_task", {
+      ...args,
+      task_id: args.task_id || args.issue || args.issue_id || positional[0],
+    });
+  } else if (command === "close" || command === "finalize") {
+    result = await callTool("workflow_close_task", {
+      ...args,
+      task_id: args.task_id || args.issue || args.issue_id || positional[0],
+    });
   } else if (command === "activity") {
     result = await callTool("workflow_update_activity", {
       ...args,
       task_id: args.task_id || args.issue || args.issue_id || args.task || positional[0],
     });
+  } else if (command === "renew" || command === "release") {
+    result = await callTool("workflow_update_activity", {
+      ...args,
+      task_id: args.task_id || positional[0],
+      status: command === "renew" ? "active" : "inactive",
+    });
   } else if (command === "list") {
-    result = await callTool("workflow_list_tasks", args);
+    result = await callTool("workflow_list_tasks", { ...args, active_only: args.all ? false : args.active_only });
   } else if (command === "pick") {
     result = await callTool("workflow_pick_task", {
       ...args,
       task_id: args.task_id || positional[0],
+    });
+  } else if (command === "takeover") {
+    result = await callTool("workflow_pick_task", {
+      ...args,
+      task_id: args.task_id || positional[0],
+      takeover: true,
     });
   } else if (command === "render") {
     result = await callTool("workflow_render_prompt", {
@@ -2038,7 +3212,7 @@ async function runCli(argv) {
   } else if (command === "ui-server") {
     await callTool("workflow_serve_ui", args);
     return;
-  } else if (command === "help" || command === "--help" || command === "-h") {
+  } else if (command === "help") {
     process.stdout.write(`${usage()}\n`);
     return;
   } else {
@@ -2046,11 +3220,13 @@ async function runCli(argv) {
   }
 
   if (args.json) {
-    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    process.stdout.write(`${JSON.stringify({ schema_version: 2, ...result }, null, 2)}\n`);
+    if (result?.passed === false || result?.healthy === false) process.exitCode = 1;
     return;
   }
 
   process.stdout.write(formatCliResult(command, result));
+  if (result?.passed === false || result?.healthy === false) process.exitCode = 1;
 }
 
 function formatCliResult(command, result) {
@@ -2078,13 +3254,23 @@ function formatCliResult(command, result) {
       .join("\n");
   }
 
-  if (command === "complete") {
+  if (command === "complete" || command === "finish") {
     return [
       `Action: ${result.action}`,
       `Task: ${result.task.title}`,
       `Source: ${result.task.identifier}`,
       `Local: ${result.local.updated ? result.local.state : result.local.reason}`,
-      result.linear ? `Linear: ${result.linear.issue.identifier} ${result.linear.issue.state}` : "Linear: skipped",
+      result.next ? `Next: ${result.next}` : null,
+      "",
+    ].filter((line) => line !== null).join("\n");
+  }
+
+  if (command === "close" || command === "finalize") {
+    return [
+      `Action: ${result.action}`,
+      `Task: ${result.task.title}`,
+      `Linear: ${result.linear.issue.identifier} ${result.linear.issue.state}`,
+      `Activity: ${result.activity.status}`,
       "",
     ].join("\n");
   }
@@ -2100,6 +3286,9 @@ function formatCliResult(command, result) {
         `Task: ${picked.task.title}`,
         `Source: ${picked.task.identifier}`,
         `Linear: ${picked.task.linear?.url || "not populated"}`,
+        picked.task.activity?.owner ? `Owner: ${picked.task.activity.owner}` : null,
+        picked.task.activity?.expires_at ? `Lease expires: ${picked.task.activity.expires_at}` : null,
+        picked.task.activity?.expires_at ? `Renew: .agents/skills/workflow/scripts/workflow renew ${picked.task.id}` : null,
         "",
         picked.prompt || "",
         "",
@@ -2119,7 +3308,7 @@ function formatCliResult(command, result) {
     const lines = [
       `Action: evaluate`,
       `${totalCandidates} unclaimed tasks available. Top candidates ranked by priority and dependency order.`,
-      `Pick one with: node .agents/skills/workflow/scripts/workflow.js pick <task-id>`,
+      "Pick one with: .agents/skills/workflow/scripts/workflow pick <task-id>",
       totalCandidates > displayLimit ? `Showing top ${displayLimit} of ${totalCandidates} candidates.` : null,
       skipped,
       "",
@@ -2170,6 +3359,9 @@ function formatCliResult(command, result) {
       `Task: ${result.task.title}`,
       `Source: ${result.task.identifier}`,
       `Linear: ${result.task.linear?.url || "not populated"}`,
+      result.task.activity?.owner ? `Owner: ${result.task.activity.owner}` : null,
+      result.task.activity?.expires_at ? `Lease expires: ${result.task.activity.expires_at}` : null,
+      result.task.activity?.expires_at ? `Renew: .agents/skills/workflow/scripts/workflow renew ${result.task.id}` : null,
       result.duplicate_prevented ? "Duplicate prevention: skipped claimed tasks." : null,
       "",
       result.prompt || "",
@@ -2252,34 +3444,54 @@ function formatDecisionState(state) {
 
 function usage() {
   return [
-    "Usage: workflow.js [command] [options]",
+    "Usage: .agents/skills/workflow/scripts/workflow [command] [options]",
     "",
     "Commands:",
-    "  next                 Start the next unclaimed local task (default)",
+    "  init                 Create a minimal WORKFLOW.md when missing",
+    "  doctor               Check local runtime and workflow readiness",
+    "  lint                 Audit task metadata; add --strict for required fields",
+    "  migrate-ids          Suggest durable IDs without editing task files",
+    "  plan                 Rank ready tasks without tracker writes",
+    "  next                 Start the next unclaimed local task",
     "  list                 List active local tasks",
     "  pick <task-id>       Pick or resume a specific task",
     "  render <task-id>     Render a prompt for a specific task",
     "  move <id>            Move a Linear issue or task's issue to another state",
     "  activity <id>        Mark claimed work active or inactive locally",
-    "  complete <task-id>   Mark a validated task complete locally and in Linear",
+    "  renew <id>           Renew an active task lease",
+    "  release <id>         Release a task lease for handoff",
+    "  takeover <id>        Explicitly take over an active task lease",
+    "  check <id>           Run a start or completion consistency gate",
+    "  finish <task-id>     Validate and mark a task done before merge",
+    "  close <task-id>      After merge, close Linear and release the lease",
+    "  complete <task-id>   Compatibility alias for finish",
+    "  reconcile [task-id]  Inspect or repair interrupted completion operations",
     "  ui                   Open the populated local workflow task board",
     "  begin-ui             Opt-in mode: begin work and open the task board",
     "  validate             Validate WORKFLOW.md",
     "",
     "Options:",
     "  --json               Print machine-readable JSON",
-    "  --limit <n>          Limit local tasks scanned",
+    "  --limit <n>          Limit candidates displayed without changing ranking",
+    "  --verbose            Include full task packets in plan output",
+    "  --all                Include completed packets when listing tasks",
+    "  --online             Verify Linear credentials and routing during doctor",
     "  --count <n>          Pick multiple unclaimed tasks for parallel work",
     "  --attempt <n>        Render with an attempt number",
     "  --status <state>     Activity status for activity command: active|inactive",
     "  --owner <name>       Optional owner for activity records",
-    "  --force              Take over an active claimed task when picking",
+    "  --lease-minutes <n>  Claim lease duration (default: 120 minutes)",
+    "  --phase <phase>      Consistency gate phase: start|complete",
+    "  --validation-evidence <summary>  Validation performed for completion",
+    "  --dry-run            Show reconciliation actions without applying them",
+    "  --override-validation  Bypass validation evidence only with a reason",
+    "  --override-merge     Bypass merge verification only with a reason",
+    "  --override-reason <reason>  Required explanation for an override or takeover",
     "  --state-name <name>  Target Linear state for move",
     "  --state-id <id>      Target Linear state ID for move",
-    "  --local-only         Complete only the local task checkbox",
-    "  --no-local           Move Linear without editing the local task checkbox",
     "  --data <source>      UI data source: list, next, pick, or none",
     "  --host <host>        Host for the local UI server",
+    "  --allow-remote       Explicitly expose the UI on a non-loopback host",
     "  --port <port>        Port for the local UI server",
     "  --task-id <id>       Task ID for --data pick",
     "  --no-open            Serve UI and print URL without opening a browser",
@@ -2300,11 +3512,23 @@ module.exports = {
   findTaskFiles,
   buildUiPayload,
   completeTask,
+  checkTaskConsistency,
+  doctorWorkflow,
+  finishTask,
+  closeTask,
+  lintTasks,
+  initializeWorkflow,
+  isActivityActive,
   launchWorkflowUi,
   listTasks,
   parseTaskFile,
+  planTasks,
+  reconcileWorkflow,
   parseWorkflow,
   runCli,
   renderTemplate,
+  selectCompatibleCandidates,
+  tasksConflict,
+  updateWorkflowOperation,
   validateWorkflowContract,
 };

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use gpui::{FontStyle, FontWeight, HighlightStyle, Hsla, WindowBackgroundAppearance, hsla};
 
 use crate::{
-    AccentColors, Appearance, BorderRadiusContent, DEFAULT_DARK_THEME, PlayerColors, StatusColors,
+    AccentColors, Appearance, DEFAULT_DARK_THEME, PlayerColors, StatusColors,
     StatusColorsRefinement, SyntaxTheme, SystemColors, Theme, ThemeColors, ThemeColorsRefinement,
     ThemeFamily, ThemeStyles, default_color_scales,
 };
@@ -387,7 +387,6 @@ pub(crate) fn sim_default_dark() -> Theme {
                 ("diff.plus".into(), green.into()),
                 ("diff.minus".into(), red.into()),
             ])),
-            border_radius: BorderRadiusContent::default(),
         },
     }
 }

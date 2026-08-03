@@ -46,7 +46,7 @@ pub enum SignInStatus {
     AlreadySignedIn {
         user: String,
     },
-    NotAuthorisim {
+    NotAuthorized {
         user: String,
     },
     NotSignedIn,

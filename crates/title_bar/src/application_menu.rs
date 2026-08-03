@@ -167,7 +167,8 @@ impl ApplicationMenu {
                             ui::IconName::Menu,
                         )
                         .style(ButtonStyle::Subtle)
-                        .icon_size(IconSize::Small),
+                        .icon_size(IconSize::Small)
+                        .aria_label("Application menu"),
                         Tooltip::text("Open Application Menu"),
                     )
                     .with_handle(handle),
@@ -273,8 +274,7 @@ impl ApplicationMenu {
 
 pub(crate) fn show_menus(cx: &mut App) -> bool {
     TitleBarSettings::get_global(cx).show_menus
-        && (cfg!(not(target_os = "macos"))
-            || option_env!("SIM_USE_CROSS_PLATFORM_MENU").is_some())
+        && (cfg!(not(target_os = "macos")) || option_env!("SIM_USE_CROSS_PLATFORM_MENU").is_some())
 }
 
 impl Render for ApplicationMenu {

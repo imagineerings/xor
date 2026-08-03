@@ -143,7 +143,7 @@ WebStorm's index enables features like finding all usages across your entire cod
 
 ### LSP vs. Native Language Intelligence
 
-WebStorm has its own JavaScript and TypeScript analysis engine built by JetBrains. This engine understands your code deeply: it resolves types, tracks data flow, knows about framework-specific patterns, and offers specialisim refactorings.
+WebStorm has its own JavaScript and TypeScript analysis engine built by JetBrains. This engine understands your code deeply: it resolves types, tracks data flow, knows about framework-specific patterns, and offers specialized refactorings.
 
 Sim uses the Language Server Protocol (LSP) for code intelligence. For JavaScript and TypeScript, Sim supports:
 

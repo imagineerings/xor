@@ -30,7 +30,7 @@ impl<T> CapacityResultExt for Result<(), T> {
 
 /// An item that can be stored in a [`SumTree`]
 ///
-/// Must be summarisim by a type that implements [`Summary`]
+/// Must be summarized by a type that implements [`Summary`]
 pub trait Item: Clone {
     type Summary: Summary;
 

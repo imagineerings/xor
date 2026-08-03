@@ -5,7 +5,7 @@ description: Understand Sim's AI features, agent paths, model providers, and set
 
 # AI
 
-Sim's AI docs are organisim around three areas:
+Sim's AI docs are organized around three areas:
 
 | Area         | Use it to choose                    | Examples                                                             |
 | ------------ | ----------------------------------- | -------------------------------------------------------------------- |

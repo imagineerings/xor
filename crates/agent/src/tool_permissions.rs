@@ -509,7 +509,7 @@ pub fn normalize_path(raw: &str) -> String {
     }
 }
 
-/// Decides permission by checking both the raw input path and a simplified/canonicalisim
+/// Decides permission by checking both the raw input path and a simplified/canonicalized
 /// version. Returns the most restrictive decision (Deny > Confirm > Allow).
 pub fn decide_permission_for_paths(
     tool_name: &str,
@@ -561,7 +561,7 @@ mod tests {
     use crate::pattern_extraction::extract_terminal_pattern;
     use crate::tools::{DeletePathTool, FetchTool, TerminalTool};
     use crate::{AgentTool, EditFileTool};
-    use agent_settings::{AgentProfileId, CompiledRegex, InvalidRegexPattern, SimMode, ToolRules};
+    use agent_settings::{AgentProfileId, CompiledRegex, InvalidRegexPattern, ToolRules};
     use gpui::px;
     use settings::{DockPosition, NotifyWhenAgentWaiting, PlaySoundWhenAgentDone};
     use std::sync::Arc;
@@ -591,15 +591,14 @@ mod tests {
             play_sound_when_agent_done: PlaySoundWhenAgentDone::default(),
             single_file_review: false,
             model_parameters: vec![],
-            sim_mode: SimMode::default(),
             auto_compact: agent_settings::AutoCompactSettings {
                 enabled: false,
-                strategy: agent_settings::AutoCompactStrategy::default(),
                 threshold: agent_settings::AutoCompactThreshold::DEFAULT,
             },
             enable_feedback: false,
             expand_edit_card: true,
             expand_terminal_card: true,
+            terminal_init_command: None,
             cancel_generation_on_terminal_stop: true,
             use_modifier_to_send: true,
             message_editor_min_lines: 1,

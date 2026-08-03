@@ -205,8 +205,8 @@ impl<'a> Matcher<'a> {
         }
 
         let path_len = prefix.len() + path.len();
-        if let Some(memoisim) = self.score_matrix[query_idx * path_len + path_idx] {
-            return memoisim;
+        if let Some(memoized) = self.score_matrix[query_idx * path_len + path_idx] {
+            return memoized;
         }
 
         let mut score = 0.0;
@@ -605,7 +605,7 @@ mod tests {
                 worktree_id: 0,
                 positions: positions.clone(),
                 path: candidate.path.into(),
-                path_prefix: RelPath::empty().into(),
+                path_prefix: RelPath::empty_arc(),
                 distance_to_relative_ancestor: usize::MAX,
                 is_dir: false,
             },

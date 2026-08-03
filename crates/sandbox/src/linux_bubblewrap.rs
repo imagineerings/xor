@@ -13,7 +13,7 @@
 //! - run a bridge process inside the sandbox that:
 //!   - listens on `localhost:<port>` and forwards reads/writes to the socket
 //!   - then, runs the untrusted command
-//! - on the zed side, we listen to the socket and forward reads/writes to the
+//! - on the sim side, we listen to the socket and forward reads/writes to the
 //!   internal HTTP proxy
 //!
 //! If networking is fully blocked or fully allowed, we don't bother with the
@@ -40,16 +40,18 @@ use std::thread;
 /// the real command to (a) validate that bwrap bound the writable grants to the
 /// inodes we captured (the bind-source TOCTOU backstop) and (b) run the
 /// restricted-network HTTP bridge. See `README.md` for the design.
-const LAUNCHER_FLAG: &str = "--zed-linux-sandbox-launcher";
+const LAUNCHER_FLAG: &str = "--sim-linux-sandbox-launcher";
 /// Re-exec marker for the WSL-side helper. This runs *inside WSL* (a Linux
 /// process) and does what `Sandbox::wrap` + the validation-fd sender do
 /// in-process on native Linux: capture the writable binds' `O_PATH` fds, stand
 /// up the validation socket, assemble the bwrap invocation, and spawn it. The
 /// capture must happen WSL-side because a Windows process holds no Linux fds.
+/// See `README.md`. Shared with the Windows side via `crate::WSL_SANDBOX_HELPER_FLAG`.
+const WSL_HELPER_FLAG: &str = crate::WSL_SANDBOX_HELPER_FLAG;
 /// Sentinel argv token meaning "this optional field is absent".
 const LAUNCHER_NONE: &str = "-";
-const PROXY_SOCKET_SANDBOX_PATH_PREFIX: &str = "/tmp/zed-sandbox";
-const VALIDATION_SOCKET_SANDBOX_PATH_PREFIX: &str = "/tmp/zed-sandbox-validate";
+const PROXY_SOCKET_SANDBOX_PATH_PREFIX: &str = "/tmp/sim-sandbox";
+const VALIDATION_SOCKET_SANDBOX_PATH_PREFIX: &str = "/tmp/sim-sandbox-validate";
 const SANDBOX_SETUP_FAILED_EXIT_CODE: i32 = 126;
 const PUMP_BUFFER_SIZE: usize = 64 * 1024;
 /// Upper bound on writable binds validated in a single `SCM_RIGHTS` message,
@@ -102,7 +104,7 @@ impl LauncherStatus {
         match self {
             LauncherStatus::BwrapNotFound => "no usable `bwrap` binary was found on PATH",
             LauncherStatus::SetuidRejected => {
-                "the only available `bwrap` is setuid-root, which Zed refuses to run"
+                "the only available `bwrap` is setuid-root, which Sim refuses to run"
             }
             LauncherStatus::SandboxProbeFailed => {
                 "`bwrap` is present but failed to create a sandbox (unprivileged user \
@@ -219,7 +221,7 @@ fn probe_bwrap(bwrap: &Path, bwrap_args: &[String]) -> bool {
 /// the sandbox where the bridge connects to it.
 pub fn build_bwrap_args(
     writable_directories: &[&Path],
-    protected_git_dirs: &[&Path],
+    protected_paths: &[&Path],
     permissions: SandboxPermissions,
     cwd: Option<&Path>,
     proxy_socket_path: Option<&Path>,
@@ -229,7 +231,7 @@ pub fn build_bwrap_args(
         .map(|_| unique_proxy_socket_sandbox_path());
     build_bwrap_args_with_sandbox_paths(
         writable_directories,
-        protected_git_dirs,
+        protected_paths,
         permissions,
         cwd,
         proxy_socket_path,
@@ -245,7 +247,7 @@ pub fn build_bwrap_args(
 )]
 fn build_bwrap_args_with_sandbox_paths(
     writable_directories: &[&Path],
-    protected_git_dirs: &[&Path],
+    protected_paths: &[&Path],
     permissions: SandboxPermissions,
     cwd: Option<&Path>,
     proxy_socket_path: Option<&Path>,
@@ -288,24 +290,19 @@ fn build_bwrap_args_with_sandbox_paths(
             let path = directory.to_string_lossy().into_owned();
             push_bind(&mut args, "--bind", &path, &path);
         }
+    }
 
-        // Protect Git directories by re-binding them read-only *over* the rw
-        // worktree binds above (order matters: later binds win). Unlike
-        // Seatbelt, bwrap can't deny content reads while keeping metadata, so on
-        // Linux a protected `.git` is read-only — its contents stay readable but
-        // can't be written. A read-only re-bind needs no TOCTOU check: the whole
-        // root is already read-only, so re-exposing a path read-only grants
-        // nothing new even if its source was swapped. A not-yet-existing `.git`
-        // can't be bound, so it's skipped (a documented gap vs. macOS). When Git
-        // access is granted these dirs are in `writable_directories` instead and
-        // this list is empty.
-        for git_dir in protected_git_dirs {
-            if !git_dir.exists() {
-                continue;
-            }
-            let path = git_dir.to_string_lossy().into_owned();
-            push_bind(&mut args, "--ro-bind", &path, &path);
+    // Protect requested paths by re-binding them read-only *over* any broader rw
+    // bind (order matters: later binds win). Unlike Seatbelt, bwrap can't deny
+    // writes while allowing content reads with a policy rule, so a protected path
+    // is read-only — its contents stay readable but can't be written. A
+    // not-yet-existing path can't be bound, so it's skipped.
+    for protected_path in protected_paths {
+        if !protected_path.exists() {
+            continue;
         }
+        let path = protected_path.to_string_lossy().into_owned();
+        push_bind(&mut args, "--ro-bind", &path, &path);
     }
 
     for flag in [
@@ -396,7 +393,7 @@ fn unique_validation_socket_host_path() -> std::io::Result<(PathBuf, PathBuf)> {
     static COUNTER: AtomicU64 = AtomicU64::new(0);
     let counter = COUNTER.fetch_add(1, Ordering::Relaxed);
     let dir = std::env::temp_dir().join(format!(
-        "zed-sandbox-validate-{}-{counter}",
+        "sim-sandbox-validate-{}-{counter}",
         std::process::id()
     ));
     // Clear a stale directory left by a previous run that reused this pid; this
@@ -424,7 +421,7 @@ fn unique_validation_socket_host_path() -> std::io::Result<(PathBuf, PathBuf)> {
 /// still-blocked accept and removes the socket and its private directory (a
 /// no-op if the thread already tore them down). The socket is bind-mounted into
 /// the sandbox at [`Self::sandbox_socket_path`].
-pub struct ValidationFdSender {
+pub(crate) struct ValidationFdSender {
     host_socket_dir: PathBuf,
     host_socket_path: PathBuf,
     sandbox_socket_path: PathBuf,
@@ -435,7 +432,7 @@ impl ValidationFdSender {
     /// Start serving `fds` (one per writable bind, in bind order). The caller
     /// must pass the same order to the launcher so each fd lines up with its
     /// bind-destination path.
-    pub fn spawn(fds: Vec<OwnedFd>) -> std::io::Result<Self> {
+    pub(crate) fn spawn(fds: Vec<OwnedFd>) -> std::io::Result<Self> {
         use std::os::unix::fs::PermissionsExt as _;
 
         if fds.len() > MAX_VALIDATED_BINDS {
@@ -454,10 +451,10 @@ impl ValidationFdSender {
         let shutdown = Arc::new(AtomicBool::new(false));
 
         // We use std threading APIs here because this code is run from both the
-        // Linux zed binary and also the WSL helper, which does not have a GPUI
+        // Linux sim binary and also the WSL helper, which does not have a GPUI
         // runtime.
         thread::Builder::new()
-            .name("zed-sandbox-validation".to_string())
+            .name("sim-sandbox-validation".to_string())
             .spawn({
                 let shutdown = shutdown.clone();
                 let host_socket_path = host_socket_path.clone();
@@ -498,11 +495,11 @@ impl ValidationFdSender {
         })
     }
 
-    pub fn host_socket_path(&self) -> &Path {
+    pub(crate) fn host_socket_path(&self) -> &Path {
         &self.host_socket_path
     }
 
-    pub fn sandbox_socket_path(&self) -> &Path {
+    pub(crate) fn sandbox_socket_path(&self) -> &Path {
         &self.sandbox_socket_path
     }
 }
@@ -566,7 +563,7 @@ pub fn check_can_create_sandbox(
     prepare_sandbox(permissions).map(|_| ())
 }
 
-/// The host (Zed-side) socket paths for the in-sandbox bind validator.
+/// The host (Sim-side) socket paths for the in-sandbox bind validator.
 #[derive(Clone, Copy)]
 pub struct ValidationSocket<'a> {
     /// Host pathname of the listener the validator connects back to.
@@ -578,7 +575,7 @@ pub struct ValidationSocket<'a> {
 
 /// Build the final command line that runs `program` inside Bubblewrap.
 ///
-/// `bridge_program` should be the current Zed executable; it is re-exec'd inside
+/// `bridge_program` should be the current Sim executable; it is re-exec'd inside
 /// the sandbox as the launcher whenever bind validation and/or the
 /// restricted-network bridge are needed, running before the real command.
 ///
@@ -593,7 +590,7 @@ pub fn wrap_invocation(
     bridge_program: &str,
     permissions: SandboxPermissions,
     writable_dirs: &[&Path],
-    protected_git_dirs: &[&Path],
+    protected_paths: &[&Path],
     cwd: Option<&Path>,
     program: &str,
     args: &[String],
@@ -635,7 +632,7 @@ pub fn wrap_invocation(
     };
     let mut bwrap_args = build_bwrap_args_with_sandbox_paths(
         writable_dirs,
-        protected_git_dirs,
+        protected_paths,
         permissions,
         cwd,
         proxy_socket_path,
@@ -709,14 +706,14 @@ pub fn run_launcher_if_invoked() {
     let invocation = match invocation {
         Ok(invocation) => invocation,
         Err(error) => {
-            eprintln!("zed: malformed sandbox launcher invocation: {error:#}");
+            eprintln!("sim: malformed sandbox launcher invocation: {error:#}");
             std::process::exit(127);
         }
     };
     run_launcher(invocation);
 }
 
-/// A decoded in-sandbox launcher invocation (the `--zed-linux-sandbox-launcher`
+/// A decoded in-sandbox launcher invocation (the `--sim-linux-sandbox-launcher`
 /// re-exec). All fields are produced by the trusted host side and parsed before
 /// any untrusted command runs.
 struct LauncherInvocation {
@@ -812,7 +809,7 @@ fn run_launcher(invocation: LauncherInvocation) -> ! {
         if let Err(error) = validate_binds(socket, &invocation.validation_paths) {
             // Fail closed: a redirected (or unverifiable) writable bind means the
             // command must not run at all.
-            eprintln!("zed: sandbox bind validation failed: {error:#}");
+            eprintln!("sim: sandbox bind validation failed: {error:#}");
             std::process::exit(SANDBOX_SETUP_FAILED_EXIT_CODE);
         }
     }
@@ -866,7 +863,7 @@ fn validate_binds(socket_path: &Path, paths: &[PathBuf]) -> Result<()> {
 /// if `exec` itself fails.
 fn exec_command(program: &OsStr, args: &[OsString]) -> ! {
     let error = Command::new(program).args(args).exec();
-    eprintln!("zed: failed to exec sandboxed command: {error}");
+    eprintln!("sim: failed to exec sandboxed command: {error}");
     std::process::exit(SANDBOX_SETUP_FAILED_EXIT_CODE);
 }
 
@@ -878,24 +875,24 @@ fn run_bridge(socket_path: PathBuf, port: u16, program: &OsStr, program_args: &[
     let listener = match TcpListener::bind((Ipv4Addr::LOCALHOST, port)) {
         Ok(listener) => listener,
         Err(error) => {
-            eprintln!("zed: failed to bind sandbox proxy bridge: {error}");
+            eprintln!("sim: failed to bind sandbox proxy bridge: {error}");
             std::process::exit(SANDBOX_SETUP_FAILED_EXIT_CODE);
         }
     };
 
     if let Err(error) = thread::Builder::new()
-        .name("zed-sandbox-bridge".to_string())
+        .name("sim-sandbox-bridge".to_string())
         .stack_size(128 * 1024)
         .spawn(move || run_bridge_listener(listener, socket_path))
     {
-        eprintln!("zed: failed to spawn sandbox proxy bridge: {error}");
+        eprintln!("sim: failed to spawn sandbox proxy bridge: {error}");
         std::process::exit(SANDBOX_SETUP_FAILED_EXIT_CODE);
     }
 
     let mut child = match Command::new(program).args(program_args).spawn() {
         Ok(child) => child,
         Err(error) => {
-            eprintln!("zed: failed to spawn sandboxed command: {error}");
+            eprintln!("sim: failed to spawn sandboxed command: {error}");
             std::process::exit(SANDBOX_SETUP_FAILED_EXIT_CODE);
         }
     };
@@ -909,7 +906,7 @@ fn run_bridge(socket_path: PathBuf, port: u16, program: &OsStr, program_args: &[
             std::process::exit(128 + signal);
         }
         Err(error) => {
-            eprintln!("zed: failed to wait for sandboxed command: {error}");
+            eprintln!("sim: failed to wait for sandboxed command: {error}");
             std::process::exit(SANDBOX_SETUP_FAILED_EXIT_CODE);
         }
     }
@@ -1001,19 +998,193 @@ fn open_o_path_fd(path: &Path) -> std::io::Result<OwnedFd> {
     Ok(OwnedFd::from(file))
 }
 
-/// Capture writable bind sources and return their resolved paths plus pinned
-/// descriptors in matching order for the in-sandbox validator.
-pub fn capture_writable_paths(paths: &[&Path]) -> std::io::Result<(Vec<PathBuf>, Vec<OwnedFd>)> {
-    let mut resolved_paths = Vec::with_capacity(paths.len());
-    let mut file_descriptors = Vec::with_capacity(paths.len());
-    for path in paths {
-        let file_descriptor = open_o_path_fd(path)?;
-        let resolved_path =
-            std::fs::read_link(format!("/proc/self/fd/{}", file_descriptor.as_raw_fd()))?;
-        resolved_paths.push(resolved_path);
-        file_descriptors.push(file_descriptor);
+/// A decoded WSL-helper invocation (`--wsl-sandbox-helper`). All fields are
+/// produced by the trusted Windows side and parsed before any untrusted command
+/// runs.
+struct WslHelperInvocation {
+    /// Absolute path of `bwrap` inside WSL (located by the Windows-side probe).
+    bwrap_path: PathBuf,
+    /// Pre-built bwrap *options* — everything before the trailing `-- cmd` —
+    /// assembled on the Windows side (`windows_wsl::build_bwrap_args`): root
+    /// bind, `/tmp` tmpfs, writable binds, Windows-interop blocking, `--setenv`s,
+    /// `--chdir`, namespace flags, etc.
+    base_args: Vec<OsString>,
+    /// The writable bind destinations to validate — exactly the ones `base_args`
+    /// binds read-write. Each is captured here (WSL-side) and checked in-sandbox.
+    writable_paths: Vec<PathBuf>,
+    program: OsString,
+    args: Vec<OsString>,
+}
+
+/// Handle a possible re-exec of this binary as the WSL-side sandbox helper. Does
+/// not return if it was invoked as one.
+pub fn run_wsl_helper_if_invoked() {
+    let Some(invocation) = parse_wsl_helper_args(std::env::args_os()) else {
+        return;
+    };
+    let invocation = match invocation {
+        Ok(invocation) => invocation,
+        Err(error) => {
+            eprintln!("sim: malformed WSL sandbox helper invocation: {error:#}");
+            std::process::exit(127);
+        }
+    };
+    run_wsl_helper(invocation);
+}
+
+fn parse_wsl_helper_args(
+    args: impl IntoIterator<Item = OsString>,
+) -> Option<Result<WslHelperInvocation>> {
+    let mut args = args.into_iter();
+    args.next()?;
+    if args.next()?.to_str() != Some(WSL_HELPER_FLAG) {
+        return None;
     }
-    Ok((resolved_paths, file_descriptors))
+    Some(decode_wsl_helper_args(args))
+}
+
+fn decode_wsl_helper_args(mut args: impl Iterator<Item = OsString>) -> Result<WslHelperInvocation> {
+    let bwrap_path = PathBuf::from(args.next().context("missing bwrap path")?);
+    let base_count = parse_count(
+        args.next().context("missing base-arg count")?,
+        "base-arg count",
+    )?;
+    let mut base_args = Vec::with_capacity(base_count);
+    for _ in 0..base_count {
+        base_args.push(args.next().context("missing base arg")?);
+    }
+    let writable_count = parse_count(
+        args.next().context("missing writable count")?,
+        "writable count",
+    )?;
+    if writable_count > MAX_VALIDATED_BINDS {
+        bail!("writable count {writable_count} exceeds {MAX_VALIDATED_BINDS}");
+    }
+    let mut writable_paths = Vec::with_capacity(writable_count);
+    for _ in 0..writable_count {
+        writable_paths.push(PathBuf::from(args.next().context("missing writable path")?));
+    }
+    let separator = args.next().context("missing argument separator")?;
+    if separator != "--" {
+        bail!("missing argument separator");
+    }
+    let program = args.next().context("missing program to run")?;
+    let args = args.collect();
+    Ok(WslHelperInvocation {
+        bwrap_path,
+        base_args,
+        writable_paths,
+        program,
+        args,
+    })
+}
+
+fn parse_count(value: OsString, what: &str) -> Result<usize> {
+    value
+        .to_str()
+        .with_context(|| format!("{what} is not valid UTF-8"))?
+        .parse::<usize>()
+        .with_context(|| format!("invalid {what}"))
+}
+
+/// The WSL-side helper entry point. Mirrors the native-Linux host side: capture
+/// the writable binds' inodes (here, inside WSL), stand up the validation socket,
+/// finish assembling the bwrap invocation (validation socket bind + in-sandbox
+/// validator re-exec), spawn bwrap, and propagate its exit. Never returns.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "the WSL helper is a dedicated per-command process that must spawn and wait for bwrap"
+)]
+fn run_wsl_helper(invocation: WslHelperInvocation) -> ! {
+    // Capture an `O_PATH` fd per writable bind *here*, inside WSL — this is the
+    // capture-at-validation step that on native Linux happens in the Sim process.
+    let mut fds = Vec::with_capacity(invocation.writable_paths.len());
+    for path in &invocation.writable_paths {
+        match open_o_path_fd(path) {
+            Ok(fd) => fds.push(fd),
+            Err(error) => {
+                // Fail closed: a writable bind we can't pin can't be verified.
+                eprintln!(
+                    "sim: WSL sandbox helper could not open writable bind {}: {error}",
+                    path.display()
+                );
+                std::process::exit(SANDBOX_SETUP_FAILED_EXIT_CODE);
+            }
+        }
+    }
+
+    let validation = if fds.is_empty() {
+        None
+    } else {
+        match ValidationFdSender::spawn(fds) {
+            Ok(sender) => Some(sender),
+            Err(error) => {
+                eprintln!("sim: WSL sandbox helper could not start the bind validator: {error}");
+                std::process::exit(SANDBOX_SETUP_FAILED_EXIT_CODE);
+            }
+        }
+    };
+
+    let current_exe = match std::env::current_exe() {
+        Ok(path) => path,
+        Err(error) => {
+            eprintln!("sim: WSL sandbox helper could not resolve its own path: {error}");
+            std::process::exit(SANDBOX_SETUP_FAILED_EXIT_CODE);
+        }
+    };
+
+    let mut args = invocation.base_args.clone();
+    if let Some(sender) = &validation {
+        // Bind the validation socket in (after the base args' tmpfs and writable
+        // binds so it isn't shadowed), then re-exec ourselves inside the sandbox
+        // as the validator before the real command. WSL has no restricted-network
+        // bridge, so both bridge fields are the absent sentinel.
+        args.push(OsString::from("--bind"));
+        args.push(sender.host_socket_path().as_os_str().to_os_string());
+        args.push(sender.sandbox_socket_path().as_os_str().to_os_string());
+        args.push(OsString::from("--"));
+        args.push(current_exe.into_os_string());
+        args.push(OsString::from(LAUNCHER_FLAG));
+        args.push(sender.sandbox_socket_path().as_os_str().to_os_string());
+        args.push(OsString::from(LAUNCHER_NONE));
+        args.push(OsString::from(LAUNCHER_NONE));
+        args.push(OsString::from(invocation.writable_paths.len().to_string()));
+        for path in &invocation.writable_paths {
+            args.push(path.clone().into_os_string());
+        }
+        args.push(OsString::from("--"));
+    } else {
+        // Nothing to validate — run the command directly under bwrap.
+        args.push(OsString::from("--"));
+    }
+    args.push(invocation.program.clone());
+    args.extend(invocation.args.iter().cloned());
+
+    let mut child = match Command::new(&invocation.bwrap_path).args(&args).spawn() {
+        Ok(child) => child,
+        Err(error) => {
+            eprintln!("sim: WSL sandbox helper could not spawn bwrap: {error}");
+            std::process::exit(SANDBOX_SETUP_FAILED_EXIT_CODE);
+        }
+    };
+
+    let status = child.wait();
+    // Hold the validator open until bwrap (and thus the in-sandbox validator that
+    // connects to it during startup) has finished.
+    drop(validation);
+    match status {
+        Ok(status) => {
+            if let Some(code) = status.code() {
+                std::process::exit(code);
+            }
+            let signal = status.signal().unwrap_or(1);
+            std::process::exit(128 + signal);
+        }
+        Err(error) => {
+            eprintln!("sim: WSL sandbox helper failed waiting for bwrap: {error}");
+            std::process::exit(SANDBOX_SETUP_FAILED_EXIT_CODE);
+        }
+    }
 }
 
 fn run_bridge_listener(listener: TcpListener, socket_path: PathBuf) {
@@ -1022,14 +1193,14 @@ fn run_bridge_listener(listener: TcpListener, socket_path: PathBuf) {
             Ok(stream) => {
                 let socket_path = socket_path.clone();
                 if let Err(error) = thread::Builder::new()
-                    .name("zed-sandbox-bridge-conn".to_string())
+                    .name("sim-sandbox-bridge-conn".to_string())
                     .stack_size(128 * 1024)
                     .spawn(move || forward_bridge_connection(stream, socket_path))
                 {
-                    eprintln!("zed: failed to spawn sandbox bridge connection thread: {error}");
+                    eprintln!("sim: failed to spawn sandbox bridge connection thread: {error}");
                 }
             }
-            Err(error) => eprintln!("zed: sandbox bridge accept failed: {error}"),
+            Err(error) => eprintln!("sim: sandbox bridge accept failed: {error}"),
         }
     }
 }
@@ -1039,7 +1210,7 @@ fn forward_bridge_connection(tcp_stream: TcpStream, socket_path: PathBuf) {
         Ok(stream) => stream,
         Err(error) => {
             eprintln!(
-                "zed: sandbox bridge failed to connect to proxy socket {}: {error}",
+                "sim: sandbox bridge failed to connect to proxy socket {}: {error}",
                 socket_path.display()
             );
             return;
@@ -1052,14 +1223,14 @@ fn copy_bidirectional(tcp_stream: TcpStream, unix_stream: UnixStream) {
     let tcp_read = match tcp_stream.try_clone() {
         Ok(stream) => stream,
         Err(error) => {
-            eprintln!("zed: sandbox bridge failed to clone TCP stream: {error}");
+            eprintln!("sim: sandbox bridge failed to clone TCP stream: {error}");
             return;
         }
     };
     let unix_read = match unix_stream.try_clone() {
         Ok(stream) => stream,
         Err(error) => {
-            eprintln!("zed: sandbox bridge failed to clone Unix stream: {error}");
+            eprintln!("sim: sandbox bridge failed to clone Unix stream: {error}");
             return;
         }
     };
@@ -1067,19 +1238,19 @@ fn copy_bidirectional(tcp_stream: TcpStream, unix_stream: UnixStream) {
     let tcp_write = tcp_stream;
     let unix_write = unix_stream;
     let to_proxy = match thread::Builder::new()
-        .name("zed-sandbox-bridge-out".to_string())
+        .name("sim-sandbox-bridge-out".to_string())
         .stack_size(128 * 1024)
         .spawn(move || copy_one_way(tcp_read, unix_write))
     {
         Ok(handle) => handle,
         Err(error) => {
-            eprintln!("zed: failed to spawn sandbox bridge pump thread: {error}");
+            eprintln!("sim: failed to spawn sandbox bridge pump thread: {error}");
             return;
         }
     };
     copy_one_way(unix_read, tcp_write);
     if to_proxy.join().is_err() {
-        eprintln!("zed: sandbox bridge pump thread panicked");
+        eprintln!("sim: sandbox bridge pump thread panicked");
     }
 }
 
@@ -1195,7 +1366,7 @@ mod tests {
         );
         assert!(!allowed.iter().any(|arg| arg == "--unshare-net"));
 
-        let socket = PathBuf::from("/tmp/zed-proxy.sock");
+        let socket = PathBuf::from("/tmp/sim-proxy.sock");
         let restricted = build_bwrap_args(
             &[],
             &[],
@@ -1218,18 +1389,20 @@ mod tests {
             network: NetworkAccess::None,
             allow_fs_write: true,
         };
-        let args = build_bwrap_args(&[], &[], permissions, None, None);
+        let protected = Path::new("/tmp");
+        let args = build_bwrap_args(&[], &[protected], permissions, None, None);
         assert!(windows_contains(&args, &["--bind", "/", "/"]));
         assert!(!windows_contains(&args, &["--ro-bind", "/", "/"]));
+        assert!(windows_contains(&args, &["--ro-bind", "/tmp", "/tmp"]));
         assert!(!windows_contains(&args, &["--tmpfs", "/tmp"]));
     }
 
     #[test]
     fn test_launcher_args_round_trip_bridge_and_validation() {
-        let bridge_socket = "/tmp/zed-sandbox-1234-0.sock";
-        let validate_socket = "/tmp/zed-sandbox-validate-1234-0.sock";
+        let bridge_socket = "/tmp/sim-sandbox-1234-0.sock";
+        let validate_socket = "/tmp/sim-sandbox-validate-1234-0.sock";
         let argv = launcher_argv(
-            "/path/to/zed",
+            "/path/to/sim",
             vec![
                 LAUNCHER_FLAG,
                 validate_socket,
@@ -1269,10 +1442,53 @@ mod tests {
     }
 
     #[test]
-    fn test_launcher_args_round_trip_no_bridge() {
-        let validate_socket = "/tmp/zed-sandbox-validate-1234-0.sock";
+    fn test_wsl_helper_args_round_trip() {
         let argv = launcher_argv(
-            "/path/to/zed",
+            "/path/to/sim",
+            vec![
+                WSL_HELPER_FLAG,
+                "/usr/bin/bwrap",
+                // base bwrap options (3 tokens)
+                "3",
+                "--ro-bind",
+                "/",
+                "/",
+                // writable binds to validate (1)
+                "1",
+                "/work/a",
+                "--",
+                "/bin/sh",
+                "-c",
+                "echo hi",
+            ],
+        );
+
+        let decoded = parse_wsl_helper_args(argv)
+            .expect("should be recognized as a WSL helper invocation")
+            .expect("should decode successfully");
+
+        assert_eq!(decoded.bwrap_path, PathBuf::from("/usr/bin/bwrap"));
+        assert_eq!(
+            decoded.base_args,
+            vec![
+                OsString::from("--ro-bind"),
+                OsString::from("/"),
+                OsString::from("/")
+            ]
+        );
+        assert_eq!(decoded.writable_paths, vec![PathBuf::from("/work/a")]);
+        assert_eq!(decoded.program, OsString::from("/bin/sh"));
+        assert_eq!(
+            decoded.args,
+            vec![OsString::from("-c"), OsString::from("echo hi")]
+        );
+    }
+
+    #[test]
+    fn test_launcher_args_round_trip_no_bridge() {
+        let validate_socket = "/tmp/sim-sandbox-validate-1234-0.sock";
+        let argv = launcher_argv(
+            "/path/to/sim",
             vec![
                 LAUNCHER_FLAG,
                 validate_socket,
@@ -1301,13 +1517,13 @@ mod tests {
 
     #[test]
     fn test_wrap_invocation_uses_bridge_for_restricted_network() {
-        let socket = PathBuf::from("/tmp/zed-proxy.sock");
+        let socket = PathBuf::from("/tmp/sim-proxy.sock");
         let permissions = SandboxPermissions {
             network: NetworkAccess::LocalhostPort(8080),
             allow_fs_write: false,
         };
         let args = build_wrapped_args_for_test(
-            "/path/to/zed",
+            "/path/to/sim",
             permissions,
             "/bin/sh",
             &["-c".to_string(), "echo hi".to_string()],
@@ -1323,7 +1539,7 @@ mod tests {
         assert!(windows_contains(
             &args,
             &[
-                "/path/to/zed",
+                "/path/to/sim",
                 LAUNCHER_FLAG,
                 LAUNCHER_NONE,
                 &sandbox_destination,
@@ -1378,7 +1594,7 @@ mod tests {
     /// Returns the in-sandbox destination of the proxy socket `--bind`, if any.
     fn proxy_socket_bind_destination(args: &[String]) -> Option<String> {
         args.windows(3).find_map(|window| {
-            if window[0] == "--bind" && window[1] == "/tmp/zed-proxy.sock" {
+            if window[0] == "--bind" && window[1] == "/tmp/sim-proxy.sock" {
                 Some(window[2].clone())
             } else {
                 None

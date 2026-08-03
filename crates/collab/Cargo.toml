@@ -39,12 +39,10 @@ cloud_api_types.workspace = true
 collections.workspace = true
 dashmap.workspace = true
 envy = "0.4.2"
-emojis.workspace = true
 futures.workspace = true
 gpui.workspace = true
 hex.workspace = true
 http_client.workspace = true
-image.workspace = true
 livekit_api.workspace = true
 log.workspace = true
 nanoid.workspace = true
@@ -53,7 +51,6 @@ prometheus = "0.14"
 prost.workspace = true
 rand.workspace = true
 reqwest = { version = "0.11", features = ["json"] }
-resvg = { version = "0.45.0", default-features = false, features = ["text", "system-fonts", "memmap-fonts", "raster-images"] }
 rpc.workspace = true
 # sea-orm and sea-orm-macros versions must match exactly.
 sea-orm = { version = "=1.1.10", features = ["sqlx-postgres", "postgres-array", "runtime-tokio-rustls", "with-uuid"] }
@@ -75,7 +72,6 @@ tracing.workspace = true
 tracing-subscriber = { version = "0.3.18", features = ["env-filter", "json", "registry", "tracing-log"] } # workaround for https://github.com/tokio-rs/tracing/issues/2927
 util.workspace = true
 uuid.workspace = true
-usvg = { version = "0.45.0", default-features = false }
 
 [dev-dependencies]
 agent = { workspace = true, features = ["test-support"] }
@@ -116,7 +112,6 @@ multi_buffer = { workspace = true, features = ["test-support"] }
 node_runtime.workspace = true
 notifications = { workspace = true, features = ["test-support"] }
 pretty_assertions.workspace = true
-proptest.workspace = true
 project = { workspace = true, features = ["test-support"] }
 prompt_store.workspace = true
 recent_projects = { workspace = true, features = ["test-support"] }

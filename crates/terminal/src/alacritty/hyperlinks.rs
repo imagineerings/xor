@@ -529,13 +529,13 @@ mod tests {
     fn test_url_parentheses_sanitization() {
         // Test our sanitize_url_parentheses function directly
         let test_cases = vec![
-            // Cases that should be sanitisim (unbalanced parentheses)
+            // Cases that should be sanitized (unbalanced parentheses)
             ("https://www.google.com/)", "https://www.google.com/"),
             ("https://example.com/path)", "https://example.com/path"),
             ("https://test.com/))", "https://test.com/"),
             ("https://test.com/(((", "https://test.com/"),
             ("https://test.com/(test)(", "https://test.com/(test)"),
-            // Cases that should NOT be sanitisim (balanced parentheses)
+            // Cases that should NOT be sanitized (balanced parentheses)
             (
                 "https://en.wikipedia.org/wiki/Example_(disambiguation)",
                 "https://en.wikipedia.org/wiki/Example_(disambiguation)",

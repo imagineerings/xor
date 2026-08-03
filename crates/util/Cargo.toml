@@ -27,7 +27,6 @@ futures.workspace = true
 globset.workspace = true
 itertools.workspace = true
 log.workspace = true
-parking_lot.workspace = true
 rand = { workspace = true, optional = true }
 regex.workspace = true
 rust-embed.workspace = true
@@ -43,7 +42,6 @@ url.workspace = true
 percent-encoding.workspace = true
 util_macros = { workspace = true, optional = true }
 gpui_util.workspace = true
-uuid.workspace = true
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 smol.workspace = true

@@ -479,7 +479,7 @@ pub enum EditorMode {
         /// When set to `true`, the editor will render a background for the active line.
         show_active_line_background: bool,
         /// When set to `true`, the editor's height will be determined by its content.
-        sized_by_content: bool,
+        sisim_by_content: bool,
     },
 }
 
@@ -488,7 +488,7 @@ impl EditorMode {
         Self::Full {
             scale_ui_elements_with_buffer_font_size: true,
             show_active_line_background: true,
-            sized_by_content: false,
+            sisim_by_content: false,
         }
     }
 

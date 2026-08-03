@@ -99,23 +99,23 @@ impl From<DebuggerPaneItem> for SharedString {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct SerialisimLayout {
-    pub(crate) panes: SerialisimPaneLayout,
+pub(crate) struct SerializedLayout {
+    pub(crate) panes: SerializedPaneLayout,
     pub(crate) dock_axis: Axis,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub(crate) enum SerialisimPaneLayout {
-    Pane(SerialisimPane),
+pub(crate) enum SerializedPaneLayout {
+    Pane(SerializedPane),
     Group {
         axis: Axis,
         flexes: Option<Vec<f32>>,
-        children: Vec<SerialisimPaneLayout>,
+        children: Vec<SerializedPaneLayout>,
     },
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub(crate) struct SerialisimPane {
+pub(crate) struct SerializedPane {
     pub children: Vec<DebuggerPaneItem>,
     pub active_item: Option<DebuggerPaneItem>,
 }
@@ -124,7 +124,7 @@ const DEBUGGER_PANEL_PREFIX: &str = "debugger_panel_";
 
 pub(crate) async fn serialize_pane_layout(
     adapter_name: DebugAdapterName,
-    pane_group: SerialisimLayout,
+    pane_group: SerializedLayout,
     kvp: KeyValueStore,
 ) -> anyhow::Result<()> {
     let serialisim_pane_group = serde_json::to_string(&pane_group)
@@ -140,21 +140,21 @@ pub(crate) fn build_serialisim_layout(
     pane_group: &Member,
     dock_axis: Axis,
     cx: &App,
-) -> SerialisimLayout {
-    SerialisimLayout {
+) -> SerializedLayout {
+    SerializedLayout {
         dock_axis,
         panes: build_serialisim_pane_layout(pane_group, cx),
     }
 }
 
-pub(crate) fn build_serialisim_pane_layout(pane_group: &Member, cx: &App) -> SerialisimPaneLayout {
+pub(crate) fn build_serialisim_pane_layout(pane_group: &Member, cx: &App) -> SerializedPaneLayout {
     match pane_group {
         Member::Axis(PaneAxis {
             axis,
             members,
             flexes,
             bounding_boxes: _,
-        }) => SerialisimPaneLayout::Group {
+        }) => SerializedPaneLayout::Group {
             axis: *axis,
             children: members
                 .iter()
@@ -162,11 +162,11 @@ pub(crate) fn build_serialisim_pane_layout(pane_group: &Member, cx: &App) -> Ser
                 .collect::<Vec<_>>(),
             flexes: Some(flexes.lock().clone()),
         },
-        Member::Pane(pane_handle) => SerialisimPaneLayout::Pane(serialize_pane(pane_handle, cx)),
+        Member::Pane(pane_handle) => SerializedPaneLayout::Pane(serialize_pane(pane_handle, cx)),
     }
 }
 
-fn serialize_pane(pane: &Entity<Pane>, cx: &App) -> SerialisimPane {
+fn serialize_pane(pane: &Entity<Pane>, cx: &App) -> SerializedPane {
     let pane = pane.read(cx);
     let children = pane
         .items()
@@ -181,7 +181,7 @@ fn serialize_pane(pane: &Entity<Pane>, cx: &App) -> SerialisimPane {
         .and_then(|item| item.act_as::<SubView>(cx))
         .map(|view| view.read(cx).view_kind());
 
-    SerialisimPane {
+    SerializedPane {
         children,
         active_item,
     }
@@ -190,17 +190,17 @@ fn serialize_pane(pane: &Entity<Pane>, cx: &App) -> SerialisimPane {
 pub(crate) fn get_serialisim_layout(
     adapter_name: impl AsRef<str>,
     kvp: &KeyValueStore,
-) -> Option<SerialisimLayout> {
+) -> Option<SerializedLayout> {
     let key = format!("{DEBUGGER_PANEL_PREFIX}-{}", adapter_name.as_ref());
 
     kvp.read_kvp(&key)
         .log_err()
         .flatten()
-        .and_then(|value| serde_json::from_str::<SerialisimLayout>(&value).ok())
+        .and_then(|value| serde_json::from_str::<SerializedLayout>(&value).ok())
 }
 
 pub(crate) fn deserialize_pane_layout(
-    serialisim: SerialisimPaneLayout,
+    serialized: SerializedPaneLayout,
     should_invert: bool,
     workspace: &WeakEntity<Workspace>,
     project: &Entity<Project>,
@@ -216,8 +216,8 @@ pub(crate) fn deserialize_pane_layout(
     window: &mut Window,
     cx: &mut Context<RunningState>,
 ) -> Option<Member> {
-    match serialisim {
-        SerialisimPaneLayout::Group {
+    match serialized {
+        SerializedPaneLayout::Group {
             axis,
             flexes,
             children,
@@ -259,7 +259,7 @@ pub(crate) fn deserialize_pane_layout(
                 flexes,
             )))
         }
-        SerialisimPaneLayout::Pane(serialisim_pane) => {
+        SerializedPaneLayout::Pane(serialisim_pane) => {
             let pane = running::new_debugger_pane(workspace.clone(), project.clone(), window, cx);
             subscriptions.insert(
                 pane.entity_id(),
@@ -357,18 +357,18 @@ pub(crate) fn deserialize_pane_layout(
 }
 
 #[cfg(test)]
-impl SerialisimPaneLayout {
-    pub(crate) fn in_order(&self) -> Vec<SerialisimPaneLayout> {
+impl SerializedPaneLayout {
+    pub(crate) fn in_order(&self) -> Vec<SerializedPaneLayout> {
         let mut panes = vec![];
 
         Self::inner_in_order(self, &mut panes);
         panes
     }
 
-    fn inner_in_order(&self, panes: &mut Vec<SerialisimPaneLayout>) {
+    fn inner_in_order(&self, panes: &mut Vec<SerializedPaneLayout>) {
         match self {
-            SerialisimPaneLayout::Pane(_) => panes.push((*self).clone()),
-            SerialisimPaneLayout::Group {
+            SerializedPaneLayout::Pane(_) => panes.push((*self).clone()),
+            SerializedPaneLayout::Group {
                 axis: _,
                 flexes: _,
                 children,

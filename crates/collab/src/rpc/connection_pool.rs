@@ -101,10 +101,6 @@ impl ConnectionPool {
         self.connections.values()
     }
 
-    pub fn connection_ids(&self) -> impl Iterator<Item = ConnectionId> + '_ {
-        self.connections.keys().copied()
-    }
-
     pub fn user_connections(&self, user_id: UserId) -> impl Iterator<Item = &Connection> + '_ {
         self.connected_users
             .get(&user_id)

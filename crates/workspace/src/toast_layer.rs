@@ -3,11 +3,11 @@ use std::{
     time::{Duration, Instant},
 };
 
-use sim_actions::toast;
 use gpui::{
     AnyView, DismissEvent, Entity, EntityId, FocusHandle, ManagedView, MouseButton, Subscription,
     Task,
 };
+use sim_actions::toast;
 use ui::{animation::DefaultAnimations, prelude::*};
 
 use crate::Workspace;

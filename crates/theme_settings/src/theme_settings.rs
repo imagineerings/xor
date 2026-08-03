@@ -10,12 +10,9 @@ mod settings;
 
 use std::sync::Arc;
 
-use ::settings::{
-    BufferLineHeight as SettingsBufferLineHeight, CursorBlink, CursorStyle, FontFeaturesContent,
-    FontSize, IntoGpui, MergeFromTrait, Settings, SettingsStore, ThemeSettingsContent,
-};
+use ::settings::{IntoGpui, Settings, SettingsStore};
 use anyhow::{Context as _, Result};
-use gpui::{App, BorrowAppContext, Font, HighlightStyle, Pixels, Refineable, px};
+use gpui::{App, Font, HighlightStyle, Pixels, Refineable, px};
 use gpui_util::ResultExt;
 use theme::{
     AccentColors, Appearance, AppearanceContent, DEFAULT_DARK_THEME, DEFAULT_ICON_THEME_NAME,
@@ -80,18 +77,6 @@ pub fn init(themes_to_load: LoadThemes, cx: &mut App) {
     if load_user_themes {
         let registry = ThemeRegistry::global(cx);
         load_bundled_themes(&registry);
-    }
-
-    // Apply Spectrum 2 font defaults when the active theme is Spectrum 2.
-    // These are injected into the default settings layer so that user-explicit
-    // font settings in settings.json can still override them.
-    if let Some(spectrum_defaults) = spectrum2_defaults(cx) {
-        cx.update_global::<SettingsStore, _>(|store, cx| {
-            store.update_default_settings(cx, |settings| {
-                let boxed_defaults = Box::new(spectrum_defaults);
-                settings.theme.merge_from(&boxed_defaults);
-            });
-        });
     }
 
     let theme = configured_theme(cx);
@@ -174,40 +159,6 @@ pub fn init(themes_to_load: LoadThemes, cx: &mut App) {
         }
     })
     .detach();
-}
-
-/// Returns Spectrum 2 Inspired font defaults when the active theme
-/// is a Spectrum 2 Inspired theme, or `None` otherwise.
-///
-/// These defaults are applied at the default settings layer so that
-/// user-explicit font settings in `settings.json` still take precedence.
-pub fn spectrum2_defaults(cx: &App) -> Option<ThemeSettingsContent> {
-    let theme_settings = ThemeSettings::get_global(cx);
-    let system_appearance = SystemAppearance::global(cx);
-    let theme_name = theme_settings.theme.name(*system_appearance);
-
-    if !theme_name.0.contains("Spectrum 2 Inspired") {
-        return None;
-    }
-
-    let mut ui_font_features = FontFeaturesContent::default();
-    ui_font_features.0.insert("calt".to_string(), 1);
-
-    let mut buffer_font_features = FontFeaturesContent::default();
-    buffer_font_features.0.insert("liga".to_string(), 1);
-
-    Some(ThemeSettingsContent {
-        ui_font_family: Some(FontFamilyName("Inter".into())),
-        buffer_font_family: Some(FontFamilyName("SF Mono".into())),
-        ui_font_size: Some(FontSize(14.0)),
-        buffer_font_size: Some(FontSize(15.0)),
-        buffer_line_height: Some(SettingsBufferLineHeight::Standard),
-        ui_font_features: Some(ui_font_features),
-        buffer_font_features: Some(buffer_font_features),
-        cursor_style: Some(CursorStyle::Block),
-        cursor_blink: Some(CursorBlink::Smooth),
-        ..Default::default()
-    })
 }
 
 fn configured_theme(cx: &mut App) -> Arc<Theme> {
@@ -404,24 +355,6 @@ pub fn refine_theme(theme: &ThemeContent) -> Theme {
         .map(|w| w.into_gpui())
         .unwrap_or_default();
 
-    let border_radius = theme::BorderRadiusContent {
-        button: theme.style.border_radius.as_ref().and_then(|br| br.button),
-        input: theme.style.border_radius.as_ref().and_then(|br| br.input),
-        panel: theme.style.border_radius.as_ref().and_then(|br| br.panel),
-        modal: theme.style.border_radius.as_ref().and_then(|br| br.modal),
-        tooltip: theme.style.border_radius.as_ref().and_then(|br| br.tooltip),
-        autocomplete: theme
-            .style
-            .border_radius
-            .as_ref()
-            .and_then(|br| br.autocomplete),
-        scrollbar_thumb: theme
-            .style
-            .border_radius
-            .as_ref()
-            .and_then(|br| br.scrollbar_thumb),
-    };
-
     Theme {
         id: uuid::Uuid::new_v4().to_string(),
         name: theme.name.clone().into(),
@@ -434,7 +367,6 @@ pub fn refine_theme(theme: &ThemeContent) -> Theme {
             status: refined_status_colors,
             player: refined_player_colors,
             syntax: syntax_theme,
-            border_radius,
         },
     }
 }

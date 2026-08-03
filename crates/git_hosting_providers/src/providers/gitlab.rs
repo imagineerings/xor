@@ -452,8 +452,7 @@ mod tests {
     #[test]
     fn test_build_gitlab_self_hosted_permalink_from_ssh_url() {
         let gitlab =
-            Gitlab::from_remote_url("git@gitlab.some-enterprise.com:simtropolis/sim.git")
-                .unwrap();
+            Gitlab::from_remote_url("git@gitlab.some-enterprise.com:simtropolis/sim.git").unwrap();
         let permalink = gitlab.build_permalink(
             ParsedGitRemote {
                 owner: "simtropolis".into(),
@@ -550,8 +549,7 @@ mod tests {
         let provider = Gitlab::public_instance();
 
         // Test standard merge commit pattern: "See merge request group/project!123"
-        let message =
-            "Merge branch 'feature' into 'main'\n\nSee merge request simtropolis/sim!789";
+        let message = "Merge branch 'feature' into 'main'\n\nSee merge request simtropolis/sim!789";
         let pull_request = provider.extract_pull_request(&remote, message).unwrap();
 
         assert_eq!(pull_request.number, 789);

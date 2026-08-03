@@ -268,32 +268,6 @@ fn generics_not_double_escaped() {
 }
 
 #[test]
-fn backslash_n_converted_to_line_break() {
-    let theme = rgb_theme();
-    let source = r#"graph TD
-    L7["Layer 7\nHTTP, FTP"]
-    L6["Layer 6\nEncryption"]
-    L7 --> L6"#;
-    let svg = mermaid_render::render_to_svg(source, &theme).expect("render failed");
-    assert!(
-        !svg.contains(r"\n"),
-        "Literal \\n should not appear in SVG output"
-    );
-    assert!(
-        svg.contains("Layer")
-            && svg.contains("HTTP,")
-            && svg.contains("FTP")
-            && svg.contains("Encryption"),
-        "Label text should remain present after converting \\n line breaks"
-    );
-    let wrapped_line_count = svg.matches("text-outer-tspan").count();
-    assert!(
-        wrapped_line_count >= 4,
-        "Label lines should be split into native SVG tspan rows, got {wrapped_line_count}"
-    );
-}
-
-#[test]
 fn class_diagram_label_text_uses_accent_classes() {
     let theme = rgb_theme();
     let source = r#"classDiagram

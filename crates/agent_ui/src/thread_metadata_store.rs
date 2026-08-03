@@ -4,7 +4,7 @@ use std::{
 };
 
 use agent::{SIM_AGENT_ID, ThreadStore};
-use agent_client_protocol::schema as acp;
+use agent_client_protocol::schema::v1 as acp;
 use anyhow::Context as _;
 use chrono::{DateTime, Utc};
 use collections::{HashMap, HashSet};
@@ -26,7 +26,7 @@ use project::{AgentId, linked_worktree_short_name};
 use remote::{RemoteConnectionOptions, same_remote_connection_identity};
 use ui::{App, Context, SharedString, ThreadItemWorktreeInfo, WorktreeKind};
 use util::ResultExt as _;
-use workspace::{PathList, SerialisimWorkspaceLocation, WorkspaceDb};
+use workspace::{PathList, SerializedWorkspaceLocation, WorkspaceDb};
 
 use crate::DEFAULT_THREAD_TITLE;
 
@@ -217,7 +217,7 @@ fn migrate_thread_remote_connections(cx: &mut App, migration_task: Task<anyhow::
             .iter()
             .filter(|workspace| {
                 !workspace.paths.is_empty()
-                    && matches!(workspace.location, SerialisimWorkspaceLocation::Local)
+                    && matches!(workspace.location, SerializedWorkspaceLocation::Local)
             })
             .for_each(|workspace| {
                 local_path_lists.insert(workspace.paths.clone());
@@ -225,7 +225,7 @@ fn migrate_thread_remote_connections(cx: &mut App, migration_task: Task<anyhow::
 
         for workspace in recent_workspaces {
             match workspace.location {
-                SerialisimWorkspaceLocation::Remote(remote_connection)
+                SerializedWorkspaceLocation::Remote(remote_connection)
                     if !local_path_lists.contains(&workspace.paths) =>
                 {
                     remote_path_lists
@@ -1509,18 +1509,18 @@ impl ThreadMetadataDb {
         let updated_at = row.updated_at.to_rfc3339();
         let created_at = row.created_at.map(|dt| dt.to_rfc3339());
         let interacted_at = row.interacted_at.map(|dt| dt.to_rfc3339());
-        let serialisim = row.folder_paths().serialize();
+        let serialized = row.folder_paths().serialize();
         let (folder_paths, folder_paths_order) = if row.folder_paths().is_empty() {
             (None, None)
         } else {
-            (Some(serialisim.paths), Some(serialisim.order))
+            (Some(serialized.paths), Some(serialized.order))
         };
-        let main_serialisim = row.main_worktree_paths().serialize();
+        let main_serialized = row.main_worktree_paths().serialize();
         let (main_worktree_paths, main_worktree_paths_order) =
             if row.main_worktree_paths().is_empty() {
                 (None, None)
             } else {
-                (Some(main_serialisim.paths), Some(main_serialisim.order))
+                (Some(main_serialized.paths), Some(main_serialized.order))
             };
         let remote_connection = row
             .remote_connection
@@ -1741,7 +1741,7 @@ impl Column for ThreadMetadata {
 
         let folder_paths = folder_paths_str
             .map(|paths| {
-                PathList::deserialize(&util::path_list::SerialisimPathList {
+                PathList::deserialize(&util::path_list::SerializedPathList {
                     paths,
                     order: folder_paths_order_str.unwrap_or_default(),
                 })
@@ -1750,7 +1750,7 @@ impl Column for ThreadMetadata {
 
         let main_worktree_paths = main_worktree_paths_str
             .map(|paths| {
-                PathList::deserialize(&util::path_list::SerialisimPathList {
+                PathList::deserialize(&util::path_list::SerializedPathList {
                     paths,
                     order: main_worktree_paths_order_str.unwrap_or_default(),
                 })
@@ -1824,7 +1824,7 @@ mod tests {
     use acp_thread::StubAgentConnection;
     use action_log::ActionLog;
     use agent::DbThread;
-    use agent_client_protocol::schema as acp;
+    use agent_client_protocol::schema::v1 as acp;
     use gpui::{TestAppContext, VisualTestContext};
     use project::FakeFs;
     use project::Project;
@@ -1844,7 +1844,6 @@ mod tests {
             request_token_usage: Default::default(),
             model: None,
             profile: None,
-            imported: false,
             subagent_context: None,
             speed: None,
             thinking_enabled: false,
@@ -1852,6 +1851,7 @@ mod tests {
             draft_prompt: None,
             ui_scroll_position: None,
             sandboxed_terminal_temp_dir: None,
+            sandbox_grants: Default::default(),
         }
     }
 

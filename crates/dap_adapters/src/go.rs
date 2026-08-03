@@ -394,10 +394,7 @@ impl DebugAdapter for GoDebugAdapter {
         })
     }
 
-    async fn config_from_sim_format(
-        &self,
-        sim_scenario: SimDebugConfig,
-    ) -> Result<DebugScenario> {
+    async fn config_from_sim_format(&self, sim_scenario: SimDebugConfig) -> Result<DebugScenario> {
         let mut args = match &sim_scenario.request {
             dap::DebugRequest::Attach(attach_config) => {
                 json!({

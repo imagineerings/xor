@@ -1,11 +1,10 @@
 use std::{cmp::Reverse, rc::Rc, sync::Arc};
 
 use acp_thread::AgentSessionConfigOptions;
-use agent_client_protocol::schema as acp;
+use agent_client_protocol::schema::v1 as acp;
 use agent_servers::AgentServer;
 
 use collections::HashSet;
-use feature_flags::{AcpBetaFeatureFlag, FeatureFlagAppExt as _};
 use fs::Fs;
 use fuzzy::StringMatchCandidate;
 use gpui::{
@@ -30,7 +29,6 @@ use crate::{
 };
 
 const PICKER_THRESHOLD: usize = 5;
-const TRUNCATED_DISPLAY_NAME_LENGTH: usize = 32;
 
 pub struct ConfigOptionsView {
     config_options: Rc<dyn AgentSessionConfigOptions>,
@@ -100,9 +98,8 @@ impl ConfigOptionsView {
         favorites_only: bool,
         cx: &mut Context<Self>,
     ) -> bool {
-        let render_boolean_config_options = should_render_boolean_config_options(cx);
         let Some(config_id) = self.first_config_option_id_matching(category, |option| {
-            Self::can_cycle_config_option(option, favorites_only, render_boolean_config_options)
+            Self::can_cycle_config_option(option, favorites_only)
         }) else {
             return false;
         };
@@ -145,14 +142,10 @@ impl ConfigOptionsView {
             .map(|option| option.id)
     }
 
-    fn can_cycle_config_option(
-        option: &acp::SessionConfigOption,
-        favorites_only: bool,
-        render_boolean_config_options: bool,
-    ) -> bool {
+    fn can_cycle_config_option(option: &acp::SessionConfigOption, favorites_only: bool) -> bool {
         match &option.kind {
             acp::SessionConfigKind::Select(_) => true,
-            acp::SessionConfigKind::Boolean(_) => !favorites_only && render_boolean_config_options,
+            acp::SessionConfigKind::Boolean(_) => !favorites_only,
             _ => false,
         }
     }
@@ -214,7 +207,7 @@ impl ConfigOptionsView {
                 ))
             }
             acp::SessionConfigKind::Boolean(boolean) => {
-                if favorites_only || !should_render_boolean_config_options(cx) {
+                if favorites_only {
                     None
                 } else {
                     Some(acp::SessionConfigOptionValue::boolean(
@@ -346,8 +339,7 @@ impl ConfigOptionSelector {
                     Picker::nonsearchable_list(delegate, window, picker_cx)
                 }
                 .show_scrollbar(true)
-                .width(rems(20.))
-                .max_height(Some(rems(20.).into()))
+                .initial_width(rems(20.))
             });
             (Some(PopoverMenuHandle::default()), Some(picker))
         } else {
@@ -427,8 +419,15 @@ impl ConfigOptionSelector {
         } else {
             IconName::ChevronDown
         };
+
         let value_name = self.current_value_name();
-        let display_name = truncate_config_option_display_name(&value_name);
+        let mut graphemes = value_name.graphemes(true);
+        let truncated = graphemes.by_ref().take(32).collect::<String>();
+        let display_name = if graphemes.next().is_some() {
+            format!("{truncated}…")
+        } else {
+            truncated
+        };
 
         Button::new(
             ElementId::Name(format!("config-option-{}", option.id.0).into()),
@@ -438,20 +437,6 @@ impl ConfigOptionSelector {
         .color(Color::Muted)
         .end_icon(Icon::new(icon).size(IconSize::XSmall).color(Color::Muted))
         .disabled(self.setting_value)
-    }
-}
-
-fn truncate_config_option_display_name(value_name: &str) -> String {
-    let mut graphemes = value_name.graphemes(true);
-    let truncated = graphemes
-        .by_ref()
-        .take(TRUNCATED_DISPLAY_NAME_LENGTH)
-        .collect::<String>();
-
-    if graphemes.next().is_some() {
-        format!("{truncated}…")
-    } else {
-        truncated
     }
 }
 
@@ -554,10 +539,6 @@ impl Render for ConfigOptionSelector {
                 .into_any_element()
             }
             acp::SessionConfigKind::Boolean(boolean) => {
-                if !should_render_boolean_config_options(cx) {
-                    return div().into_any_element();
-                }
-
                 let option_id = option.id.clone();
                 let option_name: SharedString = option.name.clone().into();
                 let option_description: Option<SharedString> =
@@ -716,6 +697,10 @@ impl ConfigOptionPickerDelegate {
 
 impl PickerDelegate for ConfigOptionPickerDelegate {
     type ListItem = AnyElement;
+
+    fn name() -> &'static str {
+        "config options"
+    }
 
     fn match_count(&self) -> usize {
         self.filtered_entries.len()
@@ -996,10 +981,6 @@ fn setting_value_for_config_option_value(
     }
 }
 
-fn should_render_boolean_config_options(cx: &App) -> bool {
-    cx.has_flag::<AcpBetaFeatureFlag>()
-}
-
 fn options_to_picker_entries(
     options: &[ConfigOptionValue],
     favorites: &HashSet<acp::SessionConfigValueId>,
@@ -1115,24 +1096,11 @@ fn count_config_options(option: &acp::SessionConfigOption) -> usize {
 mod tests {
     use super::*;
     use acp_thread::AgentConnection;
-    use feature_flags::FeatureFlag as _;
     use fs::FakeFs;
-    use gpui::{TestAppContext, UpdateGlobal};
+    use gpui::TestAppContext;
     use parking_lot::Mutex;
     use project::{AgentId, Project};
     use std::{any::Any, cell::RefCell};
-
-    #[test]
-    fn truncates_config_option_display_name_by_grapheme() {
-        let composed_name = "e\u{301}".repeat(33);
-        let truncated = truncate_config_option_display_name(&composed_name);
-
-        assert_eq!(truncated, format!("{}…", "e\u{301}".repeat(32)));
-        assert_eq!(
-            truncate_config_option_display_name(&"e\u{301}".repeat(32)),
-            "e\u{301}".repeat(32)
-        );
-    }
 
     #[gpui::test]
     fn cycling_config_option_saves_selected_value_as_default(cx: &mut TestAppContext) {
@@ -1189,16 +1157,12 @@ mod tests {
     fn cycling_boolean_config_option_saves_selected_value_as_default(cx: &mut TestAppContext) {
         let agent_server = Rc::new(TestAgentServer::default());
         let config_options = Rc::new(TestSessionConfigOptions::new(vec![
-            acp::SessionConfigOption::boolean("web_search", "Web Search", false).category(
-                acp::SessionConfigOptionCategory::Other("model_config".to_string()),
-            ),
+            acp::SessionConfigOption::boolean("web_search", "Web Search", false)
+                .category(acp::SessionConfigOptionCategory::ModelConfig),
         ]));
         let fs: Arc<dyn Fs> = FakeFs::new(cx.executor());
 
         cx.update(|cx| {
-            init_feature_flag_settings(cx);
-            set_feature_flag_override(AcpBetaFeatureFlag::NAME, "on", cx);
-
             let config_options: Rc<dyn AgentSessionConfigOptions> = config_options.clone();
             let agent_server: Rc<dyn AgentServer> = agent_server.clone();
             let fs = fs.clone();
@@ -1212,11 +1176,7 @@ mod tests {
             });
 
             assert!(view.update(cx, |view, cx| {
-                view.cycle_category_option(
-                    acp::SessionConfigOptionCategory::Other("model_config".to_string()),
-                    false,
-                    cx,
-                )
+                view.cycle_category_option(acp::SessionConfigOptionCategory::ModelConfig, false, cx)
             }));
         });
 
@@ -1237,46 +1197,8 @@ mod tests {
     }
 
     #[gpui::test]
-    fn cycling_hidden_boolean_config_option_is_unhandled(cx: &mut TestAppContext) {
-        let agent_server = Rc::new(TestAgentServer::default());
-        let config_options = Rc::new(TestSessionConfigOptions::new(vec![
-            acp::SessionConfigOption::boolean("web_search", "Web Search", false).category(
-                acp::SessionConfigOptionCategory::Other("model_config".to_string()),
-            ),
-        ]));
-        let fs: Arc<dyn Fs> = FakeFs::new(cx.executor());
-
-        cx.update(|cx| {
-            init_feature_flag_settings(cx);
-            set_feature_flag_override(AcpBetaFeatureFlag::NAME, "off", cx);
-
-            let config_options: Rc<dyn AgentSessionConfigOptions> = config_options.clone();
-            let agent_server: Rc<dyn AgentServer> = agent_server.clone();
-            let fs = fs.clone();
-            let view = cx.new(|_| ConfigOptionsView {
-                config_option_ids: ConfigOptionsView::config_option_ids(&config_options),
-                config_options,
-                selectors: Vec::new(),
-                agent_server,
-                fs,
-                _refresh_task: Task::ready(()),
-            });
-
-            assert!(!view.update(cx, |view, cx| {
-                view.cycle_category_option(
-                    acp::SessionConfigOptionCategory::Other("model_config".to_string()),
-                    false,
-                    cx,
-                )
-            }));
-        });
-
-        assert!(agent_server.saved_defaults.lock().is_empty());
-        assert!(config_options.set_values.borrow().is_empty());
-    }
-
     #[gpui::test]
-    fn cycling_category_skips_hidden_boolean_config_option(cx: &mut TestAppContext) {
+    fn cycling_category_uses_boolean_config_option(cx: &mut TestAppContext) {
         let agent_server = Rc::new(TestAgentServer::default());
         let config_options = Rc::new(TestSessionConfigOptions::new(vec![
             acp::SessionConfigOption::boolean("web_search", "Web Search", false)
@@ -1295,9 +1217,6 @@ mod tests {
         let fs: Arc<dyn Fs> = FakeFs::new(cx.executor());
 
         cx.update(|cx| {
-            init_feature_flag_settings(cx);
-            set_feature_flag_override(AcpBetaFeatureFlag::NAME, "off", cx);
-
             let config_options: Rc<dyn AgentSessionConfigOptions> = config_options.clone();
             let agent_server: Rc<dyn AgentServer> = agent_server.clone();
             let fs = fs.clone();
@@ -1318,15 +1237,15 @@ mod tests {
         assert_eq!(
             agent_server.saved_defaults.lock().as_slice(),
             &[(
-                "model".to_string(),
-                Some(AgentConfigOptionValue::ValueId("large".to_string()))
+                "web_search".to_string(),
+                Some(AgentConfigOptionValue::Boolean(true))
             )]
         );
         assert_eq!(
             config_options.set_values.borrow().as_slice(),
             &[(
-                "model".to_string(),
-                acp::SessionConfigOptionValue::value_id("large")
+                "web_search".to_string(),
+                acp::SessionConfigOptionValue::boolean(true)
             )]
         );
     }
@@ -1357,43 +1276,9 @@ mod tests {
         assert!(!handled);
     }
 
-    #[gpui::test]
-    fn boolean_config_option_rendering_is_beta_gated(cx: &mut TestAppContext) {
-        cx.update(|cx| {
-            init_feature_flag_settings(cx);
-
-            cx.update_flags(false, Vec::new());
-            set_feature_flag_override(AcpBetaFeatureFlag::NAME, "off", cx);
-            assert!(!should_render_boolean_config_options(cx));
-
-            set_feature_flag_override(AcpBetaFeatureFlag::NAME, "on", cx);
-            assert!(should_render_boolean_config_options(cx));
-        });
-    }
-
     #[derive(Default)]
     struct TestAgentServer {
         saved_defaults: Arc<Mutex<Vec<(String, Option<AgentConfigOptionValue>)>>>,
-    }
-
-    fn init_feature_flag_settings(cx: &mut App) {
-        let store = SettingsStore::test(cx);
-        cx.set_global(store);
-        SettingsStore::update_global(cx, |store, _| {
-            store.register_setting::<feature_flags::FeatureFlagsSettings>();
-        });
-        cx.update_flags(false, Vec::new());
-    }
-
-    fn set_feature_flag_override(name: &str, value: &str, cx: &mut App) {
-        SettingsStore::update_global(cx, |store, cx| {
-            store.update_user_settings(cx, |content| {
-                content
-                    .feature_flags
-                    .get_or_insert_default()
-                    .insert(name.to_string(), value.to_string());
-            });
-        });
     }
 
     impl AgentServer for TestAgentServer {

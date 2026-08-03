@@ -21,12 +21,12 @@ curl -f https://sim.dev/install.sh | SIM_CHANNEL=preview sh
 
 The Sim installed by the script works best on systems that:
 
-- have a Vulkan compatible GPU available (for example Linux on an M-series macBook)
-- have a system-wide glibc (NixOS and Alpine do not by default)
+- have a Vulkan compatible GPU available (for example Linux on an M-series MacBook)
+- have a system-wide glibc
   - x86_64 (Intel/AMD): glibc version >= 2.31 (Ubuntu 20 and newer)
   - aarch64 (ARM): glibc version >= 2.35 (Ubuntu 22 and newer)
 
-Both Nix and Alpine have third-party Sim packages available (though they are currently a few weeks out of date). If you'd like to use our builds they do work if you install a glibc compatibility layer. On NixOS you can try [nix-ld](https://github.com/Mic92/nix-ld), and on Alpine [gcompat](https://wiki.alpinelinux.org/wiki/Running_glibc_programs).
+NixOS does not have a system-wide glibc by default. If you'd like to use our builds on NixOS, they may work if you install a glibc compatibility layer such as [nix-ld](https://github.com/Mic92/nix-ld).
 
 You will need to build from source for:
 
@@ -40,11 +40,10 @@ Sim is open source, and [you can install from source](./development/linux.md).
 
 ### Installing via a package manager
 
-There are several third-party Sim packages for various Linux distributions and package managers, sometimes under `sim-editor`. You may be able to install Sim using these packages:
+There are several third-party Sim packages for various Linux distributions and package managers, sometimes under `sim-editor`. Availability varies by distribution, but you may be able to install Sim using one of these packages:
 
 - Arch: [`sim`](https://archlinux.org/packages/extra/x86_64/sim/)
 - Arch (AUR): [`sim-git`](https://aur.archlinux.org/packages/sim-git), [`sim-preview`](https://aur.archlinux.org/packages/sim-preview), [`sim-preview-bin`](https://aur.archlinux.org/packages/sim-preview-bin)
-- Alpine: `sim` ([aarch64](https://pkgs.alpinelinux.org/package/edge/testing/aarch64/sim)) ([x86_64](https://pkgs.alpinelinux.org/package/edge/testing/x86_64/sim))
 - Fedora/Ultramarine (Terra): [`sim`](https://github.com/terrapkg/packages/tree/frawhide/anda/devs/sim/stable), [`sim-preview`](https://github.com/terrapkg/packages/tree/frawhide/anda/devs/sim/preview), [`sim-nightly`](https://github.com/terrapkg/packages/tree/frawhide/anda/devs/sim/nightly)
 - Manjaro: [`sim`](https://manjaristas.org/branch_compare?q=sim)
 - Conda: [`sim`](https://anaconda.org/conda-forge/sim)
@@ -55,11 +54,11 @@ There are several third-party Sim packages for various Linux distributions and p
 - AOSC OS: [`sim`](https://packages.aosc.io/packages/sim)
 - Flathub: [`dev.sim.Sim`](https://flathub.org/apps/dev.sim.Sim)
 
-See [Repology](https://repology.org/project/sim-editor/versions) for a list of Sim packages in various repositories.
+See [Repology](https://repology.org/project/sim-editor/versions) for a current list of Sim packages in various repositories.
 
 ### Community
 
-When installing a third-party package please be aware that it may not be completely up to date and may be slightly different from the Sim we package (a common change is to rename the binary to `simit` or `simitor` to avoid conflicting with other packages).
+When installing a third-party package please be aware that it may not be completely up to date and may be slightly different from the Sim we package (a common change is to rename the binary to `zedit` or `zeditor` to avoid conflicting with other packages).
 
 We'd love your help making Sim available for everyone. If Sim is not yet available for your package manager, and you would like to fix that, we have some notes on [how to do it](./development/linux.md#notes-for-packaging-sim).
 

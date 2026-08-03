@@ -1,14 +1,8 @@
 #[cfg(any(test, feature = "test-support"))]
 pub mod test;
 
-pub mod bookmark;
-pub mod channel_chat;
-pub mod file_upload;
-pub mod groups;
 mod llm_token;
-pub mod message_priority;
 mod proxy;
-pub mod scheduled_message;
 pub mod sim_urls;
 pub mod telemetry;
 pub mod user;
@@ -61,11 +55,7 @@ use tokio::net::TcpStream;
 use url::Url;
 use util::{ConnectionResult, ResultExt};
 
-pub use bookmark::*;
-pub use file_upload::*;
-pub use groups::*;
 pub use llm_token::*;
-pub use message_priority::*;
 pub use rpc::*;
 pub use telemetry_events::Event;
 pub use user::*;
@@ -1959,13 +1949,11 @@ pub enum SimLink {
         channel_id: u64,
         heading: Option<String>,
     },
-    /// Import a local shared session: `sim://session/<encoded-session>`.
-    SharedSession { data: String },
 }
 
 /// Parses the given link into a Sim link.
 ///
-/// Returns a [`Some`] containing the parsed link if the link is a recognisim Sim link
+/// Returns a [`Some`] containing the parsed link if the link is a recognized Sim link
 /// that should be handled internally by the application.
 /// Returns [`None`] for links that should be opened in the browser.
 pub fn parse_sim_link(link: &str, cx: &App) -> Option<SimLink> {
@@ -1980,39 +1968,30 @@ pub fn parse_sim_link(link: &str, cx: &App) -> Option<SimLink> {
 
     let mut parts = path.split('/');
 
-    match parts.next()? {
-        "channel" => {
-            let slug = parts.next()?;
-            let id_str = slug.split('-').next_back()?;
-            let channel_id = id_str.parse::<u64>().ok()?;
+    if parts.next() != Some("channel") {
+        return None;
+    }
 
-            let Some(next) = parts.next() else {
-                return Some(SimLink::Channel { channel_id });
-            };
+    let slug = parts.next()?;
+    let id_str = slug.split('-').next_back()?;
+    let channel_id = id_str.parse::<u64>().ok()?;
 
-            if let Some(heading) = next.strip_prefix("notes#") {
-                return Some(SimLink::ChannelNotes {
-                    channel_id,
-                    heading: Some(heading.to_string()),
-                });
-            }
+    let Some(next) = parts.next() else {
+        return Some(SimLink::Channel { channel_id });
+    };
 
-            if next == "notes" {
-                return Some(SimLink::ChannelNotes {
-                    channel_id,
-                    heading: None,
-                });
-            }
-        }
-        "session" => {
-            let data = parts.next()?;
-            if !data.is_empty() && parts.next().is_none() {
-                return Some(SimLink::SharedSession {
-                    data: data.to_string(),
-                });
-            }
-        }
-        _ => {}
+    if let Some(heading) = next.strip_prefix("notes#") {
+        return Some(SimLink::ChannelNotes {
+            channel_id,
+            heading: Some(heading.to_string()),
+        });
+    }
+
+    if next == "notes" {
+        return Some(SimLink::ChannelNotes {
+            channel_id,
+            heading: None,
+        });
     }
 
     None
@@ -2021,7 +2000,6 @@ pub fn parse_sim_link(link: &str, cx: &App) -> Option<SimLink> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::channel_chat::{SendChannelMessage, UpdateChannelMessage};
     use crate::test::{FakeServer, parse_authorization_header};
 
     use clock::FakeSystemClock;
@@ -2482,259 +2460,6 @@ mod tests {
         });
         server.send(proto::Ping {});
         done_rx.recv().await.unwrap();
-    }
-
-    #[gpui::test]
-    async fn test_channel_chat_request_conversions(cx: &mut TestAppContext) {
-        init_test(cx);
-        let user_id = 5;
-        let client = cx.update(|cx| {
-            Client::new(
-                Arc::new(FakeSystemClock::new()),
-                FakeHttpClient::with_404_response(),
-                cx,
-            )
-        });
-        let server = FakeServer::for_client(user_id, &client, cx).await;
-
-        let send = cx.spawn({
-            let client = client.clone();
-            move |_| async move {
-                client
-                    .send_channel_message(SendChannelMessage {
-                        channel_id: 7,
-                        body: "hello".to_string(),
-                        nonce: 0x10000000000000002,
-                        mentions: vec![proto::ChatMention {
-                            range: Some(proto::Range { start: 1, end: 4 }),
-                            user_id: 9,
-                            group_id: 0,
-                        }],
-                        reply_to_message_id: Some(3),
-                        file_ids: vec!["file-1".to_string()],
-                    })
-                    .await
-            }
-        });
-        let request = server.receive::<proto::SendChannelMessage>().await.unwrap();
-        assert_eq!(request.payload.channel_id, 7);
-        assert_eq!(request.payload.body, "hello");
-        assert_eq!(
-            request.payload.nonce.clone().map(u128::from),
-            Some(0x10000000000000002)
-        );
-        assert_eq!(request.payload.mentions.len(), 1);
-        assert_eq!(request.payload.reply_to_message_id, Some(3));
-        assert_eq!(request.payload.file_ids, vec!["file-1"]);
-
-        server.respond(
-            request.receipt(),
-            proto::SendChannelMessageResponse {
-                message: Some(proto::ChannelMessage {
-                    id: 11,
-                    body: "hello".to_string(),
-                    timestamp: 12,
-                    sender_id: user_id,
-                    nonce: Some(0x10000000000000002u128.into()),
-                    mentions: Vec::new(),
-                    reply_to_message_id: Some(3),
-                    files: Vec::new(),
-                    edited_at: None,
-                    reaction_summaries: Vec::new(),
-                    scheduled_at: None,
-                    priority: 0,
-                }),
-            },
-        );
-        let message = send.await.unwrap();
-        assert_eq!(message.id, 11);
-        assert_eq!(message.body, "hello");
-
-        let update = cx.spawn({
-            let client = client.clone();
-            move |_| async move {
-                client
-                    .update_channel_message(UpdateChannelMessage {
-                        channel_id: 7,
-                        message_id: 11,
-                        body: "edited".to_string(),
-                        nonce: 0x20000000000000003,
-                        mentions: Vec::new(),
-                    })
-                    .await
-            }
-        });
-        let request = server
-            .receive::<proto::UpdateChannelMessage>()
-            .await
-            .unwrap();
-        assert_eq!(request.payload.channel_id, 7);
-        assert_eq!(request.payload.message_id, 11);
-        assert_eq!(request.payload.body, "edited");
-        assert_eq!(
-            request.payload.nonce.clone().map(u128::from),
-            Some(0x20000000000000003)
-        );
-        server.respond(request.receipt(), proto::Ack {});
-        update.await.unwrap();
-
-        client.acknowledge_channel_message(7, 11).unwrap();
-        let request = server.receive::<proto::AckChannelMessage>().await.unwrap();
-        assert_eq!(request.payload.channel_id, 7);
-        assert_eq!(request.payload.message_id, 11);
-
-        let get_thread = cx.spawn({
-            let client = client.clone();
-            move |_| async move { client.get_thread(7, 11).await }
-        });
-        let request = server.receive::<proto::GetThread>().await.unwrap();
-        assert_eq!(request.payload.channel_id, 7);
-        assert_eq!(request.payload.message_id, 11);
-        assert_eq!(request.payload.before_message_id, 0);
-        assert_eq!(
-            request.payload.limit,
-            crate::channel_chat::DEFAULT_THREAD_REPLY_LIMIT
-        );
-        server.respond(
-            request.receipt(),
-            proto::GetThreadResponse {
-                root_message: Some(proto::ChannelMessage {
-                    id: 11,
-                    body: "hello".to_string(),
-                    timestamp: 12,
-                    sender_id: user_id,
-                    nonce: Some(0x10000000000000002u128.into()),
-                    mentions: Vec::new(),
-                    reply_to_message_id: None,
-                    files: Vec::new(),
-                    edited_at: None,
-                    reaction_summaries: Vec::new(),
-                    scheduled_at: None,
-                    priority: 0,
-                }),
-                replies: vec![proto::ChannelMessage {
-                    id: 12,
-                    body: "reply".to_string(),
-                    timestamp: 13,
-                    sender_id: user_id,
-                    nonce: Some(0x30000000000000004u128.into()),
-                    mentions: Vec::new(),
-                    reply_to_message_id: Some(11),
-                    files: Vec::new(),
-                    edited_at: None,
-                    reaction_summaries: Vec::new(),
-                    scheduled_at: None,
-                    priority: 0,
-                }],
-                done: true,
-            },
-        );
-        let thread = get_thread.await.unwrap();
-        assert_eq!(thread.root_message.id, 11);
-        assert_eq!(thread.replies.len(), 1);
-        assert!(thread.done);
-        assert_eq!(
-            thread
-                .replies
-                .first()
-                .and_then(|reply| reply.reply_to_message_id),
-            Some(11)
-        );
-
-        let get_threads = cx.spawn({
-            let client = client.clone();
-            move |_| async move { client.get_threads(7).await }
-        });
-        let request = server.receive::<proto::GetThreads>().await.unwrap();
-        assert_eq!(request.payload.channel_id, 7);
-        server.respond(
-            request.receipt(),
-            proto::GetThreadsResponse {
-                threads: vec![proto::ThreadSummary {
-                    root_message_id: 11,
-                    reply_count: 1,
-                    latest_reply_at: 13,
-                    participant_user_ids: vec![user_id],
-                    has_unread: true,
-                }],
-            },
-        );
-        let threads = get_threads.await.unwrap();
-        assert_eq!(threads.len(), 1);
-        let thread_summary = threads.first().expect("missing thread summary");
-        assert_eq!(thread_summary.root_message_id, 11);
-        assert_eq!(thread_summary.reply_count, 1);
-        assert_eq!(thread_summary.participant_user_ids, vec![user_id]);
-        assert!(thread_summary.has_unread);
-    }
-
-    #[gpui::test]
-    async fn test_channel_chat_live_event_handlers(cx: &mut TestAppContext) {
-        init_test(cx);
-        let user_id = 5;
-        let client = cx.update(|cx| {
-            Client::new(
-                Arc::new(FakeSystemClock::new()),
-                FakeHttpClient::with_404_response(),
-                cx,
-            )
-        });
-        let server = FakeServer::for_client(user_id, &client, cx).await;
-        let entity = cx.new(|_| TestEntity::default());
-        let (sent_tx, sent_rx) = async_channel::bounded(1);
-        let (update_tx, update_rx) = async_channel::bounded(1);
-
-        let _sent_subscription =
-            client.add_channel_message_sent_handler(entity.downgrade(), move |_, message, _| {
-                sent_tx.try_send(message.payload).unwrap();
-                async { Ok(()) }
-            });
-        let _update_subscription =
-            client.add_channel_message_update_handler(entity.downgrade(), move |_, message, _| {
-                update_tx.try_send(message.payload).unwrap();
-                async { Ok(()) }
-            });
-
-        server.send(proto::ChannelMessageSent {
-            channel_id: 7,
-            message: Some(proto::ChannelMessage {
-                id: 1,
-                body: "live".to_string(),
-                timestamp: 2,
-                sender_id: user_id,
-                nonce: Some(1u128.into()),
-                mentions: Vec::new(),
-                reply_to_message_id: None,
-                files: Vec::new(),
-                edited_at: None,
-                reaction_summaries: Vec::new(),
-                scheduled_at: None,
-                priority: 0,
-            }),
-        });
-        assert_eq!(sent_rx.recv().await.unwrap().channel_id, 7);
-
-        server.send(proto::ChannelMessageUpdate {
-            channel_id: 7,
-            message: Some(proto::ChannelMessage {
-                id: 1,
-                body: "edited".to_string(),
-                timestamp: 2,
-                sender_id: user_id,
-                nonce: Some(2u128.into()),
-                mentions: Vec::new(),
-                reply_to_message_id: None,
-                files: Vec::new(),
-                edited_at: Some(3),
-                reaction_summaries: Vec::new(),
-                scheduled_at: None,
-                priority: 0,
-            }),
-        });
-        assert_eq!(
-            update_rx.recv().await.unwrap().message.unwrap().body,
-            "edited"
-        );
     }
 
     #[derive(Default)]

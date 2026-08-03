@@ -7,7 +7,6 @@ use gpui::{
     App, Context, Font, FontFallbacks, FontStyle, Global, Pixels, SharedString, Subscription,
     Window, px,
 };
-use language::CursorShape;
 use refineable::Refineable;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -65,7 +64,7 @@ pub struct ThemeSettings {
     /// Falls back to the buffer font family if unset.
     markdown_preview_code_font_family: Option<SharedString>,
     /// The font size to use for rendering in the markdown preview.
-    /// Falls back to the buffer font size if unset.
+    /// Falls back to the UI font size if unset.
     markdown_preview_font_size: Option<Pixels>,
     /// The theme to use for the markdown preview.
     /// Falls back to the main editor theme if unset.
@@ -84,10 +83,6 @@ pub struct ThemeSettings {
     pub experimental_theme_overrides: Option<settings::ThemeStyleContent>,
     /// Manual overrides per theme
     pub theme_overrides: HashMap<String, settings::ThemeStyleContent>,
-    /// The cursor style for the editor when this theme is active.
-    pub cursor_style: Option<CursorShape>,
-    /// The cursor blink style for the editor when this theme is active.
-    pub cursor_blink: Option<settings::CursorBlink>,
     /// The current icon theme selection.
     pub icon_theme: IconThemeSelection,
     /// The density of the UI.
@@ -456,15 +451,14 @@ impl ThemeSettings {
 
     /// Returns the markdown preview font size.
     ///
-    /// The fallback deliberately uses the configured buffer font size instead of
-    /// [`Self::buffer_font_size`] so temporary editor zoom does not also resize
-    /// the markdown preview.
+    /// Note: the fallback deliberately uses `self.ui_font_size` instead of `ui_font_size(cx)`,
+    /// so that temporary UI zoom does not also resize the markdown preview.
     pub fn markdown_preview_font_size(&self, cx: &App) -> Pixels {
         cx.try_global::<MarkdownPreviewFontSize>()
             .map(|size| size.0)
             .or(self.markdown_preview_font_size)
             .map(clamp_font_size)
-            .unwrap_or_else(|| clamp_font_size(self.buffer_font_size))
+            .unwrap_or_else(|| clamp_font_size(self.ui_font_size))
     }
 
     /// Returns the buffer font size, read from the settings.
@@ -503,7 +497,10 @@ impl ThemeSettings {
         self.git_commit_buffer_font_size
     }
 
-    /// Returns the markdown preview font size from settings.
+    /// Returns the markdown preview font size, read from the settings.
+    ///
+    /// The real markdown preview font size is stored in-memory, to support temporary
+    /// font size changes. Use [`Self::markdown_preview_font_size`] to get the real font size.
     pub fn markdown_preview_font_size_settings(&self) -> Option<Pixels> {
         self.markdown_preview_font_size
     }
@@ -759,12 +756,6 @@ impl settings::Settings for ThemeSettings {
             theme: theme_selection,
             experimental_theme_overrides: content.experimental_theme_overrides.clone(),
             theme_overrides: content.theme_overrides.clone(),
-            cursor_style: content.cursor_style.map(|s| match s {
-                settings::CursorStyle::Bar => CursorShape::Bar,
-                settings::CursorStyle::Block => CursorShape::Block,
-                settings::CursorStyle::Underline => CursorShape::Underline,
-            }),
-            cursor_blink: content.cursor_blink,
             icon_theme: icon_theme_selection,
             ui_density: ui_density_from_settings(content.ui_density.unwrap_or_default()),
             unnecessary_code_fade: content.unnecessary_code_fade.unwrap().0.clamp(0.0, 0.9),

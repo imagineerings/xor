@@ -300,18 +300,17 @@ fn spawn_posix_spawn(
     stderr_cfg: Stdio,
     kill_on_drop: bool,
 ) -> io::Result<Child> {
+    // posix_spawnp resolves programs against the parent's cwd/PATH, not the child's.
     let resolved_program = if program.as_bytes().contains(&b'/') {
         std::path::absolute(current_dir.join(program)).map_or_else(
             |_| program.as_bytes().to_vec(),
-            |path| path.into_os_string().into_vec(),
+            |p| p.into_os_string().into_vec(),
         )
     } else {
-        envs.and_then(|envs| {
-            envs.iter()
-                .find(|(key, _)| key.as_os_str() == OsStr::new("PATH"))
-                .and_then(|(_, value)| {
-                    which::which_in(program, Some(value.as_os_str()), current_dir).ok()
-                })
+        envs.and_then(|e| {
+            e.iter()
+                .find(|(k, _)| k.as_os_str() == OsStr::new("PATH"))
+                .and_then(|(_, v)| which::which_in(program, Some(v.as_os_str()), current_dir).ok())
         })
         .map_or_else(
             || program.as_bytes().to_vec(),
@@ -1005,8 +1004,10 @@ mod tests {
         let link_path = temp_dir.path().join("sim-test-echo");
         std::os::unix::fs::symlink("/bin/echo", &link_path).expect("failed to create symlink");
 
+        let relative_path = "./sim-test-echo";
+
         smol::block_on(async {
-            let output = Command::new("./sim-test-echo")
+            let output = Command::new(relative_path)
                 .args(["-n", "from-relative-path"])
                 .current_dir(temp_dir.path())
                 .env("PATH", "/nonexistent/path")

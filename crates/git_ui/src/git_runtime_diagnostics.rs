@@ -121,12 +121,12 @@ fn collect_process_tree() -> anyhow::Result<Value> {
 /// argv, so we return `None` so the caller emits a JSON null rather than
 /// something misleading.
 fn sanitize_cmd(cmd: impl IntoIterator<Item = String>) -> Option<Vec<String>> {
-    let sanitisim: Vec<String> = cmd.into_iter().map(redact_env_var_entry).collect();
-    if sanitisim.is_empty() {
+    let sanitized: Vec<String> = cmd.into_iter().map(redact_env_var_entry).collect();
+    if sanitized.is_empty() {
         return None;
     }
-    let all_redacted = sanitisim.iter().all(|s| s.ends_with("=<redacted>"));
-    if all_redacted { None } else { Some(sanitisim) }
+    let all_redacted = sanitized.iter().all(|s| s.ends_with("=<redacted>"));
+    if all_redacted { None } else { Some(sanitized) }
 }
 
 fn redact_env_var_entry(entry: String) -> String {

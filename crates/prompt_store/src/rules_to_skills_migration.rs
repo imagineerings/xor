@@ -16,11 +16,11 @@
 //!   heading containing the rule's title. See
 //!   [`migrate_default_rules_to_agents_md`].
 //!
-//!   **Customisim built-in prompts** (currently just
+//!   **Customized built-in prompts** (currently just
 //!   [`BuiltInPrompt::CommitMessage`]) are treated the same as Default
 //!   user Rules — if the user has edited the body away from the
 //!   built-in's `default_content()`, the edited body is appended to
-//!   AGENTS.md ahead of any user Default Rules. Uncustomisim built-ins
+//!   AGENTS.md ahead of any user Default Rules. Uncustomized built-ins
 //!   (still using Sim's shipped default content) are skipped so we don't
 //!   pollute AGENTS.md with text the user never wrote.
 //!
@@ -59,7 +59,7 @@ use strum::IntoEnumIterator as _;
 /// launch.
 pub const MIGRATION_DONE_KEY: &str = "rules_to_skills_migration_done";
 
-/// Global KVP key for the JSON-serialisim [`MigrationResult`] produced by
+/// Global KVP key for the JSON-serialized [`MigrationResult`] produced by
 /// the most recent migration run — the lists of source-Rule titles that
 /// were migrated to each destination. The skills announcement toast
 /// reads this to decide whether to mention the migration in its copy.
@@ -83,7 +83,7 @@ pub struct MigrationResult {
     /// Default Rules that were appended to the global AGENTS.md.
     #[serde(default)]
     pub agents_md_names: Vec<String>,
-    /// Customisim built-in prompts whose edited bodies were appended to
+    /// Customized built-in prompts whose edited bodies were appended to
     /// the top of the global AGENTS.md.
     #[serde(default)]
     pub customisim_builtins: Vec<String>,
@@ -310,7 +310,7 @@ async fn migrate_non_default_rules_to_skills(
 
 #[derive(Clone, Copy)]
 enum AgentsMdMigrationEntryKind {
-    CustomisimBuiltin,
+    CustomizedBuiltin,
     DefaultUserRule,
 }
 
@@ -320,7 +320,7 @@ enum AgentsMdMigrationEntryKind {
 ///
 /// The appended block contains, in order:
 ///
-/// 1. Each [`BuiltInPrompt`] the user has customisim (uncustomisim
+/// 1. Each [`BuiltInPrompt`] the user has customized (uncustomized
 ///    built-ins are skipped so we don't write Sim's shipped default text
 ///    into the user's personal AGENTS.md).
 /// 2. Each user Default Rule, in the order given.
@@ -336,7 +336,7 @@ async fn migrate_default_rules_to_agents_md(
 ) -> (Vec<String>, Vec<String>) {
     let mut entries: Vec<(String, String, AgentsMdMigrationEntryKind)> = Vec::new();
 
-    // Customisim built-ins come first.
+    // Customized built-ins come first.
     for builtin in BuiltInPrompt::iter() {
         let id = PromptId::BuiltIn(builtin);
         let title = builtin.title().to_string();
@@ -346,11 +346,7 @@ async fn migrate_default_rules_to_agents_md(
         if !is_customisim_builtin_body(builtin, &body) {
             continue;
         }
-        entries.push((
-            title,
-            body,
-            AgentsMdMigrationEntryKind::CustomisimBuiltin,
-        ));
+        entries.push((title, body, AgentsMdMigrationEntryKind::CustomizedBuiltin));
     }
 
     // Then user Default Rules.
@@ -385,7 +381,7 @@ async fn migrate_default_rules_to_agents_md(
     for index in appended_indices {
         let (title, _, kind) = &entries[index];
         match kind {
-            AgentsMdMigrationEntryKind::CustomisimBuiltin => {
+            AgentsMdMigrationEntryKind::CustomizedBuiltin => {
                 customisim_builtin_titles.push(title.clone());
             }
             AgentsMdMigrationEntryKind::DefaultUserRule => {

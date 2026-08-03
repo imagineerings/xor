@@ -12,8 +12,8 @@ use gpui::{
 use gpui_wgpu::{CompositorGpuHint, WgpuRenderer, WgpuSurfaceConfig};
 
 use collections::FxHashSet;
+use gpui_util::{ResultExt, maybe};
 use raw_window_handle as rwh;
-use util::{ResultExt, maybe};
 use x11rb::{
     connection::Connection,
     cookie::{Cookie, VoidCookie},
@@ -62,8 +62,8 @@ x11rb::atom_manager! {
         _NET_WM_NAME,
         _NET_WM_ICON,
         _NET_WM_STATE,
-        _NET_WM_STATE_MAXIMIZED_VERT,
-        _NET_WM_STATE_MAXIMIZED_HORZ,
+        _NET_WM_STATE_MAXIMISIM_VERT,
+        _NET_WM_STATE_MAXIMISIM_HORZ,
         _NET_WM_STATE_FULLSCREEN,
         _NET_WM_STATE_HIDDEN,
         _NET_WM_STATE_FOCUSED,
@@ -273,8 +273,8 @@ pub struct X11WindowState {
     input_handler: Option<PlatformInputHandler>,
     appearance: WindowAppearance,
     background_appearance: WindowBackgroundAppearance,
-    maximized_vertical: bool,
-    maximized_horizontal: bool,
+    maximisim_vertical: bool,
+    maximisim_horizontal: bool,
     hidden: bool,
     active: bool,
     hovered: bool,
@@ -791,8 +791,8 @@ impl X11WindowState {
                 hovered: false,
                 force_render_after_recovery: false,
                 fullscreen: false,
-                maximized_vertical: false,
-                maximized_horizontal: false,
+                maximisim_vertical: false,
+                maximisim_horizontal: false,
                 hidden: false,
                 appearance,
                 handle,
@@ -1076,8 +1076,8 @@ impl X11WindowStatePtr {
 
         state.active = false;
         state.fullscreen = false;
-        state.maximized_vertical = false;
-        state.maximized_horizontal = false;
+        state.maximisim_vertical = false;
+        state.maximisim_horizontal = false;
         state.hidden = false;
 
         for atom in atoms {
@@ -1085,10 +1085,10 @@ impl X11WindowStatePtr {
                 state.active = true;
             } else if atom == state.atoms._NET_WM_STATE_FULLSCREEN {
                 state.fullscreen = true;
-            } else if atom == state.atoms._NET_WM_STATE_MAXIMIZED_VERT {
-                state.maximized_vertical = true;
-            } else if atom == state.atoms._NET_WM_STATE_MAXIMIZED_HORZ {
-                state.maximized_horizontal = true;
+            } else if atom == state.atoms._NET_WM_STATE_MAXIMISIM_VERT {
+                state.maximisim_vertical = true;
+            } else if atom == state.atoms._NET_WM_STATE_MAXIMISIM_HORZ {
+                state.maximisim_horizontal = true;
             } else if atom == state.atoms._NET_WM_STATE_HIDDEN {
                 state.hidden = true;
             }
@@ -1324,7 +1324,7 @@ impl PlatformWindow for X11Window {
         let state = self.0.state.borrow();
 
         // A maximized window that gets minimized will still retain its maximized state.
-        !state.hidden && state.maximized_vertical && state.maximized_horizontal
+        !state.hidden && state.maximisim_vertical && state.maximisim_horizontal
     }
 
     fn window_bounds(&self) -> WindowBounds {
@@ -1410,7 +1410,11 @@ impl PlatformWindow for X11Window {
         )
         .log_err()
         .map_or(Point::new(Pixels::ZERO, Pixels::ZERO), |reply| {
-            Point::new((reply.root_x as u32).into(), (reply.root_y as u32).into())
+            let scale_factor = self.0.state.borrow().scale_factor;
+            Point::new(
+                px(reply.win_x as f32 / scale_factor),
+                px(reply.win_y as f32 / scale_factor),
+            )
         })
     }
 
@@ -1599,8 +1603,8 @@ impl PlatformWindow for X11Window {
         self.set_wm_hints(
             || "X11 SendEvent to maximize a window failed.",
             WmHintPropertyState::Toggle,
-            state.atoms._NET_WM_STATE_MAXIMIZED_VERT,
-            state.atoms._NET_WM_STATE_MAXIMIZED_HORZ,
+            state.atoms._NET_WM_STATE_MAXIMISIM_VERT,
+            state.atoms._NET_WM_STATE_MAXIMISIM_HORZ,
         )
         .log_err();
     }
@@ -1762,10 +1766,10 @@ impl PlatformWindow for X11Window {
                 } else {
                     // https://source.chromium.org/chromium/chromium/src/+/main:ui/ozone/platform/x11/x11_window.cc;l=2519;drc=1f14cc876cc5bf899d13284a12c451498219bb2d
                     Tiling {
-                        top: state.maximized_vertical,
-                        bottom: state.maximized_vertical,
-                        left: state.maximized_horizontal,
-                        right: state.maximized_horizontal,
+                        top: state.maximisim_vertical,
+                        bottom: state.maximisim_vertical,
+                        left: state.maximisim_horizontal,
+                        right: state.maximisim_horizontal,
                     }
                 };
                 Decorations::Client { tiling }
@@ -1788,12 +1792,12 @@ impl PlatformWindow for X11Window {
 
             [left, right, top, bottom]
         } else {
-            let (left, right) = if state.maximized_horizontal {
+            let (left, right) = if state.maximisim_horizontal {
                 (0, 0)
             } else {
                 (dp, dp)
             };
-            let (top, bottom) = if state.maximized_vertical {
+            let (top, bottom) = if state.maximisim_vertical {
                 (0, 0)
             } else {
                 (dp, dp)

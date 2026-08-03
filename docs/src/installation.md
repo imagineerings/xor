@@ -30,7 +30,7 @@ Get the latest stable builds via [the download page](https://sim.dev/download). 
 Additionally, you can install Sim using winget:
 
 ```sh
-winget install -e --id SimIndustries.Sim
+winget install -e --id Simtropolis.Sim
 ```
 
 ### Linux

@@ -4,7 +4,7 @@ use super::edit_session::{
 };
 use crate::{AgentTool, Thread, ToolCallEventStream, ToolInput, ToolInputPayload};
 use action_log::ActionLog;
-use agent_client_protocol::schema as acp;
+use agent_client_protocol::schema::v1 as acp;
 use futures::FutureExt as _;
 use gpui::{App, AsyncApp, Entity, Task, WeakEntity};
 use language::LanguageRegistry;
@@ -802,7 +802,7 @@ mod tests {
             setup_test_with_fs(cx, fs, &[path!("/").as_ref()]).await;
         let language_registry = project.read_with(cx, |p, _cx| p.languages().clone());
 
-        // Ensure the diff is finalisim after the edit completes.
+        // Ensure the diff is finalized after the edit completes.
         {
             let (stream_tx, mut stream_rx) = ToolCallEventStream::test();
             let edit = cx.update(|cx| {
@@ -820,10 +820,10 @@ mod tests {
             diff.read_with(cx, |diff, _| assert!(matches!(diff, Diff::Pending(_))));
             cx.run_until_parked();
             edit.await.unwrap();
-            diff.read_with(cx, |diff, _| assert!(matches!(diff, Diff::Finalisim(_))));
+            diff.read_with(cx, |diff, _| assert!(matches!(diff, Diff::Finalized(_))));
         }
 
-        // Ensure the diff is finalisim if the tool call gets dropped.
+        // Ensure the diff is finalized if the tool call gets dropped.
         {
             let tool = Arc::new(WriteFileTool::new(
                 project.clone(),
@@ -847,7 +847,7 @@ mod tests {
             diff.read_with(cx, |diff, _| assert!(matches!(diff, Diff::Pending(_))));
             drop(edit);
             cx.run_until_parked();
-            diff.read_with(cx, |diff, _| assert!(matches!(diff, Diff::Finalisim(_))));
+            diff.read_with(cx, |diff, _| assert!(matches!(diff, Diff::Finalized(_))));
         }
     }
 
@@ -973,8 +973,8 @@ mod tests {
         assert_eq!(new_text, "new line 1\nnew line 2\n");
         assert_eq!(*old_text, "old line 1\nold line 2\nold line 3\n");
 
-        // Diff is finalisim after completion
-        diff.read_with(cx, |diff, _| assert!(matches!(diff, Diff::Finalisim(_))));
+        // Diff is finalized after completion
+        diff.read_with(cx, |diff, _| assert!(matches!(diff, Diff::Finalized(_))));
     }
 
     #[gpui::test]
@@ -1345,9 +1345,10 @@ mod tests {
             .await
             .unwrap();
 
-        // The prompt is dismissed by transitioning to InProgress.
-        let dismiss = stream_rx.expect_update_fields().await;
-        assert_eq!(dismiss.status, Some(acp::ToolCallStatus::InProgress));
+        // The prompt is dismissed by resolving the pending authorization.
+        let (_, outcome) = stream_rx.expect_authorization_resolved().await;
+        assert_eq!(outcome.option_id, acp::PermissionOptionId::new("keep"));
+        assert_eq!(outcome.option_kind, acp::PermissionOptionKind::RejectOnce);
         drop(auth);
 
         // The overwrite is cancelled with an error.

@@ -1,5 +1,5 @@
 use action_log::ActionLog;
-use agent_client_protocol::schema as acp;
+use agent_client_protocol::schema::v1 as acp;
 use anyhow::{Context as _, Result, anyhow};
 use futures::FutureExt as _;
 use gpui::{App, Entity, SharedString, Task};
@@ -434,7 +434,7 @@ impl AgentTool for ReadFileTool {
                     let end_anchor = buffer.anchor_before(Point::new(end, 0));
                     // Stream the numbered output directly from the buffer's
                     // chunk iterator so the unnumbered range is never
-                    // materialisim as its own `String`.
+                    // materialized as its own `String`.
                     let mut output = String::new();
                     write_lines_numbered(
                         &mut output,

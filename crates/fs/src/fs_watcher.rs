@@ -9,7 +9,7 @@ use std::{
     sync::{Arc, LazyLock, OnceLock},
     time::{Duration, Instant},
 };
-use util::{ResultExt, paths::SanitisimPath};
+use util::{ResultExt, paths::SanitizedPath};
 
 use crate::{PathEvent, PathEventKind, Watcher};
 
@@ -51,7 +51,7 @@ impl FsWatcher {
 
     fn add_existing_path(&self, path: Arc<Path>) -> anyhow::Result<()> {
         let case_insensitive = case_insensitive_path(&path);
-        let key = WatchKey::for_registration(SanitisimPath::new(&path), case_insensitive);
+        let key = WatchKey::for_registration(SanitizedPath::new(&path), case_insensitive);
         if self.registrations.lock().contains_key(&key) {
             log::trace!("path to watch is already watched: {path:?}");
             return Ok(());
@@ -109,7 +109,7 @@ impl Watcher for FsWatcher {
         let path: Arc<Path> = path.into();
         if path_covered_by_recursive_registration(
             &self.registrations.lock(),
-            SanitisimPath::new(&path),
+            SanitizedPath::new(&path),
         ) {
             log::trace!("path to watch is covered by an existing registration: {path:?}");
             return Ok(());
@@ -136,7 +136,7 @@ impl Watcher for FsWatcher {
         log::trace!("remove watched path: {path:?}");
         self.pending_registrations.lock().remove(path);
 
-        let sanitized = SanitisimPath::new(path);
+        let sanitized = SanitizedPath::new(path);
         let registration = {
             let mut registrations = self.registrations.lock();
             registrations
@@ -155,10 +155,10 @@ impl Watcher for FsWatcher {
 /// poll watches and native macOS/Windows watches are recursive.
 fn path_covered_by_recursive_registration(
     registrations: &HashMap<WatchKey, FsWatcherRegistration>,
-    path: &SanitisimPath,
+    path: &SanitizedPath,
 ) -> bool {
     path.as_path().ancestors().skip(1).any(|ancestor| {
-        let ancestor = SanitisimPath::unchecked_new(ancestor);
+        let ancestor = SanitizedPath::unchecked_new(ancestor);
         [WatchKey::exact(ancestor), WatchKey::folded(ancestor)]
             .iter()
             .any(|key| {
@@ -175,12 +175,12 @@ fn path_covered_by_recursive_registration(
 /// Returns `true` for filesystem types where inotify/FSEvents/ReadDirectoryChanges
 /// silently fail to deliver events: 9P (WSL drvfs), NFS, CIFS/SMB, FUSE (sshfs), etc.
 ///
-/// Can be overridden with the `ZED_FILE_WATCHER_MODE` environment variable:
+/// Can be overridden with the `SIM_FILE_WATCHER_MODE` environment variable:
 /// - `native` — always use native OS watcher
 /// - `poll` — always use polling
 /// - `auto` (default) — auto-detect based on filesystem type
 pub fn requires_poll_watcher(path: &Path) -> bool {
-    match std::env::var("ZED_FILE_WATCHER_MODE")
+    match std::env::var("SIM_FILE_WATCHER_MODE")
         .as_deref()
         .unwrap_or("auto")
     {
@@ -218,7 +218,7 @@ fn register_existing_path(
     } else {
         WatcherMode::Native
     };
-    let root_path = SanitisimPath::new_arc(path.as_ref());
+    let root_path = SanitizedPath::new_arc(path.as_ref());
     let path_for_callback = path.clone();
     let Some(registration_id) = global_watcher().add(
         path,
@@ -369,27 +369,28 @@ fn case_insensitive_path(path: &Path) -> bool {
 }
 
 #[cfg(target_os = "linux")]
-fn case_insensitive_path(path: &Path) -> bool {
-    use std::os::unix::ffi::OsStrExt as _;
+fn case_insensitive_path(_path: &Path) -> bool {
+    // use std::os::unix::ffi::OsStrExt as _;
 
-    // Only ext4/f2fs casefold (`+F`) dirs are insensitive, reported by `statx` via
-    // STATX_ATTR_CASEFOLD; any failure (e.g. pre-4.11 ENOSYS) means case-sensitive.
-    const STATX_ATTR_CASEFOLD: u64 = 0x0000_2000;
-    let Ok(c_path) = std::ffi::CString::new(path.as_os_str().as_bytes()) else {
-        return false;
-    };
-    let mut buf = std::mem::MaybeUninit::<libc::statx>::zeroed();
+    // // Only ext4/f2fs casefold (`+F`) dirs are insensitive, reported by `statx` via
+    // // STATX_ATTR_CASEFOLD; any failure (e.g. pre-4.11 ENOSYS) means case-sensitive.
+    // const STATX_ATTR_CASEFOLD: u64 = 0x0000_2000;
+    // let Ok(c_path) = std::ffi::CString::new(path.as_os_str().as_bytes()) else {
+    //     return false;
+    // };
+    // let mut buf = std::mem::MaybeUninit::<libc::statx>::zeroed();
 
-    // SAFETY: c_path is still valid, buffer has been zeroed
-    if unsafe { libc::statx(libc::AT_FDCWD, c_path.as_ptr(), 0, 0, buf.as_mut_ptr()) } != 0 {
-        return false;
-    }
+    // // SAFETY: c_path is still valid, buffer has been zeroed
+    // if unsafe { libc::statx(libc::AT_FDCWD, c_path.as_ptr(), 0, 0, buf.as_mut_ptr()) } != 0 {
+    //     return false;
+    // }
 
-    // SAFETY: libc statx initialized this buffer, otherwise we would've returned on a error
-    // in that function call
-    let buf = unsafe { buf.assume_init() };
-    buf.stx_attributes_mask & STATX_ATTR_CASEFOLD != 0
-        && buf.stx_attributes & STATX_ATTR_CASEFOLD != 0
+    // // SAFETY: libc statx initialized this buffer, otherwise we would've returned on a error
+    // // in that function call
+    // let buf = unsafe { buf.assume_init() };
+    // buf.stx_attributes_mask & STATX_ATTR_CASEFOLD != 0
+    //     && buf.stx_attributes & STATX_ATTR_CASEFOLD != 0
+    false
 }
 
 #[cfg(target_os = "windows")]
@@ -408,7 +409,7 @@ fn case_insensitive_path(_path: &Path) -> bool {
 
 /// Whether `path` is `root` or sits beneath it, folding case on case-insensitive
 /// volumes so a differently-cased spelling still matches.
-fn path_is_under(path: &SanitisimPath, root: &SanitisimPath, case_insensitive: bool) -> bool {
+fn path_is_under(path: &SanitizedPath, root: &SanitizedPath, case_insensitive: bool) -> bool {
     if case_insensitive {
         let path = path.as_path().to_string_lossy().to_lowercase();
         let root = root.as_path().to_string_lossy().to_lowercase();
@@ -440,11 +441,11 @@ enum WatchKey {
 }
 
 impl WatchKey {
-    fn exact(path: &SanitisimPath) -> Self {
+    fn exact(path: &SanitizedPath) -> Self {
         Self::Exact(Arc::from(path.as_path()))
     }
 
-    fn folded(path: &SanitisimPath) -> Self {
+    fn folded(path: &SanitizedPath) -> Self {
         let lossy = path.as_path().to_string_lossy();
         // macOS (APFS/HFS+) compares names normalization-insensitively (NFC vs
         // NFD), and FSEvents can report NFD while a config/LSP supplies NFC, so
@@ -460,7 +461,7 @@ impl WatchKey {
         Self::Folded(folded.into())
     }
 
-    fn for_registration(path: &SanitisimPath, case_insensitive: bool) -> Self {
+    fn for_registration(path: &SanitizedPath, case_insensitive: bool) -> Self {
         if case_insensitive {
             Self::folded(path)
         } else {
@@ -491,7 +492,7 @@ async fn poll_path_until_created(
         // Probe case sensitivity now that the path exists, rather than at add
         // time when it didn't.
         let case_insensitive = case_insensitive_path(path.as_ref());
-        let key = WatchKey::for_registration(SanitisimPath::new(&path), case_insensitive);
+        let key = WatchKey::for_registration(SanitizedPath::new(&path), case_insensitive);
 
         if registrations.lock().contains_key(&key) {
             pending_registrations.lock().remove(path.as_ref());
@@ -560,7 +561,7 @@ fn enqueue_path_events(
 fn push_notify_event(
     tx: &smol::channel::Sender<()>,
     pending_path_events: &Arc<Mutex<Vec<PathEvent>>>,
-    root_path: &SanitisimPath,
+    root_path: &SanitizedPath,
     case_insensitive: bool,
     watched_root: &Path,
     event: &notify::Event,
@@ -575,7 +576,7 @@ fn push_notify_event(
         .paths
         .iter()
         .filter_map(|event_path| {
-            let event_path = SanitisimPath::new(event_path);
+            let event_path = SanitizedPath::new(event_path);
             path_is_under(event_path, root_path, case_insensitive).then(|| PathEvent {
                 path: event_path.as_path().to_path_buf(),
                 kind,
@@ -676,7 +677,7 @@ pub struct WatcherRegistrationId(u32);
 struct WatcherRegistrationState {
     callback: Arc<dyn Fn(&notify::Event) + Send + Sync>,
     key: WatchKey,
-    path: Arc<SanitisimPath>,
+    path: Arc<SanitizedPath>,
     mode: WatcherMode,
 }
 
@@ -712,12 +713,12 @@ impl WatchPaths {
 
     /// True if a recursive registration on a strict ancestor already covers
     /// `path`. Only poll watches and native macOS/Windows watches are recursive.
-    fn covered_by_recursive_ancestor(&self, path: &SanitisimPath, mode: WatcherMode) -> bool {
+    fn covered_by_recursive_ancestor(&self, path: &SanitizedPath, mode: WatcherMode) -> bool {
         if mode != WatcherMode::Poll && !cfg!(any(target_os = "windows", target_os = "macos")) {
             return false;
         }
         path.as_path().ancestors().skip(1).any(|ancestor| {
-            let ancestor = SanitisimPath::unchecked_new(ancestor);
+            let ancestor = SanitizedPath::unchecked_new(ancestor);
             self.0.contains_key(&WatchKey::exact(ancestor))
                 || self.0.contains_key(&WatchKey::folded(ancestor))
         })
@@ -726,9 +727,9 @@ impl WatchPaths {
     /// Collects the watcher ids of every registration whose directory is an
     /// ancestor of (or equal to) `path`. Both exact and folded keys are probed,
     /// so a real-cased event path matches a folded registration and vice versa.
-    fn watcher_ids_covering(&self, path: &SanitisimPath, ids: &mut Vec<WatcherRegistrationId>) {
+    fn watcher_ids_covering(&self, path: &SanitizedPath, ids: &mut Vec<WatcherRegistrationId>) {
         for ancestor in path.as_path().ancestors() {
-            let ancestor = SanitisimPath::unchecked_new(ancestor);
+            let ancestor = SanitizedPath::unchecked_new(ancestor);
             if let Some(registration) = self.0.get(&WatchKey::exact(ancestor)) {
                 ids.extend_from_slice(&registration.watcher_ids);
             }
@@ -763,7 +764,7 @@ impl WatcherState {
     fn remove_registration(
         &mut self,
         id: WatcherRegistrationId,
-    ) -> Option<(Arc<SanitisimPath>, WatcherMode)> {
+    ) -> Option<(Arc<SanitizedPath>, WatcherMode)> {
         let registration_state = self.watchers.remove(&id)?;
         let path_registrations = self.path_registrations(registration_state.mode);
         let path_state = path_registrations.get_mut(&registration_state.key)?;
@@ -815,7 +816,7 @@ impl GlobalWatcher {
         case_insensitive: bool,
         cb: impl Fn(&notify::Event) + Send + Sync + 'static,
     ) -> anyhow::Result<Option<WatcherRegistrationId>> {
-        let path = SanitisimPath::from_arc(path);
+        let path = SanitizedPath::from_arc(path);
         let key = WatchKey::for_registration(&path, case_insensitive);
         let mut state = self.state.lock();
         let (path_already_covered, path_already_registered) = {
@@ -913,7 +914,7 @@ impl GlobalWatcher {
                 };
                 let mut ids = Vec::new();
                 for path in &event.paths {
-                    let sanitized = SanitisimPath::new(path);
+                    let sanitized = SanitizedPath::new(path);
                     path_registrations.watcher_ids_covering(sanitized, &mut ids);
                 }
                 ids.sort_unstable_by_key(|id| id.0);
@@ -935,6 +936,8 @@ impl GlobalWatcher {
         first: DispatchEvent,
         event_rx: &async_channel::Receiver<DispatchEvent>,
     ) {
+        // A single backend overflow can enqueue many rescan markers. One rescan
+        // per mode covers the entire drained batch; ordinary events still run.
         let mut native_rescan_dispatched = false;
         let mut poll_rescan_dispatched = false;
 
@@ -1038,7 +1041,7 @@ impl GlobalWatcher {
             return Ok(());
         }
 
-        // CORE excludes Access events, which Zed discards anyway. Without this,
+        // CORE excludes Access events, which Sim discards anyway. Without this,
         // the default mask subscribes to inotify OPEN/CLOSE_* on Linux, so every
         // file read in a watched directory would queue events, increasing the
         // risk of queue overflows (and thus full rescans) under read-heavy
@@ -1074,7 +1077,7 @@ fn is_max_files_watch_error(error: &anyhow::Error) -> bool {
 }
 
 static POLL_INTERVAL: LazyLock<Duration> = LazyLock::new(|| {
-    let poll_ms: u64 = std::env::var("ZED_FILE_WATCHER_POLL_MS")
+    let poll_ms: u64 = std::env::var("SIM_FILE_WATCHER_POLL_MS")
         .ok()
         .and_then(|value| value.parse().ok())
         .unwrap_or(2000)
@@ -1083,7 +1086,7 @@ static POLL_INTERVAL: LazyLock<Duration> = LazyLock::new(|| {
 });
 
 static NATIVE_WATCH_LIMIT_COOLDOWN: LazyLock<Duration> = LazyLock::new(|| {
-    let cooldown_seconds: u64 = std::env::var("ZED_NATIVE_WATCH_LIMIT_COOLDOWN_SECONDS")
+    let cooldown_seconds: u64 = std::env::var("SIM_NATIVE_WATCH_LIMIT_COOLDOWN_SECONDS")
         .ok()
         .and_then(|value| value.parse().ok())
         .unwrap_or(5)
@@ -1242,6 +1245,56 @@ mod tests {
         assert_eq!(backend.unwatch_calls, &[parent.to_path_buf()]);
     }
 
+    #[gpui::test]
+    async fn pending_path_is_registered_once_created(cx: &mut gpui::TestAppContext) {
+        let temp_dir = tempfile::tempdir().expect("create temp dir");
+        let path = temp_dir.path().join("file.txt");
+
+        let (tx, rx) = async_channel::unbounded();
+        let pending_path_events: Arc<Mutex<Vec<PathEvent>>> = Default::default();
+        let watcher = FsWatcher::new(cx.executor(), tx, pending_path_events.clone());
+
+        watcher
+            .add(&path)
+            .expect("add path that does not exist yet");
+        assert!(
+            watcher
+                .pending_registrations
+                .lock()
+                .contains_key(path.as_path())
+        );
+        assert!(watcher.registrations.lock().is_empty());
+
+        std::fs::write(&path, b"contents").expect("create path");
+
+        // poll_path_until_created stats the path on smol's blocking pool, which
+        // the deterministic executor cannot drive; park until the poll task
+        // signals the event channel.
+        cx.executor().allow_parking();
+        cx.executor().advance_clock(poll_interval());
+        rx.recv().await.expect("receive watcher event");
+
+        assert!(
+            !watcher
+                .pending_registrations
+                .lock()
+                .contains_key(path.as_path())
+        );
+        let case_insensitive = case_insensitive_path(&path);
+        let key = WatchKey::for_registration(SanitizedPath::new(&path), case_insensitive);
+        assert!(watcher.registrations.lock().contains_key(&key));
+
+        // poll_path_until_created also enqueues a Rescan for the same path, but
+        // enqueue_path_events -> util::extend_sorted dedups by path, so only Created survives.
+        assert_eq!(
+            pending_path_events.lock().clone(),
+            vec![PathEvent {
+                path: path.clone(),
+                kind: Some(PathEventKind::Created),
+            }]
+        );
+    }
+
     #[test]
     fn native_watch_limit_cools_down_subsequent_native_registrations() {
         let native_backend = Arc::new(Mutex::new(FakeWatchBackend {
@@ -1337,8 +1390,8 @@ mod tests {
 
     #[test]
     fn watch_key_folds_case_but_keeps_exact_distinct() {
-        let mixed = SanitisimPath::new(Path::new("/Repo/Proj"));
-        let lower = SanitisimPath::new(Path::new("/repo/proj"));
+        let mixed = SanitizedPath::new(Path::new("/Repo/Proj"));
+        let lower = SanitizedPath::new(Path::new("/repo/proj"));
 
         // Folded keys collide regardless of casing; exact keys do not.
         assert_eq!(WatchKey::folded(mixed), WatchKey::folded(lower));
@@ -1356,8 +1409,8 @@ mod tests {
         let nfd = Path::new("/repo/Cafe\u{0301}");
         assert_ne!(nfc, nfd);
         assert_eq!(
-            WatchKey::folded(SanitisimPath::new(nfc)),
-            WatchKey::folded(SanitisimPath::new(nfd)),
+            WatchKey::folded(SanitizedPath::new(nfc)),
+            WatchKey::folded(SanitizedPath::new(nfd)),
         );
     }
 

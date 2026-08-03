@@ -16,7 +16,7 @@ You can also build sim from source, see [these docs](https://sim.dev/docs/develo
 Additionally, you can install Sim using winget:
 
 ```sh
-winget install -e --id SimIndustries.Sim
+winget install -e --id Simtropolis.Sim
 ```
 
 ## Uninstall

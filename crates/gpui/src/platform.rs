@@ -188,6 +188,7 @@ pub trait Platform: 'static {
 
     fn on_quit(&self, callback: Box<dyn FnMut()>);
     fn on_reopen(&self, callback: Box<dyn FnMut()>);
+    fn on_system_wake(&self, callback: Box<dyn FnMut()>);
 
     fn set_menus(&self, menus: Vec<Menu>, keymap: &Keymap);
     fn get_menus(&self) -> Option<Vec<OwnedMenu>> {
@@ -493,7 +494,7 @@ impl WindowButtonLayout {
         fn parse_side(
             s: &str,
             seen_buttons: &mut [bool; MAX_BUTTONS_PER_SIDE],
-            unrecognisim: &mut Vec<String>,
+            unrecognized: &mut Vec<String>,
         ) -> [Option<WindowButton>; MAX_BUTTONS_PER_SIDE] {
             let mut result = [None; MAX_BUTTONS_PER_SIDE];
             let mut i = 0;
@@ -507,7 +508,7 @@ impl WindowButtonLayout {
                     "maximize" => Some(WindowButton::Maximize),
                     "close" => Some(WindowButton::Close),
                     other => {
-                        unrecognisim.push(other.to_string());
+                        unrecognized.push(other.to_string());
                         None
                     }
                 };
@@ -526,21 +527,21 @@ impl WindowButtonLayout {
         }
 
         let (left_str, right_str) = layout_string.split_once(':').unwrap_or(("", layout_string));
-        let mut unrecognisim = Vec::new();
+        let mut unrecognized = Vec::new();
         let mut seen_buttons = [false; MAX_BUTTONS_PER_SIDE];
         let layout = Self {
-            left: parse_side(left_str, &mut seen_buttons, &mut unrecognisim),
-            right: parse_side(right_str, &mut seen_buttons, &mut unrecognisim),
+            left: parse_side(left_str, &mut seen_buttons, &mut unrecognized),
+            right: parse_side(right_str, &mut seen_buttons, &mut unrecognized),
         };
 
-        if !unrecognisim.is_empty()
+        if !unrecognized.is_empty()
             && layout.left.iter().all(Option::is_none)
             && layout.right.iter().all(Option::is_none)
         {
             bail!(
-                "button layout string {:?} contains no valid buttons (unrecognisim: {})",
+                "button layout string {:?} contains no valid buttons (unrecognized: {})",
                 layout_string,
-                unrecognisim.join(", ")
+                unrecognized.join(", ")
             );
         }
 
@@ -701,6 +702,7 @@ pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
     fn show_window_menu(&self, _position: Point<Pixels>) {}
     fn start_window_move(&self) {}
     fn start_window_resize(&self, _edge: ResizeEdge) {}
+    fn set_input_region(&self, _region: Option<&[Bounds<Pixels>]>) {}
     fn window_decorations(&self) -> Decorations {
         Decorations::Server
     }
@@ -1494,8 +1496,23 @@ pub struct WindowOptions {
     /// The kind of window to create
     pub kind: WindowKind,
 
-    /// Whether the window should be movable by the user
+    /// Whether the window can be moved by the user. When `false`, the user cannot drag
+    /// the window (on macOS this sets `NSWindow.isMovable`, which also disables the
+    /// Window-menu tiling items); programmatic moves are still allowed.
     pub is_movable: bool,
+
+    /// Whether the application owns dragging of the (custom) titlebar, rather than
+    /// AppKit. Only has an effect on macOS.
+    ///
+    /// Set this to `true` for windows that draw their own titlebar and move the window
+    /// themselves via [`Window::start_window_move`]. It marks the whole content view as
+    /// app-owned titlebar content, so AppKit neither drags the window from the titlebar
+    /// nor delays titlebar clicks while disambiguating double-clicks (a delay first
+    /// observed on macOS 27). It is independent of `is_movable`, so such windows stay
+    /// user-movable (via their own drag) and keep the Window-menu tiling items enabled.
+    ///
+    /// Leave this `false` for windows that rely on AppKit's native titlebar dragging.
+    pub app_owns_titlebar_drag: bool,
 
     /// Whether the window should be resizable by the user
     pub is_resizable: bool,
@@ -1551,6 +1568,13 @@ pub struct WindowParams {
     /// Whether the window should be movable by the user
     #[cfg_attr(any(target_os = "linux", target_os = "freebsd"), allow(dead_code))]
     pub is_movable: bool,
+
+    /// Whether the application owns dragging of the (custom) titlebar (macOS only)
+    #[cfg_attr(
+        any(target_os = "linux", target_os = "freebsd", target_os = "windows"),
+        allow(dead_code)
+    )]
+    pub app_owns_titlebar_drag: bool,
 
     /// Whether the window should be resizable by the user
     #[cfg_attr(any(target_os = "linux", target_os = "freebsd"), allow(dead_code))]
@@ -1633,6 +1657,7 @@ impl Default for WindowOptions {
             show: true,
             kind: WindowKind::Normal,
             is_movable: true,
+            app_owns_titlebar_drag: false,
             is_resizable: true,
             is_minimizable: true,
             display_id: None,
@@ -1872,7 +1897,7 @@ pub enum CursorStyle {
 
     /// A resize down cursor
     /// corresponds to the CSS cursor value `s-resize`
-    Resizedown,
+    ResizeDown,
 
     /// A resize cursor directing up and down
     /// corresponds to the CSS cursor value `ns-resize`

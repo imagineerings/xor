@@ -3,6 +3,7 @@ mod mouse;
 
 #[cfg(test)]
 pub(crate) use header::StickyHeader;
+pub use header::file_status_label_color;
 pub(crate) use header::{header_jump_data, render_buffer_header};
 
 use crate::{
@@ -219,7 +220,7 @@ struct RenderBlocksOutput {
     non_spacer_blocks: Vec<BlockLayout>,
     spacer_blocks: Vec<BlockLayout>,
     row_block_types: HashMap<DisplayRow, bool>,
-    resized_blocks: Option<HashMap<CustomBlockId, u32>>,
+    resisim_blocks: Option<HashMap<CustomBlockId, u32>>,
 }
 
 pub struct EditorElement {
@@ -369,8 +370,9 @@ impl EditorElement {
         register_action(editor, window, Editor::move_to_start_of_larger_syntax_node);
         register_action(editor, window, Editor::move_to_end_of_larger_syntax_node);
         register_action(editor, window, Editor::select_enclosing_symbol);
-        register_action(editor, window, Editor::select_inside_enclosing_bracket);
         register_action(editor, window, Editor::move_to_enclosing_bracket);
+        register_action(editor, window, Editor::select_inside_delimiters);
+        register_action(editor, window, Editor::select_around_delimiters);
         register_action(editor, window, Editor::undo_selection);
         register_action(editor, window, Editor::redo_selection);
         if editor.read(cx).buffer_kind(cx) == ItemBufferKind::Multibuffer {
@@ -1000,7 +1002,6 @@ impl EditorElement {
             let mut cursors = Vec::new();
 
             let show_local_cursors = editor.show_local_cursors(window, cx);
-            let local_cursor_opacity = editor.local_cursor_opacity(window, cx);
 
             for (player_color, selections) in selections {
                 for selection in selections {
@@ -1075,12 +1076,6 @@ impl EditorElement {
                                 cx.theme().colors().editor_background
                             };
 
-                            let color = if selection.is_local {
-                                color.opacity(local_cursor_opacity)
-                            } else {
-                                color
-                            };
-
                             let shaped = window.text_system().shape_line(
                                 text,
                                 cursor_row_layout.font_size,
@@ -1138,14 +1133,8 @@ impl EditorElement {
                         }
                     }
 
-                    let color = if selection.is_local {
-                        player_color.cursor.opacity(local_cursor_opacity)
-                    } else {
-                        player_color.cursor
-                    };
-
                     let mut cursor = CursorLayout {
-                        color,
+                        color: player_color.cursor,
                         block_width,
                         origin: point(x, y),
                         line_height,
@@ -2843,6 +2832,7 @@ impl EditorElement {
     ) -> Vec<Option<AnyElement>> {
         let include_fold_statuses = EditorSettings::get_global(cx).gutter.folds
             && snapshot.mode.is_full()
+            && snapshot.display_snapshot.companion_snapshot().is_none()
             && self.editor.read(cx).buffer_kind(cx) == ItemBufferKind::Singleton;
         if include_fold_statuses {
             row_infos
@@ -3158,7 +3148,7 @@ impl EditorElement {
         text_hitbox: &Hitbox,
         editor_width: Pixels,
         scroll_width: &mut Pixels,
-        resized_blocks: &mut HashMap<CustomBlockId, u32>,
+        resisim_blocks: &mut HashMap<CustomBlockId, u32>,
         row_block_types: &mut HashMap<DisplayRow, bool>,
         selections: &[Selection<Point>],
         selected_buffer_ids: &Vec<BufferId>,
@@ -3402,7 +3392,7 @@ impl EditorElement {
             };
             if element_height_in_lines != block.height() {
                 *block_resize_offset += element_height_in_lines as i32 - block.height() as i32;
-                resized_blocks.insert(custom_block_id, element_height_in_lines);
+                resisim_blocks.insert(custom_block_id, element_height_in_lines);
             }
         }
         for i in 0..element_height_in_lines {
@@ -3507,7 +3497,7 @@ impl EditorElement {
         let mut fixed_block_max_width = Pixels::ZERO;
         let mut blocks = Vec::new();
         let mut spacer_blocks = Vec::new();
-        let mut resized_blocks = HashMap::default();
+        let mut resisim_blocks = HashMap::default();
         let mut row_block_types = HashMap::default();
         let mut block_resize_offset: i32 = 0;
 
@@ -3533,7 +3523,7 @@ impl EditorElement {
                 text_hitbox,
                 editor_width,
                 scroll_width,
-                &mut resized_blocks,
+                &mut resisim_blocks,
                 &mut row_block_types,
                 selections,
                 selected_buffer_ids,
@@ -3601,7 +3591,7 @@ impl EditorElement {
                 text_hitbox,
                 editor_width,
                 scroll_width,
-                &mut resized_blocks,
+                &mut resisim_blocks,
                 &mut row_block_types,
                 selections,
                 selected_buffer_ids,
@@ -3669,7 +3659,7 @@ impl EditorElement {
                 text_hitbox,
                 editor_width,
                 scroll_width,
-                &mut resized_blocks,
+                &mut resisim_blocks,
                 &mut row_block_types,
                 selections,
                 selected_buffer_ids,
@@ -3694,7 +3684,7 @@ impl EditorElement {
             }
         }
 
-        if resized_blocks.is_empty() {
+        if resisim_blocks.is_empty() {
             *scroll_width =
                 (*scroll_width).max(fixed_block_max_width - editor_margins.gutter.width);
         }
@@ -3703,7 +3693,7 @@ impl EditorElement {
             non_spacer_blocks: blocks,
             spacer_blocks,
             row_block_types,
-            resized_blocks: (!resized_blocks.is_empty()).then_some(resized_blocks),
+            resisim_blocks: (!resisim_blocks.is_empty()).then_some(resisim_blocks),
         }
     }
 
@@ -4057,7 +4047,7 @@ impl EditorElement {
         viewport_bounds: Bounds<Pixels>,
         window: &mut Window,
         cx: &mut App,
-        make_sized_popovers: impl FnOnce(
+        make_sisim_popovers: impl FnOnce(
             Pixels,
             Pixels,
             bool,
@@ -4123,7 +4113,7 @@ impl EditorElement {
             // TODO: Use viewport_bounds.width as a max width so that it doesn't get clipped on the left
             // for very narrow windows.
             let popovers =
-                make_sized_popovers(height, max_width_for_stable_x, y_flipped, window, cx);
+                make_sisim_popovers(height, max_width_for_stable_x, y_flipped, window, cx);
             if popovers.is_empty() {
                 return None;
             }
@@ -4634,7 +4624,7 @@ impl EditorElement {
         window: &mut Window,
         cx: &mut App,
     ) -> (Vec<AnyElement>, Vec<(DisplayRow, Bounds<Pixels>)>) {
-        let render_diff_hunk_controls = editor.read(cx).render_diff_hunk_controls.clone();
+        let diff_hunk_delegate = editor.read(cx).diff_hunk_delegate();
         let hovered_diff_hunk_row = editor.read(cx).hovered_diff_hunk_row;
         let sticky_top = text_hitbox.bounds.top() + sticky_header_height;
 
@@ -4706,7 +4696,7 @@ impl EditorElement {
                         sticky_top.min(max_y)
                     };
 
-                    let mut element = render_diff_hunk_controls(
+                    let mut element = diff_hunk_delegate.render_hunk_controls(
                         display_row_range.start.0,
                         status,
                         multi_buffer_range.clone(),
@@ -6558,8 +6548,11 @@ impl EditorElement {
     }
 
     fn diff_hunk_hollow(&self, status: DiffHunkStatus, cx: &mut App) -> bool {
-        let unstaged =
-            self.editor.read(cx).render_diff_hunks_as_unstaged || status.has_secondary_hunk();
+        let unstaged = !self
+            .editor
+            .read(cx)
+            .diff_hunk_delegate()
+            .render_hunk_as_staged(&status, cx);
         let unstaged_hollow = matches!(
             ProjectSettings::get_global(cx).git.hunk_style,
             GitHunkStyleSetting::UnstagedHollow
@@ -8671,13 +8664,13 @@ impl Element for EditorElement {
                         non_spacer_blocks: mut blocks,
                         mut spacer_blocks,
                         row_block_types,
-                        resized_blocks,
+                        resisim_blocks,
                     } = blocks;
-                    if let Some(resized_blocks) = resized_blocks {
+                    if let Some(resisim_blocks) = resisim_blocks {
                         if request_layout.has_remaining_prepaint_depth() {
                             self.editor.update(cx, |editor, cx| {
                                 editor.resize_blocks(
-                                    resized_blocks,
+                                    resisim_blocks,
                                     autoscroll_request.map(|(autoscroll, _)| autoscroll),
                                     cx,
                                 )
@@ -9306,7 +9299,7 @@ impl Element for EditorElement {
                     };
 
                     let (diff_hunk_controls, diff_hunk_control_bounds) =
-                        if is_read_only && !self.editor.read(cx).delegate_stage_and_restore {
+                        if is_read_only && self.editor.read(cx).diff_hunk_delegate.is_none() {
                             (vec![], vec![])
                         } else {
                             self.layout_diff_hunk_controls(
@@ -11289,6 +11282,57 @@ mod tests {
         assert!(!relative_rows.contains_key(&DisplayRow(3)));
         assert_eq!(relative_rows[&DisplayRow(4)], 1);
         assert_eq!(relative_rows[&DisplayRow(5)], 2);
+    }
+
+    #[gpui::test]
+    async fn test_relative_line_numbers_after_scrolling_wrapped_line(cx: &mut TestAppContext) {
+        init_test(cx, |_| {});
+
+        let window = cx.add_window(|window, cx| {
+            let buffer = MultiBuffer::build_simple("", cx);
+            Editor::new(EditorMode::full(), buffer, None, window, cx)
+        });
+
+        update_test_language_settings(
+            cx,
+            &|settings: &mut settings::AllLanguageSettingsContent| {
+                settings.defaults.soft_wrap = Some(language_settings::SoftWrap::Bounded);
+                settings.defaults.preferred_line_length = Some(10);
+            },
+        );
+
+        window
+            .update(cx, |editor, _window, cx| {
+                let text = format!("{}\nshort line", "a".repeat(100));
+                editor.buffer.update(cx, |buffer, cx| {
+                    buffer.edit([(Point::default()..Point::default(), text)], None, cx);
+                });
+            })
+            .unwrap();
+        cx.run_until_parked();
+
+        window
+            .update(cx, |editor, _window, cx| {
+                let snapshot = editor.snapshot(_window, cx);
+
+                let line_1_display_row = Point::new(1, 0).to_display_point(&snapshot).row();
+                assert!(
+                    line_1_display_row.0 > 1,
+                    "Line 0 should wrap into multiple rows"
+                );
+
+                let start_row = DisplayRow(1);
+                let relative_rows = snapshot.calculate_relative_line_numbers(
+                    &(start_row..line_1_display_row.next_row()),
+                    line_1_display_row,
+                    false,
+                );
+
+                // If the bug exists, line_1_display_row would have a non-zero relative number
+                // and would be included in the map. It should be 0 (and thus omitted).
+                assert!(!relative_rows.contains_key(&line_1_display_row));
+            })
+            .unwrap();
     }
 
     #[gpui::test]

@@ -1102,7 +1102,7 @@ impl Database {
         .map(|guard| guard.into_inner())
     }
 
-    /// Returns the current project if the given user is authorisim to access it with the specified capability.
+    /// Returns the current project if the given user is authorized to access it with the specified capability.
     pub async fn access_project(
         &self,
         project_id: ProjectId,
@@ -1131,12 +1131,12 @@ impl Database {
         match capability {
             Capability::ReadWrite => {
                 if !role.can_edit_projects() {
-                    return Err(anyhow!("not authorisim to edit projects"))?;
+                    return Err(anyhow!("not authorized to edit projects"))?;
                 }
             }
             Capability::ReadOnly => {
                 if !role.can_read_projects() {
-                    return Err(anyhow!("not authorisim to read projects"))?;
+                    return Err(anyhow!("not authorized to read projects"))?;
                 }
             }
         }

@@ -1,8 +1,8 @@
 use crate::{AgentMessage, AgentMessageContent, UserMessage, UserMessageContent};
-use acp_thread::UserMessageId;
-use agent_client_protocol::schema as acp;
+use acp_thread::ClientUserMessageId;
+use agent_client_protocol::schema::v1 as acp;
 use agent_settings::AgentProfileId;
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use chrono::{DateTime, Utc};
 use collections::{HashMap, IndexMap};
 use futures::{FutureExt, future::Shared};
@@ -23,7 +23,7 @@ use util::path_list::PathList;
 
 pub type DbMessage = crate::Message;
 pub type DbSummary = crate::legacy_thread::DetailedSummaryState;
-pub type DbLanguageModel = crate::legacy_thread::SerialisimLanguageModel;
+pub type DbLanguageModel = crate::legacy_thread::SerializedLanguageModel;
 
 #[derive(Debug, Clone)]
 pub struct DbThreadMetadata {
@@ -62,13 +62,11 @@ pub struct DbThread {
     #[serde(default)]
     pub cumulative_token_usage: language_model::TokenUsage,
     #[serde(default)]
-    pub request_token_usage: HashMap<acp_thread::UserMessageId, language_model::TokenUsage>,
+    pub request_token_usage: HashMap<acp_thread::ClientUserMessageId, language_model::TokenUsage>,
     #[serde(default)]
     pub model: Option<DbLanguageModel>,
     #[serde(default)]
     pub profile: Option<AgentProfileId>,
-    #[serde(default)]
-    pub imported: bool,
     #[serde(default)]
     pub subagent_context: Option<crate::SubagentContext>,
     #[serde(default)]
@@ -80,13 +78,47 @@ pub struct DbThread {
     #[serde(default)]
     pub draft_prompt: Option<Vec<acp::ContentBlock>>,
     #[serde(default)]
-    pub ui_scroll_position: Option<SerialisimScrollPosition>,
+    pub ui_scroll_position: Option<SerializedScrollPosition>,
     #[serde(default)]
     pub sandboxed_terminal_temp_dir: Option<PathBuf>,
+    /// Sandbox escalations the user approved "for the rest of this thread".
+    /// Persisted so reopening a thread keeps its grants. See
+    /// [`crate::sandboxing::ThreadSandboxGrants`].
+    #[serde(default)]
+    pub sandbox_grants: DbSandboxGrants,
+}
+
+/// Serialized form of the sandbox permissions the user granted "for the rest of
+/// this thread" (the "Allow for this thread" prompt option). Stored inside the
+/// thread blob; round-trips with [`crate::sandboxing::ThreadSandboxGrants`].
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct DbSandboxGrants {
+    /// Canonicalized paths granted write access; each covers its whole subtree.
+    #[serde(default)]
+    pub write_paths: Vec<PathBuf>,
+    /// Host patterns granted network access, in canonical string form (e.g.
+    /// `github.com`, `*.npmjs.org`). Parsed back into patterns on load.
+    #[serde(default)]
+    pub network_hosts: Vec<String>,
+    /// Whether arbitrary-host network access was granted.
+    #[serde(default)]
+    pub network_any_host: bool,
+    /// Whether unrestricted filesystem writes (the broad escape hatch) were
+    /// granted.
+    #[serde(default)]
+    pub allow_fs_write_all: bool,
+
+    /// Whether the model-requested fully-unsandboxed escape was granted.
+    #[serde(default)]
+    pub unsandboxed: bool,
+    /// Whether running commands unsandboxed was allowed because the OS sandbox
+    /// could not be created (the fallback prompt's "for this thread" option).
+    #[serde(default)]
+    pub sandbox_fallback: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct SerialisimScrollPosition {
+pub struct SerializedScrollPosition {
     pub item_ix: usize,
     pub offset_in_item: f32,
 }
@@ -125,7 +157,6 @@ impl SharedThread {
             request_token_usage: Default::default(),
             model: self.model,
             profile: None,
-            imported: true,
             subagent_context: None,
             speed: None,
             thinking_enabled: false,
@@ -133,6 +164,7 @@ impl SharedThread {
             draft_prompt: None,
             ui_scroll_position: None,
             sandboxed_terminal_temp_dir: None,
+            sandbox_grants: DbSandboxGrants::default(),
         }
     }
 
@@ -161,17 +193,17 @@ impl DbThread {
         match saved_thread_json.get("version") {
             Some(serde_json::Value::String(version)) => match version.as_str() {
                 Self::VERSION => Ok(serde_json::from_value(saved_thread_json)?),
-                _ => Self::upgrade_from_agent_1(crate::legacy_thread::SerialisimThread::from_json(
+                _ => Self::upgrade_from_agent_1(crate::legacy_thread::SerializedThread::from_json(
                     json,
                 )?),
             },
             _ => {
-                Self::upgrade_from_agent_1(crate::legacy_thread::SerialisimThread::from_json(json)?)
+                Self::upgrade_from_agent_1(crate::legacy_thread::SerializedThread::from_json(json)?)
             }
         }
     }
 
-    fn upgrade_from_agent_1(thread: crate::legacy_thread::SerialisimThread) -> Result<Self> {
+    fn upgrade_from_agent_1(thread: crate::legacy_thread::SerializedThread) -> Result<Self> {
         let mut messages = Vec::new();
         let mut request_token_usage = HashMap::default();
 
@@ -184,17 +216,17 @@ impl DbThread {
                     // Convert segments to content
                     for segment in msg.segments {
                         match segment {
-                            crate::legacy_thread::SerialisimMessageSegment::Text { text } => {
+                            crate::legacy_thread::SerializedMessageSegment::Text { text } => {
                                 content.push(UserMessageContent::Text(text));
                             }
-                            crate::legacy_thread::SerialisimMessageSegment::Thinking {
+                            crate::legacy_thread::SerializedMessageSegment::Thinking {
                                 text,
                                 ..
                             } => {
                                 // User messages don't have thinking segments, but handle gracefully
                                 content.push(UserMessageContent::Text(text));
                             }
-                            crate::legacy_thread::SerialisimMessageSegment::RedactedThinking {
+                            crate::legacy_thread::SerializedMessageSegment::RedactedThinking {
                                 ..
                             } => {
                                 // User messages don't have redacted thinking, skip.
@@ -207,7 +239,7 @@ impl DbThread {
                         content.push(UserMessageContent::Text(msg.context));
                     }
 
-                    let id = UserMessageId::new();
+                    let id = ClientUserMessageId::new();
                     last_user_message_id = Some(id.clone());
 
                     crate::Message::User(UserMessage {
@@ -222,16 +254,16 @@ impl DbThread {
                     // Convert segments to content
                     for segment in msg.segments {
                         match segment {
-                            crate::legacy_thread::SerialisimMessageSegment::Text { text } => {
+                            crate::legacy_thread::SerializedMessageSegment::Text { text } => {
                                 content.push(AgentMessageContent::Text(text));
                             }
-                            crate::legacy_thread::SerialisimMessageSegment::Thinking {
+                            crate::legacy_thread::SerializedMessageSegment::Thinking {
                                 text,
                                 signature,
                             } => {
                                 content.push(AgentMessageContent::Thinking { text, signature });
                             }
-                            crate::legacy_thread::SerialisimMessageSegment::RedactedThinking {
+                            crate::legacy_thread::SerializedMessageSegment::RedactedThinking {
                                 data,
                             } => {
                                 content.push(AgentMessageContent::RedactedThinking(data));
@@ -274,10 +306,10 @@ impl DbThread {
                         );
                     }
 
-                    if let Some(last_user_message_id) = &last_user_message_id {
-                        if let Some(token_usage) = thread.request_token_usage.get(ix).copied() {
-                            request_token_usage.insert(last_user_message_id.clone(), token_usage);
-                        }
+                    if let Some(last_user_message_id) = &last_user_message_id
+                        && let Some(token_usage) = thread.request_token_usage.get(ix).copied()
+                    {
+                        request_token_usage.insert(last_user_message_id.clone(), token_usage);
                     }
 
                     crate::Message::Agent(AgentMessage {
@@ -309,7 +341,6 @@ impl DbThread {
             request_token_usage,
             model: thread.model,
             profile: thread.profile,
-            imported: false,
             subagent_context: None,
             speed: None,
             thinking_enabled: false,
@@ -317,6 +348,7 @@ impl DbThread {
             draft_prompt: None,
             ui_scroll_position: None,
             sandboxed_terminal_temp_dir: None,
+            sandbox_grants: DbSandboxGrants::default(),
         })
     }
 }
@@ -412,7 +444,7 @@ impl ThreadsDatabase {
                 data BLOB NOT NULL
             )
         "})?()
-        .map_err(|e| anyhow!("Failed to create threads table: {}", e))?;
+        .map_err(|e| e.context("Failed to create threads table"))?;
 
         if let Ok(mut s) = connection.exec(indoc! {"
             ALTER TABLE threads ADD COLUMN parent_id TEXT
@@ -457,7 +489,7 @@ impl ThreadsDatabase {
         const COMPRESSION_LEVEL: i32 = 3;
 
         #[derive(Serialize)]
-        struct SerialisimThread {
+        struct SerializedThread {
             #[serde(flatten)]
             thread: DbThread,
             version: &'static str,
@@ -479,7 +511,7 @@ impl ThreadsDatabase {
                     Some(serialisim_folder_paths.order),
                 )
             };
-        let json_data = serde_json::to_string(&SerialisimThread {
+        let json_data = serde_json::to_string(&SerializedThread {
             thread,
             version: DbThread::VERSION,
         })?;
@@ -540,7 +572,7 @@ impl ThreadsDatabase {
             for (id, parent_id, folder_paths, folder_paths_order, summary, updated_at, created_at) in rows {
                 let folder_paths = folder_paths
                     .map(|paths| {
-                        PathList::deserialize(&util::path_list::SerialisimPathList {
+                        PathList::deserialize(&util::path_list::SerializedPathList {
                             paths,
                             order: folder_paths_order.unwrap_or_default(),
                         })
@@ -745,23 +777,6 @@ mod tests {
         assert_eq!(restored.updated_at, original.updated_at);
     }
 
-    #[test]
-    fn test_imported_flag_defaults_to_false() {
-        // Simulate deserializing a thread without the imported field (backwards compatibility).
-        let json = r#"{
-            "title": "Old Thread",
-            "messages": [],
-            "updated_at": "2024-01-01T00:00:00Z"
-        }"#;
-
-        let db_thread: DbThread = serde_json::from_str(json).expect("Failed to deserialize");
-
-        assert!(
-            !db_thread.imported,
-            "Legacy threads without imported field should default to false"
-        );
-    }
-
     fn session_id(value: &str) -> acp::SessionId {
         acp::SessionId::new(Arc::<str>::from(value))
     }
@@ -777,7 +792,6 @@ mod tests {
             request_token_usage: HashMap::default(),
             model: None,
             profile: None,
-            imported: false,
             subagent_context: None,
             speed: None,
             thinking_enabled: false,
@@ -785,6 +799,7 @@ mod tests {
             draft_prompt: None,
             ui_scroll_position: None,
             sandboxed_terminal_temp_dir: None,
+            sandbox_grants: DbSandboxGrants::default(),
         }
     }
 
@@ -902,6 +917,54 @@ mod tests {
             db_thread.sandboxed_terminal_temp_dir.is_none(),
             "Legacy threads without sandboxed_terminal_temp_dir should default to None"
         );
+    }
+
+    #[test]
+    fn test_sandbox_grants_default_when_absent() {
+        let json = r#"{
+            "title": "Old Thread",
+            "messages": [],
+            "updated_at": "2024-01-01T00:00:00Z"
+        }"#;
+
+        let db_thread: DbThread = serde_json::from_str(json).expect("Failed to deserialize");
+
+        assert_eq!(
+            db_thread.sandbox_grants,
+            DbSandboxGrants::default(),
+            "Legacy threads without sandbox_grants should default to empty grants"
+        );
+    }
+
+    #[gpui::test]
+    async fn test_sandbox_grants_roundtrip_through_save_load(cx: &mut TestAppContext) {
+        let database = ThreadsDatabase::new(cx.executor()).unwrap();
+        let thread_id = session_id("sandbox-grants-thread");
+        let mut thread = make_thread(
+            "Sandbox Grants Thread",
+            Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap(),
+        );
+        let grants = DbSandboxGrants {
+            write_paths: vec![PathBuf::from("/tmp/build")],
+            network_hosts: vec!["github.com".to_string(), "*.npmjs.org".to_string()],
+            network_any_host: false,
+            allow_fs_write_all: false,
+            unsandboxed: true,
+            sandbox_fallback: true,
+        };
+        thread.sandbox_grants = grants.clone();
+
+        database
+            .save_thread(thread_id.clone(), thread, PathList::default())
+            .await
+            .unwrap();
+
+        let loaded = database
+            .load_thread(thread_id)
+            .await
+            .unwrap()
+            .expect("thread should exist");
+        assert_eq!(loaded.sandbox_grants, grants);
     }
 
     #[gpui::test]
@@ -1146,7 +1209,7 @@ mod tests {
             "Thread With Scroll",
             Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap(),
         );
-        thread.ui_scroll_position = Some(SerialisimScrollPosition {
+        thread.ui_scroll_position = Some(SerializedScrollPosition {
             item_ix: 42,
             offset_in_item: 13.5,
         });

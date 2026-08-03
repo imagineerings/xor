@@ -364,7 +364,7 @@ impl DebugTaskFile {
                 "type": "object",
                 "required": ["adapter", "label"],
                 // TODO: Uncommenting this will cause json-language-server to provide warnings for
-                // unrecognisim properties. It should be enabled if/when there's an adapter JSON
+                // unrecognized properties. It should be enabled if/when there's an adapter JSON
                 // schema that's comprehensive. In order to not get warnings for the other schemas,
                 // `additionalProperties` or `unevaluatedProperties` (to handle "allOf" etc style
                 // schema combinations) could be set to `true` for that schema.
@@ -422,9 +422,9 @@ mod tests {
             }
         }"#;
 
-        let deserialisim: DebugScenario = serde_json::from_str(json).unwrap();
-        assert!(deserialisim.build.is_some());
-        match deserialisim.build.as_ref().unwrap() {
+        let deserialized: DebugScenario = serde_json::from_str(json).unwrap();
+        assert!(deserialized.build.is_some());
+        match deserialized.build.as_ref().unwrap() {
             crate::BuildTaskDefinition::Template { task_template, .. } => {
                 assert_eq!("debug-build", task_template.label);
                 assert_eq!("rust", task_template.command);
@@ -432,9 +432,9 @@ mod tests {
             }
             _ => panic!("Expected Template variant"),
         }
-        assert_eq!(json!({}), deserialisim.config);
-        assert_eq!("CodeLLDB", deserialisim.adapter.as_ref());
-        assert_eq!("Build & debug rust", deserialisim.label.as_ref());
+        assert_eq!(json!({}), deserialized.config);
+        assert_eq!("CodeLLDB", deserialized.adapter.as_ref());
+        assert_eq!("Build & debug rust", deserialized.label.as_ref());
     }
 
     #[test]
@@ -445,11 +445,11 @@ mod tests {
             "adapter": "CodeLLDB"
         }"#;
 
-        let deserialisim: DebugScenario = serde_json::from_str(json).unwrap();
+        let deserialized: DebugScenario = serde_json::from_str(json).unwrap();
 
-        assert_eq!(json!({}), deserialisim.config);
-        assert_eq!("CodeLLDB", deserialisim.adapter.as_ref());
-        assert_eq!("Build & debug rust", deserialisim.label.as_ref());
+        assert_eq!(json!({}), deserialized.config);
+        assert_eq!("CodeLLDB", deserialized.adapter.as_ref());
+        assert_eq!("Build & debug rust", deserialized.label.as_ref());
     }
 
     #[test]
@@ -462,14 +462,14 @@ mod tests {
             "args": ["--test"]
         }"#;
 
-        let deserialisim: DebugScenario = serde_json::from_str(json).unwrap();
+        let deserialized: DebugScenario = serde_json::from_str(json).unwrap();
 
         assert_eq!(
             json!({ "request": "launch", "program": "target/debug/myapp", "args": ["--test"] }),
-            deserialisim.config
+            deserialized.config
         );
-        assert_eq!("CodeLLDB", deserialisim.adapter.as_ref());
-        assert_eq!("Launch program", deserialisim.label.as_ref());
+        assert_eq!("CodeLLDB", deserialized.adapter.as_ref());
+        assert_eq!("Launch program", deserialized.label.as_ref());
     }
 
     #[test]
@@ -481,14 +481,14 @@ mod tests {
             "request": "attach"
         }"#;
 
-        let deserialisim: DebugScenario = serde_json::from_str(json).unwrap();
+        let deserialized: DebugScenario = serde_json::from_str(json).unwrap();
 
         assert_eq!(
             json!({ "request": "attach", "process_id": 1234 }),
-            deserialisim.config
+            deserialized.config
         );
-        assert_eq!("CodeLLDB", deserialisim.adapter.as_ref());
-        assert_eq!("Attach to process", deserialisim.label.as_ref());
+        assert_eq!("CodeLLDB", deserialized.adapter.as_ref());
+        assert_eq!("Attach to process", deserialized.label.as_ref());
     }
 
     #[test]
@@ -496,8 +496,8 @@ mod tests {
         use crate::BuildTaskDefinition;
 
         let json = r#""my_build_task""#;
-        let deserialisim: BuildTaskDefinition = serde_json::from_str(json).unwrap();
-        match deserialisim {
+        let deserialized: BuildTaskDefinition = serde_json::from_str(json).unwrap();
+        match deserialized {
             BuildTaskDefinition::ByName(name) => assert_eq!("my_build_task", name.as_ref()),
             _ => panic!("Expected ByName variant"),
         }
@@ -506,8 +506,8 @@ mod tests {
             "command": "cargo",
             "args": ["build", "--release"]
         }"#;
-        let deserialisim: BuildTaskDefinition = serde_json::from_str(json).unwrap();
-        match deserialisim {
+        let deserialized: BuildTaskDefinition = serde_json::from_str(json).unwrap();
+        match deserialized {
             BuildTaskDefinition::Template { task_template, .. } => {
                 assert_eq!("debug-build", task_template.label);
                 assert_eq!("cargo", task_template.command);
@@ -521,8 +521,8 @@ mod tests {
             "command": "cargo",
             "args": ["build", "--release"]
         }"#;
-        let deserialisim: BuildTaskDefinition = serde_json::from_str(json).unwrap();
-        match deserialisim {
+        let deserialized: BuildTaskDefinition = serde_json::from_str(json).unwrap();
+        match deserialized {
             BuildTaskDefinition::Template { task_template, .. } => {
                 assert_eq!("Build Release", task_template.label);
                 assert_eq!("cargo", task_template.command);

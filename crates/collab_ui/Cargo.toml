@@ -18,10 +18,8 @@ test-support = [
     "call/test-support",
     "client/test-support",
     "collections/test-support",
-    "db/test-support",
     "editor/test-support",
     "gpui/test-support",
-    "markdown/test-support",
     "project/test-support",
     "settings/test-support",
     "util/test-support",
@@ -34,20 +32,15 @@ test-support = [
 anyhow.workspace = true
 call.workspace = true
 channel.workspace = true
-chrono.workspace = true
 client.workspace = true
 collections.workspace = true
 db.workspace = true
 editor.workspace = true
-feature_flags.workspace = true
 futures.workspace = true
 fuzzy.workspace = true
 gpui.workspace = true
 livekit_client.workspace = true
-language.workspace = true
-markdown.workspace = true
 menu.workspace = true
-multi_buffer.workspace = true
 notifications.workspace = true
 picker.workspace = true
 project.workspace = true
@@ -73,13 +66,11 @@ client = { workspace = true, features = ["test-support"] }
 collections = { workspace = true, features = ["test-support"] }
 editor = { workspace = true, features = ["test-support"] }
 gpui = { workspace = true, features = ["test-support"] }
-markdown = { workspace = true, features = ["test-support"] }
 notifications = { workspace = true, features = ["test-support"] }
 
 project = { workspace = true, features = ["test-support"] }
 rpc = { workspace = true, features = ["test-support"] }
 settings = { workspace = true, features = ["test-support"] }
-title_bar = { workspace = true, features = ["test-support"] }
 
 util = { workspace = true, features = ["test-support"] }
 

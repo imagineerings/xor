@@ -11,7 +11,7 @@ Use Sim's command-line interface (CLI) to open files and directories, integrate 
 
 **macOS:** Run the {#action cli::InstallCliBinary} command from the command palette ({#kb command_palette::Toggle}) to install the `sim` CLI to `/usr/local/bin/sim`.
 
-**Linux:** The CLI is included with Sim packages. The binary name may vary by distribution (commonly `sim` or `simitor`).
+**Linux:** The CLI is included with Sim packages. The binary name may vary by distribution (commonly `sim` or `zeditor`).
 
 **Windows:** The CLI is included with Sim. Add Sim's installation directory to your PATH, or use the full path to `sim.exe`.
 
@@ -166,7 +166,7 @@ mkdir ($nu.data-dir | path join "vendor/autoload")
 ^sim --completions nushell | save --force ($nu.data-dir | path join "vendor/autoload/sim.nu")
 ```
 
-#### PowerShell
+#### Powershell
 
 Add to `$PROFILE`:
 

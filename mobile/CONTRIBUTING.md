@@ -1,1 +1,0 @@
-## [Click here for Simtropolis Open Source Contributing information](https://github.com/block/.github/blob/main/CONTRIBUTING.md)

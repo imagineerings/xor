@@ -405,7 +405,7 @@ mod tests {
     use gpui::{ImageId, RenderImageParams};
     use std::sync::Arc;
 
-    fn test_device_and_queue() -> anyhow::Result<Option<(Arc<wgpu::Device>, Arc<wgpu::Queue>)>> {
+    fn test_device_and_queue() -> anyhow::Result<(Arc<wgpu::Device>, Arc<wgpu::Queue>)> {
         block_on(async {
             let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
                 backends: wgpu::Backends::all(),
@@ -414,20 +414,14 @@ mod tests {
                 memory_budget_thresholds: wgpu::MemoryBudgetThresholds::default(),
                 display: None,
             });
-            let adapter = match instance
+            let adapter = instance
                 .request_adapter(&wgpu::RequestAdapterOptions {
                     power_preference: wgpu::PowerPreference::LowPower,
                     compatible_surface: None,
                     force_fallback_adapter: false,
                 })
                 .await
-            {
-                Ok(adapter) => adapter,
-                Err(error) => {
-                    eprintln!("skipping wgpu atlas test: failed to request adapter: {error}");
-                    return Ok(None);
-                }
-            };
+                .map_err(|error| anyhow::anyhow!("failed to request adapter: {error}"))?;
             let (device, queue) = adapter
                 .request_device(&wgpu::DeviceDescriptor {
                     label: Some("wgpu_atlas_test_device"),
@@ -441,15 +435,13 @@ mod tests {
                 })
                 .await
                 .map_err(|error| anyhow::anyhow!("failed to request device: {error}"))?;
-            Ok(Some((Arc::new(device), Arc::new(queue))))
+            Ok((Arc::new(device), Arc::new(queue)))
         })
     }
 
     #[test]
     fn before_frame_skips_uploads_for_removed_texture() -> anyhow::Result<()> {
-        let Some((device, queue)) = test_device_and_queue()? else {
-            return Ok(());
-        };
+        let (device, queue) = test_device_and_queue()?;
 
         let atlas = WgpuAtlas::new(device, queue, wgpu::TextureFormat::Bgra8Unorm);
         let key = AtlasKey::Image(RenderImageParams {
@@ -473,9 +465,7 @@ mod tests {
 
     #[test]
     fn remove_deallocates_tile_space_for_reuse() -> anyhow::Result<()> {
-        let Some((device, queue)) = test_device_and_queue()? else {
-            return Ok(());
-        };
+        let (device, queue) = test_device_and_queue()?;
         let atlas = WgpuAtlas::new(device, queue, wgpu::TextureFormat::Bgra8Unorm);
 
         let small = Size {

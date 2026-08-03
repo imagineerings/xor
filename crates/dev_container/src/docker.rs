@@ -196,6 +196,13 @@ impl Docker {
         let has_buildx = if docker_cli == "podman" {
             false
         } else if let Some(use_buildkit) = use_buildkit {
+            // Honor the explicit `dev_container_use_buildkit` setting. Setting it
+            // to `false` forces the classic Docker builder for Docker-compatible
+            // engines that lack an integrated BuildKit (e.g. Apple Container via
+            // a Docker-API bridge), where BuildKit builds cannot resolve
+            // locally-built images. The classic builder builds the feature
+            // content as an image and references it with an ordinary
+            // multi-stage `FROM`.
             use_buildkit
         } else {
             let output = Command::new(docker_cli)
@@ -300,6 +307,9 @@ impl DockerClient for Docker {
             if self.has_buildx {
                 command.env("DOCKER_BUILDKIT", "1");
             } else {
+                // Without a usable BuildKit, build through the classic builder so
+                // multi-stage `FROM` of locally-built images (the feature content
+                // image) resolves from the daemon's image store.
                 command.env("DOCKER_BUILDKIT", "0");
                 command.env("COMPOSE_DOCKER_CLI_BUILD", "0");
             }
@@ -709,6 +719,8 @@ mod test {
 
     #[test]
     fn use_buildkit_setting_overrides_buildx_detection() {
+        // `Some(_)` short-circuits the `buildx version` probe, so these run
+        // without invoking docker.
         let forced_off = futures::executor::block_on(Docker::new("docker", Some(false)));
         assert!(
             !forced_off.supports_compose_buildkit(),
@@ -721,6 +733,7 @@ mod test {
             "use_buildkit=true must enable BuildKit"
         );
 
+        // podman never supports the BuildKit/buildx path, regardless of the setting.
         let podman = futures::executor::block_on(Docker::new("podman", Some(true)));
         assert!(!podman.supports_compose_buildkit());
     }

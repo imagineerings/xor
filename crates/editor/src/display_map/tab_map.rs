@@ -72,7 +72,9 @@ impl TabMap {
             old_snapshot.tab_size = tab_size;
             return (old_snapshot.clone(), vec![]);
         }
+
         let old_fold_max_point = old_snapshot.fold_snapshot.max_point();
+
         // Expand each edit to include the next tab on the same line as the edit,
         // and any subsequent tabs on that line that moved across the tab expansion
         // boundary.

@@ -812,6 +812,7 @@ impl BlockMap {
         let buffer = wrap_snapshot.buffer_snapshot();
 
         edits = self.deferred_edits.take().compose(edits);
+
         let max_point = wrap_snapshot.max_point();
 
         // Handle changing the last excerpt if it is empty.
@@ -2951,7 +2952,6 @@ mod tests {
         test::test_font,
     };
     use buffer_diff::BufferDiff;
-    use collections::HashSet;
     use gpui::{App, AppContext as _, Element, div, font, px};
     use itertools::Itertools;
     use language::{Buffer, Capability, Point};
@@ -3206,6 +3206,7 @@ mod tests {
             "every block is present before folding",
         );
 
+        // Fold lines 2 and 3 entirely, leaving line1 (the fold start) visible.
         let (inlay_snapshot, inlay_edits) = inlay_map.sync(buffer_snapshot.clone(), vec![]);
         let (mut fold_writer, _, _) = fold_map.write(inlay_snapshot, inlay_edits);
         let (fold_snapshot, fold_edits) = fold_writer.fold(vec![(
@@ -3220,7 +3221,7 @@ mod tests {
         assert_eq!(
             present_blocks(&mut block_map, wraps_snapshot, wrap_edits),
             HashSet::from_iter([block_a, block_d]),
-            "blocks B and C anchored to folded lines are dropped",
+            "blocks B and C anchored to folded lines are dropped, A (fold-start line) and D (past the fold) stay",
         );
     }
 

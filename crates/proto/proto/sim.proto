@@ -435,10 +435,6 @@ message Envelope {
     TrustWorktrees trust_worktrees = 404;
     RestrictWorktrees restrict_worktrees = 405;
 
-    ShareAgentThread share_agent_thread = 406;
-    GetSharedAgentThread get_shared_agent_thread = 407;
-    GetSharedAgentThreadResponse get_shared_agent_thread_response = 408;
-
     FindSearchCandidatesChunk find_search_candidates_chunk = 409;
     FindSearchCandidatesCancelled find_search_candidates_cancelled = 410;
     GetContextServerCommand get_context_server_command = 411;
@@ -489,68 +485,11 @@ message Envelope {
     GetDocumentLinksResponse get_document_links_response = 454;
     ResolveDocumentLink resolve_document_link = 455;
     ResolveDocumentLinkResponse resolve_document_link_response = 456;
-    AddReaction add_reaction = 457;
-    RemoveReaction remove_reaction = 458;
-    UpdateMessageReactions update_message_reactions = 459;
-    UpdateMessageReactionsResponse update_message_reactions_response = 460;
-    GetThread get_thread = 461;
-    GetThreadResponse get_thread_response = 462;
-    GetThreads get_threads = 463;
-    GetThreadsResponse get_threads_response = 464;
-    ResolveCodeAction resolve_code_action = 465;
-    ResolveCodeActionResponse resolve_code_action_response = 466;
-    AckChannelThread ack_channel_thread = 467;
-    SearchChannelMessages search_channel_messages = 468;
-    SearchChannelMessagesResponse search_channel_messages_response = 469;
-    ScheduleChannelMessage schedule_channel_message = 470;
-    ScheduleChannelMessageResponse schedule_channel_message_response = 471;
-    CancelScheduledMessage cancel_scheduled_message = 472;
-    UpdateScheduledMessage update_scheduled_message = 473;
-    GetScheduledMessages get_scheduled_messages = 474;
-    GetScheduledMessagesResponse get_scheduled_messages_response = 475;
-    ScheduledMessageSent scheduled_message_sent = 476;
-    ScheduledMessageFailed scheduled_message_failed = 477;
-    AddBookmark add_bookmark = 478;
-    RemoveBookmark remove_bookmark = 479;
-    UpdateBookmark update_bookmark = 480;
-    ReorderBookmarks reorder_bookmarks = 481;
-    UpdateChannelBookmarks update_channel_bookmarks = 482;
-    GetBookmarks get_bookmarks = 483;
-    GetBookmarksResponse get_bookmarks_response = 484;
-    GetFileUploadUrl get_file_upload_url = 485;
-    GetFileUploadUrlResponse get_file_upload_url_response = 486;
-    ConfirmFileUpload confirm_file_upload = 487;
-    ConfirmFileUploadResponse confirm_file_upload_response = 488;
-    GetFileDownloadUrl get_file_download_url = 489;
-    GetFileDownloadUrlResponse get_file_download_url_response = 490; // current max
-    RequestJoinChannel request_join_channel = 491;
-    RequestJoinChannelResponse request_join_channel_response = 492;
-    RespondToJoinRequest respond_to_join_request = 493;
-    RespondToJoinRequestResponse respond_to_join_request_response = 494;
-    GetPendingJoinRequests get_pending_join_requests = 495;
-    GetPendingJoinRequestsResponse get_pending_join_requests_response = 496;
-    JoinRequestAdded join_request_added = 497;
-    JoinRequestResponded join_request_responded = 498; // current max
-    SetStatus set_status = 499;
-    SetStatusResponse set_status_response = 500;
-    ClearStatus clear_status = 501;
-    UpdateUserStatus update_user_status = 502;
-    UpdateUserStatuses update_user_statuses = 503;
-    UserCustomStatus user_custom_status = 504; // current max
-    UrgentMessageNotification urgent_message_notification = 505; // current max
-    CreateGroup create_group = 506;
-    CreateGroupResponse create_group_response = 507;
-    UpdateGroup update_group = 508;
-    UpdateGroupResponse update_group_response = 509;
-    DeleteGroup delete_group = 510;
-    DeleteGroupResponse delete_group_response = 511;
-    GetGroups get_groups = 512;
-    GetGroupsResponse get_groups_response = 513;
-    UpdateGroupMembers update_group_members = 514;
-    UpdateGroupMembersResponse update_group_members_response = 515;
-    LeaveGroup leave_group = 516;
-    LeaveGroupResponse leave_group_response = 517;
-    UpdateGroups update_groups = 518; // current max
+    GitWorktreeCreatedAt git_worktree_created_at = 457;
+    GitWorktreeCreatedAtResponse git_worktree_created_at_response = 458;
+    TelemetryEvent telemetry_event = 459;
+    ResolveCodeAction resolve_code_action = 460;
+    ResolveCodeActionResponse resolve_code_action_response = 461; // current max
   }
 
   reserved 87 to 88;
@@ -578,6 +517,7 @@ message Envelope {
   reserved 429 to 430;
   reserved 211 to 216, 232 to 233;
   reserved 397 to 398;
+  reserved 406 to 408;
 }
 
 message Hello {
@@ -612,44 +552,11 @@ enum ErrorCode {
   RemoteUpgradeRequired = 17;
   RateLimitExceeded = 18;
   CommitFailed = 19;
-  FileTooLarge = 20;
-  UnsupportedFileType = 21;
-  FileStorageUnavailable = 22;
-  InvalidFileName = 23;
-  AlreadyExists = 24;
-  InvalidArgument = 25;
-  NotFound = 26;
-  PermissionDenied = 27;
   reserved 6;
   reserved 14 to 15;
 }
 
 message EndStream {}
-
-message UserCustomStatus {
-  optional string emoji = 1;
-  string text = 2;
-  optional uint64 expires_at = 3;
-}
-
-message SetStatus {
-  optional string emoji = 1;
-  string text = 2;
-  optional uint32 clear_after_minutes = 3;
-}
-
-message SetStatusResponse {}
-
-message ClearStatus {}
-
-message UpdateUserStatus {
-  uint64 user_id = 1;
-  optional UserCustomStatus status = 2;
-}
-
-message UpdateUserStatuses {
-  repeated UpdateUserStatus statuses = 1;
-}
 
 message Test {
   uint64 id = 1;

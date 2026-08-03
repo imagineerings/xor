@@ -1,6 +1,6 @@
 use collab::db::*;
 
-use super::{TestClient, TestError, TestServer, UserTestPlan, randomizedTest, run_randomized_test};
+use super::{RandomizedTest, TestClient, TestError, TestServer, UserTestPlan, run_randomized_test};
 use anyhow::Result;
 use async_trait::async_trait;
 use gpui::{BackgroundExecutor, SharedString, TestAppContext};
@@ -42,7 +42,7 @@ enum ChannelBufferOperation {
 const CHANNEL_COUNT: usize = 3;
 
 #[async_trait(?Send)]
-impl randomizedTest for RandomChannelBufferTest {
+impl RandomizedTest for RandomChannelBufferTest {
     type Operation = ChannelBufferOperation;
 
     async fn initialize(server: &mut TestServer, users: &[UserTestPlan]) {

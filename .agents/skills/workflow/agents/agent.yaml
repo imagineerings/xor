@@ -1,7 +1,7 @@
 interface:
   display_name: "Workflow"
-  short_description: "Begin the next unclaimed local task."
-  default_prompt: "Run the workflow skill to automatically begin the next unclaimed .agents/specs task, create its Linear issue without duplicating existing work, render WORKFLOW.md, and work from the returned prompt."
+  short_description: "Plan and safely execute local spec tasks"
+  default_prompt: "Use $workflow to inspect and plan the next ready local spec task. Claim work only when I explicitly ask to start it."
 
 policy:
   allow_implicit_invocation: true

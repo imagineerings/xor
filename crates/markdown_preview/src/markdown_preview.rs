@@ -1,11 +1,12 @@
 use gpui::{App, actions};
 use workspace::Workspace;
 
+pub mod markdown_preview_settings;
 pub mod markdown_preview_view;
 
-use crate::markdown_preview_view::MarkdownPreviewView;
-
 pub use sim_actions::preview::markdown::{OpenPreview, OpenPreviewToTheSide};
+
+use crate::markdown_preview_view::MarkdownPreviewView;
 
 actions!(
     markdown,

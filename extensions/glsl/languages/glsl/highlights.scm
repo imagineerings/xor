@@ -73,7 +73,7 @@
 [
   (type_identifier)
   (primitive_type)
-  (sized_type_specifier)
+  (sisim_type_specifier)
 ] @type
 
 (call_expression

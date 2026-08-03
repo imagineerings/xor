@@ -21,11 +21,11 @@ pub enum DetailedSummaryState {
 pub struct MessageId(pub usize);
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct SerialisimThread {
+pub struct SerializedThread {
     pub version: String,
     pub summary: SharedString,
     pub updated_at: DateTime<Utc>,
-    pub messages: Vec<SerialisimMessage>,
+    pub messages: Vec<SerializedMessage>,
     #[serde(default)]
     pub initial_project_snapshot: Option<Arc<ProjectSnapshot>>,
     #[serde(default)]
@@ -35,7 +35,7 @@ pub struct SerialisimThread {
     #[serde(default)]
     pub detailed_summary_state: DetailedSummaryState,
     #[serde(default)]
-    pub model: Option<SerialisimLanguageModel>,
+    pub model: Option<SerializedLanguageModel>,
     #[serde(default)]
     pub tool_use_limit_reached: bool,
     #[serde(default)]
@@ -43,95 +43,96 @@ pub struct SerialisimThread {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct SerialisimLanguageModel {
+pub struct SerializedLanguageModel {
     pub provider: String,
     pub model: String,
 }
 
-impl SerialisimThread {
+impl SerializedThread {
     pub const VERSION: &'static str = "0.2.0";
 
     pub fn from_json(json: &[u8]) -> Result<Self> {
         let saved_thread_json = serde_json::from_slice::<serde_json::Value>(json)?;
         match saved_thread_json.get("version") {
             Some(serde_json::Value::String(version)) => match version.as_str() {
-                SerialisimThreadV0_1_0::VERSION => {
+                SerializedThreadV0_1_0::VERSION => {
                     let saved_thread =
-                        serde_json::from_value::<SerialisimThreadV0_1_0>(saved_thread_json)?;
+                        serde_json::from_value::<SerializedThreadV0_1_0>(saved_thread_json)?;
                     Ok(saved_thread.upgrade())
                 }
-                SerialisimThread::VERSION => Ok(serde_json::from_value::<SerialisimThread>(
+                SerializedThread::VERSION => Ok(serde_json::from_value::<SerializedThread>(
                     saved_thread_json,
                 )?),
-                _ => anyhow::bail!("unrecognisim serialisim thread version: {version:?}"),
+                _ => anyhow::bail!("unrecognized serialized thread version: {version:?}"),
             },
             None => {
                 let saved_thread =
-                    serde_json::from_value::<LegacySerialisimThread>(saved_thread_json)?;
+                    serde_json::from_value::<LegacySerializedThread>(saved_thread_json)?;
                 Ok(saved_thread.upgrade())
             }
-            version => anyhow::bail!("unrecognisim serialisim thread version: {version:?}"),
+            version => anyhow::bail!("unrecognized serialized thread version: {version:?}"),
         }
     }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct SerialisimThreadV0_1_0(
-    // The structure did not change, so we are reusing the latest SerialisimThread.
-    // When making the next version, make sure this points to SerialisimThreadV0_2_0
-    SerialisimThread,
+pub struct SerializedThreadV0_1_0(
+    // The structure did not change, so we are reusing the latest SerializedThread.
+    // When making the next version, make sure this points to SerializedThreadV0_2_0
+    SerializedThread,
 );
 
-impl SerialisimThreadV0_1_0 {
+impl SerializedThreadV0_1_0 {
     pub const VERSION: &'static str = "0.1.0";
 
-    pub fn upgrade(self) -> SerialisimThread {
-        debug_assert_eq!(SerialisimThread::VERSION, "0.2.0");
+    pub fn upgrade(self) -> SerializedThread {
+        debug_assert_eq!(SerializedThread::VERSION, "0.2.0");
 
-        let mut messages: Vec<SerialisimMessage> = Vec::with_capacity(self.0.messages.len());
+        let mut messages: Vec<SerializedMessage> = Vec::with_capacity(self.0.messages.len());
 
         for message in self.0.messages {
-            if message.role == Role::User && !message.tool_results.is_empty() {
-                if let Some(last_message) = messages.last_mut() {
-                    debug_assert!(last_message.role == Role::Assistant);
+            if message.role == Role::User
+                && !message.tool_results.is_empty()
+                && let Some(last_message) = messages.last_mut()
+            {
+                debug_assert!(last_message.role == Role::Assistant);
 
-                    last_message.tool_results = message.tool_results;
-                    continue;
-                }
+                last_message.tool_results = message.tool_results;
+                continue;
             }
 
             messages.push(message);
         }
 
-        SerialisimThread {
+        SerializedThread {
             messages,
-            version: SerialisimThread::VERSION.to_string(),
+            version: SerializedThread::VERSION.to_string(),
             ..self.0
         }
     }
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
-pub struct SerialisimMessage {
+pub struct SerializedMessage {
     pub id: MessageId,
     pub role: Role,
     #[serde(default)]
-    pub segments: Vec<SerialisimMessageSegment>,
+    pub segments: Vec<SerializedMessageSegment>,
     #[serde(default)]
-    pub tool_uses: Vec<SerialisimToolUse>,
+    pub tool_uses: Vec<SerializedToolUse>,
     #[serde(default)]
-    pub tool_results: Vec<SerialisimToolResult>,
+    pub tool_results: Vec<SerializedToolResult>,
     #[serde(default)]
     pub context: String,
     #[serde(default)]
-    pub creases: Vec<SerialisimCrease>,
+    pub creases: Vec<SerializedCrease>,
     #[serde(default)]
     pub is_hidden: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
-pub enum SerialisimMessageSegment {
+pub enum SerializedMessageSegment {
     #[serde(rename = "text")]
     Text {
         text: String,
@@ -148,14 +149,14 @@ pub enum SerialisimMessageSegment {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
-pub struct SerialisimToolUse {
+pub struct SerializedToolUse {
     pub id: LanguageModelToolUseId,
     pub name: SharedString,
     pub input: serde_json::Value,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
-pub struct SerialisimToolResult {
+pub struct SerializedToolResult {
     pub tool_use_id: LanguageModelToolUseId,
     pub is_error: bool,
     pub content: LanguageModelToolResultContent,
@@ -163,18 +164,18 @@ pub struct SerialisimToolResult {
 }
 
 #[derive(Serialize, Deserialize)]
-struct LegacySerialisimThread {
+struct LegacySerializedThread {
     pub summary: SharedString,
     pub updated_at: DateTime<Utc>,
-    pub messages: Vec<LegacySerialisimMessage>,
+    pub messages: Vec<LegacySerializedMessage>,
     #[serde(default)]
     pub initial_project_snapshot: Option<Arc<ProjectSnapshot>>,
 }
 
-impl LegacySerialisimThread {
-    pub fn upgrade(self) -> SerialisimThread {
-        SerialisimThread {
-            version: SerialisimThread::VERSION.to_string(),
+impl LegacySerializedThread {
+    pub fn upgrade(self) -> SerializedThread {
+        SerializedThread {
+            version: SerializedThread::VERSION.to_string(),
             summary: self.summary,
             updated_at: self.updated_at,
             messages: self.messages.into_iter().map(|msg| msg.upgrade()).collect(),
@@ -190,22 +191,22 @@ impl LegacySerialisimThread {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct LegacySerialisimMessage {
+struct LegacySerializedMessage {
     pub id: MessageId,
     pub role: Role,
     pub text: String,
     #[serde(default)]
-    pub tool_uses: Vec<SerialisimToolUse>,
+    pub tool_uses: Vec<SerializedToolUse>,
     #[serde(default)]
-    pub tool_results: Vec<SerialisimToolResult>,
+    pub tool_results: Vec<SerializedToolResult>,
 }
 
-impl LegacySerialisimMessage {
-    fn upgrade(self) -> SerialisimMessage {
-        SerialisimMessage {
+impl LegacySerializedMessage {
+    fn upgrade(self) -> SerializedMessage {
+        SerializedMessage {
             id: self.id,
             role: self.role,
-            segments: vec![SerialisimMessageSegment::Text { text: self.text }],
+            segments: vec![SerializedMessageSegment::Text { text: self.text }],
             tool_uses: self.tool_uses,
             tool_results: self.tool_results,
             context: String::new(),
@@ -216,7 +217,7 @@ impl LegacySerialisimMessage {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
-pub struct SerialisimCrease {
+pub struct SerializedCrease {
     pub start: usize,
     pub end: usize,
     pub icon_path: SharedString,
@@ -233,10 +234,10 @@ mod tests {
     #[test]
     fn test_legacy_serialisim_thread_upgrade() {
         let updated_at = Utc::now();
-        let legacy_thread = LegacySerialisimThread {
+        let legacy_thread = LegacySerializedThread {
             summary: "Test conversation".into(),
             updated_at,
-            messages: vec![LegacySerialisimMessage {
+            messages: vec![LegacySerializedMessage {
                 id: MessageId(1),
                 role: Role::User,
                 text: "Hello, world!".to_string(),
@@ -250,13 +251,13 @@ mod tests {
 
         assert_eq!(
             upgraded,
-            SerialisimThread {
+            SerializedThread {
                 summary: "Test conversation".into(),
                 updated_at,
-                messages: vec![SerialisimMessage {
+                messages: vec![SerializedMessage {
                     id: MessageId(1),
                     role: Role::User,
-                    segments: vec![SerialisimMessageSegment::Text {
+                    segments: vec![SerializedMessageSegment::Text {
                         text: "Hello, world!".to_string()
                     }],
                     tool_uses: vec![],
@@ -265,7 +266,7 @@ mod tests {
                     creases: vec![],
                     is_hidden: false
                 }],
-                version: SerialisimThread::VERSION.to_string(),
+                version: SerializedThread::VERSION.to_string(),
                 initial_project_snapshot: None,
                 cumulative_token_usage: TokenUsage::default(),
                 request_token_usage: vec![],
@@ -280,14 +281,14 @@ mod tests {
     #[test]
     fn test_serialisim_threadv0_1_0_upgrade() {
         let updated_at = Utc::now();
-        let thread_v0_1_0 = SerialisimThreadV0_1_0(SerialisimThread {
+        let thread_v0_1_0 = SerializedThreadV0_1_0(SerializedThread {
             summary: "Test conversation".into(),
             updated_at,
             messages: vec![
-                SerialisimMessage {
+                SerializedMessage {
                     id: MessageId(1),
                     role: Role::User,
-                    segments: vec![SerialisimMessageSegment::Text {
+                    segments: vec![SerializedMessageSegment::Text {
                         text: "Use tool_1".to_string(),
                     }],
                     tool_uses: vec![],
@@ -296,13 +297,13 @@ mod tests {
                     creases: vec![],
                     is_hidden: false,
                 },
-                SerialisimMessage {
+                SerializedMessage {
                     id: MessageId(2),
                     role: Role::Assistant,
-                    segments: vec![SerialisimMessageSegment::Text {
+                    segments: vec![SerializedMessageSegment::Text {
                         text: "I want to use a tool".to_string(),
                     }],
-                    tool_uses: vec![SerialisimToolUse {
+                    tool_uses: vec![SerializedToolUse {
                         id: "abc".into(),
                         name: "tool_1".into(),
                         input: serde_json::Value::Null,
@@ -312,14 +313,14 @@ mod tests {
                     creases: vec![],
                     is_hidden: false,
                 },
-                SerialisimMessage {
+                SerializedMessage {
                     id: MessageId(1),
                     role: Role::User,
-                    segments: vec![SerialisimMessageSegment::Text {
+                    segments: vec![SerializedMessageSegment::Text {
                         text: "Here is the tool result".to_string(),
                     }],
                     tool_uses: vec![],
-                    tool_results: vec![SerialisimToolResult {
+                    tool_results: vec![SerializedToolResult {
                         tool_use_id: "abc".into(),
                         is_error: false,
                         content: LanguageModelToolResultContent::Text("abcdef".into()),
@@ -330,7 +331,7 @@ mod tests {
                     is_hidden: false,
                 },
             ],
-            version: SerialisimThreadV0_1_0::VERSION.to_string(),
+            version: SerializedThreadV0_1_0::VERSION.to_string(),
             initial_project_snapshot: None,
             cumulative_token_usage: TokenUsage::default(),
             request_token_usage: vec![],
@@ -343,14 +344,14 @@ mod tests {
 
         assert_eq!(
             upgraded,
-            SerialisimThread {
+            SerializedThread {
                 summary: "Test conversation".into(),
                 updated_at,
                 messages: vec![
-                    SerialisimMessage {
+                    SerializedMessage {
                         id: MessageId(1),
                         role: Role::User,
-                        segments: vec![SerialisimMessageSegment::Text {
+                        segments: vec![SerializedMessageSegment::Text {
                             text: "Use tool_1".to_string()
                         }],
                         tool_uses: vec![],
@@ -359,18 +360,18 @@ mod tests {
                         creases: vec![],
                         is_hidden: false
                     },
-                    SerialisimMessage {
+                    SerializedMessage {
                         id: MessageId(2),
                         role: Role::Assistant,
-                        segments: vec![SerialisimMessageSegment::Text {
+                        segments: vec![SerializedMessageSegment::Text {
                             text: "I want to use a tool".to_string(),
                         }],
-                        tool_uses: vec![SerialisimToolUse {
+                        tool_uses: vec![SerializedToolUse {
                             id: "abc".into(),
                             name: "tool_1".into(),
                             input: serde_json::Value::Null,
                         }],
-                        tool_results: vec![SerialisimToolResult {
+                        tool_results: vec![SerializedToolResult {
                             tool_use_id: "abc".into(),
                             is_error: false,
                             content: LanguageModelToolResultContent::Text("abcdef".into()),
@@ -381,7 +382,7 @@ mod tests {
                         is_hidden: false,
                     },
                 ],
-                version: SerialisimThread::VERSION.to_string(),
+                version: SerializedThread::VERSION.to_string(),
                 initial_project_snapshot: None,
                 cumulative_token_usage: TokenUsage::default(),
                 request_token_usage: vec![],

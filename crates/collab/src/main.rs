@@ -43,25 +43,13 @@ async fn main() -> Result<()> {
         Some("version") => {
             println!("collab v{} ({})", VERSION, REVISION.unwrap_or("unknown"));
         }
-        Some("reindex-channel-message-search") => {
-            let config = envy::from_env::<Config>().expect("error loading config");
-            init_tracing(&config);
-            setup_app_database(&config).await?;
-
-            let db_options = db::ConnectOptions::new(config.database_url.clone());
-            let db = Database::new(db_options).await?;
-            let rows = db.reindex_channel_message_search().await?;
-            println!("reindexed {rows} channel messages");
-        }
         Some("serve") => {
             let mode = match args.next().as_deref() {
                 Some("collab") => ServiceMode::Collab,
                 Some("api") => ServiceMode::Api,
                 Some("all") => ServiceMode::All,
                 _ => {
-                    return Err(anyhow!(
-                        "usage: collab <version | reindex-channel-message-search | serve <api|collab|all>>"
-                    ))?;
+                    return Err(anyhow!("usage: collab <version | serve <api|collab|all>>"))?;
                 }
             };
 
@@ -188,7 +176,7 @@ async fn main() -> Result<()> {
         }
         _ => {
             Err(anyhow!(
-                "usage: collab <version | reindex-channel-message-search | serve <api|collab|all>>"
+                "usage: collab <version | migrate | seed | serve <api|collab|llm|all>>"
             ))?;
         }
     }

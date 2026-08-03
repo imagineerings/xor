@@ -7,6 +7,10 @@
     allow(dead_code)
 )]
 
+mod completions;
+
+use crate::completions::Shell;
+
 use anyhow::{Context as _, Result};
 use clap::{CommandFactory, Parser};
 use cli::{CliRequest, CliResponse, IpcHandshake, ipc::IpcOneShotServer};
@@ -26,10 +30,6 @@ use util::paths::PathWithPosition;
 use walkdir::WalkDir;
 
 use std::io::IsTerminal;
-
-mod commands;
-mod completions;
-mod recipe_commands;
 
 const URL_PREFIX: [&'static str; 5] = ["sim://", "http://", "https://", "file://", "ssh://"];
 
@@ -138,9 +138,9 @@ struct Args {
     /// When directories are provided, recurses into them and shows all changed files in a single multi-diff view.
     #[arg(long, action = clap::ArgAction::Append, num_args = 2, value_names = ["OLD_PATH", "NEW_PATH"], value_hint = clap::ValueHint::AnyPath)]
     diff: Vec<String>,
-    /// Generate shell completions for Sim.
-    #[arg(long, value_name = "SHELL")]
-    completions: Option<completions::Shell>,
+    /// Generate shell completions for Sim
+    #[arg(long, value_names = ["SHELL"])]
+    completions: Option<Shell>,
     /// Uninstall Sim from user system
     #[cfg(all(
         any(target_os = "linux", target_os = "macos"),
@@ -156,7 +156,7 @@ struct Args {
 }
 
 /// Parses a path containing a position (e.g. `path:line:column`)
-/// and returns its canonicalisim string representation.
+/// and returns its canonicalized string representation.
 ///
 /// If a part of path doesn't exist, it will canonicalize the
 /// existing part and append the non-existing part.
@@ -172,8 +172,8 @@ fn parse_path_with_position(argument_str: &str) -> anyhow::Result<String> {
             let root;
             loop {
                 // canonicalize handles './', and '/'.
-                if let Ok(canonicalisim) = fs::canonicalize(&path) {
-                    root = canonicalisim;
+                if let Ok(canonicalized) = fs::canonicalize(&path) {
+                    root = canonicalized;
                     break;
                 }
                 // The comparison to `curdir` is just a shortcut
@@ -305,14 +305,14 @@ mod tests {
     use super::*;
     use serde_json::json;
     use util::path;
-    use util::paths::SanitisimPath;
+    use util::paths::SanitizedPath;
     use util::test::TempTree;
 
     macro_rules! assert_path_eq {
         ($left:expr, $right:expr) => {
             assert_eq!(
-                SanitisimPath::new(Path::new(&$left)),
-                SanitisimPath::new(Path::new(&$right))
+                SanitizedPath::new(Path::new(&$left)),
+                SanitizedPath::new(Path::new(&$right))
             )
         };
     }
@@ -503,41 +503,6 @@ fn run() -> Result<()> {
         return Ok(());
     }
 
-    if std::env::args().nth(1).as_deref() == Some("recipe") {
-        recipe_commands::run(std::env::args().skip(1))?;
-        return Ok(());
-    }
-
-    if std::env::args().nth(1).as_deref() == Some("gateway") {
-        commands::gateway::run(std::env::args().skip(1))?;
-        return Ok(());
-    }
-
-    if std::env::args().nth(1).as_deref() == Some("configure") {
-        commands::configure::run(std::env::args().skip(1))?;
-        return Ok(());
-    }
-
-    if std::env::args().nth(1).as_deref() == Some("extension") {
-        commands::extension::run(std::env::args().skip(1))?;
-        return Ok(());
-    }
-
-    if std::env::args().nth(1).as_deref() == Some("onboarding") {
-        commands::onboarding::run(std::env::args().skip(1))?;
-        return Ok(());
-    }
-
-    if std::env::args().nth(1).as_deref() == Some("interactive") {
-        commands::interactive::run(std::env::args().skip(1))?;
-        return Ok(());
-    }
-
-    if std::env::args().nth(1).as_deref() == Some("dictation") {
-        commands::dictation::run(std::env::args().skip(1))?;
-        return Ok(());
-    }
-
     let args = Args::parse();
 
     // `sim --askpass` Makes sim operate in nc/netcat mode for use with askpass
@@ -562,12 +527,12 @@ fn run() -> Result<()> {
         let file_name = file_path
             .file_name()
             .and_then(OsStr::to_str)
-            .ok_or("--completions expects a UTF-8 name for the CLI binary")
+            .ok_or("--completions expects a UTF-8 name for cli bin")
             .map_err(anyhow::Error::msg)?;
-        let mut command = Args::command();
-        command.set_bin_name(file_name);
-        command.build();
-        completions::main(&command, shell);
+        let mut cmd = Args::command();
+        cmd.set_bin_name(file_name);
+        cmd.build();
+        crate::completions::main(&cmd, shell);
         return Ok(());
     }
 

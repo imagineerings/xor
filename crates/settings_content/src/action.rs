@@ -95,7 +95,7 @@ impl JsonSchema for CommandAliasTarget {
     }
 }
 
-/// The name of a registered GPUI action, serialisim as a plain JSON string, for
+/// The name of a registered GPUI action, serialized as a plain JSON string, for
 /// example, "editor::Cancel"` or `"workspace::CloseActiveItem"`.
 ///
 /// This newtype exists so that settings fields like `command_aliases`, or the
@@ -190,7 +190,7 @@ impl JsonSchema for ActionName {
     }
 }
 
-/// A GPUI action together with its input data, serialisim as a two-element JSON
+/// A GPUI action together with its input data, serialized as a two-element JSON
 /// array of the form `["namespace::Name", { ... }]`, for example,
 /// `["pane::ActivateItem", { "index": 0 }]`.
 #[derive(Deserialize, Default)]

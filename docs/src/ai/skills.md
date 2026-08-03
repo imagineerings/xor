@@ -1,11 +1,11 @@
 ---
 title: Agent Skills - Sim
-description: Extend Sim's AI agent with reusable, on-demand skill files for specialisim tasks.
+description: Extend Sim's AI agent with reusable, on-demand skill files for specialized tasks.
 ---
 
 # Skills {#skills}
 
-Skills are reusable instruction packages that give the agent specialisim knowledge for specific tasks: test-driven development workflows, document processing, database integrations, or your team's internal coding standards.
+Skills are reusable instruction packages that give the agent specialized knowledge for specific tasks: test-driven development workflows, document processing, database integrations, or your team's internal coding standards.
 
 A skill is a folder containing a `SKILL.md` file with metadata and instructions. The agent sees a catalog of all installed skills and can load one on demand, or you can invoke any skill directly from the message editor with a slash command.
 

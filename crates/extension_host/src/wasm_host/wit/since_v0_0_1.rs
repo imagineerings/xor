@@ -128,8 +128,7 @@ impl ExtensionImports for WasmState {
         repo: String,
         options: GithubReleaseOptions,
     ) -> wasmtime::Result<Result<GithubRelease, String>> {
-        since_v0_6_0::sim::extension::github::Host::latest_github_release(self, repo, options)
-            .await
+        since_v0_6_0::sim::extension::github::Host::latest_github_release(self, repo, options).await
     }
 
     async fn current_platform(&mut self) -> Result<(Os, Architecture)> {

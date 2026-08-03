@@ -9,31 +9,30 @@ use ui::{UpdateButton, prelude::*};
 pub struct UpdateVersion {
     status: AutoUpdateStatus,
     update_check_type: UpdateCheckType,
-    dismissed: bool,
+    dismissed_status: Option<AutoUpdateStatus>,
 }
 
 impl UpdateVersion {
     pub fn new(cx: &mut Context<Self>) -> Self {
         if let Some(auto_updater) = AutoUpdater::get(cx) {
             cx.observe(&auto_updater, |this, auto_update, cx| {
-                this.status = auto_update.read(cx).status();
-                this.update_check_type = auto_update.read(cx).update_check_type();
-                if this.status.is_updated() {
-                    this.dismissed = false;
-                }
+                let auto_update = auto_update.read(cx);
+                this.status = auto_update.status();
+                this.update_check_type = auto_update.update_check_type();
+                this.dismissed_status = auto_update.dismissed_status();
                 cx.notify();
             })
             .detach();
             Self {
                 status: auto_updater.read(cx).status(),
                 update_check_type: UpdateCheckType::Automatic,
-                dismissed: false,
+                dismissed_status: auto_updater.read(cx).dismissed_status(),
             }
         } else {
             Self {
                 status: AutoUpdateStatus::Idle,
                 update_check_type: UpdateCheckType::Automatic,
-                dismissed: false,
+                dismissed_status: None,
             }
         }
     }
@@ -43,6 +42,7 @@ impl UpdateVersion {
             AutoUpdateStatus::Idle => AutoUpdateStatus::Checking,
             AutoUpdateStatus::Checking => AutoUpdateStatus::Downloading {
                 version: VersionCheckType::Semantic(Version::new(1, 99, 0)),
+                progress: Some(0.5),
             },
             AutoUpdateStatus::Downloading { .. } => AutoUpdateStatus::Installing {
                 version: VersionCheckType::Semantic(Version::new(1, 99, 0)),
@@ -58,12 +58,27 @@ impl UpdateVersion {
 
         self.status = next_state;
         self.update_check_type = UpdateCheckType::Manual;
-        self.dismissed = false;
+        self.dismissed_status = None;
         cx.notify()
     }
 
     pub fn show_update_in_menu_bar(&self) -> bool {
-        self.dismissed && self.status.is_updated()
+        self.is_dismissed() && self.status.is_updated()
+    }
+
+    fn is_dismissed(&self) -> bool {
+        self.dismissed_status.as_ref() == Some(&self.status)
+    }
+
+    fn dismiss(&mut self, cx: &mut Context<Self>) {
+        self.dismissed_status = Some(self.status.clone());
+        if let Some(auto_updater) = AutoUpdater::get(cx) {
+            let status = self.status.clone();
+            auto_updater.update(cx, |auto_updater, cx| {
+                auto_updater.dismiss_status(status, cx)
+            });
+        }
+        cx.notify()
     }
 
     fn version_tooltip_message(version: &VersionCheckType) -> String {
@@ -78,16 +93,16 @@ impl UpdateVersion {
 
 impl Render for UpdateVersion {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        if self.dismissed {
+        if self.is_dismissed() {
             return Empty.into_any_element();
         }
         match &self.status {
             AutoUpdateStatus::Checking if self.update_check_type.is_manual() => {
                 UpdateButton::checking().into_any_element()
             }
-            AutoUpdateStatus::Downloading { version } => {
+            AutoUpdateStatus::Downloading { version, progress } => {
                 let version = Self::version_tooltip_message(&version);
-                UpdateButton::downloading(version).into_any_element()
+                UpdateButton::downloading(version, *progress).into_any_element()
             }
             AutoUpdateStatus::Installing { version } => {
                 let version = Self::version_tooltip_message(&version);
@@ -99,10 +114,7 @@ impl Render for UpdateVersion {
                     .on_click(|_, _, cx| {
                         workspace::reload(cx);
                     })
-                    .on_dismiss(cx.listener(|this, _, _window, cx| {
-                        this.dismissed = true;
-                        cx.notify()
-                    }))
+                    .on_dismiss(cx.listener(|this, _, _window, cx| this.dismiss(cx)))
                     .into_any_element()
             }
             AutoUpdateStatus::Errored { error } => {
@@ -111,10 +123,7 @@ impl Render for UpdateVersion {
                     .on_click(|_, window, cx| {
                         window.dispatch_action(Box::new(workspace::OpenLog), cx);
                     })
-                    .on_dismiss(cx.listener(|this, _, _window, cx| {
-                        this.dismissed = true;
-                        cx.notify()
-                    }))
+                    .on_dismiss(cx.listener(|this, _, _window, cx| this.dismiss(cx)))
                     .into_any_element()
             }
             AutoUpdateStatus::Idle | AutoUpdateStatus::Checking { .. } => Empty.into_any_element(),

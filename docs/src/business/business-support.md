@@ -5,7 +5,7 @@ description: How to contact Sim for business inquiries and support.
 
 # Business Support
 
-For billing and business support (account setup, invoices, organization questions), email [billing-support@sim.dev](mailto:billing-support@sim.dev). Business support is prioritisim relative to other support channels.
+For billing and business support (account setup, invoices, organization questions), email [billing-support@sim.dev](mailto:billing-support@sim.dev). Business support is prioritized relative to other support channels.
 
 For general questions, email [hi@sim.dev](mailto:hi@sim.dev).
 

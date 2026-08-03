@@ -3,7 +3,7 @@ use std::iter::zip;
 
 use crate::{
     debugger_panel::DebugPanel,
-    persistence::SerialisimPaneLayout,
+    persistence::SerializedPaneLayout,
     tests::{init_test, init_test_workspace, start_debug_session},
 };
 use dap::{StoppedEvent, StoppedEventReason, messages::Events};
@@ -106,12 +106,12 @@ async fn test_invert_axis_on_panel_position_change(
     for (pre, post) in zip(pre_panes, post_panes) {
         match (pre, post) {
             (
-                SerialisimPaneLayout::Group {
+                SerializedPaneLayout::Group {
                     axis: pre_axis,
                     flexes: pre_flexes,
                     children: _,
                 },
-                SerialisimPaneLayout::Group {
+                SerializedPaneLayout::Group {
                     axis: post_axis,
                     flexes: post_flexes,
                     children: _,
@@ -120,7 +120,7 @@ async fn test_invert_axis_on_panel_position_change(
                 assert_ne!(pre_axis, post_axis);
                 assert_eq!(pre_flexes, post_flexes);
             }
-            (SerialisimPaneLayout::Pane(pre_pane), SerialisimPaneLayout::Pane(post_pane)) => {
+            (SerializedPaneLayout::Pane(pre_pane), SerializedPaneLayout::Pane(post_pane)) => {
                 assert_eq!(pre_pane.children, post_pane.children);
                 assert_eq!(pre_pane.active_item, post_pane.active_item);
             }

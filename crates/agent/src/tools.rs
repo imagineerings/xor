@@ -1,46 +1,32 @@
 mod apply_code_action_tool;
-mod code_execution;
 mod context_server_registry;
 mod copy_path_tool;
 mod create_directory_tool;
 mod create_thread_tool;
 mod delete_path_tool;
 mod diagnostics_tool;
-mod dictation_tool;
-mod docx_tool;
 mod edit_file_tool;
 mod edit_session;
 #[cfg(all(test, feature = "unit-eval"))]
 mod evals;
 mod fetch_tool;
-mod final_output_tool;
 mod find_path_tool;
 mod find_references_tool;
-mod game_graph_tool;
 mod get_code_actions_tool;
 mod go_to_definition_tool;
 mod grep_tool;
 mod list_agents_and_models_tool;
 mod list_directory_tool;
-mod mesh_generation_tool;
 mod move_path_tool;
-mod orchestrator;
-mod pdf_tool;
-mod platform_extension_tools;
-mod platform_tool;
 mod read_file_tool;
 mod rename_tool;
 mod skill_tool;
 mod spawn_agent_tool;
-mod summarize;
 mod symbol_locator;
 mod terminal_tool;
-mod todo;
 mod tool_permissions;
 mod web_search_tool;
-mod world_generation_tool;
 mod write_file_tool;
-mod xlsx_tool;
 
 use crate::AgentTool;
 use feature_flags::{
@@ -77,45 +63,32 @@ where
 }
 
 pub use apply_code_action_tool::*;
-pub use code_execution::*;
 pub use context_server_registry::*;
 pub use copy_path_tool::*;
 pub use create_directory_tool::*;
 pub use create_thread_tool::*;
 pub use delete_path_tool::*;
 pub use diagnostics_tool::*;
-pub use dictation_tool::*;
-pub use docx_tool::*;
 pub use edit_file_tool::*;
 pub use fetch_tool::*;
-pub use final_output_tool::*;
 pub use find_path_tool::*;
 pub use find_references_tool::*;
-pub use game_graph_tool::*;
 pub use get_code_actions_tool::*;
 pub use go_to_definition_tool::*;
 pub use grep_tool::*;
 pub use list_agents_and_models_tool::*;
 pub use list_directory_tool::*;
-pub use mesh_generation_tool::*;
 pub use move_path_tool::*;
-pub use orchestrator::*;
-pub use pdf_tool::*;
-pub use platform_extension_tools::*;
-pub use platform_tool::*;
 pub use read_file_tool::*;
 pub use rename_tool::*;
 pub use skill_tool::*;
 pub use spawn_agent_tool::*;
-pub use summarize::*;
 pub use symbol_locator::*;
+
 pub use terminal_tool::*;
-pub use todo::*;
 pub use tool_permissions::*;
 pub use web_search_tool::*;
-pub use world_generation_tool::*;
 pub use write_file_tool::*;
-pub use xlsx_tool::*;
 
 macro_rules! tools {
     ($($tool:ty),* $(,)?) => {
@@ -213,22 +186,14 @@ macro_rules! tools {
 //    are dropped unless it is active. The agent-profile UI uses the same gate so
 //    it never offers a tool the agent can't actually use.
 tools! {
-    AnalyzeTool,
-    AppsTool,
     ApplyCodeActionTool,
-    ChatrecallTool,
-    CodeExecutionTool,
     CopyPathTool,
     CreateDirectoryTool,
     CreateThreadTool,
     DeletePathTool,
-    DeveloperTool,
     DiagnosticsTool,
-    DictationTool,
-    DocxTool,
     EditFileTool,
     FetchTool,
-    FinalOutputTool,
     FindPathTool,
     FindReferencesTool,
     GetCodeActionsTool,
@@ -236,25 +201,14 @@ tools! {
     GrepTool,
     ListAgentsAndModelsTool,
     ListDirectoryTool,
-    SimGameGraphTool,
-    SimMeshGenerationTool,
-    SimWorldGenerationTool,
     MovePathTool,
-    OrchestratorTool,
-    PdfTool,
-    PlatformTool,
     ReadFileTool,
     RenameTool,
     SkillTool,
     SpawnAgentTool,
-    SummarizeTool,
     TerminalTool,
-    TodoTool,
-    TomTool,
-    SummonTool,
     WebSearchTool,
     WriteFileTool,
-    XlsxTool,
 }
 
 /// Some built-in tools are gated behind a feature flag and only become usable

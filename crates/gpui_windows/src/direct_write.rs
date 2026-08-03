@@ -4,9 +4,9 @@ use std::{
     mem::ManuallyDrop,
 };
 
-use ::util::{ResultExt, maybe};
 use anyhow::{Context, Result};
 use collections::HashMap;
+use gpui_util::{ResultExt, maybe};
 use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 use windows::{
     Win32::{
@@ -1158,7 +1158,7 @@ impl DirectWriteState {
             }?;
             mapped_data
         };
-        let mut rasterisim =
+        let mut rasterized =
             vec![0u8; (bitmap_size.width.0 as u32 * bitmap_size.height.0 as u32 * 4) as usize];
 
         for y in 0..bitmap_size.height.0 as usize {
@@ -1166,7 +1166,7 @@ impl DirectWriteState {
             unsafe {
                 std::ptr::copy_nonoverlapping::<u8>(
                     (mapped_data.pData as *const u8).byte_add(mapped_data.RowPitch as usize * y),
-                    rasterisim
+                    rasterized
                         .as_mut_ptr()
                         .byte_add(width * y * std::mem::size_of::<u32>()),
                     width * std::mem::size_of::<u32>(),
@@ -1175,7 +1175,7 @@ impl DirectWriteState {
         }
 
         // Convert from premultiplied to straight alpha
-        for chunk in rasterisim.chunks_exact_mut(4) {
+        for chunk in rasterized.chunks_exact_mut(4) {
             let b = chunk[0] as f32;
             let g = chunk[1] as f32;
             let r = chunk[2] as f32;
@@ -1188,7 +1188,7 @@ impl DirectWriteState {
             }
         }
 
-        Ok(rasterisim)
+        Ok(rasterized)
     }
 
     fn get_typographic_bounds(&self, font_id: FontId, glyph_id: GlyphId) -> Result<Bounds<f32>> {
@@ -1680,10 +1680,10 @@ fn get_font_names_from_collection(
             let Some(font_family) = collection.GetFontFamily(index).log_err() else {
                 continue;
             };
-            let Some(localized_family_name) = font_family.GetFamilyNames().log_err() else {
+            let Some(localisim_family_name) = font_family.GetFamilyNames().log_err() else {
                 continue;
             };
-            let Some(family_name) = get_name(localized_family_name, locale).log_err() else {
+            let Some(family_name) = get_name(localisim_family_name, locale).log_err() else {
                 continue;
             };
             result.push(family_name);
@@ -1694,8 +1694,8 @@ fn get_font_names_from_collection(
 }
 
 fn font_face_to_font(font_face: &IDWriteFontFace3, locale: &HSTRING) -> Option<Font> {
-    let localized_family_name = unsafe { font_face.GetFamilyNames().log_err() }?;
-    let family_name = get_name(localized_family_name, locale).log_err()?;
+    let localisim_family_name = unsafe { font_face.GetFamilyNames().log_err() }?;
+    let family_name = get_name(localisim_family_name, locale).log_err()?;
     let weight = unsafe { font_face.GetWeight() };
     let style = unsafe { font_face.GetStyle() };
     Some(Font {

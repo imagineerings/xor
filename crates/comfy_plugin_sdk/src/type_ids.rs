@@ -1,0 +1,956 @@
+use serde::{Deserialize, Serialize};
+use std::{collections::BTreeMap, error::Error, fmt, str::FromStr};
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ValueFamily {
+    Scalar,
+    Tensor,
+    Artifact,
+    Model,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ValueRepresentation {
+    ScalarV1,
+    TensorV1,
+    ArtifactV1,
+    ModelV1,
+}
+
+impl ValueRepresentation {
+    pub const fn family(self) -> ValueFamily {
+        match self {
+            Self::ScalarV1 => ValueFamily::Scalar,
+            Self::TensorV1 => ValueFamily::Tensor,
+            Self::ArtifactV1 => ValueFamily::Artifact,
+            Self::ModelV1 => ValueFamily::Model,
+        }
+    }
+
+    pub const fn wire_schema(self) -> &'static str {
+        match self {
+            Self::ScalarV1 => "sim:comfy-value/scalar@1",
+            Self::TensorV1 => "sim:comfy-value/tensor@1",
+            Self::ArtifactV1 => "sim:comfy-value/artifact@1",
+            Self::ModelV1 => "sim:comfy-value/model@1",
+        }
+    }
+}
+
+impl ValueFamily {
+    pub const fn representation(self) -> ValueRepresentation {
+        match self {
+            Self::Scalar => ValueRepresentation::ScalarV1,
+            Self::Tensor => ValueRepresentation::TensorV1,
+            Self::Artifact => ValueRepresentation::ArtifactV1,
+            Self::Model => ValueRepresentation::ModelV1,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum TypeEvolutionRule {
+    AdditiveWithinMajor,
+}
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
+pub struct CanonicalTypeId {
+    namespace: String,
+    name: String,
+    major: u16,
+}
+
+impl CanonicalTypeId {
+    pub fn new(
+        namespace: impl Into<String>,
+        name: impl Into<String>,
+        major: u16,
+    ) -> Result<Self, TypeRegistryError> {
+        let identifier = Self {
+            namespace: namespace.into(),
+            name: name.into(),
+            major,
+        };
+        identifier.validate()?;
+        Ok(identifier)
+    }
+
+    pub fn namespace(&self) -> &str {
+        &self.namespace
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn major(&self) -> u16 {
+        self.major
+    }
+
+    fn validate(&self) -> Result<(), TypeRegistryError> {
+        if !valid_identifier_segment(&self.namespace) || !valid_identifier_segment(&self.name) {
+            return Err(TypeRegistryError::InvalidTypeId(self.to_string()));
+        }
+        if self.major == 0 {
+            return Err(TypeRegistryError::InvalidTypeId(self.to_string()));
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for CanonicalTypeId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{}:{}@{}", self.namespace, self.name, self.major)
+    }
+}
+
+impl FromStr for CanonicalTypeId {
+    type Err = TypeRegistryError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        let (qualified_name, major) = value
+            .rsplit_once('@')
+            .ok_or_else(|| TypeRegistryError::InvalidTypeId(value.to_owned()))?;
+        let (namespace, name) = qualified_name
+            .split_once(':')
+            .ok_or_else(|| TypeRegistryError::InvalidTypeId(value.to_owned()))?;
+        if name.contains(':') {
+            return Err(TypeRegistryError::InvalidTypeId(value.to_owned()));
+        }
+        let major = major
+            .parse::<u16>()
+            .map_err(|_| TypeRegistryError::InvalidTypeId(value.to_owned()))?;
+        Self::new(namespace, name, major)
+    }
+}
+
+impl TryFrom<String> for CanonicalTypeId {
+    type Error = TypeRegistryError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        value.parse()
+    }
+}
+
+impl From<CanonicalTypeId> for String {
+    fn from(value: CanonicalTypeId) -> Self {
+        value.to_string()
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TypeRegistration {
+    pub canonical: &'static str,
+    pub source_socket: &'static str,
+    pub publisher: &'static str,
+    pub family: ValueFamily,
+    pub representation: ValueRepresentation,
+    pub wire_schema: &'static str,
+    pub evolution: TypeEvolutionRule,
+    pub aliases: &'static [&'static str],
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum TypeRegistryError {
+    InvalidTypeId(String),
+    DuplicateCanonical(String),
+    DuplicateSourceSocket(String),
+    AliasCollision(String),
+    InvalidPublisher(String),
+    NamespaceCollision {
+        namespace: String,
+        expected_publisher: String,
+        actual_publisher: String,
+    },
+    SchemaCollision {
+        type_id: String,
+        expected_schema: String,
+        actual_schema: String,
+    },
+    UnknownType(String),
+    FamilyMismatch {
+        type_id: String,
+        expected: ValueFamily,
+        actual: ValueFamily,
+    },
+    RepresentationMismatch {
+        type_id: String,
+        expected: ValueRepresentation,
+        actual: ValueRepresentation,
+    },
+}
+
+impl fmt::Display for TypeRegistryError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidTypeId(value) => write!(formatter, "invalid canonical type ID `{value}`"),
+            Self::DuplicateCanonical(value) => {
+                write!(formatter, "duplicate canonical type ID `{value}`")
+            }
+            Self::DuplicateSourceSocket(value) => {
+                write!(formatter, "duplicate source socket `{value}`")
+            }
+            Self::AliasCollision(value) => write!(formatter, "type alias collision for `{value}`"),
+            Self::InvalidPublisher(value) => {
+                write!(formatter, "invalid type publisher identifier `{value}`")
+            }
+            Self::NamespaceCollision {
+                namespace,
+                expected_publisher,
+                actual_publisher,
+            } => write!(
+                formatter,
+                "namespace `{namespace}` belongs to `{expected_publisher}`, not `{actual_publisher}`"
+            ),
+            Self::SchemaCollision {
+                type_id,
+                expected_schema,
+                actual_schema,
+            } => write!(
+                formatter,
+                "type `{type_id}` uses wire schema `{actual_schema}`, not `{expected_schema}`"
+            ),
+            Self::UnknownType(value) => write!(formatter, "unknown plugin type `{value}`"),
+            Self::FamilyMismatch {
+                type_id,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "type `{type_id}` belongs to {actual:?}, not expected {expected:?}"
+            ),
+            Self::RepresentationMismatch {
+                type_id,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "type `{type_id}` uses {actual:?}, not expected {expected:?}"
+            ),
+        }
+    }
+}
+
+impl Error for TypeRegistryError {}
+
+#[derive(Clone, Debug)]
+pub struct TypeRegistry {
+    canonical: BTreeMap<CanonicalTypeId, RegisteredType>,
+    aliases: BTreeMap<String, CanonicalTypeId>,
+}
+
+#[derive(Clone, Debug)]
+struct RegisteredType {
+    publisher: String,
+    representation: ValueRepresentation,
+    wire_schema: String,
+    evolution: TypeEvolutionRule,
+}
+
+impl TypeRegistry {
+    pub fn built_in() -> Result<Self, TypeRegistryError> {
+        Self::from_registrations(BUILT_IN_TYPES)
+    }
+
+    pub fn from_registrations(
+        registrations: &[TypeRegistration],
+    ) -> Result<Self, TypeRegistryError> {
+        let mut canonical = BTreeMap::new();
+        let mut aliases = BTreeMap::new();
+        let mut source_sockets = BTreeMap::new();
+        let mut namespace_publishers = BTreeMap::<String, String>::new();
+        for registration in registrations {
+            if !valid_publisher(registration.publisher) {
+                return Err(TypeRegistryError::InvalidPublisher(
+                    registration.publisher.to_owned(),
+                ));
+            }
+            if registration.representation.family() != registration.family {
+                return Err(TypeRegistryError::RepresentationMismatch {
+                    type_id: registration.canonical.to_owned(),
+                    expected: registration.family.representation(),
+                    actual: registration.representation,
+                });
+            }
+            let type_id = registration.canonical.parse::<CanonicalTypeId>()?;
+            if let Some(expected_publisher) = namespace_publishers.get(type_id.namespace()) {
+                if expected_publisher != registration.publisher {
+                    return Err(TypeRegistryError::NamespaceCollision {
+                        namespace: type_id.namespace().to_owned(),
+                        expected_publisher: expected_publisher.clone(),
+                        actual_publisher: registration.publisher.to_owned(),
+                    });
+                }
+            } else {
+                namespace_publishers.insert(
+                    type_id.namespace().to_owned(),
+                    registration.publisher.to_owned(),
+                );
+            }
+            let expected_schema = registration.representation.wire_schema();
+            if registration.wire_schema != expected_schema {
+                return Err(TypeRegistryError::SchemaCollision {
+                    type_id: registration.canonical.to_owned(),
+                    expected_schema: expected_schema.to_owned(),
+                    actual_schema: registration.wire_schema.to_owned(),
+                });
+            }
+            if canonical
+                .insert(
+                    type_id.clone(),
+                    RegisteredType {
+                        publisher: registration.publisher.to_owned(),
+                        representation: registration.representation,
+                        wire_schema: registration.wire_schema.to_owned(),
+                        evolution: registration.evolution,
+                    },
+                )
+                .is_some()
+            {
+                return Err(TypeRegistryError::DuplicateCanonical(
+                    registration.canonical.to_owned(),
+                ));
+            }
+            if source_sockets
+                .insert(registration.source_socket, registration.canonical)
+                .is_some()
+            {
+                return Err(TypeRegistryError::DuplicateSourceSocket(
+                    registration.source_socket.to_owned(),
+                ));
+            }
+            insert_alias(&mut aliases, registration.source_socket, &type_id)?;
+            insert_alias(&mut aliases, registration.canonical, &type_id)?;
+            for alias in registration.aliases {
+                insert_alias(&mut aliases, alias, &type_id)?;
+            }
+        }
+        Ok(Self { canonical, aliases })
+    }
+
+    pub fn resolve(
+        &self,
+        identifier_or_alias: &str,
+    ) -> Result<&CanonicalTypeId, TypeRegistryError> {
+        self.aliases
+            .get(identifier_or_alias)
+            .ok_or_else(|| TypeRegistryError::UnknownType(identifier_or_alias.to_owned()))
+    }
+
+    pub fn family(&self, type_id: &CanonicalTypeId) -> Result<ValueFamily, TypeRegistryError> {
+        self.canonical
+            .get(type_id)
+            .map(|registration| registration.representation.family())
+            .ok_or_else(|| TypeRegistryError::UnknownType(type_id.to_string()))
+    }
+
+    pub fn representation(
+        &self,
+        type_id: &CanonicalTypeId,
+    ) -> Result<ValueRepresentation, TypeRegistryError> {
+        self.canonical
+            .get(type_id)
+            .map(|registration| registration.representation)
+            .ok_or_else(|| TypeRegistryError::UnknownType(type_id.to_string()))
+    }
+
+    pub fn publisher(&self, type_id: &CanonicalTypeId) -> Result<&str, TypeRegistryError> {
+        self.canonical
+            .get(type_id)
+            .map(|registration| registration.publisher.as_str())
+            .ok_or_else(|| TypeRegistryError::UnknownType(type_id.to_string()))
+    }
+
+    pub fn wire_schema(&self, type_id: &CanonicalTypeId) -> Result<&str, TypeRegistryError> {
+        self.canonical
+            .get(type_id)
+            .map(|registration| registration.wire_schema.as_str())
+            .ok_or_else(|| TypeRegistryError::UnknownType(type_id.to_string()))
+    }
+
+    pub fn evolution(
+        &self,
+        type_id: &CanonicalTypeId,
+    ) -> Result<TypeEvolutionRule, TypeRegistryError> {
+        self.canonical
+            .get(type_id)
+            .map(|registration| registration.evolution)
+            .ok_or_else(|| TypeRegistryError::UnknownType(type_id.to_string()))
+    }
+
+    pub fn require_family(
+        &self,
+        type_id: &CanonicalTypeId,
+        expected: ValueFamily,
+    ) -> Result<(), TypeRegistryError> {
+        let actual = self.family(type_id)?;
+        if actual != expected {
+            return Err(TypeRegistryError::FamilyMismatch {
+                type_id: type_id.to_string(),
+                expected,
+                actual,
+            });
+        }
+        Ok(())
+    }
+
+    pub fn len(&self) -> usize {
+        self.canonical.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.canonical.is_empty()
+    }
+
+    pub fn registrations(&self) -> impl Iterator<Item = (&CanonicalTypeId, ValueFamily)> {
+        self.canonical
+            .iter()
+            .map(|(identifier, registration)| (identifier, registration.representation.family()))
+    }
+
+    pub fn canonical_projection(&self) -> String {
+        let mut projection = String::new();
+        for (identifier, registration) in &self.canonical {
+            projection.push_str("type|");
+            projection.push_str(&identifier.to_string());
+            projection.push('|');
+            projection.push_str(&registration.publisher);
+            projection.push('|');
+            projection.push_str(match registration.representation {
+                ValueRepresentation::ScalarV1 => "scalar-v1",
+                ValueRepresentation::TensorV1 => "tensor-v1",
+                ValueRepresentation::ArtifactV1 => "artifact-v1",
+                ValueRepresentation::ModelV1 => "model-v1",
+            });
+            projection.push('|');
+            projection.push_str(&registration.wire_schema);
+            projection.push('|');
+            projection.push_str(match registration.evolution {
+                TypeEvolutionRule::AdditiveWithinMajor => "additive-within-major",
+            });
+            projection.push('\n');
+        }
+        for (alias, identifier) in &self.aliases {
+            projection.push_str("alias|");
+            projection.push_str(alias);
+            projection.push('|');
+            projection.push_str(&identifier.to_string());
+            projection.push('\n');
+        }
+        projection
+    }
+}
+
+fn insert_alias(
+    aliases: &mut BTreeMap<String, CanonicalTypeId>,
+    alias: &str,
+    type_id: &CanonicalTypeId,
+) -> Result<(), TypeRegistryError> {
+    if aliases.insert(alias.to_owned(), type_id.clone()).is_some() {
+        return Err(TypeRegistryError::AliasCollision(alias.to_owned()));
+    }
+    Ok(())
+}
+
+fn valid_identifier_segment(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+        && value.as_bytes().first().is_some_and(u8::is_ascii_lowercase)
+}
+
+fn valid_publisher(value: &str) -> bool {
+    !value.is_empty() && value.len() <= 256 && value.split('.').all(valid_identifier_segment)
+}
+
+macro_rules! plugin_types {
+    ($(($canonical:literal, $source:literal, $family:ident, [$($alias:literal),* $(,)?])),* $(,)?) => {
+        pub const BUILT_IN_TYPES: &[TypeRegistration] = &[
+            $(TypeRegistration {
+                canonical: $canonical,
+                source_socket: $source,
+                publisher: "sim",
+                family: ValueFamily::$family,
+                representation: ValueFamily::$family.representation(),
+                wire_schema: ValueFamily::$family.representation().wire_schema(),
+                evolution: TypeEvolutionRule::AdditiveWithinMajor,
+                aliases: &[$($alias),*],
+            }),*
+        ];
+    };
+}
+
+plugin_types!(
+    ("comfy:any@1", "AnyType", Scalar, ["*"]),
+    ("comfy:array@1", "Array", Scalar, []),
+    ("comfy:audio@1", "Audio", Tensor, ["AUDIO"]),
+    (
+        "comfy:audio-encoder@1",
+        "AudioEncoder",
+        Model,
+        ["AUDIO_ENCODER"]
+    ),
+    (
+        "comfy:audio-encoder-output@1",
+        "AudioEncoderOutput",
+        Tensor,
+        ["AUDIO_ENCODER_OUTPUT"]
+    ),
+    ("comfy:autogrow@1", "Autogrow", Scalar, []),
+    (
+        "comfy:background-removal@1",
+        "BackgroundRemoval",
+        Model,
+        ["BACKGROUND_REMOVAL"]
+    ),
+    ("comfy:boolean@1", "Boolean", Scalar, ["BOOLEAN"]),
+    (
+        "comfy:bounding-box@1",
+        "BoundingBox",
+        Scalar,
+        ["BOUNDING_BOX"]
+    ),
+    (
+        "comfy:bounding-box-editor@1",
+        "BoundingBoxes",
+        Scalar,
+        ["BOUNDING_BOXES"]
+    ),
+    ("comfy:clip@1", "Clip", Model, ["CLIP"]),
+    ("comfy:clip-vision@1", "ClipVision", Model, ["CLIP_VISION"]),
+    (
+        "comfy:clip-vision-output@1",
+        "ClipVisionOutput",
+        Tensor,
+        ["CLIP_VISION_OUTPUT"]
+    ),
+    ("comfy:color@1", "Color", Scalar, ["COLOR"]),
+    ("comfy:color-list@1", "Colors", Scalar, ["COLORS"]),
+    ("comfy:combo@1", "Combo", Scalar, ["COMBO"]),
+    (
+        "comfy:conditioning@1",
+        "Conditioning",
+        Tensor,
+        ["CONDITIONING"]
+    ),
+    ("comfy:control-net@1", "ControlNet", Model, ["CONTROL_NET"]),
+    ("comfy:curve@1", "Curve", Tensor, ["CURVE"]),
+    ("comfy:custom@1", "Custom", Scalar, ["CUSTOM"]),
+    ("comfy:dictionary@1", "Dict", Scalar, ["DICT"]),
+    (
+        "comfy:dynamic-combo@1",
+        "DynamicCombo",
+        Scalar,
+        ["DYNAMIC_COMBO"]
+    ),
+    (
+        "comfy:file-3d-any@1",
+        "File3DAny",
+        Artifact,
+        ["FILE_3D_ANY"]
+    ),
+    (
+        "comfy:file-3d-fbx@1",
+        "File3DFBX",
+        Artifact,
+        ["FILE_3D_FBX"]
+    ),
+    (
+        "comfy:file-3d-glb@1",
+        "File3DGLB",
+        Artifact,
+        ["FILE_3D_GLB"]
+    ),
+    (
+        "comfy:file-3d-obj@1",
+        "File3DOBJ",
+        Artifact,
+        ["FILE_3D_OBJ"]
+    ),
+    (
+        "comfy:file-3d-point-cloud@1",
+        "File3DPointCloudAny",
+        Artifact,
+        ["FILE_3D_POINT_CLOUD_ANY"]
+    ),
+    (
+        "comfy:file-3d-splat@1",
+        "File3DSplatAny",
+        Artifact,
+        ["FILE_3D_SPLAT_ANY"]
+    ),
+    ("comfy:float@1", "Float", Scalar, ["FLOAT"]),
+    ("comfy:float-list@1", "FloatList", Scalar, ["FLOATS"]),
+    ("comfy:gligen@1", "Gligen", Model, ["GLIGEN"]),
+    ("comfy:guider@1", "Guider", Model, ["GUIDER"]),
+    ("comfy:histogram@1", "Histogram", Tensor, ["HISTOGRAM"]),
+    ("comfy:hooks@1", "Hooks", Model, ["HOOKS"]),
+    (
+        "comfy:hook-keyframes@1",
+        "HookKeyframes",
+        Model,
+        ["HOOK_KEYFRAMES", "HOOK_KF"]
+    ),
+    ("comfy:image@1", "Image", Tensor, ["IMAGE"]),
+    (
+        "comfy:image-compare@1",
+        "ImageCompare",
+        Scalar,
+        ["IMAGE_COMPARE"]
+    ),
+    ("comfy:integer@1", "Int", Scalar, ["INT"]),
+    ("comfy:latent@1", "Latent", Tensor, ["LATENT"]),
+    (
+        "comfy:latent-operation@1",
+        "LatentOperation",
+        Model,
+        ["LATENT_OPERATION"]
+    ),
+    (
+        "comfy:latent-upscale-model@1",
+        "LatentUpscaleModel",
+        Model,
+        ["LATENT_UPSCALE_MODEL"]
+    ),
+    ("comfy:load-3d@1", "Load3D", Artifact, ["LOAD_3D"]),
+    (
+        "comfy:load-3d-camera@1",
+        "Load3DCamera",
+        Scalar,
+        ["LOAD_3D_CAMERA"]
+    ),
+    (
+        "comfy:load-3d-model-info@1",
+        "Load3DModelInfo",
+        Scalar,
+        ["LOAD_3D_MODEL_INFO"]
+    ),
+    ("comfy:mask@1", "Mask", Tensor, ["MASK"]),
+    ("comfy:match-type@1", "MatchType", Scalar, ["MATCH_TYPE"]),
+    ("comfy:mesh@1", "Mesh", Artifact, ["MESH"]),
+    ("comfy:model@1", "Model", Model, ["MODEL"]),
+    ("comfy:model-patch@1", "ModelPatch", Model, ["MODEL_PATCH"]),
+    ("comfy:multi-type@1", "MultiType", Scalar, ["MULTI_TYPE"]),
+    ("comfy:noise@1", "Noise", Tensor, ["NOISE"]),
+    ("comfy:photomaker@1", "Photomaker", Model, ["PHOTOMAKER"]),
+    ("comfy:sampler@1", "Sampler", Model, ["SAMPLER"]),
+    ("comfy:sigmas@1", "Sigmas", Tensor, ["SIGMAS"]),
+    ("comfy:splat@1", "Splat", Artifact, ["SPLAT"]),
+    ("comfy:string@1", "String", Scalar, ["STRING"]),
+    ("comfy:style-model@1", "StyleModel", Model, ["STYLE_MODEL"]),
+    ("comfy:svg@1", "SVG", Artifact, []),
+    (
+        "comfy:timesteps-range@1",
+        "TimestepsRange",
+        Scalar,
+        ["TIMESTEPS_RANGE"]
+    ),
+    ("comfy:tracks@1", "Tracks", Tensor, ["TRACKS"]),
+    (
+        "comfy:upscale-model@1",
+        "UpscaleModel",
+        Model,
+        ["UPSCALE_MODEL"]
+    ),
+    ("comfy:vae@1", "Vae", Model, ["VAE"]),
+    ("comfy:video@1", "Video", Tensor, ["VIDEO"]),
+    ("comfy:voxel@1", "Voxel", Tensor, ["VOXEL"]),
+    (
+        "comfy:wan-camera-embedding@1",
+        "WanCameraEmbedding",
+        Tensor,
+        ["WAN_CAMERA_EMBEDDING"]
+    ),
+    ("comfy:webcam@1", "Webcam", Tensor, ["WEBCAM"]),
+);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sha2::{Digest, Sha256};
+    use std::collections::BTreeSet;
+
+    #[test]
+    fn canonical_ids_round_trip() -> Result<(), Box<dyn Error>> {
+        let type_id = "comfy:image@1".parse::<CanonicalTypeId>()?;
+        assert_eq!(type_id.namespace(), "comfy");
+        assert_eq!(type_id.name(), "image");
+        assert_eq!(type_id.major(), 1);
+        assert_eq!(type_id.to_string(), "comfy:image@1");
+        for invalid in ["image", "comfy:image", "Comfy:image@1", "comfy:image@0"] {
+            assert!(invalid.parse::<CanonicalTypeId>().is_err());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn built_in_registry_has_one_canonical_entry_per_socket() -> Result<(), Box<dyn Error>> {
+        let registry = TypeRegistry::built_in()?;
+        assert_eq!(registry.len(), 66);
+        assert_eq!(
+            registry.resolve("CLIP_VISION")?.to_string(),
+            "comfy:clip-vision@1"
+        );
+        assert_eq!(
+            registry.resolve("HOOK_KF")?.to_string(),
+            "comfy:hook-keyframes@1"
+        );
+        assert_eq!(
+            registry.family(registry.resolve("IMAGE")?)?,
+            ValueFamily::Tensor
+        );
+        assert_eq!(
+            registry.evolution(registry.resolve("IMAGE")?)?,
+            TypeEvolutionRule::AdditiveWithinMajor
+        );
+        assert_eq!(registry.publisher(registry.resolve("IMAGE")?)?, "sim");
+        assert_eq!(
+            registry.wire_schema(registry.resolve("IMAGE")?)?,
+            "sim:comfy-value/tensor@1"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn registry_covers_the_cataloged_v1_and_v3_socket_contracts_exactly()
+    -> Result<(), Box<dyn Error>> {
+        let catalog =
+            include_str!("../../../.agents/specs/comfy-parity/catalogs/backend-nodes.csv");
+        let mut catalog_sockets = BTreeSet::new();
+        for marker in ["IO.", "io."] {
+            let mut remainder = catalog;
+            while let Some(position) = remainder.find(marker) {
+                remainder = remainder
+                    .get(position + marker.len()..)
+                    .ok_or("catalog marker offset overflow")?;
+                let identifier_length = remainder
+                    .bytes()
+                    .take_while(|byte| byte.is_ascii_alphanumeric() || *byte == b'_')
+                    .count();
+                let identifier = remainder
+                    .get(..identifier_length)
+                    .ok_or("catalog identifier offset overflow")?;
+                let suffix = remainder
+                    .get(identifier_length..)
+                    .ok_or("catalog suffix offset overflow")?;
+                if suffix.starts_with(".Input") || suffix.starts_with(".Output") {
+                    catalog_sockets.insert(identifier.to_owned());
+                }
+                remainder = suffix;
+            }
+        }
+        assert_eq!(catalog_sockets.len(), 59);
+
+        let legacy_v1_sockets = [
+            "BOOLEAN",
+            "CLIP",
+            "CLIP_VISION",
+            "CLIP_VISION_OUTPUT",
+            "COMBO",
+            "CONDITIONING",
+            "CONTROL_NET",
+            "FLOAT",
+            "FLOATS",
+            "GLIGEN",
+            "HOOKS",
+            "HOOK_KEYFRAMES",
+            "HOOK_KF",
+            "IMAGE",
+            "INT",
+            "LATENT",
+            "MASK",
+            "MODEL",
+            "MODEL_PATCH",
+            "STRING",
+            "STYLE_MODEL",
+            "TIMESTEPS_RANGE",
+            "VAE",
+            "WEBCAM",
+        ];
+        let registry = TypeRegistry::built_in()?;
+        let mut resolved = BTreeSet::new();
+        for socket in catalog_sockets
+            .iter()
+            .map(String::as_str)
+            .chain(legacy_v1_sockets)
+        {
+            resolved.insert(registry.resolve(socket)?.clone());
+        }
+        assert_eq!(resolved.len(), 66);
+        assert_eq!(resolved.len(), registry.len());
+        assert!(
+            registry
+                .registrations()
+                .all(|(type_id, _)| resolved.contains(type_id))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn collisions_are_rejected() {
+        let duplicate = [
+            TypeRegistration {
+                canonical: "comfy:a@1",
+                source_socket: "A",
+                publisher: "sim",
+                family: ValueFamily::Scalar,
+                representation: ValueRepresentation::ScalarV1,
+                wire_schema: ValueRepresentation::ScalarV1.wire_schema(),
+                evolution: TypeEvolutionRule::AdditiveWithinMajor,
+                aliases: &["SHARED"],
+            },
+            TypeRegistration {
+                canonical: "comfy:b@1",
+                source_socket: "B",
+                publisher: "sim",
+                family: ValueFamily::Tensor,
+                representation: ValueRepresentation::TensorV1,
+                wire_schema: ValueRepresentation::TensorV1.wire_schema(),
+                evolution: TypeEvolutionRule::AdditiveWithinMajor,
+                aliases: &["SHARED"],
+            },
+        ];
+        assert!(matches!(
+            TypeRegistry::from_registrations(&duplicate),
+            Err(TypeRegistryError::AliasCollision(alias)) if alias == "SHARED"
+        ));
+    }
+
+    #[test]
+    fn generated_registry_projection_is_stable_and_representation_checked()
+    -> Result<(), Box<dyn Error>> {
+        let registry = TypeRegistry::built_in()?;
+        let projection = registry.canonical_projection();
+        assert_eq!(
+            projection
+                .lines()
+                .filter(|line| line.starts_with("type|"))
+                .count(),
+            66
+        );
+        assert_eq!(
+            format!("{:x}", Sha256::digest(projection.as_bytes())),
+            "2bcd8a4d945632d3b1a67179682e40ab8ccd2d208d78eceed936edfa0e04e446"
+        );
+        assert_eq!(
+            registry.representation(registry.resolve("IMAGE")?)?,
+            ValueRepresentation::TensorV1
+        );
+
+        let mismatch = [TypeRegistration {
+            canonical: "comfy:mismatch@1",
+            source_socket: "MISMATCH",
+            publisher: "sim",
+            family: ValueFamily::Scalar,
+            representation: ValueRepresentation::TensorV1,
+            wire_schema: ValueRepresentation::TensorV1.wire_schema(),
+            evolution: TypeEvolutionRule::AdditiveWithinMajor,
+            aliases: &[],
+        }];
+        assert!(matches!(
+            TypeRegistry::from_registrations(&mismatch),
+            Err(TypeRegistryError::RepresentationMismatch { .. })
+        ));
+
+        let namespace_collision = [
+            TypeRegistration {
+                canonical: "shared:a@1",
+                source_socket: "SHARED_A",
+                publisher: "publisher-a",
+                family: ValueFamily::Scalar,
+                representation: ValueRepresentation::ScalarV1,
+                wire_schema: ValueRepresentation::ScalarV1.wire_schema(),
+                evolution: TypeEvolutionRule::AdditiveWithinMajor,
+                aliases: &[],
+            },
+            TypeRegistration {
+                canonical: "shared:b@1",
+                source_socket: "SHARED_B",
+                publisher: "publisher-b",
+                family: ValueFamily::Scalar,
+                representation: ValueRepresentation::ScalarV1,
+                wire_schema: ValueRepresentation::ScalarV1.wire_schema(),
+                evolution: TypeEvolutionRule::AdditiveWithinMajor,
+                aliases: &[],
+            },
+        ];
+        assert!(matches!(
+            TypeRegistry::from_registrations(&namespace_collision),
+            Err(TypeRegistryError::NamespaceCollision { namespace, .. }) if namespace == "shared"
+        ));
+
+        let schema_collision = [TypeRegistration {
+            canonical: "schema:value@1",
+            source_socket: "SCHEMA_VALUE",
+            publisher: "publisher",
+            family: ValueFamily::Scalar,
+            representation: ValueRepresentation::ScalarV1,
+            wire_schema: "sim:comfy-value/tensor@1",
+            evolution: TypeEvolutionRule::AdditiveWithinMajor,
+            aliases: &[],
+        }];
+        assert!(matches!(
+            TypeRegistry::from_registrations(&schema_collision),
+            Err(TypeRegistryError::SchemaCollision { .. })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn registry_reconciliation_consumes_every_declared_task_catalog() {
+        let catalogs = [
+            (
+                include_bytes!("../../../.agents/specs/comfy-parity/catalogs/backend-nodes.csv")
+                    .as_slice(),
+                "2fd562212e8f79335b619ff0fd1844d263a05fc85839366072046173129aefe1",
+                b"schema_api".as_slice(),
+            ),
+            (
+                include_bytes!(
+                    "../../../.agents/specs/comfy-parity/catalogs/cross-compatibility.csv"
+                )
+                .as_slice(),
+                "fcecaa34f05405d6a6af6d4608a157928d44d25be3dca1c0cafa1e9eeab8ec67",
+                b"Version and capability negotiation".as_slice(),
+            ),
+            (
+                include_bytes!(
+                    "../../../.agents/specs/comfy-parity/catalogs/frontend-extensions.csv"
+                )
+                .as_slice(),
+                "83bdcb612379801617d42a1bb2713025794b75ccfc8b2f1874c7b3c75e96a223",
+                b"Unique extension name".as_slice(),
+            ),
+            (
+                include_bytes!(
+                    "../../../.agents/specs/comfy-parity/catalogs/docs-extension-contracts.csv"
+                )
+                .as_slice(),
+                "0f1f4e0b8ebb5cb2e956d2a96018b38c8e01afd340045915284a315147122f54",
+                b"production_legacy_execution".as_slice(),
+            ),
+            (
+                include_bytes!(
+                    "../../../.agents/specs/comfy-parity/catalogs/backend-external-services.csv"
+                )
+                .as_slice(),
+                "6920e13329868700eb665aa3bd8586ce46f7d45d1d0754490f28b1fc601c3837",
+                b"provider".as_slice(),
+            ),
+        ];
+        for (bytes, digest, required_contract) in catalogs {
+            assert_eq!(format!("{:x}", Sha256::digest(bytes)), digest);
+            assert!(
+                bytes
+                    .windows(required_contract.len())
+                    .any(|window| window == required_contract)
+            );
+        }
+    }
+}

@@ -2,7 +2,7 @@ use crate::{
     Thread, ToolCallEventStream, ToolPermissionContext, ToolPermissionDecision,
     decide_permission_for_path,
 };
-use agent_client_protocol::schema as acp;
+use agent_client_protocol::schema::v1 as acp;
 use agent_skills::is_agents_skills_path;
 use anyhow::{Result, anyhow};
 use fs::Fs;
@@ -63,7 +63,7 @@ pub async fn canonicalize_worktree_roots<C: gpui::AppContext>(
 }
 
 /// Walks up ancestors of `path` to find the deepest one that exists on disk and
-/// can be canonicalisim, then reattaches the remaining suffix components.
+/// can be canonicalized, then reattaches the remaining suffix components.
 ///
 /// This is needed for paths where the leaf (or intermediate directories) don't
 /// exist yet but an ancestor may be a symlink. For example, when creating
@@ -98,7 +98,7 @@ async fn canonicalize_with_ancestors(path: &Path, fs: &dyn Fs) -> Option<PathBuf
     }
 }
 
-/// Returns the canonicalisim global agent skills directory
+/// Returns the canonicalized global agent skills directory
 /// (`~/.agents/skills`).
 ///
 /// Recomputed on every call rather than cached: the underlying
@@ -117,9 +117,9 @@ fn is_within_any_worktree(canonical_path: &Path, canonical_worktree_roots: &[Pat
 }
 
 /// If `path` names `~/.agents/skills` or one of its descendants, return the
-/// canonicalisim absolute path. Returns `None` for any path that resolves
+/// canonicalized absolute path. Returns `None` for any path that resolves
 /// outside the global skills tree, for relative paths that don't start with
-/// `~`, or if the skills directory itself can't be canonicalisim (fail closed
+/// `~`, or if the skills directory itself can't be canonicalized (fail closed
 /// — better to refuse access than to compare against a non-canonical path).
 ///
 /// This is the gate that lets `read_file` / `list_directory` reach into the

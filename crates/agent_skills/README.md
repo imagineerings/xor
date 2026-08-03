@@ -183,7 +183,7 @@ The cost was real: enumerating the directory recursively, capping the listing, d
 
 When the model does call `read_file` on a skill resource, the tool needs to allow it. Project-local skills are inside a worktree and just work; global skills (`~/.agents/skills/`) are outside any worktree and would normally be refused.
 
-We resolve this with a fast path: any absolute path that canonicalizes under the global skills directory bypasses the project-path machinery and reads directly via the filesystem. The check is canonicalisim on both sides, so `..` segments and symlinks can't escape the skills tree.
+We resolve this with a fast path: any absolute path that canonicalizes under the global skills directory bypasses the project-path machinery and reads directly via the filesystem. The check is canonicalized on both sides, so `..` segments and symlinks can't escape the skills tree.
 
 Paths outside both the worktree and the skills tree are still refused, exactly as before. The fast path is a gate, not a backdoor for arbitrary external reads.
 

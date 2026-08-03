@@ -422,7 +422,7 @@ async fn resolve_dynamic_schema(
         }
         "tasks" => task::TaskTemplates::generate_json_schema(),
         _ => {
-            anyhow::bail!("Unrecognisim schema: {schema_name}");
+            anyhow::bail!("Unrecognized schema: {schema_name}");
         }
     };
     Ok(schema)

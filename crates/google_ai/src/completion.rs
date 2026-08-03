@@ -53,7 +53,7 @@ pub fn into_google(
                 MessageContent::Thinking { .. } => {
                     vec![]
                 }
-                MessageContent::RedactedThinking(_) => vec![],
+                MessageContent::RedactedThinking(_) | MessageContent::Compaction(_) => vec![],
                 MessageContent::Image(image) => {
                     vec![Part::InlineDataPart(InlineDataPart {
                         inline_data: GenerativeContentBlob {
@@ -499,9 +499,9 @@ mod tests {
         assert_eq!(thinking_config.include_thoughts, Some(true));
         assert_eq!(thinking_config.thinking_level, Some(ThinkingLevel::Low));
 
-        let serialisim = serde_json::to_value(thinking_config).unwrap();
-        assert_eq!(serialisim["thinkingLevel"], "LOW");
-        assert_eq!(serialisim["includeThoughts"], true);
+        let serialized = serde_json::to_value(thinking_config).unwrap();
+        assert_eq!(serialized["thinkingLevel"], "LOW");
+        assert_eq!(serialized["includeThoughts"], true);
     }
 
     #[test]

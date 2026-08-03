@@ -1,0 +1,4 @@
+interface:
+  display_name: "Spec-Driven Coding"
+  short_description: "Specify and implement complete repository features"
+  default_prompt: "Use $coding to define this feature in a traceable repository specification, then implement and validate every resulting task."

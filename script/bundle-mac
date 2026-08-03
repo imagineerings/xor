@@ -10,7 +10,7 @@ local_install=false
 can_code_sign=false
 
 # This must match the team in the provisioning profile.
-IDENTITY="Sim Industries, Inc."
+IDENTITY="Simtropolis, Inc."
 APPLE_NOTARIZATION_TEAM="MQ55VZLNZQ"
 
 # Function for displaying help info
@@ -87,7 +87,7 @@ script/generate-licenses
 rustup target add $target_triple
 
 echo "Compiling sim binaries"
-cargo build ${build_flag} --package sim --package cli --target $target_triple
+cargo build ${build_flag} --package sim --package cli --package comfy_worker --features sim/metal,comfy_worker/metal --target $target_triple
 # Build remote_server in separate invocation to prevent feature unification from other crates
 # from influencing dynamic libraries required by it.
 cargo build ${build_flag} --package remote_server --target $target_triple
@@ -202,6 +202,7 @@ function sign_app_binaries() {
         echo "Code signing binaries"
         # sequence of codesign commands modeled after this example: https://developer.apple.com/forums/thread/701514
         /usr/bin/codesign --deep --force --timestamp --options runtime --sign "$IDENTITY" "${app_path}/Contents/MacOS/cli" -v
+        /usr/bin/codesign --deep --force --timestamp --options runtime --sign "$IDENTITY" "${app_path}/Contents/MacOS/comfy-worker" -v
         /usr/bin/codesign --deep --force --timestamp --options runtime --sign "$IDENTITY" "${app_path}/Contents/MacOS/git" -v
         /usr/bin/codesign --deep --force --timestamp --options runtime --entitlements crates/sim/resources/sim.entitlements --sign "$IDENTITY" "${app_path}/Contents/MacOS/sim" -v
         /usr/bin/codesign --force --timestamp --options runtime --entitlements crates/sim/resources/sim.entitlements --sign "$IDENTITY" "${app_path}" -v
@@ -334,6 +335,7 @@ upload_debug_symbols
 
 cp target/${target_triple}/${target_dir}/sim "${app_path}/Contents/MacOS/sim"
 cp target/${target_triple}/${target_dir}/cli "${app_path}/Contents/MacOS/cli"
+cp target/${target_triple}/${target_dir}/comfy-worker "${app_path}/Contents/MacOS/comfy-worker"
 sign_app_binaries
 
 sign_binary "target/$target_triple/release/remote_server"

@@ -15,7 +15,7 @@ use dap::{
 };
 use extension::{Extension, WorktreeDelegate};
 use gpui::AsyncApp;
-use task::{SimDebugConfig, DebugScenario};
+use task::{DebugScenario, SimDebugConfig};
 use util::rel_path::RelPath;
 
 pub(crate) struct ExtensionDapAdapter {
@@ -106,10 +106,7 @@ impl DebugAdapter for ExtensionDapAdapter {
             .await
     }
 
-    async fn config_from_sim_format(
-        &self,
-        sim_scenario: SimDebugConfig,
-    ) -> Result<DebugScenario> {
+    async fn config_from_sim_format(&self, sim_scenario: SimDebugConfig) -> Result<DebugScenario> {
         self.extension.dap_config_to_scenario(sim_scenario).await
     }
 

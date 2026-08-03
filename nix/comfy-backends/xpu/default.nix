@@ -1,0 +1,34 @@
+{ lib, stdenvNoCC }:
+
+stdenvNoCC.mkDerivation {
+  pname = "sim-comfy-backend-xpu-metadata";
+  version = "level-zero-1.11.0-onednn-3.5.0-abi1";
+
+  dontUnpack = true;
+
+  installPhase = ''
+    runHook preInstall
+    destination="$out/lib/sim/comfy-backends/xpu"
+    mkdir -p "$destination/abi"
+    cp ${../../../crates/comfy_backend_xpu/abi/symbols-v1.json} "$destination/abi/"
+    cp ${../../../crates/comfy_backend_xpu/abi/reviewed-execution-bindings-v1.txt} "$destination/abi/"
+    cp ${../../../crates/comfy_backend_xpu/abi/verify-execution-bindings.c} "$destination/abi/"
+    cp ${../../../crates/comfy_backend_xpu/LICENSES} "$destination/"
+    cp ${./package-policy.json} "$destination/"
+    runHook postInstall
+  '';
+
+  passthru = {
+    redistributesVendorRuntime = false;
+    invokesVendorCompiler = false;
+    releasePackager = "script/package-comfy-backend-xpu";
+    cryptographicVerificationOwner = "comfy_runtime::NativeFfiRegistry";
+    supportedTargets = [ "x86_64-linux" "x86_64-windows" ];
+  };
+
+  meta = {
+    description = "Reviewed Sim Intel XPU ABI metadata without vendor runtime redistribution";
+    license = lib.licenses.gpl3Plus;
+    platforms = [ "x86_64-linux" "x86_64-windows" ];
+  };
+}

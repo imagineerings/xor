@@ -671,14 +671,8 @@ found."""
         "type": "object",
         "properties": {
             "number": {"type": "integer", "description": "The candidate issue number"},
-            "shared_root_cause": {
-                "type": "string",
-                "description": "The specific bug/root cause shared by both issues",
-            },
-            "explanation": {
-                "type": "string",
-                "description": "Brief explanation with concrete evidence from both issues",
-            },
+            "shared_root_cause": {"type": "string", "description": "The specific bug/root cause shared by both issues"},
+            "explanation": {"type": "string", "description": "Brief explanation with concrete evidence from both issues"},
         },
         "required": ["number", "shared_root_cause", "explanation"],
     }
@@ -690,10 +684,8 @@ found."""
             "properties": {
                 "reasoning": {
                     "type": "string",
-                    "description": (
-                        "A brief scratchpad (at most 2-3 sentences) weighing the strongest "
-                        "candidates and whether they share a root cause. Be terse."
-                    ),
+                    "description": "A brief scratchpad (at most 2-3 sentences) weighing the strongest "
+                                   "candidates and whether they share a root cause. Be terse.",
                     "maxLength": 700,
                 },
                 "likely_duplicates": {"type": "array", "items": duplicate_match_schema},
@@ -704,10 +696,7 @@ found."""
                         "type": "object",
                         "properties": {
                             "number": {"type": "integer", "description": "The candidate issue number"},
-                            "explanation": {
-                                "type": "string",
-                                "description": "Brief explanation of why this is useful triage context",
-                            },
+                            "explanation": {"type": "string", "description": "Brief explanation of why this is useful triage context"},
                         },
                         "required": ["number", "explanation"],
                     },
@@ -867,11 +856,7 @@ def critique_closed_candidates(anthropic_key, issue, proposed, search_results):
         log(f"  Critique: evaluating #{number}")
         try:
             verdict_data = call_claude_tool(
-                anthropic_key,
-                CRITIQUE_SYSTEM_PROMPT,
-                user_content,
-                CRITIQUE_VERDICT_TOOL,
-                max_tokens=600,
+                anthropic_key, CRITIQUE_SYSTEM_PROMPT, user_content, CRITIQUE_VERDICT_TOOL, max_tokens=600
             )
         except (requests.RequestException, ValueError) as e:
             # If the critique call fails, prefer omitting the candidate over posting noise.

@@ -154,7 +154,7 @@ The full default configuration can be shown in Sim with the {#action sim::ShowDe
 
 ## Standard Token Types
 
-Language servers report tokens using standardisim types. Common types include:
+Language servers report tokens using standardized types. Common types include:
 
 | Type            | Description                        |
 | --------------- | ---------------------------------- |

@@ -1,7 +1,7 @@
 mod async_body;
 #[cfg(not(target_family = "wasm"))]
 pub mod github;
-#[cfg(not(target_family = "wasm"))]
+#[cfg(all(not(target_family = "wasm"), feature = "github-download"))]
 pub mod github_download;
 
 pub use anyhow::{Result, anyhow};
@@ -292,11 +292,7 @@ impl HttpClientWithUrl {
     }
 
     /// Builds a Sim Cloud URL using the given path and query params.
-    pub fn build_sim_cloud_url_with_query(
-        &self,
-        path: &str,
-        query: impl Serialize,
-    ) -> Result<Url> {
+    pub fn build_sim_cloud_url_with_query(&self, path: &str, query: impl Serialize) -> Result<Url> {
         let base_url = self.base_url();
         let base_api_url = match base_url.as_ref() {
             "https://sim.dev" => "https://cloud.sim.dev",

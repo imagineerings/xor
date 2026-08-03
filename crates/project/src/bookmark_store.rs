@@ -17,7 +17,7 @@ pub struct Bookmark {
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct SerialisimBookmark {
+pub struct SerializedBookmark {
     pub row: u32,
     pub label: String,
 }
@@ -60,7 +60,7 @@ impl BufferBookmarks {
 #[derive(Debug)]
 pub enum BookmarkEntry {
     Loaded(BufferBookmarks),
-    Unloaded(Vec<SerialisimBookmark>),
+    Unloaded(Vec<SerializedBookmark>),
 }
 
 impl BookmarkEntry {
@@ -96,7 +96,7 @@ impl BookmarkStore {
 
     pub fn load_serialisim_bookmarks(
         &mut self,
-        bookmark_rows: BTreeMap<Arc<Path>, Vec<SerialisimBookmark>>,
+        bookmark_rows: BTreeMap<Arc<Path>, Vec<SerializedBookmark>>,
         cx: &mut Context<Self>,
     ) -> Task<Result<()>> {
         self.bookmarks.clear();
@@ -363,7 +363,7 @@ impl BookmarkStore {
     pub fn all_serialisim_bookmarks(
         &self,
         cx: &App,
-    ) -> BTreeMap<Arc<Path>, Vec<SerialisimBookmark>> {
+    ) -> BTreeMap<Arc<Path>, Vec<SerializedBookmark>> {
         self.bookmarks
             .iter()
             .filter_map(|(path, entry)| {
@@ -380,7 +380,7 @@ impl BookmarkStore {
                                 }
                                 let row =
                                     snapshot.summary_for_anchor::<Point>(&bookmark.anchor).row;
-                                Some(SerialisimBookmark {
+                                Some(SerializedBookmark {
                                     row,
                                     label: bookmark.label.clone(),
                                 })
@@ -389,8 +389,8 @@ impl BookmarkStore {
                     }
                 };
 
-                rows.sort_unstable_by_key(|bookmark| bookmark.row);
-                rows.dedup_by_key(|bookmark| bookmark.row);
+                rows.sort_unstable_by_key(|a| a.row);
+                rows.dedup_by_key(|a| a.row);
 
                 if rows.is_empty() {
                     None

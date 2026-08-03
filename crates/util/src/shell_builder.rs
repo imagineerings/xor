@@ -10,7 +10,7 @@ pub struct ShellBuilder {
     program: String,
     args: Vec<String>,
     interactive: bool,
-    /// Whether to redirect stdin to /dev/null for the spawned command.
+    /// Whether to redirect stdin to /dev/null for the spawned command as a subshell.
     redirect_stdin: bool,
     kind: ShellKind,
 }
@@ -299,6 +299,23 @@ mod test {
         assert_eq!(
             args,
             vec!["-i", "-c", "exec </dev/null; cat <<EOF\nhello\nEOF"]
+        );
+    }
+
+    #[test]
+    fn non_interactive_omits_interactive_flag() {
+        // Headless hosts (e.g. the eval CLI) build the agent's shell command
+        // non-interactively so it works without a controlling TTY.
+        let shell = Shell::Program("sh".to_owned());
+        let shell_builder = ShellBuilder::new(&shell, false).non_interactive();
+
+        let (program, args) = shell_builder.build(Some("echo hello".into()), &[]);
+
+        assert_eq!(program, "sh");
+        assert_eq!(args, vec!["-c", "echo hello"]);
+        assert!(
+            !args.iter().any(|arg| arg == "-i"),
+            "non-interactive shell command must not include `-i`"
         );
     }
 

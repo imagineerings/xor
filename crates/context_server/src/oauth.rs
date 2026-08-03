@@ -205,7 +205,7 @@ pub struct OAuthDiscovery {
 ///
 /// Stored in the keychain so startup can restore a refresh-capable provider
 /// without another browser flow. Deliberately excludes the full discovery
-/// metadata to keep the serialisim size well within keychain item limits.
+/// metadata to keep the serialized size well within keychain item limits.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct OAuthSession {
     pub token_endpoint: Url,
@@ -235,7 +235,7 @@ pub enum BearerError {
     InvalidToken,
     /// The request requires higher privileges than provided by the access token.
     InsufficientScope,
-    /// An unrecognisim error code (extension or future spec addition).
+    /// An unrecognized error code (extension or future spec addition).
     Other,
 }
 

@@ -79,13 +79,8 @@ raw-window-handle = "0.6"
 regex.workspace = true
 refineable.workspace = true
 scheduler.workspace = true
-resvg = { version = "0.45.0", default-features = false, features = [
-    "text",
-    "system-fonts",
-    "memmap-fonts",
-    "raster-images"
-] }
-usvg = { version = "0.45.0", default-features = false }
+resvg.workspace = true
+usvg.workspace = true
 ttf-parser = "0.25"
 util_macros.workspace = true
 schemars.workspace = true
@@ -126,8 +121,8 @@ core-foundation-sys.workspace = true
 core-graphics = "0.24"
 core-video.workspace = true
 core-text = "21"
-# WARNING: If you change this, you must also publish a new version of zed-font-kit to crates.io
-font-kit = { git = "https://github.com/simtropolis/font-kit", rev = "94b0f28166665e8fd2f53ff6d268a14955c82269", package = "zed-font-kit", version = "0.14.1-zed", optional = true }
+# WARNING: If you change this, you must also publish a new version of sim-font-kit to crates.io
+font-kit = { git = "https://github.com/simtropolis/font-kit", rev = "fd81ce08907c63cb054dfdb5fc46e024529ad160", package = "sim-font-kit", version = "0.14.1-sim", optional = true }
 foreign-types = "0.5"
 log.workspace = true
 media.workspace = true
@@ -157,13 +152,13 @@ env_logger.workspace = true
 gpui_platform = { workspace = true, features = ["font-kit", "wayland", "x11"] }
 gpui_util = { workspace = true }
 lyon = { version = "1.0", features = ["extra"] }
-proptest = { workspace = true }
 rand.workspace = true
 scheduler = { workspace = true, features = ["test-support"] }
 unicode-segmentation = { workspace = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 http_client = { workspace = true, features = ["test-support"] }
+proptest = { workspace = true }
 reqwest_client = { workspace = true, features = ["test-support"] }
 
 [target.'cfg(target_family = "wasm")'.dev-dependencies]
@@ -201,6 +196,10 @@ path = "examples/input.rs"
 [[example]]
 name = "on_window_close_quit"
 path = "examples/on_window_close_quit.rs"
+
+[[example]]
+name = "window_movable"
+path = "examples/window_movable.rs"
 
 [[example]]
 name = "opacity"

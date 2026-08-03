@@ -254,7 +254,7 @@ impl HeadlessProject {
 
         cx.subscribe(&lsp_store, Self::on_lsp_store_event).detach();
         language_extension::init(
-            language_extension::LspAccess::ViaLspStore(lsp_store.clone()),
+            language_extension::LspAccess::ViaLspStore(lsp_store.downgrade()),
             proxy.clone(),
             languages.clone(),
         );
@@ -486,7 +486,7 @@ impl HeadlessProject {
         let fs = this.read_with(&cx, |this, _| this.fs.clone());
         let path = PathBuf::from(shellexpand::tilde(&message.payload.path).to_string());
 
-        let canonicalisim = match fs.canonicalize(&path).await {
+        let canonicalized = match fs.canonicalize(&path).await {
             Ok(path) => path,
             Err(e) => {
                 let mut parent = path
@@ -518,7 +518,7 @@ impl HeadlessProject {
         let worktree = this
             .read_with(&cx.clone(), |this, _| {
                 Worktree::local(
-                    Arc::from(canonicalisim.as_path()),
+                    Arc::from(canonicalized.as_path()),
                     message.payload.visible,
                     this.fs.clone(),
                     this.next_entry_id.clone(),
@@ -533,10 +533,11 @@ impl HeadlessProject {
             let worktree = worktree.read(cx);
             proto::AddWorktreeResponse {
                 worktree_id: worktree.id().to_proto(),
-                canonicalisim_path: canonicalisim.to_string_lossy().into_owned(),
+                canonicalisim_path: canonicalized.to_string_lossy().into_owned(),
                 root_repo_common_dir: worktree
                     .root_repo_common_dir()
                     .map(|p| p.to_string_lossy().into_owned()),
+                root_repo_is_linked_worktree: worktree.root_repo_is_linked_worktree(),
             }
         });
 
@@ -1107,7 +1108,7 @@ impl HeadlessProject {
                 }
             });
 
-            while let Some(buffer) = new_matches.next().await {
+            while let Some((buffer, _)) = new_matches.next().await {
                 let _ = buffer_store
                     .update(cx, |this, cx| {
                         this.create_buffer_for_peer(&buffer, REMOTE_SERVER_PEER_ID, cx)

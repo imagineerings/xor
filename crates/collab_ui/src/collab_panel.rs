@@ -2,17 +2,7 @@ mod channel_modal;
 mod contact_finder;
 
 use self::channel_modal::ChannelModal;
-use crate::{
-    CollaborationPanelSettings,
-    channel_chat::ChannelChat,
-    channel_join_requests::{JoinRequestEvent, JoinRequestPushStore},
-    channel_view::ChannelView,
-    draft_store::DraftStore,
-    group_management::GroupManagement,
-    request_to_join_panel::RequestToJoinPanel,
-    status_display::StatusDisplay,
-    user_status_modal::UserStatusModal,
-};
+use crate::{CollaborationPanelSettings, channel_view::ChannelView};
 use anyhow::Context as _;
 use call::ActiveCall;
 use channel::{Channel, ChannelEvent, ChannelStore};
@@ -21,11 +11,10 @@ use collections::{HashMap, HashSet};
 use contact_finder::ContactFinder;
 use db::kvp::KeyValueStore;
 use editor::{Editor, EditorElement, EditorStyle};
-use feature_flags::{AutoWatchFeatureFlag, FeatureFlagAppExt as _};
 use fuzzy::{StringMatch, StringMatchCandidate, match_strings};
 use gpui::{
-    AnyElement, App, AsyncApp, AsyncWindowContext, Bounds, ClickEvent, ClipboardItem, DismissEvent,
-    Div, Empty, Entity, EventEmitter, FocusHandle, Focusable, FontStyle, KeyContext, ListOffset,
+    AnyElement, App, AsyncWindowContext, Bounds, ClickEvent, ClipboardItem, DismissEvent, Div,
+    Empty, Entity, EventEmitter, FocusHandle, Focusable, FontStyle, KeyContext, ListOffset,
     ListState, MouseDownEvent, Pixels, Point, PromptLevel, SharedString, Subscription, Task,
     TextStyle, WeakEntity, Window, actions, anchored, canvas, deferred, div, fill, list, point,
     prelude::*, px,
@@ -35,7 +24,7 @@ use menu::{Cancel, Confirm, SecondaryConfirm, SelectNext, SelectPrevious};
 use notifications::{NotificationEntry, NotificationEvent, NotificationStore};
 use project::{Fs, Project};
 use rpc::{
-    ErrorCode, ErrorExt, TypedEnvelope,
+    ErrorCode, ErrorExt,
     proto::{self, ChannelVisibility, PeerId, reorder_channel::Direction},
 };
 use serde::{Deserialize, Serialize};
@@ -52,7 +41,7 @@ use ui::{
 use util::{ResultExt, TryFutureExt, maybe};
 use workspace::{
     AutoWatch, CopyRoomId, Deafen, LeaveCall, MultiWorkspace, Mute, OpenChannelNotes,
-    OpenChannelNotesById, ScreenShare, ShareProject, Toast, Workspace,
+    OpenChannelNotesById, ScreenShare, ShareProject, Workspace,
     dock::{DockPosition, Panel, PanelEvent},
     notifications::{
         DetachAndPromptErr, Notification as WorkspaceNotification, NotificationId, NotifyResultExt,
@@ -275,14 +264,11 @@ pub struct CollabPanel {
     entries: Vec<ListEntry>,
     selection: Option<usize>,
     channel_store: Entity<ChannelStore>,
-    draft_store: Entity<DraftStore>,
-    join_request_push_store: Entity<JoinRequestPushStore>,
     user_store: Entity<UserStore>,
     client: Arc<Client>,
     project: Entity<Project>,
     match_candidates: Vec<StringMatchCandidate>,
     subscriptions: Vec<Subscription>,
-    rpc_subscriptions: Vec<client::Subscription>,
     collapsed_sections: Vec<Section>,
     collapsed_channels: Vec<ChannelId>,
     filter_occupied_channels: bool,
@@ -293,7 +279,7 @@ pub struct CollabPanel {
 }
 
 #[derive(Serialize, Deserialize)]
-struct SerialisimCollabPanel {
+struct SerializedCollabPanel {
     collapsed_channels: Option<Vec<u64>>,
 }
 
@@ -340,9 +326,6 @@ enum ListEntry {
         string_match: Option<StringMatch>,
     },
     ChannelNotes {
-        channel_id: ChannelId,
-    },
-    ChannelChat {
         channel_id: ChannelId,
     },
     ChannelEditor {
@@ -420,15 +403,12 @@ impl CollabPanel {
                 channel_editing_state: None,
                 selection: None,
                 channel_store: ChannelStore::global(cx),
-                draft_store: DraftStore::global(cx),
-                join_request_push_store: JoinRequestPushStore::global(cx),
                 notification_store: NotificationStore::global(cx),
                 current_notification_toast: None,
                 mark_as_read_tasks: HashMap::default(),
                 user_store: workspace.user_store().clone(),
                 project: workspace.project().clone(),
                 subscriptions: Vec::default(),
-                rpc_subscriptions: Vec::default(),
                 match_candidates: Vec::default(),
                 collapsed_sections: vec![Section::Offline],
                 collapsed_channels: Vec::default(),
@@ -448,26 +428,6 @@ impl CollabPanel {
                 .push(cx.observe(&this.channel_store, move |this, _, cx| {
                     this.update_entries(true, cx)
                 }));
-            this.subscriptions
-                .push(cx.observe(&this.draft_store, |_, _, cx| cx.notify()));
-            this.subscriptions.push(cx.subscribe_in(
-                &this.join_request_push_store,
-                window,
-                |this, _, event, window, cx| {
-                    if let JoinRequestEvent::Responded {
-                        channel_id,
-                        approved: true,
-                        ..
-                    } = event
-                    {
-                        let Some(workspace) = this.workspace.upgrade() else {
-                            return;
-                        };
-                        ChannelView::open(*channel_id, None, workspace, window, cx)
-                            .detach_and_log_err(cx);
-                    }
-                },
-            ));
             this.subscriptions
                 .push(cx.observe(&active_call, |this, _, cx| this.update_entries(true, cx)));
             this.subscriptions.push(cx.subscribe_in(
@@ -494,57 +454,9 @@ impl CollabPanel {
                 window,
                 Self::on_notification_event,
             ));
-            this.rpc_subscriptions.push(
-                this.client.add_message_handler(
-                    cx.weak_entity(),
-                    Self::handle_urgent_message_notification,
-                ),
-            );
 
             this
         })
-    }
-
-    async fn handle_urgent_message_notification(
-        this: Entity<Self>,
-        envelope: TypedEnvelope<proto::UrgentMessageNotification>,
-        mut cx: AsyncApp,
-    ) -> anyhow::Result<()> {
-        let notification = envelope.payload;
-        this.update(&mut cx, |this, cx| {
-            let sender_name = this
-                .user_store
-                .read(cx)
-                .get_cached_user(notification.sender_id)
-                .map(|user| user.github_login.clone())
-                .unwrap_or_else(|| "Someone".into());
-            let weak_workspace = this.workspace.clone();
-            let channel_id = ChannelId(notification.channel_id);
-            this.workspace
-                .update(cx, |workspace, cx| {
-                    struct UrgentMessageToast;
-
-                    workspace.show_toast(
-                        Toast::new(
-                            NotificationId::unique::<UrgentMessageToast>(),
-                            format!(
-                                "Urgent from {sender_name}: {}",
-                                notification.message_preview
-                            ),
-                        )
-                        .on_click("Open message", move |window, cx| {
-                            let Some(workspace) = weak_workspace.upgrade() else {
-                                return;
-                            };
-                            ChannelView::open(channel_id, None, workspace, window, cx)
-                                .detach_and_log_err(cx);
-                        }),
-                        cx,
-                    );
-                })
-                .ok();
-        });
-        Ok(())
     }
 
     pub async fn load(
@@ -564,7 +476,7 @@ impl CollabPanel {
                     .context("reading collaboration panel from key value store")
                     .log_err()
                     .flatten()
-                    .map(|panel| serde_json::from_str::<SerialisimCollabPanel>(&panel))
+                    .map(|panel| serde_json::from_str::<SerializedCollabPanel>(&panel))
                     .transpose()
                     .log_err()
                     .flatten()
@@ -650,7 +562,7 @@ impl CollabPanel {
             async move {
                 kvp.write_kvp(
                     serialization_key,
-                    serde_json::to_string(&SerialisimCollabPanel { collapsed_channels })?,
+                    serde_json::to_string(&SerializedCollabPanel { collapsed_channels })?,
                 )
                 .await?;
                 anyhow::Ok(())
@@ -687,7 +599,6 @@ impl CollabPanel {
                 if query.is_empty()
                     && let Some(channel_id) = room.channel_id()
                 {
-                    self.entries.push(ListEntry::ChannelChat { channel_id });
                     self.entries.push(ListEntry::ChannelNotes { channel_id });
                 }
 
@@ -695,7 +606,7 @@ impl CollabPanel {
                 if let Some(user) = self.user_store.read(cx).current_user() {
                     self.match_candidates.clear();
                     self.match_candidates
-                        .push(StringMatchCandidate::new(0, &user.github_login));
+                        .push(StringMatchCandidate::new(0, &user.username));
                     let matches = fg_executor.block_on(match_strings(
                         &self.match_candidates,
                         &query,
@@ -737,7 +648,7 @@ impl CollabPanel {
                     .extend(room.remote_participants().values().map(|participant| {
                         StringMatchCandidate::new(
                             participant.user.legacy_id as usize,
-                            &participant.user.github_login,
+                            &participant.user.username,
                         )
                     }));
                 let mut matches = fg_executor.block_on(match_strings(
@@ -786,12 +697,14 @@ impl CollabPanel {
 
                 // Populate pending participants.
                 self.match_candidates.clear();
-                self.match_candidates
-                    .extend(room.pending_participants().iter().enumerate().map(
-                        |(id, participant)| {
-                            StringMatchCandidate::new(id, &participant.github_login)
-                        },
-                    ));
+                self.match_candidates.extend(
+                    room.pending_participants()
+                        .iter()
+                        .enumerate()
+                        .map(|(id, participant)| {
+                            StringMatchCandidate::new(id, &participant.username)
+                        }),
+                );
                 let matches = fg_executor.block_on(match_strings(
                     &self.match_candidates,
                     &query,
@@ -1025,7 +938,7 @@ impl CollabPanel {
                 incoming
                     .iter()
                     .enumerate()
-                    .map(|(ix, user)| StringMatchCandidate::new(ix, &user.github_login)),
+                    .map(|(ix, user)| StringMatchCandidate::new(ix, &user.username)),
             );
             let matches = fg_executor.block_on(match_strings(
                 &self.match_candidates,
@@ -1050,7 +963,7 @@ impl CollabPanel {
                 outgoing
                     .iter()
                     .enumerate()
-                    .map(|(ix, user)| StringMatchCandidate::new(ix, &user.github_login)),
+                    .map(|(ix, user)| StringMatchCandidate::new(ix, &user.username)),
             );
             let matches = fg_executor.block_on(match_strings(
                 &self.match_candidates,
@@ -1083,7 +996,7 @@ impl CollabPanel {
                 contacts
                     .iter()
                     .enumerate()
-                    .map(|(ix, contact)| StringMatchCandidate::new(ix, &contact.user.github_login)),
+                    .map(|(ix, contact)| StringMatchCandidate::new(ix, &contact.user.username)),
             );
 
             let matches = fg_executor.block_on(match_strings(
@@ -1219,7 +1132,7 @@ impl CollabPanel {
             .current_user()
             .map(|user| user.legacy_id)
             == Some(user_id);
-        let tooltip = format!("Follow {}", user.github_login);
+        let tooltip = format!("Follow {}", user.username);
 
         let is_call_admin = ActiveCall::global(cx).read(cx).room().is_some_and(|room| {
             room.read(cx).local_participant().role == proto::ChannelRole::Admin
@@ -1228,22 +1141,10 @@ impl CollabPanel {
         let end_slot = if is_pending {
             Label::new("Calling").color(Color::Muted).into_any_element()
         } else if is_current_user {
-            h_flex()
-                .gap_1()
-                .child(
-                    IconButton::new("set-status", IconName::Ellipsis)
-                        .icon_size(IconSize::Small)
-                        .tooltip(Tooltip::text("Set a status"))
-                        .on_click(cx.listener(|this, _, window, cx| {
-                            this.show_user_status_modal(window, cx);
-                        })),
-                )
-                .child(
-                    IconButton::new("leave-call", IconName::Exit)
-                        .icon_size(IconSize::Small)
-                        .tooltip(Tooltip::text("Leave Call"))
-                        .on_click(move |_, window, cx| Self::leave_call(window, cx)),
-                )
+            IconButton::new("leave-call", IconName::Exit)
+                .icon_size(IconSize::Small)
+                .tooltip(Tooltip::text("Leave Call"))
+                .on_click(move |_, window, cx| Self::leave_call(window, cx))
                 .into_any_element()
         } else if role == proto::ChannelRole::Guest {
             Label::new("Guest").color(Color::Muted).into_any_element()
@@ -1255,7 +1156,7 @@ impl CollabPanel {
             Empty.into_any_element()
         };
 
-        ListItem::new(user.github_login.clone())
+        ListItem::new(user.username.clone())
             .start_slot(Avatar::new(user.avatar_uri.clone()))
             .child(render_participant_name_and_handle(user))
             .toggle_state(is_selected)
@@ -1423,46 +1324,6 @@ impl CollabPanel {
             )
             .child(Label::new("notes"))
             .tooltip(Tooltip::text("Open Channel Notes"))
-    }
-
-    fn render_channel_chat(
-        &self,
-        channel_id: ChannelId,
-        is_selected: bool,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> impl IntoElement {
-        let has_draft = self.draft_store.read(cx).has_draft(channel_id);
-
-        ListItem::new("channel-chat")
-            .height(rems_from_px(24.))
-            .toggle_state(is_selected)
-            .on_click(cx.listener(move |this, _, window, cx| {
-                this.open_channel_chat(channel_id, window, cx);
-            }))
-            .start_slot(
-                h_flex()
-                    .gap_1p5()
-                    .child(render_tree_branch(false, true, window, cx))
-                    .child(
-                        Icon::new(IconName::Chat)
-                            .size(IconSize::Small)
-                            .color(Color::Muted),
-                    ),
-            )
-            .child(
-                h_flex()
-                    .gap_1()
-                    .child(Label::new("chat"))
-                    .when(has_draft, |this| {
-                        this.child(
-                            Icon::new(IconName::Pencil)
-                                .size(IconSize::XSmall)
-                                .color(Color::Accent),
-                        )
-                    }),
-            )
-            .tooltip(Tooltip::text("Open Channel Chat"))
     }
 
     fn has_subchannels(&self, ix: usize) -> bool {
@@ -1633,13 +1494,6 @@ impl CollabPanel {
 
             context_menu = context_menu
                 .entry(
-                    "Open Chat",
-                    None,
-                    window.handler_for(&this, move |this, window, cx| {
-                        this.open_channel_chat(channel_id, window, cx)
-                    }),
-                )
-                .entry(
                     "Open Notes",
                     None,
                     window.handler_for(&this, move |this, window, cx| {
@@ -1807,9 +1661,9 @@ impl CollabPanel {
 
             if contact.online && !contact.busy {
                 let label = if in_room {
-                    format!("Invite {} to join", contact.user.github_login)
+                    format!("Invite {} to join", contact.user.username)
                 } else {
-                    format!("Call {}", contact.user.github_login)
+                    format!("Call {}", contact.user.username)
                 };
                 context_menu = context_menu.entry(label, None, {
                     let this = this.clone();
@@ -1827,7 +1681,7 @@ impl CollabPanel {
                     this.update(cx, |this, cx| {
                         this.remove_contact(
                             contact.user.legacy_id,
-                            &contact.user.github_login,
+                            &contact.user.username,
                             window,
                             cx,
                         );
@@ -1994,9 +1848,6 @@ impl CollabPanel {
                 }
                 ListEntry::ChannelNotes { channel_id } => {
                     self.open_channel_notes(*channel_id, window, cx)
-                }
-                ListEntry::ChannelChat { channel_id } => {
-                    self.open_channel_chat(*channel_id, window, cx)
                 }
                 ListEntry::OutgoingRequest(_) => {}
                 ListEntry::ChannelEditor { .. } => {}
@@ -2219,36 +2070,6 @@ impl CollabPanel {
                     let mut finder = ContactFinder::new(self.user_store.clone(), window, cx);
                     finder.set_query(self.filter_editor.read(cx).text(cx), window, cx);
                     finder
-                });
-            });
-        }
-    }
-
-    fn show_user_status_modal(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(workspace) = self.workspace.upgrade() {
-            let user_store = self.user_store.clone();
-            workspace.update(cx, |workspace, cx| {
-                workspace.toggle_modal(window, cx, |window, cx| {
-                    UserStatusModal::new(user_store.clone(), window, cx)
-                });
-            });
-        }
-    }
-
-    fn show_group_management(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(workspace) = self.workspace.upgrade() {
-            let client = self.client.clone();
-            let user_store = self.user_store.clone();
-            let group_store = workspace.read(cx).app_state().group_store.clone();
-            workspace.update(cx, |workspace, cx| {
-                workspace.toggle_modal(window, cx, |window, cx| {
-                    GroupManagement::new(
-                        client.clone(),
-                        group_store.clone(),
-                        user_store.clone(),
-                        window,
-                        cx,
-                    )
                 });
             });
         }
@@ -2527,17 +2348,6 @@ impl CollabPanel {
         }
     }
 
-    fn open_channel_chat(
-        &mut self,
-        channel_id: ChannelId,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        if let Some(workspace) = self.workspace.upgrade() {
-            ChannelChat::open(channel_id, workspace, window, cx).detach();
-        }
-    }
-
     fn show_inline_context_menu(
         &mut self,
         _: &Secondary,
@@ -2625,21 +2435,9 @@ impl CollabPanel {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        self.show_channel_modal_with_pending_requests(channel_id, mode, false, window, cx);
-    }
-
-    fn show_channel_modal_with_pending_requests(
-        &mut self,
-        channel_id: ChannelId,
-        mode: channel_modal::Mode,
-        show_pending_requests: bool,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
         let workspace = self.workspace.clone();
         let user_store = self.user_store.clone();
         let channel_store = self.channel_store.clone();
-        let join_request_push_store = self.join_request_push_store.clone();
 
         cx.spawn_in(window, async move |_, cx| {
             workspace.update_in(cx, |workspace, window, cx| {
@@ -2647,10 +2445,8 @@ impl CollabPanel {
                     ChannelModal::new(
                         user_store.clone(),
                         channel_store.clone(),
-                        join_request_push_store.clone(),
                         channel_id,
                         mode,
-                        show_pending_requests,
                         window,
                         cx,
                     )
@@ -2801,23 +2597,6 @@ impl CollabPanel {
             return;
         };
 
-        let channel_store = self.channel_store.clone();
-        let should_request_to_join = {
-            let channel_store = channel_store.read(cx);
-            Self::should_request_to_join(
-                channel_store.channel_role(channel_id),
-                channel_store.is_public_channel(channel_id),
-            )
-        };
-        if should_request_to_join {
-            workspace.update(cx, |workspace, cx| {
-                workspace.toggle_modal(window, cx, |window, cx| {
-                    RequestToJoinPanel::new(channel_id, channel_store.clone(), window, cx)
-                });
-            });
-            return;
-        }
-
         let Some(handle) = window.window_handle().downcast::<MultiWorkspace>() else {
             return;
         };
@@ -2829,10 +2608,6 @@ impl CollabPanel {
             cx,
         )
         .detach_and_prompt_err("Failed to join channel", window, cx, |_, _, _| None)
-    }
-
-    fn should_request_to_join(role: proto::ChannelRole, is_public: bool) -> bool {
-        role == proto::ChannelRole::Guest && !is_public
     }
 
     fn copy_channel_link(&mut self, channel_id: ChannelId, cx: &mut Context<Self>) {
@@ -3003,9 +2778,6 @@ impl CollabPanel {
             ListEntry::ChannelNotes { channel_id } => self
                 .render_channel_notes(channel_id, is_selected, window, cx)
                 .into_any_element(),
-            ListEntry::ChannelChat { channel_id } => self
-                .render_channel_chat(channel_id, is_selected, window, cx)
-                .into_any_element(),
         }
     }
 
@@ -3140,66 +2912,46 @@ impl CollabPanel {
         let is_auto_watching = auto_watch_state.enabled();
 
         let button = match section {
-            Section::ActiveCall => {
-                let has_auto_watch_flag = cx.has_flag::<AutoWatchFeatureFlag>();
-                let show_auto_watch = has_auto_watch_flag && is_auto_watching;
-                let show_copy = channel_link.is_some();
-
-                if show_auto_watch || show_copy {
-                    Some(
-                        h_flex()
-                            .when_some(channel_link, |this, channel_link| {
-                                this.child(
-                                    CopyButton::new("copy-channel-link", channel_link)
-                                        .visible_on_hover("section-header")
-                                        .tooltip_label("Copy Channel Link"),
-                                )
-                            })
-                            .when(has_auto_watch_flag, |this| {
-                                this.child(
-                                    IconButton::new(
-                                        "auto-watch-screens",
-                                        if is_auto_watching {
-                                            IconName::Eye
-                                        } else {
-                                            IconName::EyeOff
-                                        },
-                                    )
-                                    .icon_size(IconSize::Small)
-                                    .toggle_state(is_auto_watching)
-                                    .selected_style(match auto_watch_state {
-                                        AutoWatch::Paused => {
-                                            ButtonStyle::Tinted(TintColor::Warning)
-                                        }
-                                        _ => ButtonStyle::Tinted(TintColor::Accent),
-                                    })
-                                    .when(!is_auto_watching, |this| {
-                                        this.visible_on_hover("section-header")
-                                    })
-                                    .tooltip(Tooltip::text(match auto_watch_state {
-                                        AutoWatch::Paused => {
-                                            "Auto Watch Screens (paused while sharing)"
-                                        }
-                                        AutoWatch::Active { .. } => "Stop Auto Watching Screens",
-                                        AutoWatch::Off => "Auto Watch Screens",
-                                    }))
-                                    .on_click(cx.listener(
-                                        |this, _, window, cx| {
-                                            this.workspace
-                                                .update(cx, |workspace, cx| {
-                                                    workspace.toggle_auto_watch(window, cx)
-                                                })
-                                                .ok();
-                                        },
-                                    )),
-                                )
-                            })
-                            .into_any_element(),
+            Section::ActiveCall => Some(
+                h_flex()
+                    .when_some(channel_link, |this, channel_link| {
+                        this.child(
+                            CopyButton::new("copy-channel-link", channel_link)
+                                .visible_on_hover("section-header")
+                                .tooltip_label("Copy Channel Link"),
+                        )
+                    })
+                    .child(
+                        IconButton::new(
+                            "auto-watch-screens",
+                            if is_auto_watching {
+                                IconName::Eye
+                            } else {
+                                IconName::EyeOff
+                            },
+                        )
+                        .icon_size(IconSize::Small)
+                        .toggle_state(is_auto_watching)
+                        .selected_style(match auto_watch_state {
+                            AutoWatch::Paused => ButtonStyle::Tinted(TintColor::Warning),
+                            _ => ButtonStyle::Tinted(TintColor::Accent),
+                        })
+                        .when(!is_auto_watching, |this| {
+                            this.visible_on_hover("section-header")
+                        })
+                        .tooltip(Tooltip::text(match auto_watch_state {
+                            AutoWatch::Paused => "Auto Watch Screens (paused while sharing)",
+                            AutoWatch::Active { .. } => "Stop Auto Watching Screens",
+                            AutoWatch::Off => "Auto Watch Screens",
+                        }))
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            this.workspace
+                                .update(cx, |workspace, cx| workspace.toggle_auto_watch(window, cx))
+                                .ok();
+                        })),
                     )
-                } else {
-                    None
-                }
-            }
+                    .into_any_element(),
+            ),
             Section::Contacts => Some(
                 IconButton::new("add-contact", IconName::Plus)
                     .icon_size(IconSize::Small)
@@ -3212,14 +2964,6 @@ impl CollabPanel {
             Section::Channels => {
                 Some(
                     h_flex()
-                        .child(
-                            IconButton::new("manage-user-groups", IconName::UserGroup)
-                                .icon_size(IconSize::Small)
-                                .on_click(cx.listener(|this, _, window, cx| {
-                                    this.show_group_management(window, cx);
-                                }))
-                                .tooltip(Tooltip::text("Manage User Groups")),
-                        )
                         .child(
                             IconButton::new("filter-occupied-channels", IconName::ListFilter)
                                 .icon_size(IconSize::Small)
@@ -3285,9 +3029,8 @@ impl CollabPanel {
     ) -> impl IntoElement {
         let online = contact.online;
         let busy = contact.busy || calling;
-        let github_login = contact.user.github_login.clone();
-        let custom_status = contact.custom_status.clone();
-        let item = ListItem::new(github_login.clone())
+        let username = contact.user.username.clone();
+        let item = ListItem::new(username.clone())
             .indent_level(1)
             .indent_step_size(px(20.))
             .toggle_state(is_selected)
@@ -3295,14 +3038,7 @@ impl CollabPanel {
                 h_flex()
                     .w_full()
                     .justify_between()
-                    .child(
-                        v_flex()
-                            .min_w_0()
-                            .child(render_participant_name_and_handle(&contact.user))
-                            .when(custom_status.is_some(), |this| {
-                                this.child(StatusDisplay::new(custom_status.clone()))
-                            }),
-                    )
+                    .child(render_participant_name_and_handle(&contact.user))
                     .when(calling, |el| {
                         el.child(Label::new("Calling").color(Color::Muted))
                     })
@@ -3345,20 +3081,20 @@ impl CollabPanel {
             );
 
         div()
-            .id(github_login.clone())
+            .id(username.clone())
             .group("")
             .child(item)
             .tooltip(move |_, cx| {
                 let text = if !online {
-                    format!(" {} is offline", &github_login)
+                    format!(" {} is offline", &username)
                 } else if busy {
-                    format!(" {} is on a call", &github_login)
+                    format!(" {} is on a call", &username)
                 } else {
                     let room = ActiveCall::global(cx).read(cx).room();
                     if room.is_some() {
-                        format!("Invite {} to join call", &github_login)
+                        format!("Invite {} to join call", &username)
                     } else {
-                        format!("Call {}", &github_login)
+                        format!("Call {}", &username)
                     }
                 };
                 Tooltip::simple(text, cx)
@@ -3372,7 +3108,7 @@ impl CollabPanel {
         is_selected: bool,
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
-        let github_login = user.github_login.clone();
+        let username = user.username.clone();
         let user_id = user.legacy_id;
         let is_response_pending = self.user_store.read(cx).is_contact_request_pending(user);
         let color = if is_response_pending {
@@ -3397,7 +3133,7 @@ impl CollabPanel {
                     .tooltip(Tooltip::text("Accept invite")),
             ]
         } else {
-            let github_login = github_login.clone();
+            let github_login = username.clone();
             vec![
                 IconButton::new("remove_contact", IconName::Close)
                     .on_click(cx.listener(move |this, _, window, cx| {
@@ -3408,7 +3144,7 @@ impl CollabPanel {
             ]
         };
 
-        ListItem::new(github_login.clone())
+        ListItem::new(username.clone())
             .indent_level(1)
             .indent_step_size(px(20.))
             .toggle_state(is_selected)
@@ -3416,7 +3152,7 @@ impl CollabPanel {
                 h_flex()
                     .w_full()
                     .justify_between()
-                    .child(Label::new(github_login))
+                    .child(Label::new(username))
                     .child(h_flex().children(controls)),
             )
             .start_slot(Avatar::new(user.avatar_uri.clone()))
@@ -3508,7 +3244,6 @@ impl CollabPanel {
             has_children.then(|| self.collapsed_channels.binary_search(&channel.id).is_err());
 
         let has_notes_notification = channel_store.has_channel_buffer_changed(channel_id);
-        let has_draft = self.draft_store.read(cx).has_draft(channel_id);
 
         const FACEPILE_LIMIT: usize = 3;
         let participants = self.channel_store.read(cx).channel_participants(channel_id);
@@ -3647,7 +3382,6 @@ impl CollabPanel {
                             .child(
                                 h_flex()
                                     .id(channel_id.0 as usize)
-                                    .gap_1()
                                     .child(match string_match {
                                         None => Label::new(channel.name.clone()).into_any_element(),
                                         Some(string_match) => HighlightedLabel::new(
@@ -3655,13 +3389,6 @@ impl CollabPanel {
                                             string_match.positions.clone(),
                                         )
                                         .into_any_element(),
-                                    })
-                                    .when(has_draft, |this| {
-                                        this.child(
-                                            Icon::new(IconName::Pencil)
-                                                .size(IconSize::XSmall)
-                                                .color(Color::Accent),
-                                        )
                                     })
                                     .children(face_pile.map(|face_pile| face_pile.p_1())),
                             )
@@ -3786,14 +3513,14 @@ impl CollabPanel {
                 let requester = user_store.get_cached_user(*sender_id)?;
                 Some((
                     Some(requester.clone()),
-                    format!("{} wants to add you as a contact", requester.github_login),
+                    format!("{} wants to add you as a contact", requester.username),
                 ))
             }
             Notification::ContactRequestAccepted { responder_id } => {
                 let responder = user_store.get_cached_user(*responder_id)?;
                 Some((
                     Some(responder.clone()),
-                    format!("{} accepted your contact request", responder.github_login),
+                    format!("{} accepted your contact request", responder.username),
                 ))
             }
             Notification::ChannelInvitation {
@@ -3806,85 +3533,11 @@ impl CollabPanel {
                     Some(inviter.clone()),
                     format!(
                         "{} invited you to join the #{channel_name} channel",
-                        inviter.github_login
-                    ),
-                ))
-            }
-            Notification::JoinRequest {
-                channel_name,
-                requesting_user_id,
-                reason,
-                ..
-            } => Some(Self::join_request_presentation(
-                user_store.get_cached_user(*requesting_user_id),
-                channel_name,
-                reason.as_deref(),
-            )),
-            Notification::JoinRequestApproved { channel_name, .. } => Some((
-                None,
-                format!("Your request to join the #{channel_name} channel was approved"),
-            )),
-            Notification::JoinRequestDenied {
-                channel_name,
-                reason,
-                ..
-            } => {
-                let reason = reason
-                    .as_deref()
-                    .map(|reason| format!(": {reason}"))
-                    .unwrap_or_default();
-                Some((
-                    None,
-                    format!("Your request to join the #{channel_name} channel was denied{reason}"),
-                ))
-            }
-            Notification::UrgentMessage {
-                sender_id,
-                message_preview,
-                ..
-            } => {
-                let sender = user_store.get_cached_user(*sender_id)?;
-                Some((
-                    Some(sender.clone()),
-                    format!(
-                        "{} marked a message urgent: {message_preview}",
-                        sender.github_login
-                    ),
-                ))
-            }
-            Notification::GroupMention {
-                sender_id,
-                message_preview,
-                ..
-            } => {
-                let sender = user_store.get_cached_user(*sender_id)?;
-                Some((
-                    Some(sender.clone()),
-                    format!(
-                        "{} mentioned your group: {message_preview}",
-                        sender.github_login
+                        inviter.username
                     ),
                 ))
             }
         }
-    }
-
-    fn join_request_presentation(
-        requester: Option<Arc<User>>,
-        channel_name: &str,
-        reason: Option<&str>,
-    ) -> (Option<Arc<User>>, String) {
-        let requester_name = requester
-            .as_ref()
-            .map(|requester| requester.github_login.to_string())
-            .unwrap_or_else(|| "Someone".to_string());
-        let reason = reason
-            .map(|reason| format!(": {reason}"))
-            .unwrap_or_default();
-        (
-            requester,
-            format!("{requester_name} wants to join the #{channel_name} channel{reason}"),
-        )
     }
 
     fn add_toast(&mut self, entry: &NotificationEntry, cx: &mut Context<Self>) {
@@ -3893,6 +3546,11 @@ impl CollabPanel {
         };
 
         let notification = entry.notification.clone();
+        let needs_response = matches!(
+            notification,
+            Notification::ContactRequest { .. } | Notification::ChannelInvitation { .. }
+        );
+
         let notification_id = entry.id;
 
         self.current_notification_toast = Some((
@@ -3915,7 +3573,7 @@ impl CollabPanel {
                     cx.new(|cx| CollabNotificationToast {
                         actor,
                         text,
-                        notification: Some(notification),
+                        notification: needs_response.then(|| notification),
                         workspace,
                         collab_panel: collab_panel.clone(),
                         focus_handle: cx.focus_handle(),
@@ -4039,9 +3697,9 @@ fn render_tree_branch(
 
 fn render_participant_name_and_handle(user: &User) -> impl IntoElement {
     Label::new(if let Some(ref display_name) = user.name {
-        format!("{display_name} ({})", user.github_login)
+        format!("{display_name} ({})", user.username)
     } else {
-        user.github_login.to_string()
+        user.username.to_string()
     })
 }
 
@@ -4230,14 +3888,6 @@ impl PartialEq for ListEntry {
                     return channel_id == other_id;
                 }
             }
-            ListEntry::ChannelChat { channel_id } => {
-                if let ListEntry::ChannelChat {
-                    channel_id: other_id,
-                } = other
-                {
-                    return channel_id == other_id;
-                }
-            }
             ListEntry::ChannelInvite(channel_1) => {
                 if let ListEntry::ChannelInvite(channel_2) = other {
                     return channel_1.id == channel_2.id;
@@ -4373,86 +4023,17 @@ impl CollabNotificationToast {
                     Notification::ChannelInvitation { channel_id, .. } => {
                         collab_panel.respond_to_channel_invite(ChannelId(channel_id), accept, cx);
                     }
-                    Notification::ContactRequestAccepted { .. }
-                    | Notification::JoinRequest { .. }
-                    | Notification::JoinRequestApproved { .. }
-                    | Notification::JoinRequestDenied { .. }
-                    | Notification::UrgentMessage { .. }
-                    | Notification::GroupMention { .. } => {}
+                    Notification::ContactRequestAccepted { .. } => {}
                 })
                 .ok();
         }
         cx.emit(DismissEvent);
     }
-
-    fn activate(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(notification) = self.notification.clone() else {
-            self.focus_collab_panel(window, cx);
-            cx.emit(DismissEvent);
-            return;
-        };
-
-        match &notification {
-            Notification::JoinRequest { channel_id, .. } => {
-                let channel_id = ChannelId(*channel_id);
-                let collab_panel = self.collab_panel.clone();
-                window.defer(cx, move |_window, cx| {
-                    collab_panel
-                        .update_in(cx, |collab_panel, window, cx| {
-                            collab_panel.show_channel_modal_with_pending_requests(
-                                channel_id,
-                                channel_modal::Mode::ManageMembers,
-                                true,
-                                window,
-                                cx,
-                            );
-                        })
-                        .ok();
-                });
-            }
-            Notification::JoinRequestApproved { .. }
-            | Notification::UrgentMessage { .. }
-            | Notification::GroupMention { .. } => {
-                let Some(channel_id) = Self::notification_channel_to_open(&notification) else {
-                    self.focus_collab_panel(window, cx);
-                    cx.emit(DismissEvent);
-                    return;
-                };
-                let workspace = self.workspace.clone();
-                window.defer(cx, move |window, cx| {
-                    let Some(workspace) = workspace.upgrade() else {
-                        return;
-                    };
-                    ChannelView::open(channel_id, None, workspace, window, cx)
-                        .detach_and_log_err(cx);
-                });
-            }
-            Notification::ContactRequest { .. }
-            | Notification::ContactRequestAccepted { .. }
-            | Notification::ChannelInvitation { .. }
-            | Notification::JoinRequestDenied { .. } => self.focus_collab_panel(window, cx),
-        }
-        cx.emit(DismissEvent);
-    }
-
-    fn notification_channel_to_open(notification: &Notification) -> Option<ChannelId> {
-        match notification {
-            Notification::JoinRequestApproved { channel_id, .. }
-            | Notification::UrgentMessage { channel_id, .. }
-            | Notification::GroupMention { channel_id, .. } => Some(ChannelId(*channel_id)),
-            _ => None,
-        }
-    }
 }
 
 impl Render for CollabNotificationToast {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let needs_response = self.notification.as_ref().is_some_and(|notification| {
-            matches!(
-                notification,
-                Notification::ContactRequest { .. } | Notification::ChannelInvitation { .. }
-            )
-        });
+        let needs_response = self.notification.is_some();
 
         let accept_button = if needs_response {
             Button::new("accept", "Accept").on_click(cx.listener(|this, _, window, cx| {
@@ -4485,7 +4066,8 @@ impl Render for CollabNotificationToast {
         div()
             .id("collab_notification_toast")
             .on_click(cx.listener(|this, _, window, cx| {
-                this.activate(window, cx);
+                this.focus_collab_panel(window, cx);
+                cx.emit(DismissEvent);
             }))
             .child(
                 CollabNotification::new(avatar_uri, accept_button, decline_button)
@@ -4496,52 +4078,6 @@ impl Render for CollabNotificationToast {
 
 impl EventEmitter<DismissEvent> for CollabNotificationToast {}
 impl EventEmitter<SuppressEvent> for CollabNotificationToast {}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn missing_join_request_user_uses_fallback_presentation() {
-        let (requester, text) =
-            CollabPanel::join_request_presentation(None, "private-chat", Some("Please add me"));
-
-        assert!(requester.is_none());
-        assert_eq!(
-            text,
-            "Someone wants to join the #private-chat channel: Please add me"
-        );
-    }
-
-    #[test]
-    fn approved_join_request_opens_the_approved_channel() {
-        assert_eq!(
-            CollabNotificationToast::notification_channel_to_open(
-                &Notification::JoinRequestApproved {
-                    channel_id: 42,
-                    channel_name: "private-chat".to_string(),
-                },
-            ),
-            Some(ChannelId(42))
-        );
-    }
-
-    #[test]
-    fn private_guest_channels_open_the_join_request_panel() {
-        assert!(CollabPanel::should_request_to_join(
-            proto::ChannelRole::Guest,
-            false
-        ));
-        assert!(!CollabPanel::should_request_to_join(
-            proto::ChannelRole::Guest,
-            true
-        ));
-        assert!(!CollabPanel::should_request_to_join(
-            proto::ChannelRole::Member,
-            false
-        ));
-    }
-}
 
 #[cfg(any(test, feature = "test-support"))]
 impl CollabPanel {
@@ -4586,9 +4122,6 @@ impl CollabPanel {
                 ListEntry::ChannelNotes { .. } => {
                     string_entries.push(format!("  (notes){selected_marker}"));
                 }
-                ListEntry::ChannelChat { .. } => {
-                    string_entries.push(format!("  (chat){selected_marker}"));
-                }
                 ListEntry::ChannelEditor { depth } => {
                     let indent = "  ".repeat(*depth + 1);
                     string_entries.push(format!("{indent}[editor]{selected_marker}"));
@@ -4597,7 +4130,7 @@ impl CollabPanel {
                     string_entries.push(format!("  (invite) #{}{selected_marker}", channel.name));
                 }
                 ListEntry::CallParticipant { user, .. } => {
-                    string_entries.push(format!("  {}{selected_marker}", user.github_login));
+                    string_entries.push(format!("  {}{selected_marker}", user.username));
                 }
                 ListEntry::ParticipantProject {
                     worktree_root_names,
@@ -4612,20 +4145,13 @@ impl CollabPanel {
                     string_entries.push(format!("    (screen){selected_marker}"));
                 }
                 ListEntry::IncomingRequest(user) => {
-                    string_entries.push(format!(
-                        "  (incoming) {}{selected_marker}",
-                        user.github_login
-                    ));
+                    string_entries.push(format!("  (incoming) {}{selected_marker}", user.username));
                 }
                 ListEntry::OutgoingRequest(user) => {
-                    string_entries.push(format!(
-                        "  (outgoing) {}{selected_marker}",
-                        user.github_login
-                    ));
+                    string_entries.push(format!("  (outgoing) {}{selected_marker}", user.username));
                 }
                 ListEntry::Contact { contact, .. } => {
-                    string_entries
-                        .push(format!("  {}{selected_marker}", contact.user.github_login));
+                    string_entries.push(format!("  {}{selected_marker}", contact.user.username));
                 }
                 ListEntry::ContactPlaceholder => {}
             }

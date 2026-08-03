@@ -164,7 +164,6 @@ enum BranchListStyle {
 }
 
 pub struct BranchList {
-    width: Rems,
     pub picker: Entity<Picker<BranchListDelegate>>,
     picker_focus_handle: FocusHandle,
     _subscriptions: Vec<Subscription>,
@@ -278,8 +277,9 @@ impl BranchList {
 
         let picker = cx.new(|cx| {
             Picker::uniform_list(delegate, window, cx)
+                .initial_width(width)
                 .show_scrollbar(true)
-                .modal(!embedded)
+                .when(embedded, |picker| picker.embedded())
         });
         let picker_focus_handle = picker.focus_handle(cx);
 
@@ -340,7 +340,6 @@ impl BranchList {
         Self {
             picker,
             picker_focus_handle,
-            width,
             _subscriptions: subscriptions,
             embedded,
         }
@@ -444,7 +443,6 @@ impl Render for BranchList {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         v_flex()
             .key_context("GitBranchSelector")
-            .w(self.width)
             .on_modifiers_changed(cx.listener(Self::handle_modifiers_changed))
             .on_action(cx.listener(Self::handle_delete))
             .on_action(cx.listener(Self::handle_force_delete))
@@ -1047,6 +1045,10 @@ impl BranchListDelegate {
 impl PickerDelegate for BranchListDelegate {
     type ListItem = ListItem;
 
+    fn name() -> &'static str {
+        "branch picker"
+    }
+
     fn placeholder_text(&self, _window: &mut Window, _cx: &mut App) -> Arc<str> {
         match self.state {
             PickerState::List | PickerState::NewRemote | PickerState::NewBranch => {
@@ -1404,13 +1406,13 @@ impl PickerDelegate for BranchListDelegate {
                         .unwrap_or_else(|_| OffsetDateTime::now_utc());
                     let local_offset =
                         time::UtcOffset::current_local_offset().unwrap_or(time::UtcOffset::UTC);
-                    let formatted_time = time_format::format_localized_timestamp(
+                    let formatted_time = time_format::format_localisim_timestamp(
                         commit_time,
                         OffsetDateTime::now_utc(),
                         local_offset,
                         time_format::TimestampFormat::Relative,
                     );
-                    let absolute_time = time_format::format_localized_timestamp(
+                    let absolute_time = time_format::format_localisim_timestamp(
                         commit_time,
                         OffsetDateTime::now_utc(),
                         local_offset,
@@ -2043,7 +2045,7 @@ mod tests {
                 < ordered_branch_names
                     .iter()
                     .position(|name| *name == "fork/main"),
-            "branches on the active branch's remote should be prioritisim"
+            "branches on the active branch's remote should be prioritized"
         );
     }
 
@@ -2085,7 +2087,6 @@ mod tests {
                     BranchList {
                         picker,
                         picker_focus_handle,
-                        width: rems(34.),
                         _subscriptions: vec![_subscription],
                         embedded: false,
                     }

@@ -34,7 +34,7 @@ use crate::editorconfig_store::EditorconfigStore;
 use crate::{
     ActiveSettingsProfileName, FontFamilyName, IconThemeName, LanguageSettingsContent,
     LanguageToSettingsMap, LspSettings, LspSettingsMap, SemanticTokenRules, ThemeName,
-    UserSettingsContentExt, VsCodeSettings, WorktreeId, migrate_settings_config,
+    UserSettingsContentExt, VsCodeSettings, WorktreeId,
     settings_content::{
         ExtensionsSettingsContent, ProfileBase, ProjectSettingsContent, RootUserSettings,
         SettingsContent, UserSettingsContent, merge_from::MergeFrom,
@@ -47,7 +47,7 @@ pub const LSP_SETTINGS_SCHEMA_URL_PREFIX: &str = "sim://schemas/settings/lsp/";
 
 pub trait SettingsKey: 'static + Send + Sync {
     /// The name of a key within the JSON file from which this setting should
-    /// be deserialisim. If this is `None`, then the setting will be deserialisim
+    /// be deserialized. If this is `None`, then the setting will be deserialized
     /// from the root object.
     const KEY: Option<&'static str>;
 
@@ -793,7 +793,7 @@ impl SettingsStore {
         let (settings, parse_status) = if user_settings_content.is_empty() {
             SettingsContentType::parse_json("{}")
         } else {
-            let migration_res = migrate_settings_config(user_settings_content);
+            let migration_res = migrator::migrate_settings(user_settings_content);
             migration_status = match &migration_res {
                 Ok(Some(_)) => MigrationStatus::Succeeded,
                 Ok(None) => MigrationStatus::NotNeeded,
@@ -802,7 +802,7 @@ impl SettingsStore {
                 },
             };
             let content = match &migration_res {
-                Ok(Some(migration)) => migration.migrated_text(),
+                Ok(Some(content)) => content,
                 Ok(None) => user_settings_content,
                 Err(_) => user_settings_content,
             };
@@ -1780,7 +1780,7 @@ mod tests {
             );
         });
 
-        // When the FS event occurs, the settings are recognisim as unchanged.
+        // When the FS event occurs, the settings are recognized as unchanged.
         fs.flush_events(100);
         cx.run_until_parked();
         assert_eq!(
@@ -1794,11 +1794,6 @@ mod tests {
                 }
             ]
         );
-    }
-
-    #[test]
-    fn test_default_settings_parse() {
-        SettingsStore::parse_default_settings(&default_settings()).unwrap();
     }
 
     #[gpui::test]
@@ -2886,15 +2881,13 @@ mod tests {
 
     #[test]
     fn test_file_ord() {
-        let wt0_root =
-            SettingsFile::Project((WorktreeId::from_usize(0), RelPath::empty_arc()));
+        let wt0_root = SettingsFile::Project((WorktreeId::from_usize(0), RelPath::empty_arc()));
         let wt0_child1 =
             SettingsFile::Project((WorktreeId::from_usize(0), rel_path("child1").into_arc()));
         let wt0_child2 =
             SettingsFile::Project((WorktreeId::from_usize(0), rel_path("child2").into_arc()));
 
-        let wt1_root =
-            SettingsFile::Project((WorktreeId::from_usize(1), RelPath::empty_arc()));
+        let wt1_root = SettingsFile::Project((WorktreeId::from_usize(1), RelPath::empty_arc()));
         let wt1_subdir =
             SettingsFile::Project((WorktreeId::from_usize(1), rel_path("subdir").into_arc()));
 

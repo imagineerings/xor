@@ -74,7 +74,7 @@ impl Label {
         self
     }
 
-    /// Truncates the label from the middle, keeping the start and end visible.
+    /// Truncates overflowing text with an ellipsis (`…`) in the middle if needed.
     pub fn truncate_middle(mut self) -> Self {
         self.base = self.base.truncate_middle();
         self
@@ -336,7 +336,7 @@ mod tests {
     fn test_parse_backtick_spans_single_span() {
         let (text, ranges) = parse_backtick_spans("use `sim` to open").unwrap();
         assert_eq!(text.as_ref(), "use sim to open");
-        assert_eq!(ranges, vec![4..10]);
+        assert_eq!(ranges, vec![4..7]);
     }
 
     #[test]

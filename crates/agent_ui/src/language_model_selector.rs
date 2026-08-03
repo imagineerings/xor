@@ -47,10 +47,12 @@ pub fn language_model_selector(
     if popover_styles {
         Picker::list(delegate, window, cx)
             .show_scrollbar(true)
-            .width(rems(20.))
-            .max_height(Some(rems(20.).into()))
+            .initial_width(rems(20.))
+            .popover()
     } else {
-        Picker::list(delegate, window, cx).show_scrollbar(true)
+        Picker::list(delegate, window, cx)
+            .show_scrollbar(true)
+            .embedded()
     }
 }
 
@@ -389,6 +391,10 @@ impl ModelMatcher {
 
 impl PickerDelegate for LanguageModelPickerDelegate {
     type ListItem = AnyElement;
+
+    fn name() -> &'static str {
+        "language model selector"
+    }
 
     fn match_count(&self) -> usize {
         self.filtered_entries.len()
@@ -743,11 +749,11 @@ mod tests {
         // In the case below, `sim/gpt-5-mini` and `openai/gpt-5-mini` have identical
         // similarity scores, but `sim/gpt-5-mini` was higher in the models list,
         // so it should appear first in the results.
-        let results = matcher.fuzzy_search("gptmini");
+        let results = matcher.fuzzy_search("gpt-5-mini");
         assert_models_eq(results, vec!["sim/gpt-5-mini", "openai/gpt-5-mini"]);
 
         // Model provider should be searchable as well
-        let results = matcher.fuzzy_search("ol"); // meaning "ollama"
+        let results = matcher.fuzzy_search("ollama/");
         assert_models_eq(results, vec!["ollama/mistral", "ollama/deepseek"]);
 
         // Fuzzy search - search for Claude to get the Thinking variant

@@ -10,6 +10,5 @@ actions!(
 );
 
 pub async fn register_sim_scheme(cx: &AsyncApp) -> anyhow::Result<()> {
-    cx.update(|cx| cx.register_url_scheme(SIM_URL_SCHEME))
-        .await
+    cx.update(|cx| cx.register_url_scheme(SIM_URL_SCHEME)).await
 }

@@ -7,7 +7,7 @@ use super::edit_session::{
 };
 use crate::{AgentTool, Thread, ToolCallEventStream, ToolInput, ToolInputPayload};
 use action_log::ActionLog;
-use agent_client_protocol::schema as acp;
+use agent_client_protocol::schema::v1 as acp;
 use anyhow::Result;
 use futures::FutureExt as _;
 use gpui::{App, AsyncApp, Entity, Task, WeakEntity};
@@ -125,35 +125,36 @@ impl EditFileTool {
 
                                     last_path = parsed.path.clone();
 
-                                    if session.is_none() && path_complete {
-                                        if let Some(path) = parsed.path.as_ref() {
-                                            match EditSession::new(
-                                                PathBuf::from(path),
-                                                EditSessionMode::Edit,
-                                                Self::NAME,
-                                                self.session_context.clone(),
-                                                event_stream,
-                                                cx,
-                                            )
-                                            .await
-                                            {
-                                                Ok(created_session) => session = Some(created_session),
-                                                Err(error) => {
-                                                    log::error!("Failed to create edit session: {}", error);
-                                                    return EditSessionResult::Failed {
-                                                        error,
-                                                        session: None,
-                                                    };
-                                                }
+                                    if session.is_none()
+                                        && path_complete
+                                        && let Some(path) = parsed.path.as_ref()
+                                    {
+                                        match EditSession::new(
+                                            PathBuf::from(path),
+                                            EditSessionMode::Edit,
+                                            Self::NAME,
+                                            self.session_context.clone(),
+                                            event_stream,
+                                            cx,
+                                        )
+                                        .await
+                                        {
+                                            Ok(created_session) => session = Some(created_session),
+                                            Err(error) => {
+                                                log::error!("Failed to create edit session: {}", error);
+                                                return EditSessionResult::Failed {
+                                                    error,
+                                                    session: None,
+                                                };
                                             }
                                         }
                                     }
 
-                                    if let Some(current_session) = &mut session {
-                                        if let Err(error) = current_session.process_edit(parsed.edits.as_deref(), event_stream, cx) {
-                                            log::error!("Failed to process edit: {}", error);
-                                            return EditSessionResult::Failed { error, session };
-                                        }
+                                    if let Some(current_session) = &mut session
+                                        && let Err(error) = current_session.process_edit(parsed.edits.as_deref(), event_stream, cx)
+                                    {
+                                        log::error!("Failed to process edit: {}", error);
+                                        return EditSessionResult::Failed { error, session };
                                     }
                                 }
                             }
@@ -1305,7 +1306,7 @@ mod tests {
         // 5.5: .agents/skills is a sensitive path — still prompts. The
         // sensitive-path classifier runs regardless of the default mode, so
         // it doesn't matter that we're now in Confirm mode — we're checking
-        // that the path is recognisim and gets the "(agent skills)" tag.
+        // that the path is recognized and gets the "(agent skills)" tag.
         let (stream_tx, mut stream_rx) = ToolCallEventStream::test();
         let _auth = cx.update(|cx| {
             edit_tool.authorize(
@@ -2455,10 +2456,10 @@ mod tests {
             .unwrap();
 
         // The prompt's response channel should drop without a click; the
-        // tool dismisses the prompt by transitioning the tool call status
-        // to `InProgress`.
-        let dismiss = stream_rx.expect_update_fields().await;
-        assert_eq!(dismiss.status, Some(acp::ToolCallStatus::InProgress));
+        // tool dismisses the prompt by resolving the pending authorization.
+        let (_, outcome) = stream_rx.expect_authorization_resolved().await;
+        assert_eq!(outcome.option_id, acp::PermissionOptionId::new("save"));
+        assert_eq!(outcome.option_kind, acp::PermissionOptionKind::AllowOnce);
         drop(auth);
 
         let EditFileToolOutput::Success { new_text, .. } = task.await.unwrap() else {

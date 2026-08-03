@@ -4,7 +4,7 @@ use futures::StreamExt;
 use itertools::Itertools as _;
 
 use crate::{
-    git::{AutomatedChangeKind, SIM_ZIPPY_LOGIN, CommitDetails, CommitList},
+    git::{AutomatedChangeKind, CommitDetails, CommitList, SIM_ZIPPY_LOGIN},
     github::{
         Approvable, CommitAuthor, CommitFileChange, CommitMetadata, GithubApiClient, GithubLogin,
         PullRequestComment, PullRequestData, PullRequestReview, Repository, ReviewState,
@@ -82,10 +82,7 @@ impl fmt::Display for ReviewFailure {
             Self::Unreviewed => formatter
                 .write_str("No qualifying organization approval found for the pull request"),
             Self::UnexpectedZippyAction(failure) => {
-                write!(
-                    formatter,
-                    "Validating Sim Zippy change failed: {failure}"
-                )
+                write!(formatter, "Validating Sim Zippy change failed: {failure}")
             }
             Self::Other(error) => write!(formatter, "Failed to inspect review state: {error}"),
         }
@@ -402,16 +399,15 @@ impl Reporter {
             .is_some_and(|state| state == ReviewState::Approved)
             || item.body().is_some_and(Self::contains_approving_pattern);
 
-        let actor_is_authorisim = item
+        let actor_is_authorized = item
             .author_association()
             .is_some_and(|association| association.has_write_access());
 
-        distinct_actor && approving_pattern && actor_is_authorisim
+        distinct_actor && approving_pattern && actor_is_authorized
     }
 
     fn contains_approving_pattern(body: &str) -> bool {
-        body.contains(SIM_ZIPPY_COMMENT_APPROVAL_PATTERN)
-            || body.contains(SIM_ZIPPY_GROUP_APPROVAL)
+        body.contains(SIM_ZIPPY_COMMENT_APPROVAL_PATTERN) || body.contains(SIM_ZIPPY_GROUP_APPROVAL)
     }
 
     pub async fn generate_report(mut self, max_concurrent_checks: usize) -> Report {
@@ -454,8 +450,7 @@ mod tests {
     use std::str::FromStr;
 
     use crate::git::{
-        AutomatedChangeKind, SIM_ZIPPY_EMAIL, SIM_ZIPPY_LOGIN, CommitDetails, CommitList,
-        CommitSha,
+        AutomatedChangeKind, CommitDetails, CommitList, CommitSha, SIM_ZIPPY_EMAIL, SIM_ZIPPY_LOGIN,
     };
     use crate::github::{
         AuthorAssociation, CommitFileChange, CommitMetadataBySha, GithubApiClient, GithubLogin,

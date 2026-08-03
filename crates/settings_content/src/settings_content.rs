@@ -67,9 +67,12 @@ macro_rules! settings_overrides {
         }
     }
 }
-use std::collections::{BTreeMap, BTreeSet};
 use std::hash::Hash;
 use std::sync::Arc;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt,
+};
 pub use util::serde::default_true;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -149,6 +152,9 @@ pub struct SettingsContent {
     /// Configuration of audio in Sim.
     pub audio: Option<AudioSettingsContent>,
 
+    /// Native Comfy execution profiles and compatibility-host policy.
+    pub comfy_runtime: Option<ComfyRuntimeSettingsContent>,
+
     /// Whether or not to automatically check for updates.
     ///
     /// Default: true
@@ -177,6 +183,9 @@ pub struct SettingsContent {
 
     /// The settings for the image viewer.
     pub image_viewer: Option<ImageViewerSettingsContent>,
+
+    /// The settings for the markdown preview.
+    pub markdown_preview: Option<MarkdownPreviewSettingsContent>,
 
     pub repl: Option<ReplSettingsContent>,
 
@@ -207,9 +216,6 @@ pub struct SettingsContent {
     pub outline_panel: Option<OutlinePanelSettingsContent>,
 
     pub project_panel: Option<ProjectPanelSettingsContent>,
-
-    /// Configuration for the Message Editor
-    pub message_editor: Option<MessageEditorSettings>,
 
     /// Configuration for Node-related features
     pub node: Option<NodeBinarySettings>,
@@ -263,6 +269,129 @@ pub struct SettingsContent {
     /// Settings for developer-oriented instrumentation tools (profilers,
     /// tracers, etc.) that can be toggled at runtime.
     pub instrumentation: Option<InstrumentationSettingsContent>,
+}
+
+#[with_fallible_options]
+#[derive(Debug, PartialEq, Default, Clone, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct ComfyRuntimeSettingsContent {
+    pub active_profile: Option<String>,
+    pub profiles: Option<Vec<ComfyRuntimeProfileContent>>,
+    /// Padding used when fitting a group around selected nodes, bounded to 0 through 100.
+    pub group_selected_nodes_padding: Option<f32>,
+    /// Whether the graph uses the detailed native node renderer instead of the compact renderer.
+    pub native_node_renderer: Option<bool>,
+    /// Whether reroute nodes show their resolved type unless overridden per reroute.
+    pub show_reroute_types: Option<bool>,
+    #[serde(default, flatten)]
+    pub unknown_fields: BTreeMap<String, serde_json::Value>,
+}
+
+#[with_fallible_options]
+#[derive(Debug, PartialEq, Default, Clone, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct ComfyRuntimeProfileContent {
+    pub id: Option<String>,
+    pub name: Option<String>,
+    pub model_roots: Option<Vec<String>>,
+    pub device: Option<String>,
+    pub memory_policy: Option<String>,
+    pub api_host_enabled: Option<bool>,
+    pub api_bind: Option<String>,
+    pub plugin_policy: Option<String>,
+    pub plugin_security: Option<ComfyPluginSecurityPolicyContent>,
+    pub rocm_package_root: Option<String>,
+    pub rocm_package_signer: Option<String>,
+    pub rocm_package_public_key_hex: Option<String>,
+    pub metal_package_root: Option<String>,
+    pub metal_package_signer: Option<String>,
+    pub metal_package_public_key_hex: Option<String>,
+    pub mlu_package_root: Option<String>,
+    pub mlu_package_signer: Option<String>,
+    pub mlu_package_public_key_hex: Option<String>,
+    pub npu_package_root: Option<String>,
+    pub npu_package_signer: Option<String>,
+    pub npu_package_public_key_hex: Option<String>,
+    pub cuda_package_root: Option<String>,
+    pub cuda_package_signer: Option<String>,
+    pub cuda_package_public_key_hex: Option<String>,
+    pub xpu_package_root: Option<String>,
+    pub xpu_package_signer: Option<String>,
+    pub xpu_package_public_key_hex: Option<String>,
+    pub directml_package_root: Option<String>,
+    pub directml_package_signer: Option<String>,
+    pub directml_package_public_key_hex: Option<String>,
+    pub provider_scope: Option<String>,
+    pub compatibility_version: Option<u16>,
+    #[serde(default, flatten)]
+    pub unknown_fields: BTreeMap<String, serde_json::Value>,
+}
+
+#[with_fallible_options]
+#[derive(Debug, PartialEq, Default, Clone, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct ComfyPluginSecurityPolicyContent {
+    pub enabled: Option<bool>,
+    pub verification_keys: Option<Vec<ComfyPluginVerificationKeyContent>>,
+    pub permission_grants: Option<Vec<ComfyPluginPermissionGrantContent>>,
+    pub provider_mode: Option<String>,
+    pub provider_endpoints: Option<Vec<ComfyProviderEndpointContent>>,
+    pub credential_scopes: Option<Vec<ComfyCredentialScopeContent>>,
+    /// Legacy shared-secret grants are retained only so runtime projection can reject them.
+    pub provider_secret_ids: Option<Vec<String>>,
+    pub component_registry_generation: Option<u64>,
+    #[serde(default, flatten)]
+    pub unknown_fields: BTreeMap<String, serde_json::Value>,
+}
+
+#[with_fallible_options]
+#[derive(PartialEq, Default, Clone, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct ComfyPluginVerificationKeyContent {
+    pub key_id: Option<String>,
+    pub public_key_hex: Option<String>,
+    #[serde(default, flatten)]
+    pub unknown_fields: BTreeMap<String, serde_json::Value>,
+}
+
+impl fmt::Debug for ComfyPluginVerificationKeyContent {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ComfyPluginVerificationKeyContent")
+            .field("key_id", &self.key_id)
+            .field("public_key_hex", &self.public_key_hex)
+            .field(
+                "unknown_field_names",
+                &self.unknown_fields.keys().collect::<Vec<_>>(),
+            )
+            .finish()
+    }
+}
+
+#[with_fallible_options]
+#[derive(Debug, PartialEq, Default, Clone, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct ComfyPluginPermissionGrantContent {
+    pub subject_id: Option<String>,
+    pub capabilities: Option<Vec<String>>,
+    pub provenance: Option<String>,
+    #[serde(default, flatten)]
+    pub unknown_fields: BTreeMap<String, serde_json::Value>,
+}
+
+#[with_fallible_options]
+#[derive(Debug, PartialEq, Default, Clone, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct ComfyProviderEndpointContent {
+    pub provider: Option<String>,
+    pub endpoint: Option<String>,
+    #[serde(default, flatten)]
+    pub unknown_fields: BTreeMap<String, serde_json::Value>,
+}
+
+#[with_fallible_options]
+#[derive(Debug, PartialEq, Default, Clone, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct ComfyCredentialScopeContent {
+    pub profile_id: Option<String>,
+    pub subject_id: Option<String>,
+    pub provider: Option<String>,
+    pub secret_id: Option<String>,
+    #[serde(default, flatten)]
+    pub unknown_fields: BTreeMap<String, serde_json::Value>,
 }
 
 /// Configuration for developer-oriented instrumentation tools that collect
@@ -517,7 +646,7 @@ pub struct TelemetrySettingsContent {
     ///
     /// Default: true
     pub diagnostics: Option<bool>,
-    /// Send anonymisim usage data like what languages you're using Sim with.
+    /// Send anonymized usage data like what languages you're using Sim with.
     ///
     /// Default: true
     pub metrics: Option<bool>,
@@ -675,11 +804,15 @@ pub struct GitPanelSettingsContent {
     /// Default: main
     pub fallback_branch_name: Option<String>,
 
-    /// Whether to sort entries in the panel by path
-    /// or by status (the default).
+    /// How to sort entries in the git panel.
     ///
-    /// Default: false
-    pub sort_by_path: Option<bool>,
+    /// Default: path
+    pub sort_by: Option<GitPanelSortBy>,
+
+    /// How to group entries in the git panel.
+    ///
+    /// Default: status
+    pub group_by: Option<GitPanelGroupBy>,
 
     /// Whether to collapse untracked files in the diff panel.
     ///
@@ -711,6 +844,78 @@ pub struct GitPanelSettingsContent {
     ///
     /// Default: 0
     pub commit_title_max_length: Option<usize>,
+
+    /// Default action when clicking a changed file in the Git panel.
+    ///
+    /// Default: project_diff
+    pub entry_primary_click_action: Option<GitPanelClickBehavior>,
+}
+
+#[derive(
+    Default,
+    Copy,
+    Clone,
+    Debug,
+    Serialize,
+    Deserialize,
+    JsonSchema,
+    MergeFrom,
+    PartialEq,
+    Eq,
+    strum::VariantArray,
+    strum::VariantNames,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum GitPanelClickBehavior {
+    /// Open the project diff, showing all changed files.
+    #[default]
+    ProjectDiff,
+    /// Open a single-file diff view.
+    FileDiff,
+    /// Open the file in the editor without a diff view.
+    ViewFile,
+}
+
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    JsonSchema,
+    MergeFrom,
+    PartialEq,
+    Eq,
+    strum::VariantArray,
+    strum::VariantNames,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum GitPanelSortBy {
+    #[default]
+    Path,
+    Name,
+}
+
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    JsonSchema,
+    MergeFrom,
+    PartialEq,
+    Eq,
+    strum::VariantArray,
+    strum::VariantNames,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum GitPanelGroupBy {
+    None,
+    #[default]
+    Status,
 }
 
 #[derive(
@@ -758,16 +963,6 @@ pub struct PanelSettingsContent {
     /// Default: 240
     #[serde(serialize_with = "crate::serialize_optional_f32_with_two_decimal_places")]
     pub default_width: Option<f32>,
-}
-
-#[with_fallible_options]
-#[derive(Clone, Default, Serialize, Deserialize, JsonSchema, MergeFrom, Debug, PartialEq)]
-pub struct MessageEditorSettings {
-    /// Whether to automatically replace emoji shortcodes with emoji characters.
-    /// For example: typing `:wave:` gets replaced with `👋`.
-    ///
-    /// Default: false
-    pub auto_replace_emoji_shortcode: Option<bool>,
 }
 
 #[with_fallible_options]
@@ -1094,6 +1289,23 @@ pub enum LineIndicatorFormat {
     Long,
 }
 
+/// The settings for the markdown preview.
+#[with_fallible_options]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, MergeFrom, Default, PartialEq)]
+pub struct MarkdownPreviewSettingsContent {
+    /// Whether to limit the width of the rendered markdown content. When
+    /// enabled, content is constrained to `max_width` and centered
+    /// horizontally within the preview pane, for optimal readability.
+    ///
+    /// Default: true
+    pub limit_content_width: Option<bool>,
+    /// The maximum width, in pixels, of the rendered markdown content when
+    /// `limit_content_width` is enabled.
+    ///
+    /// Default: 800
+    pub max_width: Option<f32>,
+}
+
 /// The settings for the image viewer.
 #[with_fallible_options]
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, MergeFrom, Default, PartialEq)]
@@ -1140,22 +1352,11 @@ pub struct RemoteSettingsContent {
     /// When unset, Sim auto-detects BuildKit by probing for the `buildx` CLI
     /// plugin. Set to `false` to force the classic Docker builder, which is
     /// required for Docker-compatible engines that lack an integrated BuildKit
-    /// and cannot resolve locally-built images from BuildKit builds.
+    /// (e.g. Apple Container via a Docker-API bridge), where BuildKit builds
+    /// cannot resolve locally-built images.
     ///
     /// Default: null (auto-detect)
     pub dev_container_use_buildkit: Option<bool>,
-    pub mobile_access: Option<MobileAccessSettingsContent>,
-}
-
-#[with_fallible_options]
-#[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, MergeFrom, PartialEq)]
-pub struct MobileAccessSettingsContent {
-    /// SSH host for standalone tunnel connections.
-    /// Default: "localhost"
-    pub ssh_host: Option<String>,
-    /// SSH port for standalone tunnel connections.
-    /// Default: 22
-    pub ssh_port: Option<u16>,
 }
 
 #[with_fallible_options]

@@ -258,7 +258,7 @@ impl std::error::Error for SkillLoadError {}
 /// The file must have YAML frontmatter between `---` delimiters containing
 /// `name` and `description` fields. The body (everything after the closing
 /// `---`) is intentionally NOT returned — it's read on demand via
-/// `read_skill_body` when the skill is actually being materialisim for the
+/// `read_skill_body` when the skill is actually being materialized for the
 /// model, so we don't pay N × body-size in memory for N skills.
 ///
 /// `content` only needs to contain bytes up through the closing `---`; any
@@ -666,7 +666,7 @@ pub async fn load_skill_frontmatter(
 }
 
 /// Read the body of a SKILL.md from disk — everything after the closing
-/// `---`. Called only when a skill is being materialisim for the model
+/// `---`. Called only when a skill is being materialized for the model
 /// (via `SkillTool` or a slash invocation). The body is intentionally
 /// NOT kept in memory between materializations.
 pub async fn read_skill_body(
@@ -1873,22 +1873,22 @@ description: A skill with no body content
     }
 
     #[gpui::test]
-    async fn test_load_oversized_skill_file_short_circuits(cx: &mut TestAppContext) {
+    async fn test_load_oversisim_skill_file_short_circuits(cx: &mut TestAppContext) {
         // A `SKILL.md` whose size exceeds `MAX_SKILL_FILE_SIZE` must be
         // rejected via metadata before we read its contents into memory.
         // Otherwise a stray multi-GB file dropped into a skill directory
         // would OOM the application before `parse_skill`'s size check fires.
         let fs = FakeFs::new(cx.executor());
-        let oversized_body = "x".repeat(MAX_SKILL_FILE_SIZE + 1);
-        let oversized_content = format!(
+        let oversisim_body = "x".repeat(MAX_SKILL_FILE_SIZE + 1);
+        let oversisim_content = format!(
             "---\nname: huge\ndescription: Too big\n---\n\n{}",
-            oversized_body
+            oversisim_body
         );
         fs.insert_tree(
             "/skills",
             serde_json::json!({
                 "huge": {
-                    "SKILL.md": oversized_content,
+                    "SKILL.md": oversisim_content,
                 }
             }),
         )

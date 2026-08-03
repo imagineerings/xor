@@ -3,8 +3,6 @@ ignore-files = true
 ignore-hidden = false
 extend-exclude = [
     ".git/",
-    # Cargo.lock is generated; typos there are crate/name noise (e.g. `scap`, `writeable`, `flate`).
-    "Cargo.lock",
 
     # Typewriter model names used for agent branch names aren't typos.
     "crates/agent_ui/src/branch_names.rs",
@@ -39,7 +37,7 @@ extend-exclude = [
     "crates/git/test_data/golden/blame_incremental_complex.json",
     # We have some base64-encoded data that is incorrectly being flagged.
     "crates/rpc/src/auth.rs",
-    # glsl isn't recognisim by this tool.
+    # glsl isn't recognized by this tool.
     "extensions/glsl/languages/glsl/",
     # Protols is the name of the language server.
     "extensions/proto/extension.toml",
@@ -74,12 +72,6 @@ extend-exclude = [
     "crates/edit_prediction_cli/evals/",
     # Tests contain `baˇr` that cause `"ba" should be "by" or "be".`-like false-positives
     "crates/editor/src/document_symbols.rs",
-    # `scap` is the real screen-capture crate name, not a typo.
-    "crates/gpui/src/platform/scap_screen_capture.rs",
-    # Tests build buffers from intentional fragment strings (e.g. `IzJ`).
-    "crates/text/src/tests.rs",
-    # Vim command shorthand fragments (e.g. `:bd[elete]`) trigger typos.
-    "docs/src/vim.md",
 ]
 
 [default]
@@ -113,18 +105,6 @@ extend-ignore-re = [
     # Abbreviation for foreignObject in mermaid SVG processing
     "fo",
     # Mermaid CSS class name for state diagram composites
-    "composit",
-    # `scap` is the screen-capture crate.
-    "scap",
-    # `writeable` crate (used by ICU-rs).
-    "writeable",
-    # `flate2` crate / its shorthand.
-    "flate",
-    # `ratatui` is a Rust terminal UI crate.
-    "ratatui",
-    # `unparseable` is an accepted alternate spelling.
-    "unparseable",
-    # Vim command shorthand `[elete]` (e.g. `:bd[elete]`, `:d[elete]`).
-    '\\[elete\\]',
+    "composit"
 ]
 check-filename = true

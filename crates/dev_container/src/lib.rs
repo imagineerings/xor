@@ -157,10 +157,10 @@ impl Settings for DevContainerSettings {
 #[derive(PartialEq, Clone, Deserialize, Default, Action)]
 #[action(namespace = projects)]
 #[serde(deny_unknown_fields)]
-struct InitializedevContainer;
+struct InitializeDevContainer;
 
 pub fn init(cx: &mut App) {
-    cx.on_action(|_: &InitializedevContainer, cx| {
+    cx.on_action(|_: &InitializeDevContainer, cx| {
         with_active_or_new_workspace(cx, move |workspace, window, cx| {
             let weak_entity = cx.weak_entity();
             workspace.toggle_modal(window, cx, |window, cx| {
@@ -302,6 +302,10 @@ impl TemplatePickerDelegate {
 
 impl PickerDelegate for TemplatePickerDelegate {
     type ListItem = AnyElement;
+
+    fn name() -> &'static str {
+        "dev container template picker"
+    }
 
     fn match_count(&self) -> usize {
         self.matching_indices.len()
@@ -485,6 +489,10 @@ impl FeaturePickerDelegate {
 
 impl PickerDelegate for FeaturePickerDelegate {
     type ListItem = AnyElement;
+
+    fn name() -> &'static str {
+        "dev container feature picker"
+    }
 
     fn match_count(&self) -> usize {
         self.matching_indices.len()
@@ -1176,8 +1184,7 @@ impl StatefulModal for DevContainerModal {
                         }),
                     );
 
-                    let picker =
-                        cx.new(|cx| Picker::uniform_list(delegate, window, cx).modal(false));
+                    let picker = cx.new(|cx| Picker::uniform_list(delegate, window, cx).embedded());
                     self.picker = Some(picker);
                     Some(DevContainerState::TemplateQueryReturned(Ok(items)))
                 } else {
@@ -1308,8 +1315,7 @@ impl StatefulModal for DevContainerModal {
                         }),
                     );
 
-                    let picker =
-                        cx.new(|cx| Picker::uniform_list(delegate, window, cx).modal(false));
+                    let picker = cx.new(|cx| Picker::uniform_list(delegate, window, cx).embedded());
                     self.features_picker = Some(picker);
                     Some(DevContainerState::FeaturesQueryReturned(template_entry))
                 } else {

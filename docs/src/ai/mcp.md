@@ -35,7 +35,7 @@ Many MCP servers are available as extensions. Find them via:
 
 1. [the Sim website](https://sim.dev/extensions?filter=context-servers)
 2. in the app, open the Command Palette and run the {#action sim::Extensions} action
-3. in the app, go to the Agent Panel's top-right menu and look for the "Install New Servers…" menu item under the "MCP Servers" section
+3. in the app, open **Settings → AI → MCP Servers**, click `Add Server`, and choose `Install from Extensions`
 
 Popular servers available as an extension include:
 
@@ -51,7 +51,7 @@ Popular servers available as an extension include:
 ### As Custom Servers
 
 Creating an extension is not the only way to use MCP servers in Sim.
-You can connect both local and remote MCP servers from **Settings -> AI -> MCP Servers** (also accessible via the {#action agent::OpenSettings} action, then selecting `MCP Servers`). Click `Add Server` in the page header, then choose `Add Local Server` or `Add Remote Server`. Your specified configuration will create entries in your settings file (which you can open with {#action zed::OpenSettingsFile}) similar to the ones below:
+You can connect both local and remote MCP servers from **Settings → AI → MCP Servers** (also accessible via the {#action agent::OpenSettings} action, then selecting `MCP Servers`). Click `Add Server` in the page header, then choose `Add Local Server` or `Add Remote Server`. Your specified configuration will create entries in your settings file (which you can open with {#action sim::OpenSettingsFile}) similar to the ones below:
 
 ```json [settings]
 {
@@ -85,7 +85,7 @@ For example, the GitHub MCP extension requires you to add a [Personal Access Tok
 
 In the case of custom servers, make sure you check the provider documentation to determine what type of command, arguments, and environment variables need to be added to the JSON.
 
-To check if your MCP server is properly configured, go to the Agent Panel's settings view and watch the indicator dot next to its name.
+To check if your MCP server is properly configured, open **Settings → AI → MCP Servers** and watch the indicator dot next to its name.
 If it's running correctly, the indicator will be green and its tooltip will say "Server is active".
 If not, other colors and tooltip messages will indicate what is happening.
 

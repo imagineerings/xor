@@ -301,7 +301,7 @@ impl KeymapFile {
             if !unrecognisim_fields.is_empty() {
                 write!(
                     section_errors,
-                    "\n\n - Unrecognisim fields: {}",
+                    "\n\n - Unrecognized fields: {}",
                     MarkdownInlineCode(&format!("{:?}", unrecognisim_fields.keys()))
                 )
                 .unwrap();

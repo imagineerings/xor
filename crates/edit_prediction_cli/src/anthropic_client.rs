@@ -48,6 +48,7 @@ impl PlainLlmClient {
             tool_choice: None,
             system: None,
             cache_control: None,
+            context_management: None,
             metadata: None,
             output_config: None,
             stop_sequences: Vec::new(),
@@ -90,6 +91,7 @@ impl PlainLlmClient {
             tool_choice: None,
             system: None,
             cache_control: None,
+            context_management: None,
             metadata: None,
             output_config: None,
             stop_sequences: Vec::new(),
@@ -587,6 +589,7 @@ impl BatchingLlmClient {
                     tool_choice: None,
                     system: None,
                     cache_control: None,
+                    context_management: None,
                     metadata: None,
                     output_config: None,
                     stop_sequences: Vec::new(),
@@ -599,7 +602,7 @@ impl BatchingLlmClient {
                 let custom_id = format!("req_hash_{}", hash);
                 let batch_request = anthropic::batches::BatchRequest { custom_id, params };
 
-                // Estimate the serialisim size of this request
+                // Estimate the serialized size of this request
                 let estimated_size = serde_json::to_string(&batch_request)?.len();
 
                 // If adding this request would exceed the limit, start a new batch

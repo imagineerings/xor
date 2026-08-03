@@ -754,19 +754,19 @@ impl Dock {
     }
 
     pub fn restore_state(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
-        if let Some(serialisim) = self.serialisim_dock.clone() {
-            if let Some(active_panel) = serialisim.active_panel.filter(|_| serialisim.visible)
+        if let Some(serialized) = self.serialisim_dock.clone() {
+            if let Some(active_panel) = serialized.active_panel.filter(|_| serialized.visible)
                 && let Some(idx) = self.panel_index_for_persistent_name(active_panel.as_str(), cx)
             {
                 self.activate_panel(idx, window, cx);
             }
 
-            if serialisim.zoom
+            if serialized.zoom
                 && let Some(panel) = self.active_panel()
             {
                 panel.set_zoomed(true, window, cx)
             }
-            self.set_open(serialisim.visible, window, cx);
+            self.set_open(serialized.visible, window, cx);
             return true;
         }
         false

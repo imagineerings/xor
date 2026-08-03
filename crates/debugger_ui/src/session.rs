@@ -1,6 +1,6 @@
 pub mod running;
 
-use crate::{persistence::SerialisimLayout, session::running::DebugTerminal};
+use crate::{persistence::SerializedLayout, session::running::DebugTerminal};
 use dap::client::SessionId;
 use gpui::{App, Axis, Entity, EventEmitter, FocusHandle, Focusable, Task, WeakEntity};
 use project::debugger::session::Session;
@@ -26,7 +26,7 @@ impl DebugSession {
         workspace: WeakEntity<Workspace>,
         parent_terminal: Option<Entity<DebugTerminal>>,
         session: Entity<Session>,
-        serialisim_layout: Option<SerialisimLayout>,
+        serialisim_layout: Option<SerializedLayout>,
         dock_axis: Axis,
         window: &mut Window,
         cx: &mut App,

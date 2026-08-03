@@ -414,7 +414,7 @@ impl StyledText {
     }
 
     /// Set the styling attributes for the given text, as well as
-    /// as any ranges of text that have had their style customisim.
+    /// as any ranges of text that have had their style customized.
     pub fn with_default_highlights(
         mut self,
         default_style: &TextStyle,
@@ -429,7 +429,7 @@ impl StyledText {
     }
 
     /// Set the styling attributes for the given text, as well as
-    /// as any ranges of text that have had their style customisim.
+    /// as any ranges of text that have had their style customized.
     pub fn with_highlights(
         mut self,
         highlights: impl IntoIterator<Item = (Range<usize>, HighlightStyle)>,
@@ -875,12 +875,6 @@ impl TextLayout {
         let element_state = element_state
             .as_ref()
             .expect("measurement has not been performed");
-        let bounds = element_state
-            .bounds
-            .expect("prepaint has not been performed");
-        let line_height = element_state.line_height;
-
-        let mut line_origin = bounds.origin;
         let mut line_start_ix = 0;
 
         for line in &element_state.lines {
@@ -888,7 +882,6 @@ impl TextLayout {
             if index < line_start_ix {
                 break;
             } else if index > line_end_ix {
-                line_origin.y += line.size(line_height).height;
                 line_start_ix = line_end_ix + 1;
                 continue;
             } else {

@@ -30,6 +30,10 @@ the difference between the Sim Agent, External Agents, and Terminal Threads.
 
 [Edit Prediction](./edit-prediction.md) has its own provider setup under `edit_predictions`. LLM providers on this page apply to model-backed Sim AI features such as Sim Agent, Inline Assistant, Git commit generation, and thread summaries.
 
+## Anthropic-Compatible Providers {#anthropic-api-compatible}
+
+Anthropic-compatible provider setup has moved to [Use API Access](./use-api-access.md#anthropic-compatible).
+
 ## OpenAI-Compatible Providers {#openai-api-compatible}
 
 OpenAI-compatible provider setup has moved to [Use API Access](./use-api-access.md#openai-compatible).

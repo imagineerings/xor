@@ -20,28 +20,28 @@ pub(crate) enum Shell {
 impl Generator for Shell {
     fn file_name(&self, name: &str) -> String {
         match self {
-            Self::Bash => shells::Bash.file_name(name),
-            Self::Elvish => shells::Elvish.file_name(name),
-            Self::Fish => shells::Fish.file_name(name),
-            Self::Nushell => shells::Nushell.file_name(name),
-            Self::PowerShell => shells::PowerShell.file_name(name),
-            Self::Zsh => shells::Zsh.file_name(name),
+            Shell::Bash => self::shells::Bash.file_name(name),
+            Shell::Elvish => self::shells::Elvish.file_name(name),
+            Shell::Fish => self::shells::Fish.file_name(name),
+            Shell::Nushell => self::shells::Nushell.file_name(name),
+            Shell::PowerShell => self::shells::PowerShell.file_name(name),
+            Shell::Zsh => self::shells::Zsh.file_name(name),
         }
     }
 
-    fn generate(&self, command: &clap::Command, buffer: &mut dyn std::io::Write) {
+    fn generate(&self, cmd: &clap::Command, buf: &mut dyn std::io::Write) {
         match self {
-            Self::Bash => shells::Bash.generate(command, buffer),
-            Self::Elvish => shells::Elvish.generate(command, buffer),
-            Self::Fish => shells::Fish.generate(command, buffer),
-            Self::Nushell => shells::Nushell.generate(command, buffer),
-            Self::PowerShell => shells::PowerShell.generate(command, buffer),
-            Self::Zsh => shells::Zsh.generate(command, buffer),
+            Shell::Bash => self::shells::Bash.generate(cmd, buf),
+            Shell::Elvish => self::shells::Elvish.generate(cmd, buf),
+            Shell::Fish => self::shells::Fish.generate(cmd, buf),
+            Shell::Nushell => self::shells::Nushell.generate(cmd, buf),
+            Shell::PowerShell => self::shells::PowerShell.generate(cmd, buf),
+            Shell::Zsh => self::shells::Zsh.generate(cmd, buf),
         }
     }
 }
 
-pub(crate) fn main(command: &clap::Command, shell: &Shell) {
-    let buffer = &mut std::io::stdout();
-    shell.generate(command, buffer);
+pub(crate) fn main(cmd: &clap::Command, shell: &Shell) {
+    let buf = &mut std::io::stdout();
+    shell.generate(cmd, buf);
 }

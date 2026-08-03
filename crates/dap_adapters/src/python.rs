@@ -439,10 +439,7 @@ impl DebugAdapter for PythonDebugAdapter {
         Some(SharedString::new_static("Python").into())
     }
 
-    async fn config_from_sim_format(
-        &self,
-        sim_scenario: SimDebugConfig,
-    ) -> Result<DebugScenario> {
+    async fn config_from_sim_format(&self, sim_scenario: SimDebugConfig) -> Result<DebugScenario> {
         let mut args = json!({
             "request": match sim_scenario.request {
                 DebugRequest::Launch(_) => "launch",

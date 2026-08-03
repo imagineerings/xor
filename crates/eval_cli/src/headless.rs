@@ -116,6 +116,10 @@ pub fn init(cx: &mut App) -> Arc<AgentCliAppState> {
     languages::init(languages.clone(), fs.clone(), node_runtime.clone(), cx);
     prompt_store::init(cx);
     terminal_view::init(cx);
+
+    // The eval CLI runs headless with no controlling TTY, so PTY allocation and
+    // acquiring a controlling terminal fail with `ENOTTY`. Tell the agent to run
+    // its terminal commands without a PTY (and non-interactively) instead.
     cx.set_global(acp_thread::HeadlessTerminal(true));
 
     let stdout_is_a_pty = false;

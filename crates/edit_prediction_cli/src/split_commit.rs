@@ -2102,11 +2102,11 @@ Date: Mon Jan 1 00:00:00 2024
         };
 
         let json = serde_json::to_string(&case).unwrap();
-        let deserialisim: ExampleSpec = serde_json::from_str(&json).unwrap();
+        let deserialized: ExampleSpec = serde_json::from_str(&json).unwrap();
 
-        assert_eq!(case.repository_url, deserialisim.repository_url);
-        assert_eq!(case.revision, deserialisim.revision);
-        assert_eq!(case.cursor_position, deserialisim.cursor_position);
+        assert_eq!(case.repository_url, deserialized.repository_url);
+        assert_eq!(case.revision, deserialized.revision);
+        assert_eq!(case.cursor_position, deserialized.cursor_position);
     }
 
     #[test]

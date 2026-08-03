@@ -21,6 +21,7 @@ pub struct Model {
     pub supports_tools: Option<bool>,
     pub supports_vision: Option<bool>,
     pub supports_thinking: Option<bool>,
+    pub disabled: Option<String>,
 }
 
 fn get_max_tokens(_name: &str) -> u64 {
@@ -31,7 +32,6 @@ fn get_max_tokens(_name: &str) -> u64 {
 impl Model {
     pub fn new(
         name: &str,
-        display_name: Option<&str>,
         max_tokens: Option<u64>,
         supports_tools: Option<bool>,
         supports_vision: Option<bool>,
@@ -39,14 +39,26 @@ impl Model {
     ) -> Self {
         Self {
             name: name.to_owned(),
-            display_name: display_name
-                .map(ToString::to_string)
-                .or_else(|| name.strip_suffix(":latest").map(ToString::to_string)),
+            display_name: name.strip_suffix(":latest").map(ToString::to_string),
             max_tokens: max_tokens.unwrap_or_else(|| get_max_tokens(name)),
             keep_alive: Some(KeepAlive::indefinite()),
             supports_tools,
             supports_vision,
             supports_thinking,
+            disabled: None,
+        }
+    }
+
+    pub fn new_disabled(name: &str, reason: String) -> Self {
+        Self {
+            name: name.to_owned(),
+            display_name: name.strip_suffix(":latest").map(ToString::to_string),
+            max_tokens: get_max_tokens(name),
+            keep_alive: Some(KeepAlive::indefinite()),
+            supports_tools: None,
+            supports_vision: None,
+            supports_thinking: None,
+            disabled: Some(reason),
         }
     }
 
@@ -487,7 +499,7 @@ mod tests {
                 assert!(tool_calls.is_some_and(|v| !v.is_empty()));
                 assert!(thinking.is_none());
             }
-            _ => panic!("Deserialisim wrong role"),
+            _ => panic!("Deserialized wrong role"),
         }
     }
 
@@ -682,9 +694,9 @@ mod tests {
             tools: vec![],
         };
 
-        let serialisim = serde_json::to_string(&request).unwrap();
-        assert!(serialisim.contains("images"));
-        assert!(serialisim.contains(base64_image));
+        let serialized = serde_json::to_string(&request).unwrap();
+        assert!(serialized.contains("images"));
+        assert!(serialized.contains(base64_image));
     }
 
     #[test]
@@ -702,8 +714,8 @@ mod tests {
             tools: vec![],
         };
 
-        let serialisim = serde_json::to_string(&request).unwrap();
-        assert!(!serialisim.contains("images"));
+        let serialized = serde_json::to_string(&request).unwrap();
+        assert!(!serialized.contains("images"));
     }
 
     #[test]
@@ -723,9 +735,9 @@ mod tests {
             tools: vec![],
         };
 
-        let serialisim = serde_json::to_string(&request).unwrap();
+        let serialized = serde_json::to_string(&request).unwrap();
 
-        let parsed: serde_json::Value = serde_json::from_str(&serialisim).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&serialized).unwrap();
         let message_images = parsed["messages"][0]["images"].as_array().unwrap();
         assert_eq!(message_images.len(), 1);
         assert_eq!(message_images[0].as_str().unwrap(), base64_image);
@@ -741,27 +753,27 @@ mod tests {
             temperature: Some(0.7),
             ..Default::default()
         };
-        let serialisim = serde_json::to_string(&options_no_stop).unwrap();
+        let serialized = serde_json::to_string(&options_no_stop).unwrap();
         assert!(
-            !serialisim.contains("stop"),
+            !serialized.contains("stop"),
             "stop should not be in JSON when None"
         );
-        assert!(serialisim.contains("num_ctx"));
-        assert!(serialisim.contains("temperature"));
+        assert!(serialized.contains("num_ctx"));
+        assert!(serialized.contains("temperature"));
 
-        // When stop has values, they should be serialisim
+        // When stop has values, they should be serialized
         let options_with_stop = ChatOptions {
             stop: Some(vec!["<|eot_id|>".to_string()]),
             ..Default::default()
         };
-        let serialisim = serde_json::to_string(&options_with_stop).unwrap();
-        assert!(serialisim.contains("stop"));
-        assert!(serialisim.contains("<|eot_id|>"));
+        let serialized = serde_json::to_string(&options_with_stop).unwrap();
+        assert!(serialized.contains("stop"));
+        assert!(serialized.contains("<|eot_id|>"));
 
         // All None options should result in empty object
         let options_all_none = ChatOptions::default();
-        let serialisim = serde_json::to_string(&options_all_none).unwrap();
-        assert_eq!(serialisim, "{}");
+        let serialized = serde_json::to_string(&options_all_none).unwrap();
+        assert_eq!(serialized, "{}");
     }
 
     #[test]
@@ -782,8 +794,8 @@ mod tests {
             tools: vec![],
         };
 
-        let serialisim = serde_json::to_string(&request).unwrap();
-        let parsed: serde_json::Value = serde_json::from_str(&serialisim).unwrap();
+        let serialized = serde_json::to_string(&request).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&serialized).unwrap();
 
         let stop = parsed["options"]["stop"].as_array().unwrap();
         assert_eq!(stop.len(), 2);
@@ -813,13 +825,13 @@ mod tests {
             tools: vec![],
         };
 
-        let serialisim = serde_json::to_string(&request).unwrap();
+        let serialized = serde_json::to_string(&request).unwrap();
 
-        // The key check: "stop" should not appear in the serialisim JSON
+        // The key check: "stop" should not appear in the serialized JSON
         assert!(
-            !serialisim.contains("\"stop\""),
+            !serialized.contains("\"stop\""),
             "stop field should be omitted when None, got: {}",
-            serialisim
+            serialized
         );
     }
 }

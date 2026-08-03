@@ -1,0 +1,2061 @@
+{
+  "counts": {
+    "availability": {
+      "active": 9284,
+      "cloud/paid": 1627,
+      "cloud/paid; experimental": 48,
+      "conditional": 773,
+      "conditional;cloud/paid": 2,
+      "conditional;deprecated/dead": 1,
+      "deprecated/dead": 114,
+      "developer-only": 164,
+      "experimental": 166,
+      "infrastructure-only": 309,
+      "pinned source contract": 583,
+      "platform-specific": 142,
+      "uncertain": 82
+    },
+    "classification": {
+      "3D contract": 1,
+      "API description": 1,
+      "API node": 224,
+      "API-node extension": 1,
+      "API-node policy": 1,
+      "API-node runtime": 2,
+      "CLI JSON schema": 23,
+      "CLI documentation claim": 16,
+      "CLI event contract": 12,
+      "CLI extension contract": 17,
+      "CLI flag": 101,
+      "CLI lifecycle state": 24,
+      "CLI option or argument": 370,
+      "CLI persisted or interchange format": 34,
+      "CLI-settable feature flag": 2,
+      "CMS staging English": 2,
+      "CMS staging localization": 12,
+      "English product page": 307,
+      "HTTP client contract": 142,
+      "HTTP/static-resource client contract": 7,
+      "JSON WebSocket contract": 22,
+      "OpenAPI component schema": 58,
+      "OpenAPI-only operation": 21,
+      "Python extension API": 1,
+      "REST request contract": 1,
+      "RNG phase contract": 54,
+      "WebSocket or frontend event contract": 24,
+      "active": 12,
+      "analytics event contract": 105,
+      "application route": 22,
+      "assets/concurrency": 1,
+      "assets/persistence": 1,
+      "attention backend": 4,
+      "audio file": 3,
+      "authentication": 1,
+      "authorization": 1,
+      "authorization/assets": 1,
+      "authorization/filesystem": 1,
+      "autograd construct": 36,
+      "availability contract": 1,
+      "backend write-only carrier": 1,
+      "backward compatibility contract": 1,
+      "binary WebSocket contract": 3,
+      "binary wire contract": 1,
+      "built-in node": 565,
+      "built-in node reference": 896,
+      "bundled filesystem layout or configuration artifact": 20,
+      "bundled model configuration, tokenizer, or search-path artifact": 65,
+      "bundled template support asset": 17,
+      "bundled workflow template": 89,
+      "cache": 7,
+      "cache/extension": 1,
+      "cache/graph": 1,
+      "cache/protocol": 1,
+      "callable-operation; accelerated-attention-kernel": 4,
+      "callable-operation; activation-normalization-functional": 10,
+      "callable-operation; comfy-operator-indirection": 19,
+      "callable-operation; elementwise-or-runtime-operation": 261,
+      "callable-operation; external-tensor-kernel": 31,
+      "callable-operation; indexing-masking": 13,
+      "callable-operation; linear-algebra": 14,
+      "callable-operation; neural-network-functional": 12,
+      "callable-operation; neural-network-module": 43,
+      "callable-operation; random-number-generation": 13,
+      "callable-operation; reduction": 25,
+      "callable-operation; shape-layout-transform": 29,
+      "callable-operation; spatial-functional-kernel": 12,
+      "callable-operation; spectral-transform": 4,
+      "callable-operation; storage-dtype-device": 11,
+      "callable-operation; tensor-creation": 10,
+      "cancellation": 1,
+      "capability schema": 1,
+      "child input/output": 1,
+      "child output": 5,
+      "clip_architecture": 31,
+      "clip_text_encoder_architecture": 398,
+      "cloud API operation": 42,
+      "cloud authentication contract": 1,
+      "command": 118,
+      "compatibility": 1,
+      "compatibility extension": 1,
+      "compile-time mode contract": 1,
+      "conditional": 5,
+      "conditioning contract": 1,
+      "conditioning_value": 5,
+      "configuration file": 4,
+      "consumer-provider uncertainty": 1,
+      "content boundary": 1,
+      "content/extension boundary": 1,
+      "context/menu action": 41,
+      "controlnet": 8,
+      "core frontend extension": 32,
+      "coverage reconciliation": 4,
+      "coverage-anchor": 49,
+      "cross-process protocol catalog": 1,
+      "cross-product filesystem contract": 1,
+      "cross-product graph contract": 1,
+      "cross-product identifier contract": 2,
+      "cross-product output schema": 1,
+      "cross-product prompt contract": 1,
+      "cross-product serialization contract": 1,
+      "cross-product state contract": 1,
+      "cross-product version contract": 1,
+      "data carrier": 1,
+      "database configuration": 1,
+      "database migration": 4,
+      "database migration support template": 1,
+      "database table": 5,
+      "deployment and entitlement contract": 1,
+      "deployment mode contract": 2,
+      "deprecated/dead": 3,
+      "developer boundary": 1,
+      "documentation configuration/format": 35,
+      "documentation redirect": 65,
+      "documentation tooling contract": 108,
+      "documented lifecycle contract": 20,
+      "dynamic protocol contract": 1,
+      "dynamic wire contract": 1,
+      "environment variable": 14,
+      "error surface": 1,
+      "executable Python typed schema": 952,
+      "execution graph JSON": 1,
+      "execution graph schema": 1,
+      "explicit non-carrier": 1,
+      "extension ABI": 2,
+      "extension distribution contract": 1,
+      "extension hook": 1,
+      "extension lifecycle contract": 1,
+      "extension manifest": 1,
+      "extension policy": 2,
+      "extension protocol contract": 1,
+      "extension recovery contract": 1,
+      "extension security": 1,
+      "feature flag / remote configuration": 43,
+      "file locator JSON": 1,
+      "filesystem boundary": 2,
+      "filesystem/recovery": 1,
+      "flow control": 1,
+      "frontend extension ABI": 2,
+      "frontend extension API": 27,
+      "frontend extension bridge": 3,
+      "frontend functional module": 339,
+      "functional": 41,
+      "functional Vue component surface": 691,
+      "graph execution": 3,
+      "guidance": 3,
+      "guidance_hook": 9,
+      "hardware backend": 9,
+      "history": 2,
+      "history JSON": 1,
+      "history/telemetry": 1,
+      "hosted API-node outbound proxy endpoint": 217,
+      "image file": 3,
+      "import discriminator": 1,
+      "import recovery contract": 1,
+      "import state-transition contract": 1,
+      "independently-testable-capability": 206,
+      "individual desktop-configuration contract": 74,
+      "individual desktop-feature-flag contract": 3,
+      "individual desktop-input contract": 19,
+      "individual desktop-installation-source contract": 6,
+      "individual desktop-ipc contract": 273,
+      "individual desktop-menu contract": 45,
+      "individual desktop-persistence contract": 36,
+      "individual desktop-platform contract": 3,
+      "individual desktop-preload contract": 299,
+      "individual desktop-setting contract": 31,
+      "individual desktop-shell contract": 26,
+      "individual desktop-theme-style contract": 21,
+      "individual desktop-window contract": 44,
+      "infrastructure-only": 146,
+      "input": 20,
+      "input/mutated/restored": 1,
+      "input/output": 1,
+      "internal event WebSocket contract": 1,
+      "job JSON": 1,
+      "jobs API": 2,
+      "keybinding": 34,
+      "label": 10,
+      "latent file": 1,
+      "latent tensor scaling/channel contract": 33,
+      "legacy JSON compatibility": 1,
+      "legacy extension documentation contract": 56,
+      "legacy text migration": 1,
+      "list semantics": 3,
+      "localization extension": 1,
+      "localized embedded node documentation": 855,
+      "lossy compatibility contract": 1,
+      "media carrier": 10,
+      "media carrier variant": 1,
+      "media carrier with accept-list conflict": 1,
+      "media contract": 1,
+      "media import carrier": 1,
+      "memory control": 2,
+      "memory mode": 5,
+      "menu action": 86,
+      "menu checkbox-action": 5,
+      "menu destructive-action": 17,
+      "menu developer-action": 1,
+      "menu disabled-item": 3,
+      "menu dynamic-action": 3,
+      "menu dynamic-submenu": 1,
+      "menu infrastructure-submenu": 1,
+      "menu navigation-action": 27,
+      "menu radio-action": 11,
+      "menu submenu": 11,
+      "menu toggle-action": 10,
+      "migration": 8,
+      "migration and recovery contract": 1,
+      "migration corpus": 1,
+      "mode registry contract": 1,
+      "model file": 2,
+      "model file security": 1,
+      "model search path category": 26,
+      "model/custom-node discovery": 1,
+      "model_execution": 9,
+      "multi-user protocol contract": 1,
+      "namespace-or-value-reference; namespace-contract": 3,
+      "namespace-or-value-reference; value-or-constant-contract": 64,
+      "native IPC event contract": 1,
+      "negotiated binary wire contract": 1,
+      "network boundary": 1,
+      "node extension API": 6,
+      "node pack": 87,
+      "node policy": 322,
+      "node schema JSON": 2,
+      "node schema compatibility": 1,
+      "numeric/weight format": 13,
+      "origin boundary": 3,
+      "output policy": 1,
+      "package or test configuration coverage anchor": 2,
+      "partner endpoint mapping": 52,
+      "patch_family_equation": 6,
+      "patch_mapping": 14,
+      "patch_payload": 5,
+      "patch_semantics": 3,
+      "path compatibility contract": 1,
+      "persisted browser state": 66,
+      "persisted format / migration contract": 16,
+      "persisted settings file": 1,
+      "persisted users file": 1,
+      "persisted workflow schema": 2,
+      "persistence/recovery": 1,
+      "platform-specific deployment contract": 1,
+      "preload ABI": 2,
+      "presentational/infrastructure-only": 2,
+      "preview": 1,
+      "preview/protocol": 2,
+      "producer-consumer mismatch": 4,
+      "production module": 104,
+      "protocol": 1,
+      "protocol alias contract": 2,
+      "protocol namespace contract": 1,
+      "protocol/output schema": 1,
+      "queue": 2,
+      "queue tuple": 1,
+      "queue/cancellation": 3,
+      "queue/concurrency": 1,
+      "queue/protocol": 2,
+      "queue/security": 1,
+      "reachable CLI leaf": 123,
+      "reclassified-external-operation; elementwise-or-runtime-operation": 5,
+      "reclassified-external-operation; indexing-masking": 1,
+      "reclassified-external-operation; linear-algebra": 1,
+      "recovery contract": 1,
+      "registered model architecture detector/loader": 94,
+      "registered sampling algorithm": 44,
+      "registered sigma scheduler": 9,
+      "registry conflict contract": 1,
+      "required native parity decision": 1,
+      "resource boundary": 1,
+      "reusable English snippet": 56,
+      "route": 1,
+      "runtime": 2,
+      "runtime /api compatibility alias": 47,
+      "runtime HTTP route": 68,
+      "runtime extension": 2,
+      "runtime static route": 5,
+      "runtime/extension": 2,
+      "schema-bearing but unregistered node": 12,
+      "secret handling": 1,
+      "secret input": 6,
+      "secret-like input": 1,
+      "security compatibility fact": 1,
+      "serialization transform": 1,
+      "server extension API": 1,
+      "server feature flag": 5,
+      "server recovery": 1,
+      "session boundary": 1,
+      "setting": 152,
+      "settings file": 1,
+      "stable CLI error": 99,
+      "static compatibility contract": 1,
+      "target evidence contract": 1,
+      "telemetry contract": 52,
+      "telemetry event": 36,
+      "telemetry identity infrastructure": 1,
+      "telemetry infrastructure prefix; not emitted as an event": 1,
+      "telemetry volume-guard infrastructure": 2,
+      "tensor container": 2,
+      "tensor contract": 4,
+      "test-backed behavior": 1677,
+      "tracked-step telemetry contract": 29,
+      "transport security": 1,
+      "trusted code extension": 2,
+      "type-reference; type-contract": 15,
+      "users file": 1,
+      "vae_architecture": 31,
+      "vae_selection_branch": 30,
+      "vae_state_dict_conversion": 1,
+      "vae_tiling": 12,
+      "validation": 9,
+      "validation compatibility contract": 1,
+      "validation/extension": 1,
+      "vector file": 1,
+      "video file": 2,
+      "website/marketing route": 59,
+      "weight_adapter_registry": 2,
+      "weight_adapter_runtime": 16,
+      "widget execution contract": 1,
+      "widget persistence contract": 1,
+      "widget state-transition format": 1,
+      "wire connection contract": 1,
+      "wire event contract": 1,
+      "wire negotiation contract": 1,
+      "workflow extension": 2
+    },
+    "current_sim_status": {
+      "conflicting": 788,
+      "deferred": 2274,
+      "equivalent": 14,
+      "missing": 9943,
+      "partial": 189,
+      "uncertain": 87
+    },
+    "domain": {
+      ".github": 14,
+      "CQL policy": 419,
+      "Desktop IPC": 2,
+      "Desktop bridge": 3,
+      "Python extensions": 5,
+      "REST": 8,
+      "WebSocket": 12,
+      "a11y": 26,
+      "account": 3,
+      "agent-tools": 5,
+      "api-reference": 1,
+      "application-ui": 161,
+      "application-ui-state": 58,
+      "architecture": 1,
+      "asset": 390,
+      "asset-viewer-editor": 103,
+      "assets-specialized-media": 75,
+      "authentication-secrets": 7,
+      "autograd": 36,
+      "baseline": 1,
+      "built-in-nodes": 896,
+      "changelog": 1,
+      "cloud": 293,
+      "cloud OpenAPI": 42,
+      "cloud-account-state": 2,
+      "cloud-account-workspace": 64,
+      "cloud-billing-workspace": 25,
+      "comfy-cli": 3,
+      "command": 123,
+      "community": 2,
+      "conditioning-model-patch contract": 583,
+      "configuration": 208,
+      "custom-nodes": 36,
+      "database-migration-support": 1,
+      "deprecation": 1,
+      "desktop-configuration": 74,
+      "desktop-diagnostics": 10,
+      "desktop-feature-flag": 3,
+      "desktop-input": 19,
+      "desktop-installation": 8,
+      "desktop-installation-source": 6,
+      "desktop-ipc": 273,
+      "desktop-menu": 45,
+      "desktop-native-ui": 12,
+      "desktop-persistence": 36,
+      "desktop-platform": 3,
+      "desktop-preload": 299,
+      "desktop-renderer-surface": 43,
+      "desktop-setting": 31,
+      "desktop-shell": 26,
+      "desktop-telemetry": 139,
+      "desktop-theme-style": 21,
+      "desktop-update": 1,
+      "desktop-window": 44,
+      "development": 21,
+      "diagnostics-errors": 10,
+      "documented claim": 16,
+      "embedded metadata": 23,
+      "environment": 35,
+      "error": 99,
+      "event": 12,
+      "exec": 60,
+      "execution inputs": 2,
+      "ext": 28,
+      "extension": 131,
+      "extension documentation": 56,
+      "external-service": 217,
+      "feature flags": 1,
+      "filesystem-layout-configuration": 20,
+      "format": 74,
+      "formats": 1,
+      "frontend-extension-manager": 49,
+      "get_started": 2,
+      "graph": 750,
+      "graph sockets": 1,
+      "graph-editing-widgets": 93,
+      "graph-editor": 130,
+      "http": 141,
+      "http-client": 7,
+      "identifiers": 2,
+      "index.mdx": 1,
+      "installation": 16,
+      "interface": 19,
+      "launch-process-and-lifecycle": 25,
+      "lifecycle": 24,
+      "lifecycle documentation": 20,
+      "manager": 6,
+      "menu": 173,
+      "migrations": 1,
+      "model-device-format": 211,
+      "model-support-data": 65,
+      "models": 2,
+      "modes": 7,
+      "module": 104,
+      "node": 801,
+      "node documentation": 855,
+      "onboarding-and-migration": 15,
+      "outputs": 2,
+      "package-test-configuration": 2,
+      "parameter": 370,
+      "partner API": 52,
+      "persistence": 24,
+      "platform-packaging-and-recovery": 15,
+      "prompt protocol": 1,
+      "queue": 119,
+      "queue-execution-state": 14,
+      "queue-execution-ui": 19,
+      "random number generation": 54,
+      "redirect": 65,
+      "registry": 31,
+      "route": 1,
+      "schema": 1033,
+      "sec": 19,
+      "security": 1,
+      "setting": 262,
+      "settings": 30,
+      "settings-keybindings": 7,
+      "settings-persistence-cloud-security-and-ui": 45,
+      "snippets": 56,
+      "source-and-installation": 35,
+      "specs": 4,
+      "support": 12,
+      "target status": 1,
+      "telemetry": 36,
+      "tensor operation": 600,
+      "terminal-logs-crash-and-diagnostics": 16,
+      "tooling": 108,
+      "troubleshooting": 3,
+      "tutorials": 139,
+      "ui": 287,
+      "updates-snapshots-and-downloads": 40,
+      "web extensions": 4,
+      "website-cloud": 176,
+      "website-interaction": 9,
+      "websocket": 26,
+      "widgets": 1,
+      "window-host-and-navigation": 15,
+      "workflow": 330,
+      "workflow import": 2,
+      "workflow-experience": 68,
+      "workflow-lifecycle-sharing": 26,
+      "workflow-template": 89,
+      "workflow-template-support": 17
+    },
+    "evidence_level": {
+      "code-inferred": 7042,
+      "documented-only": 2352,
+      "observed": 103,
+      "source-fingerprinted": 583,
+      "test-backed": 3215
+    },
+    "product": {
+      "Comfy CLI": 1348,
+      "Comfy documentation": 1599,
+      "Comfy embedded documentation": 855,
+      "Comfy-Desktop": 1268,
+      "ComfyUI": 4173,
+      "ComfyUI-Frontend": 3628,
+      "ComfyUI-Frontend desktop-ui": 48,
+      "ComfyUI-Frontend website": 282,
+      "Cross-product": 94
+    },
+    "source_catalog": {
+      "backend-autograd.csv": 36,
+      "backend-conditioning-contracts.csv": 583,
+      "backend-config.csv": 153,
+      "backend-external-services.csv": 217,
+      "backend-features.csv": 107,
+      "backend-formats.csv": 40,
+      "backend-http-routes.csv": 141,
+      "backend-inactive-nodes.csv": 12,
+      "backend-models.csv": 211,
+      "backend-nodes.csv": 789,
+      "backend-rng.csv": 54,
+      "backend-schemas.csv": 1010,
+      "backend-source-coverage.csv": 194,
+      "backend-tensor-operations.csv": 600,
+      "backend-websocket-events.csv": 26,
+      "comfy-cli-commands.csv": 123,
+      "comfy-cli-config.csv": 20,
+      "comfy-cli-cql-policy.csv": 419,
+      "comfy-cli-documentation.csv": 16,
+      "comfy-cli-environment.csv": 35,
+      "comfy-cli-errors.csv": 99,
+      "comfy-cli-events.csv": 12,
+      "comfy-cli-extensions.csv": 17,
+      "comfy-cli-formats.csv": 34,
+      "comfy-cli-lifecycle.csv": 24,
+      "comfy-cli-modules.csv": 104,
+      "comfy-cli-parameters.csv": 370,
+      "comfy-cli-partner-openapi.csv": 52,
+      "comfy-cli-schemas.csv": 23,
+      "cross-compatibility.csv": 60,
+      "cross-formats.csv": 34,
+      "desktop-cli-environment.csv": 95,
+      "desktop-feature-flags.csv": 3,
+      "desktop-features.csv": 206,
+      "desktop-ipc.csv": 273,
+      "desktop-keybindings-gestures.csv": 19,
+      "desktop-menu-actions.csv": 45,
+      "desktop-persistence.csv": 36,
+      "desktop-platform-matrix.csv": 3,
+      "desktop-preload-apis.csv": 299,
+      "desktop-renderer-surfaces.csv": 43,
+      "desktop-settings.csv": 31,
+      "desktop-shell-actions.csv": 26,
+      "desktop-source-plugins.csv": 6,
+      "desktop-telemetry.csv": 139,
+      "desktop-window-events.csv": 44,
+      "docs-config-formats.csv": 35,
+      "docs-extension-contracts.csv": 56,
+      "docs-lifecycle-contracts.csv": 20,
+      "docs-openapi-cloud.csv": 42,
+      "docs-pages.csv": 1273,
+      "docs-redirects.csv": 65,
+      "docs-tooling.csv": 108,
+      "embedded-docs-nodes.csv": 855,
+      "frontend-component-surfaces.csv": 805,
+      "frontend-features.csv": 2560,
+      "frontend-functional-modules.csv": 352,
+      "frontend-http-usage.csv": 7,
+      "frontend-menus.csv": 173,
+      "frontend-persisted-state.csv": 24,
+      "frontend-routes.csv": 1,
+      "frontend-telemetry.csv": 36
+    }
+  },
+  "coverage_mapping_reconciliation": {
+    "backend_production_rows_without_feature_mapping": 0,
+    "backend_source_rows": 949,
+    "backend_test_rows": 970,
+    "backend_test_rows_without_feature_mapping": 0,
+    "comfy_cli_production_rows_without_feature_mapping": 0,
+    "comfy_cli_source_rows": 312,
+    "comfy_cli_test_rows": 2295,
+    "comfy_cli_test_rows_without_source_reference": 0,
+    "docs_source_rows": 5800,
+    "docs_source_rows_without_disposition_or_reason": 0,
+    "embedded_docs_source_rows": 10298,
+    "embedded_docs_source_rows_without_disposition_or_reason": 0
+  },
+  "feature_rows": 13295,
+  "production_native_boundary": {
+    "decision": "Production Sim implements Comfy execution entirely in native Rust and may use source applications only as development-time conformance oracles.",
+    "external_comfy_connection_allowed": false,
+    "javascript_extension_execution_allowed": false,
+    "python_comfy_process_allowed": false,
+    "python_extension_execution_allowed": false,
+    "replacement_plugin_api": "versioned Rust source trait plus WASM Component Model WIT with explicit ports and deterministic legacy mappings"
+  },
+  "registry_reconciliation": [
+    {
+      "cataloged": 789,
+      "discovered": 789,
+      "name": "ComfyUI registered nodes",
+      "notes": "No unresolved registrations; inactive schema-bearing classes are counted separately."
+    },
+    {
+      "cataloged": 12,
+      "discovered": 12,
+      "name": "ComfyUI inactive schema-bearing nodes",
+      "notes": "Not active runtime registry entries."
+    },
+    {
+      "cataloged": 120,
+      "discovered": 120,
+      "name": "ComfyUI runtime-effective HTTP paths",
+      "notes": "Master route catalog has 141 rows after 47 compatibility aliases and 21 OpenAPI-only operations are represented."
+    },
+    {
+      "cataloged": 141,
+      "discovered": 141,
+      "name": "ComfyUI HTTP catalog rows",
+      "notes": "Runtime, alias, static, and OpenAPI-only contracts use distinct rows."
+    },
+    {
+      "cataloged": 141,
+      "discovered": 141,
+      "name": "ComfyUI HTTP rows with route-specific request/response detail",
+      "notes": "Each row retains a static handler/OpenAPI excerpt and states runtime-only uncertainty explicitly."
+    },
+    {
+      "cataloged": 26,
+      "discovered": 26,
+      "name": "ComfyUI WebSocket event contracts",
+      "notes": "JSON and binary/client/server directions are represented."
+    },
+    {
+      "cataloged": 153,
+      "discovered": 153,
+      "name": "ComfyUI config/CLI/environment rows",
+      "notes": "Observed help/flag probes are marked per row."
+    },
+    {
+      "cataloged": 211,
+      "discovered": 211,
+      "name": "ComfyUI model/format/hardware rows",
+      "notes": "Conditional families remain visible."
+    },
+    {
+      "cataloged": 600,
+      "discovered": 600,
+      "name": "ComfyUI tensor operation/reference contracts",
+      "notes": "Callable operations, type references, namespace/value references, and receiver-unverified candidates remain distinct; static calls do not imply semantic closure."
+    },
+    {
+      "cataloged": 36,
+      "discovered": 36,
+      "name": "ComfyUI autograd contracts",
+      "notes": "Custom Functions, gradient modes/state, checkpointing, mixed precision, optimizers/scalers, and reverse-mode execution are explicit native obligations."
+    },
+    {
+      "cataloged": 54,
+      "discovered": 54,
+      "name": "ComfyUI phase-scoped RNG contracts",
+      "notes": "Named phases retain seed/generator/device sites, retry/cancellation policy, and no-global-RNG native decisions."
+    },
+    {
+      "cataloged": 683,
+      "discovered": 683,
+      "name": "ComfyUI Python files scanned for tensor runtime",
+      "notes": "Every scanned file maps to the canonical 949-row backend source ledger; one Python 3.10 match/case file uses syntax-only normalization."
+    },
+    {
+      "cataloged": 40,
+      "discovered": 40,
+      "name": "ComfyUI persisted formats/migrations",
+      "notes": "Prompt, queue/history, database, users, media, model/tensor, and migration contracts are represented."
+    },
+    {
+      "cataloged": 1010,
+      "discovered": 1010,
+      "name": "ComfyUI schema rows",
+      "notes": "Executable and OpenAPI component schemas are retained."
+    },
+    {
+      "cataloged": 217,
+      "discovered": 217,
+      "name": "ComfyUI hosted external endpoints",
+      "notes": "No live provider was called."
+    },
+    {
+      "cataloged": 118,
+      "discovered": 118,
+      "name": "Frontend commands",
+      "notes": "Literal and dynamically registered command IDs reconciled."
+    },
+    {
+      "cataloged": 34,
+      "discovered": 34,
+      "name": "Frontend default keybindings",
+      "notes": "Each binding resolves to a command."
+    },
+    {
+      "cataloged": 236,
+      "discovered": 236,
+      "name": "Frontend menus",
+      "notes": "Command-backed and local actions are distinct."
+    },
+    {
+      "cataloged": 152,
+      "discovered": 152,
+      "name": "Frontend settings",
+      "notes": "149 literal definitions plus three explicit schema-only uncertain entries."
+    },
+    {
+      "cataloged": 82,
+      "discovered": 82,
+      "name": "Frontend routes",
+      "notes": "Main, Desktop UI, and website routes."
+    },
+    {
+      "cataloged": 24,
+      "discovered": 24,
+      "name": "Frontend WebSocket/local events",
+      "notes": "Backend-received and local events."
+    },
+    {
+      "cataloged": 149,
+      "discovered": 149,
+      "name": "Frontend HTTP client contracts",
+      "notes": "Literal plus reconciled dynamic calls."
+    },
+    {
+      "cataloged": 43,
+      "discovered": 43,
+      "name": "Frontend feature/config flags",
+      "notes": "Client hello, server flags, and remote config."
+    },
+    {
+      "cataloged": 88,
+      "discovered": 88,
+      "name": "Frontend telemetry rows",
+      "notes": "Events and literal button identifiers."
+    },
+    {
+      "cataloged": 24,
+      "discovered": 24,
+      "name": "Frontend persisted formats/migrations",
+      "notes": "Formats and explicit migrations."
+    },
+    {
+      "cataloged": 66,
+      "discovered": 66,
+      "name": "Frontend persisted state keys",
+      "notes": "Literal and dynamic patterns."
+    },
+    {
+      "cataloged": 59,
+      "discovered": 59,
+      "name": "Frontend extension contracts",
+      "notes": "Interface members and core modules."
+    },
+    {
+      "cataloged": 804,
+      "discovered": 804,
+      "name": "Frontend broad-anchor-only production/cloud/platform Vue files",
+      "notes": "Every audit-predicate match has one stable source-specific component contract."
+    },
+    {
+      "cataloged": 1,
+      "discovered": 1,
+      "name": "Frontend explicitly required already-referenced Vue surfaces",
+      "notes": "AssetsSidebarTab is retained as a functional component contract even though another authoritative catalog already cited its source path."
+    },
+    {
+      "cataloged": 691,
+      "discovered": 691,
+      "name": "Frontend functional Vue component surface contracts",
+      "notes": "Each row records concrete props/models/emits/events/handlers, visible states, failure, accessibility, persistence, interfaces, and validation."
+    },
+    {
+      "cataloged": 114,
+      "discovered": 114,
+      "name": "Frontend presentational Vue infrastructure dispositions",
+      "notes": "Each row has a source-specific render-only reason and remains traceable through its consuming surface."
+    },
+    {
+      "cataloged": 352,
+      "discovered": 352,
+      "name": "Frontend functional-module predicate candidates",
+      "notes": "Every normalized broad-anchor-only service/store/composable candidate has one stable source-specific contract."
+    },
+    {
+      "cataloged": 339,
+      "discovered": 339,
+      "name": "Frontend functional module capabilities",
+      "notes": "Each row records exports, transitions, async lifetime, errors, persistence, side effects, source digest, and validation."
+    },
+    {
+      "cataloged": 13,
+      "discovered": 13,
+      "name": "Frontend functional module infrastructure dispositions",
+      "notes": "Each pure plumbing/re-export/helper row has a source-specific non-capability reason and consuming anchor."
+    },
+    {
+      "cataloged": 34,
+      "discovered": 34,
+      "name": "Cross-product persisted formats and media carriers",
+      "notes": "Workflow, prompt, metadata, model, output, legacy, and migration carriers are reconciled across producers/consumers."
+    },
+    {
+      "cataloged": 60,
+      "discovered": 60,
+      "name": "Cross-product compatibility contracts",
+      "notes": "REST, WebSocket, IPC, extension, mode, identifier, state, and source-conflict contracts are represented."
+    },
+    {
+      "cataloged": 273,
+      "discovered": 273,
+      "name": "Desktop IPC channels",
+      "notes": "Every discovered row has a stable master feature ID and retains its parent Desktop feature ID."
+    },
+    {
+      "cataloged": 299,
+      "discovered": 299,
+      "name": "Desktop preload API members",
+      "notes": "Every discovered row has a stable master feature ID and retains its parent Desktop feature ID."
+    },
+    {
+      "cataloged": 45,
+      "discovered": 45,
+      "name": "Desktop menu actions",
+      "notes": "Every discovered row has a stable master feature ID and retains its parent Desktop feature ID."
+    },
+    {
+      "cataloged": 26,
+      "discovered": 26,
+      "name": "Desktop shell actions",
+      "notes": "Every discovered row has a stable master feature ID and retains its parent Desktop feature ID."
+    },
+    {
+      "cataloged": 44,
+      "discovered": 44,
+      "name": "Desktop window/application/WebContents/updater events",
+      "notes": "Every discovered row has a stable master feature ID and retains its parent Desktop feature ID."
+    },
+    {
+      "cataloged": 31,
+      "discovered": 31,
+      "name": "Desktop settings",
+      "notes": "Every discovered row has a stable master feature ID and retains its parent Desktop feature ID."
+    },
+    {
+      "cataloged": 36,
+      "discovered": 36,
+      "name": "Desktop persisted formats/stores",
+      "notes": "Every discovered row has a stable master feature ID and retains its parent Desktop feature ID."
+    },
+    {
+      "cataloged": 139,
+      "discovered": 139,
+      "name": "Desktop telemetry/event literals",
+      "notes": "Every discovered row has a stable master feature ID and retains its parent Desktop feature ID."
+    },
+    {
+      "cataloged": 3,
+      "discovered": 3,
+      "name": "Desktop feature flags",
+      "notes": "Every discovered row has a stable master feature ID and retains its parent Desktop feature ID."
+    },
+    {
+      "cataloged": 74,
+      "discovered": 74,
+      "name": "Desktop CLI/environment entries",
+      "notes": "Every discovered row has a stable master feature ID and retains its parent Desktop feature ID."
+    },
+    {
+      "cataloged": 21,
+      "discovered": 21,
+      "name": "Desktop renderer CSS custom properties",
+      "notes": "Every discovered row has a stable master feature ID and retains its parent Desktop feature ID."
+    },
+    {
+      "cataloged": 19,
+      "discovered": 19,
+      "name": "Desktop keybindings/gestures",
+      "notes": "Every discovered row has a stable master feature ID and retains its parent Desktop feature ID."
+    },
+    {
+      "cataloged": 6,
+      "discovered": 6,
+      "name": "Desktop installation source modes",
+      "notes": "Every discovered row has a stable master feature ID and retains its parent Desktop feature ID."
+    },
+    {
+      "cataloged": 3,
+      "discovered": 3,
+      "name": "Desktop platform matrix rows",
+      "notes": "Every discovered row has a stable master feature ID and retains its parent Desktop feature ID."
+    },
+    {
+      "cataloged": 43,
+      "discovered": 43,
+      "name": "Desktop renderer surface contracts",
+      "notes": "Every discovered row has a stable master feature ID and retains its parent Desktop feature ID."
+    },
+    {
+      "cataloged": 43,
+      "discovered": 43,
+      "name": "Desktop renderer rows with source-specific contracts and source-file mappings",
+      "notes": "Every formerly broad-anchor-only production Vue file has one stable functional or explicit presentational/infrastructure contract and the same ID in desktop-source-coverage.csv."
+    },
+    {
+      "cataloged": 45,
+      "discovered": 45,
+      "name": "Desktop menu action rows with honest per-item evidence",
+      "notes": "No derived menu item claims test-backed evidence without a focused test for its exact action and condition."
+    },
+    {
+      "cataloged": 4,
+      "discovered": 4,
+      "name": "Desktop discarded legacy settings",
+      "notes": "Load-time removal and rewrite behavior is retained instead of omitting obsolete keys."
+    },
+    {
+      "cataloged": 139,
+      "discovered": 139,
+      "name": "Desktop telemetry/event rows with source, payload, consent, redaction, and rate detail",
+      "notes": "Every production comfy.desktop.* and app:* literal has a stable ID and explicit provider/infrastructure disposition."
+    },
+    {
+      "cataloged": 273,
+      "discovered": 273,
+      "name": "Desktop IPC rows with request/event and response/callback detail",
+      "notes": "Exact static handler/call excerpts are retained; runtime structured-clone and error variants remain explicit contract-test work."
+    },
+    {
+      "cataloged": 299,
+      "discovered": 299,
+      "name": "Desktop preload members with exact source signatures",
+      "notes": "Every bridge member retains the cited TypeScript declaration and unresolved runtime boundaries."
+    },
+    {
+      "cataloged": 123,
+      "discovered": 123,
+      "name": "comfy-cli reachable command leaves",
+      "notes": "Hidden aliases and the shadowed/dead command collision remain explicitly classified."
+    },
+    {
+      "cataloged": 370,
+      "discovered": 370,
+      "name": "comfy-cli option/argument bindings",
+      "notes": "Source declarations, alias repetitions, command scope, resolved types, nullability, value arity/cardinality, repeatability, enum choices, explicit parser constraints, paired boolean forms, defaults, envvars, hidden state, extraction evidence, and globals are retained."
+    },
+    {
+      "cataloged": 23,
+      "discovered": 23,
+      "name": "comfy-cli JSON schemas",
+      "notes": "Envelope/stream mappings and the orphan comfy version mapping are reconciled separately."
+    },
+    {
+      "cataloged": 99,
+      "discovered": 99,
+      "name": "comfy-cli stable error codes",
+      "notes": "Every error code retains meaning, hint, evidence, and native target decision."
+    },
+    {
+      "cataloged": 12,
+      "discovered": 12,
+      "name": "comfy-cli event union",
+      "notes": "The converted, prompt_preview, settled, and state schema/emitter mismatches remain explicit."
+    },
+    {
+      "cataloged": 35,
+      "discovered": 35,
+      "name": "comfy-cli production environment variables",
+      "notes": "Test/CI-only variables remain in source coverage and are not promoted to production controls."
+    },
+    {
+      "cataloged": 20,
+      "discovered": 20,
+      "name": "comfy-cli configuration keys",
+      "notes": "Every key has a native mapping or architecture-conflicting migration decision."
+    },
+    {
+      "cataloged": 34,
+      "discovered": 34,
+      "name": "comfy-cli persisted/interchange formats",
+      "notes": "The comfy-lock.yaml prose versus comfy.lock.yaml executable spelling conflict is retained."
+    },
+    {
+      "cataloged": 24,
+      "discovered": 24,
+      "name": "comfy-cli lifecycle contracts",
+      "notes": "Python child lifecycle rows remain architecture conflicts; observable stages map to native operations."
+    },
+    {
+      "cataloged": 17,
+      "discovered": 17,
+      "name": "comfy-cli extension contracts",
+      "notes": "Python/frontend override execution is prohibited; legacy identities map to Rust/WASM ports/placeholders."
+    },
+    {
+      "cataloged": 419,
+      "discovered": 419,
+      "name": "comfy-cli CQL policy rows",
+      "notes": "Pack labels, node policies, versions, Git refs, and cloud-disabling labels reconcile."
+    },
+    {
+      "cataloged": 52,
+      "discovered": 52,
+      "name": "comfy-cli partner allowlist endpoints",
+      "notes": "52 aliases reconcile to the allowlist; excluded/proxy OpenAPI totals remain in the source ledger."
+    },
+    {
+      "cataloged": 1244,
+      "discovered": 1244,
+      "name": "comfy-cli capability records",
+      "notes": "All behavioral capability rows are promoted to the master feature ledger; tests/source support remain separate closure ledgers."
+    },
+    {
+      "cataloged": 104,
+      "discovered": 104,
+      "name": "comfy-cli module/service contracts",
+      "notes": "Every production module row is promoted to a master module/service contract so source-file closure requires a master feature ID."
+    },
+    {
+      "cataloged": 1273,
+      "discovered": 1273,
+      "name": "docs authoritative/content records",
+      "notes": "English source, snippets, staging, roles, corroboration, and documented-only treatment are retained."
+    },
+    {
+      "cataloged": 896,
+      "discovered": 896,
+      "name": "docs built-in node page reconciliation",
+      "notes": "Registry and embedded-doc exact/case/normalized/unverified deltas remain explicit."
+    },
+    {
+      "cataloged": 855,
+      "discovered": 855,
+      "name": "embedded-docs node records",
+      "notes": "All locales, assets, AI-generated markers, fingerprints, sync, and registry matches reconcile."
+    },
+    {
+      "cataloged": 42,
+      "discovered": 42,
+      "name": "docs Cloud OpenAPI operations",
+      "notes": "Route-shape corroboration does not promote documented cloud semantics to executable evidence."
+    },
+    {
+      "cataloged": 65,
+      "discovered": 65,
+      "name": "docs redirects",
+      "notes": "Path and case behavior is retained as documentation-site configuration."
+    },
+    {
+      "cataloged": 108,
+      "discovered": 108,
+      "name": "docs tooling contracts",
+      "notes": "Package scripts, CI, checks, and developer tools remain code-inferred developer/infrastructure behavior."
+    },
+    {
+      "cataloged": 35,
+      "discovered": 35,
+      "name": "docs configuration/format records",
+      "notes": "Schemas, locks, navigation, and registries remain evidence records rather than product behavior unless corroborated."
+    },
+    {
+      "cataloged": 56,
+      "discovered": 56,
+      "name": "docs extension contracts",
+      "notes": "All legacy behaviors map to explicit Rust/WASM ports or prohibited execution."
+    },
+    {
+      "cataloged": 20,
+      "discovered": 20,
+      "name": "docs lifecycle contracts",
+      "notes": "Embedded version skew and documentation-only lifecycle claims remain visible."
+    }
+  ],
+  "runtime_validation": {
+    "independently_testable_rows": 13242,
+    "observed_rows": 103,
+    "percentage": 0.7778
+  },
+  "schema_detail_reconciliation": {
+    "desktop_ipc_rows": 273,
+    "desktop_ipc_rows_with_explicit_unresolved_detail": 273,
+    "desktop_ipc_rows_with_request_event_detail": 273,
+    "desktop_ipc_rows_with_response_callback_detail": 273,
+    "desktop_preload_rows": 299,
+    "desktop_preload_rows_with_explicit_unresolved_detail": 299,
+    "desktop_preload_rows_with_source_signature": 299,
+    "http_rows": 141,
+    "http_rows_with_explicit_unresolved_detail": 141,
+    "http_rows_with_request_detail": 141,
+    "http_rows_with_response_detail": 141
+  },
+  "task18_execution_disposition_reconciliation": {
+    "execution_commands": {
+      "Comfy.ClearPendingTasks": {
+        "feature_id": "COMFY-UI-067",
+        "native_action": true,
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "Comfy.Interrupt": {
+        "feature_id": "COMFY-QUEUE-033",
+        "native_action": true,
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "Comfy.Memory.UnloadModels": {
+        "feature_id": "COMFY-UI-075",
+        "native_action": false,
+        "owner": "comfy-parity-native-memory-planner",
+        "target_status": "deferred"
+      },
+      "Comfy.Memory.UnloadModelsAndExecutionCache": {
+        "feature_id": "COMFY-QUEUE-034",
+        "native_action": false,
+        "owner": "comfy-parity-native-memory-planner",
+        "target_status": "deferred"
+      },
+      "Comfy.Queue.ToggleOverlay": {
+        "feature_id": "COMFY-QUEUE-035",
+        "native_action": true,
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "Comfy.QueuePrompt": {
+        "feature_id": "COMFY-QUEUE-036",
+        "native_action": true,
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "Comfy.QueuePromptFront": {
+        "feature_id": "COMFY-QUEUE-037",
+        "native_action": true,
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "Comfy.QueueSelectedOutputNodes": {
+        "feature_id": "COMFY-QUEUE-038",
+        "native_action": true,
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "Comfy.ToggleQPOV2": {
+        "feature_id": "COMFY-QUEUE-039",
+        "native_action": true,
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      }
+    },
+    "execution_components": {
+      "COMFY-FRONTEND-SURFACE-052D51C10184": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-FRONTEND-SURFACE-0C01631C3DFA": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-FRONTEND-SURFACE-19BAB3FC51C6": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-FRONTEND-SURFACE-1F516FA6CD5A": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-FRONTEND-SURFACE-228A24CC9226": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-FRONTEND-SURFACE-26F40752861E": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-FRONTEND-SURFACE-6085B98C498A": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-FRONTEND-SURFACE-63A4ABE54AC4": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-FRONTEND-SURFACE-67797BF57062": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-FRONTEND-SURFACE-6F5EE356A779": {
+        "owner": "comfy-parity-frontend-extension-compatibility",
+        "target_status": "deferred"
+      },
+      "COMFY-FRONTEND-SURFACE-922B12C3CA3D": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-FRONTEND-SURFACE-92B3D7C9D258": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-FRONTEND-SURFACE-97D04E89D68E": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-FRONTEND-SURFACE-9F0D36286AB9": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-FRONTEND-SURFACE-A14F4CA91E43": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-FRONTEND-SURFACE-BA68BC33A2AB": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-FRONTEND-SURFACE-BC42336531A9": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-FRONTEND-SURFACE-BE5BE58D2FDE": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-FRONTEND-SURFACE-E721F4A4F9B9": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-FRONTEND-SURFACE-F3428874E71D": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-FRONTEND-SURFACE-F494BDB6FD2E": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-FRONTEND-SURFACE-F69CDE266EDA": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-FRONTEND-SURFACE-F6FF6DAE75BF": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-FRONTEND-SURFACE-F7223A6667BB": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-FRONTEND-SURFACE-FB9FC24AF7FA": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      }
+    },
+    "job_run_menus": {
+      "COMFY-MENU-001": {
+        "owner": "comfy-parity-assets-editors-viewers",
+        "target_status": "deferred"
+      },
+      "COMFY-MENU-002": {
+        "owner": "comfy-parity-assets-editors-viewers",
+        "target_status": "deferred"
+      },
+      "COMFY-MENU-003": {
+        "owner": "comfy-parity-assets-editors-viewers",
+        "target_status": "deferred"
+      },
+      "COMFY-MENU-004": {
+        "owner": "comfy-parity-workflow-experience",
+        "target_status": "deferred"
+      },
+      "COMFY-MENU-005": {
+        "owner": "comfy-parity-workflow-experience",
+        "target_status": "deferred"
+      },
+      "COMFY-MENU-006": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-MENU-007": {
+        "owner": "comfy-parity-assets-editors-viewers",
+        "target_status": "deferred"
+      },
+      "COMFY-MENU-008": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-MENU-009": {
+        "owner": "comfy-parity-process-diagnostics",
+        "target_status": "deferred"
+      },
+      "COMFY-MENU-010": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-MENU-011": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-MENU-057": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-MENU-058": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-MENU-059": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-MENU-060": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-MENU-061": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      },
+      "COMFY-MENU-062": {
+        "owner": "comfy-parity-execution-ui",
+        "target_status": "partial"
+      }
+    },
+    "queue_disposition_counts": {
+      "foundation": 8,
+      "later_owned": 39,
+      "native": 49,
+      "shared_closure": 23
+    },
+    "queue_features": {
+      "COMFY-QUEUE-001": {
+        "closure_owner": "comfy-parity-native-execution-e2e",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "shared_closure",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-002": {
+        "closure_owner": "comfy-parity-native-execution-e2e",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "shared_closure",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-003": {
+        "closure_owner": "comfy-parity-native-api-host",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "shared_closure",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-004": {
+        "closure_owner": "comfy-parity-native-execution-e2e",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "shared_closure",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-005": {
+        "closure_owner": "comfy-parity-native-api-host",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-006": {
+        "closure_owner": "comfy-parity-native-api-host",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-007": {
+        "closure_owner": "comfy-parity-native-api-host",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-008": {
+        "closure_owner": "comfy-parity-native-api-host",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-009": {
+        "closure_owner": "comfy-parity-native-api-host",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-010": {
+        "closure_owner": "comfy-parity-native-api-host",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-011": {
+        "closure_owner": "comfy-parity-native-api-host",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-012": {
+        "closure_owner": "comfy-parity-native-api-host",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-013": {
+        "closure_owner": "comfy-parity-native-api-host",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-014": {
+        "closure_owner": "comfy-parity-native-api-host",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-015": {
+        "closure_owner": "comfy-parity-native-api-host",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-016": {
+        "closure_owner": "comfy-parity-native-api-host",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-017": {
+        "closure_owner": "comfy-parity-native-api-host",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-018": {
+        "closure_owner": "comfy-parity-native-api-host",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-019": {
+        "closure_owner": "comfy-parity-native-api-host",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-020": {
+        "closure_owner": "comfy-parity-native-api-host",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-021": {
+        "closure_owner": "comfy-parity-native-api-host",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-022": {
+        "closure_owner": "comfy-parity-native-api-host",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-023": {
+        "closure_owner": "comfy-parity-native-api-host",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-024": {
+        "closure_owner": "comfy-parity-native-api-host",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-025": {
+        "closure_owner": "comfy-parity-settings-localization-ui",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-026": {
+        "closure_owner": "comfy-parity-settings-localization-ui",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-027": {
+        "closure_owner": "comfy-parity-settings-localization-ui",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-028": {
+        "closure_owner": "comfy-parity-settings-localization-ui",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-029": {
+        "closure_owner": "comfy-parity-settings-localization-ui",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-030": {
+        "closure_owner": "comfy-parity-settings-localization-ui",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-031": {
+        "closure_owner": "comfy-parity-settings-localization-ui",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-032": {
+        "closure_owner": "comfy-parity-settings-localization-ui",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-033": {
+        "closure_owner": "comfy-parity-native-execution-e2e",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "shared_closure",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-034": {
+        "closure_owner": "comfy-parity-native-memory-planner",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-035": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-036": {
+        "closure_owner": "comfy-parity-native-execution-e2e",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "shared_closure",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-037": {
+        "closure_owner": "comfy-parity-native-execution-e2e",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "shared_closure",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-038": {
+        "closure_owner": "comfy-parity-native-execution-e2e",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "shared_closure",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-039": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-040": {
+        "closure_owner": "comfy-parity-workflow-experience",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-041": {
+        "closure_owner": "comfy-parity-native-execution-e2e",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "shared_closure",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-042": {
+        "closure_owner": "comfy-parity-workflow-experience",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "shared_closure",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-043": {
+        "closure_owner": "comfy-parity-workflow-experience",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "shared_closure",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-044": {
+        "closure_owner": "comfy-parity-process-diagnostics",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-045": {
+        "closure_owner": "comfy-parity-process-diagnostics",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-046": {
+        "closure_owner": "comfy-parity-native-execution-e2e",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "shared_closure",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-047": {
+        "closure_owner": "comfy-parity-native-execution-e2e",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "shared_closure",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-048": {
+        "closure_owner": "comfy-parity-native-execution-e2e",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "shared_closure",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-049": {
+        "closure_owner": "comfy-parity-workflow-experience",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-050": {
+        "closure_owner": "comfy-parity-workflow-experience",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-051": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-052": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-053": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-054": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-055": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-056": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-057": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-058": {
+        "closure_owner": "comfy-parity-native-execution-e2e",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "shared_closure",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-059": {
+        "closure_owner": "comfy-parity-native-execution-e2e",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "shared_closure",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-060": {
+        "closure_owner": "comfy-parity-native-execution-e2e",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "shared_closure",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-061": {
+        "closure_owner": "comfy-parity-native-graph",
+        "current_owner": "comfy-parity-native-graph",
+        "disposition": "foundation",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-062": {
+        "closure_owner": "comfy-parity-native-graph",
+        "current_owner": "comfy-parity-native-graph",
+        "disposition": "foundation",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-063": {
+        "closure_owner": "comfy-parity-native-graph",
+        "current_owner": "comfy-parity-native-graph",
+        "disposition": "foundation",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-064": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-065": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-066": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-067": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-068": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-069": {
+        "closure_owner": "comfy-parity-workflow-formats",
+        "current_owner": "comfy-parity-workflow-formats",
+        "disposition": "foundation",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-070": {
+        "closure_owner": "comfy-parity-native-graph",
+        "current_owner": "comfy-parity-native-graph",
+        "disposition": "foundation",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-071": {
+        "closure_owner": "comfy-parity-assets-editors-viewers",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-072": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-073": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-074": {
+        "closure_owner": "comfy-parity-native-execution-e2e",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "shared_closure",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-075": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-076": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-077": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-078": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-079": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-080": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-081": {
+        "closure_owner": "comfy-parity-performance",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-082": {
+        "closure_owner": "comfy-parity-workflow-formats",
+        "current_owner": "comfy-parity-workflow-formats",
+        "disposition": "foundation",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-083": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-084": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-085": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-086": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-087": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-088": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-089": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-090": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-091": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-092": {
+        "closure_owner": "comfy-parity-native-api-host",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-093": {
+        "closure_owner": "comfy-parity-settings-localization-ui",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-094": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-095": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-096": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-097": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-098": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-099": {
+        "closure_owner": "comfy-parity-native-execution-e2e",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "shared_closure",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-100": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-101": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-102": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-103": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-104": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-105": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-106": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-107": {
+        "closure_owner": "comfy-parity-native-graph",
+        "current_owner": "comfy-parity-native-graph",
+        "disposition": "foundation",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-108": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-109": {
+        "closure_owner": "comfy-parity-native-execution-e2e",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "shared_closure",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-110": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-111": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-112": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-113": {
+        "closure_owner": "comfy-parity-native-execution-e2e",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "shared_closure",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-114": {
+        "closure_owner": "comfy-parity-workflow-experience",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "shared_closure",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-115": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-116": {
+        "closure_owner": "comfy-parity-execution-ui",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "native",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-117": {
+        "closure_owner": "comfy-parity-workflow-experience",
+        "current_owner": null,
+        "disposition": "later_owned",
+        "target_status": "deferred"
+      },
+      "COMFY-QUEUE-118": {
+        "closure_owner": "comfy-parity-workflow-formats",
+        "current_owner": "comfy-parity-workflow-formats",
+        "disposition": "foundation",
+        "target_status": "partial"
+      },
+      "COMFY-QUEUE-119": {
+        "closure_owner": "comfy-parity-native-api-host",
+        "current_owner": "comfy-parity-execution-ui",
+        "disposition": "shared_closure",
+        "target_status": "partial"
+      }
+    }
+  },
+  "traceability": {
+    "feature_rows": 13295,
+    "features_with_all_links": 13295
+  }
+}

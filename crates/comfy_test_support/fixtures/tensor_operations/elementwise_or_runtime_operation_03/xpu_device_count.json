@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "resolution_module": "elementwise_or_runtime_operation_03",
+  "operation_id": "COMFY-TENSOR-OP-2255F11A43BA",
+  "baseline_overload_id": "COMFY-TENSOR-OP-2255F11A43BA:blocked",
+  "baseline_fixture_sha256": "dff8ab6a55d662d3043618129024bd9fbea5773a4248d4815429eb1c2cff52f9",
+  "overload_id": "sim.native.worker.xpu-device-count.v1",
+  "owner_task_id": "comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-1917b7227a5c",
+  "ordered_parameters": [
+    {
+      "default": null,
+      "keyword_only": false,
+      "kind": "positional_or_keyword",
+      "name": "topology",
+      "type": "MemoryTopology"
+    }
+  ],
+  "output_types": [
+    "u32"
+  ],
+  "semantics": {
+    "rust_signature": "fn xpu_device_count_exact_native(topology: &MemoryTopology, cancellation: &CancellationToken) -> Result<u32, NativeMemoryStatsError>",
+    "mutation_rule": "read-only projection",
+    "alias_rule": "returns a copyable count",
+    "shape_rule": "not applicable",
+    "dtype_rule": "checked u32 count",
+    "accumulation_dtype": "none",
+    "layout_rule": "not applicable",
+    "device_rule": "counts canonical Intel XPU topology entries",
+    "numeric_rule": "exact count without runtime probing or external fallback",
+    "tolerance": "exact",
+    "determinism": "fixed topology traversal",
+    "cancellation_points": "before traversal, at bounded intervals, and after count",
+    "vjp_rule": "non-differentiable device metadata",
+    "jvp_rule": "no tangent"
+  }
+}

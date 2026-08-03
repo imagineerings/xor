@@ -9,7 +9,7 @@ mod hyperlinks;
 use alacritty_terminal::{
     event::{Event as AlacTermEvent, EventListener, Notify, WindowSize},
     event_loop::{EventLoop, Msg, Notifier},
-    grid::{Dimensions, Grid, GridIterator, Row, Scroll as AlacScroll},
+    grid::{Dimensions, Grid, GridCell, GridIterator, Row, Scroll as AlacScroll},
     index::{Boundary, Column, Direction as AlacDirection, Line, Point as AlacPoint},
     selection::{
         Selection as AlacSelection, SelectionRange as AlacSelectionRange,
@@ -355,6 +355,8 @@ impl ViMotion {
             Self::WordRight => AlacViMotion::WordRight,
             Self::WordRightEnd => AlacViMotion::WordRightEnd,
             Self::Bracket => AlacViMotion::Bracket,
+            Self::ParagraphUp => AlacViMotion::ParagraphUp,
+            Self::ParagraphDown => AlacViMotion::ParagraphDown,
         }
     }
 }
@@ -842,6 +844,51 @@ pub(super) fn total_lines(term: &Term<SimListener>) -> usize {
     term.total_lines()
 }
 
+struct UsedTerminalDimensions {
+    lines: usize,
+    columns: usize,
+}
+
+impl Dimensions for UsedTerminalDimensions {
+    fn total_lines(&self) -> usize {
+        self.lines
+    }
+
+    fn screen_lines(&self) -> usize {
+        self.lines
+    }
+
+    fn columns(&self) -> usize {
+        self.columns
+    }
+}
+
+pub(super) fn shrink_to_used(term: &mut AlacrittyTerm) {
+    let grid = term.grid();
+    let screen_lines = grid.screen_lines();
+    let cursor_lines = usize::try_from(grid.cursor.point.line.0)
+        .unwrap_or_default()
+        .saturating_add(1);
+    let content_lines = (0..screen_lines)
+        .rev()
+        .find_map(|line| {
+            let line_index = i32::try_from(line).ok()?;
+            grid[Line(line_index)][..]
+                .iter()
+                .any(|cell| !cell.is_empty())
+                .then_some(line.saturating_add(1))
+        })
+        .unwrap_or(1);
+    let lines = cursor_lines.max(content_lines).clamp(1, screen_lines);
+
+    if lines < screen_lines {
+        term.resize(UsedTerminalDimensions {
+            lines,
+            columns: term.columns(),
+        });
+    }
+}
+
 pub(super) fn screen_lines(term: &Term<SimListener>) -> usize {
     term.screen_lines()
 }
@@ -977,7 +1024,7 @@ fn process_line(line: String) -> Option<String> {
 ///
 /// Despite the quirks, this is the simplest approach to appending text to the terminal: its alternative, `grid_mut` manipulations,
 /// do not properly set the scrolling state and display odd text after appending; also those manipulations are more tedious and error-prone.
-/// The function achieves proper display and scrolling capabilities, at a cost of grid state not properly synchronisim.
+/// The function achieves proper display and scrolling capabilities, at a cost of grid state not properly synchronized.
 /// This is enough for printing moderately-sized texts like task summaries, but might break or perform poorly for larger texts.
 pub(super) unsafe fn append_text_to_term(term: &mut Term<SimListener>, text_lines: &[&str]) {
     term.newline();

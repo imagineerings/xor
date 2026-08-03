@@ -1,24 +1,13 @@
 mod connection_pool;
 
 use crate::api::{CloudflareIpCountryHeader, SystemIdHeader};
-use crate::db::bookmark_store::{BookmarkStore, BookmarkUpdate, NewBookmark};
-use crate::db::file_store::{FileStore, FileStoreConfig, FileStoreError, NewFileUpload};
-use crate::db::join_request_store::JoinRequestStore;
-use crate::db::queries::channel_messages::{
-    ChannelMessageUpdate, NewChannelMessage, SearchChannelMessagesParams,
-};
-use crate::db::scheduled_message_store::{
-    NewScheduledMessage, ScheduledMessageStore, ScheduledMessageUpdate,
-};
-use crate::db::user_status_store::{UserCustomStatus, UserStatusStore};
 use crate::entities::User;
 use crate::{
     AppState, Error, Result, auth,
     db::{
         self, BufferId, Capability, Channel, ChannelId, ChannelRole, ChannelsForUser, Database,
-        GroupId, InviteMemberResult, MembershipUpdated, MessageId, NotificationId, ProjectId,
-        RejoinedProject, RemoveChannelMemberResult, RespondToChannelInvite, RoomId, ServerId,
-        SharedThreadId, UserId,
+        InviteMemberResult, MembershipUpdated, NotificationId, ProjectId, RejoinedProject,
+        RemoveChannelMemberResult, RespondToChannelInvite, RoomId, ServerId, UserId,
     },
     executor::Executor,
 };
@@ -40,7 +29,7 @@ use axum::{
     response::IntoResponse,
     routing::get,
 };
-use collections::{HashMap, HashSet, TypeIdHashMap};
+use collections::{HashSet, TypeIdHashMap};
 pub use connection_pool::{ConnectionPool, SimVersion};
 use core::fmt::{self, Debug, Formatter};
 use futures::TryFutureExt as _;
@@ -55,16 +44,13 @@ use futures::{
     stream::{BoxStream, FuturesUnordered},
 };
 use prometheus::{IntGauge, register_int_gauge};
-use rand::Rng as _;
 use rpc::{
-    Connection, ConnectionId, ErrorCode, ErrorCodeExt, ErrorExt, Notification, Peer, Receipt,
-    TypedEnvelope,
+    Connection, ConnectionId, ErrorCode, ErrorCodeExt, ErrorExt, Peer, Receipt, TypedEnvelope,
     proto::{
         self, Ack, AnyTypedEnvelope, EntityMessage, EnvelopedMessage, LiveKitConnectionInfo,
         RequestMessage, ShareProject, UpdateChannelBufferCollaborators,
     },
 };
-use sea_orm::{ColumnTrait as _, EntityTrait as _, QueryFilter as _};
 use semver::Version;
 use std::{
     any::TypeId,
@@ -80,7 +66,6 @@ use std::{
     },
     time::{Duration, Instant},
 };
-use time::PrimitiveDateTime;
 use tokio::sync::{Semaphore, watch};
 use tower::ServiceBuilder;
 use tracing::{
@@ -96,13 +81,6 @@ pub const CLEANUP_TIMEOUT: Duration = Duration::from_secs(15);
 
 const NOTIFICATION_COUNT_PER_PAGE: usize = 50;
 const MAX_CONCURRENT_CONNECTIONS: usize = 512;
-const SCHEDULED_MESSAGE_POLL_INTERVAL: Duration = Duration::from_secs(10);
-const SCHEDULED_MESSAGE_STALE_PROCESSING_GRACE: Duration = Duration::from_secs(60);
-const JOIN_REQUEST_REASON_MAX_CHARS: usize = 500;
-const JOIN_REQUEST_RATE_LIMIT: usize = 10;
-const JOIN_REQUEST_RATE_LIMIT_WINDOW: Duration = Duration::from_secs(60);
-const BOOKMARK_REORDER_BROADCAST_DEBOUNCE: Duration = Duration::from_millis(200);
-const DEFAULT_FILE_UPLOAD_MAX_FILE_SIZE: u64 = 100 * 1024 * 1024;
 
 static CONCURRENT_CONNECTIONS: AtomicUsize = AtomicUsize::new(0);
 
@@ -185,6 +163,7 @@ impl Principal {
         match &self {
             Principal::User(user) => {
                 span.record("user_id", user.id.0);
+                span.record("username", &user.username);
                 span.record("login", &user.github_login);
             }
         }
@@ -312,7 +291,7 @@ impl Debug for Session {
         let mut result = f.debug_struct("Session");
         match &self.principal {
             Principal::User(user) => {
-                result.field("user", &user.github_login);
+                result.field("user", &user.username);
             }
         }
         result.field("connection_id", &self.connection_id).finish()
@@ -344,18 +323,6 @@ struct ConnectionPoolGuard<'a> {
 }
 
 impl Server {
-    #[cfg(feature = "test-support")]
-    pub async fn sweep_expired_statuses(&self) -> Result<()> {
-        crate::status_expiry_sweeper::StatusExpirySweeper::new(
-            self.app_state.db.clone(),
-            self.app_state.executor.clone(),
-            self.peer.clone(),
-            self.connection_pool.clone(),
-        )
-        .sweep_and_broadcast()
-        .await
-    }
-
     pub fn new(id: ServerId, app_state: Arc<AppState>) -> Arc<Self> {
         let mut server = Self {
             id: parking_lot::Mutex::new(id),
@@ -471,18 +438,8 @@ impl Server {
             .add_request_handler(request_contact)
             .add_request_handler(remove_contact)
             .add_request_handler(respond_to_contact_request)
-            .add_request_handler(set_status)
-            .add_request_handler(clear_status)
-            .add_request_handler(respond_to_join_request)
-            .add_request_handler(request_join_channel)
             .add_message_handler(subscribe_to_channels)
             .add_request_handler(create_channel)
-            .add_request_handler(create_group)
-            .add_request_handler(update_group)
-            .add_request_handler(delete_group)
-            .add_request_handler(get_groups)
-            .add_request_handler(update_group_members)
-            .add_request_handler(leave_group)
             .add_request_handler(delete_channel)
             .add_request_handler(invite_channel_member)
             .add_request_handler(remove_channel_member)
@@ -499,28 +456,10 @@ impl Server {
             .add_request_handler(join_channel_chat)
             .add_message_handler(leave_channel_chat)
             .add_request_handler(send_channel_message)
-            .add_request_handler(schedule_channel_message)
-            .add_request_handler(cancel_scheduled_message)
-            .add_request_handler(update_scheduled_message)
-            .add_request_handler(get_scheduled_messages)
-            .add_request_handler(get_bookmarks)
-            .add_request_handler(get_pending_join_requests)
-            .add_request_handler(get_file_upload_url)
-            .add_request_handler(confirm_file_upload)
-            .add_request_handler(get_file_download_url)
-            .add_request_handler(add_bookmark)
-            .add_request_handler(remove_bookmark)
-            .add_request_handler(update_bookmark)
-            .add_request_handler(reorder_bookmarks)
             .add_request_handler(remove_channel_message)
             .add_request_handler(update_channel_message)
-            .add_request_handler(add_reaction)
-            .add_request_handler(remove_reaction)
             .add_request_handler(get_channel_messages)
             .add_request_handler(get_channel_messages_by_id)
-            .add_request_handler(search_channel_messages)
-            .add_request_handler(get_thread)
-            .add_request_handler(get_threads)
             .add_request_handler(get_notifications)
             .add_request_handler(mark_notification_as_read)
             .add_request_handler(move_channel)
@@ -529,7 +468,6 @@ impl Server {
             .add_message_handler(unfollow)
             .add_message_handler(update_followers)
             .add_message_handler(acknowledge_channel_message)
-            .add_message_handler(acknowledge_channel_thread)
             .add_message_handler(acknowledge_buffer_version)
             .add_request_handler(forward_mutating_project_request::<proto::Stage>)
             .add_request_handler(forward_mutating_project_request::<proto::Unstage>)
@@ -556,6 +494,7 @@ impl Server {
             .add_request_handler(forward_mutating_project_request::<proto::GitCreateRemote>)
             .add_request_handler(forward_mutating_project_request::<proto::GitRemoveRemote>)
             .add_request_handler(forward_read_only_project_request::<proto::GitGetWorktrees>)
+            .add_request_handler(forward_read_only_project_request::<proto::GitWorktreeCreatedAt>)
             .add_request_handler(forward_read_only_project_request::<proto::GitGetHeadSha>)
             .add_request_handler(forward_read_only_project_request::<proto::GetCommitData>)
             .add_request_stream_handler(
@@ -574,8 +513,6 @@ impl Server {
             .add_request_handler(forward_mutating_project_request::<proto::CheckForPushedCommits>)
             .add_request_handler(forward_mutating_project_request::<proto::ToggleLspLogs>)
             .add_message_handler(broadcast_project_message_from_host::<proto::LanguageServerLog>)
-            .add_request_handler(share_agent_thread)
-            .add_request_handler(get_shared_agent_thread)
             .add_request_handler(forward_project_search_chunk);
 
         Arc::new(server)
@@ -588,33 +525,8 @@ impl Server {
         let timeout = self.app_state.executor.sleep(CLEANUP_TIMEOUT);
         let pool = self.connection_pool.clone();
         let livekit_client = self.app_state.livekit_client.clone();
-        let scheduled_app_state = self.app_state.clone();
-        let scheduled_peer = self.peer.clone();
-        let scheduled_pool = self.connection_pool.clone();
 
         let span = info_span!("start server");
-        self.app_state.executor.spawn_detached(
-            run_scheduled_message_loop(scheduled_app_state, scheduled_peer, scheduled_pool)
-                .instrument(span.clone()),
-        );
-        let join_request_app_state = self.app_state.clone();
-        let join_request_peer = self.peer.clone();
-        let join_request_pool = self.connection_pool.clone();
-        self.app_state.executor.spawn_detached(
-            run_join_request_expiry_loop(
-                join_request_app_state,
-                join_request_peer,
-                join_request_pool,
-            )
-            .instrument(span.clone()),
-        );
-        crate::status_expiry_sweeper::StatusExpirySweeper::new(
-            self.app_state.db.clone(),
-            self.app_state.executor.clone(),
-            self.peer.clone(),
-            self.connection_pool.clone(),
-        )
-        .start();
         self.app_state.executor.spawn_detached(
             async move {
                 tracing::info!("waiting for cleanup timeout");
@@ -1136,14 +1048,6 @@ impl Server {
                 }
 
                 let contacts = self.app_state.db.get_contacts(user.id).await?;
-                let contact_ids = contacts
-                    .iter()
-                    .map(|contact| match contact {
-                        db::Contact::Accepted { user_id, .. }
-                        | db::Contact::Outgoing { user_id }
-                        | db::Contact::Incoming { user_id } => *user_id,
-                    })
-                    .collect();
 
                 {
                     let mut pool = self.connection_pool.lock();
@@ -1153,12 +1057,6 @@ impl Server {
                         build_initial_contacts_update(contacts, &pool),
                     )?;
                 }
-
-                let statuses = UserStatusStore::new(self.app_state.db.clone())
-                    .get_custom_statuses(contact_ids)
-                    .await?;
-                self.peer
-                    .send(connection_id, build_initial_user_statuses_update(statuses))?;
 
                 if let Some(incoming_call) =
                     self.app_state.db.incoming_call_for_user(user.id).await?
@@ -1595,41 +1493,6 @@ async fn rejoin_room(
             .rejoin_room(request, session.user_id(), session.connection_id)
             .await?;
 
-        let live_kit_connection_info =
-            session
-                .app_state
-                .livekit_client
-                .as_ref()
-                .and_then(|live_kit| {
-                    let (can_publish, token) = if rejoined_room.role == ChannelRole::Guest {
-                        (
-                            false,
-                            live_kit
-                                .guest_token(
-                                    &rejoined_room.room.livekit_room,
-                                    &session.user_id().to_string(),
-                                )
-                                .trace_err()?,
-                        )
-                    } else {
-                        (
-                            true,
-                            live_kit
-                                .room_token(
-                                    &rejoined_room.room.livekit_room,
-                                    &session.user_id().to_string(),
-                                )
-                                .trace_err()?,
-                        )
-                    };
-
-                    Some(LiveKitConnectionInfo {
-                        server_url: live_kit.url().into(),
-                        token,
-                        can_publish,
-                    })
-                });
-
         response.send(proto::RejoinRoomResponse {
             room: Some(rejoined_room.room.clone()),
             reshared_projects: rejoined_room
@@ -1649,7 +1512,6 @@ async fn rejoin_room(
                 .iter()
                 .map(|rejoined_project| rejoined_project.to_proto())
                 .collect(),
-            live_kit_connection_info,
         })?;
         room_updated(&rejoined_room.room, &session.peer);
 
@@ -1737,6 +1599,8 @@ fn notify_rejoined_projects(
                 abs_path: worktree.abs_path.clone(),
                 root_name: worktree.root_name,
                 root_repo_common_dir: worktree.root_repo_common_dir,
+                // todo(collab): Get this field from database
+                root_repo_is_linked_worktree: false,
                 updated_entries: worktree.updated_entries,
                 removed_entries: worktree.removed_entries,
                 scan_id: worktree.scan_id,
@@ -2145,6 +2009,8 @@ async fn join_project(
             visible: worktree.visible,
             abs_path: worktree.abs_path.clone(),
             root_repo_common_dir: None,
+            // todo(collab): Get this field from database
+            root_repo_is_linked_worktree: false,
         })
         .collect::<Vec<_>>();
 
@@ -2197,6 +2063,8 @@ async fn join_project(
             abs_path: worktree.abs_path.clone(),
             root_name: worktree.root_name,
             root_repo_common_dir: worktree.root_repo_common_dir,
+            // todo(collab): Get this field from database
+            root_repo_is_linked_worktree: false,
             updated_entries: worktree.entries,
             removed_entries: Default::default(),
             scan_id: worktree.scan_id,
@@ -2823,6 +2691,7 @@ async fn get_users(
         .into_iter()
         .map(|user| proto::User {
             id: user.id.to_proto(),
+            username: user.username,
             avatar_url: user.avatar_url,
             github_login: user.github_login,
             name: user.name,
@@ -2861,6 +2730,7 @@ async fn fuzzy_search_users(
         .filter(|user| user.id != session.user_id())
         .map(|user| proto::User {
             id: user.id.to_proto(),
+            username: user.username,
             avatar_url: user.avatar_url,
             github_login: user.github_login,
             name: user.name,
@@ -3048,234 +2918,6 @@ async fn subscribe_user_to_channels(user_id: UserId, session: &Session) -> Resul
         session.connection_id,
         build_channels_update(channels_for_user),
     )?;
-    Ok(())
-}
-
-async fn create_group(
-    request: proto::CreateGroup,
-    response: Response<proto::CreateGroup>,
-    session: MessageContext,
-) -> Result<()> {
-    let db = session.db().await;
-    let member_ids = request
-        .member_ids
-        .iter()
-        .copied()
-        .map(UserId::from_proto)
-        .collect::<Vec<_>>();
-    let group = db
-        .create_group(
-            &request.name,
-            &request.display_name,
-            session.user_id(),
-            &member_ids,
-        )
-        .await
-        .map_err(group_rpc_error)?;
-    response.send(proto::CreateGroupResponse {
-        group: Some(group.to_proto()),
-    })?;
-    broadcast_groups(
-        &session,
-        proto::UpdateGroups {
-            groups: vec![group.to_proto()],
-            ..Default::default()
-        },
-    )
-    .await
-}
-
-async fn update_group(
-    request: proto::UpdateGroup,
-    response: Response<proto::UpdateGroup>,
-    session: MessageContext,
-) -> Result<()> {
-    let db = session.db().await;
-    let group_id = GroupId::from_proto(request.group_id);
-    ensure_group_admin(&db, group_id, session.user_id()).await?;
-    let group = db
-        .update_group(
-            group_id,
-            request.name.as_deref(),
-            request.display_name.as_deref(),
-        )
-        .await
-        .map_err(group_rpc_error)?;
-    response.send(proto::UpdateGroupResponse {
-        group: Some(group.to_proto()),
-    })?;
-    broadcast_groups(
-        &session,
-        proto::UpdateGroups {
-            groups: vec![group.to_proto()],
-            ..Default::default()
-        },
-    )
-    .await
-}
-
-async fn delete_group(
-    request: proto::DeleteGroup,
-    response: Response<proto::DeleteGroup>,
-    session: MessageContext,
-) -> Result<()> {
-    let db = session.db().await;
-    let group_id = GroupId::from_proto(request.group_id);
-    ensure_group_admin(&db, group_id, session.user_id()).await?;
-    db.delete_group(group_id).await.map_err(group_rpc_error)?;
-    response.send(proto::DeleteGroupResponse {})?;
-    broadcast_groups(
-        &session,
-        proto::UpdateGroups {
-            delete_group_ids: vec![group_id.to_proto()],
-            ..Default::default()
-        },
-    )
-    .await
-}
-
-async fn get_groups(
-    _: proto::GetGroups,
-    response: Response<proto::GetGroups>,
-    session: MessageContext,
-) -> Result<()> {
-    let groups = session
-        .db()
-        .await
-        .get_groups()
-        .await
-        .map_err(group_rpc_error)?;
-    response.send(proto::GetGroupsResponse {
-        groups: groups
-            .iter()
-            .map(db::queries::groups::GroupWithMembers::to_proto)
-            .collect(),
-    })?;
-    Ok(())
-}
-
-async fn update_group_members(
-    request: proto::UpdateGroupMembers,
-    response: Response<proto::UpdateGroupMembers>,
-    session: MessageContext,
-) -> Result<()> {
-    let db = session.db().await;
-    let group_id = GroupId::from_proto(request.group_id);
-    ensure_group_admin(&db, group_id, session.user_id()).await?;
-    let add_ids = request
-        .add_user_ids
-        .iter()
-        .copied()
-        .map(UserId::from_proto)
-        .collect::<Vec<_>>();
-    let remove_ids = request
-        .remove_user_ids
-        .iter()
-        .copied()
-        .map(UserId::from_proto)
-        .collect::<Vec<_>>();
-    let group = db
-        .update_group_members(group_id, &add_ids, &remove_ids)
-        .await
-        .map_err(group_rpc_error)?;
-    response.send(proto::UpdateGroupMembersResponse {
-        group: Some(group.to_proto()),
-    })?;
-    broadcast_groups(
-        &session,
-        proto::UpdateGroups {
-            groups: vec![group.to_proto()],
-            ..Default::default()
-        },
-    )
-    .await
-}
-
-async fn leave_group(
-    request: proto::LeaveGroup,
-    response: Response<proto::LeaveGroup>,
-    session: MessageContext,
-) -> Result<()> {
-    let db = session.db().await;
-    let group_id = GroupId::from_proto(request.group_id);
-    db.leave_group(group_id, session.user_id())
-        .await
-        .map_err(group_rpc_error)?;
-    let group = db
-        .get_group(group_id)
-        .await
-        .map_err(group_rpc_error)?
-        .ok_or_else(|| {
-            ErrorCode::NotFound
-                .message("group not found".into())
-                .anyhow()
-        })?;
-    response.send(proto::LeaveGroupResponse {})?;
-    broadcast_groups(
-        &session,
-        proto::UpdateGroups {
-            groups: vec![group.to_proto()],
-            ..Default::default()
-        },
-    )
-    .await
-}
-
-async fn ensure_group_admin(db: &Database, group_id: GroupId, user_id: UserId) -> Result<()> {
-    let group = db
-        .get_group(group_id)
-        .await
-        .map_err(group_rpc_error)?
-        .ok_or_else(|| {
-            ErrorCode::NotFound
-                .message("group not found".into())
-                .anyhow()
-        })?;
-    if group.group.admin_id != user_id {
-        return Err(ErrorCode::PermissionDenied
-            .message("only the group admin can modify this group".into())
-            .anyhow()
-            .into());
-    }
-    Ok(())
-}
-
-fn group_rpc_error(error: Error) -> Error {
-    let Error::Internal(error) = error else {
-        return error;
-    };
-    let Some(group_error) = error.downcast_ref::<db::queries::groups::GroupError>() else {
-        return Error::Internal(error);
-    };
-    let (code, message) = match group_error {
-        db::queries::groups::GroupError::DuplicateName => {
-            (ErrorCode::AlreadyExists, "group name already exists")
-        }
-        db::queries::groups::GroupError::EmptyDisplayName => (
-            ErrorCode::InvalidArgument,
-            "group display name cannot be empty",
-        ),
-        db::queries::groups::GroupError::InvalidName => (
-            ErrorCode::InvalidArgument,
-            "group name must contain only letters, numbers, and hyphens",
-        ),
-        db::queries::groups::GroupError::MembershipNotFound => {
-            (ErrorCode::NotFound, "group membership not found")
-        }
-        db::queries::groups::GroupError::NotFound => (ErrorCode::NotFound, "group not found"),
-        db::queries::groups::GroupError::TooManyMembers => (
-            ErrorCode::InvalidArgument,
-            "group exceeds maximum member count",
-        ),
-    };
-    code.anyhow().context(message).into()
-}
-
-async fn broadcast_groups(session: &MessageContext, update: proto::UpdateGroups) -> Result<()> {
-    let connection_pool = session.connection_pool().await;
-    for connection_id in connection_pool.connection_ids() {
-        session.peer.send(connection_id, update.clone())?;
-    }
     Ok(())
 }
 
@@ -3683,188 +3325,6 @@ async fn get_channel_members(
     Ok(())
 }
 
-const STATUS_CLEAR_AFTER_MINUTES: &[u32] = &[30, 60, 240, 1_440, 10_080];
-
-fn validate_status_request(
-    text: &str,
-    emoji: Option<&str>,
-    clear_after_minutes: Option<u32>,
-) -> Result<()> {
-    if text.is_empty() || text.chars().count() > 100 {
-        return Err(anyhow!("status text must contain between 1 and 100 characters").into());
-    }
-    if let Some(emoji) = emoji
-        && emojis::get(emoji).is_none()
-    {
-        return Err(anyhow!("status emoji is not recognized").into());
-    }
-    if let Some(minutes) = clear_after_minutes
-        && !STATUS_CLEAR_AFTER_MINUTES.contains(&minutes)
-    {
-        return Err(anyhow!("unsupported status clear-after duration").into());
-    }
-    Ok(())
-}
-
-async fn set_status(
-    request: proto::SetStatus,
-    response: Response<proto::SetStatus>,
-    session: MessageContext,
-) -> Result<()> {
-    let text = request.text.trim();
-    validate_status_request(text, request.emoji.as_deref(), request.clear_after_minutes)?;
-
-    let now = time::OffsetDateTime::now_utc();
-    let expires_at = request.clear_after_minutes.map(|minutes| {
-        let expires_at = now + Duration::from_secs(u64::from(minutes) * 60);
-        time::PrimitiveDateTime::new(expires_at.date(), expires_at.time())
-    });
-    let status = UserStatusStore::new(session.app_state.db.clone())
-        .upsert_custom_status(
-            session.user_id(),
-            request.emoji.clone(),
-            text.to_string(),
-            expires_at,
-        )
-        .await?;
-    broadcast_user_status_update(&session, session.user_id(), Some(status)).await?;
-    response.send(proto::SetStatusResponse {})?;
-    Ok(())
-}
-
-async fn clear_status(
-    _: proto::ClearStatus,
-    response: Response<proto::ClearStatus>,
-    session: MessageContext,
-) -> Result<()> {
-    UserStatusStore::new(session.app_state.db.clone())
-        .delete_custom_status(session.user_id())
-        .await?;
-    broadcast_user_status_update(&session, session.user_id(), None).await?;
-    response.send(proto::Ack {})?;
-    Ok(())
-}
-
-async fn broadcast_user_status_update(
-    session: &MessageContext,
-    user_id: UserId,
-    status: Option<UserCustomStatus>,
-) -> Result<()> {
-    let update = proto::UpdateUserStatus {
-        user_id: user_id.to_proto(),
-        status: status.map(|status| proto::UserCustomStatus {
-            emoji: status.emoji,
-            text: status.status_text,
-            expires_at: status
-                .expires_at
-                .map(|expires_at| expires_at.assume_utc().unix_timestamp() as u64),
-        }),
-    };
-    let connection_pool = session.connection_pool().await;
-    for connection_id in connection_pool.connection_ids() {
-        session.peer.send(connection_id, update.clone())?;
-    }
-    Ok(())
-}
-
-async fn respond_to_join_request(
-    request: proto::RespondToJoinRequest,
-    response: Response<proto::RespondToJoinRequest>,
-    session: MessageContext,
-) -> Result<()> {
-    let channel_id = ChannelId::from_proto(request.channel_id);
-    let requester_id = UserId::from_proto(request.requesting_user_id);
-    let responder_id = session.user_id();
-    let db = session.app_state.db.clone();
-    let channel = db
-        .transaction(|tx| {
-            let db = db.clone();
-            async move {
-                let channel = db.get_channel_internal(channel_id, &tx).await?;
-                db.check_user_is_channel_admin(&channel, responder_id, &tx)
-                    .await?;
-                Ok(channel)
-            }
-        })
-        .await?;
-
-    let store = JoinRequestStore::new(db.clone());
-    let handled = if request.approve {
-        store.approve_join_request(channel_id, requester_id).await?
-    } else {
-        store.deny_join_request(channel_id, requester_id).await?
-    };
-    if !handled {
-        return Err(anyhow!("join request no longer exists").into());
-    }
-
-    let notification = if request.approve {
-        rpc::Notification::JoinRequestApproved {
-            channel_id: channel_id.to_proto(),
-            channel_name: channel.name.clone(),
-        }
-    } else {
-        rpc::Notification::JoinRequestDenied {
-            channel_id: channel_id.to_proto(),
-            channel_name: channel.name.clone(),
-            reason: request.denial_reason.clone(),
-        }
-    };
-    let notifications = db
-        .transaction(|tx| {
-            let db = db.clone();
-            let notification = notification.clone();
-            async move {
-                Ok(db
-                    .create_notification(requester_id, notification, false, &tx)
-                    .await?
-                    .into_iter()
-                    .collect())
-            }
-        })
-        .await?;
-
-    let pending_request_count = store.count_pending_requests(channel_id).await?;
-    let membership_update = if request.approve {
-        Some(MembershipUpdated {
-            channel_id,
-            new_channels: db.get_channels_for_user(requester_id).await?,
-            removed_channels: Vec::new(),
-        })
-    } else {
-        None
-    };
-    let mut connection_pool = session.connection_pool().await;
-    if let Some(membership_update) = membership_update {
-        notify_membership_updated(
-            &mut connection_pool,
-            membership_update,
-            requester_id,
-            &session.peer,
-        );
-    }
-    send_notifications(&connection_pool, &session.peer, notifications);
-    send_pending_join_request_count_update(
-        &session.peer,
-        &connection_pool,
-        channel.root_id(),
-        channel_id,
-        pending_request_count,
-    )?;
-    for connection_id in connection_pool.user_connection_ids(requester_id) {
-        session.peer.send(
-            connection_id,
-            proto::JoinRequestResponded {
-                channel_id: channel_id.to_proto(),
-                approved: request.approve,
-                denial_reason: request.denial_reason.clone(),
-            },
-        )?;
-    }
-
-    response.send(proto::RespondToJoinRequestResponse { success: true })
-}
-
 /// Accept or decline a channel invitation.
 async fn respond_to_channel_invite(
     request: proto::RespondToChannelInvite,
@@ -4206,1100 +3666,36 @@ fn send_notifications(
 
 /// Send a message to the channel
 async fn send_channel_message(
-    request: proto::SendChannelMessage,
-    response: Response<proto::SendChannelMessage>,
-    session: MessageContext,
+    _request: proto::SendChannelMessage,
+    _response: Response<proto::SendChannelMessage>,
+    _session: MessageContext,
 ) -> Result<()> {
-    let channel_id = ChannelId::from_proto(request.channel_id);
-    let priority = channel_message_priority_from_proto(request.priority)?;
-    let file_ids = request
-        .file_ids
-        .iter()
-        .map(|file_id| {
-            uuid::Uuid::parse_str(file_id)
-                .context("invalid file id")
-                .map_err(Error::from)
-        })
-        .collect::<Result<Vec<_>>>()?;
-    let db = session.db().await;
-    let group_mentions = request
-        .mentions
-        .iter()
-        .filter(|mention| mention.group_id != 0)
-        .map(|mention| GroupId::from_proto(mention.group_id))
-        .collect::<Vec<_>>();
-    let mentions = expand_group_mentions(&request.mentions, &db).await?;
-    let mut message = db
-        .create_channel_message(NewChannelMessage {
-            channel_id,
-            sender_id: session.user_id(),
-            body: request.body,
-            nonce: request.nonce.context("missing channel message nonce")?,
-            mentions,
-            reply_to_message_id: request.reply_to_message_id.map(MessageId::from_proto),
-            scheduled_at: None,
-            priority,
-        })
-        .await?;
-    if !file_ids.is_empty() {
-        let attachments = file_store(&session)
-            .attach_files_to_message(
-                channel_id,
-                MessageId::from_proto(message.id),
-                session.user_id(),
-                file_ids,
-            )
-            .await
-            .map_err(file_store_rpc_error)?;
-        message.files = attachments
-            .into_iter()
-            .map(db::file_store::FileAttachment::to_proto)
-            .collect();
-    }
-
-    response.send(proto::SendChannelMessageResponse {
-        message: Some(message.clone()),
-    })?;
-    drop(db);
-    broadcast_channel_message_sent(&session, channel_id, message.clone()).await?;
-    dispatch_group_mention_notifications(&session, channel_id, &group_mentions, &message).await?;
-    if priority == 2 {
-        dispatch_urgent_notifications(&session, channel_id, &message).await?;
-    }
-    Ok(())
-}
-
-async fn dispatch_group_mention_notifications(
-    session: &MessageContext,
-    channel_id: ChannelId,
-    group_mentions: &[GroupId],
-    message: &proto::ChannelMessage,
-) -> Result<()> {
-    let sender_id = session.user_id();
-    let db = session.db().await;
-    let mut recipient_ids = HashSet::default();
-    for group_id in group_mentions.iter().copied().collect::<HashSet<_>>() {
-        for recipient_id in db.get_group_member_ids(group_id).await? {
-            if recipient_id != sender_id {
-                recipient_ids.insert((group_id.to_proto(), recipient_id));
-            }
-        }
-    }
-    if recipient_ids.is_empty() {
-        return Ok(());
-    }
-
-    let database = db.0.clone();
-    let message_preview = message.body.chars().take(200).collect::<String>();
-    let notifications = database
-        .transaction(|tx| {
-            let database = database.clone();
-            let recipient_ids = recipient_ids.clone();
-            let message_preview = message_preview.clone();
-            async move {
-                let mut notifications = Vec::new();
-                for (group_id, recipient_id) in &recipient_ids {
-                    if let Some(notification) = database
-                        .create_notification(
-                            *recipient_id,
-                            Notification::GroupMention {
-                                message_id: message.id,
-                                channel_id: channel_id.to_proto(),
-                                sender_id: sender_id.to_proto(),
-                                group_id: *group_id,
-                                message_preview: message_preview.clone(),
-                            },
-                            true,
-                            &tx,
-                        )
-                        .await?
-                    {
-                        notifications.push(notification);
-                    }
-                }
-                Ok(notifications)
-            }
-    })
-    .await?;
-    let connection_pool = session.connection_pool().await;
-    send_notifications(&connection_pool, &session.peer, notifications);
-    Ok(())
-}
-
-async fn dispatch_urgent_notifications(
-    session: &MessageContext,
-    channel_id: ChannelId,
-    message: &proto::ChannelMessage,
-) -> Result<()> {
-    let db = session.db().await;
-    let database = db.0.clone();
-    let channel = db.get_channel(channel_id, session.user_id()).await?;
-    let root_channel_id = channel.root_id();
-    let sender_id = session.user_id();
-    let message_id = MessageId::from_proto(message.id);
-    let message_preview = message.body.chars().take(200).collect::<String>();
-    let notifications = database
-        .transaction(|tx| {
-            let database = database.clone();
-            let message_preview = message_preview.clone();
-            async move {
-                let members = db::channel_member::Entity::find()
-                    .filter(db::channel_member::Column::ChannelId.eq(root_channel_id))
-                    .filter(db::channel_member::Column::Accepted.eq(true))
-                    .all(&*tx)
-                    .await?;
-                let mut notifications = Vec::new();
-                for member in members {
-                    if member.user_id == sender_id {
-                        continue;
-                    }
-                    if let Some(notification) = database
-                        .create_notification(
-                            member.user_id,
-                            Notification::UrgentMessage {
-                                message_id: message_id.to_proto(),
-                                channel_id: channel_id.to_proto(),
-                                sender_id: sender_id.to_proto(),
-                                message_preview: message_preview.clone(),
-                            },
-                            true,
-                            &tx,
-                        )
-                        .await?
-                    {
-                        notifications.push(notification);
-                    }
-                }
-                Ok(notifications)
-            }
-        })
-        .await?;
-
-    let connection_pool = session.connection_pool().await;
-    for (recipient_id, notification) in &notifications {
-        for connection_id in connection_pool.user_connection_ids(*recipient_id) {
-            session.peer.send(
-                connection_id,
-                proto::UrgentMessageNotification {
-                    channel_id: channel_id.to_proto(),
-                    message_id: message_id.to_proto(),
-                    sender_id: sender_id.to_proto(),
-                    message_preview: message_preview.clone(),
-                },
-            )?;
-            session.peer.send(
-                connection_id,
-                proto::AddNotification {
-                    notification: Some(notification.clone()),
-                },
-            )?;
-        }
-    }
-    Ok(())
-}
-
-async fn expand_group_mentions(
-    mentions: &[proto::ChatMention],
-    db: &Database,
-) -> Result<Vec<proto::ChatMention>> {
-    let mut group_members = HashMap::default();
-    for group_id in mentions
-        .iter()
-        .filter(|mention| mention.group_id != 0)
-        .map(|mention| GroupId::from_proto(mention.group_id))
-        .collect::<HashSet<_>>()
-    {
-        group_members.insert(group_id, db.get_group_member_ids(group_id).await?);
-    }
-    Ok(expand_group_mentions_from_members(
-        mentions,
-        &group_members,
-    )?)
-}
-
-fn expand_group_mentions_from_members(
-    mentions: &[proto::ChatMention],
-    group_members: &HashMap<GroupId, Vec<UserId>>,
-) -> anyhow::Result<Vec<proto::ChatMention>> {
-    let mut expanded = Vec::new();
-    for mention in mentions {
-        if mention.group_id == 0 {
-            expanded.push(mention.clone());
-            continue;
-        }
-        let user_ids = group_members
-            .get(&GroupId::from_proto(mention.group_id))
-            .with_context(|| format!("group {} not found", mention.group_id))?;
-        for user_id in user_ids {
-            expanded.push(proto::ChatMention {
-                range: mention.range.clone(),
-                user_id: user_id.to_proto(),
-                group_id: mention.group_id,
-            });
-        }
-    }
-    Ok(expanded)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use proptest::prelude::*;
-
-    #[test]
-    fn expand_group_mentions_preserves_individual_mentions_and_ranges() {
-        let mentions = vec![
-            proto::ChatMention {
-                range: Some(proto::Range { start: 0, end: 4 }),
-                user_id: 10,
-                group_id: 0,
-            },
-            proto::ChatMention {
-                range: Some(proto::Range { start: 5, end: 9 }),
-                user_id: 0,
-                group_id: 7,
-            },
-        ];
-        let members = [(
-            GroupId::from_proto(7),
-            vec![UserId::from_proto(20), UserId::from_proto(30)],
-        )]
-        .into_iter()
-        .collect();
-
-        let expanded = expand_group_mentions_from_members(&mentions, &members).unwrap();
-
-        assert_eq!(
-            expanded,
-            vec![
-                mentions[0].clone(),
-                proto::ChatMention {
-                    range: mentions[1].range.clone(),
-                    user_id: 20,
-                    group_id: 7,
-                },
-                proto::ChatMention {
-                    range: mentions[1].range.clone(),
-                    user_id: 30,
-                    group_id: 7,
-                },
-            ]
-        );
-    }
-
-    #[test]
-    fn expand_group_mentions_rejects_missing_groups() {
-        let mentions = [proto::ChatMention {
-            range: Some(proto::Range { start: 0, end: 4 }),
-            user_id: 0,
-            group_id: 99,
-        }];
-
-        assert!(expand_group_mentions_from_members(&mentions, &HashMap::default()).is_err());
-    }
-
-    proptest! {
-        #[test]
-        fn status_text_validation_matches_the_character_boundary(text in any::<String>()) {
-            let text = text.chars().take(200).collect::<String>();
-            let result = validate_status_request(&text, None, None);
-
-            prop_assert_eq!(result.is_ok(), !text.is_empty() && text.chars().count() <= 100);
-        }
-
-        #[test]
-        fn expand_group_mentions_preserves_group_membership_mapping(
-            member_ids in prop::collection::vec(1_u64..10_000, 1..20),
-        ) {
-            let mut member_ids = member_ids
-                .into_iter()
-                .map(UserId::from_proto)
-                .collect::<Vec<_>>();
-            member_ids.sort_unstable();
-            member_ids.dedup();
-            let mentions = [proto::ChatMention {
-                range: Some(proto::Range { start: 2, end: 8 }),
-                user_id: 0,
-                group_id: 7,
-            }];
-            let members = [(GroupId::from_proto(7), member_ids.clone())]
-                .into_iter()
-                .collect();
-
-            let expanded = expand_group_mentions_from_members(&mentions, &members).unwrap();
-
-            prop_assert!(expanded.iter().all(|mention| mention.group_id == 7));
-            prop_assert_eq!(
-                expanded.iter().map(|mention| mention.user_id).collect::<Vec<_>>(),
-                member_ids.iter().map(|id| id.to_proto()).collect::<Vec<_>>(),
-            );
-        }
-    }
-}
-
-fn channel_message_priority_from_proto(priority: Option<i32>) -> Result<i16> {
-    match priority.unwrap_or_default() {
-        0 => Ok(0),
-        1 => Ok(1),
-        2 => Ok(2),
-        _ => Err(anyhow!("invalid channel message priority").into()),
-    }
-}
-
-async fn schedule_channel_message(
-    request: proto::ScheduleChannelMessage,
-    response: Response<proto::ScheduleChannelMessage>,
-    session: MessageContext,
-) -> Result<()> {
-    let scheduled_at = timestamp_millis_to_primitive_datetime(request.scheduled_at)?;
-    let nonce = request.nonce.unwrap_or_else(|| {
-        tracing::warn!(
-            channel_id = request.channel_id,
-            user_id = %session.user_id(),
-            "missing scheduled message nonce; generating server-side fallback"
-        );
-        rand::rng().random::<u128>().into()
-    });
-    let store = ScheduledMessageStore::new(session.app_state.db.clone());
-    let scheduled_message_id = store
-        .create(NewScheduledMessage {
-            channel_id: ChannelId::from_proto(request.channel_id),
-            sender_id: session.user_id(),
-            body: request.body,
-            scheduled_at,
-            nonce,
-            mentions: request.mentions,
-        })
-        .await?;
-
-    response.send(proto::ScheduleChannelMessageResponse {
-        scheduled_message_id: scheduled_message_id.to_proto(),
-    })
-}
-
-async fn cancel_scheduled_message(
-    request: proto::CancelScheduledMessage,
-    response: Response<proto::CancelScheduledMessage>,
-    session: MessageContext,
-) -> Result<()> {
-    let store = ScheduledMessageStore::new(session.app_state.db.clone());
-    store
-        .cancel(
-            db::ScheduledMessageId::from_proto(request.scheduled_message_id),
-            ChannelId::from_proto(request.channel_id),
-            session.user_id(),
-        )
-        .await?;
-    response.send(proto::Ack {})
-}
-
-async fn update_scheduled_message(
-    request: proto::UpdateScheduledMessage,
-    response: Response<proto::UpdateScheduledMessage>,
-    session: MessageContext,
-) -> Result<()> {
-    let scheduled_at = request
-        .scheduled_at
-        .map(timestamp_millis_to_primitive_datetime)
-        .transpose()?;
-    let store = ScheduledMessageStore::new(session.app_state.db.clone());
-    store
-        .update(ScheduledMessageUpdate {
-            scheduled_message_id: db::ScheduledMessageId::from_proto(request.scheduled_message_id),
-            channel_id: ChannelId::from_proto(request.channel_id),
-            sender_id: session.user_id(),
-            body: request.body,
-            scheduled_at,
-            mentions: Some(request.mentions),
-        })
-        .await?;
-    response.send(proto::Ack {})
-}
-
-async fn get_scheduled_messages(
-    request: proto::GetScheduledMessages,
-    response: Response<proto::GetScheduledMessages>,
-    session: MessageContext,
-) -> Result<()> {
-    let store = ScheduledMessageStore::new(session.app_state.db.clone());
-    let messages = store
-        .list_for_user(session.user_id(), ChannelId::from_proto(request.channel_id))
-        .await?
-        .into_iter()
-        .map(|message| message.to_proto())
-        .collect();
-    response.send(proto::GetScheduledMessagesResponse { messages })
-}
-
-async fn get_bookmarks(
-    request: proto::GetBookmarks,
-    response: Response<proto::GetBookmarks>,
-    session: MessageContext,
-) -> Result<()> {
-    let channel_id = ChannelId::from_proto(request.channel_id);
-    ensure_can_read_bookmarks(&session, channel_id).await?;
-    let store = BookmarkStore::new(session.app_state.db.clone());
-    let bookmarks = store
-        .get_bookmarks(channel_id)
-        .await?
-        .into_iter()
-        .map(db::bookmark_store::Bookmark::to_proto)
-        .collect();
-    response.send(proto::GetBookmarksResponse { bookmarks })
-}
-
-async fn get_pending_join_requests(
-    request: proto::GetPendingJoinRequests,
-    response: Response<proto::GetPendingJoinRequests>,
-    session: MessageContext,
-) -> Result<()> {
-    let channel_id = ChannelId::from_proto(request.channel_id);
-    let user_id = session.user_id();
-    let db = session.app_state.db.clone();
-    db.transaction(|tx| {
-        let db = db.clone();
-        async move {
-            let channel = db.get_channel_internal(channel_id, &tx).await?;
-            db.check_user_is_channel_admin(&channel, user_id, &tx).await
-        }
-    })
-    .await?;
-
-    let requests = JoinRequestStore::new(db)
-        .get_pending_requests(channel_id)
-        .await?
-        .into_iter()
-        .map(|request| proto::PendingJoinRequest {
-            user_id: request.user_id.to_proto(),
-            reason: request.reason,
-            created_at: request.created_at.assume_utc().unix_timestamp() as u64,
-        })
-        .collect();
-    response.send(proto::GetPendingJoinRequestsResponse { requests })
-}
-
-async fn request_join_channel(
-    request: proto::RequestJoinChannel,
-    response: Response<proto::RequestJoinChannel>,
-    session: MessageContext,
-) -> Result<()> {
-    let channel_id = ChannelId::from_proto(request.channel_id);
-    let requester_id = session.user_id();
-    if request
-        .reason
-        .as_ref()
-        .is_some_and(|reason| reason.chars().count() > JOIN_REQUEST_REASON_MAX_CHARS)
-    {
-        return Err(anyhow!(
-            "join request reasons must be at most {JOIN_REQUEST_REASON_MAX_CHARS} characters"
-        )
-        .into());
-    }
-    let db = session.app_state.db.clone();
-    let channel = db
-        .transaction(|tx| {
-            let db = db.clone();
-            async move {
-                let channel = db.get_channel_internal(channel_id, &tx).await?;
-                if channel.visibility != db::ChannelVisibility::Members {
-                    return Err(anyhow!("public channels can be joined directly").into());
-                }
-                match db
-                    .channel_role_for_user(&channel, requester_id, &tx)
-                    .await?
-                {
-                    Some(ChannelRole::Banned) | None => Ok(channel),
-                    Some(_) => Err(anyhow!("user is already a channel member").into()),
-                }
-            }
-        })
-        .await?;
-
-    check_join_request_rate_limit(&session.app_state, requester_id)?;
-
-    let join_request = JoinRequestStore::new(db.clone())
-        .request_join(channel_id, requester_id, request.reason.clone())
-        .await?;
-
-    let root_channel_id = channel.root_id();
-    let (notifications, admin_user_ids) = db
-        .transaction(|tx| {
-            let db = db.clone();
-            let channel_name = channel.name.clone();
-            let reason = request.reason.clone();
-            async move {
-                let admins = db::channel_member::Entity::find()
-                    .filter(db::channel_member::Column::ChannelId.eq(root_channel_id))
-                    .filter(db::channel_member::Column::Accepted.eq(true))
-                    .filter(db::channel_member::Column::Role.eq(ChannelRole::Admin))
-                    .all(&*tx)
-                    .await?;
-                let mut notifications = Vec::new();
-                let mut admin_user_ids = Vec::new();
-                for admin in admins {
-                    admin_user_ids.push(admin.user_id);
-                    if let Some(notification) = db
-                        .create_notification(
-                            admin.user_id,
-                            rpc::Notification::JoinRequest {
-                                channel_id: channel_id.to_proto(),
-                                channel_name: channel_name.clone(),
-                                requesting_user_id: requester_id.to_proto(),
-                                requesting_user_name: requester_id.to_string(),
-                                reason: reason.clone(),
-                            },
-                            true,
-                            &tx,
-                        )
-                        .await?
-                    {
-                        notifications.push(notification);
-                    }
-                }
-                Ok((notifications, admin_user_ids))
-            }
-        })
-        .await?;
-
-    let pending_request_count = JoinRequestStore::new(db.clone())
-        .count_pending_requests(channel_id)
-        .await?;
-    let connection_pool = session.connection_pool().await;
-    send_notifications(&connection_pool, &session.peer, notifications);
-    send_pending_join_request_count_update(
-        &session.peer,
-        &connection_pool,
-        root_channel_id,
-        channel_id,
-        pending_request_count,
-    )?;
-    for admin_user_id in admin_user_ids {
-        for connection_id in connection_pool.user_connection_ids(admin_user_id) {
-            session.peer.send(
-                connection_id,
-                proto::JoinRequestAdded {
-                    channel_id: channel_id.to_proto(),
-                    requesting_user_id: requester_id.to_proto(),
-                    reason: request.reason.clone(),
-                    created_at: join_request.created_at.assume_utc().unix_timestamp() as u64,
-                },
-            )?;
-        }
-    }
-
-    response.send(proto::RequestJoinChannelResponse { success: true })
-}
-
-fn check_join_request_rate_limit(app_state: &AppState, user_id: UserId) -> Result<()> {
-    let now = Instant::now();
-    let mut attempts_by_user = app_state.join_request_attempts.lock();
-    let attempts = attempts_by_user.entry(user_id).or_default();
-    attempts.retain(|attempt| now.duration_since(*attempt) < JOIN_REQUEST_RATE_LIMIT_WINDOW);
-    if attempts.len() >= JOIN_REQUEST_RATE_LIMIT {
-        return Err(anyhow!("too many join requests; try again in a minute").into());
-    }
-    attempts.push(now);
-    Ok(())
-}
-
-async fn get_file_upload_url(
-    request: proto::GetFileUploadUrl,
-    response: Response<proto::GetFileUploadUrl>,
-    session: MessageContext,
-) -> Result<()> {
-    let channel_id = ChannelId::from_proto(request.channel_id);
-    ensure_can_upload_files(&session, channel_id).await?;
-    let store = file_store(&session);
-    let upload_url = store
-        .generate_upload_url(NewFileUpload {
-            channel_id,
-            filename: request.filename,
-            file_size: request.file_size,
-            mime_type: request.mime_type,
-            uploader_id: session.user_id(),
-            image_width: None,
-            image_height: None,
-            duration_ms: None,
-        })
-        .await
-        .map_err(file_store_rpc_error)?;
-
-    response.send(proto::GetFileUploadUrlResponse {
-        url: upload_url.url,
-        file_id: upload_url.file_id.to_string(),
-        headers: upload_url.headers,
-    })
-}
-
-async fn confirm_file_upload(
-    request: proto::ConfirmFileUpload,
-    response: Response<proto::ConfirmFileUpload>,
-    session: MessageContext,
-) -> Result<()> {
-    let file_id = uuid::Uuid::parse_str(&request.file_id).context("invalid file id")?;
-    let store = file_store(&session);
-    let attachment = store
-        .confirm_upload(file_id, session.user_id())
-        .await
-        .map_err(file_store_rpc_error)?;
-
-    response.send(proto::ConfirmFileUploadResponse {
-        attachment: Some(attachment.to_proto()),
-    })
-}
-
-async fn get_file_download_url(
-    request: proto::GetFileDownloadUrl,
-    response: Response<proto::GetFileDownloadUrl>,
-    session: MessageContext,
-) -> Result<()> {
-    let file_id = uuid::Uuid::parse_str(&request.file_id).context("invalid file id")?;
-    let store = file_store(&session);
-    let channel_id = store
-        .file_channel_id(file_id)
-        .await
-        .map_err(file_store_rpc_error)?;
-    ensure_can_read_bookmarks(&session, channel_id).await?;
-    let download = store
-        .get_file_download_url(file_id)
-        .await
-        .map_err(file_store_rpc_error)?;
-
-    response.send(proto::GetFileDownloadUrlResponse {
-        url: download.url,
-        download_count: download.download_count,
-    })
-}
-
-async fn add_bookmark(
-    request: proto::AddBookmark,
-    response: Response<proto::AddBookmark>,
-    session: MessageContext,
-) -> Result<()> {
-    let channel_id = ChannelId::from_proto(request.channel_id);
-    ensure_can_edit_bookmarks(&session, channel_id).await?;
-    let bookmark_type =
-        proto::BookmarkType::from_i32(request.r#type).context("invalid bookmark type")?;
-    let store = BookmarkStore::new(session.app_state.db.clone());
-    let bookmark = store
-        .create(NewBookmark {
-            channel_id,
-            label: request.label,
-            description: request.description,
-            bookmark_type,
-            url: request.url,
-            file_id: request.file_id,
-            message_id: request.message_id.map(MessageId::from_proto),
-            created_by: session.user_id(),
-        })
-        .await?;
-
-    let bookmarks = store.get_bookmarks(channel_id).await?;
-    post_bookmark_system_message(
-        &session,
-        channel_id,
-        format!(
-            "Pinned a {} bookmark: {}",
-            bookmark_type_label(bookmark.bookmark_type),
-            bookmark.label
-        ),
-    )
-    .await?;
-    response.send(proto::Ack {})?;
-    broadcast_channel_bookmarks_update(&session, channel_id, bookmarks, Vec::new()).await
-}
-
-async fn remove_bookmark(
-    request: proto::RemoveBookmark,
-    response: Response<proto::RemoveBookmark>,
-    session: MessageContext,
-) -> Result<()> {
-    let channel_id = ChannelId::from_proto(request.channel_id);
-    let bookmark_id = db::BookmarkId::from_proto(request.bookmark_id);
-    ensure_can_edit_bookmarks(&session, channel_id).await?;
-    let store = BookmarkStore::new(session.app_state.db.clone());
-    let bookmark_label = store
-        .get_bookmarks(channel_id)
-        .await?
-        .into_iter()
-        .find(|bookmark| bookmark.id == bookmark_id)
-        .map(|bookmark| bookmark.label);
-    let deleted = store.delete(channel_id, bookmark_id).await?;
-
-    let bookmarks = store.get_bookmarks(channel_id).await?;
-    if deleted {
-        post_bookmark_system_message(
-            &session,
-            channel_id,
-            format!(
-                "Removed bookmark: {}",
-                bookmark_label.unwrap_or_else(|| "Untitled bookmark".to_string())
-            ),
-        )
-        .await?;
-    }
-    response.send(proto::Ack {})?;
-    broadcast_channel_bookmarks_update(&session, channel_id, bookmarks, vec![bookmark_id]).await
-}
-
-async fn update_bookmark(
-    request: proto::UpdateBookmark,
-    response: Response<proto::UpdateBookmark>,
-    session: MessageContext,
-) -> Result<()> {
-    let channel_id = ChannelId::from_proto(request.channel_id);
-    ensure_can_edit_bookmarks(&session, channel_id).await?;
-    let store = BookmarkStore::new(session.app_state.db.clone());
-    let bookmark = store
-        .update(BookmarkUpdate {
-            channel_id,
-            bookmark_id: db::BookmarkId::from_proto(request.bookmark_id),
-            label: request.label,
-            description: request.description,
-        })
-        .await?;
-
-    let bookmarks = store.get_bookmarks(channel_id).await?;
-    post_bookmark_system_message(
-        &session,
-        channel_id,
-        format!("Updated bookmark: {}", bookmark.label),
-    )
-    .await?;
-    response.send(proto::Ack {})?;
-    broadcast_channel_bookmarks_update(&session, channel_id, bookmarks, Vec::new()).await
-}
-
-async fn reorder_bookmarks(
-    request: proto::ReorderBookmarks,
-    response: Response<proto::ReorderBookmarks>,
-    session: MessageContext,
-) -> Result<()> {
-    let channel_id = ChannelId::from_proto(request.channel_id);
-    ensure_can_edit_bookmarks(&session, channel_id).await?;
-    let store = BookmarkStore::new(session.app_state.db.clone());
-    store
-        .reorder(
-            channel_id,
-            request
-                .bookmark_ids
-                .into_iter()
-                .map(db::BookmarkId::from_proto)
-                .collect(),
-        )
-        .await?;
-
-    response.send(proto::Ack {})?;
-    schedule_channel_bookmarks_reorder_broadcast(&session, channel_id);
-    Ok(())
-}
-
-fn file_store(session: &MessageContext) -> FileStore {
-    #[cfg(feature = "test-support")]
-    if session.app_state.blob_store_client.is_none() {
-        return FileStore::new_for_tests(
-            session.app_state.db.clone(),
-            FileStoreConfig::new(
-                Some("test-bucket".to_string()),
-                session.app_state.config.file_upload_storage_prefix.clone(),
-                session
-                    .app_state
-                    .config
-                    .file_upload_max_file_size
-                    .unwrap_or(DEFAULT_FILE_UPLOAD_MAX_FILE_SIZE),
-                allowed_file_upload_mime_types(
-                    session
-                        .app_state
-                        .config
-                        .file_upload_allowed_mime_types
-                        .as_deref(),
-                ),
-            ),
-            "http://file-store.test",
-        );
-    }
-
-    FileStore::new(
-        session.app_state.db.clone(),
-        session.app_state.blob_store_client.clone(),
-        FileStoreConfig::new(
-            session.app_state.config.blob_store_bucket.clone(),
-            session.app_state.config.file_upload_storage_prefix.clone(),
-            session
-                .app_state
-                .config
-                .file_upload_max_file_size
-                .unwrap_or(DEFAULT_FILE_UPLOAD_MAX_FILE_SIZE),
-            allowed_file_upload_mime_types(
-                session
-                    .app_state
-                    .config
-                    .file_upload_allowed_mime_types
-                    .as_deref(),
-            ),
-        ),
-    )
-}
-
-async fn populate_channel_message_files(
-    session: &MessageContext,
-    messages: &mut [proto::ChannelMessage],
-) -> Result<()> {
-    let message_ids = messages
-        .iter()
-        .map(|message| MessageId::from_proto(message.id))
-        .collect::<Vec<_>>();
-    let mut files_by_message_id = file_store(session)
-        .get_message_files(message_ids)
-        .await
-        .map_err(file_store_rpc_error)?;
-
-    for message in messages {
-        message.files = files_by_message_id
-            .remove(&MessageId::from_proto(message.id))
-            .unwrap_or_default()
-            .into_iter()
-            .map(db::file_store::FileAttachment::to_proto)
-            .collect();
-    }
-
-    Ok(())
-}
-
-fn allowed_file_upload_mime_types(allowed_mime_types: Option<&str>) -> Vec<String> {
-    allowed_mime_types
-        .into_iter()
-        .flat_map(|allowed_mime_types| allowed_mime_types.split(','))
-        .map(str::trim)
-        .filter(|allowed_mime_type| !allowed_mime_type.is_empty())
-        .map(ToOwned::to_owned)
-        .collect()
-}
-
-fn file_store_rpc_error(error: Error) -> Error {
-    let Error::Internal(error) = error else {
-        return error;
-    };
-    let Some(file_store_error) = error.downcast_ref::<FileStoreError>() else {
-        return Error::Internal(error);
-    };
-    let message = file_store_error.to_string();
-    let rpc_error = match file_store_error {
-        FileStoreError::FileTooLarge { max_file_size } => ErrorCode::FileTooLarge
-            .with_tag("max_file_size", &max_file_size.to_string())
-            .message(message),
-        FileStoreError::EmptyFilename => ErrorCode::InvalidFileName.message(message),
-        FileStoreError::UnsupportedFileType => ErrorCode::UnsupportedFileType.message(message),
-        FileStoreError::StorageUnavailable
-        | FileStoreError::PresignFailed(_)
-        | FileStoreError::DeleteFailed(_) => ErrorCode::FileStorageUnavailable.message(message),
-    };
-    Error::from(rpc_error.anyhow())
-}
-
-async fn ensure_can_upload_files(session: &MessageContext, channel_id: ChannelId) -> Result<()> {
-    ensure_can_edit_bookmarks(session, channel_id).await
-}
-
-async fn post_bookmark_system_message(
-    session: &MessageContext,
-    channel_id: ChannelId,
-    body: String,
-) -> Result<()> {
-    let nonce = rand::rng().random::<u128>().into();
-    let message = session
-        .db()
-        .await
-        .create_channel_message(NewChannelMessage {
-            channel_id,
-            sender_id: session.user_id(),
-            body,
-            nonce,
-            mentions: Vec::new(),
-            reply_to_message_id: None,
-            scheduled_at: None,
-            priority: 0,
-        })
-        .await?;
-    broadcast_channel_message_sent(session, channel_id, message).await
-}
-
-fn bookmark_type_label(bookmark_type: proto::BookmarkType) -> &'static str {
-    match bookmark_type {
-        proto::BookmarkType::BookmarkLink => "link",
-        proto::BookmarkType::BookmarkFile => "file",
-        proto::BookmarkType::BookmarkMessage => "message",
-    }
-}
-
-async fn ensure_can_edit_bookmarks(session: &MessageContext, channel_id: ChannelId) -> Result<()> {
-    let db = session.app_state.db.clone();
-    let user_id = session.user_id();
-    db.transaction(|tx| {
-        let db = db.clone();
-
-        async move {
-            let channel = db.get_channel_internal(channel_id, &tx).await?;
-            let role = db.channel_role_for_user(&channel, user_id, &tx).await?;
-            match role {
-                Some(ChannelRole::Admin | ChannelRole::Member) => Ok(()),
-                Some(ChannelRole::Guest | ChannelRole::Talker | ChannelRole::Banned) | None => {
-                    Err(ErrorCode::Forbidden.anyhow())?
-                }
-            }
-        }
-    })
-    .await
-}
-
-async fn ensure_can_read_bookmarks(session: &MessageContext, channel_id: ChannelId) -> Result<()> {
-    let db = session.app_state.db.clone();
-    let user_id = session.user_id();
-    db.transaction(|tx| {
-        let db = db.clone();
-
-        async move {
-            let channel = db.get_channel_internal(channel_id, &tx).await?;
-            let role = db.channel_role_for_user(&channel, user_id, &tx).await?;
-            match role {
-                Some(
-                    ChannelRole::Admin
-                    | ChannelRole::Member
-                    | ChannelRole::Guest
-                    | ChannelRole::Talker,
-                ) => Ok(()),
-                Some(ChannelRole::Banned) | None => Err(ErrorCode::Forbidden.anyhow())?,
-            }
-        }
-    })
-    .await
+    Err(anyhow!("chat has been removed in the latest version of Sim").into())
 }
 
 /// Delete a channel message
 async fn remove_channel_message(
-    request: proto::RemoveChannelMessage,
-    response: Response<proto::RemoveChannelMessage>,
-    session: MessageContext,
+    _request: proto::RemoveChannelMessage,
+    _response: Response<proto::RemoveChannelMessage>,
+    _session: MessageContext,
 ) -> Result<()> {
-    let channel_id = ChannelId::from_proto(request.channel_id);
-    let message_id = MessageId::from_proto(request.message_id);
-    let message = session
-        .db()
-        .await
-        .delete_channel_message(channel_id, message_id, session.user_id())
-        .await?;
-
-    file_store(&session)
-        .delete_message_files(channel_id, message_id)
-        .await
-        .trace_err();
-    response.send(proto::Ack {})?;
-    broadcast_channel_message_update(&session, channel_id, message).await?;
-    broadcast_channel_message_reactions_update(&session, channel_id, message_id, Vec::new()).await
+    Err(anyhow!("chat has been removed in the latest version of Sim").into())
 }
 
 async fn update_channel_message(
-    request: proto::UpdateChannelMessage,
-    response: Response<proto::UpdateChannelMessage>,
-    session: MessageContext,
+    _request: proto::UpdateChannelMessage,
+    _response: Response<proto::UpdateChannelMessage>,
+    _session: MessageContext,
 ) -> Result<()> {
-    let channel_id = ChannelId::from_proto(request.channel_id);
-    let message = session
-        .db()
-        .await
-        .update_channel_message(ChannelMessageUpdate {
-            channel_id,
-            message_id: MessageId::from_proto(request.message_id),
-            editor_id: session.user_id(),
-            body: request.body,
-            nonce: request.nonce.context("missing channel message nonce")?,
-            mentions: request.mentions,
-        })
-        .await?;
-
-    response.send(proto::Ack {})?;
-    broadcast_channel_message_update(&session, channel_id, message).await
-}
-
-async fn add_reaction(
-    request: proto::AddReaction,
-    response: Response<proto::AddReaction>,
-    session: MessageContext,
-) -> Result<()> {
-    let channel_id = ChannelId::from_proto(request.channel_id);
-    let message_id = MessageId::from_proto(request.message_id);
-    let reactions = session
-        .db()
-        .await
-        .insert_channel_message_reaction(
-            channel_id,
-            message_id,
-            session.user_id(),
-            request.emoji_name,
-        )
-        .await?;
-
-    response.send(proto::UpdateMessageReactionsResponse {
-        reactions: reactions.clone(),
-    })?;
-    broadcast_channel_message_reactions_update(&session, channel_id, message_id, reactions).await
-}
-
-async fn remove_reaction(
-    request: proto::RemoveReaction,
-    response: Response<proto::RemoveReaction>,
-    session: MessageContext,
-) -> Result<()> {
-    let channel_id = ChannelId::from_proto(request.channel_id);
-    let message_id = MessageId::from_proto(request.message_id);
-    let reactions = session
-        .db()
-        .await
-        .delete_channel_message_reaction(
-            channel_id,
-            message_id,
-            session.user_id(),
-            request.emoji_name,
-        )
-        .await?;
-
-    response.send(proto::UpdateMessageReactionsResponse {
-        reactions: reactions.clone(),
-    })?;
-    broadcast_channel_message_reactions_update(&session, channel_id, message_id, reactions).await
+    Err(anyhow!("chat has been removed in the latest version of Sim").into())
 }
 
 /// Mark a channel message as read
 async fn acknowledge_channel_message(
-    request: proto::AckChannelMessage,
-    session: MessageContext,
+    _request: proto::AckChannelMessage,
+    _session: MessageContext,
 ) -> Result<()> {
-    session
-        .db()
-        .await
-        .acknowledge_channel_message(
-            ChannelId::from_proto(request.channel_id),
-            session.user_id(),
-            MessageId::from_proto(request.message_id),
-        )
-        .await
-}
-
-/// Mark a channel thread as read through a specific reply
-async fn acknowledge_channel_thread(
-    request: proto::AckChannelThread,
-    session: MessageContext,
-) -> Result<()> {
-    session
-        .db()
-        .await
-        .acknowledge_channel_thread(
-            ChannelId::from_proto(request.channel_id),
-            session.user_id(),
-            MessageId::from_proto(request.root_message_id),
-            MessageId::from_proto(request.message_id),
-        )
-        .await
+    Err(anyhow!("chat has been removed in the latest version of Sim").into())
 }
 
 /// Mark a buffer version as synced
@@ -5323,617 +3719,37 @@ async fn acknowledge_buffer_version(
 
 /// Start receiving chat updates for a channel
 async fn join_channel_chat(
-    request: proto::JoinChannelChat,
-    response: Response<proto::JoinChannelChat>,
-    session: MessageContext,
+    _request: proto::JoinChannelChat,
+    _response: Response<proto::JoinChannelChat>,
+    _session: MessageContext,
 ) -> Result<()> {
-    let channel_id = ChannelId::from_proto(request.channel_id);
-    let (mut messages, role) = session
-        .db()
-        .await
-        .join_channel_chat(channel_id, session.user_id(), session.connection_id)
-        .await?;
-    populate_channel_message_files(&session, &mut messages).await?;
-    session
-        .connection_pool()
-        .await
-        .subscribe_to_channel(session.user_id(), channel_id, role);
-    response.send(proto::JoinChannelChatResponse {
-        messages,
-        done: true,
-    })
+    Err(anyhow!("chat has been removed in the latest version of Sim").into())
 }
 
 /// Stop receiving chat updates for a channel
 async fn leave_channel_chat(
-    request: proto::LeaveChannelChat,
-    session: MessageContext,
+    _request: proto::LeaveChannelChat,
+    _session: MessageContext,
 ) -> Result<()> {
-    let channel_id = ChannelId::from_proto(request.channel_id);
-    session
-        .db()
-        .await
-        .leave_channel_chat(channel_id, session.user_id(), session.connection_id)
-        .await
+    Err(anyhow!("chat has been removed in the latest version of Sim").into())
 }
 
 /// Retrieve the chat history for a channel
 async fn get_channel_messages(
-    request: proto::GetChannelMessages,
-    response: Response<proto::GetChannelMessages>,
-    session: MessageContext,
+    _request: proto::GetChannelMessages,
+    _response: Response<proto::GetChannelMessages>,
+    _session: MessageContext,
 ) -> Result<()> {
-    const CHANNEL_MESSAGE_PAGE_SIZE: usize = 50;
-
-    let before_message_id = if request.before_message_id == 0 {
-        None
-    } else {
-        Some(MessageId::from_proto(request.before_message_id))
-    };
-    let mut messages = session
-        .db()
-        .await
-        .get_channel_messages(
-            ChannelId::from_proto(request.channel_id),
-            session.user_id(),
-            before_message_id,
-            CHANNEL_MESSAGE_PAGE_SIZE,
-        )
-        .await?;
-    populate_channel_message_files(&session, &mut messages).await?;
-    let done = messages.len() < CHANNEL_MESSAGE_PAGE_SIZE;
-    response.send(proto::GetChannelMessagesResponse { messages, done })
+    Err(anyhow!("chat has been removed in the latest version of Sim").into())
 }
 
 /// Retrieve specific chat messages
 async fn get_channel_messages_by_id(
-    request: proto::GetChannelMessagesById,
-    response: Response<proto::GetChannelMessagesById>,
-    session: MessageContext,
+    _request: proto::GetChannelMessagesById,
+    _response: Response<proto::GetChannelMessagesById>,
+    _session: MessageContext,
 ) -> Result<()> {
-    let mut messages = session
-        .db()
-        .await
-        .get_channel_messages_by_id(
-            request
-                .message_ids
-                .into_iter()
-                .map(MessageId::from_proto)
-                .collect(),
-            session.user_id(),
-        )
-        .await?;
-    populate_channel_message_files(&session, &mut messages).await?;
-    response.send(proto::GetChannelMessagesResponse {
-        messages,
-        done: true,
-    })
-}
-
-async fn search_channel_messages(
-    request: proto::SearchChannelMessages,
-    response: Response<proto::SearchChannelMessages>,
-    session: MessageContext,
-) -> Result<()> {
-    let channel_id = (request.channel_id != 0).then(|| ChannelId::from_proto(request.channel_id));
-    let filter_channel_id = if let Some(filter_channel) = request.filter_channel.as_deref() {
-        let channels = session
-            .db()
-            .await
-            .get_channels_for_user(session.user_id())
-            .await?;
-        Some(
-            channels
-                .channels
-                .into_iter()
-                .find(|channel| channel.name == filter_channel)
-                .with_context(|| format!("unknown channel {filter_channel}"))?
-                .id,
-        )
-    } else {
-        None
-    };
-    let filter_sender_id = if let Some(filter_user) = request.filter_user.as_deref() {
-        Some(
-            session
-                .app_state
-                .user_service
-                .get_user_by_github_login(filter_user)
-                .await?
-                .with_context(|| format!("unknown user {filter_user}"))?
-                .id,
-        )
-    } else {
-        None
-    };
-
-    let before_message_id = request.before_message_id.map(MessageId::from_proto);
-    let filter_after = request
-        .filter_after
-        .map(timestamp_to_primitive_datetime)
-        .transpose()?;
-    let filter_before = request
-        .filter_before
-        .map(timestamp_to_primitive_datetime)
-        .transpose()?;
-
-    let (results, done) = session
-        .db()
-        .await
-        .search_channel_messages(
-            session.user_id(),
-            SearchChannelMessagesParams {
-                channel_id,
-                query: request.query,
-                before_message_id,
-                limit: request.limit as usize,
-                filter_channel_id,
-                filter_sender_id,
-                filter_after,
-                filter_before,
-            },
-        )
-        .await?;
-
-    let users = session
-        .app_state
-        .user_service
-        .get_users_by_ids(results.iter().map(|result| result.sender_id).collect())
-        .await?
-        .into_iter()
-        .map(|user| (user.id, user.github_login))
-        .collect::<HashMap<_, _>>();
-
-    response.send(proto::SearchChannelMessagesResponse {
-        results: results
-            .into_iter()
-            .map(|result| proto::SearchResult {
-                sender_name: users
-                    .get(&result.sender_id)
-                    .cloned()
-                    .unwrap_or_else(|| result.sender_id.to_string()),
-                channel_id: result.channel_id.to_proto(),
-                channel_name: result.channel_name,
-                message: Some(result.message),
-                match_positions: result.match_positions,
-            })
-            .collect(),
-        done,
-    })
-}
-
-async fn get_thread(
-    request: proto::GetThread,
-    response: Response<proto::GetThread>,
-    session: MessageContext,
-) -> Result<()> {
-    let before_message_id =
-        (request.before_message_id != 0).then(|| MessageId::from_proto(request.before_message_id));
-    let limit = (request.limit as usize).clamp(1, 100);
-    let (root_message, replies, done) = session
-        .db()
-        .await
-        .get_channel_thread(
-            ChannelId::from_proto(request.channel_id),
-            session.user_id(),
-            MessageId::from_proto(request.message_id),
-            before_message_id,
-            limit,
-        )
-        .await?;
-    response.send(proto::GetThreadResponse {
-        root_message: Some(root_message),
-        replies,
-        done,
-    })
-}
-
-async fn get_threads(
-    request: proto::GetThreads,
-    response: Response<proto::GetThreads>,
-    session: MessageContext,
-) -> Result<()> {
-    let threads = session
-        .db()
-        .await
-        .get_channel_threads(ChannelId::from_proto(request.channel_id), session.user_id())
-        .await?;
-    response.send(proto::GetThreadsResponse { threads })
-}
-
-async fn run_scheduled_message_loop(
-    app_state: Arc<AppState>,
-    peer: Arc<Peer>,
-    connection_pool: Arc<parking_lot::Mutex<ConnectionPool>>,
-) {
-    let store = ScheduledMessageStore::new(app_state.db.clone());
-    store
-        .reset_stale_processing(stale_scheduled_message_processing_cutoff())
-        .await
-        .trace_err();
-
-    loop {
-        app_state
-            .executor
-            .sleep(SCHEDULED_MESSAGE_POLL_INTERVAL)
-            .await;
-        deliver_due_scheduled_messages(&app_state, &peer, &connection_pool)
-            .await
-            .trace_err();
-    }
-}
-
-const JOIN_REQUEST_EXPIRY_INTERVAL: Duration = Duration::from_secs(60 * 60);
-
-async fn run_join_request_expiry_loop(
-    app_state: Arc<AppState>,
-    peer: Arc<Peer>,
-    connection_pool: Arc<parking_lot::Mutex<ConnectionPool>>,
-) {
-    loop {
-        match crate::jobs::expire_join_requests(app_state.db.clone()).await {
-            Ok(expired_requests) => {
-                let mut channel_ids = expired_requests
-                    .into_iter()
-                    .map(|request| request.channel_id)
-                    .collect::<Vec<_>>();
-                channel_ids.sort_unstable();
-                channel_ids.dedup();
-
-                for channel_id in channel_ids {
-                    let result = app_state
-                        .db
-                        .transaction(|tx| {
-                            let db = app_state.db.clone();
-                            async move {
-                                let channel = db.get_channel_internal(channel_id, &tx).await?;
-                                Ok(channel.root_id())
-                            }
-                        })
-                        .await;
-                    match result {
-                        Ok(root_channel_id) => {
-                            let result = JoinRequestStore::new(app_state.db.clone())
-                                .count_pending_requests(channel_id)
-                                .await;
-                            match result {
-                                Ok(count) => {
-                                    send_pending_join_request_count_update(
-                                        &peer,
-                                        &connection_pool.lock(),
-                                        root_channel_id,
-                                        channel_id,
-                                        count,
-                                    )
-                                    .trace_err();
-                                }
-                                Err(error) => {
-                                    log::error!("counting expired join requests: {error}")
-                                }
-                            }
-                        }
-                        Err(error) => log::error!("finding expired join request channel: {error}"),
-                    }
-                }
-            }
-            Err(error) => log::error!("expiring join requests: {error}"),
-        }
-        app_state.executor.sleep(JOIN_REQUEST_EXPIRY_INTERVAL).await;
-    }
-}
-
-fn send_pending_join_request_count_update(
-    peer: &Peer,
-    connection_pool: &ConnectionPool,
-    root_channel_id: ChannelId,
-    channel_id: ChannelId,
-    count: u64,
-) -> Result<()> {
-    let update = proto::UpdateChannels {
-        pending_request_counts: vec![proto::PendingRequestCount {
-            channel_id: channel_id.to_proto(),
-            count: count as u32,
-        }],
-        ..Default::default()
-    };
-    for (connection_id, role) in connection_pool.channel_connection_ids(root_channel_id) {
-        if role == ChannelRole::Admin {
-            peer.send(connection_id, update.clone())?;
-        }
-    }
-    Ok(())
-}
-
-async fn deliver_due_scheduled_messages(
-    app_state: &AppState,
-    peer: &Peer,
-    connection_pool: &parking_lot::Mutex<ConnectionPool>,
-) -> Result<()> {
-    let store = ScheduledMessageStore::new(app_state.db.clone());
-    let messages = store.pop_due().await?;
-
-    for scheduled in messages {
-        let scheduled_message_id = scheduled.id;
-        let channel_id = scheduled.channel_id;
-        let sender_id = scheduled.sender_id;
-        let scheduled_at = scheduled.scheduled_at;
-        let message = app_state
-            .db
-            .create_channel_message(NewChannelMessage {
-                channel_id,
-                sender_id,
-                body: scheduled.body,
-                nonce: scheduled.nonce,
-                mentions: scheduled.mentions,
-                reply_to_message_id: None,
-                scheduled_at: Some(scheduled_at),
-                priority: 0,
-            })
-            .await;
-
-        match message {
-            Ok(message) => {
-                broadcast_channel_message_sent_to_channel(
-                    &app_state.db,
-                    peer,
-                    channel_id,
-                    message.clone(),
-                )
-                .await
-                .trace_err();
-                notify_scheduled_message_sent(
-                    connection_pool,
-                    peer,
-                    sender_id,
-                    channel_id,
-                    message,
-                );
-                store
-                    .delete_delivered(scheduled_message_id)
-                    .await
-                    .trace_err();
-            }
-            Err(error) => {
-                let reason = error.to_string();
-                store
-                    .mark_failed(scheduled_message_id, reason.clone())
-                    .await
-                    .trace_err();
-                notify_scheduled_message_failed(
-                    connection_pool,
-                    peer,
-                    sender_id,
-                    scheduled_message_id,
-                    channel_id,
-                    reason,
-                );
-            }
-        }
-    }
-
-    Ok(())
-}
-
-fn notify_scheduled_message_sent(
-    connection_pool: &parking_lot::Mutex<ConnectionPool>,
-    peer: &Peer,
-    sender_id: UserId,
-    channel_id: ChannelId,
-    message: proto::ChannelMessage,
-) {
-    for connection_id in connection_pool.lock().user_connection_ids(sender_id) {
-        peer.send(
-            connection_id,
-            proto::ScheduledMessageSent {
-                channel_id: channel_id.to_proto(),
-                message: Some(message.clone()),
-            },
-        )
-        .trace_err();
-    }
-}
-
-fn notify_scheduled_message_failed(
-    connection_pool: &parking_lot::Mutex<ConnectionPool>,
-    peer: &Peer,
-    sender_id: UserId,
-    scheduled_message_id: db::ScheduledMessageId,
-    channel_id: ChannelId,
-    reason: String,
-) {
-    for connection_id in connection_pool.lock().user_connection_ids(sender_id) {
-        peer.send(
-            connection_id,
-            proto::ScheduledMessageFailed {
-                scheduled_message_id: scheduled_message_id.to_proto(),
-                channel_id: channel_id.to_proto(),
-                reason: reason.clone(),
-            },
-        )
-        .trace_err();
-    }
-}
-
-fn stale_scheduled_message_processing_cutoff() -> PrimitiveDateTime {
-    let now = time::OffsetDateTime::now_utc()
-        - time::Duration::seconds(SCHEDULED_MESSAGE_STALE_PROCESSING_GRACE.as_secs() as i64);
-    PrimitiveDateTime::new(now.date(), now.time())
-}
-
-fn timestamp_to_primitive_datetime(timestamp: u64) -> Result<PrimitiveDateTime> {
-    let timestamp = timestamp
-        .try_into()
-        .context("search timestamp is out of range")?;
-    let timestamp = time::OffsetDateTime::from_unix_timestamp(timestamp)
-        .context("search timestamp is invalid")?;
-    Ok(PrimitiveDateTime::new(timestamp.date(), timestamp.time()))
-}
-
-fn timestamp_millis_to_primitive_datetime(timestamp: u64) -> Result<PrimitiveDateTime> {
-    let timestamp = i128::from(timestamp)
-        .checked_mul(1_000_000)
-        .context("scheduled timestamp is out of range")?;
-    let timestamp = time::OffsetDateTime::from_unix_timestamp_nanos(timestamp)
-        .context("scheduled timestamp is invalid")?;
-    Ok(PrimitiveDateTime::new(timestamp.date(), timestamp.time()))
-}
-
-async fn broadcast_channel_message_sent(
-    session: &MessageContext,
-    channel_id: ChannelId,
-    message: proto::ChannelMessage,
-) -> Result<()> {
-    let db = session.db().await;
-    broadcast_channel_message_sent_to_channel(&db, &session.peer, channel_id, message).await
-}
-
-async fn broadcast_channel_message_sent_to_channel(
-    db: &Database,
-    peer: &Peer,
-    channel_id: ChannelId,
-    message: proto::ChannelMessage,
-) -> Result<()> {
-    let connection_ids = db
-        .channel_chat_participant_connection_ids(channel_id)
-        .await?;
-    for connection_id in connection_ids {
-        peer.send(
-            connection_id,
-            proto::ChannelMessageSent {
-                channel_id: channel_id.to_proto(),
-                message: Some(message.clone()),
-            },
-        )?;
-    }
-    Ok(())
-}
-
-async fn broadcast_channel_message_update(
-    session: &MessageContext,
-    channel_id: ChannelId,
-    message: proto::ChannelMessage,
-) -> Result<()> {
-    let connection_ids = session
-        .db()
-        .await
-        .channel_chat_participant_connection_ids(channel_id)
-        .await?;
-    for connection_id in connection_ids {
-        session.peer.send(
-            connection_id,
-            proto::ChannelMessageUpdate {
-                channel_id: channel_id.to_proto(),
-                message: Some(message.clone()),
-            },
-        )?;
-    }
-    Ok(())
-}
-
-async fn broadcast_channel_message_reactions_update(
-    session: &MessageContext,
-    channel_id: ChannelId,
-    message_id: MessageId,
-    reactions: Vec<proto::ReactionSummary>,
-) -> Result<()> {
-    let connection_ids = session
-        .db()
-        .await
-        .channel_chat_participant_connection_ids(channel_id)
-        .await?;
-    for connection_id in connection_ids {
-        session.peer.send(
-            connection_id,
-            proto::UpdateMessageReactions {
-                channel_id: channel_id.to_proto(),
-                message_id: message_id.to_proto(),
-                reactions: reactions.clone(),
-            },
-        )?;
-    }
-    Ok(())
-}
-
-async fn broadcast_channel_bookmarks_update(
-    session: &MessageContext,
-    channel_id: ChannelId,
-    bookmarks: Vec<db::bookmark_store::Bookmark>,
-    removed_bookmark_ids: Vec<db::BookmarkId>,
-) -> Result<()> {
-    send_channel_bookmarks_update(
-        &session.app_state.db,
-        &session.peer,
-        channel_id,
-        bookmarks,
-        removed_bookmark_ids,
-    )
-    .await
-}
-
-fn schedule_channel_bookmarks_reorder_broadcast(session: &MessageContext, channel_id: ChannelId) {
-    let generation = {
-        let mut pending = session.app_state.pending_bookmark_reorder_broadcasts.lock();
-        let generation = pending.entry(channel_id).or_insert(0);
-        *generation += 1;
-        *generation
-    };
-    let app_state = session.app_state.clone();
-    let peer = session.peer.clone();
-    let executor = app_state.executor.clone();
-    executor.clone().spawn_detached(async move {
-        executor.sleep(BOOKMARK_REORDER_BROADCAST_DEBOUNCE).await;
-        let should_broadcast = {
-            let mut pending = app_state.pending_bookmark_reorder_broadcasts.lock();
-            if pending.get(&channel_id).copied() == Some(generation) {
-                pending.remove(&channel_id);
-                true
-            } else {
-                false
-            }
-        };
-        if !should_broadcast {
-            return;
-        }
-
-        let store = BookmarkStore::new(app_state.db.clone());
-        let Some(bookmarks) = store.get_bookmarks(channel_id).await.trace_err() else {
-            return;
-        };
-        send_channel_bookmarks_update(&app_state.db, &peer, channel_id, bookmarks, Vec::new())
-            .await
-            .trace_err();
-    });
-}
-
-async fn send_channel_bookmarks_update(
-    db: &Database,
-    peer: &Peer,
-    channel_id: ChannelId,
-    bookmarks: Vec<db::bookmark_store::Bookmark>,
-    removed_bookmark_ids: Vec<db::BookmarkId>,
-) -> Result<()> {
-    let bookmarks = bookmarks
-        .into_iter()
-        .map(db::bookmark_store::Bookmark::to_proto)
-        .collect::<Vec<_>>();
-    let removed_bookmark_ids = removed_bookmark_ids
-        .into_iter()
-        .map(db::BookmarkId::to_proto)
-        .collect::<Vec<_>>();
-    let connection_ids = db
-        .channel_chat_participant_connection_ids(channel_id)
-        .await?;
-    for connection_id in connection_ids {
-        peer.send(
-            connection_id,
-            proto::UpdateChannelBookmarks {
-                channel_id: channel_id.to_proto(),
-                bookmarks: bookmarks.clone(),
-                removed_bookmark_ids: removed_bookmark_ids.clone(),
-            },
-        )?;
-    }
-    Ok(())
+    Err(anyhow!("chat has been removed in the latest version of Sim").into())
 }
 
 /// Retrieve the current users notifications
@@ -6124,26 +3940,6 @@ fn build_initial_contacts_update(
     }
 
     update
-}
-
-fn build_initial_user_statuses_update(
-    statuses: Vec<UserCustomStatus>,
-) -> proto::UpdateUserStatuses {
-    proto::UpdateUserStatuses {
-        statuses: statuses
-            .into_iter()
-            .map(|status| proto::UpdateUserStatus {
-                user_id: status.user_id.to_proto(),
-                status: Some(proto::UserCustomStatus {
-                    emoji: status.emoji,
-                    text: status.status_text,
-                    expires_at: status
-                        .expires_at
-                        .map(|expires_at| expires_at.assume_utc().unix_timestamp() as u64),
-                }),
-            })
-            .collect(),
-    }
 }
 
 fn contact_for_user(user_id: UserId, busy: bool, pool: &ConnectionPool) -> proto::Contact {
@@ -6363,54 +4159,6 @@ fn project_left(project: &db::LeftProject, session: &Session) {
     }
 }
 
-async fn share_agent_thread(
-    request: proto::ShareAgentThread,
-    response: Response<proto::ShareAgentThread>,
-    session: MessageContext,
-) -> Result<()> {
-    let user_id = session.user_id();
-
-    let share_id = SharedThreadId::from_proto(request.session_id.clone())
-        .ok_or_else(|| anyhow!("Invalid session ID format"))?;
-
-    session
-        .db()
-        .await
-        .upsert_shared_thread(share_id, user_id, &request.title, request.thread_data)
-        .await?;
-
-    response.send(proto::Ack {})?;
-
-    Ok(())
-}
-
-async fn get_shared_agent_thread(
-    request: proto::GetSharedAgentThread,
-    response: Response<proto::GetSharedAgentThread>,
-    session: MessageContext,
-) -> Result<()> {
-    let share_id = SharedThreadId::from_proto(request.session_id)
-        .ok_or_else(|| anyhow!("Invalid session ID format"))?;
-
-    let result = session.db().await.get_shared_thread(share_id).await?;
-
-    match result {
-        Some((thread, username)) => {
-            response.send(proto::GetSharedAgentThreadResponse {
-                title: thread.title,
-                thread_data: thread.data,
-                sharer_username: username,
-                created_at: thread.created_at.and_utc().to_rfc3339(),
-            })?;
-        }
-        None => {
-            return Err(anyhow!("Shared thread not found").into());
-        }
-    }
-
-    Ok(())
-}
-
 pub trait ResultExt {
     type Ok;
 
@@ -6439,6 +4187,7 @@ impl From<User> for proto::User {
     fn from(user: User) -> Self {
         Self {
             id: user.id.to_proto(),
+            username: user.username,
             avatar_url: user.avatar_url,
             github_login: user.github_login,
             name: user.name,

@@ -71,37 +71,11 @@ pub enum ThinkingBlockDisplay {
     AlwaysCollapsed,
 }
 
-/// The default behavior mode for Sim-compatible agent prompts.
-#[derive(
-    Clone,
-    Copy,
-    Debug,
-    Default,
-    PartialEq,
-    Eq,
-    Serialize,
-    Deserialize,
-    JsonSchema,
-    MergeFrom,
-    strum::VariantArray,
-    strum::VariantNames,
-)]
-#[serde(rename_all = "snake_case")]
-pub enum SimModeContent {
-    /// Prefer narrow, low-risk execution.
-    Focus,
-    /// Balance directness with enough context to finish the task.
-    #[default]
-    Balanced,
-    /// Allow broader exploration when it helps solve the task.
-    Creative,
-}
-
 /// Threshold at which agent auto-compaction runs. See
 /// [`AutoCompactSettingsContent::threshold`] for the accepted formats.
 ///
 /// The canonical textual form is stored verbatim so it can round-trip through
-/// the settings UI; it is serialisim back as a JSON string for percentages and
+/// the settings UI; it is serialized back as a JSON string for percentages and
 /// as a JSON integer for token counts.
 #[derive(Clone, Debug, PartialEq, Eq, MergeFrom)]
 pub struct AutoCompactThreshold(pub String);
@@ -189,20 +163,6 @@ impl JsonSchema for AutoCompactThreshold {
     }
 }
 
-/// Strategy used when automatic agent context compaction runs.
-#[derive(
-    Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema, MergeFrom,
-)]
-#[serde(rename_all = "snake_case")]
-pub enum AutoCompactStrategyContent {
-    /// Summarize earlier context with the configured language model.
-    #[default]
-    Summarize,
-    /// Drop earlier model context at a compaction boundary while keeping the
-    /// visible thread history intact.
-    Trim,
-}
-
 #[with_fallible_options]
 #[derive(Clone, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom, Debug, Default)]
 pub struct AutoCompactSettingsContent {
@@ -212,10 +172,6 @@ pub struct AutoCompactSettingsContent {
     ///
     /// Default: true
     pub enabled: Option<bool>,
-    /// The strategy to use when automatic compaction runs.
-    ///
-    /// Default: summarize
-    pub strategy: Option<AutoCompactStrategyContent>,
     /// The threshold at which auto-compaction runs. This is one of:
     ///
     /// - A percentage string ending in `%`, e.g. `"90%"`, measured against the
@@ -331,10 +287,6 @@ pub struct AgentSettingsContent {
     /// Default: []
     #[serde(default)]
     pub model_parameters: Vec<LanguageModelParameters>,
-    /// The default behavior mode for Sim-compatible agent prompts.
-    ///
-    /// Default: balanced
-    pub sim_mode: Option<SimModeContent>,
     /// Settings for automatic agent context compaction, which summarizes
     /// earlier messages to free up room in the model's context window once the
     /// context grows too large.
@@ -351,6 +303,13 @@ pub struct AgentSettingsContent {
     ///
     /// Default: true
     pub expand_terminal_card: Option<bool>,
+    /// Command to automatically run when Sim creates a Terminal Thread shell in the agent panel.
+    /// The command is sent to the shell as if typed, so it is interpreted by your
+    /// configured shell (including on Windows and remote/WSL projects).
+    /// An empty string disables this behavior.
+    ///
+    /// Default: ""
+    pub terminal_init_command: Option<String>,
     /// How thinking blocks should be displayed by default in the agent panel.
     ///
     /// Default: automatic
@@ -502,6 +461,8 @@ impl AgentSettingsContent {
             .allow_all_hosts = Some(true);
     }
 
+    /// The persisted sandbox network host patterns, as written (callers own
+    /// parsing/validation).
     pub fn sandbox_network_hosts(&self) -> &[String] {
         self.sandbox_permissions
             .as_ref()
@@ -510,6 +471,9 @@ impl AgentSettingsContent {
             .unwrap_or_default()
     }
 
+    /// Replace the persisted sandbox network host patterns. Callers compute
+    /// the new list (typically the old list plus newly granted hosts, pruned
+    /// of entries subsumed by wildcards) rather than appending blindly.
     pub fn set_sandbox_network_hosts(&mut self, hosts: Vec<String>) {
         self.sandbox_permissions
             .get_or_insert_default()
@@ -520,12 +484,6 @@ impl AgentSettingsContent {
         self.sandbox_permissions
             .get_or_insert_default()
             .allow_fs_write_all = Some(true);
-    }
-
-    pub fn allow_sandbox_git_access(&mut self) {
-        self.sandbox_permissions
-            .get_or_insert_default()
-            .allow_git_access = Some(true);
     }
 
     pub fn allow_sandbox_unsandboxed(&mut self) {
@@ -828,33 +786,27 @@ pub struct SandboxPermissionsContent {
     /// Whether sandboxed terminal commands may always reach any host over the
     /// network without prompting.
     /// Default: false
-    #[serde(alias = "allow_network")]
     pub allow_all_hosts: Option<bool>,
 
     /// Hosts that sandboxed terminal commands may always reach over the
-    /// network without prompting. Each entry is an exact hostname or a
-    /// leading-`*.` subdomain wildcard.
+    /// network without prompting. Each entry is an exact hostname
+    /// (`github.com`) or a leading-`*.` subdomain wildcard (`*.npmjs.org`).
     /// Default: []
     pub network_hosts: Option<ExtendingVec<String>>,
-
-    /// Whether sandboxed terminal commands may always access protected Git
-    /// metadata without prompting.
-    /// Default: false
-    pub allow_git_access: Option<bool>,
 
     /// Whether sandboxed terminal commands may always write anywhere on the
     /// filesystem without prompting.
     /// Default: false
     pub allow_fs_write_all: Option<bool>,
 
-    /// Whether terminal commands may always run outside the sandbox without
-    /// prompting when they request `unsandboxed: true`.
+    /// Whether to persistently run agent terminal commands outside the OS
+    /// sandbox. This is the model-facing "off switch": when true, the sandboxed
+    /// terminal tool is not exposed and the system prompt omits the sandbox
+    /// section, so the model uses the plain `terminal` tool. On Windows, WSL
+    /// sandbox setup is skipped. Distinct from the model-requested
+    /// `unsandboxed: true` escape approved "once" or "for this thread".
     /// Default: false
     pub allow_unsandboxed: Option<bool>,
-
-    /// Whether terminal sandboxing is turned off entirely.
-    /// Default: false
-    pub disabled: Option<bool>,
 
     /// Directory subtrees that sandboxed terminal commands may always write
     /// to without prompting. Paths written by Sim are absolute.
@@ -1174,8 +1126,13 @@ mod tests {
         assert!(settings.sandbox_permissions.is_none());
 
         settings.allow_sandbox_all_hosts();
+        assert_eq!(settings.sandbox_network_hosts(), &[] as &[String]);
         settings
             .set_sandbox_network_hosts(vec!["github.com".to_string(), "*.npmjs.org".to_string()]);
+        assert_eq!(
+            settings.sandbox_network_hosts(),
+            &["github.com".to_string(), "*.npmjs.org".to_string()]
+        );
         settings.allow_sandbox_fs_write_all();
         settings.allow_sandbox_unsandboxed();
         settings.add_sandbox_write_path(PathBuf::from("/tmp/build"));

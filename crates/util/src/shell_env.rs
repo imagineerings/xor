@@ -270,15 +270,7 @@ async fn capture_windows(
         }
         ShellKind::Cmd => {
             let dir = directory_string.trim_end_matches('\\');
-            cmd.args([
-                "/d",
-                "/c",
-                "cd",
-                dir,
-                "&&",
-                &sim_path_string,
-                "--printenv",
-            ])
+            cmd.args(["/d", "/c", "cd", dir, "&&", &sim_path_string, "--printenv"])
         }
     }
     .stdin(Stdio::null())

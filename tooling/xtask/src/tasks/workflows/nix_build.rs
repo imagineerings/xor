@@ -37,7 +37,7 @@ fn nix_pr_jobs(labels: &[&str]) -> [NamedJob; 2] {
         .map(|label| format!("github.event.label.name == '{label}'"))
         .collect::<Vec<_>>()
         .join(" || ");
-    let synchronisim = labels
+    let synchronized = labels
         .iter()
         .map(|label| format!("contains(github.event.pull_request.labels.*.name, '{label}')"))
         .collect::<Vec<_>>()
@@ -58,7 +58,7 @@ fn nix_pr_jobs(labels: &[&str]) -> [NamedJob; 2] {
         job.job = job.job.cond(Expression::new(format!(
             "{DEFAULT_REPOSITORY_OWNER_GUARD} && \
             ((github.event.action == 'labeled' && ({labeled})) || \
-            (github.event.action == 'synchronize' && ({synchronisim})))"
+            (github.event.action == 'synchronize' && ({synchronized})))"
         )));
         job
     })

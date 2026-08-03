@@ -53,7 +53,7 @@ fn max_operations() -> usize {
 static LOADED_PLAN_JSON: Mutex<Option<Vec<u8>>> = Mutex::new(None);
 static LAST_PLAN: Mutex<Option<Box<dyn Send + FnOnce() -> Vec<u8>>>> = Mutex::new(None);
 
-struct TestPlan<T: randomizedTest> {
+struct TestPlan<T: RandomizedTest> {
     rng: StdRng,
     replay: bool,
     stored_operations: Vec<(StoredOperation<T::Operation>, Arc<AtomicBool>)>,
@@ -112,9 +112,8 @@ pub enum TestError {
     Other(anyhow::Error),
 }
 
-#[allow(non_camel_case_types)]
 #[async_trait(?Send)]
-pub trait randomizedTest: 'static + Sized {
+pub trait RandomizedTest: 'static + Sized {
     type Operation: Send + Clone + Serialize + DeserializeOwned;
 
     fn generate_operation(
@@ -137,7 +136,7 @@ pub trait randomizedTest: 'static + Sized {
     async fn on_quiesce(server: &mut TestServer, client: &mut [(Rc<TestClient>, TestAppContext)]);
 }
 
-pub async fn run_randomized_test<T: randomizedTest>(
+pub async fn run_randomized_test<T: RandomizedTest>(
     cx: &mut TestAppContext,
     executor: BackgroundExecutor,
     rng: StdRng,
@@ -213,7 +212,7 @@ pub fn save_randomized_test_plan() {
     }
 }
 
-impl<T: randomizedTest> TestPlan<T> {
+impl<T: RandomizedTest> TestPlan<T> {
     pub async fn new(server: &mut TestServer, mut rng: StdRng) -> Arc<Mutex<Self>> {
         let allow_server_restarts = rng.random_bool(0.7);
         let allow_client_reconnection = rng.random_bool(0.7);

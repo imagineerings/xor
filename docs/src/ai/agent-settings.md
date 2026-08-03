@@ -1,19 +1,20 @@
 ---
 title: Agent Settings - Sim
-description: Map the Agent Settings panel to Sim AI setup pages for LLM providers, External Agents, MCP servers, and related settings.
+description: Map the AI settings pages to Sim AI setup for LLM providers, External Agents, MCP servers, and related settings.
 ---
 
 # Agent Settings
 
-Agent Settings is the in-panel configuration view for model providers, External Agents, and MCP servers. Open it with {#action agent::OpenSettings} or from the top-right menu in the [Agent Panel](./agent-panel.md).
+Agent Settings live in the **AI** section of the Settings Editor, which configures model providers, External Agents, and MCP servers.
+Open it with {#action agent::OpenSettings} (also available from the top-right menu in the [Agent Panel](./agent-panel.md)), which takes you straight to the AI page.
+You can also reach the same page with {#action sim::OpenSettings} and selecting **AI** in the sidebar.
 
-Agent Settings is different from the Settings Editor.
+Within the AI page, LLM Providers, External Agents, and MCP Servers each open as their own sub-page under the **General** section.
 
-| Surface              | Opens with                      | Use it for                                                                           |
-| -------------------- | ------------------------------- | ------------------------------------------------------------------------------------ |
-| Agent Settings panel | {#action agent::OpenSettings}   | LLM providers, External Agents, MCP servers                                          |
-| Settings Editor      | {#action sim::OpenSettings}     | General Sim settings, `disable_ai`, tool permissions, edit prediction provider setup |
-| Settings file        | {#action sim::OpenSettingsFile} | Direct JSON edits and settings not exposed in UI                                     |
+| Surface         | Opens with                      | Use it for                                                                  |
+| --------------- | ------------------------------- | --------------------------------------------------------------------------- |
+| Settings Editor | {#action agent::OpenSettings}   | AI settings: LLM providers, External Agents, MCP servers, and related pages |
+| Settings file   | {#action sim::OpenSettingsFile} | Direct JSON edits and settings not exposed in UI                            |
 
 For general settings mechanics, see [Configuring Sim](../configuring-sim.md).
 
@@ -55,28 +56,20 @@ For feature-specific model examples, see [Feature-specific Models](#feature-spec
 
 ## Automatic Compaction {#automatic-compaction}
 
-Sim Agent can automatically compact long threads before they reach the selected model's context window. By default, compaction summarizes earlier messages and keeps the conversation usable without starting a new thread.
+Sim Agent can automatically compact long threads before they reach the selected model's context window. Compaction summarizes earlier messages and keeps the conversation usable without starting a new thread.
 
-Automatic compaction is enabled by default and runs when the thread reaches `90%` of the model's context window. You can change the strategy, change the threshold, or disable automatic compaction in `settings.json`:
+Automatic compaction is enabled by default and runs when the thread reaches `90%` of the model's context window. You can change the threshold or disable automatic compaction in `settings.json`:
 
 ```json [settings]
 {
   "agent": {
     "auto_compact": {
       "enabled": true,
-      "strategy": "summarize",
       "threshold": "90%"
     }
   }
 }
 ```
-
-The `strategy` value can be one of:
-
-| Value       | Meaning                                                                 |
-| ----------- | ----------------------------------------------------------------------- |
-| `summarize` | Summarize earlier context with the configured model. This is the default. |
-| `trim`      | Drop earlier model context at a compaction boundary without summarizing. |
 
 The `threshold` value can be one of:
 
@@ -103,23 +96,25 @@ For setup details and support boundaries, see [External Agents](./external-agent
 
 ## MCP Servers {#mcp-servers}
 
-The `Model Context Protocol (MCP) Servers` section configures MCP servers connected to Sim.
+The `MCP Servers` page configures Model Context Protocol servers connected to Sim.
 
-Use `Add Server` to:
+Use `Add Server` (in the page header) to:
 
-- `Add Custom Server`
+- `Add Local Server`
+- `Add Remote Server`
 - `Install from Extensions`
 
-Each configured server can expose actions such as:
+Each configured server row exposes:
 
-- `Configure Server`
-- `View Tools`
+- a `Configure` (gear) button to edit the server
+- an `Uninstall` (trash) button to remove it
+- a toggle to enable or disable it
 
 For MCP setup, auth, server status, and agent-path boundaries, see [MCP](./mcp.md).
 
 ## Related Configuration {#related-configuration}
 
-Some AI settings are not configured in the Agent Settings panel:
+Some AI settings are not configured on the AI settings pages:
 
 | Task                                                         | Go to                                          |
 | ------------------------------------------------------------ | ---------------------------------------------- |

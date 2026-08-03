@@ -61,7 +61,6 @@ impl CellControlType {
             CellControlType::ExpandCell => IconName::ChevronRight,
         }
     }
-
     fn id(&self) -> &'static str {
         match self {
             CellControlType::RunCell => "CellControlType::RunCell",
@@ -69,7 +68,7 @@ impl CellControlType {
             CellControlType::StopCell => "CellControlType::StopCell",
             CellControlType::ClearCell => "CellControlType::ClearCell",
             CellControlType::CellOptions => "CellControlType::CellOptions",
-            CellControlType::CollapseCell => "CellControlType::CollapseCell",
+            CellControlType::CollapseCell => "CellControlType::CollapseCelln",
             CellControlType::ExpandCell => "CellControlType::ExpandCell",
         }
     }
@@ -821,6 +820,9 @@ impl CodeCell {
         self.is_executing
     }
 
+    /// Displays a kernel-level failure (e.g. the kernel failed to launch because
+    /// Python is not installed) as an error output on this cell, so the user gets
+    /// feedback instead of a spinner that never resolves.
     pub fn show_kernel_error(
         &mut self,
         error_message: &str,

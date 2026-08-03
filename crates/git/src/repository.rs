@@ -24,6 +24,7 @@ use std::sync::atomic::AtomicBool;
 
 use std::process::{ExitStatus, Output};
 use std::str::FromStr;
+use std::time::SystemTime;
 use std::{
     cmp::Ordering,
     path::{Path, PathBuf},
@@ -73,6 +74,17 @@ pub fn original_repo_path_from_common_dir(common_dir: &Path) -> Option<PathBuf> 
     } else {
         None
     }
+}
+
+fn linked_worktree_git_dir(worktree_path: &Path) -> Result<PathBuf> {
+    let dot_git_path = worktree_path.join(".git");
+    let git_file = std::fs::read_to_string(&dot_git_path)
+        .with_context(|| format!("failed to read {}", dot_git_path.display()))?;
+    let git_dir = git_file
+        .strip_prefix("gitdir:")
+        .context("worktree .git file missing gitdir pointer")?
+        .trim();
+    Ok(worktree_path.join(git_dir))
 }
 
 fn normalize_git_metadata_path(path: PathBuf) -> Result<PathBuf> {
@@ -789,12 +801,18 @@ pub trait GitRepository: Send + Sync {
     /// Returns the contents of an entry in the repository's index, or None if there is no entry for the given path.
     ///
     /// Also returns `None` for symlinks.
-    fn load_index_text(&self, path: RepoPath) -> BoxFuture<'_, Option<String>>;
+    fn load_index_text(&self, path: RepoPath) -> BoxFuture<'_, Option<String>> {
+        let future = self.load_revisions(vec![format!(":{}", path.as_unix_str())]);
+        async move { future.await.ok()?.pop()? }.boxed()
+    }
 
     /// Returns the contents of an entry in the repository's HEAD, or None if HEAD does not exist or has no entry for the given path.
     ///
     /// Also returns `None` for symlinks.
-    fn load_committed_text(&self, path: RepoPath) -> BoxFuture<'_, Option<String>>;
+    fn load_committed_text(&self, path: RepoPath) -> BoxFuture<'_, Option<String>> {
+        let future = self.load_revisions(vec![format!("HEAD:{}", path.as_unix_str())]);
+        async move { future.await.ok()?.pop()? }.boxed()
+    }
     fn load_blob_content(&self, oid: Oid) -> BoxFuture<'_, Result<String>>;
 
     fn set_index_text(
@@ -817,6 +835,8 @@ pub trait GitRepository: Send + Sync {
 
     /// Resolve a list of refs to SHAs.
     fn revparse_batch(&self, revs: Vec<String>) -> BoxFuture<'_, Result<Vec<Option<String>>>>;
+
+    fn load_revisions(&self, revisions: Vec<String>) -> BoxFuture<'_, Result<Vec<Option<String>>>>;
 
     fn head_sha(&self) -> BoxFuture<'_, Option<String>> {
         async move {
@@ -856,6 +876,24 @@ pub trait GitRepository: Send + Sync {
     ) -> BoxFuture<'_, Result<()>>;
 
     fn worktrees(&self) -> BoxFuture<'_, Result<Vec<Worktree>>>;
+
+    /// Returns the creation time of a linked worktree's git metadata
+    /// directory (`.git/worktrees/<name>/`), resolved via the worktree's
+    /// `.git` file.
+    ///
+    /// The metadata directory is created by `git worktree add` and removed
+    /// by `git worktree remove`, so its creation time identifies a
+    /// particular incarnation of the worktree: if the worktree is removed
+    /// and recreated at the same path, the creation time changes.
+    ///
+    /// Returns `Ok(None)` when the worktree directory does not exist at
+    /// all, and an error when the directory exists but the time cannot be
+    /// determined (e.g. on filesystems without birthtime support); callers
+    /// should fail safe in the error case.
+    fn worktree_created_at(
+        &self,
+        worktree_path: PathBuf,
+    ) -> BoxFuture<'_, Result<Option<SystemTime>>>;
 
     fn create_worktree(
         &self,
@@ -1415,7 +1453,7 @@ impl GitRepository for RealGitRepository {
                 };
 
                 match status_code {
-                    StatusCode::Modified => {
+                    StatusCode::Modified | StatusCode::TypeChanged => {
                         stdin.write_all(commit.as_bytes()).await?;
                         stdin.write_all(b":").await?;
                         stdin.write_all(path.as_bytes()).await?;
@@ -1461,7 +1499,7 @@ impl GitRepository for RealGitRepository {
                 };
 
                 match status_code {
-                    StatusCode::Modified => {
+                    StatusCode::Modified | StatusCode::TypeChanged => {
                         info_line.clear();
                         stdout.read_line(&mut info_line).await?;
                         let len = info_line.trim_end().parse().with_context(|| {
@@ -1553,47 +1591,6 @@ impl GitRepository for RealGitRepository {
             Ok(())
         }
         .boxed()
-    }
-
-    fn load_index_text(&self, path: RepoPath) -> BoxFuture<'_, Option<String>> {
-        let git_binary = self.git_binary();
-        let path_str = format!(":{}", path.as_unix_str());
-        self.executor
-            .spawn(async move {
-                let git = git_binary;
-                let output = git
-                    .build_command(&["show", &path_str])
-                    .stdout(Stdio::piped())
-                    .stderr(Stdio::piped())
-                    .output()
-                    .await
-                    .log_err()?;
-                if !output.status.success() {
-                    return None;
-                }
-                String::from_utf8(output.stdout).ok()
-            })
-            .boxed()
-    }
-
-    fn load_committed_text(&self, path: RepoPath) -> BoxFuture<'_, Option<String>> {
-        let git = self.git_binary();
-        let path_str = format!("HEAD:{}", path.as_unix_str());
-        self.executor
-            .spawn(async move {
-                let output = git
-                    .build_command(&["show", &path_str])
-                    .stdout(Stdio::piped())
-                    .stderr(Stdio::piped())
-                    .output()
-                    .await
-                    .log_err()?;
-                if !output.status.success() {
-                    return None;
-                }
-                String::from_utf8(output.stdout).ok()
-            })
-            .boxed()
     }
 
     fn load_blob_content(&self, oid: Oid) -> BoxFuture<'_, Result<String>> {
@@ -1771,6 +1768,68 @@ impl GitRepository for RealGitRepository {
             .boxed()
     }
 
+    fn load_revisions(&self, revisions: Vec<String>) -> BoxFuture<'_, Result<Vec<Option<String>>>> {
+        let git = self.git_binary();
+        self.executor
+            .spawn(async move {
+                if revisions.is_empty() {
+                    return Ok(Vec::new());
+                }
+
+                let mut process = git
+                    .build_command(&["cat-file", "--batch"])
+                    .stdin(Stdio::piped())
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::piped())
+                    .kill_on_drop(true)
+                    .spawn()?;
+
+                let mut stdin = BufWriter::new(process.stdin.take().context("no stdin")?);
+                let mut stdout = BufReader::new(process.stdout.take().context("no stdout")?);
+                let mut newline = [0u8; 1];
+
+                let mut header_bytes = Vec::new();
+                let mut results = Vec::with_capacity(revisions.len());
+                for rev in &revisions {
+                    stdin.write_all(rev.as_bytes()).await?;
+                    stdin.write_all(b"\n").await?;
+                    stdin.flush().await?;
+
+                    header_bytes.clear();
+                    stdout.read_until(b'\n', &mut header_bytes).await?;
+                    let header_line = String::from_utf8_lossy(&header_bytes);
+
+                    let parts: Vec<&str> = header_line.trim().split(' ').collect();
+                    match parts[..] {
+                        [.., "missing"] => {
+                            results.push(None);
+                        }
+                        [_, object_type, size_str] => {
+                            let size: usize = size_str
+                                .parse()
+                                .with_context(|| format!("invalid object size: {size_str}"))?;
+
+                            let mut content = vec![0u8; size];
+                            stdout.read_exact(&mut content).await?;
+                            stdout.read_exact(&mut newline).await?;
+
+                            if object_type == "blob" {
+                                results.push(String::from_utf8(content).ok());
+                            } else {
+                                results.push(None);
+                            }
+                        }
+                        _ => bail!("invalid cat-file header: {header_line}"),
+                    }
+                }
+
+                drop(stdin);
+                process.output().await?;
+                Ok(results)
+            })
+            .boxed()
+    }
+
     fn merge_message(&self) -> BoxFuture<'_, Option<String>> {
         let path = self.path().join("MERGE_MSG");
         self.executor
@@ -1939,6 +1998,34 @@ impl GitRepository for RealGitRepository {
                     let stderr = String::from_utf8_lossy(&output.stderr);
                     anyhow::bail!("git worktree list failed: {stderr}");
                 }
+            })
+            .boxed()
+    }
+
+    fn worktree_created_at(
+        &self,
+        worktree_path: PathBuf,
+    ) -> BoxFuture<'_, Result<Option<SystemTime>>> {
+        self.executor
+            .spawn(async move {
+                match std::fs::metadata(&worktree_path) {
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                        return Ok(None);
+                    }
+                    Err(error) => {
+                        return Err(error).with_context(|| {
+                            format!("failed to stat {}", worktree_path.display())
+                        });
+                    }
+                    Ok(_) => {}
+                }
+                let git_dir = linked_worktree_git_dir(&worktree_path)?;
+                let metadata = std::fs::metadata(&git_dir)
+                    .with_context(|| format!("failed to stat {}", git_dir.display()))?;
+                let created_at = metadata.created().with_context(|| {
+                    format!("creation time unavailable for {}", git_dir.display())
+                })?;
+                Ok(Some(created_at))
             })
             .boxed()
     }
@@ -3832,10 +3919,7 @@ fn checkpoint_author_envs() -> HashMap<String, String> {
         ("GIT_AUTHOR_NAME".to_string(), "Sim".to_string()),
         ("GIT_AUTHOR_EMAIL".to_string(), "hi@sim.dev".to_string()),
         ("GIT_COMMITTER_NAME".to_string(), "Sim".to_string()),
-        (
-            "GIT_COMMITTER_EMAIL".to_string(),
-            "hi@sim.dev".to_string(),
-        ),
+        ("GIT_COMMITTER_EMAIL".to_string(), "hi@sim.dev".to_string()),
     ])
 }
 
@@ -3974,6 +4058,61 @@ mod tests {
             original_repo_path_from_common_dir(&repository.common_dir).unwrap(),
             repo_dir.path(),
         );
+    }
+
+    #[gpui::test]
+    async fn test_load_commit_with_type_changed_file(cx: &mut TestAppContext) {
+        disable_git_global_config();
+        cx.executor().allow_parking();
+
+        let repo_dir = tempfile::tempdir().expect("failed to create temporary repository");
+        git_init_repo(repo_dir.path());
+        fs::write(repo_dir.path().join("file.txt"), "regular contents\n")
+            .expect("failed to write regular file");
+        git_command(repo_dir.path(), ["add", "file.txt"]);
+        git_command(repo_dir.path(), ["commit", "-m", "initial"]);
+
+        let repository = RealGitRepository::new(
+            &repo_dir.path().join(".git"),
+            None,
+            Some("git".into()),
+            cx.executor(),
+        )
+        .expect("failed to open repository");
+        fs::write(repo_dir.path().join("file.txt"), "target")
+            .expect("failed to write symlink target");
+
+        let symlink_blob = repository
+            .git_binary()
+            .run(&["hash-object", "-w", "file.txt"])
+            .await
+            .expect("failed to write symlink blob");
+        git_command(
+            repo_dir.path(),
+            [
+                OsString::from("update-index"),
+                OsString::from("--cacheinfo"),
+                OsString::from("120000"),
+                OsString::from(symlink_blob),
+                OsString::from("file.txt"),
+            ],
+        );
+        git_command(repo_dir.path(), ["commit", "-m", "type change"]);
+
+        let commit_diff = repository
+            .load_commit("HEAD".to_string(), cx.to_async())
+            .await
+            .expect("failed to load type-changed commit");
+        assert_eq!(commit_diff.files.len(), 1);
+
+        let file = commit_diff
+            .files
+            .first()
+            .expect("type-changed file should be present");
+        assert_eq!(file.path.as_unix_str(), "file.txt");
+        assert_eq!(file.old_text.as_deref(), Some("regular contents\n"));
+        assert_eq!(file.new_text.as_deref(), Some("target"));
+        assert_eq!(file.status(), CommitFileStatus::Modified);
     }
 
     #[gpui::test]
@@ -4600,6 +4739,103 @@ mod tests {
     }
 
     #[gpui::test]
+    async fn test_load_revisions(cx: &mut TestAppContext) {
+        disable_git_global_config();
+        cx.executor().allow_parking();
+
+        let repo_dir = tempfile::tempdir().unwrap();
+        git_init_repo(repo_dir.path());
+
+        let file1_path = repo_dir.path().join("file1");
+        let file2_path = repo_dir.path().join("file2");
+        let space_file_path = repo_dir.path().join("file with spaces");
+
+        smol::fs::write(&file1_path, "file1 committed contents")
+            .await
+            .unwrap();
+        smol::fs::write(&file2_path, "file2 committed contents")
+            .await
+            .unwrap();
+        smol::fs::write(&space_file_path, "space file committed contents")
+            .await
+            .unwrap();
+
+        let repo = RealGitRepository::new(
+            &repo_dir.path().join(".git"),
+            None,
+            Some("git".into()),
+            cx.executor(),
+        )
+        .unwrap();
+
+        // Stage files and commit
+        repo.stage_paths(
+            vec![
+                repo_path("file1"),
+                repo_path("file2"),
+                repo_path("file with spaces"),
+            ],
+            Arc::new(HashMap::default()),
+        )
+        .await
+        .unwrap();
+        repo.commit(
+            "Initial commit".into(),
+            None,
+            CommitOptions::default(),
+            AskPassDelegate::new(&mut cx.to_async(), |_, _, _| {}),
+            Arc::new(test_commit_envs()),
+        )
+        .await
+        .unwrap();
+
+        // Now modify files in index but not yet committed
+        smol::fs::write(&file1_path, "file1 index contents")
+            .await
+            .unwrap();
+        repo.stage_paths(vec![repo_path("file1")], Arc::new(HashMap::default()))
+            .await
+            .unwrap();
+
+        // Write working tree contents (not indexed, not committed)
+        smol::fs::write(&file1_path, "file1 worktree contents")
+            .await
+            .unwrap();
+
+        // Now test load_revisions
+        let results = repo
+            .load_revisions(
+                [
+                    "HEAD:file1",
+                    ":file1",
+                    "HEAD:file2",
+                    ":file2",
+                    "HEAD:nonexistent",
+                    "HEAD:file with spaces",
+                    "HEAD:nonexistent file with spaces",
+                ]
+                .into_iter()
+                .map(String::from)
+                .collect(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            results,
+            vec![
+                Some("file1 committed contents".into()),
+                Some("file1 index contents".into()),
+                Some("file2 committed contents".into()),
+                Some("file2 committed contents".into()), // untouched in index, should match HEAD
+                None,
+                Some("space file committed contents".into()),
+                None,
+            ]
+        );
+    }
+
+    #[gpui::test]
     async fn test_checkpoint_empty_repo(cx: &mut TestAppContext) {
         disable_git_global_config();
 
@@ -5083,6 +5319,24 @@ mod tests {
             new_worktree.path.canonicalize().unwrap(),
             worktree_path.canonicalize().unwrap(),
         );
+
+        // The new worktree's git metadata directory should report a creation
+        // time, resolved via the worktree's `.git` file.
+        let created_at = repo
+            .worktree_created_at(worktree_path.clone())
+            .await
+            .unwrap();
+        assert!(
+            created_at.is_some(),
+            "creation time should be available for a freshly created worktree"
+        );
+
+        // A path with no worktree at all reports `None`.
+        let missing = repo
+            .worktree_created_at(worktrees_dir.join("does-not-exist"))
+            .await
+            .unwrap();
+        assert_eq!(missing, None);
     }
 
     #[gpui::test]
@@ -5373,20 +5627,20 @@ mod tests {
     fn test_original_repo_path_from_common_dir() {
         // Normal repo: common_dir is <work_dir>/.git
         assert_eq!(
-            original_repo_path_from_common_dir(Path::new("/code/sim5/.git")),
-            Some(PathBuf::from("/code/sim5"))
+            original_repo_path_from_common_dir(Path::new("/code/zed5/.git")),
+            Some(PathBuf::from("/code/zed5"))
         );
 
         // Worktree: common_dir is the main repo's .git
         // (same result — that's the point, it always traces back to the original)
         assert_eq!(
-            original_repo_path_from_common_dir(Path::new("/code/sim5/.git")),
-            Some(PathBuf::from("/code/sim5"))
+            original_repo_path_from_common_dir(Path::new("/code/zed5/.git")),
+            Some(PathBuf::from("/code/zed5"))
         );
 
         // Bare repo: no .git suffix, returns None (no working-tree root)
         assert_eq!(
-            original_repo_path_from_common_dir(Path::new("/code/sim5.git")),
+            original_repo_path_from_common_dir(Path::new("/code/zed5.git")),
             None
         );
 
@@ -5496,7 +5750,7 @@ mod tests {
             "remote",
             "add",
             "origin",
-            "https://github.com/zed-industries/zed.git",
+            "https://github.com/simtropolis/sim.git",
         ])
         .await
         .unwrap();
@@ -5513,7 +5767,7 @@ mod tests {
         assert_eq!(remote_urls.len(), 2);
         assert_eq!(
             remote_urls.get("origin").unwrap(),
-            "https://github.com/zed-industries/zed.git"
+            "https://github.com/simtropolis/sim.git"
         );
         assert_eq!(
             remote_urls.get("upstream").unwrap(),

@@ -23,6 +23,7 @@ async-trait.workspace = true
 client.workspace = true
 cloud_api_types.workspace = true
 collections.workspace = true
+comfy_model.workspace = true
 dap.workspace = true
 extension.workspace = true
 fs.workspace = true

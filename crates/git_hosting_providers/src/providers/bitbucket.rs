@@ -15,6 +15,7 @@ use git::{
     BuildCommitPermalinkParams, BuildPermalinkParams, GitHostingProvider, ParsedGitRemote,
     PullRequest, RemoteUrl,
 };
+use urlencoding::encode;
 
 use crate::get_host_from_git_remote_url;
 
@@ -255,6 +256,33 @@ impl GitHostingProvider for Bitbucket {
         permalink
     }
 
+    fn build_create_pull_request_url(
+        &self,
+        remote: &ParsedGitRemote,
+        source_branch: &str,
+    ) -> Option<Url> {
+        let ParsedGitRemote { owner, repo } = remote;
+
+        if self.is_self_hosted() {
+            let mut url = self
+                .base_url()
+                .join(&format!("projects/{owner}/repos/{repo}/compare/commits"))
+                .ok()?;
+            let source_ref = format!("refs/heads/{source_branch}");
+            let encoded_ref = encode(&source_ref);
+            url.set_query(Some(&format!("sourceBranch={encoded_ref}")));
+            Some(url)
+        } else {
+            let mut url = self
+                .base_url()
+                .join(&format!("{owner}/{repo}/pull-requests/new"))
+                .ok()?;
+            let encoded_branch = encode(source_branch);
+            url.set_query(Some(&format!("source={encoded_branch}")));
+            Some(url)
+        }
+    }
+
     fn extract_pull_request(&self, remote: &ParsedGitRemote, message: &str) -> Option<PullRequest> {
         // Check first line of commit message for PR references
         let first_line = message.lines().next()?;
@@ -336,7 +364,7 @@ mod tests {
     #[test]
     fn test_parse_remote_url_given_https_url_with_username() {
         let parsed_remote = Bitbucket::public_instance()
-            .parse_remote_url("https://thorstenballsim@bitbucket.org/simtropolis/sim.git")
+            .parse_remote_url("https://thorstenballzed@bitbucket.org/simtropolis/sim.git")
             .unwrap();
 
         assert_eq!(
@@ -418,7 +446,7 @@ mod tests {
 
     #[test]
     fn test_parse_remote_url_given_self_hosted_https_url_with_username() {
-        let remote_url = "https://thorstenballsim@bitbucket.company.com/simtropolis/sim.git";
+        let remote_url = "https://thorstenballzed@bitbucket.company.com/simtropolis/sim.git";
 
         let parsed_remote = Bitbucket::from_remote_url(remote_url)
             .unwrap()
@@ -450,18 +478,18 @@ mod tests {
 
     #[test]
     fn test_build_bitbucket_self_hosted_permalink() {
-        let permalink =
-            Bitbucket::from_remote_url("git@bitbucket.company.com:simtropolis/sim.git")
-                .unwrap()
-                .build_permalink(
-                    ParsedGitRemote {
-                        owner: "simtropolis".into(),
-                        repo: "sim".into(),
-                    },
-                    BuildPermalinkParams::new("f00b4r", &repo_path("main.rs"), None),
-                );
+        let permalink = Bitbucket::from_remote_url("git@bitbucket.company.com:simtropolis/sim.git")
+            .unwrap()
+            .build_permalink(
+                ParsedGitRemote {
+                    owner: "simtropolis".into(),
+                    repo: "sim".into(),
+                },
+                BuildPermalinkParams::new("f00b4r", &repo_path("main.rs"), None),
+            );
 
-        let expected_url = "https://bitbucket.company.com/projects/simtropolis/repos/sim/browse/main.rs?at=f00b4r";
+        let expected_url =
+            "https://bitbucket.company.com/projects/simtropolis/repos/sim/browse/main.rs?at=f00b4r";
         assert_eq!(permalink.to_string(), expected_url.to_string())
     }
 
@@ -506,26 +534,59 @@ mod tests {
             BuildPermalinkParams::new("f00b4r", &repo_path("main.rs"), Some(23..47)),
         );
 
-        let expected_url =
-            "https://bitbucket.org/simtropolis/sim/src/f00b4r/main.rs#lines-24:48";
+        let expected_url = "https://bitbucket.org/simtropolis/sim/src/f00b4r/main.rs#lines-24:48";
         assert_eq!(permalink.to_string(), expected_url.to_string())
     }
 
     #[test]
     fn test_build_bitbucket_self_hosted_permalink_with_multi_line_selection() {
-        let permalink =
-            Bitbucket::from_remote_url("git@bitbucket.company.com:simtropolis/sim.git")
-                .unwrap()
-                .build_permalink(
-                    ParsedGitRemote {
-                        owner: "simtropolis".into(),
-                        repo: "sim".into(),
-                    },
-                    BuildPermalinkParams::new("f00b4r", &repo_path("main.rs"), Some(23..47)),
-                );
+        let permalink = Bitbucket::from_remote_url("git@bitbucket.company.com:simtropolis/sim.git")
+            .unwrap()
+            .build_permalink(
+                ParsedGitRemote {
+                    owner: "simtropolis".into(),
+                    repo: "sim".into(),
+                },
+                BuildPermalinkParams::new("f00b4r", &repo_path("main.rs"), Some(23..47)),
+            );
 
         let expected_url = "https://bitbucket.company.com/projects/simtropolis/repos/sim/browse/main.rs?at=f00b4r#24-48";
         assert_eq!(permalink.to_string(), expected_url.to_string())
+    }
+
+    #[test]
+    fn test_build_bitbucket_create_pr_url() {
+        let remote = ParsedGitRemote {
+            owner: "simtropolis".into(),
+            repo: "sim".into(),
+        };
+
+        let url = Bitbucket::public_instance()
+            .build_create_pull_request_url(&remote, "feature/my-branch")
+            .expect("url should be constructed");
+
+        assert_eq!(
+            url.as_str(),
+            "https://bitbucket.org/simtropolis/sim/pull-requests/new?source=feature%2Fmy-branch"
+        );
+    }
+
+    #[test]
+    fn test_build_bitbucket_self_hosted_create_pr_url() {
+        let remote = ParsedGitRemote {
+            owner: "simtropolis".into(),
+            repo: "sim".into(),
+        };
+
+        let url = Bitbucket::from_remote_url("https://bitbucket.company.com/simtropolis/sim.git")
+            .unwrap()
+            .build_create_pull_request_url(&remote, "feature/my-branch")
+            .expect("url should be constructed");
+
+        assert_eq!(
+            url.as_str(),
+            "https://bitbucket.company.com/projects/simtropolis/repos/sim/compare/commits?sourceBranch=refs%2Fheads%2Ffeature%2Fmy-branch"
+        );
     }
 
     #[test]

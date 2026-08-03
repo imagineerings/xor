@@ -54,7 +54,7 @@ async fn test_debug_session_substitutes_variables_and_relativizes_paths(
     let home_dir = paths::home_dir();
 
     let test_cases: Vec<(&'static str, &'static str)> = vec![
-        // Absolute path - should not be relativisim
+        // Absolute path - should not be relativized
         (
             path!("/absolute/path/to/program"),
             path!("/absolute/path/to/program"),

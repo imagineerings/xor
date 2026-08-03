@@ -235,7 +235,7 @@ where
     params: T,
 }
 
-/// Language server protocol RPC request response message before it is deserialisim into a concrete type.
+/// Language server protocol RPC request response message before it is deserialized into a concrete type.
 #[derive(Serialize, Deserialize)]
 struct AnyResponse<'a> {
     jsonrpc: &'a str,
@@ -280,7 +280,7 @@ where
     params: T,
 }
 
-/// Language server RPC notification message before it is deserialisim into a concrete type.
+/// Language server RPC notification message before it is deserialized into a concrete type.
 #[derive(Debug, Clone, Deserialize)]
 struct NotificationOrRequest {
     #[serde(default)]
@@ -503,7 +503,7 @@ impl LanguageServer {
                             id: message_id,
                             error: Some(Error {
                                 code: -32601,
-                                message: format!("Unrecognisim method `{}`", msg.method),
+                                message: format!("Unrecognized method `{}`", msg.method),
                                 data: None,
                             }),
                             result: None,
@@ -568,8 +568,8 @@ impl LanguageServer {
             let outbound_tx = outbound_tx.clone();
             async move {
                 while let Ok(serializer) = notification_rx.recv().await {
-                    let serialisim = (serializer.0)();
-                    let Ok(_) = outbound_tx.send(serialisim).await else {
+                    let serialized = (serializer.0)();
+                    let Ok(_) = outbound_tx.send(serialized).await else {
                         return;
                     };
                 }
@@ -1460,7 +1460,7 @@ impl LanguageServer {
                             .spawn(async move {
                                 let response = match result {
                                     Ok(response) => match serde_json::from_str(&response) {
-                                        Ok(deserialisim) => Ok(deserialisim),
+                                        Ok(deserialized) => Ok(deserialized),
                                         Err(error) => {
                                             log::error!("failed to deserialize response from language server: {}. response from language server: {:?}", error, response);
                                             Err(error).context("failed to deserialize response")

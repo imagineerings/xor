@@ -13,7 +13,6 @@ use command_palette_hooks::{
     GlobalCommandPaletteInterceptor,
 };
 
-use sim_actions::{OpenSimUrl, command_palette::Toggle};
 use fuzzy_nucleo::{StringMatch, StringMatchCandidate};
 use gpui::{
     Action, App, Context, DismissEvent, Entity, EventEmitter, FocusHandle, Focusable,
@@ -24,6 +23,7 @@ use picker::Direction;
 use picker::{Picker, PickerDelegate};
 use postage::{sink::Sink, stream::Stream};
 use settings::Settings;
+use sim_actions::{OpenSimUrl, command_palette::Toggle};
 use ui::{HighlightedLabel, KeyBinding, ListItem, ListItemSpacing, prelude::*};
 use util::ResultExt;
 use workspace::{ModalView, Workspace, WorkspaceSettings};
@@ -42,7 +42,7 @@ pub struct CommandPalette {
 /// Removes subsequent whitespace characters and double colons from the query, and converts
 /// underscores to spaces.
 ///
-/// This improves the likelihood of a match by either humanisim name or keymap-style name.
+/// This improves the likelihood of a match by either humanized name or keymap-style name.
 /// Underscores are converted to spaces because `humanize_action_name` converts them to spaces
 /// when building the search candidates (e.g. `terminal_panel::Toggle` -> `terminal panel: toggle`).
 pub fn normalize_action_query(input: &str) -> String {
@@ -125,7 +125,10 @@ impl CommandPalette {
         );
 
         let picker = cx.new(|cx| {
-            let picker = Picker::uniform_list(delegate, window, cx);
+            // One-shot action; there's nothing to reopen.
+            let picker = Picker::uniform_list(delegate, window, cx)
+                .reopenable(false, cx)
+                .show_scrollbar(true);
             picker.set_query(query, window, cx);
             picker
         });
@@ -150,7 +153,6 @@ impl Render for CommandPalette {
     fn render(&mut self, _window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         v_flex()
             .key_context("CommandPalette")
-            .w(rems(34.))
             .child(self.picker.clone())
     }
 }
@@ -375,6 +377,10 @@ impl CommandPaletteDelegate {
 
 impl PickerDelegate for CommandPaletteDelegate {
     type ListItem = ListItem;
+
+    fn name() -> &'static str {
+        "command palette"
+    }
 
     fn placeholder_text(&self, _window: &mut Window, _cx: &mut App) -> Arc<str> {
         "Execute a command...".into()

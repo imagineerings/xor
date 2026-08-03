@@ -3,7 +3,7 @@ use std::{path::Path, sync::Arc};
 use collections::BTreeMap;
 use gpui::{Entity, TestAppContext};
 use language::Buffer;
-use project::{Project, bookmark_store::SerialisimBookmark};
+use project::{Project, bookmark_store::SerializedBookmark};
 use serde_json::json;
 use util::path;
 
@@ -23,7 +23,7 @@ mod integration {
         Arc::from(Path::new(path))
     }
 
-    fn serialized_bookmark(row: u32) -> SerializedBookmark {
+    fn serialisim_bookmark(row: u32) -> SerializedBookmark {
         SerializedBookmark {
             row,
             label: String::new(),
@@ -83,7 +83,7 @@ mod integration {
     fn get_all_bookmarks(
         project: &Entity<Project>,
         cx: &mut TestAppContext,
-    ) -> BTreeMap<Arc<Path>, Vec<SerialisimBookmark>> {
+    ) -> BTreeMap<Arc<Path>, Vec<SerializedBookmark>> {
         project.read_with(cx, |project, cx| {
             project
                 .bookmark_store()
@@ -92,15 +92,15 @@ mod integration {
         })
     }
 
-    fn build_serialisim(
+    fn build_serialized(
         entries: &[(&str, &[u32])],
-    ) -> BTreeMap<Arc<Path>, Vec<SerialisimBookmark>> {
+    ) -> BTreeMap<Arc<Path>, Vec<SerializedBookmark>> {
         let mut map = BTreeMap::new();
         for &(path_str, rows) in entries {
             let path = project_path(path_str);
             map.insert(
                 path.clone(),
-                rows.iter().map(|&row| serialized_bookmark(row)).collect(),
+                rows.iter().map(|&row| serialisim_bookmark(row)).collect(),
             );
         }
         map
@@ -108,13 +108,13 @@ mod integration {
 
     async fn restore_bookmarks(
         project: &Entity<Project>,
-        serialisim: BTreeMap<Arc<Path>, Vec<SerialisimBookmark>>,
+        serialized: BTreeMap<Arc<Path>, Vec<SerializedBookmark>>,
         cx: &mut TestAppContext,
     ) {
         project
             .update(cx, |project, cx| {
                 project.bookmark_store().update(cx, |store, cx| {
-                    store.load_serialisim_bookmarks(serialisim, cx)
+                    store.load_serialisim_bookmarks(serialized, cx)
                 })
             })
             .await
@@ -130,7 +130,7 @@ mod integration {
     }
 
     fn assert_bookmark_rows(
-        bookmarks: &BTreeMap<Arc<Path>, Vec<SerialisimBookmark>>,
+        bookmarks: &BTreeMap<Arc<Path>, Vec<SerializedBookmark>>,
         path: &str,
         expected_rows: &[u32],
     ) {
@@ -138,12 +138,12 @@ mod integration {
         let file_bookmarks = bookmarks
             .get(&path)
             .unwrap_or_else(|| panic!("Expected bookmarks for {}", path.display()));
-        let rows: Vec<u32> = file_bookmarks.iter().map(|bookmark| bookmark.row).collect();
+        let rows: Vec<u32> = file_bookmarks.iter().map(|b| b.row).collect();
         assert_eq!(rows, expected_rows, "Bookmark rows for {}", path.display());
     }
 
     fn assert_bookmark_labels(
-        bookmarks: &BTreeMap<Arc<Path>, Vec<SerialisimBookmark>>,
+        bookmarks: &BTreeMap<Arc<Path>, Vec<SerializedBookmark>>,
         path: &str,
         expected: &[(u32, &str)],
     ) {
@@ -384,12 +384,12 @@ mod integration {
 
         let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
 
-        let serialisim = build_serialisim(&[
+        let serialized = build_serialized(&[
             (path!("/project/file1.rs"), &[0, 3]),
             (path!("/project/file2.rs"), &[1]),
         ]);
 
-        restore_bookmarks(&project, serialisim, cx).await;
+        restore_bookmarks(&project, serialized, cx).await;
 
         let restored = get_all_bookmarks(&project, cx);
         assert_eq!(restored.len(), 2);
@@ -412,8 +412,8 @@ mod integration {
 
         let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
 
-        let serialisim = build_serialisim(&[(path!("/project/file1.rs"), &[1, 100, 2])]);
-        restore_bookmarks(&project, serialisim, cx).await;
+        let serialized = build_serialized(&[(path!("/project/file1.rs"), &[1, 100, 2])]);
+        restore_bookmarks(&project, serialized, cx).await;
 
         // Before resolution, unloaded bookmarks are stored as-is
         let unresolved = get_all_bookmarks(&project, cx);
@@ -453,10 +453,10 @@ mod integration {
 
         let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
 
-        let mut serialisim = build_serialisim(&[(path!("/project/file1.rs"), &[0])]);
-        serialisim.insert(project_path(path!("/project/file2.rs")), vec![]);
+        let mut serialized = build_serialized(&[(path!("/project/file1.rs"), &[0])]);
+        serialized.insert(project_path(path!("/project/file2.rs")), vec![]);
 
-        restore_bookmarks(&project, serialisim, cx).await;
+        restore_bookmarks(&project, serialized, cx).await;
 
         let restored = get_all_bookmarks(&project, cx);
         assert_eq!(restored.len(), 1);
@@ -477,8 +477,8 @@ mod integration {
 
         let project = Project::test(fs, [path!("/project").as_ref()], cx).await;
 
-        let serialisim = build_serialisim(&[(path!("/project/tiny.rs"), &[5, 10])]);
-        restore_bookmarks(&project, serialisim, cx).await;
+        let serialized = build_serialized(&[(path!("/project/tiny.rs"), &[5, 10])]);
+        restore_bookmarks(&project, serialized, cx).await;
 
         // Before resolution, unloaded bookmarks are stored as-is
         let unresolved = get_all_bookmarks(&project, cx);
@@ -526,8 +526,8 @@ mod integration {
         );
 
         // Restoring different bookmarks should replace, not merge
-        let serialisim = build_serialisim(&[(path!("/project/file1.rs"), &[2, 3])]);
-        restore_bookmarks(&project, serialisim, cx).await;
+        let serialized = build_serialized(&[(path!("/project/file1.rs"), &[2, 3])]);
+        restore_bookmarks(&project, serialized, cx).await;
 
         let after = get_all_bookmarks(&project, cx);
         assert_eq!(after.len(), 1);
@@ -557,16 +557,16 @@ mod integration {
         add_bookmarks(&project, &buffer_beta, &[1], cx);
 
         // Serialize
-        let serialisim = get_all_bookmarks(&project, cx);
-        assert_eq!(serialisim.len(), 2);
-        assert_bookmark_rows(&serialisim, path!("/project/alpha.rs"), &[0, 2, 3]);
-        assert_bookmark_rows(&serialisim, path!("/project/beta.rs"), &[1]);
+        let serialized = get_all_bookmarks(&project, cx);
+        assert_eq!(serialized.len(), 2);
+        assert_bookmark_rows(&serialized, path!("/project/alpha.rs"), &[0, 2, 3]);
+        assert_bookmark_rows(&serialized, path!("/project/beta.rs"), &[1]);
 
         // Clear and restore
         clear_bookmarks(&project, cx);
         assert!(get_all_bookmarks(&project, cx).is_empty());
 
-        restore_bookmarks(&project, serialisim, cx).await;
+        restore_bookmarks(&project, serialized, cx).await;
 
         let restored = get_all_bookmarks(&project, cx);
         assert_eq!(restored.len(), 2);
@@ -596,12 +596,12 @@ mod integration {
             buffer.edit([(0..0, "new_first_line\n")], None, cx);
         });
 
-        let serialisim = get_all_bookmarks(&project, cx);
-        assert_bookmark_rows(&serialisim, path!("/project/file.rs"), &[2, 4]);
+        let serialized = get_all_bookmarks(&project, cx);
+        assert_bookmark_rows(&serialized, path!("/project/file.rs"), &[2, 4]);
 
         // Clear and restore
         clear_bookmarks(&project, cx);
-        restore_bookmarks(&project, serialisim, cx).await;
+        restore_bookmarks(&project, serialized, cx).await;
 
         let restored = get_all_bookmarks(&project, cx);
         assert_bookmark_rows(&restored, path!("/project/file.rs"), &[2, 4]);

@@ -94,7 +94,7 @@ impl Render for EditPredictionButton {
 
                 let icon = match status {
                     Status::Error(_) => IconName::CopilotError,
-                    Status::Authorisim => {
+                    Status::Authorized => {
                         if enabled {
                             IconName::Copilot
                         } else {
@@ -161,7 +161,7 @@ impl Render for EditPredictionButton {
                                 .read(cx)
                                 .status();
                             match current_status {
-                                Status::Authorisim => this.update(cx, |this, cx| {
+                                Status::Authorized => this.update(cx, |this, cx| {
                                     this.build_copilot_context_menu(window, cx)
                                 }),
                                 _ => this.update(cx, |this, cx| {
@@ -598,10 +598,7 @@ impl EditPredictionButton {
 
                 menu = menu.item(
                     ContextMenuEntry::new(name)
-                        .toggleable(
-                            IconPosition::Start,
-                            is_current && !is_disabled_sim_provider,
-                        )
+                        .toggleable(IconPosition::Start, is_current && !is_disabled_sim_provider)
                         .disabled(is_disabled_sim_provider)
                         .when(is_disabled_sim_provider, |item| {
                             item.documentation_aside(DocumentationSide::Left, move |_cx| {
@@ -913,7 +910,7 @@ impl EditPredictionButton {
 
         menu = menu.item(
             ContextMenuEntry::new("Configure Excluded Files")
-                .icon(IconName::LockOutlined)
+                .icon(IconName::Lock)
                 .icon_color(Color::Muted)
                 .documentation_aside(DocumentationSide::Left, |_| {
                     Label::new(indoc!{"
@@ -1212,18 +1209,14 @@ impl EditPredictionButton {
                             },
                             |_window, cx| cx.open_url(&sim_urls::account_url(cx)),
                         )
-                        .entry(
-                            "Upgrade to Sim Pro or contact us.",
-                            None,
-                            |_window, cx| {
-                                telemetry::event!(
-                                    "Edit Prediction Menu Action",
-                                    action = "upsell_clicked",
-                                    reason = "account_age",
-                                );
-                                cx.open_url(&sim_urls::account_url(cx))
-                            },
-                        )
+                        .entry("Upgrade to Sim Pro or contact us.", None, |_window, cx| {
+                            telemetry::event!(
+                                "Edit Prediction Menu Action",
+                                action = "upsell_clicked",
+                                reason = "account_age",
+                            );
+                            cx.open_url(&sim_urls::account_url(cx))
+                        })
                         .separator();
                 } else if self.user_store.read(cx).has_overdue_invoices() {
                     menu = menu

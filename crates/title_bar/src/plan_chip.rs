@@ -34,6 +34,7 @@ impl RenderOnce for PlanChip {
             Plan::SimProTrial => ("Pro Trial", Color::Accent, pro_chip_bg),
             Plan::SimPro => ("Pro", Color::Accent, pro_chip_bg),
             Plan::SimBusiness => ("Business", Color::Accent, pro_chip_bg),
+            Plan::SimVip => ("VIP", Color::Accent, pro_chip_bg),
             Plan::SimStudent => ("Student", Color::Accent, pro_chip_bg),
         };
 

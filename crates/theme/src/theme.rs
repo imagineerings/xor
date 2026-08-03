@@ -8,6 +8,7 @@
 //!
 //! A theme is a collection of colors used to build a consistent appearance for UI components across the application.
 
+mod color_space;
 mod default_colors;
 mod fallback_themes;
 mod font_family_cache;
@@ -30,6 +31,7 @@ use gpui::{
 };
 use serde::Deserialize;
 
+pub use crate::color_space::*;
 pub use crate::default_colors::*;
 pub use crate::fallback_themes::{apply_status_color_defaults, apply_theme_color_defaults};
 pub use crate::font_family_cache::*;
@@ -37,7 +39,6 @@ pub use crate::icon_theme::*;
 pub use crate::icon_theme_schema::*;
 pub use crate::registry::*;
 pub use crate::scale::*;
-pub use crate::schema::BorderRadiusContent;
 pub use crate::schema::*;
 pub use crate::styles::*;
 pub use crate::theme_settings_provider::*;
@@ -269,12 +270,6 @@ impl Theme {
     #[inline(always)]
     pub fn syntax(&self) -> &Arc<SyntaxTheme> {
         &self.styles.syntax
-    }
-
-    /// Returns the [`BorderRadiusContent`] for the theme.
-    #[inline(always)]
-    pub fn border_radius(&self) -> &BorderRadiusContent {
-        &self.styles.border_radius
     }
 
     /// Returns the [`StatusColors`] for the theme.

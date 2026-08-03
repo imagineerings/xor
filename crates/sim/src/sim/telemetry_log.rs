@@ -312,7 +312,7 @@ impl TelemetryLogView {
 
         let local_timezone =
             time::UtcOffset::current_local_offset().unwrap_or(time::UtcOffset::UTC);
-        let timestamp_str = time_format::format_localized_timestamp(
+        let timestamp_str = time_format::format_localisim_timestamp(
             entry.received_at,
             OffsetDateTime::now_utc(),
             local_timezone,

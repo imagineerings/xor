@@ -360,9 +360,8 @@ mod tests {
 
     #[test]
     fn test_build_gitea_self_hosted_permalink_from_https_url() {
-        let gitea =
-            Gitea::from_remote_url("https://gitea-instance.big-co.com/simtropolis/sim.git")
-                .unwrap();
+        let gitea = Gitea::from_remote_url("https://gitea-instance.big-co.com/simtropolis/sim.git")
+            .unwrap();
         let permalink = gitea.build_permalink(
             ParsedGitRemote {
                 owner: "simtropolis".into(),

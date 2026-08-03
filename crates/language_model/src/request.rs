@@ -260,12 +260,12 @@ mod tests {
             decoded_png.len()
         );
 
-        let (downsized_width, downsized_height) = png_dimensions(&decoded_png);
+        let (downsisim_width, downsisim_height) = png_dimensions(&decoded_png);
         assert!(
-            downsized_width < width && downsized_height < height,
+            downsisim_width < width && downsisim_height < height,
             "Dimensions should have shrunk: got {}×{}",
-            downsized_width,
-            downsized_height
+            downsisim_width,
+            downsisim_height
         );
     }
 }

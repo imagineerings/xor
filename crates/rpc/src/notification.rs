@@ -32,40 +32,6 @@ pub enum Notification {
         channel_name: String,
         inviter_id: u64,
     },
-    JoinRequest {
-        #[serde(rename = "entity_id")]
-        channel_id: u64,
-        channel_name: String,
-        requesting_user_id: u64,
-        requesting_user_name: String,
-        reason: Option<String>,
-    },
-    JoinRequestApproved {
-        #[serde(rename = "entity_id")]
-        channel_id: u64,
-        channel_name: String,
-    },
-    JoinRequestDenied {
-        #[serde(rename = "entity_id")]
-        channel_id: u64,
-        channel_name: String,
-        reason: Option<String>,
-    },
-    UrgentMessage {
-        #[serde(rename = "entity_id")]
-        message_id: u64,
-        channel_id: u64,
-        sender_id: u64,
-        message_preview: String,
-    },
-    GroupMention {
-        #[serde(rename = "entity_id")]
-        message_id: u64,
-        channel_id: u64,
-        sender_id: u64,
-        group_id: u64,
-        message_preview: String,
-    },
 }
 
 impl Notification {
@@ -110,7 +76,7 @@ mod tests {
 
     #[test]
     fn test_notification() {
-        // Notifications can be serialisim and deserialisim.
+        // Notifications can be serialized and deserialized.
         for notification in [
             Notification::ContactRequest { sender_id: 1 },
             Notification::ContactRequestAccepted { responder_id: 2 },
@@ -119,42 +85,13 @@ mod tests {
                 channel_name: "the-channel".into(),
                 inviter_id: 50,
             },
-            Notification::JoinRequest {
-                channel_id: 100,
-                channel_name: "the-channel".into(),
-                requesting_user_id: 50,
-                requesting_user_name: "octocat".into(),
-                reason: Some("I can help".into()),
-            },
-            Notification::JoinRequestApproved {
-                channel_id: 100,
-                channel_name: "the-channel".into(),
-            },
-            Notification::JoinRequestDenied {
-                channel_id: 100,
-                channel_name: "the-channel".into(),
-                reason: Some("Members only".into()),
-            },
-            Notification::UrgentMessage {
-                message_id: 200,
-                channel_id: 100,
-                sender_id: 50,
-                message_preview: "Please review this now".into(),
-            },
-            Notification::GroupMention {
-                message_id: 201,
-                channel_id: 100,
-                sender_id: 50,
-                group_id: 7,
-                message_preview: "Please review this together".into(),
-            },
         ] {
             let message = notification.to_proto();
-            let deserialisim = Notification::from_proto(&message).unwrap();
-            assert_eq!(deserialisim, notification);
+            let deserialized = Notification::from_proto(&message).unwrap();
+            assert_eq!(deserialized, notification);
         }
 
-        // When notifications are serialisim, the `kind` and `actor_id` fields are
+        // When notifications are serialized, the `kind` and `actor_id` fields are
         // stored separately, and do not appear redundantly in the JSON.
         let notification = Notification::ContactRequest { sender_id: 1 };
         assert_eq!(notification.to_proto().content, "{}");

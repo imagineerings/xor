@@ -18,7 +18,7 @@ Questions? Contact us at privacy@sim.dev. The full policy below contains complet
 
 ## Introduction
 
-This Privacy Policy explains how Sim Industries, Inc. ("**Sim**," "**we**," "**our**," or "**us**") collects, uses, and shares your personal data when you use our websites (including [https://sim.dev](https://sim.dev)), our downloadable software ("**Software**"), our subscription service ("**Service**"), or otherwise interact with us.
+This Privacy Policy explains how Simtropolis, Inc. ("**Sim**," "**we**," "**our**," or "**us**") collects, uses, and shares your personal data when you use our websites (including [https://sim.dev](https://sim.dev)), our downloadable software ("**Software**"), our subscription service ("**Service**"), or otherwise interact with us.
 
 As used in this Privacy Policy, “personal data” means any information relating to an identified or identifiable individual and includes any information that constitutes "personally identifiable information," “personal data,” or "personal information" under applicable privacy or data protection laws or regulations.
 
@@ -28,7 +28,7 @@ You acknowledge the collection, use, disclosure, procedures, and other processin
 
 We may collect personal data from or about you and your devices from the sources and in the manner described below. If you do not provide requested data, some features may not work - either because we need that data to deliver them, or because we're legally required to collect it.
 
-For authorisim users on Sim Business plans, certain data described in this section may be processed by Sim as a data processor on behalf of the Sim Business customer. In those cases, the Sim Business customer determines the purposes and lawful basis for that processing, as set forth in our Data Processing Agreement.
+For authorized users on Sim Business plans, certain data described in this section may be processed by Sim as a data processor on behalf of the Sim Business customer. In those cases, the Sim Business customer determines the purposes and lawful basis for that processing, as set forth in our Data Processing Agreement.
 
 ### Personal Data You Provide to Us
 
@@ -70,7 +70,7 @@ We use the personal data we collect:
 
 - To process payments: Completing transactions through our payment processor; and
 
-- To understand aggregate usage: Generating anonymisim statistics to guide product decisions.
+- To understand aggregate usage: Generating anonymized statistics to guide product decisions.
 
 We do not use your personal data for purposes materially different from those described above without providing you notice and, where required by law, obtaining your consent.
 
@@ -128,7 +128,7 @@ The disclosures described below relate to Sim’s processing as a data controlle
 
 Depending on where you are located, applicable data protection laws may provide you with specific rights regarding your personal data. These may include the right to:
 
-- Request access to the personal data we maintain about you, update, and correct inaccuracies in your personal data, restrict or object to the processing of your personal data, have your personal data anonymisim or deleted, as appropriate, or exercise your right to data portability to easily transfer your personal data to another company.
+- Request access to the personal data we maintain about you, update, and correct inaccuracies in your personal data, restrict or object to the processing of your personal data, have your personal data anonymized or deleted, as appropriate, or exercise your right to data portability to easily transfer your personal data to another company.
 
 - Withdraw any consent you previously provided to us regarding the processing of your personal data at any time and free of charge. We will apply your preferences going forward and this will not affect the lawfulness of the processing before you withdrew your consent.
 
@@ -174,7 +174,7 @@ We will post any adjustments to the Privacy Policy on this page, and the revised
 
 When data is used as outlined in this Privacy Policy, Sim is the data controller and responsible for the processing of your personal data. When Sim processes personal data on behalf of Sim Business customers as a data processor, the terms of our Data Processing Agreement apply. If you have any questions, comments, or concerns about our processing activities, please email us at [privacy@sim.dev](mailto:privacy@sim.dev) or write to us at:
 
-Sim Industries, Inc.
+Simtropolis, Inc.
 2590 Welton St
 Suite 200, PO Box 1916
 Denver, CO 80205

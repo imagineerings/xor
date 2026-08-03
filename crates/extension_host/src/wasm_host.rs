@@ -36,8 +36,8 @@ use std::{
     sync::{Arc, LazyLock, OnceLock},
     time::Duration,
 };
-use task::{SimDebugConfig, DebugScenario, SpawnInTerminal, TaskTemplate};
-use util::paths::SanitisimPath;
+use task::{DebugScenario, SimDebugConfig, SpawnInTerminal, TaskTemplate};
+use util::paths::SanitizedPath;
 use wasmtime::{
     CacheStore, Engine, Store,
     component::{Component, ResourceTable},
@@ -57,6 +57,60 @@ pub struct WasmHost {
     pub(crate) granted_capabilities: Vec<ExtensionCapability>,
     _main_thread_message_task: Task<()>,
     main_thread_message_tx: mpsc::UnboundedSender<MainThreadCall>,
+}
+
+#[derive(Clone)]
+pub struct ComponentRuntime {
+    engine: Engine,
+}
+
+impl ComponentRuntime {
+    pub fn no_wasi() -> Result<Self> {
+        static NO_WASI_ENGINE: OnceLock<Result<Engine, String>> = OnceLock::new();
+        let engine = NO_WASI_ENGINE.get_or_init(|| {
+            let mut config = wasmtime::Config::new();
+            config.wasm_component_model(true);
+            config.consume_fuel(true);
+            config.epoch_interruption(true);
+            config.max_wasm_stack(2 * 1024 * 1024);
+            config
+                .enable_incremental_compilation(cache_store())
+                .map_err(|error| error.to_string())?;
+            let engine = Engine::new(&config).map_err(|error| error.to_string())?;
+            let epoch_engine = engine.clone();
+            let epoch_driver = std::thread::Builder::new()
+                .name("sim-component-epoch".to_owned())
+                .spawn(move || {
+                    loop {
+                        std::thread::sleep(COMPONENT_EPOCH_INTERVAL);
+                        epoch_engine.increment_epoch();
+                    }
+                })
+                .map_err(|error| error.to_string())?;
+            drop(epoch_driver);
+            Ok(engine)
+        });
+        match engine {
+            Ok(engine) => Ok(Self {
+                engine: engine.clone(),
+            }),
+            Err(error) => Err(anyhow!(
+                "failed to initialize no-WASI component runtime: {error}"
+            )),
+        }
+    }
+
+    pub fn engine(&self) -> &Engine {
+        &self.engine
+    }
+
+    pub fn compile_component(&self, bytes: &[u8]) -> Result<Component> {
+        Component::new(&self.engine, bytes)
+    }
+
+    pub fn increment_epoch(&self) {
+        self.engine.increment_epoch();
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -575,9 +629,8 @@ fn wasm_engine(executor: &BackgroundExecutor) -> wasmtime::Engine {
                     // Somewhat arbitrary interval, as it isn't a guaranteed interval.
                     // But this is a rough upper bound for how long the extension execution can block on
                     // `Future::poll`.
-                    const EPOCH_INTERVAL: Duration = Duration::from_millis(100);
                     loop {
-                        executor2.timer(EPOCH_INTERVAL).await;
+                        executor2.timer(COMPONENT_EPOCH_INTERVAL).await;
                         // Exit the loop and thread once the engine is dropped.
                         let Some(engine) = engine_ref.upgrade() else {
                             break;
@@ -591,6 +644,8 @@ fn wasm_engine(executor: &BackgroundExecutor) -> wasmtime::Engine {
         })
         .clone()
 }
+
+const COMPONENT_EPOCH_INTERVAL: Duration = Duration::from_millis(100);
 
 fn cache_store() -> Arc<IncrementalCompilationCache> {
     static CACHE_STORE: LazyLock<Arc<IncrementalCompilationCache>> =
@@ -628,6 +683,10 @@ impl WasmHost {
             _main_thread_message_task: task,
             main_thread_message_tx: tx,
         })
+    }
+
+    pub fn no_wasi_component_runtime(&self) -> Result<ComponentRuntime> {
+        ComponentRuntime::no_wasi()
     }
 
     pub fn load_extension(
@@ -710,8 +769,7 @@ impl WasmHost {
             // Run wasi-dependent operations on tokio.
             // wasmtime_wasi internally uses tokio for I/O operations.
             let (extension_task, manifest, work_dir, tx, sim_api_version) =
-                gpui_tokio::Tokio::spawn(cx, load_extension(sim_api_version, component))
-                    .await??;
+                gpui_tokio::Tokio::spawn(cx, load_extension(sim_api_version, component)).await??;
 
             // Run the extension message loop on tokio since extension
             // calls may invoke wasi functions that require a tokio runtime.
@@ -736,7 +794,7 @@ impl WasmHost {
 
         let file_perms = wasmtime_wasi::FilePerms::all();
         let dir_perms = wasmtime_wasi::DirPerms::all();
-        let path = SanitisimPath::new(&extension_work_dir).to_string();
+        let path = SanitizedPath::new(&extension_work_dir).to_string();
         #[cfg(target_os = "windows")]
         let path = path.replace('\\', "/");
 

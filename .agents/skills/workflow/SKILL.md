@@ -1,260 +1,130 @@
 ---
 name: workflow
-description: Automatically begin the next unclaimed repository workflow task from local `.agents/specs/**/tasks.md` files, render it through a repository-owned `WORKFLOW.md`, and populate Linear without duplicating existing work. Use when an agent needs to start the next logical local spec task; list, pick, render, or complete local tasks; validate or author WORKFLOW.md files for the local task workflow; or create the Linear issue that represents picked task work.
+description: Plan, claim, execute, hand off, and complete repository tasks from `.agents/specs/**/tasks.md` using a repository-owned `WORKFLOW.md` and Linear synchronization. Use when Codex needs to choose the next local spec task, inspect task readiness or conflicts, reserve independent work, manage task leases, render work prompts, reconcile interrupted updates, operate the workflow UI, or maintain the local workflow contract.
 ---
 
 # Workflow
 
-## Overview
+Turn checked-in spec tasks into safe, traceable work packets. Treat local
+`tasks.md` files as dispatch authority and Linear as the shared claim and status
+tracker.
 
-Use this skill to turn local spec tasks into actionable agent work packets. The
-only supported work source is `.agents/specs/**/tasks.md`; do not source work
-from GitHub Projects or other issue trackers. On ordinary invocation, begin the
-next unclaimed local task automatically by creating a Linear issue for it. If a
-local task already has a non-terminal Linear issue, skip it so parallel agents
-do not duplicate effort.
-
-This skill follows the Symphony service spec's core shape where it applies:
-`WORKFLOW.md` is the repository-owned contract, the prompt body is rendered with
-strict template variables, Linear is the tracker, and tracker writes are part of
-the workflow/tooling layer. Sim's local workflow mode differs from the full
-service spec by using checked-in task files as the dispatch source instead of
-polling Linear for candidates.
-
-## Workflow
-
-1. Locate the repository root.
-2. Read and validate `WORKFLOW.md`; if no explicit path is configured, use
-   `WORKFLOW.md` in the repository root or current working directory.
-3. Load task packets from `.agents/specs/**/tasks.md`. Treat each top-level
-   Markdown checkbox task as one packet; include its indented bullet details,
-   `_Requirements:` lines, and `_writes:` lines in the packet body.
-4. For automatic starts, execute `node .agents/skills/workflow/scripts/workflow.js next`.
-   It scans active local tasks in source order, skips tasks already represented
-   by non-terminal Linear issues, creates Linear for the first unclaimed task
-   when only one unclaimed task is active, and returns the rendered prompt. When
-   multiple unclaimed tasks are active, `next` should return a
-   priority-ordered shortlist rather than a full dump of every task. First
-   consult the structured decision state at `.agents/workflow-state.json` if
-   present. Treat it as a cache of concise conclusions and dependency notes,
-   not authority. Validate any cached recommendation against current task files
-   and Linear state, then rank candidates before picking: account for priority,
-   immediate value, dependencies, and the previous tasks in the same `tasks.md`
-   file. Treat previous tasks as context for what has already been completed,
-   claimed, or left incomplete; prefer the next task whose prerequisites are
-   satisfied and whose implementation adds the most useful value now. After
-   accepting or rejecting a candidate, update `.agents/workflow-state.json`
-   with the decision, rationale, evidence, and stale-file dependencies so later
-   `next` runs can reuse the ranking signal. If every active task is claimed,
-   report that instead of starting work.
-5. Before editing implementation files, run a quick start-gate consistency
-   check for the picked task's spec directory:
-   - Confirm the task is still valid to begin.
-   - Check prerequisites, dependency wave placement, obvious `_writes:`
-     conflicts, and obvious contradictions between `requirements.md`,
-     `design.md`, and `tasks.md`.
-   - If the check reveals blocking ambiguity, update the spec files or ask for
-     clarification before implementation. Do not proceed on a known inconsistent
-     task packet.
-6. Do not launch the UI during ordinary `$workflow` invocation. Launch the UI
-   only when the user explicitly asks for a visual/task board mode, such as
-   `$workflow ui`, `$workflow begin-ui`, "workflow with UI", or "show workflow
-   UI".
-7. When independent tasks can safely run in parallel, execute
-   `node .agents/skills/workflow/scripts/workflow.js next --count <n> --json`,
-   create one git worktree per returned task, and run one agent per worktree
-   from that task's rendered prompt. Use parallel work only when the task write
-   manifests, likely files, and dependencies do not overlap in a way that would
-   cause conflicting edits.
-8. For explicit task IDs, execute `node .agents/skills/workflow/scripts/workflow.js pick <task-id>`;
-   it resumes the existing Linear issue for that exact task when present
-   instead of creating a duplicate.
-9. Work from the rendered prompt in the repository checkout or task-specific
-   worktree. Do not treat Linear
-   as the source of truth for dispatch eligibility in this local workflow.
-10. When work changes phase, update Linear with
-   `node .agents/skills/workflow/scripts/workflow.js move <task-or-linear-id> --state-name <state>`.
-11. When the agent determines the implementation is complete and validation is
-    passing, run the full completion-gate consistency pass before marking the
-    task complete:
-    - Tighten start, validation, handoff, and completion gates based on the
-      actual validation performed.
-    - Update dependency waves for remaining work when ordering, prerequisites,
-      or parallel safety changed.
-    - Reconcile `requirements.md`, `design.md`, and `tasks.md` so requirement
-      references, design properties, task reads/writes, and done conditions
-      match the delivered behavior.
-    Then execute
-    `node .agents/skills/workflow/scripts/workflow.js complete <task-id>`.
-    This moves the linked Linear issue to `Done` by default and updates the
-    local task checkbox to `[x]`. Pass `--state-name <state>` when the
-    repository uses a non-`Done` terminal or review state.
-
-## Executable Script
-
-Use `scripts/workflow.js` directly; no MCP server is required.
+Use the runtime-discovering wrapper:
 
 ```bash
-node .agents/skills/workflow/scripts/workflow.js next
+.agents/skills/workflow/scripts/workflow <command>
 ```
 
-Commands:
+Read [references/workflow-contract.md](references/workflow-contract.md) before
+changing task metadata, `WORKFLOW.md`, the script, or Linear fields.
 
-- `next` — automatically pick the next unclaimed active task when only one is
-  active; when multiple tasks are active, return a priority-ordered shortlist
-  plus decision-state context for value-based selection that considers previous
-  tasks and dependencies. Avoid dumping every active task when the repository
-  has a large backlog. Use `--count <n>` to reserve multiple independent tasks
-  for parallel worktrees.
-- `list` — list task packets from local task files.
-- `render <task-id>` — render a selected task through `WORKFLOW.md`.
-- `pick <task-id>` — render a selected task and create or resume Linear.
-- `move <task-or-linear-id> --state-name <state>` — move a Linear issue from
-  one workflow stage to another.
-- `activity <task-or-linear-id> --status active|inactive` — update Linear
-  activity markers and the local workflow-state cache for claimed work. Use
-  `active` when taking a task and `inactive` when pausing or handing off work
-  that should be resumed later.
-- `complete <task-id> --state-name <state>` — after the agent verifies the task
-  works correctly, move the linked Linear issue and mark the local task
-  checkbox complete. Defaults to `--state-name Done`.
-- `ui` — opt-in visual mode; launch the local workflow task board with active
-  task data, without claiming work by default.
-- `begin-ui` — opt-in begin-and-visualize mode; begin the next task and launch
-  the UI with the claimed task payload.
-- `validate` — load and validate the `WORKFLOW.md` contract.
+## Route by intent
 
-The script reads JSON settings from `WORKFLOW_SETTINGS`. Values in
-`WORKFLOW_SETTINGS` override defaults and `WORKFLOW.md` front matter. Use these
-fields:
+Skill invocation alone does not authorize a claim or tracker write.
 
-- `repository_path`: repository root for relative paths.
-- `workflow_path`: workflow file path; defaults to `WORKFLOW.md`.
-- `tasks_glob`: local task source glob; defaults to
-  `.agents/specs/**/tasks.md`.
-- `linear_api_key`: Linear token literal or `$LINEAR_API_KEY` reference.
-- `linear_endpoint`: Linear GraphQL endpoint; defaults to
-  `https://api.linear.app/graphql`.
-- `linear_team_id` or `linear_team_key`: required to create Linear issues.
-- `linear_project_id` or `linear_project_slug`: optional Linear project routing.
-- `linear_label_ids`: optional list of Linear label IDs to attach.
-- `linear_state_id`: optional state ID for the created issue.
-- `resume_existing`: optional boolean for explicit picks; defaults to `true`.
-- `workflow_state_path`: optional path to a structured decision-state JSON file;
-  defaults to `.agents/workflow-state.json`.
+- For inspection, status, recommendations, or “what is next?”, run `workflow
+  plan --json`, `workflow list`, or `workflow check`. Stop after reporting.
+- When the user explicitly asks to start, claim, or execute work, inspect
+  `workflow plan --json`, then run `workflow next` or `workflow pick <task-id>`.
+- For completion, use the two-phase `finish` then `close` lifecycle below.
 
-## Decision State
+Run `workflow doctor` when setup may be incomplete. It reports separate
+planning, claiming, and completion capabilities. Planning is read-only and
+explains rank, blockers, dependency readiness, and manifest conflicts.
 
-Use `.agents/workflow-state.json` to speed up repeated next-task decisions. The
-file is a structured cache for reviewable conclusions only:
+`next` and `pick` run the start gate, check Linear-backed conflicts, create or
+resume the Linear issue, write an expiring lease, and return a self-contained
+prompt. Move the issue to the appropriate Linear state as implementation changes
+phase.
 
-- `recommendation`: the currently recommended task ID/source, short rationale,
-  evidence, and files that should make the recommendation stale when changed.
-- `task_activity`: local cache of claimed Linear-backed tasks and whether they
-  are `active` (currently being worked by an agent/human and should be skipped
-  by `next`) or `inactive` (claimed but available to resume before creating new
-  work). Linear issue description markers are the cross-machine source of truth;
-  this file mirrors them for fast local decisions.
-- `task_notes`: concise notes for blocked, deprioritized, claimed, dependency,
-  or ready tasks.
-- `dependency_notes`: reusable ordering facts discovered while inspecting
-  previous tasks, requirements, and design docs.
-- `ranked_candidates`: a recent priority-ordered shortlist with task IDs,
-  concise ranking rationales, blockers, and evidence used to choose or reject
-  each task.
+Do not launch the UI unless the user requests visual mode. Use `workflow ui`
+for read-only visualization or `workflow begin-ui` to claim and visualize.
 
-Agents should read the decision state before spending time re-evaluating all
-candidates, validate it against current repository state, and update it after
-accepting or rejecting a recommendation. Before picking new work, check Linear
-activity markers first, then the local `task_activity` cache: skip claimed tasks
-marked `active`, prefer resuming claimed tasks marked `inactive` when they are
-the next logical task, and mark a task `active` when taking it over. When
-pausing or handing off unmerged work, mark it `inactive` with a concise summary.
-When writing back, store the selected task,
-rejected higher-ranked candidates, short rationale, evidence, and stale-file
-dependencies so future `workflow.js next` runs can prefer smarter shortlists. Do
-not store private chain-of-thought, long scratch reasoning, secrets, or
-unverified guesses.
+## Task selection
 
-## Parallel Worktrees
+Prefer explicit, durable task metadata:
 
-The agent may decide to execute work in parallel when tasks are independent.
-Prefer parallel work when returned tasks write different files or crates, have
-no dependency ordering in their task text, and can be validated separately. Use
-sequential work when tasks touch the same files, have explicit ordering, share a
-migration/schema boundary, or require the output of an earlier task.
+```markdown
+- [ ] Implement cursor animation
+  - _id: editor-smooth-cursor_
+  - _priority: P1_
+  - _value: high_
+  - _wave: 2_
+  - _blocked_by: editor-cursor-settings_
+  - _reads: crates/editor/src/blink.rs_
+  - _writes: crates/editor/src/editor.rs_
+  - _validation: cargo test -p editor cursor_blink_
+  - _Requirements: 7.2, 7.4_
+```
 
-For parallel execution:
+Tasks without `_id` remain supported through a semantic fallback ID and a
+legacy line-based alias. Use explicit IDs for new or edited task packets.
 
-1. Reserve tasks with `workflow.js next --count <n> --json`.
-2. Create one git worktree and branch for each returned task.
-3. Start one agent per worktree using that task's rendered prompt.
-4. Move each Linear issue to the appropriate in-progress/review/done stage as
-   work begins, is handed off, and completes.
+When reserving multiple tasks, first inspect `workflow plan --count <n>`. Then
+use `workflow next --count <n> --json`; the script excludes blocked tasks and
+tasks whose dependencies or read/write manifests conflict. Claim only when one
+ready executor is available per task. Hand off every prompt immediately and
+release any batch item that does not start.
 
-## Local UI
+Earlier unfinished packets add an ordering penalty but are not hard blockers.
+Use `_blocked_by` whenever ordering is required.
 
-Use `node .agents/skills/workflow/scripts/workflow.js ui` to launch the local
-task board with a populated task payload. The command starts a localhost server,
-serves `assets/ui/index.html`, passes `?data=/workflow-data.json`, and opens the
-browser unless `--no-open` is passed.
+## Claims and handoff
+
+Claims are leases, not permanent locks. The default lease is 120 minutes.
+
+- `workflow renew <id> --lease-minutes <n>` renews ownership.
+- `workflow release <id> --summary <text>` makes work resumable.
+- `workflow takeover <id> --owner <name> --override-reason <reason>` explicitly
+  replaces an active claim without bypassing consistency gates.
+
+Use takeover only with clear coordination. Linear activity markers are the
+cross-machine source of truth; `.agents/workflow-state.json` is a local cache.
+Renew before the printed expiry. If implementation stops or cannot continue,
+release the task with a concise summary instead of abandoning the lease.
+
+## Gates and completion
+
+The script runs the start gate before a claim. Run it directly when diagnosing:
 
 ```bash
-node .agents/skills/workflow/scripts/workflow.js ui
-node .agents/skills/workflow/scripts/workflow.js begin-ui
-node .agents/skills/workflow/scripts/workflow.js ui --no-open --json
+.agents/skills/workflow/scripts/workflow check <id> --phase start
 ```
 
-UI launch is opt-in. Use these clear modes:
+Before merge:
 
-- `ui` or `ui --data list` loads active local tasks without Linear
-  writes.
-- `begin-ui` is equivalent to `ui --data next`; it reserves the next task and
-  creates or resumes its Linear issue before showing the claimed task.
-- `ui --data next --count <n>` reserves tasks and creates or resumes Linear
-  issues before showing the reserved batch.
-- `ui --data pick --task-id <task-id>` opens the UI for one explicit task after
-  creating or resuming its Linear issue.
-- `--host <host>` and `--port <port>` override the default localhost server
-  address when an agent runtime requires a specific endpoint.
-- `--static` resolves the bundled HTML file without serving workflow data.
+1. Validate the implementation.
+2. Reconcile `requirements.md`, `design.md`, and `tasks.md` with delivered
+   behavior.
+3. Run `workflow check <id> --phase complete --validation-evidence <summary>`.
+4. Run `workflow finish <id> --validation-evidence <summary>`. This marks the
+   checked-in task packet complete so the change lands in the implementation PR.
 
-The page still accepts pasted or loaded JSON from these commands when a local
-server is not appropriate:
+After merge, fetch and switch to a clean checkout whose `HEAD` exactly matches
+`origin/main`, then run `workflow close <id>`. Close moves Linear to Done and
+releases the lease without editing repository files. `workflow complete` is a
+compatibility alias for `finish`.
 
-```bash
-node .agents/skills/workflow/scripts/workflow.js list --json > /tmp/workflow-tasks.json
-node .agents/skills/workflow/scripts/workflow.js next --count 4 --json > /tmp/workflow-batch.json
-```
+`_validation` is the expected plan, not proof. `finish` requires concise
+validation evidence. Narrow overrides require both the relevant override flag
+and `--override-reason`; takeover never bypasses a gate. Close operations are
+journaled so interrupted Linear updates can be inspected or repaired with
+`workflow reconcile --dry-run` before repair.
 
-The UI groups tasks by local task state, Linear-linked state, reserved batch
-state, and done state. It also shows requirements, writes manifests, task
-packets, Linear URLs, and copyable stage-move and completion commands.
+## Setup and maintenance
 
-`WORKFLOW.md` front matter may provide equivalent values under `tracker`:
+- `workflow init` creates a minimal `WORKFLOW.md` when missing.
+- `workflow doctor` checks Node, contract parsing, tasks, IDs, Linear settings,
+  and Git availability without calling Linear.
+- `workflow doctor --online` additionally verifies Linear credentials and
+  routing without writing tracker state.
+- `workflow lint --strict` audits task metadata and reports coverage.
+- `workflow migrate-ids --json` suggests durable IDs without editing task files;
+  apply them before first claim or coordinate preservation of existing markers.
+- `workflow validate` validates `WORKFLOW.md`.
+- `workflow --self-test` runs the bundled test suite with runtime discovery.
+- `workflow reconcile --dry-run` reports interrupted operations before repair.
 
-```yaml
----
-tracker:
-  kind: linear
-  api_key: $LINEAR_API_KEY
-  team_key: ENG
-  project_slug: sim
-tasks:
-  glob: .agents/specs/**/tasks.md
----
-```
-
-## Prompt Rendering Rules
-
-- Treat unknown variables and unknown filters as errors.
-- Support dot paths such as `{{ issue.title }}`,
-  `{{ issue.description }}`, `{{ issue.labels }}`, `{{ issue.task_file }}`,
-  `{{ issue.task_line }}`, `{{ issue.requirements }}`, `{{ issue.writes }}`,
-  `{{ issue.linear.url }}`, and `{{ attempt }}`.
-- Render arrays and objects as pretty JSON.
-- If the workflow prompt body is empty, use a minimal local-task prompt. Do not
-  silently fall back when `WORKFLOW.md` is missing or has invalid front matter.
-
-Read `references/workflow-contract.md` before editing `WORKFLOW.md`, changing
-the script, or explaining the supported task and Linear fields.
+Do not manually edit `.agents/workflow-state.json` or
+`.agents/workflow-operations.json` during ordinary work. Store concise,
+reviewable evidence only; never store secrets or private reasoning.

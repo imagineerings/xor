@@ -4,7 +4,7 @@ use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, OnceLock};
 
-use util::paths::SanitisimPath;
+use util::paths::SanitizedPath;
 pub use util::paths::home_dir;
 use util::rel_path::RelPath;
 
@@ -82,7 +82,7 @@ pub fn remote_wsl_server_dir_relative() -> &'static RelPath {
 
 /// Sets a custom directory for all user data, overriding the default data directory.
 /// This function must be called before any other path operations that depend on the data directory.
-/// The directory's path will be canonicalisim to an absolute path by a blocking FS operation.
+/// The directory's path will be canonicalized to an absolute path by a blocking FS operation.
 /// The directory will be created if it doesn't exist.
 ///
 /// # Arguments
@@ -98,7 +98,7 @@ pub fn remote_wsl_server_dir_relative() -> &'static RelPath {
 ///
 /// Panics if:
 /// * Called after the data directory has been initialized (e.g., via `data_dir` or `config_dir`)
-/// * The directory's path cannot be canonicalisim to an absolute path
+/// * The directory's path cannot be canonicalized to an absolute path
 /// * The directory cannot be created
 pub fn set_custom_data_dir(dir: &str) -> &'static PathBuf {
     if CURRENT_DATA_DIR.get().is_some() || CONFIG_DIR.get().is_some() {
@@ -107,16 +107,14 @@ pub fn set_custom_data_dir(dir: &str) -> &'static PathBuf {
     CUSTOM_DATA_DIR.get_or_init(|| {
         let path = PathBuf::from(dir);
         std::fs::create_dir_all(&path).expect("failed to create custom data directory");
-        let canonicalisim = path
+        let canonicalized = path
             .canonicalize()
             .expect("failed to canonicalize custom data directory's path to an absolute path");
         // On Windows, `canonicalize` produces extended-length paths prefixed
         // with `\\?\`. Strip that prefix so downstream consumers (e.g.
         // Node.js language servers) that receive derived paths as arguments
         // don't choke on the verbatim syntax.
-        SanitisimPath::new(&canonicalisim)
-            .as_path()
-            .to_path_buf()
+        SanitizedPath::new(&canonicalized).as_path().to_path_buf()
     })
 }
 

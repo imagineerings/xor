@@ -1,5 +1,7 @@
 mod app_menus;
-pub mod apps_panel;
+#[cfg(not(test))]
+#[path = "comfy_plugin_services.rs"]
+pub mod comfy_plugin_services;
 pub mod edit_prediction_registry;
 #[cfg(target_os = "macos")]
 pub(crate) mod mac_only_instance;
@@ -10,7 +12,6 @@ mod open_listener;
 mod open_url_modal;
 mod quick_action_bar;
 pub mod remote_debug;
-pub(crate) mod shared_session_handler;
 pub mod telemetry_log;
 #[cfg(all(target_os = "macos", feature = "visual-tests"))]
 pub mod visual_tests;
@@ -33,10 +34,13 @@ use feature_flags::{FeatureFlagAppExt as _, PanicFeatureFlag};
 use fs::Fs;
 use futures::FutureExt as _;
 use futures::{StreamExt, channel::mpsc, select_biased};
+use git_ui::branch_diff::BranchDiffToolbar;
 use git_ui::commit_view::CommitViewToolbar;
 use git_ui::git_panel::GitPanel;
-use git_ui::project_diff::{BranchDiffToolbar, ProjectDiffToolbar};
+use git_ui::project_diff::ProjectDiffToolbar;
 use git_ui::solo_diff_view::{SoloDiffGitToolbar, SoloDiffStyleToolbar};
+use git_ui::staged_diff::StagedDiffToolbar;
+use git_ui::unstaged_diff::UnstagedDiffToolbar;
 use gpui::{
     Action, App, AppContext as _, AsyncWindowContext, ClipboardItem, Context, DismissEvent,
     Element, Entity, FocusHandle, Focusable, Image, ImageFormat, KeyBinding, ParentElement,
@@ -68,9 +72,9 @@ use rope::Rope;
 use search::project_search::ProjectSearchBar;
 use settings::{
     BaseKeymap, DEFAULT_KEYMAP_PATH, DefaultOpenBehavior, InvalidSettingsError, KeybindSource,
-    KeymapFile, KeymapFileLoadResult, MigrationStatus, Settings, SettingsFile, SettingsStore,
-    VIM_KEYMAP_PATH, initial_local_debug_tasks_content, initial_project_settings_content,
-    initial_tasks_content, update_settings_file,
+    KeymapFile, KeymapFileLoadResult, MigrationStatus, SPECIFIC_OVERRIDES_KEYMAP_PATH, Settings,
+    SettingsFile, SettingsStore, VIM_KEYMAP_PATH, initial_local_debug_tasks_content,
+    initial_project_settings_content, initial_tasks_content, update_settings_file,
 };
 use sidebar::Sidebar;
 #[cfg(debug_assertions)]
@@ -97,9 +101,6 @@ use sim_actions::{
     About, OpenAccountSettings, OpenBrowser, OpenDocs, OpenServerSettings, OpenSettingsFile,
     OpenSimUrl, OpenStatusPage, Quit,
 };
-use sim_game::{
-    default_game_preview_routes, default_game_task_providers, simscript_language_config,
-};
 use workspace::{
     AppState, MultiWorkspace, NewFile, NewWindow, OpenLog, Panel, Toast, Workspace,
     WorkspaceSettings, create_and_open_local_file,
@@ -109,7 +110,6 @@ use workspace::{
     CloseIntent, CloseProject, CloseWindow, RestoreBanner, with_active_or_new_workspace,
 };
 use workspace::{Pane, notifications::DetachAndPromptErr};
-use world_model::ComfyRouteCatalog;
 
 const DOCS_URL: &str = "https://sim.dev/docs/";
 const STATUS_URL: &str = "https://status.sim.dev";
@@ -117,6 +117,421 @@ const STATUS_URL: &str = "https://status.sim.dev";
 pub struct CrashHandler(pub Arc<crashes::Client>);
 
 impl gpui::Global for CrashHandler {}
+
+struct ComfyComponentHostGlobal {
+    profile_id: String,
+    component_generation: u64,
+    #[cfg(not(test))]
+    plugin_security: comfy_runtime::NativePluginSecurityPolicy,
+    router: comfy_plugin_host::ComponentHostRouter,
+}
+
+impl gpui::Global for ComfyComponentHostGlobal {}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct NativeComfyRuntimeBinding {
+    profile_id: Uuid,
+    model_roots: Vec<PathBuf>,
+    device: comfy_types::DeviceKind,
+    memory_policy: comfy_runtime::MemoryPolicy,
+    api_host: comfy_runtime::NativeApiHostPolicy,
+    plugin_policy: comfy_runtime::PluginPolicy,
+    rocm_package: Option<comfy_runtime::NativeRocmPackageSettings>,
+    metal_package: Option<comfy_runtime::NativeMetalPackageSettings>,
+    mlu_package: Option<comfy_runtime::NativeMluPackageSettings>,
+    npu_package: Option<comfy_runtime::NativeNpuPackageSettings>,
+    cuda_package: Option<comfy_runtime::NativeCudaPackageSettings>,
+    xpu_package: Option<comfy_runtime::NativeXpuPackageSettings>,
+    directml_package: Option<comfy_runtime::NativeDirectMlPackageSettings>,
+    provider_scope: String,
+    compatibility_version: u16,
+    plugin_security: comfy_runtime::NativePluginSecurityPolicy,
+}
+
+impl NativeComfyRuntimeBinding {
+    fn new(
+        profile: &comfy_runtime::NativeRuntimeProfile,
+        plugin_security: &comfy_runtime::NativePluginSecurityPolicy,
+    ) -> Self {
+        Self {
+            profile_id: profile.id,
+            model_roots: profile.model_roots.clone(),
+            device: profile.device,
+            memory_policy: profile.memory_policy,
+            api_host: profile.api_host.clone(),
+            plugin_policy: profile.plugin_policy,
+            rocm_package: profile.rocm_package.clone(),
+            metal_package: profile.metal_package.clone(),
+            mlu_package: profile.mlu_package.clone(),
+            npu_package: profile.npu_package.clone(),
+            cuda_package: profile.cuda_package.clone(),
+            xpu_package: profile.xpu_package.clone(),
+            directml_package: profile.directml_package.clone(),
+            provider_scope: profile.provider_scope.clone(),
+            compatibility_version: profile.compatibility_version,
+            plugin_security: plugin_security.clone(),
+        }
+    }
+}
+
+impl gpui::Global for NativeComfyRuntimeBinding {}
+
+#[derive(Clone)]
+struct SimComfyPluginContributionSource {
+    router: comfy_plugin_host::ComponentHostRouter,
+}
+
+impl comfy_ui::PluginContributionSource for SimComfyPluginContributionSource {
+    fn verified_contributions(&self) -> anyhow::Result<Vec<comfy_ui::PluginContributionInput>> {
+        let plugins = self.router.current()?.installed_plugins()?;
+        let mut contributions = Vec::new();
+        for plugin in plugins {
+            let binding = plugin.binding();
+            for contribution in &plugin.manifest().ui {
+                contributions.push(comfy_ui::PluginContributionInput::from_verified_manifest(
+                    binding.signed_plugin_identifier(),
+                    binding.signed_digest_sha256(),
+                    contribution.id.as_str(),
+                    contribution.surface.as_str(),
+                    contribution.state_schema.as_str(),
+                )?);
+            }
+        }
+        Ok(contributions)
+    }
+}
+
+fn register_comfy_plugin_contribution_source(
+    router: comfy_plugin_host::ComponentHostRouter,
+    cx: &mut App,
+) {
+    comfy_ui::register_plugin_contribution_source(
+        Arc::new(SimComfyPluginContributionSource { router }),
+        cx,
+    );
+}
+
+fn init_comfy_component_host(cx: &mut App) -> anyhow::Result<()> {
+    #[cfg(not(test))]
+    let (profile, plugin_security) = active_native_comfy_configuration(cx)?;
+    #[cfg(not(test))]
+    let profile_id = profile.id.to_string();
+    #[cfg(test)]
+    let profile_id = comfy_ui::LOCAL_EXECUTION_PROFILE_ID.0.to_string();
+
+    #[cfg(not(test))]
+    let execution_boundary = {
+        let asset_service = comfy_ui::native_asset_services(cx)
+            .ok_or_else(|| anyhow::anyhow!("native Comfy asset service is unavailable"))?;
+        anyhow::ensure!(
+            asset_service.profile_id() == profile_id,
+            "native Comfy component and asset profiles differ"
+        );
+        let worker = native_comfy_worker_launch(&profile, comfy_types::WorkerId(Uuid::new_v4()))?;
+        let profile_bits = profile.id.as_u128();
+        let profile_seed = (profile_bits as u64) ^ ((profile_bits >> 64) as u64);
+        comfy_plugin_services::private_worker_boundary(
+            worker,
+            asset_service.assets(),
+            plugin_security.provider_policy().clone(),
+            profile_seed,
+            cx,
+        )?
+    };
+    #[cfg(test)]
+    let execution_boundary = comfy_plugin_host::ComponentExecutionBoundary::conformance_in_process(
+        Arc::new(comfy_plugin_host::UnavailablePluginCapabilityServices),
+    );
+
+    let runtime = extension_host::ComponentRuntime::no_wasi()?;
+    #[cfg(not(test))]
+    let (trust_policy, permission_policy, component_generation) = (
+        plugin_security.trust_policy().clone(),
+        plugin_security.permission_policy().clone(),
+        plugin_security.component_registry_generation(),
+    );
+    #[cfg(test)]
+    let (trust_policy, permission_policy, component_generation) = (
+        comfy_runtime::PluginTrustPolicy::default(),
+        comfy_runtime::PermissionPolicy::new(profile_id.clone(), std::iter::empty())?,
+        comfy_runtime::DEFAULT_COMPONENT_REGISTRY_GENERATION,
+    );
+    let replacement_host = comfy_plugin_host::ComponentHost::new(
+        runtime,
+        trust_policy,
+        permission_policy,
+        execution_boundary,
+        comfy_plugin_host::ComponentLimits::default(),
+        comfy_runtime::native_image_registry_projection()?,
+    )?;
+    if let Some(component_host) = cx.try_global::<ComfyComponentHostGlobal>() {
+        let current_profile_id = component_host.profile_id.clone();
+        let current_component_generation = component_host.component_generation;
+        #[cfg(not(test))]
+        let current_plugin_security = component_host.plugin_security.clone();
+        let router = component_host.router.clone();
+        if current_profile_id == profile_id
+            && current_component_generation == component_generation
+            && {
+                #[cfg(not(test))]
+                {
+                    current_plugin_security == plugin_security
+                }
+                #[cfg(test)]
+                {
+                    true
+                }
+            }
+        {
+            router.current()?.installed_plugins()?;
+            register_comfy_plugin_contribution_source(router, cx);
+            return Ok(());
+        }
+        router.replace_with_initial_generation(replacement_host, component_generation)?;
+        register_comfy_plugin_contribution_source(router, cx);
+        let component_host = cx.global_mut::<ComfyComponentHostGlobal>();
+        component_host.profile_id = profile_id;
+        component_host.component_generation = component_generation;
+        #[cfg(not(test))]
+        {
+            component_host.plugin_security = plugin_security;
+        }
+        return Ok(());
+    }
+    let router = comfy_plugin_host::ComponentHostRouter::with_initial_generation(
+        replacement_host,
+        component_generation,
+    )?;
+    extension_host::register_component_lifecycle_adapter(Arc::new(router.clone()), cx)?;
+    register_comfy_plugin_contribution_source(router.clone(), cx);
+    cx.set_global(ComfyComponentHostGlobal {
+        profile_id,
+        component_generation,
+        #[cfg(not(test))]
+        plugin_security,
+        router,
+    });
+    Ok(())
+}
+
+pub(crate) fn init_comfy_ui(cx: &mut App) {
+    #[cfg(test)]
+    comfy_ui::init(cx);
+
+    #[cfg(not(test))]
+    {
+        match active_native_comfy_profile(cx) {
+            Ok(profile) => {
+                comfy_ui::init_for_profile(comfy_types::ProfileId(profile.id), cx);
+                if let Err(error) = register_native_comfy_execution(&profile, false, cx) {
+                    let message = format!("native Comfy execution initialization failed: {error}");
+                    log::error!("{message}");
+                    comfy_ui::set_initialization_error(message, cx);
+                }
+            }
+            Err(error) => {
+                let profile_id = configured_native_comfy_profile_id(cx)
+                    .unwrap_or(comfy_types::ProfileId(Uuid::nil()));
+                comfy_ui::init_for_profile(profile_id, cx);
+                if let Err(clear_error) = comfy_ui::clear_native_execution_services(cx) {
+                    log::error!("native Comfy execution shutdown failed: {clear_error}");
+                }
+                let message = format!("native Comfy settings are invalid: {error}");
+                log::error!("{message}");
+                comfy_ui::set_initialization_error(message, cx);
+            }
+        }
+        cx.observe_global::<SettingsStore>(sync_active_native_comfy_profile)
+            .detach();
+    }
+}
+
+#[cfg(not(test))]
+fn sync_active_native_comfy_profile(cx: &mut App) {
+    match active_native_comfy_configuration(cx) {
+        Ok((profile, plugin_security)) => {
+            let profile_id = comfy_types::ProfileId(profile.id);
+            let requires_activation = comfy_ui::initialized_profile_id(cx) != Some(profile_id);
+            let requires_recovery = comfy_ui::initialization_error(cx).is_some();
+            let next_binding = NativeComfyRuntimeBinding::new(&profile, &plugin_security);
+            let requires_rebind =
+                cx.try_global::<NativeComfyRuntimeBinding>() != Some(&next_binding);
+            if !requires_activation && !requires_recovery && !requires_rebind {
+                return;
+            }
+            comfy_ui::clear_initialization_error(cx);
+            comfy_ui::init_for_profile(profile_id, cx);
+            if let Err(error) = register_native_comfy_execution(&profile, requires_rebind, cx) {
+                let message = format!("native Comfy execution initialization failed: {error}");
+                log::error!("{message}");
+                comfy_ui::set_initialization_error(message, cx);
+            } else {
+                match init_comfy_component_host(cx) {
+                    Err(error) => {
+                        let message =
+                            format!("native Comfy component host initialization failed: {error}");
+                        log::error!("{message}");
+                        comfy_ui::set_initialization_error(message, cx);
+                    }
+                    Ok(()) => {
+                        if let Err(error) = register_native_comfy_execution(&profile, false, cx) {
+                            let message = format!(
+                                "native Comfy worker registry initialization failed: {error}"
+                            );
+                            log::error!("{message}");
+                            comfy_ui::set_initialization_error(message, cx);
+                        } else {
+                            cx.set_global(next_binding);
+                        }
+                    }
+                }
+            }
+        }
+        Err(error) => {
+            if cx.has_global::<NativeComfyRuntimeBinding>() {
+                let _removed_binding = cx.remove_global::<NativeComfyRuntimeBinding>();
+            }
+            if let Err(clear_error) = comfy_ui::clear_native_execution_services(cx) {
+                log::error!("native Comfy execution shutdown failed: {clear_error}");
+            }
+            let profile_id = configured_native_comfy_profile_id(cx)
+                .unwrap_or(comfy_types::ProfileId(Uuid::nil()));
+            if comfy_ui::initialized_profile_id(cx) != Some(profile_id) {
+                comfy_ui::init_for_profile(profile_id, cx);
+            }
+            comfy_ui::clear_initialization_error(cx);
+            let message = format!("native Comfy settings are invalid: {error}");
+            log::error!("{message}");
+            comfy_ui::set_initialization_error(message, cx);
+        }
+    }
+}
+
+#[cfg(not(test))]
+fn active_native_comfy_profile(cx: &App) -> anyhow::Result<comfy_runtime::NativeRuntimeProfile> {
+    let settings_store = cx
+        .try_global::<SettingsStore>()
+        .ok_or_else(|| anyhow::anyhow!("Sim settings store is unavailable"))?;
+    active_native_comfy_profile_from_settings(settings_store.merged_settings())
+}
+
+#[cfg(not(test))]
+fn active_native_comfy_configuration(
+    cx: &App,
+) -> anyhow::Result<(
+    comfy_runtime::NativeRuntimeProfile,
+    comfy_runtime::NativePluginSecurityPolicy,
+)> {
+    let settings_store = cx
+        .try_global::<SettingsStore>()
+        .ok_or_else(|| anyhow::anyhow!("Sim settings store is unavailable"))?;
+    active_native_comfy_configuration_from_settings(settings_store.merged_settings())
+}
+
+#[cfg(not(test))]
+fn configured_native_comfy_profile_id(cx: &App) -> Option<comfy_types::ProfileId> {
+    cx.try_global::<SettingsStore>()
+        .and_then(|store| native_comfy_profile_id_from_settings(store.merged_settings()))
+}
+
+fn native_comfy_profile_id_from_settings(
+    settings: &settings::SettingsContent,
+) -> Option<comfy_types::ProfileId> {
+    let active_profile = settings.comfy_runtime.as_ref()?.active_profile.as_deref()?;
+    Uuid::parse_str(active_profile)
+        .ok()
+        .map(comfy_types::ProfileId)
+}
+
+fn active_native_comfy_configuration_from_settings(
+    settings: &settings::SettingsContent,
+) -> anyhow::Result<(
+    comfy_runtime::NativeRuntimeProfile,
+    comfy_runtime::NativePluginSecurityPolicy,
+)> {
+    let content = settings
+        .comfy_runtime
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("native Comfy settings are missing"))?;
+    let settings = comfy_runtime::parse_runtime_settings(content)?;
+    let profile = settings
+        .active_profile()
+        .cloned()
+        .ok_or_else(|| anyhow::anyhow!("native Comfy active profile is unavailable"))?;
+    let plugin_security = settings
+        .active_plugin_security_policy()
+        .cloned()
+        .ok_or_else(|| anyhow::anyhow!("native Comfy plugin security policy is unavailable"))?;
+    Ok((profile, plugin_security))
+}
+
+fn active_native_comfy_profile_from_settings(
+    settings: &settings::SettingsContent,
+) -> anyhow::Result<comfy_runtime::NativeRuntimeProfile> {
+    active_native_comfy_configuration_from_settings(settings).map(|(profile, _)| profile)
+}
+
+#[cfg(not(test))]
+fn native_comfy_worker_launch(
+    profile: &comfy_runtime::NativeRuntimeProfile,
+    worker_id: comfy_types::WorkerId,
+) -> anyhow::Result<comfy_runtime::WorkerLaunchConfig> {
+    Ok(
+        comfy_runtime::WorkerLaunchConfig::for_packaged_worker_profile(
+            profile,
+            worker_id,
+            comfy_runtime::NATIVE_IMAGE_REGISTRY_VERSION,
+            8 * 1024 * 1024 * 1024,
+        )?,
+    )
+}
+
+#[cfg(not(test))]
+fn register_native_comfy_execution(
+    profile: &comfy_runtime::NativeRuntimeProfile,
+    replace_assets: bool,
+    cx: &mut App,
+) -> anyhow::Result<()> {
+    use comfy_runtime::{NativeExecutionControllerConfig, open_native_profile_asset_service};
+    use comfy_types::{ProfileId, WorkerId};
+
+    let profile_id = ProfileId(profile.id);
+    let assets = match comfy_ui::native_asset_services(cx) {
+        Some(services) if !replace_assets && services.profile_id() == profile_id.0.to_string() => {
+            services.assets()
+        }
+        _ => {
+            let root = paths::data_dir()
+                .join("comfy")
+                .join("native")
+                .join(profile.id.to_string());
+            let assets = open_native_profile_asset_service(
+                profile_id.0.to_string(),
+                &root,
+                &profile.model_roots,
+            )?;
+            comfy_ui::register_native_asset_services(assets.clone(), cx)?;
+            assets
+        }
+    };
+    let mut worker = native_comfy_worker_launch(profile, WorkerId(Uuid::new_v4()))?;
+    if let Some(component_host) = cx.try_global::<ComfyComponentHostGlobal>()
+        && component_host.profile_id == profile_id.0.to_string()
+    {
+        let generation = component_host.router.current()?.verified_generation()?;
+        worker = worker.with_registry_deployment(generation.worker_deployment_plan()?);
+    }
+    let presentation = comfy_ui::execution_ui_model(cx)
+        .ok_or_else(|| anyhow::anyhow!("native execution UI model is not initialized"))?
+        .read(cx)
+        .shared_service();
+    comfy_ui::register_native_execution_services(
+        NativeExecutionControllerConfig::new(assets, presentation, worker, true)?
+            .with_memory_policy(profile.memory_policy),
+        cx,
+    )?;
+    Ok(())
+}
 
 actions!(
     sim,
@@ -174,6 +589,30 @@ actions!(
 );
 
 pub fn init(cx: &mut App) {
+    init_comfy_ui(cx);
+    match init_comfy_component_host(cx) {
+        Err(error) => {
+            let message = format!("native Comfy component host initialization failed: {error}");
+            log::error!("{message}");
+            comfy_ui::set_initialization_error(message, cx);
+        }
+        #[cfg(not(test))]
+        Ok(()) => {
+            if let Ok(profile) = active_native_comfy_profile(cx)
+                && let Err(error) = register_native_comfy_execution(&profile, false, cx)
+            {
+                let message =
+                    format!("native Comfy worker registry initialization failed: {error}");
+                log::error!("{message}");
+                comfy_ui::set_initialization_error(message, cx);
+            } else if let Ok((profile, plugin_security)) = active_native_comfy_configuration(cx) {
+                cx.set_global(NativeComfyRuntimeBinding::new(&profile, &plugin_security));
+            }
+        }
+        #[cfg(test)]
+        Ok(()) => {}
+    }
+
     #[cfg(target_os = "macos")]
     cx.on_action(|_: &Hide, cx| cx.hide());
     #[cfg(target_os = "macos")]
@@ -203,6 +642,10 @@ pub fn init(cx: &mut App) {
         }
     })
     .detach();
+
+    // When Sim logs to stdout rather than the log file, avoid registering
+    // handlers for both `OpenLog` and `RevealLogInFileManager`, as the log file
+    // does not exist in that scenario and these actions would error.
     if !crate::stdout_is_a_pty() {
         cx.on_action(|_: &OpenLog, cx| {
             with_active_or_new_workspace(cx, |workspace, window, cx| {
@@ -379,9 +822,12 @@ pub fn build_window_options(display_uuid: Option<Uuid>, cx: &mut App) -> WindowO
         focus: false,
         show: false,
         kind: WindowKind::Normal,
-        // On macOS, Sim handles window movement itself. Other platforms need
-        // native movement enabled for titlebar dragging.
-        is_movable: cfg!(not(target_os = "macos")),
+        is_movable: true,
+        // Sim draws its own titlebar and moves the window via [`Window::start_window_move`],
+        // so on macOS AppKit should not own titlebar dragging. This avoids the titlebar
+        // click delay from AppKit's drag disambiguation while keeping the window movable
+        // and the Window-menu tiling items enabled. No-op on other platforms.
+        app_owns_titlebar_drag: true,
         display_id: display.map(|display| display.id()),
         window_background: cx.theme().window_background_appearance(),
         app_id: Some(app_id.to_owned()),
@@ -399,48 +845,6 @@ pub fn build_window_options(display_uuid: Option<Uuid>, cx: &mut App) -> WindowO
         },
         ..Default::default()
     }
-}
-
-pub fn register_game_integration(app_state: &AppState, _cx: &mut App) {
-    let simscript_config = simscript_language_config();
-    let name = language::LanguageName::new_static("SimScript");
-    let line_comments: Vec<Arc<str>> = simscript_config
-        .line_comment
-        .as_ref()
-        .map(|comment| vec![comment.clone().into()])
-        .unwrap_or_default();
-    let language = language::Language::new(
-        language::LanguageConfig {
-            name,
-            matcher: language::LanguageMatcher {
-                path_suffixes: simscript_config.extensions,
-                ..Default::default()
-            },
-            line_comments,
-            ..Default::default()
-        },
-        None,
-    );
-    app_state.languages.add(Arc::new(language));
-
-    for provider in default_game_task_providers() {
-        log::info!("game task provider registered: {}", provider.id);
-    }
-
-    for route in default_game_preview_routes() {
-        log::info!(
-            "game preview route registered: .{} -> {:?}",
-            route.extension,
-            route.kind,
-        );
-    }
-
-    let comfy_route_count = default_comfy_route_catalog().routes().count();
-    log::info!("Comfy control-plane route catalog registered: {comfy_route_count} routes");
-}
-
-pub fn default_comfy_route_catalog() -> ComfyRouteCatalog {
-    ComfyRouteCatalog::default_comfy_routes()
 }
 
 pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
@@ -797,7 +1201,14 @@ fn initialize_panels(window: &mut Window, cx: &mut Context<Workspace>) -> Task<a
         let channels_panel =
             collab_ui::collab_panel::CollabPanel::load(workspace_handle.clone(), cx.clone());
         let debug_panel = DebugPanel::load(workspace_handle.clone(), cx);
-        let apps_panel = apps_panel::AppsPanel::load(workspace_handle.clone(), cx.clone());
+        let mut execution_context = cx.clone();
+        let execution_panel =
+            comfy_ui::ExecutionPanel::load(workspace_handle.clone(), &mut execution_context);
+        let mut properties_context = cx.clone();
+        let graph_properties_panel = comfy_ui::GraphPropertiesPanel::load(
+            workspace_handle.clone(),
+            &mut properties_context,
+        );
 
         async fn add_panel_when_ready(
             panel_task: impl Future<Output = anyhow::Result<Entity<impl workspace::Panel>>> + 'static,
@@ -821,7 +1232,12 @@ fn initialize_panels(window: &mut Window, cx: &mut Context<Workspace>) -> Task<a
             add_panel_when_ready(git_panel, workspace_handle.clone(), cx.clone()),
             add_panel_when_ready(channels_panel, workspace_handle.clone(), cx.clone()),
             add_panel_when_ready(debug_panel, workspace_handle.clone(), cx.clone()),
-            add_panel_when_ready(apps_panel, workspace_handle.clone(), cx.clone()),
+            add_panel_when_ready(execution_panel, workspace_handle.clone(), cx.clone()),
+            add_panel_when_ready(
+                graph_properties_panel,
+                workspace_handle.clone(),
+                cx.clone()
+            ),
             initialize_agent_panel(workspace_handle, cx.clone()).map(|r| r.log_err()),
         );
 
@@ -1221,22 +1637,14 @@ fn register_actions(
             },
         )
         .register_action(
-                    |workspace: &mut Workspace,
-                     _: &terminal_panel::ToggleFocus,
-                     window: &mut Window,
-                     cx: &mut Context<Workspace>| {
-                        workspace.toggle_panel_focus::<TerminalPanel>(window, cx);
-                    },
-                )
-                .register_action(
-                    |workspace: &mut Workspace,
-                     _: &apps_panel::ToggleFocus,
-                     window: &mut Window,
-                     cx: &mut Context<Workspace>| {
-                        workspace.toggle_panel_focus::<apps_panel::AppsPanel>(window, cx);
-                    },
-                )
-                .register_action({
+            |workspace: &mut Workspace,
+             _: &terminal_panel::ToggleFocus,
+             window: &mut Window,
+             cx: &mut Context<Workspace>| {
+                workspace.toggle_panel_focus::<TerminalPanel>(window, cx);
+            },
+        )
+        .register_action({
             let app_state = app_state.clone();
             move |_, _: &NewWindow, _, cx| {
                 open_new(
@@ -1464,6 +1872,10 @@ fn initialize_pane(
             toolbar.add_item(highlights_tree_item, window, cx);
             let project_diff_toolbar = cx.new(|cx| ProjectDiffToolbar::new(workspace, cx));
             toolbar.add_item(project_diff_toolbar, window, cx);
+            let staged_diff_toolbar = cx.new(|cx| StagedDiffToolbar::new(workspace, cx));
+            toolbar.add_item(staged_diff_toolbar, window, cx);
+            let unstaged_diff_toolbar = cx.new(|cx| UnstagedDiffToolbar::new(workspace, cx));
+            toolbar.add_item(unstaged_diff_toolbar, window, cx);
             let branch_diff_toolbar = cx.new(BranchDiffToolbar::new);
             toolbar.add_item(branch_diff_toolbar, window, cx);
             let solo_diff_git_toolbar = cx.new(SoloDiffGitToolbar::new);
@@ -1797,7 +2209,7 @@ fn quit(_: &Quit, cx: &mut App) {
 
             // The loop above activated each workspace in turn, overwriting the
             // persisted active workspace. Re-activate the workspace the user
-            // actually had focused so it is the one serialisim (and restored on
+            // actually had focused so it is the one serialized (and restored on
             // next launch) as active, rather than whichever happened to be last.
             window
                 .update(cx, |multi_workspace, window, cx| {
@@ -2088,21 +2500,25 @@ pub fn handle_keymap_file_changes(
     let mut old_base_keymap = *BaseKeymap::get_global(cx);
     let mut old_vim_enabled = VimModeSetting::get_global(cx).0;
     let mut old_helix_enabled = vim_mode_setting::HelixModeSetting::get_global(cx).0;
+    let mut old_disable_ai = DisableAiSettings::get_global(cx).disable_ai;
 
     cx.observe_global::<SettingsStore>(move |cx| {
         let new_base_keymap = *BaseKeymap::get_global(cx);
         let new_vim_enabled = VimModeSetting::get_global(cx).0;
         let new_helix_enabled = vim_mode_setting::HelixModeSetting::get_global(cx).0;
+        let new_disable_ai = DisableAiSettings::get_global(cx).disable_ai;
 
         if new_base_keymap != old_base_keymap
             || new_vim_enabled != old_vim_enabled
             || new_helix_enabled != old_helix_enabled
+            || new_disable_ai != old_disable_ai
         {
             old_base_keymap = new_base_keymap;
             old_vim_enabled = new_vim_enabled;
             old_helix_enabled = new_helix_enabled;
+            old_disable_ai = new_disable_ai;
 
-            base_keymap_tx.unbounded_send(()).unwrap();
+            base_keymap_tx.unbounded_send(()).log_err();
         }
     })
     .detach();
@@ -2269,7 +2685,7 @@ fn reload_keymaps(cx: &mut App, mut user_key_bindings: Vec<KeyBinding>) {
     for key_binding in &mut user_key_bindings {
         key_binding.set_meta(KeybindSource::User.meta());
     }
-    cx.bind_keys(user_key_bindings);
+    cx.bind_keys(filter_disabled_ai_bindings(user_key_bindings, cx));
 
     let menus = app_menus(cx);
     cx.set_menus(menus);
@@ -2285,23 +2701,62 @@ fn reload_keymaps(cx: &mut App, mut user_key_bindings: Vec<KeyBinding>) {
 
 pub fn load_default_keymap(cx: &mut App) {
     let base_keymap = *BaseKeymap::get_global(cx);
+    let vim_enabled =
+        VimModeSetting::get_global(cx).0 || vim_mode_setting::HelixModeSetting::get_global(cx).0;
+    for (asset_path, source) in builtin_keymap_assets(base_keymap, vim_enabled) {
+        match KeymapFile::load_asset(asset_path, Some(source), cx) {
+            Ok(key_bindings) => cx.bind_keys(filter_disabled_ai_bindings(key_bindings, cx)),
+            Err(error) => {
+                log::error!("Failed to load built-in keymap {asset_path:?}: {error:#}");
+            }
+        }
+    }
+}
+
+const AI_ACTION_NAMESPACES: &[&str] = &[
+    "acp::",
+    "agent::",
+    "assistant::",
+    "edit_prediction::",
+    "inline_assistant::",
+    "zeta::",
+];
+
+fn is_ai_keybinding(binding: &KeyBinding) -> bool {
+    let name = binding.action().name();
+    AI_ACTION_NAMESPACES
+        .iter()
+        .any(|namespace| name.starts_with(namespace))
+}
+
+fn filter_disabled_ai_bindings(bindings: Vec<KeyBinding>, cx: &App) -> Vec<KeyBinding> {
+    if !DisableAiSettings::get_global(cx).disable_ai {
+        return bindings;
+    }
+    bindings
+        .into_iter()
+        .filter(|binding| !is_ai_keybinding(binding))
+        .collect()
+}
+
+fn builtin_keymap_assets(
+    base_keymap: BaseKeymap,
+    vim_enabled: bool,
+) -> Vec<(&'static str, KeybindSource)> {
     if base_keymap == BaseKeymap::None {
-        return;
+        return Vec::new();
     }
 
-    cx.bind_keys(
-        KeymapFile::load_asset(DEFAULT_KEYMAP_PATH, Some(KeybindSource::Default), cx).unwrap(),
-    );
-
+    let mut assets = vec![(DEFAULT_KEYMAP_PATH, KeybindSource::Default)];
     if let Some(asset_path) = base_keymap.asset_path() {
-        cx.bind_keys(KeymapFile::load_asset(asset_path, Some(KeybindSource::Base), cx).unwrap());
+        assets.push((asset_path, KeybindSource::Base));
     }
-
-    if VimModeSetting::get_global(cx).0 || vim_mode_setting::HelixModeSetting::get_global(cx).0 {
-        cx.bind_keys(
-            KeymapFile::load_asset(VIM_KEYMAP_PATH, Some(KeybindSource::Vim), cx).unwrap(),
-        );
+    if vim_enabled {
+        assets.push((VIM_KEYMAP_PATH, KeybindSource::Vim));
     }
+    assets.push((comfy_ui::DEFAULT_COMFY_KEYMAP_PATH, KeybindSource::Default));
+    assets.push((SPECIFIC_OVERRIDES_KEYMAP_PATH, KeybindSource::Default));
+    assets
 }
 
 pub fn open_new_ssh_project_from_project(
@@ -2684,8 +3139,9 @@ mod tests {
         DisplayPoint, Editor, MultiBufferOffset, SelectionEffects, display_map::DisplayRow,
     };
     use gpui::{
-        Action, AnyWindowHandle, App, AssetSource, BorrowAppContext, Modifiers, TestAppContext,
-        UpdateGlobal, VisualTestContext, WindowHandle, actions, point, px,
+        Action, AnyWindowHandle, App, AssetSource, BorrowAppContext, KeyContext, Keystroke, Menu,
+        MenuItem, Modifiers, TestAppContext, UpdateGlobal, VisualTestContext, WindowHandle,
+        actions, point, px,
     };
     use language::LanguageRegistry;
     use languages::{markdown_lang, rust_lang};
@@ -2714,6 +3170,337 @@ mod tests {
         open_new, open_paths, pane,
     };
 
+    #[test]
+    fn native_comfy_profile_adapter_uses_canonical_merged_settings() {
+        let content =
+            <settings::SettingsContent as settings::RootUserSettings>::parse_json_with_comments(
+                include_str!("../../../assets/settings/default.json"),
+            )
+            .expect("parse registered Sim defaults");
+        let profile = active_native_comfy_profile_from_settings(&content)
+            .expect("map merged settings to a native runtime profile");
+        assert_eq!(profile.id, comfy_runtime::DEFAULT_NATIVE_PROFILE_ID);
+        assert_eq!(profile.device, comfy_types::DeviceKind::Cpu);
+        assert_eq!(profile.provider_scope, "local");
+        assert!(!profile.api_host.enabled);
+    }
+
+    #[test]
+    fn native_comfy_runtime_binding_rebinds_same_profile_policy_changes() {
+        fn binding(settings: &str) -> NativeComfyRuntimeBinding {
+            let content = <settings::SettingsContent as settings::RootUserSettings>::parse_json_with_comments(settings)
+                .expect("parse native runtime settings");
+            let (profile, plugin_security) =
+                active_native_comfy_configuration_from_settings(&content)
+                    .expect("validate native runtime settings");
+            NativeComfyRuntimeBinding::new(&profile, &plugin_security)
+        }
+
+        let profile_id = comfy_runtime::DEFAULT_NATIVE_PROFILE_ID;
+        let baseline = binding(&format!(
+            r#"{{
+                "comfy_runtime": {{
+                    "active_profile": "{profile_id}",
+                    "profiles": [{{
+                        "id": "{profile_id}",
+                        "name": "Native Local",
+                        "model_roots": [],
+                        "device": "cpu",
+                        "memory_policy": "balanced",
+                        "api_host_enabled": false,
+                        "api_bind": "127.0.0.1:8188",
+                        "plugin_policy": "approved_only",
+                        "provider_scope": "local",
+                        "plugin_security": {{
+                            "component_registry_generation": 1
+                        }}
+                    }}]
+                }}
+            }}"#
+        ));
+        let changed_runtime_policy = binding(&format!(
+            r#"{{
+                "comfy_runtime": {{
+                    "active_profile": "{profile_id}",
+                    "profiles": [{{
+                        "id": "{profile_id}",
+                        "name": "Native Local",
+                        "model_roots": ["/tmp/native-models"],
+                        "device": "cpu",
+                        "memory_policy": "conservative",
+                        "api_host_enabled": false,
+                        "api_bind": "127.0.0.1:8188",
+                        "plugin_policy": "approved_only",
+                        "provider_scope": "local",
+                        "plugin_security": {{
+                            "component_registry_generation": 2
+                        }}
+                    }}]
+                }}
+            }}"#
+        ));
+        let cosmetic_only_change = binding(&format!(
+            r#"{{
+                "comfy_runtime": {{
+                    "active_profile": "{profile_id}",
+                    "profiles": [{{
+                        "id": "{profile_id}",
+                        "name": "Renamed profile",
+                        "model_roots": [],
+                        "device": "cpu",
+                        "memory_policy": "balanced",
+                        "api_host_enabled": false,
+                        "api_bind": "127.0.0.1:8188",
+                        "plugin_policy": "approved_only",
+                        "provider_scope": "local",
+                        "plugin_security": {{
+                            "component_registry_generation": 1
+                        }},
+                        "future_display_field": true
+                    }}]
+                }}
+            }}"#
+        ));
+
+        assert_ne!(baseline, changed_runtime_policy);
+        assert_eq!(baseline, cosmetic_only_change);
+
+        let rocm_binding = |package_root: &str, public_key_hex: &str| {
+            binding(&format!(
+                r#"{{
+                    "comfy_runtime": {{
+                        "active_profile": "{profile_id}",
+                        "profiles": [{{
+                            "id": "{profile_id}",
+                            "name": "Native ROCm",
+                            "model_roots": [],
+                            "device": "rocm",
+                            "memory_policy": "balanced",
+                            "api_host_enabled": false,
+                            "api_bind": "127.0.0.1:8188",
+                            "plugin_policy": "approved_only",
+                            "provider_scope": "local",
+                            "rocm_package_root": "{package_root}",
+                            "rocm_package_signer": "rocm.release",
+                            "rocm_package_public_key_hex": "{public_key_hex}"
+                        }}]
+                    }}
+                }}"#
+            ))
+        };
+        let rocm_baseline = rocm_binding("/reviewed/rocm-a", &"11".repeat(32));
+        let rotated_root = rocm_binding("/reviewed/rocm-b", &"11".repeat(32));
+        let rotated_key = rocm_binding("/reviewed/rocm-a", &"22".repeat(32));
+        assert_ne!(rocm_baseline, rotated_root);
+        assert_ne!(rocm_baseline, rotated_key);
+
+        let metal_binding = |package_root: &str, public_key_hex: &str| {
+            binding(&format!(
+                r#"{{
+                    "comfy_runtime": {{
+                        "active_profile": "{profile_id}",
+                        "profiles": [{{
+                            "id": "{profile_id}",
+                            "name": "Native Metal",
+                            "model_roots": [],
+                            "device": "metal",
+                            "memory_policy": "balanced",
+                            "api_host_enabled": false,
+                            "api_bind": "127.0.0.1:8188",
+                            "plugin_policy": "approved_only",
+                            "provider_scope": "local",
+                            "metal_package_root": "{package_root}",
+                            "metal_package_signer": "metal.release",
+                            "metal_package_public_key_hex": "{public_key_hex}"
+                        }}]
+                    }}
+                }}"#
+            ))
+        };
+        let metal_baseline = metal_binding("/reviewed/metal-a", &"33".repeat(32));
+        let metal_rotated_root = metal_binding("/reviewed/metal-b", &"33".repeat(32));
+        let metal_rotated_key = metal_binding("/reviewed/metal-a", &"44".repeat(32));
+        assert_ne!(metal_baseline, metal_rotated_root);
+        assert_ne!(metal_baseline, metal_rotated_key);
+
+        let mlu_binding = |package_root: &str, public_key_hex: &str| {
+            binding(&format!(
+                r#"{{
+                    "comfy_runtime": {{
+                        "active_profile": "{profile_id}",
+                        "profiles": [{{
+                            "id": "{profile_id}",
+                            "name": "Native MLU",
+                            "model_roots": [],
+                            "device": "mlu",
+                            "memory_policy": "balanced",
+                            "api_host_enabled": false,
+                            "api_bind": "127.0.0.1:8188",
+                            "plugin_policy": "approved_only",
+                            "provider_scope": "local",
+                            "mlu_package_root": "{package_root}",
+                            "mlu_package_signer": "mlu.release",
+                            "mlu_package_public_key_hex": "{public_key_hex}"
+                        }}]
+                    }}
+                }}"#
+            ))
+        };
+        let mlu_baseline = mlu_binding("/reviewed/mlu-a", &"55".repeat(32));
+        let mlu_rotated_root = mlu_binding("/reviewed/mlu-b", &"55".repeat(32));
+        let mlu_rotated_key = mlu_binding("/reviewed/mlu-a", &"66".repeat(32));
+        assert_ne!(mlu_baseline, mlu_rotated_root);
+        assert_ne!(mlu_baseline, mlu_rotated_key);
+
+        let npu_binding = |package_root: &str, public_key_hex: &str| {
+            binding(&format!(
+                r#"{{
+                    "comfy_runtime": {{
+                        "active_profile": "{profile_id}",
+                        "profiles": [{{
+                            "id": "{profile_id}",
+                            "name": "Native NPU",
+                            "model_roots": [],
+                            "device": "npu",
+                            "memory_policy": "balanced",
+                            "api_host_enabled": false,
+                            "api_bind": "127.0.0.1:8188",
+                            "plugin_policy": "approved_only",
+                            "provider_scope": "local",
+                            "npu_package_root": "{package_root}",
+                            "npu_package_signer": "npu.release",
+                            "npu_package_public_key_hex": "{public_key_hex}"
+                        }}]
+                    }}
+                }}"#
+            ))
+        };
+        let npu_baseline = npu_binding("/reviewed/npu-a", &"57".repeat(32));
+        let npu_rotated_root = npu_binding("/reviewed/npu-b", &"57".repeat(32));
+        let npu_rotated_key = npu_binding("/reviewed/npu-a", &"68".repeat(32));
+        assert_ne!(npu_baseline, npu_rotated_root);
+        assert_ne!(npu_baseline, npu_rotated_key);
+
+        let cuda_binding = |package_root: &str, public_key_hex: &str| {
+            binding(&format!(
+                r#"{{
+                    "comfy_runtime": {{
+                        "active_profile": "{profile_id}",
+                        "profiles": [{{
+                            "id": "{profile_id}",
+                            "name": "Native CUDA",
+                            "model_roots": [],
+                            "device": "cuda",
+                            "memory_policy": "balanced",
+                            "api_host_enabled": false,
+                            "api_bind": "127.0.0.1:8188",
+                            "plugin_policy": "approved_only",
+                            "provider_scope": "local",
+                            "cuda_package_root": "{package_root}",
+                            "cuda_package_signer": "cuda.release",
+                            "cuda_package_public_key_hex": "{public_key_hex}"
+                        }}]
+                    }}
+                }}"#
+            ))
+        };
+        let cuda_baseline = cuda_binding("/reviewed/cuda-a", &"56".repeat(32));
+        let cuda_rotated_root = cuda_binding("/reviewed/cuda-b", &"56".repeat(32));
+        let cuda_rotated_key = cuda_binding("/reviewed/cuda-a", &"67".repeat(32));
+        assert_ne!(cuda_baseline, cuda_rotated_root);
+        assert_ne!(cuda_baseline, cuda_rotated_key);
+
+        let xpu_binding = |package_root: &str, public_key_hex: &str| {
+            binding(&format!(
+                r#"{{
+                    "comfy_runtime": {{
+                        "active_profile": "{profile_id}",
+                        "profiles": [{{
+                            "id": "{profile_id}",
+                            "name": "Native XPU",
+                            "model_roots": [],
+                            "device": "xpu",
+                            "memory_policy": "balanced",
+                            "api_host_enabled": false,
+                            "api_bind": "127.0.0.1:8188",
+                            "plugin_policy": "approved_only",
+                            "provider_scope": "local",
+                            "xpu_package_root": "{package_root}",
+                            "xpu_package_signer": "xpu.release",
+                            "xpu_package_public_key_hex": "{public_key_hex}"
+                        }}]
+                    }}
+                }}"#
+            ))
+        };
+        let xpu_baseline = xpu_binding("/reviewed/xpu-a", &"69".repeat(32));
+        let xpu_rotated_root = xpu_binding("/reviewed/xpu-b", &"69".repeat(32));
+        let xpu_rotated_key = xpu_binding("/reviewed/xpu-a", &"7a".repeat(32));
+        assert_ne!(xpu_baseline, xpu_rotated_root);
+        assert_ne!(xpu_baseline, xpu_rotated_key);
+
+        let directml_binding = |package_root: &str, public_key_hex: &str| {
+            binding(&format!(
+                r#"{{
+                    "comfy_runtime": {{
+                        "active_profile": "{profile_id}",
+                        "profiles": [{{
+                            "id": "{profile_id}",
+                            "name": "Native DirectML",
+                            "model_roots": [],
+                            "device": "directml",
+                            "memory_policy": "balanced",
+                            "api_host_enabled": false,
+                            "api_bind": "127.0.0.1:8188",
+                            "plugin_policy": "approved_only",
+                            "provider_scope": "local",
+                            "directml_package_root": "{package_root}",
+                            "directml_package_signer": "directml.release",
+                            "directml_package_public_key_hex": "{public_key_hex}"
+                        }}]
+                    }}
+                }}"#
+            ))
+        };
+        let directml_baseline = directml_binding("/reviewed/directml-a", &"77".repeat(32));
+        let directml_rotated_root = directml_binding("/reviewed/directml-b", &"77".repeat(32));
+        let directml_rotated_key = directml_binding("/reviewed/directml-a", &"88".repeat(32));
+        assert_ne!(directml_baseline, directml_rotated_root);
+        assert_ne!(directml_baseline, directml_rotated_key);
+    }
+
+    #[test]
+    fn invalid_native_comfy_settings_preserve_the_selected_error_scope() {
+        let selected_profile_id = Uuid::from_u128(0x4_101);
+        let invalid_settings = format!(
+            r#"{{
+                "comfy_runtime": {{
+                    "active_profile": "{selected_profile_id}",
+                    "profiles": [{{
+                        "id": "{selected_profile_id}",
+                        "device": "future-device",
+                        "api_bind": "0.0.0.0:8188"
+                    }}]
+                }}
+            }}"#
+        );
+        let content =
+            <settings::SettingsContent as settings::RootUserSettings>::parse_json_with_comments(
+                &invalid_settings,
+            )
+            .expect("parse invalid native profile shape");
+
+        assert_eq!(
+            native_comfy_profile_id_from_settings(&content),
+            Some(comfy_types::ProfileId(selected_profile_id))
+        );
+        assert!(active_native_comfy_profile_from_settings(&content).is_err());
+        assert_ne!(
+            native_comfy_profile_id_from_settings(&content),
+            Some(comfy_ui::LOCAL_EXECUTION_PROFILE_ID)
+        );
+    }
+
     async fn flush_workspace_serialization(
         window: &WindowHandle<MultiWorkspace>,
         cx: &mut TestAppContext,
@@ -2734,6 +3521,325 @@ mod tests {
             .unwrap();
 
         futures::future::join_all(all_tasks).await;
+    }
+
+    fn validation_digest(parts: impl IntoIterator<Item = impl AsRef<[u8]>>) -> String {
+        const OFFSETS: [u64; 4] = [
+            0xcbf29ce484222325,
+            0x84222325cbf29ce4,
+            0x9e3779b185ebca87,
+            0x517cc1b727220a95,
+        ];
+        let mut lanes = OFFSETS;
+        for part in parts {
+            for byte in part.as_ref() {
+                for (index, lane) in lanes.iter_mut().enumerate() {
+                    *lane ^= u64::from(*byte).wrapping_add(index as u64);
+                    *lane = lane.wrapping_mul(0x100000001b3);
+                }
+            }
+        }
+        lanes
+            .into_iter()
+            .map(|lane| format!("{lane:016x}"))
+            .collect()
+    }
+
+    fn collect_menu_action_names(items: &[MenuItem], names: &mut Vec<String>) {
+        for item in items {
+            match item {
+                MenuItem::Action { action, .. } => names.push(action.name().to_owned()),
+                MenuItem::Submenu(menu) => collect_menu_action_names(&menu.items, names),
+                MenuItem::Separator | MenuItem::SystemMenu(_) => {}
+            }
+        }
+    }
+
+    #[test]
+    fn comfy_keymap_loads_between_vim_and_specific_overrides() {
+        let keymap_order = builtin_keymap_assets(BaseKeymap::JetBrains, true);
+        let vim_position = keymap_order
+            .iter()
+            .position(|(path, _)| *path == VIM_KEYMAP_PATH)
+            .expect("Vim keymap must be present when enabled");
+        let comfy_position = keymap_order
+            .iter()
+            .position(|(path, _)| *path == comfy_ui::DEFAULT_COMFY_KEYMAP_PATH)
+            .expect("Comfy keymap must be present");
+        let override_position = keymap_order
+            .iter()
+            .position(|(path, _)| *path == SPECIFIC_OVERRIDES_KEYMAP_PATH)
+            .expect("specific overrides must be present");
+        assert!(vim_position < comfy_position);
+        assert_eq!(comfy_position + 1, override_position);
+        assert!(builtin_keymap_assets(BaseKeymap::None, true).is_empty());
+    }
+
+    #[gpui::test(seed = 16013)]
+    fn comfy_static_menu_has_registered_action_targets(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            let menus = app_menus(cx);
+            let comfy_menu = menus
+                .iter()
+                .find(|menu| menu.name.as_ref() == "Comfy")
+                .expect("static application menus must include Comfy");
+            let mut menu_action_names = Vec::new();
+            collect_menu_action_names(&comfy_menu.items, &mut menu_action_names);
+            assert!(!menu_action_names.is_empty());
+            let mut expected_action_names = comfy_ui::native_menu_action_names()
+                .expect("canonical Comfy menu registry must resolve")
+                .into_iter()
+                .map(str::to_owned)
+                .collect::<Vec<_>>();
+            menu_action_names.sort();
+            expected_action_names.sort();
+            assert_eq!(menu_action_names, expected_action_names);
+            let registered_actions = cx
+                .all_action_names()
+                .iter()
+                .copied()
+                .collect::<HashSet<_>>();
+            for action_name in menu_action_names {
+                assert_ne!(action_name, "NoAction");
+                assert!(registered_actions.contains(action_name.as_str()));
+            }
+        });
+    }
+
+    #[gpui::test(seed = 16013)]
+    fn val_gpui_013(cx: &mut TestAppContext) {
+        const MAIN_SOURCE: &str = include_str!("main.rs");
+        const SIM_SOURCE: &str = include_str!("sim.rs");
+        const MENU_SOURCE: &str = include_str!("sim/app_menus.rs");
+
+        assert!(!MAIN_SOURCE.contains("Application::new_inaccessible"));
+        assert!(!MAIN_SOURCE.contains("SIM_EXPERIMENTAL_A11Y"));
+        assert!(MAIN_SOURCE.contains("Application::with_platform(platform)"));
+        assert!(
+            MAIN_SOURCE.contains(
+                "build_application_with_platform(gpui_platform::current_platform(false))"
+            )
+        );
+
+        #[cfg(not(target_os = "macos"))]
+        {
+            let application =
+                crate::build_application_with_platform(gpui_platform::current_platform(true));
+            drop(application);
+        }
+
+        let (keymap_order, keymap_actions, user_override_evidence, menu_action_names) =
+            cx.update(|cx| {
+                cx.set_global(db::AppDatabase::test_new());
+                workspace::AppState::test(cx);
+                init_comfy_ui(cx);
+                init_comfy_ui(cx);
+                #[cfg(feature = "test-support")]
+                assert_eq!(comfy_ui::initialization_passes_for_test(cx), Some(1));
+
+                let keymap_order = builtin_keymap_assets(BaseKeymap::JetBrains, true)
+                    .into_iter()
+                    .map(|(path, source)| format!("{}:{path}", source.name()))
+                    .collect::<Vec<_>>();
+                let comfy_position = keymap_order
+                    .iter()
+                    .position(|entry| entry.ends_with(comfy_ui::DEFAULT_COMFY_KEYMAP_PATH))
+                    .expect("Comfy keymap must be present in the built-in order");
+                let vim_position = keymap_order
+                    .iter()
+                    .position(|entry| entry.ends_with(VIM_KEYMAP_PATH))
+                    .expect("Vim keymap must be present when enabled");
+                assert!(vim_position < comfy_position);
+                let expected_override = format!("Default:{SPECIFIC_OVERRIDES_KEYMAP_PATH}");
+                assert_eq!(
+                    keymap_order.get(comfy_position + 1).map(String::as_str),
+                    Some(expected_override.as_str()),
+                );
+                assert!(builtin_keymap_assets(BaseKeymap::None, true).is_empty());
+
+                load_default_keymap(cx);
+                let keymap_actions = {
+                    let keymap = cx.key_bindings();
+                    let keymap = keymap.borrow();
+                    keymap
+                        .bindings()
+                        .filter_map(|binding| {
+                            binding
+                                .predicate()
+                                .filter(|predicate| predicate.to_string().contains("ComfyGraph"))
+                                .map(|predicate| {
+                                    assert!(predicate.to_string().contains("ComfyGraph"));
+                                    binding.action().name().to_owned()
+                                })
+                        })
+                        .collect::<Vec<_>>()
+                };
+                assert!(
+                    !keymap_actions.is_empty(),
+                    "the embedded Comfy keymap must register scoped bindings"
+                );
+
+                reload_keymaps(
+                    cx,
+                    vec![KeyBinding::new(
+                        "ctrl-enter",
+                        sim_actions::About,
+                        Some("ComfyGraph"),
+                    )],
+                );
+                let keystroke = Keystroke::parse("ctrl-enter")
+                    .expect("parse the known conflicting Comfy keystroke");
+                let mut graph_context = KeyContext::new_with_defaults();
+                graph_context.add("ComfyGraph");
+                let keymap = cx.key_bindings();
+                let keymap = keymap.borrow();
+                let (resolved_bindings, pending) =
+                    keymap.bindings_for_input(&[keystroke], &[graph_context]);
+                assert!(!pending);
+                let winning_binding = resolved_bindings
+                    .first()
+                    .expect("the conflicting user binding must resolve");
+                assert_eq!(winning_binding.action().name(), sim_actions::About.name());
+                assert_eq!(
+                    winning_binding.meta().map(KeybindSource::from_meta),
+                    Some(KeybindSource::User)
+                );
+                assert!(
+                    resolved_bindings
+                        .iter()
+                        .skip(1)
+                        .any(|binding| binding.action().name() == "comfy_shell::QueuePrompt")
+                );
+                let user_override_evidence = format!(
+                    "ctrl-enter:{}:{}",
+                    winning_binding.action().name(),
+                    KeybindSource::User.name()
+                );
+                drop(keymap);
+
+                let menus = app_menus(cx);
+                let comfy_menu_index = menus
+                    .iter()
+                    .position(|menu| menu.name.as_ref() == "Comfy")
+                    .expect("static application menus must include Comfy");
+                let window_menu_index = menus
+                    .iter()
+                    .position(|menu| menu.name.as_ref() == "Window")
+                    .expect("static application menus must include Window");
+                assert!(comfy_menu_index < window_menu_index);
+                let comfy_menu: &Menu = menus
+                    .get(comfy_menu_index)
+                    .expect("Comfy menu index must remain valid");
+                let mut menu_action_names = Vec::new();
+                collect_menu_action_names(&comfy_menu.items, &mut menu_action_names);
+                assert!(
+                    !menu_action_names.is_empty(),
+                    "Comfy menu must contain executable actions"
+                );
+                let mut expected_menu_action_names = comfy_ui::native_menu_action_names()
+                    .expect("canonical Comfy menu registry must resolve")
+                    .into_iter()
+                    .map(str::to_owned)
+                    .collect::<Vec<_>>();
+                menu_action_names.sort();
+                expected_menu_action_names.sort();
+                assert_eq!(
+                    menu_action_names, expected_menu_action_names,
+                    "production Comfy menu must exactly project its authoritative registry"
+                );
+                let registered_actions = cx
+                    .all_action_names()
+                    .iter()
+                    .copied()
+                    .collect::<HashSet<_>>();
+                for action_name in keymap_actions.iter().chain(&menu_action_names) {
+                    assert_ne!(action_name, "NoAction");
+                    assert!(
+                        registered_actions.contains(action_name.as_str()),
+                        "{action_name} must be registered with GPUI"
+                    );
+                }
+
+                (
+                    keymap_order,
+                    keymap_actions,
+                    user_override_evidence,
+                    menu_action_names,
+                )
+            });
+
+        assert!(SIM_SOURCE.contains("init_comfy_ui(cx);"));
+        assert!(SIM_SOURCE.contains("comfy_ui::init(cx);"));
+        assert!(MENU_SOURCE.contains("comfy_ui::comfy_menu()"));
+
+        let source_digest = validation_digest([MAIN_SOURCE, SIM_SOURCE, MENU_SOURCE]);
+        let keymap_digest = validation_digest(
+            keymap_order
+                .iter()
+                .chain(&keymap_actions)
+                .map(String::as_bytes),
+        );
+        let user_override_digest = validation_digest([user_override_evidence.as_bytes()]);
+        let menu_digest = validation_digest(menu_action_names.iter().map(String::as_bytes));
+        let artifact = serde_json::json!({
+            "validation_id": "VAL-GPUI-013",
+            "environment": {
+                "backend": "gpui-test",
+                "platform": if cfg!(target_os = "macos") {
+                    "test-app-and-compiled-production-bootstrap"
+                } else {
+                    "test-app-and-headless-bootstrap"
+                },
+                "os": std::env::consts::OS,
+                "arch": std::env::consts::ARCH,
+                "feature": "test-support",
+                "scheduler_seed": 16013,
+                "iterations": "1"
+            },
+            "fixture_digests": {
+                "production_sources": source_digest,
+                "keymap_order_and_actions": keymap_digest,
+                "user_keymap_precedence": user_override_digest,
+                "menu_actions": menu_digest
+            },
+            "cases": [
+                {
+                    "name": "production-accessibility-bootstrap",
+                    "passed": true,
+                    "digest": source_digest
+                },
+                {
+                    "name": "comfy-initialization-is-idempotently-invoked",
+                    "passed": true,
+                    "digest": validation_digest([SIM_SOURCE])
+                },
+                {
+                    "name": "comfy-keymap-load-order-and-context-scope",
+                    "passed": true,
+                    "digest": keymap_digest
+                },
+                {
+                    "name": "user-keymap-overrides-conflicting-comfy-default",
+                    "passed": true,
+                    "digest": user_override_digest
+                },
+                {
+                    "name": "comfy-static-menu-actions-are-registered",
+                    "passed": true,
+                    "digest": menu_digest
+                }
+            ],
+            "skipped": []
+        });
+        let artifact_directory =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/comfy-parity");
+        std::fs::create_dir_all(&artifact_directory)
+            .expect("create Comfy parity validation artifact directory");
+        std::fs::write(
+            artifact_directory.join("val-gpui-013.json"),
+            serde_json::to_vec_pretty(&artifact).expect("serialize VAL-GPUI-013 artifact"),
+        )
+        .expect("write VAL-GPUI-013 artifact");
     }
 
     #[gpui::test]
@@ -3161,7 +4267,7 @@ mod tests {
         cx.simulate_prompt_answer("Don't Save");
         close.await.unwrap();
 
-        // Advance the clock to ensure that the item has been serialisim and dropped from the queue
+        // Advance the clock to ensure that the item has been serialized and dropped from the queue
         cx.executor().advance_clock(Duration::from_secs(1));
 
         weak.assert_released();
@@ -3292,7 +4398,7 @@ mod tests {
 
         assert!(window_is_edited(window, cx));
 
-        // Advance the clock to make sure the workspace is serialisim
+        // Advance the clock to make sure the workspace is serialized
         cx.executor().advance_clock(Duration::from_secs(1));
 
         // When closing the window, no prompt shows up and the window is closed.
@@ -3373,6 +4479,16 @@ mod tests {
         let editor = multi_workspace
             .update(cx, |multi_workspace, _, cx| {
                 multi_workspace.workspace().update(cx, |workspace, cx| {
+                    assert!(
+                        workspace.panel::<comfy_ui::ExecutionPanel>(cx).is_some(),
+                        "the production workspace must register the native execution dock panel"
+                    );
+                    assert!(
+                        workspace
+                            .panel::<comfy_ui::GraphPropertiesPanel>(cx)
+                            .is_some(),
+                        "the production workspace must register the native graph properties dock panel"
+                    );
                     let editor = workspace
                         .active_item(cx)
                         .unwrap()
@@ -5343,7 +6459,6 @@ mod tests {
                 "agent",
                 "agents_sidebar",
                 "app_menu",
-                "apps_panel",
                 "assistant",
                 "assistant2",
                 "auto_update",
@@ -5356,6 +6471,8 @@ mod tests {
                 "client",
                 "collab",
                 "collab_panel",
+                "comfy_graph",
+                "comfy_shell",
                 "command_palette",
                 "console",
                 "context_server",
@@ -5417,6 +6534,7 @@ mod tests {
                 "task",
                 "terminal",
                 "terminal_panel",
+                "text_finder",
                 "theme",
                 "theme_selector",
                 "toast",
@@ -5581,7 +6699,11 @@ mod tests {
     }
 
     pub(crate) fn init_test(cx: &mut TestAppContext) -> Arc<AppState> {
-        init_test_with_state(cx, cx.update(AppState::test))
+        let app_state = cx.update(|cx| {
+            cx.set_global(db::AppDatabase::test_new());
+            AppState::test(cx)
+        });
+        init_test_with_state(cx, app_state)
     }
 
     fn init_test_with_state(
@@ -5606,6 +6728,7 @@ mod tests {
             release_channel::init(Version::new(0, 0, 0), cx);
             command_palette::init(cx);
             editor::init(cx);
+            init_comfy_ui(cx);
             collab_ui::init(&app_state, cx);
             git_ui::init(cx);
             project_panel::init(cx);

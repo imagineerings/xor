@@ -56,7 +56,7 @@ pub struct ParticipantIndex(pub u32);
 #[derive(Default, Debug)]
 pub struct User {
     pub legacy_id: LegacyUserId,
-    pub github_login: SharedString,
+    pub username: SharedString,
     pub avatar_uri: SharedUri,
     pub name: Option<String>,
 }
@@ -79,31 +79,23 @@ impl PartialOrd for User {
 
 impl Ord for User {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.github_login.cmp(&other.github_login)
+        self.username.cmp(&other.username)
     }
 }
 
 impl PartialEq for User {
     fn eq(&self, other: &Self) -> bool {
-        self.legacy_id == other.legacy_id && self.github_login == other.github_login
+        self.legacy_id == other.legacy_id && self.username == other.username
     }
 }
 
 impl Eq for User {}
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Contact {
     pub user: Arc<User>,
     pub online: bool,
     pub busy: bool,
-    pub custom_status: Option<CustomStatus>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CustomStatus {
-    pub emoji: Option<SharedString>,
-    pub text: SharedString,
-    pub expires_at: Option<i64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -116,7 +108,6 @@ pub enum ContactRequestStatus {
 
 pub struct UserStore {
     users: HashMap<u64, Arc<User>>,
-    by_github_login: HashMap<SharedString, u64>,
     participant_indices: HashMap<u64, ParticipantIndex>,
     update_contacts_tx: mpsc::UnboundedSender<UpdateContacts>,
     edit_prediction_usage: Option<EditPredictionUsage>,
@@ -187,8 +178,6 @@ impl UserStore {
         let rpc_subscriptions = vec![
             client.add_message_handler(cx.weak_entity(), Self::handle_update_contacts),
             client.add_message_handler(cx.weak_entity(), Self::handle_show_contacts),
-            client.add_message_handler(cx.weak_entity(), Self::handle_update_user_status),
-            client.add_message_handler(cx.weak_entity(), Self::handle_update_user_statuses),
         ];
 
         client.sign_out_tx.lock().replace(sign_out_tx);
@@ -199,7 +188,6 @@ impl UserStore {
 
         Self {
             users: Default::default(),
-            by_github_login: Default::default(),
             current_user: current_user_rx,
             current_organization: None,
             organizations: Vec::new(),
@@ -249,7 +237,7 @@ impl UserStore {
                                 let current_user_and_response = if let Some(response) = response {
                                     let user = Arc::new(User {
                                         legacy_id: user_id,
-                                        github_login: response.user.github_login.clone().into(),
+                                        username: response.user.username.clone().into(),
                                         avatar_uri: response.user.avatar_url.clone().into(),
                                         name: response.user.name.clone(),
                                     });
@@ -270,8 +258,6 @@ impl UserStore {
                                 cx.update(|cx| {
                                     if let Some((user, response)) = current_user_and_response {
                                         this.update(cx, |this, cx| {
-                                            this.by_github_login
-                                                .insert(user.github_login.clone(), user_id);
                                             this.users.insert(user_id, user);
                                             this.update_authenticated_user(response, cx)
                                         })
@@ -327,7 +313,6 @@ impl UserStore {
     #[cfg(feature = "test-support")]
     pub fn clear_cache(&mut self) {
         self.users.clear();
-        self.by_github_login.clear();
     }
 
     async fn handle_show_contacts(
@@ -348,30 +333,6 @@ impl UserStore {
             this.update_contacts_tx
                 .unbounded_send(UpdateContacts::Update(message.payload))
                 .unwrap();
-        });
-        Ok(())
-    }
-
-    async fn handle_update_user_status(
-        this: Entity<Self>,
-        message: TypedEnvelope<proto::UpdateUserStatus>,
-        mut cx: AsyncApp,
-    ) -> Result<()> {
-        this.update(&mut cx, |this, cx| {
-            this.update_user_status(message.payload.user_id, message.payload.status, cx);
-        });
-        Ok(())
-    }
-
-    async fn handle_update_user_statuses(
-        this: Entity<Self>,
-        message: TypedEnvelope<proto::UpdateUserStatuses>,
-        mut cx: AsyncApp,
-    ) -> Result<()> {
-        this.update(&mut cx, |this, cx| {
-            for update in message.payload.statuses {
-                this.update_user_status(update.user_id, update.status, cx);
-            }
         });
         Ok(())
     }
@@ -439,10 +400,11 @@ impl UserStore {
                             .retain(|contact| !removed_contacts.contains(&contact.user.legacy_id));
                         // Update existing contacts and insert new ones
                         for updated_contact in updated_contacts {
-                            match this.contacts.binary_search_by_key(
-                                &&updated_contact.user.github_login,
-                                |contact| &contact.user.github_login,
-                            ) {
+                            match this
+                                .contacts
+                                .binary_search_by_key(&&updated_contact.user.username, |contact| {
+                                    &contact.user.username
+                                }) {
                                 Ok(ix) => this.contacts[ix] = updated_contact,
                                 Err(ix) => this.contacts.insert(ix, updated_contact),
                             }
@@ -464,9 +426,8 @@ impl UserStore {
                         for user in incoming_requests {
                             match this
                                 .incoming_contact_requests
-                                .binary_search_by_key(&&user.github_login, |contact| {
-                                    &contact.github_login
-                                }) {
+                                .binary_search_by_key(&&user.username, |contact| &contact.username)
+                            {
                                 Ok(ix) => this.incoming_contact_requests[ix] = user,
                                 Err(ix) => this.incoming_contact_requests.insert(ix, user),
                             }
@@ -479,8 +440,8 @@ impl UserStore {
                         for request in outgoing_requests {
                             match this
                                 .outgoing_contact_requests
-                                .binary_search_by_key(&&request.github_login, |contact| {
-                                    &contact.github_login
+                                .binary_search_by_key(&&request.username, |contact| {
+                                    &contact.username
                                 }) {
                                 Ok(ix) => this.outgoing_contact_requests[ix] = request,
                                 Err(ix) => this.outgoing_contact_requests.insert(ix, request),
@@ -500,69 +461,9 @@ impl UserStore {
         &self.contacts
     }
 
-    pub fn custom_status_for_user(&self, user_id: u64) -> Option<CustomStatus> {
-        self.contacts
-            .iter()
-            .find(|contact| contact.user.legacy_id == user_id)
-            .and_then(|contact| contact.custom_status.clone())
-    }
-
-    pub fn update_user_status(
-        &mut self,
-        user_id: u64,
-        status: Option<proto::UserCustomStatus>,
-        cx: &mut Context<Self>,
-    ) {
-        let Some(contact) = self
-            .contacts
-            .iter_mut()
-            .find(|contact| contact.user.legacy_id == user_id)
-        else {
-            return;
-        };
-        Arc::make_mut(contact).custom_status = status.map(|status| CustomStatus {
-            emoji: status.emoji.map(Into::into),
-            text: status.text.into(),
-            expires_at: status.expires_at.map(|expires_at| expires_at as i64),
-        });
-        cx.notify();
-    }
-
-    pub fn set_status(
-        &self,
-        emoji: Option<SharedString>,
-        text: SharedString,
-        clear_after_minutes: Option<u32>,
-        cx: &Context<Self>,
-    ) -> Task<Result<()>> {
-        let client = self.client.upgrade();
-        cx.spawn(async move |_, _| {
-            client
-                .context("can't upgrade client reference")?
-                .request(proto::SetStatus {
-                    emoji: emoji.map(Into::into),
-                    text: text.to_string(),
-                    clear_after_minutes,
-                })
-                .await?;
-            Ok(())
-        })
-    }
-
-    pub fn clear_status(&self, cx: &Context<Self>) -> Task<Result<()>> {
-        let client = self.client.upgrade();
-        cx.spawn(async move |_, _| {
-            client
-                .context("can't upgrade client reference")?
-                .request(proto::ClearStatus {})
-                .await?;
-            Ok(())
-        })
-    }
-
     pub fn has_contact(&self, user: &Arc<User>) -> bool {
         self.contacts
-            .binary_search_by_key(&&user.github_login, |contact| &contact.user.github_login)
+            .binary_search_by_key(&&user.username, |contact| &contact.user.username)
             .is_ok()
     }
 
@@ -581,19 +482,19 @@ impl UserStore {
     pub fn contact_request_status(&self, user: &User) -> ContactRequestStatus {
         if self
             .contacts
-            .binary_search_by_key(&&user.github_login, |contact| &contact.user.github_login)
+            .binary_search_by_key(&&user.username, |contact| &contact.user.username)
             .is_ok()
         {
             ContactRequestStatus::RequestAccepted
         } else if self
             .outgoing_contact_requests
-            .binary_search_by_key(&&user.github_login, |user| &user.github_login)
+            .binary_search_by_key(&&user.username, |user| &user.username)
             .is_ok()
         {
             ContactRequestStatus::RequestSent
         } else if self
             .incoming_contact_requests
-            .binary_search_by_key(&&user.github_login, |user| &user.github_login)
+            .binary_search_by_key(&&user.username, |user| &user.username)
             .is_ok()
         {
             ContactRequestStatus::RequestReceived
@@ -780,12 +681,6 @@ impl UserStore {
                     .context("server responded with no users")
             })?
         })
-    }
-
-    pub fn cached_user_by_github_login(&self, github_login: &str) -> Option<Arc<User>> {
-        self.by_github_login
-            .get(github_login)
-            .and_then(|id| self.users.get(id).cloned())
     }
 
     pub fn current_user(&self) -> Option<Arc<User>> {
@@ -1062,13 +957,7 @@ impl UserStore {
         let mut ret = Vec::with_capacity(users.len());
         for user in users {
             let user = User::new(user);
-            if let Some(old) = self.users.insert(user.legacy_id, user.clone())
-                && old.github_login != user.github_login
-            {
-                self.by_github_login.remove(&old.github_login);
-            }
-            self.by_github_login
-                .insert(user.github_login.clone(), user.legacy_id);
+            self.users.insert(user.legacy_id, user.clone());
             ret.push(user)
         }
         ret
@@ -1097,8 +986,8 @@ impl UserStore {
         let mut ret = HashMap::default();
         let mut missing_user_ids = Vec::new();
         for id in user_ids {
-            if let Some(github_login) = self.get_cached_user(id).map(|u| u.github_login.clone()) {
-                ret.insert(id, github_login);
+            if let Some(username) = self.get_cached_user(id).map(|u| u.username.clone()) {
+                ret.insert(id, username);
             } else {
                 missing_user_ids.push(id)
             }
@@ -1119,7 +1008,7 @@ impl User {
     fn new(message: proto::User) -> Arc<Self> {
         Arc::new(User {
             legacy_id: message.id,
-            github_login: message.github_login.into(),
+            username: message.username.into(),
             avatar_uri: message.avatar_url.into(),
             name: message.name,
         })
@@ -1141,7 +1030,6 @@ impl Contact {
             user,
             online: contact.online,
             busy: contact.busy,
-            custom_status: None,
         })
     }
 }
@@ -1183,108 +1071,6 @@ impl RequestUsage {
         let amount = amount.to_str()?.parse::<i32>()?;
 
         Ok(Self { limit, amount })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use clock::FakeSystemClock;
-    use gpui::TestAppContext;
-    use http_client::FakeHttpClient;
-    use settings::SettingsStore;
-
-    #[gpui::test]
-    fn test_contact_custom_status_field(cx: &mut TestAppContext) {
-        let client = cx.update(|cx| {
-            let settings = SettingsStore::test(cx);
-            cx.set_global(settings);
-            Client::new(
-                Arc::new(FakeSystemClock::new()),
-                FakeHttpClient::with_404_response(),
-                cx,
-            )
-        });
-        let user_store = cx.update(|cx| cx.new(|cx| UserStore::new(client.clone(), cx)));
-
-        user_store.update(cx, |store, cx| {
-            store.contacts.push(Arc::new(Contact {
-                user: Arc::new(User {
-                    legacy_id: 7,
-                    github_login: "user".into(),
-                    avatar_uri: "".into(),
-                    name: Some("User".to_string()),
-                }),
-                online: true,
-                busy: false,
-                custom_status: None,
-            }));
-            store.update_user_status(
-                7,
-                Some(proto::UserCustomStatus {
-                    emoji: Some("📅".to_string()),
-                    text: "In a meeting".to_string(),
-                    expires_at: Some(123),
-                }),
-                cx,
-            );
-        });
-
-        let status = cx.update(|cx| user_store.read(cx).custom_status_for_user(7).unwrap());
-        assert_eq!(status.emoji.as_deref(), Some("📅"));
-        assert_eq!(status.text, "In a meeting");
-        assert_eq!(status.expires_at, Some(123));
-
-        user_store.update(cx, |store, cx| store.update_user_status(7, None, cx));
-        assert!(cx.update(|cx| user_store.read(cx).custom_status_for_user(7).is_none()));
-    }
-
-    #[gpui::test]
-    fn test_update_user_statuses_batch(cx: &mut TestAppContext) {
-        let client = cx.update(|cx| {
-            let settings = SettingsStore::test(cx);
-            cx.set_global(settings);
-            Client::new(
-                Arc::new(FakeSystemClock::new()),
-                FakeHttpClient::with_404_response(),
-                cx,
-            )
-        });
-        let user_store = cx.update(|cx| cx.new(|cx| UserStore::new(client.clone(), cx)));
-
-        user_store.update(cx, |store, cx| {
-            for user_id in [7, 8] {
-                store.contacts.push(Arc::new(Contact {
-                    user: Arc::new(User {
-                        legacy_id: user_id,
-                        github_login: format!("user-{user_id}").into(),
-                        avatar_uri: "".into(),
-                        name: None,
-                    }),
-                    online: true,
-                    busy: false,
-                    custom_status: None,
-                }));
-                store.update_user_status(
-                    user_id,
-                    Some(proto::UserCustomStatus {
-                        emoji: None,
-                        text: format!("Status {user_id}"),
-                        expires_at: None,
-                    }),
-                    cx,
-                );
-            }
-        });
-
-        assert_eq!(
-            cx.update(|cx| user_store.read(cx).custom_status_for_user(7).unwrap().text),
-            "Status 7"
-        );
-        assert_eq!(
-            cx.update(|cx| user_store.read(cx).custom_status_for_user(8).unwrap().text),
-            "Status 8"
-        );
     }
 }
 

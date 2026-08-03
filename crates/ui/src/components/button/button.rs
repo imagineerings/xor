@@ -97,7 +97,7 @@ impl Button {
     ///
     /// This is the primary constructor for a [`Button`] component. It initializes
     /// the button with the provided identifier and label text, setting all other
-    /// properties to their default values, which can be customisim using the
+    /// properties to their default values, which can be customized using the
     /// builder pattern methods provided by this struct.
     pub fn new(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Self {
         Self {
@@ -120,6 +120,38 @@ impl Button {
     /// Sets the color of the button's label.
     pub fn color(mut self, label_color: impl Into<Option<Color>>) -> Self {
         self.label_color = label_color.into();
+        self
+    }
+
+    /// Sets the label announced by assistive technology.
+    /// Defaults to the button's visible label.
+    pub fn aria_label(mut self, label: impl Into<SharedString>) -> Self {
+        self.base = self.base.aria_label(label);
+        self
+    }
+
+    /// Overrides the role reported to assistive technology.
+    /// Defaults to [`gpui::Role::Button`].
+    pub fn aria_role(mut self, role: gpui::Role) -> Self {
+        self.base = self.base.aria_role(role);
+        self
+    }
+
+    /// Sets the expanded state reported to assistive technology, for buttons
+    /// that control a popup (e.g. dropdown or disclosure triggers).
+    pub fn aria_expanded(mut self, expanded: bool) -> Self {
+        self.base = self.base.aria_expanded(expanded);
+        self
+    }
+
+    /// Registers a handler for an accessibility action (e.g.
+    /// [`gpui::accesskit::Action::Expand`]) dispatched by assistive technology.
+    pub fn on_a11y_action(
+        mut self,
+        action: gpui::accesskit::Action,
+        listener: impl FnMut(Option<&gpui::accesskit::ActionData>, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.base = self.base.on_a11y_action(action, listener);
         self
     }
 
@@ -369,7 +401,7 @@ impl ButtonCommon for Button {
 
 impl RenderOnce for Button {
     #[allow(refining_impl_trait)]
-    fn render(self, _window: &mut Window, cx: &mut App) -> ButtonLike {
+    fn render(mut self, _window: &mut Window, cx: &mut App) -> ButtonLike {
         let is_disabled = self.base.disabled;
         let is_selected = self.base.selected;
 
@@ -377,6 +409,10 @@ impl RenderOnce for Button {
             .selected_label
             .filter(|_| is_selected)
             .unwrap_or(self.label);
+
+        if self.base.aria_label.is_none() {
+            self.base.aria_label = Some(label.clone());
+        }
 
         let label_color = if is_disabled {
             Color::Disabled

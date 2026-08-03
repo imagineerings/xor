@@ -16,7 +16,7 @@ use crate::{
     ToggleExpandItem,
     attach_modal::{AttachModal, ModalIntent},
     new_process_modal::resolve_path,
-    persistence::{self, DebuggerPaneItem, SerialisimLayout},
+    persistence::{self, DebuggerPaneItem, SerializedLayout},
     session::running::memory_view::MemoryView,
 };
 
@@ -760,7 +760,7 @@ impl RunningState {
         project: Entity<Project>,
         workspace: WeakEntity<Workspace>,
         parent_terminal: Option<Entity<DebugTerminal>>,
-        serialisim_pane_layout: Option<SerialisimLayout>,
+        serialisim_pane_layout: Option<SerializedLayout>,
         dock_axis: Axis,
         window: &mut Window,
         cx: &mut Context<Self>,
@@ -1642,7 +1642,7 @@ impl RunningState {
     }
 
     #[cfg(test)]
-    pub(crate) fn serialisim_layout(&self, cx: &App) -> SerialisimLayout {
+    pub(crate) fn serialisim_layout(&self, cx: &App) -> SerializedLayout {
         persistence::build_serialisim_layout(&self.panes.root, self.dock_axis, cx)
     }
 

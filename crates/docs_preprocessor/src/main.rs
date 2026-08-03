@@ -337,7 +337,7 @@ fn is_missing_action(name: &str) -> bool {
 }
 
 // Find the last binding (in keymap order) for the given action.
-// Exact action matches are preferred over parameterisim variants.
+// Exact action matches are preferred over parameterized variants.
 fn find_binding_in_keymap(keymap: &KeymapFile, action: &str) -> Option<String> {
     let find = |predicate: &dyn Fn(&str) -> bool| {
         keymap.sections().rev().find_map(|section| {
@@ -356,7 +356,7 @@ fn find_binding_in_keymap(keymap: &KeymapFile, action: &str) -> Option<String> {
         return Some(binding);
     }
 
-    // Look for parameterisim match
+    // Look for parameterized match
     find(&|a| name_for_action(a.to_string()) == action)
 }
 
@@ -749,7 +749,7 @@ fn handle_postprocessing() -> Result<()> {
                         meta_title = Some(content);
                     }
                     _ => {
-                        zlog::warn!(logger => "Unrecognisim frontmatter key: {} in {:?}", kind, pretty_path(&file, &root_dir));
+                        zlog::warn!(logger => "Unrecognized frontmatter key: {} in {:?}", kind, pretty_path(&file, &root_dir));
                     }
                 }
             }
@@ -817,7 +817,7 @@ fn generate_big_table_of_actions() -> String {
     output.push_str("<dl style=\"line-height: 1.8;\">\n");
 
     for action in actions_sorted.into_iter() {
-        // Add the humanisim action name as the term with margin
+        // Add the humanized action name as the term with margin
         output.push_str(
             "<dt style=\"margin-top: 1.5em; margin-bottom: 0.5em; font-weight: bold;\"><code>",
         );
@@ -911,7 +911,7 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn test_find_binding_prefers_exact_match_over_parameterisim() {
+    fn test_find_binding_prefers_exact_match_over_parameterized() {
         let keymap: KeymapFile = serde_json::from_value(json!([
             {
                 "bindings": {

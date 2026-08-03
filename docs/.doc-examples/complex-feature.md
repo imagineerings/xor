@@ -49,7 +49,7 @@ By default, the Git Panel docks on the left. Go to **Panels > Git Panel** and ch
 
 #### Switching to Tree View
 
-The Git Panel shows a flat list of changed files by default. To see files organisim by folder hierarchy instead, toggle **Tree View** in the panel's context menu, or enable it in **Panels > Git Panel**.
+The Git Panel shows a flat list of changed files by default. To see files organized by folder hierarchy instead, toggle **Tree View** in the panel's context menu, or enable it in **Panels > Git Panel**.
 
 #### Inline Blame
 
@@ -267,7 +267,7 @@ Sim currently supports links to the hosted versions of
 
 ### Self-Hosted Instances {#self-hosted}
 
-Sim automatically identifies Git hosting providers by checking for keywords in your Git remote URL. For example, if your self-hosted URL contains `gitlab`, `gitea`, or other recognisim provider names, Sim will automatically register that hosting provider without any configuration needed.
+Sim automatically identifies Git hosting providers by checking for keywords in your Git remote URL. For example, if your self-hosted URL contains `gitlab`, `gitea`, or other recognized provider names, Sim will automatically register that hosting provider without any configuration needed.
 
 However, if your self-hosted Git instance URL doesn't contain identifying keywords, you can manually configure Sim to create clickable links to your instance by adding a `git_hosting_providers` setting so commit hashes and permalinks resolve to your domain:
 

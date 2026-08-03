@@ -4,8 +4,8 @@ use crate::{
 };
 use gpui::{
     Action, Anchor, AnyElement, App, Bounds, DismissEvent, Entity, EventEmitter, FocusHandle,
-    Focusable, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels, Point, Size,
-    Subscription, TaskExt, anchored, canvas, prelude::*, px,
+    Focusable, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels, Point, Role,
+    Size, Subscription, TaskExt, anchored, canvas, prelude::*, px,
 };
 use menu::{SelectChild, SelectFirst, SelectLast, SelectNext, SelectParent, SelectPrevious};
 use std::{
@@ -80,7 +80,7 @@ impl ContextMenuItem {
 }
 
 pub struct ContextMenuEntry {
-    toggle: Option<(IconPosition, bool)>,
+    toggle: Option<(IconPosition, bool, bool)>,
     label: SharedString,
     icon: Option<IconName>,
     custom_icon_path: Option<SharedString>,
@@ -97,6 +97,15 @@ pub struct ContextMenuEntry {
     end_slot_title: Option<SharedString>,
     end_slot_handler: Option<Rc<dyn Fn(Option<&FocusHandle>, &mut Window, &mut App)>>,
     show_end_slot_on_hover: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ContextMenuAccessibilityContract {
+    pub label: SharedString,
+    pub role: &'static str,
+    pub checked: Option<bool>,
+    pub disabled: bool,
+    pub expanded: Option<bool>,
 }
 
 impl ContextMenuEntry {
@@ -123,7 +132,12 @@ impl ContextMenuEntry {
     }
 
     pub fn toggleable(mut self, toggle_position: IconPosition, toggled: bool) -> Self {
-        self.toggle = Some((toggle_position, toggled));
+        self.toggle = Some((toggle_position, toggled, false));
+        self
+    }
+
+    pub fn radio(mut self, toggle_position: IconPosition, selected: bool) -> Self {
+        self.toggle = Some((toggle_position, selected, true));
         self
     }
 
@@ -162,7 +176,7 @@ impl ContextMenuEntry {
     }
 
     pub fn toggle(mut self, toggle_position: IconPosition, toggled: bool) -> Self {
-        self.toggle = Some((toggle_position, toggled));
+        self.toggle = Some((toggle_position, toggled, false));
         self
     }
 
@@ -184,6 +198,26 @@ impl ContextMenuEntry {
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
         self
+    }
+
+    fn accessibility_role(&self) -> Role {
+        match self.toggle {
+            Some((_, _, true)) => Role::MenuItemRadio,
+            Some(_) => Role::MenuItemCheckBox,
+            None => Role::MenuItem,
+        }
+    }
+
+    fn accessibility_role_name(&self) -> &'static str {
+        match self.toggle {
+            Some((_, _, true)) => "menu-item-radio",
+            Some(_) => "menu-item-checkbox",
+            None => "menu-item",
+        }
+    }
+
+    fn accessibility_checked(&self) -> Option<bool> {
+        self.toggle.as_ref().map(|(_, checked, _)| *checked)
     }
 
     pub fn documentation_aside(
@@ -296,7 +330,7 @@ impl ContextMenu {
         );
         window.refresh();
 
-        f(
+        let mut menu = f(
             Self {
                 builder: None,
                 items: Default::default(),
@@ -323,7 +357,9 @@ impl ContextMenu {
             },
             window,
             cx,
-        )
+        );
+        menu.ensure_visible_selection();
+        menu
     }
 
     pub fn build(
@@ -373,7 +409,7 @@ impl ContextMenu {
             );
             window.refresh();
 
-            (builder.clone())(
+            let mut menu = (builder.clone())(
                 Self {
                     builder: Some(builder),
                     items: Default::default(),
@@ -400,7 +436,9 @@ impl ContextMenu {
                 },
                 window,
                 cx,
-            )
+            );
+            menu.ensure_visible_selection();
+            menu
         })
     }
 
@@ -472,6 +510,7 @@ impl ContextMenu {
         );
 
         self.items = new_menu.items;
+        self.ensure_visible_selection();
 
         cx.notify();
     }
@@ -479,6 +518,61 @@ impl ContextMenu {
     pub fn context(mut self, focus: FocusHandle) -> Self {
         self.action_context = Some(focus);
         self
+    }
+
+    fn ensure_visible_selection(&mut self) {
+        let selected_is_valid = self
+            .selected_index
+            .and_then(|index| self.items.get(index))
+            .is_some_and(ContextMenuItem::is_selectable);
+        if !selected_is_valid {
+            self.selected_index = self.items.iter().position(ContextMenuItem::is_selectable);
+        }
+    }
+
+    pub fn accessibility_contracts(&self) -> Vec<ContextMenuAccessibilityContract> {
+        self.items
+            .iter()
+            .enumerate()
+            .filter_map(|(index, item)| match item {
+                ContextMenuItem::Entry(entry) => Some(ContextMenuAccessibilityContract {
+                    label: entry.label.clone(),
+                    role: entry.accessibility_role_name(),
+                    checked: entry.accessibility_checked(),
+                    disabled: entry.disabled,
+                    expanded: None,
+                }),
+                ContextMenuItem::Submenu { label, .. } => Some(ContextMenuAccessibilityContract {
+                    label: label.clone(),
+                    role: "menu-item",
+                    checked: None,
+                    disabled: false,
+                    expanded: Some(matches!(
+                        &self.submenu_state,
+                        SubmenuState::Open(open_submenu)
+                            if open_submenu.item_index == index
+                    )),
+                }),
+                ContextMenuItem::CustomEntry { selectable, .. } if *selectable => {
+                    Some(ContextMenuAccessibilityContract {
+                        label: SharedString::from("custom menu entry"),
+                        role: "menu-item",
+                        checked: None,
+                        disabled: false,
+                        expanded: None,
+                    })
+                }
+                ContextMenuItem::Separator
+                | ContextMenuItem::Header(_)
+                | ContextMenuItem::HeaderWithLink(_, _, _)
+                | ContextMenuItem::Label(_)
+                | ContextMenuItem::CustomEntry { .. } => None,
+            })
+            .collect()
+    }
+
+    pub fn selected_accessibility_index(&self) -> Option<usize> {
+        self.selected_index
     }
 
     pub fn header(mut self, title: impl Into<SharedString>) -> Self {
@@ -610,15 +704,29 @@ impl ContextMenu {
     }
 
     pub fn toggleable_entry(
-        mut self,
+        self,
         label: impl Into<SharedString>,
         toggled: bool,
         position: IconPosition,
         action: Option<Box<dyn Action>>,
         handler: impl Fn(&mut Window, &mut App) + 'static,
     ) -> Self {
+        self.toggleable_entry_disabled_when(label, toggled, false, position, action, handler)
+    }
+
+    /// Like [`Self::toggleable_entry`], but the entry is rendered disabled (and its handler is not
+    /// invoked) when `disabled` is `true`.
+    pub fn toggleable_entry_disabled_when(
+        mut self,
+        label: impl Into<SharedString>,
+        toggled: bool,
+        disabled: bool,
+        position: IconPosition,
+        action: Option<Box<dyn Action>>,
+        handler: impl Fn(&mut Window, &mut App) + 'static,
+    ) -> Self {
         self.items.push(ContextMenuItem::Entry(ContextMenuEntry {
-            toggle: Some((position, toggled)),
+            toggle: Some((position, toggled, false)),
             label: label.into(),
             handler: Rc::new(move |_, window, cx| handler(window, cx)),
             secondary_handler: None,
@@ -629,7 +737,7 @@ impl ContextMenu {
             icon_size: IconSize::Small,
             icon_color: None,
             action,
-            disabled: false,
+            disabled,
             documentation_aside: None,
             end_slot_icon: None,
             end_slot_title: None,
@@ -719,7 +827,7 @@ impl ContextMenu {
     ) -> Self {
         self.items.push(ContextMenuItem::Entry(ContextMenuEntry {
             toggle: if checked {
-                Some((IconPosition::Start, true))
+                Some((IconPosition::Start, true, false))
             } else {
                 None
             },
@@ -1265,6 +1373,7 @@ impl ContextMenu {
             };
 
             menu = (builder)(menu, window, cx);
+            menu.ensure_visible_selection();
             menu
         })
     }
@@ -1391,6 +1500,11 @@ impl ContextMenu {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> impl IntoElement + use<> {
+        // The menu keeps real focus on its container, so for assistive
+        // technology to track the selected item we report it as the active
+        // descendant. GPUI only honors this while the menu actually holds
+        // focus, so we mark the selected item unconditionally here.
+        let is_active_descendant = |selectable: bool| selectable && Some(ix) == self.selected_index;
         match item {
             ContextMenuItem::Separator => ListSeparator.into_any_element(),
             ContextMenuItem::Header(header) => ListSubHeader::new(header.clone())
@@ -1420,9 +1534,9 @@ impl ContextMenu {
                 .disabled(true)
                 .child(Label::new(label.clone()))
                 .into_any_element(),
-            ContextMenuItem::Entry(entry) => {
-                self.render_menu_entry(ix, entry, cx).into_any_element()
-            }
+            ContextMenuItem::Entry(entry) => self
+                .render_menu_entry(ix, entry, is_active_descendant(true), cx)
+                .into_any_element(),
             ContextMenuItem::CustomEntry {
                 entry_render,
                 handler,
@@ -1469,6 +1583,10 @@ impl ContextMenu {
                     .child(
                         ListItem::new(ix)
                             .inset(true)
+                            .when(selectable, |item| item.aria_role(Role::MenuItem))
+                            .when(is_active_descendant(selectable), |item| {
+                                item.aria_active_descendant()
+                            })
                             .toggle_state(Some(ix) == self.selected_index)
                             .selectable(selectable)
                             .when(selectable, |item| {
@@ -1500,7 +1618,14 @@ impl ContextMenu {
                 icon_color,
                 ..
             } => self
-                .render_submenu_item_trigger(ix, label.clone(), *icon, *icon_color, cx)
+                .render_submenu_item_trigger(
+                    ix,
+                    label.clone(),
+                    *icon,
+                    *icon_color,
+                    is_active_descendant(true),
+                    cx,
+                )
                 .into_any_element(),
         }
     }
@@ -1511,6 +1636,7 @@ impl ContextMenu {
         label: SharedString,
         icon: Option<IconName>,
         icon_color: Option<Color>,
+        is_active_descendant: bool,
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
         let toggle_state = Some(ix) == self.selected_index
@@ -1544,6 +1670,13 @@ impl ContextMenu {
             .child(
                 ListItem::new(ix)
                     .inset(true)
+                    .aria_role(Role::MenuItem)
+                    .aria_expanded(matches!(
+                        &self.submenu_state,
+                        SubmenuState::Open(open_submenu) if open_submenu.item_index == ix
+                    ))
+                    .when(is_active_descendant, |item| item.aria_active_descendant())
+                    .aria_label(label.clone())
                     .toggle_state(toggle_state)
                     .child(
                         canvas(
@@ -1722,8 +1855,11 @@ impl ContextMenu {
         &self,
         ix: usize,
         entry: &ContextMenuEntry,
+        is_active_descendant: bool,
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
+        let accessibility_role = entry.accessibility_role();
+        let accessibility_checked = entry.accessibility_checked();
         let ContextMenuEntry {
             toggle,
             label,
@@ -1862,6 +1998,10 @@ impl ContextMenu {
                     .group_name("label_container")
                     .inset(true)
                     .disabled(*disabled)
+                    .aria_role(accessibility_role)
+                    .when(is_active_descendant, |item| item.aria_active_descendant())
+                    .aria_label(label.clone())
+                    .when_some(accessibility_checked, |item, toggled| item.toggle(toggled))
                     .toggle_state(Some(ix) == self.selected_index)
                     .when(self.main_menu.is_none() && !*disabled, |item| {
                         item.on_hover(cx.listener(move |this, hovered, window, cx| {
@@ -1938,7 +2078,7 @@ impl ContextMenu {
                             },
                         ))
                     })
-                    .when_some(*toggle, |list_item, (position, toggled)| {
+                    .when_some(*toggle, |list_item, (position, toggled, _)| {
                         let contents = div()
                             .flex_none()
                             .child(
@@ -2155,6 +2295,7 @@ impl Render for ContextMenu {
                 .child(
                     v_flex()
                         .id("context-menu")
+                        .role(Role::Menu)
                         .max_h(vh(0.75, window))
                         .flex_shrink_0()
                         .child(menu_bounds_measure)
@@ -2313,6 +2454,43 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn radio_entries_retain_mutually_exclusive_accessibility_semantics() {
+        let entry = ContextMenuEntry::new("Select mode").radio(IconPosition::Start, true);
+        assert_eq!(entry.toggle, Some((IconPosition::Start, true, true)));
+        assert_eq!(entry.accessibility_role(), Role::MenuItemRadio);
+        assert_eq!(entry.accessibility_checked(), Some(true));
+        let checkbox = ContextMenuEntry::new("Show labels").toggleable(IconPosition::Start, true);
+        assert_eq!(checkbox.toggle, Some((IconPosition::Start, true, false)));
+        assert_eq!(checkbox.accessibility_role(), Role::MenuItemCheckBox);
+        assert_eq!(checkbox.accessibility_checked(), Some(true));
+    }
+
+    #[gpui::test]
+    fn submenu_accessibility_tracks_keyboard_expansion(cx: &mut TestAppContext) {
+        let cx = cx.add_empty_window();
+        let context_menu = cx.update(|window, cx| {
+            ContextMenu::build(window, cx, |menu, _, _| {
+                menu.submenu("Shape", |submenu, _, _| {
+                    submenu.entry("Default", None, |_, _| {})
+                })
+            })
+        });
+
+        context_menu.update_in(cx, |context_menu, window, cx| {
+            assert_eq!(context_menu.selected_accessibility_index(), Some(0));
+            assert_eq!(
+                context_menu.accessibility_contracts()[0].expanded,
+                Some(false)
+            );
+            context_menu.select_submenu_child(&SelectChild, window, cx);
+            assert_eq!(
+                context_menu.accessibility_contracts()[0].expanded,
+                Some(true)
+            );
+        });
+    }
+
     #[gpui::test]
     fn can_navigate_back_over_headers(cx: &mut TestAppContext) {
         let cx = cx.add_empty_window();
@@ -2330,8 +2508,9 @@ mod tests {
 
         context_menu.update_in(cx, |context_menu, window, cx| {
             assert_eq!(
-                None, context_menu.selected_index,
-                "No selection is in the menu initially"
+                Some(2),
+                context_menu.selected_index,
+                "The first enabled item is visibly selected when the menu opens"
             );
 
             context_menu.select_first(&SelectFirst, window, cx);

@@ -17,14 +17,14 @@ use core_foundation_sys::locale::CFLocaleCopyPreferredLanguages;
 use core_graphics::{display::CFDictionary, geometry::CGAffineTransform};
 use core_text::font_descriptor::{
     TraitAccessors, kCTFontFamilyNameAttribute, kCTFontItalicTrait, kCTFontSlantTrait,
-    kCTFontTraitsAttribute, kCTFontWeightTrait,
+    kCTFontTraitsAttribute, kCTFontWeightTrait, kCTFontWidthTrait,
 };
 use core_text::{
     font::{CTFont, CTFontRef, cascade_list_for_languages},
     font_descriptor::{
         CTFontDescriptor, CTFontDescriptorCopyAttributes, CTFontDescriptorCreateCopyWithFeature,
-        CTFontDescriptorCreateWithAttributes, CTFontDescriptorRef, kCTFontCascadeListAttribute,
-        kCTFontFeatureSettingsAttribute,
+        CTFontDescriptorCreateWithAttributes, CTFontDescriptorCreateWithNameAndSize,
+        CTFontDescriptorRef, kCTFontCascadeListAttribute, kCTFontFeatureSettingsAttribute,
     },
 };
 use font_kit::font::Font as FontKitFont;

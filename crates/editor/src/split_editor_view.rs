@@ -396,6 +396,7 @@ impl SplitBufferHeadersElement {
             .update(cx, |editor, cx| editor.snapshot(window, cx));
         let scroll_position = snapshot.scroll_position();
 
+        // Compute right margin to avoid overlapping the scrollbar
         let content_bounds = self.content_bounds(bounds, cx);
         let available_width = (content_bounds.size.width
             - self.rhs_editor.read(cx).last_right_margin())
@@ -463,6 +464,8 @@ impl SplitBufferHeadersElement {
     }
 
     fn content_bounds(&self, bounds: Bounds<Pixels>, cx: &App) -> Bounds<Pixels> {
+        // Left hand side and right hand side horizontal scrollbars are
+        // independent, so we clip the bottom if either is visible.
         let horizontal_scrollbar_height =
             (self.lhs_editor.read(cx).last_horizontal_scrollbar_visible()
                 || self.rhs_editor.read(cx).last_horizontal_scrollbar_visible())

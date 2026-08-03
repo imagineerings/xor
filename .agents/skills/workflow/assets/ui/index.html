@@ -289,16 +289,16 @@
         <div class="command">
           <div class="row between">
             <strong>All active tasks</strong>
-            <button class="secondary" data-copy="node .agents/skills/workflow/scripts/workflow.js list --json > /tmp/workflow-tasks.json">Copy</button>
+            <button class="secondary" data-copy=".agents/skills/workflow/scripts/workflow list --json > /tmp/workflow-tasks.json">Copy</button>
           </div>
-          <code>node .agents/skills/workflow/scripts/workflow.js list --json &gt; /tmp/workflow-tasks.json</code>
+          <code>.agents/skills/workflow/scripts/workflow list --json &gt; /tmp/workflow-tasks.json</code>
         </div>
         <div class="command">
           <div class="row between">
             <strong>Reserve parallel work</strong>
-            <button class="secondary" data-copy="node .agents/skills/workflow/scripts/workflow.js next --count 4 --json > /tmp/workflow-batch.json">Copy</button>
+            <button class="secondary" data-copy=".agents/skills/workflow/scripts/workflow plan --count 4 --json > /tmp/workflow-batch.json">Copy</button>
           </div>
-          <code>node .agents/skills/workflow/scripts/workflow.js next --count 4 --json &gt; /tmp/workflow-batch.json</code>
+          <code>.agents/skills/workflow/scripts/workflow plan --count 4 --json &gt; /tmp/workflow-batch.json</code>
         </div>
         <textarea id="jsonInput" spellcheck="false" placeholder="Paste workflow JSON here, or load a JSON file."></textarea>
         <div class="row">
@@ -449,6 +449,9 @@
           }
         }
       }
+      for (const activity of payload.decision_state?.task_activity || []) {
+        if (activity.status === "active" && activity.task_id) reservedIds.add(activity.task_id);
+      }
 
       const unique = new Map();
       for (const task of tasks) {
@@ -593,14 +596,14 @@
         return;
       }
 
-      const moveCommand = `node .agents/skills/workflow/scripts/workflow.js move ${task.id} --state-name "In Progress"`;
-      const completeCommand = `node .agents/skills/workflow/scripts/workflow.js complete ${task.id} --state-name "Done"`;
+      const moveCommand = `.agents/skills/workflow/scripts/workflow move ${task.id} --state-name "In Progress"`;
+      const finishCommand = `.agents/skills/workflow/scripts/workflow finish ${task.id} --validation-evidence "<summary>"`;
       elements.detail.innerHTML = `
         <div class="row between">
           <h2>${escapeHtml(task.title)}</h2>
           <div class="row">
             <button class="secondary" data-copy="${escapeHtml(moveCommand)}">Copy move command</button>
-            <button class="secondary" data-copy="${escapeHtml(completeCommand)}">Copy complete command</button>
+            <button class="secondary" data-copy="${escapeHtml(finishCommand)}">Copy finish command</button>
           </div>
         </div>
         <div class="pills">
@@ -615,7 +618,7 @@
         </div>
         <div class="stack">
           <h3>Linear</h3>
-          ${task.linear?.url ? `<p><a href="${escapeAttribute(task.linear.url)}" target="_blank" rel="noreferrer">${escapeHtml(task.linear.url)}</a></p>` : `<p>No Linear URL in loaded data.</p>`}
+          ${safeHttpUrl(task.linear?.url) ? `<p><a href="${escapeAttribute(safeHttpUrl(task.linear.url))}" target="_blank" rel="noreferrer">${escapeHtml(task.linear.url)}</a></p>` : `<p>No safe Linear URL in loaded data.</p>`}
         </div>
         <div class="stack">
           <h3>Requirements</h3>
@@ -700,6 +703,16 @@
 
     function escapeAttribute(value) {
       return escapeHtml(value).replace(/`/g, "&#096;");
+    }
+
+    function safeHttpUrl(value) {
+      if (!value) return null;
+      try {
+        const parsed = new URL(value);
+        return ["http:", "https:"].includes(parsed.protocol) ? parsed.href : null;
+      } catch (_error) {
+        return null;
+      }
     }
 
     elements.loadSample.addEventListener("click", () => {

@@ -205,7 +205,7 @@ Most documentation pages follow this structure:
 1. **Title** (H1) - Single sentence or phrase
 2. **Overview/Introduction** - 1-3 paragraphs explaining what this is
 3. **Getting Started** `{#getting-started}` - Prerequisites and first steps
-4. **Main Content** - Feature details, organisim by topic
+4. **Main Content** - Feature details, organized by topic
 5. **Advanced/Configuration** - Power user options
 6. **See Also** (optional) - Related documentation links
 
@@ -268,7 +268,7 @@ Inherit all conventions from `docs/.rules`. Key points:
 
 ## Sim-Specific Conventions
 
-### Recognisim Rules Files
+### Recognized Rules Files
 
 When documenting rules/instructions for AI, note that Sim recognizes these files (in priority order):
 
@@ -341,7 +341,7 @@ When generating a documentation plan, use this structure:
 
 ### Summary
 
-Brief description of code changes analysim.
+Brief description of code changes analyzed.
 
 ### Documentation Updates Required: [Yes/No]
 

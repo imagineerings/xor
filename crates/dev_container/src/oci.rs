@@ -270,8 +270,7 @@ mod test {
         });
 
         let response =
-            get_deserialisim_response::<TokenResponse>("", "https://ghcr.io/token", &client)
-                .await;
+            get_deserialisim_response::<TokenResponse>("", "https://ghcr.io/token", &client).await;
         assert!(response.is_ok());
         assert_eq!(response.unwrap().token, "thisisatoken".to_string())
     }

@@ -70,8 +70,8 @@ impl Rgba {
         }
     }
 
-    /// Returns a new RGBA color with the same red, green, and blue channels,
-    /// but with a new alpha value.
+    /// Returns a new RGBA color with the same red, green and blue channels, but
+    /// with a new alpha value.
     ///
     /// Example:
     /// ```
@@ -107,7 +107,7 @@ impl Rgba {
     /// Example:
     /// ```
     /// use gpui::rgba;
-    /// let color = rgba(0xFF0000FF);
+    /// let color = rgba(0xFF0000FF); // Fully opaque red
     /// let faded = color.opacity(0.5);
     /// assert_eq!(faded.a, 0.5);
     /// ```
@@ -117,7 +117,7 @@ impl Rgba {
     /// Example:
     /// ```
     /// use gpui::rgba;
-    /// let color = rgba(0x3399FFCC);
+    /// let color = rgba(0x3399FFCC); // A light blue with 80% opacity
     /// let faded = color.opacity(0.5);
     /// assert!((faded.a - 0.4).abs() < 1e-6);
     /// ```
@@ -621,7 +621,7 @@ impl Hsla {
     /// assert_eq!(faded_color.a, 0.5);
     /// ```
     ///
-    /// This will return a red color with 25% opacity.
+    /// This will return a red color with half the opacity.
     ///
     /// Example:
     /// ```
@@ -653,7 +653,7 @@ impl Hsla {
     /// assert_eq!(red_color.a, 0.25);
     /// ```
     ///
-    /// This will return a red color with half the opacity.
+    /// This will return a red color with 25% opacity.
     ///
     /// Example:
     /// ```
@@ -1064,7 +1064,6 @@ mod tests {
             b: 1.0,
             a: 0.8,
         };
-
         assert!((color.opacity(0.5).a - 0.4).abs() < 1e-6);
         assert_eq!(color.opacity(2.0).a, 0.8);
     }

@@ -31,7 +31,7 @@ for any type name, such as `AnyElement` or `LspStore`.
 ### State management
 
 - `App`: A singleton that holds full application state, including all entities. `App` is not `Send`, so it exists only on the thread that created it (usually the main/UI thread). If you see `&mut App`, you are on the UI thread.
-- `Context`: A wrapper around `App` with specialisim behavior for a specific `Entity`. You can think of it as `(&mut App, Entity<V>)`. For example, `App::spawn` takes `AsyncFnOnce(AsyncApp) -> Ret`, while `Context::spawn` takes `AsyncFnOnce(WeakEntity<V>, AsyncApp) -> Ret`.
+- `Context`: A wrapper around `App` with specialized behavior for a specific `Entity`. You can think of it as `(&mut App, Entity<V>)`. For example, `App::spawn` takes `AsyncFnOnce(AsyncApp) -> Ret`, while `Context::spawn` takes `AsyncFnOnce(WeakEntity<V>, AsyncApp) -> Ret`.
 - `AsyncApp`: An owned version of `App` for async contexts. It is still not `Send`, so it still runs on the main thread, and operations may fail if the `App` has already terminated.
   `AsyncApp` exists because `App` is usually accessed as `&mut App`, which is awkward to hold across async boundaries.
 - `AppContext`: A trait that abstracts over `App`, `AsyncApp`, `Context`, and their test variants.

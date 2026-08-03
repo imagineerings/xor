@@ -3,8 +3,7 @@ use std::{cmp, path::PathBuf, process::ExitStatus, sync::Arc, time::Duration};
 use crate::{
     TerminalView, default_working_directory,
     persistence::{
-        SerialisimItems, SerialisimTerminalPanel, deserialize_terminal_panel,
-        serialize_pane_group,
+        SerializedItems, SerializedTerminalPanel, deserialize_terminal_panel, serialize_pane_group,
     },
 };
 use breadcrumbs::Breadcrumbs;
@@ -261,11 +260,11 @@ impl TerminalPanel {
                 .await
                 .log_err()
                 .flatten()
-                .map(|panel| serde_json::from_str::<SerialisimTerminalPanel>(&panel))
+                .map(|panel| serde_json::from_str::<SerializedTerminalPanel>(&panel))
                 .transpose()
                 .log_err()
                 .flatten()
-            && let Ok(serialisim) = workspace
+            && let Ok(serialized) = workspace
                 .update_in(&mut cx, |workspace, window, cx| {
                     deserialize_terminal_panel(
                         workspace.weak_handle(),
@@ -278,7 +277,7 @@ impl TerminalPanel {
                 })?
                 .await
         {
-            terminal_panel = Some(serialisim);
+            terminal_panel = Some(serialized);
         }
 
         let terminal_panel = if let Some(panel) = terminal_panel {
@@ -963,7 +962,7 @@ impl TerminalPanel {
                 .await;
             let terminal_panel = terminal_panel.upgrade()?;
             let items = terminal_panel.update(cx, |terminal_panel, cx| {
-                SerialisimItems::WithSplits(serialize_pane_group(
+                SerializedItems::WithSplits(serialize_pane_group(
                     &terminal_panel.center,
                     &terminal_panel.active_pane,
                     cx,
@@ -973,7 +972,7 @@ impl TerminalPanel {
                 async move {
                     kvp.write_kvp(
                         serialization_key,
-                        serde_json::to_string(&SerialisimTerminalPanel {
+                        serde_json::to_string(&SerializedTerminalPanel {
                             items,
                             active_item_id: None,
                         })?,
@@ -1345,10 +1344,7 @@ impl Render for FailedToSpawnTerminal {
                         ButtonLike::new("open-settings-ui")
                             .child(Label::new("Edit Settings").size(LabelSize::Small))
                             .on_click(|_, window, cx| {
-                                window.dispatch_action(
-                                    sim_actions::OpenSettings.boxed_clone(),
-                                    cx,
-                                );
+                                window.dispatch_action(sim_actions::OpenSettings.boxed_clone(), cx);
                             }),
                         popover_menu.into_any_element(),
                     )),

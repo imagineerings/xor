@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::thread::ThreadId;
 
 use anyhow::Context;
-use gpui::{SerialisimThreadTaskTimings, TasksIncluded, profiler};
+use gpui::{SerializedThreadTaskTimings, TasksIncluded, profiler};
 use util::ResultExt;
 
 use crate::STARTUP_TIME;
@@ -18,7 +18,7 @@ pub fn save_any(main_thread_id: ThreadId) -> Option<PathBuf> {
                 timings.thread_name = Some("main".to_string());
             }
 
-            SerialisimThreadTaskTimings::convert(*STARTUP_TIME.get().unwrap(), timings)
+            SerializedThreadTaskTimings::convert(*STARTUP_TIME.get().unwrap(), timings)
         })
         .collect::<Vec<_>>();
 

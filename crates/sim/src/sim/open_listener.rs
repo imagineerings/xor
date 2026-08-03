@@ -30,7 +30,7 @@ use util::debug_panic;
 use util::paths::PathWithPosition;
 use workspace::PathList;
 use workspace::item::ItemHandle;
-use workspace::{AppState, MultiWorkspace, OpenOptions, OpenResult, SerialisimWorkspaceLocation};
+use workspace::{AppState, MultiWorkspace, OpenOptions, OpenResult, SerializedWorkspaceLocation};
 
 #[derive(Default, Debug)]
 pub struct OpenRequest {
@@ -58,12 +58,6 @@ pub enum OpenRequestKind {
     },
     AgentPanel {
         external_source_prompt: Option<ExternalSourcePrompt>,
-    },
-    SharedAgentThread {
-        session_id: String,
-    },
-    SharedSession {
-        data: String,
     },
     InstallSkill {
         /// Full `SKILL.md` contents embedded in a `sim://skill` share link.
@@ -101,14 +95,6 @@ impl std::fmt::Debug for OpenRequestKind {
             } => f
                 .debug_struct("AgentPanel")
                 .field("external_source_prompt", external_source_prompt)
-                .finish(),
-            Self::SharedAgentThread { session_id } => f
-                .debug_struct("SharedAgentThread")
-                .field("session_id", session_id)
-                .finish(),
-            Self::SharedSession { data } => f
-                .debug_struct("SharedSession")
-                .field("data_len", &data.len())
                 .finish(),
             Self::InstallSkill { content } => f
                 .debug_struct("InstallSkill")
@@ -185,14 +171,6 @@ impl OpenRequest {
                 this.kind = Some(OpenRequestKind::Extension {
                     extension_id: extension_id.to_string(),
                 });
-            } else if let Some(session_id_str) = url.strip_prefix("sim://agent/shared/") {
-                if uuid::Uuid::parse_str(session_id_str).is_ok() {
-                    this.kind = Some(OpenRequestKind::SharedAgentThread {
-                        session_id: session_id_str.to_string(),
-                    });
-                } else {
-                    log::error!("Invalid session ID in URL: {}", session_id_str);
-                }
             } else if url.starts_with(agent_skills::SKILL_SHARE_LINK_PREFIX) {
                 this.parse_skill_install_url(&url)?
             } else if let Some(agent_path) = url.strip_prefix("sim://agent") {
@@ -225,9 +203,6 @@ impl OpenRequest {
                         heading,
                     } => {
                         this.open_channel_notes.push((channel_id, heading));
-                    }
-                    SimLink::SharedSession { data } => {
-                        this.kind = Some(OpenRequestKind::SharedSession { data });
                     }
                 }
             } else {
@@ -772,17 +747,21 @@ async fn resolve_open_behavior(
 
 pub(crate) fn open_options_for_request(
     open_behavior: Option<cli::OpenBehavior>,
-    location: &SerialisimWorkspaceLocation,
+    location: &SerializedWorkspaceLocation,
     cx: &App,
 ) -> workspace::OpenOptions {
-    open_behavior.map_or_else(workspace::OpenOptions::default, |open_behavior| {
-        open_options_for_behavior(open_behavior, location, cx)
-    })
+    let open_behavior = open_behavior.unwrap_or_else(|| {
+        match workspace::WorkspaceSettings::get_global(cx).default_open_behavior {
+            settings::DefaultOpenBehavior::ExistingWindow => cli::OpenBehavior::ExistingWindow,
+            settings::DefaultOpenBehavior::NewWindow => cli::OpenBehavior::PreferNewWindow,
+        }
+    });
+    open_options_for_behavior(open_behavior, location, cx)
 }
 
 pub(crate) fn open_options_for_behavior(
     open_behavior: cli::OpenBehavior,
-    location: &SerialisimWorkspaceLocation,
+    location: &SerializedWorkspaceLocation,
     cx: &App,
 ) -> workspace::OpenOptions {
     let open_behavior = if open_behavior == cli::OpenBehavior::Default {
@@ -844,12 +823,12 @@ async fn open_workspaces(
         return restore_or_create_workspace(app_state, cx).await;
     }
 
-    let grouped_locations: Vec<(SerialisimWorkspaceLocation, PathList)> =
+    let grouped_locations: Vec<(SerializedWorkspaceLocation, PathList)> =
         if paths.is_empty() && diff_paths.is_empty() {
             Vec::new()
         } else {
             vec![(
-                SerialisimWorkspaceLocation::Local,
+                SerializedWorkspaceLocation::Local,
                 PathList::new(&paths.into_iter().map(PathBuf::from).collect::<Vec<_>>()),
             )]
         };
@@ -889,7 +868,7 @@ async fn open_workspaces(
         };
 
         match location {
-            SerialisimWorkspaceLocation::Local => {
+            SerializedWorkspaceLocation::Local => {
                 let workspace_paths = workspace_paths
                     .paths()
                     .iter()
@@ -912,7 +891,7 @@ async fn open_workspaces(
                     errored = true
                 }
             }
-            SerialisimWorkspaceLocation::Remote(mut connection) => {
+            SerializedWorkspaceLocation::Remote(mut connection) => {
                 let app_state = app_state.clone();
                 if let RemoteConnectionOptions::Ssh(options) = &mut connection {
                     cx.update(|cx| {
@@ -1091,8 +1070,8 @@ pub async fn derive_paths_with_position(
         // If the unparsed path string actually points to an existing file or directory, use it
         // instead of parsing out the line/col number. This matters for paths whose final
         // component looks like a position suffix, e.g. a folder named `Test (3)` would
-        // otherwise be parsed as `Test ` at row 3. Colon : is not valid in NTFS file names,
-        // so skip this logic if colon on Windows.
+        // otherwise be parsed as `Test ` at row 3.
+        // Colon : is not valid in NTFS file names, so skip this logic if colon on windows.
         let has_colon = original_path
             .file_name()
             .and_then(|name| name.to_str())
@@ -1106,8 +1085,8 @@ pub async fn derive_paths_with_position(
             parsed = PathWithPosition::from_path(original_path.to_path_buf());
         }
 
-        if let Ok(canonicalisim) = fs.canonicalize(&parsed.path).await {
-            parsed.path = canonicalisim;
+        if let Ok(canonicalized) = fs.canonicalize(&parsed.path).await {
+            parsed.path = canonicalized;
         }
 
         result.push(parsed);
@@ -1183,69 +1162,6 @@ mod tests {
     }
 
     #[gpui::test]
-    async fn test_derive_paths_with_position_directory_with_position_like_name(
-        cx: &mut TestAppContext,
-    ) {
-        let app_state = init_test(cx);
-        let fs = app_state.fs.as_fake();
-
-        fs.insert_tree(
-            path!("/root"),
-            json!({
-                "TEST (1)": {},
-                "Project (2,3)": {},
-                "test 123": {},
-            }),
-        )
-        .await;
-
-        let inputs = vec![
-            path!("/root/TEST (1)").to_string(),
-            path!("/root/Project (2,3)").to_string(),
-            path!("/root/test 123").to_string(),
-        ];
-        let result = derive_paths_with_position(fs.as_ref(), inputs).await;
-
-        let paths: Vec<_> = result
-            .iter()
-            .map(|p| (p.path.to_string_lossy().to_string(), p.row, p.column))
-            .collect();
-        assert_eq!(
-            paths,
-            vec![
-                (path!("/root/TEST (1)").to_string(), None, None),
-                (path!("/root/Project (2,3)").to_string(), None, None),
-                (path!("/root/test 123").to_string(), None, None),
-            ]
-        );
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    #[gpui::test]
-    async fn test_derive_paths_with_position_colon_in_name_reverts_on_unix(
-        cx: &mut TestAppContext,
-    ) {
-        let app_state = init_test(cx);
-        let fs = app_state.fs.as_fake();
-
-        fs.insert_tree(path!("/root"), json!({ "test.txt:10": "" }))
-            .await;
-
-        let result =
-            derive_paths_with_position(fs.as_ref(), vec![path!("/root/test.txt:10").to_string()])
-                .await;
-
-        let paths: Vec<_> = result
-            .iter()
-            .map(|p| (p.path.to_string_lossy().to_string(), p.row, p.column))
-            .collect();
-        assert_eq!(
-            paths,
-            vec![(path!("/root/test.txt:10").to_string(), None, None)]
-        );
-    }
-
-    #[gpui::test]
     fn test_parse_ssh_urls(cx: &mut TestAppContext) {
         let _app_state = init_test(cx);
         let cases = [
@@ -1298,6 +1214,100 @@ mod tests {
     }
 
     #[gpui::test]
+    async fn test_derive_paths_with_position_directory_with_position_like_name(
+        cx: &mut TestAppContext,
+    ) {
+        let app_state = init_test(cx);
+        let fs = app_state.fs.as_fake();
+
+        // A folder whose name ends in `(N)` or `(row,col)` would otherwise be parsed as a
+        // path with a row/column suffix (e.g. the MSVC-style `file.c(22)`), truncating the name.
+        fs.insert_tree(
+            path!("/root"),
+            json!({
+                "TEST (1)": {},
+                "Project (2,3)": {},
+                "test 123": {},
+            }),
+        )
+        .await;
+
+        let inputs = vec![
+            path!("/root/TEST (1)").to_string(),
+            path!("/root/Project (2,3)").to_string(),
+            path!("/root/test 123").to_string(),
+        ];
+        let result = derive_paths_with_position(fs.as_ref(), inputs).await;
+
+        let paths: Vec<_> = result
+            .iter()
+            .map(|p| (p.path.to_string_lossy().to_string(), p.row, p.column))
+            .collect();
+        assert_eq!(
+            paths,
+            vec![
+                (path!("/root/TEST (1)").to_string(), None, None),
+                (path!("/root/Project (2,3)").to_string(), None, None),
+                (path!("/root/test 123").to_string(), None, None),
+            ]
+        );
+    }
+
+    // Test file with colon (`:`) in the name on non-Windows platforms,
+    // as it is valid for file names on Unix-like systems.
+    #[cfg(not(target_os = "windows"))]
+    #[gpui::test]
+    async fn test_derive_paths_with_position_colon_in_name_reverts_on_unix(
+        cx: &mut TestAppContext,
+    ) {
+        let app_state = init_test(cx);
+        let fs = app_state.fs.as_fake();
+
+        fs.insert_tree(path!("/root"), json!({ "test.txt:10": "" }))
+            .await;
+
+        let result =
+            derive_paths_with_position(fs.as_ref(), vec![path!("/root/test.txt:10").to_string()])
+                .await;
+
+        let paths: Vec<_> = result
+            .iter()
+            .map(|p| (p.path.to_string_lossy().to_string(), p.row, p.column))
+            .collect();
+        assert_eq!(
+            paths,
+            vec![(path!("/root/test.txt:10").to_string(), None, None)]
+        );
+    }
+
+    // On Windows `:` is used to delimit NTFS alternate data streams,
+    // `notes.txt:10` should be parsed as `notes.txt` at row 10
+    #[cfg(target_os = "windows")]
+    #[gpui::test]
+    async fn test_derive_paths_with_position_colon_in_name_parsed_as_position_on_windows(
+        cx: &mut TestAppContext,
+    ) {
+        let app_state = init_test(cx);
+        let fs = app_state.fs.as_fake();
+
+        fs.insert_tree(path!("/root"), json!({ "test.txt": "" }))
+            .await;
+
+        let result =
+            derive_paths_with_position(fs.as_ref(), vec![path!("/root/test.txt:10").to_string()])
+                .await;
+
+        let paths: Vec<_> = result
+            .iter()
+            .map(|p| (p.path.to_string_lossy().to_string(), p.row, p.column))
+            .collect();
+        assert_eq!(
+            paths,
+            vec![(path!("/root/test.txt").to_string(), Some(10), None)]
+        );
+    }
+
+    #[gpui::test]
     fn test_parse_ssh_url_preserves_open_behavior(cx: &mut TestAppContext) {
         let _app_state = init_test(cx);
 
@@ -1344,7 +1354,7 @@ mod tests {
         let options = cx.update(|cx| {
             open_options_for_behavior(
                 cli::OpenBehavior::AlwaysNew,
-                &SerialisimWorkspaceLocation::Local,
+                &SerializedWorkspaceLocation::Local,
                 cx,
             )
         });
@@ -1543,74 +1553,6 @@ mod tests {
                 assert_eq!(external_source_prompt, None);
             }
             _ => panic!("Expected AgentPanel kind"),
-        }
-    }
-
-    #[gpui::test]
-    fn test_parse_shared_agent_thread_url(cx: &mut TestAppContext) {
-        let _app_state = init_test(cx);
-        let session_id = "123e4567-e89b-12d3-a456-426614174000";
-
-        let request = cx.update(|cx| {
-            OpenRequest::parse(
-                RawOpenRequest {
-                    urls: vec![format!("sim://agent/shared/{session_id}")],
-                    ..Default::default()
-                },
-                cx,
-            )
-            .unwrap()
-        });
-
-        match request.kind {
-            Some(OpenRequestKind::SharedAgentThread {
-                session_id: parsed_session_id,
-            }) => {
-                assert_eq!(parsed_session_id, session_id);
-            }
-            _ => panic!("Expected SharedAgentThread kind"),
-        }
-    }
-
-    #[gpui::test]
-    fn test_parse_shared_agent_thread_url_with_invalid_uuid(cx: &mut TestAppContext) {
-        let _app_state = init_test(cx);
-
-        let request = cx.update(|cx| {
-            OpenRequest::parse(
-                RawOpenRequest {
-                    urls: vec!["sim://agent/shared/not-a-uuid".into()],
-                    ..Default::default()
-                },
-                cx,
-            )
-            .unwrap()
-        });
-
-        assert!(request.kind.is_none());
-    }
-
-    #[gpui::test]
-    fn test_parse_local_shared_session_url(cx: &mut TestAppContext) {
-        let _app_state = init_test(cx);
-        let data = "abc123-_";
-
-        let request = cx.update(|cx| {
-            OpenRequest::parse(
-                RawOpenRequest {
-                    urls: vec![format!("sim://session/{data}")],
-                    ..Default::default()
-                },
-                cx,
-            )
-            .unwrap()
-        });
-
-        match request.kind {
-            Some(OpenRequestKind::SharedSession { data: parsed_data }) => {
-                assert_eq!(parsed_data, data);
-            }
-            _ => panic!("Expected SharedSession kind"),
         }
     }
 
@@ -1999,7 +1941,7 @@ mod tests {
         let window_to_replace = workspace::find_existing_workspace(
             &paths,
             &workspace::OpenOptions::default(),
-            &workspace::SerialisimWorkspaceLocation::Local,
+            &workspace::SerializedWorkspaceLocation::Local,
             &mut cx.to_async(),
         )
         .await
@@ -2668,8 +2610,9 @@ mod tests {
     }
 
     #[gpui::test]
-    async fn test_e2e_new_window_setting_restores_workspace_without_paths(cx: &mut TestAppContext) {
+    async fn test_e2e_new_window_setting_restores_workspace_when_no_paths(cx: &mut TestAppContext) {
         let app_state = init_test(cx);
+
         app_state
             .fs
             .as_fake()
@@ -2686,7 +2629,9 @@ mod tests {
         });
 
         let session_id = cx.read(|cx| app_state.session.read(cx).id().to_owned());
+
         open_workspace_file(path!("/project"), Default::default(), app_state.clone(), cx).await;
+        assert_eq!(cx.windows().len(), 1);
 
         let multi_workspace = cx.windows()[0].downcast::<MultiWorkspace>().unwrap();
         let serialization_tasks = multi_workspace
@@ -2700,6 +2645,7 @@ mod tests {
             .update(cx, |_, window, _| window.remove_window())
             .unwrap();
         cx.run_until_parked();
+        assert_eq!(cx.windows().len(), 0);
 
         cx.update(|cx| {
             app_state.session.update(cx, |app_session, _cx| {
@@ -2715,17 +2661,21 @@ mod tests {
         );
 
         assert_eq!(status, 0);
-        assert!(!prompt_shown);
+        assert!(
+            !prompt_shown,
+            "no prompt should be shown when no windows exist"
+        );
+        assert_eq!(cx.windows().len(), 1);
+
         let restored_window = cx.windows()[0].downcast::<MultiWorkspace>().unwrap();
         restored_window
             .read_with(cx, |multi_workspace, cx| {
+                let root_paths = multi_workspace.workspace().read(cx).root_paths(cx);
                 assert!(
-                    multi_workspace
-                        .workspace()
-                        .read(cx)
-                        .root_paths(cx)
+                    root_paths
                         .iter()
-                        .any(|path| path.as_ref() == Path::new(path!("/project")))
+                        .any(|path| path.as_ref() == Path::new(path!("/project"))),
+                    "expected CLI launch with no paths to restore /project, got {root_paths:?}"
                 );
             })
             .unwrap();

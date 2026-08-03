@@ -449,7 +449,7 @@ struct KeymapEditor {
     selected_index: Option<usize>,
     context_menu: Option<(Entity<ContextMenu>, Point<Pixels>, Subscription)>,
     previous_edit: Option<PreviousEdit>,
-    humanisim_action_names: HumanisimActionNameCache,
+    humanisim_action_names: HumanizedActionNameCache,
     current_widths: Entity<RedistributableColumnsState>,
     show_hover_menus: bool,
     actions_with_schemas: HashSet<&'static str>,
@@ -618,7 +618,7 @@ impl KeymapEditor {
             context_menu: None,
             previous_edit: None,
             search_query_debounce: None,
-            humanisim_action_names: HumanisimActionNameCache::new(cx),
+            humanisim_action_names: HumanizedActionNameCache::new(cx),
             show_hover_menus: true,
             actions_with_schemas: HashSet::default(),
             action_args_temp_dir: None,
@@ -816,7 +816,7 @@ impl KeymapEditor {
     fn process_bindings(
         json_language: Arc<Language>,
         sim_keybind_context_language: Arc<Language>,
-        humanisim_action_names: &HumanisimActionNameCache,
+        humanisim_action_names: &HumanizedActionNameCache,
         cx: &mut App,
     ) -> (
         Vec<ProcessedBinding>,
@@ -1717,11 +1717,11 @@ impl KeymapEditor {
     }
 }
 
-struct HumanisimActionNameCache {
+struct HumanizedActionNameCache {
     cache: HashMap<&'static str, SharedString>,
 }
 
-impl HumanisimActionNameCache {
+impl HumanizedActionNameCache {
     fn new(cx: &App) -> Self {
         let cache = HashMap::from_iter(cx.all_action_names().iter().map(|&action_name| {
             (
@@ -1789,7 +1789,7 @@ impl ActionInformation {
         action_arguments: Option<SyntaxHighlightedText>,
         actions_with_schemas: &HashSet<&'static str>,
         action_documentation: &HashMap<&'static str, &'static str>,
-        action_name_cache: &HumanisimActionNameCache,
+        action_name_cache: &HumanizedActionNameCache,
     ) -> Self {
         Self {
             humanisim_name: action_name_cache.get(action_name),
@@ -1888,9 +1888,7 @@ impl ProcessedBinding {
         match (self, other) {
             (Self::Mapped(keybind1, action1), Self::Mapped(keybind2, action2)) => {
                 match keybind1.source.cmp(&keybind2.source) {
-                    cmp::Ordering::Equal => {
-                        action1.humanisim_name.cmp(&action2.humanisim_name)
-                    }
+                    cmp::Ordering::Equal => action1.humanisim_name.cmp(&action2.humanisim_name),
                     ordering => ordering,
                 }
             }
@@ -3670,7 +3668,7 @@ async fn save_keybinding_update(
         keyboard_mapper,
         deprecated_aliases,
     )
-    .map_err(|err| anyhow::anyhow!("Could not save updated keybinding: {}", err))?;
+    .map_err(|err| err.context("Could not save updated keybinding"))?;
     fs.write(
         paths::keymap_file().as_path(),
         updated_keymap_contents.as_bytes(),
@@ -4108,12 +4106,12 @@ mod tests {
         let keymap_content = r#"[
     {
         "bindings": {
-            "alt-cmd-shift-c": "zed::OpenKeymap"
+            "alt-cmd-shift-c": "sim::OpenKeymap"
         }
     },
     {
         "bindings": {
-            "alt-cmd-shift-c": "zed::OpenKeymap"
+            "alt-cmd-shift-c": "sim::OpenKeymap"
         }
     }
 ]"#;
@@ -4121,7 +4119,7 @@ mod tests {
         let cx = &mut cx;
 
         let rows = keymap_editor.read_with(cx, |editor, _| {
-            visible_rows_for_action(editor, "zed::OpenKeymap")
+            visible_rows_for_action(editor, "sim::OpenKeymap")
         });
         assert_eq!(
             rows.len(),
@@ -4147,7 +4145,7 @@ mod tests {
         cx.run_until_parked();
 
         let rows = keymap_editor.read_with(cx, |editor, _| {
-            visible_rows_for_action(editor, "zed::OpenKeymap")
+            visible_rows_for_action(editor, "sim::OpenKeymap")
         });
         assert_eq!(rows.len(), 1, "expected one row remaining after deletion");
     }

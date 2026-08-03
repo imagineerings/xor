@@ -373,7 +373,7 @@ impl MarksState {
 
     fn loaded(
         &mut self,
-        marks: Vec<SerialisimMark>,
+        marks: Vec<SerializedMark>,
         global_mark_paths: Vec<(String, Arc<Path>)>,
         cx: &mut Context<Self>,
     ) {
@@ -1264,6 +1264,10 @@ pub struct RegistersViewDelegate {
 impl PickerDelegate for RegistersViewDelegate {
     type ListItem = Div;
 
+    fn name() -> &'static str {
+        "registers view"
+    }
+
     fn match_count(&self) -> usize {
         self.matches.len()
     }
@@ -1429,9 +1433,7 @@ impl RegistersView {
             matches,
         };
 
-        Picker::nonsearchable_uniform_list(delegate, window, cx)
-            .width(rems(36.))
-            .modal(true)
+        Picker::nonsearchable_uniform_list(delegate, window, cx).initial_width(rems(36.))
     }
 }
 
@@ -1477,6 +1479,10 @@ pub struct MarksViewDelegate {
 
 impl PickerDelegate for MarksViewDelegate {
     type ListItem = Div;
+
+    fn name() -> &'static str {
+        "marks view"
+    }
 
     fn match_count(&self) -> usize {
         self.matches.len()
@@ -1792,9 +1798,7 @@ impl MarksView {
             matches,
             workspace,
         };
-        Picker::nonsearchable_uniform_list(delegate, window, cx)
-            .width(rems(36.))
-            .modal(true)
+        Picker::nonsearchable_uniform_list(delegate, window, cx).initial_width(rems(36.))
     }
 }
 
@@ -1827,7 +1831,7 @@ impl Domain for VimDb {
 
 db::static_connection!(VimDb, [WorkspaceDb]);
 
-struct SerialisimMark {
+struct SerializedMark {
     path: Arc<Path>,
     name: String,
     points: Vec<Point>,
@@ -1854,15 +1858,15 @@ impl VimDb {
                     .into_iter()
                     .map(|point| (point.row, point.column))
                     .collect();
-                let serialisim = serde_json::to_string(&pairs)?;
-                query((workspace_id, mark_name, path.clone(), serialisim))?;
+                let serialized = serde_json::to_string(&pairs)?;
+                query((workspace_id, mark_name, path.clone(), serialized))?;
             }
             Ok(())
         })
         .await
     }
 
-    fn get_marks(&self, workspace_id: WorkspaceId) -> Result<Vec<SerialisimMark>> {
+    fn get_marks(&self, workspace_id: WorkspaceId) -> Result<Vec<SerializedMark>> {
         let result: Vec<(Arc<Path>, String, String)> = self.select_bound(sql!(
             SELECT path, mark_name, value FROM vim_marks
                 WHERE workspace_id = ?
@@ -1872,7 +1876,7 @@ impl VimDb {
             .into_iter()
             .filter_map(|(path, name, value)| {
                 let pairs: Vec<(u32, u32)> = serde_json::from_str(&value).log_err()?;
-                Some(SerialisimMark {
+                Some(SerializedMark {
                     path,
                     name,
                     points: pairs

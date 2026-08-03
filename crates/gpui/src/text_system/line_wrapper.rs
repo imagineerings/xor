@@ -2,7 +2,7 @@ use crate::{FontId, Pixels, SharedString, TextRun, TextSystem, px};
 use collections::HashMap;
 use std::{borrow::Cow, iter, sync::Arc};
 
-/// Determines whether to truncate text from the start, end, or middle.
+/// Determines whether to truncate text from the start or end.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TruncateFrom {
     /// Truncate text from the start.
@@ -478,7 +478,8 @@ impl LineWrapper {
         matches!(c, '-' | '_' | '.' | '\'' | '’' | '‘' | '$' | '%' | '@' | '#' | '^' | '~' | ',' | '=' | ':' | ';') ||
         // `⋯` character is special used in Sim, to keep this at the end of the line.
         matches!(c, '⋯') ||
-        // Non-breaking glue characters must remain attached to the preceding word.
+
+        // Non-breaking glue characters
         matches!(c, '\u{202F}' | '\u{00A0}' | '\u{2011}')
     }
 
@@ -537,7 +538,7 @@ fn update_runs_after_truncation(
             }
         }
         TruncateFrom::Middle => {
-            unreachable!("Middle truncation calls update_runs_after_middle_truncation")
+            unreachable!("Middle truncation calls this function with TruncateFrom::End directly")
         }
     }
 }
@@ -551,6 +552,9 @@ fn update_runs_after_middle_truncation(
     let original_runs = std::mem::take(runs);
     let mut result_runs: Vec<TextRun> = Vec::with_capacity(original_runs.len());
 
+    // Front segment [0, front_end_ix) + ellipsis: walk forward until the run
+    // that straddles or ends at front_end_ix, then extend that run's length
+    // to include the ellipsis.
     let mut front_remaining = front_end_ix;
     let mut front_done = false;
     for run in &original_runs {
@@ -568,6 +572,8 @@ fn update_runs_after_middle_truncation(
         }
     }
     if !front_done {
+        // front_end_ix landed exactly on a run boundary; append ellipsis to
+        // the last front run (or, if the front is empty, to the first back run).
         if let Some(last) = result_runs.last_mut() {
             last.len += ellipsis.len();
         } else if let Some(first) = original_runs.first() {
@@ -577,11 +583,14 @@ fn update_runs_after_middle_truncation(
         }
     }
 
+    // Back segment [back_start_ix, original.len()): skip runs entirely in the
+    // removed middle, keep the rest.
     let mut byte_pos = 0usize;
     for run in &original_runs {
         let run_end = byte_pos + run.len;
         if run_end > back_start_ix {
             if byte_pos < back_start_ix {
+                // Run straddles back_start_ix; keep only the tail.
                 let mut partial = run.clone();
                 partial.len = run_end - back_start_ix;
                 result_runs.push(partial);
@@ -836,6 +845,17 @@ mod tests {
                 Boundary::new(18, 0)
             ],
         );
+
+        // Test with non-breaking glue characters
+        assert_eq!(
+            wrapper
+                .wrap_line(
+                    &[LineFragment::text("a\u{202F}b\u{00A0}c\u{2011}d e")],
+                    px(72.0)
+                )
+                .collect::<Vec<_>>(),
+            &[Boundary::new(12, 0),], // special chars above take up 3, 2 and 3 bytes, so boundary ends up at 12
+        );
     }
 
     #[test]
@@ -935,54 +955,6 @@ mod tests {
             "…🦀🦀🦀🦀 eeee fff gg",
             "…",
         );
-    }
-
-    #[test]
-    fn test_truncate_line_middle() {
-        let mut wrapper = build_wrapper();
-
-        let short_text = "hello world";
-        let runs = generate_test_runs(&[short_text.len()]);
-        let (result, result_runs) = wrapper.truncate_line(
-            short_text.into(),
-            px(10000.),
-            "…",
-            &runs,
-            TruncateFrom::Middle,
-        );
-        assert_eq!(result.as_ref(), short_text);
-        assert_eq!(result_runs.len(), 1);
-        assert_eq!(result_runs[0].len, short_text.len());
-
-        let long_text = "abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz";
-        let runs = generate_test_runs(&[long_text.len()]);
-        let (result, _result_runs) =
-            wrapper.truncate_line(long_text.into(), px(100.), "…", &runs, TruncateFrom::Middle);
-        assert!(result.contains('…'));
-        assert!(result.chars().count() < long_text.chars().count());
-        assert_eq!(result.chars().next(), long_text.chars().next());
-        assert_eq!(result.chars().last(), long_text.chars().last());
-
-        let text = "abcdef";
-        let runs = generate_test_runs(&[text.len()]);
-        let (result, result_runs) =
-            wrapper.truncate_line(text.into(), px(1.), "…", &runs, TruncateFrom::Middle);
-        assert_eq!(result.as_ref(), "…");
-        assert_eq!(result_runs.len(), 1);
-        assert_eq!(result_runs[0].len, "…".len());
-
-        let multi_run_text = "abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz";
-        let run_lens = [20, 20, multi_run_text.len() - 40];
-        let runs = generate_test_runs(&run_lens);
-        let (result, result_runs) = wrapper.truncate_line(
-            multi_run_text.into(),
-            px(100.),
-            "…",
-            &runs,
-            TruncateFrom::Middle,
-        );
-        let total_run_len: usize = result_runs.iter().map(|run| run.len).sum();
-        assert_eq!(total_run_len, result.len());
     }
 
     #[test]
@@ -1180,9 +1152,6 @@ mod tests {
         assert_word("more⋯");
         assert_word("won’t");
         assert_word("‘twas");
-        assert_word("a\u{202F}b");
-        assert_word("a\u{00A0}b");
-        assert_word("a\u{2011}b");
 
         // Space
         assert_not_word("foo bar");
@@ -1215,6 +1184,12 @@ mod tests {
         assert_not_word("こんにちは");
         assert_not_word("😀😁😂");
         assert_not_word("()[]{}<>");
+
+        // Non-breaking ("Glue") characters, see https://www.unicode.org/reports/tr14/
+        // (https://github.com/simtropolis/sim/issues/59664)
+        assert_word("\u{202F}"); // NNBSP " "
+        assert_word("\u{00A0}"); // NBSP " "
+        assert_word("\u{2011}"); // NBH "‑"
     }
 
     // For compatibility with the test macro
@@ -1467,6 +1442,81 @@ mod tests {
             truncated.ends_with('\u{2026}'),
             "Should end with ellipsis since there's more content: '{}'",
             truncated
+        );
+    }
+
+    #[test]
+    fn test_truncate_line_middle() {
+        let mut wrapper = build_wrapper();
+
+        // No truncation when text fits within a very wide budget.
+        let short_text = "hello world";
+        let runs = generate_test_runs(&[short_text.len()]);
+        let (result, result_runs) = wrapper.truncate_line(
+            short_text.into(),
+            px(10000.),
+            "…",
+            &runs,
+            TruncateFrom::Middle,
+        );
+        assert_eq!(result.as_ref(), short_text);
+        assert_eq!(result_runs.len(), 1);
+        assert_eq!(result_runs[0].len, short_text.len());
+
+        // Basic middle truncation: long string with px(100.) budget.
+        let long_text = "abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz";
+        let runs = generate_test_runs(&[long_text.len()]);
+        let (result, _result_runs) =
+            wrapper.truncate_line(long_text.into(), px(100.), "…", &runs, TruncateFrom::Middle);
+        assert!(
+            result.contains('…'),
+            "Middle-truncated result should contain '…', got: '{}'",
+            result
+        );
+        assert!(
+            result.chars().count() < long_text.chars().count(),
+            "Middle-truncated result should be shorter than original"
+        );
+        assert_eq!(
+            result.chars().next(),
+            long_text.chars().next(),
+            "Result should start with the same first character as original"
+        );
+        assert_eq!(
+            result.chars().last(),
+            long_text.chars().last(),
+            "Result should end with the same last character as original"
+        );
+
+        // Degenerate case: budget so narrow that middle truncation cannot find a valid split.
+        // Still show the truncation affix instead of returning the original overflowing text.
+        let text = "abcdef";
+        let runs = generate_test_runs(&[text.len()]);
+        let (result, result_runs) =
+            wrapper.truncate_line(text.into(), px(1.), "…", &runs, TruncateFrom::Middle);
+        assert_eq!(result.as_ref(), "…");
+        assert_eq!(result_runs.len(), 1);
+        assert_eq!(result_runs[0].len, "…".len());
+
+        // Run adjustment correctness: multiple runs across the string.
+        // Verify that the returned runs' lengths sum to result.len().
+        let multi_run_text = "abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz";
+        let run_lens = [20, 20, multi_run_text.len() - 40];
+        let runs = generate_test_runs(&run_lens);
+        let (result, result_runs) = wrapper.truncate_line(
+            multi_run_text.into(),
+            px(100.),
+            "…",
+            &runs,
+            TruncateFrom::Middle,
+        );
+        let total_run_len: usize = result_runs.iter().map(|r| r.len).sum();
+        assert_eq!(
+            total_run_len,
+            result.len(),
+            "Sum of run lengths ({}) should equal result byte length ({})",
+            total_run_len,
+            result.len()
         );
     }
 

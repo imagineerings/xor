@@ -1,0 +1,295 @@
+pub mod alias_free_activation;
+pub mod artifact_index;
+pub mod attention;
+pub mod clip;
+pub mod clip_text;
+pub mod clip_text_encoder_decoder;
+pub mod clip_text_encoder_t5;
+pub mod clip_tokenizer;
+pub mod clip_vision;
+pub mod cogvideox_family;
+pub mod conditioning;
+pub mod cosmos_family;
+pub mod descriptor;
+pub mod flux_chroma_family;
+pub mod formats;
+pub mod hidream_o1_family;
+pub mod latent_format;
+pub mod model_family;
+pub mod model_store;
+pub mod native_ops;
+pub mod parser_limits;
+pub mod patch_graph;
+pub mod patches;
+pub mod quantization;
+pub mod quantized_autograd;
+pub mod registry_generator;
+pub mod restricted_pickle;
+pub mod vae;
+pub mod vae_architecture;
+pub mod vae_audio;
+pub mod vae_image;
+pub mod vae_structured;
+mod vae_tiling;
+pub mod vae_video;
+pub mod vision_models;
+pub mod weight_adapter;
+
+pub use alias_free_activation::{
+    NativeAliasFreeActivation1d, PeriodicActivation, alias_free_activation_1d_exact_native,
+};
+pub use artifact_index::{
+    ARTIFACT_INDEX_VERSION, ArtifactAvailability, ArtifactChange, ArtifactChangeKind,
+    ArtifactIndex, ArtifactIndexError, ArtifactKey, ArtifactRecord, ArtifactRoot,
+    ArtifactWritePolicy, VerifiedArtifactFile,
+};
+pub use attention::{
+    AttentionBackend, AttentionError, AttentionFallbackPolicy, AttentionMask, AttentionMaskShape,
+    AttentionOutcome, AttentionRequest, MathSdpReductionPolicy, MathSdpSelection, SdpaBackend,
+    SdpaKernelSelection, allow_fp16_bf16_reduction_math_sdp_exact_native,
+    enable_flash_sdp_exact_native, enable_math_sdp_exact_native,
+    enable_mem_efficient_sdp_exact_native, scaled_dot_product_attention_with_context,
+    sdpa_kernel_exact_native,
+};
+pub use clip_text::{
+    CLIP_TEXT_CATALOG_SYMBOLS, CLIP_TEXT_SOURCE_PATH, CLIP_TEXT_SOURCE_SHA256, ClipTextActivation,
+    ClipTextConfiguration, ClipTextError, ClipTextInput, ClipTextIntermediate,
+    ClipTextLayerWeights, ClipTextOutput, ClipTextRequest, ClipTextWeights, NativeClipText,
+    SD1_CLIP_SOURCE_PATH, SD1_CLIP_SOURCE_SHA256,
+};
+pub use clip_text_encoder_decoder::{
+    DECODER_PROFILE_FACTS, DECODER_TEXT_ENCODER_CATALOG_SYMBOLS, DecoderActivation,
+    DecoderArchitecture, DecoderAttentionCache, DecoderAudioProfileFact,
+    DecoderGenerationConfiguration, DecoderGenerationOutcome, DecoderKvState, DecoderLayerCache,
+    DecoderLayerKind, DecoderLayerWeights, DecoderProfileFact, DecoderRopeConfiguration,
+    DecoderSymbolBehavior, DecoderTextConfiguration, DecoderTextError, DecoderTextOutput,
+    DecoderTextRequest, DecoderTextWeights, DecoderVisionProfileFact, GEMMA4_SOURCE_PATH,
+    GEMMA4_SOURCE_SHA256, GPT_OSS_SOURCE_PATH, GPT_OSS_SOURCE_SHA256, LLAMA_SOURCE_PATH,
+    LLAMA_SOURCE_SHA256, NativeDecoderTextEncoder, QWEN35_SOURCE_PATH, QWEN35_SOURCE_SHA256,
+    Qwen35LinearCache, RopeScaling, apply_rope, decoder_profile_fact, decoder_symbol_behavior,
+    gemma4_audio_conv2d_subsample, gemma4_audio_relative_positions, gemma4_clipped_linear,
+    gemma4_vision_patch_embed, gemma4_vision_rope, gpt_oss_moe, gpt_oss_top_k_route,
+    precompute_multidimensional_rope, precompute_rope, qwen35_causal_conv1d_update,
+    qwen35_causal_conv1d_update_exact, qwen35_chunk_gated_delta_rule,
+    qwen35_chunk_gated_delta_rule_exact, qwen35_vision_patch_embed, qwen35_vision_patch_merge,
+    tokenize_decoder_prompt,
+};
+pub use clip_text_encoder_t5::{
+    BERT_SOURCE_PATH, BERT_SOURCE_SHA256, BidirectionalFeedForwardActivation,
+    BidirectionalLayerWeights, BidirectionalPooling, BidirectionalTextArchitecture,
+    BidirectionalTextConfiguration, BidirectionalTextError, BidirectionalTextInput,
+    BidirectionalTextOutput, BidirectionalTextRequest, BidirectionalTextWeights,
+    NativeT5TextEncoder, SPIECE_TOKENIZER_SOURCE_PATH, SPIECE_TOKENIZER_SOURCE_SHA256,
+    T5_BIDIRECTIONAL_CATALOG_SYMBOLS, T5_SOURCE_PATH, T5_SOURCE_SHA256, relative_position_bucket,
+    tokenize_bidirectional_prompt,
+};
+pub use clip_tokenizer::{
+    CLIP_TOKENIZER_SOURCE_ROWS, ClipBpeTokenizer, MAX_NATIVE_EMBEDDING_VALUES,
+    MAX_NATIVE_PROMPT_BATCH, MAX_NATIVE_PROMPT_BYTES, MAX_NATIVE_TOKEN_SECTIONS,
+    MAX_NATIVE_WEIGHT_SEGMENTS, NativePromptTokenizer, NativeTokenSection, NativeTokenValue,
+    NativeTokenizedPrompt, NativeTokenizerError, NativeTokenizerFamily, NativeWeightedToken,
+    PromptWeightSegment, SentencePieceTokenizer, TextualInversionEmbedding, TokenizerConfiguration,
+    apply_empty_baseline_token_weights, escape_important, generate_empty_tokens, parse_parentheses,
+    parse_prompt_weights, token_weights, unescape_important,
+};
+pub use clip_vision::{
+    CLIP_VISION_CATALOG_SYMBOLS, CLIP_VISION_SOURCE_PATH, CLIP_VISION_SOURCE_SHA256,
+    ClipVisionActivation, ClipVisionConfiguration, ClipVisionError, ClipVisionIntermediate,
+    ClipVisionLayerWeights, ClipVisionModelType, ClipVisionOutput, ClipVisionWeights,
+    NativeClipVision, clip_preprocess_with_context, siglip2_flex_resolution,
+    siglip2_preprocess_with_context,
+};
+pub use cogvideox_family::{
+    COGVIDEOX_LAYOUT_SIGNATURES, CogVideoXConfiguration, CogVideoXLatentVariant, CogVideoXLayout,
+    configuration_for_probe as cogvideox_configuration_for_probe,
+};
+pub use cosmos_family::{
+    COSMOS_CLIP_CANDIDATES, COSMOS_CLIP_CONFIGURATION, COSMOS_CLIP_TARGET,
+    COSMOS_GENERAL_STATE_PLAN, COSMOS_GENERAL_STATE_PLAN_CASES, COSMOS_LAYOUT_SIGNATURES,
+    COSMOS_PREDICT2_STATE_PLAN, COSMOS_PREDICT2_STATE_PLAN_CASES, COSMOS_SUPPORTED_DEVICES,
+    COSMOS_SUPPORTED_DTYPES, COSMOS_WEIGHT_RULES, CosmosArchitecture, CosmosConfiguration,
+    CosmosModelSize, CosmosRatio, configuration_for_probe as cosmos_configuration_for_probe,
+};
+pub use descriptor::{
+    CatalogModelDescriptor, MODEL_DESCRIPTOR_SCHEMA_VERSION, MemoryEstimatorDescriptor,
+    ModelCatalogAvailability, ModelCatalogConfidence, ModelCatalogKey, ModelCatalogKind,
+    ModelComponentDescriptor, ModelDescriptor, ModelDescriptorError, ModelEvidenceLevel,
+    ModelParityStatus, TensorKeyRule,
+};
+pub use flux_chroma_family::{
+    FLUX_LAYOUT_SIGNATURES, FluxChromaConfiguration, FluxChromaFinalHead, FluxChromaLayout,
+    FluxChromaVariant, configuration_for_probe as flux_chroma_configuration_for_probe,
+};
+pub use formats::{
+    ArchiveEntry, FileSlice, GgufValue, MAX_EMBEDDING_ARCHIVE_VALUES, ModelFormat,
+    ModelFormatError, ParsedModel, ParsedModelPayload, SentencePieceType, SentencePieceVocabulary,
+    SentencePieceVocabularyEntry, TensorMetadata, TorchArchiveFileLoader, detect_model_format,
+    load_torch_archive_file, parse_model_file,
+};
+pub use hidream_o1_family::{
+    HIDREAM_O1_ARCHITECTURE_VERSION, HIDREAM_O1_ASSISTANT_TOKEN_ID, HIDREAM_O1_BOI_TOKEN_ID,
+    HIDREAM_O1_BOR_TOKEN_ID, HIDREAM_O1_BOT_TOKEN_ID, HIDREAM_O1_CLIP_CANDIDATES,
+    HIDREAM_O1_CLIP_TARGET, HIDREAM_O1_COMPONENT_STATE_SCHEMAS, HIDREAM_O1_COMPONENTS,
+    HIDREAM_O1_DEEPSTACK_KEY_FRAGMENT, HIDREAM_O1_EOR_TOKEN_ID, HIDREAM_O1_IM_END_TOKEN_ID,
+    HIDREAM_O1_IM_START_TOKEN_ID, HIDREAM_O1_IMAGE_TOKEN_ID, HIDREAM_O1_LATENT_FEATURE_ID,
+    HIDREAM_O1_LATENT_FORMAT, HIDREAM_O1_LATENT_IDENTIFIER, HIDREAM_O1_LAYOUT_SIGNATURES,
+    HIDREAM_O1_MEMORY_USAGE_FACTOR, HIDREAM_O1_NATIVE_STATE_PLAN, HIDREAM_O1_NEWLINE_TOKEN_ID,
+    HIDREAM_O1_PAD_TOKEN_ID, HIDREAM_O1_PATCH_SIZE, HIDREAM_O1_PIXEL_VAE_SENTINEL,
+    HIDREAM_O1_STATE_PLAN_CASES, HIDREAM_O1_SUPPORTED_DEVICES, HIDREAM_O1_SUPPORTED_DTYPES,
+    HIDREAM_O1_TEXT_ENCODER_SENTINEL, HIDREAM_O1_TMS_TOKEN_ID, HIDREAM_O1_UNPREFIXED_STATE_PLAN,
+    HIDREAM_O1_USER_TOKEN_ID, HIDREAM_O1_VIDEO_TOKEN_ID, HIDREAM_O1_VISION_END_TOKEN_ID,
+    HIDREAM_O1_VISION_IMAGE_MEAN, HIDREAM_O1_VISION_IMAGE_STD, HIDREAM_O1_VISION_MERGE_SIZE,
+    HIDREAM_O1_VISION_PATCH_SIZE, HIDREAM_O1_VISION_START_TOKEN_ID, HIDREAM_O1_WEIGHT_RULES,
+    HiDreamO1Configuration, HiDreamO1Layout,
+    configuration_for_probe as hidream_o1_configuration_for_probe,
+};
+pub use latent_format::{
+    LATENT_FORMAT_SCHEMA_VERSION, LatentExtent, LatentFormatDefinition, LatentFormatDescriptor,
+    LatentFormatError, LatentFormatIdentity, LatentFormatRegistry, LatentTensorLayout,
+    LatentTransform, PreviewReshape, empty_latent, process_latent_in, process_latent_out,
+    project_latent_preview,
+};
+pub use model_family::{
+    MODEL_CLIP_TARGET_SCHEMA_VERSION, MODEL_FAMILY_SCHEMA_VERSION,
+    MODEL_STATE_TRANSFORM_PLAN_SCHEMA_VERSION, MappedModelComponents, MappedModelWeights,
+    ModelBaseFallback, ModelClipConfigurationFact, ModelClipConfigurationFactDefinition,
+    ModelClipModelDescriptor, ModelClipModelInvocation, ModelClipModelInvocationDefinition,
+    ModelClipTargetCandidateDefinition, ModelClipTargetCandidateDescriptor, ModelClipTargetCase,
+    ModelClipTargetDefinition, ModelClipTargetDescriptor, ModelClipTargetSelector,
+    ModelConfigurationKind, ModelConfigurationValue, ModelDetection, ModelDetectionOutcome,
+    ModelDetectionPolicy, ModelDetectionRule, ModelDimensionEvaluationContext,
+    ModelDimensionExpression, ModelFamilyComponent, ModelFamilyComponentStateSchema,
+    ModelFamilyDefinition, ModelFamilyError, ModelFamilyIdentity, ModelFamilyProfile,
+    ModelFamilyProfileSelector, ModelFamilyRegistration, ModelFamilyRegistry,
+    ModelFamilyStatePlanCase, ModelFamilyStatePlanSelector, ModelFamilyWeightBinding,
+    ModelForwardCheckpoint, ModelForwardOperation, ModelForwardStep, ModelKeyPredicate,
+    ModelKeyRewrite, ModelKeySelector, ModelLayoutSignature, ModelMemoryEstimate,
+    ModelNativeTargetIdentifier, ModelNormalizedConfiguration, ModelParsedFacts,
+    ModelParsedFormatFact, ModelParsedTensorFact, ModelPerTensorTransform, ModelProbe,
+    ModelRoundCondition, ModelSourceConfigurationRule, ModelSplitOutputRule, ModelStateLayout,
+    ModelStateTarget, ModelStateTensorReference, ModelStateTransaction,
+    ModelStateTransformOperation, ModelStateTransformPlan, ModelStateTransformPlanDefinition,
+    ModelStorageDType, ModelTokenizerDescriptor, ModelTransformBranchOutputRule,
+    ModelUnetPrefixSelection, ModelUnmatchedKeyDisposition, ModelWeightRule,
+    NativeFamilyBuildOptions, NativeFamilyModel, ResolvedModelFamily, build_model_family,
+    build_model_family_for_probe, describe_model_family, detect_model_family_rules,
+    estimate_model_memory, map_model_weights,
+};
+#[cfg(unix)]
+pub use model_store::ReadOnlyTensorMapping;
+pub use model_store::{
+    LoadedModel, ModelFamilyProbeError, ModelFamilyProbeErrorKind, ModelLoadAccounting,
+    ModelOperationRecord, ModelOperationStage, ModelStore, ModelStoreError,
+    VerifiedEmbeddingArchivePayload, VerifiedModelTensor, VerifiedModelTensorPayload,
+    VerifiedSentencePieceVocabulary,
+};
+pub use native_ops::{
+    CastedParameters, ConvolutionAutopad, EmbeddingOptions, GeluApproximation, LossReduction,
+    NativeExecutionRequirements, NativeModule, NativeModuleSpec, NativeOperationSet,
+    NativeOpsError, PrefetchReceipt, RngAwareModuleForward, UpsampleMode, WeightCastLease,
+    adaptive_average_pool_2d_module_exact_native, average_pool_1d_module_exact_native,
+    average_pool_2d_module_exact_native, average_pool_3d_module_exact_native,
+    batch_norm_1d_module_exact_native, batch_norm_2d_module_exact_native,
+    buffer_module_exact_native, cast_modules_with_vbar_with_context_exact_native,
+    conv_2d_module_exact_native, conv_3d_module_exact_native, conv1d_module_exact_native,
+    disable_weight_init_conv1d_exact_native, disable_weight_init_convolution_exact_native,
+    disable_weight_init_group_norm_exact_native, disable_weight_init_layer_norm_exact_native,
+    disable_weight_init_linear_exact_native, dropout_module_exact_native, elu_module_exact_native,
+    embedding_module_exact_native, gelu_module_exact_native, group_norm_module_exact_native,
+    huber_loss_module_exact_native, identity_module_exact_native,
+    instance_norm_2d_module_exact_native, l1_loss_module_exact_native,
+    layer_norm_module_exact_native, leaky_relu_module_exact_native, linear_module_exact_native,
+    manual_cast_layer_norm_exact_native, manual_cast_linear_exact_native,
+    max_pool_2d_module_exact_native, mixed_precision_ops_exact_native, module_dict_exact_native,
+    module_exact_native, module_init_exact_native, module_list_exact_native,
+    mse_loss_module_exact_native, multihead_attention_module_exact_native,
+    pick_operations_exact_native, pixel_shuffle_module_exact_native,
+    pixel_unshuffle_module_exact_native, prelu_module_exact_native, relu_6_module_exact_native,
+    relu_module_exact_native, remove_parametrizations_with_context_exact_native,
+    replication_pad_2d_module_exact_native, sequential_module_exact_native,
+    sigmoid_module_exact_native, silu_module_exact_native, smooth_l1_loss_module_exact_native,
+    softmax_module_exact_native, spectral_norm_exact_native, tanh_module_exact_native,
+    upsample_module_exact_native, weight_norm_exact_native, zero_pad_2d_module_exact_native,
+};
+pub use parser_limits::{
+    PARSER_DECODED_ALLOCATION_MULTIPLIER, PARSER_LIMITS_VERSION, ParserLimitError, ParserLimits,
+};
+pub use patch_graph::{
+    NestedPatch, PATCH_GRAPH_SCHEMA_VERSION, PatchApplication, PatchComputeBoundary, PatchGraph,
+    PatchGraphError, PatchGraphIdentity, PatchGraphIdentityError, PatchKind, PatchOperation,
+    PatchPayload, PatchSlice, PatchTarget, PatchTensor, PatchValueTransform,
+    SemanticPatchOperation, factorize_patch_dimension,
+};
+pub use quantization::{
+    LayerQuantizationV1, QuantLinearLayout, QuantLinearScale, QuantizationError, QuantizationKind,
+    QuantizationMetadataV1, QuantizedContentIdentity, QuantizedLinearMatrix,
+    QuantizedMaterialization, QuantizedMatrix, QuantizedSourceIdentity, quantize_linear_matrix,
+    quantize_matrix,
+};
+pub use quantized_autograd::{
+    QuantLinearError, QuantLinearExecution, QuantLinearGradients, QuantLinearOptions,
+    QuantLinearWeight, quant_linear_forward_exact_native,
+};
+pub use registry_generator::{
+    MODEL_CATALOG, ModelRegistry, ModelRegistryError, ModelRegistryGenerator,
+};
+pub use restricted_pickle::{
+    ALLOWED_PICKLE_TARGETS, AllowedPickleTarget, PickleValue, RESTRICTED_PICKLE_ALLOWLIST_VERSION,
+    RESTRICTED_PICKLE_DECODED_ALLOCATION_MULTIPLIER, RestrictedPickleError, SafeGlobalsAdmission,
+    add_safe_globals_exact_native, parse_restricted_pickle, parse_restricted_pickle_cancellable,
+};
+pub use vae::validate_native_vae_backend_target;
+pub use vae::{
+    NativeStructuredVae, NativeVae, VAE_SCHEMA_VERSION, VaeArchitectureIdentity, VaeBoundary,
+    VaeBoundaryKind, VaeCanonicalCompatibility, VaeDescriptor, VaeError, VaeGaussianSplatBatch,
+    VaeIdentity, VaeKernelProfile, VaeOperation, VaeShapeField, VaeStructuredDecodeRequest,
+    VaeStructuredOutputKind, VaeStructuredResult, VaeTileAxisFormula, VaeTilePlan,
+};
+pub use vae_architecture::{
+    VAE_AUTOMATIC_ROW_ID, VAE_DIFFUSERS_ROW_ID, VAE_DIFFUSERS_SENTINEL, VAE_SELECTOR_BRANCH_COUNT,
+    VAE_SELECTOR_CATALOG_ROWS, VAE_SELECTOR_ROW_COUNT, VAE_SELECTOR_SOURCE_PATH,
+    VAE_SELECTOR_SOURCE_SHA256, VAE_UNBOUND_ROW_ID, VaeArchitectureError, VaeArchitectureRegistry,
+    VaeArchitectureSelection, VaeBoundaryDomain, VaeCatalogRowKind, VaeExecutionTarget,
+    VaeLoaderConfiguration, VaeSelectorCatalogRow,
+};
+pub use vae_audio::{
+    AudioVaeError, AudioVaeSourceCheckpoint, NativeAudioVaeArchitecture, audio_vae_source_plan,
+    audio_vae_source_state_schema, inspect_audio_vae_architecture,
+    load_audio_vae_from_model_store_with_context,
+};
+pub use vae_image::{
+    ImageVaeError, NativeImageVaeArchitecture, image_vae_source_state_schema,
+    inspect_image_vae_architecture,
+};
+pub use vae_structured::{
+    HUNYUAN_SHAPE_ARCHITECTURE, NativeStructuredVaeArchitecture, StructuredVaeError,
+    StructuredVaeStateCheckpoint, TRIPO_GAUSSIAN_FEATURES_PER_TOKEN, TRIPO_GAUSSIANS_PER_TOKEN,
+    TRIPO_MAX_OCTREE_LEVEL, TRIPO_SPLAT_ARCHITECTURE, hammersley_3d, level_embedding,
+    load_structured_vae_from_model_store_with_context, radical_inverse, shape_grid_coordinates,
+    shape_output_from_logits, structured_vae_source_plan, structured_vae_source_state_count,
+    structured_vae_source_state_schema, systematic_sample_counts,
+    tripo_gaussian_output_from_predictions,
+};
+pub use vae_video::{
+    NativeVideoVaeArchitecture, VideoVaeError, VideoVaeSourceCheckpoint,
+    inspect_video_vae_architecture, load_video_vae_from_model_store_with_context,
+    video_vae_source_plan, video_vae_source_state_schema,
+};
+pub use vision_models::{
+    EFFICIENTNET_V2_S_OPERATION_ID, NativeEfficientNetBlockKind, NativeEfficientNetStage,
+    NativeEfficientNetV2S, NativeEfficientNetV2SFeatureSource, NativeRaftLarge,
+    NativeVisionModelError, NativeVisionStateKind, NativeVisionStateSpec, RAFT_LARGE_OPERATION_ID,
+    efficientnet_v2_s_exact_native, efficientnet_v2_s_features_from_module_with_context,
+    load_stage_c_efficientnet_feature_module_from_model_store_with_context,
+    load_vision_state_from_model_store_with_context,
+    load_vision_state_with_sibling_namespaces_from_model_store_with_context,
+    raft_large_exact_native,
+};
+pub use weight_adapter::{
+    ADAPTER_MAP_ORDER, AdapterFamily, AdapterTensor, BypassBinding, BypassForwardHook,
+    BypassInjectionManager, BypassPatch, BypassRuntimePlan, LayerKind, LoadedWeightAdapter,
+    ModuleTypeInfo, NativeWeightAdapter, TrainableAdapterKind, TrainableWeightOutput,
+    WEIGHT_ADAPTER_ORDER, WeightAdapterError, WeightAdapterLoadRequest, WeightAdapterRegistry,
+};
+
+include!(concat!(env!("OUT_DIR"), "/generated_modules.rs"));

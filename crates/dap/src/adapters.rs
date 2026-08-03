@@ -23,7 +23,7 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-use task::{SimDebugConfig, DebugScenario, TcpArgumentsTemplate};
+use task::{DebugScenario, SimDebugConfig, TcpArgumentsTemplate};
 use util::{archive::extract_zip, rel_path::RelPath};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -349,10 +349,7 @@ pub async fn download_adapter_from_github(
 pub trait DebugAdapter: 'static + Send + Sync {
     fn name(&self) -> DebugAdapterName;
 
-    async fn config_from_sim_format(
-        &self,
-        sim_scenario: SimDebugConfig,
-    ) -> Result<DebugScenario>;
+    async fn config_from_sim_format(&self, sim_scenario: SimDebugConfig) -> Result<DebugScenario>;
 
     async fn get_binary(
         &self,
@@ -442,10 +439,7 @@ impl DebugAdapter for FakeAdapter {
         None
     }
 
-    async fn config_from_sim_format(
-        &self,
-        sim_scenario: SimDebugConfig,
-    ) -> Result<DebugScenario> {
+    async fn config_from_sim_format(&self, sim_scenario: SimDebugConfig) -> Result<DebugScenario> {
         let config = serde_json::to_value(sim_scenario.request).unwrap();
 
         Ok(DebugScenario {

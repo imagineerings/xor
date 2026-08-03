@@ -196,9 +196,7 @@ impl SimSyntaxToken {
             SimSyntaxToken::Boolean => vec!["constant.language"],
             SimSyntaxToken::Comment => vec!["comment"],
             SimSyntaxToken::CommentDoc => vec!["comment.block.documentation"],
-            SimSyntaxToken::Constant => {
-                vec!["constant", "constant.language", "constant.character"]
-            }
+            SimSyntaxToken::Constant => vec!["constant", "constant.language", "constant.character"],
             SimSyntaxToken::Constructor => {
                 vec![
                     "entity.name.tag",

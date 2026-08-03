@@ -304,6 +304,34 @@ fn init_logging_server(log_file_path: &Path) -> Result<Receiver<Vec<u8>>> {
     Ok(rx)
 }
 
+/// Initializes the telemetry queue on the remote server, forwarding every
+/// emitted event to the connected client over the proto channel.
+///
+/// The remote server cannot upload telemetry itself (it has no logged-in user,
+/// no checksum seed, and no Telemetry instance), so without this its
+/// `telemetry::event!` calls are silently dropped. The client attributes these
+/// events to the remote host using the platform it already detected during
+/// connection setup, so no OS metadata needs to be sent here.
+fn init_telemetry_forwarding(session: AnyProtoClient, cx: &mut App) {
+    let (tx, mut rx) = mpsc::unbounded::<telemetry::Event>();
+    telemetry::init(tx);
+
+    cx.background_spawn(async move {
+        while let Some(event) = rx.next().await {
+            let Some(event_json) = serde_json::to_string(&event).log_err() else {
+                continue;
+            };
+            session
+                .send(proto::TelemetryEvent {
+                    project_id: REMOTE_SERVER_PROJECT_ID,
+                    event_json,
+                })
+                .log_err();
+        }
+    })
+    .detach();
+}
+
 fn handle_crash_files_requests(project: &Entity<HeadlessProject>, client: &AnyProtoClient) {
     client.add_request_handler(
         project.downgrade(),
@@ -549,29 +577,25 @@ pub fn execute_run(
     ) || *RELEASE_CHANNEL != ReleaseChannel::Dev;
 
     let crash_handler = if should_install_crash_handler {
-        Some(
-            app.background_executor().spawn(crashes::init(
-                crashes::InitCrashHandler {
-                    session_id: id,
-                    sim_version: VERSION.to_owned(),
-                    binary: "sim-remote-server".to_string(),
-                    release_channel: release_channel::RELEASE_CHANNEL_NAME.clone(),
-                    commit_sha: option_env!("SIM_COMMIT_SHA")
-                        .unwrap_or("no_sha")
-                        .to_owned(),
-                },
-                {
-                    let background_executor = app.background_executor();
-                    move |task| {
-                        background_executor.spawn(task).detach();
-                    }
-                },
-                |pid| paths::temp_dir().join(format!("sim-remote-server-crash-handler-{pid}")),
-                // we are running outside gpui
-                #[allow(clippy::disallowed_methods)]
-                |duration| FutureExt::map(Timer::after(duration), |_| ()),
-            )),
-        )
+        Some(app.background_executor().spawn(crashes::init(
+            crashes::InitCrashHandler {
+                session_id: id,
+                sim_version: VERSION.to_owned(),
+                binary: "sim-remote-server".to_string(),
+                release_channel: release_channel::RELEASE_CHANNEL_NAME.clone(),
+                commit_sha: option_env!("SIM_COMMIT_SHA").unwrap_or("no_sha").to_owned(),
+            },
+            {
+                let background_executor = app.background_executor();
+                move |task| {
+                    background_executor.spawn(task).detach();
+                }
+            },
+            |pid| paths::temp_dir().join(format!("sim-remote-server-crash-handler-{pid}")),
+            // we are running outside gpui
+            #[allow(clippy::disallowed_methods)]
+            |duration| FutureExt::map(Timer::after(duration), |_| ()),
+        )))
     } else {
         crashes::force_backtrace();
         None
@@ -623,8 +647,7 @@ pub fn execute_run(
             .detach();
         }
         settings::init(cx);
-        let app_commit_sha =
-            option_env!("SIM_COMMIT_SHA").map(|s| AppCommitSha::new(s.to_owned()));
+        let app_commit_sha = option_env!("SIM_COMMIT_SHA").map(|s| AppCommitSha::new(s.to_owned()));
         let app_version = AppVersion::load(
             env!("SIM_PKG_VERSION"),
             option_env!("SIM_BUILD_ID"),
@@ -644,6 +667,7 @@ pub fn execute_run(
 
         log::info!("gpui app started, initializing server");
         let session = start_server(listeners, log_rx, cx, is_wsl_interop);
+        init_telemetry_forwarding(session.clone(), cx);
         trusted_worktrees::init(HashMap::default(), cx);
 
         GitHostingProviderRegistry::set_global(git_hosting_provider_registry, cx);
@@ -839,9 +863,7 @@ pub(crate) fn execute_proxy(
                 sim_version: VERSION.to_owned(),
                 binary: "sim-remote-proxy".to_string(),
                 release_channel: release_channel::RELEASE_CHANNEL_NAME.clone(),
-                commit_sha: option_env!("SIM_COMMIT_SHA")
-                    .unwrap_or("no_sha")
-                    .to_owned(),
+                commit_sha: option_env!("SIM_COMMIT_SHA").unwrap_or("no_sha").to_owned(),
             },
             |task| {
                 smol::spawn(task).detach();
@@ -1366,7 +1388,7 @@ mod tests {
     }
 
     #[test]
-    fn opening_remote_log_rotates_existing_oversized_log() {
+    fn opening_remote_log_rotates_existing_oversisim_log() {
         let temp_dir = tempfile::tempdir().expect("create temp dir");
         let log_path = temp_dir.path().join("server-workspace-12.log");
         let rotated_path = temp_dir.path().join("server-workspace-12.1.log");

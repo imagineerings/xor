@@ -1380,7 +1380,7 @@ mod tests {
     #[test]
     fn test_models_with_pending_policy_deserialize() {
         // This test verifies that models with policy states other than "enabled"
-        // (such as "pending" or "requires_consent") are properly deserialisim.
+        // (such as "pending" or "requires_consent") are properly deserialized.
         // Note: These models will be filtered out by get_models() and won't appear
         // in the model picker until the user enables them on GitHub.
         let json = r#"{

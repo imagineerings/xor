@@ -252,10 +252,10 @@ fn test_randomize_order() {
         randomized_results.insert(order);
     }
 
-    // randomized mode should produce multiple different execution orders
+    // Randomized mode should produce multiple different execution orders
     assert!(
         randomized_results.len() > 1,
-        "randomized mode should produce multiple different orders"
+        "Randomized mode should produce multiple different orders"
     );
 }
 

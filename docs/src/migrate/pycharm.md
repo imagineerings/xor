@@ -150,7 +150,7 @@ PyCharm's index powers features like finding all usages across your entire codeb
 
 ### LSP vs. Native Language Intelligence
 
-PyCharm has its own language analysis engine built specifically for Python. This engine understands your code deeply: it resolves types without annotations, tracks data flow, knows about Django models and Flask routes, and offers specialisim refactorings.
+PyCharm has its own language analysis engine built specifically for Python. This engine understands your code deeply: it resolves types without annotations, tracks data flow, knows about Django models and Flask routes, and offers specialized refactorings.
 
 Sim uses the Language Server Protocol (LSP) for code intelligence. For Python, Sim provides several language servers out of the box:
 

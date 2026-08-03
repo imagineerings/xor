@@ -31,6 +31,27 @@ members = [
     "crates/cloud_api_client",
     "crates/cloud_api_types",
     "crates/cloud_llm_client",
+    "crates/comfy_api",
+    "crates/comfy_backend_corex",
+    "crates/comfy_backend_cuda",
+    "crates/comfy_backend_directml",
+    "crates/comfy_backend_metal",
+    "crates/comfy_backend_mlu",
+    "crates/comfy_backend_npu",
+    "crates/comfy_backend_rocm",
+    "crates/comfy_backend_xpu",
+    "crates/comfy_media",
+    "crates/comfy_model",
+    "crates/comfy_nodes",
+    "crates/comfy_plugin_host",
+    "crates/comfy_plugin_sdk",
+    "crates/comfy_runtime",
+    "crates/comfy_sampler",
+    "crates/comfy_tensor",
+    "crates/comfy_test_support",
+    "crates/comfy_types",
+    "crates/comfy_ui",
+    "crates/comfy_worker",
     "crates/codestral",
     "crates/collab",
     "crates/collab_ui",
@@ -54,10 +75,7 @@ members = [
     "crates/deepseek",
     "crates/dev_container",
     "crates/diagnostics",
-    "crates/dictation",
     "crates/docs_preprocessor",
-    "crates/doctor",
-    "crates/download_manager",
     "crates/edit_prediction",
     "crates/edit_prediction_cli",
     "crates/edit_prediction_context",
@@ -70,7 +88,6 @@ members = [
     "crates/env_var",
     "crates/etw_tracing",
     "crates/eval_cli",
-    "crates/eval_harbor",
     "crates/eval_utils",
     "crates/explorer_command_injector",
     "crates/extension",
@@ -87,8 +104,7 @@ members = [
     "crates/fs_benchmarks",
     "crates/fuzzy",
     "crates/fuzzy_nucleo",
-        "crates/gateway",
-        "crates/git",
+    "crates/git",
     "crates/git_hosting_providers",
     "crates/git_ui",
     "crates/go_to_line",
@@ -110,7 +126,6 @@ members = [
     "crates/http_client_tls",
     "crates/http_proxy",
     "crates/icons",
-    "crates/i18n",
     "crates/image_viewer",
     "crates/input_latency_ui",
     "crates/inspector_ui",
@@ -132,17 +147,12 @@ members = [
     "crates/line_ending_selector",
     "crates/livekit_api",
     "crates/livekit_client",
+    "crates/llama_cpp",
     "crates/lmstudio",
     "crates/lsp",
     "crates/markdown",
     "crates/markdown_preview",
-    "crates/mcp_servers/autovisualiser",
-    "crates/mcp_servers/memory",
-    "crates/mcp_servers/peekaboo",
-    "crates/mcp_servers/tutorial",
-    "crates/mcp_runner",
     "crates/mermaid_render",
-        "crates/mobile_tunnel",
     "crates/media",
     "crates/menu",
     "crates/migrator",
@@ -152,7 +162,6 @@ members = [
     "crates/net",
     "crates/node_runtime",
     "crates/notifications",
-    "crates/nostr_sharing",
     "crates/oauth_callback_server",
     "crates/ollama",
     "crates/onboarding",
@@ -165,10 +174,8 @@ members = [
     "crates/panel",
     "crates/paths",
     "crates/picker",
-    "crates/permission",
+    "crates/picker_preview",
     "crates/platform_title_bar",
-    "crates/plugins",
-    "crates/posthog",
     "crates/prettier",
     "crates/project",
     "crates/project_benchmarks",
@@ -177,7 +184,6 @@ members = [
     "crates/prompt_store",
     "crates/proto",
     "crates/recent_projects",
-    "crates/recipe",
     "crates/refineable",
     "crates/refineable/derive_refineable",
     "crates/release_channel",
@@ -190,7 +196,6 @@ members = [
     "crates/rpc",
     "crates/sandbox",
     "crates/scheduler",
-    "crates/security",
     "crates/schema_generator",
     "crates/search",
     "crates/session",
@@ -243,13 +248,9 @@ members = [
     "crates/workspace",
     "crates/worktree",
     "crates/worktree_benchmarks",
-    "crates/world_model",
     "crates/x_ai",
     "crates/sim",
     "crates/sim_actions",
-    "crates/sim_game",
-    "crates/sim_apps",
-    "crates/sim-server",
     "crates/windows_resources",
     "crates/sim_credentials_provider",
     "crates/sim_env_vars",
@@ -343,15 +344,11 @@ deepseek = { path = "crates/deepseek" }
 derive_refineable = { path = "crates/refineable/derive_refineable" }
 dev_container = { path = "crates/dev_container" }
 diagnostics = { path = "crates/diagnostics" }
-dictation = { path = "crates/dictation" }
-doctor = { path = "crates/doctor" }
-download_manager = { path = "crates/download_manager" }
 dialoguer = { version = "0.12", default-features = false }
 editor = { path = "crates/editor" }
 encoding_selector = { path = "crates/encoding_selector" }
 env_var = { path = "crates/env_var" }
 etw_tracing = { path = "crates/etw_tracing" }
-eval_harbor = { path = "crates/eval_harbor" }
 eval_utils = { path = "crates/eval_utils" }
 extension = { path = "crates/extension" }
 extension_host = { path = "crates/extension_host" }
@@ -364,7 +361,6 @@ file_icons = { path = "crates/file_icons" }
 fs = { path = "crates/fs" }
 fuzzy = { path = "crates/fuzzy" }
 fuzzy_nucleo = { path = "crates/fuzzy_nucleo" }
-gateway = { path = "crates/gateway" }
 git = { path = "crates/git" }
 git_hosting_providers = { path = "crates/git_hosting_providers" }
 git_ui = { path = "crates/git_ui" }
@@ -387,7 +383,6 @@ http_client = { path = "crates/http_client" }
 http_client_tls = { path = "crates/http_client_tls" }
 http_proxy = { path = "crates/http_proxy" }
 icons = { path = "crates/icons" }
-i18n = { path = "crates/i18n" }
 image_viewer = { path = "crates/image_viewer" }
 edit_prediction_types = { path = "crates/edit_prediction_types" }
 edit_prediction_ui = { path = "crates/edit_prediction_ui" }
@@ -412,28 +407,23 @@ languages = { path = "crates/languages" }
 line_ending_selector = { path = "crates/line_ending_selector" }
 livekit_api = { path = "crates/livekit_api" }
 livekit_client = { path = "crates/livekit_client" }
+llama_cpp = { path = "crates/llama_cpp" }
 lmstudio = { path = "crates/lmstudio" }
 lsp = { path = "crates/lsp" }
 markdown = { path = "crates/markdown" }
 markdown_preview = { path = "crates/markdown_preview" }
-mcp_autovisualiser = { path = "crates/mcp_servers/autovisualiser" }
-mcp_memory = { path = "crates/mcp_servers/memory" }
-mcp_peekaboo = { path = "crates/mcp_servers/peekaboo" }
-mcp_tutorial = { path = "crates/mcp_servers/tutorial" }
 mermaid_render = { path = "crates/mermaid_render" }
-mcp_runner = { path = "crates/mcp_runner" }
 svg_preview = { path = "crates/svg_preview" }
 media = { path = "crates/media" }
 menu = { path = "crates/menu" }
+mime = "0.3.17"
 migrator = { path = "crates/migrator" }
 mistral = { path = "crates/mistral" }
 multi_buffer = { path = "crates/multi_buffer" }
 miniprofiler_ui = { path = "crates/miniprofiler_ui" }
-mobile_tunnel = { path = "crates/mobile_tunnel" }
 net = { path = "crates/net" }
 node_runtime = { path = "crates/node_runtime" }
 notifications = { path = "crates/notifications" }
-nostr_sharing = { path = "crates/nostr_sharing" }
 oauth_callback_server = { path = "crates/oauth_callback_server" }
 ollama = { path = "crates/ollama" }
 onboarding = { path = "crates/onboarding" }
@@ -447,7 +437,7 @@ panel = { path = "crates/panel" }
 paths = { path = "crates/paths" }
 perf = { path = "tooling/perf" }
 picker = { path = "crates/picker" }
-permission = { path = "crates/permission" }
+picker_preview = { path = "crates/picker_preview" }
 prettier = { path = "crates/prettier" }
 settings_profile_selector = { path = "crates/settings_profile_selector" }
 project = { path = "crates/project" }
@@ -456,7 +446,6 @@ project_symbols = { path = "crates/project_symbols" }
 prompt_store = { path = "crates/prompt_store" }
 proto = { path = "crates/proto" }
 recent_projects = { path = "crates/recent_projects" }
-recipe = { path = "crates/recipe" }
 refineable = { path = "crates/refineable" }
 release_channel = { path = "crates/release_channel" }
 remote = { path = "crates/remote" }
@@ -469,9 +458,29 @@ rope = { path = "crates/rope" }
 rpc = { path = "crates/rpc" }
 scheduler = { path = "crates/scheduler" }
 sandbox = { path = "crates/sandbox" }
-security = { path = "crates/security" }
 search = { path = "crates/search" }
 session = { path = "crates/session" }
+comfy_api = { path = "crates/comfy_api" }
+comfy_backend_corex = { path = "crates/comfy_backend_corex" }
+comfy_backend_cuda = { path = "crates/comfy_backend_cuda" }
+comfy_backend_directml = { path = "crates/comfy_backend_directml" }
+comfy_backend_metal = { path = "crates/comfy_backend_metal" }
+comfy_backend_mlu = { path = "crates/comfy_backend_mlu" }
+comfy_backend_npu = { path = "crates/comfy_backend_npu" }
+comfy_backend_rocm = { path = "crates/comfy_backend_rocm" }
+comfy_backend_xpu = { path = "crates/comfy_backend_xpu" }
+comfy_media = { path = "crates/comfy_media" }
+comfy_model = { path = "crates/comfy_model" }
+comfy_nodes = { path = "crates/comfy_nodes" }
+comfy_plugin_host = { path = "crates/comfy_plugin_host" }
+comfy_plugin_sdk = { path = "crates/comfy_plugin_sdk" }
+comfy_runtime = { path = "crates/comfy_runtime" }
+comfy_sampler = { path = "crates/comfy_sampler" }
+comfy_tensor = { path = "crates/comfy_tensor" }
+comfy_test_support = { path = "crates/comfy_test_support" }
+comfy_types = { path = "crates/comfy_types" }
+comfy_ui = { path = "crates/comfy_ui" }
+comfy_worker = { path = "crates/comfy_worker" }
 sidebar = { path = "crates/sidebar" }
 settings = { path = "crates/settings" }
 settings_content = { path = "crates/settings_content" }
@@ -503,8 +512,6 @@ theme_settings = { path = "crates/theme_settings" }
 theme_selector = { path = "crates/theme_selector" }
 time_format = { path = "crates/time_format" }
 platform_title_bar = { path = "crates/platform_title_bar" }
-plugins = { path = "crates/plugins" }
-posthog = { path = "crates/posthog" }
 title_bar = { path = "crates/title_bar" }
 toolchain_selector = { path = "crates/toolchain_selector" }
 ui = { path = "crates/ui" }
@@ -525,10 +532,6 @@ worktree = { path = "crates/worktree" }
 x_ai = { path = "crates/x_ai" }
 sim = { path = "crates/sim" }
 sim_actions = { path = "crates/sim_actions" }
-sim_game = { path = "crates/sim_game" }
-world_model = { path = "crates/world_model" }
-sim_apps = { path = "crates/sim_apps" }
-sim_server = { path = "crates/sim-server" }
 sim_credentials_provider = { path = "crates/sim_credentials_provider" }
 sim_env_vars = { path = "crates/sim_env_vars" }
 edit_prediction = { path = "crates/edit_prediction" }
@@ -546,12 +549,13 @@ ztracing_macro = { path = "crates/ztracing_macro" }
 accesskit = "0.24.0"
 accesskit_macos = "0.26.0"
 accesskit_unix = "0.21.0"
-accesskit_windows = "0.32.1"
-agent-client-protocol = { version = "=0.14.0", features = ["unstable"] }
+accesskit_windows = "0.33.1"
+agent-client-protocol = { version = "=1.0.1", features = ["unstable"] }
 aho-corasick = "1.1"
-alacritty_terminal = { git = "https://github.com/simtropolis/alacritty", rev = "fcf32feacb367b75ec84dd40f041e4fd411d3cc1" }
+alacritty_terminal = { git = "https://github.com/simtropolis/alacritty", rev = "4c129667ce56611becdc82de6e28218c80e2e88f" }
 any_vec = "0.14"
 anyhow = "1.0.86"
+bytemuck = { version = "1.23", features = ["derive"] }
 ashpd = { version = "0.13", default-features = false, features = [
     "async-io",
     "notification",
@@ -572,7 +576,7 @@ async-recursion = "1.0.0"
 async-tar = "0.5.1"
 async-task = "4.7"
 async-trait = "0.1"
-async-tungstenite = "0.34.1"
+async-tungstenite = "0.31.0"
 async-process = "2.5.0"
 async_zip = { version = "0.0.18", features = ["deflate", "deflate64"] }
 aws-config = { version = "1.8.10", features = ["behavior-version-latest"] }
@@ -582,14 +586,15 @@ aws-credential-types = { version = "1.2.8", features = [
 aws-sdk-bedrockruntime = { version = "1.112.0", features = [
     "behavior-version-latest",
 ] }
+aws-sigv4 = "1.5.1"
 aws-smithy-runtime-api = { version = "1.9.2", features = ["http-1x", "client"] }
 aws-smithy-types = { version = "1.3.4", features = ["http-body-1-x"] }
-aes-gcm = "0.10"
 backtrace = "0.3"
 base64 = "0.22"
 bitflags = "2.6.0"
 brotli = "8.0.2"
 bytes = "1.0"
+cap-std = "3.4.5"
 cargo_metadata = "0.19"
 cargo_toml = "0.21"
 brush-parser = "0.3"
@@ -598,9 +603,9 @@ chardetng = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 ciborium = "0.2"
 circular-buffer = "1.0"
-clap = { version = "4.4", features = ["derive", "env", "wrap_help"] }
-clap_complete = "4.4"
-clap_complete_nushell = "4.4"
+clap = { version = "4.4", features = ["derive", "wrap_help"] }
+clap_complete = { version = "4.4" }
+clap_complete_nushell = { version = "4.4" }
 cocoa = "=0.26.0"
 cocoa-foundation = "=0.2.0"
 const_format = "0.2"
@@ -635,6 +640,7 @@ env_logger = "0.11"
 encoding_rs = "0.8"
 exec = "0.3.1"
 fancy-regex = "0.17.0"
+flate2 = "1.1.9"
 fork = "0.4.0"
 futures = "0.3.32"
 futures-concurrency = "7.7.1"
@@ -657,6 +663,7 @@ httparse = "1.10"
 idna = "1.0"
 ignore = "0.4.22"
 image = "0.25.1"
+half = { version = "2.6", features = ["bytemuck", "serde"] }
 imara-diff = "0.1.8"
 indexmap = { version = "2.7.0", features = ["serde"] }
 indoc = "2"
@@ -667,7 +674,6 @@ jsonschema = "0.37.0"
 jsonwebtoken = "10.0"
 jupyter-protocol = "1.4.0"
 jupyter-websocket-client = "1.1.0"
-keyring = "3"
 libc = "0.2"
 libsqlite3-sys = { version = "0.30.1", features = ["bundled"] }
 linkify = "0.10.0"
@@ -726,6 +732,7 @@ open = "5.0.0"
 ordered-float = "2.1.1"
 palette = { version = "0.7.5", default-features = false, features = ["std"] }
 parking_lot = "0.12.1"
+postcard = { version = "1.1", features = ["alloc", "use-std"] }
 partial-json-fixer = "0.5.3"
 parse_int = "0.9"
 pciid-parser = "0.8.0"
@@ -752,14 +759,14 @@ prost-build = "0.9"
 prost-types = "0.9"
 pollster = "0.4.0"
 pulldown-cmark = { version = "0.13.0", default-features = false }
-qrcode = "0.14.1"
 quick-xml = "0.38"
 quote = "1.0.9"
 rand = "0.9"
 rayon = "1.8"
 regex = "1.5"
-# WARNING: If you change this, you must also publish a new version of zed-reqwest to crates.io
-reqwest = { git = "https://github.com/simtropolis/reqwest.git", rev = "c15662463bda39148ba154100dd44d3fba5873a4", default-features = false, features = [
+ring = "0.17.14"
+# WARNING: If you change this, you must also publish a new version of sim-reqwest to crates.io
+reqwest = { git = "https://github.com/simtropolis/reqwest.git", rev = "c6e14025e406a0c5cb0c96a4a969e601c9fef3c9", default-features = false, features = [
     "charset",
     "http2",
     "macos-system-configuration",
@@ -767,7 +774,13 @@ reqwest = { git = "https://github.com/simtropolis/reqwest.git", rev = "c15662463
     "rustls-tls-native-roots",
     "socks",
     "stream",
-], package = "zed-reqwest", version = "0.12.15-zed" }
+], package = "sim-reqwest", version = "0.12.15-sim" }
+resvg = { version = "0.46.0", default-features = false, features = [
+    "text",
+    "system-fonts",
+    "memmap-fonts",
+    "raster-images",
+] }
 rsa = "0.9.6"
 runtimelib = { version = "1.4.0", default-features = false, features = [
     "async-dispatcher-runtime", "aws-lc-rs"
@@ -776,8 +789,8 @@ rust-embed = { version = "8.11", features = ["include-exclude"] }
 rustc-hash = "2.1.0"
 rustls = { version = "0.23.26" }
 rustls-platform-verifier = "0.5.0"
-# WARNING: If you change this, you must also publish a new version of zed-scap to crates.io
-scap = { git = "https://github.com/simtropolis/scap", rev = "4afea48c3b002197176fb19cd0f9b180dd36eaac", default-features = false, package = "zed-scap", version = "0.0.8-zed" }
+# WARNING: If you change this, you must also publish a new version of sim-scap to crates.io
+scap = { git = "https://github.com/simtropolis/scap", rev = "3d5bdb02b2fbc166b7754642db9063748b9082da", default-features = false, package = "sim-scap", version = "0.0.8-sim" }
 schemars = { version = "1.0", features = ["indexmap2"] }
 semver = { version = "1.0", features = ["serde"] }
 serde = { version = "1.0.221", features = ["derive", "rc"] }
@@ -808,7 +821,6 @@ sysinfo = "0.37.0"
 take-until = "0.2.0"
 tempfile = "3.20.0"
 thiserror = "2.0.12"
-tiktoken-rs = "0.12.0"
 time = { version = "0.3", features = [
     "macros",
     "parsing",
@@ -861,6 +873,7 @@ unicode-width = "0.2"
 unindent = "0.2.0"
 url = "2.2"
 urlencoding = "2.1.2"
+usvg = { version = "0.46.0", default-features = false }
 uuid = { version = "1.1.2", features = ["v4", "v5", "v7", "serde"] }
 vte = { version = "0.15.0", features = ["ansi"] }
 walkdir = "2.5"
@@ -903,6 +916,7 @@ features = [
     "Win32_Globalization",
     "Win32_Graphics_Direct3D",
     "Win32_Graphics_Direct3D11",
+    "Win32_Graphics_Direct3D12",
     "Win32_Graphics_Direct3D_Fxc",
     "Win32_Graphics_DirectComposition",
     "Win32_Graphics_DirectWrite",
@@ -917,6 +931,7 @@ features = [
     "Win32_Security",
     "Win32_Security_Credentials",
     "Win32_Security_Cryptography",
+    "Win32_Security_WinTrust",
     "Win32_Storage_FileSystem",
     "Win32_System_Com",
     "Win32_System_Com_StructuredStorage",
@@ -949,15 +964,15 @@ features = [
 ]
 
 [patch.crates-io]
-async-process = { git = "https://github.com/zed-industries/async-process.git", rev = "0b6d6713570af61806e1e5cb40e0f757cb93fd9d" }
+async-process = { git = "https://github.com/simtropolis/async-process.git", rev = "0b6d6713570af61806e1e5cb40e0f757cb93fd9d" }
 async-task = { git = "https://github.com/smol-rs/async-task.git", rev = "b4486cd71e4e94fbda54ce6302444de14f4d190e" }
 windows-capture = { git = "https://github.com/simtropolis/windows-capture.git", rev = "f0d6c1b6691db75461b732f6d5ff56eed002eeb9" }
 calloop = { git = "https://github.com/simtropolis/calloop" }
-livekit = { git = "https://github.com/simtropolis/livekit-rust-sdks", rev = "c3a55bbc207008f1ca3474b6037fdd3c443cad0f" }
-libwebrtc = { git = "https://github.com/simtropolis/livekit-rust-sdks", rev = "c3a55bbc207008f1ca3474b6037fdd3c443cad0f" }
+livekit = { git = "https://github.com/simtropolis/livekit-rust-sdks", rev = "d0e27be0cdad89eadab3e36207cda0a2b6e359ee" }
+libwebrtc = { git = "https://github.com/simtropolis/livekit-rust-sdks", rev = "d0e27be0cdad89eadab3e36207cda0a2b6e359ee" }
 notify = { git = "https://github.com/simtropolis/notify", rev = "faecbc33db4f59313e5225ef766bfd9e54a54cfd" }
 notify-types = { git = "https://github.com/simtropolis/notify", rev = "faecbc33db4f59313e5225ef766bfd9e54a54cfd" }
-webrtc-sys = { git = "https://github.com/simtropolis/livekit-rust-sdks", rev = "c3a55bbc207008f1ca3474b6037fdd3c443cad0f" }
+webrtc-sys = { git = "https://github.com/simtropolis/livekit-rust-sdks", rev = "d0e27be0cdad89eadab3e36207cda0a2b6e359ee" }
 
 [profile.dev]
 split-debuginfo = "unpacked"
@@ -1017,6 +1032,7 @@ edit_prediction_ui = { codegen-units = 1 }
 install_cli = { codegen-units = 1 }
 journal = { codegen-units = 1 }
 json_schema_store = { codegen-units = 1 }
+llama_cpp = { codegen-units = 1 }
 lmstudio = { codegen-units = 1 }
 menu = { codegen-units = 1 }
 notifications = { codegen-units = 1 }

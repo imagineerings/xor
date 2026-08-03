@@ -1559,7 +1559,7 @@ pub mod test {
             }
         }
 
-        pub fn new_deserialisim(id: WorkspaceId, cx: &mut Context<Self>) -> Self {
+        pub fn new_deserialized(id: WorkspaceId, cx: &mut Context<Self>) -> Self {
             let mut this = Self::new(cx);
             this.workspace_id = Some(id);
             this
@@ -1832,7 +1832,7 @@ pub mod test {
             _window: &mut Window,
             cx: &mut App,
         ) -> Task<anyhow::Result<Entity<Self>>> {
-            let entity = cx.new(|cx| Self::new_deserialisim(workspace_id, cx));
+            let entity = cx.new(|cx| Self::new_deserialized(workspace_id, cx));
             Task::ready(Ok(entity))
         }
 

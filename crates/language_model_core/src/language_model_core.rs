@@ -2,7 +2,6 @@ mod provider;
 mod rate_limiter;
 mod request;
 mod role;
-mod token_counter;
 pub mod tool_schema;
 pub mod util;
 
@@ -25,7 +24,6 @@ pub use crate::provider::*;
 pub use crate::rate_limiter::*;
 pub use crate::request::*;
 pub use crate::role::*;
-pub use crate::token_counter::*;
 pub use crate::tool_schema::LanguageModelToolSchemaFormat;
 pub use crate::util::{fix_streamed_json, parse_prompt_too_long, parse_tool_arguments};
 pub use gpui_shared_string::SharedString;
@@ -58,6 +56,7 @@ pub enum LanguageModelCompletionEvent {
     },
     ReasoningDetails(serde_json::Value),
     UsageUpdate(TokenUsage),
+    Compaction(CompactionContent),
 }
 
 impl LanguageModelCompletionEvent {
@@ -479,6 +478,42 @@ pub enum ReasoningEffort {
     Medium,
     High,
     XHigh,
+    Max,
+}
+
+impl ReasoningEffort {
+    pub const OPENAI_COMPATIBLE_SELECTABLE: [Self; 6] = [
+        Self::Minimal,
+        Self::Low,
+        Self::Medium,
+        Self::High,
+        Self::XHigh,
+        Self::Max,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::None => "None",
+            Self::Minimal => "Minimal",
+            Self::Low => "Low",
+            Self::Medium => "Medium",
+            Self::High => "High",
+            Self::XHigh => "Extra High",
+            Self::Max => "Max",
+        }
+    }
+
+    pub fn value(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Minimal => "minimal",
+            Self::Low => "low",
+            Self::Medium => "medium",
+            Self::High => "high",
+            Self::XHigh => "xhigh",
+            Self::Max => "max",
+        }
+    }
 }
 
 #[cfg(test)]
@@ -594,11 +629,11 @@ mod tests {
             thought_signature: Some("test_signature".to_string()),
         };
 
-        let serialisim = serde_json::to_value(&tool_use).unwrap();
+        let serialized = serde_json::to_value(&tool_use).unwrap();
 
-        assert_eq!(serialisim["id"], "test_id");
-        assert_eq!(serialisim["name"], "test_tool");
-        assert_eq!(serialisim["thought_signature"], "test_signature");
+        assert_eq!(serialized["id"], "test_id");
+        assert_eq!(serialized["name"], "test_tool");
+        assert_eq!(serialized["thought_signature"], "test_signature");
     }
 
     #[test]
@@ -633,12 +668,12 @@ mod tests {
             thought_signature: Some("round_trip_sig".to_string()),
         };
 
-        let serialisim = serde_json::to_value(&original).unwrap();
-        let deserialisim: LanguageModelToolUse = serde_json::from_value(serialisim).unwrap();
+        let serialized = serde_json::to_value(&original).unwrap();
+        let deserialized: LanguageModelToolUse = serde_json::from_value(serialized).unwrap();
 
-        assert_eq!(deserialisim.id, original.id);
-        assert_eq!(deserialisim.name, original.name);
-        assert_eq!(deserialisim.thought_signature, original.thought_signature);
+        assert_eq!(deserialized.id, original.id);
+        assert_eq!(deserialized.name, original.name);
+        assert_eq!(deserialized.thought_signature, original.thought_signature);
     }
 
     #[test]
@@ -654,11 +689,11 @@ mod tests {
             thought_signature: None,
         };
 
-        let serialisim = serde_json::to_value(&original).unwrap();
-        let deserialisim: LanguageModelToolUse = serde_json::from_value(serialisim).unwrap();
+        let serialized = serde_json::to_value(&original).unwrap();
+        let deserialized: LanguageModelToolUse = serde_json::from_value(serialized).unwrap();
 
-        assert_eq!(deserialisim.id, original.id);
-        assert_eq!(deserialisim.name, original.name);
-        assert_eq!(deserialisim.thought_signature, None);
+        assert_eq!(deserialized.id, original.id);
+        assert_eq!(deserialized.name, original.name);
+        assert_eq!(deserialized.thought_signature, None);
     }
 }

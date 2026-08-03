@@ -101,10 +101,11 @@ function GenerateLicenses {
 
 function BuildSimAndItsFriends {
     Write-Output "Building Sim and its friends, for channel: $channel"
-    # Build sim.exe, cli.exe and auto_update_helper.exe
-    cargo build --release --package sim --package cli --package auto_update_helper --target $target
+    # Build sim.exe, cli.exe, comfy-worker.exe and auto_update_helper.exe
+    cargo build --release --package sim --package cli --package comfy_worker --package auto_update_helper --features sim/rocm,comfy_worker/rocm,sim/directml,comfy_worker/directml --target $target
     Copy-Item -Path ".\$CargoOutDir\sim.exe" -Destination "$innoDir\Sim.exe" -Force
     Copy-Item -Path ".\$CargoOutDir\cli.exe" -Destination "$innoDir\cli.exe" -Force
+    Copy-Item -Path ".\$CargoOutDir\comfy-worker.exe" -Destination "$innoDir\comfy-worker.exe" -Force
     Copy-Item -Path ".\$CargoOutDir\auto_update_helper.exe" -Destination "$innoDir\auto_update_helper.exe" -Force
     # Build explorer_command_injector.dll
     switch ($channel) {
@@ -144,6 +145,7 @@ function ZipSimAndItsFriendsDebug {
     $items = @(
         ".\$CargoOutDir\sim.pdb",
         ".\$CargoOutDir\cli.pdb",
+        ".\$CargoOutDir\comfy-worker.pdb",
         ".\$CargoOutDir\auto_update_helper.pdb",
         ".\$CargoOutDir\explorer_command_injector.pdb",
         ".\$CargoOutDir\remote_server.pdb"
@@ -204,7 +206,7 @@ function SignSimAndItsFriends {
         return
     }
 
-    $files = "$innoDir\Sim.exe,$innoDir\cli.exe,$innoDir\auto_update_helper.exe,$innoDir\sim_explorer_command_injector.dll,$innoDir\sim_explorer_command_injector.appx"
+    $files = "$innoDir\Sim.exe,$innoDir\cli.exe,$innoDir\comfy-worker.exe,$innoDir\auto_update_helper.exe,$innoDir\sim_explorer_command_injector.dll,$innoDir\sim_explorer_command_injector.appx"
     & "$innoDir\sign.ps1" $files
 }
 
@@ -259,9 +261,9 @@ function BuildInstaller {
             $appMutex = "Sim-Stable-Instance-Mutex"
             $appExeName = "Sim"
             $regValueName = "Sim"
-            $appUserId = "SimIndustries.Sim"
+            $appUserId = "Simtropolis.Sim"
             $appShellNameShort = "Z&ed"
-            $appAppxFullName = "SimIndustries.Sim_1.0.0.0_neutral__japxn1gcva8rg"
+            $appAppxFullName = "Simtropolis.Sim_1.0.0.0_neutral__japxn1gcva8rg"
         }
         "preview" {
             $appId = "{{F70E4811-D0E2-4D88-AC99-D63752799F95}"
@@ -273,9 +275,9 @@ function BuildInstaller {
             $appMutex = "Sim-Preview-Instance-Mutex"
             $appExeName = "Sim"
             $regValueName = "SimPreview"
-            $appUserId = "SimIndustries.Sim.Preview"
+            $appUserId = "Simtropolis.Sim.Preview"
             $appShellNameShort = "Z&ed Preview"
-            $appAppxFullName = "SimIndustries.Sim.Preview_1.0.0.0_neutral__japxn1gcva8rg"
+            $appAppxFullName = "Simtropolis.Sim.Preview_1.0.0.0_neutral__japxn1gcva8rg"
         }
         "nightly" {
             $appId = "{{1BDB21D3-14E7-433C-843C-9C97382B2FE0}"
@@ -287,9 +289,9 @@ function BuildInstaller {
             $appMutex = "Sim-Nightly-Instance-Mutex"
             $appExeName = "Sim"
             $regValueName = "SimNightly"
-            $appUserId = "SimIndustries.Sim.Nightly"
+            $appUserId = "Simtropolis.Sim.Nightly"
             $appShellNameShort = "Z&ed Editor Nightly"
-            $appAppxFullName = "SimIndustries.Sim.Nightly_1.0.0.0_neutral__japxn1gcva8rg"
+            $appAppxFullName = "Simtropolis.Sim.Nightly_1.0.0.0_neutral__japxn1gcva8rg"
         }
         "dev" {
             $appId = "{{8357632E-24A4-4F32-BA97-E575B4D1FE5D}"
@@ -301,9 +303,9 @@ function BuildInstaller {
             $appMutex = "Sim-Dev-Instance-Mutex"
             $appExeName = "Sim"
             $regValueName = "SimDev"
-            $appUserId = "SimIndustries.Sim.Dev"
+            $appUserId = "Simtropolis.Sim.Dev"
             $appShellNameShort = "Z&ed Dev"
-            $appAppxFullName = "SimIndustries.Sim.Dev_1.0.0.0_neutral__japxn1gcva8rg"
+            $appAppxFullName = "Simtropolis.Sim.Dev_1.0.0.0_neutral__japxn1gcva8rg"
         }
         default {
             Write-Error "can't bundle installer for $channel."

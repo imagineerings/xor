@@ -48,7 +48,7 @@ struct EditStreamState {
 /// Because partial JSON comes through a fixer (`partial-json-fixer`) that
 /// closes incomplete escape sequences, a string can temporarily contain wrong
 /// trailing characters (e.g. a literal `\` instead of `\n`).  We handle this
-/// by holding back trailing backslash characters in non-finalisim chunks: if
+/// by holding back trailing backslash characters in non-finalized chunks: if
 /// a partial string ends with `\` (0x5C), that byte is not emitted until the
 /// next partial confirms or corrects it.  This avoids feeding corrupted bytes
 /// to downstream consumers.
@@ -108,51 +108,52 @@ impl StreamingParser {
             }
 
             // Process old_text changes.
-            if let Some(old_text) = &partial.old_text {
-                if !state.old_text_done {
-                    if partial.new_text.is_some() && !state.buffer_new_text_until_old_text_done {
-                        // new_text appeared after old_text, so old_text is done — emit everything.
-                        let start = find_char_boundary(old_text, state.old_text_emitted_len);
-                        let chunk = normalize_done_chunk(old_text[start..].to_string());
-                        state.old_text_done = true;
-                        state.old_text_emitted_len = old_text.len();
-                        events.push(EditEvent::OldTextChunk {
-                            edit_index: index,
-                            chunk,
-                            done: true,
-                        });
-                    } else {
-                        let safe_end = safe_emit_end_for_edit_text(old_text);
-                        let safe_start = find_char_boundary(old_text, state.old_text_emitted_len);
-
-                        if safe_end > safe_start {
-                            let chunk = old_text[safe_start..safe_end].to_string();
-                            state.old_text_emitted_len = safe_end;
-                            events.push(EditEvent::OldTextChunk {
-                                edit_index: index,
-                                chunk,
-                                done: false,
-                            });
-                        }
-                    }
-                }
-            }
-
-            // Process new_text changes.
-            if let Some(new_text) = &partial.new_text {
-                if state.old_text_done && !state.new_text_done {
-                    let safe_end = safe_emit_end_for_edit_text(new_text);
-                    let safe_start = find_char_boundary(new_text, state.new_text_emitted_len);
+            if let Some(old_text) = &partial.old_text
+                && !state.old_text_done
+            {
+                if partial.new_text.is_some() && !state.buffer_new_text_until_old_text_done {
+                    // new_text appeared after old_text, so old_text is done — emit everything.
+                    let start = find_char_boundary(old_text, state.old_text_emitted_len);
+                    let chunk = normalize_done_chunk(old_text[start..].to_string());
+                    state.old_text_done = true;
+                    state.old_text_emitted_len = old_text.len();
+                    events.push(EditEvent::OldTextChunk {
+                        edit_index: index,
+                        chunk,
+                        done: true,
+                    });
+                } else {
+                    let safe_end = safe_emit_end_for_edit_text(old_text);
+                    let safe_start = find_char_boundary(old_text, state.old_text_emitted_len);
 
                     if safe_end > safe_start {
-                        let chunk = new_text[safe_start..safe_end].to_string();
-                        state.new_text_emitted_len = safe_end;
-                        events.push(EditEvent::NewTextChunk {
+                        let chunk = old_text[safe_start..safe_end].to_string();
+                        state.old_text_emitted_len = safe_end;
+                        events.push(EditEvent::OldTextChunk {
                             edit_index: index,
                             chunk,
                             done: false,
                         });
                     }
+                }
+            }
+
+            // Process new_text changes.
+            if let Some(new_text) = &partial.new_text
+                && state.old_text_done
+                && !state.new_text_done
+            {
+                let safe_end = safe_emit_end_for_edit_text(new_text);
+                let safe_start = find_char_boundary(new_text, state.new_text_emitted_len);
+
+                if safe_end > safe_start {
+                    let chunk = new_text[safe_start..safe_end].to_string();
+                    state.new_text_emitted_len = safe_end;
+                    events.push(EditEvent::NewTextChunk {
+                        edit_index: index,
+                        chunk,
+                        done: false,
+                    });
                 }
             }
         }
@@ -180,9 +181,9 @@ impl StreamingParser {
 
     /// Finalize all edits with the complete input. This emits `done: true`
     /// events for any in-progress old_text or new_text that hasn't been
-    /// finalisim yet.
+    /// finalized yet.
     ///
-    /// `final_edits` should be the fully deserialisim final edits array. The
+    /// `final_edits` should be the fully deserialized final edits array. The
     /// parser compares against its tracked state and emits any remaining deltas
     /// with `done: true`.
     pub fn finalize_edits(&mut self, edits: &[Edit]) -> SmallVec<[EditEvent; 4]> {
@@ -270,7 +271,7 @@ impl StreamingParser {
     }
 
     /// When a new edit appears at `index`, finalize the edit at `index - 1`
-    /// by emitting a `NewTextChunk { done: true }` if it hasn't been finalisim.
+    /// by emitting a `NewTextChunk { done: true }` if it hasn't been finalized.
     fn finalize_previous_edit(
         &mut self,
         new_index: usize,
@@ -647,7 +648,7 @@ mod tests {
             ]
         );
 
-        // Second edit appears → first edit's new_text is finalisim
+        // Second edit appears → first edit's new_text is finalized
         let events = parser.push_edits(&[
             PartialEdit {
                 old_text: Some("first old".into()),

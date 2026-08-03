@@ -13,7 +13,7 @@ doctest = false
 workspace = true
 
 [dependencies]
-serde_json.workspace = true
+rand.workspace = true
 
 [dev-dependencies]
 action_log.workspace = true
@@ -24,15 +24,16 @@ criterion.workspace = true
 editor = { workspace = true, features = ["test-support"] }
 futures.workspace = true
 gpui = { workspace = true, features = ["bench"] }
-gpui_platform = { workspace = true, features = ["test-support"] }
+gpui_platform = { workspace = true, features = ["test-support", "font-kit"] }
 itertools.workspace = true
 language = { workspace = true, features = ["test-support"] }
 language_model = { workspace = true, features = ["test-support"] }
 lsp = { workspace = true, features = ["test-support"] }
+markdown.workspace = true
 multi_buffer.workspace = true
 project = { workspace = true, features = ["test-support"] }
 prompt_store.workspace = true
-rand.workspace = true
+serde_json.workspace = true
 settings = { workspace = true, features = ["test-support"] }
 text.workspace = true
 theme = { workspace = true, features = ["test-support"] }
@@ -54,5 +55,5 @@ name = "edit_file_tool"
 harness = false
 
 [[bench]]
-name = "agent"
+name = "markdown_renderer"
 harness = false

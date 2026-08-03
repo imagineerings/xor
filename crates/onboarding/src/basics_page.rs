@@ -26,23 +26,12 @@ use crate::{
     theme_preview::{ThemePreviewStyle, ThemePreviewTile},
 };
 
-const LIGHT_THEMES: [&str; 4] = [
-    "One Light",
-    "Ayu Light",
-    "Gruvbox Light",
-    "Spectrum 2 Inspired Light",
-];
-const DARK_THEMES: [&str; 4] = [
-    "One Dark",
-    "Ayu Dark",
-    "Gruvbox Dark",
-    "Spectrum 2 Inspired Dark",
-];
-const FAMILY_NAMES: [SharedString; 4] = [
+const LIGHT_THEMES: [&str; 3] = ["One Light", "Ayu Light", "Gruvbox Light"];
+const DARK_THEMES: [&str; 3] = ["One Dark", "Ayu Dark", "Gruvbox Dark"];
+const FAMILY_NAMES: [SharedString; 3] = [
     SharedString::new_static("One"),
     SharedString::new_static("Ayu"),
     SharedString::new_static("Gruvbox"),
-    SharedString::new_static("Spectrum 2 Inspired"),
 ];
 
 fn get_theme_family_themes(theme_name: &str) -> Option<(&'static str, &'static str)> {
@@ -114,7 +103,7 @@ fn render_theme_section(tab_index: &mut isize, cx: &mut App) -> impl IntoElement
         tab_index: &mut isize,
         theme_selection: &ThemeSelection,
         cx: &mut App,
-    ) -> [impl IntoElement; 4] {
+    ) -> [impl IntoElement; 3] {
         let system_appearance = SystemAppearance::global(cx);
         let theme_registry = ThemeRegistry::global(cx);
 
@@ -137,23 +126,9 @@ fn render_theme_section(tab_index: &mut isize, cx: &mut App) -> impl IntoElement
             Appearance::Dark => DARK_THEMES,
         };
 
-        let themes = theme_names.map(|theme| {
-            theme_registry.get(theme).unwrap_or_else(|_| {
-                // Fall back to One theme if the requested theme isn't installed.
-                // This handles the case where Spectrum 2 Inspired theme hasn't been
-                // installed yet (e.g., fresh setup without the theme file).
-                let fallback = if appearance == Appearance::Light {
-                    LIGHT_THEMES[0]
-                } else {
-                    DARK_THEMES[0]
-                };
-                theme_registry
-                    .get(fallback)
-                    .expect("One theme should always be available")
-            })
-        });
+        let themes = theme_names.map(|theme| theme_registry.get(theme).unwrap());
 
-        [0, 1, 2, 3].map(|index| {
+        [0, 1, 2].map(|index| {
             let theme = &themes[index];
             let is_selected = theme.name == current_theme_name;
             let name = theme.name.clone();
@@ -202,12 +177,8 @@ fn render_theme_section(tab_index: &mut isize, cx: &mut App) -> impl IntoElement
                         .map(|this| {
                             if theme_mode == ThemeAppearanceMode::System {
                                 let (light, dark) = (
-                                    theme_registry.get(LIGHT_THEMES[index]).unwrap_or_else(|_| {
-                                        theme_registry.get(LIGHT_THEMES[0]).unwrap()
-                                    }),
-                                    theme_registry.get(DARK_THEMES[index]).unwrap_or_else(|_| {
-                                        theme_registry.get(DARK_THEMES[0]).unwrap()
-                                    }),
+                                    theme_registry.get(LIGHT_THEMES[index]).unwrap(),
+                                    theme_registry.get(DARK_THEMES[index]).unwrap(),
                                 );
                                 this.child(
                                     ThemePreviewTile::new(light, theme_seed)
@@ -465,9 +436,7 @@ fn render_worktree_auto_trust_switch(tab_index: &mut isize, cx: &mut App) -> imp
     SwitchField::new(
         "onboarding-auto-trust-worktrees",
         Some("Trust All Projects By Default"),
-        Some(
-            "Automatically mark all new projects as trusted to unlock all Sim's features".into(),
-        ),
+        Some("Automatically mark all new projects as trusted to unlock all Sim's features".into()),
         toggle_state,
         {
             let fs = <dyn Fs>::global(cx);
@@ -596,20 +565,28 @@ fn render_registry_agent_button(
         .name(agent.name().clone())
         .state(state_element)
         .disabled(installed)
-        .on_click(move |_, _, cx| {
+        .on_click(move |_, window, cx| {
             telemetry::event!("Welcome Agent Install Clicked", agent = agent_id.as_str());
-            let agent_id = agent_id.clone();
-            update_settings_file(fs.clone(), cx, move |settings, _| {
-                let agent_servers = settings.agent_servers.get_or_insert_default();
-                agent_servers.entry(agent_id).or_insert_with(|| {
-                    CustomAgentServerSettings::Registry {
-                        env: Default::default(),
-                        default_mode: None,
-                        default_config_options: HashMap::default(),
-                        favorite_config_option_values: HashMap::default(),
-                    }
-                });
+            update_settings_file(fs.clone(), cx, {
+                let agent_id = agent_id.clone();
+                move |settings, _| {
+                    let agent_servers = settings.agent_servers.get_or_insert_default();
+                    agent_servers.entry(agent_id).or_insert_with(|| {
+                        CustomAgentServerSettings::Registry {
+                            env: Default::default(),
+                            default_mode: None,
+                            default_config_options: HashMap::default(),
+                            favorite_config_option_values: HashMap::default(),
+                        }
+                    });
+                }
             });
+            window.dispatch_action(
+                Box::new(sim_actions::agent::SelectAgent {
+                    agent: agent_id.clone(),
+                }),
+                cx,
+            );
         })
 }
 

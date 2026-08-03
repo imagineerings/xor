@@ -32,16 +32,20 @@ use gpui::{
 use gpui_tokio::Tokio;
 use http_client::HttpClient;
 use language_model::{
-    AuthenticateError, EnvVar, IconOrSvg, LanguageModel, LanguageModelCompletionError,
-    LanguageModelCompletionEvent, LanguageModelId, LanguageModelName, LanguageModelProvider,
-    LanguageModelProviderId, LanguageModelProviderName, LanguageModelProviderState,
-    LanguageModelRequest, LanguageModelToolChoice, LanguageModelToolResultContent,
-    LanguageModelToolUse, MessageContent, RateLimiter, Role, TokenUsage, env_var,
+    AuthenticateError, EnvVar, IconOrSvg, InlineDescription, LanguageModel,
+    LanguageModelCompletionError, LanguageModelCompletionEvent, LanguageModelId, LanguageModelName,
+    LanguageModelProvider, LanguageModelProviderId, LanguageModelProviderName,
+    LanguageModelProviderState, LanguageModelRequest, LanguageModelToolChoice,
+    LanguageModelToolResultContent, LanguageModelToolUse, MessageContent, RateLimiter, Role,
+    TokenUsage, env_var,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use settings::{BedrockAvailableModel as AvailableModel, Settings, SettingsStore};
+use settings::{
+    BedrockAvailableModel as AvailableModel, BedrockMantleAvailableModel as MantleAvailableModel,
+    Settings, SettingsStore,
+};
 use std::sync::LazyLock;
 use strum::{EnumIter, IntoEnumIterator, IntoStaticStr};
 use ui::{ButtonLink, ConfiguredApiCard, Divider, List, ListBulletItem, prelude::*};
@@ -73,6 +77,94 @@ pub struct BedrockCredentials {
     pub secret_access_key: String,
     pub session_token: Option<String>,
     pub bearer_token: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use language_model::LanguageModelRequestMessage;
+
+    fn into_bedrock_request(messages: Vec<LanguageModelRequestMessage>) -> bedrock::Request {
+        into_bedrock(
+            LanguageModelRequest {
+                messages,
+                ..Default::default()
+            },
+            "claude-sonnet-4-5".to_string(),
+            1.0,
+            4096,
+            BedrockModelMode::Default,
+            true,
+            true,
+            None,
+            None,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn test_cache_marked_message_that_filters_to_empty_is_dropped() {
+        let request = into_bedrock_request(vec![
+            LanguageModelRequestMessage {
+                role: Role::User,
+                content: vec![MessageContent::Text("What's the weather?".into())],
+                cache: false,
+                reasoning_details: None,
+            },
+            LanguageModelRequestMessage {
+                role: Role::Assistant,
+                content: vec![MessageContent::Thinking {
+                    text: "Let me think about this...".into(),
+                    signature: None,
+                }],
+                cache: true,
+                reasoning_details: None,
+            },
+            LanguageModelRequestMessage {
+                role: Role::User,
+                content: vec![MessageContent::Text("Summarize this conversation.".into())],
+                cache: false,
+                reasoning_details: None,
+            },
+        ]);
+
+        for message in &request.messages {
+            assert!(
+                message
+                    .content()
+                    .iter()
+                    .any(|block| !matches!(block, BedrockInnerContent::CachePoint(_))),
+                "message must not consist solely of cache points: {:?}",
+                message
+            );
+        }
+        assert!(
+            request
+                .messages
+                .iter()
+                .all(|message| *message.role() == bedrock::BedrockRole::User),
+            "the assistant message stripped to empty content should be dropped entirely"
+        );
+    }
+
+    #[test]
+    fn test_cache_marked_message_with_content_gets_cache_point() {
+        let request = into_bedrock_request(vec![LanguageModelRequestMessage {
+            role: Role::User,
+            content: vec![MessageContent::Text("What's the weather?".into())],
+            cache: true,
+            reasoning_details: None,
+        }]);
+
+        assert_eq!(request.messages.len(), 1);
+        assert!(
+            matches!(
+                request.messages[0].content().last(),
+                Some(BedrockInnerContent::CachePoint(_))
+            ),
+            "a cache-marked message with content should end with a cache point"
+        );
+    }
 }
 
 /// Resolved authentication configuration for Bedrock.
@@ -116,6 +208,7 @@ impl BedrockCredentials {
 #[derive(Default, Clone, Debug, PartialEq)]
 pub struct AmazonBedrockSettings {
     pub available_models: Vec<AvailableModel>,
+    pub mantle_available_models: Vec<MantleAvailableModel>,
     pub custom_headers: CustomHeaders,
     pub region: Option<String>,
     pub endpoint: Option<String>,
@@ -193,8 +286,7 @@ const AMAZON_AWS_URL: &str = "https://amazonaws.com";
 
 // These environment variables all use a `SIM_` prefix because we don't want to overwrite the user's AWS credentials.
 static SIM_BEDROCK_ACCESS_KEY_ID_VAR: LazyLock<EnvVar> = env_var!("SIM_ACCESS_KEY_ID");
-static SIM_BEDROCK_SECRET_ACCESS_KEY_VAR: LazyLock<EnvVar> =
-    env_var!("SIM_SECRET_ACCESS_KEY");
+static SIM_BEDROCK_SECRET_ACCESS_KEY_VAR: LazyLock<EnvVar> = env_var!("SIM_SECRET_ACCESS_KEY");
 static SIM_BEDROCK_SESSION_TOKEN_VAR: LazyLock<EnvVar> = env_var!("SIM_SESSION_TOKEN");
 static SIM_AWS_PROFILE_VAR: LazyLock<EnvVar> = env_var!("SIM_AWS_PROFILE");
 static SIM_BEDROCK_REGION_VAR: LazyLock<EnvVar> = env_var!("SIM_AWS_REGION");
@@ -304,43 +396,42 @@ impl State {
         let credentials_provider = self.credentials_provider.clone();
         cx.spawn(async move |this, cx| {
             // Try environment variables first
-            let (auth, from_env) =
-                if let Some(bearer_token) = &SIM_BEDROCK_BEARER_TOKEN_VAR.value {
-                    if !bearer_token.is_empty() {
+            let (auth, from_env) = if let Some(bearer_token) = &SIM_BEDROCK_BEARER_TOKEN_VAR.value {
+                if !bearer_token.is_empty() {
+                    (
+                        Some(BedrockAuth::ApiKey {
+                            api_key: bearer_token.to_string(),
+                        }),
+                        true,
+                    )
+                } else {
+                    (None, false)
+                }
+            } else if let Some(access_key_id) = &SIM_BEDROCK_ACCESS_KEY_ID_VAR.value {
+                if let Some(secret_access_key) = &SIM_BEDROCK_SECRET_ACCESS_KEY_VAR.value {
+                    if !access_key_id.is_empty() && !secret_access_key.is_empty() {
+                        let session_token = SIM_BEDROCK_SESSION_TOKEN_VAR
+                            .value
+                            .as_deref()
+                            .filter(|s| !s.is_empty())
+                            .map(|s| s.to_string());
                         (
-                            Some(BedrockAuth::ApiKey {
-                                api_key: bearer_token.to_string(),
+                            Some(BedrockAuth::IamCredentials {
+                                access_key_id: access_key_id.to_string(),
+                                secret_access_key: secret_access_key.to_string(),
+                                session_token,
                             }),
                             true,
                         )
                     } else {
                         (None, false)
                     }
-                } else if let Some(access_key_id) = &SIM_BEDROCK_ACCESS_KEY_ID_VAR.value {
-                    if let Some(secret_access_key) = &SIM_BEDROCK_SECRET_ACCESS_KEY_VAR.value {
-                        if !access_key_id.is_empty() && !secret_access_key.is_empty() {
-                            let session_token = SIM_BEDROCK_SESSION_TOKEN_VAR
-                                .value
-                                .as_deref()
-                                .filter(|s| !s.is_empty())
-                                .map(|s| s.to_string());
-                            (
-                                Some(BedrockAuth::IamCredentials {
-                                    access_key_id: access_key_id.to_string(),
-                                    secret_access_key: secret_access_key.to_string(),
-                                    session_token,
-                                }),
-                                true,
-                            )
-                        } else {
-                            (None, false)
-                        }
-                    } else {
-                        (None, false)
-                    }
                 } else {
                     (None, false)
-                };
+                }
+            } else {
+                (None, false)
+            };
 
             // If we got auth from env vars, use it
             if let Some(auth) = auth {
@@ -460,6 +551,12 @@ impl LanguageModelProvider for BedrockLanguageModelProvider {
 
     fn icon(&self) -> IconOrSvg {
         IconOrSvg::Icon(IconName::AiBedrock)
+    }
+
+    fn inline_description(&self, _cx: &App) -> Option<InlineDescription> {
+        Some(InlineDescription::Text(
+            "To use Sim's agent with Bedrock, set a custom authentication strategy in your settings or use static credentials.".into(),
+        ))
     }
 
     fn default_model(&self, _cx: &App) -> Option<Arc<dyn LanguageModel>> {
@@ -673,6 +770,18 @@ impl LanguageModel for BedrockModel {
         self.model.supports_thinking()
     }
 
+    fn refusal_fallback_model_id(&self) -> Option<&'static str> {
+        if self
+            .model
+            .id()
+            .starts_with(anthropic::FABLE_MODEL_ID_PREFIX)
+        {
+            Some(anthropic::FABLE_FALLBACK_MODEL_ID)
+        } else {
+            None
+        }
+    }
+
     fn supported_effort_levels(&self) -> Vec<language_model::LanguageModelEffortLevel> {
         if self.model.supports_adaptive_thinking() {
             vec![
@@ -884,6 +993,7 @@ pub fn into_bedrock(
                                 None
                             }
                         }
+                        MessageContent::Compaction(_) => None,
                         MessageContent::Thinking { text, signature } => {
                             if model.contains(Model::DeepSeekR1.request_id()) {
                                 // DeepSeekR1 doesn't support thinking blocks
@@ -1015,7 +1125,7 @@ pub fn into_bedrock(
                         }
                     })
                     .collect();
-                if message.cache && supports_caching {
+                if message.cache && supports_caching && !bedrock_message_content.is_empty() {
                     bedrock_message_content.push(BedrockInnerContent::CachePoint(
                         CachePointBlock::builder()
                             .r#type(CachePointType::Default)
@@ -1493,10 +1603,6 @@ impl ConfigurationView {
             .detach_and_log_err(cx);
     }
 
-    fn should_render_editor(&self, cx: &Context<Self>) -> bool {
-        self.state.read(cx).is_authenticated()
-    }
-
     fn on_tab(&mut self, _: &menu::SelectNext, window: &mut Window, cx: &mut Context<Self>) {
         window.focus_next(cx);
     }
@@ -1538,8 +1644,7 @@ impl Render for ConfigurationView {
             Some(BedrockAuth::IamCredentials { .. }) if env_var_set => {
                 format!(
                     "Using IAM credentials from {} and {} environment variables",
-                    SIM_BEDROCK_ACCESS_KEY_ID_VAR.name,
-                    SIM_BEDROCK_SECRET_ACCESS_KEY_VAR.name
+                    SIM_BEDROCK_ACCESS_KEY_ID_VAR.name, SIM_BEDROCK_SECRET_ACCESS_KEY_VAR.name
                 )
             }
             Some(BedrockAuth::IamCredentials { .. }) => "Using IAM credentials".into(),
@@ -1579,13 +1684,15 @@ impl Render for ConfigurationView {
             None
         };
 
-        if self.should_render_editor(cx) {
-            return ConfiguredApiCard::new(configured_label)
+        let credentials_control = if self.state.read(cx).is_authenticated() {
+            ConfiguredApiCard::new("bedrock-reset", configured_label)
                 .disabled(env_var_set || is_settings_derived)
                 .on_click(cx.listener(|this, _, window, cx| this.reset_credentials(window, cx)))
                 .when_some(tooltip_label, |this, label| this.tooltip_label(label))
-                .into_any_element();
-        }
+                .into_any_element()
+        } else {
+            self.render_static_credentials_ui().into_any_element()
+        };
 
         v_flex()
             .min_w_0()
@@ -1594,15 +1701,29 @@ impl Render for ConfigurationView {
             .on_action(cx.listener(Self::on_tab))
             .on_action(cx.listener(Self::on_tab_prev))
             .on_action(cx.listener(ConfigurationView::save_credentials))
-            .child(Label::new("To use Sim's agent with Bedrock, you can set a custom authentication strategy through your settings file or use static credentials."))
-            .child(Label::new("But first, to access models on AWS, you need to:").mt_1())
+            .gap_1()
+            .child(Headline::new("Amazon Bedrock").size(HeadlineSize::Small))
+            .child(
+                Label::new(
+                    "To use Sim's agent with Bedrock, you can set a custom authentication strategy through your settings file or use static credentials.",
+                )
+                .color(Color::Muted),
+            )
+            .child(
+                Label::new("But first, to access models on AWS, you need to:")
+                    .mt_1()
+                    .color(Color::Muted),
+            )
             .child(
                 List::new()
                     .child(
                         ListBulletItem::new("")
-                            .child(Label::new(
-                                "Grant permissions to the strategy you'll use according to the:",
-                            ))
+                            .child(
+                                Label::new(
+                                    "Grant permissions to the strategy you'll use according to the:",
+                                )
+                                .color(Color::Muted),
+                            )
                             .child(ButtonLink::new(
                                 "Prerequisites",
                                 "https://docs.aws.amazon.com/bedrock/latest/userguide/inference-prereq.html",
@@ -1610,33 +1731,32 @@ impl Render for ConfigurationView {
                     )
                     .child(
                         ListBulletItem::new("")
-                            .child(Label::new("Select the models you would like access to:"))
+                            .child(
+                                Label::new("Select the models you would like access to:")
+                                    .color(Color::Muted),
+                            )
                             .child(ButtonLink::new(
                                 "Bedrock Model Catalog",
                                 "https://us-east-1.console.aws.amazon.com/bedrock/home?region=us-east-1#/model-catalog",
                             )),
                     ),
             )
-            .child(self.render_static_credentials_ui())
+            .child(credentials_control)
             .into_any()
     }
 }
 
 impl ConfigurationView {
     fn render_static_credentials_ui(&self) -> impl IntoElement {
-        let section_header = |title: SharedString| {
-            h_flex()
-                .gap_2()
-                .child(Label::new(title).size(LabelSize::Default))
-                .child(Divider::horizontal())
-        };
-
         let list_item = List::new()
             .child(
                 ListBulletItem::new("")
-                    .child(Label::new(
-                        "For access keys: Create an IAM user in the AWS console with programmatic access",
-                    ))
+                    .child(
+                        Label::new(
+                            "For access keys: Create an IAM user in the AWS console with programmatic access",
+                        )
+                        .color(Color::Muted),
+                    )
                     .child(ButtonLink::new(
                         "IAM Console",
                         "https://us-east-1.console.aws.amazon.com/iam/home?region=us-east-1#/users",
@@ -1644,7 +1764,10 @@ impl ConfigurationView {
             )
             .child(
                 ListBulletItem::new("")
-                    .child(Label::new("For Bedrock API Keys: Generate an API key from the"))
+                    .child(
+                        Label::new("For Bedrock API Keys: Generate an API key from the")
+                            .color(Color::Muted),
+                    )
                     .child(ButtonLink::new(
                         "Bedrock Console",
                         "https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys-use.html",
@@ -1652,28 +1775,42 @@ impl ConfigurationView {
             )
             .child(
                 ListBulletItem::new("")
-                    .child(Label::new("Attach the necessary Bedrock permissions to"))
+                    .child(
+                        Label::new("Attach the necessary Bedrock permissions to")
+                            .color(Color::Muted),
+                    )
                     .child(ButtonLink::new(
                         "this user",
                         "https://docs.aws.amazon.com/bedrock/latest/userguide/inference-prereq.html",
                     )),
             )
-            .child(ListBulletItem::new(
-                "Enter either access keys OR a Bedrock API Key below (not both)",
-            ));
+            .child(
+                ListBulletItem::new(
+                    "Enter either access keys OR a Bedrock API Key below (not both)",
+                )
+                .label_color(Color::Muted),
+            );
 
         v_flex()
             .my_2()
             .tab_group()
             .gap_1p5()
-            .child(section_header("Static Credentials".into()))
-            .child(Label::new(
-                "This method uses your AWS access key ID and secret access key, or a Bedrock API Key.",
-            ))
+            .child(Divider::horizontal())
+            .child(Label::new("Static Credentials").mt_2())
+            .child(
+                Label::new(
+                    "This method uses your AWS access key ID and secret access key, or a Bedrock API Key.",
+                )
+                .color(Color::Muted),
+            )
             .child(list_item)
-            .child(self.access_key_id_editor.clone())
-            .child(self.secret_access_key_editor.clone())
-            .child(self.session_token_editor.clone())
+            .child(
+                v_flex()
+                    .gap_1()
+                    .child(self.access_key_id_editor.clone())
+                    .child(self.secret_access_key_editor.clone())
+                    .child(self.session_token_editor.clone()),
+            )
             .child(
                 Label::new(format!(
                     "You can also set the {}, {} and {} environment variables (or {} for Bedrock API Key authentication) and restart Sim.",
@@ -1697,7 +1834,8 @@ impl ConfigurationView {
                 .mt_1()
                 .mb_2p5(),
             )
-            .child(section_header("Using the an API key".into()))
+            .child(Divider::horizontal())
+            .child(Label::new("Using the API key").mt_2().mb_1())
             .child(self.bearer_token_editor.clone())
             .child(
                 Label::new(format!(

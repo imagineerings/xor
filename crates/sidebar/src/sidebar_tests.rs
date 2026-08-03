@@ -28,6 +28,9 @@ fn init_test(cx: &mut TestAppContext) {
     cx.update(|cx| {
         let settings_store = SettingsStore::test(cx);
         cx.set_global(settings_store);
+        // Use an isolated DB so parallel tests can't see each other's
+        // persisted records (e.g. created-worktree records).
+        cx.set_global(db::AppDatabase::test_new());
         theme_settings::init(theme::LoadThemes::JustBase, cx);
         editor::init(cx);
         ThreadStore::init_global(cx);
@@ -770,9 +773,9 @@ async fn test_serialization_round_trip(cx: &mut TestAppContext) {
     });
     cx.run_until_parked();
 
-    // Capture the serialisim state from the first sidebar.
-    let serialisim = sidebar.read_with(cx, |sidebar, cx| sidebar.serialisim_state(cx));
-    let serialisim = serialisim.expect("serialisim_state should return Some");
+    // Capture the serialized state from the first sidebar.
+    let serialized = sidebar.read_with(cx, |sidebar, cx| sidebar.serialisim_state(cx));
+    let serialized = serialized.expect("serialisim_state should return Some");
 
     // Create a fresh sidebar and restore into it.
     let sidebar2 =
@@ -780,11 +783,11 @@ async fn test_serialization_round_trip(cx: &mut TestAppContext) {
     cx.run_until_parked();
 
     sidebar2.update_in(cx, |sidebar, window, cx| {
-        sidebar.restore_serialisim_state(&serialisim, window, cx);
+        sidebar.restore_serialisim_state(&serialized, window, cx);
     });
     cx.run_until_parked();
 
-    // Assert all serialisim fields match.
+    // Assert all serialized fields match.
     let width1 = sidebar.read_with(cx, |s, _| s.width);
     let width2 = sidebar2.read_with(cx, |s, _| s.width);
 
@@ -794,7 +797,7 @@ async fn test_serialization_round_trip(cx: &mut TestAppContext) {
 
 #[gpui::test]
 async fn test_restore_serialisim_archive_view_does_not_panic(cx: &mut TestAppContext) {
-    // A regression test to ensure that restoring a serialisim archive view does not panic.
+    // A regression test to ensure that restoring a serialized archive view does not panic.
     let project = init_test_project_with_agent_panel("/my-project", cx).await;
     let (multi_workspace, cx) =
         cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
@@ -803,15 +806,15 @@ async fn test_restore_serialisim_archive_view_does_not_panic(cx: &mut TestAppCon
         AgentRegistryStore::init_test_global(cx, vec![]);
     });
 
-    let serialisim = serde_json::to_string(&SerialisimSidebar {
+    let serialized = serde_json::to_string(&SerializedSidebar {
         width: Some(400.0),
-        active_view: SerialisimSidebarView::History,
+        active_view: SerializedSidebarView::History,
     })
     .expect("serialization should succeed");
 
     multi_workspace.update_in(cx, |multi_workspace, window, cx| {
         if let Some(sidebar) = multi_workspace.sidebar() {
-            sidebar.restore_serialisim_state(&serialisim, window, cx);
+            sidebar.restore_serialisim_state(&serialized, window, cx);
         }
     });
     cx.run_until_parked();
@@ -2047,6 +2050,13 @@ async fn test_terminal_close_event_on_archived_linked_worktree_removes_workspace
         },
     )
     .await;
+    agent_ui::test_support::record_sim_created_worktree(
+        fs.as_ref(),
+        Path::new("/worktrees/project/feature-a/project"),
+        None,
+        cx,
+    )
+    .await;
     cx.update(|cx| <dyn fs::Fs>::set_global(fs.clone(), cx));
 
     let main_project = project::Project::test(fs.clone(), ["/project".as_ref()], cx).await;
@@ -2533,6 +2543,13 @@ async fn test_archive_selected_draft_archives_linked_worktree_after_last_draft(
         },
     )
     .await;
+    agent_ui::test_support::record_sim_created_worktree(
+        fs.as_ref(),
+        Path::new("/worktrees/project/feature-a/project"),
+        None,
+        cx,
+    )
+    .await;
     cx.update(|cx| <dyn fs::Fs>::set_global(fs.clone(), cx));
 
     let main_project = project::Project::test(fs.clone(), ["/project".as_ref()], cx).await;
@@ -2749,6 +2766,13 @@ async fn test_archive_selected_draft_archives_closed_linked_worktree(cx: &mut Te
             is_main: false,
             is_bare: false,
         },
+    )
+    .await;
+    agent_ui::test_support::record_sim_created_worktree(
+        fs.as_ref(),
+        Path::new("/worktrees/project/feature-a/project"),
+        None,
+        cx,
     )
     .await;
     cx.update(|cx| <dyn fs::Fs>::set_global(fs.clone(), cx));
@@ -3296,6 +3320,13 @@ async fn test_archive_selected_terminal_archives_closed_linked_worktree(cx: &mut
         },
     )
     .await;
+    agent_ui::test_support::record_sim_created_worktree(
+        fs.as_ref(),
+        Path::new("/worktrees/project/feature-a/project"),
+        None,
+        cx,
+    )
+    .await;
     cx.update(|cx| <dyn fs::Fs>::set_global(fs.clone(), cx));
 
     let main_project = project::Project::test(fs.clone(), ["/project".as_ref()], cx).await;
@@ -3462,6 +3493,13 @@ async fn test_archive_selected_thread_archives_closed_linked_worktree(cx: &mut T
             is_main: false,
             is_bare: false,
         },
+    )
+    .await;
+    agent_ui::test_support::record_sim_created_worktree(
+        fs.as_ref(),
+        Path::new("/worktrees/project/feature-a/project"),
+        None,
+        cx,
     )
     .await;
     cx.update(|cx| <dyn fs::Fs>::set_global(fs.clone(), cx));
@@ -8130,6 +8168,13 @@ async fn test_archive_last_worktree_thread_removes_workspace(cx: &mut TestAppCon
         },
     )
     .await;
+    agent_ui::test_support::record_sim_created_worktree(
+        fs.as_ref(),
+        Path::new("/worktrees/project/feature-a/project"),
+        None,
+        cx,
+    )
+    .await;
 
     cx.update(|cx| <dyn fs::Fs>::set_global(fs.clone(), cx));
 
@@ -9522,7 +9567,7 @@ async fn test_archive_thread_active_entry_management(cx: &mut TestAppContext) {
 async fn test_unarchive_only_shows_restored_thread(cx: &mut TestAppContext) {
     // Full flow: create a thread, archive it (removing the workspace),
     // then unarchive. Only the restored thread should appear — no
-    // leftover drafts or previously-serialisim threads.
+    // leftover drafts or previously-serialized threads.
     let project = init_test_project_with_agent_panel("/my-project", cx).await;
     let (multi_workspace, cx) =
         cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
@@ -13488,6 +13533,13 @@ async fn test_archive_removes_worktree_even_when_workspace_paths_diverge(cx: &mu
         },
     )
     .await;
+    agent_ui::test_support::record_sim_created_worktree(
+        fs.as_ref(),
+        Path::new("/worktrees/project/feature-a/project"),
+        None,
+        cx,
+    )
+    .await;
 
     cx.update(|cx| <dyn fs::Fs>::set_global(fs.clone(), cx));
 
@@ -13638,6 +13690,13 @@ async fn test_archive_mixed_workspace_closes_only_archived_worktree_items(cx: &m
             is_main: false,
             is_bare: false,
         },
+    )
+    .await;
+    agent_ui::test_support::record_sim_created_worktree(
+        fs.as_ref(),
+        Path::new("/worktrees/main-repo/feature-b/main-repo"),
+        None,
+        cx,
     )
     .await;
 
@@ -13859,6 +13918,13 @@ async fn test_discard_mixed_workspace_draft_closes_only_archived_worktree_items(
             is_main: false,
             is_bare: false,
         },
+    )
+    .await;
+    agent_ui::test_support::record_sim_created_worktree(
+        fs.as_ref(),
+        Path::new("/worktrees/main-repo/feature-b/main-repo"),
+        None,
+        cx,
     )
     .await;
 
@@ -14202,6 +14268,18 @@ async fn test_remote_archive_thread_with_active_connection(
     // parent repo, so `build_root_plan` targets the linked worktree
     // specifically and knows which main repo owns it.
     let remote_connection = project.read_with(cx, |p, cx| p.remote_connection_options(cx));
+
+    // Record the worktree as Sim-created on the client, keyed by the remote
+    // connection identity, with the creation time of the gitdir on the
+    // *remote* filesystem (where the archive flow will re-stat it).
+    agent_ui::test_support::record_sim_created_worktree(
+        server_fs.as_ref(),
+        Path::new("/worktrees/project/feature-a/project"),
+        remote_connection.as_ref(),
+        cx,
+    )
+    .await;
+
     let wt_thread_id = acp::SessionId::new(Arc::from("worktree-thread"));
     cx.update(|_window, cx| {
         let metadata = ThreadMetadata {

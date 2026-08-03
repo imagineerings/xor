@@ -141,7 +141,7 @@ use text::{Anchor, BufferId, LineEnding, OffsetRangeExt, ToPoint as _};
 
 use util::{
     ConnectionResult, ResultExt as _, debug_panic, defer, maybe, merge_json_value_into,
-    paths::{PathStyle, SanitisimPath, UrlExt},
+    paths::{PathStyle, SanitizedPath, UrlExt},
     post_inc,
     redact::redact_command,
     rel_path::RelPath,
@@ -1635,12 +1635,36 @@ impl LocalLspStore {
             .handle
             .read_with(cx, |buffer, _| buffer.max_point().row > 0);
 
+        // When formatting a selection, only the rows it spans may be touched.
+        let selection_row_ranges = buffer.ranges.as_ref().map(|ranges| {
+            buffer.handle.read_with(cx, |buffer, _cx| {
+                let snapshot = buffer.snapshot();
+                ranges
+                    .iter()
+                    .map(|range| {
+                        let start = range.start.to_point(&snapshot);
+                        let end = range.end.to_point(&snapshot);
+                        // A selection ending at column 0 of a row only includes that row's
+                        // preceding line break, not its content, so it shouldn't be trimmed.
+                        let end_row = if end.column == 0 && end.row > start.row {
+                            end.row
+                        } else {
+                            end.row + 1
+                        };
+                        start.row..end_row
+                    })
+                    .collect::<Vec<_>>()
+            })
+        });
+
         // handle whitespace formatting
         if settings.remove_trailing_whitespace_on_save {
             zlog::trace!(logger => "removing trailing whitespace");
             let diff = buffer
                 .handle
-                .read_with(cx, |buffer, cx| buffer.remove_trailing_whitespace(cx))
+                .read_with(cx, |buffer, cx| {
+                    buffer.remove_trailing_whitespace(selection_row_ranges.as_deref(), cx)
+                })
                 .await;
             extend_formatting_transaction(buffer, formatting_transaction_id, cx, |buffer, cx| {
                 buffer.apply_diff(diff, cx);
@@ -1649,8 +1673,11 @@ impl LocalLspStore {
 
         if settings.ensure_final_newline_on_save {
             zlog::trace!(logger => "ensuring final newline");
+            let diff = buffer.handle.read_with(cx, |buffer, _cx| {
+                buffer.ensure_final_newline(selection_row_ranges.as_deref())
+            });
             extend_formatting_transaction(buffer, formatting_transaction_id, cx, |buffer, cx| {
-                buffer.ensure_final_newline(cx);
+                buffer.apply_diff(diff, cx);
             })?;
         }
 
@@ -1925,6 +1952,7 @@ impl LocalLspStore {
                     )
                     .await
                     .context("Failed to format ranges via language server")?
+                    .unwrap_or_default()
                 } else {
                     zlog::trace!(logger => "formatting full");
                     Self::format_via_lsp(
@@ -2175,12 +2203,8 @@ impl LocalLspStore {
                             formatting_transaction_id,
                             cx,
                             |buffer, cx| {
-                                zlog::info!(
-                                    "Applying edits {edits:?}. Content: {:?}",
-                                    buffer.text()
-                                );
+                                zlog::trace!("Applying {} edits", edits.len());
                                 buffer.edit(edits, None, cx);
-                                zlog::info!("Applied edits. New Content: {:?}", buffer.text());
                             },
                         )?;
                     }
@@ -2322,14 +2346,18 @@ impl LocalLspStore {
         language_server: &Arc<LanguageServer>,
         settings: &LanguageSettings,
         cx: &mut AsyncApp,
-    ) -> Result<Vec<(Range<Anchor>, Arc<str>)>> {
+    ) -> Result<Option<Vec<(Range<Anchor>, Arc<str>)>>> {
         let capabilities = &language_server.capabilities();
         let range_formatting_provider = capabilities.document_range_formatting_provider.as_ref();
-        if range_formatting_provider == Some(&OneOf::Left(false)) {
-            anyhow::bail!(
-                "{} language server does not support range formatting",
+        if !matches!(
+            range_formatting_provider,
+            Some(OneOf::Left(true) | OneOf::Right(_))
+        ) {
+            log::debug!(
+                "Skipping range formatting: language server {} does not support range formatting",
                 language_server.name()
             );
+            return Ok(None);
         }
 
         let uri = file_path_to_lsp_url(abs_path)?;
@@ -2388,8 +2416,9 @@ impl LocalLspStore {
                 )
             })?
             .await
+            .map(Some)
         } else {
-            Ok(Vec::with_capacity(0))
+            Ok(Some(Vec::with_capacity(0)))
         }
     }
 
@@ -3411,6 +3440,25 @@ impl LocalLspStore {
                         .to_file_path()
                         .map_err(|()| anyhow!("can't convert URI to path"))?;
 
+                    // An LSP "rename symbol" can also rename the file, with the text edit
+                    // applied only to the in-memory buffer. Persist it before renaming, or
+                    // fs.rename moves the stale on-disk content and the files' contents swap.
+                    let dirty_buffer = this.update(cx, |this, cx| {
+                        let project_path = this
+                            .worktree_store()
+                            .read(cx)
+                            .project_path_for_absolute_path(&source_abs_path, cx)?;
+                        let buffer = this.buffer_store().read(cx).get_by_path(&project_path)?;
+                        buffer.read(cx).is_dirty().then_some(buffer)
+                    });
+                    if let Some(buffer) = dirty_buffer {
+                        this.update(cx, |this, cx| {
+                            this.buffer_store()
+                                .update(cx, |buffer_store, cx| buffer_store.save_buffer(buffer, cx))
+                        })
+                        .await?;
+                    }
+
                     let options = fs::RenameOptions {
                         overwrite: op
                             .options
@@ -3668,45 +3716,46 @@ impl LocalLspStore {
         if let Some((worktree, literal_prefix, pattern)) =
             Self::worktree_and_path_for_file_watcher(worktrees, watcher, cx)
         {
-            if worktree.read(cx).as_local().is_some()
-                && let Some(glob) = Glob::new(&pattern).log_err()
-            {
-                let worktree_id = worktree.read(cx).id();
-                watched
-                    .worktree_paths
-                    .entry(worktree_id)
-                    .or_default()
-                    .add(registration_id, glob);
-                worktree.update(cx, |worktree, _| {
-                    if let Some(tree) = worktree.as_local_mut() {
-                        tree.add_path_prefix_to_scan(literal_prefix);
-                    }
-                });
+            if worktree.read(cx).as_local().is_some() {
+                if let Some(glob) = Glob::new(&pattern).log_err() {
+                    let worktree_id = worktree.read(cx).id();
+                    watched
+                        .worktree_paths
+                        .entry(worktree_id)
+                        .or_default()
+                        .add(registration_id, glob);
+                    worktree.update(cx, |worktree, _| {
+                        if let Some(tree) = worktree.as_local_mut() {
+                            tree.add_path_prefix_to_scan(literal_prefix);
+                        }
+                    });
+                }
             }
+
             return;
         }
 
         let (path, pattern) = match &watcher.glob_pattern {
-            lsp::GlobPattern::String(pattern) => {
-                let watcher_path = SanitisimPath::new(pattern);
+            lsp::GlobPattern::String(s) => {
+                let watcher_path = SanitizedPath::new(s);
                 let path = glob_literal_prefix(watcher_path.as_path());
                 let pattern = watcher_path
                     .as_path()
                     .strip_prefix(&path)
-                    .map(|path| path.to_string_lossy().into_owned())
-                    .unwrap_or_else(|error| {
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .unwrap_or_else(|e| {
                         debug_panic!(
                             "Failed to strip prefix for string pattern: {}, with prefix: {}, with error: {}",
-                            pattern,
+                            s,
                             path.display(),
-                            error
+                            e
                         );
                         watcher_path.as_path().to_string_lossy().into_owned()
                     });
                 (path, pattern)
             }
-            lsp::GlobPattern::Relative(relative_pattern) => {
-                let Ok(mut base_uri) = match &relative_pattern.base_uri {
+            lsp::GlobPattern::Relative(rp) => {
+                let Ok(mut base_uri) = match &rp.base_uri {
                     lsp::OneOf::Left(workspace_folder) => &workspace_folder.uri,
                     lsp::OneOf::Right(base_uri) => base_uri,
                 }
@@ -3714,55 +3763,55 @@ impl LocalLspStore {
                     return;
                 };
 
-                let path = glob_literal_prefix(Path::new(&relative_pattern.pattern));
-                let pattern = Path::new(&relative_pattern.pattern)
+                let path = glob_literal_prefix(Path::new(&rp.pattern));
+                let pattern = Path::new(&rp.pattern)
                     .strip_prefix(&path)
-                    .map(|path| path.to_string_lossy().into_owned())
-                    .unwrap_or_else(|error| {
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .unwrap_or_else(|e| {
                         debug_panic!(
                             "Failed to strip prefix for relative pattern: {}, with prefix: {}, with error: {}",
-                            relative_pattern.pattern,
+                            rp.pattern,
                             path.display(),
-                            error
+                            e
                         );
-                        relative_pattern.pattern.clone()
+                        rp.pattern.clone()
                     });
                 base_uri.push(path);
                 (base_uri, pattern)
             }
         };
 
-        let Some(glob) = Glob::new(&pattern).log_err() else {
-            return;
-        };
-
-        if !path
-            .components()
-            .any(|component| matches!(component, path::Component::Normal(_)))
-        {
-            for worktree in worktrees {
-                watched
-                    .worktree_paths
-                    .entry(worktree.read(cx).id())
-                    .or_default()
-                    .add(registration_id, glob.clone());
+        if let Some(glob) = Glob::new(&pattern).log_err() {
+            if !path
+                .components()
+                .any(|c| matches!(c, path::Component::Normal(_)))
+            {
+                // For an unrooted glob like `**/Cargo.toml`, watch it within each worktree,
+                // rather than adding a new watcher for `/`.
+                for worktree in worktrees {
+                    watched
+                        .worktree_paths
+                        .entry(worktree.read(cx).id())
+                        .or_default()
+                        .add(registration_id, glob.clone());
+                }
+            } else {
+                let abs_path: Arc<Path> = path.into();
+                let fs = self.fs.clone();
+                let entry = watched
+                    .abs_paths
+                    .entry(abs_path.clone())
+                    .or_insert_with(|| {
+                        let task = LanguageServerWatchedPaths::spawn_abs_path_watcher(
+                            abs_path,
+                            fs,
+                            language_server_id,
+                            cx,
+                        );
+                        (LazyGlobSet::default(), task)
+                    });
+                entry.0.add(registration_id, glob);
             }
-        } else {
-            let abs_path: Arc<Path> = path.into();
-            let fs = self.fs.clone();
-            let entry = watched
-                .abs_paths
-                .entry(abs_path.clone())
-                .or_insert_with(|| {
-                    let task = LanguageServerWatchedPaths::spawn_abs_path_watcher(
-                        abs_path,
-                        fs,
-                        language_server_id,
-                        cx,
-                    );
-                    (LazyGlobSet::default(), task)
-                });
-            entry.0.add(registration_id, glob);
         }
     }
 
@@ -3777,7 +3826,7 @@ impl LocalLspStore {
             let path_style = tree.path_style();
             match &watcher.glob_pattern {
                 lsp::GlobPattern::String(s) => {
-                    let watcher_path = SanitisimPath::new(s);
+                    let watcher_path = SanitizedPath::new(s);
                     let relative = watcher_path
                         .as_path()
                         .strip_prefix(&worktree_root_path)
@@ -4195,9 +4244,10 @@ impl SymbolLocation {
 }
 
 fn should_log_lsp_request_failure(message: &str) -> bool {
-    // content modified is a weird failure mode of rust-analyzer
-    // where requests are denied before its loaded a project
-    message.ends_with("content modified") || message.ends_with("server cancelled the request")
+    // "content modified" and "server cancelled the request" are noisy failure
+    // modes of rust-analyzer where requests are denied before it has loaded a
+    // project.
+    !(message.ends_with("content modified") || message.ends_with("server cancelled the request"))
 }
 
 impl LspStore {
@@ -7208,27 +7258,16 @@ impl LspStore {
                         buffer.start_transaction();
 
                         for (range, text) in edits {
-                            let primary = &completion.replace_range;
-
-                            // Special case: if both ranges start at the very beginning of the file (line 0, column 0),
-                            // and the primary completion is just an insertion (empty range), then this is likely
-                            // an auto-import scenario and should not be considered overlapping
-                            // https://github.com/simtropolis/sim/issues/26136
-                            let is_file_start_auto_import = {
-                                let snapshot = buffer.snapshot();
-                                let primary_start_point = primary.start.to_point(&snapshot);
-                                let range_start_point = range.start.to_point(&snapshot);
-
-                                let result = primary_start_point.row == 0
-                                    && primary_start_point.column == 0
-                                    && range_start_point.row == 0
-                                    && range_start_point.column == 0;
-
-                                result
-                            };
-
-                            let has_overlap = if is_file_start_auto_import {
-                                false
+                            // Zero-width additional edits (e.g. auto-imports at file start, or
+                            // rust-analyzer's ref-match `&` insertions) only overlap the primary
+                            // edit when they fall strictly inside it. Touching its boundary is fine.
+                            let is_insertion = range.start.cmp(&range.end, buffer).is_eq();
+                            let has_overlap = if is_insertion {
+                                let insert_offset = range.start.to_offset(buffer);
+                                all_commit_ranges.iter().any(|commit_range| {
+                                    commit_range.start.to_offset(buffer) < insert_offset
+                                        && insert_offset < commit_range.end.to_offset(buffer)
+                                })
                             } else {
                                 all_commit_ranges.iter().any(|commit_range| {
                                     let start_within =
@@ -7241,8 +7280,7 @@ impl LspStore {
                                 })
                             };
 
-                            //Skip additional edits which overlap with the primary completion edit
-                            //https://github.com/simtropolis/sim/pull/1871
+                            // Skip additional edits which overlap with the primary completion edit.
                             if !has_overlap {
                                 buffer.edit([(range, text)], None, cx);
                             }
@@ -14337,7 +14375,9 @@ struct LanguageServerWatchedPaths {
 
 #[derive(Default)]
 struct LazyGlobSet {
+    /// Globs keyed by registration ID.
     globs: HashMap<String, Vec<Glob>>,
+    /// Compiled from `globs`, lazily on `is_match`. `None` when stale.
     compiled: Option<GlobSet>,
 }
 
@@ -14380,12 +14420,17 @@ impl LanguageServerWatchedPaths {
         cx: &mut Context<LspStore>,
     ) -> Task<()> {
         let lsp_store = cx.weak_entity();
-
         const LSP_ABS_PATH_OBSERVE: Duration = Duration::from_millis(100);
+
         cx.spawn({
             async move |_, cx| {
                 maybe!(async move {
-                    let mut push_updates = fs.watch(&abs_path, LSP_ABS_PATH_OBSERVE).await;
+                    let mut push_updates = cx
+                        .background_spawn({
+                            let abs_path = abs_path.clone();
+                            async move { fs.watch(&abs_path, LSP_ABS_PATH_OBSERVE).await }
+                        })
+                        .await;
                     while let Some(update) = push_updates.0.next().await {
                         let action = lsp_store
                             .update(cx, |this, _| {
@@ -15282,4 +15327,29 @@ fn extend_formatting_transaction(
         }
         Ok(())
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn should_log_lsp_request_failure_suppresses_known_noise() {
+        // Suppressed: rust-analyzer's superseded/denied request signals.
+        assert!(!should_log_lsp_request_failure(
+            "Get diagnostics via rust-analyzer failed: content modified"
+        ));
+        assert!(!should_log_lsp_request_failure(
+            "Get diagnostics via rust-analyzer failed: server cancelled the request"
+        ));
+
+        // Logged: anything else is a real failure.
+        assert!(should_log_lsp_request_failure(
+            "Get diagnostics via rust-analyzer failed: server shut down"
+        ));
+        assert!(should_log_lsp_request_failure(
+            "Get diagnostics via rust-analyzer failed: Server reset the connection"
+        ));
+        assert!(should_log_lsp_request_failure("something else entirely"));
+    }
 }

@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
-use sim_actions::OpenBrowser;
 use gpui::{Action, SharedString};
+use sim_actions::OpenBrowser;
 use ui::{IconName, IconPosition};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -15,8 +15,8 @@ impl ErrorSeverity {
     pub fn auto_dismiss_delay(&self) -> Option<Duration> {
         match self {
             ErrorSeverity::Critical => None,
-            ErrorSeverity::Error => Some(Duration::from_secs(20)),
-            ErrorSeverity::Warning => Some(Duration::from_secs(10)),
+            ErrorSeverity::Error => Some(Duration::from_secs(30)),
+            ErrorSeverity::Warning => Some(Duration::from_secs(20)),
         }
     }
 }

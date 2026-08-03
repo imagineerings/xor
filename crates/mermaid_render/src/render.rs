@@ -22,9 +22,8 @@ pub(super) fn render_mermaid(source: &str, theme: &MermaidTheme) -> Result<Strin
     let pipeline = merman::render::SvgPipeline::resvg_safe()
         .with_postprocessor(merman::render::CssOverridePostprocessor::strip_existing_important());
 
-    let source = source.replace(r"\n", "<br/>");
     let svg = renderer
-        .render_svg_with_pipeline_sync(&source, &pipeline)
+        .render_svg_with_pipeline_sync(source, &pipeline)
         .context("merman render failed")?
         .ok_or_else(|| anyhow!("merman returned no SVG for the given input"))?;
 

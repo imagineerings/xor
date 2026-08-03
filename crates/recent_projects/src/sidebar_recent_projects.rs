@@ -16,7 +16,7 @@ use ui_input::ErasedEditor;
 use util::{ResultExt, paths::PathExt};
 use workspace::{
     MultiWorkspace, OpenMode, OpenOptions, ProjectGroupKey, RecentWorkspace,
-    SerialisimWorkspaceLocation, Workspace, WorkspaceDb, notifications::DetachAndPromptErr,
+    SerializedWorkspaceLocation, Workspace, WorkspaceDb, notifications::DetachAndPromptErr,
 };
 
 use sim_actions::OpenRemote;
@@ -55,6 +55,8 @@ impl SidebarRecentProjects {
                 Picker::list(delegate, window, cx)
                     .list_measure_all()
                     .show_scrollbar(true)
+                    .initial_width(rems(18.))
+                    .popover()
             });
 
             let picker_focus_handle = picker.focus_handle(cx);
@@ -124,7 +126,7 @@ impl SidebarRecentProjectsDelegate {
     pub fn set_workspaces(&mut self, workspaces: Vec<RecentWorkspace>) {
         self.has_any_non_local_projects = workspaces
             .iter()
-            .any(|workspace| !matches!(workspace.location, SerialisimWorkspaceLocation::Local));
+            .any(|workspace| !matches!(workspace.location, SerializedWorkspaceLocation::Local));
         self.workspaces = workspaces;
     }
 }
@@ -133,6 +135,10 @@ impl EventEmitter<DismissEvent> for SidebarRecentProjectsDelegate {}
 
 impl PickerDelegate for SidebarRecentProjectsDelegate {
     type ListItem = AnyElement;
+
+    fn name() -> &'static str {
+        "sidebar recent projects"
+    }
 
     fn placeholder_text(&self, _window: &mut Window, _cx: &mut App) -> Arc<str> {
         "Search projects…".into()
@@ -245,7 +251,7 @@ impl PickerDelegate for SidebarRecentProjectsDelegate {
         };
 
         match &recent_workspace.location {
-            SerialisimWorkspaceLocation::Local => {
+            SerializedWorkspaceLocation::Local => {
                 if let Some(handle) = window.window_handle().downcast::<MultiWorkspace>() {
                     let paths = recent_workspace.paths.paths().to_vec();
                     cx.defer(move |cx| {
@@ -260,7 +266,7 @@ impl PickerDelegate for SidebarRecentProjectsDelegate {
                     });
                 }
             }
-            SerialisimWorkspaceLocation::Remote(connection) => {
+            SerializedWorkspaceLocation::Remote(connection) => {
                 let mut connection = connection.clone();
                 workspace.update(cx, |workspace, cx| {
                     let app_state = workspace.app_state().clone();
@@ -318,7 +324,7 @@ impl PickerDelegate for SidebarRecentProjectsDelegate {
             .collect();
 
         let tooltip_path: SharedString = match &workspace.location {
-            SerialisimWorkspaceLocation::Remote(options) => {
+            SerializedWorkspaceLocation::Remote(options) => {
                 let host = options.display_name();
                 if ordered_paths.len() == 1 {
                     format!("{} ({})", ordered_paths[0], host).into()
@@ -343,7 +349,7 @@ impl PickerDelegate for SidebarRecentProjectsDelegate {
             .collect();
 
         let prefix = match &workspace.location {
-            SerialisimWorkspaceLocation::Remote(options) => {
+            SerializedWorkspaceLocation::Remote(options) => {
                 Some(SharedString::from(options.display_name()))
             }
             _ => None,
@@ -357,8 +363,8 @@ impl PickerDelegate for SidebarRecentProjectsDelegate {
         };
 
         let icon = icon_for_remote_connection(match &workspace.location {
-            SerialisimWorkspaceLocation::Local => None,
-            SerialisimWorkspaceLocation::Remote(options) => Some(options),
+            SerializedWorkspaceLocation::Local => None,
+            SerializedWorkspaceLocation::Remote(options) => Some(options),
         });
 
         Some(

@@ -461,16 +461,16 @@ async fn test_realfs_atomic_write_non_existing_file(executor: BackgroundExecutor
 #[gpui::test]
 #[cfg(target_os = "windows")]
 async fn test_realfs_canonicalize(executor: BackgroundExecutor) {
-    use util::paths::SanitisimPath;
+    use util::paths::SanitizedPath;
 
     let fs = RealFs::new(None, executor);
     let temp_dir = TempDir::new().unwrap();
     let file = temp_dir.path().join("test (1).txt");
-    let file = SanitisimPath::new(&file);
+    let file = SanitizedPath::new(&file);
     std::fs::write(&file, "test").unwrap();
 
-    let canonicalisim = fs.canonicalize(file.as_path()).await;
-    assert!(canonicalisim.is_ok());
+    let canonicalized = fs.canonicalize(file.as_path()).await;
+    assert!(canonicalized.is_ok());
 }
 
 #[gpui::test]

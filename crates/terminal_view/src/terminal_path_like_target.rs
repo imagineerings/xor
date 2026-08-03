@@ -416,7 +416,7 @@ mod tests {
             $maybe_path:literal,
             $tooltip:literal,
             $cwd:tt,
-            $background_path_checks:path,
+            $background_fs_checks:path,
             $found_by:expr
         ) => {
             test_path_like_simple(
@@ -424,7 +424,7 @@ mod tests {
                 path!($maybe_path),
                 path!($tooltip),
                 none_or_some_pathbuf!($cwd),
-                $background_path_checks,
+                $background_fs_checks,
                 $found_by,
                 std::file!(),
                 std::line!(),
@@ -434,7 +434,7 @@ mod tests {
     }
 
     // Note the arms of `test`, `test_local`, and `test_remote` should be collapsed once macro
-    // metavariable expressions (#![feature(macro_metavar_expr)]) are stabilisim.
+    // metavariable expressions (#![feature(macro_metavar_expr)]) are stabilized.
     // See https://github.com/rust-lang/rust/issues/83527
     #[doc = "test_path_likes!(<cx>, <trees>, <worktrees>, { $(<tests>;)+ })"]
     macro_rules! test_path_likes {
@@ -966,7 +966,7 @@ mod tests {
             )
         }
 
-        // https://github.com/zed-industries/zed/issues/39159
+        // https://github.com/simtropolis/sim/issues/39159
         #[gpui::test]
         async fn issue_39159_remote_absolute_path_outside_worktree(cx: &mut TestAppContext) {
             test_path_likes!(

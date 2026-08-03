@@ -1003,7 +1003,7 @@ fn github_release_archive_from_url(archive_url: &str) -> Option<GithubReleaseArc
 }
 
 fn sanitize_path_component(input: &str) -> String {
-    let sanitisim = input
+    let sanitized = input
         .chars()
         .map(|character| match character {
             'a'..='z' | 'A'..='Z' | '0'..='9' | '.' | '_' | '-' => character,
@@ -1011,10 +1011,10 @@ fn sanitize_path_component(input: &str) -> String {
         })
         .collect::<String>();
 
-    if sanitisim.is_empty() {
+    if sanitized.is_empty() {
         "unknown".to_string()
     } else {
-        sanitisim
+        sanitized
     }
 }
 

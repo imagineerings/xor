@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use anyhow::{Context, Result};
 use clap::Parser;
 use gh_workflow::Workflow;
@@ -9,10 +7,26 @@ use strum::IntoEnumIterator;
 
 use crate::tasks::workflow_checks::{self};
 
+mod after_release;
+mod autofix_pr;
+mod bump_patch_version;
+mod bump_sim_version;
+mod cherry_pick;
+mod compliance_check;
+mod danger;
+mod deploy_collab;
 mod deploy_docs;
+mod extension_auto_bump;
+mod extension_bump;
+mod extension_tests;
+mod extension_workflow_rollout;
 mod extensions;
-mod release;
+mod nix_build;
+mod publish_extension_cli;
+mod release_nightly;
 mod run_bundling;
+
+mod release;
 mod run_tests;
 mod runners;
 mod steps;
@@ -84,29 +98,6 @@ struct WorkflowFile {
     r#type: WorkflowType,
 }
 
-const ARCHIVED_SIM_WORKFLOW_FILENAMES: &[&str] = &[
-    "after_release.yml",
-    "autofix_pr.yml",
-    "bump_sim_version.yml",
-    "bump_patch_version.yml",
-    "cherry_pick.yml",
-    "compliance_check.yml",
-    "danger.yml",
-    "deploy_collab.yml",
-    "deploy_docs.yml",
-    "deploy_nightly_docs.yml",
-    "extension_auto_bump.yml",
-    "extension_bump.yml",
-    "extension_tests.yml",
-    "extension_workflow_rollout.yml",
-    "nix_build.yml",
-    "publish_extension_cli.yml",
-    "release.yml",
-    "release_nightly.yml",
-    "run_bundling.yml",
-    "run_tests.yml",
-];
-
 impl WorkflowFile {
     fn sim(f: fn() -> Workflow) -> WorkflowFile {
         WorkflowFile {
@@ -145,14 +136,9 @@ impl WorkflowFile {
             .as_ref()
             .expect("Workflow must have a name at this point");
         let filename = format!(
-            "{}.yml",
-            workflow_name.rsplit("::").next().unwrap_or(workflow_name)
+            "{workflow_name}.yml",
+            workflow_name = workflow_name.rsplit("::").next().unwrap_or(workflow_name)
         );
-
-        if self.r#type.should_skip_archived_workflow(&filename) {
-            println!("Skipping archived workflow: {filename}");
-            return Ok(());
-        }
 
         let workflow_path = workflow_folder.join(filename);
 
@@ -175,7 +161,7 @@ pub enum WorkflowType {
     /// required workflows for PRs to the extension organization
     ExtensionCi,
     /// Workflows living in each of the extensions to perform checks and version
-    /// bumps until a better, more centralisim system for that is in place.
+    /// bumps until a better, more centralized system for that is in place.
     ExtensionsShared,
 }
 
@@ -204,10 +190,6 @@ impl WorkflowType {
         }
     }
 
-    fn should_skip_archived_workflow(&self, filename: &str) -> bool {
-        *self == WorkflowType::Sim && ARCHIVED_SIM_WORKFLOW_FILENAMES.contains(&filename)
-    }
-
     fn remove_generated_workflows() -> Result<()> {
         for workflow_type in Self::iter() {
             for path in fs::read_dir(workflow_type.folder_path())? {
@@ -229,29 +211,6 @@ impl WorkflowType {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::WorkflowType;
-
-    #[test]
-    fn skips_archived_sim_workflows() {
-        assert!(WorkflowType::Sim.should_skip_archived_workflow("run_bundling.yml"));
-        assert!(WorkflowType::Sim.should_skip_archived_workflow("release.yml"));
-        assert!(WorkflowType::Sim.should_skip_archived_workflow("run_tests.yml"));
-    }
-
-    #[test]
-    fn does_not_skip_extension_repository_workflows() {
-        assert!(!WorkflowType::ExtensionCi.should_skip_archived_workflow("run_tests.yml"));
-        assert!(!WorkflowType::ExtensionsShared.should_skip_archived_workflow("bump_version.yml"));
-    }
-
-    #[test]
-    fn does_not_skip_unarchived_sim_workflows() {
-        assert!(!WorkflowType::Sim.should_skip_archived_workflow("mobile_android_ci.yml"));
-    }
-}
-
 pub fn run_workflows(args: GenerateWorkflowArgs) -> Result<()> {
     if !Path::new("crates/sim/").is_dir() {
         anyhow::bail!("xtask workflows must be ran from the project root");
@@ -261,7 +220,26 @@ pub fn run_workflows(args: GenerateWorkflowArgs) -> Result<()> {
     WorkflowType::remove_generated_workflows()?;
 
     let workflows = [
-        // Core: release.yml and run_tests.yml are now hand-written minimal versions (not generated)
+        WorkflowFile::sim(after_release::after_release),
+        WorkflowFile::sim(autofix_pr::autofix_pr),
+        WorkflowFile::sim(bump_patch_version::bump_patch_version),
+        WorkflowFile::sim(bump_sim_version::bump_sim_version),
+        WorkflowFile::sim(cherry_pick::cherry_pick),
+        WorkflowFile::sim(compliance_check::compliance_check),
+        WorkflowFile::sim(danger::danger),
+        WorkflowFile::sim(deploy_collab::deploy_collab),
+        WorkflowFile::sim(deploy_docs::deploy_docs),
+        WorkflowFile::sim(deploy_docs::deploy_nightly_docs),
+        WorkflowFile::sim(extension_bump::extension_bump),
+        WorkflowFile::sim(extension_auto_bump::extension_auto_bump),
+        WorkflowFile::sim(extension_tests::extension_tests),
+        WorkflowFile::sim(extension_workflow_rollout::extension_workflow_rollout),
+        WorkflowFile::sim(nix_build::nix_build),
+        WorkflowFile::sim(publish_extension_cli::publish_extension_cli),
+        WorkflowFile::sim(release::release),
+        WorkflowFile::sim(release_nightly::release_nightly),
+        WorkflowFile::sim(run_bundling::run_bundling),
+        WorkflowFile::sim(run_tests::run_tests),
         /* workflows used for CI/CD in extension repositories */
         WorkflowFile::extension(extensions::run_tests::run_tests),
         WorkflowFile::extension_shared(extensions::bump_version::bump_version),

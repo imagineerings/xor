@@ -211,6 +211,7 @@ impl From<internal_api::User> for User {
     fn from(user: internal_api::User) -> Self {
         Self {
             id: UserId(user.legacy_user_id),
+            username: user.username,
             avatar_url: user.avatar_url,
             github_login: user.github_login,
             name: user.name,
@@ -273,21 +274,16 @@ mod fake_user_service {
             admin: bool,
             params: NewUserParams,
         ) -> UserId {
-            let db_user_id = match self.database.create_user(admin).await {
-                Ok(user) => Some(user.user_id),
-                Err(error) => {
-                    log::error!("failed to create fake user in test database: {error:?}");
-                    None
-                }
-            };
             let mut state = self.state.lock().await;
 
-            let user_id = db_user_id.unwrap_or(state.next_user_id);
+            let user_id = state.next_user_id;
             let _ = email_address;
             state.users.insert(
                 user_id,
                 User {
                     id: user_id,
+                    // For the purposes of the tests we treat these as interchangeable.
+                    username: params.github_login.clone(),
                     avatar_url: format!("https://github.com/{}.png?size=128", params.github_login),
                     github_login: params.github_login,
                     name: name.map(|name| name.to_string()),
@@ -296,7 +292,7 @@ mod fake_user_service {
                 },
             );
 
-            state.next_user_id = UserId(state.next_user_id.0.max(user_id.0) + 1);
+            state.next_user_id = UserId(state.next_user_id.0 + 1);
 
             user_id
         }

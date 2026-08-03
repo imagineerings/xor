@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 - 2025 Sim Industries, Inc.
+ * Copyright 2022 - 2025 Simtropolis, Inc.
  * License: Apache-2.0
  * See LICENSE-APACHE for complete license terms
  *
@@ -204,7 +204,7 @@ struct ClipboardData {
 enum ReadSelNotifyResult {
     GotData(ClipboardData),
     IncrStarted,
-    EventNotRecognisim,
+    EventNotRecognized,
 }
 
 impl Inner {
@@ -431,7 +431,7 @@ impl Inner {
                             // reset our timeout.
                             timeout_end += SHORT_TIMEOUT_DUR;
                         }
-                        ReadSelNotifyResult::EventNotRecognisim => (),
+                        ReadSelNotifyResult::EventNotRecognized => (),
                     }
                 }
                 // If the previous SelectionNotify event specified that the data
@@ -551,11 +551,11 @@ impl Inner {
             log::info!(
                 "Received a SelectionNotify for a selection other than CLIPBOARD, PRIMARY or SECONDARY. This is unexpected."
             );
-            return Ok(ReadSelNotifyResult::EventNotRecognisim);
+            return Ok(ReadSelNotifyResult::EventNotRecognized);
         }
         if *using_incr {
             log::warn!("Received a SelectionNotify while already expecting INCR segments.");
-            return Ok(ReadSelNotifyResult::EventNotRecognisim);
+            return Ok(ReadSelNotifyResult::EventNotRecognized);
         }
         // Accept any property type. The property type will typically match the format type except
         // when it is `TARGETS` in which case it is `ATOM`. `ANY` is provided to handle the case
@@ -844,7 +844,7 @@ fn serve_requests(context: Arc<Inner>) -> Result<(), Box<dyn std::error::Error>>
 
     log::trace!("Started serve requests thread.");
 
-    let _guard = util::defer(|| {
+    let _guard = gpui_util::defer(|| {
         context.serve_stopped.store(true, Ordering::Relaxed);
     });
 

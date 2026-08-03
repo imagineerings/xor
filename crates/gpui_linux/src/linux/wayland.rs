@@ -26,7 +26,7 @@ pub(super) fn to_shape(style: CursorStyle) -> Shape {
         CursorStyle::ResizeRight => Shape::EResize,
         CursorStyle::ResizeLeftRight => Shape::EwResize,
         CursorStyle::ResizeUp => Shape::NResize,
-        CursorStyle::Resizedown => Shape::SResize,
+        CursorStyle::ResizeDown => Shape::SResize,
         CursorStyle::ResizeUpDown => Shape::NsResize,
         CursorStyle::ResizeUpLeftDownRight => Shape::NwseResize,
         CursorStyle::ResizeUpRightDownLeft => Shape::NeswResize,

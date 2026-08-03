@@ -1,7 +1,6 @@
 use std::rc::Rc;
 use std::sync::Arc;
 
-use sim_actions::ShowCallStats;
 use call::{ActiveCall, Room};
 use channel::ChannelStore;
 use client::{User, proto::PeerId};
@@ -16,6 +15,7 @@ use project::WorktreeSettings;
 use remote_connection::RemoteConnectionModal;
 use rpc::proto::{self};
 use settings::{Settings as _, SettingsLocation};
+use sim_actions::ShowCallStats;
 use theme::ActiveTheme;
 use ui::{
     Avatar, AvatarAudioStatusIndicator, ContextMenu, ContextMenuItem, Divider, DividerColor,
@@ -240,7 +240,7 @@ impl TitleBar {
                                 })
                                 .occlude()
                                 .tooltip({
-                                    let login = collaborator.user.github_login.clone();
+                                    let login = collaborator.user.username.clone();
                                     Tooltip::text(format!("Follow {login}"))
                                 }),
                         )
@@ -295,8 +295,8 @@ impl TitleBar {
                                     avatar.indicator(
                                         AvatarAudioStatusIndicator::new(ui::AudioStatus::Muted)
                                             .tooltip({
-                                                let github_login = user.github_login.clone();
-                                                Tooltip::text(format!("{} is muted", github_login))
+                                                let username = user.username.clone();
+                                                Tooltip::text(format!("{} is muted", username))
                                             }),
                                     )
                                 }),

@@ -18,20 +18,20 @@ use std::{
 use workspace::{ItemId, WorkspaceDb, WorkspaceId};
 
 #[derive(Clone, Debug, PartialEq, Default)]
-pub(crate) struct SerialisimEditor {
+pub(crate) struct SerializedEditor {
     pub(crate) abs_path: Option<PathBuf>,
     pub(crate) contents: Option<String>,
     pub(crate) language: Option<String>,
     pub(crate) mtime: Option<MTime>,
 }
 
-impl StaticColumnCount for SerialisimEditor {
+impl StaticColumnCount for SerializedEditor {
     fn column_count() -> usize {
         6
     }
 }
 
-impl Bind for SerialisimEditor {
+impl Bind for SerializedEditor {
     fn bind(&self, statement: &Statement, start_index: i32) -> Result<i32> {
         let start_index = statement.bind(&self.abs_path, start_index)?;
         let start_index = statement.bind(
@@ -61,7 +61,7 @@ impl Bind for SerialisimEditor {
     }
 }
 
-impl Column for SerialisimEditor {
+impl Column for SerializedEditor {
     fn column(statement: &mut Statement, start_index: i32) -> Result<(Self, i32)> {
         let (abs_path, start_index): (Option<PathBuf>, i32) =
             Column::column(statement, start_index)?;
@@ -235,14 +235,14 @@ const MAX_QUERY_PLACEHOLDERS: usize = 32000;
 
 impl EditorDb {
     query! {
-        pub fn get_serialisim_editor(item_id: ItemId, workspace_id: WorkspaceId) -> Result<Option<SerialisimEditor>> {
+        pub fn get_serialisim_editor(item_id: ItemId, workspace_id: WorkspaceId) -> Result<Option<SerializedEditor>> {
             SELECT path, buffer_path, contents, language, mtime_seconds, mtime_nanos FROM editors
             WHERE item_id = ? AND workspace_id = ?
         }
     }
 
     query! {
-        pub async fn save_serialisim_editor(item_id: ItemId, workspace_id: WorkspaceId, serialisim_editor: SerialisimEditor) -> Result<()> {
+        pub async fn save_serialisim_editor(item_id: ItemId, workspace_id: WorkspaceId, serialisim_editor: SerializedEditor) -> Result<()> {
             INSERT INTO editors
                 (item_id, workspace_id, path, buffer_path, contents, language, mtime_seconds, mtime_nanos)
             VALUES
@@ -420,7 +420,7 @@ mod tests {
         let workspace_id = db.next_id().await.unwrap();
         let editor_db = cx.update(|cx| EditorDb::global(cx));
 
-        let serialisim_editor = SerialisimEditor {
+        let serialisim_editor = SerializedEditor {
             abs_path: Some(PathBuf::from("testing.txt")),
             contents: None,
             language: None,
@@ -439,7 +439,7 @@ mod tests {
         assert_eq!(have, serialisim_editor);
 
         // Now update contents and language
-        let serialisim_editor = SerialisimEditor {
+        let serialisim_editor = SerializedEditor {
             abs_path: Some(PathBuf::from("testing.txt")),
             contents: Some("Test".to_owned()),
             language: Some("Go".to_owned()),
@@ -458,7 +458,7 @@ mod tests {
         assert_eq!(have, serialisim_editor);
 
         // Now set all the fields to NULL
-        let serialisim_editor = SerialisimEditor {
+        let serialisim_editor = SerializedEditor {
             abs_path: None,
             contents: None,
             language: None,
@@ -477,7 +477,7 @@ mod tests {
         assert_eq!(have, serialisim_editor);
 
         // Storing and retrieving mtime
-        let serialisim_editor = SerialisimEditor {
+        let serialisim_editor = SerializedEditor {
             abs_path: None,
             contents: None,
             language: None,

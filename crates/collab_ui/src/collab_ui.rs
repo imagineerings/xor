@@ -1,23 +1,8 @@
 mod call_stats_modal;
-pub mod channel_bookmark_bar;
-pub mod channel_bookmark_form;
-pub mod channel_bookmark_store;
-pub mod channel_chat;
-pub mod channel_file_upload;
-pub mod channel_join_requests;
 pub mod channel_view;
 pub mod collab_panel;
-pub mod draft_store;
-pub mod group_management;
 pub mod notifications;
 mod panel_settings;
-pub mod pending_requests_list;
-pub mod priority_badge;
-pub mod priority_selector;
-pub mod request_detail_panel;
-pub mod request_to_join_panel;
-pub mod status_display;
-pub mod user_status_modal;
 
 use std::{rc::Rc, sync::Arc};
 
@@ -34,12 +19,8 @@ use workspace::AppState;
 // Another comment, nice.
 pub fn init(app_state: &Arc<AppState>, cx: &mut App) {
     call_stats_modal::init(cx);
-    channel_file_upload::init(cx);
-    channel_chat::init(cx);
     channel_view::init(cx);
-    channel_join_requests::JoinRequestPushStore::init(cx);
     collab_panel::init(cx);
-    draft_store::init(cx);
     notifications::init(app_state, cx);
     title_bar::init(cx);
 }

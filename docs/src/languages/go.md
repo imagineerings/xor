@@ -224,6 +224,36 @@ In such case Sim won't spawn a new instance of Delve, as it opts to use an exist
 - Tree-sitter: [camdencheek/tree-sitter-go-mod](https://github.com/camdencheek/tree-sitter-go-mod)
 - Language Server: N/A
 
+## Using the Tailwind CSS Language Server with Templ
+
+To get all the features (autocomplete, linting, etc.) from the [Tailwind CSS language server](https://github.com/tailwindlabs/tailwindcss-intellisense/tree/HEAD/packages/tailwindcss-language-server#readme) in [Templ](https://github.com/a-h/templ) files, you need to enable the language server for Templ and configure where it should look for CSS classes by adding the following to your `settings.json`:
+
+```json [settings]
+{
+  "languages": {
+    "Templ": {
+      "language_servers": ["tailwindcss-language-server", "..."]
+    }
+  },
+  "lsp": {
+    "tailwindcss-language-server": {
+      "settings": {
+        "includeLanguages": {
+          "templ": "html"
+        },
+        "experimental": {
+          "classRegex": ["class=\"([^\"]*)\""]
+        }
+      }
+    }
+  }
+}
+```
+
+> Note: Unlike other languages, you need to tell Tailwind to treat `.templ` files as HTML explicitly.
+
+This gives you Tailwind CSS completions inside `class="..."` attributes in your `.templ` files.
+
 ## Go Sum
 
 - Tree-sitter: [amaanq/tree-sitter-go-sum](https://github.com/amaanq/tree-sitter-go-sum)

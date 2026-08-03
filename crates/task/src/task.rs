@@ -18,11 +18,11 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 pub use adapter_schema::{AdapterSchema, AdapterSchemas};
-pub use sim_actions::RevealTarget;
 pub use debug_format::{
-    AttachRequest, SimDebugConfig, BuildTaskDefinition, DebugRequest, DebugScenario,
-    DebugTaskFile, LaunchRequest, Request, TcpArgumentsTemplate,
+    AttachRequest, BuildTaskDefinition, DebugRequest, DebugScenario, DebugTaskFile, LaunchRequest,
+    Request, SimDebugConfig, TcpArgumentsTemplate,
 };
+pub use sim_actions::RevealTarget;
 pub use task_template::{
     DebugArgsRequest, HideStrategy, RevealStrategy, SaveStrategy, TaskHook, TaskTemplate,
     TaskTemplates, substitute_variables_in_map, substitute_variables_in_str,
@@ -274,12 +274,8 @@ impl std::fmt::Display for VariableName {
             Self::MainGitWorktree => write!(f, "{SIM_VARIABLE_NAME_PREFIX}MAIN_GIT_WORKTREE"),
             Self::GitSha => write!(f, "{SIM_VARIABLE_NAME_PREFIX}GIT_SHA"),
             Self::GitShaShort => write!(f, "{SIM_VARIABLE_NAME_PREFIX}GIT_SHA_SHORT"),
-            Self::GitRepositoryName => {
-                write!(f, "{SIM_VARIABLE_NAME_PREFIX}GIT_REPOSITORY_NAME")
-            }
-            Self::GitRepositoryPath => {
-                write!(f, "{SIM_VARIABLE_NAME_PREFIX}GIT_REPOSITORY_PATH")
-            }
+            Self::GitRepositoryName => write!(f, "{SIM_VARIABLE_NAME_PREFIX}GIT_REPOSITORY_NAME"),
+            Self::GitRepositoryPath => write!(f, "{SIM_VARIABLE_NAME_PREFIX}GIT_REPOSITORY_PATH"),
             Self::GitRef => write!(f, "{SIM_VARIABLE_NAME_PREFIX}GIT_REF"),
             Self::Custom(s) => write!(
                 f,

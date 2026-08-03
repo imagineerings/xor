@@ -11,7 +11,7 @@ pub mod notifications;
 pub mod pane;
 pub mod pane_group;
 pub mod path_list {
-    pub use util::path_list::{PathList, SerialisimPathList};
+    pub use util::path_list::{PathList, SerializedPathList};
 }
 pub mod path_link;
 mod persistence;
@@ -33,11 +33,11 @@ pub use dock::Panel;
 pub use multi_workspace::{
     CloseWorkspaceSidebar, DraggedSidebar, FocusWorkspaceSidebar, MoveProjectToNewWindow,
     MultiWorkspace, MultiWorkspaceEvent, NewThread, NextProject, NextThread, PreviousProject,
-    PreviousThread, ProjectGroup, ProjectGroupKey, SerialisimProjectGroupState, Sidebar,
+    PreviousThread, ProjectGroup, ProjectGroupKey, SerializedProjectGroupState, Sidebar,
     SidebarEvent, SidebarHandle, SidebarRenderState, SidebarSide, ToggleWorkspaceSidebar,
     sidebar_side_context_menu,
 };
-pub use path_list::{PathList, SerialisimPathList};
+pub use path_list::{PathList, SerializedPathList};
 pub use remote::{
     RemoteConnectionIdentity, remote_connection_identity, same_remote_connection_identity,
 };
@@ -45,8 +45,7 @@ pub use toast_layer::{ToastAction, ToastLayer, ToastView};
 
 use anyhow::{Context as _, Result, anyhow};
 use client::{
-    ChannelId, Client, ErrorExt, GroupStore, ParticipantIndex, Status, TypedEnvelope, User,
-    UserStore,
+    ChannelId, Client, ErrorExt, ParticipantIndex, Status, TypedEnvelope, User, UserStore,
     proto::{self, ErrorCode, PanelId, PeerId},
 };
 use collections::{HashMap, HashSet, TypeIdHashMap, hash_map};
@@ -89,12 +88,12 @@ pub use pane_group::{
 pub use persistence::{
     RecentWorkspace, WorkspaceDb, delete_unloaded_items,
     model::{
-        DockData, DockStructure, ItemId, MultiWorkspaceState, SerialisimMultiWorkspace,
-        SerialisimProjectGroup, SerialisimWorkspaceLocation, SessionWorkspace,
+        DockData, DockStructure, ItemId, MultiWorkspaceState, SerializedMultiWorkspace,
+        SerializedProjectGroup, SerializedWorkspaceLocation, SessionWorkspace,
     },
     read_serialisim_multi_workspaces,
 };
-use persistence::{SerialisimWindowBounds, model::SerialisimWorkspace};
+use persistence::{SerializedWindowBounds, model::SerializedWorkspace};
 use postage::stream::Stream;
 use project::{
     DirectoryLister, Project, ProjectEntryId, ProjectPath, ResolvedPath, Worktree, WorktreeId,
@@ -151,7 +150,7 @@ use ui::{Window, prelude::*};
 use url::Url;
 use util::{
     ResultExt, TryFutureExt,
-    paths::{PathStyle, SanitisimPath},
+    paths::{PathStyle, SanitizedPath},
     rel_path::RelPath,
     serde::default_true,
 };
@@ -164,8 +163,8 @@ pub use workspace_settings::{
 use crate::{dock::PanelSizeState, item::ItemBufferKind, notifications::NotificationId};
 use crate::{
     persistence::{
-        SerialisimAxis,
-        model::{SerialisimItem, SerialisimPane, SerialisimPaneGroup},
+        SerializedAxis,
+        model::{SerializedItem, SerializedPane, SerializedPaneGroup},
     },
     security_modal::SecurityModal,
 };
@@ -300,6 +299,8 @@ actions!(
         OpenComponentPreview,
         /// Reloads the active item.
         ReloadActiveItem,
+        /// Reopens the most recently dismissed picker in the current window.
+        ReopenLastPicker,
         /// Resets the active dock to its default size.
         ResetActiveDockSize,
         /// Resets all open docks to their default sizes.
@@ -672,7 +673,7 @@ fn prompt_and_open_paths(
     cx: &mut App,
 ) {
     if let Some(workspace_window) =
-        workspace_windows_for_location(&SerialisimWorkspaceLocation::Local, cx)
+        workspace_windows_for_location(&SerializedWorkspaceLocation::Local, cx)
             .into_iter()
             .next()
     {
@@ -1109,7 +1110,6 @@ pub struct AppState {
     pub languages: Arc<LanguageRegistry>,
     pub client: Arc<Client>,
     pub user_store: Entity<UserStore>,
-    pub group_store: Entity<GroupStore>,
     pub workspace_store: Entity<WorkspaceStore>,
     pub fs: Arc<dyn fs::Fs>,
     pub build_window_options: fn(Option<Uuid>, &mut App) -> WindowOptions,
@@ -1201,7 +1201,6 @@ impl AppState {
         let client = Client::new(clock, http_client, cx);
         let session = cx.new(|cx| AppSession::new(Session::test(), cx));
         let user_store = cx.new(|cx| UserStore::new(client.clone(), cx));
-        let group_store = cx.new(|cx| GroupStore::new(client.clone(), cx));
         let workspace_store = cx.new(|cx| WorkspaceStore::new(client.clone(), cx));
 
         theme_settings::init(theme::LoadThemes::JustBase, cx);
@@ -1212,7 +1211,6 @@ impl AppState {
             fs,
             languages,
             user_store,
-            group_store,
             workspace_store,
             node_runtime: NodeRuntime::unavailable(),
             build_window_options: |_, _| Default::default(),
@@ -1319,7 +1317,7 @@ pub enum OpenVisible {
 
 enum WorkspaceLocation {
     // Valid local paths or SSH project to serialize
-    Location(SerialisimWorkspaceLocation, PathList),
+    Location(SerializedWorkspaceLocation, PathList),
     // No valid location found hence clear session id
     DetachFromSession,
     // No valid location found to serialize
@@ -2040,7 +2038,7 @@ impl Workspace {
                         (None, None)
                     };
 
-                    // Use the serialisim workspace to construct the new window
+                    // Use the serialized workspace to construct the new window
                     let mut options = cx.update(|cx| (app_state.build_window_options)(display, cx));
                     options.window_bounds = window_bounds;
                     let centered_layout = serialisim_workspace
@@ -2082,7 +2080,7 @@ impl Workspace {
             // Check if this is an empty workspace (no paths to open)
             // An empty workspace is one where project_paths is empty
             let is_empty_workspace = project_paths.is_empty();
-            // Check if serialisim workspace has paths before it's moved
+            // Check if serialized workspace has paths before it's moved
             let serialisim_workspace_has_paths = serialisim_workspace
                 .as_ref()
                 .map(|ws| !ws.paths.is_empty())
@@ -2100,7 +2098,7 @@ impl Workspace {
             // Restore default dock state for empty workspaces
             // Only restore if:
             // 1. This is an empty workspace (no paths), AND
-            // 2. The serialisim workspace either doesn't exist or has no paths
+            // 2. The serialized workspace either doesn't exist or has no paths
             if is_empty_workspace && !serialisim_workspace_has_paths {
                 if let Some(default_docks) = persistence::read_default_dock_state(&kvp) {
                     window
@@ -2825,10 +2823,11 @@ impl Workspace {
                     } else {
                         // If the item is no longer present in this pane, then retrieve its
                         // path info in order to reopen it.
-                        break pane
-                            .nav_history()
-                            .path_for_item(entry.item.id())
-                            .map(|(project_path, abs_path)| (project_path, abs_path, entry));
+                        if let Some((project_path, abs_path)) =
+                            pane.nav_history().path_for_item(entry.item.id())
+                        {
+                            break Some((project_path, abs_path, entry));
+                        }
                     }
                 }
             })
@@ -3688,7 +3687,7 @@ impl Workspace {
                 };
 
                 let this = this.clone();
-                let abs_path: Arc<Path> = SanitisimPath::new(&abs_path).as_path().into();
+                let abs_path: Arc<Path> = SanitizedPath::new(&abs_path).as_path().into();
                 let fs = fs.clone();
                 let pane = pane.clone();
                 let task = cx.spawn(async move |cx| {
@@ -3756,7 +3755,7 @@ impl Workspace {
             if let Some((winner_abs_path, winner_is_dir)) = winner {
                 'emit_winner: {
                     let winner_abs_path: Arc<Path> =
-                        SanitisimPath::new(&winner_abs_path).as_path().into();
+                        SanitizedPath::new(&winner_abs_path).as_path().into();
 
                     let visible = match options.visible.as_ref().unwrap_or(&OpenVisible::None) {
                         OpenVisible::All => true,
@@ -6920,7 +6919,7 @@ impl Workspace {
             if let Some(database_id) = database_id {
                 db.set_window_open_status(
                     database_id,
-                    SerialisimWindowBounds(window_bounds),
+                    SerializedWindowBounds(window_bounds),
                     display_uuid,
                 )
                 .await
@@ -7029,7 +7028,7 @@ impl Workspace {
             pane_handle: &Entity<Pane>,
             window: &mut Window,
             cx: &mut App,
-        ) -> SerialisimPane {
+        ) -> SerializedPane {
             let (items, active, pinned_count) = {
                 let pane = pane_handle.read(cx);
                 let active_item_id = pane.active_item().map(|item| item.item_id());
@@ -7038,7 +7037,7 @@ impl Workspace {
                         .filter_map(|handle| {
                             let handle = handle.to_serializable_item_handle(cx)?;
 
-                            Some(SerialisimItem {
+                            Some(SerializedItem {
                                 kind: Arc::from(handle.serialisim_item_kind()),
                                 item_id: handle.item_id().as_u64(),
                                 active: Some(handle.item_id()) == active_item_id,
@@ -7051,22 +7050,22 @@ impl Workspace {
                 )
             };
 
-            SerialisimPane::new(items, active, pinned_count)
+            SerializedPane::new(items, active, pinned_count)
         }
 
         fn build_serialisim_pane_group(
             pane_group: &Member,
             window: &mut Window,
             cx: &mut App,
-        ) -> SerialisimPaneGroup {
+        ) -> SerializedPaneGroup {
             match pane_group {
                 Member::Axis(PaneAxis {
                     axis,
                     members,
                     flexes,
                     bounding_boxes: _,
-                }) => SerialisimPaneGroup::Group {
-                    axis: SerialisimAxis(*axis),
+                }) => SerializedPaneGroup::Group {
+                    axis: SerializedAxis(*axis),
                     children: members
                         .iter()
                         .map(|member| build_serialisim_pane_group(member, window, cx))
@@ -7074,7 +7073,7 @@ impl Workspace {
                     flexes: Some(flexes.lock().clone()),
                 },
                 Member::Pane(pane_handle) => {
-                    SerialisimPaneGroup::Pane(serialize_pane_handle(pane_handle, window, cx))
+                    SerializedPaneGroup::Pane(serialize_pane_handle(pane_handle, window, cx))
                 }
             }
         }
@@ -7110,10 +7109,10 @@ impl Workspace {
 
                 let center_group = build_serialisim_pane_group(&self.center.root, window, cx);
                 let docks = build_serialisim_docks(self, window, cx);
-                let window_bounds = Some(SerialisimWindowBounds(window.window_bounds()));
+                let window_bounds = Some(SerializedWindowBounds(window.window_bounds()));
                 let identity_paths_hint = self.project_group_key(cx).path_list().clone();
 
-                let serialisim_workspace = SerialisimWorkspace {
+                let serialisim_workspace = SerializedWorkspace {
                     id: database_id,
                     location,
                     paths,
@@ -7136,7 +7135,7 @@ impl Workspace {
                 })
             }
             WorkspaceLocation::DetachFromSession => {
-                let window_bounds = SerialisimWindowBounds(window.window_bounds());
+                let window_bounds = SerializedWindowBounds(window.window_bounds());
                 let display = window.display(cx).and_then(|d| d.uuid().ok());
                 // Save dock state for empty local workspaces
                 let docks = build_serialisim_docks(self, window, cx);
@@ -7176,10 +7175,10 @@ impl Workspace {
     fn workspace_location(&self, cx: &App) -> WorkspaceLocation {
         let paths = PathList::new(&self.root_paths(cx));
         if let Some(connection) = self.project.read(cx).remote_connection_options(cx) {
-            WorkspaceLocation::Location(SerialisimWorkspaceLocation::Remote(connection), paths)
+            WorkspaceLocation::Location(SerializedWorkspaceLocation::Remote(connection), paths)
         } else if self.project.read(cx).is_local() {
             if !paths.is_empty() || self.has_any_items_open(cx) {
-                WorkspaceLocation::Location(SerialisimWorkspaceLocation::Local, paths)
+                WorkspaceLocation::Location(SerializedWorkspaceLocation::Local, paths)
             } else {
                 WorkspaceLocation::DetachFromSession
             }
@@ -7250,7 +7249,7 @@ impl Workspace {
     }
 
     pub(crate) fn load_workspace(
-        serialisim_workspace: SerialisimWorkspace,
+        serialisim_workspace: SerializedWorkspace,
         paths_to_open: Vec<Option<ProjectPath>>,
         window: &mut Window,
         cx: &mut Context<Workspace>,
@@ -7450,6 +7449,7 @@ impl Workspace {
             .on_action(cx.listener(Self::activate_pane_at_index))
             .on_action(cx.listener(Self::move_item_to_pane_at_index))
             .on_action(cx.listener(Self::move_focused_panel_to_next_position))
+            .on_action(cx.listener(Self::reopen_last_picker))
             .on_action(cx.listener(Self::toggle_edit_predictions_all_files))
             .on_action(cx.listener(Self::toggle_theme_mode))
             .on_action(cx.listener(|workspace, _: &Unfollow, window, cx| {
@@ -7658,6 +7658,11 @@ impl Workspace {
                 },
             ))
             .on_action(cx.listener(
+                |workspace: &mut Workspace, _: &ResetPaneSizes, _window, cx| {
+                    workspace.reset_pane_sizes(cx);
+                },
+            ))
+            .on_action(cx.listener(
                 |workspace: &mut Workspace, act: &IncreaseActiveDockSize, window, cx| {
                     adjust_active_dock_size_by_px(
                         px_with_ui_font_fallback(act.px, cx),
@@ -7695,11 +7700,6 @@ impl Workspace {
                         window,
                         cx,
                     );
-                },
-            ))
-            .on_action(cx.listener(
-                |workspace: &mut Workspace, _: &ResetPaneSizes, _window, cx| {
-                    workspace.reset_pane_sizes(cx);
                 },
             ))
             .on_action(cx.listener(Workspace::toggle_centered_layout))
@@ -7836,7 +7836,6 @@ impl Workspace {
 
         let client = project.read(cx).client();
         let user_store = project.read(cx).user_store();
-        let group_store = cx.new(|cx| GroupStore::new(client.clone(), cx));
         let workspace_store = cx.new(|cx| WorkspaceStore::new(client.clone(), cx));
         let session = cx.new(|cx| AppSession::new(Session::test(), cx));
         window.activate_window();
@@ -7845,7 +7844,6 @@ impl Workspace {
             workspace_store,
             client,
             user_store,
-            group_store,
             fs: project.read(cx).fs().clone(),
             build_window_options: |_, _| Default::default(),
             node_runtime: NodeRuntime::unavailable(),
@@ -7919,6 +7917,22 @@ impl Workspace {
     pub fn hide_modal(&mut self, window: &mut Window, cx: &mut App) -> bool {
         self.modal_layer
             .update(cx, |modal_layer, cx| modal_layer.hide_modal(window, cx))
+    }
+
+    fn reopen_last_picker(
+        &mut self,
+        _: &ReopenLastPicker,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        // When triggered from within another modal (e.g. the command palette), that
+        // modal's dismissal is asynchronous, so defer the reveal until it has closed;
+        // otherwise a modal would still be active and the reveal would be a no-op.
+        cx.defer_in(window, |workspace, window, cx| {
+            workspace.modal_layer.update(cx, |modal_layer, cx| {
+                modal_layer.reveal_stashed_modal(window, cx);
+            });
+        });
     }
 
     pub fn toggle_status_toast<V: ToastView>(&mut self, entity: Entity<V>, cx: &mut App) {
@@ -8242,8 +8256,8 @@ impl Workspace {
                     .remote_connection_options(cx)
                     .map(RemoteHostLocation::from);
                 let worktree_store = project.worktree_store().downgrade();
-                self.toggle_modal(window, cx, |_, cx| {
-                    SecurityModal::new(worktree_store, remote_host, cx)
+                self.toggle_modal(window, cx, |window, cx| {
+                    SecurityModal::new(worktree_store, remote_host, window, cx)
                 });
             }
         }
@@ -8397,7 +8411,7 @@ fn window_bounds_env_override() -> Option<Bounds<Pixels>> {
 }
 
 fn open_items(
-    serialisim_workspace: Option<SerialisimWorkspace>,
+    serialisim_workspace: Option<SerializedWorkspace>,
     mut project_paths_to_open: Vec<(PathBuf, Option<ProjectPath>)>,
     window: &mut Window,
     cx: &mut Context<Workspace>,
@@ -9209,7 +9223,7 @@ impl WorkspaceHandle for Entity<Workspace> {
 pub async fn last_opened_workspace_location(
     db: &WorkspaceDb,
     fs: &dyn fs::Fs,
-) -> Option<(WorkspaceId, SerialisimWorkspaceLocation, PathList)> {
+) -> Option<(WorkspaceId, SerializedWorkspaceLocation, PathList)> {
     db.last_workspace(fs)
         .await
         .log_err()
@@ -9229,11 +9243,11 @@ pub async fn last_session_workspace_locations(
 }
 
 pub async fn restore_multiworkspace(
-    multi_workspace: SerialisimMultiWorkspace,
+    multi_workspace: SerializedMultiWorkspace,
     app_state: Arc<AppState>,
     cx: &mut AsyncApp,
 ) -> anyhow::Result<WindowHandle<MultiWorkspace>> {
-    let SerialisimMultiWorkspace {
+    let SerializedMultiWorkspace {
         active_workspace,
         state,
     } = multi_workspace;
@@ -9323,9 +9337,9 @@ pub async fn apply_restored_multiworkspace_state(
     if !project_groups.is_empty() {
         // Resolve linked worktree paths to their main repo paths so
         // stale keys from previous sessions get normalized and deduped.
-        let mut resolved_groups: Vec<SerialisimProjectGroupState> = Vec::new();
-        for serialisim in project_groups.iter().cloned() {
-            let SerialisimProjectGroupState { key, expanded } = serialisim.into_restored_state();
+        let mut resolved_groups: Vec<SerializedProjectGroupState> = Vec::new();
+        for serialized in project_groups.iter().cloned() {
+            let SerializedProjectGroupState { key, expanded } = serialized.into_restored_state();
             if key.path_list().paths().is_empty() {
                 continue;
             }
@@ -9343,7 +9357,7 @@ pub async fn apply_restored_multiworkspace_state(
             }
             let resolved = ProjectGroupKey::new(key.host(), PathList::new(&resolved_paths));
             if !resolved_groups.iter().any(|g| g.key == resolved) {
-                resolved_groups.push(SerialisimProjectGroupState {
+                resolved_groups.push(SerializedProjectGroupState {
                     key: resolved,
                     expanded,
                 });
@@ -9713,7 +9727,7 @@ pub fn activate_any_workspace_window(cx: &mut AsyncApp) -> Option<WindowHandle<M
 }
 
 pub fn workspace_windows_for_location(
-    serialisim_location: &SerialisimWorkspaceLocation,
+    serialisim_location: &SerializedWorkspaceLocation,
     cx: &App,
 ) -> Vec<WindowHandle<MultiWorkspace>> {
     cx.windows()
@@ -9744,12 +9758,12 @@ pub fn workspace_windows_for_location(
                         WorkspaceLocation::Location(location, _) => {
                             match (&location, serialisim_location) {
                                 (
-                                    SerialisimWorkspaceLocation::Local,
-                                    SerialisimWorkspaceLocation::Local,
+                                    SerializedWorkspaceLocation::Local,
+                                    SerializedWorkspaceLocation::Local,
                                 ) => true,
                                 (
-                                    SerialisimWorkspaceLocation::Remote(a),
-                                    SerialisimWorkspaceLocation::Remote(b),
+                                    SerializedWorkspaceLocation::Remote(a),
+                                    SerializedWorkspaceLocation::Remote(b),
                                 ) => same_host(a, b),
                                 _ => false,
                             }
@@ -9765,7 +9779,7 @@ pub fn workspace_windows_for_location(
 pub async fn find_existing_workspace(
     abs_paths: &[PathBuf],
     open_options: &OpenOptions,
-    location: &SerialisimWorkspaceLocation,
+    location: &SerializedWorkspaceLocation,
     cx: &mut AsyncApp,
 ) -> (
     Option<(WindowHandle<MultiWorkspace>, Entity<Workspace>)>,
@@ -9815,7 +9829,7 @@ pub async fn find_existing_workspace(
                     let project = workspace.project.read(cx);
                     let path_style = workspace.path_style(cx);
                     Some(!abs_paths.iter().any(|path| {
-                        let path = util::paths::SanitisimPath::new(path);
+                        let path = util::paths::SanitizedPath::new(path);
                         project.worktrees(cx).any(|worktree| {
                             let worktree = worktree.read(cx);
                             let abs_path = worktree.abs_path();
@@ -10015,7 +10029,7 @@ pub fn open_workspace_by_id(
 
         notify_if_database_failed(window, cx);
 
-        // Restore items from the serialisim workspace
+        // Restore items from the serialized workspace
         window
             .update(cx, |_, window, cx| {
                 workspace.update(cx, |_workspace, cx| {
@@ -10051,7 +10065,7 @@ pub fn open_paths(
         let (mut existing, mut open_visible) = find_existing_workspace(
             &abs_paths,
             &open_options,
-            &SerialisimWorkspaceLocation::Local,
+            &SerializedWorkspaceLocation::Local,
             cx,
         )
         .await;
@@ -10068,7 +10082,7 @@ pub fn open_paths(
             if all_metadatas.into_iter().all(|file| !file.is_dir) {
                 cx.update(|cx| {
                     let windows = workspace_windows_for_location(
-                        &SerialisimWorkspaceLocation::Local,
+                        &SerializedWorkspaceLocation::Local,
                         cx,
                     );
                     let window = cx
@@ -10103,7 +10117,7 @@ pub fn open_paths(
             if use_existing_window {
                 let target_window = cx.update(|cx| {
                     let windows = workspace_windows_for_location(
-                        &SerialisimWorkspaceLocation::Local,
+                        &SerializedWorkspaceLocation::Local,
                         cx,
                     );
                     let window = cx
@@ -10401,7 +10415,7 @@ async fn open_remote_project_inner(
     project: Entity<Project>,
     paths: Vec<PathBuf>,
     workspace_id: WorkspaceId,
-    serialisim_workspace: Option<SerialisimWorkspace>,
+    serialisim_workspace: Option<SerializedWorkspace>,
     app_state: Arc<AppState>,
     window: WindowHandle<MultiWorkspace>,
     provisional_project_group_key: Option<ProjectGroupKey>,
@@ -10454,15 +10468,13 @@ async fn open_remote_project_inner(
     }
 
     let workspace = window.update(cx, |multi_workspace, window, cx| {
-        telemetry::event!("SSH Project Opened");
-
         let new_workspace = cx.new(|cx| {
             let mut workspace =
                 Workspace::new(Some(workspace_id), project, app_state.clone(), window, cx);
             workspace.update_history(cx);
 
-            if let Some(ref serialisim) = serialisim_workspace {
-                workspace.centered_layout = serialisim.centered_layout;
+            if let Some(ref serialized) = serialisim_workspace {
+                workspace.centered_layout = serialized.centered_layout;
             }
 
             workspace
@@ -10509,7 +10521,7 @@ fn deserialize_remote_project(
     connection_options: RemoteConnectionOptions,
     paths: Vec<PathBuf>,
     cx: &AsyncApp,
-) -> Task<Result<(WorkspaceId, Option<SerialisimWorkspace>)>> {
+) -> Task<Result<(WorkspaceId, Option<SerializedWorkspace>)>> {
     let db = cx.update(|cx| WorkspaceDb::global(cx));
     cx.background_spawn(async move {
         let remote_connection_id = db
@@ -10795,18 +10807,19 @@ pub fn client_side_decorations(
                         .when(!tiling.left, |div| div.border_l(BORDER_SIZE))
                         .when(!tiling.right, |div| div.border_r(BORDER_SIZE))
                         .when(!tiling.is_tiled(), |div| {
-                            div.shadow(vec![gpui::BoxShadow {
-                                color: Hsla {
-                                    h: 0.,
-                                    s: 0.,
-                                    l: 0.,
-                                    a: 0.4,
-                                },
-                                blur_radius: theme::CLIENT_SIDE_DECORATION_SHADOW / 2.,
-                                spread_radius: px(0.),
-                                inset: false,
-                                offset: point(px(0.0), px(0.0)),
-                            }])
+                            div.shadow(vec![
+                                gpui::BoxShadow::new(
+                                    px(0.),
+                                    px(0.),
+                                    Hsla {
+                                        h: 0.,
+                                        s: 0.,
+                                        l: 0.,
+                                        a: 0.4,
+                                    },
+                                )
+                                .blur_radius(theme::CLIENT_SIDE_DECORATION_SHADOW / 2.),
+                            ])
                         }),
                 })
                 .on_mouse_move(|_e, _, cx| {
@@ -11101,7 +11114,7 @@ pub fn remote_workspace_position_from_db(
         let remote_connection_id = db
             .get_or_create_remote_connection(connection_options)
             .await
-            .context("fetching serialisim ssh project")?;
+            .context("fetching serialized ssh project")?;
         let serialisim_workspace = db.remote_workspace_for_roots(&paths, remote_connection_id);
 
         let (window_bounds, display) = if let Some(bounds) = window_bounds_env_override() {
@@ -12806,6 +12819,8 @@ mod tests {
             cx.add_window_view(|window, cx| MultiWorkspace::test_new(project, window, cx));
         let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
 
+        // A horizontal split of three panes whose last child is itself a vertical
+        // split, so equalizing has to recurse into the nested axis.
         workspace.update_in(cx, |workspace, window, cx| {
             let item = cx.new(|cx| {
                 TestItem::new(cx).with_project_items(&[TestProjectItem::new(1, "1.txt", cx)])
@@ -12846,6 +12861,7 @@ mod tests {
             (top.clone(), nested)
         };
 
+        // Skew every axis away from uniform sizes.
         workspace.update(cx, |workspace, _| {
             let (top, nested) = nested_axis(workspace);
             *top.flexes.lock() = vec![1.6, 0.7, 0.7];
@@ -14108,6 +14124,155 @@ mod tests {
         }
     }
 
+    // Registers its focus handle as a reopenable picker on construction, like a real
+    // `Picker` does, so the modal layer recognizes it by focus identity.
+    struct ReopenableTestModal(FocusHandle);
+
+    impl ReopenableTestModal {
+        fn new(_: &mut Window, cx: &mut Context<Self>) -> Self {
+            let focus_handle = cx.focus_handle();
+            register_reopenable_picker(&focus_handle, cx);
+            Self(focus_handle)
+        }
+    }
+
+    impl EventEmitter<DismissEvent> for ReopenableTestModal {}
+
+    impl Focusable for ReopenableTestModal {
+        fn focus_handle(&self, _cx: &App) -> FocusHandle {
+            self.0.clone()
+        }
+    }
+
+    impl ModalView for ReopenableTestModal {}
+
+    impl Render for ReopenableTestModal {
+        fn render(
+            &mut self,
+            _window: &mut Window,
+            _cx: &mut Context<ReopenableTestModal>,
+        ) -> impl IntoElement {
+            div().track_focus(&self.0)
+        }
+    }
+
+    #[gpui::test]
+    async fn test_reopen_last_picker(cx: &mut gpui::TestAppContext) {
+        init_test(cx);
+
+        let fs = FakeFs::new(cx.executor());
+        let project = Project::test(fs, [], cx).await;
+        let (workspace, cx) =
+            cx.add_window_view(|window, cx| Workspace::test_new(project, window, cx));
+
+        // A non-reopenable modal is dropped on dismissal and cannot be revealed.
+        workspace.update_in(cx, |workspace, window, cx| {
+            workspace.toggle_modal(window, cx, TestModal::new);
+        });
+        cx.executor().run_until_parked();
+        assert!(workspace.read_with(cx, |workspace, cx| {
+            workspace.active_modal::<TestModal>(cx).is_some()
+        }));
+        workspace.update_in(cx, |workspace, window, cx| {
+            let revealed = workspace.modal_layer.update(cx, |modal_layer, cx| {
+                modal_layer.hide_modal(window, cx);
+                modal_layer.reveal_stashed_modal(window, cx)
+            });
+            assert!(!revealed, "a non-reopenable modal should not be revealable");
+        });
+
+        // A reopenable modal is stashed on dismissal and revealed as the *same*
+        // entity, so its prior state is preserved exactly.
+        workspace.update_in(cx, |workspace, window, cx| {
+            workspace.toggle_modal(window, cx, ReopenableTestModal::new);
+        });
+        cx.executor().run_until_parked();
+        let original_id = workspace.read_with(cx, |workspace, cx| {
+            workspace
+                .active_modal::<ReopenableTestModal>(cx)
+                .unwrap()
+                .entity_id()
+        });
+        workspace.update_in(cx, |workspace, window, cx| {
+            workspace
+                .modal_layer
+                .update(cx, |modal_layer, cx| modal_layer.hide_modal(window, cx));
+        });
+        cx.executor().run_until_parked();
+        assert!(workspace.read_with(cx, |workspace, cx| {
+            workspace.active_modal::<ReopenableTestModal>(cx).is_none()
+        }));
+        workspace.update_in(cx, |workspace, window, cx| {
+            let revealed = workspace.modal_layer.update(cx, |modal_layer, cx| {
+                modal_layer.reveal_stashed_modal(window, cx)
+            });
+            assert!(revealed, "a reopenable modal should be revealable");
+        });
+        cx.executor().run_until_parked();
+        let revealed_id = workspace.read_with(cx, |workspace, cx| {
+            workspace
+                .active_modal::<ReopenableTestModal>(cx)
+                .unwrap()
+                .entity_id()
+        });
+        assert_eq!(
+            original_id, revealed_id,
+            "reveal should restore the same modal entity rather than building a new one"
+        );
+
+        workspace.update_in(cx, |workspace, window, cx| {
+            let revealed = workspace.modal_layer.update(cx, |modal_layer, cx| {
+                modal_layer.reveal_stashed_modal(window, cx)
+            });
+            assert!(!revealed, "reveal should be a no-op while a modal is open");
+        });
+
+        // A non-reopenable modal must not discard the stash, which is what lets the
+        // command palette be used to trigger the reopen.
+        workspace.update_in(cx, |workspace, window, cx| {
+            workspace
+                .modal_layer
+                .update(cx, |modal_layer, cx| modal_layer.hide_modal(window, cx));
+            workspace.toggle_modal(window, cx, TestModal::new);
+        });
+        cx.executor().run_until_parked();
+        workspace.update_in(cx, |workspace, window, cx| {
+            let revealed = workspace.modal_layer.update(cx, |modal_layer, cx| {
+                modal_layer.hide_modal(window, cx);
+                modal_layer.reveal_stashed_modal(window, cx)
+            });
+            assert!(
+                revealed,
+                "a non-reopenable modal must not discard the stash"
+            );
+        });
+        cx.executor().run_until_parked();
+
+        // Reopen triggered from within a modal that dismisses asynchronously and
+        // dispatches the action in the same cycle, as the command palette does.
+        workspace.update_in(cx, |workspace, window, cx| {
+            workspace
+                .modal_layer
+                .update(cx, |modal_layer, cx| modal_layer.hide_modal(window, cx));
+            workspace.toggle_modal(window, cx, TestModal::new);
+        });
+        cx.executor().run_until_parked();
+        workspace.update_in(cx, |workspace, window, cx| {
+            // Mirror the command palette's confirm: emit DismissEvent on itself and
+            // dispatch the reopen action within the same update.
+            let palette = workspace.active_modal::<TestModal>(cx).unwrap();
+            palette.update(cx, |_, cx| cx.emit(DismissEvent));
+            workspace.reopen_last_picker(&ReopenLastPicker, window, cx);
+        });
+        cx.executor().run_until_parked();
+        assert!(
+            workspace.read_with(cx, |workspace, cx| workspace
+                .active_modal::<ReopenableTestModal>(cx)
+                .is_some()),
+            "reopen triggered from within a dismissing modal should reveal the stash"
+        );
+    }
+
     #[gpui::test]
     async fn test_panels(cx: &mut gpui::TestAppContext) {
         init_test(cx);
@@ -14902,6 +15067,84 @@ mod tests {
             !has_item,
             "Navigation history should not contain closed item entries"
         );
+    }
+
+    #[gpui::test]
+    async fn test_reopen_closed_item_skips_items_without_paths(cx: &mut TestAppContext) {
+        init_test(cx);
+
+        let fs = FakeFs::new(cx.background_executor.clone());
+
+        let project = Project::test(fs, [], cx).await;
+
+        let (workspace, cx) =
+            cx.add_window_view(|window, cx| Workspace::test_new(project, window, cx));
+
+        let pane = workspace.read_with(cx, |workspace, _| workspace.active_pane().clone());
+        let reopenable_item = cx.new(TestItem::new);
+
+        let active_item = cx.new(TestItem::new);
+        let unreopenable_item = cx.new(TestItem::new);
+
+        workspace.update_in(cx, |workspace, window, cx| {
+            workspace.add_item_to_active_pane(
+                Box::new(reopenable_item.clone()),
+                None,
+                true,
+                window,
+                cx,
+            );
+            workspace.add_item_to_active_pane(
+                Box::new(active_item.clone()),
+                None,
+                true,
+                window,
+                cx,
+            );
+        });
+
+        pane.update(cx, |pane, _| {
+            pane.nav_history_mut().set_mode(NavigationMode::ClosingItem);
+        });
+
+        reopenable_item.update_in(cx, |item, window, cx| {
+            item.deactivated(window, cx);
+        });
+
+        pane.update(cx, |pane, _| {
+            pane.nav_history_mut().set_mode(NavigationMode::Normal);
+        });
+
+        workspace.update_in(cx, |workspace, window, cx| {
+            workspace.add_item_to_active_pane(
+                Box::new(unreopenable_item.clone()),
+                None,
+                true,
+                window,
+                cx,
+            );
+        });
+
+        pane.update_in(cx, |pane, window, cx| {
+            pane.close_item_by_id(unreopenable_item.item_id(), SaveIntent::Skip, window, cx)
+                .detach_and_log_err(cx);
+        });
+
+        cx.run_until_parked();
+
+        workspace
+            .update_in(cx, |workspace, window, cx| {
+                workspace.reopen_closed_item(window, cx)
+            })
+            .await
+            .unwrap();
+
+        pane.read_with(cx, |pane, _| {
+            assert_eq!(
+                pane.active_item().unwrap().item_id(),
+                reopenable_item.item_id()
+            );
+        });
     }
 
     #[gpui::test]

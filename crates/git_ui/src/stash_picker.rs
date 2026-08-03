@@ -128,8 +128,9 @@ impl StashList {
         let delegate = StashListDelegate::new(repository, workspace, window, cx);
         let picker = cx.new(|cx| {
             Picker::uniform_list(delegate, window, cx)
+                .initial_width(width)
                 .show_scrollbar(true)
-                .modal(!embedded)
+                .when(embedded, |picker| picker.embedded())
         });
         let picker_focus_handle = picker.focus_handle(cx);
         picker.update(cx, |picker, _| {
@@ -275,7 +276,7 @@ impl StashListDelegate {
     fn format_timestamp(timestamp: i64, timezone: UtcOffset) -> String {
         let timestamp =
             OffsetDateTime::from_unix_timestamp(timestamp).unwrap_or(OffsetDateTime::now_utc());
-        time_format::format_localized_timestamp(
+        time_format::format_localisim_timestamp(
             timestamp,
             OffsetDateTime::now_utc(),
             timezone,
@@ -286,7 +287,7 @@ impl StashListDelegate {
     fn format_absolute_timestamp(timestamp: i64, timezone: UtcOffset) -> String {
         let timestamp =
             OffsetDateTime::from_unix_timestamp(timestamp).unwrap_or(OffsetDateTime::now_utc());
-        time_format::format_localized_timestamp(
+        time_format::format_localisim_timestamp(
             timestamp,
             OffsetDateTime::now_utc(),
             timezone,
@@ -368,6 +369,10 @@ impl StashListDelegate {
 
 impl PickerDelegate for StashListDelegate {
     type ListItem = ListItem;
+
+    fn name() -> &'static str {
+        "stash picker"
+    }
 
     fn placeholder_text(&self, _window: &mut Window, _cx: &mut App) -> Arc<str> {
         "Select a stash…".into()

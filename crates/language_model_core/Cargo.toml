@@ -14,7 +14,6 @@ doctest = false
 
 [dependencies]
 anyhow.workspace = true
-async-io.workspace = true
 async-lock.workspace = true
 cloud_llm_client.workspace = true
 futures.workspace = true
@@ -27,7 +26,6 @@ serde.workspace = true
 serde_json.workspace = true
 strum.workspace = true
 thiserror.workspace = true
-tiktoken-rs.workspace = true
 
 [dev-dependencies]
-smol.workspace = true
+pretty_assertions.workspace = true

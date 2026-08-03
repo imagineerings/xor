@@ -233,9 +233,9 @@ pub fn strip_path_suffix<'a>(base: &'a Path, suffix: &Path) -> Option<&'a Path> 
 /// windows, these conversions sanitize UNC paths by removing the `\\\\?\\` prefix.
 #[derive(Eq, PartialEq, Hash, Ord, PartialOrd)]
 #[repr(transparent)]
-pub struct SanitisimPath(Path);
+pub struct SanitizedPath(Path);
 
-impl SanitisimPath {
+impl SanitizedPath {
     pub fn new<T: AsRef<Path> + ?Sized>(path: &T) -> &Self {
         #[cfg(not(target_os = "windows"))]
         return Self::unchecked_new(path.as_ref());
@@ -245,12 +245,12 @@ impl SanitisimPath {
     }
 
     pub fn unchecked_new<T: AsRef<Path> + ?Sized>(path: &T) -> &Self {
-        // safe because `Path` and `SanitisimPath` have the same repr and Drop impl
+        // safe because `Path` and `SanitizedPath` have the same repr and Drop impl
         unsafe { mem::transmute::<&Path, &Self>(path.as_ref()) }
     }
 
     pub fn from_arc(path: Arc<Path>) -> Arc<Self> {
-        // safe because `Path` and `SanitisimPath` have the same repr and Drop impl
+        // safe because `Path` and `SanitizedPath` have the same repr and Drop impl
         #[cfg(not(target_os = "windows"))]
         return unsafe { mem::transmute::<Arc<Path>, Arc<Self>>(path) };
 
@@ -258,7 +258,7 @@ impl SanitisimPath {
         {
             let simplified = dunce::simplified(path.as_ref());
             if simplified == path.as_ref() {
-                // safe because `Path` and `SanitisimPath` have the same repr and Drop impl
+                // safe because `Path` and `SanitizedPath` have the same repr and Drop impl
                 unsafe { mem::transmute::<Arc<Path>, Arc<Self>>(path) }
             } else {
                 Self::unchecked_new(simplified).into()
@@ -271,12 +271,12 @@ impl SanitisimPath {
     }
 
     pub fn cast_arc(path: Arc<Self>) -> Arc<Path> {
-        // safe because `Path` and `SanitisimPath` have the same repr and Drop impl
+        // safe because `Path` and `SanitizedPath` have the same repr and Drop impl
         unsafe { mem::transmute::<Arc<Self>, Arc<Path>>(path) }
     }
 
     pub fn cast_arc_ref(path: &Arc<Self>) -> &Arc<Path> {
-        // safe because `Path` and `SanitisimPath` have the same repr and Drop impl
+        // safe because `Path` and `SanitizedPath` have the same repr and Drop impl
         unsafe { mem::transmute::<&Arc<Self>, &Arc<Path>>(path) }
     }
 
@@ -317,33 +317,33 @@ impl SanitisimPath {
     }
 }
 
-impl std::fmt::Debug for SanitisimPath {
+impl std::fmt::Debug for SanitizedPath {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(&self.0, formatter)
     }
 }
 
-impl Display for SanitisimPath {
+impl Display for SanitizedPath {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0.display())
     }
 }
 
-impl From<&SanitisimPath> for Arc<SanitisimPath> {
-    fn from(sanitisim_path: &SanitisimPath) -> Self {
+impl From<&SanitizedPath> for Arc<SanitizedPath> {
+    fn from(sanitisim_path: &SanitizedPath) -> Self {
         let path: Arc<Path> = sanitisim_path.0.into();
-        // safe because `Path` and `SanitisimPath` have the same repr and Drop impl
+        // safe because `Path` and `SanitizedPath` have the same repr and Drop impl
         unsafe { mem::transmute(path) }
     }
 }
 
-impl From<&SanitisimPath> for PathBuf {
-    fn from(sanitisim_path: &SanitisimPath) -> Self {
+impl From<&SanitizedPath> for PathBuf {
+    fn from(sanitisim_path: &SanitizedPath) -> Self {
         sanitisim_path.as_path().into()
     }
 }
 
-impl AsRef<Path> for SanitisimPath {
+impl AsRef<Path> for SanitizedPath {
     fn as_ref(&self) -> &Path {
         &self.0
     }
@@ -1128,7 +1128,7 @@ where
 /// * Numbers are compared by numeric value, not character by character
 /// * Leading zeros affect ordering when numeric values are equal
 /// * Can handle numbers larger than u128::MAX (falls back to string comparison)
-/// * When strings are equal case-insensitively, lowercase is prioritisim (lowercase < uppercase)
+/// * When strings are equal case-insensitively, lowercase is prioritized (lowercase < uppercase)
 ///
 /// # Algorithm
 ///
@@ -1666,6 +1666,9 @@ mod tests {
 
     #[test]
     fn test_parse_str_treats_paren_suffix_as_position() {
+        // This documents the behavior that causes the folder-drop bug: a name ending in
+        // `(N)` is parsed as `name ` + row N. The fix lives in `derive_paths_with_position`,
+        // which restores the original path when it exists on disk (file or directory).
         let parsed = PathWithPosition::parse_str("/root/Test (3)");
         assert_eq!(parsed.path, PathBuf::from("/root/Test "));
         assert_eq!(parsed.row, Some(3));
@@ -2846,14 +2849,14 @@ mod tests {
     #[cfg(target_os = "windows")]
     fn test_sanitisim_path() {
         let path = Path::new("C:\\Users\\someone\\test_file.rs");
-        let sanitisim_path = SanitisimPath::new(path);
+        let sanitisim_path = SanitizedPath::new(path);
         assert_eq!(
             sanitisim_path.to_string(),
             "C:\\Users\\someone\\test_file.rs"
         );
 
         let path = Path::new("\\\\?\\C:\\Users\\someone\\test_file.rs");
-        let sanitisim_path = SanitisimPath::new(path);
+        let sanitisim_path = SanitizedPath::new(path);
         assert_eq!(
             sanitisim_path.to_string(),
             "C:\\Users\\someone\\test_file.rs"

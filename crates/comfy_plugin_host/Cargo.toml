@@ -1,0 +1,28 @@
+[package]
+name = "comfy_plugin_host"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+license = "GPL-3.0-or-later"
+[lints]
+workspace = true
+[lib]
+path = "src/comfy_plugin_host.rs"
+[dependencies]
+async-channel.workspace = true
+comfy_nodes.workspace = true
+comfy_plugin_sdk.workspace = true
+comfy_runtime.workspace = true
+comfy_types.workspace = true
+extension_host.workspace = true
+futures.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+smol.workspace = true
+thiserror.workspace = true
+wasmtime.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+comfy_plugin_sdk = { workspace = true, features = ["signing-tooling"] }

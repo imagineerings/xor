@@ -5,7 +5,7 @@ slug: terms
 
 **Last Updated**: March 2, 2026
 
-Welcome, and thank you for your interest in Sim Industries, Inc. (“**Sim**,” “**we**,” or “**us**”) and our website at [www.sim.dev](https://www.sim.dev), along with our downloadable Sim software (the “**Software**”) and related subscription service (the “**Service**”). These Terms of Service are a legally binding contract between you and Sim regarding your use of the Service.
+Welcome, and thank you for your interest in Simtropolis, Inc. (“**Sim**,” “**we**,” or “**us**”) and our website at [www.sim.dev](https://www.sim.dev), along with our downloadable Sim software (the “**Software**”) and related subscription service (the “**Service**”). These Terms of Service are a legally binding contract between you and Sim regarding your use of the Service.
 
 Please read the following Terms carefully.
 
@@ -117,11 +117,11 @@ These Terms are effective beginning when Customer accepts the Terms or first d
 
 ### 9.2. Termination
 
-If Customer violates any provision of these Terms, then Customer is not authorisim to access the Service and these Terms automatically terminate. In addition, Sim may, at its sole discretion, terminate these Terms or Customer’s account on the Service, or suspend or terminate Customer’s access to the Service, at any time for any reason or no reason, with or without notice, and without any liability to Customer arising from such termination. Customer may terminate its account and these Terms at any time by contacting Sim at [hi@sim.dev](mailto:hi@sim.dev).
+If Customer violates any provision of these Terms, then Customer is not authorized to access the Service and these Terms automatically terminate. In addition, Sim may, at its sole discretion, terminate these Terms or Customer’s account on the Service, or suspend or terminate Customer’s access to the Service, at any time for any reason or no reason, with or without notice, and without any liability to Customer arising from such termination. Customer may terminate its account and these Terms at any time by contacting Sim at [hi@sim.dev](mailto:hi@sim.dev).
 
 ### 9.3. Effect of Termination
 
-Upon termination of these Terms: a) Customer’s license to access and use the Service will terminate and Customer must immediately cease all use of the Service; b) Customer will no longer be authorisim to access its account or the Service; c) Customer must pay Sim any unpaid amount that was due prior to termination; and d) all payment obligations accrued prior to termination and Section(s) 2.4 (Restrictions), 3 (General Payment Terms) with the exception of 3.4 (Subscription Service), 4.2 (Customer’s Ownership of Output), 4.4 (Telemetry), 8 (Disclaimers; No Warranties by Sim), 9.3 (Effect of Termination), 10 (Ownership; Feedback), 11 (Limitations of Liability), 12 (Indemnity), 15 (Governing Law, Dispute Resolution and Arbitration); and 16 (General Terms), will survive. If Customer’s account has been terminated for a breach of these Terms, then Customer is prohibited from creating a new account on the Service.
+Upon termination of these Terms: a) Customer’s license to access and use the Service will terminate and Customer must immediately cease all use of the Service; b) Customer will no longer be authorized to access its account or the Service; c) Customer must pay Sim any unpaid amount that was due prior to termination; and d) all payment obligations accrued prior to termination and Section(s) 2.4 (Restrictions), 3 (General Payment Terms) with the exception of 3.4 (Subscription Service), 4.2 (Customer’s Ownership of Output), 4.4 (Telemetry), 8 (Disclaimers; No Warranties by Sim), 9.3 (Effect of Termination), 10 (Ownership; Feedback), 11 (Limitations of Liability), 12 (Indemnity), 15 (Governing Law, Dispute Resolution and Arbitration); and 16 (General Terms), will survive. If Customer’s account has been terminated for a breach of these Terms, then Customer is prohibited from creating a new account on the Service.
 
 ### 9.4. Modification of the Service
 
@@ -185,7 +185,7 @@ The Terms are governed by the laws of the State of Delaware and the United State
 
 ANY CONTROVERSY OR CLAIM ARISING OUT OF OR RELATING TO THESE TERMS, OR THE BREACH THEREOF, SHALL BE SETTLED BY ARBITRATION AND JUDGMENT ON THE AWARD RENDERED BY THE ARBITRATOR MAY BE ENTERED IN ANY COURT HAVING JURISDICTION THEREOF. IF THERE IS A DISPUTE ABOUT WHETHER THIS ARBITRATION AGREEMENT CAN BE ENFORCED OR APPLIES TO THE DISPUTE, CUSTOMER AND SIM AGREE THAT THE ARBITRATOR WILL DECIDE THAT ISSUE.
 
-**a. Opt-Out.** If Customer does not wish to resolve disputes by binding arbitration, Customer may opt out of the provisions of this Section 17.2 (Dispute Resolution and Arbitration) within 30 days after the date that Customer agrees to these Terms by sending an email to [arbitration-opt-out@sim.dev](mailto:arbitration-opt-out@sim.dev) or a letter to Sim Industries, Inc., Attention: Legal Department – Arbitration Opt-Out, 2590 Welton Street, Suite 200, PMB 1916, Denver, CO 80205 that specifies: Customer’s full legal name, the email address associated with Customer’s account on the Service, and a statement that Customer wishes to opt out of arbitration (“**Opt-Out Notice**”). Once Sim receives Customer’s Opt-Out Notice, this Section 15.2 (Dispute Resolution and Arbitration) will be void and any action arising out of these Terms will be resolved as set forth in Section 15.1 (Governing Law). The remaining provisions of these Terms will not be affected by Customer’s Opt-Out Notice.
+**a. Opt-Out.** If Customer does not wish to resolve disputes by binding arbitration, Customer may opt out of the provisions of this Section 17.2 (Dispute Resolution and Arbitration) within 30 days after the date that Customer agrees to these Terms by sending an email to [arbitration-opt-out@sim.dev](mailto:arbitration-opt-out@sim.dev) or a letter to Simtropolis, Inc., Attention: Legal Department – Arbitration Opt-Out, 2590 Welton Street, Suite 200, PMB 1916, Denver, CO 80205 that specifies: Customer’s full legal name, the email address associated with Customer’s account on the Service, and a statement that Customer wishes to opt out of arbitration (“**Opt-Out Notice**”). Once Sim receives Customer’s Opt-Out Notice, this Section 15.2 (Dispute Resolution and Arbitration) will be void and any action arising out of these Terms will be resolved as set forth in Section 15.1 (Governing Law). The remaining provisions of these Terms will not be affected by Customer’s Opt-Out Notice.
 
 **b. Pre-Arbitration Dispute Resolution and Notification.** Prior to initiating an arbitration, Customer and Sim each agree to notify the other party of the dispute and attempt to negotiate an informal resolution to it first. Sim will contact Customer at the email address Customer has provided to Sim; Customer can contact Sim by email at [legal@sim.dev](mailto:legal@sim.dev). If after a good faith effort to negotiate, one party feels the dispute has not and cannot be resolved informally, the party intending to pursue arbitration agrees to notify the other party via email prior to initiating the arbitration.
 
@@ -207,7 +207,7 @@ These Terms, including the Privacy Policy and any other agreements expressly inc
 
 ### 16.2. Notices
 
-Except as set out in the Terms, any notice or consent under the Terms must be in writing to the Customer email address on the Order and Customer shall send all notices to Sim at Sim Industries, Inc., 2590 Welton Street, Suite 200, PMB 1916, Denver, CO 80205 with cc: to [legal@sim.dev](mailto:legal@sim.dev) and will be deemed given: (a) upon receipt if by personal delivery; (b) upon receipt if by certified or registered U.S. mail (return receipt requested); or (c) one day after dispatch if by a commercial overnight delivery service. Either Party may update its address with notice to the other Party pursuant to this Section. Sim may also send operational notices to Customer by email or through the Service.
+Except as set out in the Terms, any notice or consent under the Terms must be in writing to the Customer email address on the Order and Customer shall send all notices to Sim at Simtropolis, Inc., 2590 Welton Street, Suite 200, PMB 1916, Denver, CO 80205 with cc: to [legal@sim.dev](mailto:legal@sim.dev) and will be deemed given: (a) upon receipt if by personal delivery; (b) upon receipt if by certified or registered U.S. mail (return receipt requested); or (c) one day after dispatch if by a commercial overnight delivery service. Either Party may update its address with notice to the other Party pursuant to this Section. Sim may also send operational notices to Customer by email or through the Service.
 
 ### 16.3. DPA
 
@@ -247,7 +247,7 @@ By using the Service, Customer consents to receiving certain electronic communic
 
 ### 16.12. Contact Information
 
-The Service is offered by Sim Industries, Inc. Customer may contact Sim by sending correspondence to 2590 Welton Street, Suite 200, PMB 1916, Denver, CO 80205 with cc: to [legal@sim.dev](mailto:legal@sim.dev).
+The Service is offered by Simtropolis, Inc. Customer may contact Sim by sending correspondence to 2590 Welton Street, Suite 200, PMB 1916, Denver, CO 80205 with cc: to [legal@sim.dev](mailto:legal@sim.dev).
 
 ### 16.13. Notice to California Residents
 

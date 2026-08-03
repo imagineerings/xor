@@ -48,7 +48,7 @@ use std::{
 use util::path;
 use workspace::{MultiWorkspace, Workspace, WorkspaceStore};
 
-use livekit_client::test::TestServer as LivekitTestServer;
+use livekit_client::test::{ManualUnixTimestampSource, TestServer as LivekitTestServer};
 
 use crate::db_tests::TestDb;
 
@@ -56,6 +56,7 @@ pub struct TestServer {
     pub app_state: Arc<AppState>,
     pub test_livekit_server: Arc<LivekitTestServer>,
     pub test_db: TestDb,
+    livekit_timestamp_source: Arc<ManualUnixTimestampSource>,
     server: Arc<Server>,
     next_github_user_id: i32,
     connection_killers: Arc<Mutex<HashMap<PeerId, Arc<AtomicBool>>>>,
@@ -85,10 +86,6 @@ pub struct ContactsSummary {
 }
 
 impl TestServer {
-    pub async fn sweep_expired_statuses(&self) {
-        self.server.sweep_expired_statuses().await.unwrap();
-    }
-
     pub async fn start(deterministic: BackgroundExecutor) -> Self {
         static NEXT_LIVEKIT_SERVER_ID: AtomicUsize = AtomicUsize::new(0);
 
@@ -100,11 +97,13 @@ impl TestServer {
             TestDb::sqlite(deterministic.clone())
         };
         let livekit_server_id = NEXT_LIVEKIT_SERVER_ID.fetch_add(1, SeqCst);
-        let livekit_server = LivekitTestServer::create(
+        let livekit_timestamp_source = Arc::new(ManualUnixTimestampSource::new(1_234_567));
+        let livekit_server = LivekitTestServer::create_with_timestamp_source(
             format!("http://livekit.{}.test", livekit_server_id),
             format!("devkey-{}", livekit_server_id),
             format!("secret-{}", livekit_server_id),
             deterministic.clone(),
+            livekit_timestamp_source.clone(),
         )
         .unwrap();
         let executor = Executor::Deterministic(deterministic.clone());
@@ -125,8 +124,13 @@ impl TestServer {
             forbid_connections: Default::default(),
             next_github_user_id: 0,
             test_db,
+            livekit_timestamp_source,
             test_livekit_server: livekit_server,
         }
+    }
+
+    pub fn advance_livekit_timestamp(&self) {
+        self.livekit_timestamp_source.advance();
     }
 
     pub async fn start2(
@@ -332,14 +336,12 @@ impl TestServer {
             .register_hosting_provider(Arc::new(git_hosting_providers::Github::public_instance()));
 
         let user_store = cx.new(|cx| UserStore::new(client.clone(), cx));
-        let group_store = cx.new(|cx| client::GroupStore::new(client.clone(), cx));
         let workspace_store = cx.new(|cx| WorkspaceStore::new(client.clone(), cx));
         let language_registry = Arc::new(LanguageRegistry::test(cx.executor()));
         let session = cx.new(|cx| AppSession::new(Session::test(), cx));
         let app_state = Arc::new(workspace::AppState {
             client: client.clone(),
             user_store: user_store.clone(),
-            group_store,
             workspace_store,
             languages: language_registry,
             fs: fs.clone(),
@@ -354,7 +356,6 @@ impl TestServer {
             theme_settings::init(theme::LoadThemes::JustBase, cx);
             Project::init(&client, cx);
             client::init(&client, cx);
-            Client::set_global(client.clone(), cx);
             editor::init(cx);
             workspace::init(app_state.clone(), cx);
             call::init(client.clone(), user_store.clone(), cx);
@@ -584,8 +585,6 @@ impl TestServer {
             livekit_client: Some(Arc::new(livekit_test_server.create_api_client())),
             blob_store_client: None,
             executor,
-            pending_bookmark_reorder_broadcasts: Default::default(),
-            join_request_attempts: Default::default(),
             kinesis_client: None,
             user_service: FakeUserService::new(test_db.db().clone()),
             config: Config {
@@ -604,9 +603,6 @@ impl TestServer {
                 blob_store_access_key: None,
                 blob_store_secret_key: None,
                 blob_store_bucket: None,
-                file_upload_max_file_size: None,
-                file_upload_allowed_mime_types: None,
-                file_upload_storage_prefix: None,
                 sim_client_checksum_seed: None,
                 kinesis_region: None,
                 kinesis_stream: None,
@@ -737,17 +733,17 @@ impl TestClient {
                 current: store
                     .contacts()
                     .iter()
-                    .map(|contact| contact.user.github_login.clone().to_string())
+                    .map(|contact| contact.user.username.clone().to_string())
                     .collect(),
                 outgoing_requests: store
                     .outgoing_contact_requests()
                     .iter()
-                    .map(|user| user.github_login.clone().to_string())
+                    .map(|user| user.username.clone().to_string())
                     .collect(),
                 incoming_requests: store
                     .incoming_contact_requests()
                     .iter()
-                    .map(|user| user.github_login.clone().to_string())
+                    .map(|user| user.username.clone().to_string())
                     .collect(),
             })
     }

@@ -106,6 +106,6 @@ enable = false
 # and other docs-related functions.
 #
 # Comment the below section out if you need to bypass the preprocessor for some reason.
-[preprocessor.sim_docs_preprocessor]
+[preprocessor.sim-docs-preprocessor]
 command = "cargo run -p docs_preprocessor --"
 renderer = ["html", "sim-html"]

@@ -1,16 +1,12 @@
 use super::*;
 
 pub mod buffers;
-pub mod channel_messages;
 pub mod channels;
 pub mod contacts;
 pub mod contributors;
 pub mod extensions;
-pub mod groups;
-pub mod notification_preferences;
 pub mod notifications;
 pub mod projects;
 pub mod rooms;
 pub mod servers;
-pub mod shared_threads;
 pub mod users;

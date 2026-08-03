@@ -103,7 +103,7 @@ Sim has two main binaries:
 Sim moves quickly, and distribution maintainers often have different constraints and priorities. The points below describe current trade-offs:
 
 - Sim is a fast-moving project. We typically publish 2-3 builds per week to address reported issues and ship larger changes.
-- There are a couple of other `sim` binaries that may be present on Linux systems ([1](https://openzfs.github.io/openzfs-docs/man/v2.2/8/sim.8.html), [2](https://sim.brimdata.io/docs/commands/sim)). If you want to rename our CLI binary because of these issues, we suggest `simit`, `simitor`, or `sim-cli`.
+- There are a couple of other `sim` binaries that may be present on Linux systems ([1](https://openzfs.github.io/openzfs-docs/man/v2.2/8/sim.8.html), [2](https://sim.brimdata.io/docs/commands/sim)). If you want to rename our CLI binary because of these issues, we suggest `zedit`, `zeditor`, or `sim-cli`.
 - Sim automatically installs versions of common developer tools, similar to rustup/rbenv/pyenv. This behavior is discussed [here](https://github.com/simtropolis/sim/issues/12589).
 - Users can install extensions locally and from [simtropolis/extensions](https://github.com/simtropolis/extensions). Extensions may install additional tools such as language servers. Planned safety improvements are tracked [here](https://github.com/simtropolis/sim/issues/12358).
 - Sim connects to several online services by default (AI, telemetry, collaboration). AI and our telemetry can be disabled by your users with their sim settings or by patching our [default settings file](https://github.com/simtropolis/sim/blob/main/assets/settings/default.json).

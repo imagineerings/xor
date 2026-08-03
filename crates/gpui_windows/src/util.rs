@@ -1,7 +1,7 @@
 use std::sync::OnceLock;
 
-use ::util::ResultExt;
 use anyhow::Context;
+use gpui_util::ResultExt;
 use windows::{
     UI::{
         Color,
@@ -109,7 +109,7 @@ pub(crate) fn load_cursor(style: CursorStyle) -> Option<HCURSOR> {
         | CursorStyle::ResizeLeftRight
         | CursorStyle::ResizeColumn => (&SIZEWE, IDC_SIZEWE),
         CursorStyle::ResizeUp
-        | CursorStyle::Resizedown
+        | CursorStyle::ResizeDown
         | CursorStyle::ResizeUpDown
         | CursorStyle::ResizeRow => (&SIZENS, IDC_SIZENS),
         CursorStyle::ResizeUpLeftDownRight => (&SIZENWSE, IDC_SIZENWSE),

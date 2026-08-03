@@ -1,12 +1,10 @@
 use collab_ui::collab_panel;
 use gpui::{App, Menu, MenuItem, OsAction};
 use release_channel::ReleaseChannel;
-use sim_actions::{debug_panel, dev};
+use sim_actions::{Quit, debug_panel, dev, git_panel, project_panel};
 use terminal_view::terminal_panel;
 
 pub fn app_menus(cx: &mut App) -> Vec<Menu> {
-    use sim_actions::Quit;
-
     let mut view_items = vec![
         MenuItem::action(
             "Zoom In",
@@ -40,12 +38,12 @@ pub fn app_menus(cx: &mut App) -> Vec<Menu> {
             ],
         }),
         MenuItem::separator(),
-        MenuItem::action("Project Panel", sim_actions::project_panel::ToggleFocus),
+        MenuItem::action("Project Panel", project_panel::ToggleFocus),
         MenuItem::action("Outline Panel", outline_panel::ToggleFocus),
         MenuItem::action("Collab Panel", collab_panel::ToggleFocus),
-        MenuItem::action("Terminal Panel", terminal_panel::ToggleFocus),
+        MenuItem::action("Terminal Panel", terminal_panel::Toggle),
         MenuItem::action("Debugger Panel", debug_panel::ToggleFocus),
-        MenuItem::action("Sim Apps Panel", super::apps_panel::ToggleFocus),
+        MenuItem::action("Git Panel", git_panel::ToggleFocus),
         MenuItem::separator(),
         MenuItem::action("Diagnostics", diagnostics::Deploy),
         MenuItem::separator(),
@@ -273,6 +271,7 @@ pub fn app_menus(cx: &mut App) -> Vec<Menu> {
                 MenuItem::action("Clear All Breakpoints", debugger_ui::ClearAllBreakpoints),
             ],
         },
+        comfy_ui::comfy_menu(),
         Menu {
             name: "Window".into(),
             disabled: false,
@@ -308,7 +307,7 @@ pub fn app_menus(cx: &mut App) -> Vec<Menu> {
                 MenuItem::action(
                     "Sim Twitter",
                     super::OpenBrowser {
-                        url: "https://twitter.com/simdotdev".into(),
+                        url: "https://twitter.com/zeddotdev".into(),
                     },
                 ),
                 MenuItem::action(

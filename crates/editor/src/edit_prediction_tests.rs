@@ -484,7 +484,7 @@ async fn test_edit_prediction_jump_disabled_for_non_sim_providers(cx: &mut gpui:
 
     let mut cx = EditorTestContext::new(cx).await;
     let provider = cx.new(|_| FakeNonSimEditPredictionDelegate::default());
-    assign_editor_completion_provider_non_sim(provider.clone(), &mut cx);
+    assign_editor_completion_provider_non_zed(provider.clone(), &mut cx);
 
     // Cursor is 2+ lines above the proposed edit
     cx.set_state(indoc! {"
@@ -495,7 +495,7 @@ async fn test_edit_prediction_jump_disabled_for_non_sim_providers(cx: &mut gpui:
         line
     "});
 
-    propose_edits_non_sim(
+    propose_edits_non_zed(
         &provider,
         vec![(Point::new(4, 3)..Point::new(4, 3), " 4")],
         &mut cx,
@@ -1644,7 +1644,7 @@ fn assign_editor_completion_menu_provider(cx: &mut EditorTestContext) {
     });
 }
 
-fn propose_edits_non_sim<T: ToOffset>(
+fn propose_edits_non_zed<T: ToOffset>(
     provider: &Entity<FakeNonSimEditPredictionDelegate>,
     edits: Vec<(Range<T>, &str)>,
     cx: &mut EditorTestContext,
@@ -1667,7 +1667,7 @@ fn propose_edits_non_sim<T: ToOffset>(
     });
 }
 
-fn assign_editor_completion_provider_non_sim(
+fn assign_editor_completion_provider_non_zed(
     provider: Entity<FakeNonSimEditPredictionDelegate>,
     cx: &mut EditorTestContext,
 ) {

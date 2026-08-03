@@ -25,7 +25,7 @@ use text::ReplicaId;
 use util::{
     ResultExt,
     path_list::PathList,
-    paths::{PathStyle, RemotePathBuf, SanitisimPath},
+    paths::{PathStyle, RemotePathBuf, SanitizedPath},
     rel_path::RelPath,
 };
 use worktree::{
@@ -191,7 +191,7 @@ pub struct WorktreeStore {
     scanning_enabled: bool,
     #[allow(clippy::type_complexity)]
     loading_worktrees:
-        HashMap<Arc<SanitisimPath>, Shared<Task<Result<Entity<Worktree>, Arc<anyhow::Error>>>>>,
+        HashMap<Arc<SanitizedPath>, Shared<Task<Result<Entity<Worktree>, Arc<anyhow::Error>>>>>,
     initial_scan_complete: (watch::Sender<bool>, watch::Receiver<bool>),
     state: WorktreeStoreState,
 }
@@ -390,7 +390,7 @@ impl WorktreeStore {
         abs_path: impl AsRef<Path>,
         cx: &App,
     ) -> Option<(Entity<Worktree>, Arc<RelPath>)> {
-        let abs_path = SanitisimPath::new(abs_path.as_ref());
+        let abs_path = SanitizedPath::new(abs_path.as_ref());
         for tree in self.worktrees() {
             let path_style = tree.read(cx).path_style();
             if let Some(relative_path) =
@@ -636,7 +636,7 @@ impl WorktreeStore {
                                 // Otherwise, the FS watcher would do it on the `RootUpdated` event,
                                 // but with a noticeable delay, so we handle it proactively.
                                 local.update_abs_path_and_refresh(
-                                    SanitisimPath::new_arc(&abs_new_path),
+                                    SanitizedPath::new_arc(&abs_new_path),
                                     cx,
                                 );
                                 Task::ready(Ok(this.root_entry().cloned()))
@@ -701,7 +701,7 @@ impl WorktreeStore {
         visible: bool,
         cx: &mut Context<Self>,
     ) -> Task<Result<Entity<Worktree>>> {
-        let abs_path: Arc<SanitisimPath> = SanitisimPath::new_arc(&abs_path);
+        let abs_path: Arc<SanitizedPath> = SanitizedPath::new_arc(&abs_path);
         let is_via_collab = matches!(&self.state, WorktreeStoreState::Remote { upstream_client, .. } if upstream_client.is_via_collab());
         if !self.loading_worktrees.contains_key(&abs_path) {
             let task = match &self.state {
@@ -827,6 +827,7 @@ impl WorktreeStore {
                         visible,
                         abs_path: response.canonicalisim_path,
                         root_repo_common_dir: response.root_repo_common_dir,
+                        root_repo_is_linked_worktree: response.root_repo_is_linked_worktree,
                     },
                     client,
                     path_style,
@@ -844,7 +845,7 @@ impl WorktreeStore {
     fn create_local_worktree(
         &mut self,
         fs: Arc<dyn Fs>,
-        abs_path: Arc<SanitisimPath>,
+        abs_path: Arc<SanitizedPath>,
         visible: bool,
         cx: &mut Context<Self>,
     ) -> Task<Result<Entity<Worktree>, Arc<anyhow::Error>>> {
@@ -856,7 +857,7 @@ impl WorktreeStore {
         cx.spawn(async move |this, cx| {
             let worktree_id = next_worktree_id.await?;
             let worktree = Worktree::local(
-                SanitisimPath::cast_arc(abs_path.clone()),
+                SanitizedPath::cast_arc(abs_path.clone()),
                 visible,
                 fs,
                 next_entry_id,
@@ -1155,6 +1156,7 @@ impl WorktreeStore {
                     root_repo_common_dir: worktree
                         .root_repo_common_dir()
                         .map(|p| p.to_string_lossy().into_owned()),
+                    root_repo_is_linked_worktree: worktree.root_repo_is_linked_worktree(),
                 }
             })
             .collect()
@@ -1371,7 +1373,9 @@ impl WorktreeStore {
                     .root_repo_common_dir()
                     .map(|dir| crate::git_store::repo_identity_path(dir))
                     .filter(|repo_path| {
-                        *repo_path == folder_path.as_path() || !folder_path.starts_with(*repo_path)
+                        snapshot.root_repo_is_linked_worktree()
+                            || *repo_path == folder_path.as_path()
+                            || !folder_path.starts_with(*repo_path)
                     })
                     .map(Path::to_path_buf)
                     .unwrap_or_else(|| folder_path.clone());

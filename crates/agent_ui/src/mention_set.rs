@@ -1,7 +1,7 @@
 use crate::diagnostics::{DiagnosticsOptions, codeblock_fence_for_path, collect_diagnostics};
 use acp_thread::{MentionUri, selection_name};
 use agent::{ThreadStore, outline};
-use agent_client_protocol::schema as acp;
+use agent_client_protocol::schema::v1 as acp;
 use agent_servers::{AgentServer, AgentServerDelegate};
 use anyhow::{Context as _, Result, anyhow};
 use collections::{HashMap, HashSet};
@@ -697,6 +697,9 @@ impl MentionSet {
     }
 }
 
+/// Computes disambiguated labels for a set of mentions, so that mentions sharing
+/// a base name get extra context (parent path components, skill source) to tell
+/// them apart. Same approach as buffer tab titles and the sidebar.
 fn compute_disambiguated_labels<'a>(
     mentions: impl Iterator<Item = (CreaseId, &'a MentionUri)>,
 ) -> HashMap<CreaseId, SharedString> {
@@ -706,6 +709,9 @@ fn compute_disambiguated_labels<'a>(
         .collect()
 }
 
+/// Labels for each URI, in input order. Duplicate URIs are collapsed first, so a
+/// mention added twice keeps its base name instead of being escalated to its
+/// full path by the collision-resolution loop.
 fn disambiguated_labels_for_uris(uris: &[&MentionUri]) -> Vec<SharedString> {
     let mut seen: HashSet<&MentionUri> = HashSet::default();
     let unique_uris: Vec<&MentionUri> = uris
@@ -839,6 +845,8 @@ mod tests {
 
     #[test]
     fn test_disambiguated_labels_dedupe_identical_uris() {
+        // Mentioning the same file twice must not escalate the duplicates to
+        // their full path. Distinct files sharing a base name still disambiguate.
         let foo_a = MentionUri::File {
             abs_path: path!("/project/a/foo.rs").into(),
         };
@@ -852,6 +860,7 @@ mod tests {
 
         assert_eq!(labels[0].as_ref(), "a/foo.rs");
         assert_eq!(labels[2].as_ref(), "b/foo.rs");
+        // The duplicate keeps the same label rather than escalating to full path.
         assert_eq!(labels[1].as_ref(), "a/foo.rs");
     }
 }
@@ -979,7 +988,7 @@ fn image_format_from_external_content(format: image::ImageFormat) -> Option<Imag
     }
 }
 
-// Case-insensitive so that e.g. `foo.PNG` is recognisim the same as `foo.png`.
+// Case-insensitive so that e.g. `foo.PNG` is recognized the same as `foo.png`.
 // SVG is excluded because it is handled separately.
 fn is_raster_image_path(path: &Path) -> bool {
     let Some(extension) = path.extension().and_then(OsStr::to_str) else {

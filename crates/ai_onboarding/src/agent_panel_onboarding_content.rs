@@ -3,7 +3,7 @@ use std::sync::Arc;
 use client::{Client, UserStore};
 use cloud_api_types::Plan;
 use gpui::{Entity, IntoElement, ParentElement};
-use language_model::{SIM_CLOUD_PROVIDER_ID, LanguageModelRegistry};
+use language_model::{LanguageModelRegistry, SIM_CLOUD_PROVIDER_ID};
 use ui::prelude::*;
 
 use crate::{AgentPanelOnboardingCard, ApiKeysWithoutProviders, SimAiOnboarding};
@@ -48,9 +48,7 @@ impl AgentPanelOnboarding {
         LanguageModelRegistry::read_global(cx)
             .visible_providers()
             .iter()
-            .any(|provider| {
-                provider.is_authenticated(cx) && provider.id() != SIM_CLOUD_PROVIDER_ID
-            })
+            .any(|provider| provider.is_authenticated(cx) && provider.id() != SIM_CLOUD_PROVIDER_ID)
     }
 }
 

@@ -2,7 +2,8 @@ use scheduler::Instant;
 use std::{rc::Rc, time::Duration};
 
 use crate::{
-    AnyElement, App, Element, ElementId, GlobalElementId, InspectorElementId, IntoElement, Window,
+    AnyElement, App, Element, ElementId, GlobalElementId, InspectorElementId, IntoElement,
+    ParentElement, Window,
 };
 
 pub use easing::*;
@@ -93,6 +94,16 @@ pub struct AnimationElement<E> {
     element: Option<E>,
     animations: SmallVec<[Animation; 1]>,
     animator: Box<dyn Fn(E, usize, f32) -> E + 'static>,
+}
+
+impl<E: ParentElement> ParentElement for AnimationElement<E> {
+    fn extend(&mut self, elements: impl IntoIterator<Item = AnyElement>) {
+        let Some(element) = &mut self.element else {
+            return;
+        };
+
+        element.extend(elements);
+    }
 }
 
 impl<E> AnimationElement<E> {
@@ -257,5 +268,25 @@ mod easing {
 
             min + (normalized_alpha * range)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::InteractiveElement;
+    use crate::div;
+
+    use super::*;
+
+    #[test]
+    fn test_animation_parent() {
+        div()
+            .id("id")
+            .with_animation(
+                "animation",
+                Animation::new(Duration::from_secs(1)),
+                |element, _time| element,
+            )
+            .child(div());
     }
 }

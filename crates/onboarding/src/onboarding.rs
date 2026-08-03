@@ -237,6 +237,7 @@ impl Onboarding {
                 Some(Plan::SimPro) => "pro",
                 Some(Plan::SimProTrial) => "trial",
                 Some(Plan::SimBusiness) => "business",
+                Some(Plan::SimVip) => "vip",
                 Some(Plan::SimStudent) => "student",
                 Some(Plan::SimFree) | None => "free",
             }
@@ -346,10 +347,7 @@ impl Render for Onboarding {
                                     .child(
                                         h_flex()
                                             .gap_4()
-                                            .child(Vector::square(
-                                                VectorName::SimLogo,
-                                                rems(2.5),
-                                            ))
+                                            .child(Vector::square(VectorName::SimLogo, rems(2.5)))
                                             .child(
                                                 v_flex()
                                                     .child(

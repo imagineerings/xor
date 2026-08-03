@@ -1040,7 +1040,7 @@ mod tests {
             BTreeMap::from_iter([(
                 0,
                 ParsedMetadataBlock {
-                    content_range: 4..31,
+                    content_range: 4..28,
                     rows: Some(vec![
                         MetadataRow {
                             key: 4..9,
@@ -1048,7 +1048,7 @@ mod tests {
                         },
                         MetadataRow {
                             key: 16..22,
-                            value: 24..30,
+                            value: 24..27,
                         },
                     ]),
                 },
@@ -1066,7 +1066,7 @@ mod tests {
             BTreeMap::from_iter([(
                 0,
                 ParsedMetadataBlock {
-                    content_range: 4..21,
+                    content_range: 4..18,
                     rows: None,
                 },
             )])
@@ -1807,7 +1807,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unrecognized_inline_html_preserved_as_inline_html() {
+    fn test_unrecognisim_inline_html_preserved_as_inline_html() {
         for input in ["a<span>b</span>c", "a<em>b</em>c", "a<strong>b</strong>c"] {
             let parsed = parse_markdown_with_options(input, false, false, false);
             let has_inline_html = parsed

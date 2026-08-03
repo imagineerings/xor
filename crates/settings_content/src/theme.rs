@@ -157,7 +157,7 @@ pub struct ThemeSettingsContent {
     /// markdown preview. Falls back to the buffer font if unset.
     pub markdown_preview_code_font_family: Option<FontFamilyName>,
     /// The font size to use for rendering in the markdown preview.
-    /// Falls back to the buffer font size if unset.
+    /// Falls back to the UI font size if unset.
     pub markdown_preview_font_size: Option<FontSize>,
     /// The theme to use for the markdown preview.
     /// Falls back to the main editor theme if unset.
@@ -188,14 +188,6 @@ pub struct ThemeSettingsContent {
     /// These values will override the ones on the specified theme
     #[serde(default)]
     pub theme_overrides: HashMap<String, ThemeStyleContent>,
-
-    /// Cursor style for the editor when this theme is active.
-    #[schemars(default = "default_cursor_style")]
-    pub cursor_style: Option<CursorStyle>,
-
-    /// Cursor blink style for the editor when this theme is active.
-    #[serde(rename = "cursor_blink_style")]
-    pub cursor_blink: Option<CursorBlink>,
 }
 
 /// A font size value in pixels, wrapping around `f32` for custom settings UI rendering.
@@ -263,10 +255,6 @@ fn default_font_fallbacks() -> Option<Vec<FontFamilyName>> {
 
 fn default_buffer_font_weight() -> Option<FontWeightContent> {
     Some(FontWeightContent::NORMAL)
-}
-
-fn default_cursor_style() -> Option<CursorStyle> {
-    Some(CursorStyle::Bar)
 }
 
 /// Represents the selection of a theme, which can be either static or dynamic.
@@ -478,7 +466,7 @@ where
     Ok(value)
 }
 
-/// The content of a serialisim theme.
+/// The content of a serialized theme.
 #[with_fallible_options]
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema, MergeFrom, PartialEq)]
 #[serde(default)]
@@ -501,31 +489,10 @@ pub struct ThemeStyleContent {
     /// The styles for syntax nodes.
     #[serde(default)]
     pub syntax: IndexMap<String, HighlightStyleContent>,
-
-    /// Optional border radius overrides per element type.
-    pub border_radius: Option<BorderRadiusContent>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, MergeFrom, PartialEq)]
 pub struct AccentContent(pub Option<String>);
-
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, MergeFrom, PartialEq)]
-pub struct BorderRadiusContent {
-    /// Border radius for buttons (default: 6)
-    pub button: Option<f32>,
-    /// Border radius for inputs (default: 4)
-    pub input: Option<f32>,
-    /// Border radius for panels and sidebars (default: 8)
-    pub panel: Option<f32>,
-    /// Border radius for modal dialogs (default: 12)
-    pub modal: Option<f32>,
-    /// Border radius for tooltips (default: 4)
-    pub tooltip: Option<f32>,
-    /// Border radius for autocomplete menus (default: 6)
-    pub autocomplete: Option<f32>,
-    /// Border radius for scrollbar thumb (default: 2)
-    pub scrollbar_thumb: Option<f32>,
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, MergeFrom, PartialEq)]
 pub struct PlayerColorContent {
@@ -875,7 +842,7 @@ pub struct ThemeColorsContent {
     /// Read-access of a symbol, like reading a variable.
     ///
     /// A document highlight is a range inside a text document which deserves
-    /// special attention. Usually a document highlight is visualisim by changing
+    /// special attention. Usually a document highlight is visualized by changing
     /// the background color of its range.
     #[serde(rename = "editor.document_highlight.read_background")]
     pub editor_document_highlight_read_background: Option<String>,
@@ -883,7 +850,7 @@ pub struct ThemeColorsContent {
     /// Read-access of a symbol, like reading a variable.
     ///
     /// A document highlight is a range inside a text document which deserves
-    /// special attention. Usually a document highlight is visualisim by changing
+    /// special attention. Usually a document highlight is visualized by changing
     /// the background color of its range.
     #[serde(rename = "editor.document_highlight.write_background")]
     pub editor_document_highlight_write_background: Option<String>,
@@ -1388,34 +1355,6 @@ impl FontWeightContent {
     pub const BOLD: FontWeightContent = FontWeightContent(700.0);
     pub const EXTRA_BOLD: FontWeightContent = FontWeightContent(800.0);
     pub const BLACK: FontWeightContent = FontWeightContent(900.0);
-}
-
-/// Cursor style for the editor.
-#[derive(
-    Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema, MergeFrom, Default,
-)]
-#[serde(rename_all = "lowercase")]
-pub enum CursorStyle {
-    /// A vertical bar cursor.
-    #[default]
-    Bar,
-    /// A block cursor that surrounds the following character.
-    Block,
-    /// An underline cursor.
-    Underline,
-}
-
-/// Cursor blink style for the editor.
-#[derive(
-    Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema, MergeFrom, Default,
-)]
-#[serde(rename_all = "lowercase")]
-pub enum CursorBlink {
-    /// Smooth opacity transition.
-    #[default]
-    Smooth,
-    /// Phase-based blink (on/off).
-    Phase,
 }
 
 impl schemars::JsonSchema for FontWeightContent {

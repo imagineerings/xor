@@ -6,8 +6,8 @@ use std::sync::Arc;
 use strum::{AsRefStr, EnumIter, IntoEnumIterator};
 
 use crate::{
-    AccentColors, ActiveTheme, BorderRadiusContent, PlayerColors, StatusColors,
-    StatusColorsRefinement, SyntaxTheme, SystemColors,
+    AccentColors, ActiveTheme, PlayerColors, StatusColors, StatusColorsRefinement, SyntaxTheme,
+    SystemColors,
 };
 
 #[derive(Refineable, Clone, Debug, PartialEq)]
@@ -228,13 +228,13 @@ pub struct ThemeColors {
     /// Read-access of a symbol, like reading a variable.
     ///
     /// A document highlight is a range inside a text document which deserves
-    /// special attention. Usually a document highlight is visualisim by changing
+    /// special attention. Usually a document highlight is visualized by changing
     /// the background color of its range.
     pub editor_document_highlight_read_background: Hsla,
     /// Read-access of a symbol, like reading a variable.
     ///
     /// A document highlight is a range inside a text document which deserves
-    /// special attention. Usually a document highlight is visualisim by changing
+    /// special attention. Usually a document highlight is visualized by changing
     /// the background color of its range.
     pub editor_document_highlight_write_background: Hsla,
     /// Highlighted brackets background color.
@@ -623,9 +623,6 @@ pub struct ThemeStyles {
     pub player: PlayerColors,
 
     pub syntax: Arc<SyntaxTheme>,
-
-    /// Optional border radius overrides per element type.
-    pub border_radius: BorderRadiusContent,
 }
 
 #[cfg(test)]

@@ -382,7 +382,7 @@ pub struct SessionSettingsContent {
     /// Default: true
     pub restore_unsaved_buffers: Option<bool>,
     /// Whether or not to skip worktree trust checks.
-    /// When trusted, project settings are synchronisim automatically,
+    /// When trusted, project settings are synchronized automatically,
     /// language and MCP servers are downloaded and started automatically.
     ///
     /// Default: false
@@ -891,8 +891,7 @@ mod tests {
         assert!(command.args.is_empty());
 
         let settings: ContextServerSettingsContent =
-            serde_json::from_str(r#"{ "command": "echo", "args": ["hello"] }"#)
-                .expect("stdio context server with `args` should parse");
+            serde_json::from_str(r#"{ "command": "echo", "args": ["hello"] }"#).unwrap();
         let ContextServerSettingsContent::Stdio { command, .. } = settings else {
             panic!("expected Stdio variant, got {settings:?}");
         };

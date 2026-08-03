@@ -165,7 +165,7 @@ Not all languages in Sim support toolchain discovery and selection, but for thos
 
 ### Configuring Language Servers
 
-When configuring language servers in your `settings.json`, autocomplete suggestions include all available LSP adapters recognisim by Sim, not only those currently active for loaded languages. This helps you discover and configure language servers before opening files that use them.
+When configuring language servers in your `settings.json`, autocomplete suggestions include all available LSP adapters recognized by Sim, not only those currently active for loaded languages. This helps you discover and configure language servers before opening files that use them.
 
 Many language servers accept custom configuration options. You can set these in the `lsp` section of your `settings.json`:
 
@@ -214,7 +214,7 @@ Here's how you would structure these settings in Sim's `settings.json`:
 
 #### Possible configuration options
 
-Depending on how a particular language server is implemented, they may depend on different configuration options, both specified in the LSP.
+Language servers may use different configuration options depending on the implementation.
 
 - [initializationOptions](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#version_3_17_0)
 

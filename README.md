@@ -5,8 +5,6 @@
 
 Welcome to Sim, a high-performance, multiplayer code editor from the creators of [Atom](https://github.com/atom/atom) and [Tree-sitter](https://github.com/tree-sitter/tree-sitter).
 
-Sim currently tracks upstream Zed v1.10.0.
-
 ---
 
 ### Installation
@@ -43,8 +41,9 @@ We use [`cargo-about`](https://github.com/EmbarkStudios/cargo-about) to automati
 
 ## Sponsorship
 
-Sim is developed by **Sim Industries, Inc.**, a for-profit company.
+Sim is developed by **Simtropolis, Inc.**, a for-profit company.
 
 If you’d like to financially support the project, you can do so via GitHub Sponsors.
-Sponsorships go directly to Sim Industries and are used as general company revenue.
+Sponsorships go directly to Simtropolis and are used as general company revenue.
 There are no perks or entitlements associated with sponsorship.
+

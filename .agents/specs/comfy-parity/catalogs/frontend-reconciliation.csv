@@ -1,0 +1,26 @@
+registry,discovered,mapped_or_matched,orphan_or_delta,notes
+localized command IDs,118,118,0,Localized-only IDs include dynamically generated Workspace sidebar/bottom-panel commands and desktop bridge commands.
+literal command definitions/references,118,118,0,Nonlocalized literal IDs are potential orphan/developer/custom surfaces.
+default keybindings,34,34,0,Every binding resolves to a localized command after dynamic command registration.
+core/context menu rows,236,236,0,"63 original command/workflow/graph/image rows plus 173 production job, asset, workspace, keybinding, builder, help, queue, filter, website, LiteGraph, extension, and infrastructure rows; disabled website TODOs and the Desktop UI negative registry boundary remain explicit."
+production settings schema IDs,152,149,3,Schema-only entries include extension/compatibility values and hidden server state; exact delta is retained in frontend-settings.csv.
+localized settings IDs,112,112,0,Hidden settings intentionally lack labels; localized IDs absent from schema are orphan candidates.
+application + desktop + website routes,82,82,0,Vue router and Astro file routes are cataloged; Desktop UI's empty child root WelcomeView route is explicit.
+WebSocket/frontend event contracts,24,24,0,"Includes 18 backend event types and 6 local frontend events; binary types 1, 3, and 4 are represented."
+HTTP client contracts,149,149,0,"Literal helper calls plus reconciled dynamic Manager/assets/tasks/contracts, OAuth consent GET/POST, and static template index/logo/media/workflow consumers."
+feature/config flags,43,43,0,"Union of client hello, server feature enum, and RemoteConfig keys."
+telemetry event constants and button IDs,88,88,0,"52 typed event constants, 32 uniquely identified UI-button side effects, Desktop install/execution events, and website pageview/download events; duplicate source sites for the same identifier are consolidated."
+persisted formats and migrations,24,24,0,Workflow/media formats and explicit migrations.
+browser persisted state keys/patterns,66,66,0,"Literal scan plus dynamic workflow/auth keys, secure-token risks, billing markers, survey/Manager state, query preservation, and splitter patterns."
+frontend extension interface/core modules,59,59,0,ComfyExtension members and core index modules.
+broad-anchor-only production/cloud/platform Vue files,804,804,0,Every audit-predicate match has one stable source-specific component contract.
+required already-referenced Vue surface override,1,1,0,AssetsSidebarTab remains an explicit functional component contract despite prior direct catalog evidence.
+functional Vue component surfaces,691,691,0,Every row records concrete handlers/state/failure/accessibility/persistence/interface evidence.
+presentational Vue infrastructure dispositions,114,114,0,Every row has a source-specific render-only reason and consuming anchor.
+functional-module predicate candidates,352,352,0,Normalized service/store/composable candidates each have a stable module row.
+functional module capabilities,339,339,0,Each row defines exports/transitions/lifetime/error/persistence/I-O/validation evidence.
+functional module infrastructure dispositions,13,13,0,Pure plumbing/re-export/helper modules have source-specific non-capability reasons.
+Playwright spec files,245,242,3,Files with no direct test() literal are setup/parameterized/orphan candidates and remain in source coverage.
+Playwright declared test cases,1677,1677,0,Static test declaration count; not executed in this audit.
+browser_tests source rows,795,795,0,"789 executable tests, harness files, workflow/media fixtures, snapshots, and test configs are test-only; six Markdown guidance files are documented-only."
+all source-tree files,4697,4697,0,"Every file has a classification, reason, and feature mapping; production/cloud/platform counts exclude browser fixtures, Storybook configuration, website E2E viewports, and lint/typecheck/test/build configs."

@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
-use sim_actions::toast;
 use gpui::{DismissEvent, Entity, EventEmitter, FocusHandle, Focusable, IntoElement};
+use sim_actions::toast;
 use ui::{Tooltip, prelude::*};
 use workspace::{ToastAction, ToastView};
 
@@ -178,14 +178,13 @@ impl Component for StatusToast {
             },
         );
 
-        let success_example =
-            StatusToast::new("Pushed 4 changes to `sim/main`", cx, |this, _| {
-                this.icon(
-                    Icon::new(IconName::Check)
-                        .size(IconSize::Small)
-                        .color(Color::Success),
-                )
-            });
+        let success_example = StatusToast::new("Pushed 4 changes to `sim/main`", cx, |this, _| {
+            this.icon(
+                Icon::new(IconName::Check)
+                    .size(IconSize::Small)
+                    .color(Color::Success),
+            )
+        });
 
         let error_example = StatusToast::new(
             "git push: Couldn't find remote origin `iamnbutler/sim`",
@@ -209,10 +208,8 @@ impl Component for StatusToast {
             .action("More Info", |_, _| {})
         });
 
-        let pr_example = StatusToast::new(
-            "`sim/new-notification-system` created!",
-            cx,
-            |this, _cx| {
+        let pr_example =
+            StatusToast::new("`sim/new-notification-system` created!", cx, |this, _cx| {
                 this.icon(
                     Icon::new(IconName::GitBranch)
                         .size(IconSize::Small)
@@ -221,8 +218,7 @@ impl Component for StatusToast {
                 .action("Open Pull Request", |_, cx| {
                     cx.open_url("https://github.com/")
                 })
-            },
-        );
+            });
 
         v_flex()
             .gap_6()

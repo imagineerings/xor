@@ -17,8 +17,12 @@ fn server_url(cx: &App) -> &str {
 fn docs_url(cx: &App) -> String {
     let server_url = server_url(cx);
     match ReleaseChannel::try_global(cx).unwrap_or_default() {
-        ReleaseChannel::Stable => format!("{server_url}/docs"),
-        ReleaseChannel::Preview => format!("{server_url}/docs/preview"),
+        ReleaseChannel::Stable => {
+            format!("{server_url}/docs")
+        }
+        ReleaseChannel::Preview => {
+            format!("{server_url}/docs/preview")
+        }
         ReleaseChannel::Dev | ReleaseChannel::Nightly => {
             format!("{server_url}/docs/nightly")
         }
@@ -63,6 +67,10 @@ pub fn edit_prediction_docs(cx: &App) -> String {
 
 pub fn skills_docs(cx: &App) -> String {
     format!("{docs_url}/ai/skills", docs_url = docs_url(cx))
+}
+
+pub fn llm_provider_docs(cx: &App) -> String {
+    format!("{docs_url}/ai/llm-providers", docs_url = docs_url(cx))
 }
 
 /// Returns the URL to Sim's ACP registry blog post.

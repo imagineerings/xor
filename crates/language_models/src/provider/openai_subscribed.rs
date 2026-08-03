@@ -9,11 +9,11 @@ use http_client::{
     http::{HeaderName, HeaderValue},
 };
 use language_model::{
-    AuthenticateError, FastModeConfirmation, IconOrSvg, LanguageModel,
-    LanguageModelCompletionError, LanguageModelCompletionEvent, LanguageModelEffortLevel,
-    LanguageModelId, LanguageModelName, LanguageModelProvider, LanguageModelProviderId,
-    LanguageModelProviderName, LanguageModelProviderState, LanguageModelRequest,
-    LanguageModelToolChoice, RateLimiter,
+    AuthenticateError, ConfigurationViewTargetAgent, FastModeConfirmation, IconOrSvg,
+    InlineDescription, LanguageModel, LanguageModelCompletionError, LanguageModelCompletionEvent,
+    LanguageModelEffortLevel, LanguageModelId, LanguageModelName, LanguageModelProvider,
+    LanguageModelProviderId, LanguageModelProviderName, LanguageModelProviderState,
+    LanguageModelRequest, LanguageModelToolChoice, ProviderConfigurationView, RateLimiter,
 };
 use open_ai::{ReasoningEffort, responses::stream_response};
 use rand::RngCore as _;
@@ -30,6 +30,9 @@ use crate::provider::open_ai::{OpenAiResponseEventMapper, into_open_ai_response}
 const PROVIDER_ID: LanguageModelProviderId = LanguageModelProviderId::new("openai-subscribed");
 const PROVIDER_NAME: LanguageModelProviderName =
     LanguageModelProviderName::new("ChatGPT Subscription");
+
+const SUBSCRIPTION_DESCRIPTION: &str =
+    "Sign in with your ChatGPT Plus or Pro subscription to use OpenAI models in Sim's agent.";
 
 const CODEX_BASE_URL: &str = "https://chatgpt.com/backend-api/codex";
 const OPENAI_TOKEN_URL: &str = "https://auth.openai.com/oauth/token";
@@ -154,10 +157,6 @@ impl OpenAiSubscribedProvider {
         });
     }
 
-    fn sign_out(&self, cx: &mut App) -> Task<Result<()>> {
-        do_sign_out(&self.state.downgrade(), cx)
-    }
-
     fn create_language_model(&self, model: ChatGptModel) -> Arc<dyn LanguageModel> {
         Arc::new(OpenAiSubscribedLanguageModel {
             id: LanguageModelId::from(model.id().to_string()),
@@ -242,29 +241,57 @@ impl LanguageModelProvider for OpenAiSubscribedProvider {
 
     fn configuration_view(
         &self,
-        _target_agent: language_model::ConfigurationViewTargetAgent,
+        _target_agent: ConfigurationViewTargetAgent,
         _window: &mut Window,
         cx: &mut App,
     ) -> AnyView {
-        let state = self.state.clone();
-        let http_client = self.http_client.clone();
-        cx.new(|_cx| ConfigurationView { state, http_client })
-            .into()
+        cx.new(|_cx| ConfigurationView {
+            state: self.state.clone(),
+            http_client: self.http_client.clone(),
+            compact: false,
+        })
+        .into()
+    }
+
+    fn configuration_view_v2(
+        &self,
+        _target_agent: ConfigurationViewTargetAgent,
+        _window: &mut Window,
+        cx: &mut App,
+    ) -> ProviderConfigurationView {
+        ProviderConfigurationView::Inline {
+            view: cx
+                .new(|_cx| ConfigurationView {
+                    state: self.state.clone(),
+                    http_client: self.http_client.clone(),
+                    compact: true,
+                })
+                .into(),
+        }
+    }
+
+    fn inline_title(&self, cx: &App) -> Option<SharedString> {
+        (!self.state.read(cx).is_authenticated()).then(|| "Configure ChatGPT".into())
+    }
+
+    fn inline_description(&self, cx: &App) -> Option<InlineDescription> {
+        (!self.state.read(cx).is_authenticated())
+            .then(|| InlineDescription::Text(SUBSCRIPTION_DESCRIPTION.into()))
     }
 
     fn reset_credentials(&self, cx: &mut App) -> Task<Result<()>> {
-        self.sign_out(cx)
+        do_sign_out(&self.state.downgrade(), cx)
     }
 
     fn authentication_error_message(&self) -> SharedString {
         "Your ChatGPT subscription session is invalid or has expired. \
-        Sign in again via the Agent Panel settings to continue."
+        Sign in again via Settings > AI > LLM Providers to continue."
             .into()
     }
 
     fn missing_credentials_error_message(&self) -> SharedString {
         "You are not signed in to your ChatGPT account. \
-        Sign in via the Agent Panel settings to continue."
+        Sign in via Settings > AI > LLM Providers to continue."
             .into()
     }
 
@@ -295,6 +322,8 @@ impl LanguageModelProvider for OpenAiSubscribedProvider {
 // approximation; the entries below mirror that file's picker-visible models.
 #[derive(Clone, Debug, PartialEq)]
 enum ChatGptModel {
+    Gpt56Sol,
+    Gpt56Terra,
     Gpt55,
     Gpt54,
     Gpt54Mini,
@@ -302,11 +331,19 @@ enum ChatGptModel {
 
 impl ChatGptModel {
     fn all() -> Vec<Self> {
-        vec![Self::Gpt55, Self::Gpt54, Self::Gpt54Mini]
+        vec![
+            Self::Gpt56Sol,
+            Self::Gpt56Terra,
+            Self::Gpt55,
+            Self::Gpt54,
+            Self::Gpt54Mini,
+        ]
     }
 
     fn id(&self) -> &str {
         match self {
+            Self::Gpt56Sol => "gpt-5.6-sol",
+            Self::Gpt56Terra => "gpt-5.6-terra",
             Self::Gpt55 => "gpt-5.5",
             Self::Gpt54 => "gpt-5.4",
             Self::Gpt54Mini => "gpt-5.4-mini",
@@ -315,6 +352,8 @@ impl ChatGptModel {
 
     fn display_name(&self) -> &str {
         match self {
+            Self::Gpt56Sol => "GPT-5.6 Sol",
+            Self::Gpt56Terra => "GPT-5.6 Terra",
             Self::Gpt55 => "GPT-5.5",
             Self::Gpt54 => "GPT-5.4",
             Self::Gpt54Mini => "GPT-5.4 Mini",
@@ -322,15 +361,16 @@ impl ChatGptModel {
     }
 
     fn max_token_count(&self) -> u64 {
-        // All Codex-supported models share the backend's 272K input cap, even
-        // when the raw model exposes a larger context window via the public
-        // API (e.g. gpt-5.4 has max_context_window 1M, but the Codex backend
-        // caps it at 272K). Source: openai/codex models-manager/models.json.
-        272_000
+        match self {
+            Self::Gpt56Sol | Self::Gpt56Terra => 372_000,
+            Self::Gpt55 | Self::Gpt54 | Self::Gpt54Mini => 272_000,
+        }
     }
 
     fn max_output_tokens(&self) -> Option<u64> {
-        Some(128_000)
+        // Codex model metadata does not expose a max output token cap for these
+        // models. Source: openai/codex models-manager/models.json.
+        None
     }
 
     fn supports_images(&self) -> bool {
@@ -338,18 +378,30 @@ impl ChatGptModel {
     }
 
     fn default_reasoning_effort(&self) -> Option<ReasoningEffort> {
-        // Codex bundled models all default to Medium reasoning effort.
-        Some(ReasoningEffort::Medium)
+        match self {
+            Self::Gpt56Sol => Some(ReasoningEffort::Low),
+            Self::Gpt56Terra | Self::Gpt55 | Self::Gpt54 | Self::Gpt54Mini => {
+                Some(ReasoningEffort::Medium)
+            }
+        }
     }
 
     fn supported_reasoning_efforts(&self) -> &'static [ReasoningEffort] {
-        // The Codex backend's supported_reasoning_levels for every model in this list is low/medium/high/xhigh
-        &[
-            ReasoningEffort::Low,
-            ReasoningEffort::Medium,
-            ReasoningEffort::High,
-            ReasoningEffort::XHigh,
-        ]
+        match self {
+            Self::Gpt56Sol | Self::Gpt56Terra => &[
+                ReasoningEffort::Low,
+                ReasoningEffort::Medium,
+                ReasoningEffort::High,
+                ReasoningEffort::XHigh,
+                ReasoningEffort::Max,
+            ],
+            Self::Gpt55 | Self::Gpt54 | Self::Gpt54Mini => &[
+                ReasoningEffort::Low,
+                ReasoningEffort::Medium,
+                ReasoningEffort::High,
+                ReasoningEffort::XHigh,
+            ],
+        }
     }
 
     fn supports_parallel_tool_calls(&self) -> bool {
@@ -362,7 +414,7 @@ impl ChatGptModel {
 
     fn supports_priority(&self) -> bool {
         match self {
-            Self::Gpt55 | Self::Gpt54 => true,
+            Self::Gpt56Sol | Self::Gpt56Terra | Self::Gpt55 | Self::Gpt54 => true,
             Self::Gpt54Mini => false,
         }
     }
@@ -431,6 +483,7 @@ impl LanguageModel for OpenAiSubscribedLanguageModel {
                     ReasoningEffort::Medium => ("Medium", "medium"),
                     ReasoningEffort::High => ("High", "high"),
                     ReasoningEffort::XHigh => ("Extra High", "xhigh"),
+                    ReasoningEffort::Max => ("Max", "max"),
                 };
 
                 Some(LanguageModelEffortLevel {
@@ -474,7 +527,7 @@ impl LanguageModel for OpenAiSubscribedLanguageModel {
 
         // The Codex backend rejects `max_output_tokens` (`Unsupported parameter`),
         // unlike the public OpenAI Responses API. Pass `None` so the field is
-        // omitted from the serialisim request body entirely.
+        // omitted from the serialized request body entirely.
         let mut responses_request = into_open_ai_response(
             request,
             self.model.id(),
@@ -741,10 +794,12 @@ async fn do_oauth_flow(
         .query_pairs_mut()
         .append_pair("client_id", CLIENT_ID)
         .append_pair("redirect_uri", &redirect_uri)
-        .append_pair(
-            "scope",
-            "openid profile email offline_access api.connectors.read api.connectors.invoke",
-        )
+        // Deliberately excludes `api.connectors.read api.connectors.invoke`
+        // (which Codex CLI requests): extra scopes inflate the
+        // access-token JWT, and the serialized credentials must fit within
+        // Windows Credential Manager's 2560-byte blob limit
+        // (CRED_MAX_CREDENTIAL_BLOB_SIZE). See #58541.
+        .append_pair("scope", "openid profile email offline_access")
         .append_pair("response_type", "code")
         .append_pair("code_challenge", &challenge)
         .append_pair("code_challenge_method", "S256")
@@ -1040,6 +1095,9 @@ fn do_sign_out(state: &gpui::WeakEntity<State>, cx: &mut App) -> Task<Result<()>
 struct ConfigurationView {
     state: Entity<State>,
     http_client: Arc<dyn HttpClient>,
+    /// When `true`, the description is rendered elsewhere (the settings row's
+    /// left column), so it's omitted here to avoid duplication.
+    compact: bool,
 }
 
 impl Render for ConfigurationView {
@@ -1056,7 +1114,7 @@ impl Render for ConfigurationView {
 
             return v_flex()
                 .child(
-                    ConfiguredApiCard::new(SharedString::from(label))
+                    ConfiguredApiCard::new("openai-subscribed-sign-out", SharedString::from(label))
                         .button_label("Sign Out")
                         .on_click(cx.listener(move |_this, _, _window, cx| {
                             do_sign_out(&weak_state, cx).detach_and_log_err(cx);
@@ -1073,27 +1131,21 @@ impl Render for ConfigurationView {
         let button_label = if is_signing_in {
             "Signing in…"
         } else {
-            "Sign in to use ChatGPT Subscription"
+            "Sign In"
         };
 
         v_flex()
             .gap_2()
-            .child(Label::new(
-                "Sign in with your ChatGPT Plus or Pro subscription to use OpenAI models in Sim's agent.",
-            ))
+            .when(!self.compact, |this| {
+                this.child(Label::new(SUBSCRIPTION_DESCRIPTION))
+            })
             .child(
                 Button::new("sign-in", button_label)
-                    .full_width()
+                    .when(!self.compact, |this| this.full_width())
                     .style(ButtonStyle::Outlined)
+                    .size(ButtonSize::Medium)
                     .loading(is_signing_in)
                     .disabled(is_signing_in)
-                    .when(!is_signing_in, |this| {
-                        this.start_icon(
-                            Icon::new(IconName::AiOpenAi)
-                                .size(IconSize::Small)
-                                .color(Color::Muted),
-                        )
-                    })
                     .on_click(move |_, _window, cx| {
                         do_sign_in(&provider_state, &http_client, cx);
                     }),

@@ -7,7 +7,7 @@
   Key patterns to note:
   - Anchor IDs on categories and individual items for deep-linking
   - Opening paragraph explains what these are and where they're used
-  - Organisim into logical categories
+  - Organized into logical categories
   - Each item has a clear, actionable description
   - Links to related configuration docs
   - "See Also" section for related topics
@@ -39,6 +39,8 @@ When no path is provided, shows a summary of error and warning counts for all fi
 ### `fetch` {#fetch}
 
 Fetches a URL and returns the content as Markdown. Useful for providing docs as context.
+
+`fetch` is governed by tool permissions, agent profiles, and project trust. It is not run inside the terminal OS sandbox, so terminal sandbox network grants such as `allow_hosts` and `allow_all_hosts` do not apply to it.
 
 ### `find_path` {#find-path}
 

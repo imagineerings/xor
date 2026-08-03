@@ -8,13 +8,11 @@ use ui::{HighlightedLabel, ListItem, ListItemSpacing, prelude::*};
 use workspace::{ModalView, Workspace};
 
 pub fn init(cx: &mut App) {
-    cx.on_action(
-        |_: &sim_actions::settings_profile_selector::Toggle, cx| {
-            workspace::with_active_or_new_workspace(cx, |workspace, window, cx| {
-                toggle_settings_profile_selector(workspace, window, cx);
-            });
-        },
-    );
+    cx.on_action(|_: &sim_actions::settings_profile_selector::Toggle, cx| {
+        workspace::with_active_or_new_workspace(cx, |workspace, window, cx| {
+            toggle_settings_profile_selector(workspace, window, cx);
+        });
+    });
 }
 
 fn toggle_settings_profile_selector(
@@ -44,7 +42,7 @@ impl Focusable for SettingsProfileSelector {
 
 impl Render for SettingsProfileSelector {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        v_flex().w(rems(22.)).child(self.picker.clone())
+        v_flex().child(self.picker.clone())
     }
 }
 
@@ -54,7 +52,8 @@ impl SettingsProfileSelector {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let picker = cx.new(|cx| Picker::uniform_list(delegate, window, cx));
+        let picker =
+            cx.new(|cx| Picker::uniform_list(delegate, window, cx).initial_width(rems(22.)));
         Self { picker }
     }
 }
@@ -150,6 +149,10 @@ impl SettingsProfileSelectorDelegate {
 
 impl PickerDelegate for SettingsProfileSelectorDelegate {
     type ListItem = ListItem;
+
+    fn name() -> &'static str {
+        "settings profile selector"
+    }
 
     fn placeholder_text(&self, _: &mut Window, _: &mut App) -> std::sync::Arc<str> {
         "Select a settings profile...".into()
@@ -282,13 +285,13 @@ fn display_name(profile_name: &Option<String>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sim_actions::settings_profile_selector;
     use editor;
     use gpui::{TestAppContext, UpdateGlobal, VisualTestContext};
     use menu::{Cancel, Confirm, SelectNext, SelectPrevious};
     use project::{FakeFs, Project};
     use serde_json::json;
     use settings::Settings;
+    use sim_actions::settings_profile_selector;
     use theme_settings::ThemeSettings;
     use workspace::{self, AppState, MultiWorkspace};
 

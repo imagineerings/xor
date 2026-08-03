@@ -1,11 +1,10 @@
 use anthropic::AnthropicModelMode;
 use anyhow::{Context as _, Result};
 use cloud_llm_client::{
-    SIM_VERSION_HEADER_NAME, CLIENT_SUPPORTS_STATUS_MESSAGES_HEADER_NAME,
-    CLIENT_SUPPORTS_STATUS_STREAM_ENDED_HEADER_NAME, CLIENT_SUPPORTS_X_AI_HEADER_NAME,
-    CompletionBody, CompletionEvent, CompletionRequestStatus, EXPIRED_LLM_TOKEN_HEADER_NAME,
-    ListModelsResponse, OUTDATED_LLM_TOKEN_HEADER_NAME,
-    SERVER_SUPPORTS_STATUS_MESSAGES_HEADER_NAME,
+    CLIENT_SUPPORTS_STATUS_MESSAGES_HEADER_NAME, CLIENT_SUPPORTS_STATUS_STREAM_ENDED_HEADER_NAME,
+    CLIENT_SUPPORTS_X_AI_HEADER_NAME, CompletionBody, CompletionEvent, CompletionRequestStatus,
+    EXPIRED_LLM_TOKEN_HEADER_NAME, ListModelsResponse, OUTDATED_LLM_TOKEN_HEADER_NAME,
+    SERVER_SUPPORTS_STATUS_MESSAGES_HEADER_NAME, SIM_VERSION_HEADER_NAME,
 };
 use futures::{
     AsyncBufReadExt, AsyncReadExt as _, FutureExt, Stream, StreamExt,
@@ -20,12 +19,13 @@ use http_client::{
     AsyncBody, HttpClient, HttpClientWithUrl, HttpRequestExt, Method, Response, StatusCode,
 };
 use language_model::{
-    ANTHROPIC_PROVIDER_ID, ANTHROPIC_PROVIDER_NAME, SIM_CLOUD_PROVIDER_ID,
-    SIM_CLOUD_PROVIDER_NAME, GOOGLE_PROVIDER_ID, GOOGLE_PROVIDER_NAME, LanguageModel,
-    LanguageModelCompletionError, LanguageModelCompletionEvent, LanguageModelEffortLevel,
-    LanguageModelId, LanguageModelName, LanguageModelProviderId, LanguageModelProviderName,
-    LanguageModelRequest, LanguageModelToolChoice, LanguageModelToolSchemaFormat,
-    OPEN_AI_PROVIDER_ID, OPEN_AI_PROVIDER_NAME, RateLimiter, X_AI_PROVIDER_ID, X_AI_PROVIDER_NAME,
+    ANTHROPIC_PROVIDER_ID, ANTHROPIC_PROVIDER_NAME, DisabledReason, GOOGLE_PROVIDER_ID,
+    GOOGLE_PROVIDER_NAME, LanguageModel, LanguageModelCompletionError,
+    LanguageModelCompletionEvent, LanguageModelEffortLevel, LanguageModelId, LanguageModelName,
+    LanguageModelProviderId, LanguageModelProviderName, LanguageModelRequest,
+    LanguageModelToolChoice, LanguageModelToolSchemaFormat, OPEN_AI_PROVIDER_ID,
+    OPEN_AI_PROVIDER_NAME, RateLimiter, SIM_CLOUD_PROVIDER_ID, SIM_CLOUD_PROVIDER_NAME,
+    X_AI_PROVIDER_ID, X_AI_PROVIDER_NAME,
 };
 
 use schemars::JsonSchema;
@@ -42,7 +42,8 @@ use thiserror::Error;
 use anthropic::completion::{AnthropicEventMapper, AnthropicPromptCacheMode, into_anthropic};
 use google_ai::completion::{GoogleEventMapper, into_google};
 use open_ai::completion::{
-    OpenAiEventMapper, OpenAiResponseEventMapper, into_open_ai, into_open_ai_response,
+    ChatCompletionMaxTokensParameter, OpenAiEventMapper, OpenAiResponseEventMapper, into_open_ai,
+    into_open_ai_response,
 };
 
 const PROVIDER_ID: LanguageModelProviderId = SIM_CLOUD_PROVIDER_ID;
@@ -322,6 +323,14 @@ impl<TP: CloudLlmTokenProvider + 'static> LanguageModel for CloudLanguageModel<T
         self.model.is_latest
     }
 
+    fn is_disabled(&self) -> Option<DisabledReason> {
+        if self.model.is_disabled {
+            self.model.disabled_reason.clone().map(DisabledReason::new)
+        } else {
+            None
+        }
+    }
+
     fn requires_data_retention(&self) -> bool {
         // Anthropic cannot offer Fable models with Zero Data Retention
         self.id
@@ -361,6 +370,10 @@ impl<TP: CloudLlmTokenProvider + 'static> LanguageModel for CloudLanguageModel<T
 
     fn supports_fast_mode(&self) -> bool {
         self.model.supports_fast_mode
+    }
+
+    fn supports_server_side_compaction(&self) -> bool {
+        self.model.supports_server_side_compaction
     }
 
     fn supported_effort_levels(&self) -> Vec<LanguageModelEffortLevel> {
@@ -466,7 +479,7 @@ impl<TP: CloudLlmTokenProvider + 'static> LanguageModel for CloudLanguageModel<T
 
                 if enable_thinking && effort.is_some() {
                     request.thinking = Some(anthropic::Thinking::Adaptive {
-                        display: Some(anthropic::AdaptiveThinkingDisplay::Summarisim),
+                        display: Some(anthropic::AdaptiveThinkingDisplay::Summarized),
                     });
                     request.output_config = Some(anthropic::OutputConfig { effort });
                 }
@@ -502,7 +515,7 @@ impl<TP: CloudLlmTokenProvider + 'static> LanguageModel for CloudLanguageModel<T
                     )
                     .await?;
 
-                    let mut mapper = AnthropicEventMapper::new();
+                    let mut mapper = AnthropicEventMapper::new(provider_name.clone());
                     Ok(map_cloud_completion_events(
                         Box::pin(response_lines(response, includes_status_messages)),
                         &provider_name,
@@ -585,6 +598,7 @@ impl<TP: CloudLlmTokenProvider + 'static> LanguageModel for CloudLanguageModel<T
                     self.model.supports_parallel_tool_calls,
                     false,
                     None,
+                    ChatCompletionMaxTokensParameter::MaxCompletionTokens,
                     None,
                     false,
                 );

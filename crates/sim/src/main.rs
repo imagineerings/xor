@@ -1,6 +1,7 @@
 // Disable command line from opening on release mode
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod comfy_cli;
 mod reliability;
 mod sim;
 
@@ -14,8 +15,6 @@ const _: () = assert!(
      Forks: update APP_NAME in crates/paths/src/paths.rs when renaming the binary.",
 );
 
-use agent::{SharedThread, ThreadStore};
-use agent_client_protocol::schema as acp;
 use agent_ui::AgentPanel;
 use anyhow::{Context as _, Result};
 use clap::Parser;
@@ -32,8 +31,7 @@ use futures::{StreamExt, channel::oneshot, future};
 use git::GitHostingProviderRegistry;
 use git_ui::clone::clone_and_open;
 use gpui::{
-    App, AppContext, Application, AsyncApp, Focusable as _, QuitMode, Task, TaskExt,
-    UpdateGlobal as _, block_on,
+    App, AppContext, Application, AsyncApp, QuitMode, Task, TaskExt, UpdateGlobal as _, block_on,
 };
 use gpui_platform;
 
@@ -49,7 +47,6 @@ use assets::Assets;
 use node_runtime::{NodeBinaryOptions, NodeRuntime};
 use parking_lot::Mutex;
 use project::{project_settings::ProjectSettings, trusted_worktrees};
-use proto;
 use recent_projects::{RemoteSettings, open_remote_project};
 use release_channel::{AppCommitSha, AppVersion, ReleaseChannel};
 use session::{AppSession, Session};
@@ -75,7 +72,7 @@ use theme_settings::load_user_theme;
 use util::{ResultExt, maybe};
 use uuid::Uuid;
 use workspace::{
-    AppState, MultiWorkspace, SerialisimWorkspaceLocation, SessionWorkspace, Toast,
+    AppState, MultiWorkspace, SerializedWorkspaceLocation, SessionWorkspace, Toast,
     WorkspaceSettings, WorkspaceStore,
     notifications::{NotificationId, NotifyResultExt},
     restore_multiworkspace,
@@ -88,12 +85,11 @@ use crate::sim::{CrashHandler, OpenRequestKind, eager_load_active_theme_and_icon
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 fn build_application() -> Application {
-    let platform = gpui_platform::current_platform(false);
-    if std::env::var("SIM_EXPERIMENTAL_A11Y").as_deref() == Ok("1") {
-        Application::with_platform(platform)
-    } else {
-        Application::new_inaccessible(platform)
-    }
+    build_application_with_platform(gpui_platform::current_platform(false))
+}
+
+fn build_application_with_platform(platform: Rc<dyn gpui::Platform>) -> Application {
+    Application::with_platform(platform)
 }
 
 fn files_not_created_on_launch(errors: HashMap<io::ErrorKind, Vec<&Path>>) {
@@ -204,11 +200,26 @@ static STARTUP_TIME: OnceLock<Instant> = OnceLock::new();
 fn main() {
     STARTUP_TIME.get_or_init(|| Instant::now());
 
-    #[cfg(target_os = "linux")]
-    sandbox::linux_bubblewrap::run_launcher_if_invoked();
+    // If this process was re-executed as a Linux sandbox helper, run that mode
+    // without returning. Must run before argument parsing: the wrapped command's
+    // args are appended verbatim and would otherwise be misinterpreted as Sim's
+    // own arguments.
+    sandbox::run_sandbox_launcher_if_invoked();
 
     #[cfg(unix)]
     util::prevent_root_execution();
+
+    #[cfg(all(not(debug_assertions), target_os = "windows"))]
+    unsafe {
+        use windows::Win32::System::Console::{ATTACH_PARENT_PROCESS, AttachConsole};
+
+        let needs_console = std::env::args_os()
+            .skip(1)
+            .any(|argument| argument == "comfy" || argument == "--foreground");
+        if needs_console {
+            let _attachment_result = AttachConsole(ATTACH_PARENT_PROCESS);
+        }
+    }
 
     let args = Args::parse();
 
@@ -249,15 +260,6 @@ fn main() {
         return;
     }
 
-    #[cfg(all(not(debug_assertions), target_os = "windows"))]
-    unsafe {
-        use windows::Win32::System::Console::{ATTACH_PARENT_PROCESS, AttachConsole};
-
-        if args.foreground {
-            let _ = AttachConsole(ATTACH_PARENT_PROCESS);
-        }
-    }
-
     // `sim --printenv` Outputs environment variables as JSON to stdout
     if args.printenv {
         util::shell_env::print_env();
@@ -272,6 +274,14 @@ fn main() {
     // Set custom data directory.
     if let Some(dir) = &args.user_data_dir {
         paths::set_custom_data_dir(dir);
+    }
+
+    if let Some(SimCommand::Comfy(comfy_args)) = args.command.clone() {
+        let exit_code = comfy_cli::run(comfy_args);
+        if exit_code != 0 {
+            process::exit(exit_code);
+        }
+        return;
     }
 
     #[cfg(target_os = "windows")]
@@ -494,15 +504,6 @@ fn main() {
 
         release_channel::init(app_version, cx);
         gpui_tokio::init(cx);
-        let gateway_config_path = paths::config_dir().join("gateway.json");
-        match gateway::GatewayConfig::from_env_and_file(Some(gateway_config_path)) {
-            Ok(config) => {
-                gateway::init(config, cx);
-            }
-            Err(error) => {
-                log::error!("failed to load gateway configuration: {error:#}");
-            }
-        }
         if let Some(app_commit_sha) = app_commit_sha {
             AppCommitSha::set_global(app_commit_sha, cx);
         }
@@ -573,7 +574,6 @@ fn main() {
         debug_adapter_extension::init(extension_host_proxy.clone(), cx);
         languages::init(languages.clone(), fs.clone(), node_runtime.clone(), cx);
         let user_store = cx.new(|cx| UserStore::new(client.clone(), cx));
-        let group_store = cx.new(|cx| client::GroupStore::new(client.clone(), cx));
         let workspace_store = cx.new(|cx| WorkspaceStore::new(client.clone(), cx));
 
         language_extension::init(
@@ -659,7 +659,6 @@ fn main() {
             languages,
             client: client.clone(),
             user_store,
-            group_store,
             fs: fs.clone(),
             build_window_options,
             workspace_store,
@@ -789,9 +788,6 @@ fn main() {
         svg_preview::init(cx);
         onboarding::init(cx);
         settings_ui::init(cx);
-        cx.set_global(mobile_tunnel::GlobalTunnelManager(parking_lot::Mutex::new(
-            None,
-        )));
         keymap_editor::init(cx);
         extensions_ui::init(cx);
         edit_prediction::init(cx);
@@ -885,7 +881,6 @@ fn main() {
         }
 
         initialize_workspace(app_state.clone(), cx);
-        sim::register_game_integration(&app_state, cx);
 
         cx.activate(true);
 
@@ -1065,115 +1060,6 @@ fn handle_open_request(request: OpenRequest, app_state: Arc<AppState>, cx: &mut 
                 })
                 .detach_and_log_err(cx);
             }
-            OpenRequestKind::SharedAgentThread { session_id } => {
-                cx.spawn(async move |cx| {
-                    let multi_workspace =
-                        workspace::get_any_active_multi_workspace(app_state.clone(), cx.clone())
-                            .await?;
-
-                    let workspace =
-                        multi_workspace.read_with(cx, |mw, _| mw.workspace().clone())?;
-
-                    let import_state = multi_workspace.update(cx, |_, window, cx| {
-                        workspace.update(cx, |workspace, cx| {
-                            if workspace.root_paths(cx).is_empty() {
-                                workspace.focus_panel::<AgentPanel>(window, cx);
-
-                                struct OpenProjectForSharedThreadToast;
-                                workspace.show_toast(
-                                    Toast::new(
-                                        NotificationId::unique::<OpenProjectForSharedThreadToast>(),
-                                        "Open a project to import shared threads",
-                                    )
-                                    .autohide(),
-                                    cx,
-                                );
-
-                                return anyhow::Ok(None);
-                            }
-
-                            let client = workspace.project().read(cx).client();
-                            let thread_store: Option<gpui::Entity<ThreadStore>> = workspace
-                                .panel::<AgentPanel>(cx)
-                                .map(|panel| panel.read(cx).thread_store().clone());
-                            anyhow::Ok(Some((client, thread_store)))
-                        })
-                    })??;
-
-                    let Some((client, thread_store)) = import_state else {
-                        return Ok(());
-                    };
-
-                    let Some(thread_store): Option<gpui::Entity<ThreadStore>> = thread_store else {
-                        anyhow::bail!("Agent panel not available");
-                    };
-
-                    let response = client
-                        .request(proto::GetSharedAgentThread {
-                            session_id: session_id.clone(),
-                        })
-                        .await
-                        .context("Failed to fetch shared thread")?;
-
-                    let shared_thread = SharedThread::from_bytes(&response.thread_data)?;
-                    let db_thread = shared_thread.to_db_thread();
-                    let session_id = acp::SessionId::new(session_id);
-
-                    let save_session_id = session_id.clone();
-
-                    thread_store
-                        .update(&mut cx.clone(), |store, cx| {
-                            store.save_thread(
-                                save_session_id.clone(),
-                                db_thread,
-                                Default::default(),
-                                cx,
-                            )
-                        })
-                        .await?;
-
-                    let sharer_username = response.sharer_username.clone();
-
-                    multi_workspace.update(cx, |_, window, cx| {
-                        workspace.update(cx, |workspace, cx| {
-                            if let Some(panel) = workspace.panel::<AgentPanel>(cx) {
-                                panel.update(cx, |panel, cx| {
-                                    panel.open_thread(
-                                        session_id,
-                                        None,
-                                        Some(format!("🔗 {}", response.title).into()),
-                                        window,
-                                        cx,
-                                    );
-                                });
-                                panel.focus_handle(cx).focus(window, cx);
-                            }
-
-                            struct ImportedThreadToast;
-                            workspace.show_toast(
-                                Toast::new(
-                                    NotificationId::unique::<ImportedThreadToast>(),
-                                    format!("Imported shared thread from {}", sharer_username),
-                                )
-                                .autohide(),
-                                cx,
-                            );
-                        });
-                    })?;
-
-                    anyhow::Ok(())
-                })
-                .detach_and_log_err(cx);
-            }
-            OpenRequestKind::SharedSession { data } => {
-                cx.spawn(async move |cx| {
-                    crate::sim::shared_session_handler::import_shared_session_from_link(
-                        app_state, data, cx,
-                    )
-                    .await
-                })
-                .detach_and_log_err(cx);
-            }
             OpenRequestKind::InstallSkill { content } => {
                 cx.spawn(async move |cx| {
                     let multi_workspace =
@@ -1310,7 +1196,7 @@ fn handle_open_request(request: OpenRequest, app_state: Arc<AppState>, cx: &mut 
             OpenRequestKind::GitCommit { sha } => {
                 let base_open_options = sim::open_options_for_request(
                     request.open_behavior,
-                    &workspace::SerialisimWorkspaceLocation::Local,
+                    &workspace::SerializedWorkspaceLocation::Local,
                     cx,
                 );
                 cx.spawn(async move |cx| {
@@ -1364,7 +1250,7 @@ fn handle_open_request(request: OpenRequest, app_state: Arc<AppState>, cx: &mut 
 
     if let Some(connection_options) = request.remote_connection {
         let open_behavior = request.open_behavior;
-        let location = workspace::SerialisimWorkspaceLocation::Remote(connection_options.clone());
+        let location = workspace::SerializedWorkspaceLocation::Remote(connection_options.clone());
         let base_open_options = sim::open_options_for_request(open_behavior, &location, cx);
         cx.spawn(async move |cx| {
             let paths: Vec<PathBuf> = request.open_paths.into_iter().map(PathBuf::from).collect();
@@ -1380,7 +1266,7 @@ fn handle_open_request(request: OpenRequest, app_state: Arc<AppState>, cx: &mut 
         let app_state = app_state.clone();
         let base_open_options = sim::open_options_for_request(
             request.open_behavior,
-            &workspace::SerialisimWorkspaceLocation::Local,
+            &workspace::SerializedWorkspaceLocation::Local,
             cx,
         );
         task = Some(cx.spawn(async move |cx| {
@@ -1530,12 +1416,12 @@ pub(crate) async fn restore_or_create_workspace(
         let mut error_count = 0;
         for multi_workspace in multi_workspaces {
             let result = match &multi_workspace.active_workspace.location {
-                SerialisimWorkspaceLocation::Local => {
+                SerializedWorkspaceLocation::Local => {
                     restore_multiworkspace(multi_workspace, app_state.clone(), cx)
                         .await
                         .map(|_| ())
                 }
-                SerialisimWorkspaceLocation::Remote(connection_options) => {
+                SerializedWorkspaceLocation::Remote(connection_options) => {
                     let mut connection_options = connection_options.clone();
                     if let RemoteConnectionOptions::Ssh(options) = &mut connection_options {
                         cx.update(|cx| {
@@ -1683,7 +1569,7 @@ pub(crate) async fn restore_or_create_workspace(
 async fn restorable_workspaces(
     cx: &mut AsyncApp,
     app_state: &Arc<AppState>,
-) -> Option<Vec<workspace::SerialisimMultiWorkspace>> {
+) -> Option<Vec<workspace::SerializedMultiWorkspace>> {
     let locations = restorable_workspace_locations(cx, app_state).await?;
     Some(cx.update(|cx| workspace::read_serialisim_multi_workspaces(locations, cx)))
 }
@@ -1790,8 +1676,16 @@ fn stdout_is_a_pty() -> bool {
 }
 
 #[derive(Parser, Debug)]
-#[command(name = "sim", disable_version_flag = true, max_term_width = 100)]
+#[command(
+    name = "sim",
+    disable_version_flag = true,
+    max_term_width = 100,
+    subcommand_precedence_over_arg = true
+)]
 struct Args {
+    #[command(subcommand)]
+    command: Option<SimCommand>,
+
     /// A sequence of space-separated paths or urls that you want to open.
     ///
     /// Use `path:line:row` syntax to open a file at a specific location.
@@ -1896,6 +1790,12 @@ struct Args {
     #[cfg(target_os = "windows")]
     #[arg(long, hide = true)]
     etw_socket: Option<String>,
+}
+
+#[derive(clap::Subcommand, Clone, Debug)]
+enum SimCommand {
+    /// Run native Comfy lifecycle, automation, and compatibility-host commands.
+    Comfy(comfy_cli::ComfyArgs),
 }
 
 #[derive(Clone, Debug)]
@@ -2011,7 +1911,13 @@ fn watch_themes(fs: Arc<dyn fs::Fs>, cx: &mut App) {
 
         while let Some(paths) = events.next().await {
             for event in paths {
-                if fs.metadata(&event.path).await.ok().flatten().is_some() {
+                if fs
+                    .metadata(&event.path)
+                    .await
+                    .ok()
+                    .flatten()
+                    .is_some_and(|metadata| !metadata.is_dir)
+                {
                     let theme_registry = cx.update(|cx| ThemeRegistry::global(cx));
                     if let Some(bytes) = fs.load_bytes(&event.path).await.log_err()
                         && load_user_theme(&theme_registry, &bytes).log_err().is_some()

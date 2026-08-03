@@ -39,30 +39,6 @@ const TOOLS: &[ToolInfo] = &[
         regex_explanation: "Patterns are matched against the file path being written.",
     },
     ToolInfo {
-        id: "pdf_tool",
-        name: "PDF Tool",
-        description: "PDF document creation and modification operations",
-        regex_explanation: "Patterns are matched against the PDF file path being written or read.",
-    },
-    ToolInfo {
-        id: "docx_tool",
-        name: "DOCX Tool",
-        description: "DOCX document creation and modification operations",
-        regex_explanation: "Patterns are matched against the DOCX file path being written or read.",
-    },
-    ToolInfo {
-        id: "xlsx_tool",
-        name: "XLSX Tool",
-        description: "XLSX workbook creation and read operations",
-        regex_explanation: "Patterns are matched against the XLSX file path being written or read.",
-    },
-    ToolInfo {
-        id: "platform_tool",
-        name: "Platform Tool",
-        description: "Platform-specific desktop operations",
-        regex_explanation: "Patterns are matched against the path passed to the platform operation.",
-    },
-    ToolInfo {
         id: "delete_path",
         name: "Delete Path",
         description: "File and directory deletion",
@@ -312,6 +288,7 @@ fn render_tool_list_item(
                         tool_name,
                         "Tool Permissions",
                         None,
+                        true,
                         render_fn,
                         window,
                         cx,
@@ -334,6 +311,7 @@ fn get_tool_render_fn(
         "create_directory" => render_create_directory_tool_config,
         "fetch" => render_fetch_tool_config,
         "search_web" => render_web_search_tool_config,
+        "skill" => render_skill_tool_config,
         _ => render_terminal_tool_config, // fallback
     }
 }
@@ -1000,8 +978,7 @@ fn render_user_pattern_row(
     let delete_id = format!("{}-{:?}-delete-{}", tool_id, rule_type, index);
     let settings_window = cx.entity().downgrade();
 
-    SettingsInputField::new()
-        .with_id(input_id)
+    SettingsInputField::new(input_id)
         .with_initial_text(pattern)
         .tab_index(0)
         .with_buffer_font()
@@ -1061,8 +1038,7 @@ fn render_add_pattern_input(
     let input_id = format!("{}-{:?}-new-pattern", tool_id, rule_type);
     let settings_window = cx.entity().downgrade();
 
-    SettingsInputField::new()
-        .with_id(input_id)
+    SettingsInputField::new(input_id)
         .with_placeholder("Add regex pattern…")
         .tab_index(0)
         .with_buffer_font()
@@ -1413,6 +1389,7 @@ tool_config_page_fn!(render_move_path_tool_config, "move_path");
 tool_config_page_fn!(render_create_directory_tool_config, "create_directory");
 tool_config_page_fn!(render_fetch_tool_config, "fetch");
 tool_config_page_fn!(render_web_search_tool_config, "search_web");
+tool_config_page_fn!(render_skill_tool_config, "skill");
 
 #[cfg(test)]
 mod tests {
@@ -1426,15 +1403,8 @@ mod tests {
         //   2. Add it to this list with a comment explaining why it's excluded.
         const EXCLUDED_TOOLS: &[&str] = &[
             // Read-only / low-risk tools that don't call decide_permission_from_settings
-            "analyze",
             "apply_code_action",
-            "apps",
-            "chatrecall",
-            "code_execution",
-            "developer",
             "diagnostics",
-            "dictation",
-            "final_output",
             "find_path",
             "find_references",
             "get_code_actions",
@@ -1442,18 +1412,10 @@ mod tests {
             "grep",
             "list_agents_and_models",
             "list_directory",
-            "orchestrator",
             "open",
             "read_file",
             "rename_symbol",
-            "sim_game_graph",
-            "sim_mesh_generation",
-            "sim_world_generation",
-            "summarize",
-            "summon",
             "thinking",
-            "todo",
-            "tom",
             // streaming_edit_file uses "edit_file" for permission lookups,
             // so its rules are configured under the edit_file entry.
             "streaming_edit_file",

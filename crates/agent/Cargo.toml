@@ -25,7 +25,6 @@ agent_servers.workspace = true
 agent_settings.workspace = true
 agent_skills.workspace = true
 anyhow.workspace = true
-base64.workspace = true
 chrono.workspace = true
 client.workspace = true
 cloud_api_types.workspace = true
@@ -33,7 +32,6 @@ cloud_llm_client.workspace = true
 collections.workspace = true
 context_server.workspace = true
 db.workspace = true
-dictation.workspace = true
 feature_flags.workspace = true
 fs.workspace = true
 futures.workspace = true
@@ -52,12 +50,9 @@ language_models.workspace = true
 log.workspace = true
 parking_lot.workspace = true
 paths.workspace = true
-permission.workspace = true
-posthog.workspace = true
 project.workspace = true
 prompt_store.workspace = true
 quick-xml.workspace = true
-recipe.workspace = true
 regex.workspace = true
 rust-embed.workspace = true
 sandbox.workspace = true
@@ -65,7 +60,6 @@ schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 settings.workspace = true
-security.workspace = true
 shell_command_parser.workspace = true
 smallvec.workspace = true
 sqlez.workspace = true
@@ -83,8 +77,12 @@ uuid.workspace = true
 watch.workspace = true
 web_search.workspace = true
 sim_env_vars.workspace = true
-world_model.workspace = true
 zstd.workspace = true
+
+# Used only on Windows to resolve the running release channel/version so the WSL
+# sandbox helper can fetch a matching Linux `sim`.
+[target.'cfg(target_os = "windows")'.dependencies]
+release_channel.workspace = true
 
 [dev-dependencies]
 assets.workspace = true
@@ -98,7 +96,6 @@ db = { workspace = true, "features" = ["test-support"] }
 editor = { workspace = true, "features" = ["test-support"] }
 env_logger.workspace = true
 eval_utils.workspace = true
-eval_harbor.workspace = true
 fs = { workspace = true, "features" = ["test-support"] }
 git = { workspace = true, "features" = ["test-support"] }
 gpui = { workspace = true, "features" = ["test-support"] }
@@ -111,7 +108,6 @@ project = { workspace = true, "features" = ["test-support"] }
 proptest.workspace = true
 rand.workspace = true
 reqwest_client.workspace = true
-scheduler.workspace = true
 settings = { workspace = true, "features" = ["test-support"] }
 
 theme = { workspace = true, "features" = ["test-support"] }
@@ -120,6 +116,3 @@ theme_settings.workspace = true
 unindent = { workspace = true }
 
 zlog.workspace = true
-
-[package.metadata.cargo-machete]
-ignored = ["recipe"]

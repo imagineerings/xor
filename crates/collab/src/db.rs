@@ -1,11 +1,6 @@
-pub mod bookmark_store;
-pub mod file_store;
 mod ids;
-pub mod join_request_store;
 pub mod queries;
-pub mod scheduled_message_store;
 mod tables;
-pub mod user_status_store;
 
 use crate::{Error, Result};
 use anyhow::{Context as _, anyhow};
@@ -191,7 +186,7 @@ impl Database {
 
     /// room_transaction runs the block in a transaction. It returns a RoomGuard, that keeps
     /// the database locked until it is dropped. This ensures that updates sent to clients are
-    /// properly serialisim with respect to database changes.
+    /// properly serialized with respect to database changes.
     async fn room_transaction<F, Fut, T>(
         &self,
         room_id: RoomId,
@@ -492,7 +487,6 @@ pub struct RejoinedRoom {
     pub rejoined_projects: Vec<RejoinedProject>,
     pub reshared_projects: Vec<ResharedProject>,
     pub channel: Option<channel::Model>,
-    pub role: ChannelRole,
 }
 
 pub struct ResharedProject {
@@ -531,6 +525,8 @@ impl RejoinedProject {
                     visible: worktree.visible,
                     abs_path: worktree.abs_path.clone(),
                     root_repo_common_dir: None,
+                    // todo(collab): Get this field from database
+                    root_repo_is_linked_worktree: false,
                 })
                 .collect(),
             collaborators: self

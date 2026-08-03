@@ -1,5 +1,5 @@
 use acp_thread::{Elicitation, ElicitationEntryId, ElicitationStatus};
-use agent_client_protocol::schema as acp;
+use agent_client_protocol::schema::v1 as acp;
 use collections::{HashMap, HashSet};
 use component::{Component, ComponentScope, example_group_with_title, single_example};
 use editor::Editor;
@@ -234,7 +234,7 @@ impl ElicitationFormState {
                 }
                 Ok(None) => {}
                 Err(error) => {
-                    errors.insert(name.to_string(), error);
+                    errors.insert(name.clone(), error);
                 }
             }
         }
@@ -362,7 +362,7 @@ mod tests {
                     acp::ElicitationId::new("accepted-url"),
                     "https://auth.example.com/device",
                 ),
-                "Authorize Zed in your browser.",
+                "Authorize Sim in your browser.",
             ),
             status: ElicitationStatus::Accepted,
         };
@@ -409,7 +409,7 @@ mod tests {
 
     #[test]
     fn display_url_segments_use_larger_url_boundaries() {
-        let url = "https://auth.example.com/oauth/authorize?client_id=zed-desktop&scope=repository";
+        let url = "https://auth.example.com/oauth/authorize?client_id=sim-desktop&scope=repository";
 
         let display_url_segments = display_url_segments(url)
             .into_iter()
@@ -681,7 +681,7 @@ fn render_form_preview(
 ) -> AnyElement {
     let request = acp::CreateElicitationRequest::new(
         acp::ElicitationFormMode::new(preview_request_scope(entry_ix), preview_form_schema()),
-        "Choose how Zed should connect to this account.",
+        "Choose how Sim should connect to this account.",
     );
     let mut form_state = matches!(status, ElicitationStatus::Pending { .. }).then(|| {
         let acp::ElicitationMode::Form(mode) = &request.mode else {
@@ -699,7 +699,7 @@ fn render_form_preview(
 }
 
 fn preview_url() -> &'static str {
-    "https://auth.example.com/oauth/authorize?client_id=zed-desktop&redirect_uri=zed%3A%2F%2Fagent%2Facp%2Fcallback&scope=profile%20repository%20terminal&state=9b8b0a873a1e4b57b7f9f7b6d2d3d0f4"
+    "https://auth.example.com/oauth/authorize?client_id=sim-desktop&redirect_uri=sim%3A%2F%2Fagent%2Facp%2Fcallback&scope=profile%20repository%20terminal&state=9b8b0a873a1e4b57b7f9f7b6d2d3d0f4"
 }
 
 fn render_url_preview(
@@ -714,7 +714,7 @@ fn render_url_preview(
             acp::ElicitationId::new(format!("preview-url-{entry_ix}")),
             preview_url(),
         ),
-        "Authorize Zed in your browser to finish signing in.",
+        "Authorize Sim in your browser to finish signing in.",
     );
 
     render_preview_card(entry_ix, request, status, None, cx)

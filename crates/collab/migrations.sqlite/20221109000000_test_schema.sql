@@ -15,25 +15,6 @@ CREATE TABLE "users" (
 
 CREATE INDEX "index_users_on_email_address" ON "users" ("email_address");
 
-CREATE TABLE "user_groups" (
-    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-    "name" VARCHAR NOT NULL UNIQUE,
-    "display_name" VARCHAR NOT NULL,
-    "admin_id" INTEGER NOT NULL REFERENCES "users" ("id") ON DELETE RESTRICT,
-    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE "user_group_members" (
-    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-    "group_id" INTEGER NOT NULL REFERENCES "user_groups" ("id") ON DELETE CASCADE,
-    "user_id" INTEGER NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE,
-    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE ("group_id", "user_id")
-);
-
-CREATE INDEX "index_user_group_members_on_user_id" ON "user_group_members" ("user_id");
-
 CREATE TABLE "contacts" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT,
     "user_id_a" INTEGER NOT NULL,
@@ -304,159 +285,6 @@ CREATE TABLE IF NOT EXISTS "channel_chat_participants" (
 
 CREATE INDEX "index_channel_chat_participants_on_channel_id" ON "channel_chat_participants" ("channel_id");
 
-CREATE TABLE IF NOT EXISTS "channel_messages" (
-    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-    "channel_id" INTEGER NOT NULL REFERENCES channels (id) ON DELETE CASCADE,
-    "sender_id" INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    "body" TEXT NOT NULL,
-    "nonce" BLOB NOT NULL,
-    "reply_to_message_id" INTEGER REFERENCES channel_messages (id) ON DELETE SET NULL,
-    "search_vector" TEXT,
-    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "edited_at" TIMESTAMP,
-    "deleted_at" TIMESTAMP,
-    "scheduled_at" TIMESTAMP,
-    "priority" INTEGER NOT NULL DEFAULT 0
-);
-
-CREATE INDEX "index_channel_messages_on_channel_id_and_id" ON "channel_messages" ("channel_id", "id");
-
-CREATE INDEX "index_channel_messages_on_reply_to_message_id" ON "channel_messages" ("reply_to_message_id");
-
-CREATE INDEX "index_channel_messages_on_priority" ON "channel_messages" ("priority");
-
-CREATE TABLE IF NOT EXISTS "scheduled_messages" (
-    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-    "channel_id" INTEGER NOT NULL REFERENCES channels (id) ON DELETE CASCADE,
-    "sender_id" INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    "body" TEXT NOT NULL,
-    "scheduled_at" TIMESTAMP NOT NULL,
-    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "state" INTEGER NOT NULL DEFAULT 0,
-    "nonce" BLOB NOT NULL,
-    "mentions" TEXT NOT NULL DEFAULT '[]',
-    "delivered_message_id" INTEGER REFERENCES channel_messages (id) ON DELETE SET NULL,
-    "failure_reason" TEXT,
-    "updated_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX "index_scheduled_messages_on_pending_delivery"
-    ON "scheduled_messages" ("state", "scheduled_at")
-    WHERE "state" = 0;
-
-CREATE INDEX "index_scheduled_messages_on_sender_channel_pending"
-    ON "scheduled_messages" ("sender_id", "channel_id")
-    WHERE "state" = 0;
-
-CREATE UNIQUE INDEX "index_scheduled_messages_on_channel_sender_nonce"
-    ON "scheduled_messages" ("channel_id", "sender_id", "nonce");
-
-CREATE TABLE IF NOT EXISTS "channel_bookmarks" (
-    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-    "channel_id" INTEGER NOT NULL REFERENCES channels (id) ON DELETE CASCADE,
-    "label" TEXT NOT NULL,
-    "description" TEXT,
-    "bookmark_type" INTEGER NOT NULL,
-    "url" TEXT NOT NULL,
-    "file_id" TEXT,
-    "message_id" INTEGER REFERENCES channel_messages (id) ON DELETE SET NULL,
-    "created_by" INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "sort_order" INTEGER NOT NULL
-);
-
-CREATE INDEX "index_channel_bookmarks_on_channel_id_and_sort_order"
-    ON "channel_bookmarks" ("channel_id", "sort_order");
-
-CREATE TABLE IF NOT EXISTS "channel_files" (
-    "id" TEXT PRIMARY KEY,
-    "channel_id" INTEGER NOT NULL REFERENCES channels (id) ON DELETE CASCADE,
-    "message_id" INTEGER REFERENCES channel_messages (id) ON DELETE SET NULL,
-    "filename" TEXT NOT NULL,
-    "file_size" INTEGER NOT NULL,
-    "mime_type" TEXT NOT NULL,
-    "storage_path" TEXT NOT NULL,
-    "thumbnail_storage_path" TEXT,
-    "download_count" INTEGER NOT NULL DEFAULT 0,
-    "uploader_id" INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    "image_width" INTEGER,
-    "image_height" INTEGER,
-    "duration_ms" INTEGER,
-    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "uploaded_at" TIMESTAMP
-);
-
-CREATE INDEX "index_channel_files_on_channel_id_and_created_at"
-    ON "channel_files" ("channel_id", "created_at");
-
-CREATE INDEX "index_channel_files_on_message_id"
-    ON "channel_files" ("message_id");
-
-CREATE INDEX "index_channel_files_on_uploader_id"
-    ON "channel_files" ("uploader_id");
-
-CREATE TABLE IF NOT EXISTS "channel_join_requests" (
-    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-    "channel_id" INTEGER NOT NULL REFERENCES channels (id) ON DELETE CASCADE,
-    "user_id" INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    "reason" TEXT,
-    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE ("channel_id", "user_id")
-);
-
-CREATE INDEX "index_channel_join_requests_on_channel_id"
-    ON "channel_join_requests" ("channel_id");
-
-CREATE INDEX "index_channel_join_requests_on_created_at"
-    ON "channel_join_requests" ("created_at");
-
-CREATE TABLE IF NOT EXISTS "channel_message_mentions" (
-    "message_id" INTEGER NOT NULL REFERENCES channel_messages (id) ON DELETE CASCADE,
-    "range_start" INTEGER NOT NULL,
-    "range_end" INTEGER NOT NULL,
-    "user_id" INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    "source_group_id" INTEGER REFERENCES user_groups (id) ON DELETE SET NULL,
-    PRIMARY KEY ("message_id", "range_start", "range_end", "user_id")
-);
-
-CREATE INDEX "index_channel_message_mentions_on_user_id" ON "channel_message_mentions" ("user_id");
-CREATE INDEX "index_channel_message_mentions_on_source_group_id" ON "channel_message_mentions" ("source_group_id");
-
-CREATE TABLE IF NOT EXISTS "channel_message_reads" (
-    "channel_id" INTEGER NOT NULL REFERENCES channels (id) ON DELETE CASCADE,
-    "user_id" INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    "message_id" INTEGER NOT NULL REFERENCES channel_messages (id) ON DELETE CASCADE,
-    "updated_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY ("channel_id", "user_id")
-);
-
-CREATE INDEX "index_channel_message_reads_on_message_id" ON "channel_message_reads" ("message_id");
-
-CREATE TABLE IF NOT EXISTS "channel_thread_reads" (
-    "channel_id" INTEGER NOT NULL REFERENCES channels (id) ON DELETE CASCADE,
-    "root_message_id" INTEGER NOT NULL REFERENCES channel_messages (id) ON DELETE CASCADE,
-    "user_id" INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    "message_id" INTEGER NOT NULL REFERENCES channel_messages (id) ON DELETE CASCADE,
-    "updated_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY ("channel_id", "root_message_id", "user_id")
-);
-
-CREATE INDEX "index_channel_thread_reads_on_message_id" ON "channel_thread_reads" ("message_id");
-
-CREATE TABLE IF NOT EXISTS "channel_message_reactions" (
-    "channel_id" INTEGER NOT NULL REFERENCES channels (id) ON DELETE CASCADE,
-    "message_id" INTEGER NOT NULL REFERENCES channel_messages (id) ON DELETE CASCADE,
-    "user_id" INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    "emoji_name" TEXT NOT NULL,
-    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY ("message_id", "user_id", "emoji_name")
-);
-
-CREATE INDEX "index_channel_message_reactions_on_channel_id_and_message_id" ON "channel_message_reactions" ("channel_id", "message_id");
-
-CREATE INDEX "index_channel_message_reactions_on_user_id" ON "channel_message_reactions" ("user_id");
-
 CREATE TABLE "channel_members" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT,
     "channel_id" INTEGER NOT NULL REFERENCES channels (id) ON DELETE CASCADE,
@@ -551,11 +379,6 @@ CREATE TABLE "notifications" (
 
 CREATE INDEX "index_notifications_on_recipient_id_is_read_kind_entity_id" ON "notifications" ("recipient_id", "is_read", "kind", "entity_id");
 
-CREATE TABLE "user_notification_preferences" (
-    "user_id" INTEGER PRIMARY KEY REFERENCES "users" ("id") ON DELETE CASCADE,
-    "bypass_dnd_for_urgent" BOOLEAN NOT NULL DEFAULT FALSE
-);
-
 CREATE TABLE contributors (
     user_id INTEGER,
     signed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -609,26 +432,3 @@ CREATE TABLE IF NOT EXISTS "breakpoints" (
 );
 
 CREATE INDEX "index_breakpoints_on_project_id" ON "breakpoints" ("project_id");
-
-CREATE TABLE IF NOT EXISTS "shared_threads" (
-    "id" TEXT PRIMARY KEY NOT NULL,
-    "user_id" INTEGER NOT NULL,
-    "title" VARCHAR(512) NOT NULL,
-    "data" BLOB NOT NULL,
-    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX "index_shared_threads_user_id" ON "shared_threads" ("user_id");
-
-CREATE TABLE IF NOT EXISTS "user_custom_statuses" (
-    "user_id" INTEGER PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
-    "emoji" VARCHAR,
-    "status_text" VARCHAR NOT NULL,
-    "expires_at" TIMESTAMP,
-    "updated_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX "index_user_custom_statuses_on_expires_at"
-    ON "user_custom_statuses" ("expires_at")
-    WHERE "expires_at" IS NOT NULL;

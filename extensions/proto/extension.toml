@@ -3,7 +3,7 @@ name = "Proto"
 description = "Protocol Buffers support."
 version = "0.3.2"
 schema_version = 1
-authors = ["Sim Industries <support@sim.dev>"]
+authors = ["Simtropolis <support@sim.dev>"]
 repository = "https://github.com/simtropolis/sim"
 
 [grammars.proto]
