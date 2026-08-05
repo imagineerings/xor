@@ -1,7 +1,0 @@
-interface:
-  display_name: "Workflow"
-  short_description: "Plan and safely execute local spec tasks"
-  default_prompt: "Use $workflow to inspect and plan the next ready local spec task. Claim work only when I explicitly ask to start it."
-
-policy:
-  allow_implicit_invocation: true
