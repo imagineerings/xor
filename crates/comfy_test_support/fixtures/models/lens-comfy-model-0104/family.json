@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "fixture_id": "lens-comfy-model-0104",
+  "feature_id": "COMFY-MODEL-0104",
+  "seed": 104,
+  "layouts": ["prefixed-native", "standalone-native"],
+  "unsupported_layouts": ["diffusers"],
+  "dtype_device_cases": ["bf16/cpu", "f32/cpu"],
+  "configuration": {
+    "hidden_size": 2,
+    "in_channels": 2,
+    "out_channels": 1,
+    "patch_size": 2,
+    "layer_count": 1,
+    "attention_heads": 2,
+    "attention_head_dimension": 1,
+    "text_feature_dimension": 2,
+    "selected_text_layer_count": 2
+  },
+  "clip_cases": ["gpt_oss-prefixed", "gpt_oss-standalone", "default"],
+  "input": [0.0, 0.0],
+  "checkpoints": [
+    "timestep_projection",
+    "timestep_activation",
+    "joint_stream_normalization",
+    "image_mlp_projection",
+    "image_stream_projection",
+    "image_output"
+  ],
+  "failure_cases": ["partial-keys", "ambiguous-layout", "misleading-metadata", "oom", "cancelled"]
+}

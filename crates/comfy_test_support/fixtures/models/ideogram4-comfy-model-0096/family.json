@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "fixture_id": "ideogram4-comfy-model-0096",
+  "feature_id": "COMFY-MODEL-0096",
+  "seed": 96,
+  "layouts": ["prefixed-native", "standalone-native"],
+  "unsupported_layouts": ["diffusers"],
+  "dtype_device_cases": ["bf16/cpu", "f32/cpu"],
+  "configuration": {
+    "hidden_size": 2,
+    "in_channels": 4,
+    "layer_count": 1,
+    "attention_heads": 2,
+    "attention_head_dimension": 1,
+    "intermediate_size": 2,
+    "adaln_dimension": 2,
+    "llm_feature_dimension": 2,
+    "patch_size": 2
+  },
+  "input": [0.0, 0.0],
+  "checkpoints": [
+    "conditioning_projection",
+    "conditioning_activation",
+    "transformer_normalization",
+    "feed_forward_projection",
+    "image_projection",
+    "image_output"
+  ],
+  "failure_cases": ["partial-keys", "ambiguous-layout", "misleading-metadata", "oom", "cancelled"]
+}

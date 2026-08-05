@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "fixture_id": "krea2-comfy-model-0101",
+  "feature_id": "COMFY-MODEL-0101",
+  "seed": 101,
+  "layouts": ["prefixed-native", "standalone-native"],
+  "unsupported_layouts": ["diffusers"],
+  "dtype_device_cases": ["bf16/cpu", "f16/cpu", "f32/cpu"],
+  "configuration": {
+    "feature_dimension": 128,
+    "channels": 1,
+    "patch_size": 2,
+    "layer_count": 1,
+    "attention_heads": 1,
+    "key_value_heads": 1,
+    "text_layer_count": 12,
+    "text_feature_dimension": 2
+  },
+  "input": [0.0, 0.0],
+  "checkpoints": [
+    "timestep_projection",
+    "timestep_activation",
+    "shared_stream_normalization",
+    "shared_stream_mlp",
+    "image_projection",
+    "image_output"
+  ],
+  "failure_cases": ["partial-keys", "ambiguous-layout", "misleading-metadata", "oom", "cancelled"]
+}
