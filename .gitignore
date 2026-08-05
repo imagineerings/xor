@@ -10,6 +10,7 @@
 !mobile/ios/Sim.xcodeproj
 !mobile/ios/Sim.xcodeproj/**
 .DS_Store
+._*
 .blob_store
 .build
 .claude/settings.local.json

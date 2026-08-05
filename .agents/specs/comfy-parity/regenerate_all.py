@@ -170,7 +170,12 @@ def run_pipeline() -> None:
 def pack_hashes() -> dict[str, str]:
     result = {}
     for path in sorted(ROOT.rglob("*")):
-        if not path.is_file() or "__pycache__" in path.parts or path.name.startswith("audit-"):
+        if (
+            not path.is_file()
+            or "__pycache__" in path.parts
+            or path.name.startswith(("audit-", "._"))
+            or path.name == ".DS_Store"
+        ):
             continue
         result[path.relative_to(ROOT).as_posix()] = digest_bytes(path.read_bytes())
     for path in GENERATED_EXTERNAL_OUTPUTS:
@@ -178,7 +183,11 @@ def pack_hashes() -> dict[str, str]:
             result[f"@workspace/{path.relative_to(WORKSPACE).as_posix()}"] = digest_bytes(path.read_bytes())
         elif path.is_dir():
             for generated_path in sorted(path.rglob("*")):
-                if generated_path.is_file():
+                if (
+                    generated_path.is_file()
+                    and not generated_path.name.startswith("._")
+                    and generated_path.name != ".DS_Store"
+                ):
                     result[
                         f"@workspace/{generated_path.relative_to(WORKSPACE).as_posix()}"
                     ] = digest_bytes(generated_path.read_bytes())

@@ -1103,6 +1103,8 @@ def main() -> None:
         inventory_rows = list(csv.DictReader(handle))
     CONTRACT_FIXTURE_DIRECTORY.mkdir(parents=True, exist_ok=True)
     for stale_path in CONTRACT_FIXTURE_DIRECTORY.glob("*.json"):
+        if stale_path.name.startswith("._"):
+            continue
         stale_path.unlink()
     assignments = operation_owner_assignments(inventory_rows)
     rows = [

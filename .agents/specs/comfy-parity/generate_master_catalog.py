@@ -1693,15 +1693,18 @@ def decorate_trace(feature: dict[str, str], titles: dict[int, str]) -> None:
             criteria.append(criterion)
     criteria.sort(key=lambda criterion: tuple(int(part) for part in criterion.split(".")))
     designs = sorted({design for criterion in criteria for design in CRITERION_DESIGNS[criterion]})
-    tasks = []
+    tasks: list[str] = []
     for requirement in requirements:
-        for task in REQUIREMENT_TASKS[requirement]:
-            if task not in FEATURE_SCOPED_TASK_IDS and task not in tasks:
-                tasks.append(task)
-    for criterion in criteria:
-        for task in CRITERION_TASKS[criterion]:
-            if task not in FEATURE_SCOPED_TASK_IDS and task not in tasks:
-                tasks.append(task)
+        anchor_task = next(
+            (
+                task
+                for task in REQUIREMENT_TASKS[requirement]
+                if task not in FEATURE_SCOPED_TASK_IDS
+            ),
+            None,
+        )
+        if anchor_task is not None and anchor_task not in tasks:
+            tasks.append(anchor_task)
     for task in SPECIAL_FEATURE_TASKS.get(feature["feature_id"], []):
         if task not in tasks:
             tasks.append(task)
@@ -3870,7 +3873,7 @@ def synchronize_source_catalog_targets(features: list[dict[str, str]]) -> None:
         "frontend-features.csv",
     }
     for path in sorted(CATALOGS.glob("*.csv")):
-        if path.name == "features.csv":
+        if path.name == "features.csv" or path.name.startswith("._"):
             continue
         with path.open(newline="", encoding="utf-8") as handle:
             reader = csv.DictReader(handle)
@@ -4358,7 +4361,7 @@ def write_traceability(features: list[dict[str, str]]) -> None:
     lines = [
         "# Traceability",
         "",
-        "The generated table provides forward source-to-validation traceability and the data needed for reverse coverage checks. No cell is blank; uncertainty is stated rather than represented by an empty value.",
+        "The generated table provides forward source-to-validation traceability and the data needed for reverse coverage checks. The task column records direct feature owners plus one stable anchor per mapped requirement; `catalogs/native-spec-mapping.json` records the normalized criterion-to-task closure without repeating hundreds of task IDs in every feature row. No cell is blank; uncertainty is stated rather than represented by an empty value.",
         "",
         "| Source evidence | Feature ID | Requirement criterion | Design component / decision | Task | Validation |",
         "| --- | --- | --- | --- | --- | --- |",
@@ -4374,9 +4377,16 @@ def write_traceability(features: list[dict[str, str]]) -> None:
     tasks_referenced = set()
     validations_referenced = set()
     for feature in features:
-        criteria_referenced.update(part.strip() for part in feature["requirement_criteria"].split(";") if part.strip())
+        feature_criteria = {
+            part.strip()
+            for part in feature["requirement_criteria"].split(";")
+            if part.strip()
+        }
+        criteria_referenced.update(feature_criteria)
         designs_referenced.update(re.findall(r"\bD\d+\b", feature["design_coverage"]))
         tasks_referenced.update(part.strip() for part in feature["task_id"].split(";") if part.strip())
+        for criterion in feature_criteria:
+            tasks_referenced.update(CRITERION_TASKS[criterion])
         validations_referenced.update(part.strip() for part in feature["validation_id"].split(";") if part.strip())
 
     all_criteria = {f"{requirement}.{criterion}" for requirement, count in REQUIREMENT_CRITERIA_COUNTS.items() for criterion in range(1, count + 1)}
