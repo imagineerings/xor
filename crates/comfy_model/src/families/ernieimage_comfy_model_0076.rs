@@ -5,8 +5,8 @@ use crate::{
     ModelDetectionRule, ModelFamilyComponent, ModelFamilyComponentStateSchema,
     ModelFamilyDefinition, ModelFamilyError, ModelFamilyProfile, ModelFamilyRegistration,
     ModelFamilyStatePlanCase, ModelFamilyStatePlanSelector, ModelForwardOperation,
-    ModelForwardStep, ModelLayoutSignature, ModelProbe, ModelSourceConfigurationRule,
-    ModelStateLayout, ModelStateTransformPlanDefinition, ModelWeightRule,
+    ModelForwardStep, ModelLayoutSignature, ModelProbe, ModelStateLayout,
+    ModelStateTransformPlanDefinition, ModelWeightRule,
 };
 use comfy_tensor::DType;
 use comfy_types::DeviceKind;
@@ -83,11 +83,29 @@ const COMPONENTS: &[ModelFamilyComponent] = &[
     },
 ];
 
-const DETECTION_RULES: &[ModelDetectionRule] = &[ModelDetectionRule::Metadata {
-    key: "image_model",
-    value: "ernie",
-    score: 1_000,
-}];
+const DETECTION_RULES: &[ModelDetectionRule] = &[
+    ModelDetectionRule::AnyKeyPresent {
+        keys: &[
+            "model.diffusion_model.layers.0.mlp.linear_fc2.weight",
+            "layers.0.mlp.linear_fc2.weight",
+        ],
+        score: 400,
+    },
+    ModelDetectionRule::AnyKeyPresent {
+        keys: &[
+            "model.diffusion_model.text_proj.weight",
+            "text_proj.weight",
+        ],
+        score: 300,
+    },
+    ModelDetectionRule::AnyKeyPresent {
+        keys: &[
+            "model.diffusion_model.final_linear.weight",
+            "final_linear.weight",
+        ],
+        score: 300,
+    },
+];
 
 const WEIGHT_RULES: &[ModelWeightRule] = &[ModelWeightRule {
     source_prefix: "model.diffusion_model.",
@@ -204,12 +222,6 @@ pub const MODEL_FAMILY: ModelFamilyDefinition = ModelFamilyDefinition {
     forward_program: FORWARD_PROGRAM,
 };
 
-const SOURCE_CONFIGURATION: &[ModelSourceConfigurationRule] =
-    &[ModelSourceConfigurationRule::Metadata {
-        key: "image_model",
-        value: "ernie",
-    }];
-
 const NATIVE_STATE_PLAN: ModelStateTransformPlanDefinition = ModelStateTransformPlanDefinition {
     schema_version: MODEL_STATE_TRANSFORM_PLAN_SCHEMA_VERSION,
     encoded_plan: r#"{
@@ -303,7 +315,7 @@ pub const MODEL_FAMILY_REGISTRATION: ModelFamilyRegistration = ModelFamilyRegist
     definition: &MODEL_FAMILY,
     source_ordinal: 86,
     source_architecture: "model_base.ErnieImage",
-    source_configuration: SOURCE_CONFIGURATION,
+    source_configuration: &[],
     required_state_keys: &[],
     profile_selector: Some(select_profile),
     clip_target_selector: ModelClipTargetSelector::Static(&CLIP_TARGET),

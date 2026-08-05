@@ -110,13 +110,23 @@ fn val_model_family_row_001_genmomochi_source_configuration_profiles_and_ownersh
         Err(ModelFamilyError::InvalidSelectorOutput(message)) if message.contains("12, 2, 2")
     ));
 
-    let mut another_family = parsed_facts("native", DType::F32);
-    another_family.formats[0]
+    let mut misleading_metadata = parsed_facts("native", DType::F32);
+    misleading_metadata.formats[0]
         .metadata
         .insert("image_model".to_owned(), "ltxv".to_owned());
-    let another_family = ModelProbe::from_parsed_facts(another_family)?;
+    let misleading_probe = ModelProbe::from_parsed_facts(misleading_metadata)?;
+    assert_eq!(
+        registry.detect(&misleading_probe)?.identity.feature_id(),
+        mochi::MODEL_FAMILY_FEATURE_ID
+    );
+
+    let mut partial_family = parsed_facts("native", DType::F32);
+    partial_family
+        .tensors
+        .remove("model.diffusion_model.final_layer.linear.weight");
+    let partial_probe = ModelProbe::from_parsed_facts(partial_family)?;
     assert!(matches!(
-        registry.detect(&another_family),
+        registry.detect(&partial_probe),
         Err(ModelFamilyError::NoDetectionMatch)
     ));
 
@@ -477,10 +487,7 @@ fn parsed_facts_with_dimensions(
         tensors,
         formats: vec![ModelParsedFormatFact {
             identity: "safetensors".to_owned(),
-            metadata: BTreeMap::from([(
-                "image_model".to_owned(),
-                "mochi_preview".to_owned(),
-            )]),
+            metadata: BTreeMap::new(),
         }],
     }
 }
@@ -594,10 +601,6 @@ fn probe_through_model_store() -> Result<ModelProbe, Box<dyn std::error::Error>>
 
 fn write_safetensors(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut header = serde_json::Map::new();
-    header.insert(
-        "__metadata__".to_owned(),
-        serde_json::json!({"image_model":"mochi_preview"}),
-    );
     let mut shapes = model_shapes(2, 2, 2, 12);
     shapes.extend([
         ("vae.decoder.weight".to_owned(), vec![1]),

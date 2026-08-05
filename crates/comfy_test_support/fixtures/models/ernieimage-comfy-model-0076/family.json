@@ -46,10 +46,7 @@
         2
       ]
     },
-    "metadata": {
-      "image_model": "ernie",
-      "model_layout": "native"
-    }
+    "metadata": {}
   },
   "base_artifact_digest": "0076007600760076007600760076007600760076007600760076007600760076",
   "source_weights": [

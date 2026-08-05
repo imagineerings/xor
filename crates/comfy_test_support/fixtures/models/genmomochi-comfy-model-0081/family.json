@@ -42,10 +42,7 @@
         2
       ]
     },
-    "metadata": {
-      "image_model": "mochi_preview",
-      "model_layout": "native"
-    }
+    "metadata": {}
   },
   "base_artifact_digest": "0081008100810081008100810081008100810081008100810081008100810081",
   "source_weights": [

@@ -5,8 +5,8 @@ use crate::{
     ModelDetectionRule, ModelFamilyComponent, ModelFamilyComponentStateSchema,
     ModelFamilyDefinition, ModelFamilyError, ModelFamilyProfile, ModelFamilyRegistration,
     ModelFamilyStatePlanCase, ModelFamilyStatePlanSelector, ModelForwardOperation,
-    ModelForwardStep, ModelLayoutSignature, ModelProbe, ModelSourceConfigurationRule,
-    ModelStateLayout, ModelStateTransformPlanDefinition, ModelWeightRule,
+    ModelForwardStep, ModelLayoutSignature, ModelProbe, ModelStateLayout,
+    ModelStateTransformPlanDefinition, ModelWeightRule,
 };
 use comfy_tensor::DType;
 use comfy_types::DeviceKind;
@@ -94,11 +94,29 @@ const COMPONENTS: &[ModelFamilyComponent] = &[
     },
 ];
 
-const DETECTION_RULES: &[ModelDetectionRule] = &[ModelDetectionRule::Metadata {
-    key: "image_model",
-    value: "mochi_preview",
-    score: 1_000,
-}];
+const DETECTION_RULES: &[ModelDetectionRule] = &[
+    ModelDetectionRule::AnyKeyPresent {
+        keys: &[
+            "model.diffusion_model.t5_yproj.weight",
+            "t5_yproj.weight",
+        ],
+        score: 300,
+    },
+    ModelDetectionRule::AnyKeyPresent {
+        keys: &[
+            "model.diffusion_model.blocks.0.attn.proj_x.weight",
+            "blocks.0.attn.proj_x.weight",
+        ],
+        score: 400,
+    },
+    ModelDetectionRule::AnyKeyPresent {
+        keys: &[
+            "model.diffusion_model.final_layer.linear.weight",
+            "final_layer.linear.weight",
+        ],
+        score: 300,
+    },
+];
 
 const WEIGHT_RULES: &[ModelWeightRule] = &[ModelWeightRule {
     source_prefix: "model.diffusion_model.",
@@ -215,12 +233,6 @@ pub const MODEL_FAMILY: ModelFamilyDefinition = ModelFamilyDefinition {
     forward_program: FORWARD_PROGRAM,
 };
 
-const SOURCE_CONFIGURATION: &[ModelSourceConfigurationRule] =
-    &[ModelSourceConfigurationRule::Metadata {
-        key: "image_model",
-        value: "mochi_preview",
-    }];
-
 const NATIVE_STATE_PLAN: ModelStateTransformPlanDefinition = ModelStateTransformPlanDefinition {
     schema_version: MODEL_STATE_TRANSFORM_PLAN_SCHEMA_VERSION,
     encoded_plan: r#"{
@@ -318,7 +330,7 @@ pub const MODEL_FAMILY_REGISTRATION: ModelFamilyRegistration = ModelFamilyRegist
     definition: &MODEL_FAMILY,
     source_ordinal: 31,
     source_architecture: "model_base.GenmoMochi",
-    source_configuration: SOURCE_CONFIGURATION,
+    source_configuration: &[],
     required_state_keys: &[],
     profile_selector: Some(select_profile),
     clip_target_selector: ModelClipTargetSelector::Static(&CLIP_TARGET),
