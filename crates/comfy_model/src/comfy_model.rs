@@ -29,6 +29,7 @@ pub mod omnigen2_boogu_family;
 pub mod parser_limits;
 pub mod patch_graph;
 pub mod patches;
+pub mod pixeldit_pid_family;
 pub mod quantization;
 pub mod quantized_autograd;
 pub mod registry_generator;
@@ -376,6 +377,24 @@ pub use patch_graph::{
     PatchGraphError, PatchGraphIdentity, PatchGraphIdentityError, PatchKind, PatchOperation,
     PatchPayload, PatchSlice, PatchTarget, PatchTensor, PatchValueTransform,
     SemanticPatchOperation, factorize_patch_dimension,
+};
+pub use pixeldit_pid_family::{
+    PID_CONDITIONING_KEYS, PID_FORWARD_PROGRAM, PID_SAMPLING_SHIFT, PID_SR_SCALE,
+    PIXELDIT_CLIP_CANDIDATES, PIXELDIT_CLIP_TARGET, PIXELDIT_CONDITIONING_KEYS,
+    PIXELDIT_CORE_STATE_PLAN, PIXELDIT_FORWARD_PROGRAM, PIXELDIT_GROUP_COUNT, PIXELDIT_HIDDEN_SIZE,
+    PIXELDIT_INPUT_CHANNELS, PIXELDIT_NET_STATE_PLAN, PIXELDIT_PATCH_DEPTH, PIXELDIT_PATCH_SIZE,
+    PIXELDIT_PID_COMPONENT_STATE_SCHEMAS, PIXELDIT_PID_COMPONENTS, PIXELDIT_PID_LATENT_FORMAT,
+    PIXELDIT_PID_MEMORY_USAGE_FACTOR, PIXELDIT_PID_MODEL_OPTIONAL_KEYS,
+    PIXELDIT_PID_MODEL_REQUIRED_KEYS, PIXELDIT_PID_SUPPORTED_DEVICES,
+    PIXELDIT_PID_SUPPORTED_DTYPES, PIXELDIT_PIXEL_ATTENTION_HIDDEN_SIZE, PIXELDIT_PIXEL_DEPTH,
+    PIXELDIT_PIXEL_GROUP_COUNT, PIXELDIT_PIXEL_HIDDEN_SIZE, PIXELDIT_SAMPLING_SHIFT,
+    PIXELDIT_TEXT_FEATURE_DIMENSION, PIXELDIT_TEXT_MAX_LENGTH, PIXELDIT_TEXT_ROPE_THETA,
+    PiDConfiguration, PixelDitPidConditioningKey, PixelDitPidConfiguration, PixelDitPidLayout,
+    PixelDitPidVariant,
+    conditioning_keys_for_variant as pixeldit_pid_conditioning_keys_for_variant,
+    configuration_for_probe as pixeldit_pid_configuration_for_probe,
+    forward_program_for_variant as pixeldit_pid_forward_program_for_variant,
+    state_plan_for_layout as pixeldit_pid_state_plan_for_layout,
 };
 pub use quantization::{
     LayerQuantizationV1, QuantLinearLayout, QuantLinearScale, QuantizationError, QuantizationKind,
