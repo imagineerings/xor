@@ -48,6 +48,7 @@ fn val_model_family_row_001_cosmost2v_source_projection_configuration_and_owners
         cosmos::MODEL_FAMILY_REGISTRATION.source_architecture,
         "model_base.CosmosVideo"
     );
+    assert!(cosmos::MODEL_FAMILY_REGISTRATION.source_configuration.is_empty());
     assert_eq!(cosmos::MODEL_FAMILY_MEMORY_USAGE_FACTOR, 1.6);
     assert_eq!(cosmos::MODEL_FAMILY_SIGMA_DATA, 0.5);
     assert_eq!(cosmos::MODEL_FAMILY_SIGMA_MAX, 80.0);
@@ -112,6 +113,25 @@ fn val_model_family_row_001_cosmost2v_source_projection_configuration_and_owners
         configuration.model_size,
         cosmos::CosmosT2VModelSize::FourteenB
     );
+
+    let mut misleading_facts = parsed_facts(DType::F32, 16, 4_096, false, false, "native");
+    misleading_facts.formats[0].metadata.extend([
+        ("image_model".to_owned(), "cosmos_predict2".to_owned()),
+        ("in_channels".to_owned(), "17".to_owned()),
+        ("model_layout".to_owned(), "diffusers".to_owned()),
+    ]);
+    let misleading = ModelProbe::from_parsed_facts(misleading_facts)?;
+    let registry =
+        ModelFamilyRegistry::checked_registrations(&[cosmos::MODEL_FAMILY_REGISTRATION])?;
+    let misleading_resolved = registry.resolve(&misleading)?;
+    assert_eq!(
+        misleading_resolved.detection().identity.feature_id(),
+        cosmos::MODEL_FAMILY_FEATURE_ID
+    );
+    let misleading_configuration = cosmos::configuration_for_probe(&misleading)?;
+    assert_eq!(misleading_configuration.architecture, CosmosArchitecture::GeneralDit);
+    assert_eq!(misleading_configuration.in_channels, 16);
+    assert!(!misleading_configuration.image_to_video);
 
     let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     assert_eq!(
@@ -184,6 +204,11 @@ fn val_model_family_row_001_cosmost2v_source_projection_configuration_and_owners
     }
     assert!(row_source.contains("cosmos_configuration_for_probe("));
     assert!(!row_source.contains("fn required_shape("));
+    assert!(!row_source.contains("ModelDetectionRule::Metadata"));
+    assert!(!row_source.contains("ModelSourceConfigurationRule"));
+    assert!(row_source.contains("ModelDetectionRule::AnyKeyPresent"));
+    assert!(row_source.contains("ModelDetectionRule::AnyTensorDimensionValue"));
+    assert!(row_source.contains("source_configuration: &[]"));
     super::write_model_family_row_artifact(
         cosmos::MODEL_FAMILY_FIXTURE,
         cosmos::MODEL_FAMILY_FEATURE_ID,
@@ -210,12 +235,31 @@ fn val_model_family_row_001_cosmost2v_model_store_mapping_forward_patch_and_memo
     let probe = probe_through_model_store()?;
     assert_eq!(probe.format_identities(), ["safetensors"]);
     assert_eq!(probe.unet_prefix_selection()?.prefix(), "net.");
+    assert!(!probe.metadata.contains_key("image_model"));
+    assert!(!probe.metadata.contains_key("in_channels"));
+    assert!(!probe.metadata.contains_key("model_layout"));
     let resolved = registry.resolve(&probe)?;
     assert_eq!(
         resolved.detection().identity.feature_id(),
         "COMFY-MODEL-0074"
     );
     assert_eq!(resolved.source_ordinal(), 41);
+    assert_eq!(resolved.detection().score, 1_000);
+    assert_eq!(resolved.detection().evidence.len(), 2);
+    assert!(
+        resolved
+            .detection()
+            .evidence
+            .iter()
+            .any(|evidence| evidence.contains("AnyKeyPresent"))
+    );
+    assert!(
+        resolved
+            .detection()
+            .evidence
+            .iter()
+            .any(|evidence| evidence.contains("AnyTensorDimensionValue"))
+    );
     assert_eq!(resolved.profile().latent_identifier, "Cosmos1CV8x8x8");
 
     let candidates = resolved.clip_target().candidates();
@@ -434,7 +478,7 @@ fn val_model_family_row_001_cosmost2v_dtype_and_typed_failures()
     let mismatch = ModelProbe::from_parsed_facts(mismatched_facts)?;
     assert!(matches!(
         registry.resolve(&mismatch),
-        Err(ModelFamilyError::InvalidSelectorOutput(message)) if message.contains("requires 16")
+        Err(ModelFamilyError::NoDetectionMatch)
     ));
 
     let malformed =
@@ -523,7 +567,7 @@ fn parsed_facts(
     model_channels: u64,
     omit_final: bool,
     predict2: bool,
-    _layout: &str,
+    layout: &str,
 ) -> ModelParsedFacts {
     let mut tensors = BTreeMap::new();
     for (key, shape) in model_shapes(in_channels, model_channels, omit_final, predict2) {
@@ -547,14 +591,15 @@ fn parsed_facts(
             },
         );
     }
+    let mut metadata = BTreeMap::new();
+    if layout != "native" {
+        metadata.insert("model_layout".to_owned(), layout.to_owned());
+    }
     ModelParsedFacts {
         tensors,
         formats: vec![ModelParsedFormatFact {
             identity: "safetensors".to_owned(),
-            metadata: BTreeMap::from([
-                ("image_model".to_owned(), "cosmos".to_owned()),
-                ("in_channels".to_owned(), in_channels.to_string()),
-            ]),
+            metadata,
         }],
     }
 }
@@ -643,13 +688,6 @@ fn probe_through_model_store() -> Result<ModelProbe, Box<dyn std::error::Error>>
 
 fn write_safetensors(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut header = serde_json::Map::new();
-    header.insert(
-        "__metadata__".to_owned(),
-        serde_json::json!({
-            "image_model": "cosmos",
-            "in_channels": "16"
-        }),
-    );
     let mut shapes = model_shapes(16, 4_096, false, false)
         .into_iter()
         .map(|(key, shape)| (format!("net.{key}"), shape))

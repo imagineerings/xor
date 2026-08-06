@@ -20,11 +20,7 @@
         2
       ]
     },
-    "metadata": {
-      "image_model": "cosmos_predict2",
-      "in_channels": "16",
-      "model_layout": "native"
-    }
+    "metadata": {}
   },
   "base_artifact_digest": "0073007300730073007300730073007300730073007300730073007300730073",
   "source_weights": [

@@ -10,11 +10,7 @@
       "net.final_layer.linear.weight": [2, 2],
       "net.t_embedding_norm.weight": [2]
     },
-    "metadata": {
-      "image_model": "cosmos_predict2",
-      "in_channels": "17",
-      "model_layout": "native"
-    }
+    "metadata": {}
   },
   "base_artifact_digest": "0720720720720720720720720720720720720720720720720720720720720720",
   "source_weights": [

@@ -1,11 +1,12 @@
 use crate::{
-    COSMOS_CLIP_TARGET, COSMOS_LAYOUT_SIGNATURES, COSMOS_PREDICT2_STATE_PLAN_CASES,
+    COSMOS_CLIP_TARGET, COSMOS_LAYOUT_SIGNATURES, COSMOS_PATCH_PROJECTION_KEYS,
+    COSMOS_PREDICT2_DETECTION_MARKER_KEYS, COSMOS_PREDICT2_STATE_PLAN_CASES,
     COSMOS_SUPPORTED_DEVICES, COSMOS_SUPPORTED_DTYPES, COSMOS_WEIGHT_RULES, CosmosArchitecture,
     CosmosConfiguration, CosmosModelSize, MemoryEstimatorDescriptor, ModelClipTargetSelector,
     ModelDetectionRule, ModelFamilyComponent, ModelFamilyComponentStateSchema,
     ModelFamilyDefinition, ModelFamilyError, ModelFamilyProfile, ModelFamilyRegistration,
     ModelFamilyStatePlanSelector, ModelForwardOperation, ModelForwardStep, ModelProbe,
-    ModelSourceConfigurationRule, cosmos_configuration_for_probe,
+    cosmos_configuration_for_probe,
 };
 
 pub const MODEL_FAMILY_IDENTIFIER: &str = "CosmosI2VPredict2";
@@ -45,14 +46,14 @@ const COMPONENTS: &[ModelFamilyComponent] = &[
 ];
 
 const DETECTION_RULES: &[ModelDetectionRule] = &[
-    ModelDetectionRule::Metadata {
-        key: "image_model",
-        value: "cosmos_predict2",
+    ModelDetectionRule::AnyKeyPresent {
+        keys: COSMOS_PREDICT2_DETECTION_MARKER_KEYS,
         score: 700,
     },
-    ModelDetectionRule::Metadata {
-        key: "in_channels",
-        value: "17",
+    ModelDetectionRule::AnyTensorDimensionValue {
+        keys: COSMOS_PATCH_PROJECTION_KEYS,
+        dimension: 1,
+        values: &[72],
         score: 300,
     },
 ];
@@ -146,17 +147,6 @@ pub const MODEL_FAMILY: ModelFamilyDefinition = ModelFamilyDefinition {
     forward_program: FORWARD_PROGRAM,
 };
 
-const SOURCE_CONFIGURATION: &[ModelSourceConfigurationRule] = &[
-    ModelSourceConfigurationRule::Metadata {
-        key: "image_model",
-        value: "cosmos_predict2",
-    },
-    ModelSourceConfigurationRule::Metadata {
-        key: "in_channels",
-        value: "17",
-    },
-];
-
 const COMPONENT_STATE_SCHEMAS: &[ModelFamilyComponentStateSchema] = &[
     ModelFamilyComponentStateSchema {
         component: "model",
@@ -182,7 +172,7 @@ pub const MODEL_FAMILY_REGISTRATION: ModelFamilyRegistration = ModelFamilyRegist
     definition: &MODEL_FAMILY,
     source_ordinal: 44,
     source_architecture: "model_base.CosmosPredict2(image_to_video=True)",
-    source_configuration: SOURCE_CONFIGURATION,
+    source_configuration: &[],
     required_state_keys: &[],
     profile_selector: Some(select_profile),
     clip_target_selector: ModelClipTargetSelector::Static(&COSMOS_CLIP_TARGET),
