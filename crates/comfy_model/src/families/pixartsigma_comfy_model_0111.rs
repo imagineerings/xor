@@ -1,9 +1,8 @@
 use crate::{
     ModelClipTargetSelector, ModelDetectionRule, ModelFamilyDefinition, ModelFamilyError,
-    ModelFamilyProfile, ModelFamilyRegistration, ModelFamilyStatePlanCase,
-    ModelFamilyStatePlanSelector, ModelLayoutSignature, ModelProbe, ModelSourceConfigurationRule,
-    ModelStateLayout, ModelStateTransformPlan, ModelWeightRule, pixart_configuration_for_probe,
-    pixart_diffusers_state_plan,
+    ModelFamilyProfile, ModelFamilyRegistration, ModelFamilyStatePlanSelector, ModelProbe,
+    ModelSourceConfigurationRule, ModelStateTransformPlan, ModelWeightRule,
+    pixart_configuration_for_probe, pixart_diffusers_state_plan,
     pixart_family::{
         PIXART_CLIP_TARGET, PIXART_COMPONENTS, PIXART_COMPONENT_STATE_SCHEMAS,
         PIXART_FORWARD_PROGRAM, PIXART_MEMORY_ESTIMATOR, PIXART_MODEL_OPTIONAL_KEYS,
@@ -58,37 +57,6 @@ pub const MODEL_FAMILY: ModelFamilyDefinition = ModelFamilyDefinition {
 };
 
 const SOURCE_CONFIGURATION: &[ModelSourceConfigurationRule] = &[];
-const STATE_PLAN_CASES: &[ModelFamilyStatePlanCase] = &[
-    ModelFamilyStatePlanCase {
-        layout: ModelStateLayout::PrefixedNative,
-        plan: &PIXART_PREFIXED_NATIVE_STATE_PLAN,
-    },
-    ModelFamilyStatePlanCase {
-        layout: ModelStateLayout::StandaloneNative,
-        plan: &PIXART_STANDALONE_NATIVE_STATE_PLAN,
-    },
-];
-const LAYOUT_SIGNATURES: &[ModelLayoutSignature] = &[
-    ModelLayoutSignature {
-        layout: ModelStateLayout::PrefixedNative,
-        required_keys: &[
-            "model.diffusion_model.x_embedder.proj.weight",
-            "model.diffusion_model.blocks.0.attn.qkv.weight",
-            "model.diffusion_model.final_layer.linear.weight",
-        ],
-        required_prefixes: &[],
-    },
-    ModelLayoutSignature {
-        layout: ModelStateLayout::StandaloneNative,
-        required_keys: &[
-            "x_embedder.proj.weight",
-            "blocks.0.attn.qkv.weight",
-            "final_layer.linear.weight",
-        ],
-        required_prefixes: &[],
-    },
-];
-
 pub const MODEL_FAMILY_REGISTRATION: ModelFamilyRegistration = ModelFamilyRegistration {
     definition: &MODEL_FAMILY,
     source_ordinal: 24,
@@ -97,10 +65,7 @@ pub const MODEL_FAMILY_REGISTRATION: ModelFamilyRegistration = ModelFamilyRegist
     required_state_keys: &[],
     profile_selector: Some(select_profile),
     clip_target_selector: ModelClipTargetSelector::Static(&PIXART_CLIP_TARGET),
-    state_plan_selector: ModelFamilyStatePlanSelector::Layout {
-        signatures: LAYOUT_SIGNATURES,
-        cases: STATE_PLAN_CASES,
-    },
+    state_plan_selector: ModelFamilyStatePlanSelector::Probe(state_plan_for_probe),
     component_state_schemas: PIXART_COMPONENT_STATE_SCHEMAS,
 };
 
@@ -125,14 +90,15 @@ pub fn configuration_for_probe(probe: &ModelProbe) -> Result<PixArtConfiguration
     Ok(configuration)
 }
 
-pub fn diffusers_state_plan_for_probe(
+fn state_plan_for_probe(
     probe: &ModelProbe,
 ) -> Result<ModelStateTransformPlan, ModelFamilyError> {
     let configuration = configuration_for_probe(probe)?;
-    if configuration.layout != PixArtLayout::Diffusers {
-        return Err(ModelFamilyError::InvalidSelectorOutput(
-            "PixArtSigma Diffusers conversion requires an exact Diffusers probe".to_owned(),
-        ));
+    match configuration.layout {
+        PixArtLayout::PrefixedNative => PIXART_PREFIXED_NATIVE_STATE_PLAN.compile(),
+        PixArtLayout::StandaloneNative => PIXART_STANDALONE_NATIVE_STATE_PLAN.compile(),
+        PixArtLayout::Diffusers => {
+            pixart_diffusers_state_plan(configuration.depth, configuration.variant)
+        }
     }
-    pixart_diffusers_state_plan(configuration.depth, configuration.variant)
 }

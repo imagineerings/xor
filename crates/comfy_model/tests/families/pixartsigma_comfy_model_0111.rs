@@ -1,6 +1,6 @@
 use comfy_model::{
-    ModelFamilyError, ModelProbe, PixArtLayout, PixArtVariant,
-    generated_pixartsigma_comfy_model_0111 as pixart, pixart_native_state_plan_for_layout,
+    ModelFamilyError, ModelFamilyRegistry, ModelProbe, PixArtLayout, PixArtVariant,
+    generated_pixartsigma_comfy_model_0111 as pixart,
 };
 use std::collections::BTreeMap;
 
@@ -36,17 +36,24 @@ fn source_projection_descriptor_fixture_and_fail_closed_runtime()
 #[test]
 fn native_and_pinned_diffusers_layouts_execute_and_alpha_or_partial_probes_fail()
 -> Result<(), Box<dyn std::error::Error>> {
+    let registry = ModelFamilyRegistry::checked_registrations(&[
+        pixart::MODEL_FAMILY_REGISTRATION,
+    ])?;
     for layout in [
         PixArtLayout::PrefixedNative,
         PixArtLayout::StandaloneNative,
     ] {
-        let configuration = pixart::configuration_for_probe(&probe(layout, false))?;
+        let native_probe = probe(layout, false);
+        let configuration = pixart::configuration_for_probe(&native_probe)?;
         assert_eq!(configuration.variant, PixArtVariant::Sigma);
         assert_eq!(configuration.layout, layout);
         assert!(!configuration.micro_conditioning);
         assert_eq!(configuration.latent_format.identifier, "SDXL");
-        support::exercise_plan(
-            pixart_native_state_plan_for_layout(layout)?,
+        support::exercise_compiled_plan(
+            registry
+                .resolve(&native_probe)?
+                .state_plan()
+                .ok_or("registry omitted the native state plan")?,
             &native_mapping_keys(layout),
             &[
                 "native.x_embedder.proj.weight",
@@ -58,9 +65,12 @@ fn native_and_pinned_diffusers_layouts_execute_and_alpha_or_partial_probes_fail(
     let diffusers_probe = probe(PixArtLayout::Diffusers, false);
     let configuration = pixart::configuration_for_probe(&diffusers_probe)?;
     assert_eq!(configuration.layout, PixArtLayout::Diffusers);
-    let plan = pixart::diffusers_state_plan_for_probe(&diffusers_probe)?;
+    let resolved = registry.resolve(&diffusers_probe)?;
+    let plan = resolved
+        .state_plan()
+        .ok_or("registry omitted the probe-derived Diffusers state plan")?;
     support::exercise_compiled_plan(
-        &plan,
+        plan,
         &diffusers_mapping_keys(),
         &[
             "native.x_embedder.proj.weight",

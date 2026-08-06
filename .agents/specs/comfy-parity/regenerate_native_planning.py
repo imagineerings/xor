@@ -10142,7 +10142,6 @@ def task_validation_commands(item: dict[str, object]) -> str:
             )
         generated_family_module = {
             "pixartalpha_comfy_model_0110": "pixart_alpha_comfy_model_0110",
-            "pixartsigma_comfy_model_0111": "pixart_sigma_comfy_model_0111",
         }.get(family_sources[0], family_sources[0])
         commands = [
             "cargo fmt --all -- --check",
