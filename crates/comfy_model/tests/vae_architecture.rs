@@ -2090,10 +2090,23 @@ fn corrected_nested_target_compatibility_is_exact() -> Result<(), Box<dyn Error>
         VaeCanonicalCompatibility::Exact(&["HunyuanImage21Refiner"])
     );
     let (family_registry, latent_registry) = VaeArchitectureRegistry::canonical_targets()?;
-    assert!(matches!(
-        registry.intended_target(&refiner, &family_registry, &latent_registry, &cancellation,),
-        Err(VaeArchitectureError::CanonicalFamilyUnavailable { .. })
-    ));
+    let refiner_target =
+        registry.intended_target(&refiner, &family_registry, &latent_registry, &cancellation)?;
+    assert_eq!(
+        refiner_target.family().identifier(),
+        "HunyuanImage21Refiner"
+    );
+    assert_eq!(
+        refiner_target.latent_format().identifier(),
+        "HunyuanImage21Refiner"
+    );
+    registry.validate_target(
+        &refiner,
+        &refiner_target,
+        &family_registry,
+        &latent_registry,
+        &cancellation,
+    )?;
 
     let music = registry.select(
         &probe(
