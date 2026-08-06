@@ -25,6 +25,7 @@ pub mod lumina_zimage_family;
 pub mod model_family;
 pub mod model_store;
 pub mod native_ops;
+pub mod omnigen2_boogu_family;
 pub mod parser_limits;
 pub mod patch_graph;
 pub mod patches;
@@ -344,6 +345,28 @@ pub use native_ops::{
     sigmoid_module_exact_native, silu_module_exact_native, smooth_l1_loss_module_exact_native,
     softmax_module_exact_native, spectral_norm_exact_native, tanh_module_exact_native,
     upsample_module_exact_native, weight_norm_exact_native, zero_pad_2d_module_exact_native,
+};
+pub use omnigen2_boogu_family::{
+    BOOGU_AXES_DIMENSIONS, BOOGU_AXES_LENGTHS, BOOGU_CLIP_CANDIDATES, BOOGU_CLIP_CONFIGURATION,
+    BOOGU_CLIP_TARGET, BOOGU_COMPONENT_STATE_SCHEMAS, BOOGU_DETECTION_MARKER_KEYS,
+    BOOGU_DETECTION_RULES, BOOGU_FORWARD_PROGRAM, BOOGU_HEAD_COUNT, BOOGU_INPUT_CHANNELS,
+    BOOGU_KV_HEAD_COUNT, BOOGU_MEMORY_ESTIMATOR, BOOGU_MEMORY_USAGE_FACTOR,
+    BOOGU_MODEL_OPTIONAL_KEYS, BOOGU_MODEL_REQUIRED_KEYS, BOOGU_MULTIPLE_OF, BOOGU_PATCH_SIZE,
+    BOOGU_SAMPLING_SHIFT, BOOGU_SUPPORTED_DTYPES, BOOGU_TIMESTEP_SCALE, OMNIGEN2_AXES_DIMENSIONS,
+    OMNIGEN2_AXES_LENGTHS, OMNIGEN2_BASE_SUPPORTED_DTYPES, OMNIGEN2_BOOGU_COMPONENTS,
+    OMNIGEN2_BOOGU_CONDITIONING, OMNIGEN2_BOOGU_LATENT_FORMAT, OMNIGEN2_BOOGU_PREFIXED_STATE_PLAN,
+    OMNIGEN2_BOOGU_STANDALONE_STATE_PLAN, OMNIGEN2_BOOGU_SUPPORTED_DEVICES,
+    OMNIGEN2_CLIP_CANDIDATES, OMNIGEN2_CLIP_CONFIGURATION, OMNIGEN2_CLIP_TARGET,
+    OMNIGEN2_DETECTION_MARKER_KEYS, OMNIGEN2_EXTENDED_SUPPORTED_DTYPES, OMNIGEN2_FORWARD_PROGRAM,
+    OMNIGEN2_HEAD_COUNT, OMNIGEN2_HIDDEN_SIZE, OMNIGEN2_INPUT_CHANNELS, OMNIGEN2_KV_HEAD_COUNT,
+    OMNIGEN2_LAYER_COUNT, OMNIGEN2_MEMORY_ESTIMATOR, OMNIGEN2_MEMORY_USAGE_FACTOR,
+    OMNIGEN2_MODEL_OPTIONAL_KEYS, OMNIGEN2_MODEL_REQUIRED_KEYS, OMNIGEN2_MULTIPLE_OF,
+    OMNIGEN2_PATCH_SIZE, OMNIGEN2_REFINER_LAYER_COUNT, OMNIGEN2_SAMPLING_SHIFT,
+    OMNIGEN2_TEXT_FEATURE_DIMENSION, OMNIGEN2_TIMESTEP_SCALE, Omnigen2BooguConditioningFact,
+    Omnigen2BooguConfiguration, Omnigen2BooguLayout, Omnigen2BooguVariant,
+    configuration_for_probe as omnigen2_boogu_configuration_for_probe,
+    state_plan_for_layout as omnigen2_boogu_state_plan_for_layout,
+    supported_dtypes_for_capabilities as omnigen2_boogu_supported_dtypes_for_capabilities,
 };
 pub use parser_limits::{
     PARSER_DECODED_ALLOCATION_MULTIPLIER, PARSER_LIMITS_VERSION, ParserLimitError, ParserLimits,

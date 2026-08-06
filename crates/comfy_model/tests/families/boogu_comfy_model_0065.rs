@@ -101,10 +101,11 @@ fn val_model_family_row_001_boogu_source_projection_descriptor_and_ownership()
     )?;
     for canonical_adapter in [
         "ModelFamilyRegistration",
-        "ModelStateTransformPlanDefinition",
-        "ModelFamilyComponentStateSchema",
-        "ModelForwardOperation",
-        "MemoryEstimatorDescriptor",
+        "omnigen2_boogu_family",
+        "OMNIGEN2_BOOGU_STANDALONE_STATE_PLAN",
+        "BOOGU_COMPONENT_STATE_SCHEMAS",
+        "BOOGU_FORWARD_PROGRAM",
+        "BOOGU_MEMORY_ESTIMATOR",
     ] {
         assert!(row_source.contains(canonical_adapter));
     }
@@ -121,6 +122,8 @@ fn val_model_family_row_001_boogu_source_projection_descriptor_and_ownership()
     ] {
         assert!(!row_source.contains(competing_owner));
     }
+    assert!(!row_source.contains("Diffusers"));
+    assert!(row_source.contains("ModelStateLayout::StandaloneNative"));
     super::write_model_family_row_artifact(
         boogu::MODEL_FAMILY_FIXTURE,
         boogu::MODEL_FAMILY_FEATURE_ID,
@@ -129,7 +132,7 @@ fn val_model_family_row_001_boogu_source_projection_descriptor_and_ownership()
         "boogu_comfy_model_0065",
         &[
             "source-provenance-registration-descriptor",
-            "model-store-native-and-diffusers-detection",
+            "model-store-prefixed-and-standalone-native-detection",
             "transactional-component-mapping",
             "named-forward-checkpoints-and-patching",
             "memory-oom-dtype-device-cancellation",
@@ -157,7 +160,7 @@ fn val_model_family_row_001_boogu_model_store_mapping_forward_patch_and_memory()
             .detection()
             .evidence
             .iter()
-            .any(|evidence| evidence.contains("image_model") && evidence.contains("boogu"))
+            .any(|evidence| evidence.contains("double_stream_layers.0"))
     );
     let candidates = resolved.clip_target().candidates();
     assert_eq!(candidates.len(), 1);
@@ -265,7 +268,7 @@ fn val_model_family_row_001_boogu_model_store_mapping_forward_patch_and_memory()
 }
 
 #[test]
-fn val_model_family_row_001_boogu_diffusers_dtype_and_typed_failures()
+fn val_model_family_row_001_boogu_standalone_native_dtype_and_typed_failures()
 -> Result<(), Box<dyn std::error::Error>> {
     let registry = ModelFamilyRegistry::checked_registrations(&[
         boogu::MODEL_FAMILY_REGISTRATION,
@@ -278,10 +281,10 @@ fn val_model_family_row_001_boogu_diffusers_dtype_and_typed_failures()
         &cancellation,
     );
 
-    let probe = ModelProbe::from_parsed_facts(parsed_facts("diffusers", DType::Bf16, false))?;
+    let probe = ModelProbe::from_parsed_facts(parsed_facts("standalone", DType::Bf16, false))?;
     assert_eq!(probe.unet_prefix_selection()?.prefix(), "model.");
     let resolved = registry.resolve(&probe)?;
-    let source = source_tensors(&backend, &context, "diffusers", DType::Bf16, false)?;
+    let source = source_tensors(&backend, &context, "standalone", DType::Bf16, false)?;
     let weights = resolved.map_primary_weights(
         &ModelStateTransaction::new(&backend, &context),
         ARTIFACT_DIGEST,
@@ -343,8 +346,11 @@ fn val_model_family_row_001_boogu_diffusers_dtype_and_typed_failures()
     ));
 
     let no_match = ModelProbe {
-        tensor_shapes: BTreeMap::new(),
-        metadata: BTreeMap::from([("image_model".to_owned(), "omnigen2".to_owned())]),
+        tensor_shapes: BTreeMap::from([(
+            "transformer_blocks.0.attn.to_q.weight".to_owned(),
+            vec![2, 2],
+        )]),
+        metadata: BTreeMap::from([("image_model".to_owned(), "boogu".to_owned())]),
     };
     assert!(matches!(registry.detect(&no_match), Err(ModelFamilyError::NoDetectionMatch)));
     let ambiguous = ModelFamilyRegistry::checked_registrations(&AMBIGUOUS_REGISTRATIONS)?;
@@ -403,7 +409,7 @@ fn parsed_facts(layout: &str, dtype: DType, omit_x_weight: bool) -> ModelParsedF
         tensors,
         formats: vec![ModelParsedFormatFact {
             identity: "safetensors".to_owned(),
-            metadata: BTreeMap::from([("image_model".to_owned(), "boogu".to_owned())]),
+            metadata: BTreeMap::new(),
         }],
     }
 }
@@ -503,7 +509,7 @@ fn write_safetensors(path: &Path, layout: &str) -> Result<(), Box<dyn std::error
     let mut header = serde_json::Map::new();
     header.insert(
         "__metadata__".to_owned(),
-        serde_json::json!({"image_model": "boogu"}),
+        serde_json::json!({}),
     );
     let mut shapes = model_shapes(false);
     shapes.extend([
