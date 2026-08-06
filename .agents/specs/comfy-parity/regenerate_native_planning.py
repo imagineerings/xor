@@ -9188,6 +9188,31 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
                     ]
                 )
             )
+        if item["id"] == "comfy-parity-model-detection-any-of-key-selector-consolidation":
+            item["title"] = "Add canonical bounded model-key and tensor-dimension detection"
+            item["outcome"] = (
+                "Before dependent model-family rows close, extend the existing "
+                "comfy_model::model_family detection rule and registry with bounded "
+                "disjunctive any-of-key and any-tensor-dimension selectors. model_family "
+                "remains the sole detection-rule validation, scoring, evidence, "
+                "precedence, and ambiguity owner, while ModelStore remains the sole "
+                "parsed key/shape projection owner. This focused extension adds no "
+                "family registry, parser, metadata authority, state planner, cache, "
+                "persistence layer, or transaction."
+            )
+            item["done"] = (
+                "Checked any-of-key and any-tensor-dimension rules require non-empty, "
+                "unique, bounded alternatives and positive scores. Key alternatives "
+                "match at most once; dimension alternatives validate their bounded "
+                "rank index and nonzero values, inspect only parsed tensor shapes, and "
+                "reject absent, malformed, overflow, tied, or ambiguous cases typed. "
+                "ACE-Step key alternatives and CogVideoX native/Diffusers patch-channel "
+                "alternatives select from real ModelStore-derived facts without "
+                "fabricated metadata. Focused foundation, detection, row, format, "
+                "ownership, formatting, and clippy validations pass, and repository "
+                "scans find no second key/shape parser, detector, metadata authority, "
+                "state-plan selector, or transaction owner."
+            )
         if item["id"] == "comfy-parity-cogvideox-family-adapter-consolidation":
             item["dependencies"] = list(
                 dict.fromkeys(

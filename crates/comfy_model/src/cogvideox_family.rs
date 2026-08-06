@@ -1,5 +1,14 @@
 use crate::{ModelFamilyError, ModelLayoutSignature, ModelProbe, ModelStateLayout};
 
+pub const COGVIDEOX_DETECTION_MARKER_KEYS: &[&str] = &[
+    "model.diffusion_model.blocks.0.norm1.linear.weight",
+    "blocks.0.norm1.linear.weight",
+];
+pub const COGVIDEOX_PATCH_PROJECTION_KEYS: &[&str] = &[
+    "model.diffusion_model.patch_embed.proj.weight",
+    "patch_embed.proj.weight",
+];
+
 pub const COGVIDEOX_LAYOUT_SIGNATURES: &[ModelLayoutSignature] = &[
     ModelLayoutSignature {
         layout: ModelStateLayout::PrefixedNative,

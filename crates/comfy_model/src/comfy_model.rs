@@ -100,7 +100,8 @@ pub use clip_vision::{
     siglip2_preprocess_with_context,
 };
 pub use cogvideox_family::{
-    COGVIDEOX_LAYOUT_SIGNATURES, CogVideoXConfiguration, CogVideoXLatentVariant, CogVideoXLayout,
+    COGVIDEOX_DETECTION_MARKER_KEYS, COGVIDEOX_LAYOUT_SIGNATURES, COGVIDEOX_PATCH_PROJECTION_KEYS,
+    CogVideoXConfiguration, CogVideoXLatentVariant, CogVideoXLayout,
     configuration_for_probe as cogvideox_configuration_for_probe,
 };
 pub use cosmos_family::{

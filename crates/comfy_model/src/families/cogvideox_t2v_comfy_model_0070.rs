@@ -1,13 +1,13 @@
 use crate::{
-    COGVIDEOX_LAYOUT_SIGNATURES, CogVideoXConfiguration, CogVideoXLatentVariant, CogVideoXLayout,
-    MODEL_STATE_TRANSFORM_PLAN_SCHEMA_VERSION, MemoryEstimatorDescriptor,
+    COGVIDEOX_DETECTION_MARKER_KEYS, COGVIDEOX_LAYOUT_SIGNATURES,
+    COGVIDEOX_PATCH_PROJECTION_KEYS, CogVideoXConfiguration, CogVideoXLatentVariant,
+    CogVideoXLayout, MODEL_STATE_TRANSFORM_PLAN_SCHEMA_VERSION, MemoryEstimatorDescriptor,
     ModelClipModelInvocationDefinition, ModelClipTargetCandidateDefinition,
     ModelClipTargetDefinition, ModelClipTargetSelector, ModelDetectionRule, ModelFamilyComponent,
     ModelFamilyComponentStateSchema, ModelFamilyDefinition, ModelFamilyError, ModelFamilyProfile,
     ModelFamilyRegistration, ModelFamilyStatePlanCase, ModelFamilyStatePlanSelector,
-    ModelForwardOperation, ModelForwardStep, ModelProbe, ModelSourceConfigurationRule,
-    ModelStateLayout, ModelStateTransformPlanDefinition, ModelWeightRule,
-    cogvideox_configuration_for_probe,
+    ModelForwardOperation, ModelForwardStep, ModelProbe, ModelStateLayout,
+    ModelStateTransformPlanDefinition, ModelWeightRule, cogvideox_configuration_for_probe,
 };
 use comfy_tensor::DType;
 use comfy_types::DeviceKind;
@@ -58,14 +58,14 @@ const COMPONENTS: &[ModelFamilyComponent] = &[
 ];
 
 const DETECTION_RULES: &[ModelDetectionRule] = &[
-    ModelDetectionRule::Metadata {
-        key: "image_model",
-        value: "cogvideox",
+    ModelDetectionRule::AnyKeyPresent {
+        keys: COGVIDEOX_DETECTION_MARKER_KEYS,
         score: 700,
     },
-    ModelDetectionRule::Metadata {
-        key: "in_channels",
-        value: "16",
+    ModelDetectionRule::AnyTensorDimensionValue {
+        keys: COGVIDEOX_PATCH_PROJECTION_KEYS,
+        dimension: 1,
+        values: &[16, 128],
         score: 300,
     },
 ];
@@ -170,17 +170,6 @@ pub const MODEL_FAMILY: ModelFamilyDefinition = ModelFamilyDefinition {
     forward_program: FORWARD_PROGRAM,
 };
 
-const SOURCE_CONFIGURATION: &[ModelSourceConfigurationRule] = &[
-    ModelSourceConfigurationRule::Metadata {
-        key: "image_model",
-        value: "cogvideox",
-    },
-    ModelSourceConfigurationRule::Metadata {
-        key: "in_channels",
-        value: "16",
-    },
-];
-
 const NATIVE_STATE_PLAN: ModelStateTransformPlanDefinition = ModelStateTransformPlanDefinition {
     schema_version: MODEL_STATE_TRANSFORM_PLAN_SCHEMA_VERSION,
     encoded_plan: r#"{
@@ -246,7 +235,7 @@ pub const MODEL_FAMILY_REGISTRATION: ModelFamilyRegistration = ModelFamilyRegist
     definition: &MODEL_FAMILY,
     source_ordinal: 91,
     source_architecture: "model_base.CogVideoX(image_to_video=False)",
-    source_configuration: SOURCE_CONFIGURATION,
+    source_configuration: &[],
     required_state_keys: &[],
     profile_selector: Some(select_profile),
     clip_target_selector: ModelClipTargetSelector::Profile,

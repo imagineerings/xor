@@ -65,6 +65,7 @@ const MAX_TENSOR_RANK: usize = 32;
 const MAX_CLIP_TARGET_CANDIDATES: usize = 16;
 const MAX_CLIP_CONFIGURATION_FACTS: usize = 64;
 const MAX_MODEL_DETECTION_KEY_ALTERNATIVES: usize = 16;
+const MAX_MODEL_DETECTION_DIMENSION_VALUES: usize = 16;
 const MAX_MODEL_LAYOUT_SIGNATURES: usize = 3;
 const MAX_MODEL_LAYOUT_SIGNATURE_FACTS: usize = 16;
 const MAX_MODEL_PROBE_TENSORS: usize = 1_000_000;
@@ -599,6 +600,12 @@ pub enum ModelDetectionRule {
         keys: &'static [&'static str],
         score: u32,
     },
+    AnyTensorDimensionValue {
+        keys: &'static [&'static str],
+        dimension: usize,
+        values: &'static [u64],
+        score: u32,
+    },
     KeyPrefix {
         prefix: &'static str,
         minimum_matches: usize,
@@ -617,6 +624,7 @@ impl ModelDetectionRule {
             Self::ExactShape { score, .. }
             | Self::KeyPresent { score, .. }
             | Self::AnyKeyPresent { score, .. }
+            | Self::AnyTensorDimensionValue { score, .. }
             | Self::KeyPrefix { score, .. }
             | Self::Metadata { score, .. } => score,
         }
@@ -5141,6 +5149,18 @@ fn detection_score(
             ModelDetectionRule::AnyKeyPresent { keys, .. } => keys
                 .iter()
                 .any(|key| probe.tensor_shapes.contains_key(*key)),
+            ModelDetectionRule::AnyTensorDimensionValue {
+                keys,
+                dimension,
+                values,
+                ..
+            } => keys.iter().any(|key| {
+                probe
+                    .tensor_shapes
+                    .get(*key)
+                    .and_then(|shape| shape.get(dimension))
+                    .is_some_and(|value| values.contains(value))
+            }),
             ModelDetectionRule::KeyPrefix {
                 prefix,
                 minimum_matches,
@@ -6582,6 +6602,40 @@ fn validate_detection_rules(rules: &[ModelDetectionRule]) -> Result<(), ModelFam
                     )));
                 }
                 validate_keys(keys)?;
+            }
+            ModelDetectionRule::AnyTensorDimensionValue {
+                keys,
+                dimension,
+                values,
+                ..
+            } => {
+                if keys.is_empty() || keys.len() > MAX_MODEL_DETECTION_KEY_ALTERNATIVES {
+                    return Err(ModelFamilyError::InvalidDefinition(format!(
+                        "tensor-dimension detector has {} keys; expected 1..={MAX_MODEL_DETECTION_KEY_ALTERNATIVES}",
+                        keys.len()
+                    )));
+                }
+                validate_keys(keys)?;
+                if *dimension >= MAX_TENSOR_RANK {
+                    return Err(ModelFamilyError::InvalidDefinition(format!(
+                        "tensor-dimension detector dimension {dimension} exceeds maximum rank {MAX_TENSOR_RANK}"
+                    )));
+                }
+                if values.is_empty()
+                    || values.len() > MAX_MODEL_DETECTION_DIMENSION_VALUES
+                    || values.contains(&0)
+                {
+                    return Err(ModelFamilyError::InvalidDefinition(format!(
+                        "tensor-dimension detector has {} values; expected 1..={MAX_MODEL_DETECTION_DIMENSION_VALUES} nonzero values",
+                        values.len()
+                    )));
+                }
+                let unique_values = values.iter().copied().collect::<BTreeSet<_>>();
+                if unique_values.len() != values.len() {
+                    return Err(ModelFamilyError::DuplicateDefinitionValue(
+                        "tensor-dimension detector value".to_owned(),
+                    ));
+                }
             }
             ModelDetectionRule::KeyPrefix {
                 prefix,
