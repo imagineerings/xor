@@ -52,6 +52,7 @@ fn val_model_family_row_001_fluxschnell_source_projection_descriptor_and_ownersh
         schnell::MODEL_FAMILY_REGISTRATION.source_architecture,
         "model_base.Flux(model_type=model_base.ModelType.FLOW)"
     );
+    assert!(schnell::MODEL_FAMILY_REGISTRATION.source_configuration.is_empty());
     assert_eq!(schnell::MODEL_FAMILY_SAMPLING_MULTIPLIER, 1.0);
     assert_eq!(schnell::MODEL_FAMILY_SAMPLING_SHIFT, 1.0);
     assert_eq!(schnell::MODEL_FAMILY_MEMORY_USAGE_FACTOR, 3.1);
@@ -115,6 +116,26 @@ fn val_model_family_row_001_fluxschnell_source_projection_descriptor_and_ownersh
     assert_eq!(configuration.final_head, FluxChromaFinalHead::Linear);
     assert!(!configuration.use_x0_prediction);
     assert!(!configuration.use_sequential_text_ids);
+
+    let mut diffusers_facts = diffusers_facts(DType::F32);
+    diffusers_facts.formats[0].metadata.extend([
+        ("image_model".to_owned(), "flux2".to_owned()),
+        ("guidance_embed".to_owned(), "true".to_owned()),
+        ("in_channels".to_owned(), "96".to_owned()),
+        ("model_layout".to_owned(), "native".to_owned()),
+    ]);
+    let diffusers_probe = ModelProbe::from_parsed_facts(diffusers_facts)?;
+    let registry =
+        ModelFamilyRegistry::checked_registrations(&[schnell::MODEL_FAMILY_REGISTRATION])?;
+    let diffusers_resolved = registry.resolve(&diffusers_probe)?;
+    assert_eq!(
+        diffusers_resolved.detection().identity.feature_id(),
+        schnell::MODEL_FAMILY_FEATURE_ID
+    );
+    let configuration = schnell::configuration_for_probe(&diffusers_probe)?;
+    assert_eq!(configuration.layout, FluxChromaLayout::Diffusers);
+    assert_eq!(configuration.in_channels, 16);
+    assert!(!configuration.guidance_embedding);
 
     let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     assert_eq!(
@@ -218,6 +239,10 @@ fn val_model_family_row_001_fluxschnell_source_projection_descriptor_and_ownersh
     ] {
         assert!(!row_source.contains(competing_owner));
     }
+    assert!(!row_source.contains("ModelDetectionRule::Metadata"));
+    assert!(!row_source.contains("ModelSourceConfigurationRule"));
+    assert!(row_source.contains("FLUX_INPUT_PROJECTION_KEYS"));
+    assert!(row_source.contains("source_configuration: &[]"));
     super::write_model_family_row_artifact(
         schnell::MODEL_FAMILY_FIXTURE,
         schnell::MODEL_FAMILY_FEATURE_ID,
@@ -226,7 +251,7 @@ fn val_model_family_row_001_fluxschnell_source_projection_descriptor_and_ownersh
         "fluxschnell_comfy_model_0080",
         &[
             "source-provenance-registration-descriptor",
-            "model-store-prefixed-and-unprefixed-detection",
+            "model-store-native-unprefixed-and-diffusers-detection",
             "transactional-component-and-scale-mapping",
             "named-forward-checkpoints-and-patch-order",
             "memory-oom-dtype-device-cancellation",
@@ -246,11 +271,18 @@ fn val_model_family_row_001_fluxschnell_model_store_mapping_forward_patch_and_me
     ])?;
     let probe = probe_through_model_store("native")?;
     assert_eq!(probe.format_identities(), ["safetensors"]);
+    assert!(!probe.metadata.contains_key("image_model"));
+    assert!(!probe.metadata.contains_key("guidance_embed"));
+    assert!(!probe.metadata.contains_key("in_channels"));
+    assert!(!probe.metadata.contains_key("model_layout"));
     assert_eq!(
         probe.unet_prefix_selection()?.prefix(),
         "model.diffusion_model."
     );
     let resolved = registry.resolve(&probe)?;
+    assert_eq!(resolved.detection().score, 700);
+    assert_eq!(resolved.detection().evidence.len(), 1);
+    assert!(resolved.detection().evidence[0].contains("AnyTensorDimensionValue"));
     assert_eq!(
         resolved.detection().identity.feature_id(),
         "COMFY-MODEL-0080"
@@ -462,7 +494,7 @@ fn val_model_family_row_001_fluxschnell_unprefixed_dtype_and_typed_failures()
         ModelProbe::from_parsed_facts(parsed_facts("native", DType::F32, false, false, true))?;
     assert!(matches!(
         registry.resolve(&malformed),
-        Err(ModelFamilyError::InvalidSelectorOutput(message)) if message.contains("img_in.weight shape")
+        Err(ModelFamilyError::NoDetectionMatch)
     ));
     let flux2 =
         ModelProbe::from_parsed_facts(parsed_facts("native", DType::F32, false, true, false))?;
@@ -497,8 +529,7 @@ fn val_model_family_row_001_fluxschnell_unprefixed_dtype_and_typed_failures()
     let inpaint_probe = ModelProbe::from_parsed_facts(inpaint_facts)?;
     assert!(matches!(
         registry.resolve(&inpaint_probe),
-        Err(ModelFamilyError::InvalidSelectorOutput(message))
-            if message.contains("in_channels 96; expected 16")
+        Err(ModelFamilyError::NoDetectionMatch)
     ));
 
     let mut base_facts = parsed_facts("native", DType::F32, false, false, false);
@@ -561,7 +592,7 @@ fn val_model_family_row_001_fluxschnell_unprefixed_dtype_and_typed_failures()
     let ambiguous = ModelFamilyRegistry::checked_registrations(&AMBIGUOUS_REGISTRATIONS)?;
     assert!(matches!(
         ambiguous.detect(&probe),
-        Err(ModelFamilyError::AmbiguousDetection { score: 1_100, .. })
+        Err(ModelFamilyError::AmbiguousDetection { score: 700, .. })
     ));
 
     let cancelled = CancellationToken::default();
@@ -623,12 +654,76 @@ fn parsed_facts(
         tensors,
         formats: vec![ModelParsedFormatFact {
             identity: "safetensors".to_owned(),
-            metadata: BTreeMap::from([
-                ("image_model".to_owned(), "flux".to_owned()),
-                ("guidance_embed".to_owned(), "false".to_owned()),
-            ]),
+            metadata: BTreeMap::new(),
         }],
     }
+}
+
+fn diffusers_facts(dtype: DType) -> ModelParsedFacts {
+    let mut tensors = BTreeMap::new();
+    for (key, shape) in diffusers_shapes() {
+        tensors.insert(
+            key,
+            ModelParsedTensorFact {
+                shape,
+                storage_dtype: dtype.catalog_name().to_owned(),
+            },
+        );
+    }
+    ModelParsedFacts {
+        tensors,
+        formats: vec![ModelParsedFormatFact {
+            identity: "safetensors".to_owned(),
+            metadata: BTreeMap::new(),
+        }],
+    }
+}
+
+fn diffusers_shapes() -> Vec<(String, Vec<u64>)> {
+    let mut shapes = vec![
+        ("x_embedder.weight".to_owned(), vec![128, 64]),
+        ("x_embedder.bias".to_owned(), vec![128]),
+        ("context_embedder.weight".to_owned(), vec![128, 2]),
+        ("transformer_blocks.0.attn.norm_k.weight".to_owned(), vec![128]),
+        ("transformer_blocks.0.attn.to_q.weight".to_owned(), vec![128, 128]),
+        ("transformer_blocks.0.attn.to_k.weight".to_owned(), vec![128, 128]),
+        ("transformer_blocks.0.attn.to_v.weight".to_owned(), vec![128, 128]),
+        (
+            "transformer_blocks.0.attn.to_out.0.weight".to_owned(),
+            vec![2, 2],
+        ),
+        (
+            "single_transformer_blocks.0.attn.norm_k.weight".to_owned(),
+            vec![128],
+        ),
+        (
+            "single_transformer_blocks.0.attn.to_q.weight".to_owned(),
+            vec![128, 128],
+        ),
+        (
+            "single_transformer_blocks.0.attn.to_k.weight".to_owned(),
+            vec![128, 128],
+        ),
+        (
+            "single_transformer_blocks.0.attn.to_v.weight".to_owned(),
+            vec![128, 128],
+        ),
+        (
+            "single_transformer_blocks.0.proj_mlp.weight".to_owned(),
+            vec![512, 128],
+        ),
+        (
+            "single_transformer_blocks.0.proj_out.weight".to_owned(),
+            vec![2, 2],
+        ),
+        (
+            "time_text_embed.text_embedder.linear_1.weight".to_owned(),
+            vec![128, 2],
+        ),
+        ("proj_out.weight".to_owned(), vec![2, 2]),
+    ];
+    shapes.sort_by(|left, right| left.0.cmp(&right.0));
+    shapes
 }
 
 fn source_tensors(
@@ -728,10 +823,6 @@ fn write_safetensors(path: &Path, layout: &str) -> Result<(), Box<dyn std::error
         ""
     };
     let mut header = serde_json::Map::new();
-    header.insert(
-        "__metadata__".to_owned(),
-        serde_json::json!({"image_model": "flux", "guidance_embed": "false"}),
-    );
     let mut shapes = model_shapes(false, false, false);
     shapes.extend([
         ("vae.decoder.weight".to_owned(), vec![1]),

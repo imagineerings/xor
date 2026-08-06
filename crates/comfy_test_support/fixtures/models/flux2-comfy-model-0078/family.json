@@ -11,10 +11,7 @@
       "model.diffusion_model.img_in.weight": [3072, 16],
       "text_encoders.qwen3_4b.transformer.model.norm.weight": [1]
     },
-    "metadata": {
-      "image_model": "flux2",
-      "model_layout": "native"
-    }
+    "metadata": {}
   },
   "base_artifact_digest": "0670670670670670670670670670670670670670670670670670670670670670",
   "source_weights": [

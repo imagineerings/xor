@@ -3,12 +3,13 @@ use crate::{
     ModelClipModelInvocationDefinition, ModelClipTargetCandidateDefinition,
     ModelClipTargetDefinition, ModelClipTargetSelector, ModelDetectionRule, ModelFamilyDefinition,
     ModelFamilyError, ModelFamilyProfile, ModelFamilyRegistration, ModelFamilyStatePlanSelector,
-    ModelProbe, ModelSourceConfigurationRule,
+    ModelProbe,
     flux_chroma_family::{
         FLUX_COMPONENT_STATE_SCHEMAS, FLUX_COMPONENTS, FLUX_FORWARD_PROGRAM,
-        FLUX_LAYOUT_SIGNATURES, FLUX_MEMORY_USAGE_FACTOR, FLUX_MODEL_OPTIONAL_KEYS,
-        FLUX_MODEL_REQUIRED_KEYS, FLUX_STATE_PLAN_CASES, FLUX_SUPPORTED_DEVICES,
-        FLUX_SUPPORTED_DTYPES, FLUX_WEIGHT_RULES, FluxChromaConfiguration, FluxChromaVariant,
+        FLUX_INPUT_PROJECTION_KEYS, FLUX_LAYOUT_SIGNATURES, FLUX_MEMORY_USAGE_FACTOR,
+        FLUX_MODEL_OPTIONAL_KEYS, FLUX_MODEL_REQUIRED_KEYS, FLUX_STATE_PLAN_CASES,
+        FLUX_SUPPORTED_DEVICES, FLUX_SUPPORTED_DTYPES, FLUX_WEIGHT_RULES,
+        FLUX2_DISCRIMINATOR_KEYS, FluxChromaConfiguration, FluxChromaVariant,
         configuration_for_probe as flux_chroma_configuration_for_probe,
     },
 };
@@ -122,11 +123,18 @@ const NO_CLIP_TARGET: ModelClipTargetDefinition = ModelClipTargetDefinition {
     dynamic_selection: false,
 };
 
-const DETECTION_RULES: &[ModelDetectionRule] = &[ModelDetectionRule::Metadata {
-    key: "image_model",
-    value: "flux2",
-    score: 1_000,
-}];
+const DETECTION_RULES: &[ModelDetectionRule] = &[
+    ModelDetectionRule::AnyTensorDimensionValue {
+        keys: FLUX_INPUT_PROJECTION_KEYS,
+        dimension: 1,
+        values: &[16],
+        score: 600,
+    },
+    ModelDetectionRule::AnyKeyPresent {
+        keys: FLUX2_DISCRIMINATOR_KEYS,
+        score: 400,
+    },
+];
 
 pub const MODEL_FAMILY: ModelFamilyDefinition = ModelFamilyDefinition {
     feature_id: MODEL_FAMILY_FEATURE_ID,
@@ -150,17 +158,11 @@ pub const MODEL_FAMILY: ModelFamilyDefinition = ModelFamilyDefinition {
     forward_program: FLUX_FORWARD_PROGRAM,
 };
 
-const SOURCE_CONFIGURATION: &[ModelSourceConfigurationRule] =
-    &[ModelSourceConfigurationRule::Metadata {
-        key: "image_model",
-        value: "flux2",
-    }];
-
 pub const MODEL_FAMILY_REGISTRATION: ModelFamilyRegistration = ModelFamilyRegistration {
     definition: &MODEL_FAMILY,
     source_ordinal: 80,
     source_architecture: "model_base.Flux2",
-    source_configuration: SOURCE_CONFIGURATION,
+    source_configuration: &[],
     required_state_keys: &[],
     profile_selector: Some(select_profile),
     clip_target_selector: ModelClipTargetSelector::Profile,

@@ -35,11 +35,7 @@
         2
       ]
     },
-    "metadata": {
-      "image_model": "flux",
-      "guidance_embed": "true",
-      "model_layout": "native"
-    }
+    "metadata": {}
   },
   "base_artifact_digest": "0660660660660660660660660660660660660660660660660660660660660660",
   "source_weights": [

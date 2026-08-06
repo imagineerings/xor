@@ -1,14 +1,13 @@
 use crate::{
     FluxChromaConfiguration, FluxChromaVariant, ModelClipTargetSelector, ModelDetectionRule,
     ModelFamilyDefinition, ModelFamilyError, ModelFamilyProfile, ModelFamilyRegistration,
-    ModelFamilyStatePlanSelector, ModelProbe, ModelSourceConfigurationRule,
-    flux_chroma_configuration_for_probe,
+    ModelFamilyStatePlanSelector, ModelProbe, flux_chroma_configuration_for_probe,
     flux_chroma_family::{
         FLUX_CLIP_TARGET, FLUX_COMPONENT_STATE_SCHEMAS, FLUX_COMPONENTS, FLUX_FORWARD_PROGRAM,
-        FLUX_LATENT_FEATURE_ID, FLUX_LATENT_IDENTIFIER, FLUX_LAYOUT_SIGNATURES,
-        FLUX_MEMORY_ESTIMATOR, FLUX_MEMORY_USAGE_FACTOR, FLUX_MODEL_OPTIONAL_KEYS,
-        FLUX_MODEL_REQUIRED_KEYS, FLUX_STATE_PLAN_CASES, FLUX_SUPPORTED_DEVICES,
-        FLUX_SUPPORTED_DTYPES, FLUX_WEIGHT_RULES,
+        FLUX_INPUT_PROJECTION_KEYS, FLUX_LATENT_FEATURE_ID, FLUX_LATENT_IDENTIFIER,
+        FLUX_LAYOUT_SIGNATURES, FLUX_MEMORY_ESTIMATOR, FLUX_MEMORY_USAGE_FACTOR,
+        FLUX_MODEL_OPTIONAL_KEYS, FLUX_MODEL_REQUIRED_KEYS, FLUX_STATE_PLAN_CASES,
+        FLUX_SUPPORTED_DEVICES, FLUX_SUPPORTED_DTYPES, FLUX_WEIGHT_RULES,
     },
 };
 
@@ -26,18 +25,12 @@ pub const MODEL_FAMILY_SAMPLING_SHIFT: f64 = 1.0;
 pub const MODEL_FAMILY_MEMORY_USAGE_FACTOR: f64 = FLUX_MEMORY_USAGE_FACTOR;
 pub const MODEL_FAMILY_IN_CHANNELS: u64 = 16;
 
-const DETECTION_RULES: &[ModelDetectionRule] = &[
-    ModelDetectionRule::Metadata {
-        key: "image_model",
-        value: "flux",
-        score: 700,
-    },
-    ModelDetectionRule::Metadata {
-        key: "guidance_embed",
-        value: "false",
-        score: 400,
-    },
-];
+const DETECTION_RULES: &[ModelDetectionRule] = &[ModelDetectionRule::AnyTensorDimensionValue {
+    keys: FLUX_INPUT_PROJECTION_KEYS,
+    dimension: 1,
+    values: &[64],
+    score: 700,
+}];
 
 pub const MODEL_FAMILY: ModelFamilyDefinition = ModelFamilyDefinition {
     feature_id: MODEL_FAMILY_FEATURE_ID,
@@ -57,22 +50,11 @@ pub const MODEL_FAMILY: ModelFamilyDefinition = ModelFamilyDefinition {
     forward_program: FLUX_FORWARD_PROGRAM,
 };
 
-const SOURCE_CONFIGURATION: &[ModelSourceConfigurationRule] = &[
-    ModelSourceConfigurationRule::Metadata {
-        key: "image_model",
-        value: "flux",
-    },
-    ModelSourceConfigurationRule::Metadata {
-        key: "guidance_embed",
-        value: "false",
-    },
-];
-
 pub const MODEL_FAMILY_REGISTRATION: ModelFamilyRegistration = ModelFamilyRegistration {
     definition: &MODEL_FAMILY,
     source_ordinal: 30,
     source_architecture: "model_base.Flux(model_type=model_base.ModelType.FLOW)",
-    source_configuration: SOURCE_CONFIGURATION,
+    source_configuration: &[],
     required_state_keys: &[],
     profile_selector: Some(select_profile),
     clip_target_selector: ModelClipTargetSelector::Static(&FLUX_CLIP_TARGET),
