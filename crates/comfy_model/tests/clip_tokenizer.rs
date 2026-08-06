@@ -349,6 +349,13 @@ fn rust_sources_below(path: &Path) -> Result<Vec<(String, String)>, Box<dyn std:
         for entry in fs::read_dir(directory)? {
             let entry = entry?;
             let path = entry.path();
+            if path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with("._"))
+            {
+                continue;
+            }
             if path.is_dir() {
                 pending.push(path);
             } else if path.extension().and_then(|extension| extension.to_str()) == Some("rs") {
@@ -1121,6 +1128,21 @@ fn production_call_scan_finds_no_embedding_or_tokenizer_bypass()
             );
         }
     }
+    Ok(())
+}
+
+#[test]
+fn production_call_scan_ignores_apple_double_metadata() -> Result<(), Box<dyn std::error::Error>> {
+    let directory = tempfile::tempdir()?;
+    fs::write(directory.path().join("source.rs"), "fn source() {}\n")?;
+    fs::write(directory.path().join("._source.rs"), [0xff])?;
+    assert_eq!(
+        rust_sources_below(directory.path())?,
+        [(
+            directory.path().join("source.rs").display().to_string(),
+            "fn source() {}\n".to_owned(),
+        )]
+    );
     Ok(())
 }
 

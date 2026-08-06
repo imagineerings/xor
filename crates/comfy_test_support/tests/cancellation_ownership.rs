@@ -167,6 +167,9 @@ fn collect_rust_sources(directory: &Path, sources: &mut Vec<PathBuf>) -> io::Res
     for entry in fs::read_dir(directory)? {
         let entry = entry?;
         let path = entry.path();
+        if comfy_test_support::is_apple_double_metadata(&path) {
+            continue;
+        }
         if path.is_dir() {
             if matches!(
                 path.file_name().and_then(|name| name.to_str()),

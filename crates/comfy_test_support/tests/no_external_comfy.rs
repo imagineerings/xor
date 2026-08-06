@@ -29,6 +29,9 @@ fn collect_rust_sources(
     for entry in fs::read_dir(directory)? {
         let entry = entry?;
         let path = entry.path();
+        if comfy_test_support::is_apple_double_metadata(&path) {
+            continue;
+        }
         if path.is_dir() {
             collect_rust_sources(workspace_root, &path, sources)?;
         } else if path.extension().is_some_and(|extension| extension == "rs") {

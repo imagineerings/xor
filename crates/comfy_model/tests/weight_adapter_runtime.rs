@@ -1215,6 +1215,13 @@ fn production_rust_sources(root: &Path) -> Result<Vec<(PathBuf, String)>, Box<dy
         for entry in std::fs::read_dir(directory)? {
             let entry = entry?;
             let path = entry.path();
+            if path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with("._"))
+            {
+                continue;
+            }
             if path.is_dir() {
                 if path.file_name().is_some_and(|name| name == "tests") {
                     continue;
@@ -1231,6 +1238,20 @@ fn production_rust_sources(root: &Path) -> Result<Vec<(PathBuf, String)>, Box<dy
     visit(&root.join("crates"), &mut sources)?;
     sources.sort_by(|left, right| left.0.cmp(&right.0));
     Ok(sources)
+}
+
+#[test]
+fn production_source_scan_ignores_apple_double_metadata() -> Result<(), Box<dyn Error>> {
+    let directory = tempfile::tempdir()?;
+    let crates = directory.path().join("crates/example/src");
+    std::fs::create_dir_all(&crates)?;
+    std::fs::write(crates.join("owner.rs"), "fn owner() {}\n")?;
+    std::fs::write(crates.join("._owner.rs"), [0xff])?;
+    assert_eq!(
+        production_rust_sources(directory.path())?,
+        [(crates.join("owner.rs"), "fn owner() {}\n".to_owned())]
+    );
+    Ok(())
 }
 
 #[test]

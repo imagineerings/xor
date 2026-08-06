@@ -554,7 +554,7 @@ fn canonical_csv(rows: &[Vec<String>]) -> String {
                 output.push_str(field);
             }
         }
-        output.push_str("\r\n");
+        output.push('\n');
     }
     output
 }

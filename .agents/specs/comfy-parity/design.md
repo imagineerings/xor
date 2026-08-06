@@ -175,7 +175,7 @@ A development oracle records source-fingerprinted schemas, tensors, gradients, s
 
 ### D20: Generate catalogs, registries, and closure reports
 
-The ordered `regenerate_all.py` pipeline runs every checked-in extractor and derived-artifact generator twice and fails on byte drift, collisions, or unexplained deltas. Base ComfyUI and Frontend catalogs that lack checked-in extractors are explicitly checksum-locked source snapshot inputs with target-only columns excluded from the source digest; they are never misreported as regenerable outputs, and a baseline refresh requires an explicit manifest update plus source reconciliation.
+The ordered `regenerate_all.py` pipeline runs every checked-in extractor and derived-artifact generator twice and fails on byte drift, collisions, or unexplained deltas. Base ComfyUI and Frontend catalogs that lack checked-in extractors are explicitly checksum-locked source snapshot inputs with target-only columns excluded from the source digest; they are never misreported as regenerable outputs, and a baseline refresh requires an explicit manifest update plus source reconciliation. Generated module discovery and repository source audits classify macOS `._*` AppleDouble entries as filesystem metadata rather than Rust or specification sources, including when the sidecar has an `.rs` or `.md` suffix; every other registered source remains subject to exact one-to-one closure, digest, UTF-8, collision, and ownership checks.
 
 ### D21: Treat failure and recovery as domain state
 

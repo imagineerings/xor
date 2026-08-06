@@ -39,6 +39,9 @@ fn rust_sources(root: &Path) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>>
         entries.sort_by_key(|entry| entry.file_name());
         for entry in entries {
             let path = entry.path();
+            if comfy_test_support::is_apple_double_metadata(&path) {
+                continue;
+            }
             if path.is_dir() {
                 if !matches!(
                     path.file_name().and_then(|name| name.to_str()),

@@ -595,7 +595,9 @@ fn generated_module_manifests(workspace_root: &Path) -> Result<(bool, Value), Bo
             }
             for entry in fs::read_dir(source_directory)? {
                 let path = entry?.path();
-                if path.extension().and_then(|extension| extension.to_str()) != Some("rs") {
+                if comfy_test_support::is_apple_double_metadata(&path)
+                    || path.extension().and_then(|extension| extension.to_str()) != Some("rs")
+                {
                     continue;
                 }
                 let Some(name) = path.file_stem().and_then(|name| name.to_str()) else {
@@ -631,7 +633,9 @@ fn generated_module_manifests(workspace_root: &Path) -> Result<(bool, Value), Bo
     if resolution_directory.is_dir() {
         for entry in fs::read_dir(&resolution_directory)? {
             let path = entry?.path();
-            if path.extension().and_then(|extension| extension.to_str()) != Some("rs") {
+            if comfy_test_support::is_apple_double_metadata(&path)
+                || path.extension().and_then(|extension| extension.to_str()) != Some("rs")
+            {
                 continue;
             }
             let Some(name) = path.file_stem().and_then(|name| name.to_str()) else {
@@ -748,7 +752,9 @@ fn audit_production_source_boundaries(
                 pending.push(entry.path());
                 continue;
             }
-            if entry.path().extension().and_then(|value| value.to_str()) != Some("rs") {
+            if comfy_test_support::is_apple_double_metadata(&entry.path())
+                || entry.path().extension().and_then(|value| value.to_str()) != Some("rs")
+            {
                 continue;
             }
             inspected_source_files += 1;

@@ -38,7 +38,7 @@ DECISIONS = [
     (17, "Enforce layered trust boundaries", "Native API exposure, archives, paths, model formats, plugin code, provider content, secrets, native FFI, codecs, and worker IPC each have explicit validation and permissions with the D41 owner making each decision once. AssetService validates profile, subject, namespace, and operation grants before delegating path resolution to ArtifactRoot; native API snapshot persistence also delegates traversal, link rejection, changed-parent detection, synchronization, and atomic replacement to ArtifactRoot; ArtifactRoot rejects traversal and every encountered symbolic link; safe views force active HTML/SVG/script/CSS content to attachment and recheck size/mtime or content digests across reads and commits. No workflow, wire DTO, artifact, API header, or plugin manifest can self-grant executable ambient authority. <!-- impl: crates/comfy_model/src/artifact_index.rs#ArtifactRoot --> <!-- impl: crates/comfy_runtime/src/permissions.rs -->"),
     (18, "Bound tasks and make cancellation structural", "Foreground GPUI work is short and fallible. Background tasks and workers are owned by stored handles or supervisors; every layer observes the same comfy_types::CancellationToken while focused adapters retain typed cancel, interrupt, timeout, and worker-loss reasons. A worker failure DTO may report failure observations, but it cannot choose a canonical cancelled transition; the controller must bind any cancellation disposition to the active attempt's token and durable termination intent. The native executor checks cancellation before resolving dependencies, before each node and mapped-list item, and after awaited node work; cancellation or failure rolls back prepared effects and exposes no partial output set. Workers and plugins emit bounded output proposals only. OutputCommitter alone decides and journals native preview and saved-image batch publication, while ArtifactRoot alone performs each capability-relative physical publication. A later-effect failure, final-journal-write failure, or cancellation reverses every earlier publication in that batch, while startup removes final and staged files through ArtifactRoot from an interrupted publication and records recovery receipts before identities may be reused. Explicit cancel, interrupt, and live worker-loss intent remain distinct and durable through recovery. <!-- impl: crates/comfy_types/src/cancellation.rs#CancellationToken --> <!-- impl: crates/comfy_runtime/src/output_committer.rs#OutputCommitter -->"),
     (19, "Validate with deterministic source-derived fixtures", "A development oracle records source-fingerprinted schemas, tensors, gradients, schedules, trajectories, media, protocols, errors, and recovery. Release tests consume normalized fixtures without source runtimes."),
-    (20, "Generate catalogs, registries, and closure reports", "The ordered `regenerate_all.py` pipeline runs every checked-in extractor and derived-artifact generator twice and fails on byte drift, collisions, or unexplained deltas. Base ComfyUI and Frontend catalogs that lack checked-in extractors are explicitly checksum-locked source snapshot inputs with target-only columns excluded from the source digest; they are never misreported as regenerable outputs, and a baseline refresh requires an explicit manifest update plus source reconciliation."),
+    (20, "Generate catalogs, registries, and closure reports", "The ordered `regenerate_all.py` pipeline runs every checked-in extractor and derived-artifact generator twice and fails on byte drift, collisions, or unexplained deltas. Base ComfyUI and Frontend catalogs that lack checked-in extractors are explicitly checksum-locked source snapshot inputs with target-only columns excluded from the source digest; they are never misreported as regenerable outputs, and a baseline refresh requires an explicit manifest update plus source reconciliation. Generated module discovery and repository source audits classify macOS `._*` AppleDouble entries as filesystem metadata rather than Rust or specification sources, including when the sidecar has an `.rs` or `.md` suffix; every other registered source remains subject to exact one-to-one closure, digest, UTF-8, collision, and ownership checks."),
     (21, "Treat failure and recovery as domain state", "Validation, compile, execution, cache, effect, recovery, worker, backend, device, memory, plugin, provider, codec, persistence, permission, timeout, cancellation, crash, interruption, and conflict failures are typed states with visible recovery, not transient notification strings. Production execution presentation starts with an explicit disconnected Rust controller: runtime-backed actions reject without mutation until an owning native runtime registers its controller and event/output providers. Output restart reconciliation distinguishes prepared interruption, destination conflict, committed-missing, committed-corrupt, and recovered commit-after-rename; it removes only verified staging files and never treats a partial stage as a final asset. <!-- impl: crates/comfy_runtime/src/output_committer.rs#OutputOperationState -->"),
     (22, "Separate logs, diagnostics, and telemetry", "Operational logs and diagnostics are bounded, sanitized, inspectable, and locally retained. Telemetry is separately consented, redacted, rate-limited, and never a prerequisite for execution or recovery."),
     (23, "Scope profiles, windows, and resources explicitly", "Runtime profiles scope devices, workers, models, queues, history, outputs, secrets, plugins, providers, API hosts, and windows. Handles carry profile and attempt identity so cross-profile leakage is rejected. Graph execution controls retain an explicit associated attempt; interrupt, retry, error navigation, progress, previews, and output projection never fall back to another workflow's latest profile attempt, and navigation changes invalidate stale nested projections."),
@@ -8887,6 +8887,64 @@ def patch_remediation_tasks() -> list[dict[str, object]]:
             ],
             registered_source_edits=["comfy_model"],
         ),
+        task(
+            "comfy-parity-appledouble-source-scan-portability",
+            "Make generated and audited source discovery portable across macOS filesystems",
+            [1, 7, 41, 42],
+            [20, 31, 41],
+            [
+                "VAL-FOUNDATION-001",
+                "VAL-MODEL-FAMILY-FOUNDATION-001",
+                "VAL-OWNERSHIP-001",
+            ],
+            "Classify macOS AppleDouble `._*` entries as non-source filesystem metadata at every generated Rust module and repository source-audit boundary. Preserve exact discovery, UTF-8 failure, digest, collision, and ownership checks for every other path; do not delete user files, weaken registered-source closure, or make local cleanup a build prerequisite.",
+            [
+                ".gitignore",
+                ".agents/specs/comfy-parity/design.md",
+                ".agents/specs/comfy-parity/regenerate_all.py",
+                ".agents/specs/comfy-parity/regenerate_native_planning.py",
+                "crates/comfy_model/build.rs",
+                "crates/comfy_model/tests/clip_tokenizer.rs",
+                "crates/comfy_model/tests/hidream_o1_family_adapter.rs",
+                "crates/comfy_model/tests/model_family_build_manifest.rs",
+                "crates/comfy_model/tests/weight_adapter_runtime.rs",
+                "crates/comfy_test_support/src/comfy_test_support.rs",
+                "crates/comfy_test_support/tests/cancellation_ownership.rs",
+                "crates/comfy_test_support/tests/filesystem_asset_recovery.rs",
+                "crates/comfy_test_support/tests/native_foundation.rs",
+                "crates/comfy_test_support/tests/no_external_comfy.rs",
+                "crates/comfy_test_support/tests/no_python_engine.rs",
+                "crates/comfy_test_support/tests/ownership_consolidation.rs",
+                "crates/comfy_test_support/tests/plugin_e2e.rs",
+                "crates/comfy_test_support/tests/workflow_ownership.rs",
+            ],
+            [
+                ".agents/specs/comfy-parity/design.md",
+                ".agents/specs/comfy-parity/regenerate_native_planning.py",
+                ".agents/specs/comfy-parity/tasks.md",
+                ".agents/specs/comfy-parity/traceability.md",
+                "crates/comfy_model/build.rs",
+                "crates/comfy_model/tests/clip_tokenizer.rs",
+                "crates/comfy_model/tests/hidream_o1_family_adapter.rs",
+                "crates/comfy_model/tests/model_family_build_manifest.rs",
+                "crates/comfy_model/tests/weight_adapter_runtime.rs",
+                "crates/comfy_test_support/src/comfy_test_support.rs",
+                "crates/comfy_test_support/tests/cancellation_ownership.rs",
+                "crates/comfy_test_support/tests/filesystem_asset_recovery.rs",
+                "crates/comfy_test_support/tests/native_foundation.rs",
+                "crates/comfy_test_support/tests/no_external_comfy.rs",
+                "crates/comfy_test_support/tests/no_python_engine.rs",
+                "crates/comfy_test_support/tests/ownership_consolidation.rs",
+                "crates/comfy_test_support/tests/plugin_e2e.rs",
+                "crates/comfy_test_support/tests/workflow_ownership.rs",
+            ],
+            "Focused helper and build-manifest tests inject invalid-UTF-8 `._*.rs` sidecars and prove they are ignored while ordinary hidden, malformed, missing, orphaned, duplicate, and unregistered Rust sources still fail closed. Every repository source audit, model build-manifest check, complete comfy_model and comfy_test_support all-target suite, warnings-denied clippy, formatting, ownership validation, strict regeneration, and standalone spec validation passes on the fingerprint-verified snapshot tree without deleting sidecars.",
+            [
+                "comfy-parity-native-crate-foundation",
+                "comfy-parity-model-family-authoritative-foundation",
+            ],
+            registered_source_edits=["comfy_test_support"],
+        ),
     ]
 
 
@@ -8922,6 +8980,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     )
     remediation_tasks.insert(model_detection_index, backend_catalog_task)
     tasks.extend(remediation_tasks)
+
+    appledouble_portability_task = "comfy-parity-appledouble-source-scan-portability"
+    for item in tasks:
+        if item["id"] == "comfy-parity-clip-text-encoder-decoder-foundation":
+            item["dependencies"] = list(
+                dict.fromkeys(item["dependencies"] + [appledouble_portability_task])
+            )
 
     backend_catalog_provenance_task = (
         "comfy-parity-backend-catalog-provenance-reconciliation"
@@ -11710,6 +11775,21 @@ def existing_task_annotations() -> dict[str, dict[str, str | bool]]:
                 evidence = evidence.replace(
                     "  - _validation_evidence: ",
                     "  - _validation_evidence: STALE AFTER CATALOG STATUS AUDIT; the generated Apple Metal MPS row changed to partial and the typed registry rejected it. ",
+                    1,
+                )
+            annotations[identifier] = {
+                "complete": False,
+                "evidence": evidence,
+            }
+            continue
+        if (
+            identifier == "comfy-parity-node-model-registry"
+            and "POST-CATALOG-LF-REVALIDATION" not in evidence
+        ):
+            if evidence and "STALE AFTER CATALOG LINE-ENDING AUDIT" not in evidence:
+                evidence = evidence.replace(
+                    "  - _validation_evidence: ",
+                    "  - _validation_evidence: STALE AFTER CATALOG LINE-ENDING AUDIT; the read-side registry canonicalization tests emitted CRLF while every normative generated CSV uses LF, so prior cross-platform round-trip evidence is invalid until both registries and their artifacts are freshly revalidated. ",
                     1,
                 )
             annotations[identifier] = {

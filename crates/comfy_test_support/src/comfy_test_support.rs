@@ -15,6 +15,12 @@ pub use oracle::{
     load_embedded_fixtures, load_release_boundary_policy, load_tensor_signature_resolution_fixture,
 };
 
+pub fn is_apple_double_metadata(path: &std::path::Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.starts_with("._"))
+}
+
 pub fn rust_source_before_test_module(source: &str) -> &str {
     let mut offset = 0;
     let mut lines = source.split_inclusive('\n').peekable();
@@ -33,7 +39,18 @@ pub fn rust_source_before_test_module(source: &str) -> &str {
 
 #[cfg(test)]
 mod tests {
-    use super::rust_source_before_test_module;
+    use super::{is_apple_double_metadata, rust_source_before_test_module};
+
+    #[test]
+    fn apple_double_metadata_is_not_a_repository_source() {
+        assert!(is_apple_double_metadata(std::path::Path::new(
+            "._family.rs"
+        )));
+        assert!(!is_apple_double_metadata(std::path::Path::new("family.rs")));
+        assert!(!is_apple_double_metadata(std::path::Path::new(
+            ".family.rs"
+        )));
+    }
 
     #[test]
     fn production_source_projection_handles_indented_test_modules() {

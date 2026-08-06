@@ -173,6 +173,7 @@ fn synthetic_test_and_fixture_closure_rejects_missing_and_orphan_rows()
     let tests = tempfile::tempdir()?;
     assert!(build_script::model_family_test_names_in(&entries, tests.path()).is_err());
     std::fs::write(tests.path().join("family_comfy_model_9001.rs"), b"")?;
+    std::fs::write(tests.path().join("._family_comfy_model_9001.rs"), [0xff])?;
     assert_eq!(
         build_script::model_family_test_names_in(&entries, tests.path())?,
         ["family_comfy_model_9001"]
@@ -206,6 +207,7 @@ fn synthetic_test_and_fixture_closure_rejects_missing_and_orphan_rows()
 fn zero_family_rows_have_valid_empty_test_and_fixture_closure()
 -> Result<(), Box<dyn std::error::Error>> {
     let directory = tempfile::tempdir()?;
+    std::fs::write(directory.path().join("._metadata.rs"), [0xff])?;
     assert!(build_script::model_family_test_names_in(&[], directory.path())?.is_empty());
     assert!(build_script::model_family_fixture_names_in(&[], directory.path())?.is_empty());
     Ok(())

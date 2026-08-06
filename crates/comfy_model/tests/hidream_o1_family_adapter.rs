@@ -396,6 +396,13 @@ fn rust_files(root: &Path) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
     while let Some(directory) = pending.pop() {
         for entry in fs::read_dir(directory)? {
             let path = entry?.path();
+            if path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with("._"))
+            {
+                continue;
+            }
             if path.is_dir() {
                 if path.file_name().is_some_and(|name| name == "target") {
                     continue;
@@ -408,6 +415,18 @@ fn rust_files(root: &Path) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
     }
     files.sort();
     Ok(files)
+}
+
+#[test]
+fn ownership_scan_ignores_apple_double_metadata() -> Result<(), Box<dyn std::error::Error>> {
+    let directory = tempfile::tempdir()?;
+    fs::write(directory.path().join("family.rs"), "fn family() {}\n")?;
+    fs::write(directory.path().join("._family.rs"), [0xff])?;
+    assert_eq!(
+        rust_files(directory.path())?,
+        [directory.path().join("family.rs")]
+    );
+    Ok(())
 }
 
 fn count_in_files(

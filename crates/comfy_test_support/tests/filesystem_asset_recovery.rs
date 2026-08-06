@@ -5,6 +5,7 @@ use comfy_runtime::{
     UploadRequest,
 };
 use comfy_tensor::CancellationToken;
+use comfy_test_support::is_apple_double_metadata;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
@@ -29,6 +30,9 @@ fn repository_rust_sources(
         entries.sort_by_key(|entry| entry.file_name());
         for entry in entries {
             let path = entry.path();
+            if is_apple_double_metadata(&path) {
+                continue;
+            }
             if path.is_dir() {
                 if !matches!(
                     path.file_name().and_then(|name| name.to_str()),

@@ -1,4 +1,8 @@
-use std::{collections::BTreeSet, env, fs, io, path::PathBuf};
+use std::{
+    collections::BTreeSet,
+    env, fs, io,
+    path::{Path, PathBuf},
+};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ModelFamilyBuildEntry {
@@ -20,7 +24,9 @@ fn main() -> io::Result<()> {
         if directory.is_dir() {
             for entry in fs::read_dir(&directory)? {
                 let path = entry?.path();
-                if path.extension().and_then(|value| value.to_str()) != Some("rs") {
+                if is_apple_double_metadata(&path)
+                    || path.extension().and_then(|value| value.to_str()) != Some("rs")
+                {
                     continue;
                 }
                 let name = module_name(&path)?;
@@ -336,7 +342,9 @@ pub fn model_family_test_names_in(
     if directory.is_dir() {
         for entry in fs::read_dir(directory)? {
             let path = entry?.path();
-            if path.extension().and_then(|value| value.to_str()) != Some("rs") {
+            if is_apple_double_metadata(&path)
+                || path.extension().and_then(|value| value.to_str()) != Some("rs")
+            {
                 continue;
             }
             let name = module_name(&path)?;
@@ -600,7 +608,9 @@ pub fn latent_format_test_names_in(
     if directory.is_dir() {
         for entry in fs::read_dir(directory)? {
             let path = entry?.path();
-            if path.extension().and_then(|value| value.to_str()) != Some("rs") {
+            if is_apple_double_metadata(&path)
+                || path.extension().and_then(|value| value.to_str()) != Some("rs")
+            {
                 continue;
             }
             let name = module_name(&path)?;
@@ -623,6 +633,12 @@ pub fn latent_format_test_names_in(
         ));
     }
     Ok(actual.into_iter().collect())
+}
+
+fn is_apple_double_metadata(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.starts_with("._"))
 }
 
 pub fn register_latent_format(
