@@ -307,27 +307,23 @@ pub(crate) mod support {
             };
             let model = build_model_family(resolved.definition(), weights.clone(), options)?;
             assert_eq!(model.memory_estimate().total_bytes, fixture.expected_memory_bytes);
-            if *dtype == DType::F32 {
-                let input = tensor(&fixture.input, *dtype, &backend, &context)?;
-                assert_checkpoints(
-                    &backend,
-                    &context,
-                    &model.forward_checkpoints(&backend, &input, &context)?,
-                    &fixture.checkpoints,
-                )?;
-                let patched = PatchGraph::checked(
-                    &fixture.base_artifact_digest,
-                    fixture.patches.clone(),
-                )?
-                .apply(&backend, model.weights(), &context)?;
-                let patched_model = model.with_weights(patched)?;
-                assert_checkpoints(
-                    &backend,
-                    &context,
-                    &patched_model.forward_checkpoints(&backend, &input, &context)?,
-                    &fixture.patched_checkpoints,
-                )?;
-            }
+            let input = tensor(&fixture.input, *dtype, &backend, &context)?;
+            assert_checkpoints(
+                &backend,
+                &context,
+                &model.forward_checkpoints(&backend, &input, &context)?,
+                &fixture.checkpoints,
+            )?;
+            let patched =
+                PatchGraph::checked(&fixture.base_artifact_digest, fixture.patches.clone())?
+                    .apply(&backend, model.weights(), &context)?;
+            let patched_model = model.with_weights(patched)?;
+            assert_checkpoints(
+                &backend,
+                &context,
+                &patched_model.forward_checkpoints(&backend, &input, &context)?,
+                &fixture.patched_checkpoints,
+            )?;
             let mut unsupported = options;
             unsupported.device = DeviceKind::Metal;
             assert!(matches!(

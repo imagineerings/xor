@@ -302,16 +302,23 @@ impl CpuBackend {
         }
         for layout in LAYOUTS {
             for operation in UNARY_OPERATIONS {
-                supported.push(OperationSupport::unary_input(operation, DType::F32, layout));
-                supported.push(OperationSupport::unary_output(
-                    operation,
-                    if operation == UnaryOperation::IsFinite {
-                        DType::Bool
-                    } else {
-                        DType::F32
-                    },
-                    layout,
-                ));
+                let input_dtypes: &[DType] = if operation == UnaryOperation::HyperbolicTangent {
+                    &[DType::F32, DType::F16, DType::Bf16]
+                } else {
+                    &[DType::F32]
+                };
+                for dtype in input_dtypes {
+                    supported.push(OperationSupport::unary_input(operation, *dtype, layout));
+                    supported.push(OperationSupport::unary_output(
+                        operation,
+                        if operation == UnaryOperation::IsFinite {
+                            DType::Bool
+                        } else {
+                            *dtype
+                        },
+                        layout,
+                    ));
+                }
             }
             for operation in BINARY_OPERATIONS {
                 let output_dtype = binary_output_dtype(operation);
@@ -359,16 +366,18 @@ impl CpuBackend {
             }
         }
         for layout in [Layout::Contiguous, Layout::Strided] {
-            supported.push(OperationSupport::linear_algebra_input(
-                LinearAlgebraOperation::BatchMatrixMultiply,
-                DType::F32,
-                layout,
-            ));
-            supported.push(OperationSupport::linear_algebra_output(
-                LinearAlgebraOperation::BatchMatrixMultiply,
-                DType::F32,
-                layout,
-            ));
+            for dtype in [DType::F32, DType::F16, DType::Bf16] {
+                supported.push(OperationSupport::linear_algebra_input(
+                    LinearAlgebraOperation::BatchMatrixMultiply,
+                    dtype,
+                    layout,
+                ));
+                supported.push(OperationSupport::linear_algebra_output(
+                    LinearAlgebraOperation::BatchMatrixMultiply,
+                    dtype,
+                    layout,
+                ));
+            }
         }
         supported.push(OperationSupport::record_event());
         supported.push(OperationSupport::wait_event());
@@ -884,29 +893,38 @@ impl TensorBackend for CpuBackend {
             &output,
             context,
         )?;
-        if input.descriptor().dtype() != DType::F32 {
+        let input_dtype = input.descriptor().dtype();
+        let supports_low_precision = operation == UnaryOperation::HyperbolicTangent
+            && matches!(input_dtype, DType::F16 | DType::Bf16);
+        if input_dtype != DType::F32 && !supports_low_precision {
             return Err(self.unsupported(
                 operation_label,
-                "the reference unary kernel accepts f32 input only",
+                "the reference unary kernel accepts f32 input, plus f16/bf16 for tanh",
             ));
         }
         require_same_shape(input.descriptor().shape(), output.shape())?;
         let expected_dtype = if operation == UnaryOperation::IsFinite {
             DType::Bool
         } else {
-            DType::F32
+            input_dtype
         };
         require_dtype(expected_dtype, output.dtype())?;
         let shape = output.shape().to_vec();
+        let output_dtype = output.dtype();
         let mut tensor = self.allocate_tensor(operation_label, output, context)?;
         let mut write = tensor.write()?;
         for_each_index(&shape, context.cancellation, |indices| {
-            let value = read_f32(input, indices)?;
+            let value = read_real_f32(input, indices)?;
             if operation == UnaryOperation::IsFinite {
                 write_element(&mut write, indices, &[u8::from(value.is_finite())])
             } else {
                 let result = apply_unary_scalar(operation, value);
-                write_element(&mut write, indices, &result.to_ne_bytes())
+                let encoded = output_dtype.encode_scalar(
+                    Scalar::Float(f64::from(result)),
+                    operation_label,
+                    DeviceId::CPU,
+                )?;
+                write_element(&mut write, indices, &encoded)
             }
         })?;
         drop(write);
@@ -1312,6 +1330,19 @@ impl TensorBackend for CpuBackend {
                 context,
             )?;
         }
+        let dtype = left.descriptor().dtype();
+        if right.descriptor().dtype() != dtype {
+            return Err(TensorError::DTypeMismatch {
+                expected: dtype,
+                actual: right.descriptor().dtype(),
+            });
+        }
+        if output.dtype() != dtype {
+            return Err(TensorError::DTypeMismatch {
+                expected: dtype,
+                actual: output.dtype(),
+            });
+        }
         let [batch, rows, contracted] = left.descriptor().shape() else {
             return Err(TensorError::Faulted {
                 reason: "batch matrix multiplication requires rank-three inputs".to_owned(),
@@ -1347,10 +1378,15 @@ impl TensorBackend for CpuBackend {
             let mut sum = 0.0_f32;
             for inner in 0..*contracted {
                 context.check()?;
-                sum += read_f32(left, &[*batch, *row, inner])?
-                    * read_f32(right, &[*batch, inner, *column])?;
+                sum += read_real_f32(left, &[*batch, *row, inner])?
+                    * read_real_f32(right, &[*batch, inner, *column])?;
             }
-            write_element(&mut write, indices, &sum.to_ne_bytes())
+            let encoded = dtype.encode_decoded_scalar(
+                DecodedScalar::Real(f64::from(sum)),
+                "sim.cpu.linear-algebra.bmm",
+                DeviceId::CPU,
+            )?;
+            write_element(&mut write, indices, &encoded)
         })?;
         drop(write);
         self.finish(tensor, context)
@@ -2481,6 +2517,20 @@ fn read_f32(tensor: &Tensor, indices: &[u64]) -> Result<f32, TensorError> {
                 actual: tensor.descriptor().dtype().byte_width(),
             })?;
     Ok(f32::from_ne_bytes(bytes))
+}
+
+fn read_real_f32(tensor: &Tensor, indices: &[u64]) -> Result<f32, TensorError> {
+    match tensor
+        .descriptor()
+        .dtype()
+        .decode_scalar(tensor.element_bytes(indices)?)?
+    {
+        DecodedScalar::Real(value) => Ok(value as f32),
+        _ => Err(TensorError::DTypeMismatch {
+            expected: DType::F32,
+            actual: tensor.descriptor().dtype(),
+        }),
+    }
 }
 
 fn convolution_dimensions_to_usize(values: &[u64]) -> Result<Vec<usize>, TensorError> {
@@ -3692,7 +3742,11 @@ mod tests {
                 backend.copy(&input, output, context)?;
             }
             PrimitiveOperation::Unary(operation) => {
-                let operation_output_dtype = output_dtype(primitive);
+                let operation_output_dtype = if operation == UnaryOperation::IsFinite {
+                    DType::Bool
+                } else {
+                    dtype
+                };
                 let (input, output) = match role {
                     TensorRole::Input => (
                         zero_tensor(advertised_descriptor)?,
@@ -3706,7 +3760,11 @@ mod tests {
                     TensorRole::Output => (
                         zero_tensor(TensorDescriptor::contiguous(
                             advertised_shape,
-                            DType::F32,
+                            if operation == UnaryOperation::IsFinite {
+                                DType::F32
+                            } else {
+                                dtype
+                            },
                             DeviceId::CPU,
                             StreamId::DEFAULT,
                         )?)?,
@@ -3976,10 +4034,10 @@ mod tests {
                     TensorRole::Input => {
                         let left = zero_tensor(advertised_descriptor)?;
                         let right =
-                            zero_tensor(formatted_descriptor(vec![1, 1, 1], DType::F32, layout)?)?;
+                            zero_tensor(formatted_descriptor(vec![1, 1, 1], dtype, layout)?)?;
                         let output = TensorDescriptor::contiguous(
                             vec![1, 1, 1],
-                            DType::F32,
+                            dtype,
                             DeviceId::CPU,
                             StreamId::DEFAULT,
                         )?;
@@ -3988,7 +4046,7 @@ mod tests {
                     TensorRole::Output => {
                         let left = zero_tensor(TensorDescriptor::contiguous(
                             vec![1, 1, 1],
-                            DType::F32,
+                            dtype,
                             DeviceId::CPU,
                             StreamId::DEFAULT,
                         )?)?;
@@ -4601,24 +4659,26 @@ mod tests {
             &cancellation,
         );
         for layout in [Layout::Contiguous, Layout::Strided] {
-            assert!(
-                backend
-                    .capabilities()
-                    .supports(OperationSupport::linear_algebra_input(
-                        LinearAlgebraOperation::BatchMatrixMultiply,
-                        DType::F32,
-                        layout,
-                    ))
-            );
-            assert!(
-                backend
-                    .capabilities()
-                    .supports(OperationSupport::linear_algebra_output(
-                        LinearAlgebraOperation::BatchMatrixMultiply,
-                        DType::F32,
-                        layout,
-                    ))
-            );
+            for dtype in [DType::F32, DType::F16, DType::Bf16] {
+                assert!(
+                    backend
+                        .capabilities()
+                        .supports(OperationSupport::linear_algebra_input(
+                            LinearAlgebraOperation::BatchMatrixMultiply,
+                            dtype,
+                            layout,
+                        ))
+                );
+                assert!(
+                    backend
+                        .capabilities()
+                        .supports(OperationSupport::linear_algebra_output(
+                            LinearAlgebraOperation::BatchMatrixMultiply,
+                            dtype,
+                            layout,
+                        ))
+                );
+            }
             for dtype in [DType::F32, DType::F16, DType::Bf16] {
                 assert!(
                     backend
@@ -4659,6 +4719,262 @@ mod tests {
             ),
             Err(TensorError::UnsupportedCapability { .. })
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn cpu_low_precision_tanh_executes_exact_values_and_fails_atomically() -> Result<(), TensorError>
+    {
+        fn encoded_tensor(values: &[f32], dtype: DType) -> Result<Tensor, TensorError> {
+            let bytes = values
+                .iter()
+                .map(|value| {
+                    dtype.encode_decoded_scalar(
+                        DecodedScalar::Real(f64::from(*value)),
+                        "sim.cpu.unary.hyperbolic-tangent.test",
+                        DeviceId::CPU,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                .flatten()
+                .collect();
+            Tensor::from_bytes(typed_descriptor(vec![values.len() as u64], dtype), bytes)
+        }
+
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1024)?;
+        let cancellation = CancellationToken::default();
+        let context = backend.execution_context(
+            StreamId::DEFAULT,
+            authority.authorize_workspace(1024)?,
+            &cancellation,
+        );
+        for dtype in [DType::F32, DType::F16, DType::Bf16] {
+            let input = encoded_tensor(&[-1.0, 0.0, 0.5], dtype)?;
+            let (actual, event) = backend.unary(
+                UnaryOperation::HyperbolicTangent,
+                &input,
+                typed_descriptor(vec![3], dtype),
+                &context,
+            )?;
+            backend.wait_event(event, &context)?;
+            for index in 0..3 {
+                let decoded_source = read_real_f32(&input, &[index as u64])?;
+                let expected_bytes = dtype.encode_decoded_scalar(
+                    DecodedScalar::Real(f64::from(decoded_source.tanh())),
+                    "sim.cpu.unary.hyperbolic-tangent.test",
+                    DeviceId::CPU,
+                )?;
+                let expected = match dtype.decode_scalar(&expected_bytes)? {
+                    DecodedScalar::Real(value) => value as f32,
+                    _ => unreachable!("floating tanh dtype decoded as a non-real scalar"),
+                };
+                assert_eq!(read_real_f32(&actual, &[index as u64])?, expected);
+            }
+        }
+        assert_eq!(backend.memory_snapshot().current_bytes, 0);
+
+        let input = encoded_tensor(&[0.5], DType::F16)?;
+        let before = backend.memory_snapshot();
+        assert!(matches!(
+            backend.unary(
+                UnaryOperation::HyperbolicTangent,
+                &input,
+                typed_descriptor(vec![1], DType::F32),
+                &context,
+            ),
+            Err(TensorError::DTypeMismatch {
+                expected: DType::F16,
+                actual: DType::F32,
+            })
+        ));
+        assert_eq!(backend.memory_snapshot(), before);
+
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        let cancelled_context = backend.execution_context(
+            StreamId::DEFAULT,
+            authority.authorize_workspace(0)?,
+            &cancelled,
+        );
+        assert!(matches!(
+            backend.unary(
+                UnaryOperation::HyperbolicTangent,
+                &input,
+                typed_descriptor(vec![1], DType::F16),
+                &cancelled_context,
+            ),
+            Err(TensorError::Cancelled)
+        ));
+        assert_eq!(backend.memory_snapshot(), before);
+
+        let (oom_backend, oom_authority) = CpuWorkspaceAuthority::create_backend(1)?;
+        let oom_context = oom_backend.execution_context(
+            StreamId::DEFAULT,
+            oom_authority.authorize_workspace(0)?,
+            &cancellation,
+        );
+        assert!(matches!(
+            oom_backend.unary(
+                UnaryOperation::HyperbolicTangent,
+                &input,
+                typed_descriptor(vec![1], DType::F16),
+                &oom_context,
+            ),
+            Err(TensorError::AllocationFailed { .. })
+        ));
+        assert_eq!(oom_backend.memory_snapshot().current_bytes, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn cpu_low_precision_bmm_executes_exact_values_and_fails_atomically() -> Result<(), TensorError>
+    {
+        fn encoded_tensor(
+            shape: Vec<u64>,
+            values: &[f32],
+            dtype: DType,
+        ) -> Result<Tensor, TensorError> {
+            let bytes = values
+                .iter()
+                .map(|value| {
+                    dtype.encode_decoded_scalar(
+                        DecodedScalar::Real(f64::from(*value)),
+                        "sim.cpu.linear-algebra.bmm.test",
+                        DeviceId::CPU,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                .flatten()
+                .collect();
+            Tensor::from_bytes(typed_descriptor(shape, dtype), bytes)
+        }
+
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1024)?;
+        let cancellation = CancellationToken::default();
+        let context = backend.execution_context(
+            StreamId::DEFAULT,
+            authority.authorize_workspace(1024)?,
+            &cancellation,
+        );
+        for dtype in [DType::F32, DType::F16, DType::Bf16] {
+            let left = encoded_tensor(vec![1, 2, 3], &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0], dtype)?;
+            let right = encoded_tensor(vec![1, 3, 2], &[7.0, 8.0, 9.0, 10.0, 11.0, 12.0], dtype)?;
+            let output = typed_descriptor(vec![1, 2, 2], dtype);
+            let (actual, event) = backend.linear_algebra(
+                LinearAlgebraOperation::BatchMatrixMultiply,
+                &[left, right],
+                output,
+                &context,
+            )?;
+            backend.wait_event(event, &context)?;
+            let actual = tensor_to_f32_workspace(&backend, &actual, &context)?;
+            assert_eq!(&*actual, &[58.0, 64.0, 139.0, 154.0]);
+
+            let rounded_left = encoded_tensor(vec![1, 1, 1], &[0.1], dtype)?;
+            let rounded_right = encoded_tensor(vec![1, 1, 1], &[0.2], dtype)?;
+            let decoded_product = read_real_f32(&rounded_left, &[0, 0, 0])?
+                * read_real_f32(&rounded_right, &[0, 0, 0])?;
+            let expected_bytes = dtype.encode_decoded_scalar(
+                DecodedScalar::Real(f64::from(decoded_product)),
+                "sim.cpu.linear-algebra.bmm.test",
+                DeviceId::CPU,
+            )?;
+            let expected = match dtype.decode_scalar(&expected_bytes)? {
+                DecodedScalar::Real(value) => value as f32,
+                _ => unreachable!("floating BMM dtype decoded as a non-real scalar"),
+            };
+            let (rounded, event) = backend.linear_algebra(
+                LinearAlgebraOperation::BatchMatrixMultiply,
+                &[rounded_left, rounded_right],
+                typed_descriptor(vec![1, 1, 1], dtype),
+                &context,
+            )?;
+            backend.wait_event(event, &context)?;
+            assert_eq!(read_real_f32(&rounded, &[0, 0, 0])?, expected);
+        }
+        assert_eq!(backend.memory_snapshot().current_bytes, 0);
+
+        let f16_left = encoded_tensor(vec![1, 1, 1], &[2.0], DType::F16)?;
+        let bf16_right = encoded_tensor(vec![1, 1, 1], &[3.0], DType::Bf16)?;
+        let before = backend.memory_snapshot();
+        assert!(matches!(
+            backend.linear_algebra(
+                LinearAlgebraOperation::BatchMatrixMultiply,
+                &[f16_left.clone(), bf16_right],
+                typed_descriptor(vec![1, 1, 1], DType::F16),
+                &context,
+            ),
+            Err(TensorError::DTypeMismatch {
+                expected: DType::F16,
+                actual: DType::Bf16,
+            })
+        ));
+        assert_eq!(backend.memory_snapshot(), before);
+        assert!(matches!(
+            backend.linear_algebra(
+                LinearAlgebraOperation::BatchMatrixMultiply,
+                &[f16_left.clone(), f16_left.clone()],
+                typed_descriptor(vec![1, 1, 1], DType::F32),
+                &context,
+            ),
+            Err(TensorError::DTypeMismatch {
+                expected: DType::F16,
+                actual: DType::F32,
+            })
+        ));
+        assert_eq!(backend.memory_snapshot(), before);
+
+        let malformed_right = encoded_tensor(vec![1, 2, 1], &[3.0, 4.0], DType::F16)?;
+        assert!(matches!(
+            backend.linear_algebra(
+                LinearAlgebraOperation::BatchMatrixMultiply,
+                &[f16_left.clone(), malformed_right],
+                typed_descriptor(vec![1, 1, 1], DType::F16),
+                &context,
+            ),
+            Err(TensorError::Faulted { reason })
+                if reason == "batch matrix multiplication dimensions are incompatible"
+        ));
+        assert_eq!(backend.memory_snapshot(), before);
+
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        let cancelled_context = backend.execution_context(
+            StreamId::DEFAULT,
+            authority.authorize_workspace(0)?,
+            &cancelled,
+        );
+        assert!(matches!(
+            backend.linear_algebra(
+                LinearAlgebraOperation::BatchMatrixMultiply,
+                &[f16_left.clone(), f16_left],
+                typed_descriptor(vec![1, 1, 1], DType::F16),
+                &cancelled_context,
+            ),
+            Err(TensorError::Cancelled)
+        ));
+        assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+        assert_eq!(backend.memory_snapshot(), before);
+
+        let (oom_backend, oom_authority) = CpuWorkspaceAuthority::create_backend(1)?;
+        let oom_context = oom_backend.execution_context(
+            StreamId::DEFAULT,
+            oom_authority.authorize_workspace(0)?,
+            &cancellation,
+        );
+        let left = encoded_tensor(vec![1, 1, 1], &[2.0], DType::Bf16)?;
+        assert!(matches!(
+            oom_backend.linear_algebra(
+                LinearAlgebraOperation::BatchMatrixMultiply,
+                &[left.clone(), left],
+                typed_descriptor(vec![1, 1, 1], DType::Bf16),
+                &oom_context,
+            ),
+            Err(TensorError::AllocationFailed { .. })
+        ));
+        assert_eq!(oom_backend.memory_snapshot().current_bytes, 0);
         Ok(())
     }
 

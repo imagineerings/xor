@@ -79,7 +79,7 @@ pub fn tanh_with_context_exact_native(
     context: &ExecutionContext<'_>,
 ) -> Result<Tensor, ElementwiseRuntimePartTwoError> {
     context.cancellation.check()?;
-    unary_f32(
+    unary_float_preserving_dtype(
         backend,
         input,
         TANH_OPERATION_ID,
@@ -528,6 +528,32 @@ pub fn view_as_complex_jvp_exact_native(
     cancellation: &CancellationToken,
 ) -> Result<Tensor, ElementwiseRuntimePartTwoError> {
     view_as_complex_exact_native(input_tangent, cancellation)
+}
+
+fn unary_float_preserving_dtype(
+    backend: &CpuBackend,
+    input: &Tensor,
+    operation_id: &'static str,
+    operation: UnaryOperation,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, ElementwiseRuntimePartTwoError> {
+    require_cpu(input, operation_id)?;
+    let dtype = input.descriptor().dtype();
+    if !matches!(dtype, DType::F16 | DType::Bf16 | DType::F32) {
+        return Err(ElementwiseRuntimePartTwoError::UnsupportedDType {
+            operation: operation_id,
+            dtype,
+        });
+    }
+    let descriptor = TensorDescriptor::contiguous(
+        input.descriptor().shape().to_vec(),
+        dtype,
+        DeviceId::CPU,
+        input.descriptor().stream(),
+    )?;
+    let (output, _) = backend.unary(operation, input, descriptor, context)?;
+    context.check()?;
+    Ok(output)
 }
 
 fn unary_f32(

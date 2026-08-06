@@ -1486,12 +1486,15 @@ impl NativeModule {
             | NativeModuleSpec::Relu6 => {
                 requirements.append_unary(UnaryOperation::Relu, dtype);
             }
-            NativeModuleSpec::Sigmoid | NativeModuleSpec::Silu => {
+            NativeModuleSpec::Sigmoid => {
                 requirements.append_unary(UnaryOperation::Sigmoid, dtype);
-                if matches!(self.spec, NativeModuleSpec::Silu) {
-                    requirements.append_binary(BinaryOperation::Multiply, dtype);
-                }
             }
+            // The canonical SiLU owner decodes the admitted tensor into its bounded f32
+            // workspace, evaluates the exact scalar map, and re-encodes the requested dtype.
+            // It does not dispatch the backend unary or binary primitives, so advertising
+            // those as target requirements would reject otherwise executable low-precision
+            // CPU modules.
+            NativeModuleSpec::Silu => {}
             NativeModuleSpec::Tanh => {
                 requirements.append_unary(UnaryOperation::HyperbolicTangent, dtype);
             }

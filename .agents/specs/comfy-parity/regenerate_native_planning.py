@@ -70,7 +70,12 @@ _D27_CERTIFIED_BASELINE_SENTENCE = (
     "signed CPU hardware attestation is an external release-certification gate and never requires "
     "private signing material for implementation completion. Other accelerator hardware observations "
     "are conditional external release-certification gates and cannot be reported as passes on an "
-    "unavailable host."
+    "unavailable host. The CPU capability matrix advertises batch matrix multiplication for F32, F16, "
+    "and BF16 only because its native kernel decodes each input through the canonical DType codec, "
+    "accumulates deterministically in f32, re-encodes the selected output dtype, and rejects mixed "
+    "dtypes, invalid geometry, cancellation, and capacity failure before publishing an output. Its "
+    "hyperbolic-tangent primitive likewise admits F32, F16, and BF16, evaluates the decoded value "
+    "with deterministic f32 semantics, re-encodes the input dtype, and preserves typed atomic failure."
 )
 _D27_COREX_PENDING_SENTENCE = (
     "Until lawfully supplied headers, exact signatures, layouts, and normalized digests are independently reviewed, "
@@ -8987,6 +8992,75 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     remediation_tasks.insert(model_detection_index, backend_catalog_task)
     tasks.extend(remediation_tasks)
 
+    cpu_low_precision_bmm_task = "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+    tasks.append(
+        task(
+            cpu_low_precision_bmm_task,
+            "Close CPU low-precision BMM/tanh and model-execution admission",
+            [7, 31, 34, 35, 38, 41],
+            [25, 27, 28, 31, 32, 39, 41],
+            [
+                "VAL-TENSOR-001",
+                "VAL-MODEL-FAMILY-ROW-001",
+                "VAL-DEVICE-001",
+                "VAL-CANCEL-001",
+                "VAL-MEMORY-001",
+                "VAL-OWNERSHIP-001",
+            ],
+            "Close the execution gaps discovered while independently validating the LTXAV, LTXV, and LotusD rows: make the canonical CPU BatchMatrixMultiply and hyperbolic-tangent primitives honestly execute F32, F16, and BF16 tensors, carry low-precision tanh through its canonical tensor facade, and make NativeModule target admission request only primitives its selected execution path actually dispatches. Preserve deterministic f32 accumulation/evaluation, canonical DType decoding/encoding, caller-owned cancellation and workspace authority, backend capacity accounting, typed fail-closed behavior, and atomic publication.",
+            [
+                ".agents/specs/comfy-parity/requirements.md",
+                ".agents/specs/comfy-parity/design.md",
+                ".agents/specs/comfy-parity/tasks.md",
+                "crates/comfy_tensor/src/cpu_backend.rs",
+                "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_02.rs",
+                "crates/comfy_model/src/native_ops.rs",
+                "crates/comfy_model/tests/families/ltxav_comfy_model_0102.rs",
+                "crates/comfy_model/tests/families/ltxv_comfy_model_0103.rs",
+                "crates/comfy_model/tests/families/lotusd_comfy_model_0106.rs",
+                "crates/comfy_test_support/fixtures/models/ltxav-comfy-model-0102",
+                "crates/comfy_test_support/fixtures/models/ltxv-comfy-model-0103",
+            ],
+            [
+                ".agents/specs/comfy-parity/regenerate_native_planning.py",
+                ".agents/specs/comfy-parity/design.md",
+                ".agents/specs/comfy-parity/tasks.md",
+                ".agents/specs/comfy-parity/traceability.md",
+                ".agents/specs/comfy-parity/validation.md",
+                "crates/comfy_tensor/src/cpu_backend.rs",
+                "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_02.rs",
+                "crates/comfy_model/src/native_ops.rs",
+                "crates/comfy_model/tests/families/ltxav_comfy_model_0102.rs",
+                "target/comfy-parity/val-model-family-row-001/lotusd-comfy-model-0106.json",
+                "target/comfy-parity/val-model-family-row-001/ltxav-comfy-model-0102.json",
+                "target/comfy-parity/val-model-family-row-001/ltxv-comfy-model-0103.json",
+            ],
+            "The CPU capability matrix advertises contiguous and strided BMM and hyperbolic tangent for exactly F32, F16, and BF16; nonzero fixtures execute all three dtypes through canonical DType codecs with deterministic f32 accumulation/evaluation and output-dtype rounding. Mixed BMM input or output dtypes, malformed geometry, cancellation, and allocation failure return typed errors without output publication or leaked capacity, and low-precision tanh preserves the same atomic guarantees through its canonical tensor facade. NativeModule SiLU admission no longer invents unary or binary primitive requirements for its canonical bounded f32-workspace execution path. LTXAV and LTXV execute both original and patched native forward checkpoints in BF16 and F32, LotusD executes F16/BF16/F32 through canonical tanh, and focused plus aggregate tensor, model, memory, cancellation, ownership, formatting, clippy, and strict-generation checks pass. Evidence marker: POST-CPU-LOW-PRECISION-BMM-MODEL-CLOSURE.",
+            [
+                "comfy-parity-native-cpu-backend",
+                "comfy-parity-tensor-ops-linear-algebra-comfy-tensor-op-a5d623c79a18",
+                "comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-0fb8594194a8",
+                "comfy-parity-native-module-backend-target-admission-consolidation",
+                "comfy-parity-workspace-final-ownership-audit",
+                "comfy-parity-pixart-family-adapter-consolidation",
+            ],
+            registered_source_edits=["comfy_tensor", "comfy_model"],
+        )
+    )
+
+    for item in tasks:
+        if item["id"] in {
+            "comfy-parity-native-model-family-ltxav-comfy-model-0102",
+            "comfy-parity-native-model-family-ltxv-comfy-model-0103",
+            "comfy-parity-qwen-image-family-adapter-consolidation",
+            "comfy-parity-model-family-breadth-closure",
+            "comfy-parity-native-compute-breadth-integration",
+            "comfy-parity-final-validation",
+        }:
+            item["dependencies"] = list(
+                dict.fromkeys(item["dependencies"] + [cpu_low_precision_bmm_task])
+            )
+
     appledouble_portability_task = "comfy-parity-appledouble-source-scan-portability"
     for item in tasks:
         if item["id"] == "comfy-parity-clip-text-encoder-decoder-foundation":
@@ -9858,6 +9932,26 @@ def task_validation_commands(item: dict[str, object]) -> str:
             "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --all-targets",
             "./script/clippy -p comfy_model -p comfy_test_support",
             "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+        ]
+    elif identifier == "comfy-parity-cpu-low-precision-bmm-model-execution-closure":
+        commands = [
+            "cargo fmt --all -- --check",
+            "cargo check --locked -p comfy_tensor -p comfy_model -p comfy_test_support --all-targets",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_tensor --lib cpu_low_precision_bmm_executes_exact_values_and_fails_atomically",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_tensor --lib cpu_low_precision_tanh_executes_exact_values_and_fails_atomically",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_tensor --lib every_advertised_cpu_primitive_signature_executes",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test model_families generated_ltxav_comfy_model_0102",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test model_families generated_ltxv_comfy_model_0103",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test model_families generated_lotusd_comfy_model_0106",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_worker --test memory_conformance val_memory_001",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test cancellation_ownership val_cancel_001_canonical_cancellation_ownership",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_tensor --all-targets",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --all-targets",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --all-targets",
+            "./script/clippy -p comfy_tensor -p comfy_model -p comfy_test_support",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/comfy-parity",
         ]
     elif identifier == "comfy-parity-model-detection-any-of-key-selector-consolidation":
         commands = [
