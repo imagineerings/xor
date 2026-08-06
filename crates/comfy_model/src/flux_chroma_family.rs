@@ -80,7 +80,71 @@ pub const FLUX_MODEL_OPTIONAL_KEYS: &[&str] = &[
 
 pub const FLUX_SUPPORTED_DTYPES: &[DType] = &[DType::Bf16, DType::F16, DType::F32];
 pub const FLUX_SUPPORTED_DEVICES: &[DeviceKind] = &[DeviceKind::Cpu];
+pub const FLUX_NATIVE_KEY_NORM_KEYS: &[&str] = &[
+    "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.weight",
+    "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale",
+    "double_blocks.0.img_attn.norm.key_norm.weight",
+    "double_blocks.0.img_attn.norm.key_norm.scale",
+];
+pub const FLUX_DIFFUSERS_KEY_NORM_KEYS: &[&str] = &[
+    "transformer_blocks.0.attn.norm_k.weight",
+    "transformer_blocks.0.attn.norm_k.scale",
+];
+pub const FLUX_INPUT_PROJECTION_KEYS: &[&str] = &[
+    "model.diffusion_model.img_in.weight",
+    "img_in.weight",
+    "x_embedder.weight",
+];
+pub const FLUX_TEXT_PROJECTION_KEYS: &[&str] = &[
+    "model.diffusion_model.txt_in.weight",
+    "txt_in.weight",
+    "context_embedder.weight",
+];
+pub const FLUX_GUIDANCE_PROJECTION_KEYS: &[&str] = &[
+    "model.diffusion_model.guidance_in.in_layer.weight",
+    "guidance_in.in_layer.weight",
+    "time_text_embed.guidance_embedder.linear_1.weight",
+];
+pub const FLUX2_DISCRIMINATOR_KEYS: &[&str] = &[
+    "model.diffusion_model.double_stream_modulation_img.lin.weight",
+    "double_stream_modulation_img.lin.weight",
+    "single_transformer_blocks.0.attn.to_qkv_mlp_proj.weight",
+];
 pub const FLUX_LAYOUT_SIGNATURES: &[ModelLayoutSignature] = &[
+    ModelLayoutSignature {
+        layout: ModelStateLayout::PrefixedNative,
+        required_keys: &[],
+        required_prefixes: &["model.diffusion_model.double_blocks.0.img_attn.norm.key_norm."],
+    },
+    ModelLayoutSignature {
+        layout: ModelStateLayout::StandaloneNative,
+        required_keys: &[],
+        required_prefixes: &["double_blocks.0.img_attn.norm.key_norm."],
+    },
+    ModelLayoutSignature {
+        layout: ModelStateLayout::Diffusers,
+        required_keys: &[
+            "x_embedder.weight",
+            "x_embedder.bias",
+            "context_embedder.weight",
+            "transformer_blocks.0.attn.to_q.weight",
+            "transformer_blocks.0.attn.to_k.weight",
+            "transformer_blocks.0.attn.to_v.weight",
+            "transformer_blocks.0.attn.to_out.0.weight",
+            "single_transformer_blocks.0.attn.to_q.weight",
+            "single_transformer_blocks.0.attn.to_k.weight",
+            "single_transformer_blocks.0.attn.to_v.weight",
+            "single_transformer_blocks.0.proj_mlp.weight",
+            "single_transformer_blocks.0.proj_out.weight",
+            "proj_out.weight",
+        ],
+        required_prefixes: &[
+            "transformer_blocks.0.attn.norm_k.",
+            "single_transformer_blocks.0.attn.norm_k.",
+        ],
+    },
+];
+pub const CHROMA_LAYOUT_SIGNATURES: &[ModelLayoutSignature] = &[
     ModelLayoutSignature {
         layout: ModelStateLayout::PrefixedNative,
         required_keys: &[],
@@ -179,6 +243,50 @@ pub const FLUX_UNPREFIXED_STATE_PLAN: ModelStateTransformPlanDefinition =
     }"#,
     };
 
+pub const FLUX_DIFFUSERS_STATE_PLAN: ModelStateTransformPlanDefinition =
+    ModelStateTransformPlanDefinition {
+        schema_version: MODEL_STATE_TRANSFORM_PLAN_SCHEMA_VERSION,
+        encoded_plan: r#"{
+        "operations": [
+            {"Copy":{"selector":{"predicate":{"Exact":"x_embedder.weight"},"minimum_matches":1,"maximum_matches":1},"rewrite":{"Exact":"native.img_in.weight"},"component":"model"}},
+            {"Copy":{"selector":{"predicate":{"Exact":"x_embedder.bias"},"minimum_matches":1,"maximum_matches":1},"rewrite":{"Exact":"native.img_in.bias"},"component":"model"}},
+            {"Copy":{"selector":{"predicate":{"Exact":"context_embedder.weight"},"minimum_matches":1,"maximum_matches":1},"rewrite":{"Exact":"native.txt_in.weight"},"component":"model"}},
+            {"Copy":{"selector":{"predicate":{"Exact":"context_embedder.bias"},"minimum_matches":0,"maximum_matches":1},"rewrite":{"Exact":"native.txt_in.bias"},"component":"model"}},
+            {"Copy":{"selector":{"predicate":{"Exact":"proj_out.weight"},"minimum_matches":1,"maximum_matches":1},"rewrite":{"Exact":"native.final_layer.linear.weight"},"component":"model"}},
+            {"Copy":{"selector":{"predicate":{"Exact":"proj_out.bias"},"minimum_matches":0,"maximum_matches":1},"rewrite":{"Exact":"native.final_layer.linear.bias"},"component":"model"}},
+            {"Copy":{"selector":{"predicate":{"Exact":"transformer_blocks.0.attn.to_out.0.weight"},"minimum_matches":1,"maximum_matches":1},"rewrite":{"Exact":"native.double_blocks.0.img_attn.proj.weight"},"component":"model"}},
+            {"Copy":{"selector":{"predicate":{"Exact":"transformer_blocks.0.attn.to_out.0.bias"},"minimum_matches":0,"maximum_matches":1},"rewrite":{"Exact":"native.double_blocks.0.img_attn.proj.bias"},"component":"model"}},
+            {"Copy":{"selector":{"predicate":{"Exact":"transformer_blocks.0.attn.norm_k.weight"},"minimum_matches":0,"maximum_matches":1},"rewrite":{"Exact":"native.double_blocks.0.img_attn.norm.key_norm.weight"},"component":"model"}},
+            {"Copy":{"selector":{"predicate":{"Exact":"transformer_blocks.0.attn.norm_k.scale"},"minimum_matches":0,"maximum_matches":1},"rewrite":{"Exact":"native.double_blocks.0.img_attn.norm.key_norm.weight"},"component":"model"}},
+            {"Copy":{"selector":{"predicate":{"Exact":"single_transformer_blocks.0.proj_out.weight"},"minimum_matches":1,"maximum_matches":1},"rewrite":{"Exact":"native.single_blocks.0.linear2.weight"},"component":"model"}},
+            {"Copy":{"selector":{"predicate":{"Exact":"single_transformer_blocks.0.proj_out.bias"},"minimum_matches":0,"maximum_matches":1},"rewrite":{"Exact":"native.single_blocks.0.linear2.bias"},"component":"model"}},
+            {"Copy":{"selector":{"predicate":{"Exact":"transformer_blocks.0.attn.to_q.weight"},"minimum_matches":1,"maximum_matches":1},"rewrite":{"Exact":"conversion.double_blocks.0.img_attn.q.weight"},"component":"model"}},
+            {"Copy":{"selector":{"predicate":{"Exact":"transformer_blocks.0.attn.to_k.weight"},"minimum_matches":1,"maximum_matches":1},"rewrite":{"Exact":"conversion.double_blocks.0.img_attn.k.weight"},"component":"model"}},
+            {"Copy":{"selector":{"predicate":{"Exact":"transformer_blocks.0.attn.to_v.weight"},"minimum_matches":1,"maximum_matches":1},"rewrite":{"Exact":"conversion.double_blocks.0.img_attn.v.weight"},"component":"model"}},
+            {"Assemble":{"sources":[{"Staged":{"component":"model","key":"conversion.double_blocks.0.img_attn.q.weight"}},{"Staged":{"component":"model","key":"conversion.double_blocks.0.img_attn.k.weight"}},{"Staged":{"component":"model","key":"conversion.double_blocks.0.img_attn.v.weight"}}],"dimension":0,"output":{"component":"model","key":"native.double_blocks.0.img_attn.qkv.weight"}}},
+            {"Copy":{"selector":{"predicate":{"Exact":"single_transformer_blocks.0.attn.to_q.weight"},"minimum_matches":1,"maximum_matches":1},"rewrite":{"Exact":"conversion.single_blocks.0.q.weight"},"component":"model"}},
+            {"Copy":{"selector":{"predicate":{"Exact":"single_transformer_blocks.0.attn.to_k.weight"},"minimum_matches":1,"maximum_matches":1},"rewrite":{"Exact":"conversion.single_blocks.0.k.weight"},"component":"model"}},
+            {"Copy":{"selector":{"predicate":{"Exact":"single_transformer_blocks.0.attn.to_v.weight"},"minimum_matches":1,"maximum_matches":1},"rewrite":{"Exact":"conversion.single_blocks.0.v.weight"},"component":"model"}},
+            {"Copy":{"selector":{"predicate":{"Exact":"single_transformer_blocks.0.proj_mlp.weight"},"minimum_matches":1,"maximum_matches":1},"rewrite":{"Exact":"conversion.single_blocks.0.mlp.weight"},"component":"model"}},
+            {"Assemble":{"sources":[{"Staged":{"component":"model","key":"conversion.single_blocks.0.q.weight"}},{"Staged":{"component":"model","key":"conversion.single_blocks.0.k.weight"}},{"Staged":{"component":"model","key":"conversion.single_blocks.0.v.weight"}},{"Staged":{"component":"model","key":"conversion.single_blocks.0.mlp.weight"}}],"dimension":0,"output":{"component":"model","key":"native.single_blocks.0.linear1.weight"}}},
+            {"Copy":{"selector":{"predicate":{"Exact":"time_text_embed.timestep_embedder.linear_1.weight"},"minimum_matches":0,"maximum_matches":1},"rewrite":{"Exact":"native.time_in.in_layer.weight"},"component":"model"}},
+            {"Copy":{"selector":{"predicate":{"Exact":"time_text_embed.text_embedder.linear_1.weight"},"minimum_matches":0,"maximum_matches":1},"rewrite":{"Exact":"native.vector_in.in_layer.weight"},"component":"model"}},
+            {"Copy":{"selector":{"predicate":{"Exact":"time_text_embed.guidance_embedder.linear_1.weight"},"minimum_matches":0,"maximum_matches":1},"rewrite":{"Exact":"native.guidance_in.in_layer.weight"},"component":"model"}},
+            {"Move":{"selector":{"predicate":{"Prefix":"x_embedder."},"minimum_matches":1,"maximum_matches":64},"rewrite":{"Prefix":{"from":"x_embedder.","to":"native.diffusers.x_embedder."}},"component":"model"}},
+            {"Move":{"selector":{"predicate":{"Prefix":"context_embedder."},"minimum_matches":1,"maximum_matches":64},"rewrite":{"Prefix":{"from":"context_embedder.","to":"native.diffusers.context_embedder."}},"component":"model"}},
+            {"Move":{"selector":{"predicate":{"Prefix":"transformer_blocks."},"minimum_matches":1,"maximum_matches":16384},"rewrite":{"Prefix":{"from":"transformer_blocks.","to":"native.diffusers.transformer_blocks."}},"component":"model"}},
+            {"Move":{"selector":{"predicate":{"Prefix":"single_transformer_blocks."},"minimum_matches":1,"maximum_matches":16384},"rewrite":{"Prefix":{"from":"single_transformer_blocks.","to":"native.diffusers.single_transformer_blocks."}},"component":"model"}},
+            {"Move":{"selector":{"predicate":{"Prefix":"time_text_embed."},"minimum_matches":0,"maximum_matches":256},"rewrite":{"Prefix":{"from":"time_text_embed.","to":"native.diffusers.time_text_embed."}},"component":"model"}},
+            {"Move":{"selector":{"predicate":{"Prefix":"norm_out."},"minimum_matches":0,"maximum_matches":64},"rewrite":{"Prefix":{"from":"norm_out.","to":"native.diffusers.norm_out."}},"component":"model"}},
+            {"Move":{"selector":{"predicate":{"Prefix":"proj_out."},"minimum_matches":1,"maximum_matches":64},"rewrite":{"Prefix":{"from":"proj_out.","to":"native.diffusers.proj_out."}},"component":"model"}},
+            {"Move":{"selector":{"predicate":{"Prefix":"controlnet_x_embedder."},"minimum_matches":0,"maximum_matches":64},"rewrite":{"Prefix":{"from":"controlnet_x_embedder.","to":"native.diffusers.controlnet_x_embedder."}},"component":"model"}},
+            {"Move":{"selector":{"predicate":{"Prefix":"vae."},"minimum_matches":0,"maximum_matches":16384},"rewrite":"Identity","component":"vae"}},
+            {"Move":{"selector":{"predicate":{"Prefix":"text_encoders."},"minimum_matches":0,"maximum_matches":16384},"rewrite":{"Prefix":{"from":"text_encoders.","to":"text_encoder."}},"component":"text_encoder"}}
+        ],
+        "unmatched":{"Route":{"component":"model","rewrite":"Identity"}}
+    }"#,
+    };
+
 pub const FLUX_STATE_PLAN_CASES: &[ModelFamilyStatePlanCase] = &[
     ModelFamilyStatePlanCase {
         layout: ModelStateLayout::PrefixedNative,
@@ -187,6 +295,10 @@ pub const FLUX_STATE_PLAN_CASES: &[ModelFamilyStatePlanCase] = &[
     ModelFamilyStatePlanCase {
         layout: ModelStateLayout::StandaloneNative,
         plan: &FLUX_UNPREFIXED_STATE_PLAN,
+    },
+    ModelFamilyStatePlanCase {
+        layout: ModelStateLayout::Diffusers,
+        plan: &FLUX_DIFFUSERS_STATE_PLAN,
     },
 ];
 
@@ -217,12 +329,14 @@ pub enum FluxChromaVariant {
     Flux2,
     Chroma,
     ChromaRadiance,
+    LongCatImage,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FluxChromaLayout {
     Native,
     Unprefixed,
+    Diffusers,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -245,6 +359,7 @@ pub struct FluxChromaConfiguration {
     pub double_block_count: usize,
     pub single_block_count: usize,
     pub guidance_embedding: bool,
+    pub text_id_dimensions: &'static [u64],
     pub final_head: FluxChromaFinalHead,
     pub use_x0_prediction: bool,
     pub use_sequential_text_ids: bool,
@@ -263,35 +378,70 @@ pub fn configuration_for_probe(
     let (layout, prefix) = match probe.select_layout(FLUX_LAYOUT_SIGNATURES)? {
         ModelStateLayout::PrefixedNative => (FluxChromaLayout::Native, "model.diffusion_model."),
         ModelStateLayout::StandaloneNative => (FluxChromaLayout::Unprefixed, ""),
-        ModelStateLayout::Diffusers => {
-            return Err(invalid_configuration(
-                "Diffusers layout is unsupported".to_owned(),
-            ));
-        }
+        ModelStateLayout::Diffusers => (FluxChromaLayout::Diffusers, ""),
+    };
+    let diffusers = layout == FluxChromaLayout::Diffusers;
+    let img_input_key = if diffusers {
+        "x_embedder.weight".to_owned()
+    } else {
+        format!("{prefix}img_in.weight")
+    };
+    let text_input_key = if diffusers {
+        "context_embedder.weight".to_owned()
+    } else {
+        format!("{prefix}txt_in.weight")
+    };
+    let vector_input_key = if diffusers {
+        "time_text_embed.text_embedder.linear_1.weight".to_owned()
+    } else {
+        format!("{prefix}vector_in.in_layer.weight")
+    };
+    let guidance_input_key = if diffusers {
+        "time_text_embed.guidance_embedder.linear_1.weight".to_owned()
+    } else {
+        format!("{prefix}guidance_in.in_layer.weight")
+    };
+    let (double_block_pattern, single_block_pattern) = if diffusers {
+        ("transformer_blocks.{}.", "single_transformer_blocks.{}.")
+    } else {
+        ("double_blocks.{}.", "single_blocks.{}.")
     };
 
-    require_weight_or_scale(
-        probe,
-        prefix,
-        "double_blocks.0.img_attn.norm.key_norm",
-        &invalid_configuration,
-    )?;
-    let has_img_input = probe
-        .tensor_shapes
-        .contains_key(&format!("{prefix}img_in.weight"));
-    let has_distilled_guidance =
-        has_weight_or_scale(probe, prefix, "distilled_guidance_layer.0.norms.0")
-            || has_weight_or_scale(probe, prefix, "distilled_guidance_layer.norms.0");
+    if diffusers {
+        require_weight_or_scale(
+            probe,
+            "",
+            "transformer_blocks.0.attn.norm_k",
+            &invalid_configuration,
+        )?;
+    } else {
+        require_weight_or_scale(
+            probe,
+            prefix,
+            "double_blocks.0.img_attn.norm.key_norm",
+            &invalid_configuration,
+        )?;
+    }
+    let has_img_input = probe.tensor_shapes.contains_key(&img_input_key);
+    let has_distilled_guidance = !diffusers
+        && (has_weight_or_scale(probe, prefix, "distilled_guidance_layer.0.norms.0")
+            || has_weight_or_scale(probe, prefix, "distilled_guidance_layer.norms.0"));
     if !has_img_input && !has_distilled_guidance {
         return Err(invalid_configuration(
             "missing img_in or distilled-guidance branch marker".to_string(),
         ));
     }
-    let has_radiance = has_weight_or_scale(probe, prefix, "nerf_blocks.0.norm");
-    let has_flux2 = probe
-        .tensor_shapes
-        .contains_key(&format!("{prefix}double_stream_modulation_img.lin.weight"));
-    let variant = if has_radiance {
+    let has_radiance = !diffusers && has_weight_or_scale(probe, prefix, "nerf_blocks.0.norm");
+    let has_flux2 = if diffusers {
+        probe
+            .tensor_shapes
+            .contains_key("single_transformer_blocks.0.attn.to_qkv_mlp_proj.weight")
+    } else {
+        probe
+            .tensor_shapes
+            .contains_key(&format!("{prefix}double_stream_modulation_img.lin.weight"))
+    };
+    let mut variant = if has_radiance {
         FluxChromaVariant::ChromaRadiance
     } else if has_distilled_guidance {
         FluxChromaVariant::Chroma
@@ -300,18 +450,24 @@ pub fn configuration_for_probe(
     } else {
         FluxChromaVariant::Flux
     };
-    if variant != expected_variant {
+    let flux_or_longcat_expectation = matches!(
+        expected_variant,
+        FluxChromaVariant::Flux | FluxChromaVariant::LongCatImage
+    );
+    if (variant != FluxChromaVariant::Flux && variant != expected_variant)
+        || (variant == FluxChromaVariant::Flux && !flux_or_longcat_expectation)
+    {
         return Err(invalid_configuration(format!(
             "detector selected {variant:?}, expected {expected_variant:?}"
         )));
     }
-
     let (mut in_channels, mut out_channels, mut patch_size, mut hidden_size, axes_dimension) =
         match variant {
             FluxChromaVariant::Flux => (16, 16, 2, 3_072, 128),
             FluxChromaVariant::Flux2 => (16, 128, 1, 3_072, 128),
             FluxChromaVariant::Chroma => (64, 64, 2, 5_120, 128),
             FluxChromaVariant::ChromaRadiance => (3, 3, 0, 0, 128),
+            FluxChromaVariant::LongCatImage => (16, 16, 2, 3_072, 128),
         };
     let mut context_input_dimension = 4_096;
 
@@ -331,7 +487,7 @@ pub fn configuration_for_probe(
             ));
         }
         patch_size = patch_shape[2];
-    } else if let Some(shape) = probe.tensor_shapes.get(&format!("{prefix}img_in.weight")) {
+    } else if let Some(shape) = probe.tensor_shapes.get(&img_input_key) {
         if shape.len() != 2 || shape[0] == 0 || shape[1] == 0 {
             return Err(invalid_configuration("img_in.weight shape".to_string()));
         }
@@ -347,7 +503,7 @@ pub fn configuration_for_probe(
         hidden_size = shape[0];
     }
 
-    if let Some(shape) = probe.tensor_shapes.get(&format!("{prefix}txt_in.weight")) {
+    if let Some(shape) = probe.tensor_shapes.get(&text_input_key) {
         if shape.len() != 2 || shape[0] == 0 || shape[1] == 0 {
             return Err(invalid_configuration("txt_in.weight shape".to_string()));
         }
@@ -388,23 +544,41 @@ pub fn configuration_for_probe(
     let attention_heads = hidden_size / axes_dimension;
     let double_block_count = consecutive_blocks(
         probe,
-        &format!("{prefix}double_blocks.{{}}."),
+        &format!("{prefix}{double_block_pattern}"),
         &invalid_configuration,
     )?;
     let single_block_count = consecutive_blocks(
         probe,
-        &format!("{prefix}single_blocks.{{}}."),
+        &format!("{prefix}{single_block_pattern}"),
         &invalid_configuration,
     )?;
-    let vector_input_dimension = optional_matrix_dimension(
-        probe,
-        &format!("{prefix}vector_in.in_layer.weight"),
-        1,
-        &invalid_configuration,
-    )?;
-    let guidance_embedding = probe
-        .tensor_shapes
-        .contains_key(&format!("{prefix}guidance_in.in_layer.weight"));
+    let vector_input_dimension =
+        optional_matrix_dimension(probe, &vector_input_key, 1, &invalid_configuration)?;
+    let guidance_embedding = probe.tensor_shapes.contains_key(&guidance_input_key);
+
+    if variant == FluxChromaVariant::Flux
+        && context_input_dimension == 3_584
+        && vector_input_dimension.is_none()
+        && !guidance_embedding
+    {
+        variant = FluxChromaVariant::LongCatImage;
+    }
+    if variant != expected_variant {
+        return Err(invalid_configuration(format!(
+            "detector selected {variant:?}, expected {expected_variant:?}"
+        )));
+    }
+    let yak_mlp = !diffusers
+        && probe
+            .tensor_shapes
+            .contains_key(&format!("{prefix}double_blocks.0.img_mlp.gate_proj.weight"));
+    let text_normalization = !diffusers && has_weight_or_scale(probe, prefix, "txt_norm");
+    let text_id_dimensions = match variant {
+        FluxChromaVariant::Flux2 => &[3][..],
+        FluxChromaVariant::LongCatImage => &[1, 2][..],
+        FluxChromaVariant::Flux if yak_mlp && text_normalization => &[1, 2][..],
+        _ => &[][..],
+    };
 
     let final_head = if variant == FluxChromaVariant::ChromaRadiance
         && has_weight_or_scale(probe, prefix, "nerf_final_layer_conv.norm")
@@ -457,6 +631,7 @@ pub fn configuration_for_probe(
         double_block_count,
         single_block_count,
         guidance_embedding,
+        text_id_dimensions,
         final_head,
         use_x0_prediction: probe.tensor_shapes.contains_key(&format!("{prefix}__x0__")),
         use_sequential_text_ids: probe

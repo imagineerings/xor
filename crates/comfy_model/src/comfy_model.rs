@@ -120,7 +120,10 @@ pub use descriptor::{
     ModelParityStatus, TensorKeyRule,
 };
 pub use flux_chroma_family::{
-    FLUX_LAYOUT_SIGNATURES, FluxChromaConfiguration, FluxChromaFinalHead, FluxChromaLayout,
+    CHROMA_LAYOUT_SIGNATURES, FLUX_DIFFUSERS_KEY_NORM_KEYS, FLUX_DIFFUSERS_STATE_PLAN,
+    FLUX_GUIDANCE_PROJECTION_KEYS, FLUX_INPUT_PROJECTION_KEYS, FLUX_LAYOUT_SIGNATURES,
+    FLUX_NATIVE_KEY_NORM_KEYS, FLUX_STATE_PLAN_CASES, FLUX_TEXT_PROJECTION_KEYS,
+    FLUX2_DISCRIMINATOR_KEYS, FluxChromaConfiguration, FluxChromaFinalHead, FluxChromaLayout,
     FluxChromaVariant, configuration_for_probe as flux_chroma_configuration_for_probe,
 };
 pub use formats::{

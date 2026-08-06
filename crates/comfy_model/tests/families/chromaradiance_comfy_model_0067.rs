@@ -611,10 +611,16 @@ fn model_shapes(
     let prefix = match layout {
         radiance::ChromaRadianceLayout::Native => "model.diffusion_model.",
         radiance::ChromaRadianceLayout::Unprefixed => "",
+        radiance::ChromaRadianceLayout::Diffusers => {
+            panic!("ChromaRadiance has no lossless generic Diffusers layout")
+        }
     };
     let norm_suffix = match layout {
         radiance::ChromaRadianceLayout::Native => "scale",
         radiance::ChromaRadianceLayout::Unprefixed => "weight",
+        radiance::ChromaRadianceLayout::Diffusers => {
+            panic!("ChromaRadiance has no lossless generic Diffusers layout")
+        }
     };
     let mut shapes = BTreeMap::from([
         (format!("{prefix}img_in_patch.weight"), vec![2, 3, 1, 1]),

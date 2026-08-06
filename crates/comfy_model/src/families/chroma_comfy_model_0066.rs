@@ -8,7 +8,7 @@ use crate::{
     ModelForwardStep, ModelProbe, ModelStateLayout, ModelStateTransformPlanDefinition,
     ModelWeightRule,
     flux_chroma_family::{
-        FLUX_LAYOUT_SIGNATURES, FluxChromaVariant,
+        CHROMA_LAYOUT_SIGNATURES, FluxChromaVariant,
         configuration_for_probe as flux_chroma_configuration_for_probe,
     },
 };
@@ -277,7 +277,7 @@ pub const MODEL_FAMILY_REGISTRATION: ModelFamilyRegistration = ModelFamilyRegist
     profile_selector: Some(select_profile),
     clip_target_selector: ModelClipTargetSelector::Static(&CLIP_TARGET),
     state_plan_selector: ModelFamilyStatePlanSelector::Layout {
-        signatures: FLUX_LAYOUT_SIGNATURES,
+        signatures: CHROMA_LAYOUT_SIGNATURES,
         cases: STATE_PLAN_CASES,
     },
     component_state_schemas: COMPONENT_STATE_SCHEMAS,
