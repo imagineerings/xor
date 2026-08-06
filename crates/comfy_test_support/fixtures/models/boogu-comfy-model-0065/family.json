@@ -3,16 +3,16 @@
   "feature_id": "COMFY-MODEL-0065",
   "detector": {
     "tensor_shapes": {
-      "model.diffusion_model.double_stream_layers.0.img_instruct_attn.processor.img_to_q.weight": [2, 2],
-      "model.diffusion_model.norm_out.linear_2.bias": [2],
-      "model.diffusion_model.norm_out.linear_2.weight": [2, 2],
-      "model.diffusion_model.x_embedder.bias": [2],
-      "model.diffusion_model.x_embedder.weight": [2, 2]
+      "model.diffusion_model.double_stream_layers.0.img_instruct_attn.processor.img_to_q.weight": [56, 56],
+      "model.diffusion_model.single_stream_layers.0.attn.to_q.weight": [56, 56],
+      "model.diffusion_model.noise_refiner.0.attn.to_q.weight": [56, 56],
+      "model.diffusion_model.time_caption_embed.caption_embedder.0.weight": [56, 4096],
+      "model.diffusion_model.norm_out.linear_2.bias": [64],
+      "model.diffusion_model.norm_out.linear_2.weight": [64, 56],
+      "model.diffusion_model.x_embedder.bias": [56],
+      "model.diffusion_model.x_embedder.weight": [56, 64]
     },
-    "metadata": {
-      "image_model": "boogu",
-      "model_layout": "native"
-    }
+    "metadata": {}
   },
   "base_artifact_digest": "0065006500650065006500650065006500650065006500650065006500650065",
   "source_weights": [
