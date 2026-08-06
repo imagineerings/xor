@@ -16,6 +16,7 @@ pub mod flux_chroma_family;
 pub mod formats;
 pub mod hidream_o1_family;
 pub mod hunyuan3d_family;
+pub mod hunyuandit_family;
 pub mod latent_format;
 pub mod model_family;
 pub mod model_store;
@@ -178,6 +179,24 @@ pub use hunyuan3d_family::{
     configuration_for_probe as hunyuan3d_configuration_for_probe,
     state_plan_for_layout as hunyuan3d_state_plan_for_layout,
 };
+pub use hunyuandit_family::{
+    HUNYUANDIT_BASE_EXTRA_INPUT, HUNYUANDIT_CLIP_CANDIDATES, HUNYUANDIT_CLIP_TARGET,
+    HUNYUANDIT_CLIP_TEXT_DIMENSION, HUNYUANDIT_CLIP_TEXT_LENGTH, HUNYUANDIT_COMMON_MAPPING,
+    HUNYUANDIT_COMPONENTS, HUNYUANDIT_DEFAULT_MLP_RATIO, HUNYUANDIT_DIT1_EXTRA_INPUT,
+    HUNYUANDIT_FORWARD_PROGRAM, HUNYUANDIT_G_DEPTH, HUNYUANDIT_G_HIDDEN_SIZE,
+    HUNYUANDIT_G_MLP_RATIO, HUNYUANDIT_IMAGE_META_DIMENSION,
+    HUNYUANDIT_IMAGE_META_EMBEDDING_DIMENSION, HUNYUANDIT_INPUT_CHANNELS, HUNYUANDIT_LATENT_FORMAT,
+    HUNYUANDIT_LINEAR_END, HUNYUANDIT_LINEAR_START, HUNYUANDIT_MEMORY_USAGE_FACTOR,
+    HUNYUANDIT_NUMBER_OF_HEADS, HUNYUANDIT_PATCH_SIZE, HUNYUANDIT_PREFIXED_STATE_PLAN,
+    HUNYUANDIT_SAVED_MODEL_STATE_PLAN, HUNYUANDIT_STANDALONE_STATE_PLAN,
+    HUNYUANDIT_STANDARD_STATE_PLAN_CASES, HUNYUANDIT_SUPPORTED_DEVICES,
+    HUNYUANDIT_SUPPORTED_DTYPES, HUNYUANDIT_T5_TEXT_DIMENSION, HUNYUANDIT_T5_TEXT_LENGTH,
+    HUNYUANDIT1_LINEAR_END, HunyuanDiTAttentionPrecision, HunyuanDiTCommonMapping,
+    HunyuanDiTConfiguration, HunyuanDiTLayout, HunyuanDiTVariant,
+    common_mapping as hunyuandit_common_mapping,
+    configuration_for_probe as hunyuandit_configuration_for_probe,
+    state_plan_for_layout as hunyuandit_state_plan_for_layout,
+};
 pub use latent_format::{
     LATENT_FORMAT_SCHEMA_VERSION, LatentExtent, LatentFormatDefinition, LatentFormatDescriptor,
     LatentFormatError, LatentFormatIdentity, LatentFormatRegistry, LatentTensorLayout,
@@ -204,11 +223,11 @@ pub use model_family::{
     ModelRoundCondition, ModelSourceConfigurationRule, ModelSplitOutputRule, ModelStateLayout,
     ModelStateTarget, ModelStateTensorReference, ModelStateTransaction,
     ModelStateTransformOperation, ModelStateTransformPlan, ModelStateTransformPlanDefinition,
-    ModelStorageDType, ModelTokenizerDescriptor, ModelTransformBranchOutputRule,
-    ModelUnetPrefixSelection, ModelUnmatchedKeyDisposition, ModelWeightRule,
-    NativeFamilyBuildOptions, NativeFamilyModel, ResolvedModelFamily, build_model_family,
-    build_model_family_for_probe, describe_model_family, detect_model_family_rules,
-    estimate_model_memory, map_model_weights,
+    ModelStorageDType, ModelTensorFactPredicate, ModelTensorFactRelation, ModelTensorFactSubject,
+    ModelTokenizerDescriptor, ModelTransformBranchOutputRule, ModelUnetPrefixSelection,
+    ModelUnmatchedKeyDisposition, ModelWeightRule, NativeFamilyBuildOptions, NativeFamilyModel,
+    ResolvedModelFamily, build_model_family, build_model_family_for_probe, describe_model_family,
+    detect_model_family_rules, estimate_model_memory, map_model_weights,
 };
 #[cfg(unix)]
 pub use model_store::ReadOnlyTensorMapping;

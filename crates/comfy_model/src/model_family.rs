@@ -66,6 +66,7 @@ const MAX_CLIP_TARGET_CANDIDATES: usize = 16;
 const MAX_CLIP_CONFIGURATION_FACTS: usize = 64;
 const MAX_MODEL_DETECTION_KEY_ALTERNATIVES: usize = 16;
 const MAX_MODEL_DETECTION_DIMENSION_VALUES: usize = 16;
+const MAX_MODEL_DETECTION_TENSOR_PREDICATES: usize = 16;
 const MAX_MODEL_LAYOUT_SIGNATURES: usize = 3;
 const MAX_MODEL_LAYOUT_SIGNATURE_FACTS: usize = 16;
 const MAX_MODEL_PROBE_TENSORS: usize = 1_000_000;
@@ -586,6 +587,29 @@ pub struct ModelWeightRule {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ModelTensorFactSubject {
+    Rank,
+    Dimension(usize),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ModelTensorFactRelation {
+    Equal,
+    NotEqual,
+    LessThan,
+    LessThanOrEqual,
+    GreaterThan,
+    GreaterThanOrEqual,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ModelTensorFactPredicate {
+    pub subject: ModelTensorFactSubject,
+    pub relation: ModelTensorFactRelation,
+    pub value: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ModelDetectionRule {
     ExactShape {
         key: &'static str,
@@ -604,6 +628,11 @@ pub enum ModelDetectionRule {
         keys: &'static [&'static str],
         dimension: usize,
         values: &'static [u64],
+        score: u32,
+    },
+    AnyTensorFact {
+        keys: &'static [&'static str],
+        predicates: &'static [ModelTensorFactPredicate],
         score: u32,
     },
     KeyPrefix {
@@ -625,6 +654,7 @@ impl ModelDetectionRule {
             | Self::KeyPresent { score, .. }
             | Self::AnyKeyPresent { score, .. }
             | Self::AnyTensorDimensionValue { score, .. }
+            | Self::AnyTensorFact { score, .. }
             | Self::KeyPrefix { score, .. }
             | Self::Metadata { score, .. } => score,
         }
@@ -5161,6 +5191,14 @@ fn detection_score(
                     .and_then(|shape| shape.get(dimension))
                     .is_some_and(|value| values.contains(value))
             }),
+            ModelDetectionRule::AnyTensorFact {
+                keys, predicates, ..
+            } => keys.iter().any(|key| {
+                probe
+                    .tensor_shapes
+                    .get(*key)
+                    .is_some_and(|shape| tensor_fact_matches(shape, predicates))
+            }),
             ModelDetectionRule::KeyPrefix {
                 prefix,
                 minimum_matches,
@@ -6637,6 +6675,18 @@ fn validate_detection_rules(rules: &[ModelDetectionRule]) -> Result<(), ModelFam
                     ));
                 }
             }
+            ModelDetectionRule::AnyTensorFact {
+                keys, predicates, ..
+            } => {
+                if keys.is_empty() || keys.len() > MAX_MODEL_DETECTION_KEY_ALTERNATIVES {
+                    return Err(ModelFamilyError::InvalidDefinition(format!(
+                        "tensor-fact detector has {} keys; expected 1..={MAX_MODEL_DETECTION_KEY_ALTERNATIVES}",
+                        keys.len()
+                    )));
+                }
+                validate_keys(keys)?;
+                validate_tensor_fact_predicates(predicates)?;
+            }
             ModelDetectionRule::KeyPrefix {
                 prefix,
                 minimum_matches,
@@ -6657,6 +6707,61 @@ fn validate_detection_rules(rules: &[ModelDetectionRule]) -> Result<(), ModelFam
         }
     }
     Ok(())
+}
+
+fn validate_tensor_fact_predicates(
+    predicates: &[ModelTensorFactPredicate],
+) -> Result<(), ModelFamilyError> {
+    if predicates.is_empty() || predicates.len() > MAX_MODEL_DETECTION_TENSOR_PREDICATES {
+        return Err(ModelFamilyError::InvalidDefinition(format!(
+            "tensor-fact detector has {} predicates; expected 1..={MAX_MODEL_DETECTION_TENSOR_PREDICATES}",
+            predicates.len()
+        )));
+    }
+    for (index, predicate) in predicates.iter().enumerate() {
+        match predicate.subject {
+            ModelTensorFactSubject::Rank if predicate.value > MAX_TENSOR_RANK as u64 => {
+                return Err(ModelFamilyError::InvalidDefinition(format!(
+                    "tensor-fact rank {} exceeds maximum rank {MAX_TENSOR_RANK}",
+                    predicate.value
+                )));
+            }
+            ModelTensorFactSubject::Dimension(dimension) if dimension >= MAX_TENSOR_RANK => {
+                return Err(ModelFamilyError::InvalidDefinition(format!(
+                    "tensor-fact dimension {dimension} exceeds maximum rank {MAX_TENSOR_RANK}"
+                )));
+            }
+            _ => {}
+        }
+        if predicates[..index].contains(predicate) {
+            return Err(ModelFamilyError::DuplicateDefinitionValue(
+                "tensor-fact detector predicate".to_owned(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn tensor_fact_matches(shape: &[u64], predicates: &[ModelTensorFactPredicate]) -> bool {
+    predicates.iter().all(|predicate| {
+        let actual = match predicate.subject {
+            ModelTensorFactSubject::Rank => shape.len() as u64,
+            ModelTensorFactSubject::Dimension(dimension) => {
+                let Some(value) = shape.get(dimension) else {
+                    return false;
+                };
+                *value
+            }
+        };
+        match predicate.relation {
+            ModelTensorFactRelation::Equal => actual == predicate.value,
+            ModelTensorFactRelation::NotEqual => actual != predicate.value,
+            ModelTensorFactRelation::LessThan => actual < predicate.value,
+            ModelTensorFactRelation::LessThanOrEqual => actual <= predicate.value,
+            ModelTensorFactRelation::GreaterThan => actual > predicate.value,
+            ModelTensorFactRelation::GreaterThanOrEqual => actual >= predicate.value,
+        }
+    })
 }
 
 fn validate_keys<'a>(keys: &'a [&'a str]) -> Result<BTreeSet<&'a str>, ModelFamilyError> {
