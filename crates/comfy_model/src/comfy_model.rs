@@ -31,6 +31,7 @@ pub mod quantization;
 pub mod quantized_autograd;
 pub mod registry_generator;
 pub mod restricted_pickle;
+pub mod sd2_family;
 pub mod sdxl_family;
 pub mod vae;
 pub mod vae_architecture;
@@ -349,6 +350,22 @@ pub use restricted_pickle::{
     ALLOWED_PICKLE_TARGETS, AllowedPickleTarget, PickleValue, RESTRICTED_PICKLE_ALLOWLIST_VERSION,
     RESTRICTED_PICKLE_DECODED_ALLOCATION_MULTIPLIER, RestrictedPickleError, SafeGlobalsAdmission,
     add_safe_globals_exact_native, parse_restricted_pickle, parse_restricted_pickle_cancellable,
+};
+pub use sd2_family::{
+    LOTUS_CONDITIONING, SD2_ATTENTION_HEAD_CHANNELS, SD2_CHANNEL_MULTIPLIERS, SD2_CLIP_CANDIDATES,
+    SD2_CLIP_TARGET, SD2_COMMON_MAPPING, SD2_COMPONENT_STATE_SCHEMAS, SD2_COMPONENTS,
+    SD2_CONDITIONING, SD2_CONTEXT_DIMENSION, SD2_DIFFUSERS_STATE_PLAN, SD2_FORWARD_PROGRAM,
+    SD2_LATENT_FORMAT, SD2_LAYOUT_SIGNATURES, SD2_MEMORY_USAGE_FACTOR, SD2_MODEL_CHANNELS,
+    SD2_MODEL_OPTIONAL_KEYS, SD2_MODEL_REQUIRED_KEYS, SD2_NUM_RES_BLOCKS, SD2_PREFIXED_STATE_PLAN,
+    SD2_SUPPORTED_DEVICES, SD2_SUPPORTED_DTYPES, SD2_TRANSFORMER_DEPTH,
+    SD2_TRANSFORMER_DEPTH_OUTPUT, SD2_UNCLIP_BETA_SCHEDULE, SD2_UNCLIP_H_CONFIGURATION,
+    SD2_UNCLIP_L_CONFIGURATION, SD2_UNCLIP_NOISE_AUGMENT_MERGE, SD2_UNCLIP_SEED_OFFSET,
+    SD2_UNCLIP_TIMESTEPS, SD2_V_PREDICTION_THRESHOLD, Sd2CommonMapping, Sd2ConditioningFact,
+    Sd2Configuration, Sd2Layout, Sd2ModelType, Sd2UnclipConfiguration, Sd2Variant,
+    UNCLIP_CONDITIONING, common_mapping as sd2_common_mapping,
+    configuration_for_probe as sd2_configuration_for_probe, lotus_task_embedding,
+    state_plan_for_layout as sd2_state_plan_for_layout,
+    weight_statistic_request_for_probe as sd2_weight_statistic_request_for_probe,
 };
 pub use sdxl_family::{
     SDXL_ADM_INPUT_DIMENSION, SDXL_ATTENTION_HEAD_CHANNELS, SDXL_CLIP_CANDIDATES, SDXL_CLIP_TARGET,
