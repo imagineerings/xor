@@ -35,11 +35,7 @@
         2
       ]
     },
-    "metadata": {
-      "image_model": "cogvideox",
-      "in_channels": "48",
-      "model_layout": "native"
-    }
+    "metadata": {}
   },
   "base_artifact_digest": "0069006900690069006900690069006900690069006900690069006900690069",
   "source_weights": [

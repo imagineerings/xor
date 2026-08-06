@@ -89,6 +89,26 @@ fn val_model_family_row_001_cogvideox_t2v_source_configuration_profiles_and_owne
             .latent_identifier,
         "CogVideoX"
     );
+    assert!(cogvideo::MODEL_FAMILY_REGISTRATION
+        .source_configuration
+        .is_empty());
+    let mut misleading_probe = spatial_probe;
+    misleading_probe.metadata.extend([
+        ("image_model".to_owned(), "not-cogvideox".to_owned()),
+        ("in_channels".to_owned(), "32".to_owned()),
+        ("model_layout".to_owned(), "diffusers".to_owned()),
+    ]);
+    let misleading = registry.resolve(&misleading_probe)?;
+    assert_eq!(
+        misleading.detection().identity.feature_id(),
+        cogvideo::MODEL_FAMILY_FEATURE_ID
+    );
+    let misleading_configuration = cogvideo::configuration_for_probe(&misleading_probe)?;
+    assert_eq!(
+        misleading_configuration.layout,
+        cogvideo::CogVideoXT2VLayout::Native
+    );
+    assert_eq!(misleading_configuration.in_channels, 16);
 
     let temporal_probe = ModelProbe::from_parsed_facts(parsed_facts(
         "diffusers",
@@ -224,12 +244,31 @@ fn val_model_family_row_001_cogvideox_t2v_model_store_mapping_forward_patch_and_
     let registry =
         ModelFamilyRegistry::checked_registrations(&[cogvideo::MODEL_FAMILY_REGISTRATION])?;
     let probe = probe_through_model_store()?;
+    assert!(!probe.metadata.contains_key("image_model"));
+    assert!(!probe.metadata.contains_key("in_channels"));
+    assert!(!probe.metadata.contains_key("model_layout"));
     let resolved = registry.resolve(&probe)?;
     assert_eq!(
         resolved.detection().identity.feature_id(),
         "COMFY-MODEL-0070"
     );
     assert_eq!(resolved.source_ordinal(), 91);
+    assert_eq!(resolved.detection().score, 1_000);
+    assert_eq!(resolved.detection().evidence.len(), 2);
+    assert!(
+        resolved
+            .detection()
+            .evidence
+            .iter()
+            .any(|evidence| evidence.contains("AnyKeyPresent"))
+    );
+    assert!(
+        resolved
+            .detection()
+            .evidence
+            .iter()
+            .any(|evidence| evidence.contains("AnyTensorDimensionValue"))
+    );
     let candidates = resolved.clip_target().candidates();
     assert_eq!(
         candidates[0].tokenizer().identifier(),
@@ -474,9 +513,6 @@ fn parsed_facts(
     } else {
         ""
     };
-    let channels = match patch {
-        PatchVariant::Spatial { channels } | PatchVariant::Temporal { channels } => channels,
-    };
     let mut shapes = model_shapes(patch, heads);
     if temporal_options {
         shapes.extend([
@@ -513,10 +549,7 @@ fn parsed_facts(
         tensors,
         formats: vec![ModelParsedFormatFact {
             identity: "safetensors".to_owned(),
-            metadata: BTreeMap::from([
-                ("image_model".to_owned(), "cogvideox".to_owned()),
-                ("in_channels".to_owned(), channels.to_string()),
-            ]),
+            metadata: BTreeMap::new(),
         }],
     }
 }
@@ -604,10 +637,6 @@ fn probe_through_model_store() -> Result<ModelProbe, Box<dyn std::error::Error>>
 
 fn write_safetensors(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut header = serde_json::Map::new();
-    header.insert(
-        "__metadata__".to_owned(),
-        serde_json::json!({"image_model":"cogvideox","in_channels":"16"}),
-    );
     let mut shapes = model_shapes(PatchVariant::Spatial { channels: 16 }, 1);
     shapes.extend([
         ("vae.decoder.weight".to_owned(), vec![1]),
