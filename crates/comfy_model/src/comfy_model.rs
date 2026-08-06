@@ -33,6 +33,7 @@ pub mod pixart_family;
 pub mod pixeldit_pid_family;
 pub mod quantization;
 pub mod quantized_autograd;
+pub mod qwen_image_family;
 pub mod registry_generator;
 pub mod restricted_pickle;
 pub mod sd2_family;
@@ -422,6 +423,22 @@ pub use quantization::{
 pub use quantized_autograd::{
     QuantLinearError, QuantLinearExecution, QuantLinearGradients, QuantLinearOptions,
     QuantLinearWeight, quant_linear_forward_exact_native,
+};
+pub use qwen_image_family::{
+    QWEN_IMAGE_ATTENTION_HEAD_DIMENSION, QWEN_IMAGE_AXES_DIMENSIONS,
+    QWEN_IMAGE_BASE_CONDITIONING_KEYS, QWEN_IMAGE_BLOCK_PREFIXES, QWEN_IMAGE_CLIP_CANDIDATES,
+    QWEN_IMAGE_CLIP_CONFIGURATION, QWEN_IMAGE_CLIP_TARGET, QWEN_IMAGE_COMPONENT_STATE_SCHEMAS,
+    QWEN_IMAGE_COMPONENTS, QWEN_IMAGE_INNER_DIMENSION, QWEN_IMAGE_JOINT_ATTENTION_DIMENSION,
+    QWEN_IMAGE_LATENT_FORMAT, QWEN_IMAGE_LAYERED_CONDITIONING_KEYS, QWEN_IMAGE_MAXIMUM_DEPTH,
+    QWEN_IMAGE_MAXIMUM_LAYERED_SLICES, QWEN_IMAGE_MEMORY_ESTIMATOR, QWEN_IMAGE_MEMORY_USAGE_FACTOR,
+    QWEN_IMAGE_MODEL_OPTIONAL_KEYS, QWEN_IMAGE_MODEL_REQUIRED_KEYS,
+    QWEN_IMAGE_NUMBER_OF_ATTENTION_HEADS, QWEN_IMAGE_PATCH_SIZE,
+    QWEN_IMAGE_POOLED_PROJECTION_DIMENSION, QWEN_IMAGE_SAMPLING_SHIFT,
+    QWEN_IMAGE_SUPPORTED_DEVICES, QWEN_IMAGE_SUPPORTED_DTYPES, QwenImageBlockPrefix,
+    QwenImageConditioningKey, QwenImageConfiguration, QwenImageReferenceMethod,
+    checked_patch_graph as qwen_image_checked_patch_graph,
+    configuration_for_probe as qwen_image_configuration_for_probe,
+    layered_latent_extent as qwen_image_layered_latent_extent,
 };
 pub use registry_generator::{
     MODEL_CATALOG, ModelRegistry, ModelRegistryError, ModelRegistryGenerator,
