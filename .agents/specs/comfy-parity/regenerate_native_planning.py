@@ -5828,6 +5828,8 @@ def model_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]], str, l
             identifier = f"comfy-parity-native-model-family-{slug(name)}-{suffix}"
             if row["feature_id"] in {"COMFY-MODEL-0066", "COMFY-MODEL-0067"}:
                 layout_evidence = "prefixed and standalone source-native detector evidence with explicit unsupported-Diffusers rejection (the pinned generic Flux converter does not preserve Chroma-specific distilled-guidance, NeRF, or sentinel state)"
+            elif row["feature_id"] == "COMFY-MODEL-0083":
+                layout_evidence = "key-derived native-prefixed and standalone-native detector evidence with explicit unsupported-Diffusers rejection (neither the pinned source nor the canonical HiDreamO1 adapter defines that mapping)"
             elif row["feature_id"] in {"COMFY-MODEL-0084", "COMFY-MODEL-0085", "COMFY-MODEL-0086", "COMFY-MODEL-0087", "COMFY-MODEL-0088", "COMFY-MODEL-0089", "COMFY-MODEL-0090", "COMFY-MODEL-0091", "COMFY-MODEL-0092", "COMFY-MODEL-0093", "COMFY-MODEL-0094", "COMFY-MODEL-0095"}:
                 layout_evidence = "source-native prefixed, saved-`model.`, and standalone-native detector evidence with explicit unsupported-Diffusers rejection"
             elif row["feature_id"] in {"COMFY-MODEL-0096", "COMFY-MODEL-0099", "COMFY-MODEL-0100", "COMFY-MODEL-0101", "COMFY-MODEL-0102", "COMFY-MODEL-0103", "COMFY-MODEL-0104", "COMFY-MODEL-0107", "COMFY-MODEL-0108", "COMFY-MODEL-0109", "COMFY-MODEL-0112", "COMFY-MODEL-0113", "COMFY-MODEL-0114", "COMFY-MODEL-0154"}:
