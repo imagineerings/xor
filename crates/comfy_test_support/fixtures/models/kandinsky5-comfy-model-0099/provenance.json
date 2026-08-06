@@ -13,7 +13,7 @@
     {"path": "projects/comfy/ComfyUI/comfy/supported_models_base.py", "sha256": "a42dc13d789ede0dcb140fc0a4ab36bb57d820be0aa2b931c274863ec7666596"},
     {"path": "projects/comfy/ComfyUI/comfy/model_detection.py", "sha256": "f13b11988fccf9fa4d878ef5f63313c23c5f1400ec8cde04a502584e157c5072"},
     {"path": "projects/comfy/ComfyUI/comfy/model_base.py", "sha256": "99dc53baee665eca1a6aea70cfb9ab071d55784dff339b5e919dc14ae4fde8bd"},
-    {"path": "crates/comfy_model/src/kandinsky5_family.rs", "sha256": "fe46f954d41c49a0d0e29827ce61125020b51e1bae189b4f0a40689c3a127fdd"},
+    {"path": "crates/comfy_model/src/kandinsky5_family.rs", "sha256": "b3021e8deaa185da743f8fde6183994058da90d98010d9fadd43a90debf159c3"},
     {"path": "crates/comfy_model/src/latent_formats/hunyuanvideo_comfy_model_0037.rs", "sha256": "4df46e4d74034b0b1f8ef60bf860dc948fc1b418c08c6f6e2b7e363aaa198854"},
     {"path": "crates/comfy_model/src/latent_formats/flux_comfy_model_0029.rs", "sha256": "22c3b314c00dd31a7c4e777c541521c946ab335bb1bdd7b930fd88a6b7c03751"}
   ],
