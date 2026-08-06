@@ -83,9 +83,20 @@ fn val_model_family_row_001_krea2_source_configuration_descriptor_and_ownership(
     validate_provenance_and_catalog()?;
     let fixture: serde_json::Value =
         serde_json::from_slice(&std::fs::read(fixture_directory().join("family.json"))?)?;
-    assert_eq!(fixture["seed"], 101);
-    assert_eq!(fixture["dtype_device_cases"].as_array().map(Vec::len), Some(3));
+    assert_eq!(fixture["fixture_id"], krea::MODEL_FAMILY_FIXTURE);
+    assert_eq!(fixture["feature_id"], krea::MODEL_FAMILY_FEATURE_ID);
+    assert_eq!(fixture["dtype"], "f32");
+    assert_eq!(fixture["device"], "cpu");
+    assert_eq!(
+        fixture["source_weights"].as_array().map(Vec::len),
+        Some(10)
+    );
     assert_eq!(fixture["checkpoints"].as_array().map(Vec::len), Some(6));
+    assert_eq!(fixture["patches"].as_array().map(Vec::len), Some(1));
+    assert_eq!(
+        fixture["patched_checkpoints"].as_array().map(Vec::len),
+        Some(6)
+    );
 
     let row_source = std::fs::read_to_string(
         Path::new(env!("CARGO_MANIFEST_DIR")).join("src/families/krea2_comfy_model_0101.rs"),

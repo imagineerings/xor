@@ -109,9 +109,25 @@ fn val_model_family_row_001_lens_source_configuration_descriptor_clip_and_owners
     validate_provenance_and_catalog()?;
     let fixture: serde_json::Value =
         serde_json::from_slice(&std::fs::read(fixture_directory().join("family.json"))?)?;
-    assert_eq!(fixture["seed"], 104);
-    assert_eq!(fixture["clip_cases"].as_array().map(Vec::len), Some(3));
+    assert_eq!(fixture["fixture_id"], lens::MODEL_FAMILY_FIXTURE);
+    assert_eq!(fixture["feature_id"], lens::MODEL_FAMILY_FEATURE_ID);
+    assert_eq!(fixture["dtype"], "f32");
+    assert_eq!(fixture["device"], "cpu");
+    assert_eq!(
+        fixture["source_weights"].as_array().map(Vec::len),
+        Some(8)
+    );
+    assert!(
+        fixture["detector"]["tensor_shapes"]
+            .get("text_encoders.gpt_oss.transformer.layers.0.self_attn.sinks")
+            .is_some()
+    );
     assert_eq!(fixture["checkpoints"].as_array().map(Vec::len), Some(6));
+    assert_eq!(fixture["patches"].as_array().map(Vec::len), Some(1));
+    assert_eq!(
+        fixture["patched_checkpoints"].as_array().map(Vec::len),
+        Some(6)
+    );
 
     let row_source = std::fs::read_to_string(
         Path::new(env!("CARGO_MANIFEST_DIR")).join("src/families/lens_comfy_model_0104.rs"),

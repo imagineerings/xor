@@ -108,9 +108,20 @@ fn val_model_family_row_001_ideogram4_source_descriptor_configuration_and_owners
     validate_provenance_and_catalog()?;
     let fixture: serde_json::Value =
         serde_json::from_slice(&std::fs::read(fixture_directory().join("family.json"))?)?;
-    assert_eq!(fixture["seed"], 96);
-    assert_eq!(fixture["layouts"].as_array().map(Vec::len), Some(2));
+    assert_eq!(fixture["fixture_id"], ideogram::MODEL_FAMILY_FIXTURE);
+    assert_eq!(fixture["feature_id"], ideogram::MODEL_FAMILY_FEATURE_ID);
+    assert_eq!(fixture["dtype"], "f32");
+    assert_eq!(fixture["device"], "cpu");
+    assert_eq!(
+        fixture["source_weights"].as_array().map(Vec::len),
+        Some(10)
+    );
     assert_eq!(fixture["checkpoints"].as_array().map(Vec::len), Some(6));
+    assert_eq!(fixture["patches"].as_array().map(Vec::len), Some(1));
+    assert_eq!(
+        fixture["patched_checkpoints"].as_array().map(Vec::len),
+        Some(6)
+    );
 
     let row_source = std::fs::read_to_string(
         Path::new(env!("CARGO_MANIFEST_DIR"))
