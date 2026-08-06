@@ -11984,6 +11984,11 @@ def existing_task_annotations() -> dict[str, dict[str, str | bool]]:
             "comfy-parity-native-scheduler-",
             "comfy-parity-native-latent-",
         ))
+        if "POST-WORKSPACE-CONSOLIDATION" in evidence:
+            evidence = evidence.replace(
+                "STALE PRE-WORKSPACE-CONSOLIDATION EVIDENCE; independent revalidation required after canonical workspace migration. ",
+                "",
+            )
         workspace_reopened = (
             workspace_affected
             and "POST-WORKSPACE-CONSOLIDATION" not in evidence
