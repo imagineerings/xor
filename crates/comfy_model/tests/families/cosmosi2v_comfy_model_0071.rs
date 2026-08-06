@@ -409,7 +409,7 @@ fn val_model_family_row_001_cosmosi2v_dtype_and_typed_failures()
     let mismatch = ModelProbe::from_parsed_facts(mismatched_facts)?;
     assert!(matches!(
         registry.resolve(&mismatch),
-        Err(ModelFamilyError::InvalidSelectorOutput(message)) if message.contains("requires 17")
+        Err(ModelFamilyError::NoDetectionMatch)
     ));
 
     let malformed =

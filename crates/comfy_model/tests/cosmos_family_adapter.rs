@@ -1,6 +1,7 @@
 use comfy_model::{
     COSMOS_GENERAL_STATE_PLAN, COSMOS_PREDICT2_STATE_PLAN, CosmosArchitecture, CosmosModelSize,
-    CosmosRatio, ModelFamilyError, ModelProbe, cosmos_configuration_for_probe,
+    CosmosRatio, ModelFamilyError, ModelFamilyRegistry, ModelProbe, cosmos_configuration_for_probe,
+    generated_cosmosi2v_comfy_model_0071 as cosmos_i2v,
 };
 use std::{collections::BTreeMap, fs, path::Path};
 
@@ -110,6 +111,56 @@ fn val_model_family_row_001_cosmos_adapter_separates_markers_channels_and_shapes
 }
 
 #[test]
+fn val_model_detection_001_cosmos_i2v_registration_is_key_derived_and_metadata_independent()
+-> Result<(), Box<dyn std::error::Error>> {
+    let registry =
+        ModelFamilyRegistry::checked_registrations(&[cosmos_i2v::MODEL_FAMILY_REGISTRATION])?;
+    let mut model_probe = general_probe(17, 4_096);
+    model_probe.metadata.extend([
+        ("image_model".to_owned(), "anima".to_owned()),
+        ("in_channels".to_owned(), "999".to_owned()),
+    ]);
+    assert_eq!(
+        registry.detect(&model_probe)?.identity.feature_id(),
+        cosmos_i2v::MODEL_FAMILY_FEATURE_ID
+    );
+    assert_eq!(
+        registry
+            .resolve(&model_probe)?
+            .detection()
+            .identity
+            .feature_id(),
+        cosmos_i2v::MODEL_FAMILY_FEATURE_ID
+    );
+
+    let mut missing_marker = general_probe(17, 4_096);
+    missing_marker
+        .tensor_shapes
+        .remove("net.blocks.block0.blocks.0.block.attn.to_q.0.weight");
+    assert!(matches!(
+        registry.detect(&missing_marker),
+        Err(ModelFamilyError::NoDetectionMatch)
+    ));
+
+    let wrong_channels = general_probe(16, 4_096);
+    assert!(matches!(
+        registry.detect(&wrong_channels),
+        Err(ModelFamilyError::NoDetectionMatch)
+    ));
+
+    let mut cross_family = general_probe(17, 4_096);
+    cross_family
+        .tensor_shapes
+        .insert("net.blocks.0.mlp.layer1.weight".to_owned(), vec![2, 2]);
+    assert!(matches!(
+        registry.resolve(&cross_family),
+        Err(ModelFamilyError::InvalidSelectorOutput(message))
+            if message.contains("Cosmos Predict2 marker")
+    ));
+    Ok(())
+}
+
+#[test]
 fn val_model_family_row_001_cosmos_adapter_is_the_single_shared_owner() {
     let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let owner = fs::read_to_string(crate_root.join("src/cosmos_family.rs"))
@@ -117,12 +168,20 @@ fn val_model_family_row_001_cosmos_adapter_is_the_single_shared_owner() {
     assert_eq!(owner.matches("pub enum CosmosArchitecture").count(), 1);
     assert_eq!(owner.matches("pub struct CosmosConfiguration").count(), 1);
     assert_eq!(owner.matches("pub enum CosmosModelSize").count(), 1);
+    assert!(owner.contains("pub const COSMOS_GENERAL_DETECTION_MARKER_KEYS"));
+    assert!(owner.contains("pub const COSMOS_PREDICT2_DETECTION_MARKER_KEYS"));
+    assert!(owner.contains("pub const COSMOS_ANIMA_DETECTION_MARKER_KEYS"));
+    assert!(owner.contains("pub const COSMOS_PATCH_PROJECTION_KEYS"));
 
     let row = fs::read_to_string(crate_root.join("src/families/cosmosi2v_comfy_model_0071.rs"))
         .expect("CosmosI2V row source");
     assert!(!row.contains("pub struct CosmosI2VConfiguration"));
     assert!(!row.contains("pub enum CosmosI2VModelSize"));
     assert!(!row.contains("fn shape("));
+    assert!(!row.contains("ModelDetectionRule::Metadata"));
+    assert!(!row.contains("ModelSourceConfigurationRule"));
+    assert!(row.contains("ModelDetectionRule::AnyTensorDimensionValue"));
+    assert!(row.contains("source_configuration: &[]"));
     assert!(row.contains("cosmos_configuration_for_probe("));
 
     let general = COSMOS_GENERAL_STATE_PLAN

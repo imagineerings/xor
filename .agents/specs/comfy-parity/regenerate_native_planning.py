@@ -9213,6 +9213,15 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
                 "scans find no second key/shape parser, detector, metadata authority, "
                 "state-plan selector, or transaction owner."
             )
+        if item["id"] == "comfy-parity-cosmos-family-adapter-consolidation":
+            item["writes"] = list(
+                dict.fromkeys(
+                    list(item["writes"])
+                    + [
+                        "crates/comfy_model/tests/families/cosmosi2v_comfy_model_0071.rs"
+                    ]
+                )
+            )
         if item["id"] == "comfy-parity-cogvideox-family-adapter-consolidation":
             item["dependencies"] = list(
                 dict.fromkeys(

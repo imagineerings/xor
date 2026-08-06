@@ -7,6 +7,13 @@ use crate::{
 use comfy_tensor::DType;
 use comfy_types::DeviceKind;
 
+pub const COSMOS_GENERAL_DETECTION_MARKER_KEYS: &[&str] =
+    &["net.blocks.block0.blocks.0.block.attn.to_q.0.weight"];
+pub const COSMOS_PREDICT2_DETECTION_MARKER_KEYS: &[&str] = &["net.blocks.0.mlp.layer1.weight"];
+pub const COSMOS_ANIMA_DETECTION_MARKER_KEYS: &[&str] =
+    &["net.llm_adapter.blocks.0.cross_attn.q_proj.weight"];
+pub const COSMOS_PATCH_PROJECTION_KEYS: &[&str] = &["net.x_embedder.proj.1.weight"];
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CosmosArchitecture {
     GeneralDit,
@@ -142,15 +149,23 @@ pub fn configuration_for_probe(
         ));
     }
 
-    let predict2_marker = probe
-        .tensor_shapes
-        .contains_key("net.blocks.0.mlp.layer1.weight");
-    let anima_marker = probe
-        .tensor_shapes
-        .contains_key("net.llm_adapter.blocks.0.cross_attn.q_proj.weight");
+    let general_marker = COSMOS_GENERAL_DETECTION_MARKER_KEYS
+        .iter()
+        .any(|key| probe.tensor_shapes.contains_key(*key));
+    let predict2_marker = COSMOS_PREDICT2_DETECTION_MARKER_KEYS
+        .iter()
+        .any(|key| probe.tensor_shapes.contains_key(*key));
+    let anima_marker = COSMOS_ANIMA_DETECTION_MARKER_KEYS
+        .iter()
+        .any(|key| probe.tensor_shapes.contains_key(*key));
     match architecture {
         CosmosArchitecture::GeneralDit if predict2_marker => {
             return Err(invalid_configuration("Cosmos Predict2 marker".to_string()));
+        }
+        CosmosArchitecture::GeneralDit if !general_marker => {
+            return Err(invalid_configuration(
+                "missing Cosmos GeneralDIT marker".to_string(),
+            ));
         }
         CosmosArchitecture::Predict2 if anima_marker => {
             return Err(invalid_configuration("Anima marker".to_string()));
