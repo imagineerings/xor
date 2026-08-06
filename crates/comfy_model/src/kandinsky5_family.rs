@@ -118,6 +118,7 @@ pub const KANDINSKY5_MODEL_OPTIONAL_KEYS: &[&str] = &[
     "native.visual_embeddings.in_layer.bias",
     "native.time_embeddings.in_layer.bias",
     "native.time_embeddings.out_layer.weight",
+    "native.text_embeddings.in_layer.bias",
     "native.pooled_text_embeddings.in_layer.weight",
     "native.text_transformer_blocks.0.self_attention.to_query.weight",
     "native.visual_transformer_blocks.0.feed_forward.in_layer.weight",

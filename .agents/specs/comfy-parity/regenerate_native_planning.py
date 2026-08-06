@@ -11964,6 +11964,11 @@ def existing_task_annotations() -> dict[str, dict[str, str | bool]]:
             "comfy-parity-native-model-family-genmomochi-comfy-model-0081",
             "comfy-parity-native-model-family-hidream-comfy-model-0082",
         }
+        if "POST-MODEL-LAYOUT-OWNER" in evidence:
+            evidence = evidence.replace(
+                "STALE AFTER MODEL-LAYOUT OWNERSHIP AUDIT; production probes do not synthesize caller model_layout metadata, so key-derived canonical layout and plan selection plus independent revalidation are required. ",
+                "",
+            )
         if identifier in model_layout_affected_tasks and "POST-MODEL-LAYOUT-OWNER" not in evidence:
             if evidence and "STALE AFTER MODEL-LAYOUT OWNERSHIP AUDIT" not in evidence:
                 evidence = evidence.replace(
