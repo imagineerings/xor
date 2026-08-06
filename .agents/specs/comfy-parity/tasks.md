@@ -4547,7 +4547,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-WORKSPACE-CONSOLIDATION POST-CPU-LOW-PRECISION-BMM-MODEL-CLOSURE 2026-08-06 Shard C leaf commit `5455be2c` integrated as `ccbd44f6`, followed by Shard A independent validation PASS. COMFY-MODEL-0106 preserves LotusD source precedence over generic SD2, admits standard-UNet prefixed-native, standalone-native, and pinned Diffusers layouts, binds the canonical SD15 latent and IMG_TO_IMG contract, emits exactly `[sin(1), sin(0), cos(1), cos(0)]` task conditioning, and delegates SD2 configuration, transactions, patching, memory, cancellation, and execution to canonical owners. Independent aggregate validation discovered that the canonical tanh facade rejected the row's declared low-precision modes; Task 515 repaired the real CPU primitive/facade path, after which original and patched F16/BF16/F32 checkpoints passed. The row artifact records 7 passed/0 failed/0 skipped at SHA-256 `1559e8b7d0aec054f79e179746a6cf635b02e805ca9af1c050ca17b51874b77c`; source/test/family-fixture/provenance SHA-256 values are `87cc15bbc8da0e71a3f05bab0e8c16383c3791401dfe8be8305d1882233b00f7`, `987fd4a396a76ecc382328be0cc2c17e21a4c4bf2131e2332f9554f59d5f0e48`, `30414eda261e22daee10417a0eb47fbcf9f71005d0a56e8f8a8c74776c085e59`, and `86eea49b9a32a7f844cb53f5fb659aec91f433cde9b9478c0554978838604399`. The complete model/support, memory, cancellation, ownership, formatting, compile, Clippy, strict-generation, and spec-validation gates passed with the aggregate counts and platform coverage recorded for Task 221. Validated on macOS aarch64 native Rust CPU; Apple Metal remains compiled typed fail-closed, and no production Python/JavaScript or external Comfy process exists._
 
-- [ ] 228. Implement native model family: Lumina2
+- [x] 228. Implement native model family: Lumina2
   - _id: comfy-parity-native-model-family-lumina2-comfy-model-0107
   - Outcome: Implement only model-family row COMFY-MODEL-0107 as an immutable source-ordered registration and focused configuration/profile, transactional state-dictionary plan, and architecture-program selector over the authoritative ModelStore::family_probe adapter, comfy_model::model_family, comfy_model::patch_graph, and canonical tensor owners. Bind its exact source projection and provenance; source-supported prefixed-native and standalone-native evidence plus explicit unsupported-Diffusers rejection; descriptor and latent identity; component routing, key transforms, generated values, and unmatched-key policy; shape-reduced native architecture; deterministic tiny oracle fixture and named forward plus conditioning checkpoints; memory constants or checked dynamic formula; and dtype/device matrix.
   - Wave: 179
@@ -4565,7 +4565,9 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-MODEL-FAMILY-ROW-001, VAL-MODEL-DETECTION-001, VAL-MODEL-FORMAT-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo fmt --all -- --check; cargo check --locked -p comfy_model -p comfy_test_support; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test model_families generated_lumina2_comfy_model_0107; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_worker --test memory_conformance val_memory_001; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --all-targets; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_test_support; python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice
   - Done when: The one assigned family passes source-exact key-derived model-layout detection and normalized configuration, profile selection, descriptor and transactional multi-component state mapping, named forward and conditioning checkpoints, invalid/partial/ambiguous keys, misleading metadata, patch order, cancellation, OOM, and supported dtype/device fixtures without claiming another family or the aggregate closure. Provenance binds the pinned source and projection digests. Ownership tests prove the row and fixture delegate all validation, tensor mechanics, transaction commit, execution traversal, patching, memory arithmetic, parsing/cache, serialization, and cancellation state to the canonical owners.
 
-- [ ] 229. Implement native model family: Omnigen2
+  - _validation_evidence: POST-WORKSPACE-CONSOLIDATION 2026-08-06 Shard C leaf commit `24aacc5e5f00c55a000a068c3d7c3bbe6e969416` integrated as `c5be993d`, followed by Shard A independent validation PASS. COMFY-MODEL-0107 admits only its exact prefixed/standalone native layouts, preserves Lumina2 configuration, profile, conditioning, latent, transactional state mapping, patch, memory, dtype/device, cancellation, OOM, and ownership contracts, and rejects sibling, partial, mixed, ambiguous, and unsupported Diffusers probes. Its corrected focused filter passed 2/2. The row artifact records 7 passed/0 failed/0 skipped at SHA-256 `0d47c6b1908c0781be5b39885124bc083239d473e6ea20ccb40c5770401f1be5`; source/test/family-fixture/provenance digests are `e2946a6f2182ea7ed149285dfa79b8b4dba67e45848af9bae04bcf033efc4c88`, `9ad8d573e764d6624bb0a3d42235153f08d709e7ca66e9164dd7593ff01a5c76`, `fb6bdc55672861aa01fd943ecaff23baca976687dd15a38978c18e8e0b774456`, and `4509bc17f795d7e8addc25c46df9841e2a05ae2e21540b1f4c65e8c03c9954d0`. The complete model/support, memory, cancellation, ownership, formatting, compile, Clippy, strict-generation, and spec-validation gates passed with aggregate counts recorded for Task 516. Validated on macOS aarch64 native Rust CPU; Apple Metal remains compiled typed fail-closed, with no production Python/JavaScript or external Comfy process._
+
+- [x] 229. Implement native model family: Omnigen2
   - _id: comfy-parity-native-model-family-omnigen2-comfy-model-0108
   - Outcome: Implement only model-family row COMFY-MODEL-0108 as an immutable source-ordered registration and focused configuration/profile, transactional state-dictionary plan, and architecture-program selector over the authoritative ModelStore::family_probe adapter, comfy_model::model_family, comfy_model::patch_graph, and canonical tensor owners. Bind its exact source projection and provenance; source-supported prefixed-native and standalone-native evidence plus explicit unsupported-Diffusers rejection; descriptor and latent identity; component routing, key transforms, generated values, and unmatched-key policy; shape-reduced native architecture; deterministic tiny oracle fixture and named forward plus conditioning checkpoints; memory constants or checked dynamic formula; and dtype/device matrix.
   - Wave: 180
@@ -4583,7 +4585,9 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-MODEL-FAMILY-ROW-001, VAL-MODEL-DETECTION-001, VAL-MODEL-FORMAT-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo fmt --all -- --check; cargo check --locked -p comfy_model -p comfy_test_support; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test model_families generated_omnigen2_comfy_model_0108; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_worker --test memory_conformance val_memory_001; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --all-targets; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_test_support; python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice
   - Done when: The one assigned family passes source-exact key-derived model-layout detection and normalized configuration, profile selection, descriptor and transactional multi-component state mapping, named forward and conditioning checkpoints, invalid/partial/ambiguous keys, misleading metadata, patch order, cancellation, OOM, and supported dtype/device fixtures without claiming another family or the aggregate closure. Provenance binds the pinned source and projection digests. Ownership tests prove the row and fixture delegate all validation, tensor mechanics, transaction commit, execution traversal, patching, memory arithmetic, parsing/cache, serialization, and cancellation state to the canonical owners.
 
-- [ ] 230. Implement native model family: PiD
+  - _validation_evidence: POST-WORKSPACE-CONSOLIDATION 2026-08-06 Shard C leaf commit `24aacc5e5f00c55a000a068c3d7c3bbe6e969416` integrated as `c5be993d`, followed by Shard A independent validation PASS. COMFY-MODEL-0108 admits only its exact prefixed/standalone native layouts, preserves Omnigen2 configuration, profile, conditioning, latent, transactional state mapping, patch, memory, dtype/device, cancellation, OOM, and ownership contracts, and rejects Boogu sibling, malformed, partial, mixed, gapped, ambiguous, and pseudo-Diffusers probes. Its focused filter passed 2/2. The row artifact records 7 passed/0 failed/0 skipped at SHA-256 `9cddd3702f2f88c44662c8fdfd79f9af55b4fdc3b21b3540ece98c2ec400d6d8`; source/test/family-fixture/provenance digests are `f64a8bed8568538cc93607e75707d9d0f64b8ff8e00ed37cc4e8f369e18cb333`, `f562c6a9946632e7177a10feb88f32a23783a4e698e5c0ad36900b7b271b5eb5`, `479f599e70344f8cd409c6d9704486e812279af2b597c90b55ef4fa4f2f71351`, and `2d0dedc64b6a0b9751dc963c03c10a08fdae3ca508e61f182430532c0254ad46`. The complete model/support, memory, cancellation, ownership, formatting, compile, Clippy, strict-generation, and spec-validation gates passed with aggregate counts recorded for Task 516. Validated on macOS aarch64 native Rust CPU; Apple Metal remains compiled typed fail-closed, with no production Python/JavaScript or external Comfy process._
+
+- [x] 230. Implement native model family: PiD
   - _id: comfy-parity-native-model-family-pid-comfy-model-0109
   - Outcome: Implement only model-family row COMFY-MODEL-0109 as an immutable source-ordered registration and focused configuration/profile, transactional state-dictionary plan, and architecture-program selector over the authoritative ModelStore::family_probe adapter, comfy_model::model_family, comfy_model::patch_graph, and canonical tensor owners. Bind its exact source projection and provenance; source-supported prefixed-native and standalone-native evidence plus explicit unsupported-Diffusers rejection; descriptor and latent identity; component routing, key transforms, generated values, and unmatched-key policy; shape-reduced native architecture; deterministic tiny oracle fixture and named forward plus conditioning checkpoints; memory constants or checked dynamic formula; and dtype/device matrix.
   - Wave: 181
@@ -4601,13 +4605,15 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-MODEL-FAMILY-ROW-001, VAL-MODEL-DETECTION-001, VAL-MODEL-FORMAT-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo fmt --all -- --check; cargo check --locked -p comfy_model -p comfy_test_support; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test model_families generated_pid_comfy_model_0109; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_worker --test memory_conformance val_memory_001; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --all-targets; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_test_support; python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice
   - Done when: The one assigned family passes source-exact key-derived model-layout detection and normalized configuration, profile selection, descriptor and transactional multi-component state mapping, named forward and conditioning checkpoints, invalid/partial/ambiguous keys, misleading metadata, patch order, cancellation, OOM, and supported dtype/device fixtures without claiming another family or the aggregate closure. Provenance binds the pinned source and projection digests. Ownership tests prove the row and fixture delegate all validation, tensor mechanics, transaction commit, execution traversal, patching, memory arithmetic, parsing/cache, serialization, and cancellation state to the canonical owners.
 
-- [ ] 231. Implement native model family: PixArtAlpha
+  - _validation_evidence: POST-WORKSPACE-CONSOLIDATION 2026-08-06 Shard C leaf commit `24aacc5e5f00c55a000a068c3d7c3bbe6e969416` integrated as `c5be993d`, followed by Shard A independent validation PASS. COMFY-MODEL-0109 preserves PiD precedence, core/net native layout selection, training-state removal, exact AdaLN branching and splitting, configuration, profile, conditioning, latent, transactional state mapping, patch, memory, dtype/device, cancellation, OOM, and ownership contracts, and rejects PixelDiT siblings plus malformed, partial, mixed, gapped, and ambiguous probes. Its focused filter passed 2/2. The row artifact records 7 passed/0 failed/0 skipped at SHA-256 `41456cd1672cb3edb134bde5d0516bfd04cb51f339ca6d99beaa897284d41f06`; source/test/family-fixture/provenance digests are `dcb33f93cf7b758ce0dec523c4bb5108bc1f6b68acf7100e577218d711adaa48`, `3beb3a11f94adc4e1cda458334a65c0613ba8f41abe32e18026fa88facb02078`, `0e6c5d5bb7c68c31b9f682649c4b4d2cd5c670d33ef0c084eebbab77d0944652`, and `a798a0269d1cc1b2123fd6f6237d8e58b711109ca33f352f24430cd246a4b4a7`. The complete model/support, memory, cancellation, ownership, formatting, compile, Clippy, strict-generation, and spec-validation gates passed with aggregate counts recorded for Task 516. Validated on macOS aarch64 native Rust CPU; Apple Metal remains compiled typed fail-closed, with no production Python/JavaScript or external Comfy process._
+
+- [x] 231. Implement native model family: PixArtAlpha
   - _id: comfy-parity-native-model-family-pixartalpha-comfy-model-0110
   - Outcome: Implement only model-family row COMFY-MODEL-0110 as an immutable source-ordered registration and focused configuration/profile, transactional state-dictionary plan, and architecture-program selector over the authoritative ModelStore::family_probe adapter, comfy_model::model_family, comfy_model::patch_graph, and canonical tensor owners. Bind its exact source projection and provenance; source-supported prefixed-native, standalone-native, and pinned Diffusers conversion evidence; descriptor and latent identity; component routing, key transforms, generated values, and unmatched-key policy; shape-reduced native architecture; deterministic tiny oracle fixture and named forward plus conditioning checkpoints; memory constants or checked dynamic formula; and dtype/device matrix.
-  - Wave: 182
-  - _Wave: 182
-  - Dependencies: comfy-parity-model-detection-authoritative-foundation, comfy-parity-model-family-authoritative-foundation, comfy-parity-model-family-row-validation-artifact-owner, comfy-parity-model-layout-state-plan-owner-consolidation, comfy-parity-model-weight-statistic-profile-hook, comfy-parity-native-device-apple-metal-mps-comfy-model-0015, comfy-parity-pixart-family-adapter-consolidation, comfy-parity-workspace-final-ownership-audit, comfy-parity-backend-catalog-provenance-reconciliation, comfy-parity-model-detection-any-of-key-selector-consolidation
-  - _Blocked_by: comfy-parity-model-detection-authoritative-foundation, comfy-parity-model-family-authoritative-foundation, comfy-parity-model-family-row-validation-artifact-owner, comfy-parity-model-layout-state-plan-owner-consolidation, comfy-parity-model-weight-statistic-profile-hook, comfy-parity-native-device-apple-metal-mps-comfy-model-0015, comfy-parity-pixart-family-adapter-consolidation, comfy-parity-workspace-final-ownership-audit, comfy-parity-backend-catalog-provenance-reconciliation, comfy-parity-model-detection-any-of-key-selector-consolidation
+  - Wave: 185
+  - _Wave: 185
+  - Dependencies: comfy-parity-model-detection-authoritative-foundation, comfy-parity-model-family-authoritative-foundation, comfy-parity-model-family-row-validation-artifact-owner, comfy-parity-model-layout-state-plan-owner-consolidation, comfy-parity-model-weight-statistic-profile-hook, comfy-parity-native-device-apple-metal-mps-comfy-model-0015, comfy-parity-pixart-family-adapter-consolidation, comfy-parity-workspace-final-ownership-audit, comfy-parity-probe-derived-model-state-plan-selector, comfy-parity-backend-catalog-provenance-reconciliation, comfy-parity-model-detection-any-of-key-selector-consolidation
+  - _Blocked_by: comfy-parity-model-detection-authoritative-foundation, comfy-parity-model-family-authoritative-foundation, comfy-parity-model-family-row-validation-artifact-owner, comfy-parity-model-layout-state-plan-owner-consolidation, comfy-parity-model-weight-statistic-profile-hook, comfy-parity-native-device-apple-metal-mps-comfy-model-0015, comfy-parity-pixart-family-adapter-consolidation, comfy-parity-workspace-final-ownership-audit, comfy-parity-probe-derived-model-state-plan-selector, comfy-parity-backend-catalog-provenance-reconciliation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-models.csv, crates/comfy_model/catalog/model-families-v1.json, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/patch_graph.rs, crates/comfy_model/src/model_store.rs, crates/comfy_tensor/src/dtypes.rs, projects/comfy/ComfyUI/comfy/supported_models.py, projects/comfy/ComfyUI/comfy/supported_models_base.py, projects/comfy/ComfyUI/comfy/model_detection.py, projects/comfy/ComfyUI/comfy/model_base.py, projects/comfy/ComfyUI/comfy/utils.py, projects/comfy/ComfyUI/comfy/ldm/pixart/pixartms.py, projects/comfy/ComfyUI/comfy/ldm/pixart/blocks.py, projects/comfy/ComfyUI/comfy/text_encoders/pixart_t5.py, projects/comfy/ComfyUI/comfy_extras/nodes_pixart.py, crates/comfy_model/src/pixart_family.rs, crates/comfy_model/src/latent_formats/sd15_comfy_model_0045.rs, crates/comfy_model/src/latent_formats/sdxl_comfy_model_0047.rs
   - _Reads: .agents/specs/comfy-parity/catalogs/backend-models.csv, crates/comfy_model/catalog/model-families-v1.json, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/patch_graph.rs, crates/comfy_model/src/model_store.rs, crates/comfy_tensor/src/dtypes.rs, projects/comfy/ComfyUI/comfy/supported_models.py, projects/comfy/ComfyUI/comfy/supported_models_base.py, projects/comfy/ComfyUI/comfy/model_detection.py, projects/comfy/ComfyUI/comfy/model_base.py, projects/comfy/ComfyUI/comfy/utils.py, projects/comfy/ComfyUI/comfy/ldm/pixart/pixartms.py, projects/comfy/ComfyUI/comfy/ldm/pixart/blocks.py, projects/comfy/ComfyUI/comfy/text_encoders/pixart_t5.py, projects/comfy/ComfyUI/comfy_extras/nodes_pixart.py, crates/comfy_model/src/pixart_family.rs, crates/comfy_model/src/latent_formats/sd15_comfy_model_0045.rs, crates/comfy_model/src/latent_formats/sdxl_comfy_model_0047.rs
   - Writes: crates/comfy_model/src/families/pixartalpha_comfy_model_0110.rs, crates/comfy_model/tests/families/pixartalpha_comfy_model_0110.rs, crates/comfy_test_support/fixtures/models/pixartalpha-comfy-model-0110, target/comfy-parity/val-model-family-row-001/pixartalpha-comfy-model-0110.json
@@ -4615,17 +4621,19 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 31.1, 31.2, 31.3, 31.4, 31.5, 31.6, 32.1, 32.2, 32.3, 32.4, 32.5, 32.6, 32.7, 32.8, 35.1, 35.2, 35.3, 35.4, 35.5, 35.6, 36.1, 36.2, 36.3, 36.4, 36.5, 36.6, 37.1, 37.2, 37.3, 37.4, 37.5, 37.6, 38.1, 38.2, 38.3, 38.4, 38.5, 38.6, 41.1, 41.2, 41.3, 41.4, 41.5, 41.6
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 31.1, 31.2, 31.3, 31.4, 31.5, 31.6, 32.1, 32.2, 32.3, 32.4, 32.5, 32.6, 32.7, 32.8, 35.1, 35.2, 35.3, 35.4, 35.5, 35.6, 36.1, 36.2, 36.3, 36.4, 36.5, 36.6, 37.1, 37.2, 37.3, 37.4, 37.5, 37.6, 38.1, 38.2, 38.3, 38.4, 38.5, 38.6, 41.1, 41.2, 41.3, 41.4, 41.5, 41.6
   - Design: D25, D27, D28, D29, D30, D31, D39, D41, D19, D20
-  - Validation: VAL-MODEL-FAMILY-ROW-001, VAL-MODEL-DETECTION-001, VAL-MODEL-FORMAT-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo fmt --all -- --check; cargo check --locked -p comfy_model -p comfy_test_support; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test model_families generated_pixartalpha_comfy_model_0110; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_worker --test memory_conformance val_memory_001; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --all-targets; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_test_support; python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice
-  - _Validation: VAL-MODEL-FAMILY-ROW-001, VAL-MODEL-DETECTION-001, VAL-MODEL-FORMAT-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo fmt --all -- --check; cargo check --locked -p comfy_model -p comfy_test_support; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test model_families generated_pixartalpha_comfy_model_0110; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_worker --test memory_conformance val_memory_001; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --all-targets; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_test_support; python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice
+  - Validation: VAL-MODEL-FAMILY-ROW-001, VAL-MODEL-DETECTION-001, VAL-MODEL-FORMAT-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo fmt --all -- --check; cargo check --locked -p comfy_model -p comfy_test_support; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test model_families generated_pixart_alpha_comfy_model_0110; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_worker --test memory_conformance val_memory_001; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --all-targets; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_test_support; python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice
+  - _Validation: VAL-MODEL-FAMILY-ROW-001, VAL-MODEL-DETECTION-001, VAL-MODEL-FORMAT-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo fmt --all -- --check; cargo check --locked -p comfy_model -p comfy_test_support; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test model_families generated_pixart_alpha_comfy_model_0110; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_worker --test memory_conformance val_memory_001; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --all-targets; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_test_support; python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice
   - Done when: The one assigned family passes source-exact key-derived model-layout detection and normalized configuration, profile selection, descriptor and transactional multi-component state mapping, named forward and conditioning checkpoints, invalid/partial/ambiguous keys, misleading metadata, patch order, cancellation, OOM, and supported dtype/device fixtures without claiming another family or the aggregate closure. Provenance binds the pinned source and projection digests. Ownership tests prove the row and fixture delegate all validation, tensor mechanics, transaction commit, execution traversal, patching, memory arithmetic, parsing/cache, serialization, and cancellation state to the canonical owners.
+
+  - _validation_evidence: POST-WORKSPACE-CONSOLIDATION POST-PROBE-DERIVED-STATE-PLAN-SELECTOR 2026-08-06 Shard C leaf commit `24aacc5e5f00c55a000a068c3d7c3bbe6e969416` integrated as `c5be993d`, followed by Shard A independent validation and Task 516 registry-closure PASS. COMFY-MODEL-0110 preserves Alpha-over-Sigma discrimination, native and pinned Diffusers layouts, exact depth-derived QKV/KV assembly, micro-conditioning, SD15 latent identity, configuration, profile, transaction, patch, memory, dtype/device, cancellation, OOM, and ownership semantics. Native and Diffusers mapping now execute only through `ModelFamilyRegistry::resolve` and `ResolvedModelFamily::state_plan`; partial, mixed, gapped, ambiguous, and wrong-variant probes fail typed. The corrected `generated_pixart_alpha_comfy_model_0110` filter passed 2/2; the former zero-test spelling was rejected and removed from generated validation. The row artifact records 7 passed/0 failed/0 skipped at SHA-256 `7296ab3e7b46bc0e0dd1f0ba36a1f9eb1566d0d7373137b09349a339ec96cb97`; source/test/family-fixture/provenance digests are `8a2dd582aaa2804521f522e97653b316b6cc4f2d2feda488110b75209f8a8ed1`, `5c7fde5112424c53b102b34b347ec25398b3d0032a1ce99e0506b75b5a9347c7`, `5abb3c397c0e98644e7211370c71f633b6bc6f48cc0cdf60954d5c704a5f948f`, and `9795b33f06dc50aa465d79d5daf3824e7c685d100d291bf2c406fdff0f6cec8d`. The complete model/support, memory, cancellation, ownership, formatting, compile, Clippy, strict-generation, and spec-validation gates passed with aggregate counts recorded for Task 516. Validated on macOS aarch64 native Rust CPU; Apple Metal remains compiled typed fail-closed, with no production Python/JavaScript or external Comfy process._
 
 - [ ] 232. Implement native model family: PixArtSigma
   - _id: comfy-parity-native-model-family-pixartsigma-comfy-model-0111
   - Outcome: Implement only model-family row COMFY-MODEL-0111 as an immutable source-ordered registration and focused configuration/profile, transactional state-dictionary plan, and architecture-program selector over the authoritative ModelStore::family_probe adapter, comfy_model::model_family, comfy_model::patch_graph, and canonical tensor owners. Bind its exact source projection and provenance; source-supported prefixed-native, standalone-native, and pinned Diffusers conversion evidence; descriptor and latent identity; component routing, key transforms, generated values, and unmatched-key policy; shape-reduced native architecture; deterministic tiny oracle fixture and named forward plus conditioning checkpoints; memory constants or checked dynamic formula; and dtype/device matrix.
-  - Wave: 182
-  - _Wave: 182
-  - Dependencies: comfy-parity-model-detection-authoritative-foundation, comfy-parity-model-family-authoritative-foundation, comfy-parity-model-family-row-validation-artifact-owner, comfy-parity-model-layout-state-plan-owner-consolidation, comfy-parity-model-weight-statistic-profile-hook, comfy-parity-native-device-apple-metal-mps-comfy-model-0015, comfy-parity-pixart-family-adapter-consolidation, comfy-parity-workspace-final-ownership-audit, comfy-parity-backend-catalog-provenance-reconciliation, comfy-parity-model-detection-any-of-key-selector-consolidation
-  - _Blocked_by: comfy-parity-model-detection-authoritative-foundation, comfy-parity-model-family-authoritative-foundation, comfy-parity-model-family-row-validation-artifact-owner, comfy-parity-model-layout-state-plan-owner-consolidation, comfy-parity-model-weight-statistic-profile-hook, comfy-parity-native-device-apple-metal-mps-comfy-model-0015, comfy-parity-pixart-family-adapter-consolidation, comfy-parity-workspace-final-ownership-audit, comfy-parity-backend-catalog-provenance-reconciliation, comfy-parity-model-detection-any-of-key-selector-consolidation
+  - Wave: 185
+  - _Wave: 185
+  - Dependencies: comfy-parity-model-detection-authoritative-foundation, comfy-parity-model-family-authoritative-foundation, comfy-parity-model-family-row-validation-artifact-owner, comfy-parity-model-layout-state-plan-owner-consolidation, comfy-parity-model-weight-statistic-profile-hook, comfy-parity-native-device-apple-metal-mps-comfy-model-0015, comfy-parity-pixart-family-adapter-consolidation, comfy-parity-workspace-final-ownership-audit, comfy-parity-probe-derived-model-state-plan-selector, comfy-parity-backend-catalog-provenance-reconciliation, comfy-parity-model-detection-any-of-key-selector-consolidation
+  - _Blocked_by: comfy-parity-model-detection-authoritative-foundation, comfy-parity-model-family-authoritative-foundation, comfy-parity-model-family-row-validation-artifact-owner, comfy-parity-model-layout-state-plan-owner-consolidation, comfy-parity-model-weight-statistic-profile-hook, comfy-parity-native-device-apple-metal-mps-comfy-model-0015, comfy-parity-pixart-family-adapter-consolidation, comfy-parity-workspace-final-ownership-audit, comfy-parity-probe-derived-model-state-plan-selector, comfy-parity-backend-catalog-provenance-reconciliation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-models.csv, crates/comfy_model/catalog/model-families-v1.json, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/patch_graph.rs, crates/comfy_model/src/model_store.rs, crates/comfy_tensor/src/dtypes.rs, projects/comfy/ComfyUI/comfy/supported_models.py, projects/comfy/ComfyUI/comfy/supported_models_base.py, projects/comfy/ComfyUI/comfy/model_detection.py, projects/comfy/ComfyUI/comfy/model_base.py, projects/comfy/ComfyUI/comfy/utils.py, projects/comfy/ComfyUI/comfy/ldm/pixart/pixartms.py, projects/comfy/ComfyUI/comfy/ldm/pixart/blocks.py, projects/comfy/ComfyUI/comfy/text_encoders/pixart_t5.py, projects/comfy/ComfyUI/comfy_extras/nodes_pixart.py, crates/comfy_model/src/pixart_family.rs, crates/comfy_model/src/latent_formats/sd15_comfy_model_0045.rs, crates/comfy_model/src/latent_formats/sdxl_comfy_model_0047.rs
   - _Reads: .agents/specs/comfy-parity/catalogs/backend-models.csv, crates/comfy_model/catalog/model-families-v1.json, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/patch_graph.rs, crates/comfy_model/src/model_store.rs, crates/comfy_tensor/src/dtypes.rs, projects/comfy/ComfyUI/comfy/supported_models.py, projects/comfy/ComfyUI/comfy/supported_models_base.py, projects/comfy/ComfyUI/comfy/model_detection.py, projects/comfy/ComfyUI/comfy/model_base.py, projects/comfy/ComfyUI/comfy/utils.py, projects/comfy/ComfyUI/comfy/ldm/pixart/pixartms.py, projects/comfy/ComfyUI/comfy/ldm/pixart/blocks.py, projects/comfy/ComfyUI/comfy/text_encoders/pixart_t5.py, projects/comfy/ComfyUI/comfy_extras/nodes_pixart.py, crates/comfy_model/src/pixart_family.rs, crates/comfy_model/src/latent_formats/sd15_comfy_model_0045.rs, crates/comfy_model/src/latent_formats/sdxl_comfy_model_0047.rs
   - Writes: crates/comfy_model/src/families/pixartsigma_comfy_model_0111.rs, crates/comfy_model/tests/families/pixartsigma_comfy_model_0111.rs, crates/comfy_test_support/fixtures/models/pixartsigma-comfy-model-0111, target/comfy-parity/val-model-family-row-001/pixartsigma-comfy-model-0111.json
@@ -4633,8 +4641,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 31.1, 31.2, 31.3, 31.4, 31.5, 31.6, 32.1, 32.2, 32.3, 32.4, 32.5, 32.6, 32.7, 32.8, 35.1, 35.2, 35.3, 35.4, 35.5, 35.6, 36.1, 36.2, 36.3, 36.4, 36.5, 36.6, 37.1, 37.2, 37.3, 37.4, 37.5, 37.6, 38.1, 38.2, 38.3, 38.4, 38.5, 38.6, 41.1, 41.2, 41.3, 41.4, 41.5, 41.6
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 31.1, 31.2, 31.3, 31.4, 31.5, 31.6, 32.1, 32.2, 32.3, 32.4, 32.5, 32.6, 32.7, 32.8, 35.1, 35.2, 35.3, 35.4, 35.5, 35.6, 36.1, 36.2, 36.3, 36.4, 36.5, 36.6, 37.1, 37.2, 37.3, 37.4, 37.5, 37.6, 38.1, 38.2, 38.3, 38.4, 38.5, 38.6, 41.1, 41.2, 41.3, 41.4, 41.5, 41.6
   - Design: D25, D27, D28, D29, D30, D31, D39, D41, D19, D20
-  - Validation: VAL-MODEL-FAMILY-ROW-001, VAL-MODEL-DETECTION-001, VAL-MODEL-FORMAT-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo fmt --all -- --check; cargo check --locked -p comfy_model -p comfy_test_support; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test model_families generated_pixartsigma_comfy_model_0111; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_worker --test memory_conformance val_memory_001; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --all-targets; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_test_support; python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice
-  - _Validation: VAL-MODEL-FAMILY-ROW-001, VAL-MODEL-DETECTION-001, VAL-MODEL-FORMAT-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo fmt --all -- --check; cargo check --locked -p comfy_model -p comfy_test_support; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test model_families generated_pixartsigma_comfy_model_0111; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_worker --test memory_conformance val_memory_001; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --all-targets; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_test_support; python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice
+  - Validation: VAL-MODEL-FAMILY-ROW-001, VAL-MODEL-DETECTION-001, VAL-MODEL-FORMAT-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo fmt --all -- --check; cargo check --locked -p comfy_model -p comfy_test_support; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test model_families generated_pixart_sigma_comfy_model_0111; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_worker --test memory_conformance val_memory_001; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --all-targets; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_test_support; python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice
+  - _Validation: VAL-MODEL-FAMILY-ROW-001, VAL-MODEL-DETECTION-001, VAL-MODEL-FORMAT-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo fmt --all -- --check; cargo check --locked -p comfy_model -p comfy_test_support; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test model_families generated_pixart_sigma_comfy_model_0111; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_worker --test memory_conformance val_memory_001; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --all-targets; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_test_support; python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice
   - Done when: The one assigned family passes source-exact key-derived model-layout detection and normalized configuration, profile selection, descriptor and transactional multi-component state mapping, named forward and conditioning checkpoints, invalid/partial/ambiguous keys, misleading metadata, patch order, cancellation, OOM, and supported dtype/device fixtures without claiming another family or the aggregate closure. Provenance binds the pinned source and projection digests. Ownership tests prove the row and fixture delegate all validation, tensor mechanics, transaction commit, execution traversal, patching, memory arithmetic, parsing/cache, serialization, and cancellation state to the canonical owners.
 
 - [ ] 233. Implement native model family: PixelDiTT2I
@@ -4658,10 +4666,10 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 234. Implement native model family: QwenImage
   - _id: comfy-parity-native-model-family-qwenimage-comfy-model-0113
   - Outcome: Implement only model-family row COMFY-MODEL-0113 as an immutable source-ordered registration and focused configuration/profile, transactional state-dictionary plan, and architecture-program selector over the authoritative ModelStore::family_probe adapter, comfy_model::model_family, comfy_model::patch_graph, and canonical tensor owners. Bind its exact source projection and provenance; source-supported prefixed-native and standalone-native evidence plus explicit unsupported-Diffusers rejection; descriptor and latent identity; component routing, key transforms, generated values, and unmatched-key policy; shape-reduced native architecture; deterministic tiny oracle fixture and named forward plus conditioning checkpoints; memory constants or checked dynamic formula; and dtype/device matrix.
-  - Wave: 184
-  - _Wave: 184
-  - Dependencies: comfy-parity-model-detection-authoritative-foundation, comfy-parity-model-family-authoritative-foundation, comfy-parity-model-family-row-validation-artifact-owner, comfy-parity-model-layout-state-plan-owner-consolidation, comfy-parity-model-weight-statistic-profile-hook, comfy-parity-native-device-apple-metal-mps-comfy-model-0015, comfy-parity-qwen-image-family-adapter-consolidation, comfy-parity-workspace-final-ownership-audit, comfy-parity-backend-catalog-provenance-reconciliation, comfy-parity-model-detection-any-of-key-selector-consolidation
-  - _Blocked_by: comfy-parity-model-detection-authoritative-foundation, comfy-parity-model-family-authoritative-foundation, comfy-parity-model-family-row-validation-artifact-owner, comfy-parity-model-layout-state-plan-owner-consolidation, comfy-parity-model-weight-statistic-profile-hook, comfy-parity-native-device-apple-metal-mps-comfy-model-0015, comfy-parity-qwen-image-family-adapter-consolidation, comfy-parity-workspace-final-ownership-audit, comfy-parity-backend-catalog-provenance-reconciliation, comfy-parity-model-detection-any-of-key-selector-consolidation
+  - Wave: 185
+  - _Wave: 185
+  - Dependencies: comfy-parity-model-detection-authoritative-foundation, comfy-parity-model-family-authoritative-foundation, comfy-parity-model-family-row-validation-artifact-owner, comfy-parity-model-layout-state-plan-owner-consolidation, comfy-parity-model-weight-statistic-profile-hook, comfy-parity-native-device-apple-metal-mps-comfy-model-0015, comfy-parity-qwen-image-family-adapter-consolidation, comfy-parity-workspace-final-ownership-audit, comfy-parity-probe-derived-model-state-plan-selector, comfy-parity-backend-catalog-provenance-reconciliation, comfy-parity-model-detection-any-of-key-selector-consolidation
+  - _Blocked_by: comfy-parity-model-detection-authoritative-foundation, comfy-parity-model-family-authoritative-foundation, comfy-parity-model-family-row-validation-artifact-owner, comfy-parity-model-layout-state-plan-owner-consolidation, comfy-parity-model-weight-statistic-profile-hook, comfy-parity-native-device-apple-metal-mps-comfy-model-0015, comfy-parity-qwen-image-family-adapter-consolidation, comfy-parity-workspace-final-ownership-audit, comfy-parity-probe-derived-model-state-plan-selector, comfy-parity-backend-catalog-provenance-reconciliation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-models.csv, crates/comfy_model/catalog/model-families-v1.json, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/patch_graph.rs, crates/comfy_model/src/model_store.rs, crates/comfy_tensor/src/dtypes.rs, projects/comfy/ComfyUI/comfy/supported_models.py, projects/comfy/ComfyUI/comfy/supported_models_base.py, projects/comfy/ComfyUI/comfy/model_detection.py, projects/comfy/ComfyUI/comfy/model_base.py, projects/comfy/ComfyUI/comfy/ldm/qwen_image/model.py, projects/comfy/ComfyUI/comfy/ldm/qwen_image/controlnet.py, projects/comfy/ComfyUI/comfy/text_encoders/qwen_image.py, projects/comfy/ComfyUI/comfy_extras/nodes_qwen.py, crates/comfy_model/src/qwen_image_family.rs, crates/comfy_model/src/latent_formats/wan21_comfy_model_0053.rs
   - _Reads: .agents/specs/comfy-parity/catalogs/backend-models.csv, crates/comfy_model/catalog/model-families-v1.json, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/patch_graph.rs, crates/comfy_model/src/model_store.rs, crates/comfy_tensor/src/dtypes.rs, projects/comfy/ComfyUI/comfy/supported_models.py, projects/comfy/ComfyUI/comfy/supported_models_base.py, projects/comfy/ComfyUI/comfy/model_detection.py, projects/comfy/ComfyUI/comfy/model_base.py, projects/comfy/ComfyUI/comfy/ldm/qwen_image/model.py, projects/comfy/ComfyUI/comfy/ldm/qwen_image/controlnet.py, projects/comfy/ComfyUI/comfy/text_encoders/qwen_image.py, projects/comfy/ComfyUI/comfy_extras/nodes_qwen.py, crates/comfy_model/src/qwen_image_family.rs, crates/comfy_model/src/latent_formats/wan21_comfy_model_0053.rs
   - Writes: crates/comfy_model/src/families/qwenimage_comfy_model_0113.rs, crates/comfy_model/tests/families/qwenimage_comfy_model_0113.rs, crates/comfy_test_support/fixtures/models/qwenimage-comfy-model-0113, target/comfy-parity/val-model-family-row-001/qwenimage-comfy-model-0113.json
@@ -6572,10 +6580,10 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 330. Close exact native model-family breadth
   - _id: comfy-parity-model-family-breadth-closure
   - Outcome: After all 94 disjoint family rows are implemented, serialize the one aggregate native model-family closure. Extend the existing comfy_model build manifest and generated top-level test harness so the exact catalog/source projection/module/registration/test/fixture identity sets are equal, every row test actually executes, and the release artifact binds normalized source inputs plus all production, test, and fixture digests. Run every row through the real parsed-model detection adapter, canonical registry, transactional state mapping, checked build, named checkpoints, patches, memory/OOM, dtype/device, cancellation, and typed failure paths. This task owns only aggregate closure and evidence; it adds no family behavior or second registry.
-  - Wave: 185
-  - _Wave: 185
-  - Dependencies: comfy-parity-model-detection-authoritative-foundation, comfy-parity-native-model-family-acestep-comfy-model-0061, comfy-parity-native-model-family-acestep15-comfy-model-0062, comfy-parity-native-model-family-anima-comfy-model-0063, comfy-parity-native-model-family-auraflow-comfy-model-0064, comfy-parity-native-model-family-boogu-comfy-model-0065, comfy-parity-native-model-family-chroma-comfy-model-0066, comfy-parity-native-model-family-chromaradiance-comfy-model-0067, comfy-parity-native-model-family-cogvideox-i2v-comfy-model-0068, comfy-parity-native-model-family-cogvideox-inpaint-comfy-model-0069, comfy-parity-native-model-family-cogvideox-t2v-comfy-model-0070, comfy-parity-native-model-family-cosmosi2v-comfy-model-0071, comfy-parity-native-model-family-cosmosi2vpredict2-comfy-model-0072, comfy-parity-native-model-family-cosmost2ipredict2-comfy-model-0073, comfy-parity-native-model-family-cosmost2v-comfy-model-0074, comfy-parity-native-model-family-depthanything3-comfy-model-0075, comfy-parity-native-model-family-ernieimage-comfy-model-0076, comfy-parity-native-model-family-flux-comfy-model-0077, comfy-parity-native-model-family-flux2-comfy-model-0078, comfy-parity-native-model-family-fluxinpaint-comfy-model-0079, comfy-parity-native-model-family-fluxschnell-comfy-model-0080, comfy-parity-native-model-family-genmomochi-comfy-model-0081, comfy-parity-native-model-family-hidream-comfy-model-0082, comfy-parity-native-model-family-hidreamo1-comfy-model-0083, comfy-parity-native-model-family-hunyuanthree-dv2-comfy-model-0084, comfy-parity-native-model-family-hunyuanthree-dv2-1-comfy-model-0085, comfy-parity-native-model-family-hunyuanthree-dv2mini-comfy-model-0086, comfy-parity-native-model-family-hunyuandit-comfy-model-0087, comfy-parity-native-model-family-hunyuandit1-comfy-model-0088, comfy-parity-native-model-family-hunyuanimage21-comfy-model-0089, comfy-parity-native-model-family-hunyuanimage21refiner-comfy-model-0090, comfy-parity-native-model-family-hunyuanvideo-comfy-model-0091, comfy-parity-native-model-family-hunyuanvideo15-comfy-model-0092, comfy-parity-native-model-family-hunyuanvideo15-sr-distilled-comfy-model-0093, comfy-parity-native-model-family-hunyuanvideoi2v-comfy-model-0094, comfy-parity-native-model-family-hunyuanvideoskyreelsi2v-comfy-model-0095, comfy-parity-native-model-family-ideogram4-comfy-model-0096, comfy-parity-native-model-family-koala-1b-comfy-model-0097, comfy-parity-native-model-family-koala-700m-comfy-model-0098, comfy-parity-native-model-family-kandinsky5-comfy-model-0099, comfy-parity-native-model-family-kandinsky5image-comfy-model-0100, comfy-parity-native-model-family-krea2-comfy-model-0101, comfy-parity-native-model-family-ltxav-comfy-model-0102, comfy-parity-native-model-family-ltxv-comfy-model-0103, comfy-parity-native-model-family-lens-comfy-model-0104, comfy-parity-native-model-family-longcatimage-comfy-model-0105, comfy-parity-native-model-family-lotusd-comfy-model-0106, comfy-parity-native-model-family-lumina2-comfy-model-0107, comfy-parity-native-model-family-omnigen2-comfy-model-0108, comfy-parity-native-model-family-pid-comfy-model-0109, comfy-parity-native-model-family-pixartalpha-comfy-model-0110, comfy-parity-native-model-family-pixartsigma-comfy-model-0111, comfy-parity-native-model-family-pixelditt2i-comfy-model-0112, comfy-parity-native-model-family-qwenimage-comfy-model-0113, comfy-parity-native-model-family-rt-detr-v4-comfy-model-0114, comfy-parity-native-model-family-sam3-comfy-model-0115, comfy-parity-native-model-family-sam31-comfy-model-0116, comfy-parity-native-model-family-sd15-comfy-model-0117, comfy-parity-native-model-family-sd15-instructpix2pix-comfy-model-0118, comfy-parity-native-model-family-sd20-comfy-model-0119, comfy-parity-native-model-family-sd21uncliph-comfy-model-0120, comfy-parity-native-model-family-sd21unclipl-comfy-model-0121, comfy-parity-native-model-family-sd3-comfy-model-0122, comfy-parity-native-model-family-sdxl-comfy-model-0123, comfy-parity-native-model-family-sdxlrefiner-comfy-model-0124, comfy-parity-native-model-family-sdxl-instructpix2pix-comfy-model-0125, comfy-parity-native-model-family-sd-x4upscaler-comfy-model-0126, comfy-parity-native-model-family-ssd1b-comfy-model-0127, comfy-parity-native-model-family-svthree-d-p-comfy-model-0128, comfy-parity-native-model-family-svthree-d-u-comfy-model-0129, comfy-parity-native-model-family-svd-img2vid-comfy-model-0130, comfy-parity-native-model-family-segmind-vega-comfy-model-0131, comfy-parity-native-model-family-stableaudio-comfy-model-0132, comfy-parity-native-model-family-stableaudio3-comfy-model-0133, comfy-parity-native-model-family-stable-cascade-b-comfy-model-0134, comfy-parity-native-model-family-stable-cascade-c-comfy-model-0135, comfy-parity-native-model-family-stable-zero123-comfy-model-0136, comfy-parity-native-model-family-triposplat-comfy-model-0137, comfy-parity-native-model-family-wan21-camera-comfy-model-0138, comfy-parity-native-model-family-wan21-causalar-t2v-comfy-model-0139, comfy-parity-native-model-family-wan21-flowrvs-comfy-model-0140, comfy-parity-native-model-family-wan21-funcontrol2v-comfy-model-0141, comfy-parity-native-model-family-wan21-humo-comfy-model-0142, comfy-parity-native-model-family-wan21-i2v-comfy-model-0143, comfy-parity-native-model-family-wan21-scail-comfy-model-0144, comfy-parity-native-model-family-wan21-scail2-comfy-model-0145, comfy-parity-native-model-family-wan21-t2v-comfy-model-0146, comfy-parity-native-model-family-wan21-vace-comfy-model-0147, comfy-parity-native-model-family-wan22-animate-comfy-model-0148, comfy-parity-native-model-family-wan22-camera-comfy-model-0149, comfy-parity-native-model-family-wan22-s2v-comfy-model-0150, comfy-parity-native-model-family-wan22-t2v-comfy-model-0151, comfy-parity-native-model-family-wan22-wandancer-comfy-model-0152, comfy-parity-native-model-family-zimage-comfy-model-0153, comfy-parity-native-model-family-zimagepixelspace-comfy-model-0154, comfy-parity-cpu-low-precision-bmm-model-execution-closure, comfy-parity-backend-catalog-provenance-reconciliation, comfy-parity-model-detection-any-of-key-selector-consolidation
-  - _Blocked_by: comfy-parity-model-detection-authoritative-foundation, comfy-parity-native-model-family-acestep-comfy-model-0061, comfy-parity-native-model-family-acestep15-comfy-model-0062, comfy-parity-native-model-family-anima-comfy-model-0063, comfy-parity-native-model-family-auraflow-comfy-model-0064, comfy-parity-native-model-family-boogu-comfy-model-0065, comfy-parity-native-model-family-chroma-comfy-model-0066, comfy-parity-native-model-family-chromaradiance-comfy-model-0067, comfy-parity-native-model-family-cogvideox-i2v-comfy-model-0068, comfy-parity-native-model-family-cogvideox-inpaint-comfy-model-0069, comfy-parity-native-model-family-cogvideox-t2v-comfy-model-0070, comfy-parity-native-model-family-cosmosi2v-comfy-model-0071, comfy-parity-native-model-family-cosmosi2vpredict2-comfy-model-0072, comfy-parity-native-model-family-cosmost2ipredict2-comfy-model-0073, comfy-parity-native-model-family-cosmost2v-comfy-model-0074, comfy-parity-native-model-family-depthanything3-comfy-model-0075, comfy-parity-native-model-family-ernieimage-comfy-model-0076, comfy-parity-native-model-family-flux-comfy-model-0077, comfy-parity-native-model-family-flux2-comfy-model-0078, comfy-parity-native-model-family-fluxinpaint-comfy-model-0079, comfy-parity-native-model-family-fluxschnell-comfy-model-0080, comfy-parity-native-model-family-genmomochi-comfy-model-0081, comfy-parity-native-model-family-hidream-comfy-model-0082, comfy-parity-native-model-family-hidreamo1-comfy-model-0083, comfy-parity-native-model-family-hunyuanthree-dv2-comfy-model-0084, comfy-parity-native-model-family-hunyuanthree-dv2-1-comfy-model-0085, comfy-parity-native-model-family-hunyuanthree-dv2mini-comfy-model-0086, comfy-parity-native-model-family-hunyuandit-comfy-model-0087, comfy-parity-native-model-family-hunyuandit1-comfy-model-0088, comfy-parity-native-model-family-hunyuanimage21-comfy-model-0089, comfy-parity-native-model-family-hunyuanimage21refiner-comfy-model-0090, comfy-parity-native-model-family-hunyuanvideo-comfy-model-0091, comfy-parity-native-model-family-hunyuanvideo15-comfy-model-0092, comfy-parity-native-model-family-hunyuanvideo15-sr-distilled-comfy-model-0093, comfy-parity-native-model-family-hunyuanvideoi2v-comfy-model-0094, comfy-parity-native-model-family-hunyuanvideoskyreelsi2v-comfy-model-0095, comfy-parity-native-model-family-ideogram4-comfy-model-0096, comfy-parity-native-model-family-koala-1b-comfy-model-0097, comfy-parity-native-model-family-koala-700m-comfy-model-0098, comfy-parity-native-model-family-kandinsky5-comfy-model-0099, comfy-parity-native-model-family-kandinsky5image-comfy-model-0100, comfy-parity-native-model-family-krea2-comfy-model-0101, comfy-parity-native-model-family-ltxav-comfy-model-0102, comfy-parity-native-model-family-ltxv-comfy-model-0103, comfy-parity-native-model-family-lens-comfy-model-0104, comfy-parity-native-model-family-longcatimage-comfy-model-0105, comfy-parity-native-model-family-lotusd-comfy-model-0106, comfy-parity-native-model-family-lumina2-comfy-model-0107, comfy-parity-native-model-family-omnigen2-comfy-model-0108, comfy-parity-native-model-family-pid-comfy-model-0109, comfy-parity-native-model-family-pixartalpha-comfy-model-0110, comfy-parity-native-model-family-pixartsigma-comfy-model-0111, comfy-parity-native-model-family-pixelditt2i-comfy-model-0112, comfy-parity-native-model-family-qwenimage-comfy-model-0113, comfy-parity-native-model-family-rt-detr-v4-comfy-model-0114, comfy-parity-native-model-family-sam3-comfy-model-0115, comfy-parity-native-model-family-sam31-comfy-model-0116, comfy-parity-native-model-family-sd15-comfy-model-0117, comfy-parity-native-model-family-sd15-instructpix2pix-comfy-model-0118, comfy-parity-native-model-family-sd20-comfy-model-0119, comfy-parity-native-model-family-sd21uncliph-comfy-model-0120, comfy-parity-native-model-family-sd21unclipl-comfy-model-0121, comfy-parity-native-model-family-sd3-comfy-model-0122, comfy-parity-native-model-family-sdxl-comfy-model-0123, comfy-parity-native-model-family-sdxlrefiner-comfy-model-0124, comfy-parity-native-model-family-sdxl-instructpix2pix-comfy-model-0125, comfy-parity-native-model-family-sd-x4upscaler-comfy-model-0126, comfy-parity-native-model-family-ssd1b-comfy-model-0127, comfy-parity-native-model-family-svthree-d-p-comfy-model-0128, comfy-parity-native-model-family-svthree-d-u-comfy-model-0129, comfy-parity-native-model-family-svd-img2vid-comfy-model-0130, comfy-parity-native-model-family-segmind-vega-comfy-model-0131, comfy-parity-native-model-family-stableaudio-comfy-model-0132, comfy-parity-native-model-family-stableaudio3-comfy-model-0133, comfy-parity-native-model-family-stable-cascade-b-comfy-model-0134, comfy-parity-native-model-family-stable-cascade-c-comfy-model-0135, comfy-parity-native-model-family-stable-zero123-comfy-model-0136, comfy-parity-native-model-family-triposplat-comfy-model-0137, comfy-parity-native-model-family-wan21-camera-comfy-model-0138, comfy-parity-native-model-family-wan21-causalar-t2v-comfy-model-0139, comfy-parity-native-model-family-wan21-flowrvs-comfy-model-0140, comfy-parity-native-model-family-wan21-funcontrol2v-comfy-model-0141, comfy-parity-native-model-family-wan21-humo-comfy-model-0142, comfy-parity-native-model-family-wan21-i2v-comfy-model-0143, comfy-parity-native-model-family-wan21-scail-comfy-model-0144, comfy-parity-native-model-family-wan21-scail2-comfy-model-0145, comfy-parity-native-model-family-wan21-t2v-comfy-model-0146, comfy-parity-native-model-family-wan21-vace-comfy-model-0147, comfy-parity-native-model-family-wan22-animate-comfy-model-0148, comfy-parity-native-model-family-wan22-camera-comfy-model-0149, comfy-parity-native-model-family-wan22-s2v-comfy-model-0150, comfy-parity-native-model-family-wan22-t2v-comfy-model-0151, comfy-parity-native-model-family-wan22-wandancer-comfy-model-0152, comfy-parity-native-model-family-zimage-comfy-model-0153, comfy-parity-native-model-family-zimagepixelspace-comfy-model-0154, comfy-parity-cpu-low-precision-bmm-model-execution-closure, comfy-parity-backend-catalog-provenance-reconciliation, comfy-parity-model-detection-any-of-key-selector-consolidation
+  - Wave: 186
+  - _Wave: 186
+  - Dependencies: comfy-parity-model-detection-authoritative-foundation, comfy-parity-native-model-family-acestep-comfy-model-0061, comfy-parity-native-model-family-acestep15-comfy-model-0062, comfy-parity-native-model-family-anima-comfy-model-0063, comfy-parity-native-model-family-auraflow-comfy-model-0064, comfy-parity-native-model-family-boogu-comfy-model-0065, comfy-parity-native-model-family-chroma-comfy-model-0066, comfy-parity-native-model-family-chromaradiance-comfy-model-0067, comfy-parity-native-model-family-cogvideox-i2v-comfy-model-0068, comfy-parity-native-model-family-cogvideox-inpaint-comfy-model-0069, comfy-parity-native-model-family-cogvideox-t2v-comfy-model-0070, comfy-parity-native-model-family-cosmosi2v-comfy-model-0071, comfy-parity-native-model-family-cosmosi2vpredict2-comfy-model-0072, comfy-parity-native-model-family-cosmost2ipredict2-comfy-model-0073, comfy-parity-native-model-family-cosmost2v-comfy-model-0074, comfy-parity-native-model-family-depthanything3-comfy-model-0075, comfy-parity-native-model-family-ernieimage-comfy-model-0076, comfy-parity-native-model-family-flux-comfy-model-0077, comfy-parity-native-model-family-flux2-comfy-model-0078, comfy-parity-native-model-family-fluxinpaint-comfy-model-0079, comfy-parity-native-model-family-fluxschnell-comfy-model-0080, comfy-parity-native-model-family-genmomochi-comfy-model-0081, comfy-parity-native-model-family-hidream-comfy-model-0082, comfy-parity-native-model-family-hidreamo1-comfy-model-0083, comfy-parity-native-model-family-hunyuanthree-dv2-comfy-model-0084, comfy-parity-native-model-family-hunyuanthree-dv2-1-comfy-model-0085, comfy-parity-native-model-family-hunyuanthree-dv2mini-comfy-model-0086, comfy-parity-native-model-family-hunyuandit-comfy-model-0087, comfy-parity-native-model-family-hunyuandit1-comfy-model-0088, comfy-parity-native-model-family-hunyuanimage21-comfy-model-0089, comfy-parity-native-model-family-hunyuanimage21refiner-comfy-model-0090, comfy-parity-native-model-family-hunyuanvideo-comfy-model-0091, comfy-parity-native-model-family-hunyuanvideo15-comfy-model-0092, comfy-parity-native-model-family-hunyuanvideo15-sr-distilled-comfy-model-0093, comfy-parity-native-model-family-hunyuanvideoi2v-comfy-model-0094, comfy-parity-native-model-family-hunyuanvideoskyreelsi2v-comfy-model-0095, comfy-parity-native-model-family-ideogram4-comfy-model-0096, comfy-parity-native-model-family-koala-1b-comfy-model-0097, comfy-parity-native-model-family-koala-700m-comfy-model-0098, comfy-parity-native-model-family-kandinsky5-comfy-model-0099, comfy-parity-native-model-family-kandinsky5image-comfy-model-0100, comfy-parity-native-model-family-krea2-comfy-model-0101, comfy-parity-native-model-family-ltxav-comfy-model-0102, comfy-parity-native-model-family-ltxv-comfy-model-0103, comfy-parity-native-model-family-lens-comfy-model-0104, comfy-parity-native-model-family-longcatimage-comfy-model-0105, comfy-parity-native-model-family-lotusd-comfy-model-0106, comfy-parity-native-model-family-lumina2-comfy-model-0107, comfy-parity-native-model-family-omnigen2-comfy-model-0108, comfy-parity-native-model-family-pid-comfy-model-0109, comfy-parity-native-model-family-pixartalpha-comfy-model-0110, comfy-parity-native-model-family-pixartsigma-comfy-model-0111, comfy-parity-native-model-family-pixelditt2i-comfy-model-0112, comfy-parity-native-model-family-qwenimage-comfy-model-0113, comfy-parity-native-model-family-rt-detr-v4-comfy-model-0114, comfy-parity-native-model-family-sam3-comfy-model-0115, comfy-parity-native-model-family-sam31-comfy-model-0116, comfy-parity-native-model-family-sd15-comfy-model-0117, comfy-parity-native-model-family-sd15-instructpix2pix-comfy-model-0118, comfy-parity-native-model-family-sd20-comfy-model-0119, comfy-parity-native-model-family-sd21uncliph-comfy-model-0120, comfy-parity-native-model-family-sd21unclipl-comfy-model-0121, comfy-parity-native-model-family-sd3-comfy-model-0122, comfy-parity-native-model-family-sdxl-comfy-model-0123, comfy-parity-native-model-family-sdxlrefiner-comfy-model-0124, comfy-parity-native-model-family-sdxl-instructpix2pix-comfy-model-0125, comfy-parity-native-model-family-sd-x4upscaler-comfy-model-0126, comfy-parity-native-model-family-ssd1b-comfy-model-0127, comfy-parity-native-model-family-svthree-d-p-comfy-model-0128, comfy-parity-native-model-family-svthree-d-u-comfy-model-0129, comfy-parity-native-model-family-svd-img2vid-comfy-model-0130, comfy-parity-native-model-family-segmind-vega-comfy-model-0131, comfy-parity-native-model-family-stableaudio-comfy-model-0132, comfy-parity-native-model-family-stableaudio3-comfy-model-0133, comfy-parity-native-model-family-stable-cascade-b-comfy-model-0134, comfy-parity-native-model-family-stable-cascade-c-comfy-model-0135, comfy-parity-native-model-family-stable-zero123-comfy-model-0136, comfy-parity-native-model-family-triposplat-comfy-model-0137, comfy-parity-native-model-family-wan21-camera-comfy-model-0138, comfy-parity-native-model-family-wan21-causalar-t2v-comfy-model-0139, comfy-parity-native-model-family-wan21-flowrvs-comfy-model-0140, comfy-parity-native-model-family-wan21-funcontrol2v-comfy-model-0141, comfy-parity-native-model-family-wan21-humo-comfy-model-0142, comfy-parity-native-model-family-wan21-i2v-comfy-model-0143, comfy-parity-native-model-family-wan21-scail-comfy-model-0144, comfy-parity-native-model-family-wan21-scail2-comfy-model-0145, comfy-parity-native-model-family-wan21-t2v-comfy-model-0146, comfy-parity-native-model-family-wan21-vace-comfy-model-0147, comfy-parity-native-model-family-wan22-animate-comfy-model-0148, comfy-parity-native-model-family-wan22-camera-comfy-model-0149, comfy-parity-native-model-family-wan22-s2v-comfy-model-0150, comfy-parity-native-model-family-wan22-t2v-comfy-model-0151, comfy-parity-native-model-family-wan22-wandancer-comfy-model-0152, comfy-parity-native-model-family-zimage-comfy-model-0153, comfy-parity-native-model-family-zimagepixelspace-comfy-model-0154, comfy-parity-cpu-low-precision-bmm-model-execution-closure, comfy-parity-probe-derived-model-state-plan-selector, comfy-parity-backend-catalog-provenance-reconciliation, comfy-parity-model-detection-any-of-key-selector-consolidation
+  - _Blocked_by: comfy-parity-model-detection-authoritative-foundation, comfy-parity-native-model-family-acestep-comfy-model-0061, comfy-parity-native-model-family-acestep15-comfy-model-0062, comfy-parity-native-model-family-anima-comfy-model-0063, comfy-parity-native-model-family-auraflow-comfy-model-0064, comfy-parity-native-model-family-boogu-comfy-model-0065, comfy-parity-native-model-family-chroma-comfy-model-0066, comfy-parity-native-model-family-chromaradiance-comfy-model-0067, comfy-parity-native-model-family-cogvideox-i2v-comfy-model-0068, comfy-parity-native-model-family-cogvideox-inpaint-comfy-model-0069, comfy-parity-native-model-family-cogvideox-t2v-comfy-model-0070, comfy-parity-native-model-family-cosmosi2v-comfy-model-0071, comfy-parity-native-model-family-cosmosi2vpredict2-comfy-model-0072, comfy-parity-native-model-family-cosmost2ipredict2-comfy-model-0073, comfy-parity-native-model-family-cosmost2v-comfy-model-0074, comfy-parity-native-model-family-depthanything3-comfy-model-0075, comfy-parity-native-model-family-ernieimage-comfy-model-0076, comfy-parity-native-model-family-flux-comfy-model-0077, comfy-parity-native-model-family-flux2-comfy-model-0078, comfy-parity-native-model-family-fluxinpaint-comfy-model-0079, comfy-parity-native-model-family-fluxschnell-comfy-model-0080, comfy-parity-native-model-family-genmomochi-comfy-model-0081, comfy-parity-native-model-family-hidream-comfy-model-0082, comfy-parity-native-model-family-hidreamo1-comfy-model-0083, comfy-parity-native-model-family-hunyuanthree-dv2-comfy-model-0084, comfy-parity-native-model-family-hunyuanthree-dv2-1-comfy-model-0085, comfy-parity-native-model-family-hunyuanthree-dv2mini-comfy-model-0086, comfy-parity-native-model-family-hunyuandit-comfy-model-0087, comfy-parity-native-model-family-hunyuandit1-comfy-model-0088, comfy-parity-native-model-family-hunyuanimage21-comfy-model-0089, comfy-parity-native-model-family-hunyuanimage21refiner-comfy-model-0090, comfy-parity-native-model-family-hunyuanvideo-comfy-model-0091, comfy-parity-native-model-family-hunyuanvideo15-comfy-model-0092, comfy-parity-native-model-family-hunyuanvideo15-sr-distilled-comfy-model-0093, comfy-parity-native-model-family-hunyuanvideoi2v-comfy-model-0094, comfy-parity-native-model-family-hunyuanvideoskyreelsi2v-comfy-model-0095, comfy-parity-native-model-family-ideogram4-comfy-model-0096, comfy-parity-native-model-family-koala-1b-comfy-model-0097, comfy-parity-native-model-family-koala-700m-comfy-model-0098, comfy-parity-native-model-family-kandinsky5-comfy-model-0099, comfy-parity-native-model-family-kandinsky5image-comfy-model-0100, comfy-parity-native-model-family-krea2-comfy-model-0101, comfy-parity-native-model-family-ltxav-comfy-model-0102, comfy-parity-native-model-family-ltxv-comfy-model-0103, comfy-parity-native-model-family-lens-comfy-model-0104, comfy-parity-native-model-family-longcatimage-comfy-model-0105, comfy-parity-native-model-family-lotusd-comfy-model-0106, comfy-parity-native-model-family-lumina2-comfy-model-0107, comfy-parity-native-model-family-omnigen2-comfy-model-0108, comfy-parity-native-model-family-pid-comfy-model-0109, comfy-parity-native-model-family-pixartalpha-comfy-model-0110, comfy-parity-native-model-family-pixartsigma-comfy-model-0111, comfy-parity-native-model-family-pixelditt2i-comfy-model-0112, comfy-parity-native-model-family-qwenimage-comfy-model-0113, comfy-parity-native-model-family-rt-detr-v4-comfy-model-0114, comfy-parity-native-model-family-sam3-comfy-model-0115, comfy-parity-native-model-family-sam31-comfy-model-0116, comfy-parity-native-model-family-sd15-comfy-model-0117, comfy-parity-native-model-family-sd15-instructpix2pix-comfy-model-0118, comfy-parity-native-model-family-sd20-comfy-model-0119, comfy-parity-native-model-family-sd21uncliph-comfy-model-0120, comfy-parity-native-model-family-sd21unclipl-comfy-model-0121, comfy-parity-native-model-family-sd3-comfy-model-0122, comfy-parity-native-model-family-sdxl-comfy-model-0123, comfy-parity-native-model-family-sdxlrefiner-comfy-model-0124, comfy-parity-native-model-family-sdxl-instructpix2pix-comfy-model-0125, comfy-parity-native-model-family-sd-x4upscaler-comfy-model-0126, comfy-parity-native-model-family-ssd1b-comfy-model-0127, comfy-parity-native-model-family-svthree-d-p-comfy-model-0128, comfy-parity-native-model-family-svthree-d-u-comfy-model-0129, comfy-parity-native-model-family-svd-img2vid-comfy-model-0130, comfy-parity-native-model-family-segmind-vega-comfy-model-0131, comfy-parity-native-model-family-stableaudio-comfy-model-0132, comfy-parity-native-model-family-stableaudio3-comfy-model-0133, comfy-parity-native-model-family-stable-cascade-b-comfy-model-0134, comfy-parity-native-model-family-stable-cascade-c-comfy-model-0135, comfy-parity-native-model-family-stable-zero123-comfy-model-0136, comfy-parity-native-model-family-triposplat-comfy-model-0137, comfy-parity-native-model-family-wan21-camera-comfy-model-0138, comfy-parity-native-model-family-wan21-causalar-t2v-comfy-model-0139, comfy-parity-native-model-family-wan21-flowrvs-comfy-model-0140, comfy-parity-native-model-family-wan21-funcontrol2v-comfy-model-0141, comfy-parity-native-model-family-wan21-humo-comfy-model-0142, comfy-parity-native-model-family-wan21-i2v-comfy-model-0143, comfy-parity-native-model-family-wan21-scail-comfy-model-0144, comfy-parity-native-model-family-wan21-scail2-comfy-model-0145, comfy-parity-native-model-family-wan21-t2v-comfy-model-0146, comfy-parity-native-model-family-wan21-vace-comfy-model-0147, comfy-parity-native-model-family-wan22-animate-comfy-model-0148, comfy-parity-native-model-family-wan22-camera-comfy-model-0149, comfy-parity-native-model-family-wan22-s2v-comfy-model-0150, comfy-parity-native-model-family-wan22-t2v-comfy-model-0151, comfy-parity-native-model-family-wan22-wandancer-comfy-model-0152, comfy-parity-native-model-family-zimage-comfy-model-0153, comfy-parity-native-model-family-zimagepixelspace-comfy-model-0154, comfy-parity-cpu-low-precision-bmm-model-execution-closure, comfy-parity-probe-derived-model-state-plan-selector, comfy-parity-backend-catalog-provenance-reconciliation, comfy-parity-model-detection-any-of-key-selector-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-models.csv, crates/comfy_model/catalog/model-families-v1.json, crates/comfy_model/build.rs, crates/comfy_model/src/families, crates/comfy_model/tests/families, crates/comfy_test_support/fixtures/models, crates/comfy_model/src/model_store.rs, crates/comfy_model/src/model_family.rs
   - _Reads: .agents/specs/comfy-parity/catalogs/backend-models.csv, crates/comfy_model/catalog/model-families-v1.json, crates/comfy_model/build.rs, crates/comfy_model/src/families, crates/comfy_model/tests/families, crates/comfy_test_support/fixtures/models, crates/comfy_model/src/model_store.rs, crates/comfy_model/src/model_family.rs
   - Writes: crates/comfy_model/build.rs, crates/comfy_model/tests/model_families.rs, crates/comfy_model/tests/breadth_closure.rs, .agents/specs/comfy-parity/catalogs/native-model-family-closure.json, target/comfy-parity/val-model-family-001.json
@@ -7278,10 +7286,10 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 366. Integrate native tensor, device, model, sampler, scheduler, latent, and patch breadth
   - _id: comfy-parity-native-compute-breadth-integration
   - Outcome: Generate and verify the compile-time manifests and closure reports after every disjoint compute breadth leaf; hardware lab certifications remain independent release gates.
-  - Wave: 186
-  - _Wave: 186
-  - Dependencies: comfy-parity-autograd-state-ownership-consolidation, comfy-parity-integrate-device-amd-rocm-comfy-model-0014, comfy-parity-integrate-device-apple-metal-mps-comfy-model-0015, comfy-parity-integrate-device-cambricon-mlu-comfy-model-0017, comfy-parity-integrate-device-directml-comfy-model-0018, comfy-parity-integrate-device-huawei-ascend-npu-comfy-model-0019, comfy-parity-integrate-device-intel-xpu-comfy-model-0021, comfy-parity-integrate-device-nvidia-cuda-comfy-model-0022, comfy-parity-latent-format-authoritative-foundation, comfy-parity-model-detection-authoritative-foundation, comfy-parity-model-family-authoritative-foundation, comfy-parity-model-family-breadth-closure, comfy-parity-native-autograd-breadth, comfy-parity-native-conditioning-patches, comfy-parity-native-device-cpu-comfy-model-0016, comfy-parity-native-latent-aceaudio-comfy-model-0023, comfy-parity-native-latent-aceaudio15-comfy-model-0024, comfy-parity-native-latent-chromaradiance-comfy-model-0025, comfy-parity-native-latent-cogvideox-comfy-model-0026, comfy-parity-native-latent-cogvideox1-5-comfy-model-0027, comfy-parity-native-latent-cosmos1cv8x8x8-comfy-model-0028, comfy-parity-native-latent-flux-comfy-model-0029, comfy-parity-native-latent-flux2-comfy-model-0030, comfy-parity-native-latent-hidreamo1pixel-comfy-model-0031, comfy-parity-native-latent-hunyuanimage21-comfy-model-0035, comfy-parity-native-latent-hunyuanimage21refiner-comfy-model-0036, comfy-parity-native-latent-hunyuanthree-dv2-1-comfy-model-0033, comfy-parity-native-latent-hunyuanthree-dv2-comfy-model-0032, comfy-parity-native-latent-hunyuanthree-dv2mini-comfy-model-0034, comfy-parity-native-latent-hunyuanvideo-comfy-model-0037, comfy-parity-native-latent-hunyuanvideo15-comfy-model-0038, comfy-parity-native-latent-ltxav-comfy-model-0039, comfy-parity-native-latent-ltxv-comfy-model-0040, comfy-parity-native-latent-mochi-comfy-model-0041, comfy-parity-native-latent-pixelditpixel-comfy-model-0042, comfy-parity-native-latent-sc-b-comfy-model-0043, comfy-parity-native-latent-sc-prior-comfy-model-0044, comfy-parity-native-latent-sd-x4-comfy-model-0049, comfy-parity-native-latent-sd15-comfy-model-0045, comfy-parity-native-latent-sd3-comfy-model-0046, comfy-parity-native-latent-sdxl-comfy-model-0047, comfy-parity-native-latent-sdxl-playground-2-5-comfy-model-0048, comfy-parity-native-latent-stableaudio1-comfy-model-0050, comfy-parity-native-latent-stableaudio3-comfy-model-0051, comfy-parity-native-latent-triposplat-comfy-model-0052, comfy-parity-native-latent-wan21-comfy-model-0053, comfy-parity-native-latent-wan22-comfy-model-0054, comfy-parity-native-latent-zimagepixelspace-comfy-model-0055, comfy-parity-native-model-family-acestep-comfy-model-0061, comfy-parity-native-model-family-acestep15-comfy-model-0062, comfy-parity-native-model-family-anima-comfy-model-0063, comfy-parity-native-model-family-auraflow-comfy-model-0064, comfy-parity-native-model-family-boogu-comfy-model-0065, comfy-parity-native-model-family-chroma-comfy-model-0066, comfy-parity-native-model-family-chromaradiance-comfy-model-0067, comfy-parity-native-model-family-cogvideox-i2v-comfy-model-0068, comfy-parity-native-model-family-cogvideox-inpaint-comfy-model-0069, comfy-parity-native-model-family-cogvideox-t2v-comfy-model-0070, comfy-parity-native-model-family-cosmosi2v-comfy-model-0071, comfy-parity-native-model-family-cosmosi2vpredict2-comfy-model-0072, comfy-parity-native-model-family-cosmost2ipredict2-comfy-model-0073, comfy-parity-native-model-family-cosmost2v-comfy-model-0074, comfy-parity-native-model-family-depthanything3-comfy-model-0075, comfy-parity-native-model-family-ernieimage-comfy-model-0076, comfy-parity-native-model-family-flux-comfy-model-0077, comfy-parity-native-model-family-flux2-comfy-model-0078, comfy-parity-native-model-family-fluxinpaint-comfy-model-0079, comfy-parity-native-model-family-fluxschnell-comfy-model-0080, comfy-parity-native-model-family-genmomochi-comfy-model-0081, comfy-parity-native-model-family-hidream-comfy-model-0082, comfy-parity-native-model-family-hidreamo1-comfy-model-0083, comfy-parity-native-model-family-hunyuandit-comfy-model-0087, comfy-parity-native-model-family-hunyuandit1-comfy-model-0088, comfy-parity-native-model-family-hunyuanimage21-comfy-model-0089, comfy-parity-native-model-family-hunyuanimage21refiner-comfy-model-0090, comfy-parity-native-model-family-hunyuanthree-dv2-1-comfy-model-0085, comfy-parity-native-model-family-hunyuanthree-dv2-comfy-model-0084, comfy-parity-native-model-family-hunyuanthree-dv2mini-comfy-model-0086, comfy-parity-native-model-family-hunyuanvideo-comfy-model-0091, comfy-parity-native-model-family-hunyuanvideo15-comfy-model-0092, comfy-parity-native-model-family-hunyuanvideo15-sr-distilled-comfy-model-0093, comfy-parity-native-model-family-hunyuanvideoi2v-comfy-model-0094, comfy-parity-native-model-family-hunyuanvideoskyreelsi2v-comfy-model-0095, comfy-parity-native-model-family-ideogram4-comfy-model-0096, comfy-parity-native-model-family-kandinsky5-comfy-model-0099, comfy-parity-native-model-family-kandinsky5image-comfy-model-0100, comfy-parity-native-model-family-koala-1b-comfy-model-0097, comfy-parity-native-model-family-koala-700m-comfy-model-0098, comfy-parity-native-model-family-krea2-comfy-model-0101, comfy-parity-native-model-family-lens-comfy-model-0104, comfy-parity-native-model-family-longcatimage-comfy-model-0105, comfy-parity-native-model-family-lotusd-comfy-model-0106, comfy-parity-native-model-family-ltxav-comfy-model-0102, comfy-parity-native-model-family-ltxv-comfy-model-0103, comfy-parity-native-model-family-lumina2-comfy-model-0107, comfy-parity-native-model-family-omnigen2-comfy-model-0108, comfy-parity-native-model-family-pid-comfy-model-0109, comfy-parity-native-model-family-pixartalpha-comfy-model-0110, comfy-parity-native-model-family-pixartsigma-comfy-model-0111, comfy-parity-native-model-family-pixelditt2i-comfy-model-0112, comfy-parity-native-model-family-qwenimage-comfy-model-0113, comfy-parity-native-model-family-rt-detr-v4-comfy-model-0114, comfy-parity-native-model-family-sam3-comfy-model-0115, comfy-parity-native-model-family-sam31-comfy-model-0116, comfy-parity-native-model-family-sd-x4upscaler-comfy-model-0126, comfy-parity-native-model-family-sd15-comfy-model-0117, comfy-parity-native-model-family-sd15-instructpix2pix-comfy-model-0118, comfy-parity-native-model-family-sd20-comfy-model-0119, comfy-parity-native-model-family-sd21uncliph-comfy-model-0120, comfy-parity-native-model-family-sd21unclipl-comfy-model-0121, comfy-parity-native-model-family-sd3-comfy-model-0122, comfy-parity-native-model-family-sdxl-comfy-model-0123, comfy-parity-native-model-family-sdxl-instructpix2pix-comfy-model-0125, comfy-parity-native-model-family-sdxlrefiner-comfy-model-0124, comfy-parity-native-model-family-segmind-vega-comfy-model-0131, comfy-parity-native-model-family-ssd1b-comfy-model-0127, comfy-parity-native-model-family-stable-cascade-b-comfy-model-0134, comfy-parity-native-model-family-stable-cascade-c-comfy-model-0135, comfy-parity-native-model-family-stable-zero123-comfy-model-0136, comfy-parity-native-model-family-stableaudio-comfy-model-0132, comfy-parity-native-model-family-stableaudio3-comfy-model-0133, comfy-parity-native-model-family-svd-img2vid-comfy-model-0130, comfy-parity-native-model-family-svthree-d-p-comfy-model-0128, comfy-parity-native-model-family-svthree-d-u-comfy-model-0129, comfy-parity-native-model-family-triposplat-comfy-model-0137, comfy-parity-native-model-family-wan21-camera-comfy-model-0138, comfy-parity-native-model-family-wan21-causalar-t2v-comfy-model-0139, comfy-parity-native-model-family-wan21-flowrvs-comfy-model-0140, comfy-parity-native-model-family-wan21-funcontrol2v-comfy-model-0141, comfy-parity-native-model-family-wan21-humo-comfy-model-0142, comfy-parity-native-model-family-wan21-i2v-comfy-model-0143, comfy-parity-native-model-family-wan21-scail-comfy-model-0144, comfy-parity-native-model-family-wan21-scail2-comfy-model-0145, comfy-parity-native-model-family-wan21-t2v-comfy-model-0146, comfy-parity-native-model-family-wan21-vace-comfy-model-0147, comfy-parity-native-model-family-wan22-animate-comfy-model-0148, comfy-parity-native-model-family-wan22-camera-comfy-model-0149, comfy-parity-native-model-family-wan22-s2v-comfy-model-0150, comfy-parity-native-model-family-wan22-t2v-comfy-model-0151, comfy-parity-native-model-family-wan22-wandancer-comfy-model-0152, comfy-parity-native-model-family-zimage-comfy-model-0153, comfy-parity-native-model-family-zimagepixelspace-comfy-model-0154, comfy-parity-native-rng-breadth, comfy-parity-native-sampler-ddim-comfy-model-0159, comfy-parity-native-sampler-ddpm-comfy-model-0160, comfy-parity-native-sampler-deis-comfy-model-0161, comfy-parity-native-sampler-dpm-2-ancestral-comfy-model-0163, comfy-parity-native-sampler-dpm-2-comfy-model-0162, comfy-parity-native-sampler-dpm-adaptive-comfy-model-0164, comfy-parity-native-sampler-dpm-fast-comfy-model-0165, comfy-parity-native-sampler-dpmpp-2m-cfg-pp-comfy-model-0167, comfy-parity-native-sampler-dpmpp-2m-comfy-model-0166, comfy-parity-native-sampler-dpmpp-2m-sde-comfy-model-0168, comfy-parity-native-sampler-dpmpp-2m-sde-gpu-comfy-model-0169, comfy-parity-native-sampler-dpmpp-2m-sde-heun-comfy-model-0170, comfy-parity-native-sampler-dpmpp-2m-sde-heun-gpu-comfy-model-0171, comfy-parity-native-sampler-dpmpp-2s-ancestral-cfg-pp-comfy-model-0173, comfy-parity-native-sampler-dpmpp-2s-ancestral-comfy-model-0172, comfy-parity-native-sampler-dpmpp-3m-sde-comfy-model-0174, comfy-parity-native-sampler-dpmpp-3m-sde-gpu-comfy-model-0175, comfy-parity-native-sampler-dpmpp-sde-comfy-model-0176, comfy-parity-native-sampler-dpmpp-sde-gpu-comfy-model-0177, comfy-parity-native-sampler-er-sde-comfy-model-0178, comfy-parity-native-sampler-euler-ancestral-cfg-pp-comfy-model-0181, comfy-parity-native-sampler-euler-ancestral-comfy-model-0180, comfy-parity-native-sampler-euler-cfg-pp-comfy-model-0182, comfy-parity-native-sampler-euler-comfy-model-0179, comfy-parity-native-sampler-exp-heun-2-x0-comfy-model-0183, comfy-parity-native-sampler-exp-heun-2-x0-sde-comfy-model-0184, comfy-parity-native-sampler-gradient-estimation-cfg-pp-comfy-model-0186, comfy-parity-native-sampler-gradient-estimation-comfy-model-0185, comfy-parity-native-sampler-heun-comfy-model-0187, comfy-parity-native-sampler-heunpp2-comfy-model-0188, comfy-parity-native-sampler-ipndm-comfy-model-0189, comfy-parity-native-sampler-ipndm-v-comfy-model-0190, comfy-parity-native-sampler-lcm-comfy-model-0191, comfy-parity-native-sampler-lms-comfy-model-0192, comfy-parity-native-sampler-res-multistep-ancestral-cfg-pp-comfy-model-0195, comfy-parity-native-sampler-res-multistep-ancestral-comfy-model-0194, comfy-parity-native-sampler-res-multistep-cfg-pp-comfy-model-0196, comfy-parity-native-sampler-res-multistep-comfy-model-0193, comfy-parity-native-sampler-sa-solver-comfy-model-0197, comfy-parity-native-sampler-sa-solver-pece-comfy-model-0198, comfy-parity-native-sampler-seeds-2-comfy-model-0199, comfy-parity-native-sampler-seeds-3-comfy-model-0200, comfy-parity-native-sampler-uni-pc-bh2-comfy-model-0202, comfy-parity-native-sampler-uni-pc-comfy-model-0201, comfy-parity-native-scheduler-beta-comfy-model-0203, comfy-parity-native-scheduler-ddim-uniform-comfy-model-0204, comfy-parity-native-scheduler-exponential-comfy-model-0205, comfy-parity-native-scheduler-karras-comfy-model-0206, comfy-parity-native-scheduler-kl-optimal-comfy-model-0207, comfy-parity-native-scheduler-linear-quadratic-comfy-model-0208, comfy-parity-native-scheduler-normal-comfy-model-0209, comfy-parity-native-scheduler-sgm-uniform-comfy-model-0210, comfy-parity-native-scheduler-simple-comfy-model-0211, comfy-parity-quantized-autograd-adapter, comfy-parity-sampler-algorithm-family-ownership-consolidation, comfy-parity-sampler-scheduler-authoritative-foundation, comfy-parity-tensor-index-ownership-consolidation, comfy-parity-tensor-ops-accelerated-attention-kernel-comfy-tensor-op-1354ac34a777, comfy-parity-tensor-ops-activation-normalization-functional-comfy-tensor-op-0538873a73b1, comfy-parity-tensor-ops-comfy-operator-indirection-comfy-tensor-op-227f5d04687a, comfy-parity-tensor-ops-comfy-operator-indirection-comfy-tensor-op-a0bd98dda517, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-010917b0d872, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-0fb8594194a8, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-1917b7227a5c, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-2881abe3d797, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-332e7e59dc10, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-4130d690d4b2, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-54e28780b32b, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-5ab4376a79b5, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-615251b481b7, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-6d6c617423ea, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-790cde1ebf17, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-861ee6173859, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-8f0acda02879, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-9cd229514f61, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-a68ae691163c, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-b088976a05ab, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-b91a910a5af9, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-c05fe0730305, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-c8ba6ce3159c, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-d54af27b4d70, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-e78ad841c264, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-f15a2d8a6bd4, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-fcda841034ed, comfy-parity-tensor-ops-external-tensor-kernel-comfy-tensor-op-0607daa06439, comfy-parity-tensor-ops-external-tensor-kernel-comfy-tensor-op-4f9c05e204d4, comfy-parity-tensor-ops-external-tensor-kernel-comfy-tensor-op-c5a306eb73fd, comfy-parity-tensor-ops-indexing-masking-comfy-tensor-op-006e05c5daaf, comfy-parity-tensor-ops-indexing-masking-comfy-tensor-op-e9a313720d5d, comfy-parity-tensor-ops-linear-algebra-comfy-tensor-op-061170cbb6f7, comfy-parity-tensor-ops-linear-algebra-comfy-tensor-op-a5d623c79a18, comfy-parity-tensor-ops-namespace-contract-comfy-tensor-op-764a8e60b071, comfy-parity-tensor-ops-neural-network-functional-comfy-tensor-op-13df18f5f426, comfy-parity-tensor-ops-neural-network-module-comfy-tensor-op-0e602e58360a, comfy-parity-tensor-ops-neural-network-module-comfy-tensor-op-5b8ce1451811, comfy-parity-tensor-ops-neural-network-module-comfy-tensor-op-904c1e14bae4, comfy-parity-tensor-ops-neural-network-module-comfy-tensor-op-d60003ac2b14, comfy-parity-tensor-ops-random-number-generation-comfy-tensor-op-095b3e192800, comfy-parity-tensor-ops-random-number-generation-comfy-tensor-op-fd729b8a5363, comfy-parity-tensor-ops-reduction-comfy-tensor-op-00e998458e0c, comfy-parity-tensor-ops-reduction-comfy-tensor-op-9f681b3616f6, comfy-parity-tensor-ops-reduction-comfy-tensor-op-ff3f06b4b591, comfy-parity-tensor-ops-shape-layout-transform-comfy-tensor-op-0c2e0712da68, comfy-parity-tensor-ops-shape-layout-transform-comfy-tensor-op-75596b7e1112, comfy-parity-tensor-ops-shape-layout-transform-comfy-tensor-op-df605ed35114, comfy-parity-tensor-ops-spatial-functional-kernel-comfy-tensor-op-1f9d23f3b331, comfy-parity-tensor-ops-spectral-transform-comfy-tensor-op-2c39e32acd3c, comfy-parity-tensor-ops-storage-dtype-device-comfy-tensor-op-00f639d6c8a7, comfy-parity-tensor-ops-tensor-creation-comfy-tensor-op-00009bb729df, comfy-parity-tensor-ops-type-contract-comfy-tensor-op-0aa720652f2f, comfy-parity-tensor-ops-type-contract-comfy-tensor-op-ba6ae52d4258, comfy-parity-tensor-ops-value-or-constant-contract-comfy-tensor-op-137ded7f8918, comfy-parity-tensor-ops-value-or-constant-contract-comfy-tensor-op-4373837eb7ff, comfy-parity-tensor-ops-value-or-constant-contract-comfy-tensor-op-6542124fe760, comfy-parity-tensor-ops-value-or-constant-contract-comfy-tensor-op-8a525d4e1849, comfy-parity-tensor-ops-value-or-constant-contract-comfy-tensor-op-b37b2e52befe, comfy-parity-tensor-ops-value-or-constant-contract-comfy-tensor-op-e43e68ab67d6, comfy-parity-vendor-abi-wave39-ownership-consolidation, comfy-parity-vendor-abi-wave42-ownership-consolidation, comfy-parity-workspace-final-ownership-audit, comfy-parity-workspace-migrate-elementwise-01-11, comfy-parity-workspace-migrate-elementwise-12-23, comfy-parity-workspace-migrate-external-adapters, comfy-parity-workspace-migrate-native-slices, comfy-parity-workspace-migrate-pending-math, comfy-parity-cpu-low-precision-bmm-model-execution-closure, comfy-parity-backend-catalog-provenance-reconciliation, comfy-parity-patch-loading-merge-quantized-adapter
-  - _Blocked_by: comfy-parity-autograd-state-ownership-consolidation, comfy-parity-integrate-device-amd-rocm-comfy-model-0014, comfy-parity-integrate-device-apple-metal-mps-comfy-model-0015, comfy-parity-integrate-device-cambricon-mlu-comfy-model-0017, comfy-parity-integrate-device-directml-comfy-model-0018, comfy-parity-integrate-device-huawei-ascend-npu-comfy-model-0019, comfy-parity-integrate-device-intel-xpu-comfy-model-0021, comfy-parity-integrate-device-nvidia-cuda-comfy-model-0022, comfy-parity-latent-format-authoritative-foundation, comfy-parity-model-detection-authoritative-foundation, comfy-parity-model-family-authoritative-foundation, comfy-parity-model-family-breadth-closure, comfy-parity-native-autograd-breadth, comfy-parity-native-conditioning-patches, comfy-parity-native-device-cpu-comfy-model-0016, comfy-parity-native-latent-aceaudio-comfy-model-0023, comfy-parity-native-latent-aceaudio15-comfy-model-0024, comfy-parity-native-latent-chromaradiance-comfy-model-0025, comfy-parity-native-latent-cogvideox-comfy-model-0026, comfy-parity-native-latent-cogvideox1-5-comfy-model-0027, comfy-parity-native-latent-cosmos1cv8x8x8-comfy-model-0028, comfy-parity-native-latent-flux-comfy-model-0029, comfy-parity-native-latent-flux2-comfy-model-0030, comfy-parity-native-latent-hidreamo1pixel-comfy-model-0031, comfy-parity-native-latent-hunyuanimage21-comfy-model-0035, comfy-parity-native-latent-hunyuanimage21refiner-comfy-model-0036, comfy-parity-native-latent-hunyuanthree-dv2-1-comfy-model-0033, comfy-parity-native-latent-hunyuanthree-dv2-comfy-model-0032, comfy-parity-native-latent-hunyuanthree-dv2mini-comfy-model-0034, comfy-parity-native-latent-hunyuanvideo-comfy-model-0037, comfy-parity-native-latent-hunyuanvideo15-comfy-model-0038, comfy-parity-native-latent-ltxav-comfy-model-0039, comfy-parity-native-latent-ltxv-comfy-model-0040, comfy-parity-native-latent-mochi-comfy-model-0041, comfy-parity-native-latent-pixelditpixel-comfy-model-0042, comfy-parity-native-latent-sc-b-comfy-model-0043, comfy-parity-native-latent-sc-prior-comfy-model-0044, comfy-parity-native-latent-sd-x4-comfy-model-0049, comfy-parity-native-latent-sd15-comfy-model-0045, comfy-parity-native-latent-sd3-comfy-model-0046, comfy-parity-native-latent-sdxl-comfy-model-0047, comfy-parity-native-latent-sdxl-playground-2-5-comfy-model-0048, comfy-parity-native-latent-stableaudio1-comfy-model-0050, comfy-parity-native-latent-stableaudio3-comfy-model-0051, comfy-parity-native-latent-triposplat-comfy-model-0052, comfy-parity-native-latent-wan21-comfy-model-0053, comfy-parity-native-latent-wan22-comfy-model-0054, comfy-parity-native-latent-zimagepixelspace-comfy-model-0055, comfy-parity-native-model-family-acestep-comfy-model-0061, comfy-parity-native-model-family-acestep15-comfy-model-0062, comfy-parity-native-model-family-anima-comfy-model-0063, comfy-parity-native-model-family-auraflow-comfy-model-0064, comfy-parity-native-model-family-boogu-comfy-model-0065, comfy-parity-native-model-family-chroma-comfy-model-0066, comfy-parity-native-model-family-chromaradiance-comfy-model-0067, comfy-parity-native-model-family-cogvideox-i2v-comfy-model-0068, comfy-parity-native-model-family-cogvideox-inpaint-comfy-model-0069, comfy-parity-native-model-family-cogvideox-t2v-comfy-model-0070, comfy-parity-native-model-family-cosmosi2v-comfy-model-0071, comfy-parity-native-model-family-cosmosi2vpredict2-comfy-model-0072, comfy-parity-native-model-family-cosmost2ipredict2-comfy-model-0073, comfy-parity-native-model-family-cosmost2v-comfy-model-0074, comfy-parity-native-model-family-depthanything3-comfy-model-0075, comfy-parity-native-model-family-ernieimage-comfy-model-0076, comfy-parity-native-model-family-flux-comfy-model-0077, comfy-parity-native-model-family-flux2-comfy-model-0078, comfy-parity-native-model-family-fluxinpaint-comfy-model-0079, comfy-parity-native-model-family-fluxschnell-comfy-model-0080, comfy-parity-native-model-family-genmomochi-comfy-model-0081, comfy-parity-native-model-family-hidream-comfy-model-0082, comfy-parity-native-model-family-hidreamo1-comfy-model-0083, comfy-parity-native-model-family-hunyuandit-comfy-model-0087, comfy-parity-native-model-family-hunyuandit1-comfy-model-0088, comfy-parity-native-model-family-hunyuanimage21-comfy-model-0089, comfy-parity-native-model-family-hunyuanimage21refiner-comfy-model-0090, comfy-parity-native-model-family-hunyuanthree-dv2-1-comfy-model-0085, comfy-parity-native-model-family-hunyuanthree-dv2-comfy-model-0084, comfy-parity-native-model-family-hunyuanthree-dv2mini-comfy-model-0086, comfy-parity-native-model-family-hunyuanvideo-comfy-model-0091, comfy-parity-native-model-family-hunyuanvideo15-comfy-model-0092, comfy-parity-native-model-family-hunyuanvideo15-sr-distilled-comfy-model-0093, comfy-parity-native-model-family-hunyuanvideoi2v-comfy-model-0094, comfy-parity-native-model-family-hunyuanvideoskyreelsi2v-comfy-model-0095, comfy-parity-native-model-family-ideogram4-comfy-model-0096, comfy-parity-native-model-family-kandinsky5-comfy-model-0099, comfy-parity-native-model-family-kandinsky5image-comfy-model-0100, comfy-parity-native-model-family-koala-1b-comfy-model-0097, comfy-parity-native-model-family-koala-700m-comfy-model-0098, comfy-parity-native-model-family-krea2-comfy-model-0101, comfy-parity-native-model-family-lens-comfy-model-0104, comfy-parity-native-model-family-longcatimage-comfy-model-0105, comfy-parity-native-model-family-lotusd-comfy-model-0106, comfy-parity-native-model-family-ltxav-comfy-model-0102, comfy-parity-native-model-family-ltxv-comfy-model-0103, comfy-parity-native-model-family-lumina2-comfy-model-0107, comfy-parity-native-model-family-omnigen2-comfy-model-0108, comfy-parity-native-model-family-pid-comfy-model-0109, comfy-parity-native-model-family-pixartalpha-comfy-model-0110, comfy-parity-native-model-family-pixartsigma-comfy-model-0111, comfy-parity-native-model-family-pixelditt2i-comfy-model-0112, comfy-parity-native-model-family-qwenimage-comfy-model-0113, comfy-parity-native-model-family-rt-detr-v4-comfy-model-0114, comfy-parity-native-model-family-sam3-comfy-model-0115, comfy-parity-native-model-family-sam31-comfy-model-0116, comfy-parity-native-model-family-sd-x4upscaler-comfy-model-0126, comfy-parity-native-model-family-sd15-comfy-model-0117, comfy-parity-native-model-family-sd15-instructpix2pix-comfy-model-0118, comfy-parity-native-model-family-sd20-comfy-model-0119, comfy-parity-native-model-family-sd21uncliph-comfy-model-0120, comfy-parity-native-model-family-sd21unclipl-comfy-model-0121, comfy-parity-native-model-family-sd3-comfy-model-0122, comfy-parity-native-model-family-sdxl-comfy-model-0123, comfy-parity-native-model-family-sdxl-instructpix2pix-comfy-model-0125, comfy-parity-native-model-family-sdxlrefiner-comfy-model-0124, comfy-parity-native-model-family-segmind-vega-comfy-model-0131, comfy-parity-native-model-family-ssd1b-comfy-model-0127, comfy-parity-native-model-family-stable-cascade-b-comfy-model-0134, comfy-parity-native-model-family-stable-cascade-c-comfy-model-0135, comfy-parity-native-model-family-stable-zero123-comfy-model-0136, comfy-parity-native-model-family-stableaudio-comfy-model-0132, comfy-parity-native-model-family-stableaudio3-comfy-model-0133, comfy-parity-native-model-family-svd-img2vid-comfy-model-0130, comfy-parity-native-model-family-svthree-d-p-comfy-model-0128, comfy-parity-native-model-family-svthree-d-u-comfy-model-0129, comfy-parity-native-model-family-triposplat-comfy-model-0137, comfy-parity-native-model-family-wan21-camera-comfy-model-0138, comfy-parity-native-model-family-wan21-causalar-t2v-comfy-model-0139, comfy-parity-native-model-family-wan21-flowrvs-comfy-model-0140, comfy-parity-native-model-family-wan21-funcontrol2v-comfy-model-0141, comfy-parity-native-model-family-wan21-humo-comfy-model-0142, comfy-parity-native-model-family-wan21-i2v-comfy-model-0143, comfy-parity-native-model-family-wan21-scail-comfy-model-0144, comfy-parity-native-model-family-wan21-scail2-comfy-model-0145, comfy-parity-native-model-family-wan21-t2v-comfy-model-0146, comfy-parity-native-model-family-wan21-vace-comfy-model-0147, comfy-parity-native-model-family-wan22-animate-comfy-model-0148, comfy-parity-native-model-family-wan22-camera-comfy-model-0149, comfy-parity-native-model-family-wan22-s2v-comfy-model-0150, comfy-parity-native-model-family-wan22-t2v-comfy-model-0151, comfy-parity-native-model-family-wan22-wandancer-comfy-model-0152, comfy-parity-native-model-family-zimage-comfy-model-0153, comfy-parity-native-model-family-zimagepixelspace-comfy-model-0154, comfy-parity-native-rng-breadth, comfy-parity-native-sampler-ddim-comfy-model-0159, comfy-parity-native-sampler-ddpm-comfy-model-0160, comfy-parity-native-sampler-deis-comfy-model-0161, comfy-parity-native-sampler-dpm-2-ancestral-comfy-model-0163, comfy-parity-native-sampler-dpm-2-comfy-model-0162, comfy-parity-native-sampler-dpm-adaptive-comfy-model-0164, comfy-parity-native-sampler-dpm-fast-comfy-model-0165, comfy-parity-native-sampler-dpmpp-2m-cfg-pp-comfy-model-0167, comfy-parity-native-sampler-dpmpp-2m-comfy-model-0166, comfy-parity-native-sampler-dpmpp-2m-sde-comfy-model-0168, comfy-parity-native-sampler-dpmpp-2m-sde-gpu-comfy-model-0169, comfy-parity-native-sampler-dpmpp-2m-sde-heun-comfy-model-0170, comfy-parity-native-sampler-dpmpp-2m-sde-heun-gpu-comfy-model-0171, comfy-parity-native-sampler-dpmpp-2s-ancestral-cfg-pp-comfy-model-0173, comfy-parity-native-sampler-dpmpp-2s-ancestral-comfy-model-0172, comfy-parity-native-sampler-dpmpp-3m-sde-comfy-model-0174, comfy-parity-native-sampler-dpmpp-3m-sde-gpu-comfy-model-0175, comfy-parity-native-sampler-dpmpp-sde-comfy-model-0176, comfy-parity-native-sampler-dpmpp-sde-gpu-comfy-model-0177, comfy-parity-native-sampler-er-sde-comfy-model-0178, comfy-parity-native-sampler-euler-ancestral-cfg-pp-comfy-model-0181, comfy-parity-native-sampler-euler-ancestral-comfy-model-0180, comfy-parity-native-sampler-euler-cfg-pp-comfy-model-0182, comfy-parity-native-sampler-euler-comfy-model-0179, comfy-parity-native-sampler-exp-heun-2-x0-comfy-model-0183, comfy-parity-native-sampler-exp-heun-2-x0-sde-comfy-model-0184, comfy-parity-native-sampler-gradient-estimation-cfg-pp-comfy-model-0186, comfy-parity-native-sampler-gradient-estimation-comfy-model-0185, comfy-parity-native-sampler-heun-comfy-model-0187, comfy-parity-native-sampler-heunpp2-comfy-model-0188, comfy-parity-native-sampler-ipndm-comfy-model-0189, comfy-parity-native-sampler-ipndm-v-comfy-model-0190, comfy-parity-native-sampler-lcm-comfy-model-0191, comfy-parity-native-sampler-lms-comfy-model-0192, comfy-parity-native-sampler-res-multistep-ancestral-cfg-pp-comfy-model-0195, comfy-parity-native-sampler-res-multistep-ancestral-comfy-model-0194, comfy-parity-native-sampler-res-multistep-cfg-pp-comfy-model-0196, comfy-parity-native-sampler-res-multistep-comfy-model-0193, comfy-parity-native-sampler-sa-solver-comfy-model-0197, comfy-parity-native-sampler-sa-solver-pece-comfy-model-0198, comfy-parity-native-sampler-seeds-2-comfy-model-0199, comfy-parity-native-sampler-seeds-3-comfy-model-0200, comfy-parity-native-sampler-uni-pc-bh2-comfy-model-0202, comfy-parity-native-sampler-uni-pc-comfy-model-0201, comfy-parity-native-scheduler-beta-comfy-model-0203, comfy-parity-native-scheduler-ddim-uniform-comfy-model-0204, comfy-parity-native-scheduler-exponential-comfy-model-0205, comfy-parity-native-scheduler-karras-comfy-model-0206, comfy-parity-native-scheduler-kl-optimal-comfy-model-0207, comfy-parity-native-scheduler-linear-quadratic-comfy-model-0208, comfy-parity-native-scheduler-normal-comfy-model-0209, comfy-parity-native-scheduler-sgm-uniform-comfy-model-0210, comfy-parity-native-scheduler-simple-comfy-model-0211, comfy-parity-quantized-autograd-adapter, comfy-parity-sampler-algorithm-family-ownership-consolidation, comfy-parity-sampler-scheduler-authoritative-foundation, comfy-parity-tensor-index-ownership-consolidation, comfy-parity-tensor-ops-accelerated-attention-kernel-comfy-tensor-op-1354ac34a777, comfy-parity-tensor-ops-activation-normalization-functional-comfy-tensor-op-0538873a73b1, comfy-parity-tensor-ops-comfy-operator-indirection-comfy-tensor-op-227f5d04687a, comfy-parity-tensor-ops-comfy-operator-indirection-comfy-tensor-op-a0bd98dda517, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-010917b0d872, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-0fb8594194a8, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-1917b7227a5c, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-2881abe3d797, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-332e7e59dc10, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-4130d690d4b2, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-54e28780b32b, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-5ab4376a79b5, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-615251b481b7, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-6d6c617423ea, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-790cde1ebf17, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-861ee6173859, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-8f0acda02879, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-9cd229514f61, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-a68ae691163c, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-b088976a05ab, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-b91a910a5af9, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-c05fe0730305, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-c8ba6ce3159c, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-d54af27b4d70, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-e78ad841c264, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-f15a2d8a6bd4, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-fcda841034ed, comfy-parity-tensor-ops-external-tensor-kernel-comfy-tensor-op-0607daa06439, comfy-parity-tensor-ops-external-tensor-kernel-comfy-tensor-op-4f9c05e204d4, comfy-parity-tensor-ops-external-tensor-kernel-comfy-tensor-op-c5a306eb73fd, comfy-parity-tensor-ops-indexing-masking-comfy-tensor-op-006e05c5daaf, comfy-parity-tensor-ops-indexing-masking-comfy-tensor-op-e9a313720d5d, comfy-parity-tensor-ops-linear-algebra-comfy-tensor-op-061170cbb6f7, comfy-parity-tensor-ops-linear-algebra-comfy-tensor-op-a5d623c79a18, comfy-parity-tensor-ops-namespace-contract-comfy-tensor-op-764a8e60b071, comfy-parity-tensor-ops-neural-network-functional-comfy-tensor-op-13df18f5f426, comfy-parity-tensor-ops-neural-network-module-comfy-tensor-op-0e602e58360a, comfy-parity-tensor-ops-neural-network-module-comfy-tensor-op-5b8ce1451811, comfy-parity-tensor-ops-neural-network-module-comfy-tensor-op-904c1e14bae4, comfy-parity-tensor-ops-neural-network-module-comfy-tensor-op-d60003ac2b14, comfy-parity-tensor-ops-random-number-generation-comfy-tensor-op-095b3e192800, comfy-parity-tensor-ops-random-number-generation-comfy-tensor-op-fd729b8a5363, comfy-parity-tensor-ops-reduction-comfy-tensor-op-00e998458e0c, comfy-parity-tensor-ops-reduction-comfy-tensor-op-9f681b3616f6, comfy-parity-tensor-ops-reduction-comfy-tensor-op-ff3f06b4b591, comfy-parity-tensor-ops-shape-layout-transform-comfy-tensor-op-0c2e0712da68, comfy-parity-tensor-ops-shape-layout-transform-comfy-tensor-op-75596b7e1112, comfy-parity-tensor-ops-shape-layout-transform-comfy-tensor-op-df605ed35114, comfy-parity-tensor-ops-spatial-functional-kernel-comfy-tensor-op-1f9d23f3b331, comfy-parity-tensor-ops-spectral-transform-comfy-tensor-op-2c39e32acd3c, comfy-parity-tensor-ops-storage-dtype-device-comfy-tensor-op-00f639d6c8a7, comfy-parity-tensor-ops-tensor-creation-comfy-tensor-op-00009bb729df, comfy-parity-tensor-ops-type-contract-comfy-tensor-op-0aa720652f2f, comfy-parity-tensor-ops-type-contract-comfy-tensor-op-ba6ae52d4258, comfy-parity-tensor-ops-value-or-constant-contract-comfy-tensor-op-137ded7f8918, comfy-parity-tensor-ops-value-or-constant-contract-comfy-tensor-op-4373837eb7ff, comfy-parity-tensor-ops-value-or-constant-contract-comfy-tensor-op-6542124fe760, comfy-parity-tensor-ops-value-or-constant-contract-comfy-tensor-op-8a525d4e1849, comfy-parity-tensor-ops-value-or-constant-contract-comfy-tensor-op-b37b2e52befe, comfy-parity-tensor-ops-value-or-constant-contract-comfy-tensor-op-e43e68ab67d6, comfy-parity-vendor-abi-wave39-ownership-consolidation, comfy-parity-vendor-abi-wave42-ownership-consolidation, comfy-parity-workspace-final-ownership-audit, comfy-parity-workspace-migrate-elementwise-01-11, comfy-parity-workspace-migrate-elementwise-12-23, comfy-parity-workspace-migrate-external-adapters, comfy-parity-workspace-migrate-native-slices, comfy-parity-workspace-migrate-pending-math, comfy-parity-cpu-low-precision-bmm-model-execution-closure, comfy-parity-backend-catalog-provenance-reconciliation, comfy-parity-patch-loading-merge-quantized-adapter
+  - Wave: 187
+  - _Wave: 187
+  - Dependencies: comfy-parity-autograd-state-ownership-consolidation, comfy-parity-integrate-device-amd-rocm-comfy-model-0014, comfy-parity-integrate-device-apple-metal-mps-comfy-model-0015, comfy-parity-integrate-device-cambricon-mlu-comfy-model-0017, comfy-parity-integrate-device-directml-comfy-model-0018, comfy-parity-integrate-device-huawei-ascend-npu-comfy-model-0019, comfy-parity-integrate-device-intel-xpu-comfy-model-0021, comfy-parity-integrate-device-nvidia-cuda-comfy-model-0022, comfy-parity-latent-format-authoritative-foundation, comfy-parity-model-detection-authoritative-foundation, comfy-parity-model-family-authoritative-foundation, comfy-parity-model-family-breadth-closure, comfy-parity-native-autograd-breadth, comfy-parity-native-conditioning-patches, comfy-parity-native-device-cpu-comfy-model-0016, comfy-parity-native-latent-aceaudio-comfy-model-0023, comfy-parity-native-latent-aceaudio15-comfy-model-0024, comfy-parity-native-latent-chromaradiance-comfy-model-0025, comfy-parity-native-latent-cogvideox-comfy-model-0026, comfy-parity-native-latent-cogvideox1-5-comfy-model-0027, comfy-parity-native-latent-cosmos1cv8x8x8-comfy-model-0028, comfy-parity-native-latent-flux-comfy-model-0029, comfy-parity-native-latent-flux2-comfy-model-0030, comfy-parity-native-latent-hidreamo1pixel-comfy-model-0031, comfy-parity-native-latent-hunyuanimage21-comfy-model-0035, comfy-parity-native-latent-hunyuanimage21refiner-comfy-model-0036, comfy-parity-native-latent-hunyuanthree-dv2-1-comfy-model-0033, comfy-parity-native-latent-hunyuanthree-dv2-comfy-model-0032, comfy-parity-native-latent-hunyuanthree-dv2mini-comfy-model-0034, comfy-parity-native-latent-hunyuanvideo-comfy-model-0037, comfy-parity-native-latent-hunyuanvideo15-comfy-model-0038, comfy-parity-native-latent-ltxav-comfy-model-0039, comfy-parity-native-latent-ltxv-comfy-model-0040, comfy-parity-native-latent-mochi-comfy-model-0041, comfy-parity-native-latent-pixelditpixel-comfy-model-0042, comfy-parity-native-latent-sc-b-comfy-model-0043, comfy-parity-native-latent-sc-prior-comfy-model-0044, comfy-parity-native-latent-sd-x4-comfy-model-0049, comfy-parity-native-latent-sd15-comfy-model-0045, comfy-parity-native-latent-sd3-comfy-model-0046, comfy-parity-native-latent-sdxl-comfy-model-0047, comfy-parity-native-latent-sdxl-playground-2-5-comfy-model-0048, comfy-parity-native-latent-stableaudio1-comfy-model-0050, comfy-parity-native-latent-stableaudio3-comfy-model-0051, comfy-parity-native-latent-triposplat-comfy-model-0052, comfy-parity-native-latent-wan21-comfy-model-0053, comfy-parity-native-latent-wan22-comfy-model-0054, comfy-parity-native-latent-zimagepixelspace-comfy-model-0055, comfy-parity-native-model-family-acestep-comfy-model-0061, comfy-parity-native-model-family-acestep15-comfy-model-0062, comfy-parity-native-model-family-anima-comfy-model-0063, comfy-parity-native-model-family-auraflow-comfy-model-0064, comfy-parity-native-model-family-boogu-comfy-model-0065, comfy-parity-native-model-family-chroma-comfy-model-0066, comfy-parity-native-model-family-chromaradiance-comfy-model-0067, comfy-parity-native-model-family-cogvideox-i2v-comfy-model-0068, comfy-parity-native-model-family-cogvideox-inpaint-comfy-model-0069, comfy-parity-native-model-family-cogvideox-t2v-comfy-model-0070, comfy-parity-native-model-family-cosmosi2v-comfy-model-0071, comfy-parity-native-model-family-cosmosi2vpredict2-comfy-model-0072, comfy-parity-native-model-family-cosmost2ipredict2-comfy-model-0073, comfy-parity-native-model-family-cosmost2v-comfy-model-0074, comfy-parity-native-model-family-depthanything3-comfy-model-0075, comfy-parity-native-model-family-ernieimage-comfy-model-0076, comfy-parity-native-model-family-flux-comfy-model-0077, comfy-parity-native-model-family-flux2-comfy-model-0078, comfy-parity-native-model-family-fluxinpaint-comfy-model-0079, comfy-parity-native-model-family-fluxschnell-comfy-model-0080, comfy-parity-native-model-family-genmomochi-comfy-model-0081, comfy-parity-native-model-family-hidream-comfy-model-0082, comfy-parity-native-model-family-hidreamo1-comfy-model-0083, comfy-parity-native-model-family-hunyuandit-comfy-model-0087, comfy-parity-native-model-family-hunyuandit1-comfy-model-0088, comfy-parity-native-model-family-hunyuanimage21-comfy-model-0089, comfy-parity-native-model-family-hunyuanimage21refiner-comfy-model-0090, comfy-parity-native-model-family-hunyuanthree-dv2-1-comfy-model-0085, comfy-parity-native-model-family-hunyuanthree-dv2-comfy-model-0084, comfy-parity-native-model-family-hunyuanthree-dv2mini-comfy-model-0086, comfy-parity-native-model-family-hunyuanvideo-comfy-model-0091, comfy-parity-native-model-family-hunyuanvideo15-comfy-model-0092, comfy-parity-native-model-family-hunyuanvideo15-sr-distilled-comfy-model-0093, comfy-parity-native-model-family-hunyuanvideoi2v-comfy-model-0094, comfy-parity-native-model-family-hunyuanvideoskyreelsi2v-comfy-model-0095, comfy-parity-native-model-family-ideogram4-comfy-model-0096, comfy-parity-native-model-family-kandinsky5-comfy-model-0099, comfy-parity-native-model-family-kandinsky5image-comfy-model-0100, comfy-parity-native-model-family-koala-1b-comfy-model-0097, comfy-parity-native-model-family-koala-700m-comfy-model-0098, comfy-parity-native-model-family-krea2-comfy-model-0101, comfy-parity-native-model-family-lens-comfy-model-0104, comfy-parity-native-model-family-longcatimage-comfy-model-0105, comfy-parity-native-model-family-lotusd-comfy-model-0106, comfy-parity-native-model-family-ltxav-comfy-model-0102, comfy-parity-native-model-family-ltxv-comfy-model-0103, comfy-parity-native-model-family-lumina2-comfy-model-0107, comfy-parity-native-model-family-omnigen2-comfy-model-0108, comfy-parity-native-model-family-pid-comfy-model-0109, comfy-parity-native-model-family-pixartalpha-comfy-model-0110, comfy-parity-native-model-family-pixartsigma-comfy-model-0111, comfy-parity-native-model-family-pixelditt2i-comfy-model-0112, comfy-parity-native-model-family-qwenimage-comfy-model-0113, comfy-parity-native-model-family-rt-detr-v4-comfy-model-0114, comfy-parity-native-model-family-sam3-comfy-model-0115, comfy-parity-native-model-family-sam31-comfy-model-0116, comfy-parity-native-model-family-sd-x4upscaler-comfy-model-0126, comfy-parity-native-model-family-sd15-comfy-model-0117, comfy-parity-native-model-family-sd15-instructpix2pix-comfy-model-0118, comfy-parity-native-model-family-sd20-comfy-model-0119, comfy-parity-native-model-family-sd21uncliph-comfy-model-0120, comfy-parity-native-model-family-sd21unclipl-comfy-model-0121, comfy-parity-native-model-family-sd3-comfy-model-0122, comfy-parity-native-model-family-sdxl-comfy-model-0123, comfy-parity-native-model-family-sdxl-instructpix2pix-comfy-model-0125, comfy-parity-native-model-family-sdxlrefiner-comfy-model-0124, comfy-parity-native-model-family-segmind-vega-comfy-model-0131, comfy-parity-native-model-family-ssd1b-comfy-model-0127, comfy-parity-native-model-family-stable-cascade-b-comfy-model-0134, comfy-parity-native-model-family-stable-cascade-c-comfy-model-0135, comfy-parity-native-model-family-stable-zero123-comfy-model-0136, comfy-parity-native-model-family-stableaudio-comfy-model-0132, comfy-parity-native-model-family-stableaudio3-comfy-model-0133, comfy-parity-native-model-family-svd-img2vid-comfy-model-0130, comfy-parity-native-model-family-svthree-d-p-comfy-model-0128, comfy-parity-native-model-family-svthree-d-u-comfy-model-0129, comfy-parity-native-model-family-triposplat-comfy-model-0137, comfy-parity-native-model-family-wan21-camera-comfy-model-0138, comfy-parity-native-model-family-wan21-causalar-t2v-comfy-model-0139, comfy-parity-native-model-family-wan21-flowrvs-comfy-model-0140, comfy-parity-native-model-family-wan21-funcontrol2v-comfy-model-0141, comfy-parity-native-model-family-wan21-humo-comfy-model-0142, comfy-parity-native-model-family-wan21-i2v-comfy-model-0143, comfy-parity-native-model-family-wan21-scail-comfy-model-0144, comfy-parity-native-model-family-wan21-scail2-comfy-model-0145, comfy-parity-native-model-family-wan21-t2v-comfy-model-0146, comfy-parity-native-model-family-wan21-vace-comfy-model-0147, comfy-parity-native-model-family-wan22-animate-comfy-model-0148, comfy-parity-native-model-family-wan22-camera-comfy-model-0149, comfy-parity-native-model-family-wan22-s2v-comfy-model-0150, comfy-parity-native-model-family-wan22-t2v-comfy-model-0151, comfy-parity-native-model-family-wan22-wandancer-comfy-model-0152, comfy-parity-native-model-family-zimage-comfy-model-0153, comfy-parity-native-model-family-zimagepixelspace-comfy-model-0154, comfy-parity-native-rng-breadth, comfy-parity-native-sampler-ddim-comfy-model-0159, comfy-parity-native-sampler-ddpm-comfy-model-0160, comfy-parity-native-sampler-deis-comfy-model-0161, comfy-parity-native-sampler-dpm-2-ancestral-comfy-model-0163, comfy-parity-native-sampler-dpm-2-comfy-model-0162, comfy-parity-native-sampler-dpm-adaptive-comfy-model-0164, comfy-parity-native-sampler-dpm-fast-comfy-model-0165, comfy-parity-native-sampler-dpmpp-2m-cfg-pp-comfy-model-0167, comfy-parity-native-sampler-dpmpp-2m-comfy-model-0166, comfy-parity-native-sampler-dpmpp-2m-sde-comfy-model-0168, comfy-parity-native-sampler-dpmpp-2m-sde-gpu-comfy-model-0169, comfy-parity-native-sampler-dpmpp-2m-sde-heun-comfy-model-0170, comfy-parity-native-sampler-dpmpp-2m-sde-heun-gpu-comfy-model-0171, comfy-parity-native-sampler-dpmpp-2s-ancestral-cfg-pp-comfy-model-0173, comfy-parity-native-sampler-dpmpp-2s-ancestral-comfy-model-0172, comfy-parity-native-sampler-dpmpp-3m-sde-comfy-model-0174, comfy-parity-native-sampler-dpmpp-3m-sde-gpu-comfy-model-0175, comfy-parity-native-sampler-dpmpp-sde-comfy-model-0176, comfy-parity-native-sampler-dpmpp-sde-gpu-comfy-model-0177, comfy-parity-native-sampler-er-sde-comfy-model-0178, comfy-parity-native-sampler-euler-ancestral-cfg-pp-comfy-model-0181, comfy-parity-native-sampler-euler-ancestral-comfy-model-0180, comfy-parity-native-sampler-euler-cfg-pp-comfy-model-0182, comfy-parity-native-sampler-euler-comfy-model-0179, comfy-parity-native-sampler-exp-heun-2-x0-comfy-model-0183, comfy-parity-native-sampler-exp-heun-2-x0-sde-comfy-model-0184, comfy-parity-native-sampler-gradient-estimation-cfg-pp-comfy-model-0186, comfy-parity-native-sampler-gradient-estimation-comfy-model-0185, comfy-parity-native-sampler-heun-comfy-model-0187, comfy-parity-native-sampler-heunpp2-comfy-model-0188, comfy-parity-native-sampler-ipndm-comfy-model-0189, comfy-parity-native-sampler-ipndm-v-comfy-model-0190, comfy-parity-native-sampler-lcm-comfy-model-0191, comfy-parity-native-sampler-lms-comfy-model-0192, comfy-parity-native-sampler-res-multistep-ancestral-cfg-pp-comfy-model-0195, comfy-parity-native-sampler-res-multistep-ancestral-comfy-model-0194, comfy-parity-native-sampler-res-multistep-cfg-pp-comfy-model-0196, comfy-parity-native-sampler-res-multistep-comfy-model-0193, comfy-parity-native-sampler-sa-solver-comfy-model-0197, comfy-parity-native-sampler-sa-solver-pece-comfy-model-0198, comfy-parity-native-sampler-seeds-2-comfy-model-0199, comfy-parity-native-sampler-seeds-3-comfy-model-0200, comfy-parity-native-sampler-uni-pc-bh2-comfy-model-0202, comfy-parity-native-sampler-uni-pc-comfy-model-0201, comfy-parity-native-scheduler-beta-comfy-model-0203, comfy-parity-native-scheduler-ddim-uniform-comfy-model-0204, comfy-parity-native-scheduler-exponential-comfy-model-0205, comfy-parity-native-scheduler-karras-comfy-model-0206, comfy-parity-native-scheduler-kl-optimal-comfy-model-0207, comfy-parity-native-scheduler-linear-quadratic-comfy-model-0208, comfy-parity-native-scheduler-normal-comfy-model-0209, comfy-parity-native-scheduler-sgm-uniform-comfy-model-0210, comfy-parity-native-scheduler-simple-comfy-model-0211, comfy-parity-quantized-autograd-adapter, comfy-parity-sampler-algorithm-family-ownership-consolidation, comfy-parity-sampler-scheduler-authoritative-foundation, comfy-parity-tensor-index-ownership-consolidation, comfy-parity-tensor-ops-accelerated-attention-kernel-comfy-tensor-op-1354ac34a777, comfy-parity-tensor-ops-activation-normalization-functional-comfy-tensor-op-0538873a73b1, comfy-parity-tensor-ops-comfy-operator-indirection-comfy-tensor-op-227f5d04687a, comfy-parity-tensor-ops-comfy-operator-indirection-comfy-tensor-op-a0bd98dda517, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-010917b0d872, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-0fb8594194a8, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-1917b7227a5c, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-2881abe3d797, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-332e7e59dc10, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-4130d690d4b2, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-54e28780b32b, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-5ab4376a79b5, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-615251b481b7, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-6d6c617423ea, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-790cde1ebf17, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-861ee6173859, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-8f0acda02879, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-9cd229514f61, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-a68ae691163c, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-b088976a05ab, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-b91a910a5af9, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-c05fe0730305, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-c8ba6ce3159c, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-d54af27b4d70, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-e78ad841c264, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-f15a2d8a6bd4, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-fcda841034ed, comfy-parity-tensor-ops-external-tensor-kernel-comfy-tensor-op-0607daa06439, comfy-parity-tensor-ops-external-tensor-kernel-comfy-tensor-op-4f9c05e204d4, comfy-parity-tensor-ops-external-tensor-kernel-comfy-tensor-op-c5a306eb73fd, comfy-parity-tensor-ops-indexing-masking-comfy-tensor-op-006e05c5daaf, comfy-parity-tensor-ops-indexing-masking-comfy-tensor-op-e9a313720d5d, comfy-parity-tensor-ops-linear-algebra-comfy-tensor-op-061170cbb6f7, comfy-parity-tensor-ops-linear-algebra-comfy-tensor-op-a5d623c79a18, comfy-parity-tensor-ops-namespace-contract-comfy-tensor-op-764a8e60b071, comfy-parity-tensor-ops-neural-network-functional-comfy-tensor-op-13df18f5f426, comfy-parity-tensor-ops-neural-network-module-comfy-tensor-op-0e602e58360a, comfy-parity-tensor-ops-neural-network-module-comfy-tensor-op-5b8ce1451811, comfy-parity-tensor-ops-neural-network-module-comfy-tensor-op-904c1e14bae4, comfy-parity-tensor-ops-neural-network-module-comfy-tensor-op-d60003ac2b14, comfy-parity-tensor-ops-random-number-generation-comfy-tensor-op-095b3e192800, comfy-parity-tensor-ops-random-number-generation-comfy-tensor-op-fd729b8a5363, comfy-parity-tensor-ops-reduction-comfy-tensor-op-00e998458e0c, comfy-parity-tensor-ops-reduction-comfy-tensor-op-9f681b3616f6, comfy-parity-tensor-ops-reduction-comfy-tensor-op-ff3f06b4b591, comfy-parity-tensor-ops-shape-layout-transform-comfy-tensor-op-0c2e0712da68, comfy-parity-tensor-ops-shape-layout-transform-comfy-tensor-op-75596b7e1112, comfy-parity-tensor-ops-shape-layout-transform-comfy-tensor-op-df605ed35114, comfy-parity-tensor-ops-spatial-functional-kernel-comfy-tensor-op-1f9d23f3b331, comfy-parity-tensor-ops-spectral-transform-comfy-tensor-op-2c39e32acd3c, comfy-parity-tensor-ops-storage-dtype-device-comfy-tensor-op-00f639d6c8a7, comfy-parity-tensor-ops-tensor-creation-comfy-tensor-op-00009bb729df, comfy-parity-tensor-ops-type-contract-comfy-tensor-op-0aa720652f2f, comfy-parity-tensor-ops-type-contract-comfy-tensor-op-ba6ae52d4258, comfy-parity-tensor-ops-value-or-constant-contract-comfy-tensor-op-137ded7f8918, comfy-parity-tensor-ops-value-or-constant-contract-comfy-tensor-op-4373837eb7ff, comfy-parity-tensor-ops-value-or-constant-contract-comfy-tensor-op-6542124fe760, comfy-parity-tensor-ops-value-or-constant-contract-comfy-tensor-op-8a525d4e1849, comfy-parity-tensor-ops-value-or-constant-contract-comfy-tensor-op-b37b2e52befe, comfy-parity-tensor-ops-value-or-constant-contract-comfy-tensor-op-e43e68ab67d6, comfy-parity-vendor-abi-wave39-ownership-consolidation, comfy-parity-vendor-abi-wave42-ownership-consolidation, comfy-parity-workspace-final-ownership-audit, comfy-parity-workspace-migrate-elementwise-01-11, comfy-parity-workspace-migrate-elementwise-12-23, comfy-parity-workspace-migrate-external-adapters, comfy-parity-workspace-migrate-native-slices, comfy-parity-workspace-migrate-pending-math, comfy-parity-cpu-low-precision-bmm-model-execution-closure, comfy-parity-probe-derived-model-state-plan-selector, comfy-parity-backend-catalog-provenance-reconciliation, comfy-parity-patch-loading-merge-quantized-adapter
+  - _Blocked_by: comfy-parity-autograd-state-ownership-consolidation, comfy-parity-integrate-device-amd-rocm-comfy-model-0014, comfy-parity-integrate-device-apple-metal-mps-comfy-model-0015, comfy-parity-integrate-device-cambricon-mlu-comfy-model-0017, comfy-parity-integrate-device-directml-comfy-model-0018, comfy-parity-integrate-device-huawei-ascend-npu-comfy-model-0019, comfy-parity-integrate-device-intel-xpu-comfy-model-0021, comfy-parity-integrate-device-nvidia-cuda-comfy-model-0022, comfy-parity-latent-format-authoritative-foundation, comfy-parity-model-detection-authoritative-foundation, comfy-parity-model-family-authoritative-foundation, comfy-parity-model-family-breadth-closure, comfy-parity-native-autograd-breadth, comfy-parity-native-conditioning-patches, comfy-parity-native-device-cpu-comfy-model-0016, comfy-parity-native-latent-aceaudio-comfy-model-0023, comfy-parity-native-latent-aceaudio15-comfy-model-0024, comfy-parity-native-latent-chromaradiance-comfy-model-0025, comfy-parity-native-latent-cogvideox-comfy-model-0026, comfy-parity-native-latent-cogvideox1-5-comfy-model-0027, comfy-parity-native-latent-cosmos1cv8x8x8-comfy-model-0028, comfy-parity-native-latent-flux-comfy-model-0029, comfy-parity-native-latent-flux2-comfy-model-0030, comfy-parity-native-latent-hidreamo1pixel-comfy-model-0031, comfy-parity-native-latent-hunyuanimage21-comfy-model-0035, comfy-parity-native-latent-hunyuanimage21refiner-comfy-model-0036, comfy-parity-native-latent-hunyuanthree-dv2-1-comfy-model-0033, comfy-parity-native-latent-hunyuanthree-dv2-comfy-model-0032, comfy-parity-native-latent-hunyuanthree-dv2mini-comfy-model-0034, comfy-parity-native-latent-hunyuanvideo-comfy-model-0037, comfy-parity-native-latent-hunyuanvideo15-comfy-model-0038, comfy-parity-native-latent-ltxav-comfy-model-0039, comfy-parity-native-latent-ltxv-comfy-model-0040, comfy-parity-native-latent-mochi-comfy-model-0041, comfy-parity-native-latent-pixelditpixel-comfy-model-0042, comfy-parity-native-latent-sc-b-comfy-model-0043, comfy-parity-native-latent-sc-prior-comfy-model-0044, comfy-parity-native-latent-sd-x4-comfy-model-0049, comfy-parity-native-latent-sd15-comfy-model-0045, comfy-parity-native-latent-sd3-comfy-model-0046, comfy-parity-native-latent-sdxl-comfy-model-0047, comfy-parity-native-latent-sdxl-playground-2-5-comfy-model-0048, comfy-parity-native-latent-stableaudio1-comfy-model-0050, comfy-parity-native-latent-stableaudio3-comfy-model-0051, comfy-parity-native-latent-triposplat-comfy-model-0052, comfy-parity-native-latent-wan21-comfy-model-0053, comfy-parity-native-latent-wan22-comfy-model-0054, comfy-parity-native-latent-zimagepixelspace-comfy-model-0055, comfy-parity-native-model-family-acestep-comfy-model-0061, comfy-parity-native-model-family-acestep15-comfy-model-0062, comfy-parity-native-model-family-anima-comfy-model-0063, comfy-parity-native-model-family-auraflow-comfy-model-0064, comfy-parity-native-model-family-boogu-comfy-model-0065, comfy-parity-native-model-family-chroma-comfy-model-0066, comfy-parity-native-model-family-chromaradiance-comfy-model-0067, comfy-parity-native-model-family-cogvideox-i2v-comfy-model-0068, comfy-parity-native-model-family-cogvideox-inpaint-comfy-model-0069, comfy-parity-native-model-family-cogvideox-t2v-comfy-model-0070, comfy-parity-native-model-family-cosmosi2v-comfy-model-0071, comfy-parity-native-model-family-cosmosi2vpredict2-comfy-model-0072, comfy-parity-native-model-family-cosmost2ipredict2-comfy-model-0073, comfy-parity-native-model-family-cosmost2v-comfy-model-0074, comfy-parity-native-model-family-depthanything3-comfy-model-0075, comfy-parity-native-model-family-ernieimage-comfy-model-0076, comfy-parity-native-model-family-flux-comfy-model-0077, comfy-parity-native-model-family-flux2-comfy-model-0078, comfy-parity-native-model-family-fluxinpaint-comfy-model-0079, comfy-parity-native-model-family-fluxschnell-comfy-model-0080, comfy-parity-native-model-family-genmomochi-comfy-model-0081, comfy-parity-native-model-family-hidream-comfy-model-0082, comfy-parity-native-model-family-hidreamo1-comfy-model-0083, comfy-parity-native-model-family-hunyuandit-comfy-model-0087, comfy-parity-native-model-family-hunyuandit1-comfy-model-0088, comfy-parity-native-model-family-hunyuanimage21-comfy-model-0089, comfy-parity-native-model-family-hunyuanimage21refiner-comfy-model-0090, comfy-parity-native-model-family-hunyuanthree-dv2-1-comfy-model-0085, comfy-parity-native-model-family-hunyuanthree-dv2-comfy-model-0084, comfy-parity-native-model-family-hunyuanthree-dv2mini-comfy-model-0086, comfy-parity-native-model-family-hunyuanvideo-comfy-model-0091, comfy-parity-native-model-family-hunyuanvideo15-comfy-model-0092, comfy-parity-native-model-family-hunyuanvideo15-sr-distilled-comfy-model-0093, comfy-parity-native-model-family-hunyuanvideoi2v-comfy-model-0094, comfy-parity-native-model-family-hunyuanvideoskyreelsi2v-comfy-model-0095, comfy-parity-native-model-family-ideogram4-comfy-model-0096, comfy-parity-native-model-family-kandinsky5-comfy-model-0099, comfy-parity-native-model-family-kandinsky5image-comfy-model-0100, comfy-parity-native-model-family-koala-1b-comfy-model-0097, comfy-parity-native-model-family-koala-700m-comfy-model-0098, comfy-parity-native-model-family-krea2-comfy-model-0101, comfy-parity-native-model-family-lens-comfy-model-0104, comfy-parity-native-model-family-longcatimage-comfy-model-0105, comfy-parity-native-model-family-lotusd-comfy-model-0106, comfy-parity-native-model-family-ltxav-comfy-model-0102, comfy-parity-native-model-family-ltxv-comfy-model-0103, comfy-parity-native-model-family-lumina2-comfy-model-0107, comfy-parity-native-model-family-omnigen2-comfy-model-0108, comfy-parity-native-model-family-pid-comfy-model-0109, comfy-parity-native-model-family-pixartalpha-comfy-model-0110, comfy-parity-native-model-family-pixartsigma-comfy-model-0111, comfy-parity-native-model-family-pixelditt2i-comfy-model-0112, comfy-parity-native-model-family-qwenimage-comfy-model-0113, comfy-parity-native-model-family-rt-detr-v4-comfy-model-0114, comfy-parity-native-model-family-sam3-comfy-model-0115, comfy-parity-native-model-family-sam31-comfy-model-0116, comfy-parity-native-model-family-sd-x4upscaler-comfy-model-0126, comfy-parity-native-model-family-sd15-comfy-model-0117, comfy-parity-native-model-family-sd15-instructpix2pix-comfy-model-0118, comfy-parity-native-model-family-sd20-comfy-model-0119, comfy-parity-native-model-family-sd21uncliph-comfy-model-0120, comfy-parity-native-model-family-sd21unclipl-comfy-model-0121, comfy-parity-native-model-family-sd3-comfy-model-0122, comfy-parity-native-model-family-sdxl-comfy-model-0123, comfy-parity-native-model-family-sdxl-instructpix2pix-comfy-model-0125, comfy-parity-native-model-family-sdxlrefiner-comfy-model-0124, comfy-parity-native-model-family-segmind-vega-comfy-model-0131, comfy-parity-native-model-family-ssd1b-comfy-model-0127, comfy-parity-native-model-family-stable-cascade-b-comfy-model-0134, comfy-parity-native-model-family-stable-cascade-c-comfy-model-0135, comfy-parity-native-model-family-stable-zero123-comfy-model-0136, comfy-parity-native-model-family-stableaudio-comfy-model-0132, comfy-parity-native-model-family-stableaudio3-comfy-model-0133, comfy-parity-native-model-family-svd-img2vid-comfy-model-0130, comfy-parity-native-model-family-svthree-d-p-comfy-model-0128, comfy-parity-native-model-family-svthree-d-u-comfy-model-0129, comfy-parity-native-model-family-triposplat-comfy-model-0137, comfy-parity-native-model-family-wan21-camera-comfy-model-0138, comfy-parity-native-model-family-wan21-causalar-t2v-comfy-model-0139, comfy-parity-native-model-family-wan21-flowrvs-comfy-model-0140, comfy-parity-native-model-family-wan21-funcontrol2v-comfy-model-0141, comfy-parity-native-model-family-wan21-humo-comfy-model-0142, comfy-parity-native-model-family-wan21-i2v-comfy-model-0143, comfy-parity-native-model-family-wan21-scail-comfy-model-0144, comfy-parity-native-model-family-wan21-scail2-comfy-model-0145, comfy-parity-native-model-family-wan21-t2v-comfy-model-0146, comfy-parity-native-model-family-wan21-vace-comfy-model-0147, comfy-parity-native-model-family-wan22-animate-comfy-model-0148, comfy-parity-native-model-family-wan22-camera-comfy-model-0149, comfy-parity-native-model-family-wan22-s2v-comfy-model-0150, comfy-parity-native-model-family-wan22-t2v-comfy-model-0151, comfy-parity-native-model-family-wan22-wandancer-comfy-model-0152, comfy-parity-native-model-family-zimage-comfy-model-0153, comfy-parity-native-model-family-zimagepixelspace-comfy-model-0154, comfy-parity-native-rng-breadth, comfy-parity-native-sampler-ddim-comfy-model-0159, comfy-parity-native-sampler-ddpm-comfy-model-0160, comfy-parity-native-sampler-deis-comfy-model-0161, comfy-parity-native-sampler-dpm-2-ancestral-comfy-model-0163, comfy-parity-native-sampler-dpm-2-comfy-model-0162, comfy-parity-native-sampler-dpm-adaptive-comfy-model-0164, comfy-parity-native-sampler-dpm-fast-comfy-model-0165, comfy-parity-native-sampler-dpmpp-2m-cfg-pp-comfy-model-0167, comfy-parity-native-sampler-dpmpp-2m-comfy-model-0166, comfy-parity-native-sampler-dpmpp-2m-sde-comfy-model-0168, comfy-parity-native-sampler-dpmpp-2m-sde-gpu-comfy-model-0169, comfy-parity-native-sampler-dpmpp-2m-sde-heun-comfy-model-0170, comfy-parity-native-sampler-dpmpp-2m-sde-heun-gpu-comfy-model-0171, comfy-parity-native-sampler-dpmpp-2s-ancestral-cfg-pp-comfy-model-0173, comfy-parity-native-sampler-dpmpp-2s-ancestral-comfy-model-0172, comfy-parity-native-sampler-dpmpp-3m-sde-comfy-model-0174, comfy-parity-native-sampler-dpmpp-3m-sde-gpu-comfy-model-0175, comfy-parity-native-sampler-dpmpp-sde-comfy-model-0176, comfy-parity-native-sampler-dpmpp-sde-gpu-comfy-model-0177, comfy-parity-native-sampler-er-sde-comfy-model-0178, comfy-parity-native-sampler-euler-ancestral-cfg-pp-comfy-model-0181, comfy-parity-native-sampler-euler-ancestral-comfy-model-0180, comfy-parity-native-sampler-euler-cfg-pp-comfy-model-0182, comfy-parity-native-sampler-euler-comfy-model-0179, comfy-parity-native-sampler-exp-heun-2-x0-comfy-model-0183, comfy-parity-native-sampler-exp-heun-2-x0-sde-comfy-model-0184, comfy-parity-native-sampler-gradient-estimation-cfg-pp-comfy-model-0186, comfy-parity-native-sampler-gradient-estimation-comfy-model-0185, comfy-parity-native-sampler-heun-comfy-model-0187, comfy-parity-native-sampler-heunpp2-comfy-model-0188, comfy-parity-native-sampler-ipndm-comfy-model-0189, comfy-parity-native-sampler-ipndm-v-comfy-model-0190, comfy-parity-native-sampler-lcm-comfy-model-0191, comfy-parity-native-sampler-lms-comfy-model-0192, comfy-parity-native-sampler-res-multistep-ancestral-cfg-pp-comfy-model-0195, comfy-parity-native-sampler-res-multistep-ancestral-comfy-model-0194, comfy-parity-native-sampler-res-multistep-cfg-pp-comfy-model-0196, comfy-parity-native-sampler-res-multistep-comfy-model-0193, comfy-parity-native-sampler-sa-solver-comfy-model-0197, comfy-parity-native-sampler-sa-solver-pece-comfy-model-0198, comfy-parity-native-sampler-seeds-2-comfy-model-0199, comfy-parity-native-sampler-seeds-3-comfy-model-0200, comfy-parity-native-sampler-uni-pc-bh2-comfy-model-0202, comfy-parity-native-sampler-uni-pc-comfy-model-0201, comfy-parity-native-scheduler-beta-comfy-model-0203, comfy-parity-native-scheduler-ddim-uniform-comfy-model-0204, comfy-parity-native-scheduler-exponential-comfy-model-0205, comfy-parity-native-scheduler-karras-comfy-model-0206, comfy-parity-native-scheduler-kl-optimal-comfy-model-0207, comfy-parity-native-scheduler-linear-quadratic-comfy-model-0208, comfy-parity-native-scheduler-normal-comfy-model-0209, comfy-parity-native-scheduler-sgm-uniform-comfy-model-0210, comfy-parity-native-scheduler-simple-comfy-model-0211, comfy-parity-quantized-autograd-adapter, comfy-parity-sampler-algorithm-family-ownership-consolidation, comfy-parity-sampler-scheduler-authoritative-foundation, comfy-parity-tensor-index-ownership-consolidation, comfy-parity-tensor-ops-accelerated-attention-kernel-comfy-tensor-op-1354ac34a777, comfy-parity-tensor-ops-activation-normalization-functional-comfy-tensor-op-0538873a73b1, comfy-parity-tensor-ops-comfy-operator-indirection-comfy-tensor-op-227f5d04687a, comfy-parity-tensor-ops-comfy-operator-indirection-comfy-tensor-op-a0bd98dda517, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-010917b0d872, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-0fb8594194a8, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-1917b7227a5c, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-2881abe3d797, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-332e7e59dc10, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-4130d690d4b2, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-54e28780b32b, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-5ab4376a79b5, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-615251b481b7, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-6d6c617423ea, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-790cde1ebf17, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-861ee6173859, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-8f0acda02879, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-9cd229514f61, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-a68ae691163c, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-b088976a05ab, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-b91a910a5af9, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-c05fe0730305, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-c8ba6ce3159c, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-d54af27b4d70, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-e78ad841c264, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-f15a2d8a6bd4, comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-fcda841034ed, comfy-parity-tensor-ops-external-tensor-kernel-comfy-tensor-op-0607daa06439, comfy-parity-tensor-ops-external-tensor-kernel-comfy-tensor-op-4f9c05e204d4, comfy-parity-tensor-ops-external-tensor-kernel-comfy-tensor-op-c5a306eb73fd, comfy-parity-tensor-ops-indexing-masking-comfy-tensor-op-006e05c5daaf, comfy-parity-tensor-ops-indexing-masking-comfy-tensor-op-e9a313720d5d, comfy-parity-tensor-ops-linear-algebra-comfy-tensor-op-061170cbb6f7, comfy-parity-tensor-ops-linear-algebra-comfy-tensor-op-a5d623c79a18, comfy-parity-tensor-ops-namespace-contract-comfy-tensor-op-764a8e60b071, comfy-parity-tensor-ops-neural-network-functional-comfy-tensor-op-13df18f5f426, comfy-parity-tensor-ops-neural-network-module-comfy-tensor-op-0e602e58360a, comfy-parity-tensor-ops-neural-network-module-comfy-tensor-op-5b8ce1451811, comfy-parity-tensor-ops-neural-network-module-comfy-tensor-op-904c1e14bae4, comfy-parity-tensor-ops-neural-network-module-comfy-tensor-op-d60003ac2b14, comfy-parity-tensor-ops-random-number-generation-comfy-tensor-op-095b3e192800, comfy-parity-tensor-ops-random-number-generation-comfy-tensor-op-fd729b8a5363, comfy-parity-tensor-ops-reduction-comfy-tensor-op-00e998458e0c, comfy-parity-tensor-ops-reduction-comfy-tensor-op-9f681b3616f6, comfy-parity-tensor-ops-reduction-comfy-tensor-op-ff3f06b4b591, comfy-parity-tensor-ops-shape-layout-transform-comfy-tensor-op-0c2e0712da68, comfy-parity-tensor-ops-shape-layout-transform-comfy-tensor-op-75596b7e1112, comfy-parity-tensor-ops-shape-layout-transform-comfy-tensor-op-df605ed35114, comfy-parity-tensor-ops-spatial-functional-kernel-comfy-tensor-op-1f9d23f3b331, comfy-parity-tensor-ops-spectral-transform-comfy-tensor-op-2c39e32acd3c, comfy-parity-tensor-ops-storage-dtype-device-comfy-tensor-op-00f639d6c8a7, comfy-parity-tensor-ops-tensor-creation-comfy-tensor-op-00009bb729df, comfy-parity-tensor-ops-type-contract-comfy-tensor-op-0aa720652f2f, comfy-parity-tensor-ops-type-contract-comfy-tensor-op-ba6ae52d4258, comfy-parity-tensor-ops-value-or-constant-contract-comfy-tensor-op-137ded7f8918, comfy-parity-tensor-ops-value-or-constant-contract-comfy-tensor-op-4373837eb7ff, comfy-parity-tensor-ops-value-or-constant-contract-comfy-tensor-op-6542124fe760, comfy-parity-tensor-ops-value-or-constant-contract-comfy-tensor-op-8a525d4e1849, comfy-parity-tensor-ops-value-or-constant-contract-comfy-tensor-op-b37b2e52befe, comfy-parity-tensor-ops-value-or-constant-contract-comfy-tensor-op-e43e68ab67d6, comfy-parity-vendor-abi-wave39-ownership-consolidation, comfy-parity-vendor-abi-wave42-ownership-consolidation, comfy-parity-workspace-final-ownership-audit, comfy-parity-workspace-migrate-elementwise-01-11, comfy-parity-workspace-migrate-elementwise-12-23, comfy-parity-workspace-migrate-external-adapters, comfy-parity-workspace-migrate-native-slices, comfy-parity-workspace-migrate-pending-math, comfy-parity-cpu-low-precision-bmm-model-execution-closure, comfy-parity-probe-derived-model-state-plan-selector, comfy-parity-backend-catalog-provenance-reconciliation, comfy-parity-patch-loading-merge-quantized-adapter
   - Reads: crates/comfy_tensor/src/ops, crates/comfy_tensor/src/operation_resolutions, crates/comfy_test_support/fixtures/tensor_operations, crates/comfy_tensor/src/backends, crates/comfy_model/src/families, crates/comfy_model/src/latent_formats, crates/comfy_sampler/src/algorithms, crates/comfy_sampler/src/schedulers
   - _Reads: crates/comfy_tensor/src/ops, crates/comfy_tensor/src/operation_resolutions, crates/comfy_test_support/fixtures/tensor_operations, crates/comfy_tensor/src/backends, crates/comfy_model/src/families, crates/comfy_model/src/latent_formats, crates/comfy_sampler/src/algorithms, crates/comfy_sampler/src/schedulers
   - Writes: crates/comfy_tensor/tests/breadth_closure.rs, crates/comfy_model/tests/breadth_closure.rs, crates/comfy_sampler/tests/breadth_closure.rs, .agents/specs/comfy-parity/catalogs/native-compute-closure.json
@@ -7296,8 +7304,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 367. Implement native node family: (empty root category declared by source) part 1
   - _id: comfy-parity-native-nodes-empty-root-category-declared-by-source-comfy-node-0757
   - Outcome: The 1 rows assigned to this disjoint `(empty root category declared by source)` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7314,8 +7322,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 368. Implement native node family: 3d part 1
   - _id: comfy-parity-native-nodes-three-d-comfy-node-0115
   - Outcome: The 10 rows assigned to this disjoint `3d` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7332,8 +7340,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 369. Implement native node family: 3d/splat part 1
   - _id: comfy-parity-native-nodes-three-d-splat-comfy-node-0172
   - Outcome: The 7 rows assigned to this disjoint `3d/splat` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7350,8 +7358,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 370. Implement native node family: advanced/debug part 1
   - _id: comfy-parity-native-nodes-advanced-debug-comfy-node-0140
   - Outcome: The 3 rows assigned to this disjoint `advanced/debug` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7368,8 +7376,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 371. Implement native node family: advanced/guidance part 1
   - _id: comfy-parity-native-nodes-advanced-guidance-comfy-node-0049
   - Outcome: The 7 rows assigned to this disjoint `advanced/guidance` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7386,8 +7394,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 372. Implement native node family: advanced/hooks part 1
   - _id: comfy-parity-native-nodes-advanced-hooks-comfy-node-0079
   - Outcome: The 10 rows assigned to this disjoint `advanced/hooks` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7404,8 +7412,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 373. Implement native node family: advanced/hooks part 2
   - _id: comfy-parity-native-nodes-advanced-hooks-comfy-node-0119
   - Outcome: The 10 rows assigned to this disjoint `advanced/hooks` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7422,8 +7430,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 374. Implement native node family: advanced/multigpu part 1
   - _id: comfy-parity-native-nodes-advanced-multigpu-comfy-node-0454
   - Outcome: The 4 rows assigned to this disjoint `advanced/multigpu` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7440,8 +7448,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 375. Implement native node family: audio part 1
   - _id: comfy-parity-native-nodes-audio-comfy-node-0009
   - Outcome: The 10 rows assigned to this disjoint `audio` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7458,8 +7466,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 376. Implement native node family: audio part 2
   - _id: comfy-parity-native-nodes-audio-comfy-node-0589
   - Outcome: The 5 rows assigned to this disjoint `audio` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7476,8 +7484,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 377. Implement native node family: experimental part 1
   - _id: comfy-parity-native-nodes-experimental-comfy-node-0133
   - Outcome: The 10 rows assigned to this disjoint `experimental` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7494,8 +7502,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 378. Implement native node family: experimental part 2
   - _id: comfy-parity-native-nodes-experimental-comfy-node-0680
   - Outcome: The 1 rows assigned to this disjoint `experimental` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7512,8 +7520,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 379. Implement native node family: experimental/attention_experiments part 1
   - _id: comfy-parity-native-nodes-experimental-attention-experiments-comfy-node-0057
   - Outcome: The 4 rows assigned to this disjoint `experimental/attention_experiments` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7530,8 +7538,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 380. Implement native node family: experimental/stable cascade part 1
   - _id: comfy-parity-native-nodes-experimental-stable-cascade-comfy-node-0638
   - Outcome: The 1 rows assigned to this disjoint `experimental/stable cascade` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7548,8 +7556,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 381. Implement native node family: image part 1
   - _id: comfy-parity-native-nodes-image-comfy-node-0160
   - Outcome: The 10 rows assigned to this disjoint `image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7566,8 +7574,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 382. Implement native node family: image part 2
   - _id: comfy-parity-native-nodes-image-comfy-node-0586
   - Outcome: The 8 rows assigned to this disjoint `image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7584,8 +7592,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 383. Implement native node family: image/adjustments part 1
   - _id: comfy-parity-native-nodes-image-adjustments-comfy-node-0004
   - Outcome: The 2 rows assigned to this disjoint `image/adjustments` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7602,8 +7610,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 384. Implement native node family: image/background removal part 1
   - _id: comfy-parity-native-nodes-image-background-removal-comfy-node-0532
   - Outcome: The 1 rows assigned to this disjoint `image/background removal` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7620,8 +7628,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 385. Implement native node family: image/batch part 1
   - _id: comfy-parity-native-nodes-image-batch-comfy-node-0017
   - Outcome: The 10 rows assigned to this disjoint `image/batch` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7638,8 +7646,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 386. Implement native node family: image/batch part 2
   - _id: comfy-parity-native-nodes-image-batch-comfy-node-0621
   - Outcome: The 2 rows assigned to this disjoint `image/batch` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7656,8 +7664,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 387. Implement native node family: image/color part 1
   - _id: comfy-parity-native-nodes-image-color-comfy-node-0254
   - Outcome: The 4 rows assigned to this disjoint `image/color` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7674,8 +7682,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 388. Implement native node family: image/compositing part 1
   - _id: comfy-parity-native-nodes-image-compositing-comfy-node-0246
   - Outcome: The 4 rows assigned to this disjoint `image/compositing` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7692,8 +7700,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 389. Implement native node family: image/detection part 1
   - _id: comfy-parity-native-nodes-image-detection-comfy-node-0136
   - Outcome: The 10 rows assigned to this disjoint `image/detection` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration, comfy-parity-native-model-family-rt-detr-v4-comfy-model-0114, comfy-parity-tensor-ops-external-tensor-kernel-comfy-tensor-op-c5a306eb73fd
   - _Blocked_by: comfy-parity-native-compute-breadth-integration, comfy-parity-native-model-family-rt-detr-v4-comfy-model-0114, comfy-parity-tensor-ops-external-tensor-kernel-comfy-tensor-op-c5a306eb73fd
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model, crates/comfy_model/src/families/rt_detr_v4_comfy_model_0114.rs, crates/comfy_tensor/src/ops/external_tensor_kernel_03.rs
@@ -7710,8 +7718,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 390. Implement native node family: image/detection part 2
   - _id: comfy-parity-native-nodes-image-detection-comfy-node-0607
   - Outcome: The 2 rows assigned to this disjoint `image/detection` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7728,8 +7736,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 391. Implement native node family: image/filters part 1
   - _id: comfy-parity-native-nodes-image-filters-comfy-node-0045
   - Outcome: The 8 rows assigned to this disjoint `image/filters` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7746,8 +7754,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 392. Implement native node family: image/geometry estimation part 1
   - _id: comfy-parity-native-nodes-image-geometry-estimation-comfy-node-0129
   - Outcome: The 7 rows assigned to this disjoint `image/geometry estimation` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7764,8 +7772,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 393. Implement native node family: image/mask part 1
   - _id: comfy-parity-native-nodes-image-mask-comfy-node-0019
   - Outcome: The 10 rows assigned to this disjoint `image/mask` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7782,8 +7790,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 394. Implement native node family: image/mask part 2
   - _id: comfy-parity-native-nodes-image-mask-comfy-node-0625
   - Outcome: The 3 rows assigned to this disjoint `image/mask` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7800,8 +7808,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 395. Implement native node family: image/shader part 1
   - _id: comfy-parity-native-nodes-image-shader-comfy-node-0211
   - Outcome: The 1 rows assigned to this disjoint `image/shader` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7818,8 +7826,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 396. Implement native node family: image/transform part 1
   - _id: comfy-parity-native-nodes-image-transform-comfy-node-0047
   - Outcome: The 10 rows assigned to this disjoint `image/transform` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7836,8 +7844,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 397. Implement native node family: image/transform part 2
   - _id: comfy-parity-native-nodes-image-transform-comfy-node-0541
   - Outcome: The 3 rows assigned to this disjoint `image/transform` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7854,8 +7862,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 398. Implement native node family: image/upscaling part 1
   - _id: comfy-parity-native-nodes-image-upscaling-comfy-node-0262
   - Outcome: The 5 rows assigned to this disjoint `image/upscaling` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7872,8 +7880,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 399. Implement native node family: image/video part 1
   - _id: comfy-parity-native-nodes-image-video-comfy-node-0762
   - Outcome: The 2 rows assigned to this disjoint `image/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7890,8 +7898,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 400. Implement native node family: model/conditioning part 1
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0008
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7908,8 +7916,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 401. Implement native node family: model/conditioning part 2
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0070
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7926,8 +7934,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 402. Implement native node family: model/conditioning part 3
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0092
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7944,8 +7952,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 403. Implement native node family: model/conditioning part 4
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0107
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7962,8 +7970,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 404. Implement native node family: model/conditioning part 5
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0210
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration, comfy-parity-hidream-o1-family-conditioning-adapter-consolidation
   - _Blocked_by: comfy-parity-native-compute-breadth-integration, comfy-parity-hidream-o1-family-conditioning-adapter-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model, crates/comfy_model/src/hidream_o1_family.rs
@@ -7980,8 +7988,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 405. Implement native node family: model/conditioning part 6
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0277
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -7998,8 +8006,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 406. Implement native node family: model/conditioning part 7
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0480
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration, comfy-parity-pixeldit-pid-family-adapter-consolidation
   - _Blocked_by: comfy-parity-native-compute-breadth-integration, comfy-parity-pixeldit-pid-family-adapter-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model, crates/comfy_model/src/pixeldit_pid_family.rs
@@ -8016,8 +8024,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 407. Implement native node family: model/conditioning part 8
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0653
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8034,8 +8042,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 408. Implement native node family: model/conditioning part 9
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0696
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8052,8 +8060,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 409. Implement native node family: model/conditioning part 10
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0764
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8070,8 +8078,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 410. Implement native node family: model/conditioning part 11
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0776
   - Outcome: The 7 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8088,8 +8096,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 411. Implement native node family: model/latent part 1
   - _id: comfy-parity-native-nodes-model-latent-comfy-node-0018
   - Outcome: The 10 rows assigned to this disjoint `model/latent` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration, comfy-parity-hidream-o1-family-conditioning-adapter-consolidation
   - _Blocked_by: comfy-parity-native-compute-breadth-integration, comfy-parity-hidream-o1-family-conditioning-adapter-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model, crates/comfy_model/src/hidream_o1_family.rs
@@ -8106,8 +8114,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 412. Implement native node family: model/latent part 2
   - _id: comfy-parity-native-nodes-model-latent-comfy-node-0159
   - Outcome: The 10 rows assigned to this disjoint `model/latent` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration, comfy-parity-qwen-image-family-adapter-consolidation
   - _Blocked_by: comfy-parity-native-compute-breadth-integration, comfy-parity-qwen-image-family-adapter-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model, crates/comfy_model/src/qwen_image_family.rs
@@ -8124,8 +8132,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 413. Implement native node family: model/latent part 3
   - _id: comfy-parity-native-nodes-model-latent-comfy-node-0311
   - Outcome: The 10 rows assigned to this disjoint `model/latent` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8142,8 +8150,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 414. Implement native node family: model/latent part 4
   - _id: comfy-parity-native-nodes-model-latent-comfy-node-0322
   - Outcome: The 10 rows assigned to this disjoint `model/latent` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8160,8 +8168,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 415. Implement native node family: model/latent part 5
   - _id: comfy-parity-native-nodes-model-latent-comfy-node-0344
   - Outcome: The 10 rows assigned to this disjoint `model/latent` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8178,8 +8186,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 416. Implement native node family: model/latent part 6
   - _id: comfy-parity-native-nodes-model-latent-comfy-node-0597
   - Outcome: The 10 rows assigned to this disjoint `model/latent` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8196,8 +8204,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 417. Implement native node family: model/latent part 7
   - _id: comfy-parity-native-nodes-model-latent-comfy-node-0714
   - Outcome: The 8 rows assigned to this disjoint `model/latent` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8214,8 +8222,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 418. Implement native node family: model/loaders part 1
   - _id: comfy-parity-native-nodes-model-loaders-comfy-node-0012
   - Outcome: The 10 rows assigned to this disjoint `model/loaders` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8232,8 +8240,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 419. Implement native node family: model/loaders part 2
   - _id: comfy-parity-native-nodes-model-loaders-comfy-node-0209
   - Outcome: The 10 rows assigned to this disjoint `model/loaders` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8250,8 +8258,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 420. Implement native node family: model/loaders part 3
   - _id: comfy-parity-native-nodes-model-loaders-comfy-node-0351
   - Outcome: The 10 rows assigned to this disjoint `model/loaders` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8268,8 +8276,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 421. Implement native node family: model/loaders part 4
   - _id: comfy-parity-native-nodes-model-loaders-comfy-node-0685
   - Outcome: The 5 rows assigned to this disjoint `model/loaders` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8286,8 +8294,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 422. Implement native node family: model/merging part 1
   - _id: comfy-parity-native-nodes-model-merging-comfy-node-0054
   - Outcome: The 10 rows assigned to this disjoint `model/merging` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8304,8 +8312,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 423. Implement native node family: model/merging part 2
   - _id: comfy-parity-native-nodes-model-merging-comfy-node-0423
   - Outcome: The 10 rows assigned to this disjoint `model/merging` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration, comfy-parity-qwen-image-family-adapter-consolidation
   - _Blocked_by: comfy-parity-native-compute-breadth-integration, comfy-parity-qwen-image-family-adapter-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model, crates/comfy_model/src/qwen_image_family.rs
@@ -8322,8 +8330,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 424. Implement native node family: model/merging part 3
   - _id: comfy-parity-native-nodes-model-merging-comfy-node-0433
   - Outcome: The 8 rows assigned to this disjoint `model/merging` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8340,8 +8348,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 425. Implement native node family: model/patch part 1
   - _id: comfy-parity-native-nodes-model-patch-comfy-node-0055
   - Outcome: The 10 rows assigned to this disjoint `model/patch` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration, comfy-parity-hidream-o1-family-conditioning-adapter-consolidation
   - _Blocked_by: comfy-parity-native-compute-breadth-integration, comfy-parity-hidream-o1-family-conditioning-adapter-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model, crates/comfy_model/src/hidream_o1_family.rs
@@ -8358,8 +8366,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 426. Implement native node family: model/patch part 2
   - _id: comfy-parity-native-nodes-model-patch-comfy-node-0441
   - Outcome: The 10 rows assigned to this disjoint `model/patch` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration, comfy-parity-qwen-image-family-adapter-consolidation
   - _Blocked_by: comfy-parity-native-compute-breadth-integration, comfy-parity-qwen-image-family-adapter-consolidation
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model, crates/comfy_model/src/qwen_image_family.rs
@@ -8376,8 +8384,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 427. Implement native node family: model/patch part 3
   - _id: comfy-parity-native-nodes-model-patch-comfy-node-0534
   - Outcome: The 9 rows assigned to this disjoint `model/patch` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8394,8 +8402,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 428. Implement native node family: model/sampling part 1
   - _id: comfy-parity-native-nodes-model-sampling-comfy-node-0001
   - Outcome: The 10 rows assigned to this disjoint `model/sampling` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8412,8 +8420,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 429. Implement native node family: model/sampling part 2
   - _id: comfy-parity-native-nodes-model-sampling-comfy-node-0139
   - Outcome: The 10 rows assigned to this disjoint `model/sampling` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8430,8 +8438,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 430. Implement native node family: model/sampling part 3
   - _id: comfy-parity-native-nodes-model-sampling-comfy-node-0308
   - Outcome: The 10 rows assigned to this disjoint `model/sampling` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8448,8 +8456,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 431. Implement native node family: model/sampling part 4
   - _id: comfy-parity-native-nodes-model-sampling-comfy-node-0571
   - Outcome: The 10 rows assigned to this disjoint `model/sampling` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8466,8 +8474,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 432. Implement native node family: model/sampling part 5
   - _id: comfy-parity-native-nodes-model-sampling-comfy-node-0582
   - Outcome: The 10 rows assigned to this disjoint `model/sampling` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8484,8 +8492,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 433. Implement native node family: model/sampling part 6
   - _id: comfy-parity-native-nodes-model-sampling-comfy-node-0743
   - Outcome: The 2 rows assigned to this disjoint `model/sampling` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8502,8 +8510,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 434. Implement native node family: model/training part 1
   - _id: comfy-parity-native-nodes-model-training-comfy-node-0347
   - Outcome: The 6 rows assigned to this disjoint `model/training` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8520,8 +8528,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 435. Implement native node family: partner/3d part 1
   - _id: comfy-parity-native-nodes-partner-three-d-comfy-node-0408
   - Outcome: The 10 rows assigned to this disjoint `partner/3d` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8538,8 +8546,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 436. Implement native node family: partner/3d part 2
   - _id: comfy-parity-native-nodes-partner-three-d-comfy-node-0552
   - Outcome: The 10 rows assigned to this disjoint `partner/3d` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8556,8 +8564,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 437. Implement native node family: partner/3d part 3
   - _id: comfy-parity-native-nodes-partner-three-d-comfy-node-0686
   - Outcome: The 10 rows assigned to this disjoint `partner/3d` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8574,8 +8582,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 438. Implement native node family: partner/3d part 4
   - _id: comfy-parity-native-nodes-partner-three-d-comfy-node-0699
   - Outcome: The 2 rows assigned to this disjoint `partner/3d` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8592,8 +8600,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 439. Implement native node family: partner/audio part 1
   - _id: comfy-parity-native-nodes-partner-audio-comfy-node-0040
   - Outcome: The 10 rows assigned to this disjoint `partner/audio` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8610,8 +8618,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 440. Implement native node family: partner/audio part 2
   - _id: comfy-parity-native-nodes-partner-audio-comfy-node-0627
   - Outcome: The 1 rows assigned to this disjoint `partner/audio` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8628,8 +8636,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 441. Implement native node family: partner/image part 1
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0020
   - Outcome: The 10 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8646,8 +8654,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 442. Implement native node family: partner/image part 2
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0179
   - Outcome: The 10 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8664,8 +8672,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 443. Implement native node family: partner/image part 3
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0199
   - Outcome: The 10 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8682,8 +8690,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 444. Implement native node family: partner/image part 4
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0304
   - Outcome: The 10 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8700,8 +8708,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 445. Implement native node family: partner/image part 5
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0394
   - Outcome: The 10 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8718,8 +8726,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 446. Implement native node family: partner/image part 6
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0511
   - Outcome: The 10 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8736,8 +8744,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 447. Implement native node family: partner/image part 7
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0521
   - Outcome: The 10 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8754,8 +8762,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 448. Implement native node family: partner/image part 8
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0677
   - Outcome: The 4 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8772,8 +8780,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 449. Implement native node family: partner/text part 1
   - _id: comfy-parity-native-nodes-partner-text-comfy-node-0041
   - Outcome: The 9 rows assigned to this disjoint `partner/text` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8790,8 +8798,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 450. Implement native node family: partner/video part 1
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0021
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8808,8 +8816,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 451. Implement native node family: partner/video part 2
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0038
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8826,8 +8834,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 452. Implement native node family: partner/video part 3
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0222
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8844,8 +8852,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 453. Implement native node family: partner/video part 4
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0287
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8862,8 +8870,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 454. Implement native node family: partner/video part 5
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0298
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8880,8 +8888,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 455. Implement native node family: partner/video part 6
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0383
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8898,8 +8906,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 456. Implement native node family: partner/video part 7
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0465
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8916,8 +8924,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 457. Implement native node family: partner/video part 8
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0562
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8934,8 +8942,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 458. Implement native node family: partner/video part 9
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0732
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8952,8 +8960,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 459. Implement native node family: partner/video part 10
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0752
   - Outcome: The 8 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8970,8 +8978,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 460. Implement native node family: text part 1
   - _id: comfy-parity-native-nodes-text-comfy-node-0002
   - Outcome: The 10 rows assigned to this disjoint `text` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -8988,8 +8996,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 461. Implement native node family: text part 2
   - _id: comfy-parity-native-nodes-text-comfy-node-0531
   - Outcome: The 10 rows assigned to this disjoint `text` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -9006,8 +9014,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 462. Implement native node family: text part 3
   - _id: comfy-parity-native-nodes-text-comfy-node-0649
   - Outcome: The 6 rows assigned to this disjoint `text` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -9024,8 +9032,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 463. Implement native node family: utilities part 1
   - _id: comfy-parity-native-nodes-utilities-comfy-node-0077
   - Outcome: The 10 rows assigned to this disjoint `utilities` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -9042,8 +9050,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 464. Implement native node family: utilities part 2
   - _id: comfy-parity-native-nodes-utilities-comfy-node-0610
   - Outcome: The 1 rows assigned to this disjoint `utilities` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -9060,8 +9068,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 465. Implement native node family: utilities/logic part 1
   - _id: comfy-parity-native-nodes-utilities-logic-comfy-node-0082
   - Outcome: The 4 rows assigned to this disjoint `utilities/logic` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -9078,8 +9086,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 466. Implement native node family: utilities/primitive part 1
   - _id: comfy-parity-native-nodes-utilities-primitive-comfy-node-0494
   - Outcome: The 6 rows assigned to this disjoint `utilities/primitive` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -9096,8 +9104,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 467. Implement native node family: video part 1
   - _id: comfy-parity-native-nodes-video-comfy-node-0124
   - Outcome: The 7 rows assigned to this disjoint `video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -9114,8 +9122,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 468. Implement native node family: video/preprocessors part 1
   - _id: comfy-parity-native-nodes-video-preprocessors-comfy-node-0372
   - Outcome: The 1 rows assigned to this disjoint `video/preprocessors` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
-  - Wave: 187
-  - _Wave: 187
+  - Wave: 188
+  - _Wave: 188
   - Dependencies: comfy-parity-native-compute-breadth-integration
   - _Blocked_by: comfy-parity-native-compute-breadth-integration
   - Reads: .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/native-spec-mapping.json, crates/comfy_nodes/src/descriptor.rs, crates/comfy_nodes/src/registry_generator.rs, crates/comfy_nodes/src/slices, crates/comfy_runtime, crates/comfy_tensor, crates/comfy_model
@@ -9132,8 +9140,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 469. Generate the final native implementation registry and closure report
   - _id: comfy-parity-native-registry-integration
   - Outcome: A serialized generator consumes disjoint node/model/provider descriptors after all family tasks and emits the central implementation registry, object-info projection, and zero-delta closure report.
-  - Wave: 188
-  - _Wave: 188
+  - Wave: 189
+  - _Wave: 189
   - Dependencies: comfy-parity-native-nodes-empty-root-category-declared-by-source-comfy-node-0757, comfy-parity-native-nodes-three-d-comfy-node-0115, comfy-parity-native-nodes-three-d-splat-comfy-node-0172, comfy-parity-native-nodes-advanced-debug-comfy-node-0140, comfy-parity-native-nodes-advanced-guidance-comfy-node-0049, comfy-parity-native-nodes-advanced-hooks-comfy-node-0079, comfy-parity-native-nodes-advanced-hooks-comfy-node-0119, comfy-parity-native-nodes-advanced-multigpu-comfy-node-0454, comfy-parity-native-nodes-audio-comfy-node-0009, comfy-parity-native-nodes-audio-comfy-node-0589, comfy-parity-native-nodes-experimental-comfy-node-0133, comfy-parity-native-nodes-experimental-comfy-node-0680, comfy-parity-native-nodes-experimental-attention-experiments-comfy-node-0057, comfy-parity-native-nodes-experimental-stable-cascade-comfy-node-0638, comfy-parity-native-nodes-image-comfy-node-0160, comfy-parity-native-nodes-image-comfy-node-0586, comfy-parity-native-nodes-image-adjustments-comfy-node-0004, comfy-parity-native-nodes-image-background-removal-comfy-node-0532, comfy-parity-native-nodes-image-batch-comfy-node-0017, comfy-parity-native-nodes-image-batch-comfy-node-0621, comfy-parity-native-nodes-image-color-comfy-node-0254, comfy-parity-native-nodes-image-compositing-comfy-node-0246, comfy-parity-native-nodes-image-detection-comfy-node-0136, comfy-parity-native-nodes-image-detection-comfy-node-0607, comfy-parity-native-nodes-image-filters-comfy-node-0045, comfy-parity-native-nodes-image-geometry-estimation-comfy-node-0129, comfy-parity-native-nodes-image-mask-comfy-node-0019, comfy-parity-native-nodes-image-mask-comfy-node-0625, comfy-parity-native-nodes-image-shader-comfy-node-0211, comfy-parity-native-nodes-image-transform-comfy-node-0047, comfy-parity-native-nodes-image-transform-comfy-node-0541, comfy-parity-native-nodes-image-upscaling-comfy-node-0262, comfy-parity-native-nodes-image-video-comfy-node-0762, comfy-parity-native-nodes-model-conditioning-comfy-node-0008, comfy-parity-native-nodes-model-conditioning-comfy-node-0070, comfy-parity-native-nodes-model-conditioning-comfy-node-0092, comfy-parity-native-nodes-model-conditioning-comfy-node-0107, comfy-parity-native-nodes-model-conditioning-comfy-node-0210, comfy-parity-native-nodes-model-conditioning-comfy-node-0277, comfy-parity-native-nodes-model-conditioning-comfy-node-0480, comfy-parity-native-nodes-model-conditioning-comfy-node-0653, comfy-parity-native-nodes-model-conditioning-comfy-node-0696, comfy-parity-native-nodes-model-conditioning-comfy-node-0764, comfy-parity-native-nodes-model-conditioning-comfy-node-0776, comfy-parity-native-nodes-model-latent-comfy-node-0018, comfy-parity-native-nodes-model-latent-comfy-node-0159, comfy-parity-native-nodes-model-latent-comfy-node-0311, comfy-parity-native-nodes-model-latent-comfy-node-0322, comfy-parity-native-nodes-model-latent-comfy-node-0344, comfy-parity-native-nodes-model-latent-comfy-node-0597, comfy-parity-native-nodes-model-latent-comfy-node-0714, comfy-parity-native-nodes-model-loaders-comfy-node-0012, comfy-parity-native-nodes-model-loaders-comfy-node-0209, comfy-parity-native-nodes-model-loaders-comfy-node-0351, comfy-parity-native-nodes-model-loaders-comfy-node-0685, comfy-parity-native-nodes-model-merging-comfy-node-0054, comfy-parity-native-nodes-model-merging-comfy-node-0423, comfy-parity-native-nodes-model-merging-comfy-node-0433, comfy-parity-native-nodes-model-patch-comfy-node-0055, comfy-parity-native-nodes-model-patch-comfy-node-0441, comfy-parity-native-nodes-model-patch-comfy-node-0534, comfy-parity-native-nodes-model-sampling-comfy-node-0001, comfy-parity-native-nodes-model-sampling-comfy-node-0139, comfy-parity-native-nodes-model-sampling-comfy-node-0308, comfy-parity-native-nodes-model-sampling-comfy-node-0571, comfy-parity-native-nodes-model-sampling-comfy-node-0582, comfy-parity-native-nodes-model-sampling-comfy-node-0743, comfy-parity-native-nodes-model-training-comfy-node-0347, comfy-parity-native-nodes-partner-three-d-comfy-node-0408, comfy-parity-native-nodes-partner-three-d-comfy-node-0552, comfy-parity-native-nodes-partner-three-d-comfy-node-0686, comfy-parity-native-nodes-partner-three-d-comfy-node-0699, comfy-parity-native-nodes-partner-audio-comfy-node-0040, comfy-parity-native-nodes-partner-audio-comfy-node-0627, comfy-parity-native-nodes-partner-image-comfy-node-0020, comfy-parity-native-nodes-partner-image-comfy-node-0179, comfy-parity-native-nodes-partner-image-comfy-node-0199, comfy-parity-native-nodes-partner-image-comfy-node-0304, comfy-parity-native-nodes-partner-image-comfy-node-0394, comfy-parity-native-nodes-partner-image-comfy-node-0511, comfy-parity-native-nodes-partner-image-comfy-node-0521, comfy-parity-native-nodes-partner-image-comfy-node-0677, comfy-parity-native-nodes-partner-text-comfy-node-0041, comfy-parity-native-nodes-partner-video-comfy-node-0021, comfy-parity-native-nodes-partner-video-comfy-node-0038, comfy-parity-native-nodes-partner-video-comfy-node-0222, comfy-parity-native-nodes-partner-video-comfy-node-0287, comfy-parity-native-nodes-partner-video-comfy-node-0298, comfy-parity-native-nodes-partner-video-comfy-node-0383, comfy-parity-native-nodes-partner-video-comfy-node-0465, comfy-parity-native-nodes-partner-video-comfy-node-0562, comfy-parity-native-nodes-partner-video-comfy-node-0732, comfy-parity-native-nodes-partner-video-comfy-node-0752, comfy-parity-native-nodes-text-comfy-node-0002, comfy-parity-native-nodes-text-comfy-node-0531, comfy-parity-native-nodes-text-comfy-node-0649, comfy-parity-native-nodes-utilities-comfy-node-0077, comfy-parity-native-nodes-utilities-comfy-node-0610, comfy-parity-native-nodes-utilities-logic-comfy-node-0082, comfy-parity-native-nodes-utilities-primitive-comfy-node-0494, comfy-parity-native-nodes-video-comfy-node-0124, comfy-parity-native-nodes-video-preprocessors-comfy-node-0372
   - _Blocked_by: comfy-parity-native-nodes-empty-root-category-declared-by-source-comfy-node-0757, comfy-parity-native-nodes-three-d-comfy-node-0115, comfy-parity-native-nodes-three-d-splat-comfy-node-0172, comfy-parity-native-nodes-advanced-debug-comfy-node-0140, comfy-parity-native-nodes-advanced-guidance-comfy-node-0049, comfy-parity-native-nodes-advanced-hooks-comfy-node-0079, comfy-parity-native-nodes-advanced-hooks-comfy-node-0119, comfy-parity-native-nodes-advanced-multigpu-comfy-node-0454, comfy-parity-native-nodes-audio-comfy-node-0009, comfy-parity-native-nodes-audio-comfy-node-0589, comfy-parity-native-nodes-experimental-comfy-node-0133, comfy-parity-native-nodes-experimental-comfy-node-0680, comfy-parity-native-nodes-experimental-attention-experiments-comfy-node-0057, comfy-parity-native-nodes-experimental-stable-cascade-comfy-node-0638, comfy-parity-native-nodes-image-comfy-node-0160, comfy-parity-native-nodes-image-comfy-node-0586, comfy-parity-native-nodes-image-adjustments-comfy-node-0004, comfy-parity-native-nodes-image-background-removal-comfy-node-0532, comfy-parity-native-nodes-image-batch-comfy-node-0017, comfy-parity-native-nodes-image-batch-comfy-node-0621, comfy-parity-native-nodes-image-color-comfy-node-0254, comfy-parity-native-nodes-image-compositing-comfy-node-0246, comfy-parity-native-nodes-image-detection-comfy-node-0136, comfy-parity-native-nodes-image-detection-comfy-node-0607, comfy-parity-native-nodes-image-filters-comfy-node-0045, comfy-parity-native-nodes-image-geometry-estimation-comfy-node-0129, comfy-parity-native-nodes-image-mask-comfy-node-0019, comfy-parity-native-nodes-image-mask-comfy-node-0625, comfy-parity-native-nodes-image-shader-comfy-node-0211, comfy-parity-native-nodes-image-transform-comfy-node-0047, comfy-parity-native-nodes-image-transform-comfy-node-0541, comfy-parity-native-nodes-image-upscaling-comfy-node-0262, comfy-parity-native-nodes-image-video-comfy-node-0762, comfy-parity-native-nodes-model-conditioning-comfy-node-0008, comfy-parity-native-nodes-model-conditioning-comfy-node-0070, comfy-parity-native-nodes-model-conditioning-comfy-node-0092, comfy-parity-native-nodes-model-conditioning-comfy-node-0107, comfy-parity-native-nodes-model-conditioning-comfy-node-0210, comfy-parity-native-nodes-model-conditioning-comfy-node-0277, comfy-parity-native-nodes-model-conditioning-comfy-node-0480, comfy-parity-native-nodes-model-conditioning-comfy-node-0653, comfy-parity-native-nodes-model-conditioning-comfy-node-0696, comfy-parity-native-nodes-model-conditioning-comfy-node-0764, comfy-parity-native-nodes-model-conditioning-comfy-node-0776, comfy-parity-native-nodes-model-latent-comfy-node-0018, comfy-parity-native-nodes-model-latent-comfy-node-0159, comfy-parity-native-nodes-model-latent-comfy-node-0311, comfy-parity-native-nodes-model-latent-comfy-node-0322, comfy-parity-native-nodes-model-latent-comfy-node-0344, comfy-parity-native-nodes-model-latent-comfy-node-0597, comfy-parity-native-nodes-model-latent-comfy-node-0714, comfy-parity-native-nodes-model-loaders-comfy-node-0012, comfy-parity-native-nodes-model-loaders-comfy-node-0209, comfy-parity-native-nodes-model-loaders-comfy-node-0351, comfy-parity-native-nodes-model-loaders-comfy-node-0685, comfy-parity-native-nodes-model-merging-comfy-node-0054, comfy-parity-native-nodes-model-merging-comfy-node-0423, comfy-parity-native-nodes-model-merging-comfy-node-0433, comfy-parity-native-nodes-model-patch-comfy-node-0055, comfy-parity-native-nodes-model-patch-comfy-node-0441, comfy-parity-native-nodes-model-patch-comfy-node-0534, comfy-parity-native-nodes-model-sampling-comfy-node-0001, comfy-parity-native-nodes-model-sampling-comfy-node-0139, comfy-parity-native-nodes-model-sampling-comfy-node-0308, comfy-parity-native-nodes-model-sampling-comfy-node-0571, comfy-parity-native-nodes-model-sampling-comfy-node-0582, comfy-parity-native-nodes-model-sampling-comfy-node-0743, comfy-parity-native-nodes-model-training-comfy-node-0347, comfy-parity-native-nodes-partner-three-d-comfy-node-0408, comfy-parity-native-nodes-partner-three-d-comfy-node-0552, comfy-parity-native-nodes-partner-three-d-comfy-node-0686, comfy-parity-native-nodes-partner-three-d-comfy-node-0699, comfy-parity-native-nodes-partner-audio-comfy-node-0040, comfy-parity-native-nodes-partner-audio-comfy-node-0627, comfy-parity-native-nodes-partner-image-comfy-node-0020, comfy-parity-native-nodes-partner-image-comfy-node-0179, comfy-parity-native-nodes-partner-image-comfy-node-0199, comfy-parity-native-nodes-partner-image-comfy-node-0304, comfy-parity-native-nodes-partner-image-comfy-node-0394, comfy-parity-native-nodes-partner-image-comfy-node-0511, comfy-parity-native-nodes-partner-image-comfy-node-0521, comfy-parity-native-nodes-partner-image-comfy-node-0677, comfy-parity-native-nodes-partner-text-comfy-node-0041, comfy-parity-native-nodes-partner-video-comfy-node-0021, comfy-parity-native-nodes-partner-video-comfy-node-0038, comfy-parity-native-nodes-partner-video-comfy-node-0222, comfy-parity-native-nodes-partner-video-comfy-node-0287, comfy-parity-native-nodes-partner-video-comfy-node-0298, comfy-parity-native-nodes-partner-video-comfy-node-0383, comfy-parity-native-nodes-partner-video-comfy-node-0465, comfy-parity-native-nodes-partner-video-comfy-node-0562, comfy-parity-native-nodes-partner-video-comfy-node-0732, comfy-parity-native-nodes-partner-video-comfy-node-0752, comfy-parity-native-nodes-text-comfy-node-0002, comfy-parity-native-nodes-text-comfy-node-0531, comfy-parity-native-nodes-text-comfy-node-0649, comfy-parity-native-nodes-utilities-comfy-node-0077, comfy-parity-native-nodes-utilities-comfy-node-0610, comfy-parity-native-nodes-utilities-logic-comfy-node-0082, comfy-parity-native-nodes-utilities-primitive-comfy-node-0494, comfy-parity-native-nodes-video-comfy-node-0124, comfy-parity-native-nodes-video-preprocessors-comfy-node-0372
   - Reads: crates/comfy_nodes/src/families, crates/comfy_model/src/families, crates/comfy_plugin_host, .agents/specs/comfy-parity/catalogs/backend-nodes.csv, .agents/specs/comfy-parity/catalogs/backend-models.csv
@@ -9150,8 +9158,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 470. Implement templates, App Mode, sharing, tabs, and workflow recovery
   - _id: comfy-parity-workflow-experience
   - Outcome: Native workflow tabs, recents, autosave/drafts, local/bundled/provider/plugin templates, App Mode projections, and approved sharing preserve provenance, dirty state, permissions, and lossless documents.
-  - Wave: 189
-  - _Wave: 189
+  - Wave: 190
+  - _Wave: 190
   - Dependencies: comfy-parity-native-registry-integration
   - _Blocked_by: comfy-parity-native-registry-integration
   - Reads: crates/comfy_ui/src/workflow_item.rs, crates/comfy_runtime/src/workflow_formats.rs, .agents/specs/comfy-parity/catalogs/frontend-features.csv
@@ -9168,8 +9176,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 471. Build node library, asset panels, missing-dependency flows, and content dispatch
   - _id: comfy-parity-assets-editors-viewers
   - Outcome: Node library/search/replacement and native asset browsing dispatch typed outputs to specialized GPUI editors/viewers while preserving missing node/model/media/plugin state.
-  - Wave: 190
-  - _Wave: 190
+  - Wave: 191
+  - _Wave: 191
   - Dependencies: comfy-parity-workflow-experience
   - _Blocked_by: comfy-parity-workflow-experience
   - Reads: crates/comfy_ui, crates/comfy_runtime/src/assets.rs, .agents/specs/comfy-parity/catalogs/frontend-component-surfaces.csv
@@ -9186,8 +9194,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 472. Implement native image, HDR, mask, crop, paint, and bounding-box content
   - _id: comfy-parity-image-mask-content
   - Outcome: Bounded native codecs and GPUI surfaces cover image/HDR/depth/mask/crop/painter/bounding-box load, view, edit, undo, metadata, output, and external changes.
-  - Wave: 191
-  - _Wave: 191
+  - Wave: 192
+  - _Wave: 192
   - Dependencies: comfy-parity-assets-editors-viewers
   - _Blocked_by: comfy-parity-assets-editors-viewers
   - Reads: crates/comfy_media, crates/comfy_ui/src/content_registry.rs, .agents/specs/comfy-parity/catalogs/frontend-component-surfaces.csv
@@ -9204,8 +9212,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 473. Implement native audio and video codecs, widgets, players, and output inspection
   - _id: comfy-parity-audio-video-content
   - Outcome: Native readers/writers and GPUI controls cover cataloged audio/video samples, frames, timing, metadata, playback, previews, edits, outputs, and platform codec availability without command subprocesses.
-  - Wave: 192
-  - _Wave: 192
+  - Wave: 193
+  - _Wave: 193
   - Dependencies: comfy-parity-image-mask-content
   - _Blocked_by: comfy-parity-image-mask-content
   - Reads: crates/comfy_media/src/comfy_media.rs, crates/comfy_ui/src/content_registry.rs
@@ -9222,8 +9230,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 474. Implement native 3D, latent, text, JSON, file, and unknown-output inspection
   - _id: comfy-parity-three-d-latent-content
   - Outcome: Typed GPUI content covers mesh/point/splat/animation, latent channels, text/JSON/files, and preserved unknown outputs with bounded parsing and exact serialization.
-  - Wave: 193
-  - _Wave: 193
+  - Wave: 194
+  - _Wave: 194
   - Dependencies: comfy-parity-audio-video-content
   - _Blocked_by: comfy-parity-audio-video-content
   - Reads: crates/comfy_media, crates/comfy_ui/src/content_registry.rs, crates/comfy_model/src/latent_formats, .agents/specs/comfy-parity/catalogs/native-compute-closure.json
@@ -9240,8 +9248,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 475. Implement profile-scoped providers, secrets, cloud gates, telemetry, and tasks
   - _id: comfy-parity-auth-cloud-telemetry
   - Outcome: Native provider services isolate auth, secrets, entitlements, costs, uploads, polling, cancellation, tasks, feature flags, surveys, and consented telemetry by profile and plugin grants.
-  - Wave: 194
-  - _Wave: 194
+  - Wave: 195
+  - _Wave: 195
   - Dependencies: comfy-parity-three-d-latent-content
   - _Blocked_by: comfy-parity-three-d-latent-content
   - Reads: crates/credentials_provider, crates/comfy_runtime/src/trust.rs, .agents/specs/comfy-parity/catalogs/backend-external-services.csv
@@ -9258,8 +9266,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 476. Expose native settings, themes, localization, onboarding, help, and docs
   - _id: comfy-parity-settings-localization-ui
   - Outcome: GPUI surfaces expose native runtime/backend/memory/plugin/API/provider/update settings plus themes, palettes, shortcuts, locales, onboarding, help, evidence-linked docs, and the exact public-help navigation commands assigned by the native menu ledger through Sim's central Settings Editor registration. This task owns the visible help command surfaces and destinations; `comfy-parity-desktop-native-ui` and `comfy-parity-security-platform` retain the platform adapter and ExternalNavigationPolicy enforcement, so the UI never owns a second URL-security decision.
-  - Wave: 195
-  - _Wave: 195
+  - Wave: 196
+  - _Wave: 196
   - Dependencies: comfy-parity-auth-cloud-telemetry
   - _Blocked_by: comfy-parity-auth-cloud-telemetry
   - Reads: crates/settings, crates/settings_content, crates/settings_ui/src/page_data.rs, crates/comfy_runtime/src/settings.rs, .agents/specs/comfy-parity/catalogs/frontend-settings.csv, .agents/specs/comfy-parity/catalogs/docs-pages.csv, .agents/specs/comfy-parity/catalogs/native-menu-dispositions.csv, crates/comfy_runtime/src/trust.rs
@@ -9276,8 +9284,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 477. Map Desktop onboarding, adoption, migration, and profiles to native data
   - _id: comfy-parity-desktop-installations
   - Outcome: Desktop-visible lifecycle becomes native profile/backend/model/plugin/workflow/output adoption with preview, isolation, cancellation, journals, and read-only legacy Python metadata.
-  - Wave: 196
-  - _Wave: 196
+  - Wave: 197
+  - _Wave: 197
   - Dependencies: comfy-parity-settings-localization-ui
   - _Blocked_by: comfy-parity-settings-localization-ui
   - Reads: .agents/specs/comfy-parity/catalogs/desktop-features.csv, crates/comfy_runtime/src/legacy_installations.rs, crates/comfy_ui/src/onboarding.rs
@@ -9294,8 +9302,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 478. Implement native downloads, updates, snapshots, rollback, and auto-update mapping
   - _id: comfy-parity-updates-snapshots
   - Outcome: Application/backend/codec/model/registry/plugin operations use staged downloads, integrity/signature checks, pause/resume/cancel, snapshots, quiescence, verification, atomic commit, rollback, and relaunch guards.
-  - Wave: 197
-  - _Wave: 197
+  - Wave: 198
+  - _Wave: 198
   - Dependencies: comfy-parity-desktop-installations
   - _Blocked_by: comfy-parity-desktop-installations
   - Reads: crates/auto_update, crates/comfy_runtime/src/profile_operations.rs, .agents/specs/comfy-parity/catalogs/desktop-features.csv
@@ -9312,8 +9320,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 479. Implement worker health, logs, terminal, diagnostics, feedback, and crash recovery
   - _id: comfy-parity-process-diagnostics
   - Outcome: Native worker/backend/device/model/plugin/API health and bounded sanitized logs drive diagnostic panels, terminal-like read-only streams, popouts, feedback artifacts, and recovery without arbitrary shell execution.
-  - Wave: 198
-  - _Wave: 198
+  - Wave: 199
+  - _Wave: 199
   - Dependencies: comfy-parity-updates-snapshots
   - _Blocked_by: comfy-parity-updates-snapshots
   - Reads: crates/comfy_worker, crates/comfy_runtime/src/updates.rs, .agents/specs/comfy-parity/catalogs/desktop-renderer-surfaces.csv
@@ -9330,8 +9338,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 480. Map Desktop IPC, preload, menus, windows, choosers, and OS integration
   - _id: comfy-parity-desktop-native-ui
   - Outcome: Every Desktop bridge/channel/menu/window/chooser/navigation/OS contract receives a Rust service, GPUI action/event, native lifecycle mapping, inactive legacy response, or explicit defer and is registered in Sim's existing application module.
-  - Wave: 199
-  - _Wave: 199
+  - Wave: 200
+  - _Wave: 200
   - Dependencies: comfy-parity-process-diagnostics
   - _Blocked_by: comfy-parity-process-diagnostics
   - Reads: .agents/specs/comfy-parity/catalogs/desktop-ipc.csv, .agents/specs/comfy-parity/catalogs/desktop-preload-apis.csv, .agents/specs/comfy-parity/catalogs/desktop-menu-actions.csv, crates/sim/src/main.rs, crates/sim/src/sim.rs
@@ -9348,8 +9356,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 481. Harden native runtime security and platform packaging
   - _id: comfy-parity-security-platform
   - Outcome: Windows/macOS/Linux packages define backend/vendor/codec/plugin trust, signatures, sandbox/permissions, typed locations, remote API policy, secrets, model parser bounds, worker isolation, and native-only contents.
-  - Wave: 200
-  - _Wave: 200
+  - Wave: 201
+  - _Wave: 201
   - Dependencies: comfy-parity-desktop-native-ui
   - _Blocked_by: comfy-parity-desktop-native-ui
   - Reads: crates/comfy_runtime, crates/comfy_worker, crates/comfy_plugin_host, crates/comfy_media, nix, script
@@ -9366,8 +9374,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 482. Audit GPUI ownership, registered persistence, cancellation, and error propagation
   - _id: comfy-parity-gpui-persistence
   - Outcome: Every entity/service/task/subscription/profile handle and persisted model has explicit ownership, lifetime, cancellation, migration, watcher, error-to-UI, and accessibility behavior.
-  - Wave: 201
-  - _Wave: 201
+  - Wave: 202
+  - _Wave: 202
   - Dependencies: comfy-parity-security-platform
   - _Blocked_by: comfy-parity-security-platform
   - Reads: crates/comfy_ui, crates/comfy_runtime, crates/comfy_worker, crates/workspace, crates/db, crates/settings
@@ -9384,8 +9392,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 483. Enforce format, identifier, plugin, availability, and deprecation policy
   - _id: comfy-parity-backward-compatibility
   - Outcome: Legacy/current workflow and protocol versions, node/plugin IDs, Desktop/CLI state, unknown fields, deprecations, flags, docs-only claims, and inactive source behaviors preserve data and use explicit mappings or gates.
-  - Wave: 202
-  - _Wave: 202
+  - Wave: 203
+  - _Wave: 203
   - Dependencies: comfy-parity-gpui-persistence
   - _Blocked_by: comfy-parity-gpui-persistence
   - Reads: crates/comfy_runtime/src/legacy_connections.rs, crates/comfy_plugin_host/src/legacy_mapping.rs, .agents/specs/comfy-parity/parity-matrix.md
@@ -9402,8 +9410,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 484. Meet native graph, tensor, model, sampler, media, API, and recovery budgets
   - _id: comfy-parity-performance
   - Outcome: Benchmark the numeric budgets in validation.md: image ≤2 s, tiny diffusion ≤5 s, 1,000-node input p95 ≤8 ms and frame p95 ≤16.7 ms, 10,000-node interaction p95 <50 ms, worker readiness ≤2/5 s, API events ≤50 ms, preview ≤250 ms, visible cancellation ≤100 ms, bounded terminal cancellation, and ten-second resource convergence.
-  - Wave: 203
-  - _Wave: 203
+  - Wave: 204
+  - _Wave: 204
   - Dependencies: comfy-parity-backward-compatibility
   - _Blocked_by: comfy-parity-backward-compatibility
   - Reads: crates/comfy_tensor, crates/comfy_model, crates/comfy_sampler, crates/comfy_runtime, crates/comfy_ui, .agents/specs/comfy-parity/validation.md
@@ -9420,10 +9428,10 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 - [ ] 485. Run parity, closure, platform, accessibility, security, and readiness audits
   - _id: comfy-parity-final-validation
   - Outcome: All deterministic source/oracle, native unit/contract/GPUI/E2E/restart/failure/accessibility/platform/security/performance tests and forward/reverse coverage gates produce an auditable implementation-closure report for the CPU and Apple Metal certified baseline plus fail-closed optional adapters.
-  - Wave: 204
-  - _Wave: 204
-  - Dependencies: comfy-parity-performance, comfy-parity-certify-device-apple-metal-mps-comfy-model-0015, comfy-parity-certify-device-cpu-comfy-model-0016, comfy-parity-cpu-low-precision-bmm-model-execution-closure, comfy-parity-backend-catalog-provenance-reconciliation
-  - _Blocked_by: comfy-parity-performance, comfy-parity-certify-device-apple-metal-mps-comfy-model-0015, comfy-parity-certify-device-cpu-comfy-model-0016, comfy-parity-cpu-low-precision-bmm-model-execution-closure, comfy-parity-backend-catalog-provenance-reconciliation
+  - Wave: 205
+  - _Wave: 205
+  - Dependencies: comfy-parity-performance, comfy-parity-certify-device-apple-metal-mps-comfy-model-0015, comfy-parity-certify-device-cpu-comfy-model-0016, comfy-parity-cpu-low-precision-bmm-model-execution-closure, comfy-parity-probe-derived-model-state-plan-selector, comfy-parity-backend-catalog-provenance-reconciliation
+  - _Blocked_by: comfy-parity-performance, comfy-parity-certify-device-apple-metal-mps-comfy-model-0015, comfy-parity-certify-device-cpu-comfy-model-0016, comfy-parity-cpu-low-precision-bmm-model-execution-closure, comfy-parity-probe-derived-model-state-plan-selector, comfy-parity-backend-catalog-provenance-reconciliation
   - Reads: .agents/specs/comfy-parity, crates/comfy_test_support, crates/comfy_ui, script
   - _Reads: .agents/specs/comfy-parity, crates/comfy_test_support, crates/comfy_ui, script
   - Writes: .agents/specs/comfy-parity/audit, .agents/specs/comfy-parity/catalogs/native-implementation-closure.json
@@ -10032,3 +10040,23 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - Done when: The CPU capability matrix advertises contiguous and strided BMM and hyperbolic tangent for exactly F32, F16, and BF16; nonzero fixtures execute all three dtypes through canonical DType codecs with deterministic f32 accumulation/evaluation and output-dtype rounding. Mixed BMM input or output dtypes, malformed geometry, cancellation, and allocation failure return typed errors without output publication or leaked capacity, and low-precision tanh preserves the same atomic guarantees through its canonical tensor facade. NativeModule SiLU admission no longer invents unary or binary primitive requirements for its canonical bounded f32-workspace execution path. LTXAV and LTXV execute both original and patched native forward checkpoints in BF16 and F32, LotusD executes F16/BF16/F32 through canonical tanh, and focused plus aggregate tensor, model, memory, cancellation, ownership, formatting, clippy, and strict-generation checks pass. Evidence marker: POST-CPU-LOW-PRECISION-BMM-MODEL-CLOSURE.
 
   - _validation_evidence: POST-CPU-LOW-PRECISION-BMM-MODEL-CLOSURE 2026-08-06 independent implementation and validation PASS. The canonical CPU capability matrix now advertises contiguous/strided BatchMatrixMultiply and hyperbolic tangent for exactly F32/F16/BF16, decodes inputs with the canonical DType codecs, performs deterministic f32 accumulation/evaluation, rounds through the requested output dtype, accounts workspace through the caller-owned authority, and publishes only after success. Focused nonzero fixtures prove exact values in all three dtypes; mixed BMM dtypes, output mismatch, malformed geometry, pre-cancellation, mid-cancellation, and OOM fail typed without output publication or capacity leaks. The canonical tanh facade preserves F16/BF16/F32, while unsupported non-float modes remain fail-closed. NativeModule SiLU admission now requests only the bounded f32-workspace path it actually dispatches. Original and patched LTXAV/LTXV BF16/F32 and LotusD F16/BF16/F32 executions pass through these real primitives. The focused BMM, tanh, and every-advertised-CPU-signature tests each passed; the complete locked tensor matrix passed 100 library cases and every integration target, the complete model matrix passed 229 library/207 generated-family/21 foundation/9 native-vision cases, and the complete support matrix passed 29 library, deterministic native diffusion in 215.69s, four checkpoints in 100.02s, native image/recovery/release/no-external-Comfy/no-Python/plugin/workflow, and ownership 23/23 in 249.08s. VAL-MEMORY-001, canonical cancellation, and focused ownership passed; locked compile, formatting, diff integrity, warnings-denied release/all-target/all-feature Clippy in 4m39s, strict double regeneration with 515 tasks/87 validations/155 ownership rows/13,295 trace rows, and standalone spec validation exited 0. CPU backend/tanh facade/NativeModule SHA-256 values are `464808a9eeb6d3d91fa1d43f44639f52c0711acbb84ca4f064f9f1fa51fc4a01`, `b01f8f43847c733cf88eee912e55cbf9d485c3ce77aea66ad66b2660b98d3abd`, and `e10870454abc5f7026466c5979e7b06b95c9e46604f10ef00b91e8cf9eeeb9d4`; LTXAV/LTXV/LotusD row artifacts are `9cd2ff4fba0cdd053e4721a3ff3f717b311c4d281d05b461e46e2f0c9b1a2bce`, `970eaec9d239c2165e9d205a0635bf447999d97d38721dd2ab7da33a2358262a`, and `1559e8b7d0aec054f79e179746a6cf635b02e805ca9af1c050ca17b51874b77c`, each with 7 passed/0 failed/0 skipped. Validated on macOS aarch64 native Rust CPU; Apple Metal remains compiled typed fail-closed and no production Python/JavaScript or external Comfy process exists._
+
+- [x] 516. Add canonical probe-derived model state-plan selection
+  - _id: comfy-parity-probe-derived-model-state-plan-selector
+  - Outcome: Close the registry reachability gap discovered while integrating PixArtAlpha: extend the sole comfy_model::model_family state-plan selector with an immutable row-owned probe selector for plans whose bounded operation sequence depends on already validated tensor facts such as consecutive transformer depth. The canonical registry must invoke the selector during resolution, revalidate every returned operation and declared component before publication, bind the resulting owned plan into ResolvedModelFamily, and remain the only state-transaction entry point; leaves may not execute an alternate mapping path.
+  - Wave: 184
+  - _Wave: 184
+  - Dependencies: comfy-parity-model-layout-state-plan-owner-consolidation, comfy-parity-pixart-family-adapter-consolidation, comfy-parity-workspace-final-ownership-audit, comfy-parity-cpu-low-precision-bmm-model-execution-closure, comfy-parity-native-model-family-ltxav-comfy-model-0102, comfy-parity-native-model-family-ltxv-comfy-model-0103, comfy-parity-native-model-family-lotusd-comfy-model-0106, comfy-parity-model-detection-any-of-key-selector-consolidation
+  - _Blocked_by: comfy-parity-model-layout-state-plan-owner-consolidation, comfy-parity-pixart-family-adapter-consolidation, comfy-parity-workspace-final-ownership-audit, comfy-parity-cpu-low-precision-bmm-model-execution-closure, comfy-parity-native-model-family-ltxav-comfy-model-0102, comfy-parity-native-model-family-ltxv-comfy-model-0103, comfy-parity-native-model-family-lotusd-comfy-model-0106, comfy-parity-model-detection-any-of-key-selector-consolidation
+  - Reads: .agents/specs/comfy-parity/requirements.md, .agents/specs/comfy-parity/design.md, .agents/specs/comfy-parity/tasks.md, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/pixart_family.rs, crates/comfy_model/src/families/pixart_alpha_comfy_model_0110.rs, crates/comfy_model/tests/model_family_foundation.rs, crates/comfy_model/tests/families/pixart_alpha_comfy_model_0110.rs
+  - _Reads: .agents/specs/comfy-parity/requirements.md, .agents/specs/comfy-parity/design.md, .agents/specs/comfy-parity/tasks.md, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/pixart_family.rs, crates/comfy_model/src/families/pixart_alpha_comfy_model_0110.rs, crates/comfy_model/tests/model_family_foundation.rs, crates/comfy_model/tests/families/pixart_alpha_comfy_model_0110.rs
+  - Writes: .agents/specs/comfy-parity/regenerate_native_planning.py, .agents/specs/comfy-parity/design.md, .agents/specs/comfy-parity/tasks.md, .agents/specs/comfy-parity/traceability.md, .agents/specs/comfy-parity/validation.md, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/families/pixart_alpha_comfy_model_0110.rs, crates/comfy_model/tests/model_family_foundation.rs, crates/comfy_model/tests/families/pixart_alpha_comfy_model_0110.rs, target/comfy-parity/val-model-family-row-001/pixartalpha-comfy-model-0110.json
+  - _Writes: .agents/specs/comfy-parity/regenerate_native_planning.py, .agents/specs/comfy-parity/design.md, .agents/specs/comfy-parity/tasks.md, .agents/specs/comfy-parity/traceability.md, .agents/specs/comfy-parity/validation.md, crates/comfy_model/src/model_family.rs, crates/comfy_model/src/comfy_model.rs, crates/comfy_model/src/families/pixart_alpha_comfy_model_0110.rs, crates/comfy_model/tests/model_family_foundation.rs, crates/comfy_model/tests/families/pixart_alpha_comfy_model_0110.rs, target/comfy-parity/val-model-family-row-001/pixartalpha-comfy-model-0110.json
+  - Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 31.1, 31.2, 31.3, 31.4, 31.5, 31.6, 32.1, 32.2, 32.3, 32.4, 32.5, 32.6, 32.7, 32.8, 35.1, 35.2, 35.3, 35.4, 35.5, 35.6, 36.1, 36.2, 36.3, 36.4, 36.5, 36.6, 38.1, 38.2, 38.3, 38.4, 38.5, 38.6, 41.1, 41.2, 41.3, 41.4, 41.5, 41.6
+  - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 31.1, 31.2, 31.3, 31.4, 31.5, 31.6, 32.1, 32.2, 32.3, 32.4, 32.5, 32.6, 32.7, 32.8, 35.1, 35.2, 35.3, 35.4, 35.5, 35.6, 36.1, 36.2, 36.3, 36.4, 36.5, 36.6, 38.1, 38.2, 38.3, 38.4, 38.5, 38.6, 41.1, 41.2, 41.3, 41.4, 41.5, 41.6
+  - Design: D25, D28, D31, D39, D41
+  - Validation: VAL-MODEL-FAMILY-FOUNDATION-001, VAL-MODEL-DETECTION-001, VAL-MODEL-FAMILY-ROW-001, VAL-MODEL-FORMAT-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo fmt --all -- --check; cargo check --locked -p comfy_model -p comfy_test_support --all-targets; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test model_family_foundation data_plan_resolution_maps_component_schema_and_binds_probe_family_and_profile -- --exact; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test model_families generated_pixart_alpha_comfy_model_0110; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_worker --test memory_conformance val_memory_001; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test cancellation_ownership val_cancel_001_canonical_cancellation_ownership; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --all-targets; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_test_support; python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice; python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/comfy-parity
+  - _Validation: VAL-MODEL-FAMILY-FOUNDATION-001, VAL-MODEL-DETECTION-001, VAL-MODEL-FAMILY-ROW-001, VAL-MODEL-FORMAT-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo fmt --all -- --check; cargo check --locked -p comfy_model -p comfy_test_support --all-targets; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test model_family_foundation data_plan_resolution_maps_component_schema_and_binds_probe_family_and_profile -- --exact; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test model_families generated_pixart_alpha_comfy_model_0110; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_worker --test memory_conformance val_memory_001; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test cancellation_ownership val_cancel_001_canonical_cancellation_ownership; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --all-targets; CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_test_support; python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice; python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/comfy-parity
+  - Done when: The checked selector accepts only an immutable function pointer from a compiled row, receives only the bounded validated ModelProbe, and returns an owned ModelStateTransformPlan. Registry resolution revalidates the returned plan against the selected family's declared components and rejects malformed or undeclared output typed before any transaction. Foundation tests prove dynamic/static equivalence and invalid-output rejection. PixArtAlpha native and depth-derived Diffusers plans resolve and execute through ResolvedModelFamily::state_plan and the canonical transaction boundary, with partial, ambiguous, wrong-variant, cancellation, memory, and ownership failures remaining atomic. The exact focused and aggregate model/support, formatting, clippy, strict-generation, and spec-validation gates pass. Evidence marker: POST-PROBE-DERIVED-STATE-PLAN-SELECTOR.
+
+  - _validation_evidence: POST-PROBE-DERIVED-STATE-PLAN-SELECTOR 2026-08-06 independent implementation and validation PASS. `ModelFamilyStatePlanSelector::Probe` accepts only an immutable compiled function pointer over the already bounded `ModelProbe`, returns an owned `ModelStateTransformPlan`, and is invoked solely during canonical registry resolution. `ModelFamilyRegistry::resolve` recursively revalidates the result against the selected definition before binding it into `ResolvedModelFamily`; a foundation selector equivalent to the static plan passed, while a probe selector targeting undeclared component `vae` failed typed before any transaction. PixArtAlpha's public alternate helper was removed and native plus depth-derived Diffusers plans execute only through the resolved-plan boundary. The exact foundation test passed 1/1 and corrected PixArtAlpha filter passed 2/2. Locked all-target compile passed; the permissioned complete model matrix passed 229 library, 215 generated-family, 21 foundation, and 9 native-vision cases plus every other integration target, with the long native vision case finishing in 145.28s. The complete support matrix passed 29 library tests, deterministic native diffusion E2E in 173.55s, four checkpoints in 78.44s, native foundation/image/recovery/release/no-external-Comfy/no-Python/plugin/workflow gates, and 23/23 ownership tests in 179.74s. Focused VAL-MEMORY-001, canonical cancellation, and ownership passed; formatting and diff integrity passed; warnings-denied release/all-target/all-feature Clippy passed; strict double regeneration completed with 516 tasks, 87 validations, 155 ownership rows, and 13,295 trace rows; standalone spec validation exited 0. Canonical registry/reexport/generator/design SHA-256 values are `40845944fbda4bd1666bea9973ddc93e6277a224d1988eab38cc7af1557ef0f3`, `4ace56ff391a133adb7d718fcf22d571318ea57892378bc1e92f53d2d32dbf89`, `e3131f1dfbd873dd4ad0b4057ab506a3fb8a709f5b3346d7b4f971e5612e0587`, and `4afba2a839445d9aa6313c34f8050cba68d6108c8871c46a4de0d08bf4b0a6e6`. Validated on macOS aarch64 native Rust CPU; Apple Metal remains compiled typed fail-closed and no production Python/JavaScript or external Comfy process exists._

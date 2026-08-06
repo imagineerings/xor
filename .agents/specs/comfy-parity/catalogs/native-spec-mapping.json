@@ -3504,7 +3504,8 @@
       "comfy-parity-vae-canonical-cpu-execution-bridge",
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "31.2": [
       "comfy-parity-native-memory-planner",
@@ -3712,7 +3713,8 @@
       "comfy-parity-vae-canonical-cpu-execution-bridge",
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "31.3": [
       "comfy-parity-native-memory-planner",
@@ -3920,7 +3922,8 @@
       "comfy-parity-vae-canonical-cpu-execution-bridge",
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "31.4": [
       "comfy-parity-native-memory-planner",
@@ -4128,7 +4131,8 @@
       "comfy-parity-vae-canonical-cpu-execution-bridge",
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "31.5": [
       "comfy-parity-native-memory-planner",
@@ -4338,7 +4342,8 @@
       "comfy-parity-vae-canonical-cpu-execution-bridge",
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "31.6": [
       "comfy-parity-native-memory-planner",
@@ -4548,7 +4553,8 @@
       "comfy-parity-vae-canonical-cpu-execution-bridge",
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "32.1": [
       "comfy-parity-catalog-ledgers",
@@ -4594,7 +4600,8 @@
       "comfy-parity-qwen-image-family-adapter-consolidation",
       "comfy-parity-weight-adapter-runtime-bypass",
       "comfy-parity-patch-loading-merge-quantized-adapter",
-      "comfy-parity-sd1-tokenizer-owner-consolidation"
+      "comfy-parity-sd1-tokenizer-owner-consolidation",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "32.2": [
       "comfy-parity-catalog-ledgers",
@@ -4640,7 +4647,8 @@
       "comfy-parity-qwen-image-family-adapter-consolidation",
       "comfy-parity-weight-adapter-runtime-bypass",
       "comfy-parity-patch-loading-merge-quantized-adapter",
-      "comfy-parity-sd1-tokenizer-owner-consolidation"
+      "comfy-parity-sd1-tokenizer-owner-consolidation",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "32.3": [
       "comfy-parity-catalog-ledgers",
@@ -4684,7 +4692,8 @@
       "comfy-parity-qwen-image-family-adapter-consolidation",
       "comfy-parity-weight-adapter-runtime-bypass",
       "comfy-parity-patch-loading-merge-quantized-adapter",
-      "comfy-parity-sd1-tokenizer-owner-consolidation"
+      "comfy-parity-sd1-tokenizer-owner-consolidation",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "32.4": [
       "comfy-parity-catalog-ledgers",
@@ -4728,7 +4737,8 @@
       "comfy-parity-qwen-image-family-adapter-consolidation",
       "comfy-parity-weight-adapter-runtime-bypass",
       "comfy-parity-patch-loading-merge-quantized-adapter",
-      "comfy-parity-sd1-tokenizer-owner-consolidation"
+      "comfy-parity-sd1-tokenizer-owner-consolidation",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "32.5": [
       "comfy-parity-catalog-ledgers",
@@ -4774,7 +4784,8 @@
       "comfy-parity-qwen-image-family-adapter-consolidation",
       "comfy-parity-weight-adapter-runtime-bypass",
       "comfy-parity-patch-loading-merge-quantized-adapter",
-      "comfy-parity-sd1-tokenizer-owner-consolidation"
+      "comfy-parity-sd1-tokenizer-owner-consolidation",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "32.6": [
       "comfy-parity-catalog-ledgers",
@@ -4818,7 +4829,8 @@
       "comfy-parity-qwen-image-family-adapter-consolidation",
       "comfy-parity-weight-adapter-runtime-bypass",
       "comfy-parity-patch-loading-merge-quantized-adapter",
-      "comfy-parity-sd1-tokenizer-owner-consolidation"
+      "comfy-parity-sd1-tokenizer-owner-consolidation",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "32.7": [
       "comfy-parity-catalog-ledgers",
@@ -4864,7 +4876,8 @@
       "comfy-parity-qwen-image-family-adapter-consolidation",
       "comfy-parity-weight-adapter-runtime-bypass",
       "comfy-parity-patch-loading-merge-quantized-adapter",
-      "comfy-parity-sd1-tokenizer-owner-consolidation"
+      "comfy-parity-sd1-tokenizer-owner-consolidation",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "32.8": [
       "comfy-parity-catalog-ledgers",
@@ -4908,7 +4921,8 @@
       "comfy-parity-qwen-image-family-adapter-consolidation",
       "comfy-parity-weight-adapter-runtime-bypass",
       "comfy-parity-patch-loading-merge-quantized-adapter",
-      "comfy-parity-sd1-tokenizer-owner-consolidation"
+      "comfy-parity-sd1-tokenizer-owner-consolidation",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "33.1": [
       "comfy-parity-native-crate-foundation",
@@ -7373,7 +7387,8 @@
       "comfy-parity-native-module-backend-target-admission-consolidation",
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "35.2": [
       "comfy-parity-native-cpu-backend",
@@ -7663,7 +7678,8 @@
       "comfy-parity-native-module-backend-target-admission-consolidation",
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "35.3": [
       "comfy-parity-native-cpu-backend",
@@ -7954,7 +7970,8 @@
       "comfy-parity-native-module-backend-target-admission-consolidation",
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "35.4": [
       "comfy-parity-native-cpu-backend",
@@ -8243,7 +8260,8 @@
       "comfy-parity-native-module-backend-target-admission-consolidation",
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "35.5": [
       "comfy-parity-native-cpu-backend",
@@ -8534,7 +8552,8 @@
       "comfy-parity-native-module-backend-target-admission-consolidation",
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "35.6": [
       "comfy-parity-native-cpu-backend",
@@ -8824,7 +8843,8 @@
       "comfy-parity-native-module-backend-target-admission-consolidation",
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "36.1": [
       "comfy-parity-trust-foundation",
@@ -9133,7 +9153,8 @@
       "comfy-parity-vae-canonical-cpu-execution-bridge",
       "comfy-parity-native-module-backend-target-admission-consolidation",
       "comfy-parity-backend-catalog-provenance-reconciliation",
-      "comfy-parity-model-detection-any-of-key-selector-consolidation"
+      "comfy-parity-model-detection-any-of-key-selector-consolidation",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "36.2": [
       "comfy-parity-trust-foundation",
@@ -9441,7 +9462,8 @@
       "comfy-parity-vae-canonical-cpu-execution-bridge",
       "comfy-parity-native-module-backend-target-admission-consolidation",
       "comfy-parity-backend-catalog-provenance-reconciliation",
-      "comfy-parity-model-detection-any-of-key-selector-consolidation"
+      "comfy-parity-model-detection-any-of-key-selector-consolidation",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "36.3": [
       "comfy-parity-trust-foundation",
@@ -9748,7 +9770,8 @@
       "comfy-parity-vae-canonical-cpu-execution-bridge",
       "comfy-parity-native-module-backend-target-admission-consolidation",
       "comfy-parity-backend-catalog-provenance-reconciliation",
-      "comfy-parity-model-detection-any-of-key-selector-consolidation"
+      "comfy-parity-model-detection-any-of-key-selector-consolidation",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "36.4": [
       "comfy-parity-trust-foundation",
@@ -10056,7 +10079,8 @@
       "comfy-parity-vae-canonical-cpu-execution-bridge",
       "comfy-parity-native-module-backend-target-admission-consolidation",
       "comfy-parity-backend-catalog-provenance-reconciliation",
-      "comfy-parity-model-detection-any-of-key-selector-consolidation"
+      "comfy-parity-model-detection-any-of-key-selector-consolidation",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "36.5": [
       "comfy-parity-trust-foundation",
@@ -10363,7 +10387,8 @@
       "comfy-parity-vae-canonical-cpu-execution-bridge",
       "comfy-parity-native-module-backend-target-admission-consolidation",
       "comfy-parity-backend-catalog-provenance-reconciliation",
-      "comfy-parity-model-detection-any-of-key-selector-consolidation"
+      "comfy-parity-model-detection-any-of-key-selector-consolidation",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "36.6": [
       "comfy-parity-trust-foundation",
@@ -10671,7 +10696,8 @@
       "comfy-parity-vae-canonical-cpu-execution-bridge",
       "comfy-parity-native-module-backend-target-admission-consolidation",
       "comfy-parity-backend-catalog-provenance-reconciliation",
-      "comfy-parity-model-detection-any-of-key-selector-consolidation"
+      "comfy-parity-model-detection-any-of-key-selector-consolidation",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "37.1": [
       "comfy-parity-native-diffusion-foundation",
@@ -12506,7 +12532,8 @@
       "comfy-parity-vae-canonical-cpu-execution-bridge",
       "comfy-parity-native-module-backend-target-admission-consolidation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "38.2": [
       "comfy-parity-protocol-foundation",
@@ -12897,7 +12924,8 @@
       "comfy-parity-vae-canonical-cpu-execution-bridge",
       "comfy-parity-native-module-backend-target-admission-consolidation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "38.3": [
       "comfy-parity-protocol-foundation",
@@ -13289,7 +13317,8 @@
       "comfy-parity-vae-canonical-cpu-execution-bridge",
       "comfy-parity-native-module-backend-target-admission-consolidation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "38.4": [
       "comfy-parity-protocol-foundation",
@@ -13683,7 +13712,8 @@
       "comfy-parity-vae-canonical-cpu-execution-bridge",
       "comfy-parity-native-module-backend-target-admission-consolidation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "38.5": [
       "comfy-parity-protocol-foundation",
@@ -14075,7 +14105,8 @@
       "comfy-parity-vae-canonical-cpu-execution-bridge",
       "comfy-parity-native-module-backend-target-admission-consolidation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "38.6": [
       "comfy-parity-protocol-foundation",
@@ -14467,7 +14498,8 @@
       "comfy-parity-vae-canonical-cpu-execution-bridge",
       "comfy-parity-native-module-backend-target-admission-consolidation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "39.1": [
       "comfy-parity-trust-foundation",
@@ -15836,7 +15868,8 @@
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
       "comfy-parity-appledouble-source-scan-portability",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "41.2": [
       "comfy-parity-trust-foundation",
@@ -16213,7 +16246,8 @@
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
       "comfy-parity-appledouble-source-scan-portability",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "41.3": [
       "comfy-parity-trust-foundation",
@@ -16591,7 +16625,8 @@
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
       "comfy-parity-appledouble-source-scan-portability",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "41.4": [
       "comfy-parity-trust-foundation",
@@ -16966,7 +17001,8 @@
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
       "comfy-parity-appledouble-source-scan-portability",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "41.5": [
       "comfy-parity-trust-foundation",
@@ -17349,7 +17385,8 @@
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
       "comfy-parity-appledouble-source-scan-portability",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "41.6": [
       "comfy-parity-trust-foundation",
@@ -17724,7 +17761,8 @@
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
       "comfy-parity-appledouble-source-scan-portability",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "42.1": [
       "comfy-parity-catalog-ledgers",
@@ -19730,7 +19768,8 @@
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
       "comfy-parity-appledouble-source-scan-portability",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "7.2": [
       "comfy-parity-native-cpu-backend",
@@ -20192,7 +20231,8 @@
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
       "comfy-parity-appledouble-source-scan-portability",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "7.3": [
       "comfy-parity-native-cpu-backend",
@@ -20656,7 +20696,8 @@
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
       "comfy-parity-appledouble-source-scan-portability",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "7.4": [
       "comfy-parity-native-cpu-backend",
@@ -21119,7 +21160,8 @@
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
       "comfy-parity-appledouble-source-scan-portability",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "7.5": [
       "comfy-parity-native-cpu-backend",
@@ -21583,7 +21625,8 @@
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
       "comfy-parity-appledouble-source-scan-portability",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "7.6": [
       "comfy-parity-native-cpu-backend",
@@ -22046,7 +22089,8 @@
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
       "comfy-parity-appledouble-source-scan-portability",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "8.1": [
       "comfy-parity-protocol-foundation",
@@ -35858,7 +35902,8 @@
       "comfy-parity-vae-canonical-cpu-execution-bridge",
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "32": [
       "comfy-parity-catalog-ledgers",
@@ -35883,7 +35928,8 @@
       "comfy-parity-qwen-image-family-adapter-consolidation",
       "comfy-parity-weight-adapter-runtime-bypass",
       "comfy-parity-patch-loading-merge-quantized-adapter",
-      "comfy-parity-sd1-tokenizer-owner-consolidation"
+      "comfy-parity-sd1-tokenizer-owner-consolidation",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "33": [
       "comfy-parity-native-crate-foundation",
@@ -36027,7 +36073,8 @@
       "comfy-parity-native-module-backend-target-admission-consolidation",
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "36": [
       "comfy-parity-trust-foundation",
@@ -36098,7 +36145,8 @@
       "comfy-parity-vae-canonical-cpu-execution-bridge",
       "comfy-parity-native-module-backend-target-admission-consolidation",
       "comfy-parity-backend-catalog-provenance-reconciliation",
-      "comfy-parity-model-detection-any-of-key-selector-consolidation"
+      "comfy-parity-model-detection-any-of-key-selector-consolidation",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "37": [
       "comfy-parity-native-diffusion-foundation",
@@ -36212,7 +36260,8 @@
       "comfy-parity-vae-canonical-cpu-execution-bridge",
       "comfy-parity-native-module-backend-target-admission-consolidation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "39": [
       "comfy-parity-settings-persistence-foundation",
@@ -36333,7 +36382,8 @@
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
       "comfy-parity-appledouble-source-scan-portability",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "42": [
       "comfy-parity-catalog-ledgers",
@@ -36471,7 +36521,8 @@
       "comfy-parity-backend-catalog-provenance-reconciliation",
       "comfy-parity-model-detection-any-of-key-selector-consolidation",
       "comfy-parity-appledouble-source-scan-portability",
-      "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+      "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+      "comfy-parity-probe-derived-model-state-plan-selector"
     ],
     "8": [
       "comfy-parity-protocol-foundation",
@@ -74330,6 +74381,52 @@
       "39.5",
       "41.5"
     ],
+    "comfy-parity-probe-derived-model-state-plan-selector": [
+      "7.1",
+      "7.2",
+      "7.3",
+      "7.4",
+      "7.5",
+      "7.6",
+      "31.1",
+      "31.2",
+      "31.3",
+      "31.4",
+      "31.5",
+      "31.6",
+      "32.1",
+      "32.2",
+      "32.3",
+      "32.4",
+      "32.5",
+      "32.6",
+      "32.7",
+      "32.8",
+      "35.1",
+      "35.2",
+      "35.3",
+      "35.4",
+      "35.5",
+      "35.6",
+      "36.1",
+      "36.2",
+      "36.3",
+      "36.4",
+      "36.5",
+      "36.6",
+      "38.1",
+      "38.2",
+      "38.3",
+      "38.4",
+      "38.5",
+      "38.6",
+      "41.1",
+      "41.2",
+      "41.3",
+      "41.4",
+      "41.5",
+      "41.6"
+    ],
     "comfy-parity-process-diagnostics": [
       "3.1",
       "3.2",
@@ -78671,7 +78768,8 @@
     "comfy-parity-backend-catalog-provenance-reconciliation",
     "comfy-parity-model-detection-any-of-key-selector-consolidation",
     "comfy-parity-appledouble-source-scan-portability",
-    "comfy-parity-cpu-low-precision-bmm-model-execution-closure"
+    "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+    "comfy-parity-probe-derived-model-state-plan-selector"
   ],
   "validation_ids": [
     "VAL-CATALOG-001",

@@ -337,6 +337,29 @@ static FOUNDATION_TRANSACTION_REGISTRATION: [ModelFamilyRegistration; 1] =
         },
         component_state_schemas: &FOUNDATION_COMPONENT_SCHEMAS,
     }];
+fn foundation_probe_state_plan(
+    probe: &ModelProbe,
+) -> Result<ModelStateTransformPlan, ModelFamilyError> {
+    probe.select_layout(&FOUNDATION_LAYOUT_SIGNATURES)?;
+    FOUNDATION_STATE_PLAN.compile()
+}
+static FOUNDATION_PROBE_TRANSACTION_REGISTRATION: [ModelFamilyRegistration; 1] =
+    [ModelFamilyRegistration {
+        state_plan_selector: ModelFamilyStatePlanSelector::Probe(foundation_probe_state_plan),
+        ..FOUNDATION_TRANSACTION_REGISTRATION[0]
+    }];
+fn foundation_probe_undeclared_component_plan(
+    _: &ModelProbe,
+) -> Result<ModelStateTransformPlan, ModelFamilyError> {
+    FOUNDATION_UNDECLARED_COMPONENT_PLAN.compile()
+}
+static FOUNDATION_BAD_PROBE_TRANSACTION_REGISTRATION: [ModelFamilyRegistration; 1] =
+    [ModelFamilyRegistration {
+        state_plan_selector: ModelFamilyStatePlanSelector::Probe(
+            foundation_probe_undeclared_component_plan,
+        ),
+        ..FOUNDATION_TRANSACTION_REGISTRATION[0]
+    }];
 static FOUNDATION_BAD_OUTPUT_REGISTRATION: [ModelFamilyRegistration; 1] =
     [ModelFamilyRegistration {
         state_plan_selector: ModelFamilyStatePlanSelector::Layout {
@@ -1125,6 +1148,25 @@ fn data_plan_resolution_maps_component_schema_and_binds_probe_family_and_profile
     let probe = foundation_probe();
     let resolved = registry.resolve(&probe)?;
     assert!(resolved.state_plan().is_some());
+    let probe_registry =
+        ModelFamilyRegistry::checked_registrations(&FOUNDATION_PROBE_TRANSACTION_REGISTRATION)?;
+    let probe_resolved = probe_registry.resolve(&probe)?;
+    assert_eq!(
+        probe_resolved
+            .state_plan()
+            .ok_or("probe selector omitted its state plan")?
+            .identity(),
+        resolved
+            .state_plan()
+            .ok_or("layout selector omitted its state plan")?
+            .identity()
+    );
+    let bad_probe_registry =
+        ModelFamilyRegistry::checked_registrations(&FOUNDATION_BAD_PROBE_TRANSACTION_REGISTRATION)?;
+    assert!(matches!(
+        bad_probe_registry.resolve(&probe),
+        Err(ModelFamilyError::UndeclaredComponent(component)) if component == "vae"
+    ));
     let source = BTreeMap::from([(
         "source.weight".to_owned(),
         tensor(&backend, &[2], &[2.0, 3.0], DType::F32, &context)?,

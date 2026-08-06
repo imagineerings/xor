@@ -951,6 +951,9 @@ pub struct ModelFamilyStatePlanCase {
     pub plan: &'static ModelStateTransformPlanDefinition,
 }
 
+pub type ModelFamilyStatePlanProbeSelector =
+    fn(&ModelProbe) -> Result<ModelStateTransformPlan, ModelFamilyError>;
+
 #[derive(Clone, Copy, Debug)]
 pub enum ModelFamilyStatePlanSelector {
     LegacyDefinitionRules,
@@ -959,6 +962,7 @@ pub enum ModelFamilyStatePlanSelector {
         signatures: &'static [ModelLayoutSignature],
         cases: &'static [ModelFamilyStatePlanCase],
     },
+    Probe(ModelFamilyStatePlanProbeSelector),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1405,6 +1409,7 @@ impl RegisteredModelFamily {
                         ))
                     })
             }
+            ModelFamilyStatePlanSelector::Probe(selector) => Ok(Some(selector(probe)?)),
         }
     }
 
@@ -6264,6 +6269,10 @@ fn validate_registration(registration: RegisteredModelFamily) -> Result<(), Mode
                     )));
                 }
             }
+        }
+        ModelFamilyStatePlanSelector::Probe(_) => {
+            // Probe-derived plans are checked when their immutable row selector is
+            // invoked during resolution, before the plan can reach a transaction.
         }
     }
     let declared_components = registration

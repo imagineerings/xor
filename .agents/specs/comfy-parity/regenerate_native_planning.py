@@ -137,6 +137,49 @@ DECISIONS = [
     for number, title, text in DECISIONS
 ]
 
+_STATIC_STATE_PLAN_DECISION_TEXT = (
+    "key-derived prefixed-native, standalone-native, and Diffusers layout admission, "
+    "layout-to-state-plan selection, native/diffusers configuration normalization"
+)
+_PROBE_STATE_PLAN_DECISION_TEXT = (
+    "key-derived prefixed-native, standalone-native, and Diffusers layout admission, "
+    "layout-to-state-plan selection including bounded probe-derived owned plans, "
+    "native/diffusers configuration normalization"
+)
+_ARBITRARY_STATE_PLAN_CALLBACK_DECISION_TEXT = (
+    "Architecture rows select only immutable checked signatures and static or metadata-keyed "
+    "plan data; they cannot install arbitrary callbacks, own family matching, or repeat tensor "
+    "mechanics."
+)
+_BOUNDED_STATE_PLAN_SELECTOR_DECISION_TEXT = (
+    "Architecture rows select only immutable checked signatures, static plan data, or compiled "
+    "row-owned function pointers that receive the already bounded ModelProbe and return an owned "
+    "plan. The canonical registry invokes and revalidates every probe-derived plan against the "
+    "selected family's declared components before any transaction; selectors cannot read files, "
+    "parse artifacts, own family matching, publish state, or repeat tensor mechanics."
+)
+if sum(text.count(_STATIC_STATE_PLAN_DECISION_TEXT) for _, _, text in DECISIONS) != 1:
+    raise RuntimeError("D31 state-plan selection sentence no longer has one exact source match")
+if sum(
+    text.count(_ARBITRARY_STATE_PLAN_CALLBACK_DECISION_TEXT)
+    for _, _, text in DECISIONS
+) != 1:
+    raise RuntimeError("D31 architecture-row state-plan sentence no longer has one exact source match")
+DECISIONS = [
+    (
+        number,
+        title,
+        text.replace(
+            _STATIC_STATE_PLAN_DECISION_TEXT,
+            _PROBE_STATE_PLAN_DECISION_TEXT,
+        ).replace(
+            _ARBITRARY_STATE_PLAN_CALLBACK_DECISION_TEXT,
+            _BOUNDED_STATE_PLAN_SELECTOR_DECISION_TEXT,
+        ),
+    )
+    for number, title, text in DECISIONS
+]
+
 DECISION_APPENDICES = {
     13: """The Sim provider actuator consumes the sealed `AuthorizedProviderRequest::endpoint` directly. It may construct the HTTP request and attach an already-authorized secret, but it must not parse hosts, schemes, or ports again; `ProviderPolicy` remains the only URL-security decision owner.""",
     16: """SettingsStore's checked plugin-security projection recursively rejects private signing material in every retained unknown-field map before accepting even a disabled policy. Disabled settings cannot act as a storage loophole for secret authority material.""",
@@ -354,6 +397,11 @@ Task 66 closes the final two elementwise/runtime contracts without adding a gene
 
 Task 67 begins external-kernel compatibility only after the repository-wide definition and production-call-site audit. It owns one immutable rearrangement plan and executor shared by the fixed patch adapter and later general einops parsing, one flat-kernel morphology engine shared by every morphology facade in Tasks 67-69, one biquad recurrence traversal shared by equalizer/treble/bass coefficient adapters, one arbitrary-rate bandlimited resampler, and one mel-filter-bank composition over the existing native STFT and Hann implementations. `TensorBackend::resize` and `ImageTensor` remain the generic image-resize owners; the torchvision resize facade may only adapt shape, dtype, and source options. ROI Align retains its distinct ROI-coordinate interpolation and analytical maps, while image-to-tensor conversion accepts a bounded native byte buffer and never imports PIL or Python. Canonical `Tensor`, `TensorDescriptor`, `DType`, `CpuBackend`, `AutogradTape`, and `CancellationToken` retain storage, views, scalar encoding, allocation, gradient orchestration, and cancellation. The model-local fixed-ratio anti-alias path in `comfy_model::alias_free_activation` remains a focused architecture component and cannot become a second arbitrary-rate audio resampler. Tasks 68 and 69 depend on these owners and must delegate repeated mechanics rather than reimplement them.""",
 }
+
+DECISION_APPENDICES[31] += """
+
+Depth-dependent state conversion remains inside the same owner. A compiled row may supply an immutable `ModelFamilyStatePlanProbeSelector` function pointer that receives only the already bounded and validated `ModelProbe` and returns an owned `ModelStateTransformPlan`. `ModelFamilyRegistry::resolve` invokes it after family and source-contract admission, recursively revalidates every returned selector, rewrite, dimension, target, and component against the chosen definition, and binds the result into `ResolvedModelFamily` before any transaction. The selector cannot read or parse an artifact, consult caller layout metadata, allocate tensor storage, execute a transform, commit mapped state, or bypass `ModelStateTransaction`. PixArt's consecutive-depth Diffusers QKV assembly is the initial consumer; native and Diffusers layouts use the same resolved-plan boundary.
+"""
 
 DECISION_APPENDICES[27] += """
 
@@ -9061,6 +9109,74 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
                 dict.fromkeys(item["dependencies"] + [cpu_low_precision_bmm_task])
             )
 
+    probe_state_plan_task = "comfy-parity-probe-derived-model-state-plan-selector"
+    tasks.append(
+        task(
+            probe_state_plan_task,
+            "Add canonical probe-derived model state-plan selection",
+            [7, 31, 32, 35, 36, 38, 41],
+            [25, 28, 31, 39, 41],
+            [
+                "VAL-MODEL-FAMILY-FOUNDATION-001",
+                "VAL-MODEL-DETECTION-001",
+                "VAL-MODEL-FAMILY-ROW-001",
+                "VAL-MODEL-FORMAT-001",
+                "VAL-CANCEL-001",
+                "VAL-MEMORY-001",
+                "VAL-OWNERSHIP-001",
+            ],
+            "Close the registry reachability gap discovered while integrating PixArtAlpha: extend the sole comfy_model::model_family state-plan selector with an immutable row-owned probe selector for plans whose bounded operation sequence depends on already validated tensor facts such as consecutive transformer depth. The canonical registry must invoke the selector during resolution, revalidate every returned operation and declared component before publication, bind the resulting owned plan into ResolvedModelFamily, and remain the only state-transaction entry point; leaves may not execute an alternate mapping path.",
+            [
+                ".agents/specs/comfy-parity/requirements.md",
+                ".agents/specs/comfy-parity/design.md",
+                ".agents/specs/comfy-parity/tasks.md",
+                "crates/comfy_model/src/model_family.rs",
+                "crates/comfy_model/src/comfy_model.rs",
+                "crates/comfy_model/src/pixart_family.rs",
+                "crates/comfy_model/src/families/pixart_alpha_comfy_model_0110.rs",
+                "crates/comfy_model/tests/model_family_foundation.rs",
+                "crates/comfy_model/tests/families/pixart_alpha_comfy_model_0110.rs",
+            ],
+            [
+                ".agents/specs/comfy-parity/regenerate_native_planning.py",
+                ".agents/specs/comfy-parity/design.md",
+                ".agents/specs/comfy-parity/tasks.md",
+                ".agents/specs/comfy-parity/traceability.md",
+                ".agents/specs/comfy-parity/validation.md",
+                "crates/comfy_model/src/model_family.rs",
+                "crates/comfy_model/src/comfy_model.rs",
+                "crates/comfy_model/src/families/pixart_alpha_comfy_model_0110.rs",
+                "crates/comfy_model/tests/model_family_foundation.rs",
+                "crates/comfy_model/tests/families/pixart_alpha_comfy_model_0110.rs",
+                "target/comfy-parity/val-model-family-row-001/pixartalpha-comfy-model-0110.json",
+            ],
+            "The checked selector accepts only an immutable function pointer from a compiled row, receives only the bounded validated ModelProbe, and returns an owned ModelStateTransformPlan. Registry resolution revalidates the returned plan against the selected family's declared components and rejects malformed or undeclared output typed before any transaction. Foundation tests prove dynamic/static equivalence and invalid-output rejection. PixArtAlpha native and depth-derived Diffusers plans resolve and execute through ResolvedModelFamily::state_plan and the canonical transaction boundary, with partial, ambiguous, wrong-variant, cancellation, memory, and ownership failures remaining atomic. The exact focused and aggregate model/support, formatting, clippy, strict-generation, and spec-validation gates pass. Evidence marker: POST-PROBE-DERIVED-STATE-PLAN-SELECTOR.",
+            [
+                "comfy-parity-model-layout-state-plan-owner-consolidation",
+                "comfy-parity-pixart-family-adapter-consolidation",
+                "comfy-parity-workspace-final-ownership-audit",
+                cpu_low_precision_bmm_task,
+                "comfy-parity-native-model-family-ltxav-comfy-model-0102",
+                "comfy-parity-native-model-family-ltxv-comfy-model-0103",
+                "comfy-parity-native-model-family-lotusd-comfy-model-0106",
+            ],
+            registered_source_edits=["comfy_model"],
+        )
+    )
+
+    for item in tasks:
+        if item["id"] in {
+            "comfy-parity-native-model-family-pixartalpha-comfy-model-0110",
+            "comfy-parity-native-model-family-pixartsigma-comfy-model-0111",
+            "comfy-parity-native-model-family-qwenimage-comfy-model-0113",
+            "comfy-parity-model-family-breadth-closure",
+            "comfy-parity-native-compute-breadth-integration",
+            "comfy-parity-final-validation",
+        }:
+            item["dependencies"] = list(
+                dict.fromkeys(item["dependencies"] + [probe_state_plan_task])
+            )
+
     appledouble_portability_task = "comfy-parity-appledouble-source-scan-portability"
     for item in tasks:
         if item["id"] == "comfy-parity-clip-text-encoder-decoder-foundation":
@@ -9953,6 +10069,21 @@ def task_validation_commands(item: dict[str, object]) -> str:
             "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
             "python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/comfy-parity",
         ]
+    elif identifier == "comfy-parity-probe-derived-model-state-plan-selector":
+        commands = [
+            "cargo fmt --all -- --check",
+            "cargo check --locked -p comfy_model -p comfy_test_support --all-targets",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test model_family_foundation data_plan_resolution_maps_component_schema_and_binds_probe_family_and_profile -- --exact",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test model_families generated_pixart_alpha_comfy_model_0110",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_worker --test memory_conformance val_memory_001",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test cancellation_ownership val_cancel_001_canonical_cancellation_ownership",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --all-targets",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --all-targets",
+            "./script/clippy -p comfy_model -p comfy_test_support",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/comfy-parity",
+        ]
     elif identifier == "comfy-parity-model-detection-any-of-key-selector-consolidation":
         commands = [
             "cargo fmt --all -- --check",
@@ -10009,10 +10140,14 @@ def task_validation_commands(item: dict[str, object]) -> str:
             raise ValueError(
                 f"model-family task {identifier} must own one family source module"
             )
+        generated_family_module = {
+            "pixartalpha_comfy_model_0110": "pixart_alpha_comfy_model_0110",
+            "pixartsigma_comfy_model_0111": "pixart_sigma_comfy_model_0111",
+        }.get(family_sources[0], family_sources[0])
         commands = [
             "cargo fmt --all -- --check",
             "cargo check --locked -p comfy_model -p comfy_test_support",
-            f"CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test model_families generated_{family_sources[0]}",
+            f"CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test model_families generated_{generated_family_module}",
             "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_worker --test memory_conformance val_memory_001",
             "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001",
             "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --all-targets",
