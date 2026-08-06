@@ -14,6 +14,7 @@ pub mod descriptor;
 pub mod flux_chroma_family;
 pub mod formats;
 pub mod hidream_o1_family;
+pub mod hunyuan3d_family;
 pub mod latent_format;
 pub mod model_family;
 pub mod model_store;
@@ -148,6 +149,18 @@ pub use hidream_o1_family::{
     HIDREAM_O1_VISION_PATCH_SIZE, HIDREAM_O1_VISION_START_TOKEN_ID, HIDREAM_O1_WEIGHT_RULES,
     HiDreamO1Configuration, HiDreamO1Layout,
     configuration_for_probe as hidream_o1_configuration_for_probe,
+};
+pub use hunyuan3d_family::{
+    HUNYUAN3D_COMMON_MAPPING, HUNYUAN3D_COMPONENTS, HUNYUAN3D_MEMORY_USAGE_FACTOR,
+    HUNYUAN3D_MINI_DEPTH, HUNYUAN3D_MINI_LATENT_FORMAT, HUNYUAN3D_MLP_RATIO,
+    HUNYUAN3D_NUMBER_OF_HEADS, HUNYUAN3D_PREFIXED_STATE_PLAN, HUNYUAN3D_SAVED_MODEL_STATE_PLAN,
+    HUNYUAN3D_SCALE_SUFFIX, HUNYUAN3D_STANDALONE_STATE_PLAN, HUNYUAN3D_STANDARD_STATE_PLAN_CASES,
+    HUNYUAN3D_SUPPORTED_DEVICES, HUNYUAN3D_SUPPORTED_DTYPES, HUNYUAN3D_V2_LATENT_FORMAT,
+    HUNYUAN3D_V21_CONTEXT_DIMENSION, HUNYUAN3D_V21_LATENT_FORMAT, HUNYUAN3D_WEIGHT_SUFFIX,
+    Hunyuan3DCommonMapping, Hunyuan3DConfiguration, Hunyuan3DLayout, Hunyuan3DVariant,
+    common_mapping as hunyuan3d_common_mapping,
+    configuration_for_probe as hunyuan3d_configuration_for_probe,
+    state_plan_for_layout as hunyuan3d_state_plan_for_layout,
 };
 pub use latent_format::{
     LATENT_FORMAT_SCHEMA_VERSION, LatentExtent, LatentFormatDefinition, LatentFormatDescriptor,
