@@ -21,6 +21,7 @@ pub mod hunyuandit_family;
 pub mod kandinsky5_family;
 pub mod latent_format;
 pub mod ltx_family;
+pub mod lumina_zimage_family;
 pub mod model_family;
 pub mod model_store;
 pub mod native_ops;
@@ -261,6 +262,26 @@ pub use ltx_family::{
     LtxVariant, common_mapping as ltx_common_mapping,
     configuration_for_probe as ltx_configuration_for_probe, ltxv_memory_usage_factor,
     state_plan_for_layout as ltx_state_plan_for_layout,
+};
+pub use lumina_zimage_family::{
+    LUMINA_AXES_DIMENSIONS, LUMINA_AXES_LENGTHS, LUMINA_CLIP_CANDIDATES, LUMINA_CLIP_CONFIGURATION,
+    LUMINA_CLIP_TARGET, LUMINA_DIMENSION, LUMINA_HEAD_COUNT, LUMINA_INPUT_CHANNELS,
+    LUMINA_KV_HEAD_COUNT, LUMINA_MEMORY_USAGE_FACTOR, LUMINA_PATCH_SIZE, LUMINA_ROPE_THETA,
+    LUMINA_SAMPLING_SHIFT, LUMINA_ZIMAGE_COMMON_MAPPING, LUMINA_ZIMAGE_COMPONENT_STATE_SCHEMAS,
+    LUMINA_ZIMAGE_COMPONENTS, LUMINA_ZIMAGE_CONDITIONING, LUMINA_ZIMAGE_FORWARD_PROGRAM,
+    LUMINA_ZIMAGE_LATENT_FORMAT, LUMINA_ZIMAGE_MODEL_OPTIONAL_KEYS,
+    LUMINA_ZIMAGE_MODEL_REQUIRED_KEYS, LUMINA_ZIMAGE_PREFIXED_STATE_PLAN,
+    LUMINA_ZIMAGE_SAVED_MODEL_STATE_PLAN, LUMINA_ZIMAGE_STANDALONE_STATE_PLAN,
+    LUMINA_ZIMAGE_SUPPORTED_DEVICES, LUMINA_ZIMAGE_SUPPORTED_DTYPES, LuminaZImageCommonMapping,
+    LuminaZImageConditioningFact, LuminaZImageConfiguration, LuminaZImageLayout,
+    LuminaZImageVariant, ZIMAGE_AXES_DIMENSIONS, ZIMAGE_AXES_LENGTHS, ZIMAGE_CLIP_CANDIDATES,
+    ZIMAGE_CLIP_CONFIGURATION, ZIMAGE_CLIP_TARGET, ZIMAGE_DIFFUSERS_STATE_PLAN, ZIMAGE_DIMENSION,
+    ZIMAGE_HEAD_COUNT, ZIMAGE_KV_HEAD_COUNT, ZIMAGE_MEMORY_USAGE_FACTOR,
+    ZIMAGE_PAD_TOKENS_MULTIPLE, ZIMAGE_PIXEL_LATENT_FORMAT, ZIMAGE_PIXEL_MEMORY_USAGE_FACTOR,
+    ZIMAGE_ROPE_THETA, ZIMAGE_SAMPLING_SHIFT, ZIMAGE_TIME_SCALE, ZImagePixelDecoderConfiguration,
+    common_mapping as lumina_zimage_common_mapping,
+    configuration_for_probe as lumina_zimage_configuration_for_probe,
+    state_plan_for_layout as lumina_zimage_state_plan_for_layout,
 };
 pub use model_family::{
     MODEL_CLIP_TARGET_SCHEMA_VERSION, MODEL_FAMILY_SCHEMA_VERSION,
