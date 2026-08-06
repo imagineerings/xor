@@ -10,10 +10,7 @@
       "model.diffusion_model.single_blocks.0.linear2.weight": [2, 2],
       "model.diffusion_model.final_layer.linear.weight": [2, 2]
     },
-    "metadata": {
-      "image_model": "chroma",
-      "model_layout": "native"
-    }
+    "metadata": {}
   },
   "base_artifact_digest": "0660660660660660660660660660660660660660660660660660660660660660",
   "source_weights": [

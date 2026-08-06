@@ -15,10 +15,7 @@
       "model.diffusion_model.nerf_final_layer.norm.scale": [2],
       "model.diffusion_model.txt_in.weight": [128, 4]
     },
-    "metadata": {
-      "image_model": "chroma_radiance",
-      "model_layout": "native"
-    }
+    "metadata": {}
   },
   "base_artifact_digest": "0067006700670067006700670067006700670067006700670067006700670067",
   "source_weights": [

@@ -5,8 +5,8 @@ use crate::{
     ModelDetectionRule, ModelFamilyComponent, ModelFamilyComponentStateSchema,
     ModelFamilyDefinition, ModelFamilyError, ModelFamilyProfile, ModelFamilyRegistration,
     ModelFamilyStatePlanCase, ModelFamilyStatePlanSelector, ModelForwardOperation,
-    ModelForwardStep, ModelProbe, ModelSourceConfigurationRule, ModelStateLayout,
-    ModelStateTransformPlanDefinition, ModelWeightRule,
+    ModelForwardStep, ModelProbe, ModelStateLayout, ModelStateTransformPlanDefinition,
+    ModelWeightRule,
     flux_chroma_family::{
         FLUX_LAYOUT_SIGNATURES, FluxChromaConfiguration, FluxChromaFinalHead, FluxChromaLayout,
         FluxChromaVariant, configuration_for_probe as flux_chroma_configuration_for_probe,
@@ -69,11 +69,42 @@ const COMPONENTS: &[ModelFamilyComponent] = &[
     },
 ];
 
-const DETECTION_RULES: &[ModelDetectionRule] = &[ModelDetectionRule::Metadata {
-    key: "image_model",
-    value: "chroma_radiance",
-    score: 1_000,
-}];
+const DETECTION_RULES: &[ModelDetectionRule] = &[
+    ModelDetectionRule::AnyKeyPresent {
+        keys: &[
+            "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.weight",
+            "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale",
+            "double_blocks.0.img_attn.norm.key_norm.weight",
+            "double_blocks.0.img_attn.norm.key_norm.scale",
+        ],
+        score: 250,
+    },
+    ModelDetectionRule::AnyKeyPresent {
+        keys: &[
+            "model.diffusion_model.img_in_patch.weight",
+            "img_in_patch.weight",
+        ],
+        score: 250,
+    },
+    ModelDetectionRule::AnyKeyPresent {
+        keys: &[
+            "model.diffusion_model.nerf_blocks.0.norm.weight",
+            "model.diffusion_model.nerf_blocks.0.norm.scale",
+            "nerf_blocks.0.norm.weight",
+            "nerf_blocks.0.norm.scale",
+        ],
+        score: 250,
+    },
+    ModelDetectionRule::AnyKeyPresent {
+        keys: &[
+            "model.diffusion_model.nerf_final_layer.linear.weight",
+            "model.diffusion_model.nerf_final_layer_conv.conv.weight",
+            "nerf_final_layer.linear.weight",
+            "nerf_final_layer_conv.conv.weight",
+        ],
+        score: 250,
+    },
+];
 
 const WEIGHT_RULES: &[ModelWeightRule] = &[ModelWeightRule {
     source_prefix: "model.diffusion_model.",
@@ -181,12 +212,6 @@ pub const MODEL_FAMILY: ModelFamilyDefinition = ModelFamilyDefinition {
     forward_program: LINEAR_FORWARD_PROGRAM,
 };
 
-const SOURCE_CONFIGURATION: &[ModelSourceConfigurationRule] =
-    &[ModelSourceConfigurationRule::Metadata {
-        key: "image_model",
-        value: "chroma_radiance",
-    }];
-
 const NATIVE_STATE_PLAN: ModelStateTransformPlanDefinition = ModelStateTransformPlanDefinition {
     schema_version: MODEL_STATE_TRANSFORM_PLAN_SCHEMA_VERSION,
     encoded_plan: r#"{
@@ -275,7 +300,7 @@ pub const MODEL_FAMILY_REGISTRATION: ModelFamilyRegistration = ModelFamilyRegist
     definition: &MODEL_FAMILY,
     source_ordinal: 72,
     source_architecture: SOURCE_ARCHITECTURE,
-    source_configuration: SOURCE_CONFIGURATION,
+    source_configuration: &[],
     required_state_keys: &[],
     profile_selector: Some(select_profile),
     clip_target_selector: ModelClipTargetSelector::Static(&CLIP_TARGET),

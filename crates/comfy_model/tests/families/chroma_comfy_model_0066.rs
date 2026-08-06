@@ -172,6 +172,8 @@ fn val_model_family_row_001_chroma_model_store_mapping_forward_patch_and_memory(
         ModelFamilyRegistry::checked_registrations(&[chroma::MODEL_FAMILY_REGISTRATION])?;
     let probe = probe_through_model_store("native")?;
     assert_eq!(probe.format_identities(), ["safetensors"]);
+    assert!(!probe.metadata.contains_key("image_model"));
+    assert!(!probe.metadata.contains_key("model_layout"));
     assert_eq!(
         probe.unet_prefix_selection()?.prefix(),
         "model.diffusion_model."
@@ -183,6 +185,14 @@ fn val_model_family_row_001_chroma_model_store_mapping_forward_patch_and_memory(
     );
     assert_eq!(resolved.source_ordinal(), 71);
     assert_eq!(resolved.profile().latent_identifier, "Flux");
+    assert_eq!(resolved.detection().evidence.len(), 3);
+    assert!(
+        resolved
+            .detection()
+            .evidence
+            .iter()
+            .all(|evidence| evidence.contains("AnyKeyPresent"))
+    );
 
     let candidates = resolved.clip_target().candidates();
     assert_eq!(candidates.len(), 1);
@@ -379,16 +389,9 @@ fn val_model_family_row_001_chroma_unprefixed_dtype_and_typed_failures()
 
     let partial_probe =
         ModelProbe::from_parsed_facts(parsed_facts("native", DType::F32, true, false, false))?;
-    let partial_resolved = registry.resolve(&partial_probe)?;
-    let partial_source = source_tensors(&backend, &context, "native", DType::F32, true)?;
     assert!(matches!(
-        partial_resolved.map_state_dictionary(
-            &ModelStateTransaction::new(&backend, &context),
-            ARTIFACT_DIGEST,
-            &partial_source,
-        ),
-        Err(ModelFamilyError::MissingComponentKey { component, key })
-            if component == "model" && key == "native.final_layer.linear.weight"
+        registry.detect(&partial_probe),
+        Err(ModelFamilyError::NoDetectionMatch)
     ));
 
     let malformed =
@@ -501,7 +504,7 @@ fn parsed_facts(
         tensors,
         formats: vec![ModelParsedFormatFact {
             identity: "safetensors".to_owned(),
-            metadata: BTreeMap::from([("image_model".to_owned(), "chroma".to_owned())]),
+            metadata: BTreeMap::new(),
         }],
     }
 }
@@ -598,10 +601,6 @@ fn write_safetensors(path: &Path, layout: &str) -> Result<(), Box<dyn std::error
         ""
     };
     let mut header = serde_json::Map::new();
-    header.insert(
-        "__metadata__".to_owned(),
-        serde_json::json!({"image_model": "chroma"}),
-    );
     let mut shapes = model_shapes(false, false, false);
     shapes.extend([
         ("first_stage_model.decoder.weight".to_owned(), vec![1]),

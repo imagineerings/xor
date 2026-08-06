@@ -173,6 +173,8 @@ fn val_model_family_row_001_chromaradiance_native_store_mapping_forward_patch_an
     let registry = registry()?;
     let probe = probe_through_model_store()?;
     assert_eq!(probe.format_identities(), ["safetensors"]);
+    assert!(!probe.metadata.contains_key("image_model"));
+    assert!(!probe.metadata.contains_key("model_layout"));
     assert_eq!(
         probe.unet_prefix_selection()?.prefix(),
         "model.diffusion_model."
@@ -181,9 +183,14 @@ fn val_model_family_row_001_chromaradiance_native_store_mapping_forward_patch_an
     assert_eq!(resolved.detection().identity.feature_id(), "COMFY-MODEL-0067");
     assert_eq!(resolved.source_ordinal(), 72);
     assert_eq!(resolved.profile().latent_identifier, "ChromaRadiance");
-    assert!(resolved.detection().evidence.iter().any(|evidence| {
-        evidence.contains("image_model") && evidence.contains("chroma_radiance")
-    }));
+    assert_eq!(resolved.detection().evidence.len(), 4);
+    assert!(
+        resolved
+            .detection()
+            .evidence
+            .iter()
+            .all(|evidence| evidence.contains("AnyKeyPresent"))
+    );
     let configuration = radiance::configuration_for_probe(&probe)?;
     assert_eq!(configuration.layout, radiance::ChromaRadianceLayout::Native);
     assert_eq!(configuration.patch_size, 1);
@@ -452,6 +459,20 @@ fn val_model_family_row_001_chromaradiance_unprefixed_conv_dtype_and_typed_failu
         Err(ModelFamilyError::InvalidSelectorOutput(message)) if message.contains("NeRF depth")
     ));
 
+    let mut missing_head = parsed_facts(
+        radiance::ChromaRadianceLayout::Native,
+        radiance::ChromaRadianceFinalHead::Linear,
+        DType::F32,
+    );
+    missing_head
+        .tensors
+        .remove("model.diffusion_model.nerf_final_layer.linear.weight");
+    let missing_head = ModelProbe::from_parsed_facts(missing_head)?;
+    assert!(matches!(
+        registry.detect(&missing_head),
+        Err(ModelFamilyError::NoDetectionMatch)
+    ));
+
     let mut duplicate_facts = parsed_facts(
         radiance::ChromaRadianceLayout::Native,
         radiance::ChromaRadianceFinalHead::Linear,
@@ -578,10 +599,7 @@ fn parsed_facts(
         tensors,
         formats: vec![ModelParsedFormatFact {
             identity: "safetensors".to_owned(),
-            metadata: BTreeMap::from([(
-                "image_model".to_owned(),
-                "chroma_radiance".to_owned(),
-            )]),
+            metadata: BTreeMap::new(),
         }],
     }
 }
@@ -729,10 +747,6 @@ fn write_safetensors(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
         radiance::ChromaRadianceFinalHead::Linear,
     );
     let mut header = serde_json::Map::new();
-    header.insert(
-        "__metadata__".to_owned(),
-        serde_json::json!({"image_model": "chroma_radiance"}),
-    );
     let mut data = Vec::new();
     for (key, shape) in shapes {
         let start = data.len();
