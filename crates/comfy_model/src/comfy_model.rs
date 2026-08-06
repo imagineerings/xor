@@ -4,6 +4,7 @@ pub mod attention;
 pub mod clip;
 pub mod clip_text;
 pub mod clip_text_encoder_decoder;
+pub mod clip_text_encoder_multimodal;
 pub mod clip_text_encoder_t5;
 pub mod clip_tokenizer;
 pub mod clip_vision;
@@ -74,6 +75,21 @@ pub use clip_text_encoder_decoder::{
     qwen35_causal_conv1d_update_exact, qwen35_chunk_gated_delta_rule,
     qwen35_chunk_gated_delta_rule_exact, qwen35_vision_patch_embed, qwen35_vision_patch_merge,
     tokenize_decoder_prompt,
+};
+pub use clip_text_encoder_multimodal::{
+    IDEOGRAM4_SOURCE_PATH, IDEOGRAM4_SOURCE_SHA256, IDEOGRAM4_TAP_LAYERS, JINA_CLIP2_SOURCE_PATH,
+    JINA_CLIP2_SOURCE_SHA256, MULTIMODAL_PROFILE_FACTS, MULTIMODAL_TEXT_ENCODER_CATALOG_SYMBOLS,
+    MultimodalDeepstackJoin, MultimodalFamily, MultimodalImageEmbedding, MultimodalPositionIds,
+    MultimodalProfileFact, MultimodalSpan, MultimodalSymbolBehavior, MultimodalTextError,
+    MultimodalTextOwner, OVIS_SOURCE_PATH, OVIS_SOURCE_SHA256, QWEN_VL_SOURCE_PATH,
+    QWEN_VL_SOURCE_SHA256, QWEN2VL_FULL_ATTENTION_LAYERS, QWEN3VL_4B_DEEPSTACK_LAYERS,
+    QWEN3VL_8B_DEEPSTACK_LAYERS, QWEN3VL_SOURCE_PATH, QWEN3VL_SOURCE_SHA256, SAM3_CLIP_SOURCE_PATH,
+    SAM3_CLIP_SOURCE_SHA256, Sam3ConditionPack, Sam3EncodedCondition, Sam3Prompt,
+    format_ideogram4_prompt, format_ovis_prompt, format_qwen3vl_prompt, ideogram4_project_taps,
+    join_multimodal_embeddings, join_qwen3vl_deepstack, multimodal_profile,
+    multimodal_symbol_behavior, ovis_template_end, pack_sam3_conditions, parse_sam3_prompts,
+    qwen2vl_mrope_position_ids, run_bidirectional_text_owner, run_clip_text_owner,
+    run_clip_vision_owner, run_decoder_text_owner, trim_ovis_conditioning,
 };
 pub use clip_text_encoder_t5::{
     BERT_SOURCE_PATH, BERT_SOURCE_SHA256, BidirectionalFeedForwardActivation,
