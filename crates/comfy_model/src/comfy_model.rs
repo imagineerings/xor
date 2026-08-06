@@ -16,6 +16,7 @@ pub mod flux_chroma_family;
 pub mod formats;
 pub mod hidream_o1_family;
 pub mod hunyuan3d_family;
+pub mod hunyuan_video_family;
 pub mod hunyuandit_family;
 pub mod latent_format;
 pub mod model_family;
@@ -167,6 +168,24 @@ pub use hidream_o1_family::{
     HiDreamO1Configuration, HiDreamO1Layout,
     configuration_for_probe as hidream_o1_configuration_for_probe,
 };
+pub use hunyuan_video_family::{
+    HUNYUAN_IMAGE_CLIP_CANDIDATES, HUNYUAN_IMAGE_CLIP_CONFIGURATION, HUNYUAN_IMAGE_CLIP_TARGET,
+    HUNYUAN_IMAGE21_LATENT_FORMAT, HUNYUAN_IMAGE21_REFINER_LATENT_FORMAT,
+    HUNYUAN_REFINER_IMAGE_SCALE, HUNYUAN_REFINER_SEED_OFFSET, HUNYUAN_VIDEO_BYT5_INPUT_DIMENSION,
+    HUNYUAN_VIDEO_BYT5_INTERMEDIATE_DIMENSION, HUNYUAN_VIDEO_CLIP_CANDIDATES,
+    HUNYUAN_VIDEO_CLIP_CONFIGURATION, HUNYUAN_VIDEO_CLIP_TARGET,
+    HUNYUAN_VIDEO_COMPONENT_STATE_SCHEMAS, HUNYUAN_VIDEO_COMPONENTS, HUNYUAN_VIDEO_FORWARD_PROGRAM,
+    HUNYUAN_VIDEO_HEAD_DIMENSION, HUNYUAN_VIDEO_LATENT_FORMAT, HUNYUAN_VIDEO_MLP_RATIO,
+    HUNYUAN_VIDEO_MODEL_REQUIRED_KEYS, HUNYUAN_VIDEO_PREFIXED_STATE_PLAN,
+    HUNYUAN_VIDEO_SAVE_PREFIX, HUNYUAN_VIDEO_SAVED_MODEL_STATE_PLAN,
+    HUNYUAN_VIDEO_STANDALONE_STATE_PLAN, HUNYUAN_VIDEO_SUPPORTED_DEVICES,
+    HUNYUAN_VIDEO_SUPPORTED_DTYPES, HUNYUAN_VIDEO_THETA, HUNYUAN_VIDEO_VECTOR_INPUT_DIMENSION,
+    HUNYUAN_VIDEO15_CLIP_CANDIDATES, HUNYUAN_VIDEO15_CLIP_TARGET, HUNYUAN_VIDEO15_LATENT_FORMAT,
+    HUNYUAN_VIDEO15_SUPPORTED_DTYPES, HUNYUAN_VIDEO15_VISION_INPUT_DIMENSION,
+    HunyuanVideoConfiguration, HunyuanVideoLayout, HunyuanVideoVariant,
+    augment_refiner_conditioning, configuration_for_probe as hunyuan_video_configuration_for_probe,
+    state_plan_for_layout as hunyuan_video_state_plan_for_layout,
+};
 pub use hunyuan3d_family::{
     HUNYUAN3D_COMMON_MAPPING, HUNYUAN3D_COMPONENTS, HUNYUAN3D_MEMORY_USAGE_FACTOR,
     HUNYUAN3D_MINI_DEPTH, HUNYUAN3D_MINI_LATENT_FORMAT, HUNYUAN3D_MLP_RATIO,
@@ -218,10 +237,10 @@ pub use model_family::{
     ModelFamilyStatePlanCase, ModelFamilyStatePlanSelector, ModelFamilyWeightBinding,
     ModelForwardCheckpoint, ModelForwardOperation, ModelForwardStep, ModelKeyPredicate,
     ModelKeyRewrite, ModelKeySelector, ModelLayoutSignature, ModelMemoryEstimate,
-    ModelNativeTargetIdentifier, ModelNormalizedConfiguration, ModelParsedFacts,
-    ModelParsedFormatFact, ModelParsedTensorFact, ModelPerTensorTransform, ModelProbe,
-    ModelRoundCondition, ModelSourceConfigurationRule, ModelSplitOutputRule, ModelStateLayout,
-    ModelStateTarget, ModelStateTensorReference, ModelStateTransaction,
+    ModelNativeTargetIdentifier, ModelNormalizedConfiguration, ModelOptionalKeyReplacement,
+    ModelParsedFacts, ModelParsedFormatFact, ModelParsedTensorFact, ModelPerTensorTransform,
+    ModelProbe, ModelRoundCondition, ModelSourceConfigurationRule, ModelSplitOutputRule,
+    ModelStateLayout, ModelStateTarget, ModelStateTensorReference, ModelStateTransaction,
     ModelStateTransformOperation, ModelStateTransformPlan, ModelStateTransformPlanDefinition,
     ModelStorageDType, ModelTensorFactPredicate, ModelTensorFactRelation, ModelTensorFactSubject,
     ModelTokenizerDescriptor, ModelTransformBranchOutputRule, ModelUnetPrefixSelection,

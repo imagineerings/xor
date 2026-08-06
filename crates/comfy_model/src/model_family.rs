@@ -24,10 +24,12 @@ use comfy_tensor::{
     generated_elementwise_or_runtime_operation_17::{
         ElementwiseRuntimePartSeventeenError, TensorSplitSpec, tensor_split_exact_native,
     },
+    generated_external_tensor_kernel_01::ExternalTensorKernelPartOneError,
     generated_indexing_masking_01::{IndexingMaskingPartOneError, narrow_method_exact_native},
     generated_neural_network_module_02::{
         NeuralNetworkModulePartTwoError, multihead_attention_projected_with_context_exact_native,
     },
+    generated_random_number_generation_01::RandomNumberGenerationPartOneError,
     generated_reduction_01::{ReductionPartOneError, torch_std_with_context_exact_native},
     generated_shape_layout_transform_01::{
         ShapeLayoutTransformPartOneError, tensor_expand_exact_native,
@@ -2006,6 +2008,46 @@ impl ModelKeySelector {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum ModelOptionalKeyReplacement {
+    Prefix { from: String, to: String },
+    Suffix { from: String, to: String },
+    Contains { from: String, to: String },
+}
+
+impl ModelOptionalKeyReplacement {
+    fn apply(&self, source: &str) -> String {
+        match self {
+            Self::Prefix { from, to } => source
+                .strip_prefix(from)
+                .map_or_else(|| source.to_owned(), |suffix| format!("{to}{suffix}")),
+            Self::Suffix { from, to } => source
+                .strip_suffix(from)
+                .map_or_else(|| source.to_owned(), |prefix| format!("{prefix}{to}")),
+            Self::Contains { from, to } => {
+                if source.contains(from) {
+                    source.replacen(from, to, 1)
+                } else {
+                    source.to_owned()
+                }
+            }
+        }
+    }
+
+    fn validate(&self) -> Result<(), ModelFamilyError> {
+        let (from, to) = match self {
+            Self::Prefix { from, to } | Self::Suffix { from, to } | Self::Contains { from, to } => {
+                (from, to)
+            }
+        };
+        validate_state_key_fragment(from)?;
+        if to.len() > MAX_IDENTITY_BYTES || to.contains('\0') {
+            return Err(ModelFamilyError::InvalidStateKey(to.clone()));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum ModelKeyRewrite {
     Identity,
     Exact(String),
@@ -2013,6 +2055,7 @@ pub enum ModelKeyRewrite {
     Suffix { from: String, to: String },
     Contains { from: String, to: String },
     Pipeline(Vec<Self>),
+    OrderedOptional(Vec<ModelOptionalKeyReplacement>),
 }
 
 impl ModelKeyRewrite {
@@ -2048,6 +2091,14 @@ impl ModelKeyRewrite {
 
     pub fn pipeline(rewrites: Vec<Self>) -> Result<Self, ModelFamilyError> {
         let rewrite = Self::Pipeline(rewrites);
+        rewrite.validate(0)?;
+        Ok(rewrite)
+    }
+
+    pub fn ordered_optional(
+        replacements: Vec<ModelOptionalKeyReplacement>,
+    ) -> Result<Self, ModelFamilyError> {
+        let rewrite = Self::OrderedOptional(replacements);
         rewrite.validate(0)?;
         Ok(rewrite)
     }
@@ -2102,6 +2153,13 @@ impl ModelKeyRewrite {
                 }
                 value
             }
+            Self::OrderedOptional(replacements) => {
+                let mut value = source.to_owned();
+                for replacement in replacements {
+                    value = replacement.apply(&value);
+                }
+                value
+            }
         };
         validate_state_key(&target)?;
         Ok(target)
@@ -2131,6 +2189,17 @@ impl ModelKeyRewrite {
                 }
                 for rewrite in rewrites {
                     rewrite.validate(depth + 1)?;
+                }
+                Ok(())
+            }
+            Self::OrderedOptional(replacements) => {
+                if replacements.is_empty() || replacements.len() > 64 {
+                    return Err(ModelFamilyError::InvalidStateTransform(
+                        "ordered optional replacement must contain 1..=64 steps".to_owned(),
+                    ));
+                }
+                for replacement in replacements {
+                    replacement.validate()?;
                 }
                 Ok(())
             }
@@ -7065,6 +7134,10 @@ pub enum ModelFamilyError {
     ReductionOperation(#[from] ReductionPartOneError),
     #[error(transparent)]
     ElementwiseOperation(#[from] ElementwiseRuntimePartSixteenError),
+    #[error(transparent)]
+    ResizeOperation(#[from] ExternalTensorKernelPartOneError),
+    #[error(transparent)]
+    RandomOperation(#[from] RandomNumberGenerationPartOneError),
     #[error(transparent)]
     RoundOperation(#[from] ElementwiseRuntimePartSixError),
     #[error(transparent)]
