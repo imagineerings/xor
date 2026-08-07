@@ -9622,3 +9622,82 @@ fn native_module_backend_admission_preserves_canonical_capability_ownership()
     );
     Ok(())
 }
+
+#[test]
+fn val_ownership_001_task346_text_encoder_registry_preserves_canonical_owners()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let sources = rust_sources(&root)?
+        .into_iter()
+        .map(|path| {
+            let source = fs::read_to_string(&path)?;
+            Ok((path, source))
+        })
+        .collect::<Result<Vec<_>, std::io::Error>>()?;
+    let registry = fs::read_to_string(root.join("crates/comfy_model/src/clip_text_encoders.rs"))?;
+    let module_root = fs::read_to_string(root.join("crates/comfy_model/src/comfy_model.rs"))?;
+    let design = fs::read_to_string(root.join(".agents/specs/comfy-parity/design.md"))?;
+
+    assert_eq!(
+        production_source_occurrences(&sources, "pub struct TextEncoderArchitectureRegistry {")
+            .len(),
+        1
+    );
+    for owner in [
+        "comfy_model::clip_text_encoder_t5",
+        "comfy_model::clip_text_encoder_decoder",
+        "comfy_model::clip_text_encoder_multimodal",
+        "comfy_model::clip_text_encoder_composite",
+    ] {
+        assert!(registry.contains(owner));
+    }
+    assert!(registry.contains("TEXT_ENCODER_ARCHITECTURE_CONTRACT_COUNT: usize = 398"));
+    assert!(registry.contains("TEXT_ENCODER_ARCHITECTURE_REGISTRY_VERSION"));
+    assert!(registry.contains("pub fn identity_sha256"));
+    assert!(module_root.contains("pub mod clip_text_encoders;"));
+    assert!(module_root.contains("TextEncoderArchitectureRegistry"));
+    for forbidden in [
+        "CpuBackend",
+        "NativeModule",
+        "RngStream",
+        "NativeCache",
+        "ModelStore",
+        "OutputTransaction",
+        "pub fn forward(",
+    ] {
+        assert!(
+            !registry.contains(forbidden),
+            "registry contains {forbidden}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_text_encoder_architecture_registry")
+            })
+        })
+        .ok_or("ownership policy omitted the text-encoder registry concern")?;
+    assert_eq!(
+        concern
+            .get("canonical_owner")
+            .and_then(serde_json::Value::as_str),
+        Some("comfy_model::clip_text_encoders::TextEncoderArchitectureRegistry")
+    );
+    assert!(
+        concern
+            .get("consolidation_tasks")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|tasks| tasks
+                .iter()
+                .any(|task| { task.as_str() == Some("comfy-parity-clip-text-encoder-breadth") }))
+    );
+    assert!(design.contains("TextEncoderArchitectureRegistry is the sole versioned routing"));
+    Ok(())
+}

@@ -7,6 +7,7 @@ pub mod clip_text_encoder_composite;
 pub mod clip_text_encoder_decoder;
 pub mod clip_text_encoder_multimodal;
 pub mod clip_text_encoder_t5;
+pub mod clip_text_encoders;
 pub mod clip_tokenizer;
 pub mod clip_vision;
 pub mod cogvideox_family;
@@ -123,6 +124,12 @@ pub use clip_text_encoder_t5::{
     NativeT5TextEncoder, SPIECE_TOKENIZER_SOURCE_PATH, SPIECE_TOKENIZER_SOURCE_SHA256,
     T5_BIDIRECTIONAL_CATALOG_SYMBOLS, T5_SOURCE_PATH, T5_SOURCE_SHA256, relative_position_bucket,
     tokenize_bidirectional_prompt,
+};
+pub use clip_text_encoders::{
+    TEXT_ENCODER_ARCHITECTURE_CONTRACT_COUNT, TEXT_ENCODER_ARCHITECTURE_REGISTRY_VERSION,
+    TEXT_ENCODER_OWNER_FACTS, TEXT_ENCODER_SOURCE_SEGMENTS, TextEncoderArchitectureOwner,
+    TextEncoderArchitectureRegistry, TextEncoderOwnerFact, TextEncoderRegistryError,
+    TextEncoderSourceSegment,
 };
 pub use clip_tokenizer::{
     CLIP_TOKENIZER_SOURCE_ROWS, ClipBpeTokenizer, MAX_NATIVE_EMBEDDING_VALUES,

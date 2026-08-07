@@ -129,9 +129,19 @@ fn main() -> io::Result<()> {
         .map(|entry| format!("\"{}\"", entry.feature_id))
         .collect::<Vec<_>>()
         .join(", ");
+    let model_family_identifier_values = model_families
+        .iter()
+        .map(|entry| format!("\"{}\"", entry.identifier))
+        .collect::<Vec<_>>()
+        .join(", ");
     let model_family_fixture_values = model_families
         .iter()
         .map(|entry| format!("\"{}\"", entry.fixture))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let model_family_source_ordinal_values = model_families
+        .iter()
+        .map(|entry| entry.source_ordinal.to_string())
         .collect::<Vec<_>>()
         .join(", ");
     let output_directory = PathBuf::from(env::var_os("OUT_DIR").ok_or_else(|| {
@@ -152,7 +162,9 @@ fn main() -> io::Result<()> {
              pub const GENERATED_MODEL_FAMILY_SOURCE_MANIFEST: &[(&str, &str, &str, u16)] = &[{model_family_source_manifest}];\n\
              pub const GENERATED_MODEL_FAMILY_MODULES: &[&str] = &[{model_family_module_values}];\n\
              pub const GENERATED_MODEL_FAMILY_FEATURE_IDS: &[&str] = &[{model_family_feature_values}];\n\
-             pub const GENERATED_MODEL_FAMILY_FIXTURES: &[&str] = &[{model_family_fixture_values}];\n"
+             pub const GENERATED_MODEL_FAMILY_IDENTIFIERS: &[&str] = &[{model_family_identifier_values}];\n\
+             pub const GENERATED_MODEL_FAMILY_FIXTURES: &[&str] = &[{model_family_fixture_values}];\n\
+             pub const GENERATED_MODEL_FAMILY_SOURCE_ORDINALS: &[u16] = &[{model_family_source_ordinal_values}];\n"
         ),
     )?;
     let test_values = latent_format_test_names
@@ -187,6 +199,16 @@ fn main() -> io::Result<()> {
              fn generated_model_family_test_manifest_matches_source_manifest() {{\n\
                  assert_eq!(GENERATED_MODEL_FAMILY_TEST_MODULES, comfy_model::GENERATED_MODEL_FAMILY_MODULES);\n\
                  assert_eq!(GENERATED_MODEL_FAMILY_TEST_FIXTURES, comfy_model::GENERATED_MODEL_FAMILY_FIXTURES);\n\
+                 assert_eq!(GENERATED_MODEL_FAMILY_TEST_MODULES.len(), comfy_model::GENERATED_MODEL_FAMILY_REGISTRATIONS.len());\n\
+                 for (index, registration) in comfy_model::GENERATED_MODEL_FAMILY_REGISTRATIONS.iter().enumerate() {{\n\
+                     let (module, feature_id, fixture, source_ordinal) = comfy_model::GENERATED_MODEL_FAMILY_SOURCE_MANIFEST[index];\n\
+                     assert_eq!(module, GENERATED_MODEL_FAMILY_TEST_MODULES[index]);\n\
+                     assert_eq!(fixture, GENERATED_MODEL_FAMILY_TEST_FIXTURES[index]);\n\
+                     assert_eq!(feature_id, registration.definition.feature_id);\n\
+                     assert_eq!(comfy_model::GENERATED_MODEL_FAMILY_IDENTIFIERS[index], registration.definition.identifier);\n\
+                     assert_eq!(source_ordinal, registration.source_ordinal);\n\
+                     assert_eq!(source_ordinal, comfy_model::GENERATED_MODEL_FAMILY_SOURCE_ORDINALS[index]);\n\
+                 }}\n\
              }}\n",
             model_family_test_names
                 .iter()

@@ -10021,6 +10021,111 @@
       "decision_reason": "Task 69 owns only immutable transform ordering for the observed Compose boundary. Task 67 normalization remains the sole affine equation, channel validation, derivative, and output publication owner, so no generic parallel transform framework or adapter-owned tensor state is introduced."
     },
     {
+      "concern": "native_text_encoder_architecture_registry",
+      "canonical_owner": "comfy_model::clip_text_encoders::TextEncoderArchitectureRegistry",
+      "owner_files": [
+        "crates/comfy_model/src/clip_text_encoders.rs"
+      ],
+      "owner_symbols": [
+        "TextEncoderArchitectureRegistry",
+        "TextEncoderArchitectureOwner",
+        "TextEncoderOwnerFact",
+        "TEXT_ENCODER_SOURCE_SEGMENTS"
+      ],
+      "allowed_adapters": [
+        "NativeT5TextEncoder remains the sole bidirectional T5, UMT5, and BERT graph owner",
+        "NativeDecoderTextEncoder remains the sole Llama, Gemma, GPT-OSS, and Qwen3.5 decoder graph owner",
+        "clip_text_encoder_multimodal retains only source-specific multimodal position, projection, packing, and delegation behavior",
+        "clip_text_encoder_composite retains only source-specific wrapper, cleaner, audio-token, profile, and output-composition behavior",
+        "TextEncoderArchitectureRegistry owns only versioned source-and-symbol routing plus deterministic registry identity and executes no graph"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/clip_text_encoders.rs",
+          "pattern": "^pub struct TextEncoderArchitectureRegistry \\{",
+          "qualified": "comfy_model::clip_text_encoders::TextEncoderArchitectureRegistry",
+          "role": "canonical",
+          "symbol": "TextEncoderArchitectureRegistry"
+        },
+        {
+          "path": "crates/comfy_model/src/clip_text_encoders.rs",
+          "pattern": "^pub enum TextEncoderArchitectureOwner \\{",
+          "qualified": "comfy_model::clip_text_encoders::TextEncoderArchitectureOwner",
+          "role": "related",
+          "symbol": "TextEncoderArchitectureOwner"
+        },
+        {
+          "path": "crates/comfy_model/src/clip_text_encoders.rs",
+          "pattern": "^pub struct TextEncoderOwnerFact \\{",
+          "qualified": "comfy_model::clip_text_encoders::TextEncoderOwnerFact",
+          "role": "related",
+          "symbol": "TextEncoderOwnerFact"
+        }
+      ],
+      "call_symbols": [
+        "TextEncoderArchitectureRegistry",
+        "TextEncoderArchitectureOwner",
+        "TEXT_ENCODER_OWNER_FACTS",
+        "TEXT_ENCODER_SOURCE_SEGMENTS"
+      ],
+      "required_mappings": [
+        {
+          "name": "text-encoder-registry-binds-four-exact-owner-counts",
+          "path": "crates/comfy_model/src/clip_text_encoders.rs",
+          "pattern": "TEXT_ENCODER_ARCHITECTURE_CONTRACT_COUNT: usize = 398[\\s\\S]*TEXT_ENCODER_OWNER_FACTS: \\[TextEncoderOwnerFact; 4\\][\\s\\S]*contract_count: 19[\\s\\S]*contract_count: 127[\\s\\S]*contract_count: 53[\\s\\S]*contract_count: 199"
+        },
+        {
+          "name": "text-encoder-registry-routes-without-executing-a-fifth-graph",
+          "path": "crates/comfy_model/src/clip_text_encoders.rs",
+          "pattern": "pub fn owner_for[\\s\\S]*TEXT_ENCODER_SOURCE_SEGMENTS[\\s\\S]*COMPOSITE_TEXT_ENCODER_CONTRACTS[\\s\\S]*pub fn identity_sha256"
+        },
+        {
+          "name": "task346-ownership-oracle-proves-registry-only-boundary",
+          "path": "crates/comfy_test_support/tests/ownership_consolidation.rs",
+          "pattern": "val_ownership_001_task346_text_encoder_registry_preserves_canonical_owners",
+          "activation_task": "comfy-parity-clip-text-encoder-breadth",
+          "activation_reason": "Task 346 adds the whole-repository registry and executor-boundary oracle before closure"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-clip-text-encoder-breadth"
+      ],
+      "production_consumers": [
+        "native text-encoder architecture routing",
+        "cache dependency identity for the complete native text-encoder registry",
+        "conformance and ownership validation ledgers"
+      ],
+      "requirements": [
+        "Requirement 7",
+        "Requirement 34",
+        "Requirement 36",
+        "Requirement 38",
+        "Requirement 41"
+      ],
+      "design": [
+        "D18",
+        "D20",
+        "D25",
+        "D26",
+        "D28",
+        "D31",
+        "D32",
+        "D39",
+        "D41"
+      ],
+      "validation": [
+        "VAL-CLIP-001",
+        "VAL-TENSOR-001",
+        "VAL-MODEL-FAMILY-001",
+        "VAL-RNG-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "TextEncoderArchitectureRegistry is the sole versioned mapping from each source path and symbol to one of the four established native text-encoder owners and the sole aggregate registry identity. It owns no tokenizer parser, model weights, tensor equation, backend admission, workspace, RNG state, cancellation state, cache storage, persistence, or publication transition; all 398 executions remain in their focused canonical owners."
+    },
+    {
       "concern": "native_vision_model_architectures",
       "canonical_owner": "comfy_model::vision_models",
       "owner_files": [
