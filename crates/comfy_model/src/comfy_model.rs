@@ -3,6 +3,7 @@ pub mod artifact_index;
 pub mod attention;
 pub mod clip;
 pub mod clip_text;
+pub mod clip_text_encoder_composite;
 pub mod clip_text_encoder_decoder;
 pub mod clip_text_encoder_multimodal;
 pub mod clip_text_encoder_t5;
@@ -69,6 +70,18 @@ pub use clip_text::{
     ClipTextConfiguration, ClipTextError, ClipTextInput, ClipTextIntermediate,
     ClipTextLayerWeights, ClipTextOutput, ClipTextRequest, ClipTextWeights, NativeClipText,
     SD1_CLIP_SOURCE_PATH, SD1_CLIP_SOURCE_SHA256,
+};
+pub use clip_text_encoder_composite::{
+    AudioSamplingOptions, COMPOSITE_TEXT_ENCODER_CONTRACT_COUNT, COMPOSITE_TEXT_ENCODER_CONTRACTS,
+    CompositeConditioningInput, CompositeConditioningOutput, CompositeContractFact,
+    CompositeExecutionPlan, CompositeHiddenJoin, CompositeOwner, CompositePooledPolicy,
+    CompositeSymbolBehavior, CompositeTextEncoderError, QuotedPromptPart, basic_cleaners,
+    collapse_whitespace, compose_conditioning, composite_contract_fact, composite_execution_plan,
+    composite_symbol_behavior, delegate_bidirectional_text, delegate_clip_text,
+    delegate_clip_vision, delegate_decoder_text, expand_abbreviations_multilingual,
+    expand_numbers_multilingual, expand_symbols_multilingual, generate_audio_codes,
+    japanese_to_romaji, multilingual_cleaners, number_to_text_i64, sample_audio_token,
+    split_quotation,
 };
 pub use clip_text_encoder_decoder::{
     DECODER_PROFILE_FACTS, DECODER_TEXT_ENCODER_CATALOG_SYMBOLS, DecoderActivation,

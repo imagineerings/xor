@@ -381,7 +381,7 @@ fn val_clip_001_multimodal_rows_execute_and_extend_cumulative_ledger() -> Result
             "case_ids": [
                 "text-encoder-multimodal:source-provenance-and-exact-row-closure",
                 "text-encoder-multimodal:canonical-text-and-vision-delegation",
-                "text-encoder-multimodal:mrope-modality-deepstack-and-projection",
+                "text-encoder-multimodal:position-and-projection-semantics",
                 "text-encoder-multimodal:typed-target-cancellation-oom-workspace",
             ],
             "implementations": implementations,
