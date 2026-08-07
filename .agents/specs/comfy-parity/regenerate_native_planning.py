@@ -403,6 +403,11 @@ DECISION_APPENDICES[31] += """
 Depth-dependent state conversion remains inside the same owner. A compiled row may supply an immutable `ModelFamilyStatePlanProbeSelector` function pointer that receives only the already bounded and validated `ModelProbe` and returns an owned `ModelStateTransformPlan`. `ModelFamilyRegistry::resolve` invokes it after family and source-contract admission, recursively revalidates every returned selector, rewrite, dimension, target, and component against the chosen definition, and binds the result into `ResolvedModelFamily` before any transaction. The selector cannot read or parse an artifact, consult caller layout metadata, allocate tensor storage, execute a transform, commit mapped state, or bypass `ModelStateTransaction`. PixArt's consecutive-depth Diffusers QKV assembly is the initial consumer; native and Diffusers layouts use the same resolved-plan boundary.
 """
 
+DECISION_APPENDICES[31] += """
+
+`comfy_model::clip_text_encoders::TextEncoderArchitectureRegistry` is the sole versioned routing and contract-ownership table for the 398 generated text-encoder architecture rows: `checked` validates the immutable versioned contract table, `owner_for` binds every pinned source path and symbol to exactly one checked native owner (T5, decoder, multimodal, or composite), and `identity_sha256` derives one registry identity from the version, owner facts, source segments, and composite contracts. It owns no backend, module, RNG, cache, store, transaction, or forward implementation; the four focused text-encoder modules and `comfy_model::clip` retain their equation, graph, and execution ownership.
+"""
+
 DECISION_APPENDICES[27] += """
 
 Wave 39 callable tables are lifetime-bound implementation details, not reusable DTOs. Private `DirectMlSymbols`, `MluSymbols`, and `NativeNpuSymbols` values are non-cloneable and non-copyable and exist only inside their non-cloneable retained-certificate composites (`CertifiedDirectMlExecutionInputs`, `MluCallSurface`, and `OwnedNpuCore`). DirectML's reviewed unsafe calls are split between its loader and execution modules but remain one crate-owned boundary recorded as `comfy_backend_directml::{loader,execution}`; no runtime, tensor, worker, package, or test adapter may copy a callable table or invoke those function pointers independently.

@@ -9698,6 +9698,9 @@ fn val_ownership_001_task346_text_encoder_registry_preserves_canonical_owners()
                 .iter()
                 .any(|task| { task.as_str() == Some("comfy-parity-clip-text-encoder-breadth") }))
     );
-    assert!(design.contains("TextEncoderArchitectureRegistry is the sole versioned routing"));
+    assert!(
+        design.contains("is the sole versioned routing and contract-ownership table"),
+        "design.md must document the text-encoder registry as the sole versioned routing table"
+    );
     Ok(())
 }

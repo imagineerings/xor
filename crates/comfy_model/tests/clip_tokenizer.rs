@@ -20,7 +20,7 @@ use std::{
 const TOKENIZER_IMPLEMENTATION_CLOSURE: [(&str, &str); 7] = [
     (
         "crates/comfy_model/src/clip.rs",
-        "5032baf887ed5dc871ee6d4272f4b07048d2e3b67a7a340018705f493c957ac2",
+        "9181a69ce876c525463373a5dc58d288435006182063a26be5e9200bb6d3950c",
     ),
     (
         "crates/comfy_model/src/clip_tokenizer.rs",
@@ -36,15 +36,15 @@ const TOKENIZER_IMPLEMENTATION_CLOSURE: [(&str, &str); 7] = [
     ),
     (
         "crates/comfy_model/src/slices/native_diffusion.rs",
-        "745199abae5fe14ee19aebc190bf5c8123f13a9922f01bf04b093502c03eaccb",
+        "4859809749fc4e14908663bf1a9fd07dab705b13d06260dedda4f383ef21e680",
     ),
     (
         "crates/comfy_runtime/src/native_execution_controller.rs",
-        "97dfef84b2ad7dd9cd82a411ef1e8a9e7f0ef0bca7d2317b0bc30128ea751c61",
+        "c5ef5148c1b8b3f8244e997cd07f3093b3b076555a01aa5005efed44ed420256",
     ),
     (
         "crates/comfy_test_support/src/native_diffusion_fixture.rs",
-        "95e6c9064c844c635e35a3a88427c39e75cbc095c72453dfa516105edfe1e6d2",
+        "1e295e60f90c3e2d875c20c487b6a16f397127053ac3c476ea528e26695489d4",
     ),
 ];
 
