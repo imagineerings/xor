@@ -1,18 +1,21 @@
 pub use crate::clip::Sd1Tokenizer;
 use crate::{
-    ArtifactIndex, AttentionBackend, AttentionError, AttentionFallbackPolicy, AttentionMask,
-    AttentionMaskShape, AttentionRequest, LatentExtent, LatentFormatError, LoadedModel,
-    ModelDetectionRule, ModelFamilyIdentity, ModelProbe, ModelStore, ModelStoreError,
-    ModelTokenizerDescriptor, detect_model_family_rules, empty_latent as canonical_empty_latent,
+    ArtifactIndex, AttentionBackend, AttentionError, AttentionFallbackPolicy, AttentionRequest,
+    LatentExtent, LatentFormatError, LoadedModel, ModelDetectionRule, ModelFamilyIdentity,
+    ModelProbe, ModelStore, ModelStoreError, ModelTokenizerDescriptor, PatchGraph,
+    detect_model_family_rules, empty_latent as canonical_empty_latent,
     generated_sd15_comfy_model_0045::LATENT_FORMAT as SD15_LATENT_FORMAT,
     project_latent_preview as canonical_project_latent_preview,
     scaled_dot_product_attention_with_context,
+};
+use crate::clip::{
+    LoadedSd1Clip, Sd1ClipArtifactProfile, Sd1ClipExecutionBinding, TokenizerIdentity,
 };
 use comfy_tensor::{
     CancellationToken, CpuBackend, CpuWorkspaceVec, ExecutionContext, Tensor,
     generated_native_diffusion::{
         NativeDiffusionTensorError, add, add_channel_bias, concat_channels, conv2d, group_norm,
-        layer_norm, linear, nearest_upsample_2x, quick_gelu, silu, tensor_from_f32, tensor_to_f32,
+        linear, nearest_upsample_2x, silu, tensor_from_f32, tensor_to_f32,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -39,7 +42,7 @@ pub fn sd15_latent_format_identity()
         .map_err(|error| NativeDiffusionModelError::LatentAdapter(error.to_string()))
 }
 
-const CLIP_PREFIX: &str = "cond_stage_model.transformer.text_model";
+const SD15_CLIP_SOURCE_PREFIX: &str = "cond_stage_model.transformer.";
 const UNET_PREFIX: &str = "model.diffusion_model";
 const VAE_PREFIX: &str = "first_stage_model";
 const SD15_INPUT_SHAPE: [u64; 4] = [320, 4, 3, 3];
@@ -189,9 +192,8 @@ pub struct Sd15DetectorProjection {
 }
 
 impl Sd15DetectorProjection {
-    pub fn detect(&self) -> Result<&'static str, NativeDiffusionModelError> {
-        let identity = sd15_model_family_identity()?;
-        let probe = ModelProbe {
+    fn model_probe(&self) -> ModelProbe {
+        ModelProbe {
             tensor_shapes: self.source_shapes.clone(),
             metadata: BTreeMap::from([
                 ("feature_id".to_owned(), self.feature_id.clone()),
@@ -211,7 +213,12 @@ impl Sd15DetectorProjection {
                     self.use_temporal_attention.to_string(),
                 ),
             ]),
-        };
+        }
+    }
+
+    pub fn detect(&self) -> Result<&'static str, NativeDiffusionModelError> {
+        let identity = sd15_model_family_identity()?;
+        let probe = self.model_probe();
         detect_model_family_rules(identity, &SD15_DETECTION_RULES, &probe)
             .map(|_| SD15_FEATURE_ID)
             .map_err(|_| NativeDiffusionModelError::UnsupportedFamily)
@@ -250,9 +257,65 @@ pub struct WeightSpec {
     pub shape: Vec<u64>,
 }
 
+pub fn sd15_clip_artifact_profile()
+-> Result<Sd1ClipArtifactProfile, NativeDiffusionModelError> {
+    Sd1ClipArtifactProfile::checked(
+        SD15_CLIP_SOURCE_PREFIX,
+        SD15_VOCAB_SIZE,
+        SD15_TOKEN_COUNT,
+        SD15_TINY_WIDTH,
+        SD15_TINY_WIDTH * 4,
+        2,
+        4,
+    )
+    .map_err(map_sd15_clip_error)
+}
+
+pub fn bind_sd15_clip_execution(
+    projection: &Sd15DetectorProjection,
+    artifact_digest: &str,
+    tokenizer_identity: TokenizerIdentity,
+) -> Result<(Sd1ClipArtifactProfile, Sd1ClipExecutionBinding), NativeDiffusionModelError> {
+    projection.detect()?;
+    let family = sd15_model_family_identity()?;
+    let patch_graph = PatchGraph::checked_semantic(artifact_digest, Vec::new())
+        .map_err(|error| NativeDiffusionModelError::Clip(error.to_string()))?;
+    let profile = sd15_clip_artifact_profile()?;
+    let binding = profile
+        .bind_execution(family, artifact_digest, &patch_graph, tokenizer_identity)
+        .map_err(map_sd15_clip_error)?;
+    Ok((profile, binding))
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn load_sd15_clip_execution(
+    store: &ModelStore,
+    index: &ArtifactIndex,
+    loaded: &LoadedModel,
+    projection: &Sd15DetectorProjection,
+    tokenizer_identity: TokenizerIdentity,
+    backend: Arc<CpuBackend>,
+    context: &ExecutionContext<'_>,
+) -> Result<LoadedSd1Clip, NativeDiffusionModelError> {
+    let (profile, binding) =
+        bind_sd15_clip_execution(projection, loaded.identity(), tokenizer_identity)?;
+    LoadedSd1Clip::from_model_store(
+        &profile, binding, store, index, loaded, backend, context,
+    )
+    .map_err(map_sd15_clip_error)
+}
+
 pub fn sd15_tiny_weight_manifest() -> Result<Vec<WeightSpec>, NativeDiffusionModelError> {
     let mut weights = Vec::new();
-    add_clip_specs(&mut weights);
+    weights.extend(
+        sd15_clip_artifact_profile()?
+            .parameters()
+            .iter()
+            .map(|parameter| WeightSpec {
+                key: parameter.name().to_owned(),
+                shape: parameter.shape().to_vec(),
+            }),
+    );
     add_unet_specs(&mut weights);
     add_vae_specs(&mut weights);
     weights.sort_by(|left, right| left.key.cmp(&right.key));
@@ -296,30 +359,6 @@ fn conv_parameters(
         &[output, input, kernel, kernel],
     );
     parameter(weights, format!("{prefix}.bias"), &[output]);
-}
-
-fn add_clip_specs(weights: &mut Vec<WeightSpec>) {
-    parameter(
-        weights,
-        format!("{CLIP_PREFIX}.embeddings.token_embedding.weight"),
-        &[SD15_VOCAB_SIZE as u64, SD15_TINY_WIDTH as u64],
-    );
-    parameter(
-        weights,
-        format!("{CLIP_PREFIX}.embeddings.position_embedding.weight"),
-        &[SD15_TOKEN_COUNT as u64, SD15_TINY_WIDTH as u64],
-    );
-    for layer in 0..2 {
-        let prefix = format!("{CLIP_PREFIX}.encoder.layers.{layer}");
-        norm_parameters(weights, &format!("{prefix}.layer_norm1"), 32);
-        norm_parameters(weights, &format!("{prefix}.layer_norm2"), 32);
-        for projection in ["q_proj", "k_proj", "v_proj", "out_proj"] {
-            linear_parameters(weights, &format!("{prefix}.self_attn.{projection}"), 32, 32);
-        }
-        linear_parameters(weights, &format!("{prefix}.mlp.fc1"), 128, 32);
-        linear_parameters(weights, &format!("{prefix}.mlp.fc2"), 32, 128);
-    }
-    norm_parameters(weights, &format!("{CLIP_PREFIX}.final_layer_norm"), 32);
 }
 
 fn add_unet_specs(weights: &mut Vec<WeightSpec>) {
@@ -504,6 +543,16 @@ fn map_sd15_tokenizer_error(error: crate::clip::ClipError) -> NativeDiffusionMod
     }
 }
 
+fn map_sd15_clip_error(error: crate::clip::ClipError) -> NativeDiffusionModelError {
+    match error {
+        crate::clip::ClipError::Tensor(comfy_tensor::TensorError::Cancelled)
+        | crate::clip::ClipError::TensorOperation(NativeDiffusionTensorError::Tensor(
+            comfy_tensor::TensorError::Cancelled,
+        )) => NativeDiffusionModelError::Cancelled,
+        error => NativeDiffusionModelError::Clip(error.to_string()),
+    }
+}
+
 #[derive(Debug)]
 pub struct Sd15TinyModel {
     backend: Arc<CpuBackend>,
@@ -549,7 +598,7 @@ impl Sd15TinyModel {
         backend: Arc<CpuBackend>,
         context: &ExecutionContext<'_>,
     ) -> Result<Self, NativeDiffusionModelError> {
-        let manifest = sd15_tiny_weight_manifest()?;
+        let mut manifest = sd15_tiny_weight_manifest()?;
         let expected = manifest
             .iter()
             .map(|spec| spec.key.as_str())
@@ -571,6 +620,7 @@ impl Sd15TinyModel {
                     .collect(),
             });
         }
+        manifest.retain(|spec| !spec.key.starts_with(SD15_CLIP_SOURCE_PREFIX));
         let mut tensor_bytes = store.read_tensors(
             index,
             loaded,
@@ -620,116 +670,6 @@ impl Sd15TinyModel {
         self.weights
             .get(key)
             .ok_or_else(|| NativeDiffusionModelError::MissingWeight(key.to_owned()))
-    }
-
-    pub fn encode_text(
-        &self,
-        tokens: &[u32; SD15_TOKEN_COUNT],
-        context: &ExecutionContext<'_>,
-    ) -> Result<Tensor, NativeDiffusionModelError> {
-        check_context(context)?;
-        let token_embedding = tensor_to_f32(
-            &self.backend,
-            self.weight(&format!("{CLIP_PREFIX}.embeddings.token_embedding.weight"))?,
-            context,
-        )?;
-        let position_embedding = tensor_to_f32(
-            &self.backend,
-            self.weight(&format!(
-                "{CLIP_PREFIX}.embeddings.position_embedding.weight"
-            ))?,
-            context,
-        )?;
-        let hidden_count = SD15_TOKEN_COUNT * SD15_TINY_WIDTH;
-        let mut hidden = self.backend.workspace_vec(context, hidden_count)?;
-        for _ in 0..hidden_count {
-            hidden.try_push(0.0)?;
-        }
-        for (position, token) in tokens.iter().enumerate() {
-            check_context(context)?;
-            let token = usize::try_from(*token)
-                .map_err(|_| NativeDiffusionModelError::Overflow("token index"))?;
-            if token >= SD15_VOCAB_SIZE {
-                return Err(NativeDiffusionModelError::TokenOutOfRange(
-                    *tokens.get(position).unwrap_or(&u32::MAX),
-                ));
-            }
-            for channel in 0..SD15_TINY_WIDTH {
-                hidden[position * SD15_TINY_WIDTH + channel] = token_embedding
-                    [token * SD15_TINY_WIDTH + channel]
-                    + position_embedding[position * SD15_TINY_WIDTH + channel];
-            }
-        }
-        let hidden_tensor = tensor_from_f32(
-            &self.backend,
-            &[1, SD15_TOKEN_COUNT as u64, SD15_TINY_WIDTH as u64],
-            &hidden,
-            context,
-        )?;
-        drop(hidden);
-        drop(position_embedding);
-        drop(token_embedding);
-        let mut hidden = hidden_tensor;
-        let mask_count = SD15_TOKEN_COUNT
-            .checked_mul(SD15_TOKEN_COUNT)
-            .ok_or(NativeDiffusionModelError::Overflow("CLIP causal mask"))?;
-        let mut causal_mask = self.backend.workspace_vec(context, mask_count)?;
-        for query in 0..SD15_TOKEN_COUNT {
-            for key in 0..SD15_TOKEN_COUNT {
-                causal_mask.try_push(key <= query)?;
-            }
-        }
-        for layer in 0..2 {
-            let prefix = format!("{CLIP_PREFIX}.encoder.layers.{layer}");
-            let normalized = self.layer_norm(&hidden, &format!("{prefix}.layer_norm1"), context)?;
-            let query = self.linear(&normalized, &format!("{prefix}.self_attn.q_proj"), context)?;
-            let key = self.linear(&normalized, &format!("{prefix}.self_attn.k_proj"), context)?;
-            let value = self.linear(&normalized, &format!("{prefix}.self_attn.v_proj"), context)?;
-            let query_values = tensor_to_f32(&self.backend, &query, context)?;
-            let key_values = tensor_to_f32(&self.backend, &key, context)?;
-            let value_values = tensor_to_f32(&self.backend, &value, context)?;
-            let attention = scaled_dot_product_attention_with_context(
-                &self.backend,
-                AttentionRequest {
-                    backend: AttentionBackend::PytorchSdp,
-                    fallback: AttentionFallbackPolicy::AllowExactNative,
-                    batch: 1,
-                    query_tokens: SD15_TOKEN_COUNT,
-                    key_tokens: SD15_TOKEN_COUNT,
-                    heads: 4,
-                    head_dimension: 8,
-                    value_dimension: 8,
-                    scale: None,
-                    workspace_limit_bytes: SD15_TOKEN_COUNT * std::mem::size_of::<f32>(),
-                },
-                &query_values,
-                &key_values,
-                &value_values,
-                Some(AttentionMask::Boolean {
-                    values: &causal_mask,
-                    shape: AttentionMaskShape::QueryByKey,
-                }),
-                context,
-            )?;
-            drop(value_values);
-            drop(key_values);
-            drop(query_values);
-            let attention = tensor_from_f32(
-                &self.backend,
-                &[1, SD15_TOKEN_COUNT as u64, SD15_TINY_WIDTH as u64],
-                &attention.values,
-                context,
-            )?;
-            let attention =
-                self.linear(&attention, &format!("{prefix}.self_attn.out_proj"), context)?;
-            hidden = add(&self.backend, &hidden, &attention, context)?;
-            let normalized = self.layer_norm(&hidden, &format!("{prefix}.layer_norm2"), context)?;
-            let feed_forward = self.linear(&normalized, &format!("{prefix}.mlp.fc1"), context)?;
-            let feed_forward = quick_gelu(&self.backend, &feed_forward, context)?;
-            let feed_forward = self.linear(&feed_forward, &format!("{prefix}.mlp.fc2"), context)?;
-            hidden = add(&self.backend, &hidden, &feed_forward, context)?;
-        }
-        self.layer_norm(&hidden, &format!("{CLIP_PREFIX}.final_layer_norm"), context)
     }
 
     pub fn denoise_at_model_time(
@@ -924,22 +864,6 @@ impl Sd15TinyModel {
             input,
             self.weight(&format!("{prefix}.weight"))?,
             Some(self.weight(&format!("{prefix}.bias"))?),
-            context,
-        )?)
-    }
-
-    fn layer_norm(
-        &self,
-        input: &Tensor,
-        prefix: &str,
-        context: &ExecutionContext<'_>,
-    ) -> Result<Tensor, NativeDiffusionModelError> {
-        Ok(layer_norm(
-            &self.backend,
-            input,
-            self.weight(&format!("{prefix}.weight"))?,
-            self.weight(&format!("{prefix}.bias"))?,
-            1e-5,
             context,
         )?)
     }
@@ -1259,8 +1183,8 @@ pub enum NativeDiffusionModelError {
     WeightBytes(String),
     #[error("native diffusion tokenizer error: {0}")]
     Tokenizer(String),
-    #[error("native diffusion token {0} is outside the SD1 vocabulary")]
-    TokenOutOfRange(u32),
+    #[error("canonical native CLIP adapter rejected the request: {0}")]
+    Clip(String),
     #[error("native diffusion {name} expected shape {expected:?}, got {actual:?}")]
     InputShape {
         name: &'static str,

@@ -73,9 +73,10 @@ fn main() -> Result<()> {
     let backend = Arc::new(backend);
     let workspace = workspace_authority.authorize_workspace(MEMORY_LIMIT)?;
     let context = backend.execution_context(StreamId::DEFAULT, workspace, &cancellation);
-    let model = fixture.load_model_with_context(backend.clone(), &context)?;
-    let positive = model.encode_text(&positive_tokens, &context)?;
-    let negative = model.encode_text(&negative_tokens, &context)?;
+    let bundle = fixture.load_bundle_with_context(backend.clone(), &context)?;
+    let (_, positive) = bundle.encode_text("a test", &context)?;
+    let (_, negative) = bundle.encode_text("", &context)?;
+    let model = bundle.model();
     {
         let negative_values = tensor_to_f32(&backend, &negative, &context)?;
         let positive_values = tensor_to_f32(&backend, &positive, &context)?;
@@ -113,7 +114,8 @@ fn main() -> Result<()> {
     let latent = empty_sd15_latent(&backend, 1, 32, 32, &context)?;
     let initial = scale_initial_noise(&backend, &noise.noise, &latent, sigmas[0], &context)?;
     let plan = checked_native_diffusion_plan("euler", "normal", SEED, 4, 7.0, 1.0)?;
-    let mut guidance = Sd15GuidanceAdapter::checked(&model, &positive, &negative, &context)?;
+    let mut guidance =
+        Sd15GuidanceAdapter::checked(model.as_ref(), &positive, &negative, &context)?;
     let trace = sample_euler(
         &backend,
         initial,

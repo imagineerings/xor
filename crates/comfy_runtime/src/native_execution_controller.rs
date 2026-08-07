@@ -1,17 +1,18 @@
 use crate::{
     AssetNamespace, AssetRoots, AttemptEventKind, AttemptState, AuthorizedCapabilities,
-    CacheDependencies, CompiledPlan, EffectClass, EffectCoordinator, ExecutionActuatorEventInput,
-    ExecutionControlCommand, ExecutionControlCommandKind, ExecutionController, ExecutionEngine,
-    ExecutionError, ExecutionEventBus, ExecutionFailure, ExecutionFailureOrigin, ExecutionOutput,
-    ExecutionOutputAvailability, ExecutionPreview, ExecutionReport, InputBinding, InputMode,
-    MemoryPolicy, NativeCache, NativeNode, NativeNodeRegistry, NodeContext, NodeFailure,
-    NodeFailureKind, NodeOutcome, OutputCommitError, OutputCommitReceipt, OutputCommitter,
-    OutputExecutionScope, OutputMediaKind, OutputProposal, PreparedEffect, PreparedEffectRequest,
-    PreparedOutput, ProfileId, PromptCompileError, RuntimeAvailability, RuntimeCachePolicy,
-    RuntimeInputDescriptor, RuntimeNodeDescriptor, RuntimeOutputDescriptor, RuntimeSupervisor,
-    RuntimeSupervisorError, SharedAssetService, SharedExecutionPresentationService,
-    SharedOutputCommitter, ValueType, WorkerLaunchConfig, WorkflowFormatDocument,
-    authorize_native_input_reader, authorize_native_output_committer, graph_to_prompt,
+    CacheDependencies, CanonicalClipCacheIdentities, CompiledPlan, EffectClass, EffectCoordinator,
+    ExecutionActuatorEventInput, ExecutionControlCommand, ExecutionControlCommandKind,
+    ExecutionController, ExecutionEngine, ExecutionError, ExecutionEventBus, ExecutionFailure,
+    ExecutionFailureOrigin, ExecutionOutput, ExecutionOutputAvailability, ExecutionPreview,
+    ExecutionReport, InputBinding, InputMode, MemoryPolicy, NativeCache, NativeNode,
+    NativeNodeRegistry, NodeContext, NodeFailure, NodeFailureKind, NodeOutcome, OutputCommitError,
+    OutputCommitReceipt, OutputCommitter, OutputExecutionScope, OutputMediaKind, OutputProposal,
+    PreparedEffect, PreparedEffectRequest, PreparedOutput, ProfileId, PromptCompileError,
+    RuntimeAvailability, RuntimeCachePolicy, RuntimeInputDescriptor, RuntimeNodeDescriptor,
+    RuntimeOutputDescriptor, RuntimeSupervisor, RuntimeSupervisorError, SharedAssetService,
+    SharedExecutionPresentationService, SharedOutputCommitter, ValueType, WorkerLaunchConfig,
+    WorkflowFormatDocument, authorize_native_input_reader, authorize_native_output_committer,
+    graph_to_prompt,
 };
 use chrono::{Local, Utc};
 #[cfg(test)]
@@ -20,14 +21,14 @@ use comfy_media::{
     MetadataWritePolicy, PngError, PngLimits, decode_png, encode_png_frame_with_policy_and_context,
 };
 use comfy_model::{
-    clip::NativeTokenizer,
+    clip::{ClipError, LoadedSd1Clip, NativeTokenizer, WeightedText},
     conditioning::{
         ConditioningEntry, ConditioningEntryOptions, ConditioningError, ConditioningIdentity,
         ConditioningSet, ConditioningValue,
     },
     generated_native_diffusion::{
-        Sd1Tokenizer, Sd15TinyModel, empty_sd15_latent, encode_sd15_prompt,
-        sd15_latent_format_identity, sd15_model_family_identity,
+        Sd1Tokenizer, Sd15TinyModel, empty_sd15_latent, sd15_latent_format_identity,
+        sd15_model_family_identity,
     },
 };
 use comfy_nodes::{
@@ -123,6 +124,8 @@ pub struct NativeDiffusionBundle {
     tokenizer_digest: String,
     model: Arc<Sd15TinyModel>,
     tokenizer: Arc<Sd1Tokenizer>,
+    clip: Arc<LoadedSd1Clip>,
+    clip_cache_identities: CanonicalClipCacheIdentities,
 }
 
 impl NativeDiffusionBundle {
@@ -131,27 +134,50 @@ impl NativeDiffusionBundle {
         model_digest: impl Into<String>,
         model: Arc<Sd15TinyModel>,
         tokenizer: Arc<Sd1Tokenizer>,
+        clip: Arc<LoadedSd1Clip>,
     ) -> Result<Self, NativeImageRuntimeError> {
         let fixture_id = fixture_id.into();
         let model_digest = model_digest.into();
         let tokenizer_identity = tokenizer.identity();
-        if fixture_id != "sd15-tiny-v1"
-            || model_digest.len() != 64
+        let invalid_model_digest = model_digest.len() != 64
             || !model_digest
                 .bytes()
-                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-            || tokenizer_identity.descriptor().identifier() != "comfy.sd1.tokenizer"
-        {
-            return Err(NativeImageRuntimeError::Registry(
-                "native diffusion provider identity is invalid".to_owned(),
-            ));
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
+        let invalid_reason = if fixture_id != "sd15-tiny-v1" {
+            Some("fixture")
+        } else if invalid_model_digest {
+            Some("model artifact")
+        } else if tokenizer_identity.descriptor().identifier() != "comfy.sd1.tokenizer" {
+            Some("tokenizer descriptor")
+        } else if clip.plan().tokenizer_identity() != tokenizer_identity {
+            Some("tokenizer execution binding")
+        } else if clip.plan().artifact_identity().as_str() != model_digest {
+            Some("CLIP artifact binding")
+        } else {
+            None
+        };
+        if let Some(reason) = invalid_reason {
+            return Err(NativeImageRuntimeError::Registry(format!(
+                "native diffusion provider {reason} identity is invalid"
+            )));
         }
+        let clip_cache_identities = CanonicalClipCacheIdentities::checked(
+            tokenizer_identity.digest(),
+            clip.architecture().digest(),
+            clip.plan().artifact_identity().as_str(),
+            clip.plan().model_identity().as_str(),
+            clip.plan().patch_identity().as_str(),
+            clip.plan().digest(),
+        )
+        .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
         Ok(Self {
             fixture_id,
             model_digest,
             tokenizer_digest: tokenizer_identity.digest().to_owned(),
             model,
             tokenizer,
+            clip,
+            clip_cache_identities,
         })
     }
 
@@ -161,6 +187,55 @@ impl NativeDiffusionBundle {
 
     pub fn tokenizer_digest(&self) -> &str {
         &self.tokenizer_digest
+    }
+
+    pub fn model(&self) -> &Arc<Sd15TinyModel> {
+        &self.model
+    }
+
+    pub fn clip(&self) -> &Arc<LoadedSd1Clip> {
+        &self.clip
+    }
+
+    pub fn clip_cache_identities(&self) -> &CanonicalClipCacheIdentities {
+        &self.clip_cache_identities
+    }
+
+    pub fn encode_text(
+        &self,
+        text: &str,
+        context: &ExecutionContext<'_>,
+    ) -> Result<([u32; comfy_model::clip::SD1_CONTEXT_LENGTH], Tensor), NativeImageRuntimeError>
+    {
+        let prompts = vec![vec![
+            WeightedText::checked(text, 1.0).map_err(map_clip_runtime_error)?,
+        ]];
+        let batch = self
+            .tokenizer
+            .tokenize_batch(&prompts, context.cancellation)
+            .map_err(map_clip_runtime_error)?;
+        let tokens = batch
+            .rows()
+            .first()
+            .ok_or_else(|| {
+                NativeImageRuntimeError::Execution(
+                    "canonical SD1 tokenizer returned no prompt row".to_owned(),
+                )
+            })?
+            .sd1_token_ids()
+            .map_err(map_clip_runtime_error)?;
+        let encoding = self
+            .clip
+            .execute(&batch, context)
+            .map_err(map_clip_runtime_error)?;
+        Ok((tokens, encoding.conditioning().clone()))
+    }
+}
+
+fn map_clip_runtime_error(error: ClipError) -> NativeImageRuntimeError {
+    match error {
+        ClipError::Tensor(TensorError::Cancelled) => NativeImageRuntimeError::Cancelled,
+        error => NativeImageRuntimeError::Execution(error.to_string()),
     }
 }
 
@@ -294,6 +369,10 @@ pub trait NativeDiffusionProvider: Send + Sync {
     fn model_digest(&self) -> Result<String, NativeImageRuntimeError>;
 
     fn tokenizer_digest(&self) -> Result<String, NativeImageRuntimeError>;
+
+    fn clip_cache_identities(
+        &self,
+    ) -> Result<CanonicalClipCacheIdentities, NativeImageRuntimeError>;
 
     fn load(
         &self,
@@ -1248,6 +1327,7 @@ struct NativeDiffusionHandle {
     fixture_id: String,
     model_digest: String,
     tokenizer_digest: String,
+    clip_execution_digest: String,
 }
 
 struct NativeDiffusionState {
@@ -1268,8 +1348,10 @@ impl NativeDiffusionState {
         let bundle = Arc::new(self.provider.load(self.backend.clone(), context)?);
         let provider_model_digest = self.provider.model_digest()?;
         let provider_tokenizer_digest = self.provider.tokenizer_digest()?;
+        let provider_clip_cache_identities = self.provider.clip_cache_identities()?;
         if provider_model_digest != bundle.model_digest
             || provider_tokenizer_digest != bundle.tokenizer_digest
+            || provider_clip_cache_identities != bundle.clip_cache_identities
         {
             return Err(NativeImageRuntimeError::Registry(
                 "native diffusion provider cache identity does not match its loaded bundle"
@@ -1287,11 +1369,12 @@ impl NativeDiffusionState {
     ) -> Result<NativeDiffusionHandle, NativeImageRuntimeError> {
         let bundle = self.bundle(context)?;
         Ok(NativeDiffusionHandle {
-            schema_version: 2,
+            schema_version: 3,
             role,
             fixture_id: bundle.fixture_id.clone(),
             model_digest: bundle.model_digest.clone(),
             tokenizer_digest: bundle.tokenizer_digest.clone(),
+            clip_execution_digest: bundle.clip_cache_identities.execution().to_owned(),
         })
     }
 
@@ -1302,11 +1385,12 @@ impl NativeDiffusionState {
         context: &ExecutionContext<'_>,
     ) -> Result<Arc<NativeDiffusionBundle>, NativeImageRuntimeError> {
         let bundle = self.bundle(context)?;
-        if handle.schema_version != 2
+        if handle.schema_version != 3
             || handle.role != role
             || handle.fixture_id != bundle.fixture_id
             || handle.model_digest != bundle.model_digest
             || handle.tokenizer_digest != bundle.tokenizer_digest
+            || handle.clip_execution_digest != bundle.clip_cache_identities.execution()
         {
             return Err(NativeImageRuntimeError::Handle(
                 "native diffusion handle does not belong to the loaded model".to_owned(),
@@ -1343,11 +1427,16 @@ impl NativeNode for CheckpointLoaderNode {
             .provider
             .tokenizer_digest()
             .map_err(runtime_failure)?;
+        let clip_identities = self
+            .state
+            .provider
+            .clip_cache_identities()
+            .map_err(runtime_failure)?;
+        let mut artifact_digests = clip_identities.artifact_digests();
+        artifact_digests.insert("model.safetensors".to_owned(), model_digest);
+        artifact_digests.insert("tokenizer.sd1".to_owned(), tokenizer_digest);
         Ok(CacheDependencies {
-            artifact_digests: BTreeMap::from([
-                ("model.safetensors".to_owned(), model_digest),
-                ("tokenizer.sd1".to_owned(), tokenizer_digest),
-            ]),
+            artifact_digests,
             ..CacheDependencies::default()
         })
     }
@@ -1403,6 +1492,21 @@ impl NativeNode for ClipTextEncodeNode {
         NATIVE_DIFFUSION_REGISTRY_VERSION
     }
 
+    fn cache_dependencies(
+        &self,
+        _inputs: &BTreeMap<String, Value>,
+    ) -> Result<CacheDependencies, NodeFailure> {
+        Ok(CacheDependencies {
+            artifact_digests: self
+                .state
+                .provider
+                .clip_cache_identities()
+                .map_err(runtime_failure)?
+                .artifact_digests(),
+            ..CacheDependencies::default()
+        })
+    }
+
     fn execute<'a>(
         &'a self,
         context: NodeContext,
@@ -1416,12 +1520,9 @@ impl NativeNode for ClipTextEncodeNode {
                 .resolve(&handle, NativeDiffusionRole::Clip, &tensor_context)
                 .map_err(runtime_failure)?;
             let text = required_string(&inputs, "text")?;
-            let tokens = encode_sd15_prompt(&bundle.tokenizer, text, tensor_context.cancellation)
-                .map_err(diffusion_failure)?;
-            let conditioning = bundle
-                .model
-                .encode_text(&tokens, &tensor_context)
-                .map_err(diffusion_failure)?;
+            let (tokens, conditioning) = bundle
+                .encode_text(text, &tensor_context)
+                .map_err(runtime_failure)?;
             let conditioning = self
                 .tensors
                 .lock()
@@ -4334,6 +4435,20 @@ mod tests {
 
         fn tokenizer_digest(&self) -> Result<String, NativeImageRuntimeError> {
             Ok("1".repeat(64))
+        }
+
+        fn clip_cache_identities(
+            &self,
+        ) -> Result<CanonicalClipCacheIdentities, NativeImageRuntimeError> {
+            CanonicalClipCacheIdentities::checked(
+                "1".repeat(64),
+                "2".repeat(64),
+                "0".repeat(64),
+                "3".repeat(64),
+                "4".repeat(64),
+                "5".repeat(64),
+            )
+            .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))
         }
 
         fn load(

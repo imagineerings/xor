@@ -1,5 +1,4 @@
 use comfy_media::{PngLimits, decode_png};
-use comfy_model::generated_native_diffusion::encode_sd15_prompt;
 use comfy_runtime::{
     AttemptState, NATIVE_DIFFUSION_REGISTRY_VERSION, NativeDiffusionProvider,
     NativeImageOutputProposal, NativeImageWorkerEvent, NativeImageWorkerPlan, OutputCommitter,
@@ -357,16 +356,10 @@ fn cancellation_at_every_denoiser_evaluation(
     let loading_cancellation = CancellationToken::default();
     let loading_context =
         backend.execution_context(StreamId::DEFAULT, workspace.clone(), &loading_cancellation);
-    let model = fixture.load_model_with_context(backend.clone(), &loading_context)?;
-    let tokenizer = fixture.tokenizer()?;
-    let positive = model.encode_text(
-        &encode_sd15_prompt(&tokenizer, "a test", &loading_cancellation)?,
-        &loading_context,
-    )?;
-    let negative = model.encode_text(
-        &encode_sd15_prompt(&tokenizer, "", &loading_cancellation)?,
-        &loading_context,
-    )?;
+    let bundle = fixture.load_bundle_with_context(backend.clone(), &loading_context)?;
+    let model = bundle.model();
+    let (_, positive) = bundle.encode_text("a test", &loading_context)?;
+    let (_, negative) = bundle.encode_text("", &loading_context)?;
     let plan = checked_native_diffusion_plan("euler", "normal", 0, 4, 7.0, 1.0)?;
     for cancellation_step in 0..4 {
         let cancellation = CancellationToken::default();
@@ -374,7 +367,8 @@ fn cancellation_at_every_denoiser_evaluation(
             backend.execution_context(StreamId::DEFAULT, workspace.clone(), &cancellation);
         let sigmas = normal_sigmas(&backend, &context, 4, 1.0)?;
         let initial = tensor_from_f32(&backend, &[1, 4, 4, 4], &[0.0; 64], &context)?;
-        let mut guidance = Sd15GuidanceAdapter::checked(&model, &positive, &negative, &context)?;
+        let mut guidance =
+            Sd15GuidanceAdapter::checked(model.as_ref(), &positive, &negative, &context)?;
         let mut reached_step = None;
         let result = sample_euler(
             &backend,

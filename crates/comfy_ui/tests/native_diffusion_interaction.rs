@@ -1,8 +1,9 @@
 use comfy_runtime::{
-    CompiledPlan, ExecutionControlCommand, ExecutionControlCommandKind, ExecutionController,
-    ExecutionDataSource, ExecutionFailure, ExecutionPresentationService, ExecutionSnapshotStatus,
-    GraphCommand, NativeDiffusionBundle, NativeDiffusionProvider, NativeImageRuntimeError,
-    ProfileId, WorkflowStorageProvider, compile_native_diffusion_workflow,
+    CanonicalClipCacheIdentities, CompiledPlan, ExecutionControlCommand,
+    ExecutionControlCommandKind, ExecutionController, ExecutionDataSource, ExecutionFailure,
+    ExecutionPresentationService, ExecutionSnapshotStatus, GraphCommand, NativeDiffusionBundle,
+    NativeDiffusionProvider, NativeImageRuntimeError, ProfileId, WorkflowStorageProvider,
+    compile_native_diffusion_workflow,
 };
 use comfy_tensor::{CpuBackend, ExecutionContext};
 use comfy_types::AttemptId;
@@ -31,6 +32,20 @@ impl NativeDiffusionProvider for CompileOnlyProvider {
 
     fn tokenizer_digest(&self) -> Result<String, NativeImageRuntimeError> {
         Ok("1".repeat(64))
+    }
+
+    fn clip_cache_identities(
+        &self,
+    ) -> Result<CanonicalClipCacheIdentities, NativeImageRuntimeError> {
+        CanonicalClipCacheIdentities::checked(
+            "1".repeat(64),
+            "2".repeat(64),
+            "0".repeat(64),
+            "3".repeat(64),
+            "4".repeat(64),
+            "5".repeat(64),
+        )
+        .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))
     }
 
     fn load(

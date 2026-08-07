@@ -6,6 +6,93 @@ use thiserror::Error;
 
 pub const CACHE_SCHEMA_VERSION: u16 = 1;
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct CanonicalClipCacheIdentities {
+    tokenizer: String,
+    architecture: String,
+    artifact: String,
+    model: String,
+    patch: String,
+    execution: String,
+}
+
+impl CanonicalClipCacheIdentities {
+    pub fn checked(
+        tokenizer: impl Into<String>,
+        architecture: impl Into<String>,
+        artifact: impl Into<String>,
+        model: impl Into<String>,
+        patch: impl Into<String>,
+        execution: impl Into<String>,
+    ) -> Result<Self, NativeCacheError> {
+        let identities = Self {
+            tokenizer: tokenizer.into(),
+            architecture: architecture.into(),
+            artifact: artifact.into(),
+            model: model.into(),
+            patch: patch.into(),
+            execution: execution.into(),
+        };
+        if identities
+            .ordered()
+            .into_iter()
+            .any(|(_, digest)| !is_sha256(digest))
+        {
+            return Err(NativeCacheError::InvalidDependencyIdentity);
+        }
+        Ok(identities)
+    }
+
+    pub fn artifact_digests(&self) -> BTreeMap<String, String> {
+        self.ordered()
+            .into_iter()
+            .map(|(name, digest)| (name.to_owned(), digest.to_owned()))
+            .collect()
+    }
+
+    pub fn tokenizer(&self) -> &str {
+        &self.tokenizer
+    }
+
+    pub fn architecture(&self) -> &str {
+        &self.architecture
+    }
+
+    pub fn artifact(&self) -> &str {
+        &self.artifact
+    }
+
+    pub fn model(&self) -> &str {
+        &self.model
+    }
+
+    pub fn patch(&self) -> &str {
+        &self.patch
+    }
+
+    pub fn execution(&self) -> &str {
+        &self.execution
+    }
+
+    fn ordered(&self) -> [(&'static str, &str); 6] {
+        [
+            ("clip.architecture", &self.architecture),
+            ("clip.artifact", &self.artifact),
+            ("clip.execution", &self.execution),
+            ("clip.model", &self.model),
+            ("clip.patch", &self.patch),
+            ("clip.tokenizer", &self.tokenizer),
+        ]
+    }
+}
+
+fn is_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct CacheKey {
     pub node_class: String,
@@ -425,5 +512,74 @@ pub(crate) mod tests {
             ("cache_lru_targeted_invalidation", true),
             ("cache_demanded_dependency_identity", true),
         ])
+    }
+
+    #[test]
+    fn canonical_clip_cache_identities_bind_every_execution_owner() -> Result<(), NativeCacheError>
+    {
+        let identities = CanonicalClipCacheIdentities::checked(
+            "1".repeat(64),
+            "2".repeat(64),
+            "3".repeat(64),
+            "4".repeat(64),
+            "5".repeat(64),
+            "6".repeat(64),
+        )?;
+        let dependencies = identities.artifact_digests();
+        assert_eq!(dependencies.len(), 6);
+        assert_eq!(dependencies.get("clip.tokenizer"), Some(&"1".repeat(64)));
+        let base = CacheKey::from_inputs_with_dependencies(
+            "CLIPTextEncode",
+            "1",
+            &BTreeMap::from([("text".to_owned(), json!("a test"))]),
+            BTreeMap::new(),
+            dependencies,
+            "cpu",
+            "f32",
+            None,
+            None,
+            "config-v1",
+            "registry-v1",
+            "stable",
+        )?;
+        for changed in 0..6 {
+            let mut values = ["1", "2", "3", "4", "5", "6"].map(|value| value.repeat(64));
+            values[changed] = "a".repeat(64);
+            let changed = CanonicalClipCacheIdentities::checked(
+                values[0].clone(),
+                values[1].clone(),
+                values[2].clone(),
+                values[3].clone(),
+                values[4].clone(),
+                values[5].clone(),
+            )?;
+            let key = CacheKey::from_inputs_with_dependencies(
+                "CLIPTextEncode",
+                "1",
+                &BTreeMap::from([("text".to_owned(), json!("a test"))]),
+                BTreeMap::new(),
+                changed.artifact_digests(),
+                "cpu",
+                "f32",
+                None,
+                None,
+                "config-v1",
+                "registry-v1",
+                "stable",
+            )?;
+            assert_ne!(base.identity()?, key.identity()?);
+        }
+        assert!(
+            CanonicalClipCacheIdentities::checked(
+                "not-a-digest",
+                "2".repeat(64),
+                "3".repeat(64),
+                "4".repeat(64),
+                "5".repeat(64),
+                "6".repeat(64),
+            )
+            .is_err()
+        );
+        Ok(())
     }
 }

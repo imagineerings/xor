@@ -1521,6 +1521,13 @@ fn canonical_candidate_matches(
     if tokenizer == architecture.tokenizer() && clip_model == architecture.clip_model() {
         return true;
     }
+    if architecture.tokenizer() == "comfy.sd1_clip.SD1Tokenizer"
+        && architecture.clip_model() == "comfy.sd1_clip.SD1ClipModel"
+        && tokenizer == "comfy.sd1.tokenizer"
+        && clip_model == "comfy.sd1.clip"
+    {
+        return true;
+    }
     architecture.tokenizer() == "comfy.text_encoders.cogvideo.CogVideoXTokenizer"
         && architecture.clip_model() == "comfy.text_encoders.cogvideo.cogvideo_te"
         && tokenizer == "comfy.text_encoders.cogvideo.CogVideoXT5Tokenizer"
@@ -2734,6 +2741,442 @@ pub trait NativeTextEncoder: Send + Sync {
 pub type Sd1ClipLayerTensors = ClipTextLayerWeights;
 pub type Sd1ClipTensors = ClipTextWeights;
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct Sd1ClipParameterLayout {
+    name: String,
+    shape: Vec<u64>,
+}
+
+impl Sd1ClipParameterLayout {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn shape(&self) -> &[u64] {
+        &self.shape
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Sd1ClipArtifactProfile {
+    source_prefix: String,
+    vocabulary_size: usize,
+    context_length: usize,
+    hidden_width: usize,
+    intermediate_width: usize,
+    layer_count: usize,
+    attention_heads: usize,
+    parameters: Vec<Sd1ClipParameterLayout>,
+    digest: String,
+}
+
+impl Sd1ClipArtifactProfile {
+    #[allow(clippy::too_many_arguments)]
+    pub fn checked(
+        source_prefix: impl Into<String>,
+        vocabulary_size: usize,
+        context_length: usize,
+        hidden_width: usize,
+        intermediate_width: usize,
+        layer_count: usize,
+        attention_heads: usize,
+    ) -> Result<Self, ClipError> {
+        let source_prefix = source_prefix.into();
+        if source_prefix.is_empty()
+            || !source_prefix.ends_with('.')
+            || source_prefix.contains('\0')
+            || vocabulary_size == 0
+            || context_length < 2
+            || hidden_width == 0
+            || intermediate_width == 0
+            || layer_count == 0
+            || attention_heads == 0
+            || !hidden_width.is_multiple_of(attention_heads)
+        {
+            return Err(ClipError::InvalidEncoderShape);
+        }
+        let mut parameters = Vec::new();
+        let mut add = |suffix: String, shape: Vec<u64>| {
+            parameters.push(Sd1ClipParameterLayout {
+                name: format!("{source_prefix}{suffix}"),
+                shape,
+            });
+        };
+        add(
+            "text_model.embeddings.token_embedding.weight".to_owned(),
+            vec![
+                u64_from_usize(vocabulary_size)?,
+                u64_from_usize(hidden_width)?,
+            ],
+        );
+        add(
+            "text_model.embeddings.position_embedding.weight".to_owned(),
+            vec![
+                u64_from_usize(context_length)?,
+                u64_from_usize(hidden_width)?,
+            ],
+        );
+        for layer in 0..layer_count {
+            let prefix = format!("text_model.encoder.layers.{layer}");
+            for norm in ["layer_norm1", "layer_norm2"] {
+                add(
+                    format!("{prefix}.{norm}.weight"),
+                    vec![u64_from_usize(hidden_width)?],
+                );
+                add(
+                    format!("{prefix}.{norm}.bias"),
+                    vec![u64_from_usize(hidden_width)?],
+                );
+            }
+            for projection in ["q_proj", "k_proj", "v_proj", "out_proj"] {
+                add(
+                    format!("{prefix}.self_attn.{projection}.weight"),
+                    vec![u64_from_usize(hidden_width)?, u64_from_usize(hidden_width)?],
+                );
+                add(
+                    format!("{prefix}.self_attn.{projection}.bias"),
+                    vec![u64_from_usize(hidden_width)?],
+                );
+            }
+            add(
+                format!("{prefix}.mlp.fc1.weight"),
+                vec![
+                    u64_from_usize(intermediate_width)?,
+                    u64_from_usize(hidden_width)?,
+                ],
+            );
+            add(
+                format!("{prefix}.mlp.fc1.bias"),
+                vec![u64_from_usize(intermediate_width)?],
+            );
+            add(
+                format!("{prefix}.mlp.fc2.weight"),
+                vec![
+                    u64_from_usize(hidden_width)?,
+                    u64_from_usize(intermediate_width)?,
+                ],
+            );
+            add(
+                format!("{prefix}.mlp.fc2.bias"),
+                vec![u64_from_usize(hidden_width)?],
+            );
+        }
+        add(
+            "text_model.final_layer_norm.weight".to_owned(),
+            vec![u64_from_usize(hidden_width)?],
+        );
+        add(
+            "text_model.final_layer_norm.bias".to_owned(),
+            vec![u64_from_usize(hidden_width)?],
+        );
+        parameters.sort_by(|left, right| left.name.cmp(&right.name));
+        if parameters
+            .windows(2)
+            .any(|pair| pair[0].name == pair[1].name)
+        {
+            return Err(ClipError::InvalidParameterManifest(
+                "SD1 CLIP artifact layout contains duplicate parameters".to_owned(),
+            ));
+        }
+        let encoded = serde_json::to_vec(&(
+            &source_prefix,
+            vocabulary_size,
+            context_length,
+            hidden_width,
+            intermediate_width,
+            layer_count,
+            attention_heads,
+            &parameters,
+        ))
+        .map_err(|error| ClipError::IdentitySerialization(error.to_string()))?;
+        Ok(Self {
+            source_prefix,
+            vocabulary_size,
+            context_length,
+            hidden_width,
+            intermediate_width,
+            layer_count,
+            attention_heads,
+            parameters,
+            digest: sha256(&encoded),
+        })
+    }
+
+    pub fn source_prefix(&self) -> &str {
+        &self.source_prefix
+    }
+
+    pub fn parameters(&self) -> &[Sd1ClipParameterLayout] {
+        &self.parameters
+    }
+
+    pub fn digest(&self) -> &str {
+        &self.digest
+    }
+
+    pub fn bind_execution(
+        &self,
+        family: ModelFamilyIdentity,
+        artifact_digest: &str,
+        patch_graph: &PatchGraph,
+        tokenizer_identity: TokenizerIdentity,
+    ) -> Result<Sd1ClipExecutionBinding, ClipError> {
+        validate_sha256("artifact", artifact_digest)?;
+        let patch_identity = patch_graph.identity();
+        let architecture = self.projected_architecture()?;
+        let candidate =
+            ModelClipTargetCandidateDescriptor::checked("comfy.sd1.tokenizer", "comfy.sd1.clip")
+                .map_err(|error| ClipError::InvalidParameterManifest(error.to_string()))?;
+        let target = ModelClipTargetDescriptor::checked(vec![candidate], false)
+            .map_err(|error| ClipError::InvalidParameterManifest(error.to_string()))?;
+        let domain = ClipLoadDomain::checked_facts(
+            family,
+            target,
+            ClipType::StableDiffusion,
+            architecture.clone(),
+            vec![artifact_digest.to_owned()],
+            patch_identity,
+            self.digest(),
+            DType::F32,
+            DeviceId::CPU,
+        )?;
+        let plan = ClipExecutionPlan::checked_from_domain(
+            &domain,
+            tokenizer_identity,
+            ClipLayerSelection::Final,
+            ClipPooling::None,
+            self.context_length,
+            self.hidden_width,
+        )?;
+        Ok(Sd1ClipExecutionBinding {
+            architecture,
+            profile_identity: self.digest.clone(),
+            plan,
+        })
+    }
+
+    fn projected_architecture(&self) -> Result<ClipArchitectureSelection, ClipError> {
+        let tensor_shapes = self
+            .parameters
+            .iter()
+            .map(|parameter| {
+                parameter
+                    .name
+                    .strip_prefix(&self.source_prefix)
+                    .map(|name| (name.to_owned(), parameter.shape.clone()))
+                    .ok_or_else(|| {
+                        ClipError::InvalidParameterManifest(
+                            "SD1 CLIP parameter escaped its source prefix".to_owned(),
+                        )
+                    })
+            })
+            .collect::<Result<BTreeMap<_, _>, _>>()?;
+        select_clip_architecture(
+            ClipType::StableDiffusion,
+            &[ModelProbe {
+                tensor_shapes,
+                metadata: BTreeMap::new(),
+            }],
+        )
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Sd1ClipExecutionBinding {
+    architecture: ClipArchitectureSelection,
+    profile_identity: String,
+    plan: ClipExecutionPlan,
+}
+
+impl Sd1ClipExecutionBinding {
+    pub fn architecture(&self) -> &ClipArchitectureSelection {
+        &self.architecture
+    }
+
+    pub fn plan(&self) -> &ClipExecutionPlan {
+        &self.plan
+    }
+
+    pub fn profile_identity(&self) -> &str {
+        &self.profile_identity
+    }
+}
+
+#[derive(Debug)]
+pub struct LoadedSd1Clip {
+    binding: Sd1ClipExecutionBinding,
+    encoder: Sd1ClipTextEncoder,
+}
+
+impl LoadedSd1Clip {
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_model_store(
+        profile: &Sd1ClipArtifactProfile,
+        binding: Sd1ClipExecutionBinding,
+        store: &ModelStore,
+        index: &ArtifactIndex,
+        loaded: &LoadedModel,
+        backend: Arc<CpuBackend>,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Self, ClipError> {
+        context.check()?;
+        if loaded.identity() != binding.plan().artifact_identity().as_str()
+            || profile.digest() != binding.profile_identity()
+        {
+            return Err(ClipError::BindingMismatch);
+        }
+        let expected = profile
+            .parameters
+            .iter()
+            .map(|parameter| parameter.name.as_str())
+            .collect::<BTreeSet<_>>();
+        let actual = loaded
+            .tensors()
+            .keys()
+            .filter(|name| name.starts_with(profile.source_prefix()))
+            .map(String::as_str)
+            .collect::<BTreeSet<_>>();
+        if expected != actual {
+            return Err(ClipError::ParameterSetMismatch {
+                artifact_index: 0,
+                missing: expected
+                    .difference(&actual)
+                    .map(|name| (*name).to_owned())
+                    .collect(),
+                unexpected: actual
+                    .difference(&expected)
+                    .map(|name| (*name).to_owned())
+                    .collect(),
+            });
+        }
+        let mut bytes = store.read_tensors(
+            index,
+            loaded,
+            profile
+                .parameters
+                .iter()
+                .map(|parameter| parameter.name.as_str()),
+            context.cancellation,
+        )?;
+        let mut tensors = BTreeMap::new();
+        for parameter in &profile.parameters {
+            context.check()?;
+            let metadata = loaded
+                .tensors()
+                .get(&parameter.name)
+                .ok_or_else(|| ClipError::MissingManifestParameter(parameter.name.clone()))?;
+            if metadata.shape != parameter.shape {
+                return Err(ClipError::ManifestParameterShape {
+                    name: parameter.name.clone(),
+                    expected: parameter.shape.clone(),
+                    actual: metadata.shape.clone(),
+                });
+            }
+            if metadata.data_type != "F32" {
+                return Err(ClipError::ManifestParameterDType {
+                    name: parameter.name.clone(),
+                    expected: "F32".to_owned(),
+                    actual: metadata.data_type.clone(),
+                });
+            }
+            let encoded = bytes
+                .remove(&metadata.name)
+                .ok_or_else(|| ClipError::MissingManifestParameter(metadata.name.clone()))?;
+            if !encoded.len().is_multiple_of(std::mem::size_of::<f32>()) {
+                return Err(ClipError::InvalidParameterBytes(metadata.name.clone()));
+            }
+            let mut values = backend.workspace_vec(context, encoded.len() / 4)?;
+            for (index, chunk) in encoded.chunks_exact(4).enumerate() {
+                if index.is_multiple_of(64) {
+                    context.check()?;
+                }
+                let value = <[u8; 4]>::try_from(chunk)
+                    .map_err(|_| ClipError::InvalidParameterBytes(metadata.name.clone()))?;
+                values.try_push(f32::from_le_bytes(value))?;
+            }
+            let tensor = tensor_from_f32(&backend, &parameter.shape, &values, context)?;
+            tensors.insert(parameter.name.clone(), tensor);
+        }
+        if !bytes.is_empty() {
+            return Err(ClipError::NativeProjectionSetMismatch);
+        }
+        let clip_tensors = profile.take_tensors(&mut tensors)?;
+        if !tensors.is_empty() {
+            return Err(ClipError::NativeProjectionSetMismatch);
+        }
+        let parameters = Sd1ClipParameters::checked_for_plan(
+            binding.plan(),
+            clip_tensors,
+            profile.vocabulary_size,
+            profile.attention_heads,
+        )?;
+        let encoder = Sd1ClipTextEncoder::new(backend, parameters)?;
+        Ok(Self { binding, encoder })
+    }
+
+    pub fn architecture(&self) -> &ClipArchitectureSelection {
+        self.binding.architecture()
+    }
+
+    pub fn plan(&self) -> &ClipExecutionPlan {
+        self.binding.plan()
+    }
+
+    pub fn execute(
+        &self,
+        batch: &TokenBatch,
+        context: &ExecutionContext<'_>,
+    ) -> Result<ClipEncoding, ClipError> {
+        self.encoder.execute(self.binding.plan(), batch, context)
+    }
+}
+
+impl Sd1ClipArtifactProfile {
+    fn take_tensors(
+        &self,
+        tensors: &mut BTreeMap<String, Tensor>,
+    ) -> Result<Sd1ClipTensors, ClipError> {
+        let take = |tensors: &mut BTreeMap<String, Tensor>, suffix: &str| {
+            let name = format!("{}{suffix}", self.source_prefix);
+            tensors
+                .remove(&name)
+                .ok_or(ClipError::MissingManifestParameter(name))
+        };
+        let mut layers = Vec::new();
+        layers
+            .try_reserve_exact(self.layer_count)
+            .map_err(|_| ClipError::Allocation("SD1 CLIP layers"))?;
+        for layer in 0..self.layer_count {
+            let prefix = format!("text_model.encoder.layers.{layer}");
+            layers.push(Sd1ClipLayerTensors {
+                layer_norm_1_weight: take(tensors, &format!("{prefix}.layer_norm1.weight"))?,
+                layer_norm_1_bias: take(tensors, &format!("{prefix}.layer_norm1.bias"))?,
+                query_weight: take(tensors, &format!("{prefix}.self_attn.q_proj.weight"))?,
+                query_bias: take(tensors, &format!("{prefix}.self_attn.q_proj.bias"))?,
+                key_weight: take(tensors, &format!("{prefix}.self_attn.k_proj.weight"))?,
+                key_bias: take(tensors, &format!("{prefix}.self_attn.k_proj.bias"))?,
+                value_weight: take(tensors, &format!("{prefix}.self_attn.v_proj.weight"))?,
+                value_bias: take(tensors, &format!("{prefix}.self_attn.v_proj.bias"))?,
+                output_weight: take(tensors, &format!("{prefix}.self_attn.out_proj.weight"))?,
+                output_bias: take(tensors, &format!("{prefix}.self_attn.out_proj.bias"))?,
+                layer_norm_2_weight: take(tensors, &format!("{prefix}.layer_norm2.weight"))?,
+                layer_norm_2_bias: take(tensors, &format!("{prefix}.layer_norm2.bias"))?,
+                feed_forward_1_weight: take(tensors, &format!("{prefix}.mlp.fc1.weight"))?,
+                feed_forward_1_bias: take(tensors, &format!("{prefix}.mlp.fc1.bias"))?,
+                feed_forward_2_weight: take(tensors, &format!("{prefix}.mlp.fc2.weight"))?,
+                feed_forward_2_bias: take(tensors, &format!("{prefix}.mlp.fc2.bias"))?,
+            });
+        }
+        Ok(Sd1ClipTensors {
+            token_embedding: take(tensors, "text_model.embeddings.token_embedding.weight")?,
+            position_embedding: take(tensors, "text_model.embeddings.position_embedding.weight")?,
+            layers,
+            final_layer_norm_weight: take(tensors, "text_model.final_layer_norm.weight")?,
+            final_layer_norm_bias: take(tensors, "text_model.final_layer_norm.bias")?,
+        })
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Sd1ClipParameters {
     artifact_identity: ClipBindingIdentity,
@@ -3106,6 +3549,8 @@ pub enum ClipError {
         expected: String,
         actual: String,
     },
+    #[error("CLIP parameter {0} has invalid f32 bytes")]
+    InvalidParameterBytes(String),
     #[error("native CLIP projection does not match parameter {0}")]
     NativeProjectionMismatch(String),
     #[error("native CLIP projection contains a missing or unexpected parameter")]
@@ -3738,6 +4183,10 @@ fn u64_bytes(value: usize) -> Result<[u8; 8], ClipError> {
     Ok(u64::try_from(value)
         .map_err(|_| ClipError::Overflow("identity field"))?
         .to_le_bytes())
+}
+
+fn u64_from_usize(value: usize) -> Result<u64, ClipError> {
+    u64::try_from(value).map_err(|_| ClipError::Overflow("parameter dimension"))
 }
 
 #[cfg(test)]

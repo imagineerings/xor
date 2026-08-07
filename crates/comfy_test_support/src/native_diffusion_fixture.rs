@@ -3,10 +3,14 @@ use comfy_model::{
     clip::NativeTokenizer,
     generated_native_diffusion::{
         NativeDiffusionModelError, Sd1Tokenizer, Sd15DetectorProjection, Sd15TinyModel,
-        admit_reduced_fixture, load_sd15_tokenizer,
+        admit_reduced_fixture, bind_sd15_clip_execution, load_sd15_clip_execution,
+        load_sd15_tokenizer,
     },
 };
-use comfy_runtime::{NativeDiffusionBundle, NativeDiffusionProvider, NativeImageRuntimeError};
+use comfy_runtime::{
+    CanonicalClipCacheIdentities, NativeDiffusionBundle, NativeDiffusionProvider,
+    NativeImageRuntimeError,
+};
 use comfy_tensor::{
     CancellationToken, CpuBackend, CpuWorkspaceAuthority, ExecutionContext, StreamId,
 };
@@ -82,6 +86,74 @@ impl NativeDiffusionFixture {
         backend: Arc<CpuBackend>,
         context: &ExecutionContext<'_>,
     ) -> Result<Sd15TinyModel, NativeDiffusionFixtureError> {
+        let (store, index, loaded, _projection, admission) =
+            self.load_checkpoint(context.cancellation)?;
+        Ok(Sd15TinyModel::load_reduced_fixture(
+            &store, &index, &loaded, &admission, backend, context,
+        )?)
+    }
+
+    pub fn load_bundle_with_context(
+        &self,
+        backend: Arc<CpuBackend>,
+        context: &ExecutionContext<'_>,
+    ) -> Result<NativeDiffusionBundle, NativeDiffusionFixtureError> {
+        let tokenizer = Arc::new(self.tokenizer()?);
+        let (store, index, loaded, projection, admission) =
+            self.load_checkpoint(context.cancellation)?;
+        let model = Arc::new(Sd15TinyModel::load_reduced_fixture(
+            &store,
+            &index,
+            &loaded,
+            &admission,
+            backend.clone(),
+            context,
+        )?);
+        let clip = Arc::new(load_sd15_clip_execution(
+            &store,
+            &index,
+            &loaded,
+            &projection,
+            tokenizer.identity().clone(),
+            backend,
+            context,
+        )?);
+        NativeDiffusionBundle::new("sd15-tiny-v1", loaded.identity(), model, tokenizer, clip)
+            .map_err(|error| NativeDiffusionFixtureError::Runtime(error.to_string()))
+    }
+
+    pub fn load_clip_with_context(
+        &self,
+        backend: Arc<CpuBackend>,
+        context: &ExecutionContext<'_>,
+    ) -> Result<comfy_model::clip::LoadedSd1Clip, NativeDiffusionFixtureError> {
+        let tokenizer = self.tokenizer()?;
+        let (store, index, loaded, projection, _admission) =
+            self.load_checkpoint(context.cancellation)?;
+        Ok(load_sd15_clip_execution(
+            &store,
+            &index,
+            &loaded,
+            &projection,
+            tokenizer.identity().clone(),
+            backend,
+            context,
+        )?)
+    }
+
+    fn load_checkpoint(
+        &self,
+        cancellation: &CancellationToken,
+    ) -> Result<
+        (
+            ModelStore,
+            ArtifactIndex,
+            Arc<comfy_model::LoadedModel>,
+            Sd15DetectorProjection,
+            comfy_model::generated_native_diffusion::ReducedFixtureAdmission,
+        ),
+        NativeDiffusionFixtureError,
+    > {
         let detector_bytes = self.read("sd15-detector-projection.json")?;
         let projection: Sd15DetectorProjection = serde_json::from_slice(&detector_bytes)?;
         projection.detect()?;
@@ -94,13 +166,11 @@ impl NativeDiffusionFixture {
             &self.root,
             ["safetensors"],
         )?)?;
-        index.refresh(context.cancellation)?;
+        index.refresh(cancellation)?;
         let key = ArtifactKey::new("sd15-tiny-fixture", "model.safetensors")?;
         let mut store = ModelStore::new(ParserLimits::default())?;
-        let loaded = store.load(&index, &key, context.cancellation)?;
-        Ok(Sd15TinyModel::load_reduced_fixture(
-            &store, &index, &loaded, &admission, backend, context,
-        )?)
+        let loaded = store.load(&index, &key, cancellation)?;
+        Ok((store, index, loaded, projection, admission))
     }
 }
 
@@ -124,24 +194,37 @@ impl NativeDiffusionProvider for NativeDiffusionFixture {
             .to_owned())
     }
 
+    fn clip_cache_identities(
+        &self,
+    ) -> Result<CanonicalClipCacheIdentities, NativeImageRuntimeError> {
+        let tokenizer = self
+            .tokenizer()
+            .map_err(|error| NativeImageRuntimeError::Asset(error.to_string()))?;
+        let projection = self
+            .detector_projection()
+            .map_err(|error| NativeImageRuntimeError::Asset(error.to_string()))?;
+        let model_digest = self.model_digest()?;
+        let (_, binding) =
+            bind_sd15_clip_execution(&projection, &model_digest, tokenizer.identity().clone())
+                .map_err(|error| NativeImageRuntimeError::Asset(error.to_string()))?;
+        CanonicalClipCacheIdentities::checked(
+            tokenizer.identity().digest(),
+            binding.architecture().digest(),
+            binding.plan().artifact_identity().as_str(),
+            binding.plan().model_identity().as_str(),
+            binding.plan().patch_identity().as_str(),
+            binding.plan().digest(),
+        )
+        .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))
+    }
+
     fn load(
         &self,
         backend: Arc<CpuBackend>,
         context: &ExecutionContext<'_>,
     ) -> Result<NativeDiffusionBundle, NativeImageRuntimeError> {
-        let model_digest = self.model_digest()?;
-        let tokenizer = self
-            .tokenizer()
-            .map_err(|error| NativeImageRuntimeError::Asset(error.to_string()))?;
-        let model = self
-            .load_model_with_context(backend, context)
-            .map_err(|error| NativeImageRuntimeError::Execution(error.to_string()))?;
-        NativeDiffusionBundle::new(
-            "sd15-tiny-v1",
-            model_digest,
-            Arc::new(model),
-            Arc::new(tokenizer),
-        )
+        self.load_bundle_with_context(backend, context)
+            .map_err(|error| NativeImageRuntimeError::Execution(error.to_string()))
     }
 }
 
@@ -163,4 +246,6 @@ pub enum NativeDiffusionFixtureError {
     Store(#[from] comfy_model::ModelStoreError),
     #[error(transparent)]
     Tensor(#[from] comfy_tensor::TensorError),
+    #[error("native diffusion runtime fixture error: {0}")]
+    Runtime(String),
 }

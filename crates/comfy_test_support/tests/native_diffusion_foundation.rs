@@ -183,6 +183,25 @@ fn native_diffusion_fixture_rejects_invalid_weight_keys_and_shapes()
 }
 
 #[test]
+fn canonical_clip_load_is_failure_atomic_and_workspace_bounded()
+-> Result<(), Box<dyn std::error::Error>> {
+    let fixture = NativeDiffusionFixture::checked_in();
+    let cancellation = CancellationToken::default();
+    let (backend, workspace_authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+    let backend = Arc::new(backend);
+    let workspace = workspace_authority.authorize_workspace(1024 * 1024)?;
+    let context = backend.execution_context(StreamId::DEFAULT, workspace.clone(), &cancellation);
+    assert!(
+        fixture
+            .load_clip_with_context(backend.clone(), &context)
+            .is_err()
+    );
+    assert_eq!(workspace.in_use_bytes(), 0);
+    assert_eq!(backend.memory_snapshot().current_bytes, 0);
+    Ok(())
+}
+
+#[test]
 fn native_diffusion_fixture_matches_all_checkpoints() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = NativeDiffusionFixture::checked_in();
     let cancellation = CancellationToken::default();
@@ -198,7 +217,8 @@ fn native_diffusion_fixture_matches_all_checkpoints() -> Result<(), Box<dyn std:
     let backend = Arc::new(backend);
     let workspace = workspace_authority.authorize_workspace(MEMORY_LIMIT)?;
     let context = backend.execution_context(StreamId::DEFAULT, workspace.clone(), &cancellation);
-    let model = Arc::new(fixture.load_model_with_context(backend.clone(), &context)?);
+    let bundle = fixture.load_bundle_with_context(backend.clone(), &context)?;
+    let model = bundle.model().clone();
     let model_digest = fixture.model_digest()?;
     let vocabulary = String::from_utf8(fixture.read("vocab.json")?)?;
     let merges = String::from_utf8(fixture.read("merges.txt")?)?;
@@ -213,6 +233,7 @@ fn native_diffusion_fixture_matches_all_checkpoints() -> Result<(), Box<dyn std:
             model_digest.clone(),
             model.clone(),
             Arc::new(wrong_descriptor),
+            bundle.clip().clone(),
         )
         .is_err()
     );
@@ -240,18 +261,24 @@ fn native_diffusion_fixture_matches_all_checkpoints() -> Result<(), Box<dyn std:
         &alternate_vocabulary,
         &merges,
     )?;
-    let alternate_bundle = NativeDiffusionBundle::new(
-        "sd15-tiny-v1",
-        model_digest,
-        model.clone(),
-        Arc::new(alternate_tokenizer),
-    )?;
     assert_ne!(
-        alternate_bundle.tokenizer_digest(),
+        alternate_tokenizer.identity().digest(),
         fixture.tokenizer_digest()?
     );
-    let positive = model.encode_text(&positive_tokens, &context)?;
-    let negative = model.encode_text(&negative_tokens, &context)?;
+    assert!(
+        NativeDiffusionBundle::new(
+            "sd15-tiny-v1",
+            model_digest,
+            model.clone(),
+            Arc::new(alternate_tokenizer),
+            bundle.clip().clone(),
+        )
+        .is_err()
+    );
+    let (canonical_positive_tokens, positive) = bundle.encode_text("a test", &context)?;
+    let (canonical_negative_tokens, negative) = bundle.encode_text("", &context)?;
+    assert_eq!(canonical_positive_tokens, positive_tokens);
+    assert_eq!(canonical_negative_tokens, negative_tokens);
     assert_tensor_file(
         fixture.root().join("clip-conditioning.safetensors"),
         "positive",
@@ -348,6 +375,7 @@ fn native_diffusion_fixture_matches_all_checkpoints() -> Result<(), Box<dyn std:
     let decoded_values = tensor_to_f32(&backend, &decoded, &context)?;
     let expected_decoded = fs::read(fixture.root().join("vae-decoded.f32le"))?;
     assert_eq!(f32_bytes(&decoded_values), expected_decoded);
+    drop(decoded);
     let bhwc = nchw_to_bhwc(&decoded_values, 3, 32, 32)?;
     let png = encode_png_frame(
         &bhwc,
@@ -361,19 +389,18 @@ fn native_diffusion_fixture_matches_all_checkpoints() -> Result<(), Box<dyn std:
     )?;
     assert_eq!(png, fs::read(fixture.root().join("output.png"))?);
 
+    let workspace_before_cancel = workspace.in_use_bytes();
     let cancelled = CancellationToken::default();
     cancelled.cancel();
-    let cancelled_context = backend.execution_context(StreamId::DEFAULT, workspace, &cancelled);
-    assert!(
-        model
-            .encode_text(&positive_tokens, &cancelled_context)
-            .is_err()
-    );
+    let cancelled_context =
+        backend.execution_context(StreamId::DEFAULT, workspace.clone(), &cancelled);
+    assert!(bundle.encode_text("a test", &cancelled_context).is_err());
     assert!(
         fixture
             .load_model(1024, &CancellationToken::default())
             .is_err()
     );
+    assert_eq!(workspace.in_use_bytes(), workspace_before_cancel);
     Ok(())
 }
 
@@ -386,22 +413,16 @@ fn native_diffusion_guidance_adapter_preserves_cfg_and_failure_boundaries()
     let backend = Arc::new(backend);
     let workspace = workspace_authority.authorize_workspace(MEMORY_LIMIT)?;
     let context = backend.execution_context(StreamId::DEFAULT, workspace, &cancellation);
-    let model = fixture.load_model_with_context(backend.clone(), &context)?;
-    let tokenizer = fixture.tokenizer()?;
-    let positive = model.encode_text(
-        &encode_sd15_prompt(&tokenizer, "a test", &cancellation)?,
-        &context,
-    )?;
-    let negative = model.encode_text(
-        &encode_sd15_prompt(&tokenizer, "", &cancellation)?,
-        &context,
-    )?;
+    let bundle = fixture.load_bundle_with_context(backend.clone(), &context)?;
+    let model = bundle.model();
+    let (_, positive) = bundle.encode_text("a test", &context)?;
+    let (_, negative) = bundle.encode_text("", &context)?;
     let latent = tensor_from_f32(&backend, &[1, 4, 4, 4], &[0.0; 64], &context)?;
     let sigma = normal_sigmas(&backend, &context, 4, 1.0)?[0];
     let model_time = sd15_model_time(sigma)?;
 
     let scale_one = checked_native_diffusion_plan("euler", "normal", SEED, 4, 1.0, 1.0)?;
-    let mut adapter = Sd15GuidanceAdapter::checked(&model, &positive, &negative, &context)?;
+    let mut adapter = Sd15GuidanceAdapter::checked(model.as_ref(), &positive, &negative, &context)?;
     let guided = adapter.execute(&backend, &latent, sigma, &scale_one, &context)?;
     let conditional = model.denoise_at_model_time(&latent, model_time, &positive, &context)?;
     assert!(guided.unconditional_skipped());
