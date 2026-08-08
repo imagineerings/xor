@@ -3773,8 +3773,11 @@ version = "0.1.0"
 dependencies = [
  "comfy_tensor",
  "comfy_types",
+ "futures 0.3.32",
  "serde",
  "serde_json",
+ "thiserror 2.0.18",
+ "uuid",
 ]
 
 [[package]]
