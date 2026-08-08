@@ -8474,6 +8474,8 @@ def native_node_runtime_foundation_task(dependency: str) -> dict[str, object]:
             "crates/comfy_runtime/src/executor.rs",
             "crates/comfy_runtime/src/cache.rs",
             "crates/comfy_runtime/src/prompt_compiler.rs",
+            "crates/comfy_runtime/src/execution_presentation.rs",
+            "crates/comfy_runtime/src/queue_history.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
             "crates/comfy_runtime/src/comfy_runtime.rs",
             "crates/comfy_worker/src/comfy_worker.rs",
