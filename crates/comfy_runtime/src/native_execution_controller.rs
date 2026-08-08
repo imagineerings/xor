@@ -9,11 +9,11 @@ use crate::{
     MemoryPolicy, NativeCache, NativeNode, NativeNodeRegistry, NodeContext, NodeFailure,
     NodeFailureKind, NodeOutcome, OutputCommitError, OutputCommitReceipt, OutputCommitter,
     OutputExecutionScope, OutputMediaKind, OutputProposal, PreparedEffect, PreparedEffectRequest,
-    PreparedOutput, ProfileId, PromptCompileError, RuntimeAvailability, RuntimeCachePolicy,
-    RuntimeInputDescriptor, RuntimeNodeDescriptor, RuntimeOutputDescriptor, RuntimeSupervisor,
-    RuntimeSupervisorError, SharedAssetService, SharedExecutionPresentationService,
-    SharedOutputCommitter, ValueType, WorkerLaunchConfig, WorkflowFormatDocument,
-    authorize_native_input_reader, authorize_native_output_committer, graph_to_prompt,
+    PreparedOutput, ProfileId, PromptCompileError, RuntimeCachePolicy, RuntimeNodeDescriptor,
+    RuntimeOutputDescriptor, RuntimeSupervisor, RuntimeSupervisorError, SharedAssetService,
+    SharedExecutionPresentationService, SharedOutputCommitter, WorkerLaunchConfig,
+    WorkflowFormatDocument, authorize_native_input_reader, authorize_native_output_committer,
+    graph_to_prompt,
 };
 use chrono::{Local, Utc};
 #[cfg(test)]
@@ -40,9 +40,12 @@ use comfy_model::{
     },
 };
 use comfy_nodes::{
-    CatalogNodeDescriptor, NativeImageDescriptor, NativeImageDescriptorError, NativeImageEffect,
-    NodeDescriptor, NodeRegistry, PortDescriptor, native_diffusion_descriptors,
-    native_image_descriptors,
+    CatalogNodeDescriptor, NATIVE_NODE_CONTRACT_SCHEMA_VERSION, NativeHandleKind,
+    NativeHandleStoreError, NativeHandleType, NativeImageDescriptor, NativeImageDescriptorError,
+    NativeImageEffect, NativeInputDescriptor, NativeNodeBinding, NativeNodeContractError,
+    NativeNodePresentation, NativeOpaqueHandle, NativePrimitive, NativePrimitiveType,
+    NativeTypeUnion, NativeValue, NativeValueType, NodeDescriptor, NodeRegistry, PortDescriptor,
+    generated_family_node_bindings, native_diffusion_descriptors, native_image_descriptors,
 };
 use comfy_sampler::{
     DiscreteSamplingProfile, GUIDANCE_ADAPTER_ID, GuidanceDenoiser, GuidanceError,
@@ -1191,6 +1194,9 @@ impl NativeImageWorkerResult {
                 encoded_json,
             });
         }
+        report.outputs.clear();
+        report.events.clear();
+        drop(report.handle_lease.take());
         Ok(Self {
             report,
             output_proposal_ids,
@@ -1200,6 +1206,11 @@ impl NativeImageWorkerResult {
     }
 
     pub fn decode_ui_outputs(&self) -> Result<BTreeMap<NodeId, Value>, NativeImageRuntimeError> {
+        if !self.report.outputs.is_empty() || !self.report.events.is_empty() {
+            return Err(NativeImageRuntimeError::WorkerEvent(
+                "native worker result carried process-local outputs or events".to_owned(),
+            ));
+        }
         if self.encoded_ui_outputs.len() > MAX_NATIVE_UI_OUTPUTS {
             return Err(NativeImageRuntimeError::WorkerEvent(
                 "native worker UI output count exceeds its bound".to_owned(),
@@ -1284,6 +1295,18 @@ pub enum NativeImageRuntimeError {
 impl From<NativeImageDescriptorError> for NativeImageRuntimeError {
     fn from(error: NativeImageDescriptorError) -> Self {
         Self::Descriptors(error.to_string())
+    }
+}
+
+impl From<NativeNodeContractError> for NativeImageRuntimeError {
+    fn from(error: NativeNodeContractError) -> Self {
+        Self::Registry(error.to_string())
+    }
+}
+
+impl From<NativeHandleStoreError> for NativeImageRuntimeError {
+    fn from(error: NativeHandleStoreError) -> Self {
+        Self::Handle(error.to_string())
     }
 }
 
@@ -1422,10 +1445,111 @@ pub fn native_image_registry_projection() -> Result<NativeNodeRegistry, NativeIm
     let cpu_backend = projection_only_cpu_backend()?;
     native_image_registry_with_execution_state(
         Arc::new(Mutex::new(BTreeMap::new())),
-        Arc::new(Mutex::new(NativeTensorStore::default())),
         cpu_backend,
         true,
     )
+}
+
+pub fn generated_native_node_registry_projection(
+    diffusion_provider: Option<Arc<dyn NativeDiffusionProvider>>,
+) -> Result<NativeNodeRegistry, NativeImageRuntimeError> {
+    let cpu_backend = projection_only_cpu_backend()?;
+    let mut registry = if let Some(provider) = diffusion_provider {
+        native_registry_with_diffusion_provider(
+            Arc::new(Mutex::new(BTreeMap::new())),
+            cpu_backend,
+            true,
+            provider,
+        )?
+    } else {
+        native_image_registry_with_execution_state(
+            Arc::new(Mutex::new(BTreeMap::new())),
+            cpu_backend,
+            true,
+        )?
+    };
+    registry
+        .register_native_bindings(generated_family_node_bindings()?)
+        .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
+    registry
+        .validate_comprehensive_bindings()
+        .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
+    Ok(registry)
+}
+
+pub fn compile_generated_native_prompt(
+    submission: comfy_types::PromptSubmission,
+    diffusion_provider: Option<Arc<dyn NativeDiffusionProvider>>,
+) -> Result<CompiledPlan, NativeImageRuntimeError> {
+    let registry = generated_native_node_registry_projection(diffusion_provider)?;
+    Ok(crate::PromptCompiler::new(&registry).compile(submission)?)
+}
+
+pub fn generated_native_frontend_descriptors(
+    diffusion_provider: Option<Arc<dyn NativeDiffusionProvider>>,
+) -> Result<BTreeMap<String, NodeDescriptor>, NativeImageRuntimeError> {
+    let registry = generated_native_node_registry_projection(diffusion_provider)?;
+    registry
+        .descriptors()
+        .map(|(class_type, descriptor)| {
+            let presentation = registry.presentation(class_type).ok_or_else(|| {
+                NativeImageRuntimeError::Registry(format!(
+                    "native node `{class_type}` has no presentation projection"
+                ))
+            })?;
+            let inputs = descriptor
+                .inputs
+                .iter()
+                .map(|input| {
+                    Ok(PortDescriptor {
+                        name: input.name.clone(),
+                        type_name: frontend_type_name(input.accepted_types.members())?,
+                        required: input.required,
+                    })
+                })
+                .collect::<Result<Vec<_>, NativeImageRuntimeError>>()?;
+            let outputs = descriptor
+                .outputs
+                .iter()
+                .map(|output| {
+                    Ok(PortDescriptor {
+                        name: output.name.clone(),
+                        type_name: frontend_type_name(std::slice::from_ref(&output.produced_type))?,
+                        required: true,
+                    })
+                })
+                .collect::<Result<Vec<_>, NativeImageRuntimeError>>()?;
+            Ok((
+                class_type.to_owned(),
+                NodeDescriptor {
+                    type_name: class_type.to_owned(),
+                    display_name: presentation.display_name.clone(),
+                    inputs,
+                    outputs,
+                },
+            ))
+        })
+        .collect()
+}
+
+fn frontend_type_name(types: &[NativeValueType]) -> Result<String, NativeImageRuntimeError> {
+    if types.is_empty() {
+        return Err(NativeImageRuntimeError::Registry(
+            "frontend projection received an empty runtime type union".to_owned(),
+        ));
+    }
+    let project = |value_type: &NativeValueType| match value_type {
+        NativeValueType::Any => "ANY".to_owned(),
+        NativeValueType::Primitive(NativePrimitiveType::Null) => "NULL".to_owned(),
+        NativeValueType::Primitive(NativePrimitiveType::Boolean) => "BOOLEAN".to_owned(),
+        NativeValueType::Primitive(NativePrimitiveType::Integer) => "INT".to_owned(),
+        NativeValueType::Primitive(NativePrimitiveType::Number) => "FLOAT".to_owned(),
+        NativeValueType::Primitive(NativePrimitiveType::String) => "STRING".to_owned(),
+        NativeValueType::Handle(handle_type) => handle_type.type_id.clone(),
+        NativeValueType::PreservedUnknown => "UNKNOWN".to_owned(),
+    };
+    let projected = types.iter().map(project).collect::<Vec<_>>();
+    Ok(projected.join("|"))
 }
 
 fn projection_only_cpu_backend() -> Result<Arc<CpuBackend>, NativeImageRuntimeError> {
@@ -1437,39 +1561,62 @@ fn projection_only_cpu_backend() -> Result<Arc<CpuBackend>, NativeImageRuntimeEr
 
 fn native_image_registry_with_execution_state(
     input_assets: Arc<Mutex<BTreeMap<String, Vec<u8>>>>,
-    tensors: Arc<Mutex<NativeTensorStore>>,
     cpu_backend: Arc<CpuBackend>,
     metadata_enabled: bool,
 ) -> Result<NativeNodeRegistry, NativeImageRuntimeError> {
     let mut registry = NativeNodeRegistry::default();
-    for descriptor in native_image_descriptors()? {
-        registry.register_descriptor(runtime_descriptor(descriptor)?)?;
-    }
-    registry.register(Arc::new(LoadImageNode {
-        input_assets,
-        tensors: tensors.clone(),
-        cpu_backend: cpu_backend.clone(),
-    }))?;
-    registry.register(Arc::new(ImageScaleNode {
-        tensors: tensors.clone(),
-        cpu_backend: cpu_backend.clone(),
-    }))?;
-    registry.register(Arc::new(ImageInvertNode {
-        tensors: tensors.clone(),
-        cpu_backend: cpu_backend.clone(),
-    }))?;
-    registry.register(Arc::new(SaveImageNode {
-        tensors: tensors.clone(),
-        cpu_backend: cpu_backend.clone(),
-        namespace: AssetNamespace::Temporary,
-        metadata_enabled,
-    }))?;
-    registry.register(Arc::new(SaveImageNode {
-        tensors,
-        cpu_backend,
-        namespace: AssetNamespace::Output,
-        metadata_enabled,
-    }))?;
+    let nodes = BTreeMap::<String, Arc<dyn NativeNode>>::from([
+        (
+            "LoadImage".to_owned(),
+            Arc::new(LoadImageNode {
+                input_assets,
+                cpu_backend: cpu_backend.clone(),
+            }) as Arc<dyn NativeNode>,
+        ),
+        (
+            "ImageScale".to_owned(),
+            Arc::new(ImageScaleNode {
+                cpu_backend: cpu_backend.clone(),
+            }) as Arc<dyn NativeNode>,
+        ),
+        (
+            "ImageInvert".to_owned(),
+            Arc::new(ImageInvertNode {
+                cpu_backend: cpu_backend.clone(),
+            }) as Arc<dyn NativeNode>,
+        ),
+        (
+            "PreviewImage".to_owned(),
+            Arc::new(SaveImageNode {
+                cpu_backend: cpu_backend.clone(),
+                namespace: AssetNamespace::Temporary,
+                metadata_enabled,
+            }) as Arc<dyn NativeNode>,
+        ),
+        (
+            "SaveImage".to_owned(),
+            Arc::new(SaveImageNode {
+                cpu_backend,
+                namespace: AssetNamespace::Output,
+                metadata_enabled,
+            }) as Arc<dyn NativeNode>,
+        ),
+    ]);
+    let bindings = native_image_descriptors()?
+        .iter()
+        .map(|descriptor| {
+            let node = nodes.get(&descriptor.class_type).cloned().ok_or_else(|| {
+                NativeImageRuntimeError::Registry(format!(
+                    "native image implementation `{}` is absent",
+                    descriptor.class_type
+                ))
+            })?;
+            native_executable_binding(descriptor, node)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    registry
+        .register_native_bindings(bindings)
+        .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
     if registry.descriptor_len() != 5
         || registry.node_len() != 5
         || !registry.descriptors_are_fully_bound()
@@ -1485,41 +1632,65 @@ fn native_image_registry_with_execution_state(
 
 fn native_registry_with_diffusion_provider(
     input_assets: Arc<Mutex<BTreeMap<String, Vec<u8>>>>,
-    tensors: Arc<Mutex<NativeTensorStore>>,
     cpu_backend: Arc<CpuBackend>,
     metadata_enabled: bool,
     provider: Arc<dyn NativeDiffusionProvider>,
 ) -> Result<NativeNodeRegistry, NativeImageRuntimeError> {
     let mut registry = native_image_registry_with_execution_state(
         input_assets,
-        tensors.clone(),
         cpu_backend.clone(),
         metadata_enabled,
     )?;
-    for descriptor in native_diffusion_descriptors()? {
-        registry.register_descriptor(runtime_descriptor(descriptor)?)?;
-    }
     let state = Arc::new(NativeDiffusionState {
         provider,
         backend: cpu_backend.clone(),
         loaded: Mutex::new(None),
     });
-    registry.register(Arc::new(CheckpointLoaderNode {
-        state: state.clone(),
-    }))?;
-    registry.register(Arc::new(ClipTextEncodeNode {
-        state: state.clone(),
-        tensors: tensors.clone(),
-    }))?;
-    registry.register(Arc::new(EmptyLatentNode {
-        backend: cpu_backend,
-        tensors: tensors.clone(),
-    }))?;
-    registry.register(Arc::new(KSamplerNode {
-        state: state.clone(),
-        tensors: tensors.clone(),
-    }))?;
-    registry.register(Arc::new(VaeDecodeNode { state, tensors }))?;
+    let nodes = BTreeMap::<String, Arc<dyn NativeNode>>::from([
+        (
+            "CheckpointLoaderSimple".to_owned(),
+            Arc::new(CheckpointLoaderNode {
+                state: state.clone(),
+            }) as Arc<dyn NativeNode>,
+        ),
+        (
+            "CLIPTextEncode".to_owned(),
+            Arc::new(ClipTextEncodeNode {
+                state: state.clone(),
+            }) as Arc<dyn NativeNode>,
+        ),
+        (
+            "EmptyLatentImage".to_owned(),
+            Arc::new(EmptyLatentNode {
+                backend: cpu_backend,
+            }) as Arc<dyn NativeNode>,
+        ),
+        (
+            "KSampler".to_owned(),
+            Arc::new(KSamplerNode {
+                state: state.clone(),
+            }) as Arc<dyn NativeNode>,
+        ),
+        (
+            "VAEDecode".to_owned(),
+            Arc::new(VaeDecodeNode { state }) as Arc<dyn NativeNode>,
+        ),
+    ]);
+    let bindings = native_diffusion_descriptors()?
+        .iter()
+        .map(|descriptor| {
+            let node = nodes.get(&descriptor.class_type).cloned().ok_or_else(|| {
+                NativeImageRuntimeError::Registry(format!(
+                    "native diffusion implementation `{}` is absent",
+                    descriptor.class_type
+                ))
+            })?;
+            native_executable_binding(descriptor, node)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    registry
+        .register_native_bindings(bindings)
+        .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
     if registry.descriptor_len() != 10
         || registry.node_len() != 10
         || !registry.descriptors_are_fully_bound()
@@ -1575,7 +1746,6 @@ pub fn compile_native_diffusion_workflow(
     let backend = projection_only_cpu_backend()?;
     let registry = native_registry_with_diffusion_provider(
         Arc::new(Mutex::new(BTreeMap::new())),
-        Arc::new(Mutex::new(NativeTensorStore::default())),
         backend,
         true,
         provider,
@@ -1606,39 +1776,41 @@ fn runtime_descriptor(
         .inputs
         .iter()
         .map(|port| {
-            let value_type = value_type(&port.type_name);
-            let allows_literal = !matches!(
+            let value_type = native_value_type(&port.type_name)?;
+            let allows_literal = matches!(
                 value_type,
-                ValueType::Image | ValueType::Mask | ValueType::Tensor
+                NativeValueType::Any | NativeValueType::Primitive(_)
             );
-            (
-                port.name.clone(),
-                RuntimeInputDescriptor {
-                    value_type,
-                    required: port.required,
-                    hidden: port.hidden,
-                    lazy: false,
-                    mode: InputMode::Scalar,
-                    allows_literal,
-                },
-            )
+            Ok(NativeInputDescriptor {
+                name: port.name.clone(),
+                accepted_types: NativeTypeUnion::new([value_type])?,
+                required: port.required,
+                hidden: port.hidden,
+                lazy: false,
+                cardinality: InputMode::Scalar,
+                allows_literal,
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, NativeNodeContractError>>()?;
     let outputs = descriptor
         .outputs
         .iter()
-        .map(|port| RuntimeOutputDescriptor {
-            value_type: value_type(&port.type_name),
-            is_list: false,
+        .map(|port| {
+            Ok(RuntimeOutputDescriptor {
+                name: port.name.clone(),
+                produced_type: native_value_type(&port.type_name)?,
+                is_list: false,
+            })
         })
-        .collect();
-    Ok(RuntimeNodeDescriptor {
+        .collect::<Result<Vec<_>, NativeNodeContractError>>()?;
+    let runtime = RuntimeNodeDescriptor {
+        schema_version: NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
         class_type: descriptor.class_type.clone(),
         implementation_version: descriptor.implementation_version.clone(),
         inputs,
+        dynamic_inputs: Vec::new(),
         outputs,
         output_node: descriptor.output_node,
-        availability: RuntimeAvailability::Native,
         effect: match descriptor.effect {
             NativeImageEffect::Pure => EffectClass::Pure,
             NativeImageEffect::ReadsArtifact => EffectClass::ReadsArtifact,
@@ -1649,154 +1821,294 @@ fn runtime_descriptor(
         } else {
             RuntimeCachePolicy::Never
         },
+    };
+    runtime.validate()?;
+    Ok(runtime)
+}
+
+fn native_executable_binding(
+    descriptor: &NativeImageDescriptor,
+    node: Arc<dyn NativeNode>,
+) -> Result<NativeNodeBinding, NativeImageRuntimeError> {
+    let catalog = NodeRegistry::built_in()
+        .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
+    let catalog = catalog.descriptor(&descriptor.class_type).ok_or_else(|| {
+        NativeImageRuntimeError::Registry(format!(
+            "native node `{}` has no catalog descriptor",
+            descriptor.class_type
+        ))
+    })?;
+    Ok(NativeNodeBinding::Executable {
+        feature_id: catalog.feature_id.clone(),
+        descriptor: runtime_descriptor(descriptor)?,
+        presentation: NativeNodePresentation {
+            display_name: descriptor.display_name.clone(),
+            category: descriptor.category.clone(),
+            description: descriptor.description.clone(),
+            output_names: descriptor
+                .outputs
+                .iter()
+                .map(|output| output.name.clone())
+                .collect(),
+            search_aliases: descriptor.search_aliases.clone(),
+            is_deprecated: false,
+            is_experimental: false,
+        },
+        node,
     })
 }
 
-fn value_type(type_name: &str) -> ValueType {
-    match type_name {
-        "BOOLEAN" => ValueType::Boolean,
-        "INT" => ValueType::Integer,
-        "FLOAT" => ValueType::Number,
-        "STRING" => ValueType::String,
-        "IMAGE" => ValueType::Image,
-        "MASK" => ValueType::Mask,
-        "TENSOR" => ValueType::Tensor,
-        "PROMPT" | "EXTRA_PNGINFO" => ValueType::Any,
-        other => ValueType::Custom(other.to_owned()),
+fn native_value_type(type_name: &str) -> Result<NativeValueType, NativeNodeContractError> {
+    Ok(match type_name {
+        "BOOLEAN" => NativeValueType::Primitive(NativePrimitiveType::Boolean),
+        "INT" => NativeValueType::Primitive(NativePrimitiveType::Integer),
+        "FLOAT" => NativeValueType::Primitive(NativePrimitiveType::Number),
+        "STRING" => NativeValueType::Primitive(NativePrimitiveType::String),
+        "PROMPT" | "EXTRA_PNGINFO" => NativeValueType::Any,
+        "IMAGE" => {
+            NativeValueType::Handle(NativeHandleType::new(NativeHandleKind::Image, type_name)?)
+        }
+        "MASK" => {
+            NativeValueType::Handle(NativeHandleType::new(NativeHandleKind::Mask, type_name)?)
+        }
+        "TENSOR" => {
+            NativeValueType::Handle(NativeHandleType::new(NativeHandleKind::Tensor, type_name)?)
+        }
+        "LATENT" => {
+            NativeValueType::Handle(NativeHandleType::new(NativeHandleKind::Latent, type_name)?)
+        }
+        "MODEL" => {
+            NativeValueType::Handle(NativeHandleType::new(NativeHandleKind::Model, type_name)?)
+        }
+        "CLIP" => {
+            NativeValueType::Handle(NativeHandleType::new(NativeHandleKind::Clip, type_name)?)
+        }
+        "VAE" => NativeValueType::Handle(NativeHandleType::new(NativeHandleKind::Vae, type_name)?),
+        "CONDITIONING" => NativeValueType::Handle(NativeHandleType::new(
+            NativeHandleKind::Conditioning,
+            type_name,
+        )?),
+        other => NativeValueType::Handle(NativeHandleType::new(NativeHandleKind::Artifact, other)?),
+    })
+}
+
+#[derive(Clone)]
+enum StoredNativeTensor {
+    Image {
+        metadata: NativeTensorHandle,
+        tensor: Arc<ImageTensor>,
+    },
+    Tensor {
+        metadata: NativeTensorHandle,
+        tensor: Tensor,
+    },
+}
+
+fn prepare_image_metadata(
+    kind: NativeTensorKind,
+    tensor: &ImageTensor,
+) -> Result<NativeTensorHandle, NativeImageRuntimeError> {
+    if !matches!(kind, NativeTensorKind::Image | NativeTensorKind::Mask) {
+        return Err(NativeImageRuntimeError::Handle(
+            "image tensor handles require image or mask kind".to_owned(),
+        ));
+    }
+    let descriptor = tensor.tensor().descriptor().clone();
+    let bytes = tensor.tensor().contiguous_bytes()?;
+    let content_digest = native_tensor_digest(kind, &descriptor, &bytes)?;
+    NativeTensorHandle::new(kind, content_digest, descriptor)
+}
+
+fn native_tensor_handle_type(
+    kind: NativeTensorKind,
+) -> Result<NativeHandleType, NativeImageRuntimeError> {
+    let (kind, type_id) = match kind {
+        NativeTensorKind::Image => (NativeHandleKind::Image, "IMAGE"),
+        NativeTensorKind::Mask => (NativeHandleKind::Mask, "MASK"),
+        NativeTensorKind::Conditioning => (NativeHandleKind::Conditioning, "CONDITIONING"),
+        NativeTensorKind::Latent => (NativeHandleKind::Latent, "LATENT"),
+    };
+    Ok(NativeHandleType::new(kind, type_id)?)
+}
+
+fn publish_image(
+    context: &NodeContext,
+    kind: NativeTensorKind,
+    tensor: ImageTensor,
+) -> Result<NativeValue, NodeFailure> {
+    let metadata = prepare_image_metadata(kind, &tensor).map_err(runtime_failure)?;
+    let resident_bytes = tensor
+        .tensor()
+        .contiguous_bytes()
+        .map_err(tensor_failure)?
+        .len();
+    let handle = context
+        .handle_store()
+        .publish(
+            native_tensor_handle_type(kind).map_err(runtime_failure)?,
+            Arc::new(StoredNativeTensor::Image {
+                metadata: metadata.clone(),
+                tensor: Arc::new(tensor),
+            }),
+            Some(metadata.content_digest().to_owned()),
+            resident_bytes,
+            &context.cancellation,
+        )
+        .map_err(|error| runtime_failure(error.into()))?;
+    Ok(NativeValue::Handle { value: handle })
+}
+
+fn required_opaque_handle<'a>(
+    inputs: &'a BTreeMap<String, NativeValue>,
+    name: &str,
+) -> Result<&'a NativeOpaqueHandle, NodeFailure> {
+    match inputs.get(name) {
+        Some(NativeValue::Handle { value }) => Ok(value),
+        Some(_) => Err(NodeFailure {
+            code: "invalid_native_handle".to_owned(),
+            message: format!("`{name}` must be an opaque native handle"),
+            kind: NodeFailureKind::Failure,
+            retryable: false,
+        }),
+        None => Err(NodeFailure {
+            code: "missing_native_handle".to_owned(),
+            message: format!("`{name}` is missing"),
+            kind: NodeFailureKind::Failure,
+            retryable: false,
+        }),
     }
 }
 
-#[derive(Default)]
-struct NativeTensorStore {
-    images: BTreeMap<String, Arc<ImageTensor>>,
-    tensors: BTreeMap<String, Tensor>,
+fn resolve_image(
+    context: &NodeContext,
+    inputs: &BTreeMap<String, NativeValue>,
+    name: &str,
+    expected_kind: NativeTensorKind,
+) -> Result<Arc<ImageTensor>, NodeFailure> {
+    let handle = required_opaque_handle(inputs, name)?;
+    let expected_type = native_tensor_handle_type(expected_kind).map_err(runtime_failure)?;
+    let stored = context
+        .handle_store()
+        .resolve(handle, &expected_type, &context.cancellation)
+        .map_err(|error| runtime_failure(error.into()))?
+        .downcast::<StoredNativeTensor>()
+        .map_err(|_| invalid_diffusion_input("native image handle stored the wrong object type"))?;
+    let StoredNativeTensor::Image { metadata, tensor } = stored.as_ref() else {
+        return Err(invalid_diffusion_input(
+            "native image handle stored a raw tensor object",
+        ));
+    };
+    metadata.validate(expected_kind).map_err(runtime_failure)?;
+    if !matches!(
+        expected_kind,
+        NativeTensorKind::Image | NativeTensorKind::Mask
+    ) {
+        return Err(runtime_failure(NativeImageRuntimeError::Handle(
+            "image tensor handle kind or schema is invalid".to_owned(),
+        )));
+    }
+    if tensor.tensor().descriptor() != metadata.descriptor() {
+        return Err(runtime_failure(NativeImageRuntimeError::Handle(
+            "handle descriptor does not match worker storage".to_owned(),
+        )));
+    }
+    let bytes = tensor.tensor().contiguous_bytes().map_err(tensor_failure)?;
+    if native_tensor_digest(expected_kind, tensor.tensor().descriptor(), &bytes)
+        .map_err(runtime_failure)?
+        != metadata.content_digest()
+    {
+        return Err(runtime_failure(NativeImageRuntimeError::Handle(
+            "image tensor content identity changed".to_owned(),
+        )));
+    }
+    Ok(tensor.clone())
 }
 
-impl NativeTensorStore {
-    fn prepare_image_handle(
-        kind: NativeTensorKind,
-        tensor: &ImageTensor,
-    ) -> Result<NativeTensorHandle, NativeImageRuntimeError> {
-        if !matches!(kind, NativeTensorKind::Image | NativeTensorKind::Mask) {
-            return Err(NativeImageRuntimeError::Handle(
-                "image tensor handles require image or mask kind".to_owned(),
-            ));
-        }
-        let descriptor = tensor.tensor().descriptor().clone();
-        let bytes = tensor.tensor().contiguous_bytes()?;
-        let content_digest = native_tensor_digest(kind, &descriptor, &bytes)?;
-        NativeTensorHandle::new(kind, content_digest, descriptor)
+fn prepare_tensor_metadata(
+    kind: NativeTensorKind,
+    tensor: &Tensor,
+) -> Result<NativeTensorHandle, NativeImageRuntimeError> {
+    if !matches!(
+        kind,
+        NativeTensorKind::Conditioning | NativeTensorKind::Latent
+    ) {
+        return Err(NativeImageRuntimeError::Handle(
+            "raw tensor handles require conditioning or latent kind".to_owned(),
+        ));
     }
+    let descriptor = tensor.descriptor().clone();
+    let bytes = tensor.contiguous_bytes()?;
+    let content_digest = native_tensor_digest(kind, &descriptor, &bytes)?;
+    NativeTensorHandle::new(kind, content_digest, descriptor)
+}
 
-    fn commit_prepared_image(&mut self, handle: &NativeTensorHandle, tensor: ImageTensor) {
-        self.images
-            .entry(handle.content_digest().to_owned())
-            .or_insert_with(|| Arc::new(tensor));
-    }
+fn publish_tensor(
+    context: &NodeContext,
+    kind: NativeTensorKind,
+    tensor: Tensor,
+) -> Result<NativeValue, NodeFailure> {
+    let metadata = prepare_tensor_metadata(kind, &tensor).map_err(runtime_failure)?;
+    let resident_bytes = tensor.contiguous_bytes().map_err(tensor_failure)?.len();
+    let handle = context
+        .handle_store()
+        .publish(
+            native_tensor_handle_type(kind).map_err(runtime_failure)?,
+            Arc::new(StoredNativeTensor::Tensor {
+                metadata: metadata.clone(),
+                tensor,
+            }),
+            Some(metadata.content_digest().to_owned()),
+            resident_bytes,
+            &context.cancellation,
+        )
+        .map_err(|error| runtime_failure(error.into()))?;
+    Ok(NativeValue::Handle { value: handle })
+}
 
-    fn get(
-        &self,
-        handle: &NativeTensorHandle,
-        expected_kind: NativeTensorKind,
-    ) -> Result<Arc<ImageTensor>, NativeImageRuntimeError> {
-        handle.validate(expected_kind)?;
-        if !matches!(
-            expected_kind,
-            NativeTensorKind::Image | NativeTensorKind::Mask
-        ) {
-            return Err(NativeImageRuntimeError::Handle(
-                "image tensor handle kind or schema is invalid".to_owned(),
-            ));
-        }
-        let tensor = self
-            .images
-            .get(handle.content_digest())
-            .cloned()
-            .ok_or_else(|| {
-                NativeImageRuntimeError::Handle(format!(
-                    "tensor {} is not present in this worker",
-                    handle.content_digest()
-                ))
-            })?;
-        if tensor.tensor().descriptor() != handle.descriptor() {
-            return Err(NativeImageRuntimeError::Handle(
-                "handle descriptor does not match worker storage".to_owned(),
-            ));
-        }
-        let bytes = tensor.tensor().contiguous_bytes()?;
-        if native_tensor_digest(expected_kind, tensor.tensor().descriptor(), &bytes)?
-            != handle.content_digest()
-        {
-            return Err(NativeImageRuntimeError::Handle(
-                "image tensor content identity changed".to_owned(),
-            ));
-        }
-        Ok(tensor)
+fn resolve_tensor(
+    context: &NodeContext,
+    inputs: &BTreeMap<String, NativeValue>,
+    name: &str,
+    expected_kind: NativeTensorKind,
+) -> Result<Tensor, NodeFailure> {
+    let handle = required_opaque_handle(inputs, name)?;
+    let expected_type = native_tensor_handle_type(expected_kind).map_err(runtime_failure)?;
+    let stored = context
+        .handle_store()
+        .resolve(handle, &expected_type, &context.cancellation)
+        .map_err(|error| runtime_failure(error.into()))?
+        .downcast::<StoredNativeTensor>()
+        .map_err(|_| {
+            invalid_diffusion_input("native tensor handle stored the wrong object type")
+        })?;
+    let StoredNativeTensor::Tensor { metadata, tensor } = stored.as_ref() else {
+        return Err(invalid_diffusion_input(
+            "native tensor handle stored an image object",
+        ));
+    };
+    metadata.validate(expected_kind).map_err(runtime_failure)?;
+    if !matches!(
+        expected_kind,
+        NativeTensorKind::Conditioning | NativeTensorKind::Latent
+    ) {
+        return Err(runtime_failure(NativeImageRuntimeError::Handle(
+            "raw tensor handle kind or schema is invalid".to_owned(),
+        )));
     }
-
-    fn prepare_tensor_handle(
-        kind: NativeTensorKind,
-        tensor: &Tensor,
-    ) -> Result<NativeTensorHandle, NativeImageRuntimeError> {
-        if !matches!(
-            kind,
-            NativeTensorKind::Conditioning | NativeTensorKind::Latent
-        ) {
-            return Err(NativeImageRuntimeError::Handle(
-                "raw tensor handles require conditioning or latent kind".to_owned(),
-            ));
-        }
-        let descriptor = tensor.descriptor().clone();
-        let bytes = tensor.contiguous_bytes()?;
-        let content_digest = native_tensor_digest(kind, &descriptor, &bytes)?;
-        NativeTensorHandle::new(kind, content_digest, descriptor)
+    if tensor.descriptor() != metadata.descriptor() {
+        return Err(runtime_failure(NativeImageRuntimeError::Handle(
+            "raw tensor descriptor changed".to_owned(),
+        )));
     }
-
-    fn commit_prepared_tensor(&mut self, handle: &NativeTensorHandle, tensor: Tensor) {
-        self.tensors
-            .entry(handle.content_digest().to_owned())
-            .or_insert(tensor);
+    let bytes = tensor.contiguous_bytes().map_err(tensor_failure)?;
+    if native_tensor_digest(expected_kind, tensor.descriptor(), &bytes).map_err(runtime_failure)?
+        != metadata.content_digest()
+    {
+        return Err(runtime_failure(NativeImageRuntimeError::Handle(
+            "raw tensor content identity changed".to_owned(),
+        )));
     }
-
-    fn get_tensor(
-        &self,
-        handle: &NativeTensorHandle,
-        expected_kind: NativeTensorKind,
-    ) -> Result<Tensor, NativeImageRuntimeError> {
-        handle.validate(expected_kind)?;
-        if !matches!(
-            expected_kind,
-            NativeTensorKind::Conditioning | NativeTensorKind::Latent
-        ) {
-            return Err(NativeImageRuntimeError::Handle(
-                "raw tensor handle kind or schema is invalid".to_owned(),
-            ));
-        }
-        let tensor = self
-            .tensors
-            .get(handle.content_digest())
-            .cloned()
-            .ok_or_else(|| {
-                NativeImageRuntimeError::Handle(format!(
-                    "tensor {} is not present in this worker",
-                    handle.content_digest()
-                ))
-            })?;
-        if tensor.descriptor() != handle.descriptor() {
-            return Err(NativeImageRuntimeError::Handle(
-                "raw tensor descriptor changed".to_owned(),
-            ));
-        }
-        let bytes = tensor.contiguous_bytes()?;
-        if native_tensor_digest(expected_kind, tensor.descriptor(), &bytes)?
-            != handle.content_digest()
-        {
-            return Err(NativeImageRuntimeError::Handle(
-                "raw tensor content identity changed".to_owned(),
-            ));
-        }
-        Ok(tensor)
-    }
+    Ok(tensor.clone())
 }
 
 fn native_tensor_digest(
@@ -1957,6 +2269,78 @@ struct NativeDiffusionState {
     loaded: Mutex<Option<Arc<NativeDiffusionBundle>>>,
 }
 
+#[derive(Clone)]
+struct StoredNativeDiffusion {
+    metadata: NativeDiffusionHandle,
+    bundle: Arc<NativeDiffusionBundle>,
+}
+
+fn native_diffusion_handle_type(
+    role: NativeDiffusionRole,
+) -> Result<NativeHandleType, NativeImageRuntimeError> {
+    let (kind, type_id) = match role {
+        NativeDiffusionRole::Model => (NativeHandleKind::Model, "MODEL"),
+        NativeDiffusionRole::Clip => (NativeHandleKind::Clip, "CLIP"),
+        NativeDiffusionRole::Vae => (NativeHandleKind::Vae, "VAE"),
+    };
+    Ok(NativeHandleType::new(kind, type_id)?)
+}
+
+fn publish_diffusion_bundle(
+    state: &NativeDiffusionState,
+    context: &NodeContext,
+    tensor_context: &ExecutionContext<'_>,
+    role: NativeDiffusionRole,
+) -> Result<NativeValue, NodeFailure> {
+    let bundle = state.bundle(tensor_context).map_err(runtime_failure)?;
+    let metadata = NativeDiffusionHandle::from_bundle(&bundle, role).map_err(runtime_failure)?;
+    let encoded_metadata = serde_json::to_vec(&metadata).map_err(encoding_failure)?;
+    let digest = format!("{:x}", Sha256::digest(&encoded_metadata));
+    let resident_bytes = encoded_metadata
+        .len()
+        .checked_add(std::mem::size_of_val(bundle.as_ref()))
+        .ok_or_else(|| invalid_diffusion_input("native diffusion resident size overflowed"))?;
+    let handle = context
+        .handle_store()
+        .publish(
+            native_diffusion_handle_type(role).map_err(runtime_failure)?,
+            Arc::new(StoredNativeDiffusion { metadata, bundle }),
+            Some(digest),
+            resident_bytes,
+            &context.cancellation,
+        )
+        .map_err(|error| runtime_failure(error.into()))?;
+    Ok(NativeValue::Handle { value: handle })
+}
+
+fn resolve_diffusion_bundle(
+    state: &NativeDiffusionState,
+    context: &NodeContext,
+    inputs: &BTreeMap<String, NativeValue>,
+    name: &str,
+    role: NativeDiffusionRole,
+    tensor_context: &ExecutionContext<'_>,
+) -> Result<Arc<NativeDiffusionBundle>, NodeFailure> {
+    let handle = required_opaque_handle(inputs, name)?;
+    let expected_type = native_diffusion_handle_type(role).map_err(runtime_failure)?;
+    let stored = context
+        .handle_store()
+        .resolve(handle, &expected_type, &context.cancellation)
+        .map_err(|error| runtime_failure(error.into()))?
+        .downcast::<StoredNativeDiffusion>()
+        .map_err(|_| {
+            invalid_diffusion_input("native diffusion handle stored the wrong object type")
+        })?;
+    let expected = state.bundle(tensor_context).map_err(runtime_failure)?;
+    let expected_metadata =
+        NativeDiffusionHandle::from_bundle(&expected, role).map_err(runtime_failure)?;
+    stored
+        .metadata
+        .require_exact_match(&expected_metadata)
+        .map_err(runtime_failure)?;
+    Ok(stored.bundle.clone())
+}
+
 impl NativeDiffusionState {
     fn validate_provider_bundle(
         &self,
@@ -2005,27 +2389,6 @@ impl NativeDiffusionState {
         self.validate_provider_bundle(&selected, context.cancellation)?;
         Ok(selected)
     }
-
-    fn handle(
-        &self,
-        role: NativeDiffusionRole,
-        context: &ExecutionContext<'_>,
-    ) -> Result<NativeDiffusionHandle, NativeImageRuntimeError> {
-        let bundle = self.bundle(context)?;
-        NativeDiffusionHandle::from_bundle(&bundle, role)
-    }
-
-    fn resolve(
-        &self,
-        handle: &NativeDiffusionHandle,
-        role: NativeDiffusionRole,
-        context: &ExecutionContext<'_>,
-    ) -> Result<Arc<NativeDiffusionBundle>, NativeImageRuntimeError> {
-        let bundle = self.bundle(context)?;
-        let expected = NativeDiffusionHandle::from_bundle(&bundle, role)?;
-        handle.require_exact_match(&expected)?;
-        Ok(bundle)
-    }
 }
 
 struct CheckpointLoaderNode {
@@ -2044,7 +2407,7 @@ impl NativeNode for CheckpointLoaderNode {
     fn cache_dependencies(
         &self,
         context: &NodeContext,
-        _inputs: &BTreeMap<String, Value>,
+        _inputs: &BTreeMap<String, NativeValue>,
     ) -> Result<CacheDependencies, NodeFailure> {
         let identities = self
             .state
@@ -2060,7 +2423,7 @@ impl NativeNode for CheckpointLoaderNode {
     fn execute<'a>(
         &'a self,
         context: NodeContext,
-        inputs: BTreeMap<String, Value>,
+        inputs: BTreeMap<String, NativeValue>,
     ) -> BoxFuture<'a, Result<NodeOutcome, NodeFailure>> {
         Box::pin(async move {
             if required_string(&inputs, "ckpt_name")? != "model.safetensors" {
@@ -2069,24 +2432,26 @@ impl NativeNode for CheckpointLoaderNode {
                 ));
             }
             let tensor_context = native_image_tensor_context(&self.state.backend, &context);
-            let model = self
-                .state
-                .handle(NativeDiffusionRole::Model, &tensor_context)
-                .map_err(runtime_failure)?;
-            let clip = self
-                .state
-                .handle(NativeDiffusionRole::Clip, &tensor_context)
-                .map_err(runtime_failure)?;
-            let vae = self
-                .state
-                .handle(NativeDiffusionRole::Vae, &tensor_context)
-                .map_err(runtime_failure)?;
+            let model = publish_diffusion_bundle(
+                &self.state,
+                &context,
+                &tensor_context,
+                NativeDiffusionRole::Model,
+            )?;
+            let clip = publish_diffusion_bundle(
+                &self.state,
+                &context,
+                &tensor_context,
+                NativeDiffusionRole::Clip,
+            )?;
+            let vae = publish_diffusion_bundle(
+                &self.state,
+                &context,
+                &tensor_context,
+                NativeDiffusionRole::Vae,
+            )?;
             Ok(NodeOutcome::Values {
-                outputs: vec![
-                    serde_json::to_value(model).map_err(encoding_failure)?,
-                    serde_json::to_value(clip).map_err(encoding_failure)?,
-                    serde_json::to_value(vae).map_err(encoding_failure)?,
-                ],
+                outputs: vec![model, clip, vae],
                 ui: Some(json!({"checkpoint": "model.safetensors", "family": "COMFY-MODEL-0117"})),
                 effects: Vec::new(),
             })
@@ -2096,7 +2461,6 @@ impl NativeNode for CheckpointLoaderNode {
 
 struct ClipTextEncodeNode {
     state: Arc<NativeDiffusionState>,
-    tensors: Arc<Mutex<NativeTensorStore>>,
 }
 
 impl NativeNode for ClipTextEncodeNode {
@@ -2111,7 +2475,7 @@ impl NativeNode for ClipTextEncodeNode {
     fn cache_dependencies(
         &self,
         context: &NodeContext,
-        _inputs: &BTreeMap<String, Value>,
+        _inputs: &BTreeMap<String, NativeValue>,
     ) -> Result<CacheDependencies, NodeFailure> {
         let identities = self
             .state
@@ -2127,30 +2491,25 @@ impl NativeNode for ClipTextEncodeNode {
     fn execute<'a>(
         &'a self,
         context: NodeContext,
-        inputs: BTreeMap<String, Value>,
+        inputs: BTreeMap<String, NativeValue>,
     ) -> BoxFuture<'a, Result<NodeOutcome, NodeFailure>> {
         Box::pin(async move {
             let tensor_context = native_image_tensor_context(&self.state.backend, &context);
-            let handle: NativeDiffusionHandle = required_json(&inputs, "clip")?;
-            let bundle = self
-                .state
-                .resolve(&handle, NativeDiffusionRole::Clip, &tensor_context)
-                .map_err(runtime_failure)?;
+            let bundle = resolve_diffusion_bundle(
+                &self.state,
+                &context,
+                &inputs,
+                "clip",
+                NativeDiffusionRole::Clip,
+                &tensor_context,
+            )?;
             let text = required_string(&inputs, "text")?;
             let (tokens, conditioning) = bundle
                 .encode_text(text, &tensor_context)
                 .map_err(runtime_failure)?;
-            let handle = NativeTensorStore::prepare_tensor_handle(
-                NativeTensorKind::Conditioning,
-                &conditioning,
-            )
-            .map_err(runtime_failure)?;
-            let output = serde_json::to_value(handle.clone()).map_err(encoding_failure)?;
+            let output = publish_tensor(&context, NativeTensorKind::Conditioning, conditioning)?;
             let ui = json!({"tokens": tokens.to_vec()});
             tensor_context.check().map_err(tensor_failure)?;
-            self.tensors
-                .lock()
-                .commit_prepared_tensor(&handle, conditioning);
             Ok(NodeOutcome::Values {
                 outputs: vec![output],
                 ui: Some(ui),
@@ -2162,7 +2521,6 @@ impl NativeNode for ClipTextEncodeNode {
 
 struct EmptyLatentNode {
     backend: Arc<CpuBackend>,
-    tensors: Arc<Mutex<NativeTensorStore>>,
 }
 
 impl NativeNode for EmptyLatentNode {
@@ -2177,7 +2535,7 @@ impl NativeNode for EmptyLatentNode {
     fn execute<'a>(
         &'a self,
         context: NodeContext,
-        inputs: BTreeMap<String, Value>,
+        inputs: BTreeMap<String, NativeValue>,
     ) -> BoxFuture<'a, Result<NodeOutcome, NodeFailure>> {
         Box::pin(async move {
             let tensor_context = native_image_tensor_context(&self.backend, &context);
@@ -2189,12 +2547,8 @@ impl NativeNode for EmptyLatentNode {
                 &tensor_context,
             )
             .map_err(native_diffusion_model_failure)?;
-            let handle =
-                NativeTensorStore::prepare_tensor_handle(NativeTensorKind::Latent, &latent)
-                    .map_err(runtime_failure)?;
-            let output = serde_json::to_value(handle.clone()).map_err(encoding_failure)?;
             tensor_context.check().map_err(tensor_failure)?;
-            self.tensors.lock().commit_prepared_tensor(&handle, latent);
+            let output = publish_tensor(&context, NativeTensorKind::Latent, latent)?;
             Ok(NodeOutcome::Values {
                 outputs: vec![output],
                 ui: None,
@@ -2206,7 +2560,6 @@ impl NativeNode for EmptyLatentNode {
 
 struct KSamplerNode {
     state: Arc<NativeDiffusionState>,
-    tensors: Arc<Mutex<NativeTensorStore>>,
 }
 
 impl NativeNode for KSamplerNode {
@@ -2221,7 +2574,7 @@ impl NativeNode for KSamplerNode {
     fn cache_dependencies(
         &self,
         context: &NodeContext,
-        inputs: &BTreeMap<String, Value>,
+        inputs: &BTreeMap<String, NativeValue>,
     ) -> Result<CacheDependencies, NodeFailure> {
         let identities = self
             .state
@@ -2241,15 +2594,18 @@ impl NativeNode for KSamplerNode {
     fn execute<'a>(
         &'a self,
         context: NodeContext,
-        inputs: BTreeMap<String, Value>,
+        inputs: BTreeMap<String, NativeValue>,
     ) -> BoxFuture<'a, Result<NodeOutcome, NodeFailure>> {
         Box::pin(async move {
             let tensor_context = native_image_tensor_context(&self.state.backend, &context);
-            let model_handle: NativeDiffusionHandle = required_json(&inputs, "model")?;
-            let bundle = self
-                .state
-                .resolve(&model_handle, NativeDiffusionRole::Model, &tensor_context)
-                .map_err(runtime_failure)?;
+            let bundle = resolve_diffusion_bundle(
+                &self.state,
+                &context,
+                &inputs,
+                "model",
+                NativeDiffusionRole::Model,
+                &tensor_context,
+            )?;
             let steps = u32::try_from(required_u64(&inputs, "steps")?)
                 .map_err(|_| invalid_diffusion_input("steps exceed u32"))?;
             let seed = required_u64(&inputs, "seed")?;
@@ -2262,23 +2618,20 @@ impl NativeNode for KSamplerNode {
                 required_f32(&inputs, "denoise")?,
             )
             .map_err(native_diffusion_sampler_failure)?;
-            let positive_handle: NativeTensorHandle = required_json(&inputs, "positive")?;
-            let negative_handle: NativeTensorHandle = required_json(&inputs, "negative")?;
-            let latent_handle: NativeTensorHandle = required_json(&inputs, "latent_image")?;
-            let (positive, negative, latent) = {
-                let tensors = self.tensors.lock();
-                (
-                    tensors
-                        .get_tensor(&positive_handle, NativeTensorKind::Conditioning)
-                        .map_err(runtime_failure)?,
-                    tensors
-                        .get_tensor(&negative_handle, NativeTensorKind::Conditioning)
-                        .map_err(runtime_failure)?,
-                    tensors
-                        .get_tensor(&latent_handle, NativeTensorKind::Latent)
-                        .map_err(runtime_failure)?,
-                )
-            };
+            let positive = resolve_tensor(
+                &context,
+                &inputs,
+                "positive",
+                NativeTensorKind::Conditioning,
+            )?;
+            let negative = resolve_tensor(
+                &context,
+                &inputs,
+                "negative",
+                NativeTensorKind::Conditioning,
+            )?;
+            let latent =
+                resolve_tensor(&context, &inputs, "latent_image", NativeTensorKind::Latent)?;
             let stream = NoiseRequest::native_diffusion(
                 context.prompt_id.0.to_string(),
                 context.node_id.0.clone(),
@@ -2389,9 +2742,6 @@ impl NativeNode for KSamplerNode {
                 .last()
                 .cloned()
                 .ok_or_else(|| invalid_diffusion_input("Euler returned no latent"))?;
-            let handle =
-                NativeTensorStore::prepare_tensor_handle(NativeTensorKind::Latent, &final_latent)
-                    .map_err(runtime_failure)?;
             let denoiser_sha256 = trace
                 .denoiser_evaluations
                 .iter()
@@ -2404,7 +2754,6 @@ impl NativeNode for KSamplerNode {
                 .map(tensor_sha256)
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(runtime_failure)?;
-            let output = serde_json::to_value(handle.clone()).map_err(encoding_failure)?;
             let ui = json!({
                 "sigmas": sigmas,
                 "noise_sha256": tensor_sha256(&noise.noise).map_err(runtime_failure)?,
@@ -2412,9 +2761,7 @@ impl NativeNode for KSamplerNode {
                 "latent_sha256": latent_sha256,
             });
             tensor_context.check().map_err(tensor_failure)?;
-            self.tensors
-                .lock()
-                .commit_prepared_tensor(&handle, final_latent);
+            let output = publish_tensor(&context, NativeTensorKind::Latent, final_latent)?;
             Ok(NodeOutcome::Values {
                 outputs: vec![output],
                 ui: Some(ui),
@@ -2426,7 +2773,6 @@ impl NativeNode for KSamplerNode {
 
 struct VaeDecodeNode {
     state: Arc<NativeDiffusionState>,
-    tensors: Arc<Mutex<NativeTensorStore>>,
 }
 
 impl NativeNode for VaeDecodeNode {
@@ -2441,7 +2787,7 @@ impl NativeNode for VaeDecodeNode {
     fn cache_dependencies(
         &self,
         context: &NodeContext,
-        _inputs: &BTreeMap<String, Value>,
+        _inputs: &BTreeMap<String, NativeValue>,
     ) -> Result<CacheDependencies, NodeFailure> {
         let identities = self
             .state
@@ -2457,21 +2803,19 @@ impl NativeNode for VaeDecodeNode {
     fn execute<'a>(
         &'a self,
         context: NodeContext,
-        inputs: BTreeMap<String, Value>,
+        inputs: BTreeMap<String, NativeValue>,
     ) -> BoxFuture<'a, Result<NodeOutcome, NodeFailure>> {
         Box::pin(async move {
             let tensor_context = native_image_tensor_context(&self.state.backend, &context);
-            let vae_handle: NativeDiffusionHandle = required_json(&inputs, "vae")?;
-            let bundle = self
-                .state
-                .resolve(&vae_handle, NativeDiffusionRole::Vae, &tensor_context)
-                .map_err(runtime_failure)?;
-            let latent_handle: NativeTensorHandle = required_json(&inputs, "samples")?;
-            let latent = self
-                .tensors
-                .lock()
-                .get_tensor(&latent_handle, NativeTensorKind::Latent)
-                .map_err(runtime_failure)?;
+            let bundle = resolve_diffusion_bundle(
+                &self.state,
+                &context,
+                &inputs,
+                "vae",
+                NativeDiffusionRole::Vae,
+                &tensor_context,
+            )?;
+            let latent = resolve_tensor(&context, &inputs, "samples", NativeTensorKind::Latent)?;
             let decoded = bundle
                 .vae
                 .decode(self.state.backend.as_ref(), &latent, &tensor_context)
@@ -2501,12 +2845,9 @@ impl NativeNode for VaeDecodeNode {
             let image =
                 ImageTensor::from_f32(&self.state.backend, &tensor_context, 1, 32, 32, 3, &bhwc)
                     .map_err(tensor_failure)?;
-            let handle = NativeTensorStore::prepare_image_handle(NativeTensorKind::Image, &image)
-                .map_err(runtime_failure)?;
-            let output = serde_json::to_value(handle.clone()).map_err(encoding_failure)?;
             let ui = json!({"width": 32, "height": 32});
             tensor_context.check().map_err(tensor_failure)?;
-            self.tensors.lock().commit_prepared_image(&handle, image);
+            let output = publish_image(&context, NativeTensorKind::Image, image)?;
             Ok(NodeOutcome::Values {
                 outputs: vec![output],
                 ui: Some(ui),
@@ -2522,6 +2863,7 @@ pub struct NativeImageExecutor {
     input_assets: Arc<Mutex<BTreeMap<String, Vec<u8>>>>,
     nodes: Arc<NativeNodeRegistry>,
     cache: Arc<Mutex<NativeCache>>,
+    handle_store_generation: crate::NativeHandleStoreGeneration,
     cpu_backend: Arc<CpuBackend>,
     metadata_enabled: bool,
     diffusion_enabled: bool,
@@ -2554,10 +2896,8 @@ impl NativeImageExecutor {
     ) -> Result<Self, NativeImageRuntimeError> {
         validate_worker_input_assets(&input_assets)?;
         let input_assets = Arc::new(Mutex::new(input_assets));
-        let tensors = Arc::new(Mutex::new(NativeTensorStore::default()));
         let nodes = native_image_registry_with_execution_state(
             input_assets.clone(),
-            tensors,
             cpu_backend.clone(),
             metadata_enabled,
         )?;
@@ -2568,6 +2908,7 @@ impl NativeImageExecutor {
             cache: Arc::new(Mutex::new(NativeCache::new(4096).map_err(|error| {
                 NativeImageRuntimeError::Execution(error.to_string())
             })?)),
+            handle_store_generation: crate::NativeHandleStoreGeneration::new()?,
             cpu_backend,
             metadata_enabled,
             diffusion_enabled: false,
@@ -2583,10 +2924,8 @@ impl NativeImageExecutor {
     ) -> Result<Self, NativeImageRuntimeError> {
         validate_worker_input_assets(&input_assets)?;
         let input_assets = Arc::new(Mutex::new(input_assets));
-        let tensors = Arc::new(Mutex::new(NativeTensorStore::default()));
         let nodes = native_registry_with_diffusion_provider(
             input_assets.clone(),
-            tensors,
             cpu_backend.clone(),
             metadata_enabled,
             provider,
@@ -2598,6 +2937,7 @@ impl NativeImageExecutor {
             cache: Arc::new(Mutex::new(NativeCache::new(4096).map_err(|error| {
                 NativeImageRuntimeError::Execution(error.to_string())
             })?)),
+            handle_store_generation: crate::NativeHandleStoreGeneration::new()?,
             cpu_backend,
             metadata_enabled,
             diffusion_enabled: true,
@@ -2694,13 +3034,14 @@ impl NativeImageExecutor {
         } else {
             format!("native-image-v1:{memory_configuration}")
         };
-        let mut engine = ExecutionEngine::new_with_workspace_authorization(
+        let mut engine = ExecutionEngine::new_with_handle_store_generation(
             self.profile_id,
             self.nodes.clone(),
             self.cache.clone(),
             effects.clone(),
             registry_version,
             workspace,
+            self.handle_store_generation.clone(),
         )?
         .with_backend("cpu")?
         .with_dtype_policy("f32")?
@@ -2755,7 +3096,6 @@ fn native_image_tensor_context<'a>(
 
 struct LoadImageNode {
     input_assets: Arc<Mutex<BTreeMap<String, Vec<u8>>>>,
-    tensors: Arc<Mutex<NativeTensorStore>>,
     cpu_backend: Arc<CpuBackend>,
 }
 
@@ -2771,7 +3111,7 @@ impl NativeNode for LoadImageNode {
     fn cache_dependencies(
         &self,
         context: &NodeContext,
-        inputs: &BTreeMap<String, Value>,
+        inputs: &BTreeMap<String, NativeValue>,
     ) -> Result<CacheDependencies, NodeFailure> {
         context.cancellation.check().map_err(cancellation_failure)?;
         let image = required_string(inputs, "image")?;
@@ -2785,7 +3125,7 @@ impl NativeNode for LoadImageNode {
     fn execute<'a>(
         &'a self,
         context: NodeContext,
-        inputs: BTreeMap<String, Value>,
+        inputs: BTreeMap<String, NativeValue>,
     ) -> BoxFuture<'a, Result<NodeOutcome, NodeFailure>> {
         Box::pin(async move {
             context.cancellation.check().map_err(cancellation_failure)?;
@@ -2819,20 +3159,9 @@ impl NativeNode for LoadImageNode {
                 &decoded.mask_bhw,
             )
             .map_err(tensor_failure)?;
-            let image_handle =
-                NativeTensorStore::prepare_image_handle(NativeTensorKind::Image, &image)
-                    .map_err(runtime_failure)?;
-            let mask_handle =
-                NativeTensorStore::prepare_image_handle(NativeTensorKind::Mask, &mask)
-                    .map_err(runtime_failure)?;
-            let image_output =
-                serde_json::to_value(image_handle.clone()).map_err(encoding_failure)?;
-            let mask_output =
-                serde_json::to_value(mask_handle.clone()).map_err(encoding_failure)?;
             tensor_context.check().map_err(tensor_failure)?;
-            let mut tensors = self.tensors.lock();
-            tensors.commit_prepared_image(&image_handle, image);
-            tensors.commit_prepared_image(&mask_handle, mask);
+            let image_output = publish_image(&context, NativeTensorKind::Image, image)?;
+            let mask_output = publish_image(&context, NativeTensorKind::Mask, mask)?;
             Ok(NodeOutcome::Values {
                 outputs: vec![image_output, mask_output],
                 ui: None,
@@ -2867,7 +3196,6 @@ impl LoadImageNode {
 }
 
 struct ImageScaleNode {
-    tensors: Arc<Mutex<NativeTensorStore>>,
     cpu_backend: Arc<CpuBackend>,
 }
 
@@ -2883,15 +3211,10 @@ impl NativeNode for ImageScaleNode {
     fn execute<'a>(
         &'a self,
         context: NodeContext,
-        inputs: BTreeMap<String, Value>,
+        inputs: BTreeMap<String, NativeValue>,
     ) -> BoxFuture<'a, Result<NodeOutcome, NodeFailure>> {
         Box::pin(async move {
-            let handle = required_handle(&inputs, "image")?;
-            let image = self
-                .tensors
-                .lock()
-                .get(&handle, NativeTensorKind::Image)
-                .map_err(runtime_failure)?;
+            let image = resolve_image(&context, &inputs, "image", NativeTensorKind::Image)?;
             let mode = parse_resize_mode(required_string(&inputs, "upscale_method")?)?;
             let crop = parse_resize_crop(required_string(&inputs, "crop")?)?;
             let width = required_u64(&inputs, "width")?;
@@ -2907,11 +3230,8 @@ impl NativeNode for ImageScaleNode {
                     &tensor_context,
                 )
                 .map_err(tensor_failure)?;
-            let handle = NativeTensorStore::prepare_image_handle(NativeTensorKind::Image, &resized)
-                .map_err(runtime_failure)?;
-            let output = serde_json::to_value(handle.clone()).map_err(encoding_failure)?;
             tensor_context.check().map_err(tensor_failure)?;
-            self.tensors.lock().commit_prepared_image(&handle, resized);
+            let output = publish_image(&context, NativeTensorKind::Image, resized)?;
             Ok(NodeOutcome::Values {
                 outputs: vec![output],
                 ui: None,
@@ -2922,7 +3242,6 @@ impl NativeNode for ImageScaleNode {
 }
 
 struct ImageInvertNode {
-    tensors: Arc<Mutex<NativeTensorStore>>,
     cpu_backend: Arc<CpuBackend>,
 }
 
@@ -2938,25 +3257,16 @@ impl NativeNode for ImageInvertNode {
     fn execute<'a>(
         &'a self,
         context: NodeContext,
-        inputs: BTreeMap<String, Value>,
+        inputs: BTreeMap<String, NativeValue>,
     ) -> BoxFuture<'a, Result<NodeOutcome, NodeFailure>> {
         Box::pin(async move {
-            let handle = required_handle(&inputs, "image")?;
-            let image = self
-                .tensors
-                .lock()
-                .get(&handle, NativeTensorKind::Image)
-                .map_err(runtime_failure)?;
+            let image = resolve_image(&context, &inputs, "image", NativeTensorKind::Image)?;
             let tensor_context = native_image_tensor_context(&self.cpu_backend, &context);
             let inverted = image
                 .invert(&self.cpu_backend, &tensor_context)
                 .map_err(tensor_failure)?;
-            let handle =
-                NativeTensorStore::prepare_image_handle(NativeTensorKind::Image, &inverted)
-                    .map_err(runtime_failure)?;
-            let output = serde_json::to_value(handle.clone()).map_err(encoding_failure)?;
             tensor_context.check().map_err(tensor_failure)?;
-            self.tensors.lock().commit_prepared_image(&handle, inverted);
+            let output = publish_image(&context, NativeTensorKind::Image, inverted)?;
             Ok(NodeOutcome::Values {
                 outputs: vec![output],
                 ui: None,
@@ -2967,7 +3277,6 @@ impl NativeNode for ImageInvertNode {
 }
 
 struct SaveImageNode {
-    tensors: Arc<Mutex<NativeTensorStore>>,
     cpu_backend: Arc<CpuBackend>,
     namespace: AssetNamespace,
     metadata_enabled: bool,
@@ -2988,23 +3297,16 @@ impl NativeNode for SaveImageNode {
     fn execute<'a>(
         &'a self,
         context: NodeContext,
-        inputs: BTreeMap<String, Value>,
+        inputs: BTreeMap<String, NativeValue>,
     ) -> BoxFuture<'a, Result<NodeOutcome, NodeFailure>> {
         Box::pin(async move {
-            let handle = required_handle(&inputs, "images")?;
-            let image = self
-                .tensors
-                .lock()
-                .get(&handle, NativeTensorKind::Image)
-                .map_err(runtime_failure)?;
+            let image = resolve_image(&context, &inputs, "images", NativeTensorKind::Image)?;
             let (batch, height, width, channels) = image.dimensions().map_err(tensor_failure)?;
             let pixels = image.as_f32_slice().map_err(tensor_failure)?;
             let prefix = if self.namespace == AssetNamespace::Temporary {
                 "ComfyUI_temp".to_owned()
             } else {
-                inputs
-                    .get("filename_prefix")
-                    .and_then(Value::as_str)
+                optional_string(&inputs, "filename_prefix")
                     .unwrap_or("ComfyUI")
                     .to_owned()
             };
@@ -3058,7 +3360,12 @@ impl NativeNode for SaveImageNode {
                 }));
             }
             Ok(NodeOutcome::Values {
-                outputs: vec![serde_json::to_value(handle).map_err(encoding_failure)?],
+                outputs: vec![
+                    inputs
+                        .get("images")
+                        .cloned()
+                        .ok_or_else(|| invalid_diffusion_input("`images` is missing"))?,
+                ],
                 ui: Some(json!({"images": ui_images})),
                 effects,
             })
@@ -3132,7 +3439,14 @@ impl EffectCoordinator for NativeImageProposalCoordinator {
         Ok(effect)
     }
 
-    fn commit_batch(&self, effects: &[PreparedEffect]) -> Result<(), String> {
+    fn commit_batch(
+        &self,
+        effects: &[PreparedEffect],
+        cancellation: &CancellationToken,
+    ) -> Result<(), String> {
+        cancellation
+            .check()
+            .map_err(|_| "native image effect commit was cancelled".to_owned())?;
         let mut state = self.state.lock();
         let mut prepared_batch = Vec::with_capacity(effects.len());
         for effect in effects {
@@ -3149,6 +3463,9 @@ impl EffectCoordinator for NativeImageProposalCoordinator {
             }
             prepared_batch.push(prepared);
         }
+        cancellation
+            .check()
+            .map_err(|_| "native image effect commit was cancelled".to_owned())?;
         for (effect, prepared) in effects.iter().zip(prepared_batch) {
             state.prepared.remove(&effect.transaction_id);
             state.proposed.push(prepared.proposal);
@@ -3158,61 +3475,79 @@ impl EffectCoordinator for NativeImageProposalCoordinator {
 
     fn rollback_batch(&self, effects: &[PreparedEffect]) -> Result<(), String> {
         let mut state = self.state.lock();
+        let transaction_ids = effects
+            .iter()
+            .map(|effect| effect.transaction_id)
+            .collect::<BTreeSet<_>>();
         for effect in effects {
             state.prepared.remove(&effect.transaction_id);
         }
+        state
+            .proposed
+            .retain(|proposal| !transaction_ids.contains(&proposal.proposal_id()));
         Ok(())
     }
 }
 
 fn required_string<'a>(
-    inputs: &'a BTreeMap<String, Value>,
+    inputs: &'a BTreeMap<String, NativeValue>,
     name: &str,
 ) -> Result<&'a str, NodeFailure> {
-    inputs
-        .get(name)
-        .and_then(Value::as_str)
-        .ok_or_else(|| NodeFailure {
-            code: "invalid_native_image_input".to_owned(),
-            message: format!("`{name}` must be a string"),
-            kind: NodeFailureKind::Failure,
-            retryable: false,
-        })
+    optional_string(inputs, name).ok_or_else(|| NodeFailure {
+        code: "invalid_native_image_input".to_owned(),
+        message: format!("`{name}` must be a string"),
+        kind: NodeFailureKind::Failure,
+        retryable: false,
+    })
 }
 
-fn required_u64(inputs: &BTreeMap<String, Value>, name: &str) -> Result<u64, NodeFailure> {
-    inputs
-        .get(name)
-        .and_then(Value::as_u64)
-        .ok_or_else(|| NodeFailure {
+fn optional_string<'a>(inputs: &'a BTreeMap<String, NativeValue>, name: &str) -> Option<&'a str> {
+    match inputs.get(name) {
+        Some(NativeValue::Primitive {
+            value: NativePrimitive::String(value),
+        }) => Some(value),
+        _ => None,
+    }
+}
+
+fn required_u64(inputs: &BTreeMap<String, NativeValue>, name: &str) -> Result<u64, NodeFailure> {
+    match inputs.get(name) {
+        Some(NativeValue::Primitive {
+            value: NativePrimitive::UnsignedInteger(value),
+        }) => Ok(*value),
+        Some(NativeValue::Primitive {
+            value: NativePrimitive::Integer(value),
+        }) => u64::try_from(*value).map_err(|_| NodeFailure {
             code: "invalid_native_image_input".to_owned(),
             message: format!("`{name}` must be a non-negative integer"),
             kind: NodeFailureKind::Failure,
             retryable: false,
-        })
+        }),
+        _ => Err(NodeFailure {
+            code: "invalid_native_image_input".to_owned(),
+            message: format!("`{name}` must be a non-negative integer"),
+            kind: NodeFailureKind::Failure,
+            retryable: false,
+        }),
+    }
 }
 
-fn required_f32(inputs: &BTreeMap<String, Value>, name: &str) -> Result<f32, NodeFailure> {
-    let value = inputs
-        .get(name)
-        .and_then(Value::as_f64)
-        .map(|value| value as f32)
-        .filter(|value| value.is_finite())
-        .ok_or_else(|| invalid_diffusion_input(&format!("`{name}` must be a finite number")))?;
+fn required_f32(inputs: &BTreeMap<String, NativeValue>, name: &str) -> Result<f32, NodeFailure> {
+    let value = match inputs.get(name) {
+        Some(NativeValue::Primitive {
+            value: NativePrimitive::Number(value),
+        }) => Some(*value as f32),
+        Some(NativeValue::Primitive {
+            value: NativePrimitive::Integer(value),
+        }) => Some(*value as f32),
+        Some(NativeValue::Primitive {
+            value: NativePrimitive::UnsignedInteger(value),
+        }) => Some(*value as f32),
+        _ => None,
+    }
+    .filter(|value| value.is_finite())
+    .ok_or_else(|| invalid_diffusion_input(&format!("`{name}` must be a finite number")))?;
     Ok(value)
-}
-
-fn required_json<T: serde::de::DeserializeOwned>(
-    inputs: &BTreeMap<String, Value>,
-    name: &str,
-) -> Result<T, NodeFailure> {
-    serde_json::from_value(
-        inputs
-            .get(name)
-            .cloned()
-            .ok_or_else(|| invalid_diffusion_input(&format!("`{name}` is missing")))?,
-    )
-    .map_err(encoding_failure)
 }
 
 fn invalid_diffusion_input(message: &str) -> NodeFailure {
@@ -3636,19 +3971,6 @@ fn tensor_sha256(tensor: &Tensor) -> Result<String, NativeImageRuntimeError> {
     Ok(format!("{:x}", Sha256::digest(tensor.contiguous_bytes()?)))
 }
 
-fn required_handle(
-    inputs: &BTreeMap<String, Value>,
-    name: &str,
-) -> Result<NativeTensorHandle, NodeFailure> {
-    let value = inputs.get(name).cloned().ok_or_else(|| NodeFailure {
-        code: "missing_native_tensor_handle".to_owned(),
-        message: format!("`{name}` is missing"),
-        kind: NodeFailureKind::Failure,
-        retryable: false,
-    })?;
-    serde_json::from_value(value).map_err(encoding_failure)
-}
-
 fn parse_resize_mode(value: &str) -> Result<ResizeMode, NodeFailure> {
     match value {
         "nearest-exact" => Ok(ResizeMode::NearestExact),
@@ -3678,21 +4000,58 @@ fn parse_resize_crop(value: &str) -> Result<ResizeCrop, NodeFailure> {
     }
 }
 
-fn png_metadata(inputs: &BTreeMap<String, Value>) -> Result<BTreeMap<String, String>, NodeFailure> {
+fn native_value_json(value: &NativeValue) -> Result<Value, NodeFailure> {
+    match value {
+        NativeValue::Primitive { value } => Ok(match value {
+            NativePrimitive::Null => Value::Null,
+            NativePrimitive::Boolean(value) => Value::Bool(*value),
+            NativePrimitive::Integer(value) => Value::from(*value),
+            NativePrimitive::UnsignedInteger(value) => Value::from(*value),
+            NativePrimitive::Number(value) => Value::from(*value),
+            NativePrimitive::String(value) => Value::String(value.clone()),
+        }),
+        NativeValue::List { values } => values
+            .iter()
+            .map(native_value_json)
+            .collect::<Result<Vec<_>, _>>()
+            .map(Value::Array),
+        NativeValue::PreservedUnknown { value, .. } => Ok(value.clone()),
+        NativeValue::Handle { .. } => Err(NodeFailure {
+            code: "opaque_handle_serialization_rejected".to_owned(),
+            message: "opaque native handles cannot be projected into persisted metadata".to_owned(),
+            kind: NodeFailureKind::Failure,
+            retryable: false,
+        }),
+    }
+}
+
+fn png_metadata(
+    inputs: &BTreeMap<String, NativeValue>,
+) -> Result<BTreeMap<String, String>, NodeFailure> {
     let mut metadata = BTreeMap::new();
     if let Some(prompt) = inputs.get("prompt")
-        && !prompt.is_null()
+        && !matches!(
+            prompt,
+            NativeValue::Primitive {
+                value: NativePrimitive::Null
+            }
+        )
     {
         metadata.insert(
             "prompt".to_owned(),
-            serde_json::to_string(prompt).map_err(encoding_failure)?,
+            serde_json::to_string(&native_value_json(prompt)?).map_err(encoding_failure)?,
         );
     }
-    if let Some(extra) = inputs.get("extra_pnginfo").and_then(Value::as_object) {
+    if let Some(extra) = inputs
+        .get("extra_pnginfo")
+        .map(native_value_json)
+        .transpose()?
+        .and_then(|value| value.as_object().cloned())
+    {
         for (key, value) in extra {
             metadata.insert(
-                key.clone(),
-                serde_json::to_string(value).map_err(encoding_failure)?,
+                key,
+                serde_json::to_string(&value).map_err(encoding_failure)?,
             );
         }
     }
@@ -3733,7 +4092,10 @@ fn required_worker_input_ids(
                 node.id
             )));
         };
-        let Some(logical_id) = value.as_str() else {
+        let NativeValue::Primitive {
+            value: NativePrimitive::String(logical_id),
+        } = value
+        else {
             return Err(NativeImageRuntimeError::Encoding(format!(
                 "LoadImage node {:?} has a non-string image identity",
                 node.id
@@ -4542,6 +4904,7 @@ pub(crate) fn val_domain_004_worker_ui_wire_adapter_case()
             events: Vec::new(),
             cache_hits: 0,
             error: None,
+            handle_lease: None,
         },
         Vec::new(),
         1,
@@ -5134,15 +5497,53 @@ fn terminal_event(state: AttemptState, error: Option<String>) -> AttemptEventKin
 mod tests {
     use super::*;
     use crate::{
-        AttemptState, CacheKey, ExecutionAttemptPersistence, ExecutionCommandAck,
+        AttemptEvent, AttemptState, CacheKey, ExecutionAttemptPersistence, ExecutionCommandAck,
         ExecutionCommandOutcome, ExecutionDataSource, ExecutionPresentationService,
-        ExecutionSnapshotStatus, PersistedExecutionAttempt, PersistedExecutionProfile,
-        PromptCompiler,
+        ExecutionSnapshotStatus, NativeHandleStoreGeneration, PersistedExecutionAttempt,
+        PersistedExecutionProfile, PromptCompiler,
     };
     use comfy_types::{ApiPrompt, PromptId, PromptNode, PromptSubmission, RequestId, WorkerId};
     use serde_json::json;
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use tempfile::TempDir;
+
+    fn native(value: Value) -> NativeValue {
+        match value {
+            Value::Null => NativeValue::Primitive {
+                value: NativePrimitive::Null,
+            },
+            Value::Bool(value) => NativeValue::Primitive {
+                value: NativePrimitive::Boolean(value),
+            },
+            Value::Number(value) => {
+                if let Some(value) = value.as_i64() {
+                    NativeValue::Primitive {
+                        value: NativePrimitive::Integer(value),
+                    }
+                } else if let Some(value) = value.as_u64() {
+                    NativeValue::Primitive {
+                        value: NativePrimitive::UnsignedInteger(value),
+                    }
+                } else if let Some(value) = value.as_f64() {
+                    NativeValue::Primitive {
+                        value: NativePrimitive::Number(value),
+                    }
+                } else {
+                    NativeValue::PreservedUnknown {
+                        type_name: "sim.json-number@1".to_owned(),
+                        value: Value::Number(value),
+                    }
+                }
+            }
+            Value::String(value) => NativeValue::Primitive {
+                value: NativePrimitive::String(value),
+            },
+            value => NativeValue::PreservedUnknown {
+                type_name: "sim.json@1".to_owned(),
+                value,
+            },
+        }
+    }
 
     struct FailOnceExecutionPersistence {
         database: crate::ComfyRuntimeDb,
@@ -5210,23 +5611,32 @@ mod tests {
                 backend: Arc::new(backend),
                 loaded: Mutex::new(None),
             }),
-            tensors: Arc::new(Mutex::new(NativeTensorStore::default())),
         };
         let inputs = BTreeMap::from([
-            ("model".to_owned(), json!("model-digest-a")),
-            ("positive".to_owned(), json!("conditioning-positive")),
-            ("negative".to_owned(), json!("conditioning-negative")),
-            ("cfg".to_owned(), json!(7.0)),
-            ("seed".to_owned(), json!(1)),
+            ("model".to_owned(), native(json!("model-digest-a"))),
+            (
+                "positive".to_owned(),
+                native(json!("conditioning-positive")),
+            ),
+            (
+                "negative".to_owned(),
+                native(json!("conditioning-negative")),
+            ),
+            ("cfg".to_owned(), native(json!(7.0))),
+            ("seed".to_owned(), native(json!(1))),
         ]);
         let cancellation = CancellationToken::default();
-        let context = NodeContext {
-            prompt_id: PromptId(Uuid::from_u128(0x5100)),
-            attempt_id: AttemptId(Uuid::from_u128(0x5101)),
-            node_id: NodeId("5".to_owned()),
+        let attempt_id = AttemptId(Uuid::from_u128(0x5101));
+        let handle_generation = crate::NativeHandleStoreGeneration::new()?;
+        let scratch = workspace_authority.authorize_workspace(1 << 20)?;
+        let context = NodeContext::new(
+            PromptId(Uuid::from_u128(0x5100)),
+            attempt_id,
+            NodeId("5".to_owned()),
             cancellation,
-            scratch: workspace_authority.authorize_workspace(1 << 20)?,
-        };
+            scratch.clone(),
+            handle_generation.handle_store_for_attempt(attempt_id),
+        )?;
         let dependencies = node.cache_dependencies(&context, &inputs)?;
         assert_eq!(cache_identity_calls.load(Ordering::SeqCst), 1);
         assert_eq!(dependencies.artifact_digests.len(), 6);
@@ -5241,7 +5651,7 @@ mod tests {
         );
         let change_token = node.cache_change_token(&inputs)?;
         assert_eq!(change_token, "stable");
-        let key = |inputs: &BTreeMap<String, Value>, token: &str| {
+        let key = |inputs: &BTreeMap<String, NativeValue>, token: &str| {
             CacheKey::from_inputs_with_dependencies(
                 "KSampler",
                 NATIVE_DIFFUSION_REGISTRY_VERSION,
@@ -5262,7 +5672,7 @@ mod tests {
         cache.insert(
             canonical.clone(),
             crate::CacheEntry {
-                outputs: vec![json!("latent")],
+                outputs: vec![native(json!("latent"))],
                 ui: None,
             },
         );
@@ -5270,10 +5680,10 @@ mod tests {
         assert!(cache.get(&key(&inputs, "sim.comfy.guidance.v0")?).is_none());
 
         for (name, value) in [
-            ("model", json!("model-digest-b")),
-            ("positive", json!("conditioning-other")),
-            ("negative", json!("conditioning-other")),
-            ("cfg", json!(1.0)),
+            ("model", native(json!("model-digest-b"))),
+            ("positive", native(json!("conditioning-other"))),
+            ("negative", native(json!("conditioning-other"))),
+            ("cfg", native(json!(1.0))),
         ] {
             let mut changed = inputs.clone();
             changed.insert(name.to_owned(), value);
@@ -5308,10 +5718,14 @@ mod tests {
 
         let cancelled = CancellationToken::default();
         cancelled.cancel();
-        let cancelled_context = NodeContext {
-            cancellation: cancelled,
-            ..context
-        };
+        let cancelled_context = NodeContext::new(
+            context.prompt_id,
+            context.attempt_id,
+            context.node_id,
+            cancelled,
+            scratch,
+            handle_generation.handle_store_for_attempt(attempt_id),
+        )?;
         let error = node
             .cache_dependencies(&cancelled_context, &inputs)
             .expect_err("cancelled cache identity discovery must fail");
@@ -5333,18 +5747,20 @@ mod tests {
                 logical_id.to_owned(),
                 bytes.clone(),
             )]))),
-            tensors: Arc::new(Mutex::new(NativeTensorStore::default())),
             cpu_backend: Arc::new(backend),
         };
-        let inputs = BTreeMap::from([("image".to_owned(), json!(logical_id))]);
+        let inputs = BTreeMap::from([("image".to_owned(), native(json!(logical_id)))]);
         let cancellation = CancellationToken::default();
-        let context = NodeContext {
-            prompt_id: PromptId(Uuid::from_u128(0x1a6e)),
-            attempt_id: AttemptId(Uuid::from_u128(0x1a6f)),
-            node_id: NodeId("load-image".to_owned()),
-            cancellation: cancellation.clone(),
-            scratch: workspace_authority.authorize_workspace(1 << 20)?,
-        };
+        let attempt_id = AttemptId(Uuid::from_u128(0x1a6f));
+        let handle_generation = crate::NativeHandleStoreGeneration::new()?;
+        let context = NodeContext::new(
+            PromptId(Uuid::from_u128(0x1a6e)),
+            attempt_id,
+            NodeId("load-image".to_owned()),
+            cancellation.clone(),
+            workspace_authority.authorize_workspace(1 << 20)?,
+            handle_generation.handle_store_for_attempt(attempt_id),
+        )?;
 
         let dependencies = node.cache_dependencies(&context, &inputs)?;
         assert_eq!(
@@ -5736,7 +6152,7 @@ mod tests {
             let descriptor = registry.descriptor(class_type).ok_or_else(|| {
                 NativeImageRuntimeError::Registry(format!("missing {class_type}"))
             })?;
-            assert_eq!(descriptor.availability, RuntimeAvailability::Native);
+            descriptor.validate()?;
             assert_eq!(
                 descriptor.implementation_version,
                 NATIVE_IMAGE_REGISTRY_VERSION
@@ -5746,6 +6162,62 @@ mod tests {
                 registry.implementation_namespace(class_type),
                 Some("sim.native_rust")
             );
+            assert!(registry.binding_source(class_type).is_some());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn generated_registry_is_comprehensive_and_preserves_union_frontend_types()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let bindings = generated_family_node_bindings()?;
+        let registry = generated_native_node_registry_projection(None)?;
+        registry.validate_comprehensive_bindings()?;
+        for class_type in [
+            "LoadImage",
+            "ImageScale",
+            "ImageInvert",
+            "PreviewImage",
+            "SaveImage",
+        ] {
+            assert!(registry.descriptor(class_type).is_some());
+            assert!(registry.node(class_type).is_some());
+        }
+        for binding in &bindings {
+            let class_type = &binding.descriptor().class_type;
+            assert_eq!(
+                registry.binding_declared_disposition(class_type),
+                Some(binding.disposition())
+            );
+            assert!(
+                registry
+                    .binding_source(class_type)
+                    .is_some_and(|source| !source.is_empty())
+            );
+            assert!(registry.presentation(class_type).is_some());
+        }
+
+        let frontend = generated_native_frontend_descriptors(None)?;
+        assert_eq!(frontend.len(), registry.descriptor_len());
+        if let Some((class_type, descriptor, input)) =
+            registry.descriptors().find_map(|(class_type, descriptor)| {
+                descriptor
+                    .inputs
+                    .iter()
+                    .find(|input| input.accepted_types.members().len() > 1)
+                    .map(|input| (class_type, descriptor, input))
+            })
+        {
+            let frontend_descriptor = frontend
+                .get(class_type)
+                .ok_or("union descriptor was absent from frontend projection")?;
+            let frontend_input = frontend_descriptor
+                .inputs
+                .iter()
+                .find(|candidate| candidate.name == input.name)
+                .ok_or("union input was absent from frontend projection")?;
+            assert!(frontend_input.type_name.contains('|'));
+            assert_eq!(frontend_descriptor.outputs.len(), descriptor.outputs.len());
         }
         Ok(())
     }
@@ -6130,36 +6602,25 @@ mod tests {
         let tensor =
             ImageTensor::from_f32(&cpu_backend, &tensor_context, 1, 1, 1, 3, &[0.0, 0.5, 1.0])?;
         let raw_tensor = tensor.tensor().clone();
-        let mut store = NativeTensorStore::default();
-        let first = NativeTensorStore::prepare_image_handle(NativeTensorKind::Image, &tensor)?;
-        store.commit_prepared_image(&first, tensor.clone());
-        let second = NativeTensorStore::prepare_image_handle(NativeTensorKind::Image, &tensor)?;
-        store.commit_prepared_image(&second, tensor);
+        let first = prepare_image_metadata(NativeTensorKind::Image, &tensor)?;
+        let second = prepare_image_metadata(NativeTensorKind::Image, &tensor)?;
         assert_eq!(first, second);
-        assert!(store.get(&first, NativeTensorKind::Image).is_ok());
-        assert!(store.get(&first, NativeTensorKind::Mask).is_err());
+        first.validate(NativeTensorKind::Image)?;
+        assert!(first.validate(NativeTensorKind::Mask).is_err());
         let mut forged_image_kind = serde_json::to_value(&first)?;
         forged_image_kind["kind"] = json!("mask");
         let forged_image_kind = serde_json::from_value::<NativeTensorHandle>(forged_image_kind)?;
-        assert!(
-            store
-                .get(&forged_image_kind, NativeTensorKind::Mask)
-                .is_err()
-        );
-        let raw_handle =
-            NativeTensorStore::prepare_tensor_handle(NativeTensorKind::Conditioning, &raw_tensor)?;
-        store.commit_prepared_tensor(&raw_handle, raw_tensor);
-        assert!(
-            store
-                .get_tensor(&raw_handle, NativeTensorKind::Conditioning)
-                .is_ok()
-        );
+        forged_image_kind.validate(NativeTensorKind::Mask)?;
+        assert!(forged_image_kind.validate(NativeTensorKind::Image).is_err());
+        let raw_handle = prepare_tensor_metadata(NativeTensorKind::Conditioning, &raw_tensor)?;
+        raw_handle.validate(NativeTensorKind::Conditioning)?;
         let mut forged_raw_kind = serde_json::to_value(&raw_handle)?;
         forged_raw_kind["kind"] = json!("latent");
         let forged_raw_kind = serde_json::from_value::<NativeTensorHandle>(forged_raw_kind)?;
+        forged_raw_kind.validate(NativeTensorKind::Latent)?;
         assert!(
-            store
-                .get_tensor(&forged_raw_kind, NativeTensorKind::Latent)
+            forged_raw_kind
+                .validate(NativeTensorKind::Conditioning)
                 .is_err()
         );
         let mut invalid_raw_digest = serde_json::to_value(&raw_handle)?;
@@ -6187,7 +6648,7 @@ mod tests {
                 comfy_tensor::StreamId::new(1),
             )?,
         )?;
-        assert!(store.get(&mismatched, NativeTensorKind::Image).is_err());
+        assert_ne!(mismatched.descriptor(), first.descriptor());
 
         let mut invalid_wire = serde_json::to_value(&first)?;
         let strides = invalid_wire
@@ -6217,25 +6678,29 @@ mod tests {
         let image =
             ImageTensor::from_f32(&cpu_backend, &tensor_context, 1, 1, 1, 3, &[0.0, 0.5, 1.0])?;
         let raw_tensor = image.tensor().clone();
-        let image_handle =
-            NativeTensorStore::prepare_image_handle(NativeTensorKind::Image, &image)?;
-        let raw_handle =
-            NativeTensorStore::prepare_tensor_handle(NativeTensorKind::Conditioning, &raw_tensor)?;
+        let image_handle = prepare_image_metadata(NativeTensorKind::Image, &image)?;
+        let raw_handle = prepare_tensor_metadata(NativeTensorKind::Conditioning, &raw_tensor)?;
         serde_json::to_value(&image_handle)?;
         serde_json::to_value(&raw_handle)?;
 
         cancellation.cancel();
         assert!(tensor_context.check().is_err());
 
-        let store = NativeTensorStore::default();
-        assert!(store.get(&image_handle, NativeTensorKind::Image).is_err());
-        assert!(
-            store
-                .get_tensor(&raw_handle, NativeTensorKind::Conditioning)
-                .is_err()
+        let generation = NativeHandleStoreGeneration::new()?;
+        let attempt_id = AttemptId(Uuid::from_u128(1));
+        let store = generation.handle_store_for_attempt(attempt_id);
+        let result = store.publish(
+            native_tensor_handle_type(NativeTensorKind::Image)?,
+            Arc::new(StoredNativeTensor::Image {
+                metadata: image_handle.clone(),
+                tensor: Arc::new(image),
+            }),
+            Some(image_handle.content_digest().to_owned()),
+            0,
+            &cancellation,
         );
-        assert!(store.images.is_empty());
-        assert!(store.tensors.is_empty());
+        assert!(matches!(result, Err(NativeHandleStoreError::Cancelled)));
+        assert!(generation.is_empty());
         Ok(())
     }
 
@@ -6286,6 +6751,7 @@ mod tests {
                     events: Vec::new(),
                     cache_hits: 0,
                     error: None,
+                    handle_lease: None,
                 },
                 Vec::new(),
                 1,
@@ -6324,6 +6790,45 @@ mod tests {
     fn native_worker_result_maps_ui_outputs_through_a_bounded_wire_dto()
     -> Result<(), Box<dyn std::error::Error>> {
         assert!(super::val_domain_004_worker_ui_wire_adapter_case()?);
+
+        let profile_id = ProfileId(Uuid::from_u128(31));
+        let prompt_id = PromptId(Uuid::from_u128(32));
+        let attempt_id = AttemptId(Uuid::from_u128(33));
+        let event = AttemptEvent {
+            profile_id,
+            prompt_id,
+            attempt_id,
+            sequence: 0,
+            node_id: Some(NodeId("worker".to_owned())),
+            at: Utc::now(),
+            kind: AttemptEventKind::Started,
+            data: None,
+        };
+        let mut result = NativeImageWorkerResult::from_execution_report(
+            ExecutionReport {
+                profile_id,
+                prompt_id,
+                attempt_id,
+                state: AttemptState::Succeeded,
+                outputs: BTreeMap::from([(NodeId("worker".to_owned()), vec![native(json!(1))])]),
+                ui_outputs: BTreeMap::new(),
+                events: vec![event.clone()],
+                cache_hits: 0,
+                error: None,
+                handle_lease: None,
+            },
+            Vec::new(),
+            1,
+        )?;
+        assert!(result.report.outputs.is_empty());
+        assert!(result.report.events.is_empty());
+
+        result.report.events.push(event);
+        assert!(matches!(
+            result.decode_ui_outputs(),
+            Err(NativeImageRuntimeError::WorkerEvent(message))
+                if message.contains("process-local outputs or events")
+        ));
         Ok(())
     }
 

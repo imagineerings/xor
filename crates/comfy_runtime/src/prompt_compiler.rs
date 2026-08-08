@@ -1,4 +1,8 @@
 use crate::executor::NativeNodeRegistry;
+use comfy_nodes::{
+    NativeNodeDescriptor, NativePortCardinality, NativePrimitive, NativePrimitiveType,
+    NativeTypeUnion, NativeValue, NativeValueType,
+};
 use comfy_types::{ApiPrompt, NodeId, PromptId, PromptNode, PromptSubmission};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -9,145 +13,17 @@ use uuid::Uuid;
 pub const MAX_PROMPT_NODES: usize = 100_000;
 pub const MAX_PROMPT_INPUTS: usize = 1_000_000;
 
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ValueType {
-    Any,
-    Boolean,
-    Integer,
-    Number,
-    String,
-    Image,
-    Mask,
-    Latent,
-    Model,
-    Conditioning,
-    Tensor,
-    Artifact,
-    Custom(String),
-}
-
-impl ValueType {
-    fn accepts(&self, output: &Self) -> bool {
-        self == &Self::Any
-            || output == &Self::Any
-            || self == output
-            || (self == &Self::Number && output == &Self::Integer)
-    }
-
-    fn accepts_literal(&self, value: &Value) -> bool {
-        match self {
-            Self::Any => true,
-            Self::Boolean => value.is_boolean(),
-            Self::Integer => value.as_i64().is_some() || value.as_u64().is_some(),
-            Self::Number => value.is_number(),
-            Self::String => value.is_string(),
-            Self::Image
-            | Self::Mask
-            | Self::Latent
-            | Self::Model
-            | Self::Conditioning
-            | Self::Tensor
-            | Self::Artifact
-            | Self::Custom(_) => false,
-        }
-    }
-
-    pub(crate) fn accepts_runtime_output(&self, value: &Value) -> bool {
-        match self {
-            Self::Image
-            | Self::Mask
-            | Self::Latent
-            | Self::Model
-            | Self::Conditioning
-            | Self::Tensor
-            | Self::Artifact
-            | Self::Custom(_) => !value.is_null(),
-            _ => self.accepts_literal(value),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum InputMode {
-    Scalar,
-    List,
-    Mapped,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct RuntimeInputDescriptor {
-    pub value_type: ValueType,
-    pub required: bool,
-    pub hidden: bool,
-    pub lazy: bool,
-    pub mode: InputMode,
-    pub allows_literal: bool,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct RuntimeOutputDescriptor {
-    pub value_type: ValueType,
-    pub is_list: bool,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum RuntimeAvailability {
-    Native,
-    NativeProvider { provider: String },
-    Unavailable { reason: String },
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum EffectClass {
-    Pure,
-    ReadsArtifact,
-    WritesArtifact,
-    Provider,
-    ExclusiveDevice,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum RuntimeCachePolicy {
-    InputIdentity,
-    Never,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct RuntimeNodeDescriptor {
-    pub class_type: String,
-    pub implementation_version: String,
-    pub inputs: BTreeMap<String, RuntimeInputDescriptor>,
-    pub outputs: Vec<RuntimeOutputDescriptor>,
-    pub output_node: bool,
-    pub availability: RuntimeAvailability,
-    pub effect: EffectClass,
-    pub cache: RuntimeCachePolicy,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct RuntimeNodePresentation {
-    pub display_name: String,
-    pub category: String,
-    pub output_names: Vec<String>,
-}
-
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum InputBinding {
     Literal {
-        value: Value,
+        value: NativeValue,
     },
     Link {
         source: NodeId,
         output_index: usize,
         lazy: bool,
-        mode: InputMode,
+        mode: NativePortCardinality,
     },
 }
 
@@ -155,7 +31,7 @@ pub enum InputBinding {
 pub struct CompiledNode {
     pub id: NodeId,
     pub class_type: String,
-    pub descriptor: RuntimeNodeDescriptor,
+    pub descriptor: NativeNodeDescriptor,
     pub inputs: BTreeMap<String, InputBinding>,
     pub unknown: BTreeMap<String, Value>,
 }
@@ -323,7 +199,7 @@ impl<'a> PromptCompiler<'a> {
     fn resolve_descriptors<'b>(
         &'b self,
         prompt: &ApiPrompt,
-    ) -> Result<BTreeMap<NodeId, &'a RuntimeNodeDescriptor>, PromptCompileError> {
+    ) -> Result<BTreeMap<NodeId, &'a NativeNodeDescriptor>, PromptCompileError> {
         let mut descriptors = BTreeMap::new();
         for (node_id, node) in &prompt.0 {
             let descriptor = self.registry.descriptor(&node.class_type).ok_or_else(|| {
@@ -332,11 +208,11 @@ impl<'a> PromptCompiler<'a> {
                     class_type: node.class_type.clone(),
                 }
             })?;
-            if let RuntimeAvailability::Unavailable { reason } = &descriptor.availability {
+            if let Some(reason) = self.registry.unavailable_reason(&node.class_type) {
                 return Err(PromptCompileError::UnavailableNode {
                     node: node_id.clone(),
                     class_type: node.class_type.clone(),
-                    reason: reason.clone(),
+                    reason: reason.to_owned(),
                 });
             }
             descriptors.insert(node_id.clone(), descriptor);
@@ -348,28 +224,43 @@ impl<'a> PromptCompiler<'a> {
 fn compile_inputs(
     node_id: &NodeId,
     prompt_node: &PromptNode,
-    descriptor: &RuntimeNodeDescriptor,
+    descriptor: &NativeNodeDescriptor,
     prompt: &ApiPrompt,
-    descriptors: &BTreeMap<NodeId, &RuntimeNodeDescriptor>,
+    descriptors: &BTreeMap<NodeId, &NativeNodeDescriptor>,
 ) -> Result<BTreeMap<String, InputBinding>, PromptCompileError> {
-    for (name, input) in &descriptor.inputs {
-        if input.required && !input.hidden && !prompt_node.inputs.contains_key(name) {
+    for input in &descriptor.inputs {
+        if input.required && !input.hidden && !prompt_node.inputs.contains_key(&input.name) {
             return Err(PromptCompileError::MissingInput {
                 node: node_id.clone(),
-                input: name.clone(),
+                input: input.name.clone(),
             });
+        }
+    }
+    for dynamic in &descriptor.dynamic_inputs {
+        for offset in 0..dynamic.minimum_count {
+            let index = dynamic.start_index.checked_add(offset).ok_or_else(|| {
+                PromptCompileError::InvalidRuntimeDescriptor(descriptor.class_type.clone())
+            })?;
+            let name = dynamic.name_template.replace("{index}", &index.to_string());
+            if dynamic.input.required
+                && !dynamic.input.hidden
+                && !prompt_node.inputs.contains_key(&name)
+            {
+                return Err(PromptCompileError::MissingInput {
+                    node: node_id.clone(),
+                    input: name,
+                });
+            }
         }
     }
     let mut compiled = BTreeMap::new();
     for (name, value) in &prompt_node.inputs {
-        let input =
-            descriptor
-                .inputs
-                .get(name)
-                .ok_or_else(|| PromptCompileError::UnknownInput {
-                    node: node_id.clone(),
-                    input: name.clone(),
-                })?;
+        let input = resolve_input_descriptor(descriptor, name).ok_or_else(|| {
+            PromptCompileError::UnknownInput {
+                node: node_id.clone(),
+                input: name.clone(),
+            }
+        })?;
         if input.hidden {
             continue;
         }
@@ -396,8 +287,11 @@ fn compile_inputs(
                     output_index,
                 }
             })?;
-            let list_compatible = !output.is_list || input.mode != InputMode::Scalar;
-            if !input.value_type.accepts(&output.value_type) || !list_compatible {
+            let list_compatible =
+                !output.is_list || input.cardinality != NativePortCardinality::Scalar;
+            if !type_union_accepts_output(&input.accepted_types, &output.produced_type)
+                || !list_compatible
+            {
                 return Err(PromptCompileError::IncompatibleLink {
                     node: node_id.clone(),
                     input: name.clone(),
@@ -409,33 +303,21 @@ fn compile_inputs(
                 source,
                 output_index,
                 lazy: input.lazy,
-                mode: input.mode,
+                mode: input.cardinality,
             }
         } else {
-            let shape_valid = match input.mode {
-                InputMode::List => value.as_array().is_some_and(|values| {
-                    values
-                        .iter()
-                        .all(|value| input.value_type.accepts_literal(value))
-                }),
-                InputMode::Mapped => value.as_array().map_or_else(
-                    || input.value_type.accepts_literal(value),
-                    |values| {
-                        values
-                            .iter()
-                            .all(|value| input.value_type.accepts_literal(value))
-                    },
-                ),
-                InputMode::Scalar => input.value_type.accepts_literal(value),
-            };
-            if !input.allows_literal || !shape_valid {
+            let native_value = native_literal(value, &input.accepted_types, input.cardinality);
+            if !input.allows_literal || native_value.is_none() {
                 return Err(PromptCompileError::InvalidLiteral {
                     node: node_id.clone(),
                     input: name.clone(),
                 });
             }
             InputBinding::Literal {
-                value: value.clone(),
+                value: native_value.ok_or_else(|| PromptCompileError::InvalidLiteral {
+                    node: node_id.clone(),
+                    input: name.clone(),
+                })?,
             }
         };
         compiled.insert(name.clone(), binding);
@@ -445,16 +327,16 @@ fn compile_inputs(
 
 fn inject_hidden_inputs(
     node_id: &NodeId,
-    descriptor: &RuntimeNodeDescriptor,
+    descriptor: &NativeNodeDescriptor,
     prompt: &ApiPrompt,
     extra_data: &BTreeMap<String, Value>,
     inputs: &mut BTreeMap<String, InputBinding>,
 ) -> Result<(), PromptCompileError> {
-    for (name, input) in &descriptor.inputs {
+    for input in &descriptor.inputs {
         if !input.hidden {
             continue;
         }
-        let value = match name.as_str() {
+        let value = match input.name.as_str() {
             "prompt" => serde_json::to_value(prompt),
             "extra_pnginfo" => Ok(extra_data
                 .get("extra_pnginfo")
@@ -465,17 +347,140 @@ fn inject_hidden_inputs(
             _ => {
                 return Err(PromptCompileError::UnsupportedHiddenInput {
                     node: node_id.clone(),
-                    input: name.clone(),
+                    input: input.name.clone(),
                 });
             }
         }
         .map_err(|_| PromptCompileError::InvalidLiteral {
             node: node_id.clone(),
-            input: name.clone(),
+            input: input.name.clone(),
         })?;
-        inputs.insert(name.clone(), InputBinding::Literal { value });
+        let value = native_literal(&value, &input.accepted_types, NativePortCardinality::Scalar)
+            .ok_or_else(|| PromptCompileError::InvalidLiteral {
+                node: node_id.clone(),
+                input: input.name.clone(),
+            })?;
+        inputs.insert(input.name.clone(), InputBinding::Literal { value });
     }
     Ok(())
+}
+
+pub(crate) fn resolve_input_descriptor(
+    descriptor: &NativeNodeDescriptor,
+    name: &str,
+) -> Option<comfy_nodes::NativeInputDescriptor> {
+    if let Some(input) = descriptor.inputs.iter().find(|input| input.name == name) {
+        return Some(input.clone());
+    }
+    for dynamic in &descriptor.dynamic_inputs {
+        let Some((prefix, suffix)) = dynamic.name_template.split_once("{index}") else {
+            continue;
+        };
+        let Some(index) = name
+            .strip_prefix(prefix)
+            .and_then(|value| value.strip_suffix(suffix))
+            .and_then(|value| value.parse::<u32>().ok())
+        else {
+            continue;
+        };
+        let Some(end) = dynamic.start_index.checked_add(dynamic.maximum_count) else {
+            continue;
+        };
+        if index >= dynamic.start_index && index < end {
+            let mut input = dynamic.input.clone();
+            input.name = name.to_owned();
+            return Some(input);
+        }
+    }
+    None
+}
+
+fn type_union_accepts_output(union: &NativeTypeUnion, output: &NativeValueType) -> bool {
+    union.members().iter().any(|expected| {
+        expected == &NativeValueType::Any
+            || expected == output
+            || matches!(
+                (expected, output),
+                (
+                    NativeValueType::Primitive(NativePrimitiveType::Number),
+                    NativeValueType::Primitive(NativePrimitiveType::Integer)
+                )
+            )
+    })
+}
+
+fn native_literal(
+    value: &Value,
+    accepted_types: &NativeTypeUnion,
+    cardinality: NativePortCardinality,
+) -> Option<NativeValue> {
+    match cardinality {
+        NativePortCardinality::List => value.as_array().and_then(|values| {
+            values
+                .iter()
+                .map(|value| native_scalar_literal(value, accepted_types))
+                .collect::<Option<Vec<_>>>()
+                .map(|values| NativeValue::List { values })
+        }),
+        NativePortCardinality::Mapped => value.as_array().map_or_else(
+            || native_scalar_literal(value, accepted_types),
+            |values| {
+                values
+                    .iter()
+                    .map(|value| native_scalar_literal(value, accepted_types))
+                    .collect::<Option<Vec<_>>>()
+                    .map(|values| NativeValue::List { values })
+            },
+        ),
+        NativePortCardinality::Scalar => native_scalar_literal(value, accepted_types),
+    }
+}
+
+fn native_scalar_literal(value: &Value, accepted_types: &NativeTypeUnion) -> Option<NativeValue> {
+    let primitive = match value {
+        Value::Null => Some(NativePrimitive::Null),
+        Value::Bool(value) => Some(NativePrimitive::Boolean(*value)),
+        Value::Number(value) => value
+            .as_i64()
+            .map(NativePrimitive::Integer)
+            .or_else(|| value.as_u64().map(NativePrimitive::UnsignedInteger))
+            .or_else(|| {
+                value
+                    .as_f64()
+                    .filter(|value| value.is_finite())
+                    .map(NativePrimitive::Number)
+            }),
+        Value::String(value) => Some(NativePrimitive::String(value.clone())),
+        Value::Array(_) | Value::Object(_) => None,
+    };
+    if let Some(primitive) = primitive {
+        let native = NativeValue::Primitive { value: primitive };
+        if accepted_types.accepts(&native)
+            || accepted_types.members() == [NativeValueType::Any]
+            || matches!(
+                &native,
+                NativeValue::Primitive {
+                    value: NativePrimitive::Integer(_) | NativePrimitive::UnsignedInteger(_)
+                }
+            ) && accepted_types
+                .members()
+                .contains(&NativeValueType::Primitive(NativePrimitiveType::Number))
+        {
+            return Some(native);
+        }
+    }
+    if accepted_types.members() == [NativeValueType::Any]
+        || accepted_types
+            .members()
+            .contains(&NativeValueType::PreservedUnknown)
+    {
+        Some(NativeValue::PreservedUnknown {
+            type_name: "sim.json@1".to_owned(),
+            value: value.clone(),
+        })
+    } else {
+        None
+    }
 }
 
 fn decode_link(value: &Value) -> Option<(NodeId, usize)> {
@@ -573,22 +578,50 @@ fn static_required_nodes(
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+    use comfy_nodes::{
+        NATIVE_NODE_CONTRACT_SCHEMA_VERSION, NativeCachePolicy, NativeDynamicInputDescriptor,
+        NativeEffectClass, NativeInputDescriptor, NativeNodeContractError, NativeOutputDescriptor,
+        NativePrimitiveType,
+    };
     use serde_json::json;
 
-    fn descriptor(class_type: &str, output_node: bool) -> RuntimeNodeDescriptor {
-        RuntimeNodeDescriptor {
+    fn descriptor(
+        class_type: &str,
+        output_node: bool,
+    ) -> Result<NativeNodeDescriptor, NativeNodeContractError> {
+        Ok(NativeNodeDescriptor {
+            schema_version: NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
             class_type: class_type.to_owned(),
             implementation_version: "1".to_owned(),
-            inputs: BTreeMap::new(),
-            outputs: vec![RuntimeOutputDescriptor {
-                value_type: ValueType::Number,
+            inputs: Vec::new(),
+            dynamic_inputs: Vec::new(),
+            outputs: vec![NativeOutputDescriptor {
+                name: "value".to_owned(),
+                produced_type: NativeValueType::Primitive(NativePrimitiveType::Number),
                 is_list: false,
             }],
             output_node,
-            availability: RuntimeAvailability::Native,
-            effect: EffectClass::Pure,
-            cache: RuntimeCachePolicy::InputIdentity,
-        }
+            effect: NativeEffectClass::Pure,
+            cache: NativeCachePolicy::InputIdentity,
+        })
+    }
+
+    fn input(
+        name: &str,
+        value_type: NativeValueType,
+        lazy: bool,
+        cardinality: NativePortCardinality,
+        allows_literal: bool,
+    ) -> Result<NativeInputDescriptor, NativeNodeContractError> {
+        Ok(NativeInputDescriptor {
+            name: name.to_owned(),
+            accepted_types: NativeTypeUnion::new([value_type])?,
+            required: true,
+            hidden: false,
+            lazy,
+            cardinality,
+            allows_literal,
+        })
     }
 
     fn submission(nodes: BTreeMap<NodeId, PromptNode>) -> PromptSubmission {
@@ -605,31 +638,23 @@ pub(crate) mod tests {
     #[test]
     fn val_domain_004_prompt_graph_and_lazy_dependencies_compile_deterministically()
     -> Result<(), Box<dyn std::error::Error>> {
-        let mut source = descriptor("Source", false);
+        let mut source = descriptor("Source", false)?;
         source.outputs[0].is_list = true;
-        let mut choose = descriptor("Choose", true);
-        choose.inputs.insert(
-            "condition".to_owned(),
-            RuntimeInputDescriptor {
-                value_type: ValueType::Boolean,
-                required: true,
-                hidden: false,
-                lazy: false,
-                mode: InputMode::Scalar,
-                allows_literal: true,
-            },
-        );
-        choose.inputs.insert(
-            "value".to_owned(),
-            RuntimeInputDescriptor {
-                value_type: ValueType::Number,
-                required: true,
-                hidden: false,
-                lazy: true,
-                mode: InputMode::Mapped,
-                allows_literal: false,
-            },
-        );
+        let mut choose = descriptor("Choose", true)?;
+        choose.inputs.push(input(
+            "condition",
+            NativeValueType::Primitive(NativePrimitiveType::Boolean),
+            false,
+            NativePortCardinality::Scalar,
+            true,
+        )?);
+        choose.inputs.push(input(
+            "value",
+            NativeValueType::Primitive(NativePrimitiveType::Number),
+            true,
+            NativePortCardinality::Mapped,
+            false,
+        )?);
         let mut registry = NativeNodeRegistry::default();
         registry.register_descriptor(source)?;
         registry.register_descriptor(choose)?;
@@ -673,18 +698,14 @@ pub(crate) mod tests {
     #[test]
     fn val_domain_004_invalid_graphs_fail_with_node_addressable_errors()
     -> Result<(), Box<dyn std::error::Error>> {
-        let mut output = descriptor("Output", true);
-        output.inputs.insert(
-            "value".to_owned(),
-            RuntimeInputDescriptor {
-                value_type: ValueType::Number,
-                required: true,
-                hidden: false,
-                lazy: false,
-                mode: InputMode::Scalar,
-                allows_literal: false,
-            },
-        );
+        let mut output = descriptor("Output", true)?;
+        output.inputs.push(input(
+            "value",
+            NativeValueType::Primitive(NativePrimitiveType::Number),
+            false,
+            NativePortCardinality::Scalar,
+            false,
+        )?);
         let mut registry = NativeNodeRegistry::default();
         registry.register_descriptor(output)?;
         let error = PromptCompiler::new(&registry)
@@ -703,26 +724,24 @@ pub(crate) mod tests {
 
     #[test]
     fn val_domain_004_hidden_inputs_are_host_injected() -> Result<(), Box<dyn std::error::Error>> {
-        let mut output = descriptor("Output", true);
+        let mut output = descriptor("Output", true)?;
         for (name, value_type) in [
-            ("prompt", ValueType::Custom("PROMPT".to_owned())),
+            ("prompt", NativeValueType::Any),
+            ("extra_pnginfo", NativeValueType::Any),
             (
-                "extra_pnginfo",
-                ValueType::Custom("EXTRA_PNGINFO".to_owned()),
+                "unique_id",
+                NativeValueType::Primitive(NativePrimitiveType::String),
             ),
-            ("unique_id", ValueType::String),
         ] {
-            output.inputs.insert(
-                name.to_owned(),
-                RuntimeInputDescriptor {
-                    value_type,
-                    required: true,
-                    hidden: true,
-                    lazy: false,
-                    mode: InputMode::Scalar,
-                    allows_literal: false,
-                },
-            );
+            let mut descriptor = input(
+                name,
+                value_type,
+                false,
+                NativePortCardinality::Scalar,
+                false,
+            )?;
+            descriptor.hidden = true;
+            output.inputs.push(descriptor);
         }
         let mut registry = NativeNodeRegistry::default();
         registry.register_descriptor(output)?;
@@ -747,32 +766,36 @@ pub(crate) mod tests {
         assert_eq!(
             inputs["unique_id"],
             InputBinding::Literal {
-                value: json!("out")
+                value: NativeValue::Primitive {
+                    value: NativePrimitive::String("out".to_owned())
+                }
             }
         );
-        assert_eq!(
-            inputs["extra_pnginfo"],
+        assert!(matches!(
+            &inputs["extra_pnginfo"],
             InputBinding::Literal {
-                value: json!({"workflow": {"id": "fixture"}})
-            }
-        );
+                value: NativeValue::PreservedUnknown { value, .. }
+            } if value == &json!({"workflow": {"id": "fixture"}})
+        ));
         let InputBinding::Literal { value: prompt } = &inputs["prompt"] else {
             return Err("prompt hidden input was not injected".into());
         };
-        assert!(prompt.get("out").is_some());
+        assert!(matches!(
+            prompt,
+            NativeValue::PreservedUnknown { value, .. }
+                if value.get("out").is_some()
+        ));
 
-        let mut provider = descriptor("Provider", true);
-        provider.inputs.insert(
-            "auth_token_comfy_org".to_owned(),
-            RuntimeInputDescriptor {
-                value_type: ValueType::String,
-                required: true,
-                hidden: true,
-                lazy: false,
-                mode: InputMode::Scalar,
-                allows_literal: false,
-            },
-        );
+        let mut provider = descriptor("Provider", true)?;
+        let mut secret = input(
+            "auth_token_comfy_org",
+            NativeValueType::Primitive(NativePrimitiveType::String),
+            false,
+            NativePortCardinality::Scalar,
+            false,
+        )?;
+        secret.hidden = true;
+        provider.inputs.push(secret);
         let mut provider_registry = NativeNodeRegistry::default();
         provider_registry.register_descriptor(provider)?;
         let provider_error = PromptCompiler::new(&provider_registry)
@@ -795,11 +818,81 @@ pub(crate) mod tests {
         Ok(())
     }
 
+    #[test]
+    fn integer_literals_preserve_u64_and_signed_values_exactly()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut output = descriptor("Output", true)?;
+        output.inputs.push(input(
+            "seed",
+            NativeValueType::Primitive(NativePrimitiveType::Integer),
+            false,
+            NativePortCardinality::Scalar,
+            true,
+        )?);
+        let mut registry = NativeNodeRegistry::default();
+        registry.register_descriptor(output)?;
+        for (literal, expected) in [
+            (json!(u64::MAX), NativePrimitive::UnsignedInteger(u64::MAX)),
+            (json!(-7), NativePrimitive::Integer(-7)),
+        ] {
+            let plan = PromptCompiler::new(&registry).compile(submission(BTreeMap::from([(
+                NodeId::from("out"),
+                PromptNode {
+                    class_type: "Output".to_owned(),
+                    inputs: BTreeMap::from([("seed".to_owned(), literal)]),
+                    unknown: BTreeMap::new(),
+                },
+            )])))?;
+            assert_eq!(
+                plan.nodes[&NodeId::from("out")].inputs["seed"],
+                InputBinding::Literal {
+                    value: NativeValue::Primitive { value: expected }
+                }
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn dynamic_input_resolution_checks_every_template() -> Result<(), Box<dyn std::error::Error>> {
+        let mut dynamic = descriptor("Dynamic", true)?;
+        let dynamic_input = input(
+            "value",
+            NativeValueType::Primitive(NativePrimitiveType::Number),
+            false,
+            NativePortCardinality::Scalar,
+            true,
+        )?;
+        dynamic.dynamic_inputs = vec![
+            NativeDynamicInputDescriptor {
+                name_template: "first_{index}".to_owned(),
+                start_index: 0,
+                minimum_count: 0,
+                maximum_count: 2,
+                input: dynamic_input.clone(),
+            },
+            NativeDynamicInputDescriptor {
+                name_template: "second_{index}".to_owned(),
+                start_index: 4,
+                minimum_count: 0,
+                maximum_count: 2,
+                input: dynamic_input,
+            },
+        ];
+        assert_eq!(
+            resolve_input_descriptor(&dynamic, "second_5").map(|input| input.name),
+            Some("second_5".to_owned())
+        );
+        Ok(())
+    }
+
     pub(crate) fn val_domain_004_prompt_case_results()
     -> Result<Vec<(&'static str, bool)>, Box<dyn std::error::Error>> {
         val_domain_004_prompt_graph_and_lazy_dependencies_compile_deterministically()?;
         val_domain_004_invalid_graphs_fail_with_node_addressable_errors()?;
         val_domain_004_hidden_inputs_are_host_injected()?;
+        integer_literals_preserve_u64_and_signed_values_exactly()?;
+        dynamic_input_resolution_checks_every_template()?;
         Ok(vec![
             ("prompt_graph_lazy_demand_closure", true),
             ("prompt_node_addressable_validation", true),

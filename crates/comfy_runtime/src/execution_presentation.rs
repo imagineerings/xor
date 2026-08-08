@@ -2944,9 +2944,10 @@ pub enum ExecutionPresentationError {
 mod tests {
     use super::*;
     use crate::{
-        CompiledNode, EffectClass, RuntimeAvailability, RuntimeCachePolicy, RuntimeNodeDescriptor,
-        RuntimeOutputDescriptor, ValueType,
+        CompiledNode, NativeCachePolicy, NativeEffectClass, NativeNodeDescriptor,
+        NativeOutputDescriptor, NativeValueType,
     };
+    use comfy_nodes::NATIVE_NODE_CONTRACT_SCHEMA_VERSION;
     use std::{
         collections::{BTreeMap, BTreeSet},
         sync::atomic::{AtomicBool, Ordering},
@@ -3062,18 +3063,20 @@ mod tests {
                 CompiledNode {
                     id: node_id.clone(),
                     class_type: "Output".to_owned(),
-                    descriptor: RuntimeNodeDescriptor {
+                    descriptor: NativeNodeDescriptor {
+                        schema_version: NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
                         class_type: "Output".to_owned(),
                         implementation_version: "1".to_owned(),
-                        inputs: BTreeMap::new(),
-                        outputs: vec![RuntimeOutputDescriptor {
-                            value_type: ValueType::Any,
+                        inputs: Vec::new(),
+                        dynamic_inputs: Vec::new(),
+                        outputs: vec![NativeOutputDescriptor {
+                            name: "value".to_owned(),
+                            produced_type: NativeValueType::Any,
                             is_list: false,
                         }],
                         output_node: true,
-                        availability: RuntimeAvailability::Native,
-                        effect: EffectClass::Pure,
-                        cache: RuntimeCachePolicy::Never,
+                        effect: NativeEffectClass::Pure,
+                        cache: NativeCachePolicy::Never,
                     },
                     inputs: BTreeMap::new(),
                     unknown: BTreeMap::new(),

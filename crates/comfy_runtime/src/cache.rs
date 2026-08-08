@@ -1,3 +1,5 @@
+use crate::NativeHandleLease;
+use comfy_nodes::NativeValue;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -488,7 +490,7 @@ impl CacheKey {
     pub fn from_inputs(
         node_class: impl Into<String>,
         implementation_version: impl Into<String>,
-        inputs: &BTreeMap<String, Value>,
+        inputs: &BTreeMap<String, NativeValue>,
         artifact_digests: BTreeMap<String, String>,
         backend: impl Into<String>,
         dtype_policy: impl Into<String>,
@@ -518,7 +520,7 @@ impl CacheKey {
     pub fn from_inputs_with_dependencies(
         node_class: impl Into<String>,
         implementation_version: impl Into<String>,
-        inputs: &BTreeMap<String, Value>,
+        inputs: &BTreeMap<String, NativeValue>,
         demanded_dependencies: BTreeMap<String, String>,
         artifact_digests: BTreeMap<String, String>,
         backend: impl Into<String>,
@@ -531,7 +533,11 @@ impl CacheKey {
     ) -> Result<Self, NativeCacheError> {
         let demanded_inputs = inputs
             .iter()
-            .map(|(name, value)| Ok((name.clone(), canonical_json(value)?)))
+            .map(|(name, value)| {
+                let value = serde_json::to_value(value)
+                    .map_err(|error| NativeCacheError::Canonicalization(error.to_string()))?;
+                Ok((name.clone(), canonical_json(&value)?))
+            })
             .collect::<Result<Vec<_>, NativeCacheError>>()?;
         let node_class = node_class.into();
         let implementation_version = implementation_version.into();
@@ -588,7 +594,7 @@ impl CacheKey {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CacheEntry {
-    pub outputs: Vec<Value>,
+    pub outputs: Vec<NativeValue>,
     pub ui: Option<Value>,
 }
 
@@ -617,6 +623,7 @@ pub enum NativeCacheError {
 #[derive(Clone, Debug)]
 struct CacheRecord {
     entry: CacheEntry,
+    handle_lease: Option<NativeHandleLease>,
 }
 
 #[derive(Clone, Debug)]
@@ -639,13 +646,40 @@ impl NativeCache {
     }
 
     pub fn get(&mut self, key: &CacheKey) -> Option<CacheEntry> {
-        let entry = self.entries.get(key)?.entry.clone();
-        self.touch(key);
-        Some(entry)
+        self.get_with_handle_lease(key).map(|(entry, _)| entry)
     }
 
-    pub fn insert(&mut self, key: CacheKey, entry: CacheEntry) {
-        self.entries.insert(key.clone(), CacheRecord { entry });
+    pub(crate) fn get_with_handle_lease(
+        &mut self,
+        key: &CacheKey,
+    ) -> Option<(CacheEntry, Option<NativeHandleLease>)> {
+        let record = self.entries.get(key)?;
+        let entry = record.entry.clone();
+        let lease = record.handle_lease.clone();
+        self.touch(key);
+        Some((entry, lease))
+    }
+
+    pub fn insert(&mut self, key: CacheKey, entry: CacheEntry) -> bool {
+        self.insert_with_handle_lease(key, entry, None)
+    }
+
+    pub(crate) fn insert_with_handle_lease(
+        &mut self,
+        key: CacheKey,
+        entry: CacheEntry,
+        handle_lease: Option<NativeHandleLease>,
+    ) -> bool {
+        if !cache_lease_covers_entry(&entry, handle_lease.as_ref()) {
+            return false;
+        }
+        self.entries.insert(
+            key.clone(),
+            CacheRecord {
+                entry,
+                handle_lease,
+            },
+        );
         self.touch(&key);
         while self.entries.len() > self.maximum_entries {
             let Some(oldest) = self.least_recently_used.pop_front() else {
@@ -653,6 +687,31 @@ impl NativeCache {
             };
             self.entries.remove(&oldest);
         }
+        true
+    }
+
+    pub(crate) fn insert_batch_with_handle_leases(
+        &mut self,
+        entries: Vec<(CacheKey, CacheEntry, Option<NativeHandleLease>)>,
+    ) -> bool {
+        if entries
+            .iter()
+            .any(|(_, entry, lease)| !cache_lease_covers_entry(entry, lease.as_ref()))
+        {
+            return false;
+        }
+        for (key, entry, lease) in entries {
+            if !self.insert_with_handle_lease(key, entry, lease) {
+                return false;
+            }
+        }
+        true
+    }
+
+    pub(crate) fn remove(&mut self, key: &CacheKey) -> bool {
+        self.least_recently_used
+            .retain(|candidate| candidate != key);
+        self.entries.remove(key).is_some()
     }
 
     pub fn invalidate_node(&mut self, node_class: &str) -> usize {
@@ -724,6 +783,23 @@ impl NativeCache {
     }
 }
 
+fn cache_lease_covers_entry(entry: &CacheEntry, lease: Option<&NativeHandleLease>) -> bool {
+    let contains_handles = entry.outputs.iter().any(native_value_contains_handle);
+    match (contains_handles, lease) {
+        (false, None) => true,
+        (true, Some(lease)) => lease.covers_values(&entry.outputs),
+        _ => false,
+    }
+}
+
+fn native_value_contains_handle(value: &NativeValue) -> bool {
+    match value {
+        NativeValue::Handle { .. } => true,
+        NativeValue::List { values } => values.iter().any(native_value_contains_handle),
+        NativeValue::Primitive { .. } | NativeValue::PreservedUnknown { .. } => false,
+    }
+}
+
 pub fn canonical_json(value: &Value) -> Result<String, NativeCacheError> {
     match value {
         Value::Null => Ok("null".to_owned()),
@@ -762,11 +838,18 @@ pub(crate) mod tests {
     use super::*;
     use serde_json::json;
 
+    fn native(value: Value) -> NativeValue {
+        NativeValue::PreservedUnknown {
+            type_name: "sim.json@1".to_owned(),
+            value,
+        }
+    }
+
     fn key(node: &str, input: Value) -> Result<CacheKey, NativeCacheError> {
         CacheKey::from_inputs(
             node,
             "1",
-            &BTreeMap::from([("input".to_owned(), input)]),
+            &BTreeMap::from([("input".to_owned(), native(input))]),
             BTreeMap::new(),
             "cpu",
             "f32",
@@ -798,14 +881,14 @@ pub(crate) mod tests {
         cache.insert(
             first.clone(),
             CacheEntry {
-                outputs: vec![json!(1)],
+                outputs: vec![native(json!(1))],
                 ui: None,
             },
         );
         cache.insert(
             second.clone(),
             CacheEntry {
-                outputs: vec![json!(2)],
+                outputs: vec![native(json!(2))],
                 ui: None,
             },
         );
@@ -813,7 +896,7 @@ pub(crate) mod tests {
         cache.insert(
             third.clone(),
             CacheEntry {
-                outputs: vec![json!(3)],
+                outputs: vec![native(json!(3))],
                 ui: None,
             },
         );
@@ -826,7 +909,7 @@ pub(crate) mod tests {
     #[test]
     fn val_domain_004_dependency_identities_are_canonical_and_validated()
     -> Result<(), NativeCacheError> {
-        let inputs = BTreeMap::from([("value".to_owned(), json!(7))]);
+        let inputs = BTreeMap::from([("value".to_owned(), native(json!(7)))]);
         let first = CacheKey::from_inputs_with_dependencies(
             "Output",
             "1",
@@ -906,7 +989,7 @@ pub(crate) mod tests {
         let base = CacheKey::from_inputs_with_dependencies(
             "CLIPTextEncode",
             "1",
-            &BTreeMap::from([("text".to_owned(), json!("a test"))]),
+            &BTreeMap::from([("text".to_owned(), native(json!("a test")))]),
             BTreeMap::new(),
             dependencies,
             "cpu",
@@ -931,7 +1014,7 @@ pub(crate) mod tests {
             let key = CacheKey::from_inputs_with_dependencies(
                 "CLIPTextEncode",
                 "1",
-                &BTreeMap::from([("text".to_owned(), json!("a test"))]),
+                &BTreeMap::from([("text".to_owned(), native(json!("a test")))]),
                 BTreeMap::new(),
                 changed.artifact_digests(),
                 "cpu",

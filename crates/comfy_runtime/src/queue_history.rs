@@ -1263,9 +1263,10 @@ impl ExecutionEventBus {
 mod tests {
     use super::*;
     use crate::{
-        CacheEntry, CacheKey, EffectClass, NativeCache, RuntimeAvailability, RuntimeCachePolicy,
-        RuntimeNodeDescriptor, RuntimeOutputDescriptor, ValueType,
+        CacheEntry, CacheKey, NativeCache, NativeCachePolicy, NativeEffectClass,
+        NativeNodeDescriptor, NativeOutputDescriptor, NativeValue, NativeValueType,
     };
+    use comfy_nodes::NATIVE_NODE_CONTRACT_SCHEMA_VERSION;
     use serde_json::json;
     use sha2::{Digest, Sha256};
     use std::collections::{BTreeMap, BTreeSet};
@@ -1284,18 +1285,20 @@ mod tests {
                 crate::CompiledNode {
                     id: node_id.clone(),
                     class_type: "Output".to_owned(),
-                    descriptor: RuntimeNodeDescriptor {
+                    descriptor: NativeNodeDescriptor {
+                        schema_version: NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
                         class_type: "Output".to_owned(),
                         implementation_version: "1".to_owned(),
-                        inputs: BTreeMap::new(),
-                        outputs: vec![RuntimeOutputDescriptor {
-                            value_type: ValueType::Any,
+                        inputs: Vec::new(),
+                        dynamic_inputs: Vec::new(),
+                        outputs: vec![NativeOutputDescriptor {
+                            name: "value".to_owned(),
+                            produced_type: NativeValueType::Any,
                             is_list: false,
                         }],
                         output_node: true,
-                        availability: RuntimeAvailability::Native,
-                        effect: EffectClass::Pure,
-                        cache: RuntimeCachePolicy::Never,
+                        effect: NativeEffectClass::Pure,
+                        cache: NativeCachePolicy::Never,
                     },
                     inputs: BTreeMap::new(),
                     unknown: BTreeMap::new(),
@@ -1824,7 +1827,13 @@ mod tests {
         let key = CacheKey::from_inputs(
             "Fixture",
             "1",
-            &BTreeMap::from([("value".to_owned(), json!({"b": 2, "a": 1}))]),
+            &BTreeMap::from([(
+                "value".to_owned(),
+                NativeValue::PreservedUnknown {
+                    type_name: "sim.json@1".to_owned(),
+                    value: json!({"b": 2, "a": 1}),
+                },
+            )]),
             BTreeMap::new(),
             "cpu",
             "f32",
@@ -1838,7 +1847,9 @@ mod tests {
         cache.insert(
             key.clone(),
             CacheEntry {
-                outputs: vec![json!(3)],
+                outputs: vec![NativeValue::Primitive {
+                    value: comfy_nodes::NativePrimitive::Integer(3),
+                }],
                 ui: None,
             },
         );
@@ -1846,7 +1857,12 @@ mod tests {
         let invalidated = cache.invalidate_registry("registry-v2");
         case_results.insert(
             "cache_identity".to_owned(),
-            cached_outputs == Some(vec![json!(3)]) && invalidated == 1 && cache.get(&key).is_none(),
+            cached_outputs
+                == Some(vec![NativeValue::Primitive {
+                    value: comfy_nodes::NativePrimitive::Integer(3),
+                }])
+                && invalidated == 1
+                && cache.get(&key).is_none(),
         );
 
         let bus = ExecutionEventBus::new(1)?;

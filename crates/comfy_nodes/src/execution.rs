@@ -40,6 +40,7 @@ pub enum NativePrimitive {
     Null,
     Boolean(bool),
     Integer(i64),
+    UnsignedInteger(u64),
     Number(f64),
     String(String),
 }
@@ -49,7 +50,7 @@ impl NativePrimitive {
         match self {
             Self::Null => NativePrimitiveType::Null,
             Self::Boolean(_) => NativePrimitiveType::Boolean,
-            Self::Integer(_) => NativePrimitiveType::Integer,
+            Self::Integer(_) | Self::UnsignedInteger(_) => NativePrimitiveType::Integer,
             Self::Number(_) => NativePrimitiveType::Number,
             Self::String(_) => NativePrimitiveType::String,
         }
@@ -515,6 +516,8 @@ pub enum NativeHandleStoreError {
     WrongType { expected: String, actual: String },
     #[error("native handle `{0}` is absent")]
     Missing(String),
+    #[error("native handle digest does not match the stored object")]
+    DigestMismatch,
     #[error("native handle store rejected the operation: {0}")]
     Rejected(String),
     #[error("native handle contract is invalid: {0}")]
@@ -536,6 +539,8 @@ pub trait NativeHandleStore: Send + Sync + fmt::Debug {
         &self,
         handle_type: NativeHandleType,
         value: NativeStoredObject,
+        digest_sha256: Option<String>,
+        resident_bytes: usize,
         cancellation: &CancellationToken,
     ) -> Result<NativeOpaqueHandle, NativeHandleStoreError>;
 
@@ -1006,7 +1011,7 @@ mod tests {
         identity: NativeHandleStoreIdentity,
         attempt_id: AttemptId,
         next_identifier: AtomicU64,
-        values: Mutex<BTreeMap<String, NativeStoredObject>>,
+        values: Mutex<BTreeMap<String, (NativeStoredObject, Option<String>)>>,
     }
 
     impl fmt::Debug for TestHandleStore {
@@ -1078,18 +1083,24 @@ mod tests {
             cancellation: &CancellationToken,
         ) -> Result<NativeStoredObject, NativeHandleStoreError> {
             self.check_handle(handle, expected_type, cancellation)?;
-            self.values
-                .lock()
-                .map_err(|_| NativeHandleStoreError::Rejected("test store is poisoned".to_owned()))?
+            let values = self.values.lock().map_err(|_| {
+                NativeHandleStoreError::Rejected("test store is poisoned".to_owned())
+            })?;
+            let (value, digest) = values
                 .get(handle.identifier())
-                .cloned()
-                .ok_or_else(|| NativeHandleStoreError::Missing(handle.identifier().to_owned()))
+                .ok_or_else(|| NativeHandleStoreError::Missing(handle.identifier().to_owned()))?;
+            if digest.as_deref() != handle.digest_sha256() {
+                return Err(NativeHandleStoreError::DigestMismatch);
+            }
+            Ok(value.clone())
         }
 
         fn publish(
             &self,
             handle_type: NativeHandleType,
             value: NativeStoredObject,
+            digest_sha256: Option<String>,
+            _resident_bytes: usize,
             cancellation: &CancellationToken,
         ) -> Result<NativeOpaqueHandle, NativeHandleStoreError> {
             cancellation
@@ -1103,12 +1114,12 @@ mod tests {
                 self.identity,
                 identifier.clone(),
                 generation,
-                None,
+                digest_sha256.clone(),
             )?;
             self.values
                 .lock()
                 .map_err(|_| NativeHandleStoreError::Rejected("test store is poisoned".to_owned()))?
-                .insert(identifier, value);
+                .insert(identifier, (value, digest_sha256));
             Ok(handle)
         }
 
@@ -1272,6 +1283,30 @@ mod tests {
     }
 
     #[test]
+    fn integer_primitives_preserve_full_signed_and_unsigned_ranges()
+    -> Result<(), Box<dyn std::error::Error>> {
+        for value in [
+            NativeValue::Primitive {
+                value: NativePrimitive::Integer(i64::MIN),
+            },
+            NativeValue::Primitive {
+                value: NativePrimitive::UnsignedInteger(u64::MAX),
+            },
+        ] {
+            assert_eq!(
+                serde_json::from_slice::<NativeValue>(&serde_json::to_vec(&value)?)?,
+                value
+            );
+            assert!(matches!(
+                &value,
+                NativeValue::Primitive { value }
+                    if value.primitive_type() == NativePrimitiveType::Integer
+            ));
+        }
+        Ok(())
+    }
+
+    #[test]
     fn descriptors_and_bindings_reject_ambiguous_or_mismatched_contracts()
     -> Result<(), Box<dyn std::error::Error>> {
         identity_binding()?.validate()?;
@@ -1328,6 +1363,8 @@ mod tests {
         let handle = handle_store.publish(
             model_type()?,
             Arc::new("model state".to_owned()),
+            Some("a".repeat(64)),
+            "model state".len(),
             &CancellationToken::default(),
         )?;
         let model = NativeValue::Handle { value: handle };
@@ -1387,6 +1424,8 @@ mod tests {
         let handle = store.publish(
             model_type.clone(),
             Arc::new("model state".to_owned()),
+            Some("b".repeat(64)),
+            "model state".len(),
             &CancellationToken::default(),
         )?;
         let resolved = store.resolve(&handle, &model_type, &CancellationToken::default())?;
@@ -1421,6 +1460,17 @@ mod tests {
             ),
             Err(NativeHandleStoreError::WrongGeneration)
         ));
+        let forged_digest = NativeOpaqueHandle::new(
+            model_type.clone(),
+            identity,
+            handle.identifier(),
+            handle.generation(),
+            Some("c".repeat(64)),
+        )?;
+        assert!(matches!(
+            store.resolve(&forged_digest, &model_type, &CancellationToken::default()),
+            Err(NativeHandleStoreError::DigestMismatch)
+        ));
         let image_type = NativeHandleType::new(NativeHandleKind::Image, "IMAGE")?;
         assert!(matches!(
             store.resolve(&handle, &image_type, &CancellationToken::default()),
@@ -1431,7 +1481,7 @@ mod tests {
         assert!(cancellation.cancel());
         let before = store.object_count()?;
         assert!(matches!(
-            store.publish(image_type, Arc::new(vec![0_u8; 4]), &cancellation),
+            store.publish(image_type, Arc::new(vec![0_u8; 4]), None, 4, &cancellation,),
             Err(NativeHandleStoreError::Cancelled)
         ));
         assert_eq!(store.object_count()?, before);

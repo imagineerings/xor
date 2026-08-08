@@ -1,3 +1,13 @@
+pub use comfy_nodes::{
+    NativeCacheDependencies, NativeCachePolicy, NativeDynamicInputDescriptor, NativeEffectClass,
+    NativeHandleKind, NativeHandleStore, NativeHandleStoreError, NativeHandleStoreIdentity,
+    NativeHandleType, NativeInputDescriptor, NativeNode, NativeNodeBinding,
+    NativeNodeBindingDisposition, NativeNodeContext, NativeNodeContractError, NativeNodeDescriptor,
+    NativeNodeFailure, NativeNodeFailureKind, NativeNodeOutcome, NativeNodePresentation,
+    NativeOpaqueHandle, NativeOutputDescriptor, NativePortCardinality, NativePreparedEffectRequest,
+    NativePrimitive, NativePrimitiveType, NativeStoredObject, NativeTypeUnion, NativeValue,
+    NativeValueType,
+};
 pub use comfy_types::{AttemptId, ExecutionId, ProfileId, PromptId, RequestId};
 
 pub mod assets;

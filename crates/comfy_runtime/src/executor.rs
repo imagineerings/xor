@@ -1,14 +1,28 @@
 use crate::{
     AttemptEvent, AttemptEventKind, AttemptState, CacheEntry, CacheKey, CompiledNode, CompiledPlan,
-    EffectClass, EventBusError, ExecutionEventBus, InputBinding, InputMode, NativeCache,
-    PromptCompileError, RuntimeCachePolicy, RuntimeNodeDescriptor, RuntimeNodePresentation,
-    RuntimeOutputDescriptor,
+    EventBusError, ExecutionEventBus, InputBinding, NativeCache, PromptCompileError,
 };
 use chrono::Utc;
+pub use comfy_nodes::{
+    NativeCacheDependencies as CacheDependencies, NativeCachePolicy as RuntimeCachePolicy,
+    NativeEffectClass as EffectClass, NativeNode, NativeNodeBinding,
+    NativeNodeContext as NodeContext, NativeNodeDescriptor as RuntimeNodeDescriptor,
+    NativeNodeFailure as NodeFailure, NativeNodeFailureKind as NodeFailureKind,
+    NativeNodeOutcome as NodeOutcome, NativeNodePresentation as RuntimeNodePresentation,
+    NativeOutputDescriptor as RuntimeOutputDescriptor, NativePortCardinality as InputMode,
+    NativePreparedEffectRequest as PreparedEffectRequest,
+};
+use comfy_nodes::{
+    NativeHandleStore, NativeHandleStoreError, NativeHandleStoreIdentity, NativeHandleType,
+    NativeNodeBindingDisposition, NativeNodeContractError, NativeOpaqueHandle, NativeStoredObject,
+    NativeValue, NodeRegistry,
+};
 use comfy_tensor::{BackendCapabilityMatrix, ScratchReservation};
 #[cfg(test)]
 use comfy_tensor::{CpuWorkspaceAuthority, DeviceId, NativeDeviceProperties};
-use comfy_types::{AttemptId, CancellationToken, DeviceKind, NodeId, ProfileId, PromptId};
+use comfy_types::{
+    AttemptId, CancellationToken, DeviceKind, NodeId, ProfileId, PromptId, PromptSubmission,
+};
 use futures::future::BoxFuture;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
@@ -16,7 +30,11 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    sync::Arc,
+    fmt,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
 };
 use thiserror::Error;
 use uuid::Uuid;
@@ -26,6 +44,8 @@ pub const MAX_EFFECTS_PER_NODE: usize = 4_096;
 pub const MAX_EFFECT_METADATA_BYTES: usize = 4 * 1024 * 1024;
 pub const MAX_NATIVE_COMPILE_OPTIONS: usize = 64;
 pub const MAX_NATIVE_COMPILE_TEXT_BYTES: usize = 4_096;
+pub const MAX_RUNTIME_NATIVE_HANDLES: usize = 1_000_000;
+pub const MAX_RUNTIME_NATIVE_HANDLE_BYTES: usize = 8 * 1024 * 1024 * 1024;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -250,21 +270,6 @@ pub enum NativeCompileError {
     Cancelled,
 }
 
-#[derive(Clone, Debug)]
-pub struct NodeContext {
-    pub prompt_id: PromptId,
-    pub attempt_id: AttemptId,
-    pub node_id: NodeId,
-    pub cancellation: CancellationToken,
-    pub scratch: ScratchReservation,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct PreparedEffectRequest {
-    pub transaction_id: Uuid,
-    pub metadata: Vec<u8>,
-}
-
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PreparedEffect {
     pub prompt_id: PromptId,
@@ -274,84 +279,21 @@ pub struct PreparedEffect {
     pub metadata: Vec<u8>,
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct CacheDependencies {
-    pub artifact_digests: BTreeMap<String, String>,
-    pub plugin_digest: Option<String>,
-    pub rng_phase: Option<String>,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum NodeOutcome {
-    Values {
-        outputs: Vec<Value>,
-        ui: Option<Value>,
-        effects: Vec<PreparedEffectRequest>,
-    },
-    Blocked {
-        reason: String,
-    },
-    Expansion {
-        plan: CompiledPlan,
-        output_node: NodeId,
-    },
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum NodeFailureKind {
-    Failure,
-    Interrupted,
-}
-
-#[derive(Clone, Debug, Error, Eq, PartialEq)]
-#[error("{code}: {message}")]
-pub struct NodeFailure {
-    pub code: String,
-    pub message: String,
-    pub kind: NodeFailureKind,
-    pub retryable: bool,
-}
-
-pub trait NativeNode: Send + Sync {
-    fn class_type(&self) -> &str;
-    fn implementation_version(&self) -> &str;
-
-    fn implementation_namespace(&self) -> &str {
-        "sim.native_rust"
-    }
-
-    fn demanded_lazy_inputs(
-        &self,
-        _context: &NodeContext,
-        _available_inputs: &BTreeMap<String, Value>,
-    ) -> Result<BTreeSet<String>, NodeFailure> {
-        Ok(BTreeSet::new())
-    }
-
-    fn cache_change_token(&self, _inputs: &BTreeMap<String, Value>) -> Result<String, NodeFailure> {
-        Ok("stable".to_owned())
-    }
-
-    fn cache_dependencies(
-        &self,
-        _context: &NodeContext,
-        _inputs: &BTreeMap<String, Value>,
-    ) -> Result<CacheDependencies, NodeFailure> {
-        Ok(CacheDependencies::default())
-    }
-
-    fn execute<'a>(
-        &'a self,
-        context: NodeContext,
-        inputs: BTreeMap<String, Value>,
-    ) -> BoxFuture<'a, Result<NodeOutcome, NodeFailure>>;
-}
-
 #[derive(Clone, Default)]
 pub struct NativeNodeRegistry {
     nodes: BTreeMap<String, Arc<dyn NativeNode>>,
     descriptors: BTreeMap<String, RuntimeNodeDescriptor>,
     presentations: BTreeMap<String, RuntimeNodePresentation>,
+    bindings: BTreeMap<String, RegistryBindingState>,
+}
+
+#[derive(Clone, Debug)]
+struct RegistryBindingState {
+    disposition: NativeNodeBindingDisposition,
+    provider_activated: bool,
+    implementation_namespace: Option<String>,
+    catalog_source: String,
+    reason: Option<String>,
 }
 
 impl NativeNodeRegistry {
@@ -376,7 +318,20 @@ impl NativeNodeRegistry {
         if node.implementation_namespace().trim().is_empty() {
             return Err(ExecutionError::InvalidNodeImplementation(class_type));
         }
-        self.nodes.insert(class_type, node);
+        self.nodes.insert(class_type.clone(), node);
+        self.bindings.insert(
+            class_type.clone(),
+            RegistryBindingState {
+                disposition: NativeNodeBindingDisposition::Executable,
+                provider_activated: false,
+                implementation_namespace: self
+                    .nodes
+                    .get(&class_type)
+                    .map(|node| node.implementation_namespace().to_owned()),
+                catalog_source: String::new(),
+                reason: None,
+            },
+        );
         Ok(())
     }
 
@@ -392,10 +347,7 @@ impl NativeNodeRegistry {
         &mut self,
         descriptor: RuntimeNodeDescriptor,
     ) -> Result<(), PromptCompileError> {
-        if descriptor.class_type.is_empty()
-            || descriptor.implementation_version.is_empty()
-            || descriptor.inputs.iter().any(|(name, _)| name.is_empty())
-        {
+        if descriptor.validate().is_err() {
             return Err(PromptCompileError::InvalidRuntimeDescriptor(
                 descriptor.class_type,
             ));
@@ -447,10 +399,151 @@ impl NativeNodeRegistry {
         self.descriptors.contains_key(class_type) && self.nodes.contains_key(class_type)
     }
 
+    pub fn validate_comprehensive_bindings(&self) -> Result<(), NativeNodeRegistryError> {
+        for (class_type, descriptor) in &self.descriptors {
+            descriptor.validate()?;
+            let binding = self
+                .bindings
+                .get(class_type)
+                .ok_or_else(|| NativeNodeRegistryError::IncompleteRegistry(class_type.clone()))?;
+            let presentation = self
+                .presentations
+                .get(class_type)
+                .ok_or_else(|| NativeNodeRegistryError::IncompleteRegistry(class_type.clone()))?;
+            presentation.validate()?;
+            let expected_output_names = descriptor
+                .outputs
+                .iter()
+                .map(|output| output.name.as_str())
+                .collect::<Vec<_>>();
+            if binding.catalog_source.is_empty()
+                || presentation
+                    .output_names
+                    .iter()
+                    .map(String::as_str)
+                    .collect::<Vec<_>>()
+                    != expected_output_names
+            {
+                return Err(NativeNodeRegistryError::IncompleteRegistry(
+                    class_type.clone(),
+                ));
+            }
+            let has_node = self.nodes.contains_key(class_type);
+            let node_matches = self.nodes.get(class_type).is_none_or(|node| {
+                node.class_type() == class_type
+                    && node.implementation_version() == descriptor.implementation_version
+                    && binding.implementation_namespace.as_deref()
+                        == Some(node.implementation_namespace())
+            });
+            let valid = match binding.disposition {
+                NativeNodeBindingDisposition::Executable => {
+                    has_node
+                        && node_matches
+                        && !binding.provider_activated
+                        && binding.reason.is_none()
+                        && binding
+                            .implementation_namespace
+                            .as_deref()
+                            .is_some_and(|value| !value.is_empty())
+                }
+                NativeNodeBindingDisposition::ProviderRequired => {
+                    has_node == binding.provider_activated
+                        && node_matches
+                        && binding
+                            .reason
+                            .as_deref()
+                            .is_some_and(|value| !value.is_empty())
+                        && binding
+                            .implementation_namespace
+                            .as_deref()
+                            .is_some_and(|value| !value.is_empty())
+                }
+                NativeNodeBindingDisposition::Unavailable => {
+                    !has_node
+                        && !binding.provider_activated
+                        && binding
+                            .reason
+                            .as_deref()
+                            .is_some_and(|value| !value.is_empty())
+                        && binding.implementation_namespace.is_none()
+                }
+            };
+            if !valid {
+                return Err(NativeNodeRegistryError::IncompleteRegistry(
+                    class_type.clone(),
+                ));
+            }
+        }
+        if self.nodes.keys().any(|class_type| {
+            !self.descriptors.contains_key(class_type) || !self.bindings.contains_key(class_type)
+        }) || self.presentations.keys().any(|class_type| {
+            !self.descriptors.contains_key(class_type) || !self.bindings.contains_key(class_type)
+        }) || self.bindings.keys().any(|class_type| {
+            !self.descriptors.contains_key(class_type)
+                || !self.presentations.contains_key(class_type)
+        }) {
+            return Err(NativeNodeRegistryError::IncompleteRegistry(
+                "registry key sets differ".to_owned(),
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn bindings_are_comprehensive(&self) -> bool {
+        self.validate_comprehensive_bindings().is_ok()
+    }
+
     pub fn implementation_namespace(&self, class_type: &str) -> Option<&str> {
         self.nodes
             .get(class_type)
             .map(|node| node.implementation_namespace())
+    }
+
+    pub fn binding_disposition(&self, class_type: &str) -> Option<NativeNodeBindingDisposition> {
+        self.bindings.get(class_type).map(|binding| {
+            if binding.provider_activated {
+                NativeNodeBindingDisposition::Executable
+            } else {
+                binding.disposition
+            }
+        })
+    }
+
+    pub fn binding_declared_disposition(
+        &self,
+        class_type: &str,
+    ) -> Option<NativeNodeBindingDisposition> {
+        self.bindings
+            .get(class_type)
+            .map(|binding| binding.disposition)
+    }
+
+    pub fn provider_binding_is_activated(&self, class_type: &str) -> Option<bool> {
+        self.bindings
+            .get(class_type)
+            .map(|binding| binding.provider_activated)
+    }
+
+    pub fn binding_source(&self, class_type: &str) -> Option<&str> {
+        self.bindings
+            .get(class_type)
+            .map(|binding| binding.catalog_source.as_str())
+    }
+
+    pub fn binding_implementation_namespace(&self, class_type: &str) -> Option<&str> {
+        self.bindings
+            .get(class_type)
+            .and_then(|binding| binding.implementation_namespace.as_deref())
+    }
+
+    pub fn unavailable_reason(&self, class_type: &str) -> Option<&str> {
+        if self.nodes.contains_key(class_type) {
+            return None;
+        }
+        self.bindings
+            .get(class_type)
+            .filter(|binding| binding.disposition != NativeNodeBindingDisposition::Executable)
+            .and_then(|binding| binding.reason.as_deref())
     }
 
     pub fn presentation(&self, class_type: &str) -> Option<&RuntimeNodePresentation> {
@@ -485,6 +578,126 @@ impl NativeNodeRegistry {
         )
     }
 
+    pub fn register_native_bindings(
+        &mut self,
+        bindings: impl IntoIterator<Item = NativeNodeBinding>,
+    ) -> Result<(), NativeNodeRegistryError> {
+        let catalog = NodeRegistry::built_in()?;
+        let bindings = bindings.into_iter().collect::<Vec<_>>();
+        for binding in &bindings {
+            catalog.validate_native_binding(binding)?;
+        }
+        let mut next = self.clone();
+        for binding in bindings {
+            binding.validate()?;
+            let class_type = binding.descriptor().class_type.clone();
+            if next.descriptors.contains_key(&class_type)
+                || next.nodes.contains_key(&class_type)
+                || next.presentations.contains_key(&class_type)
+                || next.bindings.contains_key(&class_type)
+            {
+                return Err(NativeNodeRegistryError::DuplicateBinding(class_type));
+            }
+            let descriptor = binding.descriptor().clone();
+            let presentation = binding.presentation().clone();
+            let catalog_source = catalog
+                .descriptor(&class_type)
+                .map(|descriptor| descriptor.source_file.clone())
+                .ok_or_else(|| NativeNodeRegistryError::BindingMismatch(class_type.clone()))?;
+            match binding {
+                NativeNodeBinding::Executable { node, .. } => {
+                    let source = node.implementation_namespace().to_owned();
+                    next.register_descriptor(descriptor)?;
+                    next.register(node)?;
+                    next.presentations.insert(class_type.clone(), presentation);
+                    next.bindings.insert(
+                        class_type,
+                        RegistryBindingState {
+                            disposition: NativeNodeBindingDisposition::Executable,
+                            provider_activated: false,
+                            implementation_namespace: Some(source),
+                            catalog_source,
+                            reason: None,
+                        },
+                    );
+                }
+                NativeNodeBinding::ProviderRequired {
+                    provider, reason, ..
+                } => {
+                    next.register_descriptor(descriptor)?;
+                    next.presentations.insert(class_type.clone(), presentation);
+                    next.bindings.insert(
+                        class_type,
+                        RegistryBindingState {
+                            disposition: NativeNodeBindingDisposition::ProviderRequired,
+                            provider_activated: false,
+                            implementation_namespace: Some(provider),
+                            catalog_source,
+                            reason: Some(reason),
+                        },
+                    );
+                }
+                NativeNodeBinding::Unavailable { reason, .. } => {
+                    next.register_descriptor(descriptor)?;
+                    next.presentations.insert(class_type.clone(), presentation);
+                    next.bindings.insert(
+                        class_type,
+                        RegistryBindingState {
+                            disposition: NativeNodeBindingDisposition::Unavailable,
+                            provider_activated: false,
+                            implementation_namespace: None,
+                            catalog_source,
+                            reason: Some(reason),
+                        },
+                    );
+                }
+            }
+        }
+        *self = next;
+        Ok(())
+    }
+
+    pub fn activate_provider_bindings(
+        &mut self,
+        bindings: impl IntoIterator<Item = (Arc<dyn NativeNode>, RuntimeNodePresentation)>,
+    ) -> Result<(), NativeNodeRegistryError> {
+        let mut next = self.clone();
+        let mut activated = BTreeSet::new();
+        for (node, presentation) in bindings {
+            let class_type = node.class_type().to_owned();
+            if !activated.insert(class_type.clone()) || next.nodes.contains_key(&class_type) {
+                return Err(NativeNodeRegistryError::DuplicateBinding(class_type));
+            }
+            let descriptor = next
+                .descriptors
+                .get(&class_type)
+                .ok_or_else(|| NativeNodeRegistryError::BindingMismatch(class_type.clone()))?;
+            let expected_presentation = next
+                .presentations
+                .get(&class_type)
+                .ok_or_else(|| NativeNodeRegistryError::BindingMismatch(class_type.clone()))?;
+            let binding = next
+                .bindings
+                .get(&class_type)
+                .ok_or_else(|| NativeNodeRegistryError::BindingMismatch(class_type.clone()))?;
+            if binding.disposition != NativeNodeBindingDisposition::ProviderRequired
+                || descriptor.implementation_version != node.implementation_version()
+                || binding.implementation_namespace.as_deref()
+                    != Some(node.implementation_namespace())
+                || expected_presentation != &presentation
+            {
+                return Err(NativeNodeRegistryError::BindingMismatch(class_type));
+            }
+            next.nodes.insert(class_type.clone(), node);
+            if let Some(binding) = next.bindings.get_mut(&class_type) {
+                binding.provider_activated = true;
+            }
+        }
+        next.validate_comprehensive_bindings()?;
+        *self = next;
+        Ok(())
+    }
+
     fn register_bound_batch_internal(
         &mut self,
         bindings: impl IntoIterator<
@@ -504,15 +717,8 @@ impl NativeNodeRegistry {
                 return Err(NativeNodeRegistryError::BindingMismatch(class_type));
             }
             if let Some(presentation) = presentation.as_ref() {
-                if presentation.display_name.is_empty()
-                    || presentation.display_name.len() > 256
-                    || presentation.category.is_empty()
-                    || presentation.category.len() > 512
+                if presentation.validate().is_err()
                     || presentation.output_names.len() != descriptor.outputs.len()
-                    || presentation
-                        .output_names
-                        .iter()
-                        .any(|name| name.is_empty() || name.len() > 256)
                 {
                     return Err(NativeNodeRegistryError::InvalidPresentation(class_type));
                 }
@@ -543,11 +749,550 @@ pub enum NativeNodeRegistryError {
     InvalidPresentation(String),
     #[error("native node presentation for `{0}` is already registered")]
     DuplicatePresentation(String),
+    #[error("native node binding for `{0}` is already registered")]
+    DuplicateBinding(String),
+    #[error("native node registry is incomplete at `{0}`")]
+    IncompleteRegistry(String),
+    #[error(transparent)]
+    Contract(#[from] NativeNodeContractError),
+    #[error(transparent)]
+    Catalog(#[from] comfy_nodes::NodeRegistryError),
+}
+
+#[derive(Clone)]
+pub struct NativeHandleStoreGeneration {
+    state: Arc<NativeHandleStoreGenerationState>,
+}
+
+struct NativeHandleStoreGenerationState {
+    identity: NativeHandleStoreIdentity,
+    next_generation: AtomicU64,
+    data: Mutex<NativeHandleStoreData>,
+    capacity: usize,
+    byte_capacity: usize,
+}
+
+#[derive(Default)]
+struct NativeHandleStoreData {
+    values: BTreeMap<String, StoredNativeHandle>,
+    resident_bytes: usize,
+}
+
+fn remove_stored_handle(
+    data: &mut NativeHandleStoreData,
+    identifier: &str,
+) -> Option<StoredNativeHandle> {
+    let resident_bytes = data.values.get(identifier)?.resident_bytes;
+    let next_resident_bytes = data.resident_bytes.checked_sub(resident_bytes)?;
+    let removed = data.values.remove(identifier)?;
+    data.resident_bytes = next_resident_bytes;
+    Some(removed)
+}
+
+#[derive(Clone)]
+struct StoredNativeHandle {
+    handle_type: NativeHandleType,
+    generation: u64,
+    digest_sha256: Option<String>,
+    value: NativeStoredObject,
+    committed: bool,
+    published_by: AttemptId,
+    resident_bytes: usize,
+    roots: usize,
+}
+
+#[derive(Clone)]
+pub struct NativeHandleLease {
+    generation: NativeHandleStoreGeneration,
+    handles: Arc<Vec<NativeOpaqueHandle>>,
+}
+
+impl fmt::Debug for NativeHandleLease {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("NativeHandleLease")
+            .field("handle_count", &self.handles.len())
+            .finish_non_exhaustive()
+    }
+}
+
+impl Drop for NativeHandleLease {
+    fn drop(&mut self) {
+        if Arc::strong_count(&self.handles) != 1 {
+            return;
+        }
+        self.generation.release_roots(&self.handles);
+    }
+}
+
+impl PartialEq for NativeHandleLease {
+    fn eq(&self, other: &Self) -> bool {
+        self.generation.identity() == other.generation.identity() && self.handles == other.handles
+    }
+}
+
+impl NativeHandleLease {
+    pub(crate) fn covers_values(&self, values: &[NativeValue]) -> bool {
+        let mut handles = Vec::new();
+        for value in values {
+            collect_native_value_handles(value, &mut handles);
+        }
+        let unique = handles
+            .into_iter()
+            .map(|handle| {
+                (
+                    (handle.identifier().to_owned(), handle.generation()),
+                    handle.clone(),
+                )
+            })
+            .collect::<BTreeMap<_, _>>();
+        unique.len() == self.handles.len()
+            && unique
+                .values()
+                .zip(self.handles.iter())
+                .all(|(expected, actual)| expected == actual)
+    }
+
+    pub(crate) fn store_identity(&self) -> NativeHandleStoreIdentity {
+        self.generation.identity()
+    }
+}
+
+impl fmt::Debug for NativeHandleStoreGeneration {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("NativeHandleStoreGeneration")
+            .field("identity", &self.state.identity)
+            .finish_non_exhaustive()
+    }
+}
+
+impl NativeHandleStoreGeneration {
+    pub fn new() -> Result<Self, NativeHandleStoreError> {
+        Self::with_capacities(MAX_RUNTIME_NATIVE_HANDLES, MAX_RUNTIME_NATIVE_HANDLE_BYTES)
+    }
+
+    pub fn with_capacity(capacity: usize) -> Result<Self, NativeHandleStoreError> {
+        Self::with_capacities(capacity, MAX_RUNTIME_NATIVE_HANDLE_BYTES)
+    }
+
+    pub fn with_capacities(
+        capacity: usize,
+        byte_capacity: usize,
+    ) -> Result<Self, NativeHandleStoreError> {
+        if capacity == 0 || byte_capacity == 0 {
+            return Err(NativeHandleStoreError::Rejected(
+                "native handle store capacities must be nonzero".to_owned(),
+            ));
+        }
+        Ok(Self {
+            state: Arc::new(NativeHandleStoreGenerationState {
+                identity: NativeHandleStoreIdentity::new(Uuid::new_v4(), Uuid::new_v4())?,
+                next_generation: AtomicU64::new(1),
+                data: Mutex::new(NativeHandleStoreData::default()),
+                capacity,
+                byte_capacity,
+            }),
+        })
+    }
+
+    pub fn identity(&self) -> NativeHandleStoreIdentity {
+        self.state.identity
+    }
+
+    pub fn len(&self) -> usize {
+        self.state.data.lock().values.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn resident_bytes(&self) -> usize {
+        self.state.data.lock().resident_bytes
+    }
+
+    fn acquire_lease<'a>(
+        &self,
+        handles: impl IntoIterator<Item = &'a NativeOpaqueHandle>,
+    ) -> Result<Option<NativeHandleLease>, NativeHandleStoreError> {
+        let mut handles_by_key = BTreeMap::new();
+        for handle in handles {
+            handle.validate()?;
+            if handle.store_identity().store_id != self.identity().store_id {
+                return Err(NativeHandleStoreError::WrongStore);
+            }
+            if handle.store_identity().generation_id != self.identity().generation_id {
+                return Err(NativeHandleStoreError::WrongGeneration);
+            }
+            let key = (handle.identifier().to_owned(), handle.generation());
+            if let Some(existing) = handles_by_key.insert(key, handle.clone())
+                && existing != *handle
+            {
+                return Err(NativeHandleStoreError::DigestMismatch);
+            }
+        }
+        let handles = handles_by_key;
+        if handles.is_empty() {
+            return Ok(None);
+        }
+        let mut data = self.state.data.lock();
+        for ((identifier, generation), handle) in &handles {
+            let record = data
+                .values
+                .get(identifier)
+                .ok_or_else(|| NativeHandleStoreError::Missing(identifier.clone()))?;
+            if !record.committed
+                || record.generation != *generation
+                || record.handle_type != *handle.handle_type()
+            {
+                return Err(NativeHandleStoreError::WrongGeneration);
+            }
+            if record.digest_sha256.as_deref() != handle.digest_sha256() {
+                return Err(NativeHandleStoreError::DigestMismatch);
+            }
+            if record.roots == usize::MAX {
+                return Err(NativeHandleStoreError::Rejected(
+                    "native handle root count overflowed".to_owned(),
+                ));
+            }
+        }
+        for (identifier, _) in handles.keys() {
+            if let Some(record) = data.values.get_mut(identifier) {
+                record.roots += 1;
+            }
+        }
+        Ok(Some(NativeHandleLease {
+            generation: self.clone(),
+            handles: Arc::new(handles.into_values().collect()),
+        }))
+    }
+
+    fn release_roots(&self, handles: &[NativeOpaqueHandle]) {
+        let mut data = self.state.data.lock();
+        let mut removals = Vec::new();
+        for handle in handles {
+            if let Some(record) = data.values.get_mut(handle.identifier())
+                && record.generation == handle.generation()
+                && record.roots > 0
+            {
+                record.roots -= 1;
+                if record.roots == 0 && record.committed {
+                    removals.push(handle.identifier().to_owned());
+                }
+            }
+        }
+        for identifier in removals {
+            remove_stored_handle(&mut data, &identifier);
+        }
+    }
+
+    fn collect_unrooted_attempt(&self, attempt_id: AttemptId) {
+        let mut data = self.state.data.lock();
+        let identifiers = data
+            .values
+            .iter()
+            .filter(|(_, record)| {
+                record.committed && record.published_by == attempt_id && record.roots == 0
+            })
+            .map(|(identifier, _)| identifier.clone())
+            .collect::<Vec<_>>();
+        for identifier in identifiers {
+            remove_stored_handle(&mut data, &identifier);
+        }
+    }
+
+    fn session(&self, attempt_id: AttemptId) -> Arc<RuntimeNativeHandleStoreSession> {
+        Arc::new(RuntimeNativeHandleStoreSession {
+            generation: self.clone(),
+            attempt_id,
+            staged: Mutex::new(NativeHandleStoreSessionStage::default()),
+        })
+    }
+
+    pub fn handle_store_for_attempt(&self, attempt_id: AttemptId) -> Arc<dyn NativeHandleStore> {
+        self.session(attempt_id)
+    }
+}
+
+struct RuntimeNativeHandleStoreSession {
+    generation: NativeHandleStoreGeneration,
+    attempt_id: AttemptId,
+    staged: Mutex<NativeHandleStoreSessionStage>,
+}
+
+#[derive(Default)]
+struct NativeHandleStoreSessionStage {
+    identifiers: Vec<String>,
+    closed: bool,
+}
+
+impl fmt::Debug for RuntimeNativeHandleStoreSession {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("RuntimeNativeHandleStoreSession")
+            .field("identity", &self.generation.identity())
+            .field("attempt_id", &self.attempt_id)
+            .finish_non_exhaustive()
+    }
+}
+
+impl RuntimeNativeHandleStoreSession {
+    fn checkpoint(&self) -> usize {
+        self.staged.lock().identifiers.len()
+    }
+
+    fn rollback_from(&self, checkpoint: usize) {
+        let identifiers = {
+            let mut staged = self.staged.lock();
+            if checkpoint >= staged.identifiers.len() {
+                return;
+            }
+            staged.identifiers.split_off(checkpoint)
+        };
+        let mut data = self.generation.state.data.lock();
+        for identifier in identifiers {
+            if data
+                .values
+                .get(&identifier)
+                .is_some_and(|record| !record.committed && record.published_by == self.attempt_id)
+            {
+                remove_stored_handle(&mut data, &identifier);
+            }
+        }
+    }
+
+    fn rollback_all(&self) {
+        let identifiers = {
+            let mut staged = self.staged.lock();
+            staged.closed = true;
+            std::mem::take(&mut staged.identifiers)
+        };
+        let mut data = self.generation.state.data.lock();
+        for identifier in identifiers {
+            if data
+                .values
+                .get(&identifier)
+                .is_some_and(|record| !record.committed && record.published_by == self.attempt_id)
+            {
+                remove_stored_handle(&mut data, &identifier);
+            }
+        }
+    }
+
+    fn commit(&self) {
+        let identifiers = {
+            let mut staged = self.staged.lock();
+            staged.closed = true;
+            std::mem::take(&mut staged.identifiers)
+        };
+        let mut data = self.generation.state.data.lock();
+        for identifier in identifiers {
+            if let Some(record) = data.values.get_mut(&identifier)
+                && record.published_by == self.attempt_id
+            {
+                record.committed = true;
+            }
+        }
+    }
+
+    fn rollback_identifier(&self, identifier: &str) {
+        let mut staged = self.staged.lock();
+        staged
+            .identifiers
+            .retain(|candidate| candidate != identifier);
+        let mut data = self.generation.state.data.lock();
+        if data
+            .values
+            .get(identifier)
+            .is_some_and(|record| !record.committed && record.published_by == self.attempt_id)
+        {
+            remove_stored_handle(&mut data, identifier);
+        }
+    }
+
+    fn validate_handle(
+        &self,
+        handle: &NativeOpaqueHandle,
+        expected_type: &NativeHandleType,
+        cancellation: &CancellationToken,
+    ) -> Result<(), NativeHandleStoreError> {
+        cancellation
+            .check()
+            .map_err(|_| NativeHandleStoreError::Cancelled)?;
+        handle.validate()?;
+        let identity = self.generation.identity();
+        if handle.store_identity().store_id != identity.store_id {
+            return Err(NativeHandleStoreError::WrongStore);
+        }
+        if handle.store_identity().generation_id != identity.generation_id {
+            return Err(NativeHandleStoreError::WrongGeneration);
+        }
+        if handle.handle_type() != expected_type {
+            return Err(NativeHandleStoreError::WrongType {
+                expected: expected_type.type_id.clone(),
+                actual: handle.handle_type().type_id.clone(),
+            });
+        }
+        Ok(())
+    }
+}
+
+impl NativeHandleStore for RuntimeNativeHandleStoreSession {
+    fn identity(&self) -> NativeHandleStoreIdentity {
+        self.generation.identity()
+    }
+
+    fn attempt_id(&self) -> AttemptId {
+        self.attempt_id
+    }
+
+    fn resolve(
+        &self,
+        handle: &NativeOpaqueHandle,
+        expected_type: &NativeHandleType,
+        cancellation: &CancellationToken,
+    ) -> Result<NativeStoredObject, NativeHandleStoreError> {
+        self.validate_handle(handle, expected_type, cancellation)?;
+        let data = self.generation.state.data.lock();
+        let record = data
+            .values
+            .get(handle.identifier())
+            .ok_or_else(|| NativeHandleStoreError::Missing(handle.identifier().to_owned()))?;
+        if !record.committed && record.published_by != self.attempt_id {
+            return Err(NativeHandleStoreError::Missing(
+                handle.identifier().to_owned(),
+            ));
+        }
+        if record.generation != handle.generation() || record.handle_type != *expected_type {
+            return Err(NativeHandleStoreError::WrongGeneration);
+        }
+        if record.digest_sha256.as_deref() != handle.digest_sha256() {
+            return Err(NativeHandleStoreError::DigestMismatch);
+        }
+        Ok(record.value.clone())
+    }
+
+    fn publish(
+        &self,
+        handle_type: NativeHandleType,
+        value: NativeStoredObject,
+        digest_sha256: Option<String>,
+        resident_bytes: usize,
+        cancellation: &CancellationToken,
+    ) -> Result<NativeOpaqueHandle, NativeHandleStoreError> {
+        cancellation
+            .check()
+            .map_err(|_| NativeHandleStoreError::Cancelled)?;
+        handle_type.validate()?;
+        let resident_bytes = resident_bytes.max(1);
+        let mut staged = self.staged.lock();
+        if staged.closed {
+            return Err(NativeHandleStoreError::Rejected(
+                "native handle store attempt session is closed".to_owned(),
+            ));
+        }
+        let mut data = self.generation.state.data.lock();
+        let next_resident_bytes =
+            data.resident_bytes
+                .checked_add(resident_bytes)
+                .ok_or_else(|| {
+                    NativeHandleStoreError::Rejected(
+                        "native handle resident byte count overflowed".to_owned(),
+                    )
+                })?;
+        if data.values.len() >= self.generation.state.capacity
+            || next_resident_bytes > self.generation.state.byte_capacity
+        {
+            return Err(NativeHandleStoreError::Rejected(
+                "native handle store capacity is exhausted".to_owned(),
+            ));
+        }
+        let generation = self
+            .generation
+            .state
+            .next_generation
+            .fetch_add(1, Ordering::AcqRel);
+        if generation == 0 {
+            return Err(NativeHandleStoreError::Rejected(
+                "native handle generation was exhausted".to_owned(),
+            ));
+        }
+        let identifier = format!("native-{generation:016x}");
+        let handle = NativeOpaqueHandle::new(
+            handle_type.clone(),
+            self.generation.identity(),
+            identifier.clone(),
+            generation,
+            digest_sha256.clone(),
+        )?;
+        data.values.insert(
+            identifier.clone(),
+            StoredNativeHandle {
+                handle_type,
+                generation,
+                digest_sha256,
+                value,
+                committed: false,
+                published_by: self.attempt_id,
+                resident_bytes,
+                roots: 0,
+            },
+        );
+        data.resident_bytes = next_resident_bytes;
+        drop(data);
+        staged.identifiers.push(identifier);
+        drop(staged);
+        if cancellation.is_cancelled() {
+            self.rollback_identifier(handle.identifier());
+            return Err(NativeHandleStoreError::Cancelled);
+        }
+        Ok(handle)
+    }
+
+    fn revoke(
+        &self,
+        handle: &NativeOpaqueHandle,
+        cancellation: &CancellationToken,
+    ) -> Result<(), NativeHandleStoreError> {
+        self.validate_handle(handle, handle.handle_type(), cancellation)?;
+        let mut staged = self.staged.lock();
+        if staged.closed {
+            return Err(NativeHandleStoreError::Rejected(
+                "native handle store attempt session is closed".to_owned(),
+            ));
+        }
+        let mut data = self.generation.state.data.lock();
+        let removable = data
+            .values
+            .get(handle.identifier())
+            .is_some_and(|record| !record.committed && record.published_by == self.attempt_id);
+        if !removable {
+            return Err(NativeHandleStoreError::Rejected(
+                "native handles may only be revoked by their publishing attempt before commit"
+                    .to_owned(),
+            ));
+        }
+        let removed = remove_stored_handle(&mut data, handle.identifier());
+        if removed.is_none() {
+            return Err(NativeHandleStoreError::Missing(
+                handle.identifier().to_owned(),
+            ));
+        }
+        staged
+            .identifiers
+            .retain(|identifier| identifier != handle.identifier());
+        Ok(())
+    }
 }
 
 pub trait EffectCoordinator: Send + Sync {
     fn prepare(&self, effect: PreparedEffect) -> Result<PreparedEffect, String>;
-    fn commit_batch(&self, effects: &[PreparedEffect]) -> Result<(), String>;
+    fn commit_batch(
+        &self,
+        effects: &[PreparedEffect],
+        cancellation: &CancellationToken,
+    ) -> Result<(), String>;
     fn rollback_batch(&self, effects: &[PreparedEffect]) -> Result<(), String>;
 }
 
@@ -604,7 +1349,14 @@ impl EffectCoordinator for RecordingEffectCoordinator {
         Ok(effect)
     }
 
-    fn commit_batch(&self, effects: &[PreparedEffect]) -> Result<(), String> {
+    fn commit_batch(
+        &self,
+        effects: &[PreparedEffect],
+        cancellation: &CancellationToken,
+    ) -> Result<(), String> {
+        cancellation
+            .check()
+            .map_err(|_| "effect commit was cancelled".to_owned())?;
         self.calls.lock().committed_batches.push(effects.to_vec());
         Ok(())
     }
@@ -670,6 +1422,10 @@ pub enum ExecutionError {
     ExpansionDepth,
     #[error("expanded plan does not contain output node {0:?}")]
     InvalidExpansionOutput(NodeId),
+    #[error("expanded prompt failed compilation: {0}")]
+    ExpansionCompile(PromptCompileError),
+    #[error("native handle store failed: {0}")]
+    HandleStore(String),
     #[error("cache operation failed: {0}")]
     Cache(String),
     #[error("effect coordination failed: {0}")]
@@ -688,18 +1444,34 @@ pub enum ExecutionError {
     OversizedEffect { node: NodeId, transaction_id: Uuid },
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ExecutionReport {
     pub profile_id: ProfileId,
     pub prompt_id: PromptId,
     pub attempt_id: AttemptId,
     pub state: AttemptState,
-    pub outputs: BTreeMap<NodeId, Vec<Value>>,
+    pub outputs: BTreeMap<NodeId, Vec<NativeValue>>,
     #[serde(default)]
     pub ui_outputs: BTreeMap<NodeId, Value>,
     pub events: Vec<AttemptEvent>,
     pub cache_hits: usize,
     pub error: Option<String>,
+    #[serde(skip)]
+    pub(crate) handle_lease: Option<NativeHandleLease>,
+}
+
+impl PartialEq for ExecutionReport {
+    fn eq(&self, other: &Self) -> bool {
+        self.profile_id == other.profile_id
+            && self.prompt_id == other.prompt_id
+            && self.attempt_id == other.attempt_id
+            && self.state == other.state
+            && self.outputs == other.outputs
+            && self.ui_outputs == other.ui_outputs
+            && self.events == other.events
+            && self.cache_hits == other.cache_hits
+            && self.error == other.error
+    }
 }
 
 pub struct ExecutionEngine {
@@ -713,6 +1485,7 @@ pub struct ExecutionEngine {
     dtype_policy: String,
     configuration_token: String,
     scratch: ScratchReservation,
+    handle_store_generation: NativeHandleStoreGeneration,
 }
 
 impl ExecutionEngine {
@@ -723,6 +1496,27 @@ impl ExecutionEngine {
         effects: Arc<dyn EffectCoordinator>,
         registry_version: impl Into<String>,
         scratch: ScratchReservation,
+    ) -> Result<Self, ExecutionError> {
+        Self::new_with_handle_store_generation(
+            profile_id,
+            nodes,
+            cache,
+            effects,
+            registry_version,
+            scratch,
+            NativeHandleStoreGeneration::new()
+                .map_err(|error| ExecutionError::HandleStore(error.to_string()))?,
+        )
+    }
+
+    pub fn new_with_handle_store_generation(
+        profile_id: ProfileId,
+        nodes: Arc<NativeNodeRegistry>,
+        cache: Arc<Mutex<NativeCache>>,
+        effects: Arc<dyn EffectCoordinator>,
+        registry_version: impl Into<String>,
+        scratch: ScratchReservation,
+        handle_store_generation: NativeHandleStoreGeneration,
     ) -> Result<Self, ExecutionError> {
         let registry_version = registry_version.into();
         if registry_version.is_empty() {
@@ -741,7 +1535,12 @@ impl ExecutionEngine {
             dtype_policy: "default".to_owned(),
             configuration_token: "default".to_owned(),
             scratch,
+            handle_store_generation,
         })
+    }
+
+    pub fn handle_store_generation(&self) -> &NativeHandleStoreGeneration {
+        &self.handle_store_generation
     }
 
     pub fn with_event_bus(mut self, event_bus: ExecutionEventBus) -> Self {
@@ -788,16 +1587,104 @@ impl ExecutionEngine {
         attempt_id: AttemptId,
         cancellation: CancellationToken,
     ) -> ExecutionReport {
-        let mut state = RunState::new(self.profile_id, plan.prompt_id, attempt_id, cancellation);
+        let handle_store = self.handle_store_generation.session(attempt_id);
+        let mut report_handle_lease = None;
+        let mut state = RunState::new(
+            self.profile_id,
+            plan.prompt_id,
+            attempt_id,
+            cancellation,
+            handle_store,
+        );
         let result = async {
             state.emit(self.event_bus.as_ref(), None, AttemptEventKind::Started)?;
             self.run_plan(plan, &mut state, 0).await?;
             if state.cancellation.is_cancelled() {
                 return Err(ExecutionError::Cancelled);
             }
-            self.effects
-                .commit_batch(&state.prepared_effects)
-                .map_err(ExecutionError::Effect)?;
+            state.handle_store.commit();
+            let pending_cache_entries = std::mem::take(&mut state.pending_cache_entries);
+            let mut leased_cache_entries = Vec::with_capacity(pending_cache_entries.len());
+            for (key, entry) in pending_cache_entries {
+                let mut handles = Vec::new();
+                for output in &entry.outputs {
+                    collect_native_value_handles(output, &mut handles);
+                }
+                let lease = match self.handle_store_generation.acquire_lease(handles.iter()) {
+                    Ok(lease) => lease,
+                    Err(error) => {
+                        drop(leased_cache_entries);
+                        self.handle_store_generation
+                            .collect_unrooted_attempt(attempt_id);
+                        return Err(ExecutionError::HandleStore(error.to_string()));
+                    }
+                };
+                leased_cache_entries.push((key, entry, lease));
+            }
+            let mut report_handles = Vec::new();
+            for values in state.outputs.values() {
+                for output in values {
+                    collect_native_value_handles(output, &mut report_handles);
+                }
+            }
+            let report_lease = match self
+                .handle_store_generation
+                .acquire_lease(report_handles.iter())
+            {
+                Ok(lease) => lease,
+                Err(error) => {
+                    drop(leased_cache_entries);
+                    self.handle_store_generation
+                        .collect_unrooted_attempt(attempt_id);
+                    return Err(ExecutionError::HandleStore(error.to_string()));
+                }
+            };
+            if state.cancellation.is_cancelled() {
+                drop(report_lease);
+                drop(leased_cache_entries);
+                self.handle_store_generation
+                    .collect_unrooted_attempt(attempt_id);
+                return Err(ExecutionError::Cancelled);
+            }
+            if let Err(error) = self
+                .effects
+                .commit_batch(&state.prepared_effects, &state.cancellation)
+            {
+                drop(report_lease);
+                drop(leased_cache_entries);
+                self.handle_store_generation
+                    .collect_unrooted_attempt(attempt_id);
+                return Err(ExecutionError::Effect(error));
+            }
+            if state.cancellation.is_cancelled() {
+                drop(report_lease);
+                drop(leased_cache_entries);
+                self.handle_store_generation
+                    .collect_unrooted_attempt(attempt_id);
+                return Err(ExecutionError::Cancelled);
+            }
+            if state.cancellation.is_cancelled() {
+                drop(report_lease);
+                drop(leased_cache_entries);
+                self.handle_store_generation
+                    .collect_unrooted_attempt(attempt_id);
+                return Err(ExecutionError::Cancelled);
+            }
+            if !self
+                .cache
+                .lock()
+                .insert_batch_with_handle_leases(leased_cache_entries)
+            {
+                drop(report_lease);
+                self.handle_store_generation
+                    .collect_unrooted_attempt(attempt_id);
+                return Err(ExecutionError::Cache(
+                    "native cache handle leases did not cover the committed batch".to_owned(),
+                ));
+            }
+            report_handle_lease = report_lease;
+            self.handle_store_generation
+                .collect_unrooted_attempt(attempt_id);
             if let Err(error) =
                 state.emit(self.event_bus.as_ref(), None, AttemptEventKind::Succeeded)
             {
@@ -818,8 +1705,10 @@ impl ExecutionEngine {
                 events: state.events,
                 cache_hits: state.cache_hits,
                 error: (!state.diagnostics.is_empty()).then(|| state.diagnostics.join("; ")),
+                handle_lease: report_handle_lease,
             },
             Err(error) => {
+                state.handle_store.rollback_all();
                 let mut error_message = error.to_string();
                 if let Err(rollback_error) = self.effects.rollback_batch(&state.prepared_effects) {
                     error_message.push_str("; rollback failed: ");
@@ -860,6 +1749,7 @@ impl ExecutionEngine {
                     events: state.events,
                     cache_hits: state.cache_hits,
                     error: Some(error_message),
+                    handle_lease: None,
                 }
             }
         }
@@ -889,7 +1779,7 @@ impl ExecutionEngine {
         node_id: &'a NodeId,
         state: &'a mut RunState,
         expansion_depth: usize,
-    ) -> BoxFuture<'a, Result<Vec<Value>, ExecutionError>> {
+    ) -> BoxFuture<'a, Result<Vec<NativeValue>, ExecutionError>> {
         Box::pin(async move {
             if state.cancellation.is_cancelled() {
                 return Err(ExecutionError::Cancelled);
@@ -914,7 +1804,7 @@ impl ExecutionEngine {
         node_id: &NodeId,
         state: &mut RunState,
         expansion_depth: usize,
-    ) -> Result<Vec<Value>, ExecutionError> {
+    ) -> Result<Vec<NativeValue>, ExecutionError> {
         let node = plan
             .nodes
             .get(node_id)
@@ -934,13 +1824,15 @@ impl ExecutionEngine {
                 actual: implementation.implementation_version().to_owned(),
             });
         }
-        let context = NodeContext {
-            prompt_id: plan.prompt_id,
-            attempt_id: state.attempt_id,
-            node_id: node_id.clone(),
-            cancellation: state.cancellation.clone(),
-            scratch: self.scratch.clone(),
-        };
+        let context = NodeContext::new(
+            plan.prompt_id,
+            state.attempt_id,
+            node_id.clone(),
+            state.cancellation.clone(),
+            self.scratch.clone(),
+            state.handle_store.clone(),
+        )
+        .map_err(|error| ExecutionError::HandleStore(error.to_string()))?;
         let mut inputs = BTreeMap::new();
         for (name, binding) in &node.inputs {
             match binding {
@@ -1017,24 +1909,47 @@ impl ExecutionEngine {
         let cache_identity = cache_key
             .identity()
             .map_err(|error| ExecutionError::Cache(error.to_string()))?;
-        if node.descriptor.cache == RuntimeCachePolicy::InputIdentity
-            && let Some(entry) = self.cache.lock().get(&cache_key)
-        {
-            state.cache_hits = state.cache_hits.saturating_add(1);
-            state.emit(
-                self.event_bus.as_ref(),
-                Some(node_id.clone()),
-                AttemptEventKind::CacheHit,
-            )?;
-            state.outputs.insert(node_id.clone(), entry.outputs.clone());
-            if let Some(ui) = entry.ui {
-                state.ui_outputs.insert(node_id.clone(), ui);
+        if node.descriptor.cache == RuntimeCachePolicy::InputIdentity {
+            let cached = self.cache.lock().get_with_handle_lease(&cache_key);
+            if let Some((entry, cache_lease)) = cached {
+                let mut handles = Vec::new();
+                for output in &entry.outputs {
+                    collect_native_value_handles(output, &mut handles);
+                }
+                let attempt_lease = if handles.is_empty() {
+                    cache_lease.is_none().then_some(None)
+                } else if cache_lease.as_ref().is_some_and(|lease| {
+                    lease.store_identity() == self.handle_store_generation.identity()
+                        && lease.covers_values(&entry.outputs)
+                }) {
+                    self.handle_store_generation
+                        .acquire_lease(handles.iter())
+                        .ok()
+                } else {
+                    None
+                };
+                if let Some(attempt_lease) = attempt_lease {
+                    if let Some(lease) = attempt_lease {
+                        state.cache_handle_leases.push(lease);
+                    }
+                    state.cache_hits = state.cache_hits.saturating_add(1);
+                    state.emit(
+                        self.event_bus.as_ref(),
+                        Some(node_id.clone()),
+                        AttemptEventKind::CacheHit,
+                    )?;
+                    state.outputs.insert(node_id.clone(), entry.outputs.clone());
+                    if let Some(ui) = entry.ui {
+                        state.ui_outputs.insert(node_id.clone(), ui);
+                    }
+                    state
+                        .cache_identities
+                        .insert(node_id.clone(), cache_identity);
+                    emit_progress(plan, state, self.event_bus.as_ref(), node_id.clone())?;
+                    return Ok(entry.outputs);
+                }
+                self.cache.lock().remove(&cache_key);
             }
-            state
-                .cache_identities
-                .insert(node_id.clone(), cache_identity);
-            emit_progress(plan, state, self.event_bus.as_ref(), node_id.clone())?;
-            return Ok(entry.outputs);
         }
 
         let (outputs, ui, effects) = self
@@ -1102,13 +2017,13 @@ impl ExecutionEngine {
                 .iter()
                 .all(|effect| effect.node_id != *node_id)
         {
-            self.cache.lock().insert(
+            state.pending_cache_entries.push((
                 cache_key,
                 CacheEntry {
                     outputs: outputs.clone(),
                     ui: ui.clone(),
                 },
-            );
+            ));
         }
         state.outputs.insert(node_id.clone(), outputs.clone());
         if let Some(ui) = ui {
@@ -1126,20 +2041,18 @@ impl ExecutionEngine {
         node: &CompiledNode,
         implementation: &dyn NativeNode,
         context: NodeContext,
-        inputs: BTreeMap<String, Value>,
+        inputs: BTreeMap<String, NativeValue>,
         state: &mut RunState,
         expansion_depth: usize,
-    ) -> Result<(Vec<Value>, Option<Value>, Vec<PreparedEffectRequest>), ExecutionError> {
-        let mapped = node
-            .descriptor
-            .inputs
+    ) -> Result<(Vec<NativeValue>, Option<Value>, Vec<PreparedEffectRequest>), ExecutionError> {
+        let mapped = inputs
             .iter()
-            .filter(|(_, descriptor)| descriptor.mode == InputMode::Mapped)
-            .filter_map(|(name, _)| {
-                inputs
-                    .get(name)
-                    .and_then(Value::as_array)
-                    .map(|values| (name.clone(), values.len()))
+            .filter_map(|(name, value)| {
+                crate::prompt_compiler::resolve_input_descriptor(&node.descriptor, name)
+                    .filter(|descriptor| descriptor.cardinality == InputMode::Mapped)
+                    .and_then(|_| {
+                        native_list_values(value).map(|values| (name.clone(), values.len()))
+                    })
             })
             .collect::<Vec<_>>();
         if mapped.is_empty() {
@@ -1159,7 +2072,7 @@ impl ExecutionEngine {
                 node.descriptor
                     .outputs
                     .iter()
-                    .map(|_| Value::Array(Vec::new()))
+                    .map(|_| NativeValue::List { values: Vec::new() })
                     .collect(),
                 None,
                 Vec::new(),
@@ -1179,12 +2092,13 @@ impl ExecutionEngine {
             }
             let mut iteration_inputs = inputs.clone();
             for (name, _) in &mapped {
-                let values = inputs.get(name).and_then(Value::as_array).ok_or_else(|| {
-                    ExecutionError::InvalidLazyDemand {
+                let values = inputs
+                    .get(name)
+                    .and_then(native_list_values)
+                    .ok_or_else(|| ExecutionError::InvalidLazyDemand {
                         node: node.id.clone(),
                         input: name.clone(),
-                    }
-                })?;
+                    })?;
                 let value_index = index.min(values.len().saturating_sub(1));
                 let value = values.get(value_index).cloned().ok_or_else(|| {
                     ExecutionError::InvalidLazyDemand {
@@ -1218,13 +2132,12 @@ impl ExecutionEngine {
                 .enumerate()
             {
                 if descriptor.is_list {
-                    let output_values =
-                        output
-                            .as_array()
-                            .ok_or_else(|| ExecutionError::InvalidOutput {
-                                node: node.id.clone(),
-                                output_index,
-                            })?;
+                    let output_values = native_list_values(&output).ok_or_else(|| {
+                        ExecutionError::InvalidOutput {
+                            node: node.id.clone(),
+                            output_index,
+                        }
+                    })?;
                     values.extend(output_values.iter().cloned());
                 } else {
                     values.push(output);
@@ -1236,7 +2149,10 @@ impl ExecutionEngine {
             effects.extend(iteration_effects);
         }
         Ok((
-            collected.into_iter().map(Value::Array).collect(),
+            collected
+                .into_iter()
+                .map(|values| NativeValue::List { values })
+                .collect(),
             (!combined_ui.is_empty()).then_some(Value::Array(combined_ui)),
             effects,
         ))
@@ -1247,48 +2163,93 @@ impl ExecutionEngine {
         implementation: &dyn NativeNode,
         output_descriptors: &[RuntimeOutputDescriptor],
         context: NodeContext,
-        inputs: BTreeMap<String, Value>,
+        inputs: BTreeMap<String, NativeValue>,
         state: &mut RunState,
         expansion_depth: usize,
-    ) -> Result<(Vec<Value>, Option<Value>, Vec<PreparedEffectRequest>), ExecutionError> {
+    ) -> Result<(Vec<NativeValue>, Option<Value>, Vec<PreparedEffectRequest>), ExecutionError> {
         if state.cancellation.is_cancelled() {
             return Err(ExecutionError::Cancelled);
         }
         let node_id = context.node_id.clone();
+        let handle_checkpoint = state.handle_store.checkpoint();
         let outcome = implementation.execute(context, inputs).await;
         if state.cancellation.is_cancelled() {
+            state.handle_store.rollback_from(handle_checkpoint);
             return Err(ExecutionError::Cancelled);
         }
-        let outcome =
-            outcome.map_err(|failure| execution_node_failure(node_id.clone(), failure))?;
-        let result = match outcome {
-            NodeOutcome::Values {
-                outputs,
-                ui,
-                effects,
-            } => Ok((outputs, ui, effects)),
-            NodeOutcome::Blocked { reason } => Err(ExecutionError::Blocked {
-                node: node_id.clone(),
-                reason,
-            }),
-            NodeOutcome::Expansion { plan, output_node } => {
-                if expansion_depth >= MAX_EXPANSION_DEPTH {
-                    return Err(ExecutionError::ExpansionDepth);
-                }
-                let (plan, output_node) = namespace_expansion(
-                    &plan,
-                    &output_node,
-                    &node_id,
-                    state.prompt_id,
-                    expansion_depth,
-                    state.next_expansion_scope()?,
-                )?;
-                self.run_node(&plan, &output_node, state, expansion_depth + 1)
-                    .await
-                    .map(|outputs| (outputs, None, Vec::new()))
+        let outcome = match outcome {
+            Ok(outcome) => outcome,
+            Err(failure) => {
+                state.handle_store.rollback_from(handle_checkpoint);
+                return Err(execution_node_failure(node_id, failure));
             }
-        }?;
-        validate_outputs(&node_id, output_descriptors, &result.0)?;
+        };
+        if let Err(error) = outcome.validate() {
+            state.handle_store.rollback_from(handle_checkpoint);
+            return Err(ExecutionError::HandleStore(error.to_string()));
+        }
+        let result = async {
+            match outcome {
+                NodeOutcome::Values {
+                    outputs,
+                    ui,
+                    effects,
+                } => Ok((outputs, ui, effects)),
+                NodeOutcome::Blocked { reason } => Err(ExecutionError::Blocked {
+                    node: node_id.clone(),
+                    reason,
+                }),
+                NodeOutcome::Expansion {
+                    prompt,
+                    output_node,
+                } => {
+                    if expansion_depth >= MAX_EXPANSION_DEPTH {
+                        return Err(ExecutionError::ExpansionDepth);
+                    }
+                    let plan = crate::PromptCompiler::new(&self.nodes)
+                        .compile(PromptSubmission {
+                            prompt,
+                            prompt_id: Some(state.prompt_id),
+                            client_id: None,
+                            number: None,
+                            extra_data: BTreeMap::new(),
+                            unknown: BTreeMap::new(),
+                        })
+                        .map_err(ExecutionError::ExpansionCompile)?;
+                    if !plan.nodes.contains_key(&output_node) {
+                        return Err(ExecutionError::InvalidExpansionOutput(output_node));
+                    }
+                    let scope = state.next_expansion_scope;
+                    let next_scope = scope
+                        .checked_add(1)
+                        .ok_or(ExecutionError::ExpansionSequenceExhausted)?;
+                    let (plan, output_node) = namespace_expansion(
+                        &plan,
+                        &output_node,
+                        &node_id,
+                        state.prompt_id,
+                        expansion_depth,
+                        scope,
+                    )?;
+                    state.next_expansion_scope = next_scope;
+                    self.run_node(&plan, &output_node, state, expansion_depth + 1)
+                        .await
+                        .map(|outputs| (outputs, None, Vec::new()))
+                }
+            }
+        }
+        .await;
+        let result = match result {
+            Ok(result) => result,
+            Err(error) => {
+                state.handle_store.rollback_from(handle_checkpoint);
+                return Err(error);
+            }
+        };
+        if let Err(error) = validate_outputs(&node_id, output_descriptors, &result.0) {
+            state.handle_store.rollback_from(handle_checkpoint);
+            return Err(error);
+        }
         Ok(result)
     }
 }
@@ -1333,7 +2294,7 @@ fn nonempty_cache_dimension(name: &'static str, value: String) -> Result<String,
 
 fn demanded_dependency_identities(
     node: &CompiledNode,
-    inputs: &BTreeMap<String, Value>,
+    inputs: &BTreeMap<String, NativeValue>,
     state: &RunState,
 ) -> Result<BTreeMap<String, String>, ExecutionError> {
     node.inputs
@@ -1375,7 +2336,7 @@ fn demanded_dependency_identities(
 fn validate_outputs(
     node_id: &NodeId,
     descriptors: &[RuntimeOutputDescriptor],
-    outputs: &[Value],
+    outputs: &[NativeValue],
 ) -> Result<(), ExecutionError> {
     if outputs.len() != descriptors.len() {
         return Err(ExecutionError::OutputArity {
@@ -1386,13 +2347,14 @@ fn validate_outputs(
     }
     for (output_index, (descriptor, output)) in descriptors.iter().zip(outputs).enumerate() {
         let valid = if descriptor.is_list {
-            output.as_array().is_some_and(|values| {
+            native_list_values(output).is_some_and(|values| {
                 values
                     .iter()
-                    .all(|value| descriptor.value_type.accepts_runtime_output(value))
+                    .all(|value| native_output_type_accepts(&descriptor.produced_type, value))
             })
         } else {
-            descriptor.value_type.accepts_runtime_output(output)
+            !matches!(output, NativeValue::List { .. })
+                && native_output_type_accepts(&descriptor.produced_type, output)
         };
         if !valid {
             return Err(ExecutionError::InvalidOutput {
@@ -1408,8 +2370,8 @@ fn linked_value(
     source: &NodeId,
     output_index: usize,
     mode: InputMode,
-    outputs: &[Value],
-) -> Result<Value, ExecutionError> {
+    outputs: &[NativeValue],
+) -> Result<NativeValue, ExecutionError> {
     let value =
         outputs
             .get(output_index)
@@ -1418,10 +2380,52 @@ fn linked_value(
                 node: source.clone(),
                 output_index,
             })?;
-    if mode == InputMode::List && !value.is_array() {
-        Ok(Value::Array(vec![value]))
+    if mode == InputMode::List && !matches!(value, NativeValue::List { .. }) {
+        Ok(NativeValue::List {
+            values: vec![value],
+        })
     } else {
         Ok(value)
+    }
+}
+
+fn native_list_values(value: &NativeValue) -> Option<&[NativeValue]> {
+    match value {
+        NativeValue::List { values } => Some(values),
+        _ => None,
+    }
+}
+
+fn collect_native_value_handles(value: &NativeValue, handles: &mut Vec<NativeOpaqueHandle>) {
+    match value {
+        NativeValue::Handle { value } => handles.push(value.clone()),
+        NativeValue::List { values } => {
+            for value in values {
+                collect_native_value_handles(value, handles);
+            }
+        }
+        NativeValue::Primitive { .. } | NativeValue::PreservedUnknown { .. } => {}
+    }
+}
+
+fn native_output_type_accepts(
+    expected: &comfy_nodes::NativeValueType,
+    value: &NativeValue,
+) -> bool {
+    match (expected, value) {
+        (comfy_nodes::NativeValueType::Any, _) => true,
+        (comfy_nodes::NativeValueType::Primitive(expected), NativeValue::Primitive { value }) => {
+            *expected == value.primitive_type()
+                || (*expected == comfy_nodes::NativePrimitiveType::Number
+                    && value.primitive_type() == comfy_nodes::NativePrimitiveType::Integer)
+        }
+        (comfy_nodes::NativeValueType::Handle(expected), NativeValue::Handle { value }) => {
+            expected == value.handle_type()
+        }
+        (comfy_nodes::NativeValueType::PreservedUnknown, NativeValue::PreservedUnknown { .. }) => {
+            true
+        }
+        _ => false,
     }
 }
 
@@ -1471,7 +2475,7 @@ struct RunState {
     prompt_id: PromptId,
     attempt_id: AttemptId,
     cancellation: CancellationToken,
-    outputs: BTreeMap<NodeId, Vec<Value>>,
+    outputs: BTreeMap<NodeId, Vec<NativeValue>>,
     ui_outputs: BTreeMap<NodeId, Value>,
     cache_identities: BTreeMap<NodeId, String>,
     visiting: BTreeSet<NodeId>,
@@ -1481,6 +2485,9 @@ struct RunState {
     next_expansion_scope: u64,
     cache_hits: usize,
     diagnostics: Vec<String>,
+    handle_store: Arc<RuntimeNativeHandleStoreSession>,
+    pending_cache_entries: Vec<(CacheKey, CacheEntry)>,
+    cache_handle_leases: Vec<NativeHandleLease>,
 }
 
 impl RunState {
@@ -1489,6 +2496,7 @@ impl RunState {
         prompt_id: PromptId,
         attempt_id: AttemptId,
         cancellation: CancellationToken,
+        handle_store: Arc<RuntimeNativeHandleStoreSession>,
     ) -> Self {
         Self {
             profile_id,
@@ -1505,16 +2513,10 @@ impl RunState {
             next_expansion_scope: 0,
             cache_hits: 0,
             diagnostics: Vec::new(),
+            handle_store,
+            pending_cache_entries: Vec::new(),
+            cache_handle_leases: Vec::new(),
         }
-    }
-
-    fn next_expansion_scope(&mut self) -> Result<u64, ExecutionError> {
-        let scope = self.next_expansion_scope;
-        self.next_expansion_scope = self
-            .next_expansion_scope
-            .checked_add(1)
-            .ok_or(ExecutionError::ExpansionSequenceExhausted)?;
-        Ok(scope)
     }
 
     fn emit(
@@ -1556,15 +2558,66 @@ impl From<EventBusError> for ExecutionError {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::{
-        InputMode, PromptCompiler, RuntimeAvailability, RuntimeInputDescriptor,
-        RuntimeNodeDescriptor, RuntimeOutputDescriptor, ValueType,
+    use crate::{InputMode, PromptCompiler, RuntimeNodeDescriptor, RuntimeOutputDescriptor};
+    use comfy_nodes::{
+        NATIVE_NODE_CONTRACT_SCHEMA_VERSION, NativeInputDescriptor, NativePrimitive,
+        NativePrimitiveType, NativeTypeUnion, NativeValueType,
     };
     use comfy_types::{ApiPrompt, PromptNode, PromptSubmission};
     use serde_json::json;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     const TEST_WORKSPACE_BYTES: u64 = 64 * 1024 * 1024;
+
+    #[derive(Clone)]
+    enum ValueType {
+        Any,
+        Boolean,
+        Integer,
+        Number,
+    }
+
+    struct RuntimeInputDescriptor {
+        value_type: ValueType,
+        required: bool,
+        hidden: bool,
+        lazy: bool,
+        mode: InputMode,
+        allows_literal: bool,
+    }
+
+    fn native_integer(value: i64) -> NativeValue {
+        NativeValue::Primitive {
+            value: NativePrimitive::Integer(value),
+        }
+    }
+
+    fn native_boolean(value: bool) -> NativeValue {
+        NativeValue::Primitive {
+            value: NativePrimitive::Boolean(value),
+        }
+    }
+
+    fn native_string(value: &str) -> NativeValue {
+        NativeValue::Primitive {
+            value: NativePrimitive::String(value.to_owned()),
+        }
+    }
+
+    fn native_null() -> NativeValue {
+        NativeValue::Primitive {
+            value: NativePrimitive::Null,
+        }
+    }
+
+    fn native_integer_value(value: &NativeValue) -> Option<i64> {
+        match value {
+            NativeValue::Primitive {
+                value: NativePrimitive::Integer(value),
+            } => Some(*value),
+            _ => None,
+        }
+    }
 
     struct FixtureNode {
         class_type: String,
@@ -1587,7 +2640,7 @@ pub(crate) mod tests {
         fn demanded_lazy_inputs(
             &self,
             context: &NodeContext,
-            _available: &BTreeMap<String, Value>,
+            _available: &BTreeMap<String, NativeValue>,
         ) -> Result<BTreeSet<String>, NodeFailure> {
             self.observed.lock().push(context.scratch.bytes());
             Ok(BTreeSet::new())
@@ -1596,12 +2649,12 @@ pub(crate) mod tests {
         fn execute<'a>(
             &'a self,
             context: NodeContext,
-            _inputs: BTreeMap<String, Value>,
+            _inputs: BTreeMap<String, NativeValue>,
         ) -> BoxFuture<'a, Result<NodeOutcome, NodeFailure>> {
             self.observed.lock().push(context.scratch.bytes());
             Box::pin(async {
                 Ok(NodeOutcome::Values {
-                    outputs: vec![json!(1)],
+                    outputs: vec![native_integer(1)],
                     ui: None,
                     effects: Vec::new(),
                 })
@@ -1621,9 +2674,11 @@ pub(crate) mod tests {
         fn demanded_lazy_inputs(
             &self,
             _context: &NodeContext,
-            available: &BTreeMap<String, Value>,
+            available: &BTreeMap<String, NativeValue>,
         ) -> Result<BTreeSet<String>, NodeFailure> {
-            if self.class_type == "Choose" && available.get("condition") == Some(&json!(true)) {
+            if self.class_type == "Choose"
+                && available.get("condition") == Some(&native_boolean(true))
+            {
                 Ok(BTreeSet::from(["value".to_owned()]))
             } else {
                 Ok(BTreeSet::new())
@@ -1633,7 +2688,7 @@ pub(crate) mod tests {
         fn execute<'a>(
             &'a self,
             context: NodeContext,
-            inputs: BTreeMap<String, Value>,
+            inputs: BTreeMap<String, NativeValue>,
         ) -> BoxFuture<'a, Result<NodeOutcome, NodeFailure>> {
             self.calls.fetch_add(1, Ordering::SeqCst);
             Box::pin(async move {
@@ -1647,35 +2702,46 @@ pub(crate) mod tests {
                     });
                 }
                 let outputs = match self.class_type.as_str() {
-                    "Source" => vec![json!([1, 2, 3])],
-                    "LazySource" | "InnerOutput" => vec![json!(42)],
-                    "Double" => vec![json!(
+                    "Source" => vec![NativeValue::List {
+                        values: vec![native_integer(1), native_integer(2), native_integer(3)],
+                    }],
+                    "LazySource" | "InnerOutput" => vec![native_integer(42)],
+                    "Double" => vec![native_integer(
                         inputs
                             .get("value")
-                            .and_then(Value::as_i64)
+                            .and_then(native_integer_value)
                             .unwrap_or_default()
-                            * 2
+                            * 2,
                     )],
-                    "Pair" => vec![json!(
+                    "Pair" => vec![native_integer(
                         inputs
                             .get("left")
-                            .and_then(Value::as_i64)
+                            .and_then(native_integer_value)
                             .unwrap_or_default()
                             * 10
                             + inputs
                                 .get("right")
-                                .and_then(Value::as_i64)
-                                .unwrap_or_default()
+                                .and_then(native_integer_value)
+                                .unwrap_or_default(),
                     )],
-                    "ListMap" => vec![json!([inputs
-                        .get("value")
-                        .and_then(Value::as_i64)
-                        .unwrap_or_default()])],
-                    "Choose" => vec![inputs.get("value").cloned().unwrap_or_else(|| json!(0))],
-                    "Output" => vec![inputs.get("value").cloned().unwrap_or(Value::Null)],
+                    "ListMap" => vec![NativeValue::List {
+                        values: vec![native_integer(
+                            inputs
+                                .get("value")
+                                .and_then(native_integer_value)
+                                .unwrap_or_default(),
+                        )],
+                    }],
+                    "Choose" => vec![
+                        inputs
+                            .get("value")
+                            .cloned()
+                            .unwrap_or_else(|| native_integer(0)),
+                    ],
+                    "Output" => vec![inputs.get("value").cloned().unwrap_or_else(native_null)],
                     "Write" => {
                         return Ok(NodeOutcome::Values {
-                            outputs: vec![json!("prepared")],
+                            outputs: vec![native_string("prepared")],
                             ui: None,
                             effects: vec![PreparedEffectRequest {
                                 transaction_id: Uuid::from_u128(99),
@@ -1688,7 +2754,7 @@ pub(crate) mod tests {
                             reason: "fixture blocker".to_owned(),
                         });
                     }
-                    _ => vec![Value::Null],
+                    _ => vec![native_null()],
                 };
                 Ok(NodeOutcome::Values {
                     outputs,
@@ -1700,7 +2766,53 @@ pub(crate) mod tests {
     }
 
     struct ExpansionNode {
-        plan: CompiledPlan,
+        prompt: ApiPrompt,
+    }
+
+    struct PublishingMalformedExpansionNode;
+
+    impl NativeNode for PublishingMalformedExpansionNode {
+        fn class_type(&self) -> &str {
+            "PublishingMalformedExpansion"
+        }
+
+        fn implementation_version(&self) -> &str {
+            "1"
+        }
+
+        fn execute<'a>(
+            &'a self,
+            context: NodeContext,
+            _inputs: BTreeMap<String, NativeValue>,
+        ) -> BoxFuture<'a, Result<NodeOutcome, NodeFailure>> {
+            Box::pin(async move {
+                context
+                    .handle_store()
+                    .publish(
+                        NativeHandleType::new(comfy_nodes::NativeHandleKind::Tensor, "TEST")
+                            .map_err(|error| NodeFailure {
+                                code: "handle_type".to_owned(),
+                                message: error.to_string(),
+                                kind: NodeFailureKind::Failure,
+                                retryable: false,
+                            })?,
+                        Arc::new(9_u64),
+                        Some("e".repeat(64)),
+                        8,
+                        &context.cancellation,
+                    )
+                    .map_err(|error| NodeFailure {
+                        code: "publish".to_owned(),
+                        message: error.to_string(),
+                        kind: NodeFailureKind::Failure,
+                        retryable: false,
+                    })?;
+                Ok(NodeOutcome::Expansion {
+                    prompt: ApiPrompt(BTreeMap::new()),
+                    output_node: NodeId("missing".to_owned()),
+                })
+            })
+        }
     }
 
     impl NativeNode for ExpansionNode {
@@ -1715,12 +2827,12 @@ pub(crate) mod tests {
         fn execute<'a>(
             &'a self,
             _context: NodeContext,
-            _inputs: BTreeMap<String, Value>,
+            _inputs: BTreeMap<String, NativeValue>,
         ) -> BoxFuture<'a, Result<NodeOutcome, NodeFailure>> {
-            let plan = self.plan.clone();
+            let prompt = self.prompt.clone();
             Box::pin(async move {
                 Ok(NodeOutcome::Expansion {
-                    plan,
+                    prompt,
                     output_node: NodeId::from("inner"),
                 })
             })
@@ -1741,7 +2853,7 @@ pub(crate) mod tests {
         fn execute<'a>(
             &'a self,
             context: NodeContext,
-            _inputs: BTreeMap<String, Value>,
+            _inputs: BTreeMap<String, NativeValue>,
         ) -> BoxFuture<'a, Result<NodeOutcome, NodeFailure>> {
             Box::pin(async move {
                 context.cancellation.cancel();
@@ -1771,7 +2883,7 @@ pub(crate) mod tests {
         fn demanded_lazy_inputs(
             &self,
             context: &NodeContext,
-            _available_inputs: &BTreeMap<String, Value>,
+            _available_inputs: &BTreeMap<String, NativeValue>,
         ) -> Result<BTreeSet<String>, NodeFailure> {
             self.phases.lock().push("demand");
             context.cancellation.cancel();
@@ -1780,7 +2892,7 @@ pub(crate) mod tests {
 
         fn cache_change_token(
             &self,
-            _inputs: &BTreeMap<String, Value>,
+            _inputs: &BTreeMap<String, NativeValue>,
         ) -> Result<String, NodeFailure> {
             self.phases.lock().push("change");
             Ok("stable".to_owned())
@@ -1789,7 +2901,7 @@ pub(crate) mod tests {
         fn cache_dependencies(
             &self,
             _context: &NodeContext,
-            _inputs: &BTreeMap<String, Value>,
+            _inputs: &BTreeMap<String, NativeValue>,
         ) -> Result<CacheDependencies, NodeFailure> {
             self.phases.lock().push("dependencies");
             Ok(CacheDependencies::default())
@@ -1798,12 +2910,12 @@ pub(crate) mod tests {
         fn execute<'a>(
             &'a self,
             _context: NodeContext,
-            _inputs: BTreeMap<String, Value>,
+            _inputs: BTreeMap<String, NativeValue>,
         ) -> BoxFuture<'a, Result<NodeOutcome, NodeFailure>> {
             self.phases.lock().push("execute");
             Box::pin(async move {
                 Ok(NodeOutcome::Values {
-                    outputs: vec![json!(1)],
+                    outputs: vec![native_integer(1)],
                     ui: Some(json!({"preview": "must-not-publish"})),
                     effects: vec![PreparedEffectRequest {
                         transaction_id: Uuid::from_u128(100),
@@ -1830,12 +2942,12 @@ pub(crate) mod tests {
         fn execute<'a>(
             &'a self,
             _context: NodeContext,
-            _inputs: BTreeMap<String, Value>,
+            _inputs: BTreeMap<String, NativeValue>,
         ) -> BoxFuture<'a, Result<NodeOutcome, NodeFailure>> {
             self.calls.fetch_add(1, Ordering::SeqCst);
             Box::pin(async {
                 Ok(NodeOutcome::Values {
-                    outputs: vec![json!(1)],
+                    outputs: vec![native_integer(1)],
                     ui: Some(json!({"preview": "ready"})),
                     effects: Vec::new(),
                 })
@@ -1845,6 +2957,40 @@ pub(crate) mod tests {
 
     struct VersionedSourceNode {
         version: &'static str,
+    }
+
+    struct ConfiguredNode {
+        class_type: String,
+        version: String,
+        namespace: String,
+    }
+
+    impl NativeNode for ConfiguredNode {
+        fn class_type(&self) -> &str {
+            &self.class_type
+        }
+
+        fn implementation_version(&self) -> &str {
+            &self.version
+        }
+
+        fn implementation_namespace(&self) -> &str {
+            &self.namespace
+        }
+
+        fn execute<'a>(
+            &'a self,
+            _context: NodeContext,
+            _inputs: BTreeMap<String, NativeValue>,
+        ) -> BoxFuture<'a, Result<NodeOutcome, NodeFailure>> {
+            Box::pin(async {
+                Ok(NodeOutcome::Values {
+                    outputs: Vec::new(),
+                    ui: None,
+                    effects: Vec::new(),
+                })
+            })
+        }
     }
 
     impl NativeNode for VersionedSourceNode {
@@ -1859,11 +3005,11 @@ pub(crate) mod tests {
         fn execute<'a>(
             &'a self,
             _context: NodeContext,
-            _inputs: BTreeMap<String, Value>,
+            _inputs: BTreeMap<String, NativeValue>,
         ) -> BoxFuture<'a, Result<NodeOutcome, NodeFailure>> {
             Box::pin(async {
                 Ok(NodeOutcome::Values {
-                    outputs: vec![json!(7)],
+                    outputs: vec![native_integer(7)],
                     ui: None,
                     effects: Vec::new(),
                 })
@@ -1887,12 +3033,12 @@ pub(crate) mod tests {
         fn execute<'a>(
             &'a self,
             _context: NodeContext,
-            inputs: BTreeMap<String, Value>,
+            inputs: BTreeMap<String, NativeValue>,
         ) -> BoxFuture<'a, Result<NodeOutcome, NodeFailure>> {
             self.calls.fetch_add(1, Ordering::SeqCst);
             Box::pin(async move {
                 Ok(NodeOutcome::Values {
-                    outputs: vec![inputs.get("value").cloned().unwrap_or(Value::Null)],
+                    outputs: vec![inputs.get("value").cloned().unwrap_or_else(native_null)],
                     ui: None,
                     effects: Vec::new(),
                 })
@@ -1905,28 +3051,55 @@ pub(crate) mod tests {
         output_node: bool,
         inputs: BTreeMap<String, RuntimeInputDescriptor>,
         effect: EffectClass,
-    ) -> RuntimeNodeDescriptor {
-        RuntimeNodeDescriptor {
+    ) -> Result<RuntimeNodeDescriptor, NativeNodeContractError> {
+        let inputs = inputs
+            .into_iter()
+            .map(|(name, input)| {
+                Ok(NativeInputDescriptor {
+                    name,
+                    accepted_types: NativeTypeUnion::new([match input.value_type {
+                        ValueType::Any => NativeValueType::Any,
+                        ValueType::Boolean => {
+                            NativeValueType::Primitive(NativePrimitiveType::Boolean)
+                        }
+                        ValueType::Integer => {
+                            NativeValueType::Primitive(NativePrimitiveType::Integer)
+                        }
+                        ValueType::Number => {
+                            NativeValueType::Primitive(NativePrimitiveType::Number)
+                        }
+                    }])?,
+                    required: input.required,
+                    hidden: input.hidden,
+                    lazy: input.lazy,
+                    cardinality: input.mode,
+                    allows_literal: input.allows_literal,
+                })
+            })
+            .collect::<Result<Vec<_>, NativeNodeContractError>>()?;
+        Ok(RuntimeNodeDescriptor {
+            schema_version: NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
             class_type: class_type.to_owned(),
             implementation_version: "1".to_owned(),
             inputs,
+            dynamic_inputs: Vec::new(),
             outputs: vec![RuntimeOutputDescriptor {
-                value_type: if class_type == "Write" {
-                    ValueType::Any
+                name: "value".to_owned(),
+                produced_type: if class_type == "Write" {
+                    NativeValueType::Any
                 } else {
-                    ValueType::Number
+                    NativeValueType::Primitive(NativePrimitiveType::Number)
                 },
                 is_list: class_type == "Source" || class_type == "Output",
             }],
             output_node,
-            availability: RuntimeAvailability::Native,
             effect,
             cache: if effect == EffectClass::Pure {
                 RuntimeCachePolicy::InputIdentity
             } else {
                 RuntimeCachePolicy::Never
             },
-        }
+        })
     }
 
     fn input(
@@ -1949,7 +3122,8 @@ pub(crate) mod tests {
     fn component_presentation_registration_is_checked_and_atomic()
     -> Result<(), Box<dyn std::error::Error>> {
         let calls = Arc::new(AtomicUsize::new(0));
-        let descriptor = runtime_descriptor("Component", false, BTreeMap::new(), EffectClass::Pure);
+        let descriptor =
+            runtime_descriptor("Component", false, BTreeMap::new(), EffectClass::Pure)?;
         let node: Arc<dyn NativeNode> = Arc::new(FixtureNode {
             class_type: "Component".to_owned(),
             calls,
@@ -1962,7 +3136,11 @@ pub(crate) mod tests {
                 RuntimeNodePresentation {
                     display_name: "Signed Component".to_owned(),
                     category: "signed/category".to_owned(),
+                    description: String::new(),
                     output_names: Vec::new(),
+                    search_aliases: Vec::new(),
+                    is_deprecated: false,
+                    is_experimental: false,
                 },
             )])
             .expect_err("output-name arity must match the execution descriptor");
@@ -1978,7 +3156,11 @@ pub(crate) mod tests {
         let presentation = RuntimeNodePresentation {
             display_name: "Signed Component".to_owned(),
             category: "signed/category".to_owned(),
-            output_names: vec!["Signed output".to_owned()],
+            description: String::new(),
+            output_names: vec!["value".to_owned()],
+            search_aliases: Vec::new(),
+            is_deprecated: false,
+            is_experimental: false,
         };
         registry.register_bound_batch_with_presentations([(
             descriptor,
@@ -1988,6 +3170,355 @@ pub(crate) mod tests {
         assert!(registry.descriptor_is_bound("Component"));
         assert_eq!(registry.presentation("Component"), Some(&presentation));
         Ok(())
+    }
+
+    #[test]
+    fn native_handle_store_sessions_isolate_stage_commit_and_revoke()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let generation = NativeHandleStoreGeneration::with_capacities(4, 16)?;
+        let first_attempt = AttemptId(Uuid::from_u128(10));
+        let second_attempt = AttemptId(Uuid::from_u128(11));
+        let first = generation.session(first_attempt);
+        let second = generation.session(second_attempt);
+        let handle_type = NativeHandleType::new(comfy_nodes::NativeHandleKind::Tensor, "TEST")?;
+        let digest = "a".repeat(64);
+        let handle = first.publish(
+            handle_type.clone(),
+            Arc::new(7_u64),
+            Some(digest),
+            0,
+            &CancellationToken::default(),
+        )?;
+
+        assert!(matches!(
+            second.resolve(&handle, &handle_type, &CancellationToken::default()),
+            Err(NativeHandleStoreError::Missing(_))
+        ));
+        assert_eq!(
+            *first
+                .resolve(&handle, &handle_type, &CancellationToken::default())?
+                .downcast::<u64>()
+                .map_err(|_| "stored test handle had the wrong object type")?,
+            7
+        );
+
+        first.commit();
+        assert!(matches!(
+            first.publish(
+                handle_type.clone(),
+                Arc::new(8_u64),
+                Some("b".repeat(64)),
+                1,
+                &CancellationToken::default(),
+            ),
+            Err(NativeHandleStoreError::Rejected(_))
+        ));
+        assert!(
+            second
+                .resolve(&handle, &handle_type, &CancellationToken::default())
+                .is_ok()
+        );
+        assert!(matches!(
+            second.revoke(&handle, &CancellationToken::default()),
+            Err(NativeHandleStoreError::Rejected(_))
+        ));
+
+        let lease = generation
+            .acquire_lease([&handle])?
+            .ok_or("committed handle did not produce a lease")?;
+        generation.collect_unrooted_attempt(first_attempt);
+        assert_eq!(generation.len(), 1);
+        drop(lease);
+        assert!(generation.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn native_handle_store_capacity_and_lease_validation_are_atomic()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let generation = NativeHandleStoreGeneration::with_capacities(2, 5)?;
+        let attempt_id = AttemptId(Uuid::from_u128(12));
+        let session = generation.session(attempt_id);
+        let handle_type = NativeHandleType::new(comfy_nodes::NativeHandleKind::Tensor, "TEST")?;
+        let first = session.publish(
+            handle_type.clone(),
+            Arc::new(1_u64),
+            Some("a".repeat(64)),
+            4,
+            &CancellationToken::default(),
+        )?;
+        assert!(matches!(
+            session.publish(
+                handle_type.clone(),
+                Arc::new(2_u64),
+                Some("b".repeat(64)),
+                2,
+                &CancellationToken::default(),
+            ),
+            Err(NativeHandleStoreError::Rejected(_))
+        ));
+        let second = session.publish(
+            handle_type.clone(),
+            Arc::new(3_u64),
+            Some("c".repeat(64)),
+            0,
+            &CancellationToken::default(),
+        )?;
+        assert_eq!(generation.len(), 2);
+        assert_eq!(generation.resident_bytes(), 5);
+        session.commit();
+
+        let forged = NativeOpaqueHandle::new(
+            handle_type,
+            generation.identity(),
+            second.identifier(),
+            second.generation(),
+            Some("d".repeat(64)),
+        )?;
+        assert!(matches!(
+            generation.acquire_lease([&first, &forged]),
+            Err(NativeHandleStoreError::DigestMismatch)
+        ));
+        let data = generation.state.data.lock();
+        assert!(data.values.values().all(|record| record.roots == 0));
+        drop(data);
+        generation.collect_unrooted_attempt(attempt_id);
+        assert!(generation.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn native_cache_leases_cover_aliases_and_release_on_lru_and_invalidation()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let generation = NativeHandleStoreGeneration::with_capacities(4, 8)?;
+        let attempt_id = AttemptId(Uuid::from_u128(13));
+        let session = generation.session(attempt_id);
+        let handle_type = NativeHandleType::new(comfy_nodes::NativeHandleKind::Tensor, "TEST")?;
+        let first = session.publish(
+            handle_type.clone(),
+            Arc::new(1_u64),
+            Some("a".repeat(64)),
+            1,
+            &CancellationToken::default(),
+        )?;
+        let second = session.publish(
+            handle_type,
+            Arc::new(2_u64),
+            Some("b".repeat(64)),
+            1,
+            &CancellationToken::default(),
+        )?;
+        session.commit();
+        let first_entry = CacheEntry {
+            outputs: vec![
+                NativeValue::Handle {
+                    value: first.clone(),
+                },
+                NativeValue::List {
+                    values: vec![NativeValue::Handle {
+                        value: first.clone(),
+                    }],
+                },
+            ],
+            ui: None,
+        };
+        let second_entry = CacheEntry {
+            outputs: vec![NativeValue::Handle {
+                value: second.clone(),
+            }],
+            ui: None,
+        };
+        let first_key = CacheKey::from_inputs(
+            "First",
+            "1",
+            &BTreeMap::new(),
+            BTreeMap::new(),
+            "cpu",
+            "f32",
+            None,
+            None,
+            "config-v1",
+            "registry-v1",
+            "stable",
+        )?;
+        let second_key = CacheKey::from_inputs(
+            "Second",
+            "1",
+            &BTreeMap::new(),
+            BTreeMap::new(),
+            "cpu",
+            "f32",
+            None,
+            None,
+            "config-v1",
+            "registry-v1",
+            "stable",
+        )?;
+        let mut cache = NativeCache::new(1)?;
+        assert!(!cache.insert(first_key.clone(), first_entry.clone()));
+        assert!(cache.is_empty());
+        assert!(cache.insert_with_handle_lease(
+            first_key,
+            first_entry,
+            generation.acquire_lease([&first])?,
+        ));
+        assert!(cache.insert_with_handle_lease(
+            second_key,
+            second_entry,
+            generation.acquire_lease([&second])?,
+        ));
+        assert_eq!(generation.len(), 1);
+        assert_eq!(cache.invalidate_node("Second"), 1);
+        assert!(generation.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn provider_activation_is_checked_atomic_and_preserves_declared_provenance()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let catalog = NodeRegistry::built_in()?;
+        let catalog_descriptor = catalog
+            .registered()
+            .values()
+            .find(|descriptor| {
+                descriptor.catalog_status == comfy_nodes::CatalogNodeStatus::ProviderRequired
+            })
+            .ok_or("generated catalog did not include a provider-required binding")?;
+        let presentation = RuntimeNodePresentation {
+            display_name: catalog_descriptor.display_name.clone(),
+            category: match catalog_descriptor.category.as_str() {
+                "(empty root category declared by source)" => String::new(),
+                category => category.to_owned(),
+            },
+            description: String::new(),
+            output_names: vec!["value".to_owned()],
+            search_aliases: Vec::new(),
+            is_deprecated: false,
+            is_experimental: false,
+        };
+        let descriptor = RuntimeNodeDescriptor {
+            schema_version: NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
+            class_type: catalog_descriptor.node_identifier.clone(),
+            implementation_version: "provider-v1".to_owned(),
+            inputs: Vec::new(),
+            dynamic_inputs: Vec::new(),
+            outputs: vec![RuntimeOutputDescriptor {
+                name: "value".to_owned(),
+                produced_type: NativeValueType::Any,
+                is_list: false,
+            }],
+            output_node: catalog_descriptor.output_node,
+            effect: EffectClass::Provider,
+            cache: RuntimeCachePolicy::Never,
+        };
+        let binding = NativeNodeBinding::ProviderRequired {
+            feature_id: catalog_descriptor.feature_id.clone(),
+            descriptor,
+            presentation,
+            provider: "sim.provider.test".to_owned(),
+            reason: "verified provider activation is required".to_owned(),
+        };
+        let NativeNodeBinding::ProviderRequired {
+            descriptor,
+            presentation,
+            provider,
+            ..
+        } = binding.clone()
+        else {
+            return Err("selected binding was not provider-required".into());
+        };
+        let node: Arc<dyn NativeNode> = Arc::new(ConfiguredNode {
+            class_type: descriptor.class_type.clone(),
+            version: descriptor.implementation_version.clone(),
+            namespace: provider,
+        });
+        let mut registry = NativeNodeRegistry::default();
+        registry.register_native_bindings([binding])?;
+        registry.validate_comprehensive_bindings()?;
+
+        let mut mismatched_presentation = presentation.clone();
+        mismatched_presentation.display_name.push_str(" mismatch");
+        assert!(matches!(
+            registry.activate_provider_bindings([(node.clone(), mismatched_presentation)]),
+            Err(NativeNodeRegistryError::BindingMismatch(class_type))
+                if class_type == descriptor.class_type
+        ));
+        assert_eq!(
+            registry.provider_binding_is_activated(&descriptor.class_type),
+            Some(false)
+        );
+        assert!(registry.node(&descriptor.class_type).is_none());
+
+        registry.activate_provider_bindings([(node, presentation)])?;
+        assert_eq!(
+            registry.binding_declared_disposition(&descriptor.class_type),
+            Some(NativeNodeBindingDisposition::ProviderRequired)
+        );
+        assert_eq!(
+            registry.binding_disposition(&descriptor.class_type),
+            Some(NativeNodeBindingDisposition::Executable)
+        );
+        assert_eq!(
+            registry.provider_binding_is_activated(&descriptor.class_type),
+            Some(true)
+        );
+        registry.validate_comprehensive_bindings()?;
+        Ok(())
+    }
+
+    #[test]
+    fn malformed_expansion_rolls_back_published_handles_and_cache_state()
+    -> Result<(), Box<dyn std::error::Error>> {
+        smol::block_on(async {
+            let descriptor = runtime_descriptor(
+                "PublishingMalformedExpansion",
+                true,
+                BTreeMap::new(),
+                EffectClass::Pure,
+            )?;
+            let plan = compile_plan(
+                vec![descriptor.clone()],
+                BTreeMap::from([(
+                    NodeId("expand".to_owned()),
+                    PromptNode {
+                        class_type: descriptor.class_type.clone(),
+                        inputs: BTreeMap::new(),
+                        unknown: BTreeMap::new(),
+                    },
+                )]),
+            )?;
+            let mut registry = NativeNodeRegistry::default();
+            registry.register_descriptor(descriptor)?;
+            registry.register(Arc::new(PublishingMalformedExpansionNode))?;
+            let cache = Arc::new(Mutex::new(NativeCache::new(4)?));
+            let effects = Arc::new(RecordingEffectCoordinator::default());
+            let generation = NativeHandleStoreGeneration::with_capacities(4, 32)?;
+            let (_backend, workspace_authority) =
+                CpuWorkspaceAuthority::create_backend(TEST_WORKSPACE_BYTES)?;
+            let engine = ExecutionEngine::new_with_handle_store_generation(
+                ProfileId(Uuid::from_u128(41)),
+                Arc::new(registry),
+                cache.clone(),
+                effects.clone(),
+                "registry-v1",
+                workspace_authority.authorize_workspace(TEST_WORKSPACE_BYTES)?,
+                generation.clone(),
+            )?;
+            let report = engine
+                .execute(
+                    &plan,
+                    AttemptId(Uuid::from_u128(42)),
+                    CancellationToken::default(),
+                )
+                .await;
+            assert_eq!(report.state, AttemptState::Failed);
+            assert!(report.outputs.is_empty());
+            assert!(report.ui_outputs.is_empty());
+            assert!(generation.is_empty());
+            assert!(cache.lock().is_empty());
+            assert!(effects.committed().is_empty());
+            Ok::<(), Box<dyn std::error::Error>>(())
+        })
     }
 
     fn compile_plan(
@@ -2017,7 +3548,7 @@ pub(crate) mod tests {
                 true,
                 BTreeMap::new(),
                 EffectClass::Pure,
-            );
+            )?;
             let plan = compile_plan(
                 vec![descriptor.clone()],
                 BTreeMap::from([(
@@ -2065,7 +3596,7 @@ pub(crate) mod tests {
             let (_workspace_backend, workspace_authority) =
                 CpuWorkspaceAuthority::create_backend(TEST_WORKSPACE_BYTES)?;
             let descriptors = vec![
-                runtime_descriptor("Source", false, BTreeMap::new(), EffectClass::Pure),
+                runtime_descriptor("Source", false, BTreeMap::new(), EffectClass::Pure)?,
                 runtime_descriptor(
                     "Double",
                     false,
@@ -2074,7 +3605,7 @@ pub(crate) mod tests {
                         input(ValueType::Number, false, InputMode::Mapped, false),
                     )]),
                     EffectClass::Pure,
-                ),
+                )?,
                 runtime_descriptor(
                     "Output",
                     true,
@@ -2083,7 +3614,7 @@ pub(crate) mod tests {
                         input(ValueType::Number, false, InputMode::List, false),
                     )]),
                     EffectClass::Pure,
-                ),
+                )?,
             ];
             let plan = compile_plan(
                 descriptors,
@@ -2139,7 +3670,12 @@ pub(crate) mod tests {
                 )
                 .await;
             assert_eq!(first.state, AttemptState::Succeeded);
-            assert_eq!(first.outputs[&NodeId::from("output")], [json!([2, 4, 6])]);
+            assert_eq!(
+                first.outputs[&NodeId::from("output")],
+                [NativeValue::List {
+                    values: vec![native_integer(2), native_integer(4), native_integer(6)],
+                }]
+            );
             let first_calls = calls.load(Ordering::SeqCst);
             let second = engine
                 .execute(
@@ -2175,7 +3711,7 @@ pub(crate) mod tests {
                     ),
                 ]),
                 EffectClass::Pure,
-            );
+            )?;
             let mut list_map = runtime_descriptor(
                 "ListMap",
                 true,
@@ -2184,7 +3720,7 @@ pub(crate) mod tests {
                     input(ValueType::Integer, false, InputMode::Mapped, true),
                 )]),
                 EffectClass::Pure,
-            );
+            )?;
             list_map.outputs[0].is_list = true;
             let plan = compile_plan(
                 vec![pair, list_map],
@@ -2234,8 +3770,18 @@ pub(crate) mod tests {
                 )
                 .await;
             assert_eq!(report.state, AttemptState::Succeeded);
-            assert_eq!(report.outputs[&NodeId::from("pair")], [json!([14, 25, 35])]);
-            assert_eq!(report.outputs[&NodeId::from("list")], [json!([1, 2])]);
+            assert_eq!(
+                report.outputs[&NodeId::from("pair")],
+                [NativeValue::List {
+                    values: vec![native_integer(14), native_integer(25), native_integer(35)],
+                }]
+            );
+            assert_eq!(
+                report.outputs[&NodeId::from("list")],
+                [NativeValue::List {
+                    values: vec![native_integer(1), native_integer(2)],
+                }]
+            );
             assert_eq!(calls.load(Ordering::SeqCst), 5);
             Ok::<(), Box<dyn std::error::Error>>(())
         })
@@ -2253,7 +3799,7 @@ pub(crate) mod tests {
                     true,
                     BTreeMap::new(),
                     EffectClass::Pure,
-                )],
+                )?],
                 BTreeMap::from([(
                     NodeId::from("cancel"),
                     PromptNode {
@@ -2290,7 +3836,7 @@ pub(crate) mod tests {
                     true,
                     BTreeMap::new(),
                     EffectClass::WritesArtifact,
-                )],
+                )?],
                 BTreeMap::from([(
                     NodeId::from("before-cache"),
                     PromptNode {
@@ -2364,7 +3910,7 @@ pub(crate) mod tests {
                     true,
                     BTreeMap::new(),
                     EffectClass::Pure,
-                )],
+                )?],
                 BTreeMap::from([(
                     NodeId::from("ui"),
                     PromptNode {
@@ -2418,7 +3964,7 @@ pub(crate) mod tests {
                     false,
                     BTreeMap::new(),
                     EffectClass::Pure,
-                );
+                )?;
                 source.implementation_version = source_version.to_owned();
                 compile_plan(
                     vec![
@@ -2431,7 +3977,7 @@ pub(crate) mod tests {
                                 input(ValueType::Number, false, InputMode::Scalar, false),
                             )]),
                             EffectClass::Pure,
-                        ),
+                        )?,
                     ],
                     BTreeMap::from([
                         (
@@ -2484,7 +4030,7 @@ pub(crate) mod tests {
                     )
                     .await;
                 assert_eq!(report.state, AttemptState::Succeeded);
-                assert_eq!(report.outputs[&NodeId::from("output")], [json!(7)]);
+                assert_eq!(report.outputs[&NodeId::from("output")], [native_integer(7)]);
             }
             assert_eq!(passthrough_calls.load(Ordering::SeqCst), 2);
             Ok::<(), Box<dyn std::error::Error>>(())
@@ -2503,7 +4049,7 @@ pub(crate) mod tests {
                     true,
                     BTreeMap::new(),
                     EffectClass::Pure,
-                )],
+                )?],
                 BTreeMap::from([(
                     NodeId::from("block"),
                     PromptNode {
@@ -2553,7 +4099,7 @@ pub(crate) mod tests {
             let (_workspace_backend, workspace_authority) =
                 CpuWorkspaceAuthority::create_backend(TEST_WORKSPACE_BYTES)?;
             let descriptors = vec![
-                runtime_descriptor("LazySource", false, BTreeMap::new(), EffectClass::Pure),
+                runtime_descriptor("LazySource", false, BTreeMap::new(), EffectClass::Pure)?,
                 runtime_descriptor(
                     "Choose",
                     true,
@@ -2568,7 +4114,7 @@ pub(crate) mod tests {
                         ),
                     ]),
                     EffectClass::Pure,
-                ),
+                )?,
             ];
             let nodes = |condition| {
                 BTreeMap::from([
@@ -2630,7 +4176,10 @@ pub(crate) mod tests {
                 )
                 .await;
             assert_eq!(demanded.state, AttemptState::Succeeded);
-            assert_eq!(demanded.outputs[&NodeId::from("choose")], [json!(42)]);
+            assert_eq!(
+                demanded.outputs[&NodeId::from("choose")],
+                [native_integer(42)]
+            );
             assert_eq!(source_calls.load(Ordering::SeqCst), 1);
             Ok::<(), Box<dyn std::error::Error>>(())
         })
@@ -2642,22 +4191,14 @@ pub(crate) mod tests {
         smol::block_on(async {
             let (_workspace_backend, workspace_authority) =
                 CpuWorkspaceAuthority::create_backend(TEST_WORKSPACE_BYTES)?;
-            let inner = compile_plan(
-                vec![runtime_descriptor(
-                    "InnerOutput",
-                    true,
-                    BTreeMap::new(),
-                    EffectClass::Pure,
-                )],
-                BTreeMap::from([(
-                    NodeId::from("inner"),
-                    PromptNode {
-                        class_type: "InnerOutput".to_owned(),
-                        inputs: BTreeMap::new(),
-                        unknown: BTreeMap::new(),
-                    },
-                )]),
-            )?;
+            let inner = ApiPrompt(BTreeMap::from([(
+                NodeId::from("inner"),
+                PromptNode {
+                    class_type: "InnerOutput".to_owned(),
+                    inputs: BTreeMap::new(),
+                    unknown: BTreeMap::new(),
+                },
+            )]));
             let outer = compile_plan(
                 vec![runtime_descriptor(
                     "Expand",
@@ -2667,7 +4208,7 @@ pub(crate) mod tests {
                         input(ValueType::Integer, false, InputMode::Mapped, true),
                     )]),
                     EffectClass::Pure,
-                )],
+                )?],
                 BTreeMap::from([(
                     NodeId::from("expand"),
                     PromptNode {
@@ -2678,7 +4219,13 @@ pub(crate) mod tests {
                 )]),
             )?;
             let mut expansion_registry = NativeNodeRegistry::default();
-            expansion_registry.register(Arc::new(ExpansionNode { plan: inner }))?;
+            expansion_registry.register_descriptor(runtime_descriptor(
+                "InnerOutput",
+                true,
+                BTreeMap::new(),
+                EffectClass::Pure,
+            )?)?;
+            expansion_registry.register(Arc::new(ExpansionNode { prompt: inner }))?;
             expansion_registry.register(Arc::new(FixtureNode {
                 class_type: "InnerOutput".to_owned(),
                 calls: Arc::new(AtomicUsize::new(0)),
@@ -2699,7 +4246,12 @@ pub(crate) mod tests {
                 )
                 .await;
             assert_eq!(expanded.state, AttemptState::Succeeded);
-            assert_eq!(expanded.outputs[&NodeId::from("expand")], [json!([42, 42])]);
+            assert_eq!(
+                expanded.outputs[&NodeId::from("expand")],
+                [NativeValue::List {
+                    values: vec![native_integer(42), native_integer(42)],
+                }]
+            );
             assert_eq!(
                 expanded
                     .outputs
@@ -2715,7 +4267,7 @@ pub(crate) mod tests {
                     true,
                     BTreeMap::new(),
                     EffectClass::WritesArtifact,
-                )],
+                )?],
                 BTreeMap::from([(
                     NodeId::from("write"),
                     PromptNode {
@@ -2757,7 +4309,7 @@ pub(crate) mod tests {
                         false,
                         BTreeMap::new(),
                         EffectClass::WritesArtifact,
-                    ),
+                    )?,
                     runtime_descriptor(
                         "Block",
                         true,
@@ -2766,7 +4318,7 @@ pub(crate) mod tests {
                             input(ValueType::Any, false, InputMode::Scalar, false),
                         )]),
                         EffectClass::Pure,
-                    ),
+                    )?,
                 ],
                 BTreeMap::from([
                     (
