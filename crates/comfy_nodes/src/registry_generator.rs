@@ -103,6 +103,7 @@ pub enum NodeRegistryError {
         row: usize,
         field: &'static str,
     },
+    MissingSourceProjection(String),
     DuplicateNode(String),
     DuplicateFeature(String),
     InvalidNativeBinding {
@@ -153,6 +154,10 @@ impl fmt::Display for NodeRegistryError {
             Self::InvalidDescriptor { row, field } => {
                 write!(formatter, "node catalog row {row} has invalid `{field}`")
             }
+            Self::MissingSourceProjection(identifier) => write!(
+                formatter,
+                "node catalog descriptor `{identifier}` has no checked source module projection"
+            ),
             Self::DuplicateNode(identifier) => {
                 write!(formatter, "duplicate node identifier `{identifier}`")
             }
@@ -205,6 +210,11 @@ impl NodeRegistry {
         self.registered
             .get(identifier)
             .or_else(|| self.inactive.get(identifier))
+    }
+
+    pub fn source_python_module(&self, identifier: &str) -> Option<String> {
+        self.descriptor(identifier)
+            .and_then(|descriptor| source_python_module(&descriptor.source_file))
     }
 
     pub fn validate_native_binding(
@@ -329,6 +339,7 @@ fn parse_registered_row(
 ) -> Result<CatalogNodeDescriptor, NodeRegistryError> {
     validate_column_count(row_number, row, REGISTERED_HEADER.len())?;
     validate_common(row_number, row, 28, "COMFY-NODE-")?;
+    validate_source_file(row_number, &row[23])?;
     Ok(CatalogNodeDescriptor {
         schema_version: NODE_DESCRIPTOR_SCHEMA_VERSION,
         source: CatalogNodeSource::Registered,
@@ -374,6 +385,7 @@ fn parse_inactive_row(
 ) -> Result<CatalogNodeDescriptor, NodeRegistryError> {
     validate_column_count(row_number, row, INACTIVE_HEADER.len())?;
     validate_common(row_number, row, 17, "COMFY-NODE-INACTIVE-")?;
+    validate_source_file(row_number, &row[11])?;
     Ok(CatalogNodeDescriptor {
         schema_version: NODE_DESCRIPTOR_SCHEMA_VERSION,
         source: CatalogNodeSource::Inactive,
@@ -484,6 +496,40 @@ fn valid_catalog_identifier(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 4_096
         && value.chars().all(|character| !character.is_control())
+}
+
+fn validate_source_file(row: usize, value: &str) -> Result<(), NodeRegistryError> {
+    if source_python_module(value).is_some() {
+        Ok(())
+    } else {
+        Err(NodeRegistryError::InvalidDescriptor {
+            row,
+            field: "source_file",
+        })
+    }
+}
+
+fn source_python_module(source_file: &str) -> Option<String> {
+    if source_file == "nodes.py" {
+        return Some("nodes".to_owned());
+    }
+    let (parent, filename) = source_file.split_once('/')?;
+    if !matches!(parent, "comfy_extras" | "comfy_api_nodes")
+        || filename.contains('/')
+        || !filename.ends_with(".py")
+    {
+        return None;
+    }
+    let stem = filename.strip_suffix(".py")?;
+    if stem.is_empty()
+        || stem.len() > 4_096
+        || !stem
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || character == '_')
+    {
+        return None;
+    }
+    Some(format!("{parent}.{stem}"))
 }
 
 fn validate_header(rows: &[Vec<String>], expected: &[&str]) -> Result<(), NodeRegistryError> {
@@ -899,6 +945,37 @@ mod tests {
             NodeRegistryGenerator::from_catalogs(&duplicated, INACTIVE_NODE_CATALOG),
             Err(NodeRegistryError::DuplicateNode(_)) | Err(NodeRegistryError::DuplicateFeature(_))
         ));
+        let mut registered = parse_csv(REGISTERED_NODE_CATALOG)?;
+        for invalid_source in [
+            "foreign/node.py",
+            "comfy_extras/nested/node.py",
+            "comfy_extras/node",
+            "comfy_extras/.py",
+            "comfy_extras/not-valid.py",
+        ] {
+            registered[1][23] = invalid_source.to_owned();
+            let invalid_catalog = canonical_csv(&registered);
+            assert!(matches!(
+                NodeRegistryGenerator::from_catalogs(&invalid_catalog, INACTIVE_NODE_CATALOG),
+                Err(NodeRegistryError::InvalidDescriptor {
+                    field: "source_file",
+                    ..
+                })
+            ));
+        }
+        let mut inactive = parse_csv(INACTIVE_NODE_CATALOG)?;
+        inactive[1][11] = "comfy_api_nodes/nested/node.py".to_owned();
+        let invalid_inactive_catalog = canonical_csv(&inactive);
+        assert!(matches!(
+            NodeRegistryGenerator::from_catalogs(
+                REGISTERED_NODE_CATALOG,
+                &invalid_inactive_catalog
+            ),
+            Err(NodeRegistryError::InvalidDescriptor {
+                row: 2,
+                field: "source_file",
+            })
+        ));
         Ok(())
     }
 
@@ -1197,7 +1274,7 @@ mod tests {
                     .collect::<Vec<_>>();
         assert!(early_slice_membership_is_exact);
 
-        let object_info = ObjectInfoRegistry::from_node_registry(&registry);
+        let object_info = ObjectInfoRegistry::from_node_registry(&registry)?;
         let object_info_is_read_only_projection =
             registry.registered().iter().chain(registry.inactive()).all(
                 |(identifier, descriptor)| {
@@ -1208,6 +1285,10 @@ mod tests {
                             projected.node_identifier == descriptor.node_identifier
                                 && projected.display_name == descriptor.display_name
                                 && projected.category == descriptor.category
+                                && projected.source_python_module
+                                    == registry
+                                        .source_python_module(identifier)
+                                        .unwrap_or_default()
                                 && projected.schema_source == descriptor.schema_source
                                 && projected.input.raw == descriptor.inputs
                                 && projected.input.input_is_list == descriptor.input_is_list
@@ -1217,6 +1298,7 @@ mod tests {
                                 && projected.output.output_node == descriptor.output_node
                                 && projected.availability == descriptor.availability
                                 && projected.catalog_status == descriptor.catalog_status
+                                && projected.inactive_reason == descriptor.inactive_reason
                                 && projected.feature_id == descriptor.feature_id
                         })
                 },

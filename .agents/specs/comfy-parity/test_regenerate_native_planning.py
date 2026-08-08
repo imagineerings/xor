@@ -47,6 +47,7 @@ class ValidationGenerationTests(unittest.TestCase):
         )
 
         self.assertIn("crates/comfy_nodes/src/execution.rs", foundation_writes)
+        self.assertIn("crates/comfy_nodes/src/object_info.rs", foundation_writes)
         self.assertIn("Cargo.lock", foundation_writes)
         self.assertIn("crates/comfy_runtime/src/executor.rs", foundation_writes)
         self.assertIn("crates/comfy_runtime/src/cache.rs", foundation_writes)
