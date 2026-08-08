@@ -12,5 +12,8 @@ path = "src/comfy_nodes.rs"
 [dependencies]
 comfy_tensor.workspace = true
 comfy_types.workspace = true
+futures.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+thiserror.workspace = true
+uuid.workspace = true

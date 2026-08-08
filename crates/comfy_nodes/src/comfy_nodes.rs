@@ -1,4 +1,5 @@
 pub mod descriptor;
+pub mod execution;
 pub mod object_info;
 pub mod registry_generator;
 pub mod slice_registry;
@@ -6,6 +7,18 @@ pub mod slice_registry;
 pub use descriptor::{
     CatalogNodeDescriptor, CatalogNodeSource, CatalogNodeStatus, NODE_DESCRIPTOR_SCHEMA_VERSION,
     NodeDescriptor, PortDescriptor,
+};
+pub use execution::{
+    NATIVE_NODE_CONTRACT_SCHEMA_VERSION, NATIVE_OPAQUE_HANDLE_SCHEMA_VERSION,
+    NativeCacheDependencies, NativeCachePolicy, NativeDynamicInputDescriptor, NativeEffectClass,
+    NativeHandleKind, NativeHandleStore, NativeHandleStoreError, NativeHandleStoreIdentity,
+    NativeHandleType, NativeInputDescriptor, NativeNode, NativeNodeBinding,
+    NativeNodeBindingDisposition, NativeNodeBindingsFactory, NativeNodeContext,
+    NativeNodeContractError, NativeNodeDescriptor, NativeNodeFailure, NativeNodeFailureKind,
+    NativeNodeOutcome, NativeNodePresentation, NativeOpaqueHandle, NativeOutputDescriptor,
+    NativePortCardinality, NativePreparedEffectRequest, NativePrimitive, NativePrimitiveType,
+    NativeStoredObject, NativeTypeUnion, NativeValue, NativeValueType,
+    validate_generated_family_bindings,
 };
 pub use object_info::{
     OBJECT_INFO_SCHEMA_VERSION, ObjectInfoInputSchema, ObjectInfoNode, ObjectInfoOutputSchema,
@@ -49,6 +62,28 @@ mod generated_manifest_tests {
                 .collect::<BTreeSet<_>>()
                 .len()
         );
+        assert!(
+            GENERATED_FAMILY_MODULES
+                .windows(2)
+                .all(|pair| pair[0] < pair[1])
+        );
+        assert!(
+            GENERATED_FAMILY_DESCRIPTOR_IDS
+                .windows(2)
+                .all(|pair| pair[0] < pair[1])
+        );
+        assert!(
+            GENERATED_FAMILY_MODULES
+                .iter()
+                .all(|module| GENERATED_MODULES.contains(module))
+        );
+        assert!(
+            GENERATED_FAMILY_DESCRIPTOR_IDS
+                .iter()
+                .all(|identifier| GENERATED_DESCRIPTOR_IDS.contains(identifier))
+        );
+        let family_bindings = generated_family_node_bindings()?;
+        assert_eq!(family_bindings.len(), GENERATED_FAMILY_DESCRIPTOR_IDS.len());
         let registry = NodeRegistry::built_in()?;
         assert!(
             GENERATED_DESCRIPTOR_IDS

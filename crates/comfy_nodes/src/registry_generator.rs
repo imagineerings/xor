@@ -1,5 +1,6 @@
 use crate::{
     CatalogNodeDescriptor, CatalogNodeSource, CatalogNodeStatus, NODE_DESCRIPTOR_SCHEMA_VERSION,
+    NativeNodeBinding, NativeNodeBindingDisposition,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -104,6 +105,10 @@ pub enum NodeRegistryError {
     },
     DuplicateNode(String),
     DuplicateFeature(String),
+    InvalidNativeBinding {
+        identifier: String,
+        reason: String,
+    },
 }
 
 impl fmt::Display for NodeRegistryError {
@@ -154,6 +159,12 @@ impl fmt::Display for NodeRegistryError {
             Self::DuplicateFeature(identifier) => {
                 write!(formatter, "duplicate node feature ID `{identifier}`")
             }
+            Self::InvalidNativeBinding { identifier, reason } => {
+                write!(
+                    formatter,
+                    "native node binding for `{identifier}` is invalid: {reason}"
+                )
+            }
         }
     }
 }
@@ -194,6 +205,59 @@ impl NodeRegistry {
         self.registered
             .get(identifier)
             .or_else(|| self.inactive.get(identifier))
+    }
+
+    pub fn validate_native_binding(
+        &self,
+        binding: &NativeNodeBinding,
+    ) -> Result<(), NodeRegistryError> {
+        let identifier = binding.descriptor().class_type.clone();
+        binding
+            .validate()
+            .map_err(|error| NodeRegistryError::InvalidNativeBinding {
+                identifier: identifier.clone(),
+                reason: error.to_string(),
+            })?;
+        let catalog = self.descriptor(&identifier).ok_or_else(|| {
+            NodeRegistryError::InvalidNativeBinding {
+                identifier: identifier.clone(),
+                reason: "catalog descriptor is absent".to_owned(),
+            }
+        })?;
+        let expected_category = match catalog.category.as_str() {
+            "(empty root category declared by source)" => "",
+            category => category,
+        };
+        let expected_disposition = match (catalog.source, catalog.catalog_status) {
+            (CatalogNodeSource::Inactive, _) => NativeNodeBindingDisposition::Unavailable,
+            (CatalogNodeSource::Registered, CatalogNodeStatus::ProviderRequired) => {
+                NativeNodeBindingDisposition::ProviderRequired
+            }
+            (
+                CatalogNodeSource::Registered,
+                CatalogNodeStatus::DescriptorOnly | CatalogNodeStatus::Inactive,
+            ) => NativeNodeBindingDisposition::Executable,
+        };
+        let mismatch = if binding.feature_id() != catalog.feature_id {
+            Some("feature_id")
+        } else if binding.presentation().display_name != catalog.display_name {
+            Some("display_name")
+        } else if binding.presentation().category != expected_category {
+            Some("category")
+        } else if binding.descriptor().output_node != catalog.output_node {
+            Some("output_node")
+        } else if binding.disposition() != expected_disposition {
+            Some("disposition")
+        } else {
+            None
+        };
+        if let Some(field) = mismatch {
+            return Err(NodeRegistryError::InvalidNativeBinding {
+                identifier,
+                reason: format!("catalog field `{field}` does not match"),
+            });
+        }
+        Ok(())
     }
 }
 
@@ -577,8 +641,13 @@ mod tests {
     use super::*;
     use crate::{
         CatalogNodeStatus, DIFFUSION_SLICE_NODE_IDS, EarlySliceRegistry, IMAGE_SLICE_NODE_IDS,
-        ObjectInfoRegistry,
+        NATIVE_NODE_CONTRACT_SCHEMA_VERSION, NativeCachePolicy, NativeEffectClass,
+        NativeHandleKind, NativeHandleType, NativeInputDescriptor, NativeNode, NativeNodeContext,
+        NativeNodeDescriptor, NativeNodeFailure, NativeNodeOutcome, NativeNodePresentation,
+        NativeOutputDescriptor, NativePortCardinality, NativeTypeUnion, NativeValue,
+        NativeValueType, ObjectInfoRegistry,
     };
+    use futures::future::BoxFuture;
     use serde::Serialize;
     use std::{fs, path::Path};
 
@@ -829,6 +898,242 @@ mod tests {
         assert!(matches!(
             NodeRegistryGenerator::from_catalogs(&duplicated, INACTIVE_NODE_CATALOG),
             Err(NodeRegistryError::DuplicateNode(_)) | Err(NodeRegistryError::DuplicateFeature(_))
+        ));
+        Ok(())
+    }
+
+    struct CatalogTestNode(&'static str);
+
+    impl NativeNode for CatalogTestNode {
+        fn class_type(&self) -> &str {
+            self.0
+        }
+
+        fn implementation_version(&self) -> &str {
+            "1"
+        }
+
+        fn execute<'a>(
+            &'a self,
+            _context: NativeNodeContext,
+            _inputs: BTreeMap<String, NativeValue>,
+        ) -> BoxFuture<'a, Result<NativeNodeOutcome, NativeNodeFailure>> {
+            Box::pin(async {
+                Ok(NativeNodeOutcome::Blocked {
+                    reason: "not executed by this metadata test".to_owned(),
+                })
+            })
+        }
+    }
+
+    #[test]
+    fn native_bindings_are_checked_against_atomic_catalog_presentation()
+    -> Result<(), Box<dyn Error>> {
+        let descriptor = NativeNodeDescriptor {
+            schema_version: NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
+            class_type: "wanBlockSwap".to_owned(),
+            implementation_version: "1".to_owned(),
+            inputs: vec![NativeInputDescriptor {
+                name: "model".to_owned(),
+                accepted_types: NativeTypeUnion::new([NativeValueType::Handle(
+                    NativeHandleType::new(NativeHandleKind::Model, "MODEL")?,
+                )])?,
+                required: true,
+                hidden: false,
+                lazy: false,
+                cardinality: NativePortCardinality::Scalar,
+                allows_literal: false,
+            }],
+            dynamic_inputs: Vec::new(),
+            outputs: vec![NativeOutputDescriptor {
+                name: "model".to_owned(),
+                produced_type: NativeValueType::Handle(NativeHandleType::new(
+                    NativeHandleKind::Model,
+                    "MODEL",
+                )?),
+                is_list: false,
+            }],
+            output_node: false,
+            effect: NativeEffectClass::Pure,
+            cache: NativeCachePolicy::InputIdentity,
+        };
+        let presentation = NativeNodePresentation {
+            display_name: "wanBlockSwap".to_owned(),
+            category: String::new(),
+            description: "Intercepts an unstable custom node.".to_owned(),
+            output_names: vec!["model".to_owned()],
+            search_aliases: Vec::new(),
+            is_deprecated: true,
+            is_experimental: false,
+        };
+        let binding = NativeNodeBinding::Executable {
+            feature_id: "COMFY-NODE-0757".to_owned(),
+            descriptor: descriptor.clone(),
+            presentation: presentation.clone(),
+            node: std::sync::Arc::new(CatalogTestNode("wanBlockSwap")),
+        };
+        let registry = NodeRegistry::built_in()?;
+        registry.validate_native_binding(&binding)?;
+
+        let mismatched = NativeNodeBinding::Unavailable {
+            feature_id: "COMFY-NODE-0757".to_owned(),
+            descriptor,
+            presentation,
+            reason: "unavailable for this test".to_owned(),
+        };
+        assert!(matches!(
+            registry.validate_native_binding(&mismatched),
+            Err(NodeRegistryError::InvalidNativeBinding { reason, .. })
+                if reason.contains("disposition")
+        ));
+
+        let image_type = NativeHandleType::new(NativeHandleKind::Image, "IMAGE")?;
+        let descriptor_only_descriptor = NativeNodeDescriptor {
+            schema_version: NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
+            class_type: "ImageInvert".to_owned(),
+            implementation_version: "1".to_owned(),
+            inputs: vec![NativeInputDescriptor {
+                name: "image".to_owned(),
+                accepted_types: NativeTypeUnion::new([NativeValueType::Handle(
+                    image_type.clone(),
+                )])?,
+                required: true,
+                hidden: false,
+                lazy: false,
+                cardinality: NativePortCardinality::Scalar,
+                allows_literal: false,
+            }],
+            dynamic_inputs: Vec::new(),
+            outputs: vec![NativeOutputDescriptor {
+                name: "image".to_owned(),
+                produced_type: NativeValueType::Handle(image_type),
+                is_list: false,
+            }],
+            output_node: false,
+            effect: NativeEffectClass::Pure,
+            cache: NativeCachePolicy::InputIdentity,
+        };
+        let descriptor_only_presentation = NativeNodePresentation {
+            display_name: "Invert Image Colors".to_owned(),
+            category: "image/color".to_owned(),
+            description: String::new(),
+            output_names: vec!["image".to_owned()],
+            search_aliases: Vec::new(),
+            is_deprecated: false,
+            is_experimental: false,
+        };
+        registry.validate_native_binding(&NativeNodeBinding::Executable {
+            feature_id: "COMFY-NODE-0254".to_owned(),
+            descriptor: descriptor_only_descriptor.clone(),
+            presentation: descriptor_only_presentation.clone(),
+            node: std::sync::Arc::new(CatalogTestNode("ImageInvert")),
+        })?;
+        assert!(matches!(
+            registry.validate_native_binding(&NativeNodeBinding::Unavailable {
+                feature_id: "COMFY-NODE-0254".to_owned(),
+                descriptor: descriptor_only_descriptor,
+                presentation: descriptor_only_presentation,
+                reason: "wrong disposition".to_owned(),
+            }),
+            Err(NodeRegistryError::InvalidNativeBinding { reason, .. })
+                if reason.contains("disposition")
+        ));
+
+        let provider_descriptor = NativeNodeDescriptor {
+            schema_version: NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
+            class_type: "BeebleSwitchXImageEdit".to_owned(),
+            implementation_version: "1".to_owned(),
+            inputs: Vec::new(),
+            dynamic_inputs: Vec::new(),
+            outputs: vec![
+                NativeOutputDescriptor {
+                    name: "image".to_owned(),
+                    produced_type: NativeValueType::Handle(NativeHandleType::new(
+                        NativeHandleKind::Image,
+                        "IMAGE",
+                    )?),
+                    is_list: false,
+                },
+                NativeOutputDescriptor {
+                    name: "alpha".to_owned(),
+                    produced_type: NativeValueType::Handle(NativeHandleType::new(
+                        NativeHandleKind::Mask,
+                        "MASK",
+                    )?),
+                    is_list: false,
+                },
+            ],
+            output_node: false,
+            effect: NativeEffectClass::Provider,
+            cache: NativeCachePolicy::Never,
+        };
+        let provider_presentation = NativeNodePresentation {
+            display_name: "Beeble SwitchX Image Edit".to_owned(),
+            category: "partner/image/Beeble".to_owned(),
+            description: String::new(),
+            output_names: vec!["image".to_owned(), "alpha".to_owned()],
+            search_aliases: Vec::new(),
+            is_deprecated: false,
+            is_experimental: false,
+        };
+        registry.validate_native_binding(&NativeNodeBinding::ProviderRequired {
+            feature_id: "COMFY-NODE-0020".to_owned(),
+            descriptor: provider_descriptor.clone(),
+            presentation: provider_presentation.clone(),
+            provider: "comfy-api".to_owned(),
+            reason: "cloud provider authorization is required".to_owned(),
+        })?;
+        assert!(matches!(
+            registry.validate_native_binding(&NativeNodeBinding::Unavailable {
+                feature_id: "COMFY-NODE-0020".to_owned(),
+                descriptor: provider_descriptor,
+                presentation: provider_presentation,
+                reason: "wrong disposition".to_owned(),
+            }),
+            Err(NodeRegistryError::InvalidNativeBinding { reason, .. })
+                if reason.contains("disposition")
+        ));
+
+        let inactive_descriptor = NativeNodeDescriptor {
+            schema_version: NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
+            class_type: "AutogrowNamesTestNode".to_owned(),
+            implementation_version: "1".to_owned(),
+            inputs: Vec::new(),
+            dynamic_inputs: Vec::new(),
+            outputs: vec![NativeOutputDescriptor {
+                name: "string".to_owned(),
+                produced_type: NativeValueType::Primitive(crate::NativePrimitiveType::String),
+                is_list: false,
+            }],
+            output_node: false,
+            effect: NativeEffectClass::Pure,
+            cache: NativeCachePolicy::Never,
+        };
+        let inactive_presentation = NativeNodePresentation {
+            display_name: "AutogrowNamesTest".to_owned(),
+            category: "utilities/logic".to_owned(),
+            description: String::new(),
+            output_names: vec!["string".to_owned()],
+            search_aliases: Vec::new(),
+            is_deprecated: true,
+            is_experimental: false,
+        };
+        registry.validate_native_binding(&NativeNodeBinding::Unavailable {
+            feature_id: "COMFY-NODE-INACTIVE-0001".to_owned(),
+            descriptor: inactive_descriptor.clone(),
+            presentation: inactive_presentation.clone(),
+            reason: "source node is inactive".to_owned(),
+        })?;
+        assert!(matches!(
+            registry.validate_native_binding(&NativeNodeBinding::ProviderRequired {
+                feature_id: "COMFY-NODE-INACTIVE-0001".to_owned(),
+                descriptor: inactive_descriptor,
+                presentation: inactive_presentation,
+                provider: "invalid-provider".to_owned(),
+                reason: "wrong disposition".to_owned(),
+            }),
+            Err(NodeRegistryError::InvalidNativeBinding { reason, .. })
+                if reason.contains("disposition")
         ));
         Ok(())
     }
