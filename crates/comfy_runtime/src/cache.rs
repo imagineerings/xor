@@ -16,6 +16,78 @@ pub struct CanonicalClipCacheIdentities {
     execution: String,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct CanonicalVaeCacheIdentities {
+    identity: String,
+    artifact: String,
+    patch: String,
+    execution: String,
+}
+
+impl CanonicalVaeCacheIdentities {
+    pub fn checked(
+        identity: impl Into<String>,
+        artifact: impl Into<String>,
+        patch: impl Into<String>,
+        execution: impl Into<String>,
+    ) -> Result<Self, NativeCacheError> {
+        let identities = Self {
+            identity: identity.into(),
+            artifact: artifact.into(),
+            patch: patch.into(),
+            execution: execution.into(),
+        };
+        if identities
+            .ordered()
+            .into_iter()
+            .any(|(_, digest)| !is_sha256(digest))
+        {
+            return Err(NativeCacheError::InvalidDependencyIdentity);
+        }
+        Ok(identities)
+    }
+
+    pub fn artifact_digests(&self) -> BTreeMap<String, String> {
+        self.ordered()
+            .into_iter()
+            .map(|(name, digest)| (name.to_owned(), digest.to_owned()))
+            .collect()
+    }
+
+    pub fn identity(&self) -> &str {
+        &self.identity
+    }
+
+    pub fn artifact(&self) -> &str {
+        &self.artifact
+    }
+
+    pub fn patch(&self) -> &str {
+        &self.patch
+    }
+
+    pub fn execution(&self) -> &str {
+        &self.execution
+    }
+
+    pub fn require_exact_match(&self, actual: &Self) -> Result<(), NativeCacheError> {
+        if self == actual {
+            Ok(())
+        } else {
+            Err(NativeCacheError::DependencyIdentityMismatch)
+        }
+    }
+
+    fn ordered(&self) -> [(&'static str, &str); 4] {
+        [
+            ("vae.artifact", &self.artifact),
+            ("vae.execution", &self.execution),
+            ("vae.identity", &self.identity),
+            ("vae.patch", &self.patch),
+        ]
+    }
+}
+
 impl CanonicalClipCacheIdentities {
     pub fn checked(
         tokenizer: impl Into<String>,
@@ -237,6 +309,8 @@ pub enum NativeCacheError {
     InvalidDimension(&'static str),
     #[error("cache dependency identities must have non-empty names and values")]
     InvalidDependencyIdentity,
+    #[error("cache dependency identities do not match")]
+    DependencyIdentityMismatch,
 }
 
 #[derive(Clone, Debug)]
@@ -577,6 +651,46 @@ pub(crate) mod tests {
                 "4".repeat(64),
                 "5".repeat(64),
                 "6".repeat(64),
+            )
+            .is_err()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn canonical_vae_cache_identities_bind_every_execution_owner() -> Result<(), NativeCacheError> {
+        let identities = CanonicalVaeCacheIdentities::checked(
+            "1".repeat(64),
+            "2".repeat(64),
+            "3".repeat(64),
+            "4".repeat(64),
+        )?;
+        let dependencies = identities.artifact_digests();
+        assert_eq!(dependencies.len(), 4);
+        assert_eq!(dependencies.get("vae.identity"), Some(&"1".repeat(64)));
+        assert_eq!(dependencies.get("vae.execution"), Some(&"4".repeat(64)));
+        identities.require_exact_match(&identities)?;
+        for changed in 0..4 {
+            let mut values = ["1", "2", "3", "4"].map(|value| value.repeat(64));
+            values[changed] = "a".repeat(64);
+            let changed = CanonicalVaeCacheIdentities::checked(
+                values[0].clone(),
+                values[1].clone(),
+                values[2].clone(),
+                values[3].clone(),
+            )?;
+            assert_ne!(identities, changed);
+            assert_eq!(
+                identities.require_exact_match(&changed),
+                Err(NativeCacheError::DependencyIdentityMismatch)
+            );
+        }
+        assert!(
+            CanonicalVaeCacheIdentities::checked(
+                "not-a-digest",
+                "2".repeat(64),
+                "3".repeat(64),
+                "4".repeat(64),
             )
             .is_err()
         );

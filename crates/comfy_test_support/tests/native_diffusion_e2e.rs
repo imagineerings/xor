@@ -117,6 +117,18 @@ fn val_native_e2e_002() -> Result<(), Box<dyn Error>> {
     let mut plan = compile_native_diffusion_workflow(WORKFLOW, &BTreeSet::new(), provider)?;
     plan.prompt_id = PromptId(Uuid::from_u128(0x5349_4d00_0000_0000_0000_0000_0000_3702));
     let mut cases = BTreeMap::new();
+    let model_digest = fixture.model_digest()?;
+    let vae_cache_identities = fixture.vae_cache_identities()?;
+    cases.insert(
+        "canonical_vae_cache_binds_identity_artifact_patch_and_execution",
+        vae_cache_identities.artifact() == model_digest.as_str()
+            && vae_cache_identities.identity().len() == 64
+            && vae_cache_identities.patch().len() == 64
+            && vae_cache_identities.execution().len() == 64
+            && vae_cache_identities.identity() != vae_cache_identities.artifact()
+            && vae_cache_identities.patch() != vae_cache_identities.artifact()
+            && vae_cache_identities.execution() != vae_cache_identities.identity(),
+    );
     cases.insert(
         "workflow_has_six_exact_node_types",
         plan.nodes.len() == 7
@@ -175,9 +187,12 @@ fn val_native_e2e_002() -> Result<(), Box<dyn Error>> {
                 .and_then(|value| value.get("tokens"))
                 == expected_tokens.get("negative"),
     );
-    let sampler = ui
-        .get(&NodeId("5".to_owned()))
-        .ok_or("KSampler omitted checkpoint trace")?;
+    let sampler = ui.get(&NodeId("5".to_owned())).ok_or_else(|| {
+        format!(
+            "KSampler omitted checkpoint trace; execution error: {:?}",
+            result.report.error
+        )
+    })?;
     cases.insert(
         "all_sampler_intermediate_hashes_match",
         sampler_hashes_match(sampler, fixture.root())?,

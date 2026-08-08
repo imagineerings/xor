@@ -1,15 +1,15 @@
 use comfy_model::{
-    ArtifactIndex, ArtifactKey, ArtifactRoot, ModelStore, ParserLimits,
+    ArtifactIndex, ArtifactKey, ArtifactRecord, ArtifactRoot, ModelStore, ParserLimits,
     clip::NativeTokenizer,
     generated_native_diffusion::{
         NativeDiffusionModelError, Sd1Tokenizer, Sd15DetectorProjection, Sd15TinyModel,
-        admit_reduced_fixture, bind_sd15_clip_execution, load_sd15_clip_execution,
-        load_sd15_tokenizer,
+        admit_reduced_fixture, bind_sd15_clip_execution, bind_sd15_vae_execution,
+        load_sd15_clip_execution, load_sd15_tokenizer, load_sd15_vae_execution,
     },
 };
 use comfy_runtime::{
-    CanonicalClipCacheIdentities, NativeDiffusionBundle, NativeDiffusionProvider,
-    NativeImageRuntimeError,
+    CanonicalClipCacheIdentities, CanonicalVaeCacheIdentities, NativeDiffusionBundle,
+    NativeDiffusionProvider, NativeImageRuntimeError,
 };
 use comfy_tensor::{
     CancellationToken, CpuBackend, CpuWorkspaceAuthority, ExecutionContext, StreamId,
@@ -21,6 +21,11 @@ use std::{
     sync::Arc,
 };
 use thiserror::Error;
+
+// Cache dependency discovery runs before an execution context exists, so the checked-in fixture
+// pins the digest produced by its materialized canonical VAE instead of privately loading it again.
+const SD15_TINY_VAE_EXECUTION_DIGEST: &str =
+    "31b853b46be2e3335f6d397bdd907ddba0c695ae0b0fe9ccdcf3175a1305bd40";
 
 #[derive(Clone, Debug)]
 pub struct NativeDiffusionFixture {
@@ -86,7 +91,7 @@ impl NativeDiffusionFixture {
         backend: Arc<CpuBackend>,
         context: &ExecutionContext<'_>,
     ) -> Result<Sd15TinyModel, NativeDiffusionFixtureError> {
-        let (store, index, loaded, _projection, admission) =
+        let (store, index, loaded, _artifact, _projection, admission) =
             self.load_checkpoint(context.cancellation)?;
         Ok(Sd15TinyModel::load_reduced_fixture(
             &store, &index, &loaded, &admission, backend, context,
@@ -99,7 +104,7 @@ impl NativeDiffusionFixture {
         context: &ExecutionContext<'_>,
     ) -> Result<NativeDiffusionBundle, NativeDiffusionFixtureError> {
         let tokenizer = Arc::new(self.tokenizer()?);
-        let (store, index, loaded, projection, admission) =
+        let (store, index, loaded, artifact, projection, admission) =
             self.load_checkpoint(context.cancellation)?;
         let model = Arc::new(Sd15TinyModel::load_reduced_fixture(
             &store,
@@ -115,11 +120,27 @@ impl NativeDiffusionFixture {
             &loaded,
             &projection,
             tokenizer.identity().clone(),
-            backend,
+            backend.clone(),
             context,
         )?);
-        NativeDiffusionBundle::new("sd15-tiny-v1", loaded.identity(), model, tokenizer, clip)
-            .map_err(|error| NativeDiffusionFixtureError::Runtime(error.to_string()))
+        let vae = Arc::new(load_sd15_vae_execution(
+            &store,
+            &index,
+            loaded.clone(),
+            &artifact,
+            &projection,
+            &backend,
+            context,
+        )?);
+        NativeDiffusionBundle::new_with_vae(
+            "sd15-tiny-v1",
+            loaded.identity(),
+            model,
+            tokenizer,
+            clip,
+            vae,
+        )
+        .map_err(|error| NativeDiffusionFixtureError::Runtime(error.to_string()))
     }
 
     pub fn load_clip_with_context(
@@ -128,7 +149,7 @@ impl NativeDiffusionFixture {
         context: &ExecutionContext<'_>,
     ) -> Result<comfy_model::clip::LoadedSd1Clip, NativeDiffusionFixtureError> {
         let tokenizer = self.tokenizer()?;
-        let (store, index, loaded, projection, _admission) =
+        let (store, index, loaded, _artifact, projection, _admission) =
             self.load_checkpoint(context.cancellation)?;
         Ok(load_sd15_clip_execution(
             &store,
@@ -149,6 +170,7 @@ impl NativeDiffusionFixture {
             ModelStore,
             ArtifactIndex,
             Arc<comfy_model::LoadedModel>,
+            ArtifactRecord,
             Sd15DetectorProjection,
             comfy_model::generated_native_diffusion::ReducedFixtureAdmission,
         ),
@@ -168,9 +190,13 @@ impl NativeDiffusionFixture {
         )?)?;
         index.refresh(cancellation)?;
         let key = ArtifactKey::new("sd15-tiny-fixture", "model.safetensors")?;
+        let artifact = index
+            .record(&key)
+            .cloned()
+            .ok_or_else(|| comfy_model::ArtifactIndexError::Missing(key.clone()))?;
         let mut store = ModelStore::new(ParserLimits::default())?;
         let loaded = store.load(&index, &key, cancellation)?;
-        Ok((store, index, loaded, projection, admission))
+        Ok((store, index, loaded, artifact, projection, admission))
     }
 }
 
@@ -214,6 +240,23 @@ impl NativeDiffusionProvider for NativeDiffusionFixture {
             binding.plan().model_identity().as_str(),
             binding.plan().patch_identity().as_str(),
             binding.plan().digest(),
+        )
+        .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))
+    }
+
+    fn vae_cache_identities(&self) -> Result<CanonicalVaeCacheIdentities, NativeImageRuntimeError> {
+        let cancellation = CancellationToken::default();
+        let (_store, _index, _loaded, artifact, projection, _admission) = self
+            .load_checkpoint(&cancellation)
+            .map_err(|error| NativeImageRuntimeError::Asset(error.to_string()))?;
+        let descriptor = bind_sd15_vae_execution(&projection, &artifact)
+            .map_err(|error| NativeImageRuntimeError::Asset(error.to_string()))?;
+        let identity = descriptor.identity();
+        CanonicalVaeCacheIdentities::checked(
+            identity.digest(),
+            identity.artifact_sha256(),
+            &identity.patch().ordered_digest,
+            SD15_TINY_VAE_EXECUTION_DIGEST,
         )
         .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))
     }

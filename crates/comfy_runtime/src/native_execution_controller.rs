@@ -1,18 +1,18 @@
 use crate::{
     AssetNamespace, AssetRoots, AttemptEventKind, AttemptState, AuthorizedCapabilities,
-    CacheDependencies, CanonicalClipCacheIdentities, CompiledPlan, EffectClass, EffectCoordinator,
-    ExecutionActuatorEventInput, ExecutionControlCommand, ExecutionControlCommandKind,
-    ExecutionController, ExecutionEngine, ExecutionError, ExecutionEventBus, ExecutionFailure,
-    ExecutionFailureOrigin, ExecutionOutput, ExecutionOutputAvailability, ExecutionPreview,
-    ExecutionReport, InputBinding, InputMode, MemoryPolicy, NativeCache, NativeNode,
-    NativeNodeRegistry, NodeContext, NodeFailure, NodeFailureKind, NodeOutcome, OutputCommitError,
-    OutputCommitReceipt, OutputCommitter, OutputExecutionScope, OutputMediaKind, OutputProposal,
-    PreparedEffect, PreparedEffectRequest, PreparedOutput, ProfileId, PromptCompileError,
-    RuntimeAvailability, RuntimeCachePolicy, RuntimeInputDescriptor, RuntimeNodeDescriptor,
-    RuntimeOutputDescriptor, RuntimeSupervisor, RuntimeSupervisorError, SharedAssetService,
-    SharedExecutionPresentationService, SharedOutputCommitter, ValueType, WorkerLaunchConfig,
-    WorkflowFormatDocument, authorize_native_input_reader, authorize_native_output_committer,
-    graph_to_prompt,
+    CacheDependencies, CanonicalClipCacheIdentities, CanonicalVaeCacheIdentities, CompiledPlan,
+    EffectClass, EffectCoordinator, ExecutionActuatorEventInput, ExecutionControlCommand,
+    ExecutionControlCommandKind, ExecutionController, ExecutionEngine, ExecutionError,
+    ExecutionEventBus, ExecutionFailure, ExecutionFailureOrigin, ExecutionOutput,
+    ExecutionOutputAvailability, ExecutionPreview, ExecutionReport, InputBinding, InputMode,
+    MemoryPolicy, NativeCache, NativeNode, NativeNodeRegistry, NodeContext, NodeFailure,
+    NodeFailureKind, NodeOutcome, OutputCommitError, OutputCommitReceipt, OutputCommitter,
+    OutputExecutionScope, OutputMediaKind, OutputProposal, PreparedEffect, PreparedEffectRequest,
+    PreparedOutput, ProfileId, PromptCompileError, RuntimeAvailability, RuntimeCachePolicy,
+    RuntimeInputDescriptor, RuntimeNodeDescriptor, RuntimeOutputDescriptor, RuntimeSupervisor,
+    RuntimeSupervisorError, SharedAssetService, SharedExecutionPresentationService,
+    SharedOutputCommitter, ValueType, WorkerLaunchConfig, WorkflowFormatDocument,
+    authorize_native_input_reader, authorize_native_output_committer, graph_to_prompt,
 };
 use chrono::{Local, Utc};
 #[cfg(test)]
@@ -21,6 +21,7 @@ use comfy_media::{
     MetadataWritePolicy, PngError, PngLimits, decode_png, encode_png_frame_with_policy_and_context,
 };
 use comfy_model::{
+    NativeVae, VaeBoundaryKind, VaeKernelProfile,
     clip::{ClipError, LoadedSd1Clip, NativeTokenizer, WeightedText},
     conditioning::{
         ConditioningEntry, ConditioningEntryOptions, ConditioningError, ConditioningIdentity,
@@ -46,7 +47,7 @@ use comfy_sampler::{
     },
 };
 use comfy_tensor::{
-    BackendCapabilityMatrix, CancellationToken, CpuBackend, CpuWorkspaceAuthority,
+    BackendCapabilityMatrix, CancellationToken, CpuBackend, CpuWorkspaceAuthority, DType,
     ExecutionContext, ImageTensor, ResizeCrop, ResizeMode, ScratchReservation, StreamId,
     TensorDescriptor, TensorError,
 };
@@ -126,48 +127,91 @@ pub struct NativeDiffusionBundle {
     tokenizer: Arc<Sd1Tokenizer>,
     clip: Arc<LoadedSd1Clip>,
     clip_cache_identities: CanonicalClipCacheIdentities,
+    vae: Arc<NativeVae>,
+    vae_cache_identities: CanonicalVaeCacheIdentities,
+}
+
+fn validate_native_diffusion_bundle_inputs(
+    fixture_id: &str,
+    model_digest: &str,
+    tokenizer: &Sd1Tokenizer,
+    clip: &LoadedSd1Clip,
+) -> Result<CanonicalClipCacheIdentities, NativeImageRuntimeError> {
+    let tokenizer_identity = tokenizer.identity();
+    let invalid_model_digest = model_digest.len() != 64
+        || !model_digest
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
+    let invalid_reason = if fixture_id != "sd15-tiny-v1" {
+        Some("fixture")
+    } else if invalid_model_digest {
+        Some("model artifact")
+    } else if tokenizer_identity.descriptor().identifier() != "comfy.sd1.tokenizer" {
+        Some("tokenizer descriptor")
+    } else if clip.plan().tokenizer_identity() != tokenizer_identity {
+        Some("tokenizer execution binding")
+    } else if clip.plan().artifact_identity().as_str() != model_digest {
+        Some("CLIP artifact binding")
+    } else {
+        None
+    };
+    if let Some(reason) = invalid_reason {
+        return Err(NativeImageRuntimeError::Registry(format!(
+            "native diffusion provider {reason} identity is invalid"
+        )));
+    }
+    CanonicalClipCacheIdentities::checked(
+        tokenizer_identity.digest(),
+        clip.architecture().digest(),
+        clip.plan().artifact_identity().as_str(),
+        clip.plan().model_identity().as_str(),
+        clip.plan().patch_identity().as_str(),
+        clip.plan().digest(),
+    )
+    .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))
 }
 
 impl NativeDiffusionBundle {
-    pub fn new(
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_with_vae(
         fixture_id: impl Into<String>,
         model_digest: impl Into<String>,
         model: Arc<Sd15TinyModel>,
         tokenizer: Arc<Sd1Tokenizer>,
         clip: Arc<LoadedSd1Clip>,
+        vae: Arc<NativeVae>,
     ) -> Result<Self, NativeImageRuntimeError> {
         let fixture_id = fixture_id.into();
         let model_digest = model_digest.into();
+        let clip_cache_identities =
+            validate_native_diffusion_bundle_inputs(&fixture_id, &model_digest, &tokenizer, &clip)?;
         let tokenizer_identity = tokenizer.identity();
-        let invalid_model_digest = model_digest.len() != 64
-            || !model_digest
-                .bytes()
-                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
-        let invalid_reason = if fixture_id != "sd15-tiny-v1" {
-            Some("fixture")
-        } else if invalid_model_digest {
-            Some("model artifact")
-        } else if tokenizer_identity.descriptor().identifier() != "comfy.sd1.tokenizer" {
-            Some("tokenizer descriptor")
-        } else if clip.plan().tokenizer_identity() != tokenizer_identity {
-            Some("tokenizer execution binding")
-        } else if clip.plan().artifact_identity().as_str() != model_digest {
-            Some("CLIP artifact binding")
-        } else {
-            None
-        };
-        if let Some(reason) = invalid_reason {
-            return Err(NativeImageRuntimeError::Registry(format!(
-                "native diffusion provider {reason} identity is invalid"
-            )));
+        let identity = vae.descriptor().identity();
+        let family = sd15_model_family_identity()
+            .map_err(|error| NativeImageRuntimeError::Execution(error.to_string()))?;
+        let latent = sd15_latent_format_identity()
+            .map_err(|error| NativeImageRuntimeError::Execution(error.to_string()))?;
+        let invalid_vae = identity.artifact_sha256() != model_digest
+            || identity.family() != &family
+            || identity.latent_format() != &latent
+            || identity.architecture().as_str()
+                != "comfy.ldm.models.autoencoder.AutoencoderKL.reduced.v1"
+            || identity.profile() != &VaeKernelProfile::Sd15AutoencoderKlReducedV1
+            || identity.dtype() != DType::F32
+            || identity.device() != comfy_tensor::DeviceId::CPU
+            || identity.boundary().kind() != VaeBoundaryKind::Image
+            || identity.boundary().channels() != 3
+            || vae.descriptor().decode_clamp() != [0.0, 1.0];
+        if invalid_vae {
+            return Err(NativeImageRuntimeError::Registry(
+                "native diffusion provider canonical VAE identity is invalid".to_owned(),
+            ));
         }
-        let clip_cache_identities = CanonicalClipCacheIdentities::checked(
-            tokenizer_identity.digest(),
-            clip.architecture().digest(),
-            clip.plan().artifact_identity().as_str(),
-            clip.plan().model_identity().as_str(),
-            clip.plan().patch_identity().as_str(),
-            clip.plan().digest(),
+        let vae_cache_identities = CanonicalVaeCacheIdentities::checked(
+            identity.digest(),
+            identity.artifact_sha256(),
+            &identity.patch().ordered_digest,
+            vae.execution_digest(),
         )
         .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
         Ok(Self {
@@ -178,6 +222,8 @@ impl NativeDiffusionBundle {
             tokenizer,
             clip,
             clip_cache_identities,
+            vae,
+            vae_cache_identities,
         })
     }
 
@@ -199,6 +245,14 @@ impl NativeDiffusionBundle {
 
     pub fn clip_cache_identities(&self) -> &CanonicalClipCacheIdentities {
         &self.clip_cache_identities
+    }
+
+    pub fn vae(&self) -> &Arc<NativeVae> {
+        &self.vae
+    }
+
+    pub fn vae_cache_identities(&self) -> &CanonicalVaeCacheIdentities {
+        &self.vae_cache_identities
     }
 
     pub fn encode_text(
@@ -373,6 +427,8 @@ pub trait NativeDiffusionProvider: Send + Sync {
     fn clip_cache_identities(
         &self,
     ) -> Result<CanonicalClipCacheIdentities, NativeImageRuntimeError>;
+
+    fn vae_cache_identities(&self) -> Result<CanonicalVaeCacheIdentities, NativeImageRuntimeError>;
 
     fn load(
         &self,
@@ -1328,6 +1384,8 @@ struct NativeDiffusionHandle {
     model_digest: String,
     tokenizer_digest: String,
     clip_execution_digest: String,
+    vae_identity_digest: String,
+    vae_execution_digest: String,
 }
 
 struct NativeDiffusionState {
@@ -1349,6 +1407,7 @@ impl NativeDiffusionState {
         let provider_model_digest = self.provider.model_digest()?;
         let provider_tokenizer_digest = self.provider.tokenizer_digest()?;
         let provider_clip_cache_identities = self.provider.clip_cache_identities()?;
+        let provider_vae_cache_identities = self.provider.vae_cache_identities()?;
         if provider_model_digest != bundle.model_digest
             || provider_tokenizer_digest != bundle.tokenizer_digest
             || provider_clip_cache_identities != bundle.clip_cache_identities
@@ -1358,6 +1417,14 @@ impl NativeDiffusionState {
                     .to_owned(),
             ));
         }
+        provider_vae_cache_identities
+            .require_exact_match(&bundle.vae_cache_identities)
+            .map_err(|_| {
+                NativeImageRuntimeError::Registry(
+                    "native diffusion provider cache identity does not match its loaded bundle"
+                        .to_owned(),
+                )
+            })?;
         let mut loaded = self.loaded.lock();
         Ok(loaded.get_or_insert_with(|| bundle.clone()).clone())
     }
@@ -1369,12 +1436,14 @@ impl NativeDiffusionState {
     ) -> Result<NativeDiffusionHandle, NativeImageRuntimeError> {
         let bundle = self.bundle(context)?;
         Ok(NativeDiffusionHandle {
-            schema_version: 3,
+            schema_version: 4,
             role,
             fixture_id: bundle.fixture_id.clone(),
             model_digest: bundle.model_digest.clone(),
             tokenizer_digest: bundle.tokenizer_digest.clone(),
             clip_execution_digest: bundle.clip_cache_identities.execution().to_owned(),
+            vae_identity_digest: bundle.vae_cache_identities.identity().to_owned(),
+            vae_execution_digest: bundle.vae_cache_identities.execution().to_owned(),
         })
     }
 
@@ -1385,12 +1454,14 @@ impl NativeDiffusionState {
         context: &ExecutionContext<'_>,
     ) -> Result<Arc<NativeDiffusionBundle>, NativeImageRuntimeError> {
         let bundle = self.bundle(context)?;
-        if handle.schema_version != 3
+        if handle.schema_version != 4
             || handle.role != role
             || handle.fixture_id != bundle.fixture_id
             || handle.model_digest != bundle.model_digest
             || handle.tokenizer_digest != bundle.tokenizer_digest
             || handle.clip_execution_digest != bundle.clip_cache_identities.execution()
+            || handle.vae_identity_digest != bundle.vae_cache_identities.identity()
+            || handle.vae_execution_digest != bundle.vae_cache_identities.execution()
         {
             return Err(NativeImageRuntimeError::Handle(
                 "native diffusion handle does not belong to the loaded model".to_owned(),
@@ -1433,6 +1504,13 @@ impl NativeNode for CheckpointLoaderNode {
             .clip_cache_identities()
             .map_err(runtime_failure)?;
         let mut artifact_digests = clip_identities.artifact_digests();
+        artifact_digests.extend(
+            self.state
+                .provider
+                .vae_cache_identities()
+                .map_err(runtime_failure)?
+                .artifact_digests(),
+        );
         artifact_digests.insert("model.safetensors".to_owned(), model_digest);
         artifact_digests.insert("tokenizer.sd1".to_owned(), tokenizer_digest);
         Ok(CacheDependencies {
@@ -1767,6 +1845,21 @@ impl NativeNode for VaeDecodeNode {
         NATIVE_DIFFUSION_REGISTRY_VERSION
     }
 
+    fn cache_dependencies(
+        &self,
+        _inputs: &BTreeMap<String, Value>,
+    ) -> Result<CacheDependencies, NodeFailure> {
+        Ok(CacheDependencies {
+            artifact_digests: self
+                .state
+                .provider
+                .vae_cache_identities()
+                .map_err(runtime_failure)?
+                .artifact_digests(),
+            ..CacheDependencies::default()
+        })
+    }
+
     fn execute<'a>(
         &'a self,
         context: NodeContext,
@@ -1786,9 +1879,11 @@ impl NativeNode for VaeDecodeNode {
                 .get_tensor(&latent_handle, NativeTensorKind::Latent)
                 .map_err(runtime_failure)?;
             let decoded = bundle
-                .model
-                .decode(&latent, &tensor_context)
-                .map_err(diffusion_failure)?;
+                .vae
+                .decode(self.state.backend.as_ref(), &latent, &tensor_context)
+                .map_err(|error| {
+                    runtime_failure(NativeImageRuntimeError::Execution(error.to_string()))
+                })?;
             if decoded.descriptor().shape() != [1, 3, 32, 32] {
                 return Err(invalid_diffusion_input(
                     "native SD15 VAE returned an unexpected image shape",
@@ -4447,6 +4542,18 @@ mod tests {
                 "3".repeat(64),
                 "4".repeat(64),
                 "5".repeat(64),
+            )
+            .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))
+        }
+
+        fn vae_cache_identities(
+            &self,
+        ) -> Result<CanonicalVaeCacheIdentities, NativeImageRuntimeError> {
+            CanonicalVaeCacheIdentities::checked(
+                "6".repeat(64),
+                "0".repeat(64),
+                "7".repeat(64),
+                "8".repeat(64),
             )
             .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))
         }

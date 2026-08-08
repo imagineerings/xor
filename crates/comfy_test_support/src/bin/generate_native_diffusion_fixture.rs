@@ -153,7 +153,9 @@ fn main() -> Result<()> {
         .latents
         .last()
         .context("Euler trace has no final latent")?;
-    let decoded = model.decode(final_latent, &context)?;
+    let decoded = bundle
+        .vae()
+        .decode(backend.as_ref(), final_latent, &context)?;
     let decoded_nchw = tensor_to_f32(&backend, &decoded, &context)?;
     fs::write(
         root.join("vae-decoded.f32le"),

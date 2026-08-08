@@ -1,12 +1,14 @@
 use crate::vision_models::canonical_vision_model_store_dtype;
 use crate::{
-    ArtifactIndex, LatentFormatDefinition, LoadedModel, ModelStore,
-    NativeEfficientNetV2SFeatureSource, NativeModule, NativeOpsError, NativeVisionModelError,
-    NativeVisionStateKind, NativeVisionStateSpec, VaeDescriptor, VaeError, VaeKernelProfile,
-    VaeLoaderConfiguration, efficientnet_v2_s_features_from_module_with_context,
+    ArtifactIndex, AttentionBackend, AttentionFallbackPolicy, AttentionRequest,
+    LatentFormatDefinition, LoadedModel, ModelStore, NativeEfficientNetV2SFeatureSource,
+    NativeModule, NativeOpsError, NativeVisionModelError, NativeVisionStateKind,
+    NativeVisionStateSpec, VaeDescriptor, VaeError, VaeKernelProfile, VaeLoaderConfiguration,
+    efficientnet_v2_s_features_from_module_with_context,
     load_stage_c_efficientnet_feature_module_from_model_store_with_context,
     load_vision_state_from_model_store_with_context,
     load_vision_state_with_sibling_namespaces_from_model_store_with_context,
+    scaled_dot_product_attention_with_context,
     vae::{NativeVae, VaeKernelFunctions, VaeModelBinding},
     vae_architecture::ExplicitAutoencoderKlTopology,
 };
@@ -26,11 +28,17 @@ use comfy_tensor::{
     BinaryOperation, ConvolutionSpec, CpuBackend, DType, DecodedScalar, ExecutionContext,
     LinearAlgebraOperation, ResizeCrop, ResizeMode, ResizeSpec, Scalar, ScalarSide, Tensor,
     TensorBackend, TensorDescriptor, UnaryOperation, ViewAccess,
+    generated_native_diffusion::{
+        add as sd15_add, conv2d as sd15_conv2d, group_norm as sd15_group_norm_operation, linear,
+        nearest_upsample_2x as sd15_nearest_upsample_2x, silu as sd15_silu, tensor_from_f32,
+        tensor_to_f32,
+    },
 };
 use std::{collections::BTreeMap, sync::Arc};
 use thiserror::Error;
 
 const PIXEL_SPACE_ARCHITECTURE: &str = "comfy.pixel_space_convert.PixelspaceConversionVAE.v1";
+const SD15_REDUCED_ARCHITECTURE: &str = "comfy.ldm.models.autoencoder.AutoencoderKL.reduced.v1";
 const KL_ARCHITECTURE: &str = "comfy.ldm.models.autoencoder.AutoencoderKL.v1";
 const TEMPORAL_ARCHITECTURE: &str = "comfy.ldm.models.autoencoder.AutoencodingEngine.temporal.v1";
 const TAESD_ARCHITECTURE: &str = "comfy.taesd.TAESD.v1";
@@ -111,6 +119,7 @@ pub fn inspect_image_vae_architecture(
 ) -> Result<NativeImageVaeArchitecture, ImageVaeError> {
     let profile = descriptor.identity().profile().clone();
     let expected_architecture = match &profile {
+        VaeKernelProfile::Sd15AutoencoderKlReducedV1 => SD15_REDUCED_ARCHITECTURE,
         VaeKernelProfile::PixelSpaceV1 => PIXEL_SPACE_ARCHITECTURE,
         VaeKernelProfile::TemporalAutoencodingEngineV1 => TEMPORAL_ARCHITECTURE,
         VaeKernelProfile::TaesdV1 => TAESD_ARCHITECTURE,
@@ -162,7 +171,7 @@ pub fn inspect_image_vae_architecture(
     }
     let state = source_state_manifest(&profile, descriptor, floating_dtype)?;
     let execution_operations = source_execution_operations(&profile, descriptor)?;
-    let sibling_namespaces = stage_c_sibling_namespaces(&profile);
+    let sibling_namespaces = image_vae_sibling_namespaces(&profile);
     admit_source_manifest(model, &state, &source_names, sibling_namespaces)?;
     Ok(NativeImageVaeArchitecture {
         profile,
@@ -234,8 +243,11 @@ fn state_dtype_sentinel(profile: &VaeKernelProfile) -> &'static str {
     }
 }
 
-fn stage_c_sibling_namespaces(profile: &VaeKernelProfile) -> &'static [&'static str] {
+fn image_vae_sibling_namespaces(profile: &VaeKernelProfile) -> &'static [&'static str] {
     match profile {
+        VaeKernelProfile::Sd15AutoencoderKlReducedV1 => {
+            &["cond_stage_model.", "model.diffusion_model."]
+        }
         VaeKernelProfile::StableCascadeStageCEncoderV1 => &["backbone."],
         VaeKernelProfile::StableCascadeStageCCombinedV1 => &["encoder.backbone."],
         _ => &[],
@@ -259,6 +271,19 @@ fn legacy_quantization_source_names_from_names(
     names: &std::collections::BTreeSet<&str>,
 ) -> Result<BTreeMap<String, String>, ImageVaeError> {
     let mut source_names = BTreeMap::new();
+    if profile == &VaeKernelProfile::Sd15AutoencoderKlReducedV1 {
+        for name in names {
+            if let Some(canonical) = name.strip_prefix("first_stage_model.") {
+                if source_names
+                    .insert(canonical.to_owned(), (*name).to_owned())
+                    .is_some()
+                {
+                    return Err(ImageVaeError::UnexpectedState((*name).to_owned()));
+                }
+            }
+        }
+        return Ok(source_names);
+    }
     if !matches!(
         profile,
         VaeKernelProfile::AutoencoderKlV1
@@ -451,6 +476,7 @@ pub fn image_vae_source_state_schema(
     dtype: DType,
 ) -> Result<Vec<NativeVisionStateSpec>, ImageVaeError> {
     let state = match profile {
+        VaeKernelProfile::Sd15AutoencoderKlReducedV1 => sd15_reduced_manifest(dtype),
         VaeKernelProfile::PixelSpaceV1 => pixel_space_manifest(dtype),
         VaeKernelProfile::TaesdV1 => {
             let latent_channels = match innermost_image_loader_configuration(loader_configuration) {
@@ -529,6 +555,46 @@ fn innermost_image_loader_configuration(
         }
         configuration => configuration,
     }
+}
+
+pub(crate) fn sd15_reduced_vae_source_state_schema(dtype: DType) -> Vec<NativeVisionStateSpec> {
+    sd15_reduced_manifest(dtype)
+}
+
+fn sd15_reduced_manifest(dtype: DType) -> Vec<NativeVisionStateSpec> {
+    let mut manifest = SourceStateManifest::new(dtype);
+    manifest.convolution("encoder.conv_in", 32, 3, &[3, 3], true);
+    manifest.convolution("encoder.conv_out", 8, 32, &[3, 3], true);
+    manifest.convolution("quant_conv", 8, 8, &[1, 1], true);
+    manifest.convolution("post_quant_conv", 4, 4, &[1, 1], true);
+    manifest.convolution("decoder.conv_in", 128, 4, &[3, 3], true);
+    manifest.resnet("decoder.mid.block_1", 128, 128);
+    manifest.normalization("decoder.mid.attn_1.norm", 128);
+    for projection in ["q", "k", "v", "proj_out"] {
+        manifest.parameter(
+            format!("decoder.mid.attn_1.{projection}.weight"),
+            vec![128, 128],
+        );
+        manifest.parameter(format!("decoder.mid.attn_1.{projection}.bias"), vec![128]);
+    }
+    manifest.resnet("decoder.mid.block_2", 128, 128);
+    let mut input = 128;
+    for (level, output) in [128_u64, 128, 64, 32].into_iter().enumerate() {
+        manifest.resnet(&format!("decoder.up.{level}.block"), input, output);
+        if level < 3 {
+            manifest.convolution(
+                &format!("decoder.up.{level}.upsample"),
+                output,
+                output,
+                &[3, 3],
+                true,
+            );
+        }
+        input = output;
+    }
+    manifest.normalization("decoder.norm_out", 32);
+    manifest.convolution("decoder.conv_out", 3, 32, &[3, 3], true);
+    manifest.state
 }
 
 fn pixel_space_manifest(dtype: DType) -> Vec<NativeVisionStateSpec> {
@@ -1070,6 +1136,17 @@ pub fn load_image_vae_from_model_store_with_context(
                 context,
             )?
         }
+        None if !image_vae_sibling_namespaces(architecture.profile()).is_empty() => {
+            load_vision_state_with_sibling_namespaces_from_model_store_with_context(
+                backend,
+                store,
+                index,
+                &model,
+                &vision_schema,
+                image_vae_sibling_namespaces(architecture.profile()),
+                context,
+            )?
+        }
         None => load_vision_state_from_model_store_with_context(
             backend,
             store,
@@ -1334,6 +1411,12 @@ fn image_encode_raw(
     latent_definition: &'static LatentFormatDefinition,
     context: &ExecutionContext<'_>,
 ) -> Result<Tensor, VaeError> {
+    if module.layer_name().contains("Sd15AutoencoderKlReducedV1") {
+        return Err(VaeError::OperationUnavailable {
+            profile: "Sd15AutoencoderKlReducedV1".to_owned(),
+            operation: crate::VaeOperation::Encode,
+        });
+    }
     if module.layer_name().contains("PixelSpaceV1") {
         return pixel_space_encode(backend, input, context);
     }
@@ -1409,11 +1492,15 @@ fn image_encode_raw(
 fn image_decode_raw(
     module: &NativeModule,
     backend: &dyn TensorBackend,
-    _cpu_backend: Option<&CpuBackend>,
+    cpu_backend: Option<&CpuBackend>,
     input: &Tensor,
     latent_definition: &'static LatentFormatDefinition,
     context: &ExecutionContext<'_>,
 ) -> Result<Tensor, VaeError> {
+    if module.layer_name().contains("Sd15AutoencoderKlReducedV1") {
+        let cpu_backend = cpu_backend.ok_or(VaeError::ImageVaeRequiresCpuBackend)?;
+        return sd15_reduced_decode(module, cpu_backend, input, context);
+    }
     if module.layer_name().contains("PixelSpaceV1") {
         return pixel_space_decode(backend, input, context);
     }
@@ -1508,6 +1595,346 @@ fn image_decode_raw(
         hidden = unary_tensor(backend, &hidden, UnaryOperation::HyperbolicTangent, context)?;
     }
     affine_tensor(backend, &hidden, 0.5, 0.5, context)
+}
+
+fn sd15_reduced_decode(
+    module: &NativeModule,
+    backend: &CpuBackend,
+    input: &Tensor,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, VaeError> {
+    context.check()?;
+    let mut hidden =
+        sd15_reduced_convolution(module, backend, input, "post_quant_conv", 1, 0, context)?;
+    hidden = sd15_reduced_convolution(module, backend, &hidden, "decoder.conv_in", 1, 1, context)?;
+    hidden = sd15_reduced_resblock(module, backend, &hidden, "decoder.mid.block_1", context)?;
+    hidden = sd15_reduced_attention(module, backend, &hidden, context)?;
+    hidden = sd15_reduced_resblock(module, backend, &hidden, "decoder.mid.block_2", context)?;
+    for level in 0..4 {
+        hidden = sd15_reduced_resblock(
+            module,
+            backend,
+            &hidden,
+            &format!("decoder.up.{level}.block"),
+            context,
+        )?;
+        if level < 3 {
+            hidden = sd15_nearest_upsample_2x(backend, &hidden, context)?;
+            hidden = sd15_reduced_convolution(
+                module,
+                backend,
+                &hidden,
+                &format!("decoder.up.{level}.upsample"),
+                1,
+                1,
+                context,
+            )?;
+        }
+    }
+    hidden = sd15_reduced_group_norm(module, backend, &hidden, "decoder.norm_out", context)?;
+    hidden = sd15_silu(backend, &hidden, context)?;
+    hidden = sd15_reduced_convolution(module, backend, &hidden, "decoder.conv_out", 1, 1, context)?;
+    let mut values = tensor_to_f32(backend, &hidden, context)?;
+    for value in values.iter_mut() {
+        *value = ((value.tanh() + 1.0) * 0.5).clamp(0.0, 1.0);
+    }
+    tensor_from_f32(backend, hidden.descriptor().shape(), &values, context).map_err(Into::into)
+}
+
+fn sd15_reduced_attention(
+    module: &NativeModule,
+    backend: &CpuBackend,
+    input: &Tensor,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, VaeError> {
+    let prefix = "decoder.mid.attn_1";
+    let normalized =
+        sd15_reduced_group_norm(module, backend, input, &format!("{prefix}.norm"), context)?;
+    let query_tokens = sd15_nchw_to_tokens(backend, &normalized, context)?;
+    let context_tokens = sd15_nchw_to_tokens(backend, input, context)?;
+    let query = sd15_reduced_linear(
+        module,
+        backend,
+        &query_tokens,
+        &format!("{prefix}.q"),
+        context,
+    )?;
+    let key = sd15_reduced_linear(
+        module,
+        backend,
+        &context_tokens,
+        &format!("{prefix}.k"),
+        context,
+    )?;
+    let value = sd15_reduced_linear(
+        module,
+        backend,
+        &context_tokens,
+        &format!("{prefix}.v"),
+        context,
+    )?;
+    let shape = input.descriptor().shape();
+    let channels = usize::try_from(shape[1]).map_err(|_| VaeError::ShapeOverflow)?;
+    let query_count =
+        usize::try_from(query.descriptor().shape()[1]).map_err(|_| VaeError::ShapeOverflow)?;
+    let key_count =
+        usize::try_from(key.descriptor().shape()[1]).map_err(|_| VaeError::ShapeOverflow)?;
+    let heads = 4;
+    let head_dimension = channels.checked_div(heads).ok_or(VaeError::ShapeOverflow)?;
+    let query_values = tensor_to_f32(backend, &query, context)?;
+    let key_values = tensor_to_f32(backend, &key, context)?;
+    let value_values = tensor_to_f32(backend, &value, context)?;
+    let outcome = scaled_dot_product_attention_with_context(
+        backend,
+        AttentionRequest {
+            backend: AttentionBackend::PytorchSdp,
+            fallback: AttentionFallbackPolicy::AllowExactNative,
+            batch: 1,
+            query_tokens: query_count,
+            key_tokens: key_count,
+            heads,
+            head_dimension,
+            value_dimension: head_dimension,
+            scale: None,
+            workspace_limit_bytes: key_count * std::mem::size_of::<f32>(),
+        },
+        &query_values,
+        &key_values,
+        &value_values,
+        None,
+        context,
+    )?;
+    drop(value_values);
+    drop(key_values);
+    drop(query_values);
+    let attention = tensor_from_f32(
+        backend,
+        &[
+            1,
+            u64::try_from(query_count).map_err(|_| VaeError::ShapeOverflow)?,
+            shape[1],
+        ],
+        &outcome.values,
+        context,
+    )?;
+    let attention = sd15_reduced_linear(
+        module,
+        backend,
+        &attention,
+        &format!("{prefix}.proj_out"),
+        context,
+    )?;
+    let attention = sd15_tokens_to_nchw(backend, &attention, shape[2], shape[3], context)?;
+    sd15_add(backend, input, &attention, context).map_err(Into::into)
+}
+
+fn sd15_reduced_resblock(
+    module: &NativeModule,
+    backend: &CpuBackend,
+    input: &Tensor,
+    prefix: &str,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, VaeError> {
+    let mut hidden =
+        sd15_reduced_group_norm(module, backend, input, &format!("{prefix}.norm1"), context)?;
+    hidden = sd15_silu(backend, &hidden, context)?;
+    hidden = sd15_reduced_convolution(
+        module,
+        backend,
+        &hidden,
+        &format!("{prefix}.conv1"),
+        1,
+        1,
+        context,
+    )?;
+    hidden = sd15_reduced_group_norm(
+        module,
+        backend,
+        &hidden,
+        &format!("{prefix}.norm2"),
+        context,
+    )?;
+    hidden = sd15_silu(backend, &hidden, context)?;
+    hidden = sd15_reduced_convolution(
+        module,
+        backend,
+        &hidden,
+        &format!("{prefix}.conv2"),
+        1,
+        1,
+        context,
+    )?;
+    let input_channels = input
+        .descriptor()
+        .shape()
+        .get(1)
+        .copied()
+        .ok_or(VaeError::ShapeOverflow)?;
+    let output_channels = hidden
+        .descriptor()
+        .shape()
+        .get(1)
+        .copied()
+        .ok_or(VaeError::ShapeOverflow)?;
+    let residual = if input_channels == output_channels {
+        input.clone()
+    } else {
+        sd15_reduced_convolution(
+            module,
+            backend,
+            input,
+            &format!("{prefix}.nin_shortcut"),
+            1,
+            0,
+            context,
+        )?
+    };
+    sd15_add(backend, &residual, &hidden, context).map_err(Into::into)
+}
+
+fn sd15_reduced_group_norm(
+    module: &NativeModule,
+    backend: &CpuBackend,
+    input: &Tensor,
+    prefix: &str,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, VaeError> {
+    let channels = usize::try_from(
+        input
+            .descriptor()
+            .shape()
+            .get(1)
+            .copied()
+            .ok_or(VaeError::ShapeOverflow)?,
+    )
+    .map_err(|_| VaeError::ShapeOverflow)?;
+    let weight_name = format!("{prefix}.weight");
+    let bias_name = format!("{prefix}.bias");
+    let weight = find_module(module, &weight_name)
+        .and_then(NativeModule::registered_buffer)
+        .ok_or_else(|| missing_module(&weight_name))?;
+    let bias = find_module(module, &bias_name)
+        .and_then(NativeModule::registered_buffer)
+        .ok_or_else(|| missing_module(&bias_name))?;
+    sd15_group_norm_operation(
+        backend,
+        input,
+        weight,
+        bias,
+        32.min(channels),
+        1.0e-6,
+        context,
+    )
+    .map_err(Into::into)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn sd15_reduced_convolution(
+    module: &NativeModule,
+    backend: &CpuBackend,
+    input: &Tensor,
+    prefix: &str,
+    stride: usize,
+    padding: usize,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, VaeError> {
+    let weight_name = format!("{prefix}.weight");
+    let convolution =
+        find_module(module, &weight_name).ok_or_else(|| missing_module(&weight_name))?;
+    let (weight, bias) = convolution.dense_parameters()?;
+    sd15_conv2d(backend, input, weight, bias, stride, padding, context).map_err(Into::into)
+}
+
+fn sd15_reduced_linear(
+    module: &NativeModule,
+    backend: &CpuBackend,
+    input: &Tensor,
+    prefix: &str,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, VaeError> {
+    let weight_name = format!("{prefix}.weight");
+    let bias_name = format!("{prefix}.bias");
+    let weight = find_module(module, &weight_name)
+        .and_then(NativeModule::registered_buffer)
+        .ok_or_else(|| missing_module(&weight_name))?;
+    let bias = find_module(module, &bias_name)
+        .and_then(NativeModule::registered_buffer)
+        .ok_or_else(|| missing_module(&bias_name))?;
+    linear(backend, input, weight, Some(bias), context).map_err(Into::into)
+}
+
+fn sd15_nchw_to_tokens(
+    backend: &CpuBackend,
+    tensor: &Tensor,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, VaeError> {
+    let shape = tensor.descriptor().shape();
+    if shape.len() != 4 || shape[0] != 1 {
+        return Err(VaeError::InvalidShape {
+            expected: vec![1, 0, 0, 0],
+            actual: shape.to_vec(),
+        });
+    }
+    let channels = usize::try_from(shape[1]).map_err(|_| VaeError::ShapeOverflow)?;
+    let height = usize::try_from(shape[2]).map_err(|_| VaeError::ShapeOverflow)?;
+    let width = usize::try_from(shape[3]).map_err(|_| VaeError::ShapeOverflow)?;
+    let source = tensor_to_f32(backend, tensor, context)?;
+    let mut values = backend.workspace_vec(context, source.len())?;
+    for _ in 0..source.len() {
+        values.try_push(0.0)?;
+    }
+    for y in 0..height {
+        for x in 0..width {
+            for channel in 0..channels {
+                values[(y * width + x) * channels + channel] =
+                    source[(channel * height + y) * width + x];
+            }
+        }
+    }
+    tensor_from_f32(
+        backend,
+        &[
+            1,
+            u64::try_from(height * width).map_err(|_| VaeError::ShapeOverflow)?,
+            shape[1],
+        ],
+        &values,
+        context,
+    )
+    .map_err(Into::into)
+}
+
+fn sd15_tokens_to_nchw(
+    backend: &CpuBackend,
+    tensor: &Tensor,
+    height: u64,
+    width: u64,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, VaeError> {
+    let shape = tensor.descriptor().shape();
+    if shape.len() != 3 || shape[0] != 1 || shape[1] != height * width {
+        return Err(VaeError::InvalidShape {
+            expected: vec![1, height * width, shape.last().copied().unwrap_or(0)],
+            actual: shape.to_vec(),
+        });
+    }
+    let channels = usize::try_from(shape[2]).map_err(|_| VaeError::ShapeOverflow)?;
+    let height_usize = usize::try_from(height).map_err(|_| VaeError::ShapeOverflow)?;
+    let width_usize = usize::try_from(width).map_err(|_| VaeError::ShapeOverflow)?;
+    let source = tensor_to_f32(backend, tensor, context)?;
+    let mut values = backend.workspace_vec(context, source.len())?;
+    for _ in 0..source.len() {
+        values.try_push(0.0)?;
+    }
+    for y in 0..height_usize {
+        for x in 0..width_usize {
+            for channel in 0..channels {
+                values[(channel * height_usize + y) * width_usize + x] =
+                    source[(y * width_usize + x) * channels + channel];
+            }
+        }
+    }
+    tensor_from_f32(backend, &[1, shape[2], height, width], &values, context).map_err(Into::into)
 }
 
 fn average_pool_2d(
@@ -3121,6 +3548,22 @@ mod tests {
 
     #[test]
     fn val_vae_001_source_manifests_fix_dimensions_and_state_ownership() {
+        let reduced = sd15_reduced_manifest(DType::F32);
+        assert_eq!(
+            reduced
+                .iter()
+                .find(|spec| spec.name == "decoder.mid.attn_1.q.weight")
+                .map(|spec| (spec.shape.as_slice(), spec.kind)),
+            Some((&[128, 128][..], NativeVisionStateKind::Parameter))
+        );
+        assert_eq!(
+            reduced
+                .iter()
+                .find(|spec| spec.name == "decoder.up.3.block.nin_shortcut.weight")
+                .map(|spec| spec.shape.as_slice()),
+            Some(&[32, 64, 1, 1][..])
+        );
+
         let pixel = pixel_space_manifest(DType::F32);
         assert_eq!(pixel.len(), 1);
         assert_eq!(pixel[0].shape, Vec::<u64>::new());
@@ -3287,6 +3730,7 @@ mod tests {
         let mut combined_stage_c = stage_c_encoder_manifest("encoder.", DType::F32);
         combined_stage_c.extend(stage_c_previewer_manifest("previewer.", DType::F32));
         let manifests = [
+            ("sd15-reduced", sd15_reduced_manifest(DType::F32)),
             ("pixel", pixel_space_manifest(DType::F32)),
             ("taesd", taesd_manifest(4, DType::F32)?),
             ("taesd-flux2", taesd_manifest(128, DType::F32)?),
@@ -3443,6 +3887,65 @@ mod tests {
             ),
             Err(ImageVaeError::UnexpectedState(_))
         ));
+
+        let compiled = [
+            "first_stage_model.encoder.conv_in.weight",
+            "first_stage_model.decoder.conv_out.bias",
+            "cond_stage_model.transformer.weight",
+            "model.diffusion_model.input.weight",
+        ]
+        .into_iter()
+        .collect();
+        let projection = legacy_quantization_source_names_from_names(
+            &VaeKernelProfile::Sd15AutoencoderKlReducedV1,
+            &compiled,
+        )
+        .expect("compiled SD15 projection");
+        assert_eq!(projection.len(), 2);
+        assert_eq!(
+            projection.get("encoder.conv_in.weight").map(String::as_str),
+            Some("first_stage_model.encoder.conv_in.weight")
+        );
+        assert_eq!(
+            projection.get("decoder.conv_out.bias").map(String::as_str),
+            Some("first_stage_model.decoder.conv_out.bias")
+        );
+    }
+
+    #[test]
+    fn val_vae_001_sd15_reduced_encode_is_typed_unavailable()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (backend, workspace_authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+        let cancellation = CancellationToken::default();
+        let context = backend.execution_context(
+            StreamId::DEFAULT,
+            workspace_authority.authorize_workspace(1024 * 1024)?,
+            &cancellation,
+        );
+        let descriptor = TensorDescriptor::contiguous(
+            vec![1, 3, 1, 1],
+            DType::F32,
+            DeviceId::CPU,
+            StreamId::DEFAULT,
+        )?;
+        let (input, event) = backend.upload_f32(descriptor, &[0.0, 0.0, 0.0], &context)?;
+        backend.wait_event(event, &context)?;
+        let module = NativeModule::module_dict("image-vae:Sd15AutoencoderKlReducedV1", Vec::new())?;
+        assert!(matches!(
+            image_encode_raw(
+                &module,
+                &backend,
+                Some(&backend),
+                &input,
+                &crate::generated_sd15_comfy_model_0045::LATENT_FORMAT,
+                &context,
+            ),
+            Err(VaeError::OperationUnavailable {
+                operation: crate::VaeOperation::Encode,
+                ..
+            })
+        ));
+        Ok(())
     }
 
     #[test]

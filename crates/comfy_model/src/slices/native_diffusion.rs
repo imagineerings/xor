@@ -1,18 +1,20 @@
 pub use crate::clip::Sd1Tokenizer;
 use crate::{
-    ArtifactIndex, AttentionBackend, AttentionError, AttentionFallbackPolicy, AttentionRequest,
-    LatentExtent, LatentFormatError, LoadedModel, ModelDetectionRule, ModelFamilyIdentity,
-    ModelProbe, ModelStore, ModelStoreError, ModelTokenizerDescriptor, PatchGraph,
+    ArtifactIndex, ArtifactRecord, AttentionBackend, AttentionError, AttentionFallbackPolicy,
+    AttentionRequest, LatentExtent, LatentFormatError, LoadedModel, ModelDetectionRule,
+    ModelFamilyIdentity, ModelProbe, ModelStore, ModelStoreError, ModelTokenizerDescriptor,
+    NativeVae, PatchGraph, VaeArchitectureIdentity, VaeBoundary, VaeDescriptor, VaeKernelProfile,
     detect_model_family_rules, empty_latent as canonical_empty_latent,
     generated_sd15_comfy_model_0045::LATENT_FORMAT as SD15_LATENT_FORMAT,
     project_latent_preview as canonical_project_latent_preview,
     scaled_dot_product_attention_with_context,
+    vae_image::{load_image_vae_from_model_store_with_context, sd15_reduced_vae_source_state_schema},
 };
 use crate::clip::{
     LoadedSd1Clip, Sd1ClipArtifactProfile, Sd1ClipExecutionBinding, TokenizerIdentity,
 };
 use comfy_tensor::{
-    CancellationToken, CpuBackend, CpuWorkspaceVec, ExecutionContext, Tensor,
+    CancellationToken, CpuBackend, CpuWorkspaceVec, DType, DeviceId, ExecutionContext, Tensor,
     generated_native_diffusion::{
         NativeDiffusionTensorError, add, add_channel_bias, concat_channels, conv2d, group_norm,
         linear, nearest_upsample_2x, silu, tensor_from_f32, tensor_to_f32,
@@ -305,6 +307,56 @@ pub fn load_sd15_clip_execution(
     .map_err(map_sd15_clip_error)
 }
 
+pub fn bind_sd15_vae_execution(
+    projection: &Sd15DetectorProjection,
+    artifact: &ArtifactRecord,
+) -> Result<VaeDescriptor, NativeDiffusionModelError> {
+    projection.detect()?;
+    let patch = PatchGraph::checked_semantic(&artifact.sha256, Vec::new())
+        .map_err(|error| NativeDiffusionModelError::Vae(error.to_string()))?
+        .identity();
+    VaeDescriptor::checked(
+        artifact,
+        sd15_model_family_identity()?,
+        &SD15_LATENT_FORMAT,
+        VaeArchitectureIdentity::checked(
+            "comfy.ldm.models.autoencoder.AutoencoderKL.reduced.v1",
+        )
+        .map_err(|error| NativeDiffusionModelError::Vae(error.to_string()))?,
+        patch,
+        DType::F32,
+        DeviceId::CPU,
+        VaeBoundary::image(3)
+            .map_err(|error| NativeDiffusionModelError::Vae(error.to_string()))?,
+        VaeKernelProfile::Sd15AutoencoderKlReducedV1,
+        [0.0, 1.0],
+    )
+    .map_err(|error| NativeDiffusionModelError::Vae(error.to_string()))
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn load_sd15_vae_execution(
+    store: &ModelStore,
+    index: &ArtifactIndex,
+    loaded: Arc<LoadedModel>,
+    artifact: &ArtifactRecord,
+    projection: &Sd15DetectorProjection,
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+) -> Result<NativeVae, NativeDiffusionModelError> {
+    let descriptor = bind_sd15_vae_execution(projection, artifact)?;
+    load_image_vae_from_model_store_with_context(
+        backend,
+        store,
+        index,
+        loaded,
+        descriptor,
+        &SD15_LATENT_FORMAT,
+        context,
+    )
+    .map_err(|error| NativeDiffusionModelError::Vae(error.to_string()))
+}
+
 pub fn sd15_tiny_weight_manifest() -> Result<Vec<WeightSpec>, NativeDiffusionModelError> {
     let mut weights = Vec::new();
     weights.extend(
@@ -317,7 +369,14 @@ pub fn sd15_tiny_weight_manifest() -> Result<Vec<WeightSpec>, NativeDiffusionMod
             }),
     );
     add_unet_specs(&mut weights);
-    add_vae_specs(&mut weights);
+    weights.extend(
+        sd15_reduced_vae_source_state_schema(DType::F32)
+            .into_iter()
+            .map(|state| WeightSpec {
+                key: format!("{VAE_PREFIX}.{}", state.name),
+                shape: state.shape,
+            }),
+    );
     weights.sort_by(|left, right| left.key.cmp(&right.key));
     let mut names = BTreeSet::new();
     if weights
@@ -464,56 +523,6 @@ fn add_attention_specs(weights: &mut Vec<WeightSpec>, prefix: &str, channels: u6
     linear_parameters(weights, &format!("{prefix}.proj_out"), channels, channels);
 }
 
-fn add_vae_specs(weights: &mut Vec<WeightSpec>) {
-    conv_parameters(weights, &format!("{VAE_PREFIX}.encoder.conv_in"), 32, 3, 3);
-    conv_parameters(weights, &format!("{VAE_PREFIX}.encoder.conv_out"), 8, 32, 3);
-    conv_parameters(weights, &format!("{VAE_PREFIX}.quant_conv"), 8, 8, 1);
-    conv_parameters(weights, &format!("{VAE_PREFIX}.post_quant_conv"), 4, 4, 1);
-    conv_parameters(weights, &format!("{VAE_PREFIX}.decoder.conv_in"), 128, 4, 3);
-    add_resblock_specs(
-        weights,
-        &format!("{VAE_PREFIX}.decoder.mid.block_1"),
-        128,
-        128,
-        false,
-    );
-    add_attention_specs(
-        weights,
-        &format!("{VAE_PREFIX}.decoder.mid.attn_1"),
-        128,
-        128,
-    );
-    add_resblock_specs(
-        weights,
-        &format!("{VAE_PREFIX}.decoder.mid.block_2"),
-        128,
-        128,
-        false,
-    );
-    let mut input = 128;
-    for (level, output) in [128_u64, 128, 64, 32].into_iter().enumerate() {
-        add_resblock_specs(
-            weights,
-            &format!("{VAE_PREFIX}.decoder.up.{level}.block"),
-            input,
-            output,
-            false,
-        );
-        if level < 3 {
-            conv_parameters(
-                weights,
-                &format!("{VAE_PREFIX}.decoder.up.{level}.upsample"),
-                output,
-                output,
-                3,
-            );
-        }
-        input = output;
-    }
-    norm_parameters(weights, &format!("{VAE_PREFIX}.decoder.norm_out"), 32);
-    conv_parameters(weights, &format!("{VAE_PREFIX}.decoder.conv_out"), 3, 32, 3);
-}
-
 pub fn load_sd15_tokenizer(
     vocabulary_json: &str,
     merges: &str,
@@ -598,7 +607,8 @@ impl Sd15TinyModel {
         backend: Arc<CpuBackend>,
         context: &ExecutionContext<'_>,
     ) -> Result<Self, NativeDiffusionModelError> {
-        let mut manifest = sd15_tiny_weight_manifest()?;
+        let mut manifest = Vec::new();
+        add_unet_specs(&mut manifest);
         let expected = manifest
             .iter()
             .map(|spec| spec.key.as_str())
@@ -606,6 +616,7 @@ impl Sd15TinyModel {
         let actual = loaded
             .tensors()
             .keys()
+            .filter(|key| key.starts_with(UNET_PREFIX))
             .map(String::as_str)
             .collect::<BTreeSet<_>>();
         if expected != actual {
@@ -620,7 +631,6 @@ impl Sd15TinyModel {
                     .collect(),
             });
         }
-        manifest.retain(|spec| !spec.key.starts_with(SD15_CLIP_SOURCE_PREFIX));
         let mut tensor_bytes = store.read_tensors(
             index,
             loaded,
@@ -771,86 +781,6 @@ impl Sd15TinyModel {
         hidden = self.group_norm(&hidden, &format!("{UNET_PREFIX}.out.0"), context)?;
         hidden = silu(&self.backend, &hidden, context)?;
         self.conv(&hidden, &format!("{UNET_PREFIX}.out.2"), 1, 1, context)
-    }
-
-    pub fn decode(
-        &self,
-        latent: &Tensor,
-        context: &ExecutionContext<'_>,
-    ) -> Result<Tensor, NativeDiffusionModelError> {
-        check_context(context)?;
-        require_shape(latent, &[1, 4, 4, 4], "SD15 VAE latent")?;
-        let mut values = tensor_to_f32(&self.backend, latent, context)?;
-        for value in values.iter_mut() {
-            *value /= SD15_LATENT_FORMAT.scale_factor;
-        }
-        let mut hidden = tensor_from_f32(&self.backend, &[1, 4, 4, 4], &values, context)?;
-        drop(values);
-        hidden = self.conv(
-            &hidden,
-            &format!("{VAE_PREFIX}.post_quant_conv"),
-            1,
-            0,
-            context,
-        )?;
-        hidden = self.conv(
-            &hidden,
-            &format!("{VAE_PREFIX}.decoder.conv_in"),
-            1,
-            1,
-            context,
-        )?;
-        hidden = self.resblock(
-            &hidden,
-            None,
-            &format!("{VAE_PREFIX}.decoder.mid.block_1"),
-            context,
-        )?;
-        let self_context = nchw_to_tokens(&self.backend, &hidden, context)?;
-        hidden = self.spatial_attention(
-            &hidden,
-            &self_context,
-            &format!("{VAE_PREFIX}.decoder.mid.attn_1"),
-            context,
-        )?;
-        hidden = self.resblock(
-            &hidden,
-            None,
-            &format!("{VAE_PREFIX}.decoder.mid.block_2"),
-            context,
-        )?;
-        for level in 0..4 {
-            hidden = self.resblock(
-                &hidden,
-                None,
-                &format!("{VAE_PREFIX}.decoder.up.{level}.block"),
-                context,
-            )?;
-            if level < 3 {
-                hidden = nearest_upsample_2x(&self.backend, &hidden, context)?;
-                hidden = self.conv(
-                    &hidden,
-                    &format!("{VAE_PREFIX}.decoder.up.{level}.upsample"),
-                    1,
-                    1,
-                    context,
-                )?;
-            }
-        }
-        hidden = self.group_norm(&hidden, &format!("{VAE_PREFIX}.decoder.norm_out"), context)?;
-        hidden = silu(&self.backend, &hidden, context)?;
-        let hidden = self.conv(
-            &hidden,
-            &format!("{VAE_PREFIX}.decoder.conv_out"),
-            1,
-            1,
-            context,
-        )?;
-        let mut values = tensor_to_f32(&self.backend, &hidden, context)?;
-        for value in values.iter_mut() {
-            *value = ((value.tanh() + 1.0) * 0.5).clamp(0.0, 1.0);
-        }
-        tensor_from_f32(&self.backend, &[1, 3, 32, 32], &values, context).map_err(Into::into)
     }
 
     fn linear(
@@ -1185,6 +1115,8 @@ pub enum NativeDiffusionModelError {
     Tokenizer(String),
     #[error("canonical native CLIP adapter rejected the request: {0}")]
     Clip(String),
+    #[error("canonical native VAE adapter rejected the request: {0}")]
+    Vae(String),
     #[error("native diffusion {name} expected shape {expected:?}, got {actual:?}")]
     InputShape {
         name: &'static str,

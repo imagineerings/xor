@@ -228,12 +228,13 @@ fn native_diffusion_fixture_matches_all_checkpoints() -> Result<(), Box<dyn std:
         &merges,
     )?;
     assert!(
-        NativeDiffusionBundle::new(
+        NativeDiffusionBundle::new_with_vae(
             "sd15-tiny-v1",
             model_digest.clone(),
             model.clone(),
             Arc::new(wrong_descriptor),
             bundle.clip().clone(),
+            bundle.vae().clone(),
         )
         .is_err()
     );
@@ -266,12 +267,13 @@ fn native_diffusion_fixture_matches_all_checkpoints() -> Result<(), Box<dyn std:
         fixture.tokenizer_digest()?
     );
     assert!(
-        NativeDiffusionBundle::new(
+        NativeDiffusionBundle::new_with_vae(
             "sd15-tiny-v1",
             model_digest,
             model.clone(),
             Arc::new(alternate_tokenizer),
             bundle.clip().clone(),
+            bundle.vae().clone(),
         )
         .is_err()
     );
@@ -368,7 +370,8 @@ fn native_diffusion_fixture_matches_all_checkpoints() -> Result<(), Box<dyn std:
             &context,
         )?;
     }
-    let decoded = model.decode(
+    let decoded = bundle.vae().decode(
+        backend.as_ref(),
         trace.latents.last().ok_or("missing final latent")?,
         &context,
     )?;

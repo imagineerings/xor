@@ -1,6 +1,6 @@
 pub use crate::vae_tiling::VaeTileAxisFormula;
 use crate::{
-    ArtifactAvailability, ArtifactKey, ArtifactRecord, LatentFormatDefinition,
+    ArtifactAvailability, ArtifactKey, ArtifactRecord, AttentionError, LatentFormatDefinition,
     LatentFormatDescriptor, LatentFormatError, LatentFormatIdentity, LatentFormatRegistry,
     LatentTensorLayout, LatentTransform, LoadedModel, ModelFamilyIdentity, ModelFamilyRegistry,
     ModelStore, ModelStoreError, NativeModule, NativeOpsError, PatchGraphIdentity,
@@ -16,13 +16,13 @@ use crate::{
 use comfy_tensor::{
     BinaryOperation, CancellationToken, CpuBackend, DType, DecodedScalar, DeviceId,
     ExecutionContext, Scalar, ScalarSide, StreamId, Tensor, TensorBackend, TensorError, ViewAccess,
+    generated_native_diffusion::NativeDiffusionTensorError,
 };
 #[cfg(test)]
 use comfy_tensor::{
     TensorDescriptor,
     generated_native_diffusion::{
-        NativeDiffusionTensorError, conv2d, group_norm, nearest_upsample_2x, silu, tensor_from_f32,
-        tensor_to_f32,
+        conv2d, group_norm, nearest_upsample_2x, silu, tensor_from_f32, tensor_to_f32,
     },
 };
 #[cfg(test)]
@@ -113,9 +113,13 @@ const PROFILE_F32_ONLY: &[DType] = &[DType::F32];
 impl VaeKernelProfile {
     pub const fn is_conformance_only(&self) -> bool {
         match self {
-            Self::BlockAverageNearestV1 | Self::Sd15AutoencoderKlReducedV1 => true,
+            Self::BlockAverageNearestV1 => true,
             _ => false,
         }
+    }
+
+    pub(crate) const fn uses_explicit_source_admission(&self) -> bool {
+        matches!(self, Self::Sd15AutoencoderKlReducedV1)
     }
 
     fn identity_bytes(&self) -> Result<Vec<u8>, VaeError> {
@@ -313,13 +317,16 @@ impl VaeKernelProfile {
                     1,
                     Some(16),
                 ),
-                Self::BlockAverageNearestV1 | Self::Sd15AutoencoderKlReducedV1 => (
+                Self::BlockAverageNearestV1 => (
                     Unavailable("conformance profiles use test-owned identities"),
                     PROFILE_F32_ONLY,
                     Image,
                     2,
                     None,
                 ),
+                Self::Sd15AutoencoderKlReducedV1 => {
+                    (Exact(&["SD15"]), PROFILE_F32_ONLY, Image, 2, Some(4))
+                }
             };
         VaeProfileContract {
             canonical_compatibility,
@@ -1162,8 +1169,13 @@ impl VaeModelBinding {
         cancellation: &CancellationToken,
     ) -> Result<Self, VaeError> {
         cancellation.check().map_err(TensorError::from)?;
-        let probe = store.family_probe(&loaded_model, cancellation)?;
-        if !descriptor.identity().profile().is_conformance_only() {
+        if !descriptor.identity().profile().is_conformance_only()
+            && !descriptor
+                .identity()
+                .profile()
+                .uses_explicit_source_admission()
+        {
+            let probe = store.family_probe(&loaded_model, cancellation)?;
             let registry = VaeArchitectureRegistry::checked()?;
             let (family_registry, latent_registry) = VaeArchitectureRegistry::canonical_targets()?;
             let target = VaeExecutionTarget::new(
@@ -1419,7 +1431,7 @@ struct Sd15LearnedVaeKernel {
 impl Sd15LearnedVaeKernel {
     fn checked(identity: VaeIdentity, weights: BTreeMap<String, Tensor>) -> Result<Self, VaeError> {
         if identity.profile() != &VaeKernelProfile::Sd15AutoencoderKlReducedV1
-            || !identity.profile().is_conformance_only()
+            || !identity.profile().uses_explicit_source_admission()
         {
             return Err(VaeError::KernelProfileMismatch);
         }
@@ -2972,9 +2984,10 @@ pub enum VaeError {
     LatentFormat(#[from] LatentFormatError),
     #[error(transparent)]
     Tensor(#[from] TensorError),
-    #[cfg(test)]
     #[error(transparent)]
     NativeTensor(#[from] NativeDiffusionTensorError),
+    #[error(transparent)]
+    Attention(#[from] AttentionError),
     #[error(transparent)]
     ModelStore(#[from] ModelStoreError),
     #[error(transparent)]
@@ -3803,24 +3816,8 @@ mod tests {
         transform: LatentTransform::HunyuanImage21Refiner,
     };
 
-    static SD15_REDUCED: LatentFormatDefinition = LatentFormatDefinition {
-        feature_id: "COMFY-MODEL-0903",
-        identifier: "vae_sd15_reduced",
-        channels: 4,
-        dimensions: 2,
-        spatial_downscale_ratio: 8,
-        temporal_downscale_ratio: 1,
-        scale_factor: 0.18215,
-        shift_factor: 0.0,
-        channel_means: &[],
-        channel_stds: &[],
-        preview_factors: &[],
-        preview_bias: None,
-        preview_reshape: PreviewReshape::None,
-        decoder_name: None,
-        layout: LatentTensorLayout::ChannelsFirst,
-        transform: LatentTransform::Affine,
-    };
+    static SD15_REDUCED: LatentFormatDefinition =
+        crate::generated_sd15_comfy_model_0045::LATENT_FORMAT;
 
     fn artifact(digest_byte: char) -> Result<ArtifactRecord, Box<dyn Error>> {
         Ok(ArtifactRecord {
