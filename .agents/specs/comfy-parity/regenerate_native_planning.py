@@ -8465,6 +8465,7 @@ def native_node_runtime_foundation_task(dependency: str) -> dict[str, object]:
             "crates/comfy_test_support/tests",
         ],
         [
+            "Cargo.lock",
             "crates/comfy_nodes/Cargo.toml",
             "crates/comfy_nodes/build.rs",
             "crates/comfy_nodes/src/execution.rs",
