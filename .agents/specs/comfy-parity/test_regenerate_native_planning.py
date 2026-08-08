@@ -50,6 +50,9 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertIn("crates/comfy_runtime/src/executor.rs", foundation_writes)
         self.assertIn("crates/comfy_worker/src/comfy_worker.rs", foundation_writes)
         self.assertIn("crates/comfy_api/src/services.rs", foundation_writes)
+        self.assertIn("crates/comfy_plugin_host/src/registry_adapter.rs", foundation_writes)
+        self.assertIn("crates/comfy_ui/src/execution_model.rs", foundation_writes)
+        self.assertIn("crates/sim/src/sim.rs", foundation_writes)
         self.assertIn(
             "crates/comfy_runtime/src/native_execution_controller.rs", registry_writes
         )
