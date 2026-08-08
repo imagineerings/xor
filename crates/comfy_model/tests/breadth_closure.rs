@@ -1,7 +1,7 @@
 use comfy_model::{
-    GENERATED_MODEL_FAMILY_FIXTURES, GENERATED_MODEL_FAMILY_IDENTIFIERS,
-    GENERATED_MODEL_FAMILY_REGISTRATIONS, GENERATED_MODEL_FAMILY_SOURCE_MANIFEST,
-    ModelFamilyRegistry,
+    GENERATED_LATENT_FORMAT_MANIFEST, GENERATED_LATENT_FORMATS, GENERATED_MODEL_FAMILY_FIXTURES,
+    GENERATED_MODEL_FAMILY_IDENTIFIERS, GENERATED_MODEL_FAMILY_REGISTRATIONS,
+    GENERATED_MODEL_FAMILY_SOURCE_MANIFEST, LatentFormatRegistry, ModelFamilyRegistry,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -98,6 +98,40 @@ fn val_model_family_001_rejects_duplicate_or_partial_closure_before_publication(
     partial.rows.pop();
     partial.family_count -= 1;
     assert!(validate_closure(&partial).is_err());
+    Ok(())
+}
+
+#[test]
+fn val_latent_001_exact_native_breadth_closure() -> Result<(), Box<dyn std::error::Error>> {
+    let registry = LatentFormatRegistry::checked(GENERATED_LATENT_FORMATS)?;
+    assert_eq!(registry.len(), 33);
+    assert_eq!(GENERATED_LATENT_FORMAT_MANIFEST.len(), 33);
+    let root = repository_root();
+    let mut modules = BTreeSet::new();
+    let mut feature_ids = BTreeSet::new();
+    let mut identifiers = BTreeSet::new();
+    for (module, definition) in GENERATED_LATENT_FORMAT_MANIFEST {
+        assert!(modules.insert((*module).to_owned()));
+        assert!(feature_ids.insert(definition.feature_id));
+        assert!(identifiers.insert(definition.identifier));
+        assert!(
+            root.join(format!("crates/comfy_model/src/latent_formats/{module}.rs"))
+                .is_file(),
+        );
+        assert!(
+            root.join(format!(
+                "crates/comfy_model/tests/latent_formats/{module}.rs"
+            ))
+            .is_file(),
+        );
+    }
+    let source_modules = rust_module_names(&root.join("crates/comfy_model/src/latent_formats"))?;
+    let test_modules = rust_module_names(&root.join("crates/comfy_model/tests/latent_formats"))?;
+    assert_eq!(modules, source_modules);
+    assert_eq!(modules, test_modules);
+    assert_eq!(modules.len(), registry.len());
+    assert_eq!(feature_ids.len(), registry.len());
+    assert_eq!(identifiers.len(), registry.len());
     Ok(())
 }
 

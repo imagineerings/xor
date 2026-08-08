@@ -9,7 +9,7 @@
     "samplers_path": "projects/comfy/ComfyUI/comfy/samplers.py",
     "samplers_sha256": "d882256ae9baa1d23f1367ab2ec3b021fdc15fe39ce4cb49ea2c1ee10026a649",
     "catalog_path": ".agents/specs/comfy-parity/catalogs/backend-models.csv",
-    "catalog_sha256": "d6577fb446d9735e305a6a677b541dbd97e1a4d221585b0fe6422976b6b3cf6c",
+    "catalog_sha256": "9ce79963ec723037fca84eaf73d8760fc83155f8bbc2ddd66a53aaf4e8a82c33",
     "equation_lines": [1394, 1397, 1398, 1400, 1401, 1402, 1403, 1417, 1418, 1419, 1421, 1422, 1428, 1429, 1430, 1433, 1434, 1435, 1437, 1438, 1439, 1445, 1448, 1449, 1454, 1455, 1459, 1460],
     "registry_line": 973,
     "catalog_line": 194

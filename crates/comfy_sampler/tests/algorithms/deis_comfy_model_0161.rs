@@ -161,7 +161,7 @@ fn val_sampler_001_deis_definition_is_exact_and_not_an_alias() -> Result<(), Box
     );
     assert_eq!(
         fixture.source.catalog_sha256,
-        "d6577fb446d9735e305a6a677b541dbd97e1a4d221585b0fe6422976b6b3cf6c"
+        "9ce79963ec723037fca84eaf73d8760fc83155f8bbc2ddd66a53aaf4e8a82c33"
     );
     assert_eq!(
         file_digest(&fixture.source.coefficient_path)?,

@@ -9395,6 +9395,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
                         ".agents/specs/comfy-parity/catalogs/backend-models.csv",
                         "crates/comfy_model/catalog/model-families-v1.json",
                         ".agents/specs/comfy-parity/catalogs/native-model-family-closure.json",
+                        ".agents/specs/comfy-parity/catalogs/native-spec-mapping.json",
                     ]
                 )
             )
@@ -9439,6 +9440,90 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
                         "target/comfy-parity/val-model-family-001.json",
                         "target/comfy-parity/val-model-format-001.json",
                         "target/comfy-parity/val-sampling-foundation-001.json",
+                    ]
+                )
+            )
+        if item["id"] == "comfy-parity-native-compute-breadth-integration":
+            item["validations"] = list(
+                dict.fromkeys(
+                    list(item["validations"])
+                    + [
+                        "VAL-AUTOGRAD-001",
+                        "VAL-RNG-001",
+                        "VAL-DEVICE-001",
+                        "VAL-PATCH-001",
+                        "VAL-PATCH-ADAPTER-001",
+                        "VAL-OWNERSHIP-001",
+                    ]
+                )
+            )
+            item["reads"] = list(
+                dict.fromkeys(
+                    list(item["reads"])
+                    + [
+                        ".agents/specs/comfy-parity/catalogs/backend-conditioning-contracts.csv",
+                        ".agents/specs/comfy-parity/catalogs/backend-autograd.csv",
+                        ".agents/specs/comfy-parity/catalogs/backend-models.csv",
+                        ".agents/specs/comfy-parity/catalogs/native-model-family-closure.json",
+                        ".agents/specs/comfy-parity/catalogs/native-spec-mapping.json",
+                        ".agents/specs/comfy-parity/fixtures/quant-linear-source-oracle.json",
+                        ".agents/specs/comfy-parity/regenerate_native_planning.py",
+                        "crates/comfy_tensor/build.rs",
+                        "crates/comfy_tensor/src/comfy_tensor.rs",
+                        "crates/comfy_tensor/operation_contract_evidence.rs",
+                        "crates/comfy_tensor/src/operation_contracts.rs",
+                        "crates/comfy_tensor/src/operation_contract_records.rs",
+                        "crates/comfy_tensor/tests/backends",
+                        "crates/comfy_model/build.rs",
+                        "crates/comfy_model/catalog/model-families-v1.json",
+                        "crates/comfy_model/src/comfy_model.rs",
+                        "crates/comfy_model/src/model_family.rs",
+                        "crates/comfy_model/src/latent_format.rs",
+                        "crates/comfy_model/src/patch_graph.rs",
+                        "crates/comfy_model/src/patches.rs",
+                        "crates/comfy_model/tests/families",
+                        "crates/comfy_model/tests/latent_formats",
+                        "crates/comfy_model/tests/model_families.rs",
+                        "crates/comfy_model/tests/patch_adapters.rs",
+                        "crates/comfy_sampler/build.rs",
+                        "crates/comfy_sampler/src/comfy_sampler.rs",
+                        "crates/comfy_sampler/src/sampler.rs",
+                        "crates/comfy_sampler/src/scheduler.rs",
+                        "crates/comfy_sampler/tests/algorithms",
+                        "crates/comfy_sampler/tests/schedulers",
+                        "crates/comfy_test_support/tests/autograd_breadth.rs",
+                        "crates/comfy_test_support/fixtures/models",
+                        "crates/comfy_test_support/fixtures/autograd/breadth-v1.json",
+                        "crates/comfy_test_support/fixtures/samplers",
+                        "crates/comfy_test_support/fixtures/schedulers",
+                        "crates/comfy_test_support/fixtures/tensor_signatures/contracts",
+                        "projects/comfy/ComfyUI/comfy/lora.py",
+                        "projects/comfy/ComfyUI/comfy/model_patcher.py",
+                        "projects/comfy/ComfyUI/comfy/weight_adapter",
+                        "projects/comfy/ComfyUI/comfy_extras/nodes_model_merging.py",
+                    ]
+                )
+            )
+            item["writes"] = list(
+                dict.fromkeys(
+                    list(item["writes"])
+                    + [
+                        ".agents/specs/comfy-parity/regenerate_native_planning.py",
+                        ".agents/specs/comfy-parity/tasks.md",
+                        "crates/comfy_sampler/tests/algorithms/deis_comfy_model_0161.rs",
+                        "crates/comfy_test_support/fixtures/samplers",
+                        "crates/comfy_test_support/fixtures/schedulers",
+                        "target/comfy-parity/val-autograd-001.json",
+                        "target/comfy-parity/val-device-001.json",
+                        "target/comfy-parity/val-latent-001.json",
+                        "target/comfy-parity/val-model-family-001.json",
+                        "target/comfy-parity/val-ownership-001.json",
+                        "target/comfy-parity/val-patch-001.json",
+                        "target/comfy-parity/val-patch-adapter-001.json",
+                        "target/comfy-parity/val-rng-001.json",
+                        "target/comfy-parity/val-sampler-001.json",
+                        "target/comfy-parity/val-scheduler-001.json",
+                        "target/comfy-parity/val-tensor-001.json",
                     ]
                 )
             )
@@ -10466,6 +10551,40 @@ def task_validation_commands(item: dict[str, object]) -> str:
             "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --all-targets",
             "./script/clippy -p comfy_model -p comfy_tensor -p comfy_worker -p comfy_test_support",
             "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+        ]
+    elif identifier == "comfy-parity-native-compute-breadth-integration":
+        commands = [
+            "cargo fmt --all -- --check",
+            "cargo check --locked -p comfy_tensor -p comfy_model -p comfy_sampler -p comfy_test_support --all-targets",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_tensor --test breadth_closure --all-features",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test breadth_closure",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_tensor val_tensor_001",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_tensor val_autograd_001",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test autograd_breadth",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_tensor val_rng_001",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_tensor --all-features val_device_001",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test model_families every_generated_model_family_fixture_executes_the_canonical_harness -- --exact",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test latent_formats val_latent_001_all_formats_emit_complete_artifact -- --exact",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --lib patch_graph::tests::val_patch_001_catalog_manifest_is_exact_digest_bound_and_executable -- --exact",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test patch_adapters val_patch_adapter_001_exact_catalog_manifest_and_artifact_are_current -- --exact",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_sampler val_sampler_001",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_sampler val_scheduler_001",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "UPDATE_COMFY_NATIVE_COMPUTE_CLOSURE=1 CARGO_INCREMENTAL=0 cargo test --locked -p comfy_sampler --test breadth_closure",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_tensor --all-targets --all-features --no-run",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --all-targets --no-run",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_sampler --all-targets --no-run",
+            "./script/clippy -p comfy_tensor -p comfy_model -p comfy_sampler -p comfy_test_support",
+            "UPDATE_COMFY_NATIVE_COMPUTE_CLOSURE=1 CARGO_INCREMENTAL=0 cargo test --locked -p comfy_sampler --test breadth_closure",
+            "UPDATE_COMFY_NATIVE_COMPUTE_CLOSURE=1 CARGO_INCREMENTAL=0 cargo test --locked -p comfy_sampler --test breadth_closure",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_tensor --test breadth_closure --all-features",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test breadth_closure",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_sampler --test breadth_closure",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact",
+            "python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/comfy-parity",
+            "git diff --check",
         ]
     elif identifier == "comfy-parity-model-family-authoritative-foundation":
         commands = [

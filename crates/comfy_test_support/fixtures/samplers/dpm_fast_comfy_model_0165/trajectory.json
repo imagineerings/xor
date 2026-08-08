@@ -9,7 +9,7 @@
     "equation_path": "projects/comfy/ComfyUI/comfy/k_diffusion/sampling.py",
     "equation_sha256": "cc5f944efd85c566484c3999beb74e8c19c894f2a50ca574d090c3a46ac6bd06",
     "catalog_path": ".agents/specs/comfy-parity/catalogs/backend-models.csv",
-    "catalog_sha256": "d6577fb446d9735e305a6a677b541dbd97e1a4d221585b0fe6422976b6b3cf6c"
+    "catalog_sha256": "9ce79963ec723037fca84eaf73d8760fc83155f8bbc2ddd66a53aaf4e8a82c33"
   },
   "tolerance": 0.00003,
   "seed": 356,
