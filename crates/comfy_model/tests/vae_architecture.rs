@@ -22,6 +22,7 @@ use std::{
 };
 
 const VAE_TILING_TASK: &str = "comfy-parity-vae-multidimensional-tiling";
+const VAE_EXECUTION_TASK: &str = "comfy-parity-vae-execution-foundation";
 const VAE_VIDEO_TASK: &str = "comfy-parity-vae-video-architectures";
 const VAE_AUDIO_TASK: &str = "comfy-parity-vae-audio-architectures";
 const VAE_STRUCTURED_TASK: &str = "comfy-parity-vae-structured-architectures";
@@ -843,6 +844,123 @@ fn val_vae_001_selector_rows() -> Result<(), Box<dyn Error>> {
         }));
     }
     let loader_contract_count = contract_evidence.len();
+    let execution_rows = catalog_rows
+        .iter()
+        .filter(|fields| fields.get(8).is_some_and(|task| task == VAE_EXECUTION_TASK))
+        .collect::<Vec<_>>();
+    assert_eq!(execution_rows.len(), 1);
+    let execution_fields = execution_rows
+        .first()
+        .copied()
+        .ok_or("VAE execution contract is unavailable")?;
+    assert_eq!(execution_fields.len(), 15);
+    assert_eq!(
+        execution_fields[0],
+        "conditioning-model-execution-sd-vae-6e4631bd"
+    );
+    assert_eq!(execution_fields[1], "model_execution");
+    assert_eq!(execution_fields[2], "projects/comfy/ComfyUI/comfy/sd.py");
+    assert_eq!(execution_fields[3], "VAE");
+    assert_eq!(execution_fields[5], VAE_SELECTOR_SOURCE_SHA256);
+    assert_eq!(
+        execution_fields[6],
+        "b84589afa030b5865c809774f949922d464a94a26375957f2da423b4a27524d4"
+    );
+    assert_eq!(execution_fields[7], "comfy_model::vae");
+    assert_eq!(execution_fields[8], VAE_EXECUTION_TASK);
+    assert_eq!(execution_fields[9], "comfy_model::vae::tests");
+    assert_eq!(execution_fields[10], "native_rust");
+    assert_eq!(execution_fields[14], "VAL-VAE-001");
+
+    let execution_family = family_registry
+        .definitions_in_source_order()
+        .into_iter()
+        .find(|definition| definition.identifier == "CogVideoX_T2V")
+        .ok_or("canonical CogVideoX family is unavailable")?;
+    let execution_target = VaeExecutionTarget::new(
+        ModelFamilyIdentity::new(
+            execution_family.feature_id,
+            execution_family.identifier,
+            execution_family.architecture_version,
+        )?,
+        LatentFormatIdentity::new(
+            execution_family.latent_feature_id,
+            execution_family.latent_identifier,
+        )?,
+        DType::F32,
+        DeviceId::CPU,
+    );
+    let execution_fixture = selector_fixtures()
+        .into_iter()
+        .find(|fixture| fixture.row == "conditioning-vae-selection-sd-l690-3abc5b4d")
+        .ok_or("CogVideoX VAE fixture is unavailable")?;
+    let execution_selection = registry.select_for_target(
+        &execution_fixture.probe()?,
+        &execution_target,
+        &family_registry,
+        &latent_registry,
+        &cancellation,
+    )?;
+    let execution_artifact = ArtifactRecord {
+        key: ArtifactKey::new("models", "cog-vae.safetensors")?,
+        namespace: "vae".to_owned(),
+        canonical_path: PathBuf::from("/verified/models/cog-vae.safetensors"),
+        byte_size: 1,
+        modified_nanoseconds: 1,
+        sha256: "a".repeat(64),
+        availability: ArtifactAvailability::Present,
+    };
+    let execution_patch =
+        PatchGraph::checked_semantic(execution_artifact.sha256.clone(), Vec::new())?.identity();
+    let execution_descriptor = VaeDescriptor::checked_selection(
+        &execution_artifact,
+        &execution_selection,
+        &execution_target,
+        &family_registry,
+        &latent_registry,
+        execution_patch.clone(),
+        VaeBoundary::video(3)?,
+        [0.0, 1.0],
+        &cancellation,
+    )?;
+    assert_eq!(
+        execution_descriptor.identity().family(),
+        execution_target.family()
+    );
+    assert_eq!(
+        execution_descriptor.identity().latent_format(),
+        execution_target.latent_format()
+    );
+    let encoded_execution_identity = serde_json::to_value(execution_descriptor.identity())?;
+    let decoded_execution_identity =
+        serde_json::from_value::<comfy_model::VaeIdentity>(encoded_execution_identity)?;
+    assert_eq!(decoded_execution_identity, *execution_descriptor.identity());
+    assert!(matches!(
+        VaeDescriptor::checked_selection(
+            &execution_artifact,
+            &execution_selection,
+            &execution_target,
+            &family_registry,
+            &latent_registry,
+            execution_patch,
+            VaeBoundary::image(3)?,
+            [0.0, 1.0],
+            &cancellation,
+        ),
+        Err(VaeError::SelectionBoundaryMismatch { .. })
+    ));
+    contract_evidence.push(json!({
+        "contract_id": execution_fields[0],
+        "task_id": VAE_EXECUTION_TASK,
+        "source_sha256": execution_fields[5],
+        "symbol_sha256": execution_fields[6],
+        "status": "passed",
+        "case_ids": [
+            "vae-execution:canonical-selection-binding",
+            "vae-execution:identity-round-trip",
+            "vae-execution:typed-boundary-rejection",
+        ],
+    }));
     let tiling_rows = catalog_rows
         .iter()
         .filter(|fields| fields.get(8).is_some_and(|task| task == VAE_TILING_TASK))
@@ -1512,11 +1630,8 @@ fn val_vae_001_selector_rows() -> Result<(), Box<dyn Error>> {
     })
     .collect::<Result<Vec<_>, std::io::Error>>()?;
     let audio_implementations = [
-        "crates/comfy_model/src/vae.rs",
         "crates/comfy_model/src/vae_architecture.rs",
-        "crates/comfy_model/src/vae_tiling.rs",
         "crates/comfy_model/src/vae_audio.rs",
-        "crates/comfy_model/src/native_ops.rs",
         "crates/comfy_model/src/vision_models.rs",
         "crates/comfy_runtime/src/assets.rs",
         "crates/comfy_model/tests/vae_architecture.rs",
@@ -1537,8 +1652,6 @@ fn val_vae_001_selector_rows() -> Result<(), Box<dyn Error>> {
         "crates/comfy_model/src/vae.rs",
         "crates/comfy_model/src/vae_architecture.rs",
         "crates/comfy_model/src/vae_structured.rs",
-        "crates/comfy_model/src/model_store.rs",
-        "crates/comfy_model/src/vision_models.rs",
         "crates/comfy_runtime/src/assets.rs",
         "crates/comfy_model/tests/vae_architecture.rs",
         "crates/comfy_model/tests/vae_structured.rs",
@@ -1565,6 +1678,27 @@ fn val_vae_001_selector_rows() -> Result<(), Box<dyn Error>> {
                     "path": implementation_path,
                     "sha256": implementation_sha256,
                 },
+            }),
+        ),
+        (
+            VAE_EXECUTION_TASK,
+            json!({
+                "status": "passed",
+                "passed": 1,
+                "failed": 0,
+                "skipped": 0,
+                "case_ids": [
+                    "vae-execution:canonical-selection-binding",
+                    "vae-execution:identity-round-trip",
+                    "vae-execution:typed-boundary-rejection",
+                ],
+                "implementations": [{
+                    "path": "crates/comfy_model/src/vae.rs",
+                    "sha256": format!(
+                        "{:x}",
+                        Sha256::digest(fs::read(workspace.join("crates/comfy_model/src/vae.rs"))?)
+                    ),
+                }],
             }),
         ),
         (

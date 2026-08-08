@@ -1979,6 +1979,14 @@ fn run_ownership_validation(
         && model_clip_tokenizer_tests.contains(
             "canonical_sd1_artifact_admission_rejects_noncanonical_id_domains_and_merge_cardinality",
         );
+    let provider_identity_surface = runtime_controller_production
+        .split_once("pub trait NativeDiffusionProvider: Send + Sync {")
+        .and_then(|(_, remainder)| remainder.split_once("    fn load("))
+        .map(|(identity_surface, _)| identity_surface);
+    let fixture_provider_identity_surface = native_diffusion_fixture
+        .split_once("impl NativeDiffusionProvider for NativeDiffusionFixture {")
+        .and_then(|(_, remainder)| remainder.split_once("    fn load("))
+        .map(|(identity_surface, _)| identity_surface);
     let task_512_native_diffusion_binds_canonical_tokenizer_identity = model_native_diffusion
         .contains("pub const SD15_VOCAB_SIZE: usize = crate::clip::SD1_VOCABULARY_SIZE;")
         && model_native_diffusion
@@ -1986,16 +1994,39 @@ fn run_ownership_validation(
         && model_native_diffusion.contains(".encode_fixed_token_ids(text, cancellation)")
         && !model_native_diffusion.contains("merge_ranks:")
         && !model_native_diffusion.contains("fn byte_encoder(")
-        && runtime_controller_production.contains("tokenizer_digest: String")
-        && runtime_controller_production.contains("fn tokenizer_digest(&self)")
+        && runtime_cache_production.contains("    tokenizer_digest: String,")
         && runtime_controller_production
-            .contains("provider_tokenizer_digest != bundle.tokenizer_digest")
+            .contains("cache_identities: CanonicalNativeDiffusionCacheIdentities")
+        && runtime_cache_production.contains("pub struct CanonicalNativeDiffusionCacheIdentities")
+        && provider_identity_surface.is_some_and(|surface| {
+            surface.contains("fn cache_identities(")
+                && surface.contains("&CancellationToken")
+                && surface.contains("CanonicalNativeDiffusionCacheIdentities")
+                && !surface.contains("fn model_digest(")
+                && !surface.contains("fn tokenizer_digest(")
+                && !surface.contains("fn clip_cache_identities(")
+                && !surface.contains("fn vae_cache_identities(")
+                && !surface.contains("fn conditioning_cache_identities(")
+        })
         && runtime_controller_production
-            .contains("(\"tokenizer.sd1\".to_owned(), tokenizer_digest)")
+            .contains("provider_identity.tokenizer_digest() != bundle.tokenizer_digest()")
+        && runtime_cache_production.contains(
+            "digests.insert(\"tokenizer.sd1\".to_owned(), self.tokenizer_digest.clone());",
+        )
         && runtime_controller_production
-            .contains("handle.tokenizer_digest != bundle.tokenizer_digest")
-        && native_diffusion_fixture.contains("fn tokenizer_digest(&self)")
-        && native_diffusion_fixture.contains(".identity()\n            .digest()");
+            .contains("NativeDiffusionHandle::from_bundle(&bundle, role)")
+        && runtime_controller_production.contains("handle.require_exact_match(&expected)?")
+        && fixture_provider_identity_surface.is_some_and(|surface| {
+            surface.contains("fn cache_identities(")
+                && surface.contains("checkpoint_identity_snapshot(cancellation)")
+                && surface.contains("tokenizer.identity()")
+                && surface.contains(".digest()")
+                && !surface.contains("fn model_digest(")
+                && !surface.contains("fn tokenizer_digest(")
+                && !surface.contains("fn clip_cache_identities(")
+                && !surface.contains("fn vae_cache_identities(")
+                && !surface.contains("fn conditioning_cache_identities(")
+        });
     let task_512_policy_trace = policy_concerns
         .iter()
         .find(|entry| {

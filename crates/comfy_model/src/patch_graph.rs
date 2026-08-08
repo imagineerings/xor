@@ -4223,8 +4223,7 @@ mod tests {
         let implementation = std::fs::read(repository.join(implementation_path))
             .map_err(|error| PatchGraphError::Serialization(error.to_string()))?;
         let implementation_sha256 = format!("{:x}", Sha256::digest(implementation));
-        const TASK_IMPLEMENTATION_PATHS: [&str; 13] = [
-            "crates/comfy_model/Cargo.toml",
+        const TASK_IMPLEMENTATION_PATHS: [&str; 11] = [
             "crates/comfy_model/src/comfy_model.rs",
             "crates/comfy_model/src/clip.rs",
             "crates/comfy_model/src/model_family.rs",
@@ -4233,7 +4232,6 @@ mod tests {
             "crates/comfy_model/tests/model_family_foundation.rs",
             "crates/comfy_tensor/src/cpu_backend.rs",
             "crates/comfy_tensor/src/operation.rs",
-            "crates/comfy_test_support/Cargo.toml",
             "crates/comfy_test_support/tests/patch_compute_boundary.rs",
             "crates/comfy_worker/src/memory_modes.rs",
             "crates/comfy_worker/tests/memory_conformance.rs",

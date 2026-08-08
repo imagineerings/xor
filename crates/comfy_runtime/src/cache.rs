@@ -7,6 +7,7 @@ use thiserror::Error;
 pub const CACHE_SCHEMA_VERSION: u16 = 1;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(try_from = "CanonicalClipCacheIdentitiesWire")]
 pub struct CanonicalClipCacheIdentities {
     tokenizer: String,
     architecture: String,
@@ -17,11 +18,311 @@ pub struct CanonicalClipCacheIdentities {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(try_from = "CanonicalVaeCacheIdentitiesWire")]
 pub struct CanonicalVaeCacheIdentities {
     identity: String,
     artifact: String,
     patch: String,
     execution: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(try_from = "CanonicalConditioningCacheIdentitiesWire")]
+pub struct CanonicalConditioningCacheIdentities {
+    conditioning: String,
+    guidance: String,
+    model_patch: String,
+    model_execution: String,
+    control: String,
+    execution: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(try_from = "CanonicalNativeDiffusionCacheIdentitiesWire")]
+pub struct CanonicalNativeDiffusionCacheIdentities {
+    model_digest: String,
+    tokenizer_digest: String,
+    clip: CanonicalClipCacheIdentities,
+    vae: CanonicalVaeCacheIdentities,
+    conditioning: CanonicalConditioningCacheIdentities,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CanonicalClipCacheIdentitiesWire {
+    tokenizer: String,
+    architecture: String,
+    artifact: String,
+    model: String,
+    patch: String,
+    execution: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CanonicalVaeCacheIdentitiesWire {
+    identity: String,
+    artifact: String,
+    patch: String,
+    execution: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CanonicalConditioningCacheIdentitiesWire {
+    conditioning: String,
+    guidance: String,
+    model_patch: String,
+    model_execution: String,
+    control: String,
+    execution: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CanonicalNativeDiffusionCacheIdentitiesWire {
+    model_digest: String,
+    tokenizer_digest: String,
+    clip: CanonicalClipCacheIdentities,
+    vae: CanonicalVaeCacheIdentities,
+    conditioning: CanonicalConditioningCacheIdentities,
+}
+
+impl TryFrom<CanonicalClipCacheIdentitiesWire> for CanonicalClipCacheIdentities {
+    type Error = NativeCacheError;
+
+    fn try_from(value: CanonicalClipCacheIdentitiesWire) -> Result<Self, Self::Error> {
+        Self::checked(
+            value.tokenizer,
+            value.architecture,
+            value.artifact,
+            value.model,
+            value.patch,
+            value.execution,
+        )
+    }
+}
+
+impl TryFrom<CanonicalVaeCacheIdentitiesWire> for CanonicalVaeCacheIdentities {
+    type Error = NativeCacheError;
+
+    fn try_from(value: CanonicalVaeCacheIdentitiesWire) -> Result<Self, Self::Error> {
+        Self::checked(value.identity, value.artifact, value.patch, value.execution)
+    }
+}
+
+impl TryFrom<CanonicalConditioningCacheIdentitiesWire> for CanonicalConditioningCacheIdentities {
+    type Error = NativeCacheError;
+
+    fn try_from(value: CanonicalConditioningCacheIdentitiesWire) -> Result<Self, Self::Error> {
+        let identities = Self::checked(
+            value.conditioning,
+            value.guidance,
+            value.model_patch,
+            value.model_execution,
+            value.control,
+        )?;
+        if identities.execution != value.execution {
+            return Err(NativeCacheError::DependencyIdentityMismatch);
+        }
+        Ok(identities)
+    }
+}
+
+impl CanonicalNativeDiffusionCacheIdentities {
+    pub fn checked(
+        model_digest: impl Into<String>,
+        tokenizer_digest: impl Into<String>,
+        clip: CanonicalClipCacheIdentities,
+        vae: CanonicalVaeCacheIdentities,
+        conditioning: CanonicalConditioningCacheIdentities,
+    ) -> Result<Self, NativeCacheError> {
+        let model_digest = model_digest.into();
+        let tokenizer_digest = tokenizer_digest.into();
+        if !is_sha256(&model_digest)
+            || !is_sha256(&tokenizer_digest)
+            || clip
+                .artifact_digests()
+                .into_values()
+                .chain(vae.artifact_digests().into_values())
+                .chain(conditioning.artifact_digests().into_values())
+                .any(|digest| !is_sha256(&digest))
+        {
+            return Err(NativeCacheError::InvalidDependencyIdentity);
+        }
+        let canonical_conditioning = CanonicalConditioningCacheIdentities::checked(
+            conditioning.conditioning(),
+            conditioning.guidance(),
+            conditioning.model_patch(),
+            conditioning.model_execution(),
+            conditioning.control(),
+        )?;
+        if canonical_conditioning != conditioning
+            || clip.artifact() != model_digest
+            || vae.artifact() != model_digest
+            || clip.tokenizer() != tokenizer_digest
+        {
+            return Err(NativeCacheError::DependencyIdentityMismatch);
+        }
+        Ok(Self {
+            model_digest,
+            tokenizer_digest,
+            clip,
+            vae,
+            conditioning,
+        })
+    }
+
+    pub fn model_digest(&self) -> &str {
+        &self.model_digest
+    }
+
+    pub fn tokenizer_digest(&self) -> &str {
+        &self.tokenizer_digest
+    }
+
+    pub fn clip(&self) -> &CanonicalClipCacheIdentities {
+        &self.clip
+    }
+
+    pub fn vae(&self) -> &CanonicalVaeCacheIdentities {
+        &self.vae
+    }
+
+    pub fn conditioning(&self) -> &CanonicalConditioningCacheIdentities {
+        &self.conditioning
+    }
+
+    pub fn artifact_digests(&self) -> BTreeMap<String, String> {
+        let mut digests = self.clip.artifact_digests();
+        digests.extend(self.vae.artifact_digests());
+        digests.extend(self.conditioning.artifact_digests());
+        digests.insert("model.safetensors".to_owned(), self.model_digest.clone());
+        digests.insert("tokenizer.sd1".to_owned(), self.tokenizer_digest.clone());
+        digests
+    }
+
+    pub fn require_exact_match(&self, actual: &Self) -> Result<(), NativeCacheError> {
+        if self == actual {
+            Ok(())
+        } else {
+            Err(NativeCacheError::DependencyIdentityMismatch)
+        }
+    }
+}
+
+impl TryFrom<CanonicalNativeDiffusionCacheIdentitiesWire>
+    for CanonicalNativeDiffusionCacheIdentities
+{
+    type Error = NativeCacheError;
+
+    fn try_from(value: CanonicalNativeDiffusionCacheIdentitiesWire) -> Result<Self, Self::Error> {
+        Self::checked(
+            value.model_digest,
+            value.tokenizer_digest,
+            value.clip,
+            value.vae,
+            value.conditioning,
+        )
+    }
+}
+
+impl CanonicalConditioningCacheIdentities {
+    pub fn checked(
+        conditioning: impl Into<String>,
+        guidance: impl Into<String>,
+        model_patch: impl Into<String>,
+        model_execution: impl Into<String>,
+        control: impl Into<String>,
+    ) -> Result<Self, NativeCacheError> {
+        let conditioning = conditioning.into();
+        let guidance = guidance.into();
+        let model_patch = model_patch.into();
+        let model_execution = model_execution.into();
+        let control = control.into();
+        if [
+            conditioning.as_str(),
+            guidance.as_str(),
+            model_patch.as_str(),
+            model_execution.as_str(),
+            control.as_str(),
+        ]
+        .into_iter()
+        .any(|digest| !is_sha256(digest))
+        {
+            return Err(NativeCacheError::InvalidDependencyIdentity);
+        }
+        let mut hasher = Sha256::new();
+        hasher.update(b"sim.comfy.conditioning-execution.v1\0");
+        for digest in [
+            conditioning.as_str(),
+            guidance.as_str(),
+            model_patch.as_str(),
+            model_execution.as_str(),
+            control.as_str(),
+        ] {
+            hasher.update(digest.as_bytes());
+            hasher.update([0]);
+        }
+        Ok(Self {
+            conditioning,
+            guidance,
+            model_patch,
+            model_execution,
+            control,
+            execution: format!("{:x}", hasher.finalize()),
+        })
+    }
+
+    pub fn artifact_digests(&self) -> BTreeMap<String, String> {
+        self.ordered()
+            .into_iter()
+            .map(|(name, digest)| (name.to_owned(), digest.to_owned()))
+            .collect()
+    }
+
+    pub fn conditioning(&self) -> &str {
+        &self.conditioning
+    }
+
+    pub fn guidance(&self) -> &str {
+        &self.guidance
+    }
+
+    pub fn model_patch(&self) -> &str {
+        &self.model_patch
+    }
+
+    pub fn model_execution(&self) -> &str {
+        &self.model_execution
+    }
+
+    pub fn control(&self) -> &str {
+        &self.control
+    }
+
+    pub fn execution(&self) -> &str {
+        &self.execution
+    }
+
+    pub fn require_exact_match(&self, actual: &Self) -> Result<(), NativeCacheError> {
+        if self == actual {
+            Ok(())
+        } else {
+            Err(NativeCacheError::DependencyIdentityMismatch)
+        }
+    }
+
+    fn ordered(&self) -> [(&'static str, &str); 6] {
+        [
+            ("conditioning.abi", &self.conditioning),
+            ("conditioning.control", &self.control),
+            ("conditioning.execution", &self.execution),
+            ("conditioning.guidance", &self.guidance),
+            ("conditioning.model-execution", &self.model_execution),
+            ("conditioning.model-patch", &self.model_patch),
+        ]
+    }
 }
 
 impl CanonicalVaeCacheIdentities {
@@ -693,6 +994,279 @@ pub(crate) mod tests {
                 "4".repeat(64),
             )
             .is_err()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn canonical_conditioning_cache_identities_bind_every_execution_owner()
+    -> Result<(), NativeCacheError> {
+        let identities = CanonicalConditioningCacheIdentities::checked(
+            "1".repeat(64),
+            "2".repeat(64),
+            "3".repeat(64),
+            "4".repeat(64),
+            "5".repeat(64),
+        )?;
+        let dependencies = identities.artifact_digests();
+        assert_eq!(dependencies.len(), 6);
+        assert_eq!(
+            dependencies.get("conditioning.control"),
+            Some(&"5".repeat(64))
+        );
+        assert_eq!(
+            dependencies.get("conditioning.execution"),
+            Some(&identities.execution().to_owned())
+        );
+        identities.require_exact_match(&identities)?;
+        for changed in 0..5 {
+            let mut values = ["1", "2", "3", "4", "5"].map(|value| value.repeat(64));
+            values[changed] = "a".repeat(64);
+            let changed = CanonicalConditioningCacheIdentities::checked(
+                values[0].clone(),
+                values[1].clone(),
+                values[2].clone(),
+                values[3].clone(),
+                values[4].clone(),
+            )?;
+            assert_ne!(identities, changed);
+            assert_eq!(
+                identities.require_exact_match(&changed),
+                Err(NativeCacheError::DependencyIdentityMismatch)
+            );
+        }
+        assert!(
+            CanonicalConditioningCacheIdentities::checked(
+                "not-a-digest",
+                "2".repeat(64),
+                "3".repeat(64),
+                "4".repeat(64),
+                "5".repeat(64),
+            )
+            .is_err()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn canonical_native_diffusion_cache_identities_bind_one_checked_snapshot()
+    -> Result<(), NativeCacheError> {
+        let model = "1".repeat(64);
+        let tokenizer = "2".repeat(64);
+        let clip = CanonicalClipCacheIdentities::checked(
+            tokenizer.clone(),
+            "3".repeat(64),
+            model.clone(),
+            "4".repeat(64),
+            "5".repeat(64),
+            "6".repeat(64),
+        )?;
+        let vae = CanonicalVaeCacheIdentities::checked(
+            "7".repeat(64),
+            model.clone(),
+            "8".repeat(64),
+            "9".repeat(64),
+        )?;
+        let conditioning = CanonicalConditioningCacheIdentities::checked(
+            "a".repeat(64),
+            "b".repeat(64),
+            "c".repeat(64),
+            "d".repeat(64),
+            "e".repeat(64),
+        )?;
+        let identities = CanonicalNativeDiffusionCacheIdentities::checked(
+            model.clone(),
+            tokenizer.clone(),
+            clip.clone(),
+            vae.clone(),
+            conditioning.clone(),
+        )?;
+        assert_eq!(identities.model_digest(), model);
+        assert_eq!(identities.tokenizer_digest(), tokenizer);
+        assert_eq!(identities.clip(), &clip);
+        assert_eq!(identities.vae(), &vae);
+        assert_eq!(identities.conditioning(), &conditioning);
+        assert_ne!(clip.patch(), vae.patch());
+        assert_ne!(clip.patch(), conditioning.model_patch());
+        assert_ne!(vae.patch(), conditioning.model_patch());
+        let artifact_digests = identities.artifact_digests();
+        assert_eq!(artifact_digests.len(), 18);
+        assert_eq!(artifact_digests.get("model.safetensors"), Some(&model));
+        assert_eq!(artifact_digests.get("tokenizer.sd1"), Some(&tokenizer));
+        assert_eq!(
+            artifact_digests.get("clip.execution"),
+            Some(&"6".repeat(64))
+        );
+        assert_eq!(artifact_digests.get("vae.execution"), Some(&"9".repeat(64)));
+        assert_eq!(
+            artifact_digests.get("conditioning.execution"),
+            Some(&conditioning.execution().to_owned())
+        );
+        let encoded = serde_json::to_vec(&identities)
+            .map_err(|error| NativeCacheError::Canonicalization(error.to_string()))?;
+        let decoded: CanonicalNativeDiffusionCacheIdentities = serde_json::from_slice(&encoded)
+            .map_err(|error| NativeCacheError::Canonicalization(error.to_string()))?;
+        identities.require_exact_match(&decoded)?;
+
+        let mut forged = serde_json::to_value(&identities)
+            .map_err(|error| NativeCacheError::Canonicalization(error.to_string()))?;
+        forged["clip"]["execution"] = json!("NOT-A-LOWERCASE-SHA256");
+        assert!(serde_json::from_value::<CanonicalNativeDiffusionCacheIdentities>(forged).is_err());
+        let mut forged = serde_json::to_value(&identities)
+            .map_err(|error| NativeCacheError::Canonicalization(error.to_string()))?;
+        forged["conditioning"]["execution"] = json!("f".repeat(64));
+        assert!(serde_json::from_value::<CanonicalNativeDiffusionCacheIdentities>(forged).is_err());
+
+        let mut invalid_clip = serde_json::to_value(&clip)
+            .map_err(|error| NativeCacheError::Canonicalization(error.to_string()))?;
+        invalid_clip["execution"] = json!("NOT-A-LOWERCASE-SHA256");
+        assert!(serde_json::from_value::<CanonicalClipCacheIdentities>(invalid_clip).is_err());
+
+        let mut forged_conditioning = serde_json::to_value(&conditioning)
+            .map_err(|error| NativeCacheError::Canonicalization(error.to_string()))?;
+        forged_conditioning["execution"] = json!("f".repeat(64));
+        assert!(
+            serde_json::from_value::<CanonicalConditioningCacheIdentities>(forged_conditioning)
+                .is_err()
+        );
+
+        let mut unknown_leaf = serde_json::to_value(&vae)
+            .map_err(|error| NativeCacheError::Canonicalization(error.to_string()))?;
+        unknown_leaf["unexpected"] = json!(true);
+        assert!(serde_json::from_value::<CanonicalVaeCacheIdentities>(unknown_leaf).is_err());
+
+        let mut unknown_aggregate = serde_json::to_value(&identities)
+            .map_err(|error| NativeCacheError::Canonicalization(error.to_string()))?;
+        unknown_aggregate["unexpected"] = json!(true);
+        assert!(
+            serde_json::from_value::<CanonicalNativeDiffusionCacheIdentities>(unknown_aggregate)
+                .is_err()
+        );
+
+        for changed in 0..5 {
+            let changed_model = if changed == 0 {
+                "f".repeat(64)
+            } else {
+                model.clone()
+            };
+            let changed_tokenizer = if changed == 1 {
+                "f".repeat(64)
+            } else {
+                tokenizer.clone()
+            };
+            let changed_clip = if changed == 2 {
+                CanonicalClipCacheIdentities::checked(
+                    changed_tokenizer.clone(),
+                    "3".repeat(64),
+                    changed_model.clone(),
+                    "4".repeat(64),
+                    "5".repeat(64),
+                    "f".repeat(64),
+                )?
+            } else {
+                CanonicalClipCacheIdentities::checked(
+                    changed_tokenizer.clone(),
+                    "3".repeat(64),
+                    changed_model.clone(),
+                    "4".repeat(64),
+                    "5".repeat(64),
+                    "6".repeat(64),
+                )?
+            };
+            let changed_vae = CanonicalVaeCacheIdentities::checked(
+                "7".repeat(64),
+                changed_model.clone(),
+                "8".repeat(64),
+                if changed == 3 {
+                    "f".repeat(64)
+                } else {
+                    "9".repeat(64)
+                },
+            )?;
+            let changed_conditioning = CanonicalConditioningCacheIdentities::checked(
+                "a".repeat(64),
+                "b".repeat(64),
+                "c".repeat(64),
+                "d".repeat(64),
+                if changed == 4 {
+                    "f".repeat(64)
+                } else {
+                    "e".repeat(64)
+                },
+            )?;
+            let changed_identities = CanonicalNativeDiffusionCacheIdentities::checked(
+                changed_model,
+                changed_tokenizer,
+                changed_clip,
+                changed_vae,
+                changed_conditioning,
+            )?;
+            assert_eq!(
+                identities.require_exact_match(&changed_identities),
+                Err(NativeCacheError::DependencyIdentityMismatch)
+            );
+        }
+        assert_eq!(
+            CanonicalNativeDiffusionCacheIdentities::checked(
+                "F".repeat(64),
+                tokenizer.clone(),
+                clip.clone(),
+                vae.clone(),
+                conditioning.clone(),
+            ),
+            Err(NativeCacheError::InvalidDependencyIdentity)
+        );
+        let clip_tokenizer_mismatch = CanonicalClipCacheIdentities::checked(
+            "f".repeat(64),
+            clip.architecture(),
+            clip.artifact(),
+            clip.model(),
+            clip.patch(),
+            clip.execution(),
+        )?;
+        assert_eq!(
+            CanonicalNativeDiffusionCacheIdentities::checked(
+                model.clone(),
+                tokenizer.clone(),
+                clip_tokenizer_mismatch,
+                vae.clone(),
+                conditioning.clone(),
+            ),
+            Err(NativeCacheError::DependencyIdentityMismatch)
+        );
+        let clip_artifact_mismatch = CanonicalClipCacheIdentities::checked(
+            clip.tokenizer(),
+            clip.architecture(),
+            "f".repeat(64),
+            clip.model(),
+            clip.patch(),
+            clip.execution(),
+        )?;
+        assert_eq!(
+            CanonicalNativeDiffusionCacheIdentities::checked(
+                model.clone(),
+                tokenizer.clone(),
+                clip_artifact_mismatch,
+                vae.clone(),
+                conditioning.clone(),
+            ),
+            Err(NativeCacheError::DependencyIdentityMismatch)
+        );
+        let vae_artifact_mismatch = CanonicalVaeCacheIdentities::checked(
+            vae.identity(),
+            "f".repeat(64),
+            vae.patch(),
+            vae.execution(),
+        )?;
+        assert_eq!(
+            CanonicalNativeDiffusionCacheIdentities::checked(
+                model,
+                tokenizer,
+                clip,
+                vae_artifact_mismatch,
+                conditioning,
+            ),
+            Err(NativeCacheError::DependencyIdentityMismatch)
         );
         Ok(())
     }

@@ -25,9 +25,9 @@ use comfy_tensor::generated_neural_network_functional_01::{
 };
 use comfy_tensor::generated_neural_network_module_02::replication_pad_2d_tensor_with_context_exact_native;
 use comfy_tensor::{
-    BinaryOperation, ConvolutionSpec, CpuBackend, DType, DecodedScalar, ExecutionContext,
-    LinearAlgebraOperation, ResizeCrop, ResizeMode, ResizeSpec, Scalar, ScalarSide, Tensor,
-    TensorBackend, TensorDescriptor, UnaryOperation, ViewAccess,
+    BinaryOperation, CancellationToken, ConvolutionSpec, CpuBackend, DType, DecodedScalar,
+    ExecutionContext, LinearAlgebraOperation, ResizeCrop, ResizeMode, ResizeSpec, Scalar,
+    ScalarSide, Tensor, TensorBackend, TensorDescriptor, TensorError, UnaryOperation, ViewAccess,
     generated_native_diffusion::{
         add as sd15_add, conv2d as sd15_conv2d, group_norm as sd15_group_norm_operation, linear,
         nearest_upsample_2x as sd15_nearest_upsample_2x, silu as sd15_silu, tensor_from_f32,
@@ -1083,10 +1083,7 @@ pub fn load_image_vae_from_model_store_with_context(
     latent_definition: &'static LatentFormatDefinition,
     context: &ExecutionContext<'_>,
 ) -> Result<NativeVae, ImageVaeError> {
-    context
-        .cancellation
-        .check()
-        .map_err(|error| ImageVaeError::Tensor(error.to_string()))?;
+    check_image_vae_cancellation(context.cancellation)?;
     crate::vae::validate_native_vae_backend_binding(
         backend,
         descriptor.identity().dtype(),
@@ -1180,10 +1177,7 @@ pub fn load_image_vae_from_model_store_with_context(
         descriptor.identity().device(),
         context,
     )?;
-    context
-        .cancellation
-        .check()
-        .map_err(|error| ImageVaeError::Tensor(error.to_string()))?;
+    check_image_vae_cancellation(context.cancellation)?;
     let binding =
         VaeModelBinding::checked(&descriptor, store, model, module, context.cancellation)?;
     let functions = VaeKernelFunctions::checked(
@@ -1197,6 +1191,14 @@ pub fn load_image_vae_from_model_store_with_context(
         binding,
         functions,
     )?)
+}
+
+fn check_image_vae_cancellation(cancellation: &CancellationToken) -> Result<(), ImageVaeError> {
+    cancellation
+        .check()
+        .map_err(TensorError::from)
+        .map_err(VaeError::from)
+        .map_err(ImageVaeError::from)
 }
 
 fn build_native_module(
@@ -1875,33 +1877,25 @@ fn sd15_nchw_to_tokens(
             actual: shape.to_vec(),
         });
     }
-    let channels = usize::try_from(shape[1]).map_err(|_| VaeError::ShapeOverflow)?;
-    let height = usize::try_from(shape[2]).map_err(|_| VaeError::ShapeOverflow)?;
-    let width = usize::try_from(shape[3]).map_err(|_| VaeError::ShapeOverflow)?;
-    let source = tensor_to_f32(backend, tensor, context)?;
-    let mut values = backend.workspace_vec(context, source.len())?;
-    for _ in 0..source.len() {
-        values.try_push(0.0)?;
-    }
-    for y in 0..height {
-        for x in 0..width {
-            for channel in 0..channels {
-                values[(y * width + x) * channels + channel] =
-                    source[(channel * height + y) * width + x];
-            }
-        }
-    }
-    tensor_from_f32(
-        backend,
-        &[
-            1,
-            u64::try_from(height * width).map_err(|_| VaeError::ShapeOverflow)?,
-            shape[1],
-        ],
-        &values,
-        context,
-    )
-    .map_err(Into::into)
+    let token_count = shape[2]
+        .checked_mul(shape[3])
+        .ok_or(VaeError::ShapeOverflow)?;
+    let descriptor = tensor.descriptor().permuted_view(&[0, 2, 3, 1])?;
+    let channels_last = tensor.view(descriptor, ViewAccess::ReadOnly)?;
+    let descriptor = TensorDescriptor::contiguous(
+        channels_last.descriptor().shape().to_vec(),
+        channels_last.descriptor().dtype(),
+        channels_last.descriptor().device(),
+        context.stream,
+    )?;
+    let (channels_last, event) = backend.copy(&channels_last, descriptor, context)?;
+    backend.wait_event(event, context)?;
+    let descriptor = channels_last
+        .descriptor()
+        .reshaped_view(vec![1, token_count, shape[1]])?;
+    channels_last
+        .view(descriptor, ViewAccess::ReadOnly)
+        .map_err(Into::into)
 }
 
 fn sd15_tokens_to_nchw(
@@ -1918,23 +1912,21 @@ fn sd15_tokens_to_nchw(
             actual: shape.to_vec(),
         });
     }
-    let channels = usize::try_from(shape[2]).map_err(|_| VaeError::ShapeOverflow)?;
-    let height_usize = usize::try_from(height).map_err(|_| VaeError::ShapeOverflow)?;
-    let width_usize = usize::try_from(width).map_err(|_| VaeError::ShapeOverflow)?;
-    let source = tensor_to_f32(backend, tensor, context)?;
-    let mut values = backend.workspace_vec(context, source.len())?;
-    for _ in 0..source.len() {
-        values.try_push(0.0)?;
-    }
-    for y in 0..height_usize {
-        for x in 0..width_usize {
-            for channel in 0..channels {
-                values[(channel * height_usize + y) * width_usize + x] =
-                    source[(y * width_usize + x) * channels + channel];
-            }
-        }
-    }
-    tensor_from_f32(backend, &[1, shape[2], height, width], &values, context).map_err(Into::into)
+    let descriptor = tensor
+        .descriptor()
+        .reshaped_view(vec![1, height, width, shape[2]])?;
+    let channels_last = tensor.view(descriptor, ViewAccess::ReadOnly)?;
+    let descriptor = channels_last.descriptor().permuted_view(&[0, 3, 1, 2])?;
+    let channels_first = channels_last.view(descriptor, ViewAccess::ReadOnly)?;
+    let descriptor = TensorDescriptor::contiguous(
+        channels_first.descriptor().shape().to_vec(),
+        channels_first.descriptor().dtype(),
+        channels_first.descriptor().device(),
+        context.stream,
+    )?;
+    let (channels_first, event) = backend.copy(&channels_first, descriptor, context)?;
+    backend.wait_event(event, context)?;
+    Ok(channels_first)
 }
 
 fn average_pool_2d(
@@ -3467,6 +3459,16 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
+    fn image_vae_cancellation_remains_typed() {
+        let cancellation = CancellationToken::default();
+        cancellation.cancel();
+        assert!(matches!(
+            check_image_vae_cancellation(&cancellation),
+            Err(ImageVaeError::Vae(VaeError::Tensor(TensorError::Cancelled)))
+        ));
+    }
+
+    #[test]
     fn val_vae_001_stage_c_requires_concrete_cpu_backend_before_feature_lookup()
     -> Result<(), Box<dyn std::error::Error>> {
         let (backend, workspace_authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
@@ -3916,7 +3918,7 @@ mod tests {
     fn val_vae_001_sd15_reduced_encode_is_typed_unavailable()
     -> Result<(), Box<dyn std::error::Error>> {
         let (backend, workspace_authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
-        let cancellation = CancellationToken::default();
+        let cancellation: CancellationToken = Default::default();
         let context = backend.execution_context(
             StreamId::DEFAULT,
             workspace_authority.authorize_workspace(1024 * 1024)?,

@@ -1,24 +1,34 @@
 pub use crate::clip::Sd1Tokenizer;
+use crate::clip::{
+    ClipError, LoadedSd1Clip, Sd1ClipArtifactProfile, Sd1ClipExecutionBinding, TokenizerIdentity,
+};
 use crate::{
-    ArtifactIndex, ArtifactRecord, AttentionBackend, AttentionError, AttentionFallbackPolicy,
-    AttentionRequest, LatentExtent, LatentFormatError, LoadedModel, ModelDetectionRule,
-    ModelFamilyIdentity, ModelProbe, ModelStore, ModelStoreError, ModelTokenizerDescriptor,
-    NativeVae, PatchGraph, VaeArchitectureIdentity, VaeBoundary, VaeDescriptor, VaeKernelProfile,
+    ArtifactIndex, ArtifactIndexError, ArtifactRecord, AttentionBackend, AttentionError,
+    AttentionFallbackPolicy, AttentionRequest, ClipTextError, ImageVaeError, LatentExtent,
+    LatentFormatError, LoadedModel, MappedModelWeights, ModelDetectionRule, ModelFamilyIdentity,
+    ModelProbe, ModelStore, ModelStoreError, ModelTokenizerDescriptor, NativeOpsError, NativeVae,
+    NativeVisionModelError, PatchGraph, PatchGraphError, PatchGraphIdentity, QuantizationError,
+    VaeArchitectureError, VaeArchitectureIdentity, VaeBoundary, VaeDescriptor, VaeError,
+    VaeKernelProfile,
+    controlnet::ControlResult,
     detect_model_family_rules, empty_latent as canonical_empty_latent,
     generated_sd15_comfy_model_0045::LATENT_FORMAT as SD15_LATENT_FORMAT,
     project_latent_preview as canonical_project_latent_preview,
     scaled_dot_product_attention_with_context,
-    vae_image::{load_image_vae_from_model_store_with_context, sd15_reduced_vae_source_state_schema},
-};
-use crate::clip::{
-    LoadedSd1Clip, Sd1ClipArtifactProfile, Sd1ClipExecutionBinding, TokenizerIdentity,
+    vae_image::{
+        load_image_vae_from_model_store_with_context, sd15_reduced_vae_source_state_schema,
+    },
 };
 use comfy_tensor::{
     CancellationToken, CpuBackend, CpuWorkspaceVec, DType, DeviceId, ExecutionContext, Tensor,
+    generated_activation_normalization_functional_01::FunctionalError,
+    generated_comfy_operator_indirection_01::OperatorIndirectionError,
     generated_native_diffusion::{
         NativeDiffusionTensorError, add, add_channel_bias, concat_channels, conv2d, group_norm,
         linear, nearest_upsample_2x, silu, tensor_from_f32, tensor_to_f32,
     },
+    generated_neural_network_module_02::NeuralNetworkModulePartTwoError,
+    generated_shape_layout_transform_02::ShapeLayoutTransformPartTwoError,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -259,8 +269,7 @@ pub struct WeightSpec {
     pub shape: Vec<u64>,
 }
 
-pub fn sd15_clip_artifact_profile()
--> Result<Sd1ClipArtifactProfile, NativeDiffusionModelError> {
+pub fn sd15_clip_artifact_profile() -> Result<Sd1ClipArtifactProfile, NativeDiffusionModelError> {
     Sd1ClipArtifactProfile::checked(
         SD15_CLIP_SOURCE_PREFIX,
         SD15_VOCAB_SIZE,
@@ -271,6 +280,21 @@ pub fn sd15_clip_artifact_profile()
         4,
     )
     .map_err(map_sd15_clip_error)
+}
+
+pub fn bind_sd15_empty_patch_execution(
+    artifact_digest: &str,
+) -> Result<(PatchGraph, String), NativeDiffusionModelError> {
+    let patch_graph = PatchGraph::checked_semantic(artifact_digest, Vec::new())
+        .map_err(|error| NativeDiffusionModelError::Patch(error.to_string()))?;
+    let mapped = MappedModelWeights::from_parts(
+        artifact_digest.to_owned(),
+        BTreeMap::new(),
+        Vec::new(),
+    )
+    .with_patch_graph_identity(&patch_graph.identity().ordered_digest)
+    .map_err(|error| NativeDiffusionModelError::Patch(error.to_string()))?;
+    Ok((patch_graph, mapped.cache_identity().to_owned()))
 }
 
 pub fn bind_sd15_clip_execution(
@@ -301,10 +325,8 @@ pub fn load_sd15_clip_execution(
 ) -> Result<LoadedSd1Clip, NativeDiffusionModelError> {
     let (profile, binding) =
         bind_sd15_clip_execution(projection, loaded.identity(), tokenizer_identity)?;
-    LoadedSd1Clip::from_model_store(
-        &profile, binding, store, index, loaded, backend, context,
-    )
-    .map_err(map_sd15_clip_error)
+    LoadedSd1Clip::from_model_store(&profile, binding, store, index, loaded, backend, context)
+        .map_err(map_sd15_clip_error)
 }
 
 pub fn bind_sd15_vae_execution(
@@ -319,15 +341,12 @@ pub fn bind_sd15_vae_execution(
         artifact,
         sd15_model_family_identity()?,
         &SD15_LATENT_FORMAT,
-        VaeArchitectureIdentity::checked(
-            "comfy.ldm.models.autoencoder.AutoencoderKL.reduced.v1",
-        )
-        .map_err(|error| NativeDiffusionModelError::Vae(error.to_string()))?,
+        VaeArchitectureIdentity::checked("comfy.ldm.models.autoencoder.AutoencoderKL.reduced.v1")
+            .map_err(|error| NativeDiffusionModelError::Vae(error.to_string()))?,
         patch,
         DType::F32,
         DeviceId::CPU,
-        VaeBoundary::image(3)
-            .map_err(|error| NativeDiffusionModelError::Vae(error.to_string()))?,
+        VaeBoundary::image(3).map_err(|error| NativeDiffusionModelError::Vae(error.to_string()))?,
         VaeKernelProfile::Sd15AutoencoderKlReducedV1,
         [0.0, 1.0],
     )
@@ -354,7 +373,12 @@ pub fn load_sd15_vae_execution(
         &SD15_LATENT_FORMAT,
         context,
     )
-    .map_err(|error| NativeDiffusionModelError::Vae(error.to_string()))
+    .map_err(|error| {
+        match image_vae_load_failure(&error) {
+            Some(class) => classified_load_error(error.to_string(), class),
+            None => NativeDiffusionModelError::Vae(error.to_string()),
+        }
+    })
 }
 
 pub fn sd15_tiny_weight_manifest() -> Result<Vec<WeightSpec>, NativeDiffusionModelError> {
@@ -543,21 +567,227 @@ pub fn encode_sd15_prompt(
         .map_err(map_sd15_tokenizer_error)
 }
 
-fn map_sd15_tokenizer_error(error: crate::clip::ClipError) -> NativeDiffusionModelError {
+#[derive(Clone, Copy)]
+enum LoadFailureClass {
+    Cancelled,
+    ResourceExhausted,
+}
+
+fn tensor_load_failure(error: &comfy_tensor::TensorError) -> Option<LoadFailureClass> {
     match error {
-        crate::clip::ClipError::Tensor(comfy_tensor::TensorError::Cancelled) => {
-            NativeDiffusionModelError::Cancelled
+        comfy_tensor::TensorError::Cancelled => Some(LoadFailureClass::Cancelled),
+        comfy_tensor::TensorError::AllocationFailed { .. }
+        | comfy_tensor::TensorError::ResourceLimitExceeded { .. }
+        | comfy_tensor::TensorError::WorkspaceAuthorizationExceeded { .. } => {
+            Some(LoadFailureClass::ResourceExhausted)
         }
-        error => NativeDiffusionModelError::Tokenizer(error.to_string()),
+        _ => None,
     }
 }
 
-fn map_sd15_clip_error(error: crate::clip::ClipError) -> NativeDiffusionModelError {
+fn functional_load_failure(error: &FunctionalError) -> Option<LoadFailureClass> {
     match error {
-        crate::clip::ClipError::Tensor(comfy_tensor::TensorError::Cancelled)
-        | crate::clip::ClipError::TensorOperation(NativeDiffusionTensorError::Tensor(
-            comfy_tensor::TensorError::Cancelled,
-        )) => NativeDiffusionModelError::Cancelled,
+        FunctionalError::Cancelled => Some(LoadFailureClass::Cancelled),
+        FunctionalError::AllocationFailed { .. } => Some(LoadFailureClass::ResourceExhausted),
+        FunctionalError::Tensor(error) => tensor_load_failure(error),
+        _ => None,
+    }
+}
+
+fn operator_load_failure(error: &OperatorIndirectionError) -> Option<LoadFailureClass> {
+    match error {
+        OperatorIndirectionError::Cancelled => Some(LoadFailureClass::Cancelled),
+        OperatorIndirectionError::Tensor(error) => tensor_load_failure(error),
+        _ => None,
+    }
+}
+
+fn quantization_load_failure(error: &QuantizationError) -> Option<LoadFailureClass> {
+    match error {
+        QuantizationError::Cancelled => Some(LoadFailureClass::Cancelled),
+        QuantizationError::AllocationFailed { .. }
+        | QuantizationError::MaterializationCapacity { .. } => {
+            Some(LoadFailureClass::ResourceExhausted)
+        }
+        _ => None,
+    }
+}
+
+fn module_part_two_load_failure(
+    error: &NeuralNetworkModulePartTwoError,
+) -> Option<LoadFailureClass> {
+    match error {
+        NeuralNetworkModulePartTwoError::Cancelled => Some(LoadFailureClass::Cancelled),
+        NeuralNetworkModulePartTwoError::Tensor(error) => tensor_load_failure(error),
+        NeuralNetworkModulePartTwoError::Functional(error) => functional_load_failure(error),
+        NeuralNetworkModulePartTwoError::Operator(error) => operator_load_failure(error),
+        _ => None,
+    }
+}
+
+fn native_ops_load_failure(error: &NativeOpsError) -> Option<LoadFailureClass> {
+    match error {
+        NativeOpsError::Cancelled => Some(LoadFailureClass::Cancelled),
+        NativeOpsError::Tensor(error) => operator_load_failure(error),
+        NativeOpsError::Functional(error) => functional_load_failure(error),
+        NativeOpsError::Quantization(error) => quantization_load_failure(error),
+        NativeOpsError::Workspace(error) => tensor_load_failure(error),
+        NativeOpsError::ModulePartTwo(error) => module_part_two_load_failure(error),
+        _ => None,
+    }
+}
+
+fn attention_load_failure(error: &AttentionError) -> Option<LoadFailureClass> {
+    match error {
+        AttentionError::Cancelled => Some(LoadFailureClass::Cancelled),
+        AttentionError::Tensor(error) => tensor_load_failure(error),
+        AttentionError::AllocationFailed { .. } | AttentionError::WorkspaceTooSmall { .. } => {
+            Some(LoadFailureClass::ResourceExhausted)
+        }
+        _ => None,
+    }
+}
+
+fn artifact_index_load_failure(error: &ArtifactIndexError) -> Option<LoadFailureClass> {
+    match error {
+        ArtifactIndexError::Cancelled => Some(LoadFailureClass::Cancelled),
+        ArtifactIndexError::AllocationFailed(_) => Some(LoadFailureClass::ResourceExhausted),
+        _ => None,
+    }
+}
+
+fn model_store_load_failure(error: &ModelStoreError) -> Option<LoadFailureClass> {
+    match error {
+        ModelStoreError::Cancelled => Some(LoadFailureClass::Cancelled),
+        ModelStoreError::AllocationFailed { .. } => Some(LoadFailureClass::ResourceExhausted),
+        ModelStoreError::Index(error) => artifact_index_load_failure(error),
+        _ => None,
+    }
+}
+
+fn native_tensor_load_failure(error: &NativeDiffusionTensorError) -> Option<LoadFailureClass> {
+    match error {
+        NativeDiffusionTensorError::Tensor(error) => tensor_load_failure(error),
+        NativeDiffusionTensorError::Functional(error) => functional_load_failure(error),
+        NativeDiffusionTensorError::Operator(error) => operator_load_failure(error),
+        _ => None,
+    }
+}
+
+fn shape_layout_load_failure(
+    error: &ShapeLayoutTransformPartTwoError,
+) -> Option<LoadFailureClass> {
+    match error {
+        ShapeLayoutTransformPartTwoError::Cancelled => Some(LoadFailureClass::Cancelled),
+        ShapeLayoutTransformPartTwoError::Tensor(error) => tensor_load_failure(error),
+        _ => None,
+    }
+}
+
+fn clip_text_load_failure(error: &ClipTextError) -> Option<LoadFailureClass> {
+    match error {
+        ClipTextError::Tensor(error) => tensor_load_failure(error),
+        ClipTextError::Module(error) => native_ops_load_failure(error),
+        ClipTextError::Attention(error) => attention_load_failure(error),
+        ClipTextError::NativeDiffusion(error) => native_tensor_load_failure(error),
+        ClipTextError::ShapeLayout(error) => shape_layout_load_failure(error),
+        ClipTextError::Allocation(_) => Some(LoadFailureClass::ResourceExhausted),
+        _ => None,
+    }
+}
+
+fn clip_load_failure(error: &ClipError) -> Option<LoadFailureClass> {
+    match error {
+        ClipError::Allocation(_) => Some(LoadFailureClass::ResourceExhausted),
+        ClipError::Tensor(error) => tensor_load_failure(error),
+        ClipError::TensorOperation(error) => native_tensor_load_failure(error),
+        ClipError::Attention(error) => attention_load_failure(error),
+        ClipError::ModelStore(error) => model_store_load_failure(error),
+        ClipError::NativeModule(error) => native_ops_load_failure(error),
+        ClipError::TextTransformer(error) => clip_text_load_failure(error),
+        _ => None,
+    }
+}
+
+fn vae_architecture_load_failure(error: &VaeArchitectureError) -> Option<LoadFailureClass> {
+    match error {
+        VaeArchitectureError::Cancelled(_) => Some(LoadFailureClass::Cancelled),
+        VaeArchitectureError::ModelStore(error) => model_store_load_failure(error),
+        _ => None,
+    }
+}
+
+fn vae_load_failure(error: &VaeError) -> Option<LoadFailureClass> {
+    match error {
+        VaeError::Allocation(_) => Some(LoadFailureClass::ResourceExhausted),
+        VaeError::Tensor(error) => tensor_load_failure(error),
+        VaeError::NativeTensor(error) => native_tensor_load_failure(error),
+        VaeError::Attention(error) => attention_load_failure(error),
+        VaeError::ModelStore(error) => model_store_load_failure(error),
+        VaeError::NativeOps(error) => native_ops_load_failure(error),
+        VaeError::Architecture(error) => vae_architecture_load_failure(error),
+        _ => None,
+    }
+}
+
+fn vision_load_failure(error: &NativeVisionModelError) -> Option<LoadFailureClass> {
+    match error {
+        NativeVisionModelError::Cancelled => Some(LoadFailureClass::Cancelled),
+        NativeVisionModelError::Module(error) => native_ops_load_failure(error),
+        NativeVisionModelError::Tensor(error) => operator_load_failure(error),
+        NativeVisionModelError::TensorStorage(error) => tensor_load_failure(error),
+        NativeVisionModelError::ModelStore(error) => model_store_load_failure(error),
+        NativeVisionModelError::Functional(error) => functional_load_failure(error),
+        _ => None,
+    }
+}
+
+fn image_vae_load_failure(error: &ImageVaeError) -> Option<LoadFailureClass> {
+    match error {
+        ImageVaeError::Vae(error) => vae_load_failure(error),
+        ImageVaeError::NativeModule(error) => native_ops_load_failure(error),
+        ImageVaeError::VisionState(error) => vision_load_failure(error),
+        _ => None,
+    }
+}
+
+fn patch_load_failure(error: &PatchGraphError) -> Option<LoadFailureClass> {
+    match error {
+        PatchGraphError::Cancelled(_) => Some(LoadFailureClass::Cancelled),
+        PatchGraphError::Tensor(error) => tensor_load_failure(error),
+        PatchGraphError::TensorOperation(error) => operator_load_failure(error),
+        _ => None,
+    }
+}
+
+fn classified_load_error(
+    message: String,
+    class: LoadFailureClass,
+) -> NativeDiffusionModelError {
+    match class {
+        LoadFailureClass::Cancelled => NativeDiffusionModelError::Cancelled,
+        LoadFailureClass::ResourceExhausted => {
+            NativeDiffusionModelError::ResourceExhausted(message)
+        }
+    }
+}
+
+fn map_sd15_tokenizer_error(error: ClipError) -> NativeDiffusionModelError {
+    match clip_load_failure(&error) {
+        Some(class) => classified_load_error(error.to_string(), class),
+        None => NativeDiffusionModelError::Tokenizer(error.to_string()),
+    }
+}
+
+fn map_sd15_clip_error(error: ClipError) -> NativeDiffusionModelError {
+    if let Some(class) = clip_load_failure(&error) {
+        return classified_load_error(error.to_string(), class);
+    }
+    match error {
+        ClipError::Tensor(error) => NativeDiffusionModelError::TensorBackend(error),
+        ClipError::TensorOperation(error) => NativeDiffusionModelError::Tensor(error),
+        ClipError::Attention(error) => NativeDiffusionModelError::Attention(error),
+        ClipError::ModelStore(error) => NativeDiffusionModelError::Store(error),
         error => NativeDiffusionModelError::Clip(error.to_string()),
     }
 }
@@ -566,6 +796,8 @@ fn map_sd15_clip_error(error: crate::clip::ClipError) -> NativeDiffusionModelErr
 pub struct Sd15TinyModel {
     backend: Arc<CpuBackend>,
     weights: BTreeMap<String, Tensor>,
+    patch_identity: PatchGraphIdentity,
+    patch_execution_digest: String,
 }
 
 impl Sd15TinyModel {
@@ -579,7 +811,31 @@ impl Sd15TinyModel {
     ) -> Result<Self, NativeDiffusionModelError> {
         check_context(context)?;
         projection.detect()?;
-        Self::load_weights(store, index, loaded, backend, context)
+        let patch_graph = PatchGraph::checked_semantic(loaded.identity(), Vec::new())
+            .map_err(|error| NativeDiffusionModelError::Patch(error.to_string()))?;
+        Self::load_production_with_patch_graph(
+            store,
+            index,
+            loaded,
+            projection,
+            &patch_graph,
+            backend,
+            context,
+        )
+    }
+
+    pub fn load_production_with_patch_graph(
+        store: &ModelStore,
+        index: &ArtifactIndex,
+        loaded: &LoadedModel,
+        projection: &Sd15DetectorProjection,
+        patch_graph: &PatchGraph,
+        backend: Arc<CpuBackend>,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Self, NativeDiffusionModelError> {
+        check_context(context)?;
+        projection.detect()?;
+        Self::load_weights(store, index, loaded, patch_graph, backend, context)
     }
 
     #[cfg(feature = "test-support")]
@@ -597,13 +853,43 @@ impl Sd15TinyModel {
         {
             return Err(NativeDiffusionModelError::InvalidFixtureAdmission);
         }
-        Self::load_weights(store, index, loaded, backend, context)
+        let patch_graph = PatchGraph::checked_semantic(loaded.identity(), Vec::new())
+            .map_err(|error| NativeDiffusionModelError::Patch(error.to_string()))?;
+        Self::load_reduced_fixture_with_patch_graph(
+            store,
+            index,
+            loaded,
+            admission,
+            &patch_graph,
+            backend,
+            context,
+        )
+    }
+
+    #[cfg(feature = "test-support")]
+    pub fn load_reduced_fixture_with_patch_graph(
+        store: &ModelStore,
+        index: &ArtifactIndex,
+        loaded: &LoadedModel,
+        admission: &ReducedFixtureAdmission,
+        patch_graph: &PatchGraph,
+        backend: Arc<CpuBackend>,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Self, NativeDiffusionModelError> {
+        check_context(context)?;
+        if admission.fixture_id != SD15_TINY_FIXTURE_ID
+            || admission.detector_transcript_sha256.len() != 64
+        {
+            return Err(NativeDiffusionModelError::InvalidFixtureAdmission);
+        }
+        Self::load_weights(store, index, loaded, patch_graph, backend, context)
     }
 
     fn load_weights(
         store: &ModelStore,
         index: &ArtifactIndex,
         loaded: &LoadedModel,
+        patch_graph: &PatchGraph,
         backend: Arc<CpuBackend>,
         context: &ExecutionContext<'_>,
     ) -> Result<Self, NativeDiffusionModelError> {
@@ -673,7 +959,32 @@ impl Sd15TinyModel {
             let tensor = tensor_from_f32(&backend, &metadata.shape, &values, context)?;
             weights.insert(metadata.name.clone(), tensor);
         }
-        Ok(Self { backend, weights })
+        let mapped =
+            MappedModelWeights::from_parts(loaded.identity().to_owned(), weights, Vec::new());
+        let patched = patch_graph
+            .apply(backend.as_ref(), &mapped, context)
+            .map_err(|error| match patch_load_failure(&error) {
+                Some(class) => classified_load_error(error.to_string(), class),
+                None => NativeDiffusionModelError::Patch(error.to_string()),
+            })?;
+        Ok(Self {
+            backend,
+            weights: patched.tensors().clone(),
+            patch_identity: patch_graph.identity(),
+            patch_execution_digest: patched.cache_identity().to_owned(),
+        })
+    }
+
+    pub fn patch_identity(&self) -> &PatchGraphIdentity {
+        &self.patch_identity
+    }
+
+    pub fn patch_execution_digest(&self) -> &str {
+        &self.patch_execution_digest
+    }
+
+    pub fn backend(&self) -> &CpuBackend {
+        &self.backend
     }
 
     fn weight(&self, key: &str) -> Result<&Tensor, NativeDiffusionModelError> {
@@ -687,6 +998,17 @@ impl Sd15TinyModel {
         latent: &Tensor,
         model_time: f32,
         conditioning: &Tensor,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, NativeDiffusionModelError> {
+        self.denoise_at_model_time_with_control(latent, model_time, conditioning, None, context)
+    }
+
+    pub fn denoise_at_model_time_with_control(
+        &self,
+        latent: &Tensor,
+        model_time: f32,
+        conditioning: &Tensor,
+        control: Option<&ControlResult>,
         context: &ExecutionContext<'_>,
     ) -> Result<Tensor, NativeDiffusionModelError> {
         check_context(context)?;
@@ -713,6 +1035,9 @@ impl Sd15TinyModel {
             1,
             context,
         )?;
+        let mut input_control = control.map(|result| result.input().iter().rev());
+        let mut middle_control = control.map(|result| result.middle().iter().rev());
+        let mut output_control = control.map(|result| result.output().iter().rev());
         let mut skips = Vec::new();
         for level in 0..4 {
             hidden = self.resblock(
@@ -721,6 +1046,7 @@ impl Sd15TinyModel {
                 &format!("{UNET_PREFIX}.down.{level}.res"),
                 context,
             )?;
+            hidden = add_next_control(&self.backend, hidden, input_control.as_mut(), context)?;
             skips.push(hidden.clone());
             if level < 3 {
                 hidden = self.conv(
@@ -750,10 +1076,12 @@ impl Sd15TinyModel {
             &format!("{UNET_PREFIX}.mid.block_2"),
             context,
         )?;
+        hidden = add_next_control(&self.backend, hidden, middle_control.as_mut(), context)?;
         for level in 0..4 {
             let skip = skips
                 .pop()
                 .ok_or(NativeDiffusionModelError::Overflow("UNet skip"))?;
+            let skip = add_next_control(&self.backend, skip, output_control.as_mut(), context)?;
             hidden = resize_to_match(&self.backend, hidden, &skip, context)?;
             hidden = concat_channels(&self.backend, &hidden, &skip, context)?;
             hidden = self.resblock(
@@ -778,6 +1106,9 @@ impl Sd15TinyModel {
                 )?;
             }
         }
+        reject_excess_control(input_control, "input")?;
+        reject_excess_control(middle_control, "middle")?;
+        reject_excess_control(output_control, "output")?;
         hidden = self.group_norm(&hidden, &format!("{UNET_PREFIX}.out.0"), context)?;
         hidden = silu(&self.backend, &hidden, context)?;
         self.conv(&hidden, &format!("{UNET_PREFIX}.out.2"), 1, 1, context)
@@ -1066,6 +1397,28 @@ fn resize_to_match(
     Ok(input)
 }
 
+fn add_next_control<'a>(
+    backend: &CpuBackend,
+    hidden: Tensor,
+    controls: Option<&mut std::iter::Rev<std::slice::Iter<'a, Option<Tensor>>>>,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, NativeDiffusionModelError> {
+    match controls.and_then(Iterator::next) {
+        Some(Some(control)) => add(backend, &hidden, control, context).map_err(Into::into),
+        Some(None) | None => Ok(hidden),
+    }
+}
+
+fn reject_excess_control(
+    controls: Option<std::iter::Rev<std::slice::Iter<'_, Option<Tensor>>>>,
+    section: &'static str,
+) -> Result<(), NativeDiffusionModelError> {
+    if controls.is_some_and(|mut controls| controls.next().is_some()) {
+        return Err(NativeDiffusionModelError::ExcessControl(section));
+    }
+    Ok(())
+}
+
 fn timestep_embedding(
     backend: &CpuBackend,
     context: &ExecutionContext<'_>,
@@ -1117,6 +1470,10 @@ pub enum NativeDiffusionModelError {
     Clip(String),
     #[error("canonical native VAE adapter rejected the request: {0}")]
     Vae(String),
+    #[error("canonical patch graph rejected the native diffusion model: {0}")]
+    Patch(String),
+    #[error("native diffusion control result contains excess {0} slots")]
+    ExcessControl(&'static str),
     #[error("native diffusion {name} expected shape {expected:?}, got {actual:?}")]
     InputShape {
         name: &'static str,
@@ -1135,6 +1492,8 @@ pub enum NativeDiffusionModelError {
     Overflow(&'static str),
     #[error("native diffusion model execution was cancelled")]
     Cancelled,
+    #[error("native diffusion resource exhausted: {0}")]
+    ResourceExhausted(String),
     #[error(transparent)]
     Store(#[from] ModelStoreError),
     #[error(transparent)]
@@ -1284,6 +1643,50 @@ mod tests {
             Err(NativeDiffusionModelError::Cancelled)
         ));
         Ok(())
+    }
+
+    #[test]
+    fn sd15_load_errors_preserve_typed_cancellation_and_capacity_failures() {
+        assert!(matches!(
+            map_sd15_clip_error(ClipError::TextTransformer(ClipTextError::ShapeLayout(
+                ShapeLayoutTransformPartTwoError::Cancelled,
+            ))),
+            NativeDiffusionModelError::Cancelled
+        ));
+        assert!(matches!(
+            map_sd15_clip_error(ClipError::TextTransformer(ClipTextError::ShapeLayout(
+                ShapeLayoutTransformPartTwoError::Tensor(
+                    TensorError::WorkspaceAuthorizationExceeded {
+                        requested: 64,
+                        authorized: 32,
+                        in_use: 0,
+                    },
+                ),
+            ))),
+            NativeDiffusionModelError::ResourceExhausted(_)
+        ));
+        assert!(matches!(
+            image_vae_load_failure(&ImageVaeError::Vae(VaeError::Tensor(
+                TensorError::Cancelled,
+            ))),
+            Some(LoadFailureClass::Cancelled)
+        ));
+        assert!(matches!(
+            image_vae_load_failure(&ImageVaeError::NativeModule(
+                NativeOpsError::Quantization(QuantizationError::Cancelled),
+            )),
+            Some(LoadFailureClass::Cancelled)
+        ));
+        assert!(matches!(
+            patch_load_failure(&PatchGraphError::Tensor(
+                TensorError::WorkspaceAuthorizationExceeded {
+                    requested: 128,
+                    authorized: 64,
+                    in_use: 0,
+                },
+            )),
+            Some(LoadFailureClass::ResourceExhausted)
+        ));
     }
 
     #[test]

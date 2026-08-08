@@ -12,6 +12,7 @@ pub mod clip_tokenizer;
 pub mod clip_vision;
 pub mod cogvideox_family;
 pub mod conditioning;
+pub mod controlnet;
 pub mod cosmos_family;
 pub mod descriptor;
 pub mod flux_chroma_family;

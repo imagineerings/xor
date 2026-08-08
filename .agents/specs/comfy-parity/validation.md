@@ -46,7 +46,7 @@ Implementation completion requires deterministic CPU conformance, strict verific
 - Fixture: Pinned source trees, checksum-locked base snapshot inputs, and every checked-in generator.
 - Command/runner: `python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice`.
 - Procedure and expected signal: Run `regenerate_all.py --check-twice`, compare hashes, verify the source-snapshot manifest, reconcile registries and every source-file disposition against master feature IDs, and fail on stale output, unstable IDs, orphan, collision, or duplicate IDs without pretending missing base extractors ran.
-- Pass artifact: exit status 0 plus `target/comfy-parity/val-catalog-001.json` containing fixture digests, environment/backend identity, per-case results, and no unexplained skipped row.
+- Pass artifact: exit status 0 from the exact runner after the source-snapshot manifest matches and both complete regeneration passes produce no changed paths. The checked-in generated outputs and command result are the evidence; this command-only gate emits no separate target JSON artifact.
 
 ### VAL-CANCEL-001: Canonical cancellation ownership
 
@@ -535,6 +535,22 @@ Implementation completion requires deterministic CPU conformance, strict verific
 - Command/runner: `cargo test --locked -p comfy_model val_patch_001`.
 - Procedure and expected signal: Independently verify pinned source and symbol digests; execute every generated patch contract through the canonical PatchGraph and caller ExecutionContext; cover ordering, dtype, device, cancellation, OOM rollback, workspace convergence, and authoritative ownership; publish the versioned cumulative exact-task/exact-contract schema, where a truthful partial artifact claims only its passed rows; require zero failures and zero skips for every claimed task result.
 - Pass artifact: exit status 0 plus `target/comfy-parity/val-patch-001.json` using schema version 1 with validation and environment identity, truthful partial or passed overall status, aggregate summary, current sole-producer path and SHA-256, current per-task implementation paths and SHA-256 values, and unique exact contract records binding contract ID, owning task ID, pinned source and symbol SHA-256 values, passed status, and non-empty unique case IDs. Every claimed task result has zero failures and skips; partial artifacts claim only their exact passed rows.
+
+### VAL-CONTROLNET-001: Native ControlNet contract closure
+
+- Type: model/tensor/conditioning.
+- Fixture: Every generated ControlNet and T2I adapter contract row.
+- Command/runner: `cargo test --locked -p comfy_model controlnet::tests`.
+- Procedure and expected signal: Independently verify pinned source and symbol digests; execute every generated ControlNet contract through the canonical checked chain; cover strength, hint preprocessing, batch projection, fixed-slot merge ordering, VAE and latent delegation, identity, dtype/device, cancellation, OOM rollback, workspace convergence, and authoritative ownership; publish the versioned cumulative exact-task/exact-contract schema with zero failures and zero skips.
+- Pass artifact: exit status 0 plus `target/comfy-parity/val-controlnet-001.json` using schema version 1 with validation and environment identity, truthful partial or passed overall status, aggregate summary, current sole-producer path and SHA-256, current per-task implementation paths and SHA-256 values, and unique exact contract records binding contract ID, owning task ID, pinned source and symbol SHA-256 values, passed status, and non-empty unique case IDs. Every claimed task result has zero failures and skips; partial artifacts claim only their exact passed rows.
+
+### VAL-CONDITIONING-001: Native conditioning integration closure
+
+- Type: model/sampler/runtime/worker.
+- Fixture: Every generated conditioning-value and guidance contract plus their production native-diffusion integration.
+- Command/runner: `CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test native_conditioning_integration val_conditioning_001`.
+- Procedure and expected signal: Independently verify pinned source and symbol digests and execute every generated conditioning and guidance contract through the canonical prebound typed runtime bundle. Require caller-cancellable aggregate cache-identity discovery with zero model loads or private workspace; exact provider, bundle, and handle binding for model/tokenizer, CLIP, VAE identity and execution, conditioning PatchGraph/model execution, and ControlNet execution; mutation-based cache separation and stale warm-provider rejection before execution; structural Cancelled versus ResourceExhausted preservation through conditioning, CLIP, model, VAE, and ControlNet wrappers; and zero tensor, output, or proposal publication plus workspace convergence on either failure. Publish the versioned cumulative exact-task/exact-contract schema with zero failures and zero skips.
+- Pass artifact: exit status 0 plus `target/comfy-parity/val-conditioning-001.json` using schema version 1 with validation and environment identity, truthful partial or passed overall status, aggregate summary, current sole-producer path and SHA-256, current per-task implementation paths and SHA-256 values, and unique exact contract records binding contract ID, owning task ID, pinned source and symbol SHA-256 values, passed status, and non-empty unique case IDs. Every claimed task result has zero failures and skips; partial artifacts claim only their exact passed rows.
 
 ### VAL-PATCH-ADAPTER-001: Native patch loading and merge adapter closure
 

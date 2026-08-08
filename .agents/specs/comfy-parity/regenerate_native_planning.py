@@ -428,6 +428,8 @@ DECISION_APPENDICES[41] += """
 
 For native conditioning and model execution, `comfy_model::conditioning` is the sole immutable conditioning-value, mask, region, preparation, concatenation-compatibility, percent-window-input, and conditioning-identity owner. `comfy_model::clip` is the sole bounded weighted-token-batch, tokenizer/text-encoder execution-plan, encoding, and execution-identity owner while importing model-family target selection and ModelStore artifacts. `comfy_model::vae` is the sole VAE descriptor, `VaeTilePlan`, native encode/decode, and execution-identity owner while importing canonical latent geometry and transforms. Its private `vae_tiling` module is only the source-derived tile traversal, feather-mask, and normalized-stitching mechanics adapter; the public `VaeTileAxisFormula` is an immutable checked VAE geometry value, and the adapter may neither own a second plan nor authorize workspace, allocate through a private backend, mint cancellation, retry, publish, or persist. A pass whose complete input fits one tile follows the source direct-assignment branch and does not allocate, multiply, or divide by a feather mask; multi-tile passes alone feather-accumulate and normalize. Every tile operation delegates storage, device/dtype/stream validation, allocation, replacement, events, caller-owned scratch leasing, and cancellation to `TensorBackend` and `ExecutionContext`; 1D extra-channel reshaping and channel preparation remain kernel-boundary adaptations inside the canonical VAE owner. `comfy_model::vae_architecture` is only the focused pinned-source adapter for diffusers state-dict key normalization, source-ordered architecture selection, and bounded loader/profile configuration; it maps every selected profile explicitly to canonical `VaeIdentity`, model-family, and latent-format values, constructs state only through `ModelStore` and `NativeModule`, and owns no artifact parsing, model cache, family/latent validation, tensor state, workspace, cancellation state, or publication. `comfy_model::controlnet` is the sole ControlNet/adapter-chain, hint, strength, fixed-result-slot, merge-order, and identity owner. The existing `PatchGraph` remains the sole ordered patch-payload validation, application, rollback, and digest owner; `comfy_model::patches` may only translate checked ModelStore/model-family mappings into PatchGraph operations. `comfy_sampler::guidance` is a focused CFG and hook-order adapter over canonical conditioning, SamplingProfile, sampler transactions, tensor operations, workspace, trace, callback publication, and cancellation owners. Its CFG1 optimization reproduces Python `math.isclose(scale, 1.0)` with the source default `1e-9` relative tolerance and no absolute tolerance, and its caller-supplied compatible-batch limit counts exact latent, resolved conditioning-tensor/list, and mask byte lengths without owning allocation or memory policy. It checks the canonical cancellation token immediately after every hook before validating or advancing to the next phase. Runtime cache DTOs map every immutable execution identity explicitly but own none of their validation. The generated source-fingerprinted conditioning-contract ledger is the exact closure inventory; backend-model rows cannot stand in for conditioning, CLIP, VAE, ControlNet, guidance, or patch coverage. The old SD1 tokenizer, tiny CLIP, and tiny VAE slice code must delegate to these owners and may not remain as parallel implementations.
 
+The earlier split-DTO cache description is superseded by one checked, caller-cancellable `CanonicalNativeDiffusionCacheIdentities` snapshot spanning the model artifact, tokenizer, CLIP, VAE, and conditioning identities. Leaf owners validate their own canonical identities; the aggregate owns lowercase-SHA validation, model/tokenizer cross-binding, canonical conditioning-execution recomputation, exact matching, and fail-closed deserialization. `NativeDiffusionProvider::cache_identities` discovers this immutable snapshot without `ModelStore::load`, model materialization, private workspace, or a fresh cancellation token. Bundle construction derives the same aggregate from loaded execution state; warm and cold bundle paths revalidate it exactly, and handles plus cache dependencies consume the aggregate as their single authority. Split bundle getters are compatibility projections only.
+
 The reduced native-diffusion integration has exactly one focused `comfy_runtime::Sd15GuidanceAdapter`. It maps raw checked CLIP tensor ports once into canonical SD15 `ConditioningSet` values, delegates every CFG decision, conditional/unconditional orchestration step, hook phase, compatible batch, and regional accumulation to `comfy_sampler::guidance`, and calls only `Sd15TinyModel::denoise_at_model_time`. The model slice exports canonical SD15 family and latent identities and contains no CFG validation or arithmetic. KSampler binds `GUIDANCE_ADAPTER_ID` into its pre-execution cache change token, keeps the caller `ExecutionContext` unchanged, and publishes a final tensor only after canonical guidance and Euler sampling succeed. Deterministic fixture generation and conformance tests call the same runtime adapter; they may not retain a test-local CFG path.
 
 `comfy_model::clip::Sd1Tokenizer` is the sole SD1 vocabulary, merge-rank, byte-encoding, BPE traversal, shared prompt-bound constants, cancellation, and fixed-77 padding/token-sequence owner. It exposes one bounded untruncated content-token projection for multi-section consumers and one canonical fixed-context projection; adapters cannot first truncate to 75 content tokens and then pretend to section a long prompt. The native-diffusion slice re-exports the canonical type only for compatibility, and its `load_sd15_tokenizer` and `encode_sd15_prompt` functions provide only the checked SD15 descriptor, typed error mapping, and fixed-77-token projection. `clip_tokenizer::NativePromptTokenizer` is the single generic source-family owner for prompt weighting, configurable multi-section packing, special tokens, configurable padding, and word identities over canonical content tokens; it cannot parse or reconstruct the SD1 vocabulary, merges, byte decoder, shared bounds, or fixed-77 identity. Its packer must make bounded forward progress when a configured word threshold exceeds section capacity, preserve one word identity across forced splits, enforce the shared prompt bound before copying disabled-weight text, and preserve Comfy's comma fallback even when a stripped textual-inversion name is unavailable. `formats` and `ModelStore` alone parse and retain bounded SentencePiece ModelProto pieces with score/type facts and bind verified artifact identity inseparably to parsed bytes/tensors; caller-built toy vocabularies, record/handle re-pairing, raw `.bin` float reinterpretation, and adapter-local path/security validation are forbidden. Runtime, fixture, and tokenizer callers pass their existing canonical cancellation token. No same validation or state transition is implemented by both the fixed SD1 owner and the generic section adapter, and no duplicate tokenizer parser, traversal, allocator, cache, retry, workspace, persistence, or publication behavior remains in native-diffusion or clip_tokenizer. The later broad CLIP-owner consolidation removes the remaining tiny CLIP equations and binds execution cache identities after text-encoder and patch breadth, and may not reintroduce a tokenizer owner.
@@ -725,6 +727,8 @@ VALIDATIONS = {
     "VAL-MODEL-FORMAT-001": ("Safe model formats", "model/security", "Valid, truncated, corrupt, hostile, oversized, sharded, mmap, safetensors, restricted PyTorch, GGUF, config, and tokenizer files", "Compare tensors and metadata, bound resources, reject executable pickle, preserve errors, cancel safely, and detect external changes."),
     "VAL-CLIP-001": ("Native tokenizer and CLIP closure", "model/tensor/architecture", "Every generated tokenizer, prompt-weighting, text-encoder, vision-encoder, detector, loader, and projection contract row", "Independently verify pinned source and symbol digests; execute one source-derived valid and invalid fixture per row; cover architecture and artifact binding, masks, layers, pooling, dtype/device, cancellation, OOM, workspace convergence, and production call-site ownership; publish the versioned cumulative exact-task/exact-contract schema, where a truthful partial artifact claims only its passed rows; require zero failures and zero skips for every claimed task result."),
     "VAL-PATCH-001": ("Native PatchGraph contract closure", "model/tensor/patching", "Every generated PatchGraph payload, semantic, and family-equation contract row", "Independently verify pinned source and symbol digests; execute every generated patch contract through the canonical PatchGraph and caller ExecutionContext; cover ordering, dtype, device, cancellation, OOM rollback, workspace convergence, and authoritative ownership; publish the versioned cumulative exact-task/exact-contract schema, where a truthful partial artifact claims only its passed rows; require zero failures and zero skips for every claimed task result."),
+    "VAL-CONTROLNET-001": ("Native ControlNet contract closure", "model/tensor/conditioning", "Every generated ControlNet and T2I adapter contract row", "Independently verify pinned source and symbol digests; execute every generated ControlNet contract through the canonical checked chain; cover strength, hint preprocessing, batch projection, fixed-slot merge ordering, VAE and latent delegation, identity, dtype/device, cancellation, OOM rollback, workspace convergence, and authoritative ownership; publish the versioned cumulative exact-task/exact-contract schema with zero failures and zero skips."),
+    "VAL-CONDITIONING-001": ("Native conditioning integration closure", "model/sampler/runtime/worker", "Every generated conditioning-value and guidance contract plus their production native-diffusion integration", "Independently verify pinned source and symbol digests and execute every generated conditioning and guidance contract through the canonical prebound typed runtime bundle. Require caller-cancellable aggregate cache-identity discovery with zero model loads or private workspace; exact provider, bundle, and handle binding for model/tokenizer, CLIP, VAE identity and execution, conditioning PatchGraph/model execution, and ControlNet execution; mutation-based cache separation and stale warm-provider rejection before execution; structural Cancelled versus ResourceExhausted preservation through conditioning, CLIP, model, VAE, and ControlNet wrappers; and zero tensor, output, or proposal publication plus workspace convergence on either failure. Publish the versioned cumulative exact-task/exact-contract schema with zero failures and zero skips."),
     "VAL-PATCH-ADAPTER-001": ("Native patch loading and merge adapter closure", "model/tensor/patching/architecture", "The exact 14 source-fingerprinted model-patcher, LoRA-loader, key-discovery, prefetch, and Model/CLIP merge rows", "Independently verify every pinned source and selected-symbol digest; execute one source-derived valid and invalid fixture per row; cover checked many-alias and sliced key bindings, load precedence and diagnostics, immutable PatchGraph composition and per-key projection, all seven merge formulas and exclusions, recursive aligned prefetch, dense and quantized replacement, caller context/cancellation/OOM, and failure atomicity. Search the repository and prove patches delegates family recognition to weight_adapter, ordering/equations/digests to PatchGraph, codecs/identity/materialization to quantization, and allocation/device/cancellation/publication to their canonical owners; require a byte-stable zero-failure/zero-skip artifact twice."),
     "VAL-VAE-001": ("Native VAE architecture closure", "model/tensor/architecture", "Every generated VAE selector, profile, image, video, audio, structured-output, tiling, detector, and loader contract row", "Independently verify pinned source and symbol digests; execute one source-derived valid and invalid fixture per row; cover geometry, dtype/device, ModelStore binding, tile execution, cancellation, OOM/retry delegation, workspace convergence, and production call-site ownership; publish the versioned cumulative exact-task/exact-contract schema, where a truthful partial artifact claims only its passed rows; require zero failures and zero skips for every claimed task result."),
     "VAL-WEIGHT-ADAPTER-001": ("Native weight-adapter runtime closure", "model/tensor/autograd/architecture", "The exact source-fingerprinted weight-adapter registry, trainable-base, bypass, Adapter, and Diff catalog rows", "Independently verify every pinned source and selected-symbol digest; execute one source-derived valid and invalid fixture per row; cover source-compatible initialization, caller-owned RNG commit, additive and transform forwards, analytical reverse traversal through the canonical AutogradTape, saved-value mutation witnesses and release, linear and convolution bypass geometry, static PatchGraph projection, quantized materialization delegation, dtype/device/layout rejection without CPU fallback, caller-authorized workspace, cancellation, OOM/retry delegation, and no partial value or gradient publication. Search the complete repository and prove comfy_model::weight_adapter owns only registry and runtime planning while PatchGraph, quantization, TensorBackend, workspace authority, CancellationToken, worker retry, AutogradTape, GradientStore, persistence, and final transactions retain sole authority; require a byte-stable zero-failure/zero-skip artifact twice."),
@@ -8208,11 +8212,11 @@ def model_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]], str, l
             "Implement native ControlNet and adapter chains",
             [7, 34, 36, 37, 38],
             [18, 25, 26, 28, 31, 32, 33, 41],
-            ["VAL-LATENT-001", "VAL-TENSOR-001", "VAL-MODEL-FAMILY-001", "VAL-CANCEL-001", "VAL-MEMORY-001", "VAL-OWNERSHIP-001"],
-            "Make comfy_model::controlnet the sole immutable ControlNet/adapter graph, strength, window-input, hint, fixed-slot result, chain-order, and execution-identity owner. Implement source-exact constant/linear-up strengths, hint resize and batch broadcast, optional canonical VAE/latent processing, mask concatenation, extra conditioning, global average pooling, shared strength exactly once, dtype conversion, and previous-chain merges. Sampling-profile adapters alone resolve percent windows to sigma/time; model-family and ModelStore alone select and load state.",
-            [*conditioning_source_reads, ".agents/specs/comfy-parity/catalogs/backend-conditioning-contracts.csv", "crates/comfy_model/src/conditioning.rs", "crates/comfy_model/src/vae.rs", "crates/comfy_model/src/patch_graph.rs", "crates/comfy_model/src/model_family.rs", "crates/comfy_tensor/src/comfy_tensor.rs"],
-            ["crates/comfy_model/src/controlnet.rs"],
-            "Fixtures cover strength/window bounds, hint resize and broadcast remainder, hint identity invalidation, input/middle/output slot order, previous-chain merging, global average pooling, VAE and latent delegation, dtype conversion, malformed shapes, cancellation/OOM with no partial result, exact workspace convergence, deterministic identity, and one chain owner.",
+            ["VAL-CONTROLNET-001", "VAL-CATALOG-001", "VAL-LATENT-001", "VAL-TENSOR-001", "VAL-MODEL-FAMILY-001", "VAL-CANCEL-001", "VAL-MEMORY-001", "VAL-OWNERSHIP-001"],
+            "Make the production-registered comfy_model::controlnet module the sole immutable ControlNet/adapter graph, strength, window-input, hint, fixed-slot result, chain-order, and execution-identity owner. Implement source-exact constant and linear-up strengths, hint resize and batch broadcast, optional canonical VAE and latent processing, mask concatenation, extra conditioning, global average pooling, shared strength exactly once, dtype conversion, and previous-chain merges. Sampling-profile adapters alone resolve percent windows to sigma/time; model-family and ModelStore alone select and load state.",
+            [*conditioning_source_reads, ".agents/specs/comfy-parity/generate_conditioning_catalog.py", ".agents/specs/comfy-parity/test_generate_conditioning_catalog.py", ".agents/specs/comfy-parity/generate_ownership_catalog.py", ".agents/specs/comfy-parity/ownership-policy.json", ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv", ".agents/specs/comfy-parity/catalogs/backend-conditioning-contracts.csv", "crates/comfy_model/src/comfy_model.rs", "crates/comfy_model/src/conditioning.rs", "crates/comfy_model/src/vae.rs", "crates/comfy_model/src/model_store.rs", "crates/comfy_model/src/latent_format.rs", "crates/comfy_model/src/patch_graph.rs", "crates/comfy_model/src/model_family.rs", "crates/comfy_tensor/src/comfy_tensor.rs", "crates/comfy_tensor/src/operation.rs"],
+            [".agents/specs/comfy-parity/generate_conditioning_catalog.py", ".agents/specs/comfy-parity/test_generate_conditioning_catalog.py", ".agents/specs/comfy-parity/ownership-policy.json", ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv", ".agents/specs/comfy-parity/catalogs/backend-conditioning-contracts.csv", ".agents/specs/comfy-parity/regenerate_native_planning.py", ".agents/specs/comfy-parity/design.md", ".agents/specs/comfy-parity/validation.md", "crates/comfy_model/src/comfy_model.rs", "crates/comfy_model/src/controlnet.rs", "target/comfy-parity/val-controlnet-001.json", "target/comfy-parity/val-ownership-001.json"],
+            "The module is compiled and exported from comfy_model; exact fixtures cover all eight generated ControlNet contracts, strength/window bounds, hint resize and quotient/remainder batch broadcast, T2I unshuffle dimensions, SD3.5 canny/depth transforms, hint identity invalidation, input/middle/output slot order, previous-chain merging, global average pooling, VAE and latent delegation, dtype conversion, malformed shapes, cancellation/OOM with no partial result, exact workspace convergence, deterministic identity, and one chain owner. The schema-version-1 VAL-CONTROLNET-001 artifact binds every row to current source, symbol, task, implementation, and case digests; conditioning and ownership generation are byte-stable twice.",
             [
                 conditioning_values_task_id,
                 vae_owner_task_id,
@@ -8266,10 +8270,10 @@ def model_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]], str, l
             [7, 31, 34, 36, 38, 41],
             [18, 25, 26, 28, 31, 32, 41],
             ["VAL-VAE-001", "VAL-NATIVE-E2E-002", "VAL-LATENT-001", "VAL-CANCEL-001", "VAL-MEMORY-001", "VAL-OWNERSHIP-001"],
-            "Remove VAE validation, weight storage, geometry, and decode equations from Sd15TinyModel; migrate production runtime, worker memory attempts, cache, and deterministic fixtures to canonical NativeVae architecture plans. Boundary VAE ports and compatibility types map explicitly to VaeIdentity; only AttemptMemoryController retries and only canonical output owners publish.",
-            ["crates/comfy_model/src/vae.rs", "crates/comfy_model/src/vae_architecture.rs", "crates/comfy_model/src/vae_tiling.rs", "crates/comfy_model/src/vae_image.rs", "crates/comfy_model/src/vae_video.rs", "crates/comfy_model/src/vae_audio.rs", "crates/comfy_model/src/vae_structured.rs", "crates/comfy_model/src/slices/native_diffusion.rs", "crates/comfy_runtime/src/native_execution_controller.rs", "crates/comfy_runtime/src/cache.rs", "crates/comfy_worker/src/memory_modes.rs", "crates/comfy_test_support/src/native_diffusion_fixture.rs", "crates/comfy_test_support/tests/native_diffusion_e2e.rs", ".agents/specs/comfy-parity/ownership-policy.json"],
-            ["crates/comfy_model/src/slices/native_diffusion.rs", "crates/comfy_runtime/src/native_execution_controller.rs", "crates/comfy_runtime/src/cache.rs", "crates/comfy_worker/src/comfy_worker.rs", "crates/comfy_test_support/src/native_diffusion_fixture.rs", "crates/comfy_test_support/tests/native_diffusion_e2e.rs"],
-            "Whole-repository scans find one VAE descriptor/loader/tiler/execution owner and no VAE equations or state in Sd15TinyModel; production decode uses canonical identity-bound NativeVae; worker retry is external and monotonic; adapter byte equivalence, cache invalidation, cancellation/failure recovery, VAL-VAE-001, native diffusion E2E, and affected model/runtime/worker/test-support suites pass.",
+            "Remove VAE validation, weight storage, geometry, and decode equations from Sd15TinyModel; migrate production runtime, worker memory attempts, cache, and deterministic fixtures to canonical NativeVae architecture plans. The reduced SD15 profile is an exact production image identity with explicit compiled-source admission rather than a test/conformance identity. Boundary VAE ports and compatibility types map explicitly to VaeIdentity; only AttemptMemoryController retries and only canonical output owners publish.",
+            ["crates/comfy_model/src/vae.rs", "crates/comfy_model/src/vae_architecture.rs", "crates/comfy_model/src/vae_tiling.rs", "crates/comfy_model/src/vae_image.rs", "crates/comfy_model/src/vae_video.rs", "crates/comfy_model/src/vae_audio.rs", "crates/comfy_model/src/vae_structured.rs", "crates/comfy_model/src/slices/native_diffusion.rs", "crates/comfy_model/tests/clip_tokenizer.rs", "crates/comfy_runtime/src/native_execution_controller.rs", "crates/comfy_runtime/src/cache.rs", "crates/comfy_worker/src/memory_modes.rs", "crates/comfy_test_support/src/native_diffusion_fixture.rs", "crates/comfy_test_support/src/bin/generate_native_diffusion_fixture.rs", "crates/comfy_test_support/tests/native_diffusion_e2e.rs", "crates/comfy_test_support/tests/native_diffusion_foundation.rs", ".agents/specs/comfy-parity/ownership-policy.json"],
+            ["crates/comfy_model/src/vae.rs", "crates/comfy_model/src/vae_image.rs", "crates/comfy_model/src/slices/native_diffusion.rs", "crates/comfy_model/tests/clip_tokenizer.rs", "crates/comfy_runtime/src/native_execution_controller.rs", "crates/comfy_runtime/src/cache.rs", "crates/comfy_worker/src/comfy_worker.rs", "crates/comfy_test_support/src/native_diffusion_fixture.rs", "crates/comfy_test_support/src/bin/generate_native_diffusion_fixture.rs", "crates/comfy_test_support/tests/native_diffusion_e2e.rs", "crates/comfy_test_support/tests/native_diffusion_foundation.rs"],
+            "Whole-repository scans find one VAE descriptor/loader/tiler/execution owner and no VAE equations or state in Sd15TinyModel. The reduced SD15 identity is an exact F32 CPU image profile with explicit compiled-source admission; vae_image owns its prefixed source schema, name mapping, byte-equivalent learned decode equations, typed unavailable encode path, canonical state materialization, and identity-bound NativeVae construction. Production, fixture-generator, and foundation compatibility callers decode through that canonical NativeVae and no legacy constructor can omit its identity; worker retry is external and monotonic; adapter byte equivalence, cache invalidation, cancellation/failure recovery, VAL-VAE-001, native diffusion E2E, and affected model/runtime/worker/test-support suites pass.",
             [vae_structured_task_id, clip_owner_task_id],
             registered_source_edits=["comfy_model", "comfy_runtime", "comfy_worker", "comfy_test_support"],
         ),
@@ -8278,11 +8282,11 @@ def model_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]], str, l
             "Integrate native conditioning, CLIP, VAE, ControlNet, guidance, and patches",
             [7, 34, 36, 37, 38, 41],
             [25, 26, 28, 31, 32, 33, 41],
-            ["VAL-LATENT-001", "VAL-TENSOR-001", "VAL-MODEL-FAMILY-001", "VAL-MODEL-FORMAT-001", "VAL-SAMPLING-FOUNDATION-001", "VAL-NATIVE-E2E-002", "VAL-MEMORY-001", "VAL-OWNERSHIP-001"],
-            "Integrate every cataloged native conditioning, tokenizer/CLIP, VAE, ControlNet, guidance, and patch foundation through the canonical model, sampler, runtime cache, worker, and deterministic native-diffusion slice. Migrate the old SD1 tokenizer, tiny CLIP, and tiny VAE implementations into focused compatibility adapters over their canonical owners; include all execution identities in CacheDependencies; and preserve single-owner validation, state transition, persistence, security, transaction, tensor, memory, cancellation, and publication boundaries.",
-            [*conditioning_source_reads, ".agents/specs/comfy-parity/catalogs/backend-conditioning-contracts.csv", ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv", "crates/comfy_model/src/conditioning.rs", "crates/comfy_model/src/clip.rs", "crates/comfy_model/src/vae.rs", "crates/comfy_model/src/controlnet.rs", "crates/comfy_model/src/patches.rs", "crates/comfy_model/src/patch_graph.rs", "crates/comfy_sampler/src/guidance.rs", "crates/comfy_model/src/slices/native_diffusion.rs", "crates/comfy_runtime/src/native_execution_controller.rs", "crates/comfy_runtime/src/cache.rs", "crates/comfy_test_support/src/native_diffusion_fixture.rs", "crates/comfy_test_support/src/slices/native_diffusion.rs"],
-            ["crates/comfy_model/src/comfy_model.rs", "crates/comfy_sampler/src/comfy_sampler.rs", "crates/comfy_model/src/slices/native_diffusion.rs", "crates/comfy_runtime/src/native_execution_controller.rs", "crates/comfy_runtime/src/cache.rs", "crates/comfy_test_support/src/native_diffusion_fixture.rs", "crates/comfy_test_support/src/slices/native_diffusion.rs", "crates/comfy_test_support/tests/native_diffusion_e2e.rs", ".agents/specs/comfy-parity/ownership-policy.json", ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv", ".agents/specs/comfy-parity/design.md"],
-            "The generated conditioning-contract ledger has zero unexplained rows and maps one-for-one to executable source-derived fixtures. Deterministic native diffusion uses only the canonical tokenizer/CLIP, VAE, guidance, ControlNet, and PatchGraph owners; runtime cache keys include every immutable execution identity; old tiny and parallel implementations are absent; adapter equivalence, ownership twice, tensor, latent, model-family, model-format, sampling, memory, cancellation, native diffusion E2E, formatting, clippy, and strict regeneration all pass with concrete durable evidence.",
+            ["VAL-CONDITIONING-001", "VAL-CONTROLNET-001", "VAL-CLIP-001", "VAL-VAE-001", "VAL-PATCH-001", "VAL-PATCH-ADAPTER-001", "VAL-CATALOG-001", "VAL-LATENT-001", "VAL-TENSOR-001", "VAL-MODEL-FAMILY-001", "VAL-MODEL-FORMAT-001", "VAL-SAMPLING-FOUNDATION-001", "VAL-NATIVE-E2E-002", "VAL-CANCEL-001", "VAL-MEMORY-001", "VAL-OWNERSHIP-001"],
+            "Integrate every cataloged native conditioning, tokenizer/CLIP, VAE, ControlNet, guidance, and patch foundation through a production-reachable prebound typed provider and execution bundle spanning the canonical model, sampler, runtime cache, worker, and deterministic native-diffusion slice. Migrate old compatibility implementations into delegation-only adapters over their canonical owners; include every immutable execution identity in CacheDependencies; and preserve single-owner validation, state transition, persistence, security, transaction, tensor, memory, cancellation, and publication boundaries.",
+            [*conditioning_source_reads, ".agents/specs/comfy-parity/generate_conditioning_catalog.py", ".agents/specs/comfy-parity/test_generate_conditioning_catalog.py", ".agents/specs/comfy-parity/generate_ownership_catalog.py", ".agents/specs/comfy-parity/generate_master_catalog.py", ".agents/specs/comfy-parity/regenerate_all.py", ".agents/specs/comfy-parity/regenerate_native_planning.py", ".agents/specs/comfy-parity/ownership-policy.json", ".agents/specs/comfy-parity/catalogs/backend-conditioning-contracts.csv", ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv", "crates/comfy_tensor/src/ops/neural_network_functional_01.rs", "crates/comfy_tensor/src/ops/neural_network_module_02.rs", "crates/comfy_tensor/tests/neural_network_module_02.rs", "crates/comfy_model/src/conditioning.rs", "crates/comfy_model/src/clip.rs", "crates/comfy_model/src/clip_tokenizer.rs", "crates/comfy_model/src/clip_text.rs", "crates/comfy_model/src/clip_text_encoders.rs", "crates/comfy_model/src/formats.rs", "crates/comfy_model/src/model_store.rs", "crates/comfy_model/src/vae.rs", "crates/comfy_model/src/vae_architecture.rs", "crates/comfy_model/src/vae_tiling.rs", "crates/comfy_model/src/vae_image.rs", "crates/comfy_model/src/vae_video.rs", "crates/comfy_model/src/vae_audio.rs", "crates/comfy_model/src/vae_structured.rs", "crates/comfy_model/src/controlnet.rs", "crates/comfy_model/src/patches.rs", "crates/comfy_model/src/patch_graph.rs", "crates/comfy_model/src/model_family.rs", "crates/comfy_model/src/latent_format.rs", "crates/comfy_sampler/src/guidance.rs", "crates/comfy_sampler/src/sampler.rs", "crates/comfy_sampler/src/algorithms/native_diffusion.rs", "crates/comfy_sampler/src/sampling_profile.rs", "crates/comfy_sampler/src/noise.rs", "crates/comfy_model/src/slices/native_diffusion.rs", "crates/comfy_runtime/src/assets.rs", "crates/comfy_runtime/src/executor.rs", "crates/comfy_runtime/src/output_committer.rs", "crates/comfy_runtime/src/native_execution_controller.rs", "crates/comfy_runtime/src/cache.rs", "crates/comfy_worker/src/comfy_worker.rs", "crates/comfy_worker/src/memory_modes.rs", "crates/comfy_worker/tests/memory_conformance.rs", "crates/comfy_test_support/src/native_diffusion_fixture.rs", "crates/comfy_test_support/src/bin/generate_native_diffusion_fixture.rs", "crates/comfy_test_support/tests/cancellation_ownership.rs", "crates/comfy_test_support/tests/native_diffusion_e2e.rs", "crates/comfy_test_support/tests/native_diffusion_foundation.rs", "crates/comfy_test_support/tests/ownership_consolidation.rs"],
+            [".agents/specs/comfy-parity/generate_conditioning_catalog.py", ".agents/specs/comfy-parity/test_generate_conditioning_catalog.py", ".agents/specs/comfy-parity/catalogs/backend-conditioning-contracts.csv", ".agents/specs/comfy-parity/regenerate_native_planning.py", ".agents/specs/comfy-parity/ownership-policy.json", ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv", ".agents/specs/comfy-parity/design.md", ".agents/specs/comfy-parity/validation.md", "crates/comfy_tensor/src/ops/neural_network_module_02.rs", "crates/comfy_tensor/tests/neural_network_module_02.rs", "crates/comfy_model/src/comfy_model.rs", "crates/comfy_sampler/src/comfy_sampler.rs", "crates/comfy_model/src/slices/native_diffusion.rs", "crates/comfy_runtime/src/native_execution_controller.rs", "crates/comfy_runtime/src/cache.rs", "crates/comfy_worker/src/comfy_worker.rs", "crates/comfy_test_support/src/native_diffusion_fixture.rs", "crates/comfy_test_support/src/bin/generate_native_diffusion_fixture.rs", "crates/comfy_test_support/tests/native_diffusion_e2e.rs", "crates/comfy_test_support/tests/native_diffusion_foundation.rs", "crates/comfy_test_support/tests/native_conditioning_integration.rs", "target/comfy-parity/val-conditioning-001.json", "target/comfy-parity/val-clip-001.json", "target/comfy-parity/val-vae-001.json", "target/comfy-parity/val-patch-001.json", "target/comfy-parity/val-ownership-001.json"],
+            "The generated conditioning-contract ledger has zero unexplained rows and maps one-for-one to executable source-derived fixtures and explicit cumulative artifacts. The production-reachable prebound native provider and bundle use only the canonical tokenizer/CLIP, VAE, guidance, ControlNet, and PatchGraph owners; runtime and worker handles bind every immutable execution identity; old tiny and parallel implementations are absent. The focused VAL-CONDITIONING-001 integration suite proves source-derived conditioning and guidance behavior, real bundle reachability, cache separation, cancellation, OOM/no publication, and workspace convergence; cumulative CLIP, VAE, ControlNet, PatchGraph, catalog, ownership-twice, native diffusion, formatting, clippy, and strict regeneration checks all pass with concrete durable evidence.",
             [conditioning_values_task_id, clip_owner_task_id, vae_owner_task_id, patch_semantics_task_id, controlnet_task_id, guidance_task_id, guidance_consolidation_task_id, sampler_algorithm_ownership_task_id, "comfy-parity-tensor-ops-neural-network-module-comfy-tensor-op-904c1e14bae4", "comfy-parity-tensor-ops-neural-network-module-comfy-tensor-op-d60003ac2b14", "comfy-parity-tensor-ops-random-number-generation-comfy-tensor-op-095b3e192800"],
         ),
     ])
@@ -9351,7 +9355,91 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             item["dependencies"] = list(
                 dict.fromkeys(
                     list(item["dependencies"])
-                    + ["comfy-parity-integrate-device-nvidia-cuda-comfy-model-0022"]
+                    + [
+                        "comfy-parity-integrate-device-nvidia-cuda-comfy-model-0022",
+                    ]
+                )
+            )
+            item["validations"] = list(
+                dict.fromkeys(list(item["validations"]) + ["VAL-AUTOGRAD-001"])
+            )
+            item["reads"] = list(
+                dict.fromkeys(
+                    list(item["reads"])
+                    + [
+                        "crates/comfy_tensor/src/comfy_tensor.rs",
+                        "crates/comfy_tensor/src/operation.rs",
+                        "crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs",
+                        "crates/comfy_tensor/src/ops/comfy_operator_indirection_01.rs",
+                        "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_08.rs",
+                        "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_16.rs",
+                        "crates/comfy_tensor/src/ops/external_tensor_kernel_01.rs",
+                        "crates/comfy_tensor/src/ops/indexing_masking_01.rs",
+                        "crates/comfy_tensor/src/ops/native_diffusion.rs",
+                        "crates/comfy_tensor/src/ops/reduction_01.rs",
+                        "crates/comfy_tensor/src/ops/shape_layout_transform_01.rs",
+                        "crates/comfy_tensor/src/ops/shape_layout_transform_02.rs",
+                        "crates/comfy_tensor/src/rng.rs",
+                        "crates/comfy_tensor/src/rng_profiles/compat.rs",
+                        "crates/comfy_tensor/tests/ops/neural_network_module_02.rs",
+                        "crates/comfy_model/src/attention.rs",
+                        "crates/comfy_model/src/native_ops.rs",
+                        "crates/comfy_model/src/quantization.rs",
+                        "crates/comfy_media/src/png.rs",
+                        "crates/comfy_model/tests/latent_formats.rs",
+                        "crates/comfy_model/tests/model_families.rs",
+                        "crates/comfy_model/tests/restricted_pickle_allowlist.rs",
+                        "crates/comfy_sampler/tests/sampling_foundation.rs",
+                        "crates/comfy_sampler/src/scheduler.rs",
+                        "projects/comfy/ComfyUI/comfy/samplers.py",
+                        ".agents/specs/comfy-parity/catalogs/backend-models.csv",
+                        "crates/comfy_model/catalog/model-families-v1.json",
+                        ".agents/specs/comfy-parity/catalogs/native-model-family-closure.json",
+                    ]
+                )
+            )
+            item["writes"] = [
+                path
+                for path in item["writes"]
+                if path != "crates/comfy_tensor/tests/neural_network_module_02.rs"
+            ]
+            item["writes"] = list(
+                dict.fromkeys(
+                    list(item["writes"])
+                    + [
+                        "crates/comfy_tensor/tests/ops/neural_network_module_02.rs",
+                        "crates/comfy_tensor/src/ops/shape_layout_transform_02.rs",
+                        "crates/comfy_runtime/src/executor.rs",
+                        "crates/comfy_model/src/controlnet.rs",
+                        "crates/comfy_model/src/patch_graph.rs",
+                        "crates/comfy_model/src/vae_image.rs",
+                        "crates/comfy_model/tests/clip_tokenizer.rs",
+                        "crates/comfy_model/tests/vae_architecture.rs",
+                        "crates/comfy_test_support/tests/ownership_consolidation.rs",
+                        "crates/comfy_ui/tests/native_diffusion_interaction.rs",
+                        "crates/comfy_sampler/tests/sampling_foundation.rs",
+                        "crates/comfy_sampler/tests/ownership.rs",
+                        ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+                        ".agents/specs/comfy-parity/catalogs/features.csv",
+                        ".agents/specs/comfy-parity/catalogs/master-reconciliation.json",
+                        ".agents/specs/comfy-parity/catalogs/native-spec-mapping.json",
+                        ".agents/specs/comfy-parity/parity-matrix.md",
+                        ".agents/specs/comfy-parity/source-inventory.md",
+                        ".agents/specs/comfy-parity/tasks.md",
+                        ".agents/specs/comfy-parity/traceability.md",
+                        "target/comfy-parity/val-cancel-001.json",
+                        "target/comfy-parity/val-controlnet-001.json",
+                        "target/comfy-parity/val-memory-001.json",
+                        "target/comfy-parity/val-native-e2e-002.json",
+                        "target/comfy-parity/val-patch-adapter-001.json",
+                        "target/comfy-parity/val-tensor-001.json",
+                        "target/comfy-parity/val-autograd-shape-layout-transform-02.json",
+                        "target/comfy-parity/val-tensor-shape-layout-transform-02.json",
+                        "target/comfy-parity/val-latent-001.json",
+                        "target/comfy-parity/val-model-family-001.json",
+                        "target/comfy-parity/val-model-format-001.json",
+                        "target/comfy-parity/val-sampling-foundation-001.json",
+                    ]
                 )
             )
         if item["id"] == "comfy-parity-model-layout-state-plan-owner-consolidation":
@@ -9940,10 +10028,62 @@ def task_validation_commands(item: dict[str, object]) -> str:
     elif identifier == "comfy-parity-conditioning-contract-catalog":
         commands = [
             "env PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_generate_conditioning_catalog.py -v",
+            "env PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py -v",
             "python3 .agents/specs/comfy-parity/generate_conditioning_catalog.py",
             "python3 .agents/specs/comfy-parity/generate_master_catalog.py",
             "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
             "python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/comfy-parity",
+        ]
+    elif identifier == "comfy-parity-native-conditioning-patches":
+        commands = [
+            "cargo fmt --all -- --check",
+            "env PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_generate_conditioning_catalog.py -v",
+            "env PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py -v",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_tensor --test neural_network_module_02 embedding_preserves_typed_workspace_exhaustion -- --exact",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_runtime --lib executor::tests::val_domain_004_canonical_cancellation_and_ui_cache_semantics -- --exact",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_runtime --lib cache::tests::canonical_native_diffusion_cache_identities_bind_one_checked_snapshot -- --exact",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --lib controlnet::tests::canonical_tensor_errors_preserve_typed_resource_and_cancellation_sources -- --exact",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_runtime --lib native_execution_controller::tests::ksampler_cache_identity_binds_guidance_adapter_and_inputs -- --exact",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_runtime --lib native_execution_controller::tests::load_image_cache_dependencies_hash_exact_bytes_and_preserve_typed_cancellation -- --exact",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_runtime --lib native_execution_controller::tests::native_diffusion_failures_preserve_typed_cancellation_and_resource_exhaustion -- --exact",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_runtime --lib native_execution_controller::tests::native_diffusion_handles_deserialize_fail_closed_and_reject_stale_membership -- --exact",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_runtime --lib native_execution_controller::tests::prepared_tensor_handles_remain_unpublished_when_final_cancellation_fails -- --exact",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --lib native_diffusion_fixture::tests::provider_load_preserves_cancelled_and_capacity_failures_and_recovers -- --exact",
+            "cargo check --locked -p comfy_tensor -p comfy_model -p comfy_sampler -p comfy_runtime -p comfy_worker -p comfy_plugin_host -p comfy_test_support --all-targets",
+            "cargo check --locked -p comfy_ui --features test-support --all-targets",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_tensor --all-targets",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --all-targets",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_sampler --all-targets",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_runtime --all-targets",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_worker --all-targets",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_plugin_host --all-targets",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --all-targets",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_ui --features test-support --all-targets",
+            "./script/clippy -p comfy_tensor -p comfy_model -p comfy_sampler -p comfy_runtime -p comfy_worker -p comfy_plugin_host -p comfy_test_support -p comfy_ui",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test clip_tokenizer val_clip_001_tokenizer_rows_execute_and_publish_partial_ledger -- --exact",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test vae_architecture val_vae_001_selector_rows -- --exact",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --lib patch_graph::tests::val_patch_001_catalog_manifest_is_exact_digest_bound_and_executable -- --exact",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test patch_adapters val_patch_adapter_001_exact_catalog_manifest_and_artifact_are_current -- --exact",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --lib controlnet::tests::val_controlnet_001_catalog_manifest_is_exact_digest_bound_and_executable -- --exact",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test native_conditioning_integration val_conditioning_001 -- --exact",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test native_diffusion_e2e val_native_e2e_002 -- --exact",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_tensor --lib generated_shape_layout_transform_02::validation_tests::writes_task_validation_artifacts -- --exact",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_tensor val_tensor_001",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_tensor val_memory_001",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_worker --test memory_conformance val_memory_001 -- --exact",
+            "python3 .agents/specs/comfy-parity/generate_conditioning_catalog.py",
+            "python3 -c \"import csv,pathlib; rows=list(csv.DictReader(pathlib.Path('.agents/specs/comfy-parity/catalogs/backend-conditioning-contracts.csv').open())); assert len(rows)==583 and all(row['current_sim_status']=='equivalent' for row in rows)\"",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test restricted_pickle_allowlist val_model_format_001 -- --exact",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test latent_formats val_latent_001_all_formats_emit_complete_artifact -- --exact",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_sampler --test sampling_foundation val_sampling_foundation_001 -- --exact",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_model --test model_families every_generated_model_family_fixture_executes_the_canonical_harness -- --exact",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test cancellation_ownership val_cancel_001_canonical_cancellation_ownership -- --exact",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact",
+            "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact",
+            "python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/comfy-parity",
+            "git diff --check",
         ]
     elif identifier == "comfy-parity-vae-domain-loader-foundation":
         commands = [
@@ -12361,6 +12501,10 @@ def validation_runner(identifier: str) -> str:
         return "cargo test --locked -p comfy_model --test weight_adapter_runtime"
     if identifier == "VAL-PATCH-ADAPTER-001":
         return "cargo test --locked -p comfy_model --test patch_adapters"
+    if identifier == "VAL-CONTROLNET-001":
+        return "cargo test --locked -p comfy_model controlnet::tests"
+    if identifier == "VAL-CONDITIONING-001":
+        return "CARGO_INCREMENTAL=0 cargo test --locked -p comfy_test_support --test native_conditioning_integration val_conditioning_001"
     if identifier in {"VAL-CLIP-001", "VAL-PATCH-001", "VAL-VAE-001"}:
         return f"cargo test --locked -p comfy_model {identifier.casefold().replace('-', '_')}"
     if identifier == "VAL-MEMORY-001":
@@ -12457,7 +12601,7 @@ def write_validation() -> None:
     ]
     for identifier, (title, layer, fixture, procedure) in VALIDATIONS.items():
         pass_artifact = f"exit status 0 plus `target/comfy-parity/{identifier.casefold()}.json` containing fixture digests, environment/backend identity, per-case results, and no unexplained skipped row."
-        if identifier in {"VAL-CLIP-001", "VAL-PATCH-001", "VAL-VAE-001"}:
+        if identifier in {"VAL-CLIP-001", "VAL-PATCH-001", "VAL-VAE-001", "VAL-CONTROLNET-001", "VAL-CONDITIONING-001"}:
             pass_artifact = (
                 f"exit status 0 plus `target/comfy-parity/{identifier.casefold()}.json` "
                 "using schema version 1 with validation and environment identity, truthful "
@@ -12467,6 +12611,13 @@ def write_validation() -> None:
                 "source and symbol SHA-256 values, passed status, and non-empty unique case IDs. "
                 "Every claimed task result has zero failures and skips; partial artifacts claim "
                 "only their exact passed rows."
+            )
+        if identifier == "VAL-CATALOG-001":
+            pass_artifact = (
+                "exit status 0 from the exact runner after the source-snapshot manifest "
+                "matches and both complete regeneration passes produce no changed paths. "
+                "The checked-in generated outputs and command result are the evidence; this "
+                "command-only gate emits no separate target JSON artifact."
             )
         if identifier == "VAL-DEVICE-001":
             pass_artifact += " The Apple Metal baseline retains its signed artifact under `catalogs/native-device-certification/`; a supplied CPU artifact must verify cryptographically but may remain explicitly stale as an external release gate; optional accelerator artifacts are accepted only as external target-lab evidence."

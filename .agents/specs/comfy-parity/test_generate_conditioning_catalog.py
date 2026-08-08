@@ -8,6 +8,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import generate_conditioning_catalog as catalog
 
@@ -161,6 +162,106 @@ class ConditioningArtifactClosureTests(unittest.TestCase):
         duplicate_case = copy.deepcopy(self.payload)
         duplicate_case["contracts"][0]["case_ids"] = ["same", "same"]
         self.assert_rejected(duplicate_case)
+
+        cross_contract_duplicate = copy.deepcopy(self.payload)
+        second_contract = copy.deepcopy(cross_contract_duplicate["contracts"][0])
+        second_contract["contract_id"] = "conditioning-patch-payload-second"
+        cross_contract_duplicate["contracts"].append(second_contract)
+        self.assert_rejected(cross_contract_duplicate)
+
+    def test_contract_case_registry_rejects_misassociation_and_duplicates(self) -> None:
+        rows = catalog.generate_rows()
+        catalog.validate_contract_cases(rows)
+        first, second = list(catalog.CONTRACT_CASES)[:2]
+
+        misassociated = dict(catalog.CONTRACT_CASES)
+        misassociated[first] = f"{second}:misassociated-case"
+        with patch.object(catalog, "CONTRACT_CASES", misassociated):
+            with self.assertRaisesRegex(RuntimeError, "is not bound to contract"):
+                catalog.validate_contract_cases(rows)
+
+        duplicated = dict(catalog.CONTRACT_CASES)
+        duplicated[second] = duplicated[first]
+        with patch.object(catalog, "CONTRACT_CASES", duplicated):
+            with self.assertRaisesRegex(RuntimeError, "contains duplicate case IDs"):
+                catalog.validate_contract_cases(rows)
+
+        wrong_keys = dict(catalog.CONTRACT_CASES)
+        wrong_keys.pop(first)
+        fabricated = "conditioning-conditioning-value-conds-condfabricated-deadbeef"
+        wrong_keys[fabricated] = f"{fabricated}:fabricated-case"
+        with patch.object(catalog, "CONTRACT_CASES", wrong_keys):
+            with self.assertRaisesRegex(
+                RuntimeError, "differs from generated source rows"
+            ):
+                catalog.validate_contract_cases(rows)
+
+        wrong_partition = copy.deepcopy(rows)
+        guidance_row = next(
+            row
+            for row in wrong_partition
+            if row["implementation_task"] == catalog.GUIDANCE_TASK
+        )
+        guidance_row["implementation_task"] = catalog.CONDITIONING_TASK
+        with self.assertRaisesRegex(RuntimeError, "generated task partition mismatch"):
+            catalog.validate_contract_cases(wrong_partition)
+
+    def test_conditioning_contract_requires_its_exact_registered_case(self) -> None:
+        contract_id = next(iter(catalog.CONTRACT_CASES))
+        row = dict(self.row)
+        row.update(
+            contract_id=contract_id,
+            implementation_task=catalog.CONDITIONING_TASK,
+        )
+        payload = copy.deepcopy(self.payload)
+        payload["validation_id"] = catalog.CONDITIONING_CLOSURE_ARTIFACT
+        task_result = payload["task_results"].pop(catalog.PATCH_GRAPH_TASK)
+        task_result["implementations"] = [
+            self.create_temporary_implementation(path)
+            for path in sorted(
+                catalog.TASK_IMPLEMENTATION_CLOSURES[catalog.CONDITIONING_TASK]
+            )
+        ]
+        task_result["case_ids"] = sorted(
+            catalog.TASK_REQUIRED_CASES[catalog.CONDITIONING_TASK]
+        )
+        payload["task_results"][catalog.CONDITIONING_TASK] = task_result
+        payload["contracts"][0].update(
+            contract_id=contract_id,
+            task_id=catalog.CONDITIONING_TASK,
+            case_ids=[catalog.CONTRACT_CASES[contract_id]],
+        )
+        declared = {
+            catalog.CONDITIONING_TASK: frozenset(
+                catalog.TASK_IMPLEMENTATION_CLOSURES[catalog.CONDITIONING_TASK]
+            )
+        }
+        self.assertTrue(
+            catalog.artifact_covers_row(
+                payload,
+                row,
+                catalog.CONDITIONING_CLOSURE_ARTIFACT,
+                self.workspace,
+                declared,
+            )
+        )
+
+        wrong = copy.deepcopy(payload)
+        other_contract_id = next(
+            candidate for candidate in catalog.CONTRACT_CASES if candidate != contract_id
+        )
+        wrong["contracts"][0]["case_ids"] = [
+            catalog.CONTRACT_CASES[other_contract_id]
+        ]
+        self.assertFalse(
+            catalog.artifact_covers_row(
+                wrong,
+                row,
+                catalog.CONDITIONING_CLOSURE_ARTIFACT,
+                self.workspace,
+                declared,
+            )
+        )
 
     def test_malformed_summary_environment_and_implementation_fail_closed(self) -> None:
         invalid_payloads = []
@@ -508,6 +609,62 @@ class ConditioningArtifactClosureTests(unittest.TestCase):
                 )
             )
 
+    def test_controlnet_manifest_is_exact_and_explicitly_closed(self) -> None:
+        rows = [
+            row
+            for row in catalog.generate_rows()
+            if row["implementation_task"] == catalog.CONTROLNET_TASK
+        ]
+        self.assertEqual(len(rows), 8)
+        self.assertEqual(
+            {
+                (row["kind"], row["source_path"], row["source_symbol"])
+                for row in rows
+            },
+            catalog.CONTROLNET_SOURCE_MANIFEST,
+        )
+        self.assertTrue(
+            all(
+                row["closure_artifact"] == catalog.CONTROLNET_CLOSURE_ARTIFACT
+                for row in rows
+            )
+        )
+
+    def test_clip_and_vae_execution_manifests_are_exact_and_closed(self) -> None:
+        rows = catalog.generate_rows()
+        clip_rows = [
+            row
+            for row in rows
+            if row["implementation_task"] == catalog.CLIP_EXECUTION_TASK
+        ]
+        self.assertEqual(len(clip_rows), 8)
+        self.assertEqual(
+            {
+                (row["kind"], row["source_path"], row["source_symbol"])
+                for row in clip_rows
+            },
+            catalog.CLIP_EXECUTION_SOURCE_MANIFEST,
+        )
+        self.assertTrue(
+            all(row["closure_artifact"] == "VAL-CLIP-001" for row in clip_rows)
+        )
+        vae_rows = [
+            row
+            for row in rows
+            if row["implementation_task"] == catalog.VAE_EXECUTION_TASK
+        ]
+        self.assertEqual(len(vae_rows), 1)
+        self.assertEqual(
+            {
+                (row["kind"], row["source_path"], row["source_symbol"])
+                for row in vae_rows
+            },
+            catalog.VAE_EXECUTION_SOURCE_MANIFEST,
+        )
+        self.assertTrue(
+            all(row["closure_artifact"] == "VAL-VAE-001" for row in vae_rows)
+        )
+
     def test_cumulative_artifact_checks_each_task_against_its_own_declared_writes(self) -> None:
         payload = copy.deepcopy(self.payload)
         second_task = "second-task"
@@ -566,15 +723,33 @@ class ConditioningArtifactClosureTests(unittest.TestCase):
         self.assertEqual(
             catalog.closure_artifact_for(
                 "comfy_model::conditioning::tests",
-                "comfy-parity-conditioning-value-foundation",
+                catalog.CONDITIONING_TASK,
             ),
-            "",
+            "VAL-CONDITIONING-001",
         )
         self.assertEqual(
             catalog.closure_artifact_for(
-                "VAL-VAE-001", "comfy-parity-vae-domain-loader-foundation"
+                "comfy_sampler::guidance::tests", catalog.GUIDANCE_TASK
+            ),
+            "VAL-CONDITIONING-001",
+        )
+        self.assertEqual(
+            catalog.closure_artifact_for(
+                "comfy_model::controlnet::tests", catalog.CONTROLNET_TASK
+            ),
+            "VAL-CONTROLNET-001",
+        )
+        self.assertEqual(
+            catalog.closure_artifact_for(
+                "comfy_model::vae::tests", catalog.VAE_EXECUTION_TASK
             ),
             "VAL-VAE-001",
+        )
+        self.assertEqual(
+            catalog.closure_artifact_for(
+                "VAL-CLIP-001", catalog.CLIP_EXECUTION_TASK
+            ),
+            "VAL-CLIP-001",
         )
 
     def test_task_state_requires_one_current_non_stale_evidence_record(self) -> None:

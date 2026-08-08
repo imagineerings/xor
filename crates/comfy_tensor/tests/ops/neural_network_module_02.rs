@@ -1,7 +1,8 @@
 use comfy_tensor::{
     CancellationToken, CpuBackend, CpuWorkspaceAuthority, DType, DeviceId, ExecutionContext,
-    GENERATED_RESOLVED_OPERATION_CONTRACT_SLICES, StreamId, Tensor, TensorDescriptor,
-    generated_neural_network_functional_01::EmbeddingOptions,
+    GENERATED_RESOLVED_OPERATION_CONTRACT_SLICES, StreamId, Tensor, TensorDescriptor, TensorError,
+    generated_elementwise_or_runtime_operation_08::ElementwiseRuntimePartEightError,
+    generated_neural_network_functional_01::{EmbeddingOptions, NeuralNetworkFunctionalError},
     generated_neural_network_module_01::LossReduction,
     generated_neural_network_module_02::{
         BATCH_NORM_1D_OPERATION_ID, NeuralNetworkModulePartTwoError,
@@ -639,6 +640,70 @@ fn cancellation_precedes_part_two_validation() -> Result<(), Box<dyn std::error:
             &context,
         ),
         Err(NeuralNetworkModulePartTwoError::Cancelled)
+    ));
+    Ok(())
+}
+
+#[test]
+fn embedding_preserves_typed_workspace_exhaustion() -> Result<(), Box<dyn std::error::Error>> {
+    let backend = TestBackend::new()?;
+    let cancellation = CancellationToken::default();
+    let indices = upload_i64(&backend, &[2], &[0, 2], &cancellation)?;
+    let mut weight = upload_f32(
+        &backend,
+        &[3, 2],
+        &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+        &cancellation,
+    )?;
+    let workspace = backend.authority.authorize_workspace(0)?;
+    let context =
+        backend
+            .backend
+            .execution_context(StreamId::DEFAULT, workspace, &cancellation);
+    assert!(matches!(
+        embedding_module_with_context_exact_native(
+            &backend,
+            &indices,
+            &mut weight,
+            EmbeddingOptions::default(),
+            &context,
+        ),
+        Err(NeuralNetworkModulePartTwoError::Tensor(
+            comfy_tensor::TensorError::WorkspaceAuthorizationExceeded { .. }
+                | comfy_tensor::TensorError::AllocationFailed { .. }
+                | comfy_tensor::TensorError::ResourceLimitExceeded { .. }
+        ))
+    ));
+    assert_eq!(context.scratch.in_use_bytes(), 0);
+    assert_eq!(
+        NeuralNetworkModulePartTwoError::from(NeuralNetworkFunctionalError::Tensor(
+            TensorError::Cancelled,
+        )),
+        NeuralNetworkModulePartTwoError::Cancelled
+    );
+    assert_eq!(
+        NeuralNetworkModulePartTwoError::from(NeuralNetworkFunctionalError::IndexSelect(
+            ElementwiseRuntimePartEightError::Cancelled,
+        )),
+        NeuralNetworkModulePartTwoError::Cancelled
+    );
+    assert!(matches!(
+        NeuralNetworkModulePartTwoError::from(NeuralNetworkFunctionalError::IndexSelect(
+            ElementwiseRuntimePartEightError::Tensor(
+                TensorError::WorkspaceAuthorizationExceeded {
+                    requested: 64,
+                    authorized: 32,
+                    in_use: 0,
+                },
+            ),
+        )),
+        NeuralNetworkModulePartTwoError::Tensor(
+            TensorError::WorkspaceAuthorizationExceeded {
+                requested: 64,
+                authorized: 32,
+                in_use: 0,
+            }
+        )
     ));
     Ok(())
 }

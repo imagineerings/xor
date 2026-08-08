@@ -1,13 +1,14 @@
 use crate::{
     CancellationToken, CpuBackend, DType, DeviceId, ExecutionContext, Tensor,
     TensorDescriptor, TensorError, ViewAccess,
+    generated_comfy_operator_indirection_01::OperatorIndirectionError,
     generated_elementwise_or_runtime_operation_08::{
-        concatenate_jvp_with_context_exact_native, concatenate_vjp_with_context_exact_native,
-        concatenate_with_context_exact_native,
+        ElementwiseRuntimePartEightError, concatenate_jvp_with_context_exact_native,
+        concatenate_vjp_with_context_exact_native, concatenate_with_context_exact_native,
     },
     generated_elementwise_or_runtime_operation_16::{
-        tile_jvp_with_context_exact_native, tile_vjp_with_context_exact_native,
-        tile_with_context_exact_native,
+        ElementwiseRuntimePartSixteenError, tile_jvp_with_context_exact_native,
+        tile_vjp_with_context_exact_native, tile_with_context_exact_native,
     },
     generated_elementwise_or_runtime_operation_17::{
         TensorSplitSpec, tensor_split_exact_native, tensor_split_jvp_exact_native,
@@ -100,7 +101,7 @@ pub fn repeat_vjp_with_context_exact_native(
     require_f32_cpu(input, TENSOR_REPEAT_OPERATION_ID)?;
     require_f32_cpu(output_gradient, TENSOR_REPEAT_OPERATION_ID)?;
     tile_vjp_with_context_exact_native(backend, input, repeats, output_gradient, context)
-        .map_err(|error| canonical_error(TENSOR_REPEAT_OPERATION_ID, error))
+        .map_err(|error| part_sixteen_error(TENSOR_REPEAT_OPERATION_ID, error))
 }
 
 pub fn repeat_jvp_with_context_exact_native(
@@ -113,7 +114,7 @@ pub fn repeat_jvp_with_context_exact_native(
     context.cancellation.check()?;
     validate_repeat(input, repeats, TENSOR_REPEAT_OPERATION_ID)?;
     tile_jvp_with_context_exact_native(backend, input, input_tangent, repeats, context)
-        .map_err(|error| canonical_error(TENSOR_REPEAT_OPERATION_ID, error))
+        .map_err(|error| part_sixteen_error(TENSOR_REPEAT_OPERATION_ID, error))
 }
 
 pub fn tensor_reshape_with_context_exact_native(
@@ -236,7 +237,7 @@ pub fn torch_cat_with_context_exact_native(
     context.cancellation.check()?;
     require_nonempty_compatible(inputs, TORCH_CAT_OPERATION_ID)?;
     concatenate_with_context_exact_native(backend, inputs, dimension, context)
-        .map_err(|error| canonical_error(TORCH_CAT_OPERATION_ID, error))
+        .map_err(|error| part_eight_error(TORCH_CAT_OPERATION_ID, error))
 }
 
 pub fn cat_vjp_with_context_exact_native(
@@ -255,7 +256,7 @@ pub fn cat_vjp_with_context_exact_native(
         output_gradient,
         context,
     )
-    .map_err(|error| canonical_error(TORCH_CAT_OPERATION_ID, error))
+    .map_err(|error| part_eight_error(TORCH_CAT_OPERATION_ID, error))
 }
 
 pub fn cat_jvp_with_context_exact_native(
@@ -274,7 +275,7 @@ pub fn cat_jvp_with_context_exact_native(
         dimension,
         context,
     )
-    .map_err(|error| canonical_error(TORCH_CAT_OPERATION_ID, error))
+    .map_err(|error| part_eight_error(TORCH_CAT_OPERATION_ID, error))
 }
 
 pub fn torch_flatten_with_context_exact_native(
@@ -514,7 +515,7 @@ fn repeat_for_operation(
     context.cancellation.check()?;
     validate_repeat(input, repeats, operation)?;
     tile_with_context_exact_native(backend, input, repeats, context)
-        .map_err(|error| canonical_error(operation, error))
+        .map_err(|error| part_sixteen_error(operation, error))
 }
 
 fn validate_repeat(
@@ -650,7 +651,40 @@ fn stack_for_operation(
         );
     }
     concatenate_with_context_exact_native(backend, &expanded, axis, context)
-        .map_err(|error| canonical_error(operation, error))
+        .map_err(|error| part_eight_error(operation, error))
+}
+
+fn part_eight_error(
+    operation: &'static str,
+    error: ElementwiseRuntimePartEightError,
+) -> ShapeLayoutTransformPartTwoError {
+    match error {
+        ElementwiseRuntimePartEightError::Cancelled => ShapeLayoutTransformPartTwoError::Cancelled,
+        ElementwiseRuntimePartEightError::Tensor(error) => error.into(),
+        error => canonical_error(operation, error),
+    }
+}
+
+fn part_sixteen_error(
+    operation: &'static str,
+    error: ElementwiseRuntimePartSixteenError,
+) -> ShapeLayoutTransformPartTwoError {
+    match error {
+        ElementwiseRuntimePartSixteenError::Cancelled => {
+            ShapeLayoutTransformPartTwoError::Cancelled
+        }
+        ElementwiseRuntimePartSixteenError::Tensor(error) => error.into(),
+        ElementwiseRuntimePartSixteenError::Cast(OperatorIndirectionError::Cancelled) => {
+            ShapeLayoutTransformPartTwoError::Cancelled
+        }
+        ElementwiseRuntimePartSixteenError::Cast(OperatorIndirectionError::Tensor(error)) => {
+            error.into()
+        }
+        ElementwiseRuntimePartSixteenError::PartEight(error) => {
+            part_eight_error(operation, error)
+        }
+        error => canonical_error(operation, error),
+    }
 }
 
 fn canonical_split_spec(
@@ -824,7 +858,63 @@ fn overflow(
 
 #[cfg(test)]
 mod validation_tests {
+    use super::{
+        ShapeLayoutTransformPartTwoError, TORCH_CAT_OPERATION_ID, part_eight_error,
+        part_sixteen_error,
+    };
+    use crate::{
+        TensorError,
+        generated_comfy_operator_indirection_01::OperatorIndirectionError,
+        generated_elementwise_or_runtime_operation_08::ElementwiseRuntimePartEightError,
+        generated_elementwise_or_runtime_operation_16::ElementwiseRuntimePartSixteenError,
+    };
     use std::collections::BTreeMap;
+
+    #[test]
+    fn canonical_owner_wrappers_preserve_typed_cancellation_and_resource_exhaustion() {
+        assert!(matches!(
+            part_eight_error(
+                TORCH_CAT_OPERATION_ID,
+                ElementwiseRuntimePartEightError::Cancelled,
+            ),
+            ShapeLayoutTransformPartTwoError::Cancelled
+        ));
+        assert!(matches!(
+            part_eight_error(
+                TORCH_CAT_OPERATION_ID,
+                ElementwiseRuntimePartEightError::Tensor(
+                    TensorError::WorkspaceAuthorizationExceeded {
+                        requested: 64,
+                        authorized: 32,
+                        in_use: 0,
+                    },
+                ),
+            ),
+            ShapeLayoutTransformPartTwoError::Tensor(
+                TensorError::WorkspaceAuthorizationExceeded {
+                    requested: 64,
+                    authorized: 32,
+                    in_use: 0,
+                }
+            )
+        ));
+        assert!(matches!(
+            part_sixteen_error(
+                TORCH_CAT_OPERATION_ID,
+                ElementwiseRuntimePartSixteenError::Cast(OperatorIndirectionError::Cancelled),
+            ),
+            ShapeLayoutTransformPartTwoError::Cancelled
+        ));
+        assert!(matches!(
+            part_sixteen_error(
+                TORCH_CAT_OPERATION_ID,
+                ElementwiseRuntimePartSixteenError::PartEight(
+                    ElementwiseRuntimePartEightError::Cancelled,
+                ),
+            ),
+            ShapeLayoutTransformPartTwoError::Cancelled
+        ));
+    }
 
     #[test]
     fn writes_task_validation_artifacts() -> Result<(), Box<dyn std::error::Error>> {

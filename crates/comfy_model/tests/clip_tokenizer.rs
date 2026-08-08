@@ -1,12 +1,17 @@
+use comfy_model::clip::{
+    ClipError, ClipType, TextEncoderModel, detect_text_encoder_model, llama_detect,
+    select_clip_architecture, t5xxl_detect,
+};
 use comfy_model::clip_tokenizer::{
     CLIP_TOKENIZER_SOURCE_ROWS, apply_empty_baseline_token_weights, escape_important,
     generate_empty_tokens, parse_parentheses, token_weights, unescape_important,
 };
 use comfy_model::{
-    ArtifactIndex, ArtifactKey, ArtifactRoot, ClipBpeTokenizer, ModelStore,
-    ModelTokenizerDescriptor, NativePromptTokenizer, NativeTokenValue, NativeTokenizerError,
-    NativeTokenizerFamily, ParserLimits, SentencePieceTokenizer, TextualInversionEmbedding,
-    TokenizerConfiguration, parse_prompt_weights,
+    ArtifactIndex, ArtifactKey, ArtifactRoot, ClipBpeTokenizer, ModelParsedFacts,
+    ModelParsedTensorFact, ModelProbe, ModelStore, ModelTokenizerDescriptor, NativePromptTokenizer,
+    NativeTokenValue, NativeTokenizerError, NativeTokenizerFamily, ParserLimits,
+    SentencePieceTokenizer, TextualInversionEmbedding, TokenizerConfiguration,
+    parse_prompt_weights,
 };
 use comfy_tensor::CancellationToken;
 use serde_json::{Value, json};
@@ -36,17 +41,180 @@ const TOKENIZER_IMPLEMENTATION_CLOSURE: [(&str, &str); 7] = [
     ),
     (
         "crates/comfy_model/src/slices/native_diffusion.rs",
-        "4859809749fc4e14908663bf1a9fd07dab705b13d06260dedda4f383ef21e680",
+        "494413ff17ec6ed6e1c8ae3f26b99b7868470fda997619cb026185ebeb5a2d38",
     ),
     (
         "crates/comfy_runtime/src/native_execution_controller.rs",
-        "c5ef5148c1b8b3f8244e997cd07f3093b3b076555a01aa5005efed44ed420256",
+        "6a604b5781c44e64fb94880a6d3f92508559d3fec0452981afa89d41f0a96eff",
     ),
     (
         "crates/comfy_test_support/src/native_diffusion_fixture.rs",
-        "1e295e60f90c3e2d875c20c487b6a16f397127053ac3c476ea528e26695489d4",
+        "dfa227c69146fd3566e3f9aa58c226bdce2094a7db27ec36ce67959ac9a561b0",
     ),
 ];
+
+const CLIP_EXECUTION_SOURCE_ROWS: [&str; 8] = [
+    "CLIP",
+    "CLIPType",
+    "load_clip",
+    "TEModel",
+    "detect_te_model",
+    "t5xxl_detect",
+    "llama_detect",
+    "load_text_encoder_state_dicts",
+];
+
+fn clip_execution_probe(
+    tensors: Vec<(&str, Vec<u64>, &str)>,
+) -> Result<ModelProbe, Box<dyn std::error::Error>> {
+    Ok(ModelProbe::from_parsed_facts(ModelParsedFacts {
+        tensors: tensors
+            .into_iter()
+            .map(|(name, shape, storage_dtype)| {
+                (
+                    name.to_owned(),
+                    ModelParsedTensorFact {
+                        shape,
+                        storage_dtype: storage_dtype.to_owned(),
+                    },
+                )
+            })
+            .collect(),
+        formats: Vec::new(),
+    })?)
+}
+
+fn clip_l_execution_probe() -> Result<ModelProbe, Box<dyn std::error::Error>> {
+    clip_execution_probe(vec![(
+        "text_model.encoder.layers.0.mlp.fc1.weight",
+        vec![1, 2],
+        "F32",
+    )])
+}
+
+fn t5xxl_execution_probe() -> Result<ModelProbe, Box<dyn std::error::Error>> {
+    clip_execution_probe(vec![
+        (
+            "encoder.block.23.layer.1.DenseReluDense.wi_1.weight",
+            vec![10_240, 2],
+            "F32",
+        ),
+        ("encoder.final_layer_norm.weight", vec![4_096], "F16"),
+        ("encoder.block.0.layer.0.comfy_quant", vec![1], "U8"),
+    ])
+}
+
+fn llama_execution_probe() -> Result<ModelProbe, Box<dyn std::error::Error>> {
+    clip_execution_probe(vec![
+        (
+            "model.layers.0.post_attention_layernorm.weight",
+            vec![3_584],
+            "F32",
+        ),
+        ("model.layers.0.self_attn.k_proj.weight", vec![2, 2], "F32"),
+        ("model.norm.weight", vec![2], "BF16"),
+    ])
+}
+
+fn execute_clip_execution_catalog_contract(symbol: &str) -> Result<(), Box<dyn std::error::Error>> {
+    match symbol {
+        "CLIP" => {
+            let probe = clip_l_execution_probe()?;
+            let first =
+                select_clip_architecture(ClipType::StableDiffusion, std::slice::from_ref(&probe))?;
+            let second =
+                select_clip_architecture(ClipType::StableDiffusion, std::slice::from_ref(&probe))?;
+            assert_eq!(first.digest(), second.digest());
+            assert_eq!(first.digest().len(), 64);
+            assert!(matches!(
+                select_clip_architecture(ClipType::StableDiffusion, &[]),
+                Err(ClipError::InvalidArtifactSet(0))
+            ));
+        }
+        "CLIPType" => {
+            assert_eq!(ClipType::ALL.len(), 32);
+            for (index, clip_type) in ClipType::ALL.into_iter().enumerate() {
+                assert_eq!(usize::from(clip_type.source_ordinal()), index + 1);
+            }
+        }
+        "load_clip" => {
+            let selection = select_clip_architecture(
+                ClipType::Wan,
+                std::slice::from_ref(&t5xxl_execution_probe()?),
+            )?;
+            assert_eq!(
+                selection.tokenizer(),
+                "comfy.text_encoders.wan.WanT5Tokenizer"
+            );
+            assert_eq!(selection.clip_model(), "comfy.text_encoders.wan.te");
+        }
+        "TEModel" => {
+            assert_eq!(TextEncoderModel::ALL.len(), 35);
+            for (index, model) in TextEncoderModel::ALL.into_iter().enumerate() {
+                assert_eq!(usize::from(model.source_ordinal()), index + 1);
+            }
+        }
+        "detect_te_model" => {
+            let probe = clip_l_execution_probe()?;
+            assert_eq!(
+                detect_text_encoder_model(&probe.tensor_shapes)?,
+                Some(TextEncoderModel::ClipL)
+            );
+            assert!(matches!(
+                detect_text_encoder_model(&BTreeMap::from([(
+                    "encoder.block.23.layer.1.DenseReluDense.wi_1.weight".to_owned(),
+                    Vec::new(),
+                )])),
+                Err(ClipError::InvalidDetectorTensor(_))
+            ));
+        }
+        "t5xxl_detect" => {
+            let probe = t5xxl_execution_probe()?;
+            let configuration =
+                t5xxl_detect(std::slice::from_ref(&probe))?.ok_or("T5XXL was not detected")?;
+            assert_eq!(configuration.artifact_index(), 0);
+            assert_eq!(configuration.weight_dtype(), Some("float16"));
+            assert!(configuration.mixed_per_layer_quantization());
+            assert_eq!(
+                t5xxl_detect(std::slice::from_ref(&clip_l_execution_probe()?))?,
+                None
+            );
+        }
+        "llama_detect" => {
+            let configuration =
+                llama_detect(&[clip_l_execution_probe()?, llama_execution_probe()?])?
+                    .ok_or("Llama was not detected")?;
+            assert_eq!(configuration.artifact_index(), 1);
+            assert_eq!(configuration.weight_dtype(), Some("bfloat16"));
+            assert_eq!(
+                llama_detect(std::slice::from_ref(&clip_l_execution_probe()?))?,
+                None
+            );
+        }
+        "load_text_encoder_state_dicts" => {
+            let clip = clip_l_execution_probe()?;
+            let t5xxl = t5xxl_execution_probe()?;
+            let selected =
+                select_clip_architecture(ClipType::Flux, &[clip.clone(), t5xxl.clone()])?;
+            assert_eq!(
+                selected.tokenizer(),
+                "comfy.text_encoders.flux.FluxTokenizer"
+            );
+            assert_eq!(selected.clip_model(), "comfy.text_encoders.flux.flux_clip");
+            let reversed = select_clip_architecture(ClipType::Flux, &[t5xxl, clip.clone()])?;
+            assert_ne!(selected.digest(), reversed.digest());
+            assert!(matches!(
+                select_clip_architecture(
+                    ClipType::StableDiffusion,
+                    &[clip.clone(), clip.clone(), clip.clone(), clip.clone(), clip],
+                ),
+                Err(ClipError::InvalidArtifactSet(5))
+            ));
+        }
+        unexpected => return Err(format!("unaccounted CLIP execution symbol {unexpected}").into()),
+    }
+    Ok(())
+}
 
 fn verify_tokenizer_implementation_closure(
     workspace: &Path,
@@ -1724,6 +1892,7 @@ fn execute_invalid_tokenizer_catalog_contract(
 fn val_clip_001_tokenizer_rows_execute_and_publish_partial_ledger()
 -> Result<(), Box<dyn std::error::Error>> {
     const CONTRACT_TASK: &str = "comfy-parity-clip-tokenizer-foundation";
+    const EXECUTION_TASK: &str = "comfy-parity-clip-execution-foundation";
     const OWNER_RESULT_TASK: &str = "comfy-parity-sd1-tokenizer-owner-consolidation";
     let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -1767,6 +1936,44 @@ fn val_clip_001_tokenizer_rows_execute_and_publish_partial_ledger()
     }
     assert_eq!(symbols, CLIP_TOKENIZER_SOURCE_ROWS);
     assert_eq!(contracts.len(), CLIP_TOKENIZER_SOURCE_ROWS.len());
+    let tokenizer_contract_count = contracts.len();
+
+    let mut execution_symbols = Vec::new();
+    for line in catalog.lines().skip(1) {
+        let fields = line.split(',').collect::<Vec<_>>();
+        if fields.get(8).copied() != Some(EXECUTION_TASK) {
+            continue;
+        }
+        assert_eq!(fields.len(), 15);
+        assert_eq!(fields[7], "comfy_model::clip");
+        assert_eq!(fields[9], "VAL-CLIP-001");
+        assert_eq!(fields[10], "native_rust");
+        assert_eq!(fields[14], "VAL-CLIP-001");
+        let source = fs::read(workspace.join(fields[2]))?;
+        assert_eq!(format!("{:x}", Sha256::digest(&source)), fields[5]);
+        assert_eq!(python_symbol_sha256(&source, fields[3])?, fields[6]);
+        execute_clip_execution_catalog_contract(fields[3])?;
+        execution_symbols.push(fields[3]);
+        contracts.push(json!({
+            "contract_id": fields[0],
+            "task_id": EXECUTION_TASK,
+            "source_sha256": fields[5],
+            "symbol_sha256": fields[6],
+            "status": "passed",
+            "case_ids": [
+                format!("{}:native-clip-execution-valid", fields[0]),
+                format!("{}:native-clip-execution-invalid", fields[0]),
+            ],
+        }));
+    }
+    assert_eq!(execution_symbols, CLIP_EXECUTION_SOURCE_ROWS);
+    assert_eq!(
+        contracts
+            .iter()
+            .filter(|contract| contract.get("task_id") == Some(&json!(EXECUTION_TASK)))
+            .count(),
+        CLIP_EXECUTION_SOURCE_ROWS.len()
+    );
 
     let producer_path = "crates/comfy_model/tests/clip_tokenizer.rs";
     let producer_sha256 = format!(
@@ -1803,10 +2010,37 @@ fn val_clip_001_tokenizer_rows_execute_and_publish_partial_ledger()
     assert_eq!(tokenizer_task_implementations.len(), 4);
     let task_results = BTreeMap::from([
         (
+            EXECUTION_TASK,
+            json!({
+                "status": "passed",
+                "passed": CLIP_EXECUTION_SOURCE_ROWS.len(),
+                "failed": 0,
+                "skipped": 0,
+                "case_ids": [
+                    "task336:source-provenance-and-eight-contracts",
+                    "task336:clip-type-and-text-encoder-model-closure",
+                    "task336:detector-configuration-and-order",
+                    "task336:one-to-four-artifact-loader-selection",
+                    "task336:typed-malformed-and-oversized-rejection",
+                ],
+                "implementations": [
+                    {
+                        "path": "crates/comfy_model/src/clip.rs",
+                        "sha256": format!(
+                            "{:x}",
+                            Sha256::digest(fs::read(workspace.join(
+                                "crates/comfy_model/src/clip.rs"
+                            ))?)
+                        ),
+                    }
+                ],
+            }),
+        ),
+        (
             OWNER_RESULT_TASK,
             json!({
                 "status": "passed",
-                "passed": contracts.len(),
+                "passed": tokenizer_contract_count,
                 "failed": 0,
                 "skipped": 0,
                 "case_ids": [
@@ -1820,7 +2054,7 @@ fn val_clip_001_tokenizer_rows_execute_and_publish_partial_ledger()
             CONTRACT_TASK,
             json!({
                 "status": "passed",
-                "passed": contracts.len(),
+                "passed": tokenizer_contract_count,
                 "failed": 0,
                 "skipped": 0,
                 "case_ids": [
@@ -1850,7 +2084,7 @@ fn val_clip_001_tokenizer_rows_execute_and_publish_partial_ledger()
             "dtype": "f32",
         },
         "summary": {
-            "passed": contracts.len() * 2,
+            "passed": 0,
             "failed": 0,
             "skipped": 0,
         },
@@ -1878,7 +2112,7 @@ fn val_clip_001_tokenizer_rows_execute_and_publish_partial_ledger()
             .and_then(Value::as_object)
         {
             for (task, result) in previous_results {
-                if task != CONTRACT_TASK && task != OWNER_RESULT_TASK {
+                if task != CONTRACT_TASK && task != EXECUTION_TASK && task != OWNER_RESULT_TASK {
                     current_results.insert(task.clone(), result.clone());
                 }
             }
@@ -1890,45 +2124,75 @@ fn val_clip_001_tokenizer_rows_execute_and_publish_partial_ledger()
         if let Some(previous_contracts) =
             previous_artifact.get("contracts").and_then(Value::as_array)
         {
+            let mut contract_ids = current_contracts
+                .iter()
+                .filter_map(|contract| {
+                    contract
+                        .get("contract_id")
+                        .and_then(Value::as_str)
+                        .map(str::to_owned)
+                })
+                .collect::<BTreeSet<_>>();
             for contract in previous_contracts {
                 let task = contract.get("task_id").and_then(Value::as_str);
-                if task != Some(CONTRACT_TASK) && task != Some(OWNER_RESULT_TASK) {
+                if task != Some(CONTRACT_TASK)
+                    && task != Some(EXECUTION_TASK)
+                    && task != Some(OWNER_RESULT_TASK)
+                {
+                    let contract_id = contract
+                        .get("contract_id")
+                        .and_then(Value::as_str)
+                        .ok_or("VAL-CLIP-001 prior contract has no contract ID")?;
+                    if !contract_ids.insert(contract_id.to_owned()) {
+                        let current = current_contracts
+                            .iter()
+                            .find(|current| {
+                                current.get("contract_id").and_then(Value::as_str)
+                                    == Some(contract_id)
+                            })
+                            .ok_or("VAL-CLIP-001 duplicate contract is unavailable")?;
+                        assert_eq!(
+                            current, contract,
+                            "conflicting prior contract {contract_id}"
+                        );
+                        continue;
+                    }
                     current_contracts.push(contract.clone());
                 }
             }
         }
-        let completed_tasks = artifact
-            .get("task_results")
-            .and_then(Value::as_object)
-            .ok_or("VAL-CLIP-001 task results are missing")?
-            .keys()
-            .cloned()
-            .collect::<BTreeSet<_>>();
-        artifact
-            .get_mut("remaining_tasks")
-            .and_then(Value::as_array_mut)
-            .ok_or("VAL-CLIP-001 remaining tasks are missing")?
-            .retain(|task| {
-                task.as_str()
-                    .is_none_or(|task| !completed_tasks.contains(task))
-            });
-        let passed = artifact
-            .get("task_results")
-            .and_then(Value::as_object)
-            .ok_or("VAL-CLIP-001 task results are missing")?
-            .values()
-            .try_fold(0_u64, |total, result| {
-                total
-                    .checked_add(
-                        result
-                            .get("passed")
-                            .and_then(Value::as_u64)
-                            .ok_or("VAL-CLIP-001 task result has no passed count")?,
-                    )
-                    .ok_or("VAL-CLIP-001 passed count overflowed")
-            })?;
-        artifact["summary"] = json!({"passed": passed, "failed": 0, "skipped": 0});
     }
+    let completed_tasks = artifact
+        .get("task_results")
+        .and_then(Value::as_object)
+        .ok_or("VAL-CLIP-001 task results are missing")?
+        .keys()
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    artifact
+        .get_mut("remaining_tasks")
+        .and_then(Value::as_array_mut)
+        .ok_or("VAL-CLIP-001 remaining tasks are missing")?
+        .retain(|task| {
+            task.as_str()
+                .is_none_or(|task| !completed_tasks.contains(task))
+        });
+    let passed = artifact
+        .get("task_results")
+        .and_then(Value::as_object)
+        .ok_or("VAL-CLIP-001 task results are missing")?
+        .values()
+        .try_fold(0_u64, |total, result| {
+            total
+                .checked_add(
+                    result
+                        .get("passed")
+                        .and_then(Value::as_u64)
+                        .ok_or("VAL-CLIP-001 task result has no passed count")?,
+                )
+                .ok_or("VAL-CLIP-001 passed count overflowed")
+        })?;
+    artifact["summary"] = json!({"passed": passed, "failed": 0, "skipped": 0});
     fs::create_dir_all(&artifact_directory)?;
     fs::write(&artifact_path, serde_json::to_vec_pretty(&artifact)?)?;
     Ok(())

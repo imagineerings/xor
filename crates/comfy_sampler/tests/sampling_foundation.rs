@@ -194,13 +194,22 @@ fn identities_registries_and_plan_round_trip_fail_closed() -> Result<(), Box<dyn
 fn generated_sampler_ordinals_match_the_pinned_source_list() -> Result<(), Box<dyn Error>> {
     let source_names = pinned_sampler_names()?;
     let registry = SamplerRegistry::foundational()?;
-    for definition in registry.definitions() {
-        let Some(source_ordinal) = source_names
-            .iter()
-            .position(|identity| identity == definition.identity)
-        else {
-            continue;
-        };
+    assert_eq!(
+        registry.definitions().len(),
+        source_names.len(),
+        "generated sampler registry does not exactly cover pinned KSAMPLER_NAMES"
+    );
+    for (source_ordinal, (definition, source_identity)) in registry
+        .definitions()
+        .iter()
+        .zip(source_names.iter())
+        .enumerate()
+    {
+        assert_eq!(
+            definition.identity,
+            source_identity.as_str(),
+            "generated sampler identity does not match pinned source ordinal {source_ordinal}"
+        );
         assert_eq!(
             usize::from(definition.source_ordinal),
             source_ordinal,
@@ -758,6 +767,47 @@ fn adaptive_attempt_limit_is_checked_before_row_work() -> Result<(), Box<dyn Err
 }
 
 #[test]
+fn adaptive_completion_uses_source_one_e_minus_five_time_tolerance() -> Result<(), Box<dyn Error>> {
+    let (backend, authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+    let cancellation = CancellationToken::default();
+    let context = execution_context(&backend, &authority, &cancellation)?;
+    let plan = SamplingPlan::new(
+        "euler",
+        "normal",
+        SamplingProfileIdentity::sd15(),
+        11,
+        1,
+        1.0,
+        1.0,
+    )?;
+    let initial = tensor_from_f32(&backend, &[1], &[0.0], &context)?;
+    let within_sigma = 1.000_009_f32;
+    let outside_sigma = 1.000_011_f32;
+    let terminal_sigma = 1.0_f32;
+    assert!(within_sigma.ln() < 1.0e-5);
+    assert!(outside_sigma.ln() > 1.0e-5);
+
+    let within = AdaptiveSamplingSession::new(
+        plan.clone(),
+        within_sigma,
+        terminal_sigma,
+        initial.clone(),
+        1,
+        1,
+    )?;
+    assert!(within.is_complete());
+    assert_eq!(
+        within.next_attempt(&cancellation),
+        Err(SamplingError::SessionComplete)
+    );
+
+    let outside = AdaptiveSamplingSession::new(plan, outside_sigma, terminal_sigma, initial, 1, 1)?;
+    assert!(!outside.is_complete());
+    assert_eq!(outside.next_attempt(&cancellation), Ok(0));
+    Ok(())
+}
+
+#[test]
 fn noise_phases_replay_without_owning_rng_state() -> Result<(), Box<dyn Error>> {
     let (backend, authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
     let cancellation = CancellationToken::default();
@@ -875,12 +925,15 @@ fn compatibility_noise_request_is_the_only_row_transaction_adapter() -> Result<(
 #[test]
 fn val_sampling_foundation_001() -> Result<(), Box<dyn Error>> {
     identities_registries_and_plan_round_trip_fail_closed()?;
+    generated_sampler_ordinals_match_the_pinned_source_list()?;
+    sampling_plan_is_the_only_sampler_to_penultimate_policy_adapter()?;
     scheduler_profile_slicing_and_scaling_are_canonical()?;
     sampling_profile_owns_snr_offsets_and_model_noise_scale()?;
     native_diffusion_scaling_adapters_are_exact_and_context_bound()?;
     session_commits_steps_failure_atomically_and_orders_callbacks()?;
     adaptive_session_owns_rejected_and_accepted_attempt_state()?;
     adaptive_attempt_limit_is_checked_before_row_work()?;
+    adaptive_completion_uses_source_one_e_minus_five_time_tolerance()?;
     noise_phases_replay_without_owning_rng_state()?;
     compatibility_noise_request_is_the_only_row_transaction_adapter()?;
     assert!(matches!(
@@ -898,21 +951,55 @@ fn val_sampling_foundation_001() -> Result<(), Box<dyn Error>> {
     ));
 
     let root = workspace()?;
+    let model_adapter_path = "crates/comfy_model/src/slices/native_diffusion.rs";
+    let runtime_adapter_path = "crates/comfy_runtime/src/native_execution_controller.rs";
+    let fixture_adapter_path =
+        "crates/comfy_test_support/src/bin/generate_native_diffusion_fixture.rs";
     let source_files = [
         "crates/comfy_sampler/src/sampler.rs",
         "crates/comfy_sampler/src/scheduler.rs",
         "crates/comfy_sampler/src/sampling_profile.rs",
         "crates/comfy_sampler/src/noise.rs",
         "crates/comfy_sampler/src/algorithms/native_diffusion.rs",
-        "crates/comfy_model/src/slices/native_diffusion.rs",
-        "crates/comfy_runtime/src/native_execution_controller.rs",
-        "crates/comfy_test_support/src/bin/generate_native_diffusion_fixture.rs",
+        model_adapter_path,
+        runtime_adapter_path,
+        fixture_adapter_path,
         "crates/comfy_sampler/build.rs",
+        "crates/comfy_sampler/tests/sampling_foundation.rs",
+        "crates/comfy_tensor/src/ops/native_diffusion.rs",
     ];
     let mut source_digests = BTreeMap::new();
     for relative in source_files {
         let bytes = fs::read(root.join(relative))?;
         source_digests.insert(relative, format!("{:x}", Sha256::digest(bytes)));
+    }
+    let model_adapter = fs::read_to_string(root.join(model_adapter_path))?;
+    assert!(model_adapter.contains("pub fn denoise_at_model_time("));
+    assert!(model_adapter.contains("model_time: f32,"));
+    assert!(!model_adapter.contains("fn sigma_to_timestep"));
+    assert!(!model_adapter.contains("0.00085_f64.sqrt()"));
+    assert!(!model_adapter.contains("DiscreteSamplingProfile"));
+
+    let runtime_adapter = fs::read_to_string(root.join(runtime_adapter_path))?;
+    assert!(runtime_adapter.contains("let model_time = sd15_model_time("));
+    assert!(runtime_adapter.contains("let initial = scale_initial_noise("));
+    assert!(runtime_adapter.contains("let model_input = match scale_model_input("));
+    assert!(!runtime_adapter.contains("noise.mul_add(initial_sigma"));
+
+    let fixture_adapter = fs::read_to_string(root.join(fixture_adapter_path))?;
+    assert!(fixture_adapter.contains("let initial = scale_initial_noise("));
+    assert!(fixture_adapter.contains("let model_input = scale_model_input("));
+    assert!(!fixture_adapter.contains("value * sigmas[0]"));
+
+    let fixture_files = [
+        "projects/comfy/ComfyUI/comfy/samplers.py",
+        "projects/comfy/ComfyUI/comfy/model_sampling.py",
+        "projects/comfy/ComfyUI/comfy/k_diffusion/sampling.py",
+    ];
+    let mut fixture_digests = BTreeMap::new();
+    for relative in fixture_files {
+        let bytes = fs::read(root.join(relative))?;
+        fixture_digests.insert(relative, format!("{:x}", Sha256::digest(bytes)));
     }
     let cases = BTreeMap::from([
         ("brownian_interval_identity_is_stable", true),
@@ -921,7 +1008,10 @@ fn val_sampling_foundation_001() -> Result<(), Box<dyn Error>> {
         ("compatibility_noise_request_is_canonical", true),
         ("device_loss_and_oom_are_typed", true),
         ("euler_and_simple_source_defaults_are_explicit", true),
-        ("generated_source_test_fixture_closure_is_build_owned", true),
+        (
+            "generated_source_test_fixture_closure_and_ordinals_are_exact",
+            true,
+        ),
         ("model_time_and_noise_scaling_have_one_profile_owner", true),
         ("sampling_profile_owns_snr_and_model_noise_scale", true),
         (
@@ -929,8 +1019,14 @@ fn val_sampling_foundation_001() -> Result<(), Box<dyn Error>> {
             true,
         ),
         ("noise_phases_are_independent_and_retry_replayable", true),
-        ("plan_and_identity_schema_round_trips_are_checked", true),
-        ("runtime_and_fixture_scaling_delegate_to_the_profile", true),
+        (
+            "plan_identity_schema_and_penultimate_policy_are_checked",
+            true,
+        ),
+        (
+            "runtime_fixture_and_model_time_adapters_are_canonical",
+            true,
+        ),
         (
             "scheduler_builder_owns_validation_workspace_and_finalization",
             true,
@@ -941,8 +1037,15 @@ fn val_sampling_foundation_001() -> Result<(), Box<dyn Error>> {
         ),
         ("sampling_profile_exact_index_access_is_canonical", true),
         ("scheduler_denoise_and_step_slicing_are_checked", true),
-        ("adaptive_attempt_state_and_limits_are_canonical", true),
+        (
+            "adaptive_attempt_state_limits_and_completion_tolerance_are_canonical",
+            true,
+        ),
     ]);
+    let passed = cases.values().filter(|passed| **passed).count();
+    let failed = cases.len() - passed;
+    assert_eq!(cases.len(), 18);
+    assert_eq!(failed, 0);
     let value = json!({
         "validation_id": "VAL-SAMPLING-FOUNDATION-001",
         "scope": "authoritative native sampler, scheduler, sampling-profile, and RNG-phase foundation",
@@ -952,8 +1055,9 @@ fn val_sampling_foundation_001() -> Result<(), Box<dyn Error>> {
             "operating_system": std::env::consts::OS,
         },
         "source_digests": source_digests,
+        "fixture_digests": fixture_digests,
         "cases": cases,
-        "summary": {"passed": 15, "failed": 0, "skipped": 0},
+        "summary": {"passed": passed, "failed": failed, "skipped": 0},
         "skipped": [],
     });
     let output = root.join("target/comfy-parity/val-sampling-foundation-001.json");

@@ -206,7 +206,6 @@ fn native_diffusion_fixture_matches_all_checkpoints() -> Result<(), Box<dyn std:
     let fixture = NativeDiffusionFixture::checked_in();
     let cancellation = CancellationToken::default();
     let tokenizer = fixture.tokenizer()?;
-    assert_eq!(fixture.tokenizer_digest()?, tokenizer.identity().digest());
     let positive_tokens = encode_sd15_prompt(&tokenizer, "a test", &cancellation)?;
     let negative_tokens = encode_sd15_prompt(&tokenizer, "", &cancellation)?;
     assert_eq!(&positive_tokens[..4], &[49_406, 320, 1_628, 49_407]);
@@ -217,9 +216,15 @@ fn native_diffusion_fixture_matches_all_checkpoints() -> Result<(), Box<dyn std:
     let backend = Arc::new(backend);
     let workspace = workspace_authority.authorize_workspace(MEMORY_LIMIT)?;
     let context = backend.execution_context(StreamId::DEFAULT, workspace.clone(), &cancellation);
+    let cache_identities = fixture.cache_identities(context.cancellation)?;
+    assert_eq!(
+        cache_identities.tokenizer_digest(),
+        tokenizer.identity().digest()
+    );
     let bundle = fixture.load_bundle_with_context(backend.clone(), &context)?;
+    assert_eq!(&cache_identities, bundle.cache_identities());
     let model = bundle.model().clone();
-    let model_digest = fixture.model_digest()?;
+    let model_digest = cache_identities.model_digest().to_owned();
     let vocabulary = String::from_utf8(fixture.read("vocab.json")?)?;
     let merges = String::from_utf8(fixture.read("merges.txt")?)?;
     let wrong_descriptor = Sd1Tokenizer::from_json_and_merges(
@@ -264,7 +269,7 @@ fn native_diffusion_fixture_matches_all_checkpoints() -> Result<(), Box<dyn std:
     )?;
     assert_ne!(
         alternate_tokenizer.identity().digest(),
-        fixture.tokenizer_digest()?
+        cache_identities.tokenizer_digest()
     );
     assert!(
         NativeDiffusionBundle::new_with_vae(

@@ -476,6 +476,7 @@ def artifact_covers_row(
     if not isinstance(contracts, list) or not contracts:
         return False
     seen_contracts = set()
+    seen_case_ids = set()
     matching_contract = None
     for contract in contracts:
         if not isinstance(contract, dict):
@@ -492,10 +493,18 @@ def artifact_covers_row(
             or len(case_ids) != len(set(case_ids))
         ):
             return False
+        contract_case_ids = set(case_ids)
+        if not seen_case_ids.isdisjoint(contract_case_ids):
+            return False
+        seen_case_ids.update(contract_case_ids)
         if contract_id == row["contract_id"]:
             matching_contract = contract
     if matching_contract is None:
         return False
+    if closure_artifact == CONDITIONING_CLOSURE_ARTIFACT:
+        expected_case_id = CONTRACT_CASES.get(row["contract_id"])
+        if expected_case_id is None or matching_contract.get("case_ids") != [expected_case_id]:
+            return False
     return (
         matching_contract.get("task_id") == row["implementation_task"]
         and matching_contract.get("source_sha256") == row["source_sha256"]
@@ -600,6 +609,53 @@ def validate_closure_rules() -> None:
         raise RuntimeError("conditioning closure self-test rejected validated fail-closed row")
 
 
+def validate_contract_cases(rows: list[dict[str, str]]) -> None:
+    expected_task_counts = {
+        CONDITIONING_TASK: 5,
+        GUIDANCE_TASK: 12,
+    }
+    contract_rows = [
+        row
+        for row in rows
+        if row["implementation_task"] in expected_task_counts
+    ]
+    observed_contract_ids = {row["contract_id"] for row in contract_rows}
+    expected_contract_ids = set(CONTRACT_CASES)
+    if observed_contract_ids != expected_contract_ids:
+        raise RuntimeError(
+            "VAL-CONDITIONING-001 contract case mapping differs from generated "
+            "source rows: "
+            f"missing={sorted(expected_contract_ids - observed_contract_ids)}, "
+            f"unexpected={sorted(observed_contract_ids - expected_contract_ids)}"
+        )
+    observed_task_counts = {
+        task_id: sum(
+            row["implementation_task"] == task_id for row in contract_rows
+        )
+        for task_id in expected_task_counts
+    }
+    if observed_task_counts != expected_task_counts:
+        raise RuntimeError(
+            "VAL-CONDITIONING-001 generated task partition mismatch: "
+            f"expected={expected_task_counts}, observed={observed_task_counts}"
+        )
+    if len(CONTRACT_CASES) != 17:
+        raise RuntimeError(
+            "VAL-CONDITIONING-001 contract case mapping must contain exactly 17 entries"
+        )
+    if len(set(CONTRACT_CASES.values())) != len(CONTRACT_CASES):
+        raise RuntimeError(
+            "VAL-CONDITIONING-001 contract case mapping contains duplicate case IDs"
+        )
+    for contract_id, case_id in CONTRACT_CASES.items():
+        prefix = f"{contract_id}:"
+        if not case_id.startswith(prefix) or not case_id.removeprefix(prefix):
+            raise RuntimeError(
+                f"VAL-CONDITIONING-001 case ID {case_id!r} is not bound to "
+                f"contract {contract_id!r}"
+            )
+
+
 WEIGHT_ADAPTER_OWNER = "comfy_model::weight_adapter"
 WEIGHT_ADAPTER_TASK = "comfy-parity-weight-adapter-runtime-bypass"
 WEIGHT_ADAPTER_VALIDATION = "comfy_model::weight_adapter::tests"
@@ -612,6 +668,33 @@ PATCH_GRAPH_OWNER = "comfy_model::patch_graph"
 PATCH_GRAPH_TASK = "comfy-parity-patch-graph-semantic-foundation"
 PATCH_GRAPH_VALIDATION = "comfy_model::patch_graph::tests"
 PATCH_GRAPH_CLOSURE_ARTIFACT = "VAL-PATCH-001"
+CONTROLNET_TASK = "comfy-parity-controlnet-chain-foundation"
+CONTROLNET_VALIDATION = "comfy_model::controlnet::tests"
+CONTROLNET_CLOSURE_ARTIFACT = "VAL-CONTROLNET-001"
+CONDITIONING_TASK = "comfy-parity-conditioning-value-foundation"
+GUIDANCE_TASK = "comfy-parity-conditioning-guidance-adapter"
+CONDITIONING_CLOSURE_ARTIFACT = "VAL-CONDITIONING-001"
+CONTRACT_CASES = {
+    "conditioning-conditioning-value-conds-condregular-505e5b9e": "conditioning-conditioning-value-conds-condregular-505e5b9e:regular-repeat-concat-size",
+    "conditioning-conditioning-value-conds-condnoiseshape-7f11dbb1": "conditioning-conditioning-value-conds-condnoiseshape-7f11dbb1:noise-shape-region-repeat",
+    "conditioning-conditioning-value-conds-condcrossattn-4d921d69": "conditioning-conditioning-value-conds-condcrossattn-4d921d69:cross-attention-lcm-concat",
+    "conditioning-conditioning-value-conds-condconstant-0e559aad": "conditioning-conditioning-value-conds-condconstant-0e559aad:constant-equality-identity",
+    "conditioning-conditioning-value-conds-condlist-21ce2116": "conditioning-conditioning-value-conds-condlist-21ce2116:list-itemwise-process-concat-size",
+    "conditioning-guidance-samplers-get-area-and-mult-14d8dec2": "conditioning-guidance-samplers-get-area-and-mult-14d8dec2:resolved-area-mask-window-weight",
+    "conditioning-guidance-samplers-calc-cond-batch-23aa4a02": "conditioning-guidance-samplers-calc-cond-batch-23aa4a02:compatible-batch-regional-accumulation",
+    "conditioning-guidance-samplers-sampling-function-ef25ad1d": "conditioning-guidance-samplers-sampling-function-ef25ad1d:cfg-skip-and-hook-pipeline",
+    "conditioning-guidance-hook-sampler-helpers-prepare-mask-048488c7": "conditioning-guidance-hook-sampler-helpers-prepare-mask-048488c7:mask-normalize-broadcast",
+    "conditioning-guidance-hook-sampler-helpers-get-models-from-cond-1be91d68": "conditioning-guidance-hook-sampler-helpers-get-models-from-cond-1be91d68:typed-control-hook-reference-projection",
+    "conditioning-guidance-hook-sampler-helpers-convert-cond-e8752d85": "conditioning-guidance-hook-sampler-helpers-convert-cond-e8752d85:typed-entry-set-conversion",
+    "conditioning-guidance-hook-sampler-helpers-get-additional-models-7ba596bf": "conditioning-guidance-hook-sampler-helpers-get-additional-models-7ba596bf:prebound-additional-model-identity",
+    "conditioning-guidance-hook-sampler-helpers-prepare-sampling-b141c606": "conditioning-guidance-hook-sampler-helpers-prepare-sampling-b141c606:prebound-bundle-load-and-execute",
+    "conditioning-guidance-hook-sampler-helpers-cleanup-models-6f147c97": "conditioning-guidance-hook-sampler-helpers-cleanup-models-6f147c97:scope-drop-workspace-convergence",
+    "conditioning-guidance-hook-hooks-hook-536ff505": "conditioning-guidance-hook-hooks-hook-536ff505:ordered-guidance-hook-phases",
+    "conditioning-guidance-hook-hooks-weighthook-03327446": "conditioning-guidance-hook-hooks-weighthook-03327446:weight-hook-patchgraph-delegation",
+    "conditioning-guidance-hook-patcher-extension-patcherinjection-116374da": "conditioning-guidance-hook-patcher-extension-patcherinjection-116374da:injection-hook-lifecycle-cancellation",
+}
+VAE_EXECUTION_TASK = "comfy-parity-vae-execution-foundation"
+CLIP_EXECUTION_TASK = "comfy-parity-clip-execution-foundation"
 TOKENIZER_TASK = "comfy-parity-clip-tokenizer-foundation"
 TEXT_TASK = "comfy-parity-clip-text-transformer-foundation"
 VISION_TASK = "comfy-parity-clip-vision-foundation"
@@ -709,6 +792,16 @@ VISION_SYMBOLS = frozenset(
 VAE_TILING_TASK = "comfy-parity-vae-multidimensional-tiling"
 VAE_IMAGE_TASK = "comfy-parity-vae-image-architectures"
 TASK_IMPLEMENTATION_CLOSURES = {
+    CONTROLNET_TASK: frozenset(
+        {
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/src/controlnet.rs",
+        }
+    ),
+    CONDITIONING_TASK: frozenset({"crates/comfy_model/src/conditioning.rs"}),
+    GUIDANCE_TASK: frozenset({"crates/comfy_sampler/src/guidance.rs"}),
+    VAE_EXECUTION_TASK: frozenset({"crates/comfy_model/src/vae.rs"}),
+    CLIP_EXECUTION_TASK: frozenset({"crates/comfy_model/src/clip.rs"}),
     PATCH_ADAPTER_TASK: frozenset(
         {
             "crates/comfy_model/src/patch_graph.rs",
@@ -729,7 +822,6 @@ TASK_IMPLEMENTATION_CLOSURES = {
     ),
     PATCH_GRAPH_TASK: frozenset(
         {
-            "crates/comfy_model/Cargo.toml",
             "crates/comfy_model/src/comfy_model.rs",
             "crates/comfy_model/src/clip.rs",
             "crates/comfy_model/src/model_family.rs",
@@ -740,7 +832,6 @@ TASK_IMPLEMENTATION_CLOSURES = {
             "crates/comfy_tensor/src/operation.rs",
             "crates/comfy_worker/src/memory_modes.rs",
             "crates/comfy_worker/tests/memory_conformance.rs",
-            "crates/comfy_test_support/Cargo.toml",
             "crates/comfy_test_support/tests/patch_compute_boundary.rs",
         }
     ),
@@ -821,6 +912,29 @@ TASK_IMPLEMENTATION_CLOSURES = {
     ),
 }
 TASK_REQUIRED_CASES = {
+    CONTROLNET_TASK: frozenset(
+        {
+            "controlnet:all-eight-contracts",
+            "controlnet:strength-and-slot-merge",
+            "controlnet:hint-preprocessing-and-batching",
+            "controlnet:vae-latent-and-chain-delegation",
+            "controlnet:cancellation-oom-workspace-ownership",
+        }
+    ),
+    CONDITIONING_TASK: frozenset(
+        {
+            "conditioning:all-contracts",
+            "conditioning:values-regions-masks",
+            "conditioning:cancellation-oom-workspace-ownership",
+        }
+    ),
+    GUIDANCE_TASK: frozenset(
+        {
+            "guidance:all-contracts",
+            "guidance:cfg-hooks-batching-regions",
+            "guidance:cancellation-oom-workspace-ownership",
+        }
+    ),
     PATCH_ADAPTER_TASK: frozenset(
         {
             "task511:all-14-valid-invalid",
@@ -958,6 +1072,53 @@ PATCH_GRAPH_SOURCE_MANIFEST = frozenset(
         for family in ("boft", "glora", "loha", "lokr", "lora", "oft")
     }
 )
+CONTROLNET_SOURCE_MANIFEST = frozenset(
+    {
+        (
+            "controlnet",
+            "projects/comfy/ComfyUI/comfy/controlnet.py",
+            symbol,
+        )
+        for symbol in (
+            "StrengthType",
+            "ControlIsolation",
+            "ControlBase",
+            "ControlNet",
+            "ControlLoraOps",
+            "ControlLora",
+            "ControlNetSD35",
+            "T2IAdapter",
+        )
+    }
+)
+CLIP_EXECUTION_SOURCE_MANIFEST = frozenset(
+    {
+        (
+            "model_execution",
+            "projects/comfy/ComfyUI/comfy/sd.py",
+            symbol,
+        )
+        for symbol in (
+            "CLIP",
+            "CLIPType",
+            "load_clip",
+            "TEModel",
+            "detect_te_model",
+            "t5xxl_detect",
+            "llama_detect",
+            "load_text_encoder_state_dicts",
+        )
+    }
+)
+VAE_EXECUTION_SOURCE_MANIFEST = frozenset(
+    {
+        (
+            "model_execution",
+            "projects/comfy/ComfyUI/comfy/sd.py",
+            "VAE",
+        )
+    }
+)
 WEIGHT_ADAPTER_SOURCE_MANIFEST = frozenset(
     {
         (
@@ -1061,6 +1222,14 @@ def contract_slug(value: str) -> str:
 
 
 def closure_artifact_for(validation_surface: str, implementation_task: str) -> str:
+    if implementation_task == CONTROLNET_TASK:
+        return CONTROLNET_CLOSURE_ARTIFACT
+    if implementation_task in {CONDITIONING_TASK, GUIDANCE_TASK}:
+        return CONDITIONING_CLOSURE_ARTIFACT
+    if implementation_task == VAE_EXECUTION_TASK:
+        return "VAL-VAE-001"
+    if implementation_task == CLIP_EXECUTION_TASK:
+        return "VAL-CLIP-001"
     if implementation_task == PATCH_ADAPTER_TASK:
         return PATCH_ADAPTER_CLOSURE_ARTIFACT
     if implementation_task == WEIGHT_ADAPTER_TASK:
@@ -1222,11 +1391,11 @@ def row_for(
             validation_surface = "VAL-VAE-001"
         elif isinstance(node, ast.ClassDef) and name == "VAE":
             owner = "comfy_model::vae"
-            implementation_task = "comfy-parity-vae-execution-foundation"
+            implementation_task = VAE_EXECUTION_TASK
             validation_surface = "comfy_model::vae::tests"
         else:
             owner = "comfy_model::clip"
-            implementation_task = "comfy-parity-clip-execution-foundation"
+            implementation_task = CLIP_EXECUTION_TASK
             validation_surface = "VAL-CLIP-001"
     elif plan.path.endswith("/clip_model.py"):
         if name in VISION_SYMBOLS:
@@ -1234,7 +1403,7 @@ def row_for(
         elif name in TEXT_SYMBOLS:
             implementation_task = TEXT_TASK
         else:
-            implementation_task = "comfy-parity-clip-execution-foundation"
+            implementation_task = CLIP_EXECUTION_TASK
         validation_surface = "VAL-CLIP-001"
     elif plan.path.endswith("/sd1_clip.py"):
         if name in {
@@ -1255,7 +1424,7 @@ def row_for(
         elif name in TEXT_SYMBOLS:
             implementation_task = TEXT_TASK
         else:
-            implementation_task = "comfy-parity-clip-execution-foundation"
+            implementation_task = CLIP_EXECUTION_TASK
         validation_surface = "VAL-CLIP-001"
     return {
         "contract_id": (
@@ -1720,12 +1889,97 @@ def generate_rows() -> list[dict[str, str]]:
                 raise RuntimeError(
                     f"patch-adapter row {row['contract_id']} has invalid {field}"
                 )
+    controlnet_rows = [
+        row for row in rows if row["implementation_task"] == CONTROLNET_TASK
+    ]
+    observed_controlnet_manifest = {
+        (row["kind"], row["source_path"], row["source_symbol"])
+        for row in controlnet_rows
+    }
+    if observed_controlnet_manifest != CONTROLNET_SOURCE_MANIFEST:
+        raise RuntimeError(
+            "ControlNet source manifest closure mismatch: expected "
+            f"{sorted(CONTROLNET_SOURCE_MANIFEST)}, observed "
+            f"{sorted(observed_controlnet_manifest)}"
+        )
+    if len(controlnet_rows) != len(CONTROLNET_SOURCE_MANIFEST):
+        raise RuntimeError("ControlNet source manifest contains duplicate rows")
+    for row in controlnet_rows:
+        if row["native_owner"] != "comfy_model::controlnet":
+            raise RuntimeError(
+                f"ControlNet row {row['contract_id']} has owner {row['native_owner']}"
+            )
+        if row["validation_surface"] != CONTROLNET_VALIDATION:
+            raise RuntimeError(
+                "ControlNet row "
+                f"{row['contract_id']} has validation surface "
+                f"{row['validation_surface']}"
+            )
+        if row["closure_artifact"] != CONTROLNET_CLOSURE_ARTIFACT:
+            raise RuntimeError(
+                "ControlNet row "
+                f"{row['contract_id']} has closure artifact "
+                f"{row['closure_artifact']}"
+            )
+    clip_execution_rows = [
+        row for row in rows if row["implementation_task"] == CLIP_EXECUTION_TASK
+    ]
+    observed_clip_execution_manifest = {
+        (row["kind"], row["source_path"], row["source_symbol"])
+        for row in clip_execution_rows
+    }
+    if observed_clip_execution_manifest != CLIP_EXECUTION_SOURCE_MANIFEST:
+        raise RuntimeError(
+            "CLIP execution source manifest closure mismatch: expected "
+            f"{sorted(CLIP_EXECUTION_SOURCE_MANIFEST)}, observed "
+            f"{sorted(observed_clip_execution_manifest)}"
+        )
+    if len(clip_execution_rows) != len(CLIP_EXECUTION_SOURCE_MANIFEST):
+        raise RuntimeError("CLIP execution source manifest contains duplicate rows")
+    for row in clip_execution_rows:
+        if row["native_owner"] != "comfy_model::clip":
+            raise RuntimeError(
+                f"CLIP execution row {row['contract_id']} has owner "
+                f"{row['native_owner']}"
+            )
+        if row["closure_artifact"] != "VAL-CLIP-001":
+            raise RuntimeError(
+                f"CLIP execution row {row['contract_id']} has closure artifact "
+                f"{row['closure_artifact']}"
+            )
+    vae_execution_rows = [
+        row for row in rows if row["implementation_task"] == VAE_EXECUTION_TASK
+    ]
+    observed_vae_execution_manifest = {
+        (row["kind"], row["source_path"], row["source_symbol"])
+        for row in vae_execution_rows
+    }
+    if observed_vae_execution_manifest != VAE_EXECUTION_SOURCE_MANIFEST:
+        raise RuntimeError(
+            "VAE execution source manifest closure mismatch: expected "
+            f"{sorted(VAE_EXECUTION_SOURCE_MANIFEST)}, observed "
+            f"{sorted(observed_vae_execution_manifest)}"
+        )
+    if len(vae_execution_rows) != len(VAE_EXECUTION_SOURCE_MANIFEST):
+        raise RuntimeError("VAE execution source manifest contains duplicate rows")
+    for row in vae_execution_rows:
+        if row["native_owner"] != "comfy_model::vae":
+            raise RuntimeError(
+                f"VAE execution row {row['contract_id']} has owner "
+                f"{row['native_owner']}"
+            )
+        if row["closure_artifact"] != "VAL-VAE-001":
+            raise RuntimeError(
+                f"VAE execution row {row['contract_id']} has closure artifact "
+                f"{row['closure_artifact']}"
+            )
     return rows
 
 
 def main() -> None:
     validate_closure_rules()
     rows = generate_rows()
+    validate_contract_cases(rows)
     states = task_states()
     declared_writes_by_task = {
         task_id: state[2] for task_id, state in states.items()

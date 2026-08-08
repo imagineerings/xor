@@ -334,6 +334,7 @@ pub trait NativeNode: Send + Sync {
 
     fn cache_dependencies(
         &self,
+        _context: &NodeContext,
         _inputs: &BTreeMap<String, Value>,
     ) -> Result<CacheDependencies, NodeFailure> {
         Ok(CacheDependencies::default())
@@ -566,6 +567,15 @@ struct RecordingEffectCoordinator {
 
 #[cfg(test)]
 impl RecordingEffectCoordinator {
+    pub fn prepared(&self) -> BTreeSet<Uuid> {
+        self.calls
+            .lock()
+            .prepared
+            .iter()
+            .map(|effect| effect.transaction_id)
+            .collect()
+    }
+
     pub fn committed(&self) -> BTreeSet<Uuid> {
         self.calls
             .lock()
@@ -979,11 +989,14 @@ impl ExecutionEngine {
             inputs.insert(name, linked_value(source, *output_index, *mode, &outputs)?);
         }
 
+        if context.cancellation.is_cancelled() {
+            return Err(ExecutionError::Cancelled);
+        }
         let change_token = implementation
             .cache_change_token(&inputs)
             .map_err(|failure| execution_node_failure(node_id.clone(), failure))?;
         let cache_dependencies = implementation
-            .cache_dependencies(&inputs)
+            .cache_dependencies(&context, &inputs)
             .map_err(|failure| execution_node_failure(node_id.clone(), failure))?;
         let demanded_dependencies = demanded_dependency_identities(&node, &inputs, state)?;
         let cache_key = CacheKey::from_inputs_with_dependencies(
@@ -1742,6 +1755,65 @@ pub(crate) mod tests {
         }
     }
 
+    struct CancelBeforeCacheNode {
+        phases: Arc<Mutex<Vec<&'static str>>>,
+    }
+
+    impl NativeNode for CancelBeforeCacheNode {
+        fn class_type(&self) -> &str {
+            "CancelBeforeCache"
+        }
+
+        fn implementation_version(&self) -> &str {
+            "1"
+        }
+
+        fn demanded_lazy_inputs(
+            &self,
+            context: &NodeContext,
+            _available_inputs: &BTreeMap<String, Value>,
+        ) -> Result<BTreeSet<String>, NodeFailure> {
+            self.phases.lock().push("demand");
+            context.cancellation.cancel();
+            Ok(BTreeSet::new())
+        }
+
+        fn cache_change_token(
+            &self,
+            _inputs: &BTreeMap<String, Value>,
+        ) -> Result<String, NodeFailure> {
+            self.phases.lock().push("change");
+            Ok("stable".to_owned())
+        }
+
+        fn cache_dependencies(
+            &self,
+            _context: &NodeContext,
+            _inputs: &BTreeMap<String, Value>,
+        ) -> Result<CacheDependencies, NodeFailure> {
+            self.phases.lock().push("dependencies");
+            Ok(CacheDependencies::default())
+        }
+
+        fn execute<'a>(
+            &'a self,
+            _context: NodeContext,
+            _inputs: BTreeMap<String, Value>,
+        ) -> BoxFuture<'a, Result<NodeOutcome, NodeFailure>> {
+            self.phases.lock().push("execute");
+            Box::pin(async move {
+                Ok(NodeOutcome::Values {
+                    outputs: vec![json!(1)],
+                    ui: Some(json!({"preview": "must-not-publish"})),
+                    effects: vec![PreparedEffectRequest {
+                        transaction_id: Uuid::from_u128(100),
+                        metadata: b"must-not-publish".to_vec(),
+                    }],
+                })
+            })
+        }
+    }
+
     struct UiNode {
         calls: Arc<AtomicUsize>,
     }
@@ -2211,6 +2283,80 @@ pub(crate) mod tests {
             assert_eq!(cancelled.state, AttemptState::Cancelled);
             assert!(cancelled.outputs.is_empty());
             assert!(cancelled.ui_outputs.is_empty());
+
+            let before_cache_plan = compile_plan(
+                vec![runtime_descriptor(
+                    "CancelBeforeCache",
+                    true,
+                    BTreeMap::new(),
+                    EffectClass::WritesArtifact,
+                )],
+                BTreeMap::from([(
+                    NodeId::from("before-cache"),
+                    PromptNode {
+                        class_type: "CancelBeforeCache".to_owned(),
+                        inputs: BTreeMap::new(),
+                        unknown: BTreeMap::new(),
+                    },
+                )]),
+            )?;
+            let phases = Arc::new(Mutex::new(Vec::new()));
+            let mut before_cache_registry = NativeNodeRegistry::default();
+            before_cache_registry.register(Arc::new(CancelBeforeCacheNode {
+                phases: phases.clone(),
+            }))?;
+            let before_cache = Arc::new(Mutex::new(NativeCache::new(4)?));
+            let before_cache_effects = Arc::new(RecordingEffectCoordinator::default());
+            let before_cache_engine = ExecutionEngine::new_with_workspace_authorization(
+                ProfileId(Uuid::nil()),
+                Arc::new(before_cache_registry),
+                before_cache.clone(),
+                before_cache_effects.clone(),
+                "registry-v1",
+                workspace_authority.authorize_workspace(TEST_WORKSPACE_BYTES)?,
+            )?;
+
+            let pre_cancelled = CancellationToken::default();
+            pre_cancelled.cancel();
+            let report = before_cache_engine
+                .execute(
+                    &before_cache_plan,
+                    AttemptId(Uuid::from_u128(0x2101)),
+                    pre_cancelled,
+                )
+                .await;
+            assert_eq!(report.state, AttemptState::Cancelled);
+            assert!(phases.lock().is_empty());
+            assert_eq!(report.cache_hits, 0);
+            assert!(before_cache.lock().is_empty());
+            assert!(before_cache_effects.prepared().is_empty());
+            assert!(before_cache_effects.committed().is_empty());
+            assert!(before_cache_effects.rolled_back().is_empty());
+            assert!(report.outputs.is_empty());
+            assert!(report.ui_outputs.is_empty());
+            assert_eq!(report.events.len(), 2);
+            assert!(matches!(report.events[0].kind, AttemptEventKind::Started));
+            assert!(matches!(report.events[1].kind, AttemptEventKind::Cancelled));
+
+            let report = before_cache_engine
+                .execute(
+                    &before_cache_plan,
+                    AttemptId(Uuid::from_u128(0x2102)),
+                    CancellationToken::default(),
+                )
+                .await;
+            assert_eq!(report.state, AttemptState::Cancelled);
+            assert_eq!(phases.lock().as_slice(), &["demand"]);
+            assert_eq!(report.cache_hits, 0);
+            assert!(before_cache.lock().is_empty());
+            assert!(before_cache_effects.prepared().is_empty());
+            assert!(before_cache_effects.committed().is_empty());
+            assert!(before_cache_effects.rolled_back().is_empty());
+            assert!(report.outputs.is_empty());
+            assert!(report.ui_outputs.is_empty());
+            assert_eq!(report.events.len(), 2);
+            assert!(matches!(report.events[0].kind, AttemptEventKind::Started));
+            assert!(matches!(report.events[1].kind, AttemptEventKind::Cancelled));
 
             let ui_plan = compile_plan(
                 vec![runtime_descriptor(

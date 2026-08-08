@@ -25,6 +25,7 @@ use crate::{
         linear_vjp_with_context_exact_native as canonical_linear_vjp,
         linear_with_context_exact_native as canonical_linear, map_padded_coordinate,
     },
+    generated_elementwise_or_runtime_operation_08::ElementwiseRuntimePartEightError,
     generated_neural_network_functional_01::{
         EmbeddingOptions, NeuralNetworkFunctionalError,
         embedding_jvp_with_context_exact_native as canonical_embedding_jvp,
@@ -131,6 +132,15 @@ impl From<NeuralNetworkFunctionalError> for NeuralNetworkModulePartTwoError {
     fn from(error: NeuralNetworkFunctionalError) -> Self {
         match error {
             NeuralNetworkFunctionalError::Cancelled => Self::Cancelled,
+            NeuralNetworkFunctionalError::Tensor(error) => error.into(),
+            NeuralNetworkFunctionalError::Operator(error) => error.into(),
+            NeuralNetworkFunctionalError::Normalization(error) => error.into(),
+            NeuralNetworkFunctionalError::IndexSelect(
+                ElementwiseRuntimePartEightError::Cancelled,
+            ) => Self::Cancelled,
+            NeuralNetworkFunctionalError::IndexSelect(
+                ElementwiseRuntimePartEightError::Tensor(error),
+            ) => error.into(),
             error => Self::NeuralFunctional(error.to_string()),
         }
     }

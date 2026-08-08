@@ -6039,10 +6039,10 @@
           "path": "crates/comfy_runtime/src/native_execution_controller.rs",
           "pattern": "impl GuidanceDenoiser for Sd15GuidanceDenoiser[\\s\\S]*execute_guidance\\("
         },
-        {
-          "name": "runtime-cache-binds-guidance-version",
-          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
-          "pattern": "GUIDANCE_ADAPTER_ID\\.to_owned\\(\\)"
+    {
+      "name": "runtime-cache-binds-guidance-version",
+      "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+      "pattern": "sha256_tagged\\(\\s*\"sim\\.comfy\\.guidance-adapter\\.identity\\.v1\",\\s*\\[GUIDANCE_ADAPTER_ID\\.as_bytes\\(\\)\\]"
         },
         {
           "name": "fixture-generator-uses-runtime-guidance-adapter",
@@ -6061,10 +6061,11 @@
         }
       ],
       "known_open_reasons": [],
-      "consolidation_tasks": [
-        "comfy-parity-conditioning-guidance-adapter",
-        "comfy-parity-native-guidance-owner-consolidation"
-      ],
+  "consolidation_tasks": [
+    "comfy-parity-conditioning-guidance-adapter",
+    "comfy-parity-native-guidance-owner-consolidation",
+    "comfy-parity-native-conditioning-patches"
+  ],
       "production_consumers": [
         "native diffusion KSampler",
         "sampler guidance hooks",
@@ -6257,12 +6258,17 @@
         {
           "name": "native-diffusion-runtime-binds-tokenizer-identity-to-cache-and-handles",
           "path": "crates/comfy_runtime/src/native_execution_controller.rs",
-          "pattern": "tokenizer_digest: String[\\s\\S]*provider_tokenizer_digest != bundle\\.tokenizer_digest[\\s\\S]*handle\\.tokenizer_digest != bundle\\.tokenizer_digest[\\s\\S]*tokenizer\\.sd1"
+          "pattern": "cache_identities: CanonicalNativeDiffusionCacheIdentities[\\s\\S]*provider_identity\\.tokenizer_digest\\(\\) != bundle\\.tokenizer_digest\\(\\)[\\s\\S]*NativeDiffusionHandle::from_bundle[\\s\\S]*handle\\.require_exact_match"
+        },
+        {
+          "name": "native-diffusion-cache-exposes-canonical-tokenizer-dependency",
+          "path": "crates/comfy_runtime/src/cache.rs",
+          "pattern": "digests\\.insert\\(\"tokenizer\\.sd1\"\\.to_owned\\(\\), self\\.tokenizer_digest\\.clone\\(\\)\\);"
         },
         {
           "name": "native-diffusion-preserves-canonical-tokenizer-cancellation",
           "path": "crates/comfy_model/src/slices/native_diffusion.rs",
-          "pattern": "ClipError::Tensor\\(comfy_tensor::TensorError::Cancelled\\)[\\s\\S]*NativeDiffusionModelError::Cancelled"
+          "pattern": "fn clip_load_failure[\\s\\S]*ClipError::Tensor\\(error\\) => tensor_load_failure\\(error\\)[\\s\\S]*fn map_sd15_tokenizer_error[\\s\\S]*LoadFailureClass::Cancelled[\\s\\S]*NativeDiffusionModelError::Cancelled"
         }
       ],
       "known_open_reasons": [],
@@ -6314,6 +6320,7 @@
       "allowed_adapters": [
         "comfy_test_support::NativeDiffusionFixture alone constructs the feature-gated reduced fixture admission",
         "generated_native_diffusion::load_sd15_tokenizer and encode_sd15_prompt only map the canonical clip::Sd1Tokenizer into the checked SD15 descriptor, typed error, and fixed-77-token boundary while preserving caller cancellation",
+        "generated_native_diffusion::bind_sd15_vae_execution and load_sd15_vae_execution map the admitted reduced checkpoint into the canonical exact SD15 VaeIdentity and vae_image adapter; Sd15TinyModel retains no VAE state or equations",
         "comfy_runtime::Sd15GuidanceAdapter maps typed conditioning into Sd15TinyModel::denoise_at_model_time through comfy_sampler::guidance without repeating model equations, CFG arithmetic, or weight validation",
         "future node adapters map typed node ports into Sd15TinyModel without repeating model equations or weight validation"
       ],
@@ -6369,6 +6376,11 @@
           "pattern": "admit_reduced_fixture"
         },
         {
+          "name": "test-support-provider-binds-canonical-vae-execution",
+          "path": "crates/comfy_test_support/src/native_diffusion_fixture.rs",
+          "pattern": "load_sd15_vae_execution[\\s\\S]*NativeDiffusionBundle::new_with_vae"
+        },
+        {
           "name": "fixture-validation-pins-exact-membership-and-live-provenance",
           "path": "crates/comfy_test_support/tests/native_diffusion_foundation.rs",
           "pattern": "native_diffusion_fixture_catalog_and_provenance_are_exact"
@@ -6379,16 +6391,14 @@
           "pattern": "native_diffusion_fixture_rejects_invalid_weight_keys_and_shapes"
         }
       ],
-      "known_open_reasons": [
-        "comfy-parity-clip-owner-consolidation remains pending for removal of the native-diffusion slice's tiny CLIP equations and execution state after text-encoder and patch breadth",
-        "comfy-parity-sd1-tokenizer-owner-consolidation was reopened after clip_tokenizer introduced duplicate SD1 bounds, section packing, padding, token-sequence, artifact-binding, and SentencePiece behavior; closure requires the focused canonical adapters recorded by native_diffusion_language_tokenization_and_embedding_artifacts"
-      ],
+      "known_open_reasons": [],
       "consolidation_tasks": [
         "comfy-parity-native-diffusion-foundation",
         "comfy-parity-conditioning-guidance-adapter",
         "comfy-parity-native-guidance-owner-consolidation",
         "comfy-parity-sd1-tokenizer-owner-consolidation",
-        "comfy-parity-clip-owner-consolidation"
+        "comfy-parity-clip-owner-consolidation",
+        "comfy-parity-vae-owner-consolidation"
       ],
       "production_consumers": [
         "native diffusion node adapters",
@@ -6409,6 +6419,7 @@
       ],
       "validation": [
         "VAL-CLIP-001",
+        "VAL-VAE-001",
         "VAL-MODEL-FORMAT-001",
         "VAL-MODEL-FAMILY-001",
         "VAL-LATENT-001",
@@ -6417,7 +6428,7 @@
         "VAL-OWNERSHIP-001",
         "VAL-NATIVE-E2E-002"
       ],
-      "decision_reason": "comfy_model::clip::Sd1Tokenizer alone owns SD1 vocabulary and merge validation, byte encoding, BPE traversal, shared prompt bounds, cancellation, and the fixed-77 padding/token-sequence identity. The generated native-diffusion compatibility export and two SD15 functions only attach the checked descriptor, map errors, and project that canonical 77-token sequence. The separate native_diffusion_language_tokenization_and_embedding_artifacts concern records NativePromptTokenizer as the distinct generic configurable multi-section owner plus focused SentencePiece and textual-inversion adapters while their reopened consolidation remains pending. Sd15TinyModel retains the pinned detector, topology, reduced CLIP/UNet/VAE execution, latent behavior, and weight-contract rejection until the separately pending CLIP and VAE owner-consolidation tasks migrate those equations and state. ModelStore remains the sole verified byte/cache owner, attention remains in comfy_model::attention, Tensor/CpuBackend retain storage, and reduced execution artifacts are admitted only by the development fixture provider. The conformance fixture tests own no production behavior."
+      "decision_reason": "comfy_model::clip::Sd1Tokenizer alone owns SD1 vocabulary and merge validation, byte encoding, BPE traversal, shared prompt bounds, cancellation, and the fixed-77 padding/token-sequence identity. The generated native-diffusion compatibility export and two SD15 functions only attach the checked descriptor, map errors, and project that canonical 77-token sequence. NativePromptTokenizer remains the distinct generic configurable multi-section owner plus focused SentencePiece and textual-inversion adapters. Sd15TinyModel retains only the pinned detector, reduced UNet topology and execution, latent behavior, and UNet weight-contract rejection. The reduced checkpoint's VAE source schema, state materialization, equations, descriptor, execution, and cache identity delegate to the canonical comfy_model::vae and vae_image owners; the runtime bundle and compatibility fixtures carry the checked NativeVae rather than a model-local decoder. ModelStore remains the sole verified byte/cache owner, attention remains in comfy_model::attention, Tensor/CpuBackend retain storage, and reduced artifact admission remains development-fixture controlled. The conformance fixture tests own no production behavior."
     },
     {
       "concern": "native_diffusion_tensor_kernels",
@@ -8712,6 +8723,152 @@
       "decision_reason": "comfy_runtime::trust owns native-library path safety, bounds, stable identity, cancellable capture, SHA-256, Linux memfd sealing, Windows non-reparse read-locked snapshots, loader-path projection, and retained File lifetime exactly once. MLU, NPU, ROCm, and XPU adapters consume immutable bytes and digests, apply only backend-specific ABI or dependency policy, obtain certificates from NativeFfiRegistry, and retain the canonical image without repeating filesystem, digest, seal, snapshot, or lifetime behavior."
     },
     {
+      "concern": "native_model_controlnet_domain",
+      "canonical_owner": "comfy_model::controlnet",
+      "owner_files": [
+        "crates/comfy_model/src/controlnet.rs"
+      ],
+      "owner_symbols": [
+        "ControlChain",
+        "ControlExecutionIdentity",
+        "ControlRuntime",
+        "ControlModelExecutor",
+        "ControlResult",
+        "ControlBase",
+        "StrengthType",
+        "ControlHintPreprocess"
+      ],
+      "allowed_adapters": [
+        "ControlModelExecutor is the focused checked execution port for already selected and loaded model state; ModelStore and model_family remain the sole checkpoint selection, loading, and family owners",
+        "ControlLoraOps binds an existing PatchGraphIdentity and delegates all patch equations, ordering, rollback, and digest semantics to comfy_model::patch_graph",
+        "ControlRuntime may call canonical NativeVae encode and thereby the canonical latent-format transform exactly once when the immutable control identity requires that VAE execution digest",
+        "sampling-profile adapters alone convert percent windows into model time or sigma; ControlPercentWindow accepts only the already resolved immutable percent input",
+        "comfy_tensor remains the sole tensor storage, operation, workspace, device, dtype, event, and cancellation owner; controlnet composes canonical operations under the caller ExecutionContext and publishes only a complete ControlResult"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/controlnet.rs",
+          "qualified": "comfy_model::controlnet::ControlChain",
+          "role": "canonical",
+          "symbol": "ControlChain"
+        },
+        {
+          "path": "crates/comfy_model/src/controlnet.rs",
+          "qualified": "comfy_model::controlnet::ControlExecutionIdentity",
+          "role": "canonical_identity",
+          "symbol": "ControlExecutionIdentity"
+        },
+        {
+          "path": "crates/comfy_model/src/controlnet.rs",
+          "qualified": "comfy_model::controlnet::ControlRuntime",
+          "role": "canonical_service",
+          "symbol": "ControlRuntime"
+        },
+        {
+          "path": "crates/comfy_model/src/controlnet.rs",
+          "qualified": "comfy_model::controlnet::ControlResult",
+          "role": "boundary_dto",
+          "symbol": "ControlResult"
+        },
+        {
+          "path": "crates/comfy_model/src/controlnet.rs",
+          "qualified": "comfy_model::controlnet::StrengthType",
+          "role": "canonical_configuration",
+          "symbol": "StrengthType"
+        },
+        {
+          "path": "crates/comfy_model/src/controlnet.rs",
+          "qualified": "comfy_model::controlnet::ControlHintPreprocess",
+          "role": "source_adapter",
+          "symbol": "ControlHintPreprocess"
+        }
+      ],
+      "call_symbols": [
+        "ControlChain",
+        "ControlExecutionIdentity",
+        "ControlRuntime",
+        "ControlModelExecutor",
+        "ControlResult",
+        "ControlBase",
+        "StrengthType",
+        "ControlHintPreprocess",
+        "ControlNet",
+        "ControlLora",
+        "ControlLoraOps",
+        "ControlNetSD35",
+        "T2IAdapter"
+      ],
+      "required_mappings": [
+        {
+          "name": "comfy-model-registers-one-controlnet-module",
+          "path": "crates/comfy_model/src/comfy_model.rs",
+          "pattern": "pub mod controlnet;"
+        },
+        {
+          "name": "controlnet-identity-binds-model-patch-hint-configuration-and-chain-order",
+          "path": "crates/comfy_model/src/controlnet.rs",
+          "pattern": "fn compute_chain_identity[\\s\\S]*hash_controlnet[\\s\\S]*hash_model[\\s\\S]*hash_patch[\\s\\S]*hash_tensor_binding"
+        },
+        {
+          "name": "controlnet-delegates-vae-and-latent-processing-once",
+          "path": "crates/comfy_model/src/controlnet.rs",
+          "pattern": "expected_vae_sha256[\\s\\S]*vae\\.map\\(NativeVae::execution_digest\\)[\\s\\S]*vae\\.encode\\(backend, &hint, context\\)"
+        },
+        {
+          "name": "control-lora-delegates-to-canonical-patch-identity",
+          "path": "crates/comfy_model/src/controlnet.rs",
+          "pattern": "impl ControlLoraOps[\\s\\S]*validate_for_base[\\s\\S]*impl ControlLora[\\s\\S]*control\\.model\\.patch != operations\\.patch"
+        },
+        {
+          "name": "controlnet-execution-is-cancellable-atomic-and-workspace-convergent",
+          "path": "crates/comfy_model/src/controlnet.rs",
+          "pattern": "pub fn execute\\([\\s\\S]*workspace_before[\\s\\S]*execute_atomic[\\s\\S]*workspace_after[\\s\\S]*WorkspaceLeak[\\s\\S]*check_context\\(context\\)"
+        },
+        {
+          "name": "controlnet-contract-artifact-binds-exact-eight-source-rows",
+          "path": "crates/comfy_model/src/controlnet.rs",
+          "pattern": "val_controlnet_001_catalog_manifest_is_exact_digest_bound_and_executable[\\s\\S]*const EXPECTED: \\[\\(&str, &str, &str, &str\\); 8\\][\\s\\S]*VAL-CONTROLNET-001"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-controlnet-chain-foundation"
+      ],
+      "production_consumers": [
+        "native diffusion conditioning execution",
+        "runtime cache and execution identity integration",
+        "native worker diffusion attempts"
+      ],
+      "requirements": [
+        "Requirement 7",
+        "Requirement 34",
+        "Requirement 36",
+        "Requirement 37",
+        "Requirement 38",
+        "Requirement 41"
+      ],
+      "design": [
+        "D18",
+        "D25",
+        "D26",
+        "D28",
+        "D31",
+        "D32",
+        "D33",
+        "D41"
+      ],
+      "validation": [
+        "VAL-CONTROLNET-001",
+        "VAL-CATALOG-001",
+        "VAL-LATENT-001",
+        "VAL-TENSOR-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "comfy_model::controlnet is the single immutable ControlNet and adapter-chain domain owner. It owns checked strength and percent-window inputs, hint preparation, fixed input/middle/output slots, predecessor merge order, and deterministic execution identity. It delegates model selection and state admission to ModelStore and model_family, patch semantics to PatchGraph, VAE plus latent transforms to NativeVae, percent conversion to sampling profiles, and all tensor, device, dtype, workspace, cancellation, and publication mechanics to comfy_tensor and the caller ExecutionContext."
+    },
+    {
       "concern": "native_model_operator_lifecycle",
       "canonical_owner": "comfy_model::NativeModule and NativeOperationSet",
       "owner_files": [
@@ -9025,7 +9182,7 @@
         "comfy_model::vae_structured is the focused Hunyuan3D ShapeVAE and TripoSplat topology, exact state-manifest, and source-equation adapter; it delegates checkpoint admission to ModelStore and vision_models and tensors, caller workspace, RNG, and cancellation to comfy_tensor, and owns no 3D media domain, asset/path/index, VAE plan, retry, queue, cache, persistence, or transaction service",
         "AssetService::load_structured_vae_with_context is the sole production structured-VAE authorization and admission adapter; future comfy_media::three_d presentation or persistence values must map explicitly from VaeStructuredResult and cannot own model topology or execution state",
         "Hunyuan structured encode remains typed unavailable because the pinned source references an undefined pre_kl module; Tripo consumes checkpoint-owned perturbation and base-scale buffers plus only the caller-addressed canonical RNG transaction",
-        "Sd15TinyModel VAE equations remain the separately declared native_diffusion_model_slice consolidation work for Task 362 and are not admitted as a second generic VAE domain owner",
+        "The reduced SD15 compatibility architecture is an exact F32 CPU image VaeIdentity whose explicit compiled-source admission, source schema, state mapping, learned decode equations, and typed-unavailable encode path are implemented by vae_image; Sd15TinyModel owns none of them",
         "AssetService performs canonical asset authorization and then delegates image dtype/device admission to comfy_model::vae before ModelStore loading; vae_image reuses the same binding check for direct internal callers and owns no second admission policy"
       ],
       "definitions": [
@@ -19119,10 +19276,10 @@
           "path": "crates/comfy_model/tests/latent_format_foundation.rs",
           "pattern": "identity_and_registry_are_checked_and_stable[\\s\\S]*register_latent_format[\\s\\S]*val_latent_001_authoritative_foundation[\\s\\S]*per_channel_and_custom_transforms_round_trip"
         },
-        {
-          "name": "native-diffusion-sd15-adapters-use-canonical-row-and-operations",
-          "path": "crates/comfy_model/src/slices/native_diffusion.rs",
-          "pattern": "empty_latent as canonical_empty_latent[\\s\\S]*generated_sd15_comfy_model_0045::LATENT_FORMAT as SD15_LATENT_FORMAT[\\s\\S]*project_latent_preview as canonical_project_latent_preview[\\s\\S]*canonical_empty_latent\\([\\s\\S]*canonical_project_latent_preview\\(&SD15_LATENT_FORMAT[\\s\\S]*SD15_LATENT_FORMAT\\.scale_factor"
+      {
+        "name": "native-diffusion-sd15-adapters-use-canonical-row-and-operations",
+        "path": "crates/comfy_model/src/slices/native_diffusion.rs",
+        "pattern": "empty_latent as canonical_empty_latent[\\s\\S]*generated_sd15_comfy_model_0045::LATENT_FORMAT as SD15_LATENT_FORMAT[\\s\\S]*project_latent_preview as canonical_project_latent_preview[\\s\\S]*canonical_empty_latent\\([\\s\\S]*canonical_project_latent_preview\\(&SD15_LATENT_FORMAT"
         }
       ],
       "known_open_reasons": [],
@@ -19156,7 +19313,7 @@
         "VAL-TENSOR-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "The repository-wide audit established comfy_model::latent_format and the existing build manifest as the sole domain and registry owner. LatentFormatIdentity and LatentFormatRegistry own stable identity and uniqueness; the latent_format operations own all geometry, alias-preserving identity, transform, preview, cancellation, and typed error mechanics; TensorBackend and TensorDescriptor retain allocation, device, dtype, storage, and descriptor ownership. `comfy-parity-native-latent-sd15-comfy-model-0045` removed the remaining native-diffusion SD15 constants and tensor loops: its public compatibility functions now map typed errors around the canonical row and operations, and VAE decode reads the row scale. Generated row modules remain data-only adapters and cannot create a second validator, registry, allocator, tensor facade, cancellation token, persistence layer, or model store."
+      "decision_reason": "The repository-wide audit established comfy_model::latent_format and the existing build manifest as the sole domain and registry owner. LatentFormatIdentity and LatentFormatRegistry own stable identity and uniqueness; the latent_format operations own all geometry, alias-preserving identity, transform, preview, cancellation, and typed error mechanics; TensorBackend and TensorDescriptor retain allocation, device, dtype, storage, and descriptor ownership. `comfy-parity-native-latent-sd15-comfy-model-0045` removed the remaining native-diffusion SD15 constants and tensor loops: its public compatibility functions now map typed errors around the canonical row, empty-latent, and preview operations, while canonical NativeVae alone applies the latent transform during VAE execution. Generated row modules remain data-only adapters and cannot create a second validator, registry, allocator, tensor facade, cancellation token, persistence layer, or model store."
     },
     {
       "concern": "workspace_tensor_zz_sampler_ancestral_step_coefficients",

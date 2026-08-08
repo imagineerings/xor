@@ -242,6 +242,10 @@ impl ControlModelBinding {
         &self.model_state_sha256
     }
 
+    pub fn executor_sha256(&self) -> &str {
+        &self.executor_sha256
+    }
+
     pub const fn dtype(&self) -> DType {
         self.dtype
     }
@@ -506,6 +510,49 @@ impl ControlChain {
         &self.identity
     }
 
+    pub fn require_executor_digest(&self, digest: &str) -> Result<(), ControlNetError> {
+        validate_sha256("control executor implementation", digest)?;
+        for node in &self.nodes {
+            let binding = match node {
+                ControlNode::ControlNet(control) => &control.model,
+                ControlNode::ControlLora(control) => &control.control.model,
+                ControlNode::ControlNetSD35(control) => &control.control.model,
+                ControlNode::T2IAdapter(adapter) => &adapter.model,
+            };
+            if binding.executor_sha256() != digest {
+                return Err(ControlNetError::Invalid(
+                    "control executor identity does not match its model binding".to_owned(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn require_vae_execution_digest(
+        &self,
+        digest: Option<&str>,
+    ) -> Result<(), ControlNetError> {
+        if let Some(digest) = digest {
+            validate_sha256("control VAE execution", digest)?;
+        }
+        for node in &self.nodes {
+            let expected = match node {
+                ControlNode::ControlNet(control) => control.expected_vae_sha256.as_deref(),
+                ControlNode::ControlLora(control) => control.control.expected_vae_sha256.as_deref(),
+                ControlNode::ControlNetSD35(control) => {
+                    control.control.expected_vae_sha256.as_deref()
+                }
+                ControlNode::T2IAdapter(_) => None,
+            };
+            if expected != digest {
+                return Err(ControlNetError::Invalid(
+                    "control VAE execution identity does not match every chain node".to_owned(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
     pub fn execution_identity(
         &self,
         conditioning: &ControlConditioning,
@@ -664,6 +711,8 @@ impl ControlResult {
 }
 
 pub trait ControlModelExecutor: Send + Sync {
+    fn execution_digest(&self) -> &str;
+
     fn execute_controlnet(
         &self,
         binding: &ControlModelBinding,
@@ -688,7 +737,7 @@ pub enum ControlNetError {
     #[error(transparent)]
     Tensor(TensorError),
     #[error("canonical tensor operation failed: {0}")]
-    CanonicalTensor(String),
+    CanonicalTensor(#[source] Box<dyn std::error::Error + Send + Sync + 'static>),
     #[error(transparent)]
     Vae(#[from] VaeError),
     #[error(
@@ -715,6 +764,9 @@ impl<'a> ControlRuntime<'a> {
         vae: Option<&NativeVae>,
         context: &ExecutionContext<'_>,
     ) -> Result<Option<ControlResult>, ControlNetError> {
+        check_context(context)?;
+        let vae_execution_digest = vae.map(NativeVae::execution_digest);
+        chain.require_vae_execution_digest(vae_execution_digest.as_deref())?;
         let workspace_before = context.scratch.in_use_bytes();
         let result = self.execute_atomic(chain, isolation, conditioning, vae, context);
         let workspace_after = context.scratch.in_use_bytes();
@@ -924,23 +976,15 @@ fn prepare_control_hint(
 ) -> Result<Tensor, ControlNetError> {
     let noisy_shape = conditioning.noisy.tensor().descriptor().shape();
     let vae_ratio = match (&control.expected_vae_sha256, vae) {
-        (Some(expected), Some(vae)) => {
-            let actual = vae.execution_digest();
-            if &actual != expected {
-                return Err(ControlNetError::Invalid(format!(
-                    "control VAE execution digest mismatch: expected {expected}, got {actual}"
-                )));
-            }
-            vae.descriptor().latent_format().spatial_downscale_ratio
-        }
+        (Some(_), Some(vae)) => vae.descriptor().latent_format().spatial_downscale_ratio,
         (Some(_), None) => {
             return Err(ControlNetError::Invalid(
-                "control graph requires its bound NativeVae".into(),
+                "validated control execution lost its bound NativeVae".into(),
             ));
         }
         (None, Some(_)) => {
             return Err(ControlNetError::Invalid(
-                "an unbound VAE cannot participate in control execution".into(),
+                "validated unbound control execution gained a NativeVae".into(),
             ));
         }
         (None, None) => 1,
@@ -1534,14 +1578,14 @@ fn check_context(context: &ExecutionContext<'_>) -> Result<(), ControlNetError> 
     context.check().map_err(ControlNetError::from)
 }
 
-fn canonical_error(
-    context: &ExecutionContext<'_>,
-    error: impl std::fmt::Display,
-) -> ControlNetError {
+fn canonical_error<E>(context: &ExecutionContext<'_>, error: E) -> ControlNetError
+where
+    E: std::error::Error + Send + Sync + 'static,
+{
     if context.cancellation.is_cancelled() {
         ControlNetError::Cancelled
     } else {
-        ControlNetError::CanonicalTensor(error.to_string())
+        ControlNetError::CanonicalTensor(Box::new(error))
     }
 }
 
@@ -1668,6 +1712,16 @@ mod tests {
         strength_type: StrengthType,
         preprocess: ControlHintPreprocess,
     ) -> Result<ControlNet, Box<dyn Error>> {
+        controlnet_with_vae(hint, strength, strength_type, preprocess, None)
+    }
+
+    fn controlnet_with_vae(
+        hint: ControlTensorBinding,
+        strength: f32,
+        strength_type: StrengthType,
+        preprocess: ControlHintPreprocess,
+        expected_vae_sha256: Option<String>,
+    ) -> Result<ControlNet, Box<dyn Error>> {
         Ok(ControlNet::checked(
             base(strength, strength_type, false, None)?,
             model_binding()?,
@@ -1675,11 +1729,114 @@ mod tests {
             1,
             ResizeMode::NearestExact,
             preprocess,
-            None,
+            expected_vae_sha256,
             Vec::new(),
             false,
             vec!["y".into()],
         )?)
+    }
+
+    #[test]
+    fn canonical_tensor_errors_preserve_typed_resource_and_cancellation_sources()
+    -> Result<(), Box<dyn Error>> {
+        let active = CancellationToken::default();
+        let (_backend, _authority, context) = backend_and_context(&active, MEMORY_BYTES)?;
+        let resource = canonical_error(
+            &context,
+            TensorError::WorkspaceAuthorizationExceeded {
+                requested: 128,
+                authorized: 64,
+                in_use: 0,
+            },
+        );
+        let ControlNetError::CanonicalTensor(resource) = resource else {
+            return Err("canonical tensor resource failure lost its wrapper".into());
+        };
+        assert!(matches!(
+            resource.downcast_ref::<TensorError>(),
+            Some(TensorError::WorkspaceAuthorizationExceeded { .. })
+        ));
+
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        let (_backend, _authority, context) = backend_and_context(&cancelled, MEMORY_BYTES)?;
+        assert!(matches!(
+            canonical_error(&context, TensorError::Cancelled),
+            ControlNetError::Cancelled
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn chain_vae_binding_is_uniform_exact_and_checked_before_execution()
+    -> Result<(), Box<dyn Error>> {
+        let cancellation: CancellationToken = Default::default();
+        let (backend, _authority, context) = backend_and_context(&cancellation, MEMORY_BYTES)?;
+        let vae_digest = digest('d');
+        let other_vae_digest = digest('e');
+        let bound_hint = tensor(&backend, &[1, 1, 1, 1], &[1.0], &context)?;
+        let bound = controlnet_with_vae(
+            binding(bound_hint, 'f')?,
+            1.0,
+            StrengthType::Constant,
+            ControlHintPreprocess::Identity,
+            Some(vae_digest.clone()),
+        )?;
+        let bound_chain = ControlChain::checked(vec![ControlNode::ControlNet(bound.clone())])?;
+        bound_chain.require_vae_execution_digest(Some(&vae_digest))?;
+        assert!(matches!(
+            bound_chain.require_vae_execution_digest(None),
+            Err(ControlNetError::Invalid(_))
+        ));
+        assert!(matches!(
+            bound_chain.require_vae_execution_digest(Some(&other_vae_digest)),
+            Err(ControlNetError::Invalid(_))
+        ));
+
+        let unbound_hint = tensor(&backend, &[1, 1, 1, 1], &[1.0], &context)?;
+        let unbound = controlnet(
+            binding(unbound_hint.clone(), '1')?,
+            1.0,
+            StrengthType::Constant,
+            ControlHintPreprocess::Identity,
+        )?;
+        let unbound_chain = ControlChain::checked(vec![ControlNode::ControlNet(unbound.clone())])?;
+        unbound_chain.require_vae_execution_digest(None)?;
+        assert!(matches!(
+            unbound_chain.require_vae_execution_digest(Some(&vae_digest)),
+            Err(ControlNetError::Invalid(_))
+        ));
+
+        let adapter = T2IAdapter::checked(
+            base(1.0, StrengthType::Constant, false, None)?,
+            model_binding()?,
+            binding(unbound_hint, '2')?,
+            1,
+            1,
+            1,
+            ResizeMode::NearestExact,
+        )?;
+        let adapter_chain = ControlChain::checked(vec![ControlNode::T2IAdapter(adapter)])?;
+        adapter_chain.require_vae_execution_digest(None)?;
+        assert!(matches!(
+            adapter_chain.require_vae_execution_digest(Some(&vae_digest)),
+            Err(ControlNetError::Invalid(_))
+        ));
+
+        let mixed_chain = ControlChain::checked(vec![
+            ControlNode::ControlNet(bound),
+            ControlNode::ControlNet(unbound),
+        ])?;
+        assert!(matches!(
+            mixed_chain.require_vae_execution_digest(None),
+            Err(ControlNetError::Invalid(_))
+        ));
+        assert!(matches!(
+            mixed_chain.require_vae_execution_digest(Some(&vae_digest)),
+            Err(ControlNetError::Invalid(_))
+        ));
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+        Ok(())
     }
 
     fn conditioning(
@@ -1708,6 +1865,10 @@ mod tests {
     }
 
     impl ControlModelExecutor for RecordingExecutor {
+        fn execution_digest(&self) -> &str {
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        }
+
         fn execute_controlnet(
             &self,
             _binding: &ControlModelBinding,
@@ -1760,7 +1921,7 @@ mod tests {
 
     #[test]
     fn quotient_remainder_broadcast_matches_source_order() -> Result<(), Box<dyn Error>> {
-        let cancellation = CancellationToken::default();
+        let cancellation: CancellationToken = Default::default();
         let (backend, _authority, context) = backend_and_context(&cancellation, MEMORY_BYTES)?;
         let input = tensor(&backend, &[3, 1, 1, 1], &[1.0, 2.0, 3.0], &context)?;
         let output = broadcast_image_to(&backend, &input, 10, 2, &context)?;
@@ -1781,7 +1942,7 @@ mod tests {
     #[test]
     fn shared_tensors_receive_linear_strength_once_and_slots_stay_ordered()
     -> Result<(), Box<dyn Error>> {
-        let cancellation = CancellationToken::default();
+        let cancellation: CancellationToken = Default::default();
         let (backend, _authority, context) = backend_and_context(&cancellation, MEMORY_BYTES)?;
         let shared = tensor(&backend, &[1, 1, 1, 1], &[1.0], &context)?;
         let final_slot = tensor(&backend, &[1, 1, 1, 1], &[1.0], &context)?;
@@ -1827,7 +1988,7 @@ mod tests {
 
     #[test]
     fn previous_chain_merge_fills_adds_and_appends_fixed_slots() -> Result<(), Box<dyn Error>> {
-        let cancellation = CancellationToken::default();
+        let cancellation: CancellationToken = Default::default();
         let (backend, _authority, context) = backend_and_context(&cancellation, MEMORY_BYTES)?;
         let one = tensor(&backend, &[1, 1, 1, 1], &[1.0], &context)?;
         let two = tensor(&backend, &[1, 1, 1, 1], &[2.0], &context)?;
@@ -1871,7 +2032,7 @@ mod tests {
 
     #[test]
     fn global_average_pool_sd35_and_t2i_equations_are_exact() -> Result<(), Box<dyn Error>> {
-        let cancellation = CancellationToken::default();
+        let cancellation: CancellationToken = Default::default();
         let (backend, _authority, context) = backend_and_context(&cancellation, MEMORY_BYTES)?;
         let input = tensor(&backend, &[1, 1, 2, 2], &[1.0, 3.0, 5.0, 7.0], &context)?;
         assert_eq!(
@@ -1906,7 +2067,7 @@ mod tests {
     #[test]
     fn identity_binds_hint_predecessor_and_patch_without_tensor_allocation_identity()
     -> Result<(), Box<dyn Error>> {
-        let cancellation = CancellationToken::default();
+        let cancellation: CancellationToken = Default::default();
         let (backend, _authority, context) = backend_and_context(&cancellation, MEMORY_BYTES)?;
         let first_tensor = tensor(&backend, &[1, 1, 2, 2], &[0.0; 4], &context)?;
         let second_tensor = tensor(&backend, &[1, 1, 2, 2], &[0.0; 4], &context)?;
@@ -1965,7 +2126,7 @@ mod tests {
 
     #[test]
     fn runtime_resizes_executes_chain_and_converges_workspace() -> Result<(), Box<dyn Error>> {
-        let cancellation = CancellationToken::default();
+        let cancellation: CancellationToken = Default::default();
         let (backend, _authority, context) = backend_and_context(&cancellation, MEMORY_BYTES)?;
         let executor = RecordingExecutor::default();
         let hint = tensor(&backend, &[2, 1, 1, 1], &[1.0, 2.0], &context)?;
@@ -2008,7 +2169,7 @@ mod tests {
 
     #[test]
     fn cancellation_and_oom_publish_no_partial_result() -> Result<(), Box<dyn Error>> {
-        let cancellation = CancellationToken::default();
+        let cancellation: CancellationToken = Default::default();
         let (backend, _authority, context) = backend_and_context(&cancellation, MEMORY_BYTES)?;
         let executor = RecordingExecutor::default();
         let hint = tensor(&backend, &[1, 1, 1, 1], &[1.0], &context)?;
@@ -2042,7 +2203,7 @@ mod tests {
         assert!(executor.calls.lock().map_err(|_| "calls lock")?.is_empty());
         assert_eq!(context.scratch.in_use_bytes(), 0);
 
-        let oom_cancellation = CancellationToken::default();
+        let oom_cancellation: CancellationToken = Default::default();
         let (oom_backend, _oom_authority, oom_context) =
             backend_and_context(&oom_cancellation, 96)?;
         let large = tensor(&oom_backend, &[1, 1, 4, 4], &[1.0; 16], &oom_context)?;
@@ -2060,7 +2221,7 @@ mod tests {
     #[test]
     fn control_lora_delegates_patch_math_and_sd35_requires_preprocess() -> Result<(), Box<dyn Error>>
     {
-        let cancellation = CancellationToken::default();
+        let cancellation: CancellationToken = Default::default();
         let (backend, _authority, context) = backend_and_context(&cancellation, MEMORY_BYTES)?;
         let hint = tensor(&backend, &[1, 1, 1, 1], &[0.0], &context)?;
         let standard = controlnet(
@@ -2313,7 +2474,7 @@ mod tests {
             repository
                 .join(".agents/specs/comfy-parity/catalogs/backend-conditioning-contracts.csv"),
         )?;
-        let cancellation = CancellationToken::default();
+        let cancellation: CancellationToken = Default::default();
         let (backend, _authority, context) = backend_and_context(&cancellation, MEMORY_BYTES)?;
         let mut seen = BTreeSet::new();
         let mut contracts = Vec::new();
@@ -2359,6 +2520,19 @@ mod tests {
         let implementation_path = "crates/comfy_model/src/controlnet.rs";
         let implementation = std::fs::read(repository.join(implementation_path))?;
         let implementation_sha256 = format!("{:x}", Sha256::digest(implementation));
+        let task_implementations = [
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/src/controlnet.rs",
+        ]
+        .into_iter()
+        .map(|path| {
+            let bytes = std::fs::read(repository.join(path))?;
+            Ok(serde_json::json!({
+                "path": path,
+                "sha256": format!("{:x}", Sha256::digest(bytes)),
+            }))
+        })
+        .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
         let task_results = BTreeMap::from([(
             TASK,
             serde_json::json!({
@@ -2367,10 +2541,7 @@ mod tests {
                 "failed": 0,
                 "skipped": 0,
                 "case_ids": REQUIRED_CASE_IDS,
-                "implementations": [{
-                    "path": implementation_path,
-                    "sha256": implementation_sha256,
-                }],
+                "implementations": task_implementations,
             }),
         )]);
         let artifact = serde_json::json!({

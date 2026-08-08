@@ -458,23 +458,24 @@ fn authoritative_sampling_owners_have_no_competing_production_definitions()
     assert!(runtime.contains("impl GuidanceDenoiser for Sd15GuidanceDenoiser"));
     assert!(runtime.contains("pub struct Sd15GuidanceAdapter"));
     assert!(runtime.contains("execute_guidance("));
-    assert!(runtime.contains("GUIDANCE_ADAPTER_ID.to_owned()"));
+    assert!(runtime.contains("[GUIDANCE_ADAPTER_ID.as_bytes()]"));
+    assert!(runtime.contains("artifact_digests: identities.conditioning().artifact_digests()"));
     let ksampler = runtime
         .split("struct KSamplerNode")
         .nth(1)
         .and_then(|source| source.split("struct VaeDecodeNode").next())
         .ok_or("KSampler implementation slice is unavailable")?;
     let guidance_position = ksampler
-        .find("let prediction = guidance")
+        .find("let prediction = match guidance.execute(")
         .ok_or("KSampler does not call canonical guidance")?;
     let publication_position = ksampler
-        .find("insert_tensor(NativeTensorKind::Latent, final_latent)")
+        .find("commit_prepared_tensor(&handle, final_latent)")
         .ok_or("KSampler final latent publication is unavailable")?;
     assert!(guidance_position < publication_position);
     assert!(ksampler[guidance_position..publication_position].contains(".execute("));
     assert_eq!(
         ksampler
-            .matches("insert_tensor(NativeTensorKind::Latent, final_latent)")
+            .matches("commit_prepared_tensor(&handle, final_latent)")
             .count(),
         1
     );

@@ -117,17 +117,31 @@ fn val_native_e2e_002() -> Result<(), Box<dyn Error>> {
     let mut plan = compile_native_diffusion_workflow(WORKFLOW, &BTreeSet::new(), provider)?;
     plan.prompt_id = PromptId(Uuid::from_u128(0x5349_4d00_0000_0000_0000_0000_0000_3702));
     let mut cases = BTreeMap::new();
-    let model_digest = fixture.model_digest()?;
-    let vae_cache_identities = fixture.vae_cache_identities()?;
+    let cancellation = CancellationToken::default();
+    let cache_identities = fixture.cache_identities(&cancellation)?;
+    let model_digest = cache_identities.model_digest();
+    let vae_cache_identities = cache_identities.vae();
+    let conditioning_cache_identities = cache_identities.conditioning();
     cases.insert(
         "canonical_vae_cache_binds_identity_artifact_patch_and_execution",
-        vae_cache_identities.artifact() == model_digest.as_str()
+        vae_cache_identities.artifact() == model_digest
             && vae_cache_identities.identity().len() == 64
             && vae_cache_identities.patch().len() == 64
             && vae_cache_identities.execution().len() == 64
             && vae_cache_identities.identity() != vae_cache_identities.artifact()
             && vae_cache_identities.patch() != vae_cache_identities.artifact()
             && vae_cache_identities.execution() != vae_cache_identities.identity(),
+    );
+    cases.insert(
+        "canonical_conditioning_cache_binds_patch_control_guidance_and_execution",
+        conditioning_cache_identities.conditioning().len() == 64
+            && conditioning_cache_identities.guidance().len() == 64
+            && conditioning_cache_identities.model_patch().len() == 64
+            && conditioning_cache_identities.model_execution().len() == 64
+            && conditioning_cache_identities.control().len() == 64
+            && conditioning_cache_identities.execution().len() == 64
+            && conditioning_cache_identities.execution()
+                != conditioning_cache_identities.guidance(),
     );
     cases.insert(
         "workflow_has_six_exact_node_types",
@@ -203,7 +217,7 @@ fn val_native_e2e_002() -> Result<(), Box<dyn Error>> {
             .map(|proposal| proposal.output().clone())
             .collect::<Vec<_>>(),
         &authorize_native_output_committer(&roots.asset_roots.profile_id)?,
-        &CancellationToken::default(),
+        &cancellation,
     )?;
     let receipt = receipts.first().ok_or("SaveImage produced no output")?;
     let actual_png = fs::read(
