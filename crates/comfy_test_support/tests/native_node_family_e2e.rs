@@ -119,6 +119,17 @@ fn portable_values_dynamic_ports_and_attempt_handles_fail_closed() -> Result<(),
         schema_version: comfy_nodes::NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
         class_type: "Task367PortableProbe".to_owned(),
         implementation_version: "1".to_owned(),
+        source_schema: Some(comfy_nodes::NativeDescriptorSchemaMetadata::synthetic(
+            ["value".to_owned()],
+            [comfy_nodes::NativeDynamicSchemaMetadata::compatibility(
+                "value_{index}",
+                1,
+                1,
+                8,
+                comfy_nodes::NativeInputSchemaMetadata::compatibility("value", "ANY"),
+            )],
+            std::iter::empty(),
+        )),
         inputs: vec![NativeInputDescriptor {
             name: "value".to_owned(),
             accepted_types: union.clone(),

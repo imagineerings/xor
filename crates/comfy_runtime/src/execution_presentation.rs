@@ -3067,6 +3067,13 @@ mod tests {
                         schema_version: NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
                         class_type: "Output".to_owned(),
                         implementation_version: "1".to_owned(),
+                        source_schema: Some(
+                            comfy_nodes::NativeDescriptorSchemaMetadata::synthetic(
+                                std::iter::empty(),
+                                std::iter::empty(),
+                                ["value".to_owned()],
+                            ),
+                        ),
                         inputs: Vec::new(),
                         dynamic_inputs: Vec::new(),
                         outputs: vec![NativeOutputDescriptor {

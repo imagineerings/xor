@@ -236,12 +236,8 @@ fn compile_inputs(
             });
         }
     }
-    for dynamic in &descriptor.dynamic_inputs {
-        for offset in 0..dynamic.minimum_count {
-            let index = dynamic.start_index.checked_add(offset).ok_or_else(|| {
-                PromptCompileError::InvalidRuntimeDescriptor(descriptor.class_type.clone())
-            })?;
-            let name = dynamic.name_template.replace("{index}", &index.to_string());
+    for (dynamic_index, dynamic) in descriptor.dynamic_inputs.iter().enumerate() {
+        for name in required_dynamic_input_names(descriptor, dynamic_index, dynamic)? {
             if dynamic.input.required
                 && !dynamic.input.hidden
                 && !prompt_node.inputs.contains_key(&name)
@@ -264,6 +260,7 @@ fn compile_inputs(
         if input.hidden {
             continue;
         }
+        let source_schema = resolve_input_schema(descriptor, name);
         let binding = if let Some((source, output_index)) = decode_link(value) {
             if !prompt.0.contains_key(&source) {
                 return Err(PromptCompileError::UnknownLink {
@@ -313,12 +310,19 @@ fn compile_inputs(
                     input: name.clone(),
                 });
             }
-            InputBinding::Literal {
-                value: native_value.ok_or_else(|| PromptCompileError::InvalidLiteral {
+            let value = native_value.ok_or_else(|| PromptCompileError::InvalidLiteral {
+                node: node_id.clone(),
+                input: name.clone(),
+            })?;
+            if source_schema.as_ref().is_some_and(|schema| {
+                !comfy_nodes::native_value_matches_input_schema(&value, schema)
+            }) {
+                return Err(PromptCompileError::InvalidLiteral {
                     node: node_id.clone(),
                     input: name.clone(),
-                })?,
+                });
             }
+            InputBinding::Literal { value }
         };
         compiled.insert(name.clone(), binding);
     }
@@ -360,6 +364,15 @@ fn inject_hidden_inputs(
                 node: node_id.clone(),
                 input: input.name.clone(),
             })?;
+        if resolve_input_schema(descriptor, &input.name)
+            .as_ref()
+            .is_some_and(|schema| !comfy_nodes::native_value_matches_input_schema(&value, schema))
+        {
+            return Err(PromptCompileError::InvalidLiteral {
+                node: node_id.clone(),
+                input: input.name.clone(),
+            });
+        }
         inputs.insert(input.name.clone(), InputBinding::Literal { value });
     }
     Ok(())
@@ -372,7 +385,18 @@ pub(crate) fn resolve_input_descriptor(
     if let Some(input) = descriptor.inputs.iter().find(|input| input.name == name) {
         return Some(input.clone());
     }
-    for dynamic in &descriptor.dynamic_inputs {
+    for (dynamic_index, dynamic) in descriptor.dynamic_inputs.iter().enumerate() {
+        if dynamic.name_template == "{name}"
+            && descriptor
+                .source_schema
+                .as_ref()
+                .and_then(|schema| schema.dynamic_inputs.get(dynamic_index))
+                .is_some_and(|schema| schema.names.iter().any(|candidate| candidate == name))
+        {
+            let mut input = dynamic.input.clone();
+            input.name = name.to_owned();
+            return Some(input);
+        }
         let Some((prefix, suffix)) = dynamic.name_template.split_once("{index}") else {
             continue;
         };
@@ -393,6 +417,85 @@ pub(crate) fn resolve_input_descriptor(
         }
     }
     None
+}
+
+fn resolve_input_schema(
+    descriptor: &NativeNodeDescriptor,
+    name: &str,
+) -> Option<comfy_nodes::NativeInputSchemaMetadata> {
+    let source_schema = descriptor.source_schema.as_ref()?;
+    if let Some((index, _)) = descriptor
+        .inputs
+        .iter()
+        .enumerate()
+        .find(|(_, input)| input.name == name)
+    {
+        return source_schema.inputs.get(index).cloned();
+    }
+    for (index, dynamic) in descriptor.dynamic_inputs.iter().enumerate() {
+        if dynamic.name_template == "{name}" {
+            let dynamic_schema = source_schema.dynamic_inputs.get(index)?;
+            if dynamic_schema
+                .names
+                .iter()
+                .any(|candidate| candidate == name)
+            {
+                let mut schema = (*dynamic_schema.input).clone();
+                schema.name = name.to_owned();
+                return Some(schema);
+            }
+            continue;
+        }
+        let Some((prefix, suffix)) = dynamic.name_template.split_once("{index}") else {
+            continue;
+        };
+        let Some(value) = name
+            .strip_prefix(prefix)
+            .and_then(|value| value.strip_suffix(suffix))
+            .and_then(|value| value.parse::<u32>().ok())
+        else {
+            continue;
+        };
+        let end = dynamic.start_index.checked_add(dynamic.maximum_count)?;
+        if value >= dynamic.start_index && value < end {
+            let mut schema = (*source_schema.dynamic_inputs.get(index)?.input).clone();
+            schema.name = name.to_owned();
+            return Some(schema);
+        }
+    }
+    None
+}
+
+fn required_dynamic_input_names(
+    descriptor: &NativeNodeDescriptor,
+    dynamic_index: usize,
+    dynamic: &comfy_nodes::NativeDynamicInputDescriptor,
+) -> Result<Vec<String>, PromptCompileError> {
+    if dynamic.name_template == "{name}" {
+        let names = descriptor
+            .source_schema
+            .as_ref()
+            .and_then(|schema| schema.dynamic_inputs.get(dynamic_index))
+            .map(|schema| schema.names.clone())
+            .ok_or_else(|| {
+                PromptCompileError::InvalidRuntimeDescriptor(descriptor.class_type.clone())
+            })?;
+        return Ok(names
+            .into_iter()
+            .take(dynamic.minimum_count as usize)
+            .collect());
+    }
+    (0..dynamic.minimum_count)
+        .map(|offset| {
+            dynamic
+                .start_index
+                .checked_add(offset)
+                .map(|index| dynamic.name_template.replace("{index}", &index.to_string()))
+                .ok_or_else(|| {
+                    PromptCompileError::InvalidRuntimeDescriptor(descriptor.class_type.clone())
+                })
+        })
+        .collect()
 }
 
 fn type_union_accepts_output(union: &NativeTypeUnion, output: &NativeValueType) -> bool {
@@ -579,9 +682,9 @@ fn static_required_nodes(
 pub(crate) mod tests {
     use super::*;
     use comfy_nodes::{
-        NATIVE_NODE_CONTRACT_SCHEMA_VERSION, NativeCachePolicy, NativeDynamicInputDescriptor,
-        NativeEffectClass, NativeInputDescriptor, NativeNodeContractError, NativeOutputDescriptor,
-        NativePrimitiveType,
+        LEGACY_NATIVE_NODE_CONTRACT_SCHEMA_VERSION, NativeCachePolicy,
+        NativeDynamicInputDescriptor, NativeEffectClass, NativeInputDescriptor,
+        NativeNodeContractError, NativeOutputDescriptor, NativePrimitiveType,
     };
     use serde_json::json;
 
@@ -590,9 +693,10 @@ pub(crate) mod tests {
         output_node: bool,
     ) -> Result<NativeNodeDescriptor, NativeNodeContractError> {
         Ok(NativeNodeDescriptor {
-            schema_version: NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
+            schema_version: LEGACY_NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
             class_type: class_type.to_owned(),
             implementation_version: "1".to_owned(),
+            source_schema: None,
             inputs: Vec::new(),
             dynamic_inputs: Vec::new(),
             outputs: vec![NativeOutputDescriptor {
@@ -854,6 +958,83 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn prompt_schema_constraints_fail_before_execution() -> Result<(), Box<dyn std::error::Error>> {
+        let mut bounded = descriptor("Bounded", true)?;
+        bounded.schema_version = comfy_nodes::NATIVE_NODE_CONTRACT_SCHEMA_VERSION;
+        bounded.inputs = vec![
+            input(
+                "seed",
+                NativeValueType::Primitive(NativePrimitiveType::Integer),
+                false,
+                NativePortCardinality::Scalar,
+                true,
+            )?,
+            input(
+                "weights",
+                NativeValueType::Primitive(NativePrimitiveType::Number),
+                false,
+                NativePortCardinality::List,
+                true,
+            )?,
+        ];
+        let mut source_schema = comfy_nodes::NativeDescriptorSchemaMetadata::compatibility(
+            comfy_nodes::NativeSchemaProvenance::SourceV3,
+            [
+                ("seed".to_owned(), "INT".to_owned()),
+                ("weights".to_owned(), "FLOAT".to_owned()),
+            ],
+            std::iter::empty(),
+            [("value".to_owned(), "FLOAT".to_owned())],
+        );
+        source_schema.inputs[0].default =
+            Some(comfy_nodes::NativeSchemaValue::UnsignedInteger { value: 3 });
+        source_schema.inputs[0].minimum =
+            Some(comfy_nodes::NativeSchemaValue::UnsignedInteger { value: 1 });
+        source_schema.inputs[0].maximum =
+            Some(comfy_nodes::NativeSchemaValue::UnsignedInteger { value: 5 });
+        source_schema.inputs[0].choices = [1, 3, 5]
+            .into_iter()
+            .map(|value| comfy_nodes::NativeSchemaValue::UnsignedInteger { value })
+            .collect();
+        source_schema.inputs[1].minimum = Some(comfy_nodes::NativeSchemaValue::FiniteDecimal {
+            value: "0.0".to_owned(),
+        });
+        source_schema.inputs[1].maximum = Some(comfy_nodes::NativeSchemaValue::FiniteDecimal {
+            value: "1.0".to_owned(),
+        });
+        bounded.source_schema = Some(source_schema);
+        let mut registry = NativeNodeRegistry::default();
+        registry.register_descriptor(bounded)?;
+
+        let compile = |seed, weights| {
+            PromptCompiler::new(&registry).compile(submission(BTreeMap::from([(
+                NodeId::from("out"),
+                PromptNode {
+                    class_type: "Bounded".to_owned(),
+                    inputs: BTreeMap::from([
+                        ("seed".to_owned(), seed),
+                        ("weights".to_owned(), weights),
+                    ]),
+                    unknown: BTreeMap::new(),
+                },
+            )])))
+        };
+        compile(json!(3), json!([0.0, 0.5, 1.0]))?;
+        for (seed, weights) in [
+            (json!(0), json!([0.5])),
+            (json!(4), json!([0.5])),
+            (json!(6), json!([0.5])),
+            (json!(3), json!([0.5, 1.1])),
+        ] {
+            assert!(matches!(
+                compile(seed, weights),
+                Err(PromptCompileError::InvalidLiteral { .. })
+            ));
+        }
+        Ok(())
+    }
+
+    #[test]
     fn dynamic_input_resolution_checks_every_template() -> Result<(), Box<dyn std::error::Error>> {
         let mut dynamic = descriptor("Dynamic", true)?;
         let dynamic_input = input(
@@ -878,11 +1059,61 @@ pub(crate) mod tests {
                 maximum_count: 2,
                 input: dynamic_input,
             },
+            NativeDynamicInputDescriptor {
+                name_template: "{name}".to_owned(),
+                start_index: 0,
+                minimum_count: 1,
+                maximum_count: 2,
+                input: input(
+                    "named_value",
+                    NativeValueType::Primitive(NativePrimitiveType::Number),
+                    false,
+                    NativePortCardinality::Scalar,
+                    true,
+                )?,
+            },
         ];
+        let mut named_schema = comfy_nodes::NativeDynamicSchemaMetadata::compatibility(
+            "{name}",
+            0,
+            1,
+            2,
+            comfy_nodes::NativeInputSchemaMetadata::compatibility("named_value", "FLOAT"),
+        );
+        named_schema.names = vec!["left".to_owned(), "right".to_owned()];
+        dynamic.schema_version = comfy_nodes::NATIVE_NODE_CONTRACT_SCHEMA_VERSION;
+        dynamic.source_schema = Some(comfy_nodes::NativeDescriptorSchemaMetadata::compatibility(
+            comfy_nodes::NativeSchemaProvenance::SourceV3,
+            std::iter::empty(),
+            [
+                comfy_nodes::NativeDynamicSchemaMetadata::compatibility(
+                    "first_{index}",
+                    0,
+                    0,
+                    2,
+                    comfy_nodes::NativeInputSchemaMetadata::compatibility("value", "FLOAT"),
+                ),
+                comfy_nodes::NativeDynamicSchemaMetadata::compatibility(
+                    "second_{index}",
+                    4,
+                    0,
+                    2,
+                    comfy_nodes::NativeInputSchemaMetadata::compatibility("value", "FLOAT"),
+                ),
+                named_schema,
+            ],
+            [("value".to_owned(), "FLOAT".to_owned())],
+        ));
+        dynamic.validate()?;
         assert_eq!(
             resolve_input_descriptor(&dynamic, "second_5").map(|input| input.name),
             Some("second_5".to_owned())
         );
+        assert_eq!(
+            resolve_input_descriptor(&dynamic, "right").map(|input| input.name),
+            Some("right".to_owned())
+        );
+        assert!(resolve_input_descriptor(&dynamic, "unknown").is_none());
         Ok(())
     }
 

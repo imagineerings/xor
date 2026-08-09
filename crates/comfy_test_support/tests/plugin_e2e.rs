@@ -1577,10 +1577,11 @@ fn api_catalog_projection_is_exact() -> Result<bool, Box<dyn Error>> {
         ExecutionDataSource::Live,
         ExecutionSnapshotStatus::Ready,
     )?;
-    let services = Arc::new(NativeRuntimeHttpServices::native_image(
+    let services = Arc::new(NativeRuntimeHttpServices::new(
         profile_id,
         comfy_runtime::ExecutionPresentationOwner::ephemeral(presentation),
         Arc::new(DisconnectedExecutionController),
+        native_image_registry_projection()?,
     )?);
     let capabilities = services.http_capabilities()?;
     let security_config = ApiSecurityConfig::loopback();
@@ -1618,34 +1619,67 @@ fn api_catalog_projection_is_exact() -> Result<bool, Box<dyn Error>> {
         return Ok(false);
     };
     let bindings = native_image_catalog_bindings()?;
-    if body.len() != bindings.len() {
+    let catalog = CatalogNodeRegistry::built_in()?;
+    if body.len() != catalog.registered().len() + catalog.inactive().len() {
         return Ok(false);
     }
     Ok(bindings.iter().all(|(class_type, binding)| {
         let Some(projected) = body.get(class_type) else {
             return false;
         };
-        let output_types = binding
-            .native
+        let Some(schema) = catalog.source_schema(class_type) else {
+            return false;
+        };
+        let Some(python_module) = catalog.source_python_module(class_type) else {
+            return false;
+        };
+        let output_types = schema
             .outputs
             .iter()
-            .map(|output| json!(output.type_name))
+            .map(|output| json!(output.source_type_name))
             .collect::<Vec<_>>();
-        let output_names = binding
-            .native
+        let output_names = schema
             .outputs
             .iter()
-            .map(|output| json!(output.name))
+            .map(|output| {
+                json!(
+                    output
+                        .display_name
+                        .as_ref()
+                        .or(output.source_name.as_ref())
+                        .unwrap_or(&output.source_type_name)
+                )
+            })
             .collect::<Vec<_>>();
-        projected["name"] == class_type.as_str()
+        let Ok(source_schema) = serde_json::to_value(schema) else {
+            return false;
+        };
+        let source_v1 = schema.provenance == comfy_nodes::NativeSchemaProvenance::SourceV1;
+        let deprecated_is_exact = if source_v1 && !schema.presentation.is_deprecated {
+            projected.get("deprecated").is_none()
+        } else {
+            projected["deprecated"] == schema.presentation.is_deprecated
+        };
+        let experimental_is_exact = if source_v1 && !schema.presentation.is_experimental {
+            projected.get("experimental").is_none()
+        } else {
+            projected["experimental"] == schema.presentation.is_experimental
+        };
+        let exact = projected["name"] == class_type.as_str()
             && projected["display_name"] == binding.catalog.display_name
             && projected["description"] == binding.native.description
-            && projected["python_module"] == binding.native.python_module
+            && projected["python_module"] == python_module
             && projected["category"] == binding.catalog.category
             && projected["output"] == serde_json::Value::Array(output_types)
             && projected["output_name"] == serde_json::Value::Array(output_names)
             && projected["output_node"] == binding.native.output_node
-            && projected.get("experimental").is_none()
+            && deprecated_is_exact
+            && experimental_is_exact
+            && projected["sim_schema"] == source_schema;
+        if !exact {
+            eprintln!("{class_type} catalog/API mismatch: {projected:#}");
+        }
+        exact
     }))
 }
 

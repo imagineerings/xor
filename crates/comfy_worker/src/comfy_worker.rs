@@ -1352,6 +1352,7 @@ mod tests {
             schema_version: 1,
             class_type: "ForgedInput".to_owned(),
             implementation_version: "1".to_owned(),
+            source_schema: None,
             inputs: Vec::new(),
             dynamic_inputs: Vec::new(),
             outputs: Vec::new(),

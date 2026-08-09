@@ -5,6 +5,7 @@ use crate::{
     NativeNodeContext, NativeNodeContractError, NativeNodeDescriptor, NativeNodeFailure,
     NativeNodeFailureKind, NativeNodeOutcome, NativeNodePresentation, NativeOpaqueHandle,
     NativeOutputDescriptor, NativePortCardinality, NativeTypeUnion, NativeValue, NativeValueType,
+    built_in_source_schema,
 };
 use futures::future::BoxFuture;
 use std::{
@@ -24,12 +25,17 @@ const DESCRIPTION: &str =
 
 fn native_node_bindings() -> Result<Vec<NativeNodeBinding>, NativeNodeContractError> {
     let model_type = model_type()?;
+    let source_schema = built_in_source_schema(CLASS_TYPE)
+        .map_err(|error| NativeNodeContractError::InvalidSourceSchema(error.to_string()))?
+        .bind_execution_ports(&["model".to_owned()], &[], &["model".to_owned()])
+        .map_err(|error| NativeNodeContractError::InvalidSourceSchema(error.to_string()))?;
     Ok(vec![NativeNodeBinding::Executable {
         feature_id: FEATURE_ID.to_owned(),
         descriptor: NativeNodeDescriptor {
             schema_version: NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
             class_type: CLASS_TYPE.to_owned(),
             implementation_version: IMPLEMENTATION_VERSION.to_owned(),
+            source_schema: Some(source_schema),
             inputs: vec![NativeInputDescriptor {
                 name: "model".to_owned(),
                 accepted_types: NativeTypeUnion::new([NativeValueType::Handle(

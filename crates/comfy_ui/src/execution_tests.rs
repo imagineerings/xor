@@ -415,7 +415,30 @@ fn generated_ui_compiler_tracks_the_comprehensive_frontend_projection() -> Resul
     let registry = comfy_runtime::generated_native_node_registry_projection(None)?;
     registry.validate_comprehensive_bindings()?;
     let frontend = comfy_runtime::generated_native_frontend_descriptors(None)?;
+    let contracts = comfy_runtime::generated_native_frontend_contracts(None)?;
     assert_eq!(frontend.len(), registry.descriptor_len());
+    assert_eq!(contracts.len(), registry.descriptor_len());
+    for (class_type, contract) in &contracts {
+        contract.runtime.validate_exact_schema_v2()?;
+        assert_eq!(contract.graph, frontend[class_type]);
+        assert_eq!(
+            contract.runtime.source_schema.as_ref().map(|schema| {
+                schema
+                    .inputs
+                    .iter()
+                    .map(|input| input.name.as_str())
+                    .collect::<Vec<_>>()
+            }),
+            Some(
+                contract
+                    .graph
+                    .inputs
+                    .iter()
+                    .map(|input| input.name.as_str())
+                    .collect::<Vec<_>>()
+            )
+        );
+    }
 
     let model = native_image_graph_fixture(LOCAL_EXECUTION_PROFILE_ID)?;
     let WorkflowOpenState::Editable(engine) = &model.open_state else {

@@ -216,10 +216,23 @@ fn native_descriptor(
             }),
         }
     }
+    let source_schema = comfy_nodes::NativeDescriptorSchemaMetadata::compatibility(
+        comfy_nodes::NativeSchemaProvenance::Plugin,
+        node.ports
+            .iter()
+            .filter(|port| port.direction == PortDirection::Input)
+            .map(|port| (port.id.clone(), port.type_id.to_string())),
+        std::iter::empty(),
+        node.ports
+            .iter()
+            .filter(|port| port.direction == PortDirection::Output)
+            .map(|port| (port.name.clone(), port.type_id.to_string())),
+    );
     let descriptor = comfy_nodes::NativeNodeDescriptor {
         schema_version: NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
         class_type: node.id.clone(),
         implementation_version: node.version.to_string(),
+        source_schema: Some(source_schema),
         inputs,
         dynamic_inputs: Vec::new(),
         outputs,

@@ -1,3 +1,4 @@
+use crate::{NativeDescriptorSchemaMetadata, NativeInputSchemaMetadata, NativeSchemaValue};
 use comfy_tensor::{ScratchReservation, TensorDescriptor};
 use comfy_types::{ApiPrompt, AttemptId, CancellationToken, NodeId, PromptId};
 use futures::future::BoxFuture;
@@ -12,7 +13,8 @@ use std::{
 use thiserror::Error;
 use uuid::Uuid;
 
-pub const NATIVE_NODE_CONTRACT_SCHEMA_VERSION: u16 = 1;
+pub const NATIVE_NODE_CONTRACT_SCHEMA_VERSION: u16 = 2;
+pub const LEGACY_NATIVE_NODE_CONTRACT_SCHEMA_VERSION: u16 = 1;
 pub const NATIVE_OPAQUE_HANDLE_SCHEMA_VERSION: u16 = 1;
 
 const MAX_IDENTIFIER_BYTES: usize = 4_096;
@@ -314,6 +316,199 @@ impl NativeTypeUnion {
     }
 }
 
+pub fn native_value_matches_input_schema(
+    value: &NativeValue,
+    schema: &NativeInputSchemaMetadata,
+) -> bool {
+    match value {
+        NativeValue::List { values } => values
+            .iter()
+            .all(|value| native_value_matches_input_schema(value, schema)),
+        _ => {
+            let Some(schema_value) = native_value_as_schema_value(value) else {
+                return schema.choices.is_empty()
+                    && schema.minimum.is_none()
+                    && schema.maximum.is_none();
+            };
+            if !schema.choices.is_empty()
+                && !schema
+                    .choices
+                    .iter()
+                    .any(|choice| schema_values_equal(&schema_value, choice))
+            {
+                return false;
+            }
+            schema.minimum.as_ref().is_none_or(|minimum| {
+                // Preserved source expressions are provenance, not executable numeric bounds.
+                matches!(minimum, NativeSchemaValue::PreservedExpression { .. })
+                    || schema_number_at_least(&schema_value, minimum)
+            }) && schema.maximum.as_ref().is_none_or(|maximum| {
+                matches!(maximum, NativeSchemaValue::PreservedExpression { .. })
+                    || schema_number_at_most(&schema_value, maximum)
+            })
+        }
+    }
+}
+
+fn schema_values_equal(left: &NativeSchemaValue, right: &NativeSchemaValue) -> bool {
+    left == right
+        || compare_schema_numbers(left, right)
+            .is_some_and(|ordering| ordering == std::cmp::Ordering::Equal)
+}
+
+fn native_value_as_schema_value(value: &NativeValue) -> Option<NativeSchemaValue> {
+    let NativeValue::Primitive { value } = value else {
+        return None;
+    };
+    match value {
+        NativePrimitive::Null => Some(NativeSchemaValue::Null),
+        NativePrimitive::Boolean(value) => Some(NativeSchemaValue::Boolean { value: *value }),
+        NativePrimitive::Integer(value) => Some(NativeSchemaValue::SignedInteger { value: *value }),
+        NativePrimitive::UnsignedInteger(value) => {
+            Some(NativeSchemaValue::UnsignedInteger { value: *value })
+        }
+        NativePrimitive::Number(value) if value.is_finite() => {
+            Some(NativeSchemaValue::FiniteDecimal {
+                value: value.to_string(),
+            })
+        }
+        NativePrimitive::Number(_) => None,
+        NativePrimitive::String(value) => Some(NativeSchemaValue::String {
+            value: value.clone(),
+        }),
+    }
+}
+
+fn native_value_from_schema_value(value: &NativeSchemaValue) -> Option<NativeValue> {
+    Some(match value {
+        NativeSchemaValue::Null => NativeValue::Primitive {
+            value: NativePrimitive::Null,
+        },
+        NativeSchemaValue::Boolean { value } => NativeValue::Primitive {
+            value: NativePrimitive::Boolean(*value),
+        },
+        NativeSchemaValue::SignedInteger { value } => NativeValue::Primitive {
+            value: NativePrimitive::Integer(*value),
+        },
+        NativeSchemaValue::UnsignedInteger { value } => NativeValue::Primitive {
+            value: NativePrimitive::UnsignedInteger(*value),
+        },
+        NativeSchemaValue::FiniteDecimal { value } => NativeValue::Primitive {
+            value: NativePrimitive::Number(
+                value
+                    .parse::<f64>()
+                    .ok()
+                    .filter(|value| value.is_finite())?,
+            ),
+        },
+        NativeSchemaValue::String { value } => NativeValue::Primitive {
+            value: NativePrimitive::String(value.clone()),
+        },
+        NativeSchemaValue::List { values } => NativeValue::List {
+            values: values
+                .iter()
+                .map(native_value_from_schema_value)
+                .collect::<Option<Vec<_>>>()?,
+        },
+        NativeSchemaValue::Object { .. } | NativeSchemaValue::PreservedExpression { .. } => {
+            return None;
+        }
+    })
+}
+
+fn native_type_union_accepts_value(union: &NativeTypeUnion, value: &NativeValue) -> bool {
+    union.accepts(value)
+        || union.members() == [NativeValueType::Any]
+        || matches!(
+            value,
+            NativeValue::Primitive {
+                value: NativePrimitive::Integer(_) | NativePrimitive::UnsignedInteger(_)
+            }
+        ) && union
+            .members()
+            .contains(&NativeValueType::Primitive(NativePrimitiveType::Number))
+}
+
+fn schema_number_at_least(value: &NativeSchemaValue, minimum: &NativeSchemaValue) -> bool {
+    compare_schema_numbers(value, minimum).is_some_and(|ordering| !ordering.is_lt())
+}
+
+fn schema_number_at_most(value: &NativeSchemaValue, maximum: &NativeSchemaValue) -> bool {
+    compare_schema_numbers(value, maximum).is_some_and(|ordering| !ordering.is_gt())
+}
+
+fn compare_schema_numbers(
+    left: &NativeSchemaValue,
+    right: &NativeSchemaValue,
+) -> Option<std::cmp::Ordering> {
+    use std::cmp::Ordering;
+    match (left, right) {
+        (
+            NativeSchemaValue::SignedInteger { value: left },
+            NativeSchemaValue::SignedInteger { value: right },
+        ) => Some(left.cmp(right)),
+        (
+            NativeSchemaValue::UnsignedInteger { value: left },
+            NativeSchemaValue::UnsignedInteger { value: right },
+        ) => Some(left.cmp(right)),
+        (
+            NativeSchemaValue::SignedInteger { value: left },
+            NativeSchemaValue::UnsignedInteger { value: right },
+        ) => {
+            if *left < 0 {
+                Some(Ordering::Less)
+            } else {
+                Some((*left as u64).cmp(right))
+            }
+        }
+        (
+            NativeSchemaValue::UnsignedInteger { value: left },
+            NativeSchemaValue::SignedInteger { value: right },
+        ) => {
+            if *right < 0 {
+                Some(Ordering::Greater)
+            } else {
+                Some(left.cmp(&(*right as u64)))
+            }
+        }
+        (NativeSchemaValue::FiniteDecimal { value: left }, right) => {
+            compare_finite_decimal(left, right)
+        }
+        (left, NativeSchemaValue::FiniteDecimal { value: right }) => {
+            compare_finite_decimal(right, left).map(Ordering::reverse)
+        }
+        _ => None,
+    }
+}
+
+fn compare_finite_decimal(value: &str, other: &NativeSchemaValue) -> Option<std::cmp::Ordering> {
+    const MAX_EXACT_F64_INTEGER: u64 = 1 << 53;
+    let value = value
+        .parse::<f64>()
+        .ok()
+        .filter(|value| value.is_finite())?;
+    let other = match other {
+        NativeSchemaValue::SignedInteger { value } => {
+            if value.unsigned_abs() > MAX_EXACT_F64_INTEGER {
+                return None;
+            }
+            *value as f64
+        }
+        NativeSchemaValue::UnsignedInteger { value } => {
+            if *value > MAX_EXACT_F64_INTEGER {
+                return None;
+            }
+            *value as f64
+        }
+        NativeSchemaValue::FiniteDecimal { value } => value
+            .parse::<f64>()
+            .ok()
+            .filter(|value| value.is_finite())?,
+        _ => return None,
+    };
+    value.partial_cmp(&other)
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum NativePortCardinality {
@@ -359,15 +554,18 @@ impl NativeDynamicInputDescriptor {
             MAX_IDENTIFIER_BYTES,
             false,
         )?;
-        if self.name_template.matches("{index}").count() != 1
-            || self.minimum_count > self.maximum_count
-            || self.maximum_count == 0
+        let indexed = self.name_template.matches("{index}").count() == 1
+            && !self.name_template.contains("{name}");
+        let named = self.name_template == "{name}";
+        if !(indexed || named) || self.minimum_count > self.maximum_count || self.maximum_count == 0
         {
             return Err(NativeNodeContractError::InvalidDynamicInput);
         }
-        self.start_index
-            .checked_add(self.maximum_count)
-            .ok_or(NativeNodeContractError::InvalidDynamicInput)?;
+        if indexed {
+            self.start_index
+                .checked_add(self.maximum_count)
+                .ok_or(NativeNodeContractError::InvalidDynamicInput)?;
+        }
         self.input.validate()
     }
 }
@@ -409,6 +607,8 @@ pub struct NativeNodeDescriptor {
     pub schema_version: u16,
     pub class_type: String,
     pub implementation_version: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_schema: Option<NativeDescriptorSchemaMetadata>,
     pub inputs: Vec<NativeInputDescriptor>,
     pub dynamic_inputs: Vec<NativeDynamicInputDescriptor>,
     pub outputs: Vec<NativeOutputDescriptor>,
@@ -419,10 +619,22 @@ pub struct NativeNodeDescriptor {
 
 impl NativeNodeDescriptor {
     pub fn validate(&self) -> Result<(), NativeNodeContractError> {
-        if self.schema_version != NATIVE_NODE_CONTRACT_SCHEMA_VERSION {
-            return Err(NativeNodeContractError::UnsupportedContractSchema(
-                self.schema_version,
-            ));
+        match (self.schema_version, self.source_schema.as_ref()) {
+            (LEGACY_NATIVE_NODE_CONTRACT_SCHEMA_VERSION, None) => {}
+            (NATIVE_NODE_CONTRACT_SCHEMA_VERSION, Some(source_schema)) => source_schema
+                .validate()
+                .map_err(|error| NativeNodeContractError::InvalidSourceSchema(error.to_string()))?,
+            (LEGACY_NATIVE_NODE_CONTRACT_SCHEMA_VERSION, Some(_))
+            | (NATIVE_NODE_CONTRACT_SCHEMA_VERSION, None) => {
+                return Err(NativeNodeContractError::InvalidSourceSchema(
+                    "descriptor version and source metadata do not agree".to_owned(),
+                ));
+            }
+            _ => {
+                return Err(NativeNodeContractError::UnsupportedContractSchema(
+                    self.schema_version,
+                ));
+            }
         }
         validate_identifier("node class type", &self.class_type)?;
         validate_identifier("node implementation version", &self.implementation_version)?;
@@ -432,11 +644,61 @@ impl NativeNodeDescriptor {
         {
             return Err(NativeNodeContractError::InvalidPortCount);
         }
+        if let Some(source_schema) = &self.source_schema {
+            if source_schema.inputs.len() != self.inputs.len()
+                || source_schema.dynamic_inputs.len() != self.dynamic_inputs.len()
+                || source_schema.outputs.len() != self.outputs.len()
+                || !source_schema
+                    .inputs
+                    .iter()
+                    .zip(&self.inputs)
+                    .all(|(schema, input)| schema.name == input.name)
+                || !source_schema
+                    .outputs
+                    .iter()
+                    .zip(&self.outputs)
+                    .all(|(schema, output)| schema.name == output.name)
+                || !source_schema
+                    .dynamic_inputs
+                    .iter()
+                    .zip(&self.dynamic_inputs)
+                    .all(|(schema, input)| {
+                        schema.identity == input.name_template
+                            && schema.start_index == input.start_index
+                            && schema.minimum_count == input.minimum_count
+                            && schema.maximum_count == input.maximum_count
+                            && schema.input.name == input.input.name
+                            && (input.name_template != "{name}"
+                                || (schema.names.len() >= input.minimum_count as usize
+                                    && schema.names.len() <= input.maximum_count as usize))
+                    })
+            {
+                return Err(NativeNodeContractError::InvalidSourceSchema(
+                    "schema port order does not match the execution descriptor".to_owned(),
+                ));
+            }
+        }
         let mut input_names = BTreeSet::new();
         for input in &self.inputs {
             input.validate()?;
             if !input_names.insert(input.name.as_str()) {
                 return Err(NativeNodeContractError::DuplicatePort(input.name.clone()));
+            }
+        }
+        if let Some(source_schema) = &self.source_schema {
+            for (input, schema) in self.inputs.iter().zip(&source_schema.inputs) {
+                if let Some(default) = schema
+                    .default
+                    .as_ref()
+                    .and_then(native_value_from_schema_value)
+                    && (!native_type_union_accepts_value(&input.accepted_types, &default)
+                        || !native_value_matches_input_schema(&default, schema))
+                {
+                    return Err(NativeNodeContractError::InvalidSourceSchema(format!(
+                        "default for input `{}` is incompatible with its execution type or constraints",
+                        input.name
+                    )));
+                }
             }
         }
         let mut templates = BTreeSet::new();
@@ -454,6 +716,18 @@ impl NativeNodeDescriptor {
             if !output_names.insert(output.name.as_str()) {
                 return Err(NativeNodeContractError::DuplicatePort(output.name.clone()));
             }
+        }
+        Ok(())
+    }
+
+    pub fn validate_exact_schema_v2(&self) -> Result<(), NativeNodeContractError> {
+        self.validate()?;
+        if self.schema_version != NATIVE_NODE_CONTRACT_SCHEMA_VERSION
+            || self.source_schema.is_none()
+        {
+            return Err(NativeNodeContractError::InvalidSourceSchema(
+                "an exact schema-v2 descriptor is required".to_owned(),
+            ));
         }
         Ok(())
     }
@@ -1127,6 +1401,8 @@ pub enum NativeNodeContractError {
     InvalidDynamicInput,
     #[error("native node descriptor has an invalid port count")]
     InvalidPortCount,
+    #[error("native node source schema is invalid: {0}")]
+    InvalidSourceSchema(String),
     #[error("native node descriptor repeats port `{0}`")]
     DuplicatePort(String),
     #[error("native node presentation repeats search alias `{0}`")]
@@ -1391,6 +1667,11 @@ mod tests {
             schema_version: NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
             class_type: "IdentityModel".to_owned(),
             implementation_version: "1".to_owned(),
+            source_schema: Some(NativeDescriptorSchemaMetadata::synthetic(
+                ["model".to_owned()],
+                std::iter::empty(),
+                ["model".to_owned()],
+            )),
             inputs: vec![NativeInputDescriptor {
                 name: "model".to_owned(),
                 accepted_types: NativeTypeUnion::new([NativeValueType::Handle(model_type()?)])?,
@@ -1524,6 +1805,50 @@ mod tests {
         assert!(matches!(
             binding.validate(),
             Err(NativeNodeContractError::InvalidPresentationOutputs)
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn native_descriptor_v1_decode_preserves_absent_schema_without_inference()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut legacy = identity_descriptor()?;
+        legacy.schema_version = LEGACY_NATIVE_NODE_CONTRACT_SCHEMA_VERSION;
+        legacy.source_schema = None;
+        let encoded = serde_json::to_vec(&legacy)?;
+        let decoded: NativeNodeDescriptor = serde_json::from_slice(&encoded)?;
+        assert_eq!(decoded, legacy);
+        decoded.validate()?;
+        assert!(decoded.validate_exact_schema_v2().is_err());
+        assert!(!serde_json::to_string(&decoded)?.contains("source_schema"));
+        Ok(())
+    }
+
+    #[test]
+    fn native_descriptor_v2_round_trips_exact_ordered_schema()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let descriptor = identity_descriptor()?;
+        descriptor.validate_exact_schema_v2()?;
+        let encoded = serde_json::to_vec(&descriptor)?;
+        let decoded: NativeNodeDescriptor = serde_json::from_slice(&encoded)?;
+        assert_eq!(decoded, descriptor);
+
+        let mut missing = descriptor.clone();
+        missing.source_schema = None;
+        assert!(matches!(
+            missing.validate(),
+            Err(NativeNodeContractError::InvalidSourceSchema(_))
+        ));
+        let mut mismatched = descriptor;
+        mismatched
+            .source_schema
+            .as_mut()
+            .ok_or("v2 source schema is missing")?
+            .inputs[0]
+            .name = "other".to_owned();
+        assert!(matches!(
+            mismatched.validate(),
+            Err(NativeNodeContractError::InvalidSourceSchema(_))
         ));
         Ok(())
     }

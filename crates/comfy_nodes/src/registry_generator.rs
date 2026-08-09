@@ -1,17 +1,21 @@
 use crate::{
-    CatalogNodeDescriptor, CatalogNodeSource, CatalogNodeStatus, NODE_DESCRIPTOR_SCHEMA_VERSION,
-    NativeNodeBinding, NativeNodeBindingDisposition,
+    CatalogNodeDescriptor, CatalogNodeSchemaMetadata, CatalogNodeSource, CatalogNodeStatus,
+    NODE_DESCRIPTOR_SCHEMA_VERSION, NativeNodeBinding, NativeNodeBindingDisposition,
 };
+use serde::Deserialize;
 use std::{
     collections::{BTreeMap, BTreeSet},
     error::Error,
     fmt,
+    sync::{Arc, OnceLock},
 };
 
 pub const REGISTERED_NODE_CATALOG: &str =
     include_str!("../../../.agents/specs/comfy-parity/catalogs/backend-nodes.csv");
 pub const INACTIVE_NODE_CATALOG: &str =
     include_str!("../../../.agents/specs/comfy-parity/catalogs/backend-inactive-nodes.csv");
+pub const NODE_CONTRACT_CATALOG: &[u8] =
+    include_bytes!("../../../.agents/specs/comfy-parity/catalogs/backend-node-contracts.json");
 
 const MAX_CATALOG_BYTES: usize = 16 * 1024 * 1024;
 const MAX_CATALOG_ROWS: usize = 100_000;
@@ -176,17 +180,355 @@ impl fmt::Display for NodeRegistryError {
 
 impl Error for NodeRegistryError {}
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NodeContractCatalogWire {
+    classification: String,
+    contracts: Vec<NodeContractWire>,
+    input: NodeContractInputWire,
+    schema_version: u16,
+    source_snapshot: NodeContractSourceSnapshotWire,
+    summary: NodeContractSummaryWire,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NodeContractInputWire {
+    path: String,
+    sha256: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NodeContractSourceSnapshotWire {
+    files: usize,
+    manifest_sha256: String,
+    root: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NodeContractSummaryWire {
+    executable: usize,
+    normalized_v1: usize,
+    normalized_v3: usize,
+    preserved_schema_contracts: usize,
+    provider_required: usize,
+    rows: usize,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NodeContractWire {
+    availability: String,
+    binding_disposition: String,
+    capability_hints: NodeContractCapabilitiesWire,
+    category: String,
+    classification: String,
+    feature_id: String,
+    input_is_list: String,
+    lazy_inputs: String,
+    node_identifier: String,
+    output_is_list: String,
+    output_node: bool,
+    schema: NodeContractSchemaWire,
+    schema_api: String,
+    source: NodeContractSourceWire,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NodeContractCapabilitiesWire {
+    asset_or_effect: bool,
+    provider: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NodeContractSchemaWire {
+    catalog_correlation: String,
+    catalog_sha256: String,
+    catalog_source: String,
+    #[serde(rename = "contract")]
+    _contract: serde::de::IgnoredAny,
+    definition_sha256: String,
+    method: String,
+    portable: CatalogNodeSchemaMetadata,
+    status: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NodeContractSourceWire {
+    catalog_line: Option<u32>,
+    path: String,
+    sha256: String,
+    symbol: NodeContractSymbolWire,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NodeContractSymbolWire {
+    end_line: u32,
+    kind: String,
+    line: u32,
+    sha256: String,
+    status: String,
+    symbol: String,
+}
+
+fn built_in_contract_schemas()
+-> Result<Arc<BTreeMap<String, CatalogNodeSchemaMetadata>>, NodeRegistryError> {
+    static SCHEMAS: OnceLock<
+        Result<Arc<BTreeMap<String, CatalogNodeSchemaMetadata>>, NodeRegistryError>,
+    > = OnceLock::new();
+    SCHEMAS.get_or_init(parse_built_in_contract_schemas).clone()
+}
+
+pub fn built_in_source_schema(
+    identifier: &str,
+) -> Result<CatalogNodeSchemaMetadata, NodeRegistryError> {
+    built_in_contract_schemas()?
+        .get(identifier)
+        .cloned()
+        .ok_or_else(|| NodeRegistryError::MissingSourceProjection(identifier.to_owned()))
+}
+
+fn parse_built_in_contract_schemas()
+-> Result<Arc<BTreeMap<String, CatalogNodeSchemaMetadata>>, NodeRegistryError> {
+    if NODE_CONTRACT_CATALOG.len() > MAX_CATALOG_BYTES {
+        return Err(NodeRegistryError::CatalogTooLarge);
+    }
+    let mut deserializer = serde_json::Deserializer::from_slice(NODE_CONTRACT_CATALOG);
+    let catalog = NodeContractCatalogWire::deserialize(&mut deserializer).map_err(|error| {
+        NodeRegistryError::InvalidNativeBinding {
+            identifier: "backend-node-contracts.json".to_owned(),
+            reason: error.to_string(),
+        }
+    })?;
+    deserializer
+        .end()
+        .map_err(|error| NodeRegistryError::InvalidNativeBinding {
+            identifier: "backend-node-contracts.json".to_owned(),
+            reason: error.to_string(),
+        })?;
+    if catalog.schema_version != 2
+        || catalog.classification.is_empty()
+        || catalog.input.path != "catalogs/backend-nodes.csv"
+        || catalog.input.sha256 != sha256_hex(REGISTERED_NODE_CATALOG.as_bytes())
+        || catalog.source_snapshot.root != "projects/comfy/ComfyUI"
+        || catalog.source_snapshot.files == 0
+        || !valid_sha256(&catalog.source_snapshot.manifest_sha256)
+        || catalog.summary.rows != catalog.contracts.len()
+        || catalog.summary.rows != 789
+        || catalog.summary.executable != 575
+        || catalog.summary.provider_required != 214
+        || catalog.summary.normalized_v1 != 135
+        || catalog.summary.normalized_v3 != 654
+        || catalog.summary.preserved_schema_contracts != 0
+    {
+        return Err(NodeRegistryError::InvalidDescriptor {
+            row: 0,
+            field: "node_contract_catalog",
+        });
+    }
+    let mut schemas = BTreeMap::new();
+    let mut feature_ids = BTreeSet::new();
+    for (index, contract) in catalog.contracts.into_iter().enumerate() {
+        let row = index + 1;
+        validate_contract_wire(row, &contract)?;
+        if !feature_ids.insert(contract.feature_id.clone())
+            || schemas
+                .insert(contract.node_identifier.clone(), contract.schema.portable)
+                .is_some()
+        {
+            return Err(NodeRegistryError::InvalidDescriptor {
+                row,
+                field: "node_contract_identity",
+            });
+        }
+    }
+    Ok(Arc::new(schemas))
+}
+
+fn validate_contract_wire(
+    row: usize,
+    contract: &NodeContractWire,
+) -> Result<(), NodeRegistryError> {
+    let expected_provider = contract.availability == "cloud/paid";
+    if contract.binding_disposition
+        != if expected_provider {
+            "provider_required"
+        } else {
+            "executable"
+        }
+        || contract.capability_hints.provider != expected_provider
+        || contract.category.is_empty()
+        || contract.classification.is_empty()
+        || contract.feature_id.is_empty()
+        || contract.input_is_list.is_empty()
+        || contract.lazy_inputs.is_empty()
+        || contract.output_is_list.is_empty()
+        || contract.schema.catalog_source.is_empty()
+        || contract.schema.catalog_sha256 != sha256_hex(contract.schema.catalog_source.as_bytes())
+        || contract.schema.definition_sha256 != contract.schema.portable.definition_sha256
+        || contract.schema.catalog_sha256 != contract.schema.portable.catalog_sha256
+        || !matches!(
+            contract.schema.catalog_correlation.as_str(),
+            "direct" | "verified_inherited_method" | "verified_inherited_base"
+        )
+        || contract.schema.method
+            != if contract.schema_api == "V3" {
+                "define_schema"
+            } else {
+                "INPUT_TYPES"
+            }
+        || contract.schema.status
+            != if contract.schema_api == "V3" {
+                "normalized_v3"
+            } else {
+                "normalized_v1"
+            }
+        || contract.source.catalog_line.is_some_and(|line| line == 0)
+        || contract.source.path.is_empty()
+        || !valid_sha256(&contract.source.sha256)
+        || contract.source.symbol.line == 0
+        || contract.source.symbol.end_line < contract.source.symbol.line
+        || contract.source.symbol.kind != "ClassDef"
+        || !valid_sha256(&contract.source.symbol.sha256)
+        || contract.source.symbol.status != "parsed_definition"
+        || contract.source.symbol.symbol.is_empty()
+        || contract.schema.portable.node.feature_id.as_deref() != Some(&contract.feature_id)
+        || contract.schema.portable.presentation.is_deprecated
+            != (contract.availability == "deprecated/dead")
+        || contract.output_node && contract.capability_hints.asset_or_effect == expected_provider
+    {
+        return Err(NodeRegistryError::InvalidDescriptor {
+            row,
+            field: "node_contract",
+        });
+    }
+    contract
+        .schema
+        .portable
+        .validate()
+        .map_err(|_| NodeRegistryError::InvalidDescriptor {
+            row,
+            field: "portable_schema",
+        })
+}
+
+fn sha256_hex(value: &[u8]) -> String {
+    const INITIAL: [u32; 8] = [
+        0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab,
+        0x5be0cd19,
+    ];
+    const ROUND: [u32; 64] = [
+        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,
+        0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe,
+        0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f,
+        0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
+        0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc,
+        0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
+        0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116,
+        0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+        0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7,
+        0xc67178f2,
+    ];
+
+    let bit_length = (value.len() as u64).wrapping_mul(8);
+    let mut message = value.to_vec();
+    message.push(0x80);
+    while message.len() % 64 != 56 {
+        message.push(0);
+    }
+    message.extend_from_slice(&bit_length.to_be_bytes());
+
+    let mut hash = INITIAL;
+    for chunk in message.chunks_exact(64) {
+        let mut schedule = [0_u32; 64];
+        for (index, bytes) in chunk.chunks_exact(4).enumerate() {
+            schedule[index] = u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+        }
+        for index in 16..64 {
+            let small_zero = schedule[index - 15].rotate_right(7)
+                ^ schedule[index - 15].rotate_right(18)
+                ^ (schedule[index - 15] >> 3);
+            let small_one = schedule[index - 2].rotate_right(17)
+                ^ schedule[index - 2].rotate_right(19)
+                ^ (schedule[index - 2] >> 10);
+            schedule[index] = schedule[index - 16]
+                .wrapping_add(small_zero)
+                .wrapping_add(schedule[index - 7])
+                .wrapping_add(small_one);
+        }
+
+        let [mut a, mut b, mut c, mut d, mut e, mut f, mut g, mut h] = hash;
+        for index in 0..64 {
+            let big_one = e.rotate_right(6) ^ e.rotate_right(11) ^ e.rotate_right(25);
+            let choose = (e & f) ^ ((!e) & g);
+            let temporary_one = h
+                .wrapping_add(big_one)
+                .wrapping_add(choose)
+                .wrapping_add(ROUND[index])
+                .wrapping_add(schedule[index]);
+            let big_zero = a.rotate_right(2) ^ a.rotate_right(13) ^ a.rotate_right(22);
+            let majority = (a & b) ^ (a & c) ^ (b & c);
+            let temporary_two = big_zero.wrapping_add(majority);
+            h = g;
+            g = f;
+            f = e;
+            e = d.wrapping_add(temporary_one);
+            d = c;
+            c = b;
+            b = a;
+            a = temporary_one.wrapping_add(temporary_two);
+        }
+        hash[0] = hash[0].wrapping_add(a);
+        hash[1] = hash[1].wrapping_add(b);
+        hash[2] = hash[2].wrapping_add(c);
+        hash[3] = hash[3].wrapping_add(d);
+        hash[4] = hash[4].wrapping_add(e);
+        hash[5] = hash[5].wrapping_add(f);
+        hash[6] = hash[6].wrapping_add(g);
+        hash[7] = hash[7].wrapping_add(h);
+    }
+    hash.iter().map(|word| format!("{word:08x}")).collect()
+}
+
+fn valid_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NodeRegistry {
     registered: BTreeMap<String, CatalogNodeDescriptor>,
     inactive: BTreeMap<String, CatalogNodeDescriptor>,
+    schemas: Arc<BTreeMap<String, CatalogNodeSchemaMetadata>>,
 }
 
 impl NodeRegistry {
     pub fn built_in() -> Result<Self, NodeRegistryError> {
-        let registry =
+        let mut registry =
             NodeRegistryGenerator::from_catalogs(REGISTERED_NODE_CATALOG, INACTIVE_NODE_CATALOG)?
                 .finish();
+        registry.schemas = built_in_contract_schemas()?;
+        if registry.schemas.len() != registry.registered.len()
+            || registry.registered.iter().any(|(identifier, descriptor)| {
+                registry.schemas.get(identifier).is_none_or(|schema| {
+                    schema.node.feature_id.as_deref() != Some(&descriptor.feature_id)
+                        || schema.catalog_sha256 != sha256_hex(descriptor.schema_source.as_bytes())
+                })
+            })
+        {
+            return Err(NodeRegistryError::InvalidDescriptor {
+                row: 0,
+                field: "node_contract_catalog",
+            });
+        }
         for identifier in crate::GENERATED_DESCRIPTOR_IDS {
             if !registry.registered.contains_key(*identifier) {
                 return Err(NodeRegistryError::InvalidDescriptor {
@@ -210,6 +552,10 @@ impl NodeRegistry {
         self.registered
             .get(identifier)
             .or_else(|| self.inactive.get(identifier))
+    }
+
+    pub fn source_schema(&self, identifier: &str) -> Option<&CatalogNodeSchemaMetadata> {
+        self.schemas.get(identifier)
     }
 
     pub fn source_python_module(&self, identifier: &str) -> Option<String> {
@@ -248,8 +594,52 @@ impl NodeRegistry {
                 CatalogNodeStatus::DescriptorOnly | CatalogNodeStatus::Inactive,
             ) => NativeNodeBindingDisposition::Executable,
         };
+        let source_schema_mismatch = binding
+            .descriptor()
+            .source_schema
+            .as_ref()
+            .filter(|schema| {
+                matches!(
+                    schema.node.provenance,
+                    crate::NativeSchemaProvenance::SourceV1
+                        | crate::NativeSchemaProvenance::SourceV3
+                )
+            })
+            .is_some_and(|schema| {
+                self.source_schema(&identifier)
+                    .and_then(|catalog_schema| {
+                        catalog_schema
+                            .bind_execution_ports(
+                                &binding
+                                    .descriptor()
+                                    .inputs
+                                    .iter()
+                                    .map(|input| input.name.clone())
+                                    .collect::<Vec<_>>(),
+                                &schema.dynamic_inputs,
+                                &binding
+                                    .descriptor()
+                                    .outputs
+                                    .iter()
+                                    .map(|output| output.name.clone())
+                                    .collect::<Vec<_>>(),
+                            )
+                            .ok()
+                    })
+                    .is_none_or(|expected| expected != *schema)
+            });
         let mismatch = if binding.feature_id() != catalog.feature_id {
             Some("feature_id")
+        } else if binding
+            .descriptor()
+            .source_schema
+            .as_ref()
+            .and_then(|schema| schema.node.feature_id.as_deref())
+            .is_some_and(|feature_id| feature_id != binding.feature_id())
+        {
+            Some("source_schema.feature_id")
+        } else if source_schema_mismatch {
+            Some("source_schema")
         } else if binding.presentation().display_name != catalog.display_name {
             Some("display_name")
         } else if binding.presentation().category != expected_category {
@@ -304,6 +694,7 @@ impl NodeRegistryGenerator {
         NodeRegistry {
             registered: self.registered,
             inactive: self.inactive,
+            schemas: Arc::new(BTreeMap::new()),
         }
     }
 
@@ -687,11 +1078,11 @@ mod tests {
     use super::*;
     use crate::{
         CatalogNodeStatus, DIFFUSION_SLICE_NODE_IDS, EarlySliceRegistry, IMAGE_SLICE_NODE_IDS,
-        NATIVE_NODE_CONTRACT_SCHEMA_VERSION, NativeCachePolicy, NativeEffectClass,
-        NativeHandleKind, NativeHandleType, NativeInputDescriptor, NativeNode, NativeNodeContext,
-        NativeNodeDescriptor, NativeNodeFailure, NativeNodeOutcome, NativeNodePresentation,
-        NativeOutputDescriptor, NativePortCardinality, NativeTypeUnion, NativeValue,
-        NativeValueType, ObjectInfoRegistry,
+        NATIVE_NODE_CONTRACT_SCHEMA_VERSION, NativeCachePolicy, NativeDescriptorSchemaMetadata,
+        NativeEffectClass, NativeHandleKind, NativeHandleType, NativeInputDescriptor, NativeNode,
+        NativeNodeContext, NativeNodeDescriptor, NativeNodeFailure, NativeNodeOutcome,
+        NativeNodePresentation, NativeOutputDescriptor, NativePortCardinality, NativeSchemaValue,
+        NativeTypeUnion, NativeValue, NativeValueType, ObjectInfoRegistry,
     };
     use futures::future::BoxFuture;
     use serde::Serialize;
@@ -927,6 +1318,66 @@ mod tests {
     }
 
     #[test]
+    fn registry_projects_exact_v1_v3_and_autogrow_source_schema() -> Result<(), Box<dyn Error>> {
+        let registry = NodeRegistry::built_in()?;
+        let sampler = registry
+            .source_schema("KSampler")
+            .ok_or("KSampler source schema is missing")?;
+        let seed = sampler
+            .inputs
+            .iter()
+            .find(|input| input.schema.name == "seed")
+            .ok_or("KSampler seed schema is missing")?;
+        assert_eq!(
+            seed.schema.maximum,
+            Some(NativeSchemaValue::UnsignedInteger { value: u64::MAX })
+        );
+        assert_eq!(
+            sampler
+                .inputs
+                .iter()
+                .find(|input| input.schema.name == "cfg")
+                .and_then(|input| input.schema.step.as_ref()),
+            Some(&NativeSchemaValue::FiniteDecimal {
+                value: "0.1".to_owned()
+            })
+        );
+
+        let batch = registry
+            .source_schema("BatchImagesNode")
+            .ok_or("BatchImagesNode source schema is missing")?;
+        assert_eq!(batch.dynamic_inputs.len(), 1);
+        assert_eq!(batch.dynamic_inputs[0].identity, "image{index}");
+        assert_eq!(batch.dynamic_inputs[0].prefix.as_deref(), Some("image"));
+        assert_eq!(batch.dynamic_inputs[0].minimum_count, 1);
+        assert_eq!(batch.dynamic_inputs[0].maximum_count, 50);
+        assert_eq!(
+            batch.dynamic_inputs[0].input.source_type_names,
+            ["IMAGE".to_owned()]
+        );
+
+        let open_ai = registry
+            .source_schema("OpenAIGPTImage1")
+            .ok_or("OpenAIGPTImage1 source schema is missing")?;
+        let quality = open_ai
+            .inputs
+            .iter()
+            .find(|input| input.schema.name == "quality")
+            .ok_or("OpenAIGPTImage1 quality schema is missing")?;
+        assert_eq!(
+            quality.schema.choices,
+            ["low", "medium", "high"]
+                .into_iter()
+                .map(|value| NativeSchemaValue::String {
+                    value: value.to_owned()
+                })
+                .collect::<Vec<_>>()
+        );
+        assert!(open_ai.presentation.is_deprecated);
+        Ok(())
+    }
+
+    #[test]
     fn malformed_or_duplicate_catalogs_are_rejected() -> Result<(), Box<dyn Error>> {
         assert!(matches!(
             parse_csv("a,b\n\"unterminated"),
@@ -1010,6 +1461,11 @@ mod tests {
             schema_version: NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
             class_type: "wanBlockSwap".to_owned(),
             implementation_version: "1".to_owned(),
+            source_schema: Some(NativeDescriptorSchemaMetadata::synthetic(
+                ["model".to_owned()],
+                std::iter::empty(),
+                ["model".to_owned()],
+            )),
             inputs: vec![NativeInputDescriptor {
                 name: "model".to_owned(),
                 accepted_types: NativeTypeUnion::new([NativeValueType::Handle(
@@ -1069,6 +1525,11 @@ mod tests {
             schema_version: NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
             class_type: "ImageInvert".to_owned(),
             implementation_version: "1".to_owned(),
+            source_schema: Some(NativeDescriptorSchemaMetadata::synthetic(
+                ["image".to_owned()],
+                std::iter::empty(),
+                ["image".to_owned()],
+            )),
             inputs: vec![NativeInputDescriptor {
                 name: "image".to_owned(),
                 accepted_types: NativeTypeUnion::new([NativeValueType::Handle(
@@ -1120,6 +1581,11 @@ mod tests {
             schema_version: NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
             class_type: "BeebleSwitchXImageEdit".to_owned(),
             implementation_version: "1".to_owned(),
+            source_schema: Some(NativeDescriptorSchemaMetadata::synthetic(
+                std::iter::empty(),
+                std::iter::empty(),
+                ["image".to_owned(), "alpha".to_owned()],
+            )),
             inputs: Vec::new(),
             dynamic_inputs: Vec::new(),
             outputs: vec![
@@ -1175,6 +1641,11 @@ mod tests {
             schema_version: NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
             class_type: "AutogrowNamesTestNode".to_owned(),
             implementation_version: "1".to_owned(),
+            source_schema: Some(NativeDescriptorSchemaMetadata::synthetic(
+                std::iter::empty(),
+                std::iter::empty(),
+                ["string".to_owned()],
+            )),
             inputs: Vec::new(),
             dynamic_inputs: Vec::new(),
             outputs: vec![NativeOutputDescriptor {

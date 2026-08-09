@@ -4477,7 +4477,7 @@ fn reconcile_node(
     Ok(())
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GraphBlueprintMetadata {
     pub filename: String,
     pub display_name: String,
@@ -4486,6 +4486,8 @@ pub struct GraphBlueprintMetadata {
     pub search_aliases: Vec<String>,
     pub inputs: Vec<SubgraphPort>,
     pub outputs: Vec<SubgraphPort>,
+    #[serde(default)]
+    pub exposed_widgets: Vec<SubgraphExposedWidget>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -5089,6 +5091,7 @@ fn extract_published_subgraph_blueprint(
         search_aliases,
         inputs: definition.inputs.clone(),
         outputs: definition.outputs.clone(),
+        exposed_widgets: definition.exposed_widgets.clone(),
     };
     Ok((clipboard, metadata))
 }
@@ -8875,6 +8878,8 @@ mod tests {
             "image",
             GraphPortType::Concrete("IMAGE".to_owned()),
         ));
+        let exposed_widget = integer_widget("seed", 5);
+        internal.widgets.push(exposed_widget.clone());
         definition
             .graph
             .definitions
@@ -8891,12 +8896,21 @@ mod tests {
             identifier: "published-output".to_owned(),
             name: "image".to_owned(),
             port_type: GraphPortType::Concrete("IMAGE".to_owned()),
-            internal_node: Some(internal_identifier),
+            internal_node: Some(internal_identifier.clone()),
             internal_slot: 0,
             source_fields: Map::new(),
         }];
         definition.description = "Fallback definition description".to_owned();
         definition.search_aliases = vec!["fallback".to_owned()];
+        let mut exposed_widget_schema = exposed_widget.clone();
+        exposed_widget_schema.identifier = "published-seed".to_owned();
+        definition.exposed_widgets = vec![SubgraphExposedWidget {
+            identifier: "published-seed".to_owned(),
+            internal_node: internal_identifier.clone(),
+            internal_widget: "seed".to_owned(),
+            widget: exposed_widget_schema,
+            unknown: BTreeMap::from([("future".to_owned(), Value::Bool(true))]),
+        }];
         definition.unknown.insert(
             "extra".to_owned(),
             json!({
@@ -8915,6 +8929,9 @@ mod tests {
         instance.subgraph_definition = Some(definition_identifier.clone());
         instance.inputs[0].name = "image".to_owned();
         instance.outputs[0].name = "image".to_owned();
+        let mut instance_widget = exposed_widget;
+        instance_widget.identifier = "published-seed".to_owned();
+        instance.widgets.push(instance_widget);
         instance.position = GraphPoint { x: 320.0, y: 240.0 };
         engine
             .document
@@ -8958,6 +8975,16 @@ mod tests {
         );
         assert_eq!(first.metadata.inputs.len(), 1);
         assert_eq!(first.metadata.outputs.len(), 1);
+        assert_eq!(first.metadata.exposed_widgets.len(), 1);
+        assert_eq!(
+            first.metadata.exposed_widgets[0].identifier,
+            "published-seed"
+        );
+        assert!(matches!(
+            first.metadata.exposed_widgets[0].widget.kind,
+            GraphWidgetKind::Integer { .. }
+        ));
+        assert_eq!(first.metadata.exposed_widgets[0].unknown["future"], true);
 
         let value: Value = serde_json::from_slice(&first.workflow_bytes)?;
         assert_eq!(value["version"], 0.4);

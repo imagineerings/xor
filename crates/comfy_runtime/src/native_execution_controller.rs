@@ -42,11 +42,11 @@ use comfy_model::{
 use comfy_nodes::{
     CatalogNodeDescriptor, NATIVE_NODE_CONTRACT_SCHEMA_VERSION, NativeHandleKind,
     NativeHandleStoreError, NativeHandleType, NativeImageDescriptor, NativeImageDescriptorError,
-    NativeImageEffect, NativeInputDescriptor, NativeNodeBinding, NativeNodeContractError,
-    NativeNodePresentation, NativeOpaqueHandle, NativePrimitive, NativePrimitiveType,
-    NativeStoredModelObject, NativeStoredTensorObject, NativeTypeUnion, NativeValue,
-    NativeValueType, NodeDescriptor, NodeRegistry, PortDescriptor, generated_family_node_bindings,
-    native_diffusion_descriptors, native_image_descriptors,
+    NativeImageEffect, NativeInputDescriptor, NativeNodeBinding, NativeNodeBindingDisposition,
+    NativeNodeContractError, NativeNodePresentation, NativeOpaqueHandle, NativePrimitive,
+    NativePrimitiveType, NativeStoredModelObject, NativeStoredTensorObject, NativeTypeUnion,
+    NativeValue, NativeValueType, NodeDescriptor, NodeRegistry, PortDescriptor,
+    generated_family_node_bindings, native_diffusion_descriptors, native_image_descriptors,
 };
 use comfy_sampler::{
     DiscreteSamplingProfile, GUIDANCE_ADAPTER_ID, GuidanceDenoiser, GuidanceError,
@@ -1495,10 +1495,33 @@ pub fn compile_generated_native_prompt(
 pub fn generated_native_frontend_descriptors(
     diffusion_provider: Option<Arc<dyn NativeDiffusionProvider>>,
 ) -> Result<BTreeMap<String, NodeDescriptor>, NativeImageRuntimeError> {
+    Ok(generated_native_frontend_contracts(diffusion_provider)?
+        .into_iter()
+        .map(|(class_type, contract)| (class_type, contract.graph))
+        .collect())
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GeneratedNativeFrontendDescriptor {
+    pub graph: NodeDescriptor,
+    pub runtime: RuntimeNodeDescriptor,
+    pub presentation: NativeNodePresentation,
+    pub disposition: NativeNodeBindingDisposition,
+    pub unavailable_reason: Option<String>,
+}
+
+pub fn generated_native_frontend_contracts(
+    diffusion_provider: Option<Arc<dyn NativeDiffusionProvider>>,
+) -> Result<BTreeMap<String, GeneratedNativeFrontendDescriptor>, NativeImageRuntimeError> {
     let registry = generated_native_node_registry_projection(diffusion_provider)?;
     registry
         .descriptors()
         .map(|(class_type, descriptor)| {
+            descriptor.validate_exact_schema_v2().map_err(|error| {
+                NativeImageRuntimeError::Registry(format!(
+                    "native frontend node `{class_type}` lacks exact schema v2: {error}"
+                ))
+            })?;
             let presentation = registry.presentation(class_type).ok_or_else(|| {
                 NativeImageRuntimeError::Registry(format!(
                     "native node `{class_type}` has no presentation projection"
@@ -1528,11 +1551,23 @@ pub fn generated_native_frontend_descriptors(
                 .collect::<Result<Vec<_>, NativeImageRuntimeError>>()?;
             Ok((
                 class_type.to_owned(),
-                NodeDescriptor {
-                    type_name: class_type.to_owned(),
-                    display_name: presentation.display_name.clone(),
-                    inputs,
-                    outputs,
+                GeneratedNativeFrontendDescriptor {
+                    graph: NodeDescriptor {
+                        type_name: class_type.to_owned(),
+                        display_name: presentation.display_name.clone(),
+                        inputs,
+                        outputs,
+                    },
+                    runtime: descriptor.clone(),
+                    presentation: presentation.clone(),
+                    disposition: registry.binding_disposition(class_type).ok_or_else(|| {
+                        NativeImageRuntimeError::Registry(format!(
+                            "native node `{class_type}` has no binding disposition"
+                        ))
+                    })?,
+                    unavailable_reason: registry
+                        .unavailable_reason(class_type)
+                        .map(ToOwned::to_owned),
                 },
             ))
         })
@@ -1810,10 +1845,30 @@ fn runtime_descriptor(
             })
         })
         .collect::<Result<Vec<_>, NativeNodeContractError>>()?;
+    let input_names = descriptor
+        .inputs
+        .iter()
+        .map(|port| port.name.clone())
+        .collect::<Vec<_>>();
+    let output_names = descriptor
+        .outputs
+        .iter()
+        .map(|port| port.name.clone())
+        .collect::<Vec<_>>();
+    let source_schema = comfy_nodes::built_in_source_schema(&descriptor.class_type)
+        .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?
+        .bind_execution_ports(&input_names, &[], &output_names)
+        .map_err(|error| {
+            NativeImageRuntimeError::Registry(format!(
+                "{} source schema: {error}",
+                descriptor.class_type
+            ))
+        })?;
     let runtime = RuntimeNodeDescriptor {
         schema_version: NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
         class_type: descriptor.class_type.clone(),
         implementation_version: descriptor.implementation_version.clone(),
+        source_schema: Some(source_schema),
         inputs,
         dynamic_inputs: Vec::new(),
         outputs,
@@ -3500,13 +3555,18 @@ impl NativeNode for SaveImageNode {
                     "type": self.namespace.locator_type(),
                 }));
             }
-            Ok(NodeOutcome::Values {
-                outputs: vec![
+            let outputs = if self.namespace == AssetNamespace::Temporary {
+                Vec::new()
+            } else {
+                vec![
                     inputs
                         .get("images")
                         .cloned()
                         .ok_or_else(|| invalid_diffusion_input("`images` is missing"))?,
-                ],
+                ]
+            };
+            Ok(NodeOutcome::Values {
+                outputs,
                 ui: Some(json!({"images": ui_images})),
                 effects,
             })
@@ -6351,6 +6411,38 @@ mod tests {
 
         let frontend = generated_native_frontend_descriptors(None)?;
         assert_eq!(frontend.len(), registry.descriptor_len());
+        let contracts = generated_native_frontend_contracts(None)?;
+        assert_eq!(contracts.len(), registry.descriptor_len());
+        for (class_type, contract) in &contracts {
+            contract.runtime.validate_exact_schema_v2()?;
+            assert_eq!(contract.graph.type_name, *class_type);
+            assert_eq!(
+                contract.runtime.source_schema.as_ref().map(|schema| schema
+                    .inputs
+                    .iter()
+                    .map(|input| &input.name)
+                    .collect::<Vec<_>>()),
+                Some(
+                    contract
+                        .graph
+                        .inputs
+                        .iter()
+                        .map(|input| &input.name)
+                        .collect::<Vec<_>>()
+                )
+            );
+            assert_eq!(
+                contract.presentation,
+                registry
+                    .presentation(class_type)
+                    .ok_or("frontend presentation is absent from the registry")?
+                    .clone()
+            );
+            assert_eq!(
+                Some(contract.disposition),
+                registry.binding_disposition(class_type)
+            );
+        }
         if let Some((class_type, descriptor, input)) =
             registry.descriptors().find_map(|(class_type, descriptor)| {
                 descriptor

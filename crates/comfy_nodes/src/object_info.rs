@@ -1,8 +1,8 @@
-use crate::{CatalogNodeDescriptor, CatalogNodeStatus, NodeRegistry};
+use crate::{CatalogNodeDescriptor, CatalogNodeSchemaMetadata, CatalogNodeStatus, NodeRegistry};
 use serde::Serialize;
 use std::collections::BTreeMap;
 
-pub const OBJECT_INFO_SCHEMA_VERSION: u16 = 1;
+pub const OBJECT_INFO_SCHEMA_VERSION: u16 = 2;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct ObjectInfoInputSchema {
@@ -26,6 +26,7 @@ pub struct ObjectInfoNode {
     pub category: String,
     pub source_python_module: String,
     pub schema_source: String,
+    pub source_schema: Option<CatalogNodeSchemaMetadata>,
     pub input: ObjectInfoInputSchema,
     pub output: ObjectInfoOutputSchema,
     pub availability: String,
@@ -35,7 +36,11 @@ pub struct ObjectInfoNode {
 }
 
 impl ObjectInfoNode {
-    fn from_catalog(descriptor: &CatalogNodeDescriptor, source_python_module: String) -> Self {
+    fn from_catalog(
+        descriptor: &CatalogNodeDescriptor,
+        source_python_module: String,
+        source_schema: Option<CatalogNodeSchemaMetadata>,
+    ) -> Self {
         Self {
             schema_version: OBJECT_INFO_SCHEMA_VERSION,
             node_identifier: descriptor.node_identifier.clone(),
@@ -43,6 +48,7 @@ impl ObjectInfoNode {
             category: descriptor.category.clone(),
             source_python_module,
             schema_source: descriptor.schema_source.clone(),
+            source_schema,
             input: ObjectInfoInputSchema {
                 raw: descriptor.inputs.clone(),
                 input_is_list: descriptor.input_is_list.clone(),
@@ -79,7 +85,11 @@ impl ObjectInfoRegistry {
                     })?;
                 Ok((
                     identifier.clone(),
-                    ObjectInfoNode::from_catalog(descriptor, source_python_module),
+                    ObjectInfoNode::from_catalog(
+                        descriptor,
+                        source_python_module,
+                        registry.source_schema(identifier).cloned(),
+                    ),
                 ))
             })
             .collect::<Result<_, crate::NodeRegistryError>>()?;
@@ -108,6 +118,7 @@ mod tests {
         assert!(load_image.input.raw.contains("image_upload"));
         assert!(load_image.output.raw.contains("IMAGE"));
         assert_eq!(load_image.catalog_status, CatalogNodeStatus::DescriptorOnly);
+        assert!(load_image.source_schema.is_some());
         assert!(load_image.schema_source.contains("LoadImage.INPUT_TYPES"));
         assert_eq!(
             object_info.nodes()["AddNoise"].source_python_module,

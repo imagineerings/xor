@@ -9,7 +9,7 @@ use comfy_runtime::{
     NativeExecutionControllerConfig, OperationEligibility, ProfileId, RequestId, RetryPromptSource,
     SharedAssetService, SharedExecutionPresentationService, WorkflowFormatDocument,
     authorize_native_output_ui, compile_generated_native_prompt,
-    generated_native_frontend_descriptors, graph_to_prompt,
+    generated_native_frontend_contracts, graph_to_prompt,
 };
 use comfy_tensor::CancellationToken;
 use comfy_types::NodeId;
@@ -934,10 +934,14 @@ pub(crate) fn compile_generated_native_workflow(
         ExecutionFailure::new("native_plan_compilation_failed", error.to_string())
             .with_origin(ExecutionFailureOrigin::Validation)
     })?;
-    let descriptors = generated_native_frontend_descriptors(None).map_err(|error| {
+    let contracts = generated_native_frontend_contracts(None).map_err(|error| {
         ExecutionFailure::new("native_plan_compilation_failed", error.to_string())
             .with_origin(ExecutionFailureOrigin::Validation)
     })?;
+    let descriptors = contracts
+        .into_iter()
+        .map(|(class_type, contract)| (class_type, contract.graph))
+        .collect();
     let submission =
         graph_to_prompt(&workflow, &descriptors, "sim-native-generated-v1").map_err(|error| {
             ExecutionFailure::new("native_plan_compilation_failed", error.to_string())

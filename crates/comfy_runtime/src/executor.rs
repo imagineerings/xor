@@ -3075,10 +3075,16 @@ pub(crate) mod tests {
                 })
             })
             .collect::<Result<Vec<_>, NativeNodeContractError>>()?;
+        let source_schema = comfy_nodes::NativeDescriptorSchemaMetadata::synthetic(
+            inputs.iter().map(|input| input.name.clone()),
+            std::iter::empty(),
+            ["value".to_owned()],
+        );
         Ok(RuntimeNodeDescriptor {
             schema_version: NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
             class_type: class_type.to_owned(),
             implementation_version: "1".to_owned(),
+            source_schema: Some(source_schema),
             inputs,
             dynamic_inputs: Vec::new(),
             outputs: vec![RuntimeOutputDescriptor {
@@ -3403,6 +3409,11 @@ pub(crate) mod tests {
             schema_version: NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
             class_type: catalog_descriptor.node_identifier.clone(),
             implementation_version: "provider-v1".to_owned(),
+            source_schema: Some(comfy_nodes::NativeDescriptorSchemaMetadata::synthetic(
+                std::iter::empty(),
+                std::iter::empty(),
+                ["value".to_owned()],
+            )),
             inputs: Vec::new(),
             dynamic_inputs: Vec::new(),
             outputs: vec![RuntimeOutputDescriptor {

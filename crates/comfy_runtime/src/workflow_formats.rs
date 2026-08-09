@@ -1400,13 +1400,27 @@ struct LinkProjection {
     type_name: String,
 }
 
+struct PromptWidgetValue {
+    identifier: Option<String>,
+    prompt_value: Value,
+}
+
 fn prompt_widget_values(
     node: &Map<String, Value>,
     node_index: usize,
-) -> Result<Option<Vec<Value>>, WorkflowFormatError> {
+) -> Result<Option<Vec<PromptWidgetValue>>, WorkflowFormatError> {
     let workflow_values = node.get("widgets_values").and_then(Value::as_array);
     let Some(native) = node.get(NATIVE_WIDGETS_FIELD) else {
-        return Ok(workflow_values.cloned());
+        return Ok(workflow_values.map(|values| {
+            values
+                .iter()
+                .cloned()
+                .map(|prompt_value| PromptWidgetValue {
+                    identifier: None,
+                    prompt_value,
+                })
+                .collect()
+        }));
     };
     let native = native
         .as_object()
@@ -1441,20 +1455,49 @@ fn prompt_widget_values(
             ),
         });
     }
+    let mut identifiers = BTreeSet::new();
     widgets
         .iter()
         .enumerate()
         .map(|(widget_index, widget)| {
-            widget
-                .as_object()
-                .and_then(|widget| widget.get("prompt_value"))
-                .cloned()
+            let widget = widget.as_object().ok_or_else(|| {
+                WorkflowFormatError::PromptProjection {
+                    path: format!(
+                        "$.nodes[{node_index}].{NATIVE_WIDGETS_FIELD}.widgets[{widget_index}]"
+                    ),
+                    reason: "native widget must be an object".to_owned(),
+                }
+            })?;
+            let identifier = widget
+                .get("identifier")
+                .and_then(Value::as_str)
+                .filter(|identifier| !identifier.trim().is_empty())
                 .ok_or_else(|| WorkflowFormatError::PromptProjection {
+                    path: format!(
+                        "$.nodes[{node_index}].{NATIVE_WIDGETS_FIELD}.widgets[{widget_index}].identifier"
+                    ),
+                    reason: "native widget identifier is required".to_owned(),
+                })?;
+            if !identifiers.insert(identifier) {
+                return Err(WorkflowFormatError::PromptProjection {
+                    path: format!(
+                        "$.nodes[{node_index}].{NATIVE_WIDGETS_FIELD}.widgets[{widget_index}].identifier"
+                    ),
+                    reason: "native widget identifier is duplicated".to_owned(),
+                });
+            }
+            let prompt_value = widget.get("prompt_value").cloned().ok_or_else(|| {
+                WorkflowFormatError::PromptProjection {
                     path: format!(
                         "$.nodes[{node_index}].{NATIVE_WIDGETS_FIELD}.widgets[{widget_index}].prompt_value"
                     ),
                     reason: "native widget prompt value is required".to_owned(),
-                })
+                }
+            })?;
+            Ok(PromptWidgetValue {
+                identifier: Some(identifier.to_owned()),
+                prompt_value,
+            })
         })
         .collect::<Result<Vec<_>, _>>()
         .map(Some)
@@ -1582,9 +1625,29 @@ pub fn graph_to_prompt(
         }
         if let Some(widget_values) = prompt_widget_values(node, node_index)? {
             let widget_names = widget_names(node, descriptor);
-            for (index, value) in widget_values.iter().enumerate() {
-                let Some(name) = widget_names.get(index) else {
-                    break;
+            for (index, widget) in widget_values.iter().enumerate() {
+                let name = if let Some(identifier) = &widget.identifier {
+                    if descriptor.is_some_and(|descriptor| {
+                        !descriptor
+                            .inputs
+                            .iter()
+                            .any(|input| input.name == *identifier)
+                    }) {
+                        return Err(WorkflowFormatError::PromptProjection {
+                            path: format!(
+                                "$.nodes[{node_index}].{NATIVE_WIDGETS_FIELD}.widgets[{index}].identifier"
+                            ),
+                            reason: format!(
+                                "native widget identifier `{identifier}` is not an input of `{class_type}`"
+                            ),
+                        });
+                    }
+                    identifier
+                } else {
+                    let Some(name) = widget_names.get(index) else {
+                        break;
+                    };
+                    name
                 };
                 if linked_names.contains(name) {
                     continue;
@@ -1594,7 +1657,10 @@ pub fn graph_to_prompt(
                         descriptor.inputs.iter().find(|input| input.name == *name)
                     })
                     .map(|input| input.type_name.as_str());
-                inputs.insert(name.clone(), wrap_literal(value.clone(), type_name));
+                inputs.insert(
+                    name.clone(),
+                    wrap_literal(widget.prompt_value.clone(), type_name),
+                );
             }
         }
         let mut unknown = BTreeMap::new();
@@ -3439,11 +3505,18 @@ mod tests {
                 NodeDescriptor {
                     type_name: "Source".to_owned(),
                     display_name: "Source".to_owned(),
-                    inputs: vec![PortDescriptor {
-                        name: "literal".to_owned(),
-                        type_name: "VALUE".to_owned(),
-                        required: true,
-                    }],
+                    inputs: vec![
+                        PortDescriptor {
+                            name: "literal".to_owned(),
+                            type_name: "VALUE".to_owned(),
+                            required: true,
+                        },
+                        PortDescriptor {
+                            name: "second".to_owned(),
+                            type_name: "VALUE".to_owned(),
+                            required: true,
+                        },
+                    ],
                     outputs: vec![PortDescriptor {
                         name: "value".to_owned(),
                         type_name: "VALUE".to_owned(),
@@ -3745,18 +3818,29 @@ mod tests {
                 "type": "Source",
                 "inputs": [],
                 "outputs": [],
-                "widgets_values": ["workflow-value"],
+                "widgets_values": ["workflow-second", "workflow-value"],
                 "sim:native-widgets": {
                     "version": 1,
-                    "widgets": [{
-                        "identifier": "literal",
-                        "kind": {"kind": "text", "multiline": false},
-                        "value": "workflow-value",
-                        "prompt_value": "prompt-value",
-                        "validation": "valid",
-                        "converted_to_input": false,
-                        "visible": true
-                    }]
+                    "widgets": [
+                        {
+                            "identifier": "second",
+                            "kind": {"kind": "text", "multiline": false},
+                            "value": "workflow-second",
+                            "prompt_value": "prompt-second",
+                            "validation": "valid",
+                            "converted_to_input": false,
+                            "visible": true
+                        },
+                        {
+                            "identifier": "literal",
+                            "kind": {"kind": "text", "multiline": false},
+                            "value": "workflow-value",
+                            "prompt_value": "prompt-value",
+                            "validation": "valid",
+                            "converted_to_input": false,
+                            "visible": true
+                        }
+                    ]
                 }
             }],
             "links": []
@@ -3767,6 +3851,10 @@ mod tests {
         assert_eq!(
             prompt.prompt.0[&NodeId("source".to_owned())].inputs["literal"],
             "prompt-value"
+        );
+        assert_eq!(
+            prompt.prompt.0[&NodeId("source".to_owned())].inputs["second"],
+            "prompt-second"
         );
 
         let mut malformed = workflow.value().clone();
@@ -3781,6 +3869,30 @@ mod tests {
         assert!(matches!(
             graph_to_prompt(&malformed, &descriptors(), "test"),
             Err(WorkflowFormatError::PromptProjection { path, .. }) if path.ends_with(".prompt_value")
+        ));
+
+        let mut duplicated = workflow.value().clone();
+        duplicated["nodes"][0]["sim:native-widgets"]["widgets"][1]["identifier"] =
+            Value::String("second".to_owned());
+        let duplicated = WorkflowFormatDocument::parse(
+            &serde_json::to_vec(&duplicated).expect("serialize duplicated widget workflow"),
+        )
+        .expect("parse duplicated widget workflow");
+        assert!(matches!(
+            graph_to_prompt(&duplicated, &descriptors(), "test"),
+            Err(WorkflowFormatError::PromptProjection { path, .. }) if path.ends_with(".identifier")
+        ));
+
+        let mut unknown = workflow.value().clone();
+        unknown["nodes"][0]["sim:native-widgets"]["widgets"][0]["identifier"] =
+            Value::String("socket_only".to_owned());
+        let unknown = WorkflowFormatDocument::parse(
+            &serde_json::to_vec(&unknown).expect("serialize unknown widget workflow"),
+        )
+        .expect("parse unknown widget workflow");
+        assert!(matches!(
+            graph_to_prompt(&unknown, &descriptors(), "test"),
+            Err(WorkflowFormatError::PromptProjection { path, .. }) if path.ends_with(".identifier")
         ));
     }
 

@@ -105,7 +105,17 @@ class ValidationGenerationTests(unittest.TestCase):
             ".agents/specs/comfy-parity/ownership-policy.json", foundation_writes
         )
         self.assertIn("crates/comfy_nodes/src/execution.rs", schema_writes)
+        self.assertIn(
+            "crates/comfy_nodes/src/families/empty_root_category_declared_by_source_01.rs",
+            schema_writes,
+        )
+        self.assertIn("crates/comfy_nodes/src/slices/native_image.descriptors.json", schema_writes)
+        self.assertIn("crates/comfy_runtime/src/executor.rs", schema_writes)
+        self.assertIn("crates/comfy_runtime/src/graph.rs", schema_writes)
+        self.assertIn("crates/comfy_runtime/src/workflow_formats.rs", schema_writes)
         self.assertIn("crates/comfy_api/src/services.rs", schema_writes)
+        self.assertIn("crates/comfy_plugin_host/src/registry_adapter.rs", schema_writes)
+        self.assertIn("crates/comfy_worker/src/comfy_worker.rs", schema_writes)
         self.assertIn("crates/comfy_model/src/native_node_payload.rs", value_writes)
         self.assertIn("crates/comfy_tensor/src/native_node_payload.rs", value_writes)
         self.assertIn("crates/comfy_sampler/src/native_diffusion_payload.rs", value_writes)

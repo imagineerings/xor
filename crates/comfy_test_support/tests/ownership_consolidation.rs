@@ -7839,7 +7839,7 @@ fn run_ownership_validation(
         (
             "task367_production_consumers_use_the_comprehensive_generated_registry",
             runtime_executor.contains("pub fn validate_comprehensive_bindings(")
-                && execution_ui_production.contains("generated_native_frontend_descriptors(None)")
+                && execution_ui_production.contains("generated_native_frontend_contracts(None)")
                 && execution_ui_production.contains("compile_generated_native_prompt(")
                 && execution_ui_production.contains("graph_to_prompt(")
                 && !execution_ui_production.contains("compile_native_image_workflow(")
@@ -7889,8 +7889,11 @@ fn run_ownership_validation(
                     .contains("register_bound_batch_with_presentations(bindings)")
                 && api_services.contains("self.registry.presentation(class_type)")
                 && api_services.contains("native_node_presentation_missing")
-                && api_services.contains("let output_names = presentation")
-                && api_services.contains(".output_names")
+                && api_services.contains(
+                    "let (outputs, output_names, output_tooltips) = if let Some(schema)",
+                )
+                && api_services.contains("runtime.source_schema.as_ref()")
+                && !api_services.contains("let output_names = presentation")
                 && !api_services.contains("\"category\": \"extensions\"")
                 && !api_services.contains("format!(\"output_{index}\")"),
         ),

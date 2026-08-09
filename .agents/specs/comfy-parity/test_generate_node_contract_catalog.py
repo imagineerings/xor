@@ -84,6 +84,19 @@ class NodeContractCatalogTests(unittest.TestCase):
             [item["value"] for item in quality_keywords["options"]["items"]],
             ["low", "medium", "high"],
         )
+        portable_inputs = {
+            value["name"]: value
+            for value in provider["schema"]["portable"]["inputs"]
+        }
+        self.assertEqual(
+            [choice["value"] for choice in portable_inputs["quality"]["choices"]],
+            ["low", "medium", "high"],
+        )
+        self.assertEqual(portable_inputs["custom_width"]["step"]["value"], 16)
+        self.assertEqual(
+            portable_inputs["seed"]["maximum"]["kind"],
+            "preserved_expression",
+        )
 
     def test_v1_and_autogrow_contracts_are_structured_without_execution(self) -> None:
         sampler = self.contracts["COMFY-NODE-0306"]
@@ -100,6 +113,18 @@ class NodeContractCatalogTests(unittest.TestCase):
         }
         self.assertEqual(option_entries["default"]["value"], 0)
         self.assertEqual(option_entries["max"]["value"], 18446744073709551615)
+        portable_sampler_inputs = {
+            value["name"]: value
+            for value in sampler["schema"]["portable"]["inputs"]
+        }
+        self.assertEqual(
+            portable_sampler_inputs["seed"]["maximum"],
+            {"kind": "unsigned_integer", "value": 18446744073709551615},
+        )
+        self.assertEqual(
+            portable_sampler_inputs["cfg"]["step"],
+            {"kind": "finite_decimal", "value": "0.1"},
+        )
 
         batch = self.contracts["COMFY-NODE-0017"]
         bindings = batch["schema"]["contract"]["bindings"]
@@ -111,6 +136,14 @@ class NodeContractCatalogTests(unittest.TestCase):
         self.assertEqual(template_keywords["prefix"]["value"], "image")
         self.assertEqual(template_keywords["min"]["value"], 1)
         self.assertEqual(template_keywords["max"]["value"], 50)
+        dynamic = batch["schema"]["portable"]["dynamic_inputs"]
+        self.assertEqual(len(dynamic), 1)
+        self.assertEqual(dynamic[0]["identity"], "image{index}")
+        self.assertEqual(dynamic[0]["prefix"], "image")
+        self.assertEqual(dynamic[0]["minimum_count"], 1)
+        self.assertEqual(dynamic[0]["maximum_count"], 50)
+        self.assertEqual(dynamic[0]["input"]["source_type_names"], ["IMAGE"])
+        self.assertEqual(batch["schema"]["portable"]["inputs"], [])
 
         inherited = self.contracts["COMFY-NODE-0159"]
         self.assertEqual(inherited["schema"]["catalog_correlation"], "verified_inherited_base")
@@ -155,6 +188,19 @@ class NodeContractCatalogTests(unittest.TestCase):
             for item in local_partner_helper["schema"]["contract"]["node_options"]
         }
         self.assertFalse(node_options["is_api_node"]["value"])
+        outputs = local_partner_helper["schema"]["contract"]["outputs"]
+        self.assertTrue(all(output["callee"]["name"] for output in outputs))
+        self.assertTrue(
+            all(
+                output["source_type_name"] != "PRESERVED_EXPRESSION"
+                for output in local_partner_helper["schema"]["portable"]["outputs"]
+            )
+        )
+
+        expanded_inputs = self.contracts["COMFY-NODE-0020"]["schema"]["portable"]
+        self.assertEqual(expanded_inputs["inputs"], [])
+        self.assertEqual(len(expanded_inputs["unresolved_inputs"]), 1)
+        self.assertIn("_common_inputs", expanded_inputs["unresolved_inputs"][0]["source"])
 
     def test_schema_source_mismatch_fails_closed(self) -> None:
         with generator.INPUT.open(newline="", encoding="utf-8") as handle:

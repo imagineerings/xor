@@ -9,8 +9,9 @@ use comfy_runtime::{
     AuthorizedCapabilities, CompiledPlan, ExecutionCommandAck, ExecutionCommandOutcome,
     ExecutionCommandReceiptState, ExecutionControlCommand, ExecutionControlCommandKind,
     ExecutionController, ExecutionFailureOrigin, ExecutionSnapshot, ExecutionSnapshotStatus,
-    InputBinding, InputMode, NativeNodeBindingDisposition, NativeNodeRegistry, NativePrimitive,
-    NativePrimitiveType, NativeValue, NativeValueType, NodeRegistry, ObjectInfoNode,
+    InputBinding, InputMode, NativeInputRequirement, NativeInputSchemaMetadata,
+    NativeNodeBindingDisposition, NativeNodeRegistry, NativePrimitive, NativeSchemaProvenance,
+    NativeSchemaValue, NativeUploadKind, NativeValue, NodeRegistry, ObjectInfoNode,
     ObjectInfoRegistry, ProfileId, PromptCompiler, PromptId, RECENT_COMMAND_RESULT_CAPACITY,
     RequestId, RuntimeNodeDescriptor, RuntimeNodePresentation, SharedAssetService,
     SharedExecutionPresentationService, generated_native_node_registry_projection,
@@ -1039,138 +1040,117 @@ impl NativeRuntimeHttpServices {
                 })?;
             let unavailable_reason = self.registry.unavailable_reason(class_type);
             let source = object_info.nodes().get(class_type);
-            let Some(binding) = bindings.get(class_type) else {
-                let python_module = if let Some(source) = source {
-                    source.source_python_module.as_str()
-                } else {
-                    self.registry
-                        .implementation_namespace(class_type)
-                        .ok_or_else(|| {
-                            NativeServiceError::new(
-                                NativeServiceErrorKind::Internal,
-                                "native_plugin_namespace_missing",
-                                format!("{class_type} has no signed implementation namespace"),
-                            )
-                        })?
-                };
-                let presentation = self.registry.presentation(class_type).ok_or_else(|| {
-                    NativeServiceError::new(
-                        NativeServiceErrorKind::Internal,
-                        "native_node_presentation_missing",
-                        format!("{class_type} has no checked presentation projection"),
-                    )
-                })?;
-                result.insert(
-                    class_type.to_owned(),
-                    project_component_node(
-                        class_type,
-                        python_module,
-                        runtime,
-                        presentation,
-                        disposition,
-                        unavailable_reason,
-                        source,
-                    ),
-                );
-                continue;
-            };
-            let source = source.ok_or_else(|| {
-                NativeServiceError::new(
-                    NativeServiceErrorKind::Internal,
-                    "native_node_source_metadata_missing",
-                    format!("{class_type} has no canonical source object-info row"),
-                )
-            })?;
-            if binding.native.python_module != source.source_python_module {
-                return Err(NativeServiceError::new(
-                    NativeServiceErrorKind::Internal,
-                    "native_node_source_module_mismatch",
-                    format!("{class_type} disagrees with its canonical source Python module"),
-                ));
-            }
-            let mut required = Map::new();
-            let mut optional = Map::new();
-            let mut hidden = Map::new();
-            let mut required_order = Vec::new();
-            let mut optional_order = Vec::new();
-            let mut hidden_order = Vec::new();
-            for input in &binding.native.inputs {
-                let runtime_input = runtime
-                    .inputs
-                    .iter()
-                    .find(|runtime_input| runtime_input.name == input.name)
+            let python_module = if let Some(source) = source {
+                source.source_python_module.as_str()
+            } else {
+                self.registry
+                    .implementation_namespace(class_type)
                     .ok_or_else(|| {
                         NativeServiceError::new(
                             NativeServiceErrorKind::Internal,
-                            "native_node_port_mismatch",
-                            format!(
-                                "{class_type} input `{}` is absent from the execution binding",
-                                input.name
-                            ),
+                            "native_plugin_namespace_missing",
+                            format!("{class_type} has no signed implementation namespace"),
                         )
-                    })?;
-                if runtime_input.hidden {
-                    hidden.insert(input.name.clone(), Value::String(input.type_name.clone()));
-                    hidden_order.push(input.name.clone());
-                    continue;
-                }
-                let type_specification = if input.choices_from_input_assets {
-                    Value::Array(self.input_asset_choices()?)
-                } else if input.choices.is_empty() {
-                    Value::String(input.type_name.clone())
-                } else {
-                    Value::Array(input.choices.iter().cloned().map(Value::String).collect())
-                };
-                let options = Value::Object(input.options.clone().into_iter().collect());
-                let target = if input.required {
-                    required_order.push(input.name.clone());
-                    &mut required
-                } else {
-                    optional_order.push(input.name.clone());
-                    &mut optional
-                };
-                target.insert(input.name.clone(), json!([type_specification, options]));
+                    })?
+            };
+            if disposition == NativeNodeBindingDisposition::Unavailable
+                && source.is_some_and(|source| source.source_schema.is_none())
+            {
+                let source = source.ok_or_else(|| {
+                    NativeServiceError::new(
+                        NativeServiceErrorKind::Internal,
+                        "native_node_source_metadata_missing",
+                        format!("{class_type} has no canonical source object-info row"),
+                    )
+                })?;
+                result.insert(class_type.to_owned(), project_inactive_source_node(source));
+                continue;
             }
-            let outputs = binding
-                .native
-                .outputs
-                .iter()
-                .map(|output| Value::String(output.type_name.clone()))
-                .collect::<Vec<_>>();
-            let output_names = binding
-                .native
-                .outputs
-                .iter()
-                .map(|output| Value::String(output.name.clone()))
-                .collect::<Vec<_>>();
-            result.insert(
-                class_type.to_owned(),
-                json!({
-                    "input": {"required": required, "optional": optional, "hidden": hidden},
-                    "input_order": {"required": required_order, "optional": optional_order, "hidden": hidden_order},
-                    "is_input_list": runtime.inputs.iter().any(|input| input.cardinality != InputMode::Scalar),
-                    "output": outputs,
-                    "output_is_list": runtime.outputs.iter().map(|output| output.is_list).collect::<Vec<_>>(),
-                    "output_name": output_names,
-                    "name": class_type,
-                    "display_name": binding.catalog.display_name,
-                    "description": binding.native.description,
-                    "python_module": source.source_python_module,
-                    "category": binding.catalog.category,
-                    "output_node": runtime.output_node,
-                    "has_intermediate_output": binding.native.has_intermediate_output,
-                    "search_aliases": binding.native.search_aliases,
-                    "essentials_category": binding.native.essentials_category,
-                    "sim_native_binding": native_binding_projection(disposition, unavailable_reason),
-                    "sim_source": native_source_projection(source),
-                }),
-            );
+            let presentation = self.registry.presentation(class_type).ok_or_else(|| {
+                NativeServiceError::new(
+                    NativeServiceErrorKind::Internal,
+                    "native_node_presentation_missing",
+                    format!("{class_type} has no checked presentation projection"),
+                )
+            })?;
+            let mut input_choice_overrides = HashMap::new();
+            let mut input_option_overrides = HashMap::new();
+            if let Some(binding) = bindings.get(class_type) {
+                if let Some(source) = source
+                    && binding.native.python_module != source.source_python_module
+                {
+                    return Err(NativeServiceError::new(
+                        NativeServiceErrorKind::Internal,
+                        "native_node_source_module_mismatch",
+                        format!("{class_type} disagrees with its canonical source Python module"),
+                    ));
+                }
+                for input in &binding.native.inputs {
+                    if input.choices_from_input_assets || !input.choices.is_empty() {
+                        let choices = if input.choices_from_input_assets {
+                            self.input_asset_choices()?
+                        } else {
+                            input.choices.iter().cloned().map(Value::String).collect()
+                        };
+                        input_choice_overrides.insert(input.name.clone(), choices);
+                    }
+                    input_option_overrides.insert(
+                        input.name.clone(),
+                        input.options.clone().into_iter().collect::<Map<_, _>>(),
+                    );
+                }
+            }
+            let mut projected = project_component_node(
+                class_type,
+                python_module,
+                runtime,
+                presentation,
+                disposition,
+                unavailable_reason,
+                source,
+                &input_choice_overrides,
+                &input_option_overrides,
+            )?;
+            if let Some(binding) = bindings.get(class_type)
+                && let Some(node) = projected.as_object_mut()
+            {
+                node.insert(
+                    "description".to_owned(),
+                    Value::String(binding.native.description.clone()),
+                );
+                node.insert(
+                    "search_aliases".to_owned(),
+                    json!(binding.native.search_aliases),
+                );
+                node.insert(
+                    "essentials_category".to_owned(),
+                    json!(binding.native.essentials_category),
+                );
+                node.insert(
+                    "has_intermediate_output".to_owned(),
+                    Value::Bool(binding.native.has_intermediate_output),
+                );
+            }
+            result.insert(class_type.to_owned(), projected);
+        }
+        for (class_type, source) in object_info.nodes() {
+            if result.contains_key(class_type)
+                || requested.is_some_and(|requested| requested != class_type)
+            {
+                continue;
+            }
+            let projected = if source.source_schema.is_some() {
+                project_unbound_source_node(source)
+            } else {
+                project_inactive_source_node(source)
+            };
+            result.insert(class_type.clone(), projected);
         }
         if requested.is_some() && result.is_empty() {
             return Err(NativeServiceError::new(
                 NativeServiceErrorKind::NotFound,
                 "native_node_not_found",
-                "the requested node is not in the native execution registry",
+                "the requested node is not in the canonical native source catalog",
             ));
         }
         Ok(NativeServiceResponse::json(200, Value::Object(result)))
@@ -1535,68 +1515,504 @@ fn project_component_node(
     disposition: NativeNodeBindingDisposition,
     unavailable_reason: Option<&str>,
     source: Option<&ObjectInfoNode>,
-) -> Value {
+    input_choice_overrides: &HashMap<String, Vec<Value>>,
+    input_option_overrides: &HashMap<String, Map<String, Value>>,
+) -> Result<Value, NativeServiceError> {
     let mut required = Map::new();
     let mut optional = Map::new();
     let mut hidden = Map::new();
     let mut required_order = Vec::new();
     let mut optional_order = Vec::new();
     let mut hidden_order = Vec::new();
-    for input in &runtime.inputs {
-        let name = &input.name;
-        let type_name = runtime_type_union_name(input.accepted_types.members());
-        if input.hidden {
-            hidden.insert(name.clone(), Value::String(type_name));
-            hidden_order.push(name.clone());
-            continue;
+    let catalog_schema = source.and_then(|source| source.source_schema.as_ref());
+    if let Some(schema) = catalog_schema {
+        for input in &schema.inputs {
+            let runtime_input = runtime
+                .inputs
+                .iter()
+                .find(|candidate| candidate.name == input.schema.name)
+                .ok_or_else(|| schema_projection_error(class_type, &input.schema.name))?;
+            insert_projected_input(
+                &input.schema,
+                input.requirement,
+                runtime_input.lazy,
+                input_choice_overrides
+                    .get(&input.schema.name)
+                    .map(Vec::as_slice),
+                input_option_overrides.get(&input.schema.name),
+                &mut required,
+                &mut optional,
+                &mut hidden,
+                &mut required_order,
+                &mut optional_order,
+                &mut hidden_order,
+            );
         }
-        let mode = match input.cardinality {
-            InputMode::Scalar => "scalar",
-            InputMode::List => "list",
-            InputMode::Mapped => "mapped",
-        };
-        let options = json!({
-            "lazy": input.lazy,
-            "allows_literal": input.allows_literal,
-            "mode": mode,
-        });
-        let value = json!([type_name, options]);
-        if input.required {
-            required_order.push(name.clone());
-            required.insert(name.clone(), value);
-        } else {
-            optional_order.push(name.clone());
-            optional.insert(name.clone(), value);
+    } else if let Some(schema) = runtime.source_schema.as_ref() {
+        for (input, input_schema) in runtime.inputs.iter().zip(&schema.inputs) {
+            let requirement = if input.hidden {
+                NativeInputRequirement::Hidden
+            } else if input.required {
+                NativeInputRequirement::Required
+            } else {
+                NativeInputRequirement::Optional
+            };
+            insert_projected_input(
+                input_schema,
+                requirement,
+                input.lazy,
+                input_choice_overrides.get(&input.name).map(Vec::as_slice),
+                input_option_overrides.get(&input.name),
+                &mut required,
+                &mut optional,
+                &mut hidden,
+                &mut required_order,
+                &mut optional_order,
+                &mut hidden_order,
+            );
         }
+    } else {
+        return Err(NativeServiceError::new(
+            NativeServiceErrorKind::Internal,
+            "native_node_source_schema_missing",
+            format!("{class_type} has no exact source or signed plugin schema"),
+        ));
     }
-    let outputs = runtime
-        .outputs
-        .iter()
-        .map(|output| Value::String(runtime_value_type_name(&output.produced_type)))
-        .collect::<Vec<_>>();
-    let output_names = presentation
-        .output_names
-        .iter()
-        .map(|name| Value::String(name.clone()))
-        .collect::<Vec<_>>();
-    json!({
+    let (outputs, output_names, output_tooltips) = if let Some(schema) = catalog_schema {
+        (
+            schema
+                .outputs
+                .iter()
+                .map(|output| Value::String(output.source_type_name.clone()))
+                .collect::<Vec<_>>(),
+            schema
+                .outputs
+                .iter()
+                .map(|output| {
+                    Value::String(
+                        output
+                            .display_name
+                            .as_ref()
+                            .or(output.source_name.as_ref())
+                            .cloned()
+                            .unwrap_or_else(|| output.source_type_name.clone()),
+                    )
+                })
+                .collect::<Vec<_>>(),
+            schema
+                .outputs
+                .iter()
+                .map(|output| {
+                    output
+                        .tooltip
+                        .clone()
+                        .map(Value::String)
+                        .unwrap_or(Value::Null)
+                })
+                .collect::<Vec<_>>(),
+        )
+    } else {
+        let schema = runtime.source_schema.as_ref().ok_or_else(|| {
+            NativeServiceError::new(
+                NativeServiceErrorKind::Internal,
+                "native_node_source_schema_missing",
+                format!("{class_type} has no exact output schema"),
+            )
+        })?;
+        (
+            schema
+                .outputs
+                .iter()
+                .map(|output| Value::String(output.source_type_name.clone()))
+                .collect::<Vec<_>>(),
+            schema
+                .outputs
+                .iter()
+                .map(|output| {
+                    Value::String(
+                        output
+                            .display_name
+                            .clone()
+                            .unwrap_or_else(|| output.name.clone()),
+                    )
+                })
+                .collect::<Vec<_>>(),
+            schema
+                .outputs
+                .iter()
+                .map(|output| {
+                    output
+                        .tooltip
+                        .clone()
+                        .map(Value::String)
+                        .unwrap_or(Value::Null)
+                })
+                .collect::<Vec<_>>(),
+        )
+    };
+    let source_node_schema = catalog_schema
+        .map(|schema| &schema.node)
+        .or_else(|| runtime.source_schema.as_ref().map(|schema| &schema.node));
+    let source_presentation = catalog_schema.map(|schema| &schema.presentation);
+    let sim_schema = if let Some(schema) = catalog_schema {
+        serde_json::to_value(schema)
+    } else {
+        serde_json::to_value(runtime.source_schema.as_ref())
+    }
+    .map_err(|error| {
+        NativeServiceError::new(
+            NativeServiceErrorKind::Internal,
+            "native_node_source_schema_serialization_failed",
+            error.to_string(),
+        )
+    })?;
+    let mut value = json!({
         "input": {"required": required, "optional": optional, "hidden": hidden},
         "input_order": {"required": required_order, "optional": optional_order, "hidden": hidden_order},
         "is_input_list": runtime.inputs.iter().any(|input| input.cardinality != InputMode::Scalar),
         "output": outputs,
         "output_is_list": runtime.outputs.iter().map(|output| output.is_list).collect::<Vec<_>>(),
         "output_name": output_names,
+        "output_tooltips": output_tooltips,
         "name": class_type,
-        "display_name": presentation.display_name,
-        "description": "",
+        "display_name": source_presentation.and_then(|value| value.display_name.as_deref()).unwrap_or(&presentation.display_name),
+        "description": source_presentation.and_then(|value| value.description.as_deref()).unwrap_or(""),
         "python_module": python_module,
         "category": presentation.category,
         "output_node": runtime.output_node,
-        "has_intermediate_output": false,
-        "search_aliases": [],
-        "essentials_category": null,
+        "has_intermediate_output": source_node_schema.is_some_and(|schema| schema.has_intermediate_output),
+        "deprecated": source_presentation.is_some_and(|value| value.is_deprecated) || presentation.is_deprecated,
+        "experimental": source_presentation.is_some_and(|value| value.is_experimental) || presentation.is_experimental,
+        "dev_only": source_node_schema.is_some_and(|schema| schema.development_only),
+        "api_node": source_node_schema.is_some_and(|schema| schema.api_node),
+        "price_badge": source_node_schema.and_then(|schema| schema.price_badge.as_ref()).and_then(project_schema_value),
+        "search_aliases": presentation.search_aliases,
+        "essentials_category": source_node_schema.and_then(|schema| schema.essentials_category.as_deref()),
         "sim_native_binding": native_binding_projection(disposition, unavailable_reason),
         "sim_source": source.map(native_source_projection),
+        "sim_schema": sim_schema,
+    });
+    if source_node_schema
+        .is_some_and(|schema| schema.provenance == NativeSchemaProvenance::SourceV1)
+        && let Some(node) = value.as_object_mut()
+    {
+        if !source_presentation.is_some_and(|value| value.is_deprecated)
+            && !presentation.is_deprecated
+        {
+            node.remove("deprecated");
+        }
+        if !source_presentation.is_some_and(|value| value.is_experimental)
+            && !presentation.is_experimental
+        {
+            node.remove("experimental");
+        }
+        if !source_node_schema.is_some_and(|schema| schema.development_only) {
+            node.remove("dev_only");
+        }
+        if !source_node_schema.is_some_and(|schema| schema.api_node) {
+            node.remove("api_node");
+        }
+    }
+    Ok(value)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn insert_projected_input(
+    schema: &NativeInputSchemaMetadata,
+    requirement: NativeInputRequirement,
+    lazy: bool,
+    choice_override: Option<&[Value]>,
+    option_override: Option<&Map<String, Value>>,
+    required: &mut Map<String, Value>,
+    optional: &mut Map<String, Value>,
+    hidden: &mut Map<String, Value>,
+    required_order: &mut Vec<String>,
+    optional_order: &mut Vec<String>,
+    hidden_order: &mut Vec<String>,
+) {
+    let type_name = schema.source_type_names.join("|");
+    if requirement == NativeInputRequirement::Hidden {
+        hidden.insert(schema.name.clone(), Value::String(type_name));
+        hidden_order.push(schema.name.clone());
+        return;
+    }
+    let type_specification = if let Some(choices) = choice_override {
+        Value::Array(choices.to_vec())
+    } else {
+        let choices = schema
+            .choices
+            .iter()
+            .map(project_schema_value)
+            .collect::<Option<Vec<_>>>();
+        choices
+            .filter(|choices| !choices.is_empty())
+            .map(Value::Array)
+            .unwrap_or(Value::String(type_name))
+    };
+    let value = json!([
+        type_specification,
+        project_input_options(schema, lazy, option_override)
+    ]);
+    match requirement {
+        NativeInputRequirement::Required => {
+            required_order.push(schema.name.clone());
+            required.insert(schema.name.clone(), value);
+        }
+        NativeInputRequirement::Optional | NativeInputRequirement::Preserved => {
+            optional_order.push(schema.name.clone());
+            optional.insert(schema.name.clone(), value);
+        }
+        NativeInputRequirement::Hidden => {}
+    }
+}
+
+fn project_input_options(
+    schema: &NativeInputSchemaMetadata,
+    lazy: bool,
+    option_override: Option<&Map<String, Value>>,
+) -> Value {
+    let mut options = Map::new();
+    insert_schema_option(&mut options, "default", schema.default.as_ref());
+    insert_schema_option(&mut options, "min", schema.minimum.as_ref());
+    insert_schema_option(&mut options, "max", schema.maximum.as_ref());
+    insert_schema_option(&mut options, "step", schema.step.as_ref());
+    insert_optional_string(&mut options, "display_name", schema.display_name.as_deref());
+    insert_optional_string(&mut options, "tooltip", schema.tooltip.as_deref());
+    insert_true(&mut options, "multiline", schema.multiline);
+    insert_true(&mut options, "socketless", schema.socketless);
+    insert_optional_string(&mut options, "widgetType", schema.widget_type.as_deref());
+    insert_true(&mut options, "forceInput", schema.force_input);
+    insert_true(&mut options, "rawLink", schema.raw_link);
+    insert_true(&mut options, "advanced", schema.advanced);
+    insert_true(&mut options, "lazy", lazy);
+    if let Some(upload) = schema.upload {
+        let name = match upload {
+            NativeUploadKind::Image => "image_upload",
+            NativeUploadKind::Audio => "audio_upload",
+            NativeUploadKind::Video => "video_upload",
+            NativeUploadKind::Model => "model_upload",
+            NativeUploadKind::Artifact => "artifact_upload",
+        };
+        options.insert(name.to_owned(), Value::Bool(true));
+    }
+    let mut preserved = Map::new();
+    for field in &schema.extra {
+        if let Some(value) = project_schema_value(&field.value) {
+            options.insert(field.name.clone(), value);
+        } else {
+            preserved.insert(field.name.clone(), schema_value_wire(&field.value));
+        }
+    }
+    if !preserved.is_empty() {
+        options.insert(
+            "sim_source_expressions".to_owned(),
+            Value::Object(preserved),
+        );
+    }
+    if let Some(overrides) = option_override {
+        for (name, value) in overrides {
+            options.entry(name.clone()).or_insert_with(|| value.clone());
+        }
+    }
+    Value::Object(options)
+}
+
+fn insert_schema_option(
+    options: &mut Map<String, Value>,
+    name: &str,
+    value: Option<&NativeSchemaValue>,
+) {
+    if let Some(value) = value.and_then(project_schema_value) {
+        options.insert(name.to_owned(), value);
+    }
+}
+
+fn insert_optional_string(options: &mut Map<String, Value>, name: &str, value: Option<&str>) {
+    if let Some(value) = value {
+        options.insert(name.to_owned(), Value::String(value.to_owned()));
+    }
+}
+
+fn insert_true(options: &mut Map<String, Value>, name: &str, value: bool) {
+    if value {
+        options.insert(name.to_owned(), Value::Bool(true));
+    }
+}
+
+fn project_schema_value(value: &NativeSchemaValue) -> Option<Value> {
+    match value {
+        NativeSchemaValue::Null => Some(Value::Null),
+        NativeSchemaValue::Boolean { value } => Some(Value::Bool(*value)),
+        NativeSchemaValue::SignedInteger { value } => Some(Value::from(*value)),
+        NativeSchemaValue::UnsignedInteger { value } => Some(Value::from(*value)),
+        NativeSchemaValue::FiniteDecimal { value } => {
+            value.parse::<serde_json::Number>().ok().map(Value::Number)
+        }
+        NativeSchemaValue::String { value } => Some(Value::String(value.clone())),
+        NativeSchemaValue::List { values } => values
+            .iter()
+            .map(project_schema_value)
+            .collect::<Option<Vec<_>>>()
+            .map(Value::Array),
+        NativeSchemaValue::Object { fields } => fields
+            .iter()
+            .map(|field| Some((field.name.clone(), project_schema_value(&field.value)?)))
+            .collect::<Option<Map<_, _>>>()
+            .map(Value::Object),
+        NativeSchemaValue::PreservedExpression { .. } => None,
+    }
+}
+
+fn schema_value_wire(value: &NativeSchemaValue) -> Value {
+    match value {
+        NativeSchemaValue::PreservedExpression { source, sha256 } => {
+            json!({"kind": "preserved_expression", "source": source, "sha256": sha256})
+        }
+        value => project_schema_value(value).unwrap_or_else(|| {
+            serde_json::to_value(value).unwrap_or_else(
+                |error| json!({"kind": "serialization_error", "message": error.to_string()}),
+            )
+        }),
+    }
+}
+
+fn schema_projection_error(class_type: &str, input_name: &str) -> NativeServiceError {
+    NativeServiceError::new(
+        NativeServiceErrorKind::Internal,
+        "native_node_port_mismatch",
+        format!("{class_type} source input `{input_name}` is absent from the execution binding"),
+    )
+}
+
+fn project_inactive_source_node(source: &ObjectInfoNode) -> Value {
+    json!({
+        "input": {"required": {}, "optional": {}, "hidden": {}},
+        "input_order": {"required": [], "optional": [], "hidden": []},
+        "is_input_list": false,
+        "output": [],
+        "output_is_list": [],
+        "output_name": [],
+        "output_tooltips": [],
+        "name": source.node_identifier,
+        "display_name": source.display_name,
+        "description": source.inactive_reason.as_deref().unwrap_or(""),
+        "python_module": source.source_python_module,
+        "category": source.category,
+        "output_node": source.output.output_node,
+        "has_intermediate_output": false,
+        "deprecated": source.availability == "deprecated/dead",
+        "experimental": source.availability == "experimental",
+        "dev_only": false,
+        "api_node": source.source_python_module.starts_with("comfy_api_nodes."),
+        "search_aliases": [],
+        "essentials_category": null,
+        "sim_native_binding": native_binding_projection(
+            NativeNodeBindingDisposition::Unavailable,
+            source.inactive_reason.as_deref(),
+        ),
+        "sim_source": native_source_projection(source),
+        "sim_schema": {
+            "schema_source": source.schema_source,
+            "input": source.input,
+            "output": source.output,
+        },
+    })
+}
+
+fn project_unbound_source_node(source: &ObjectInfoNode) -> Value {
+    let Some(schema) = source.source_schema.as_ref() else {
+        return project_inactive_source_node(source);
+    };
+    let mut required = Map::new();
+    let mut optional = Map::new();
+    let mut hidden = Map::new();
+    let mut required_order = Vec::new();
+    let mut optional_order = Vec::new();
+    let mut hidden_order = Vec::new();
+    for input in &schema.inputs {
+        insert_projected_input(
+            &input.schema,
+            input.requirement,
+            false,
+            None,
+            None,
+            &mut required,
+            &mut optional,
+            &mut hidden,
+            &mut required_order,
+            &mut optional_order,
+            &mut hidden_order,
+        );
+    }
+    let disposition = match source.catalog_status {
+        comfy_runtime::CatalogNodeStatus::ProviderRequired => {
+            NativeNodeBindingDisposition::ProviderRequired
+        }
+        comfy_runtime::CatalogNodeStatus::DescriptorOnly
+        | comfy_runtime::CatalogNodeStatus::Inactive => NativeNodeBindingDisposition::Unavailable,
+    };
+    let reason = match disposition {
+        NativeNodeBindingDisposition::ProviderRequired => {
+            Some("requires a verified native provider")
+        }
+        NativeNodeBindingDisposition::Unavailable => Some("native implementation not integrated"),
+        NativeNodeBindingDisposition::Executable => None,
+    };
+    let outputs = schema
+        .outputs
+        .iter()
+        .map(|output| Value::String(output.source_type_name.clone()))
+        .collect::<Vec<_>>();
+    let output_names = schema
+        .outputs
+        .iter()
+        .map(|output| {
+            Value::String(
+                output
+                    .display_name
+                    .as_ref()
+                    .or(output.source_name.as_ref())
+                    .cloned()
+                    .unwrap_or_else(|| output.source_type_name.clone()),
+            )
+        })
+        .collect::<Vec<_>>();
+    let output_tooltips = schema
+        .outputs
+        .iter()
+        .map(|output| {
+            output
+                .tooltip
+                .clone()
+                .map(Value::String)
+                .unwrap_or(Value::Null)
+        })
+        .collect::<Vec<_>>();
+    json!({
+        "input": {"required": required, "optional": optional, "hidden": hidden},
+        "input_order": {"required": required_order, "optional": optional_order, "hidden": hidden_order},
+        "is_input_list": false,
+        "output": outputs,
+        "output_is_list": vec![false; schema.outputs.len()],
+        "output_name": output_names,
+        "output_tooltips": output_tooltips,
+        "name": source.node_identifier,
+        "display_name": schema.presentation.display_name.as_deref().unwrap_or(&source.display_name),
+        "description": schema.presentation.description.as_deref().unwrap_or(""),
+        "python_module": source.source_python_module,
+        "category": source.category,
+        "output_node": source.output.output_node,
+        "has_intermediate_output": schema.node.has_intermediate_output,
+        "deprecated": schema.presentation.is_deprecated,
+        "experimental": schema.presentation.is_experimental,
+        "dev_only": schema.node.development_only,
+        "api_node": schema.node.api_node,
+        "price_badge": schema.node.price_badge.as_ref().and_then(project_schema_value),
+        "search_aliases": [],
+        "essentials_category": schema.node.essentials_category,
+        "sim_native_binding": native_binding_projection(disposition, reason),
+        "sim_source": native_source_projection(source),
+        "sim_schema": schema,
     })
 }
 
@@ -1622,27 +2038,6 @@ fn native_source_projection(source: &ObjectInfoNode) -> Value {
         "catalog_status": source.catalog_status,
         "inactive_reason": source.inactive_reason,
     })
-}
-
-fn runtime_type_union_name(value_types: &[NativeValueType]) -> String {
-    value_types
-        .iter()
-        .map(runtime_value_type_name)
-        .collect::<Vec<_>>()
-        .join("|")
-}
-
-fn runtime_value_type_name(value_type: &NativeValueType) -> String {
-    match value_type {
-        NativeValueType::Any => "*".to_owned(),
-        NativeValueType::Primitive(NativePrimitiveType::Null) => "NULL".to_owned(),
-        NativeValueType::Primitive(NativePrimitiveType::Boolean) => "BOOLEAN".to_owned(),
-        NativeValueType::Primitive(NativePrimitiveType::Integer) => "INT".to_owned(),
-        NativeValueType::Primitive(NativePrimitiveType::Number) => "FLOAT".to_owned(),
-        NativeValueType::Primitive(NativePrimitiveType::String) => "STRING".to_owned(),
-        NativeValueType::Handle(handle_type) => handle_type.type_id.clone(),
-        NativeValueType::PreservedUnknown => "UNKNOWN".to_owned(),
-    }
 }
 
 fn lock<'a, T>(
@@ -2356,6 +2751,7 @@ pub(crate) mod tests {
             schema_version: 1,
             class_type: class_type.to_owned(),
             implementation_version: "1".to_owned(),
+            source_schema: None,
             inputs: Vec::new(),
             dynamic_inputs: Vec::new(),
             outputs: Vec::new(),
@@ -2835,7 +3231,7 @@ pub(crate) mod tests {
             None,
         )?)?;
         let body = body_json(response)?;
-        assert_eq!(body.as_object().map(Map::len), Some(5));
+        assert_eq!(body.as_object().map(Map::len), Some(801));
         assert_eq!(body["LoadImage"]["python_module"], "nodes");
         assert_eq!(
             body["LoadImage"]["sim_source"]["catalog_status"],
@@ -2895,11 +3291,28 @@ pub(crate) mod tests {
         assert_eq!(body["ImageInvert"]["description"], "");
         assert_eq!(body["ImageInvert"]["has_intermediate_output"], false);
         assert!(body["ImageScale"].get("experimental").is_none());
+        let open_ai = &body["OpenAIGPTImage1"];
+        assert_eq!(open_ai["deprecated"], true);
+        assert_eq!(open_ai["api_node"], true);
+        assert_eq!(open_ai["input"]["required"]["prompt"][1]["default"], "");
+        assert_eq!(open_ai["input"]["required"]["prompt"][1]["multiline"], true);
+        assert_eq!(
+            open_ai["input"]["optional"]["quality"][0],
+            json!(["low", "medium", "high"])
+        );
+        assert_eq!(open_ai["input"]["optional"]["custom_width"][1]["min"], 1024);
+        assert_eq!(open_ai["input"]["optional"]["custom_width"][1]["max"], 3840);
+        assert_eq!(open_ai["input"]["optional"]["custom_width"][1]["step"], 16);
+        assert_eq!(
+            open_ai["sim_schema"]["inputs"][1]["maximum"]["kind"],
+            "preserved_expression"
+        );
+        assert_eq!(body["AddNoise"]["experimental"], true);
         Ok(())
     }
 
     #[test]
-    fn native_object_info_projects_only_executable_registry_nodes() -> Result<(), NativeServiceError>
+    fn native_object_info_projects_the_complete_source_registry() -> Result<(), NativeServiceError>
     {
         validate_native_object_info_fixture()
     }
@@ -2944,11 +3357,12 @@ pub(crate) mod tests {
             "comfy_extras.nodes_logic"
         );
         assert_eq!(
-            catalog["AutogrowNamesTestNode"]["sim_native_binding"],
-            json!({
-                "disposition": "unavailable",
-                "reason": "inactive in the canonical source registry",
-            })
+            catalog["AutogrowNamesTestNode"]["sim_native_binding"]["disposition"],
+            "unavailable"
+        );
+        assert_eq!(
+            catalog["AutogrowNamesTestNode"]["sim_native_binding"]["reason"],
+            catalog["AutogrowNamesTestNode"]["sim_source"]["inactive_reason"]
         );
         assert_eq!(
             catalog["AutogrowNamesTestNode"]["sim_source"]["catalog_status"],
@@ -2957,6 +3371,7 @@ pub(crate) mod tests {
         assert!(catalog["AutogrowNamesTestNode"]["sim_source"]["inactive_reason"].is_string());
         assert!(catalog["AutogrowNamesTestNode"]["sim_source"]["availability"].is_string());
         assert!(catalog["AutogrowNamesTestNode"]["sim_source"]["feature_id"].is_string());
+        assert!(catalog["AutogrowNamesTestNode"]["sim_schema"]["schema_source"].is_string());
 
         let error = services
             .dispatch(request(
@@ -3040,6 +3455,7 @@ pub(crate) mod tests {
             schema_version: 1,
             class_type: "Presentationless".to_owned(),
             implementation_version: "1".to_owned(),
+            source_schema: None,
             inputs: Vec::new(),
             dynamic_inputs: Vec::new(),
             outputs: Vec::new(),
