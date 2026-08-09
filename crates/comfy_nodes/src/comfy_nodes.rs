@@ -17,7 +17,8 @@ pub use execution::{
     NativeNodeContractError, NativeNodeDescriptor, NativeNodeFailure, NativeNodeFailureKind,
     NativeNodeOutcome, NativeNodePresentation, NativeOpaqueHandle, NativeOutputDescriptor,
     NativePortCardinality, NativePreparedEffectRequest, NativePrimitive, NativePrimitiveType,
-    NativeStoredObject, NativeTypeUnion, NativeValue, NativeValueType,
+    NativeStoredArtifactObject, NativeStoredModelObject, NativeStoredObject,
+    NativeStoredTensorObject, NativeTypeUnion, NativeValue, NativeValueType,
     validate_generated_family_bindings,
 };
 pub use object_info::{

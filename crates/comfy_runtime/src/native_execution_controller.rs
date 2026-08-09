@@ -44,8 +44,9 @@ use comfy_nodes::{
     NativeHandleStoreError, NativeHandleType, NativeImageDescriptor, NativeImageDescriptorError,
     NativeImageEffect, NativeInputDescriptor, NativeNodeBinding, NativeNodeContractError,
     NativeNodePresentation, NativeOpaqueHandle, NativePrimitive, NativePrimitiveType,
-    NativeTypeUnion, NativeValue, NativeValueType, NodeDescriptor, NodeRegistry, PortDescriptor,
-    generated_family_node_bindings, native_diffusion_descriptors, native_image_descriptors,
+    NativeStoredModelObject, NativeStoredTensorObject, NativeTypeUnion, NativeValue,
+    NativeValueType, NodeDescriptor, NodeRegistry, PortDescriptor, generated_family_node_bindings,
+    native_diffusion_descriptors, native_image_descriptors,
 };
 use comfy_sampler::{
     DiscreteSamplingProfile, GUIDANCE_ADAPTER_ID, GuidanceDenoiser, GuidanceError,
@@ -1910,6 +1911,22 @@ enum StoredNativeTensor {
     },
 }
 
+fn native_stored_tensor_object(
+    metadata: &NativeTensorHandle,
+    resident_bytes: usize,
+    payload: StoredNativeTensor,
+) -> Result<NativeStoredTensorObject, NativeImageRuntimeError> {
+    let byte_length = u64::try_from(resident_bytes).map_err(|_| {
+        NativeImageRuntimeError::Handle("native tensor byte length overflowed".to_owned())
+    })?;
+    Ok(NativeStoredTensorObject::new(
+        metadata.descriptor().clone(),
+        byte_length,
+        metadata.content_digest(),
+        Arc::new(payload),
+    )?)
+}
+
 fn prepare_image_metadata(
     kind: NativeTensorKind,
     tensor: &ImageTensor,
@@ -1952,10 +1969,17 @@ fn publish_image(
         .handle_store()
         .publish(
             native_tensor_handle_type(kind).map_err(runtime_failure)?,
-            Arc::new(StoredNativeTensor::Image {
-                metadata: metadata.clone(),
-                tensor: Arc::new(tensor),
-            }),
+            Arc::new(
+                native_stored_tensor_object(
+                    &metadata,
+                    resident_bytes,
+                    StoredNativeTensor::Image {
+                        metadata: metadata.clone(),
+                        tensor: Arc::new(tensor),
+                    },
+                )
+                .map_err(runtime_failure)?,
+            ),
             Some(metadata.content_digest().to_owned()),
             resident_bytes,
             &context.cancellation,
@@ -1993,12 +2017,22 @@ fn resolve_image(
 ) -> Result<Arc<ImageTensor>, NodeFailure> {
     let handle = required_opaque_handle(inputs, name)?;
     let expected_type = native_tensor_handle_type(expected_kind).map_err(runtime_failure)?;
-    let stored = context
+    let projected = context
         .handle_store()
         .resolve(handle, &expected_type, &context.cancellation)
         .map_err(|error| runtime_failure(error.into()))?
-        .downcast::<StoredNativeTensor>()
+        .downcast::<NativeStoredTensorObject>()
         .map_err(|_| invalid_diffusion_input("native image handle stored the wrong object type"))?;
+    if projected.digest() != handle.digest_sha256().unwrap_or_default() {
+        return Err(invalid_diffusion_input(
+            "native image handle projection digest changed",
+        ));
+    }
+    let stored = projected
+        .payload()
+        .clone()
+        .downcast::<StoredNativeTensor>()
+        .map_err(|_| invalid_diffusion_input("native image handle payload type is invalid"))?;
     let StoredNativeTensor::Image { metadata, tensor } = stored.as_ref() else {
         return Err(invalid_diffusion_input(
             "native image handle stored a raw tensor object",
@@ -2059,10 +2093,17 @@ fn publish_tensor(
         .handle_store()
         .publish(
             native_tensor_handle_type(kind).map_err(runtime_failure)?,
-            Arc::new(StoredNativeTensor::Tensor {
-                metadata: metadata.clone(),
-                tensor,
-            }),
+            Arc::new(
+                native_stored_tensor_object(
+                    &metadata,
+                    resident_bytes,
+                    StoredNativeTensor::Tensor {
+                        metadata: metadata.clone(),
+                        tensor,
+                    },
+                )
+                .map_err(runtime_failure)?,
+            ),
             Some(metadata.content_digest().to_owned()),
             resident_bytes,
             &context.cancellation,
@@ -2079,14 +2120,24 @@ fn resolve_tensor(
 ) -> Result<Tensor, NodeFailure> {
     let handle = required_opaque_handle(inputs, name)?;
     let expected_type = native_tensor_handle_type(expected_kind).map_err(runtime_failure)?;
-    let stored = context
+    let projected = context
         .handle_store()
         .resolve(handle, &expected_type, &context.cancellation)
         .map_err(|error| runtime_failure(error.into()))?
-        .downcast::<StoredNativeTensor>()
+        .downcast::<NativeStoredTensorObject>()
         .map_err(|_| {
             invalid_diffusion_input("native tensor handle stored the wrong object type")
         })?;
+    if projected.digest() != handle.digest_sha256().unwrap_or_default() {
+        return Err(invalid_diffusion_input(
+            "native tensor handle projection digest changed",
+        ));
+    }
+    let stored = projected
+        .payload()
+        .clone()
+        .downcast::<StoredNativeTensor>()
+        .map_err(|_| invalid_diffusion_input("native tensor handle payload type is invalid"))?;
     let StoredNativeTensor::Tensor { metadata, tensor } = stored.as_ref() else {
         return Err(invalid_diffusion_input(
             "native tensor handle stored an image object",
@@ -2281,6 +2332,14 @@ struct StoredNativeDiffusion {
     bundle: Arc<NativeDiffusionBundle>,
 }
 
+fn native_diffusion_model_format(role: NativeDiffusionRole) -> &'static str {
+    match role {
+        NativeDiffusionRole::Model => "sim-native-diffusion-model-v1",
+        NativeDiffusionRole::Clip => "sim-native-diffusion-clip-v1",
+        NativeDiffusionRole::Vae => "sim-native-diffusion-vae-v1",
+    }
+}
+
 fn native_diffusion_handle_type(
     role: NativeDiffusionRole,
 ) -> Result<NativeHandleType, NativeImageRuntimeError> {
@@ -2310,7 +2369,15 @@ fn publish_diffusion_bundle(
         .handle_store()
         .publish(
             native_diffusion_handle_type(role).map_err(runtime_failure)?,
-            Arc::new(StoredNativeDiffusion { metadata, bundle }),
+            Arc::new(
+                NativeStoredModelObject::new(
+                    metadata.fixture_id.clone(),
+                    native_diffusion_model_format(role),
+                    digest.clone(),
+                    Arc::new(StoredNativeDiffusion { metadata, bundle }),
+                )
+                .map_err(|error| runtime_failure(error.into()))?,
+            ),
             Some(digest),
             resident_bytes,
             &context.cancellation,
@@ -2329,14 +2396,24 @@ fn resolve_diffusion_bundle(
 ) -> Result<Arc<NativeDiffusionBundle>, NodeFailure> {
     let handle = required_opaque_handle(inputs, name)?;
     let expected_type = native_diffusion_handle_type(role).map_err(runtime_failure)?;
-    let stored = context
+    let projected = context
         .handle_store()
         .resolve(handle, &expected_type, &context.cancellation)
         .map_err(|error| runtime_failure(error.into()))?
-        .downcast::<StoredNativeDiffusion>()
+        .downcast::<NativeStoredModelObject>()
         .map_err(|_| {
             invalid_diffusion_input("native diffusion handle stored the wrong object type")
         })?;
+    if projected.digest() != handle.digest_sha256().unwrap_or_default() {
+        return Err(invalid_diffusion_input(
+            "native diffusion handle projection digest changed",
+        ));
+    }
+    let stored = projected
+        .payload()
+        .clone()
+        .downcast::<StoredNativeDiffusion>()
+        .map_err(|_| invalid_diffusion_input("native diffusion handle payload type is invalid"))?;
     let expected = state.bundle(tensor_context).map_err(runtime_failure)?;
     let expected_metadata =
         NativeDiffusionHandle::from_bundle(&expected, role).map_err(runtime_failure)?;
@@ -6752,6 +6829,7 @@ mod tests {
             cpu_backend.execution_context(StreamId::DEFAULT, workspace, &cancellation);
         let image =
             ImageTensor::from_f32(&cpu_backend, &tensor_context, 1, 1, 1, 3, &[0.0, 0.5, 1.0])?;
+        let image_resident_bytes = image.tensor().contiguous_bytes()?.len();
         let raw_tensor = image.tensor().clone();
         let image_handle = prepare_image_metadata(NativeTensorKind::Image, &image)?;
         let raw_handle = prepare_tensor_metadata(NativeTensorKind::Conditioning, &raw_tensor)?;
@@ -6766,10 +6844,14 @@ mod tests {
         let store = generation.handle_store_for_attempt(attempt_id);
         let result = store.publish(
             native_tensor_handle_type(NativeTensorKind::Image)?,
-            Arc::new(StoredNativeTensor::Image {
-                metadata: image_handle.clone(),
-                tensor: Arc::new(image),
-            }),
+            Arc::new(native_stored_tensor_object(
+                &image_handle,
+                image_resident_bytes,
+                StoredNativeTensor::Image {
+                    metadata: image_handle.clone(),
+                    tensor: Arc::new(image),
+                },
+            )?),
             Some(image_handle.content_digest().to_owned()),
             0,
             &cancellation,

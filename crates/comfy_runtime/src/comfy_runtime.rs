@@ -6,8 +6,9 @@ pub use comfy_nodes::{
     NativeNodeContext, NativeNodeContractError, NativeNodeDescriptor, NativeNodeFailure,
     NativeNodeFailureKind, NativeNodeOutcome, NativeNodePresentation, NativeOpaqueHandle,
     NativeOutputDescriptor, NativePortCardinality, NativePreparedEffectRequest, NativePrimitive,
-    NativePrimitiveType, NativeStoredObject, NativeTypeUnion, NativeValue, NativeValueType,
-    NodeRegistry, NodeRegistryError, ObjectInfoInputSchema, ObjectInfoNode, ObjectInfoOutputSchema,
+    NativePrimitiveType, NativeStoredArtifactObject, NativeStoredModelObject, NativeStoredObject,
+    NativeStoredTensorObject, NativeTypeUnion, NativeValue, NativeValueType, NodeRegistry,
+    NodeRegistryError, ObjectInfoInputSchema, ObjectInfoNode, ObjectInfoOutputSchema,
     ObjectInfoRegistry,
 };
 pub use comfy_types::{AttemptId, ExecutionId, ProfileId, PromptId, RequestId};

@@ -1,4 +1,4 @@
-use comfy_tensor::ScratchReservation;
+use comfy_tensor::{ScratchReservation, TensorDescriptor};
 use comfy_types::{ApiPrompt, AttemptId, CancellationToken, NodeId, PromptId};
 use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
@@ -504,6 +504,195 @@ impl NativeNodePresentation {
 
 pub type NativeStoredObject = Arc<dyn Any + Send + Sync>;
 
+#[derive(Clone)]
+pub struct NativeStoredTensorObject {
+    descriptor: TensorDescriptor,
+    byte_length: u64,
+    digest_sha256: String,
+    payload: NativeStoredObject,
+}
+
+impl fmt::Debug for NativeStoredTensorObject {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("NativeStoredTensorObject")
+            .field("descriptor", &self.descriptor)
+            .field("byte_length", &self.byte_length)
+            .field("digest_sha256", &self.digest_sha256)
+            .finish_non_exhaustive()
+    }
+}
+
+impl NativeStoredTensorObject {
+    pub fn new(
+        descriptor: TensorDescriptor,
+        byte_length: u64,
+        digest_sha256: impl Into<String>,
+        payload: NativeStoredObject,
+    ) -> Result<Self, NativeNodeContractError> {
+        let digest_sha256 = digest_sha256.into();
+        descriptor
+            .validate_backing_byte_length(byte_length)
+            .map_err(|_| NativeNodeContractError::InvalidStoredObject)?;
+        if !valid_sha256(&digest_sha256) {
+            return Err(NativeNodeContractError::InvalidDigest);
+        }
+        Ok(Self {
+            descriptor,
+            byte_length,
+            digest_sha256,
+            payload,
+        })
+    }
+
+    pub fn descriptor(&self) -> &TensorDescriptor {
+        &self.descriptor
+    }
+
+    pub fn byte_length(&self) -> u64 {
+        self.byte_length
+    }
+
+    pub fn digest(&self) -> &str {
+        &self.digest_sha256
+    }
+
+    pub fn payload(&self) -> &NativeStoredObject {
+        &self.payload
+    }
+}
+
+#[derive(Clone)]
+pub struct NativeStoredModelObject {
+    identifier: String,
+    format: String,
+    digest_sha256: String,
+    payload: NativeStoredObject,
+}
+
+impl fmt::Debug for NativeStoredModelObject {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("NativeStoredModelObject")
+            .field("identifier", &self.identifier)
+            .field("format", &self.format)
+            .field("digest_sha256", &self.digest_sha256)
+            .finish_non_exhaustive()
+    }
+}
+
+impl NativeStoredModelObject {
+    pub fn new(
+        identifier: impl Into<String>,
+        format: impl Into<String>,
+        digest_sha256: impl Into<String>,
+        payload: NativeStoredObject,
+    ) -> Result<Self, NativeNodeContractError> {
+        let identifier = identifier.into();
+        let format = format.into();
+        let digest_sha256 = digest_sha256.into();
+        validate_identifier("stored model identifier", &identifier)?;
+        validate_identifier("stored model format", &format)?;
+        if !valid_sha256(&digest_sha256) {
+            return Err(NativeNodeContractError::InvalidDigest);
+        }
+        Ok(Self {
+            identifier,
+            format,
+            digest_sha256,
+            payload,
+        })
+    }
+
+    pub fn identifier(&self) -> &str {
+        &self.identifier
+    }
+
+    pub fn format(&self) -> &str {
+        &self.format
+    }
+
+    pub fn digest(&self) -> &str {
+        &self.digest_sha256
+    }
+
+    pub fn payload(&self) -> &NativeStoredObject {
+        &self.payload
+    }
+}
+
+#[derive(Clone)]
+pub struct NativeStoredArtifactObject {
+    namespace: String,
+    identifier: String,
+    byte_length: u64,
+    digest_sha256: String,
+    payload: NativeStoredObject,
+}
+
+impl fmt::Debug for NativeStoredArtifactObject {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("NativeStoredArtifactObject")
+            .field("namespace", &self.namespace)
+            .field("identifier", &self.identifier)
+            .field("byte_length", &self.byte_length)
+            .field("digest_sha256", &self.digest_sha256)
+            .finish_non_exhaustive()
+    }
+}
+
+impl NativeStoredArtifactObject {
+    pub fn new(
+        namespace: impl Into<String>,
+        identifier: impl Into<String>,
+        byte_length: u64,
+        digest_sha256: impl Into<String>,
+        payload: NativeStoredObject,
+    ) -> Result<Self, NativeNodeContractError> {
+        let namespace = namespace.into();
+        let identifier = identifier.into();
+        let digest_sha256 = digest_sha256.into();
+        validate_identifier("stored artifact namespace", &namespace)?;
+        validate_text(
+            "stored artifact identifier",
+            &identifier,
+            MAX_IDENTIFIER_BYTES,
+            false,
+        )?;
+        if !valid_sha256(&digest_sha256) {
+            return Err(NativeNodeContractError::InvalidDigest);
+        }
+        Ok(Self {
+            namespace,
+            identifier,
+            byte_length,
+            digest_sha256,
+            payload,
+        })
+    }
+
+    pub fn namespace(&self) -> &str {
+        &self.namespace
+    }
+
+    pub fn identifier(&self) -> &str {
+        &self.identifier
+    }
+
+    pub fn byte_length(&self) -> u64 {
+        self.byte_length
+    }
+
+    pub fn digest(&self) -> &str {
+        &self.digest_sha256
+    }
+
+    pub fn payload(&self) -> &NativeStoredObject {
+        &self.payload
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum NativeHandleStoreError {
     #[error("native handle operation was cancelled")]
@@ -954,6 +1143,8 @@ pub enum NativeNodeContractError {
     BindingImplementationMismatch,
     #[error("native node context does not match its attempt-local handle store")]
     InvalidNodeContext,
+    #[error("native stored object metadata does not match its payload contract")]
+    InvalidStoredObject,
     #[error("generated native node descriptors contain a duplicate")]
     DuplicateGeneratedDescriptor,
     #[error("generated native node bindings do not exactly match descriptor IDs")]
@@ -1001,7 +1192,7 @@ fn valid_sha256(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use comfy_tensor::CpuWorkspaceAuthority;
+    use comfy_tensor::{CpuWorkspaceAuthority, DType, DeviceId, StreamId};
     use std::sync::{
         Mutex,
         atomic::{AtomicU64, Ordering},
@@ -1501,6 +1692,54 @@ mod tests {
             validate_generated_family_bindings(&[], &["IdentityModel"]),
             Err(NativeNodeContractError::GeneratedBindingMismatch)
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn stored_object_projections_bind_exact_metadata_to_one_payload()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let tensor_payload: NativeStoredObject = Arc::new(vec![0_u8; 16]);
+        let descriptor =
+            TensorDescriptor::contiguous(vec![2, 2], DType::F32, DeviceId::CPU, StreamId::DEFAULT)?;
+        let tensor =
+            NativeStoredTensorObject::new(descriptor.clone(), 16, "a".repeat(64), tensor_payload)?;
+        assert_eq!(tensor.descriptor(), &descriptor);
+        assert_eq!(tensor.byte_length(), 16);
+        assert_eq!(tensor.digest(), "a".repeat(64));
+        assert!(tensor.payload().downcast_ref::<Vec<u8>>().is_some());
+        assert!(matches!(
+            NativeStoredTensorObject::new(
+                descriptor,
+                1,
+                "a".repeat(64),
+                Arc::new(Vec::<u8>::new())
+            ),
+            Err(NativeNodeContractError::InvalidStoredObject)
+        ));
+
+        let model = NativeStoredModelObject::new(
+            "fixture-model",
+            "sim-native-model-v1",
+            "b".repeat(64),
+            Arc::new("model payload".to_owned()),
+        )?;
+        assert_eq!(model.identifier(), "fixture-model");
+        assert_eq!(model.format(), "sim-native-model-v1");
+        assert_eq!(model.digest(), "b".repeat(64));
+        assert!(model.payload().downcast_ref::<String>().is_some());
+
+        let artifact = NativeStoredArtifactObject::new(
+            "output",
+            "nested/fixture.png",
+            128,
+            "c".repeat(64),
+            Arc::new(vec![0_u8; 128]),
+        )?;
+        assert_eq!(artifact.namespace(), "output");
+        assert_eq!(artifact.identifier(), "nested/fixture.png");
+        assert_eq!(artifact.byte_length(), 128);
+        assert_eq!(artifact.digest(), "c".repeat(64));
+        assert!(artifact.payload().downcast_ref::<Vec<u8>>().is_some());
         Ok(())
     }
 }

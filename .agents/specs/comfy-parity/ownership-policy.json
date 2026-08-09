@@ -9420,6 +9420,9 @@
         "NativeNodeBinding",
         "NativeValue",
         "NativeHandleStore",
+        "NativeStoredTensorObject",
+        "NativeStoredModelObject",
+        "NativeStoredArtifactObject",
         "NodeRegistry",
         "PluginNode"
       ],
@@ -9428,6 +9431,7 @@
         "generated_native_node_registry_projection atomically composes the compatibility image and diffusion slices with generated family bindings and validates comprehensive executable, provider-required, and unavailable closure",
         "native_image_registry_projection remains a deliberately narrow compatibility projection and is not the production comprehensive registry",
         "comfy_runtime::NativeHandleStoreGeneration is the sole concrete store and lease owner; nodes receive only an attempt-scoped comfy_nodes::NativeHandleStore boundary",
+        "comfy_nodes::NativeStoredTensorObject, NativeStoredModelObject, and NativeStoredArtifactObject wrap the one concrete stored payload with checked neutral metadata for built-in and signed-plugin interoperability; they own no second payload or store",
         "verified PluginNode metadata maps exact display name, category, ordered output-port names, signed namespace, and typed ports into RuntimeNodePresentation and NativeNodeBinding in the same atomic batch as its executable descriptor",
         "NativeRuntimeHttpServices serializes checked RuntimeNodePresentation while cataloged built-ins obtain python_module only from ObjectInfoRegistry.source_python_module; unavailable rows remain visible and fail closed before execution"
       ],
@@ -9475,6 +9479,24 @@
           "symbol": "NativeHandleStore"
         },
         {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativeStoredTensorObject",
+          "role": "boundary_dto",
+          "symbol": "NativeStoredTensorObject"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativeStoredModelObject",
+          "role": "boundary_dto",
+          "symbol": "NativeStoredModelObject"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativeStoredArtifactObject",
+          "role": "boundary_dto",
+          "symbol": "NativeStoredArtifactObject"
+        },
+        {
           "path": "crates/comfy_runtime/src/executor.rs",
           "qualified": "comfy_runtime::NativeHandleStoreGeneration",
           "role": "canonical",
@@ -9518,6 +9540,9 @@
         "NativeHandleStoreGeneration",
         "NativeNodeBinding",
         "NativeNodeRegistry",
+        "NativeStoredArtifactObject",
+        "NativeStoredModelObject",
+        "NativeStoredTensorObject",
         "NativeValue",
         "NodeRegistry",
         "NodeRegistryGenerator",
@@ -9609,7 +9634,7 @@
         "VAL-WORKER-PLUGIN-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "NativeNodeRegistry alone owns runtime binding identity, dispatch, provider activation, and unavailable state. NativeHandleStoreGeneration alone owns concrete attempt staging, committed objects, leases, generation checks, and resident-byte accounting. NodeRegistry owns built-in catalog metadata and its checked source-module projection; the verified PluginNode owns signed component metadata. The portable NativeNodeBinding, NativeValue, NativeHandleStore, and presentation DTOs live below the runtime dependency boundary in comfy_nodes::execution. Production consumers use the comprehensive generated registry, while the early image projection remains compatibility-only."
+      "decision_reason": "NativeNodeRegistry alone owns runtime binding identity, dispatch, provider activation, and unavailable state. NativeHandleStoreGeneration alone owns concrete attempt staging, committed objects, leases, generation checks, and resident-byte accounting. NodeRegistry owns built-in catalog metadata and its checked source-module projection; the verified PluginNode owns signed component metadata. The portable NativeNodeBinding, NativeValue, NativeHandleStore, presentation DTOs, and neutral stored-object metadata wrappers live below the runtime dependency boundary in comfy_nodes::execution. Each wrapper retains the one actual stored payload, so plugin interoperability introduces neither a JSON value tunnel nor a parallel store. Production consumers use the comprehensive generated registry, while the early image projection remains compatibility-only."
     },
     {
       "concern": "native_rgb8_tensor_conversion",
