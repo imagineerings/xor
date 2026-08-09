@@ -6,12 +6,14 @@ use comfy_nodes::{
     NATIVE_NODE_CONTRACT_SCHEMA_VERSION, NativeHandleKind, NativeHandleType, NativeInputDescriptor,
     NativeNode, NativeNodeContext, NativeNodeFailure, NativeNodeFailureKind, NativeNodeOutcome,
     NativeNodePresentation, NativeOutputDescriptor, NativePortCardinality,
-    NativePreparedEffectRequest, NativePrimitive, NativePrimitiveType, NativeTypeUnion,
+    NativePreparedEffectRequest, NativePrimitive, NativePrimitiveType, NativeStoredArtifactObject,
+    NativeStoredModelObject, NativeStoredObject, NativeStoredTensorObject, NativeTypeUnion,
     NativeValue, NativeValueType,
 };
 use comfy_plugin_sdk::{
-    CachePolicy, EffectPolicy, PluginNode, PluginPort, PluginValue, PluginValueRepresentation,
-    PortCardinality, PortDirection, PortPresence, ScalarValue, TypeRegistry, ValueFamily,
+    ArtifactValue, CachePolicy, EffectPolicy, ModelValue, PluginNode, PluginPort, PluginValue,
+    PluginValueRepresentation, PortCardinality, PortDirection, PortPresence, ScalarValue,
+    TensorValue, TypeRegistry, ValueFamily,
 };
 use comfy_runtime::{NativeNodeRegistry, NativeNodeRegistryError};
 use futures::future::BoxFuture;
@@ -369,9 +371,7 @@ fn plugin_value(
                 .handle_store()
                 .resolve(&handle, &expected_type, &context.cancellation)
                 .map_err(plugin_failure)?;
-            let stored = stored
-                .downcast::<PluginValue>()
-                .map_err(|_| invalid_value(&port.id))?;
+            let stored = plugin_value_from_stored(port, family, stored, registry)?;
             if stored.type_id() != &port.type_id || stored.family() != family {
                 return Err(invalid_value(&port.id));
             }
@@ -379,8 +379,55 @@ fn plugin_value(
             if let PluginValueRepresentation::Artifact(artifact) = stored.representation() {
                 artifact_value_identity(profile_id, artifact).map_err(plugin_failure)?;
             }
-            Ok((*stored).clone())
+            Ok(stored)
         }
+    }
+}
+
+fn plugin_value_from_stored(
+    port: &PluginPort,
+    family: ValueFamily,
+    stored: NativeStoredObject,
+    registry: &TypeRegistry,
+) -> Result<PluginValue, NativeNodeFailure> {
+    if let Ok(value) = stored.clone().downcast::<PluginValue>() {
+        return Ok((*value).clone());
+    }
+    match family {
+        ValueFamily::Tensor => {
+            let stored = stored
+                .downcast::<NativeStoredTensorObject>()
+                .map_err(|_| invalid_value(&port.id))?;
+            let value = TensorValue::new(
+                stored.descriptor().clone(),
+                stored.byte_length(),
+                stored.digest(),
+            )
+            .map_err(plugin_failure)?;
+            PluginValue::tensor(port.type_id.clone(), value, registry).map_err(plugin_failure)
+        }
+        ValueFamily::Artifact => {
+            let stored = stored
+                .downcast::<NativeStoredArtifactObject>()
+                .map_err(|_| invalid_value(&port.id))?;
+            let value = ArtifactValue::new(
+                stored.namespace(),
+                stored.identifier(),
+                stored.byte_length(),
+                stored.digest(),
+            )
+            .map_err(plugin_failure)?;
+            PluginValue::artifact(port.type_id.clone(), value, registry).map_err(plugin_failure)
+        }
+        ValueFamily::Model => {
+            let stored = stored
+                .downcast::<NativeStoredModelObject>()
+                .map_err(|_| invalid_value(&port.id))?;
+            let value = ModelValue::new(stored.identifier(), stored.format(), stored.digest())
+                .map_err(plugin_failure)?;
+            PluginValue::model(port.type_id.clone(), value, registry).map_err(plugin_failure)
+        }
+        ValueFamily::Scalar => Err(invalid_value(&port.id)),
     }
 }
 
@@ -538,11 +585,12 @@ fn publish_plugin_value(
         .ok_or_else(|| invalid_value(&port.id))?
         .to_owned();
     let resident_bytes = value.abi_bytes().map_err(plugin_failure)?.len().max(1);
+    let stored = stored_plugin_value(&value, &digest)?;
     let handle = context
         .handle_store()
         .publish(
             native_handle_type(port, family).map_err(plugin_failure)?,
-            Arc::new(value),
+            stored,
             Some(digest),
             resident_bytes,
             &context.cancellation,
@@ -550,6 +598,38 @@ fn publish_plugin_value(
         .map_err(plugin_failure)?;
     published.push(handle.clone());
     Ok(NativeValue::Handle { value: handle })
+}
+
+fn stored_plugin_value(
+    value: &PluginValue,
+    digest: &str,
+) -> Result<NativeStoredObject, NativeNodeFailure> {
+    let payload: NativeStoredObject = Arc::new(value.clone());
+    match value.representation() {
+        PluginValueRepresentation::Tensor(value) => NativeStoredTensorObject::new(
+            value.descriptor().clone(),
+            value.byte_length(),
+            digest,
+            payload,
+        )
+        .map(|value| Arc::new(value) as NativeStoredObject)
+        .map_err(plugin_failure),
+        PluginValueRepresentation::Artifact(value) => NativeStoredArtifactObject::new(
+            value.namespace(),
+            value.identifier(),
+            value.byte_length(),
+            digest,
+            payload,
+        )
+        .map(|value| Arc::new(value) as NativeStoredObject)
+        .map_err(plugin_failure),
+        PluginValueRepresentation::Model(value) => {
+            NativeStoredModelObject::new(value.identifier(), value.format(), digest, payload)
+                .map(|value| Arc::new(value) as NativeStoredObject)
+                .map_err(plugin_failure)
+        }
+        PluginValueRepresentation::Scalar(_) => Err(invalid_value("scalar-output")),
+    }
 }
 
 fn revoke_published(
@@ -700,7 +780,9 @@ fn plugin_failure(error: impl std::fmt::Display) -> NativeNodeFailure {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use comfy_plugin_sdk::ArtifactValue;
+    use comfy_plugin_sdk::{
+        ArtifactValue, DType, DeviceId, PortSerialization, StreamId, TensorDescriptor,
+    };
     use std::error::Error;
 
     fn artifact_value(identifier: &str) -> Result<PluginValue, Box<dyn Error>> {
@@ -710,6 +792,131 @@ mod tests {
             ArtifactValue::new("input", identifier, 3, "2".repeat(64))?,
             &registry,
         )?)
+    }
+
+    fn input_port(
+        registry: &TypeRegistry,
+        type_name: &str,
+        serialization: PortSerialization,
+    ) -> Result<PluginPort, Box<dyn Error>> {
+        Ok(PluginPort {
+            id: format!("{type_name}-input"),
+            name: format!("{type_name} input"),
+            direction: PortDirection::Input,
+            type_id: registry.resolve(type_name)?.clone(),
+            cardinality: PortCardinality::Singular,
+            presence: PortPresence::Required,
+            hidden: false,
+            lazy: false,
+            default: None,
+            serialization,
+            accepted_legacy_names: Vec::new(),
+        })
+    }
+
+    #[test]
+    fn neutral_stored_objects_bridge_native_and_plugin_values() -> Result<(), Box<dyn Error>> {
+        let registry = TypeRegistry::built_in()?;
+        let tensor_digest = "1".repeat(64);
+        let tensor = PluginValue::tensor(
+            registry.resolve("IMAGE")?.clone(),
+            TensorValue::new(
+                TensorDescriptor::contiguous(
+                    vec![1],
+                    DType::F32,
+                    DeviceId::CPU,
+                    StreamId::DEFAULT,
+                )?,
+                4,
+                &tensor_digest,
+            )?,
+            &registry,
+        )?;
+        let artifact = artifact_value("bridge.svg")?;
+        let model_digest = "3".repeat(64);
+        let model = PluginValue::model(
+            registry.resolve("MODEL")?.clone(),
+            ModelValue::new("bridge-model", "safetensors", &model_digest)?,
+            &registry,
+        )?;
+        let cases = [
+            (
+                input_port(&registry, "IMAGE", PortSerialization::Handle)?,
+                ValueFamily::Tensor,
+                tensor,
+            ),
+            (
+                input_port(&registry, "SVG", PortSerialization::ArtifactReference)?,
+                ValueFamily::Artifact,
+                artifact,
+            ),
+            (
+                input_port(&registry, "MODEL", PortSerialization::Handle)?,
+                ValueFamily::Model,
+                model,
+            ),
+        ];
+        for (port, family, expected) in cases {
+            let digest = value_digest(&expected).ok_or("fixture has no digest")?;
+            let native_payload: NativeStoredObject = Arc::new("native-payload".to_owned());
+            let native: NativeStoredObject = match expected.representation() {
+                PluginValueRepresentation::Tensor(value) => {
+                    Arc::new(NativeStoredTensorObject::new(
+                        value.descriptor().clone(),
+                        value.byte_length(),
+                        digest,
+                        native_payload,
+                    )?)
+                }
+                PluginValueRepresentation::Artifact(value) => {
+                    Arc::new(NativeStoredArtifactObject::new(
+                        value.namespace(),
+                        value.identifier(),
+                        value.byte_length(),
+                        digest,
+                        native_payload,
+                    )?)
+                }
+                PluginValueRepresentation::Model(value) => Arc::new(NativeStoredModelObject::new(
+                    value.identifier(),
+                    value.format(),
+                    digest,
+                    native_payload,
+                )?),
+                PluginValueRepresentation::Scalar(_) => {
+                    return Err("unexpected scalar fixture".into());
+                }
+            };
+            let projected = plugin_value_from_stored(&port, family, native, &registry)?;
+            assert_eq!(projected, expected);
+            let republished = stored_plugin_value(&projected, digest)?;
+            let payload = match family {
+                ValueFamily::Tensor => republished
+                    .downcast::<NativeStoredTensorObject>()
+                    .map_err(|_| "tensor was not wrapped")?
+                    .payload()
+                    .clone(),
+                ValueFamily::Artifact => republished
+                    .downcast::<NativeStoredArtifactObject>()
+                    .map_err(|_| "artifact was not wrapped")?
+                    .payload()
+                    .clone(),
+                ValueFamily::Model => republished
+                    .downcast::<NativeStoredModelObject>()
+                    .map_err(|_| "model was not wrapped")?
+                    .payload()
+                    .clone(),
+                ValueFamily::Scalar => return Err("unexpected scalar fixture".into()),
+            };
+            assert_eq!(
+                payload
+                    .downcast::<PluginValue>()
+                    .map_err(|_| "wrapper payload was not a plugin value")?
+                    .as_ref(),
+                &expected
+            );
+        }
+        Ok(())
     }
 
     #[test]

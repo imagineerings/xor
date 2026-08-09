@@ -30,7 +30,8 @@ use comfy_runtime::{
     ExecutionDataSource, ExecutionEventBus, ExecutionPresentationService, ExecutionSnapshotStatus,
     NativeHandleKind, NativeHandleStore, NativeHandleStoreError, NativeHandleStoreGeneration,
     NativeHandleStoreIdentity, NativeHandleType, NativeNodeRegistry, NativeOpaqueHandle,
-    NativePrimitive, NativeStoredObject, NativeValue, NodeContext, NodeOutcome, OutputCommitter,
+    NativePrimitive, NativeStoredArtifactObject, NativeStoredModelObject, NativeStoredObject,
+    NativeStoredTensorObject, NativeValue, NodeContext, NodeOutcome, OutputCommitter,
     OutputExecutionScope, PermissionGrant, PermissionPolicy, PluginAuthorization,
     PluginCapabilityBroker, PluginRngPolicy, PluginServiceActuatorError,
     PluginServiceOperationContext, PluginTrustPolicy, PluginVerificationKey, ProfileId,
@@ -852,18 +853,44 @@ fn registry_handle(
     type_id: &str,
 ) -> Result<NativeValue, Box<dyn Error>> {
     let digest = match value.representation() {
-        comfy_plugin_sdk::PluginValueRepresentation::Tensor(value) => value.digest(),
-        comfy_plugin_sdk::PluginValueRepresentation::Artifact(value) => value.digest(),
-        comfy_plugin_sdk::PluginValueRepresentation::Model(value) => value.digest(),
+        comfy_plugin_sdk::PluginValueRepresentation::Tensor(value) => value.digest().to_owned(),
+        comfy_plugin_sdk::PluginValueRepresentation::Artifact(value) => value.digest().to_owned(),
+        comfy_plugin_sdk::PluginValueRepresentation::Model(value) => value.digest().to_owned(),
         comfy_plugin_sdk::PluginValueRepresentation::Scalar(_) => {
             return Err("scalar plugin fixture cannot be published as a handle".into());
         }
     };
     let resident_bytes = value.abi_bytes()?.len().max(1);
+    let payload: NativeStoredObject = Arc::new(value.clone());
+    let stored: NativeStoredObject = match value.representation() {
+        comfy_plugin_sdk::PluginValueRepresentation::Tensor(value) => {
+            Arc::new(NativeStoredTensorObject::new(
+                value.descriptor().clone(),
+                value.byte_length(),
+                &digest,
+                payload,
+            )?)
+        }
+        comfy_plugin_sdk::PluginValueRepresentation::Artifact(value) => {
+            Arc::new(NativeStoredArtifactObject::new(
+                value.namespace(),
+                value.identifier(),
+                value.byte_length(),
+                &digest,
+                payload,
+            )?)
+        }
+        comfy_plugin_sdk::PluginValueRepresentation::Model(value) => Arc::new(
+            NativeStoredModelObject::new(value.identifier(), value.format(), &digest, payload)?,
+        ),
+        comfy_plugin_sdk::PluginValueRepresentation::Scalar(_) => {
+            return Err("scalar plugin fixture cannot be published as a handle".into());
+        }
+    };
     let handle = store.publish(
         NativeHandleType::new(handle_kind, type_id)?,
-        Arc::new(value),
-        Some(digest.to_owned()),
+        stored,
+        Some(digest),
         resident_bytes,
         cancellation,
     )?;
@@ -1099,9 +1126,27 @@ async fn exercise_native_registry_value_boundary(
     let resolver = generation.handle_store_for_attempt(attempt_id);
     for handle in &output_handles {
         let value = resolver.resolve(handle, handle.handle_type(), &cancellation)?;
-        value
-            .downcast::<PluginValue>()
-            .map_err(|_| "published native plugin handle did not retain its typed ABI value")?;
+        let payload = match handle.handle_type().kind {
+            NativeHandleKind::Image => value
+                .downcast::<NativeStoredTensorObject>()
+                .map_err(|_| "plugin tensor output did not publish the neutral stored wrapper")?
+                .payload()
+                .clone(),
+            NativeHandleKind::Artifact => value
+                .downcast::<NativeStoredArtifactObject>()
+                .map_err(|_| "plugin artifact output did not publish the neutral stored wrapper")?
+                .payload()
+                .clone(),
+            NativeHandleKind::Model => value
+                .downcast::<NativeStoredModelObject>()
+                .map_err(|_| "plugin model output did not publish the neutral stored wrapper")?
+                .payload()
+                .clone(),
+            kind => return Err(format!("unexpected plugin output handle kind {kind:?}").into()),
+        };
+        payload.downcast::<PluginValue>().map_err(
+            |_| "published neutral wrapper did not retain the plugin ABI value as its payload",
+        )?;
     }
     for handle in output_handles.iter().rev() {
         resolver.revoke(handle, &cancellation)?;
