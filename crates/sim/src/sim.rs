@@ -262,7 +262,7 @@ fn init_comfy_component_host(cx: &mut App) -> anyhow::Result<()> {
         permission_policy,
         execution_boundary,
         comfy_plugin_host::ComponentLimits::default(),
-        comfy_runtime::native_image_registry_projection()?,
+        comfy_runtime::generated_native_node_registry_projection(None)?,
     )?;
     if let Some(component_host) = cx.try_global::<ComfyComponentHostGlobal>() {
         let current_profile_id = component_host.profile_id.clone();
@@ -3183,6 +3183,33 @@ mod tests {
         assert_eq!(profile.device, comfy_types::DeviceKind::Cpu);
         assert_eq!(profile.provider_scope, "local");
         assert!(!profile.api_host.enabled);
+    }
+
+    #[gpui::test(seed = 367)]
+    fn native_comfy_component_host_starts_from_the_comprehensive_generated_registry(
+        cx: &mut TestAppContext,
+    ) {
+        cx.update(|cx| {
+            init_comfy_component_host(cx).expect("initialize native Comfy component host");
+            let actual = cx
+                .global::<ComfyComponentHostGlobal>()
+                .router
+                .current()
+                .expect("read current native Comfy component generation")
+                .registry_snapshot()
+                .expect("read native Comfy component registry");
+            let expected = comfy_runtime::generated_native_node_registry_projection(None)
+                .expect("build comprehensive generated native registry");
+            actual
+                .validate_comprehensive_bindings()
+                .expect("validate component-host native registry");
+            assert_eq!(actual.descriptor_len(), expected.descriptor_len());
+            assert!(
+                expected
+                    .descriptors()
+                    .all(|(class_type, _)| actual.descriptor(class_type).is_some())
+            );
+        });
     }
 
     #[test]

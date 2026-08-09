@@ -1,3 +1,21 @@
+pub use comfy_nodes::{
+    CatalogNodeDescriptor, CatalogNodeInputSchemaMetadata, CatalogNodeOutputSchemaMetadata,
+    CatalogNodeSchemaMetadata, CatalogNodeSource, CatalogNodeStatus, NativeCacheDependencies,
+    NativeCachePolicy, NativeDescriptorSchemaMetadata, NativeDynamicInputDescriptor,
+    NativeDynamicSchemaMetadata, NativeEffectClass, NativeHandleKind, NativeHandleStore,
+    NativeHandleStoreError, NativeHandleStoreIdentity, NativeHandleType, NativeInputDescriptor,
+    NativeInputRequirement, NativeInputSchemaMetadata, NativeNode, NativeNodeBinding,
+    NativeNodeBindingDisposition, NativeNodeContext, NativeNodeContractError, NativeNodeDescriptor,
+    NativeNodeFailure, NativeNodeFailureKind, NativeNodeOutcome, NativeNodePresentation,
+    NativeNodeSchemaMetadata, NativeOpaqueHandle, NativeOutputDescriptor,
+    NativeOutputSchemaMetadata, NativePortCardinality, NativePreparedEffectRequest,
+    NativePrimitive, NativePrimitiveType, NativeSchemaError, NativeSchemaField,
+    NativeSchemaProvenance, NativeSchemaValue, NativeSourcePresentationMetadata,
+    NativeStoredArtifactObject, NativeStoredModelObject, NativeStoredObject,
+    NativeStoredTensorObject, NativeTypeUnion, NativeUploadKind, NativeValue, NativeValueType,
+    NodeRegistry, NodeRegistryError, ObjectInfoInputSchema, ObjectInfoNode, ObjectInfoOutputSchema,
+    ObjectInfoRegistry,
+};
 pub use comfy_types::{AttemptId, ExecutionId, ProfileId, PromptId, RequestId};
 
 pub mod assets;

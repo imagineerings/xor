@@ -130,9 +130,7 @@
       { "name": "prompt", "type_name": "PROMPT", "required": false, "hidden": true },
       { "name": "extra_pnginfo", "type_name": "EXTRA_PNGINFO", "required": false, "hidden": true }
     ],
-    "outputs": [
-      { "name": "images", "type_name": "IMAGE", "required": true }
-    ],
+    "outputs": [],
     "output_node": true,
     "effect": "writes_artifact",
     "cache_by_input_identity": false,

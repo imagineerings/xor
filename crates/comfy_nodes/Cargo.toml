@@ -10,7 +10,13 @@ workspace = true
 [lib]
 path = "src/comfy_nodes.rs"
 [dependencies]
+comfy_media.workspace = true
+comfy_model.workspace = true
+comfy_sampler.workspace = true
 comfy_tensor.workspace = true
 comfy_types.workspace = true
+futures.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+thiserror.workspace = true
+uuid.workspace = true

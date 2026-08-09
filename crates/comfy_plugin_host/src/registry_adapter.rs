@@ -2,16 +2,20 @@ use crate::{
     ComponentHost, ComponentHostError, InstalledVerifiedPlugin, InvocationInputs,
     capabilities::artifact_value_identity,
 };
+use comfy_nodes::{
+    NATIVE_NODE_CONTRACT_SCHEMA_VERSION, NativeHandleKind, NativeHandleType, NativeInputDescriptor,
+    NativeNode, NativeNodeContext, NativeNodeFailure, NativeNodeFailureKind, NativeNodeOutcome,
+    NativeNodePresentation, NativeOutputDescriptor, NativePortCardinality,
+    NativePreparedEffectRequest, NativePrimitive, NativePrimitiveType, NativeStoredArtifactObject,
+    NativeStoredModelObject, NativeStoredObject, NativeStoredTensorObject, NativeTypeUnion,
+    NativeValue, NativeValueType,
+};
 use comfy_plugin_sdk::{
-    CachePolicy, EffectPolicy, PluginNode, PluginPort, PluginValue, PluginValueRepresentation,
-    PortCardinality, PortDirection, PortPresence, ScalarValue, TypeRegistry, ValueFamily,
+    ArtifactValue, CachePolicy, EffectPolicy, ModelValue, PluginNode, PluginPort, PluginValue,
+    PluginValueRepresentation, PortCardinality, PortDirection, PortPresence, ScalarValue,
+    TensorValue, TypeRegistry, ValueFamily,
 };
-use comfy_runtime::{
-    EffectClass, InputMode, NativeNode, NativeNodeRegistry, NativeNodeRegistryError, NodeContext,
-    NodeFailure, NodeFailureKind, NodeOutcome, PreparedEffectRequest, RuntimeAvailability,
-    RuntimeCachePolicy, RuntimeInputDescriptor, RuntimeNodeDescriptor, RuntimeNodePresentation,
-    RuntimeOutputDescriptor, ValueType,
-};
+use comfy_runtime::{NativeNodeRegistry, NativeNodeRegistryError};
 use futures::future::BoxFuture;
 use serde_json::{Map, Number, Value};
 use sha2::{Digest, Sha256};
@@ -49,7 +53,7 @@ pub(crate) fn registry_with_plugins(
     let mut bindings = Vec::new();
     for plugin in plugins {
         for node in &plugin.manifest().nodes {
-            let descriptor = runtime_descriptor(node, &type_registry)?;
+            let descriptor = native_descriptor(node, &type_registry)?;
             let implementation_version = descriptor.implementation_version.clone();
             let implementation: Arc<dyn NativeNode> = Arc::new(PluginNativeNode {
                 component_host: component_host.clone(),
@@ -58,8 +62,7 @@ pub(crate) fn registry_with_plugins(
                 type_registry: type_registry.clone(),
                 implementation_version,
             });
-            let presentation = runtime_presentation(node);
-            bindings.push((descriptor, implementation, presentation));
+            bindings.push((descriptor, implementation, native_presentation(node)));
         }
     }
     let mut registry = base.clone();
@@ -67,16 +70,20 @@ pub(crate) fn registry_with_plugins(
     Ok(registry)
 }
 
-fn runtime_presentation(node: &PluginNode) -> RuntimeNodePresentation {
-    RuntimeNodePresentation {
+fn native_presentation(node: &PluginNode) -> NativeNodePresentation {
+    NativeNodePresentation {
         display_name: node.display_name.clone(),
         category: node.category.clone(),
+        description: String::new(),
         output_names: node
             .ports
             .iter()
             .filter(|port| port.direction == PortDirection::Output)
             .map(|port| port.name.clone())
             .collect(),
+        search_aliases: Vec::new(),
+        is_deprecated: false,
+        is_experimental: false,
     }
 }
 
@@ -103,13 +110,19 @@ impl NativeNode for PluginNativeNode {
 
     fn execute<'a>(
         &'a self,
-        context: NodeContext,
-        inputs: BTreeMap<String, Value>,
-    ) -> BoxFuture<'a, Result<NodeOutcome, NodeFailure>> {
+        context: NativeNodeContext,
+        inputs: BTreeMap<String, NativeValue>,
+    ) -> BoxFuture<'a, Result<NativeNodeOutcome, NativeNodeFailure>> {
         Box::pin(async move {
+            context.validate().map_err(plugin_failure)?;
             let profile_id = self.plugin.authorization().capabilities().profile_id();
-            let invocation_inputs =
-                invocation_inputs(&self.node, inputs, &self.type_registry, profile_id)?;
+            let invocation_inputs = invocation_inputs(
+                &self.node,
+                inputs,
+                &self.type_registry,
+                profile_id,
+                &context,
+            )?;
             let result = self
                 .component_host
                 .execute_plugin(
@@ -124,7 +137,9 @@ impl NativeNode for PluginNativeNode {
                 &self.node,
                 &result.outputs,
                 &result.output_presence,
+                &self.type_registry,
                 profile_id,
+                &context,
             )?;
             let ui = (!result.effects.ui_state.is_empty() || !result.effects.logs.is_empty()).then(
                 || {
@@ -138,12 +153,12 @@ impl NativeNode for PluginNativeNode {
                 Vec::new()
             } else {
                 let metadata = serde_json::to_vec(&result.effects).map_err(plugin_failure)?;
-                vec![PreparedEffectRequest {
+                vec![NativePreparedEffectRequest {
                     transaction_id: effect_transaction_id(&context, &metadata),
                     metadata,
                 }]
             };
-            Ok(NodeOutcome::Values {
+            Ok(NativeNodeOutcome::Values {
                 outputs,
                 ui,
                 effects,
@@ -152,11 +167,11 @@ impl NativeNode for PluginNativeNode {
     }
 }
 
-fn runtime_descriptor(
+fn native_descriptor(
     node: &PluginNode,
     registry: &TypeRegistry,
-) -> Result<RuntimeNodeDescriptor, PluginRegistryAdapterError> {
-    let mut inputs = BTreeMap::new();
+) -> Result<comfy_nodes::NativeNodeDescriptor, PluginRegistryAdapterError> {
+    let mut inputs = Vec::new();
     let mut outputs = Vec::new();
     for port in &node.ports {
         let family = registry.family(&port.type_id).map_err(|error| {
@@ -165,28 +180,35 @@ fn runtime_descriptor(
                 message: error.to_string(),
             }
         })?;
-        let value_type = value_type(port, family);
-        match port.direction {
-            PortDirection::Input => {
-                inputs.insert(
-                    port.id.clone(),
-                    RuntimeInputDescriptor {
-                        value_type,
-                        required: port.presence == PortPresence::Required,
-                        hidden: port.hidden,
-                        lazy: port.lazy,
-                        mode: if port.cardinality == PortCardinality::List {
-                            InputMode::List
-                        } else {
-                            InputMode::Scalar
-                        },
-                        allows_literal: family == ValueFamily::Scalar,
-                    },
-                );
+        let value_type = native_value_type(port, family).map_err(|error| {
+            PluginRegistryAdapterError::InvalidPort {
+                node: node.id.clone(),
+                message: error.to_string(),
             }
-            PortDirection::Output => outputs.push(RuntimeOutputDescriptor {
-                value_type: if port.presence == PortPresence::Optional {
-                    ValueType::Any
+        })?;
+        match port.direction {
+            PortDirection::Input => inputs.push(NativeInputDescriptor {
+                name: port.id.clone(),
+                accepted_types: NativeTypeUnion::new([value_type]).map_err(|error| {
+                    PluginRegistryAdapterError::InvalidPort {
+                        node: node.id.clone(),
+                        message: error.to_string(),
+                    }
+                })?,
+                required: port.presence == PortPresence::Required,
+                hidden: port.hidden,
+                lazy: port.lazy,
+                cardinality: if port.cardinality == PortCardinality::List {
+                    NativePortCardinality::List
+                } else {
+                    NativePortCardinality::Scalar
+                },
+                allows_literal: family == ValueFamily::Scalar,
+            }),
+            PortDirection::Output => outputs.push(NativeOutputDescriptor {
+                name: port.name.clone(),
+                produced_type: if port.presence == PortPresence::Optional {
+                    NativeValueType::Any
                 } else {
                     value_type
                 },
@@ -194,47 +216,117 @@ fn runtime_descriptor(
             }),
         }
     }
-    Ok(RuntimeNodeDescriptor {
+    let source_schema = comfy_nodes::NativeDescriptorSchemaMetadata::compatibility(
+        comfy_nodes::NativeSchemaProvenance::Plugin,
+        node.ports
+            .iter()
+            .filter(|port| port.direction == PortDirection::Input)
+            .map(|port| (port.id.clone(), port.type_id.to_string())),
+        std::iter::empty(),
+        node.ports
+            .iter()
+            .filter(|port| port.direction == PortDirection::Output)
+            .map(|port| (port.name.clone(), port.type_id.to_string())),
+    );
+    let descriptor = comfy_nodes::NativeNodeDescriptor {
+        schema_version: NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
         class_type: node.id.clone(),
         implementation_version: node.version.to_string(),
+        source_schema: Some(source_schema),
         inputs,
+        dynamic_inputs: Vec::new(),
         outputs,
         output_node: node.effects != EffectPolicy::Pure,
-        availability: RuntimeAvailability::Native,
         effect: match node.effects {
-            EffectPolicy::Pure => EffectClass::Pure,
-            EffectPolicy::Transactional => EffectClass::WritesArtifact,
-            EffectPolicy::Provider => EffectClass::Provider,
+            EffectPolicy::Pure => comfy_nodes::NativeEffectClass::Pure,
+            EffectPolicy::Transactional => comfy_nodes::NativeEffectClass::WritesArtifact,
+            EffectPolicy::Provider => comfy_nodes::NativeEffectClass::Provider,
         },
         cache: if node.cache == CachePolicy::Never {
-            RuntimeCachePolicy::Never
+            comfy_nodes::NativeCachePolicy::Never
         } else {
-            RuntimeCachePolicy::InputIdentity
+            comfy_nodes::NativeCachePolicy::InputIdentity
         },
+    };
+    descriptor
+        .validate()
+        .map_err(|error| PluginRegistryAdapterError::InvalidPort {
+            node: node.id.clone(),
+            message: error.to_string(),
+        })?;
+    Ok(descriptor)
+}
+
+fn native_value_type(
+    port: &PluginPort,
+    family: ValueFamily,
+) -> Result<NativeValueType, comfy_nodes::NativeNodeContractError> {
+    Ok(match family {
+        ValueFamily::Scalar => match port.type_id.name() {
+            "boolean" => NativeValueType::Primitive(NativePrimitiveType::Boolean),
+            "integer" => NativeValueType::Primitive(NativePrimitiveType::Integer),
+            "float" | "number" => NativeValueType::Primitive(NativePrimitiveType::Number),
+            "string" => NativeValueType::Primitive(NativePrimitiveType::String),
+            "any" => NativeValueType::Any,
+            _ => NativeValueType::PreservedUnknown,
+        },
+        ValueFamily::Tensor | ValueFamily::Artifact | ValueFamily::Model => {
+            NativeValueType::Handle(native_handle_type(port, family)?)
+        }
     })
 }
 
-fn value_type(port: &PluginPort, family: ValueFamily) -> ValueType {
-    match family {
-        ValueFamily::Scalar => match port.type_id.name() {
-            "boolean" => ValueType::Boolean,
-            "integer" => ValueType::Integer,
-            "float" | "number" => ValueType::Number,
-            "string" => ValueType::String,
-            _ => ValueType::Custom(port.type_id.to_string()),
+fn native_handle_type(
+    port: &PluginPort,
+    family: ValueFamily,
+) -> Result<NativeHandleType, comfy_nodes::NativeNodeContractError> {
+    let name = port.type_id.name();
+    let kind = match family {
+        ValueFamily::Tensor => match name {
+            "image" => NativeHandleKind::Image,
+            "mask" => NativeHandleKind::Mask,
+            "audio" => NativeHandleKind::Audio,
+            "video" => NativeHandleKind::Video,
+            "conditioning" => NativeHandleKind::Conditioning,
+            "latent" => NativeHandleKind::Latent,
+            _ => NativeHandleKind::Tensor,
         },
-        ValueFamily::Tensor => ValueType::Tensor,
-        ValueFamily::Artifact => ValueType::Artifact,
-        ValueFamily::Model => ValueType::Model,
+        ValueFamily::Artifact
+            if name.starts_with("file-3d") || matches!(name, "load-3d" | "mesh" | "splat") =>
+        {
+            NativeHandleKind::ThreeD
+        }
+        ValueFamily::Artifact => NativeHandleKind::Artifact,
+        ValueFamily::Model => match name {
+            "model" => NativeHandleKind::Model,
+            "clip" | "clip-vision" => NativeHandleKind::Clip,
+            "vae" => NativeHandleKind::Vae,
+            "control-net" => NativeHandleKind::ControlNet,
+            _ => NativeHandleKind::Model,
+        },
+        ValueFamily::Scalar => NativeHandleKind::Artifact,
+    };
+    NativeHandleType::new(kind, source_type_identity(name))
+}
+
+fn source_type_identity(name: &str) -> String {
+    match name {
+        "integer" => "INT".to_owned(),
+        "float-list" => "FLOATS".to_owned(),
+        "color-list" => "COLORS".to_owned(),
+        "bounding-box-editor" => "BOUNDING_BOXES".to_owned(),
+        "dictionary" => "DICT".to_owned(),
+        name => name.replace('-', "_").to_ascii_uppercase(),
     }
 }
 
 fn invocation_inputs(
     node: &PluginNode,
-    mut values: BTreeMap<String, Value>,
+    mut values: BTreeMap<String, NativeValue>,
     registry: &TypeRegistry,
     profile_id: &str,
-) -> Result<InvocationInputs, NodeFailure> {
+    context: &NativeNodeContext,
+) -> Result<InvocationInputs, NativeNodeFailure> {
     let mut inputs = InvocationInputs::default();
     for port in node
         .ports
@@ -246,16 +338,19 @@ fn invocation_inputs(
             continue;
         };
         let values = if port.cardinality == PortCardinality::List {
-            value
-                .as_array()
-                .cloned()
-                .ok_or_else(|| invalid_value(&port.id))?
+            match value {
+                NativeValue::List { values } => values,
+                _ => return Err(invalid_value(&port.id)),
+            }
         } else {
+            if matches!(value, NativeValue::List { .. }) {
+                return Err(invalid_value(&port.id));
+            }
             vec![value]
         };
         let values = values
             .into_iter()
-            .map(|value| plugin_value(port, value, registry, profile_id))
+            .map(|value| plugin_value(port, value, registry, profile_id, context))
             .collect::<Result<Vec<_>, _>>()?;
         inputs.set_present(&port.id, values);
     }
@@ -267,29 +362,113 @@ fn invocation_inputs(
 
 fn plugin_value(
     port: &PluginPort,
-    value: Value,
+    value: NativeValue,
     registry: &TypeRegistry,
     profile_id: &str,
-) -> Result<PluginValue, NodeFailure> {
-    match registry.family(&port.type_id).map_err(plugin_failure)? {
-        ValueFamily::Scalar => {
-            PluginValue::scalar(port.type_id.clone(), scalar_from_json(value)?, registry)
-                .map_err(plugin_failure)
-        }
-        _ => {
-            let value: PluginValue = serde_json::from_value(value).map_err(plugin_failure)?;
-            if value.type_id() != &port.type_id {
+    context: &NativeNodeContext,
+) -> Result<PluginValue, NativeNodeFailure> {
+    let family = registry.family(&port.type_id).map_err(plugin_failure)?;
+    match family {
+        ValueFamily::Scalar => PluginValue::scalar(
+            port.type_id.clone(),
+            scalar_from_native(value, &port.type_id.to_string())?,
+            registry,
+        )
+        .map_err(plugin_failure),
+        ValueFamily::Tensor | ValueFamily::Artifact | ValueFamily::Model => {
+            let NativeValue::Handle { value: handle } = value else {
+                return Err(invalid_value(&port.id));
+            };
+            let expected_type = native_handle_type(port, family).map_err(plugin_failure)?;
+            let stored = context
+                .handle_store()
+                .resolve(&handle, &expected_type, &context.cancellation)
+                .map_err(plugin_failure)?;
+            let stored = plugin_value_from_stored(port, family, stored, registry)?;
+            if stored.type_id() != &port.type_id || stored.family() != family {
                 return Err(invalid_value(&port.id));
             }
-            if let PluginValueRepresentation::Artifact(artifact) = value.representation() {
+            validate_value_digest(&handle, &stored, &port.id)?;
+            if let PluginValueRepresentation::Artifact(artifact) = stored.representation() {
                 artifact_value_identity(profile_id, artifact).map_err(plugin_failure)?;
             }
-            Ok(value)
+            Ok(stored)
         }
     }
 }
 
-fn scalar_from_json(value: Value) -> Result<ScalarValue, NodeFailure> {
+fn plugin_value_from_stored(
+    port: &PluginPort,
+    family: ValueFamily,
+    stored: NativeStoredObject,
+    registry: &TypeRegistry,
+) -> Result<PluginValue, NativeNodeFailure> {
+    if let Ok(value) = stored.clone().downcast::<PluginValue>() {
+        return Ok((*value).clone());
+    }
+    match family {
+        ValueFamily::Tensor => {
+            let stored = stored
+                .downcast::<NativeStoredTensorObject>()
+                .map_err(|_| invalid_value(&port.id))?;
+            let value = TensorValue::new(
+                stored.descriptor().clone(),
+                stored.byte_length(),
+                stored.digest(),
+            )
+            .map_err(plugin_failure)?;
+            PluginValue::tensor(port.type_id.clone(), value, registry).map_err(plugin_failure)
+        }
+        ValueFamily::Artifact => {
+            let stored = stored
+                .downcast::<NativeStoredArtifactObject>()
+                .map_err(|_| invalid_value(&port.id))?;
+            let value = ArtifactValue::new(
+                stored.namespace(),
+                stored.identifier(),
+                stored.byte_length(),
+                stored.digest(),
+            )
+            .map_err(plugin_failure)?;
+            PluginValue::artifact(port.type_id.clone(), value, registry).map_err(plugin_failure)
+        }
+        ValueFamily::Model => {
+            let stored = stored
+                .downcast::<NativeStoredModelObject>()
+                .map_err(|_| invalid_value(&port.id))?;
+            let value = ModelValue::new(stored.identifier(), stored.format(), stored.digest())
+                .map_err(plugin_failure)?;
+            PluginValue::model(port.type_id.clone(), value, registry).map_err(plugin_failure)
+        }
+        ValueFamily::Scalar => Err(invalid_value(&port.id)),
+    }
+}
+
+fn scalar_from_native(
+    value: NativeValue,
+    expected_unknown_type: &str,
+) -> Result<ScalarValue, NativeNodeFailure> {
+    match value {
+        NativeValue::Primitive { value } => match value {
+            NativePrimitive::Null => Ok(ScalarValue::Null),
+            NativePrimitive::Boolean(value) => Ok(ScalarValue::Boolean(value)),
+            NativePrimitive::Integer(value) => Ok(ScalarValue::Integer(value)),
+            NativePrimitive::UnsignedInteger(value) => i64::try_from(value)
+                .map(ScalarValue::Integer)
+                .map_err(|_| invalid_value("unsigned-integer")),
+            NativePrimitive::Number(value) => Ok(ScalarValue::Float(value)),
+            NativePrimitive::String(value) => Ok(ScalarValue::String(value)),
+        },
+        NativeValue::PreservedUnknown { type_name, value }
+            if type_name == expected_unknown_type =>
+        {
+            scalar_from_json(value)
+        }
+        _ => Err(invalid_value(expected_unknown_type)),
+    }
+}
+
+fn scalar_from_json(value: Value) -> Result<ScalarValue, NativeNodeFailure> {
     match value {
         Value::Null => Ok(ScalarValue::Null),
         Value::Bool(value) => Ok(ScalarValue::Boolean(value)),
@@ -315,7 +494,7 @@ fn scalar_from_json(value: Value) -> Result<ScalarValue, NodeFailure> {
             values
                 .into_iter()
                 .map(|(key, value)| Ok((key, scalar_from_json(value)?)))
-                .collect::<Result<Vec<_>, NodeFailure>>()
+                .collect::<Result<Vec<_>, NativeNodeFailure>>()
                 .map(ScalarValue::Record)
         }
     }
@@ -325,46 +504,234 @@ fn invocation_outputs(
     node: &PluginNode,
     outputs: &BTreeMap<String, Vec<PluginValue>>,
     presence: &BTreeMap<String, bool>,
+    registry: &TypeRegistry,
     profile_id: &str,
-) -> Result<Vec<Value>, NodeFailure> {
-    node.ports
+    context: &NativeNodeContext,
+) -> Result<Vec<NativeValue>, NativeNodeFailure> {
+    let mut published = Vec::new();
+    let result = node
+        .ports
         .iter()
         .filter(|port| port.direction == PortDirection::Output)
         .map(|port| {
             if !presence.get(&port.id).copied().unwrap_or(false) {
-                return Ok(Value::Null);
+                return Ok(NativeValue::Primitive {
+                    value: NativePrimitive::Null,
+                });
             }
             let values = outputs.get(&port.id).cloned().unwrap_or_default();
             if port.cardinality == PortCardinality::List {
                 values
                     .into_iter()
-                    .map(|value| runtime_value(value, profile_id))
+                    .map(|value| {
+                        runtime_value(value, port, registry, profile_id, context, &mut published)
+                    })
                     .collect::<Result<Vec<_>, _>>()
-                    .map(Value::Array)
+                    .map(|values| NativeValue::List { values })
             } else {
                 let mut values = values.into_iter();
                 let value = values.next().ok_or_else(|| invalid_value(&port.id))?;
                 if values.next().is_some() {
                     return Err(invalid_value(&port.id));
                 }
-                runtime_value(value, profile_id)
+                runtime_value(value, port, registry, profile_id, context, &mut published)
             }
         })
-        .collect()
+        .collect::<Result<Vec<_>, _>>();
+    if let Err(mut failure) = result {
+        let cleanup_errors = revoke_published(context, &published);
+        if !cleanup_errors.is_empty() {
+            failure.message.push_str("; output cleanup failed: ");
+            failure.message.push_str(&cleanup_errors.join(", "));
+        }
+        return Err(failure);
+    }
+    if context.cancellation.is_cancelled() {
+        let cleanup_errors = revoke_published(context, &published);
+        let mut failure = plugin_failure("plugin output publication was cancelled");
+        if !cleanup_errors.is_empty() {
+            failure.message.push_str("; output cleanup failed: ");
+            failure.message.push_str(&cleanup_errors.join(", "));
+        }
+        return Err(failure);
+    }
+    result
 }
 
-fn runtime_value(value: PluginValue, profile_id: &str) -> Result<Value, NodeFailure> {
+fn runtime_value(
+    value: PluginValue,
+    port: &PluginPort,
+    registry: &TypeRegistry,
+    profile_id: &str,
+    context: &NativeNodeContext,
+    published: &mut Vec<comfy_nodes::NativeOpaqueHandle>,
+) -> Result<NativeValue, NativeNodeFailure> {
+    if value.type_id() != &port.type_id {
+        return Err(invalid_value(&port.id));
+    }
     match value.representation() {
-        PluginValueRepresentation::Scalar(value) => scalar_to_json(value.clone()),
+        PluginValueRepresentation::Scalar(value) => {
+            scalar_to_native(value.clone(), &port.type_id.to_string())
+        }
         PluginValueRepresentation::Artifact(artifact) => {
             artifact_value_identity(profile_id, artifact).map_err(plugin_failure)?;
-            serde_json::to_value(value).map_err(plugin_failure)
+            publish_plugin_value(value, port, registry, context, published)
         }
-        _ => serde_json::to_value(value).map_err(plugin_failure),
+        PluginValueRepresentation::Tensor(_) | PluginValueRepresentation::Model(_) => {
+            publish_plugin_value(value, port, registry, context, published)
+        }
     }
 }
 
-fn scalar_to_json(value: ScalarValue) -> Result<Value, NodeFailure> {
+fn publish_plugin_value(
+    value: PluginValue,
+    port: &PluginPort,
+    registry: &TypeRegistry,
+    context: &NativeNodeContext,
+    published: &mut Vec<comfy_nodes::NativeOpaqueHandle>,
+) -> Result<NativeValue, NativeNodeFailure> {
+    let family = registry.family(&port.type_id).map_err(plugin_failure)?;
+    if family == ValueFamily::Scalar || value.family() != family {
+        return Err(invalid_value(&port.id));
+    }
+    let digest = value_digest(&value)
+        .ok_or_else(|| invalid_value(&port.id))?
+        .to_owned();
+    let resident_bytes = value.abi_bytes().map_err(plugin_failure)?.len().max(1);
+    let stored = stored_plugin_value(&value, &digest)?;
+    let handle = context
+        .handle_store()
+        .publish(
+            native_handle_type(port, family).map_err(plugin_failure)?,
+            stored,
+            Some(digest),
+            resident_bytes,
+            &context.cancellation,
+        )
+        .map_err(plugin_failure)?;
+    published.push(handle.clone());
+    Ok(NativeValue::Handle { value: handle })
+}
+
+fn stored_plugin_value(
+    value: &PluginValue,
+    digest: &str,
+) -> Result<NativeStoredObject, NativeNodeFailure> {
+    let payload: NativeStoredObject = Arc::new(value.clone());
+    match value.representation() {
+        PluginValueRepresentation::Tensor(value) => NativeStoredTensorObject::new(
+            value.descriptor().clone(),
+            value.byte_length(),
+            digest,
+            payload,
+        )
+        .map(|value| Arc::new(value) as NativeStoredObject)
+        .map_err(plugin_failure),
+        PluginValueRepresentation::Artifact(value) => NativeStoredArtifactObject::new(
+            value.namespace(),
+            value.identifier(),
+            value.byte_length(),
+            digest,
+            payload,
+        )
+        .map(|value| Arc::new(value) as NativeStoredObject)
+        .map_err(plugin_failure),
+        PluginValueRepresentation::Model(value) => {
+            NativeStoredModelObject::new(value.identifier(), value.format(), digest, payload)
+                .map(|value| Arc::new(value) as NativeStoredObject)
+                .map_err(plugin_failure)
+        }
+        PluginValueRepresentation::Scalar(_) => Err(invalid_value("scalar-output")),
+    }
+}
+
+fn revoke_published(
+    context: &NativeNodeContext,
+    handles: &[comfy_nodes::NativeOpaqueHandle],
+) -> Vec<String> {
+    let cleanup_cancellation = comfy_types::CancellationToken::default();
+    let mut errors = Vec::new();
+    for handle in handles.iter().rev() {
+        if let Err(error) = context.handle_store().revoke(handle, &cleanup_cancellation) {
+            errors.push(error.to_string());
+        }
+    }
+    errors
+}
+
+fn validate_value_digest(
+    handle: &comfy_nodes::NativeOpaqueHandle,
+    value: &PluginValue,
+    port: &str,
+) -> Result<(), NativeNodeFailure> {
+    if value_digest(value) != handle.digest_sha256() {
+        return Err(invalid_value(port));
+    }
+    Ok(())
+}
+
+fn value_digest(value: &PluginValue) -> Option<&str> {
+    match value.representation() {
+        PluginValueRepresentation::Tensor(value) => Some(value.digest()),
+        PluginValueRepresentation::Artifact(value) => Some(value.digest()),
+        PluginValueRepresentation::Model(value) => Some(value.digest()),
+        PluginValueRepresentation::Scalar(_) => None,
+    }
+}
+
+fn scalar_to_native(value: ScalarValue, type_name: &str) -> Result<NativeValue, NativeNodeFailure> {
+    let value = match value {
+        ScalarValue::Null => {
+            return Ok(NativeValue::Primitive {
+                value: NativePrimitive::Null,
+            });
+        }
+        ScalarValue::Boolean(value) => {
+            return Ok(NativeValue::Primitive {
+                value: NativePrimitive::Boolean(value),
+            });
+        }
+        ScalarValue::Integer(value) => {
+            return Ok(NativeValue::Primitive {
+                value: NativePrimitive::Integer(value),
+            });
+        }
+        ScalarValue::Float(value) => {
+            return Ok(NativeValue::Primitive {
+                value: NativePrimitive::Number(value),
+            });
+        }
+        ScalarValue::String(value) => {
+            return Ok(NativeValue::Primitive {
+                value: NativePrimitive::String(value),
+            });
+        }
+        ScalarValue::Bytes(values) => Value::Array(
+            values
+                .into_iter()
+                .map(|value| Value::Number(Number::from(value)))
+                .collect(),
+        ),
+        ScalarValue::List(values) => Value::Array(
+            values
+                .into_iter()
+                .map(scalar_to_json)
+                .collect::<Result<Vec<_>, _>>()?,
+        ),
+        ScalarValue::Record(values) => Value::Object(
+            values
+                .into_iter()
+                .map(|(key, value)| Ok((key, scalar_to_json(value)?)))
+                .collect::<Result<Map<_, _>, NativeNodeFailure>>()?,
+        ),
+    };
+    Ok(NativeValue::PreservedUnknown {
+        type_name: type_name.to_owned(),
+        value,
+    })
+}
+
+fn scalar_to_json(value: ScalarValue) -> Result<Value, NativeNodeFailure> {
     match value {
         ScalarValue::Null => Ok(Value::Null),
         ScalarValue::Boolean(value) => Ok(Value::Bool(value)),
@@ -387,12 +754,12 @@ fn scalar_to_json(value: ScalarValue) -> Result<Value, NodeFailure> {
         ScalarValue::Record(values) => values
             .into_iter()
             .map(|(key, value)| Ok((key, scalar_to_json(value)?)))
-            .collect::<Result<Map<_, _>, NodeFailure>>()
+            .collect::<Result<Map<_, _>, NativeNodeFailure>>()
             .map(Value::Object),
     }
 }
 
-fn effect_transaction_id(context: &NodeContext, metadata: &[u8]) -> Uuid {
+fn effect_transaction_id(context: &NativeNodeContext, metadata: &[u8]) -> Uuid {
     let mut hasher = Sha256::new();
     hasher.update(b"sim-comfy-plugin-effect-v1");
     hasher.update(context.prompt_id.0.as_bytes());
@@ -405,20 +772,20 @@ fn effect_transaction_id(context: &NodeContext, metadata: &[u8]) -> Uuid {
     Uuid::from_bytes(bytes)
 }
 
-fn invalid_value(port: &str) -> NodeFailure {
-    NodeFailure {
+fn invalid_value(port: &str) -> NativeNodeFailure {
+    NativeNodeFailure {
         code: "invalid_plugin_value".to_owned(),
-        message: format!("plugin port `{port}` has an invalid runtime value"),
-        kind: NodeFailureKind::Failure,
+        message: format!("plugin port `{port}` has an invalid native value"),
+        kind: NativeNodeFailureKind::Failure,
         retryable: false,
     }
 }
 
-fn plugin_failure(error: impl std::fmt::Display) -> NodeFailure {
-    NodeFailure {
+fn plugin_failure(error: impl std::fmt::Display) -> NativeNodeFailure {
+    NativeNodeFailure {
         code: "plugin_invocation_failed".to_owned(),
         message: error.to_string(),
-        kind: NodeFailureKind::Failure,
+        kind: NativeNodeFailureKind::Failure,
         retryable: false,
     }
 }
@@ -426,7 +793,9 @@ fn plugin_failure(error: impl std::fmt::Display) -> NodeFailure {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use comfy_plugin_sdk::ArtifactValue;
+    use comfy_plugin_sdk::{
+        ArtifactValue, DType, DeviceId, PortSerialization, StreamId, TensorDescriptor,
+    };
     use std::error::Error;
 
     fn artifact_value(identifier: &str) -> Result<PluginValue, Box<dyn Error>> {
@@ -438,20 +807,163 @@ mod tests {
         )?)
     }
 
+    fn input_port(
+        registry: &TypeRegistry,
+        type_name: &str,
+        serialization: PortSerialization,
+    ) -> Result<PluginPort, Box<dyn Error>> {
+        Ok(PluginPort {
+            id: format!("{type_name}-input"),
+            name: format!("{type_name} input"),
+            direction: PortDirection::Input,
+            type_id: registry.resolve(type_name)?.clone(),
+            cardinality: PortCardinality::Singular,
+            presence: PortPresence::Required,
+            hidden: false,
+            lazy: false,
+            default: None,
+            serialization,
+            accepted_legacy_names: Vec::new(),
+        })
+    }
+
+    #[test]
+    fn neutral_stored_objects_bridge_native_and_plugin_values() -> Result<(), Box<dyn Error>> {
+        let registry = TypeRegistry::built_in()?;
+        let tensor_digest = "1".repeat(64);
+        let tensor = PluginValue::tensor(
+            registry.resolve("IMAGE")?.clone(),
+            TensorValue::new(
+                TensorDescriptor::contiguous(
+                    vec![1],
+                    DType::F32,
+                    DeviceId::CPU,
+                    StreamId::DEFAULT,
+                )?,
+                4,
+                &tensor_digest,
+            )?,
+            &registry,
+        )?;
+        let artifact = artifact_value("bridge.svg")?;
+        let model_digest = "3".repeat(64);
+        let model = PluginValue::model(
+            registry.resolve("MODEL")?.clone(),
+            ModelValue::new("bridge-model", "safetensors", &model_digest)?,
+            &registry,
+        )?;
+        let cases = [
+            (
+                input_port(&registry, "IMAGE", PortSerialization::Handle)?,
+                ValueFamily::Tensor,
+                tensor,
+            ),
+            (
+                input_port(&registry, "SVG", PortSerialization::ArtifactReference)?,
+                ValueFamily::Artifact,
+                artifact,
+            ),
+            (
+                input_port(&registry, "MODEL", PortSerialization::Handle)?,
+                ValueFamily::Model,
+                model,
+            ),
+        ];
+        for (port, family, expected) in cases {
+            let digest = value_digest(&expected).ok_or("fixture has no digest")?;
+            let native_payload: NativeStoredObject = Arc::new("native-payload".to_owned());
+            let native: NativeStoredObject = match expected.representation() {
+                PluginValueRepresentation::Tensor(value) => {
+                    Arc::new(NativeStoredTensorObject::new(
+                        value.descriptor().clone(),
+                        value.byte_length(),
+                        digest,
+                        native_payload,
+                    )?)
+                }
+                PluginValueRepresentation::Artifact(value) => {
+                    Arc::new(NativeStoredArtifactObject::new(
+                        value.namespace(),
+                        value.identifier(),
+                        value.byte_length(),
+                        digest,
+                        native_payload,
+                    )?)
+                }
+                PluginValueRepresentation::Model(value) => Arc::new(NativeStoredModelObject::new(
+                    value.identifier(),
+                    value.format(),
+                    digest,
+                    native_payload,
+                )?),
+                PluginValueRepresentation::Scalar(_) => {
+                    return Err("unexpected scalar fixture".into());
+                }
+            };
+            let projected = plugin_value_from_stored(&port, family, native, &registry)?;
+            assert_eq!(projected, expected);
+            let republished = stored_plugin_value(&projected, digest)?;
+            let payload = match family {
+                ValueFamily::Tensor => republished
+                    .downcast::<NativeStoredTensorObject>()
+                    .map_err(|_| "tensor was not wrapped")?
+                    .payload()
+                    .clone(),
+                ValueFamily::Artifact => republished
+                    .downcast::<NativeStoredArtifactObject>()
+                    .map_err(|_| "artifact was not wrapped")?
+                    .payload()
+                    .clone(),
+                ValueFamily::Model => republished
+                    .downcast::<NativeStoredModelObject>()
+                    .map_err(|_| "model was not wrapped")?
+                    .payload()
+                    .clone(),
+                ValueFamily::Scalar => return Err("unexpected scalar fixture".into()),
+            };
+            assert_eq!(
+                payload
+                    .downcast::<PluginValue>()
+                    .map_err(|_| "wrapper payload was not a plugin value")?
+                    .as_ref(),
+                &expected
+            );
+        }
+        Ok(())
+    }
+
     #[test]
     fn registry_adapter_rejects_noncanonical_artifact_abi_paths() -> Result<(), Box<dyn Error>> {
-        let valid = runtime_value(artifact_value("nested/fixture.svg")?, "profile-a")?;
-        let projected: PluginValue = serde_json::from_value(valid)?;
-        assert!(matches!(
-            projected.representation(),
-            PluginValueRepresentation::Artifact(value)
-                if value.identifier() == "nested/fixture.svg"
-        ));
-
-        let error = runtime_value(artifact_value("../escape.svg")?, "profile-a")
-            .expect_err("canonical asset owner must reject traversal");
-        assert_eq!(error.code, "plugin_invocation_failed");
-        assert!(!error.retryable);
+        let registry = TypeRegistry::built_in()?;
+        let port = PluginPort {
+            id: "artifact".to_owned(),
+            name: "artifact".to_owned(),
+            direction: PortDirection::Output,
+            type_id: registry.resolve("SVG")?.clone(),
+            cardinality: PortCardinality::Singular,
+            presence: PortPresence::Required,
+            hidden: false,
+            lazy: false,
+            default: None,
+            serialization: comfy_plugin_sdk::PortSerialization::ArtifactReference,
+            accepted_legacy_names: Vec::new(),
+        };
+        artifact_value_identity(
+            "profile-a",
+            match artifact_value("nested/fixture.svg")?.representation() {
+                PluginValueRepresentation::Artifact(value) => value,
+                _ => return Err("fixture is not an artifact".into()),
+            },
+        )?;
+        let invalid = artifact_value("../escape.svg")?;
+        let PluginValueRepresentation::Artifact(invalid) = invalid.representation() else {
+            return Err("fixture is not an artifact".into());
+        };
+        assert!(artifact_value_identity("profile-a", invalid).is_err());
+        assert_eq!(
+            native_handle_type(&port, ValueFamily::Artifact)?.type_id,
+            "SVG"
+        );
         Ok(())
     }
 }

@@ -1,19 +1,38 @@
 pub mod descriptor;
+pub mod execution;
 pub mod object_info;
 pub mod registry_generator;
 pub mod slice_registry;
 
 pub use descriptor::{
-    CatalogNodeDescriptor, CatalogNodeSource, CatalogNodeStatus, NODE_DESCRIPTOR_SCHEMA_VERSION,
+    CatalogNodeDescriptor, CatalogNodeInputSchemaMetadata, CatalogNodeOutputSchemaMetadata,
+    CatalogNodeSchemaMetadata, CatalogNodeSource, CatalogNodeStatus,
+    NATIVE_SCHEMA_METADATA_VERSION, NODE_DESCRIPTOR_SCHEMA_VERSION, NativeDescriptorSchemaMetadata,
+    NativeDynamicSchemaMetadata, NativeInputRequirement, NativeInputSchemaMetadata,
+    NativeNodeSchemaMetadata, NativeOutputSchemaMetadata, NativeSchemaError, NativeSchemaField,
+    NativeSchemaProvenance, NativeSchemaValue, NativeSourcePresentationMetadata, NativeUploadKind,
     NodeDescriptor, PortDescriptor,
+};
+pub use execution::{
+    LEGACY_NATIVE_NODE_CONTRACT_SCHEMA_VERSION, NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
+    NATIVE_OPAQUE_HANDLE_SCHEMA_VERSION, NativeCacheDependencies, NativeCachePolicy,
+    NativeDynamicInputDescriptor, NativeEffectClass, NativeHandleKind, NativeHandleStore,
+    NativeHandleStoreError, NativeHandleStoreIdentity, NativeHandleType, NativeInputDescriptor,
+    NativeNode, NativeNodeBinding, NativeNodeBindingDisposition, NativeNodeBindingsFactory,
+    NativeNodeContext, NativeNodeContractError, NativeNodeDescriptor, NativeNodeFailure,
+    NativeNodeFailureKind, NativeNodeOutcome, NativeNodePresentation, NativeOpaqueHandle,
+    NativeOutputDescriptor, NativePortCardinality, NativePreparedEffectRequest, NativePrimitive,
+    NativePrimitiveType, NativeStoredArtifactObject, NativeStoredModelObject, NativeStoredObject,
+    NativeStoredTensorObject, NativeTypeUnion, NativeValue, NativeValueType,
+    native_value_matches_input_schema, validate_generated_family_bindings,
 };
 pub use object_info::{
     OBJECT_INFO_SCHEMA_VERSION, ObjectInfoInputSchema, ObjectInfoNode, ObjectInfoOutputSchema,
     ObjectInfoRegistry,
 };
 pub use registry_generator::{
-    INACTIVE_NODE_CATALOG, NodeRegistry, NodeRegistryError, NodeRegistryGenerator,
-    REGISTERED_NODE_CATALOG,
+    INACTIVE_NODE_CATALOG, NODE_CONTRACT_CATALOG, NodeRegistry, NodeRegistryError,
+    NodeRegistryGenerator, REGISTERED_NODE_CATALOG, built_in_source_schema,
 };
 pub use slice_registry::{
     DIFFUSION_SLICE_NODE_IDS, EarlySliceRegistry, IMAGE_SLICE_NODE_IDS, SliceRegistryError,
@@ -49,6 +68,28 @@ mod generated_manifest_tests {
                 .collect::<BTreeSet<_>>()
                 .len()
         );
+        assert!(
+            GENERATED_FAMILY_MODULES
+                .windows(2)
+                .all(|pair| pair[0] < pair[1])
+        );
+        assert!(
+            GENERATED_FAMILY_DESCRIPTOR_IDS
+                .windows(2)
+                .all(|pair| pair[0] < pair[1])
+        );
+        assert!(
+            GENERATED_FAMILY_MODULES
+                .iter()
+                .all(|module| GENERATED_MODULES.contains(module))
+        );
+        assert!(
+            GENERATED_FAMILY_DESCRIPTOR_IDS
+                .iter()
+                .all(|identifier| GENERATED_DESCRIPTOR_IDS.contains(identifier))
+        );
+        let family_bindings = generated_family_node_bindings()?;
+        assert_eq!(family_bindings.len(), GENERATED_FAMILY_DESCRIPTOR_IDS.len());
         let registry = NodeRegistry::built_in()?;
         assert!(
             GENERATED_DESCRIPTOR_IDS

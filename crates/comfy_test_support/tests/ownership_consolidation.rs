@@ -1604,14 +1604,16 @@ fn run_ownership_validation(
         && runtime_cache_production.contains("least_recently_used: VecDeque<CacheKey>");
     let task_27_controller_and_engine_delegate_compilation_and_cache = runtime_controller_production
         .matches("crate::PromptCompiler::new(&registry).compile(submission)?")
-        .count() == 2
+        .count() == 3
         && runtime_controller_production.contains("cache: Arc<Mutex<NativeCache>>")
         && runtime_controller_production.contains("self.cache.clone(),")
         && runtime_executor_production.contains("cache: Arc<Mutex<NativeCache>>")
         && runtime_executor_production
             .contains("let cache_key = CacheKey::from_inputs_with_dependencies(")
-        && runtime_executor_production.contains("self.cache.lock().get(&cache_key)")
-        && runtime_executor_production.contains("self.cache.lock().insert(")
+        && runtime_executor_production
+            .contains("self.cache.lock().get_with_handle_lease(&cache_key)")
+        && runtime_executor_production
+            .contains("insert_batch_with_handle_leases(leased_cache_entries)")
         && !runtime_controller_production.contains("pub struct PromptCompiler")
         && !runtime_controller_production.contains("pub struct CacheKey")
         && !runtime_controller_production.contains("pub struct NativeCache")
@@ -2015,7 +2017,9 @@ fn run_ownership_validation(
         )
         && runtime_controller_production
             .contains("NativeDiffusionHandle::from_bundle(&bundle, role)")
-        && runtime_controller_production.contains("handle.require_exact_match(&expected)?")
+        && runtime_controller_production
+            .contains("NativeDiffusionHandle::from_bundle(&expected, role)")
+        && runtime_controller_production.contains(".require_exact_match(&expected_metadata)")
         && fixture_provider_identity_surface.is_some_and(|surface| {
             surface.contains("fn cache_identities(")
                 && surface.contains("checkpoint_identity_snapshot(cancellation)")
@@ -7783,10 +7787,15 @@ fn run_ownership_validation(
                     .contains("Result<ModelValue, InvocationError>")
                 && plugin_registry_adapter
                     .contains("artifact_value_identity(profile_id, artifact)")
+                && plugin_registry_adapter.contains("fn plugin_value_from_stored(")
+                && plugin_registry_adapter.contains("NativeStoredTensorObject")
+                && plugin_registry_adapter.contains("NativeStoredArtifactObject")
+                && plugin_registry_adapter.contains("NativeStoredModelObject")
+                && plugin_registry_adapter.contains("fn invocation_inputs(")
+                && plugin_registry_adapter.contains("fn invocation_outputs(")
                 && plugin_registry_adapter.contains(
-                    "invocation_inputs(&self.node, inputs, &self.type_registry, profile_id)",
-                )
-                && plugin_registry_adapter.contains("runtime_value(value, profile_id)"),
+                    "runtime_value(value, port, registry, profile_id, context, &mut published)",
+                ),
         ),
         (
             "private_worker_preserves_authoritative_component_limits_and_diagnostics",
@@ -7828,11 +7837,51 @@ fn run_ownership_validation(
                 && plugin_private_worker.contains("supervisor.deploy_registry("),
         ),
         (
+            "task367_production_consumers_use_the_comprehensive_generated_registry",
+            runtime_executor.contains("pub fn validate_comprehensive_bindings(")
+                && execution_ui_production.contains("generated_native_frontend_contracts(None)")
+                && execution_ui_production.contains("compile_generated_native_prompt(")
+                && execution_ui_production.contains("graph_to_prompt(")
+                && !execution_ui_production.contains("compile_native_image_workflow(")
+                && sim_bootstrap
+                    .contains("generated_native_node_registry_projection(None)?")
+                && !sim_bootstrap.contains("comfy_runtime::native_image_registry_projection()?")
+                && api_host_production.contains("pub fn with_registry(")
+                && api_services
+                    .contains("for (class_type, runtime) in self.registry.descriptors()")
+                && worker_process.contains("RegistryDeploymentCommit")
+                && worker_process.contains("apply_compiled_registry_commit(")
+                && worker_process.contains("worker_plan.validate()?")
+                && plugin_registry_adapter.contains("fn invocation_inputs(")
+                && plugin_registry_adapter.contains("BTreeMap<String, NativeValue>")
+                && plugin_registry_adapter.contains("fn invocation_outputs(")
+                && plugin_registry_adapter.contains("context.handle_store()")
+                && plugin_registry_adapter.contains("NativeValue::Primitive")
+                && plugin_registry_adapter.contains("NativeValue::PreservedUnknown")
+                && plugin_registry_adapter.contains("NativeValue::List")
+                && plugin_registry_adapter.contains("NativeValue::Handle")
+                && !plugin_registry_adapter.contains("serde_json::to_value")
+                && !plugin_registry_adapter.contains("serde_json::from_value")
+                && runtime_controller_production
+                    .contains("pub fn generated_native_node_registry_projection(")
+                && runtime_controller_production
+                    .contains("pub fn generated_native_frontend_descriptors(")
+                && runtime_controller_production
+                    .contains("pub fn compile_generated_native_prompt(")
+                && runtime_controller_production
+                    .contains("pub fn native_image_registry_projection(")
+                && runtime_controller_production
+                    .contains("pub fn compile_native_image_workflow("),
+        ),
+        (
             "signed_component_presentation_has_one_checked_projection_owner",
-            production_source_occurrences(&sources, "struct RuntimeNodePresentation").len() == 1
+            production_source_occurrences(&sources, "pub struct NativeNodePresentation").len()
+                == 1
                 && runtime_executor
                     .contains("presentations: BTreeMap<String, RuntimeNodePresentation>")
                 && runtime_executor.contains("fn register_bound_batch_internal(")
+                && plugin_registry_adapter
+                    .contains("fn native_presentation(node: &PluginNode) -> NativeNodePresentation")
                 && plugin_registry_adapter.contains("display_name: node.display_name.clone()")
                 && plugin_registry_adapter.contains("category: node.category.clone()")
                 && plugin_registry_adapter.contains(".map(|port| port.name.clone())")
@@ -7840,8 +7889,11 @@ fn run_ownership_validation(
                     .contains("register_bound_batch_with_presentations(bindings)")
                 && api_services.contains("self.registry.presentation(class_type)")
                 && api_services.contains("native_node_presentation_missing")
-                && api_services.contains("let output_names = presentation")
-                && api_services.contains(".output_names")
+                && api_services.contains(
+                    "let (outputs, output_names, output_tooltips) = if let Some(schema)",
+                )
+                && api_services.contains("runtime.source_schema.as_ref()")
+                && !api_services.contains("let output_names = presentation")
                 && !api_services.contains("\"category\": \"extensions\"")
                 && !api_services.contains("format!(\"output_{index}\")"),
         ),

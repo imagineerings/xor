@@ -22,7 +22,12 @@ def rel(path: Path) -> str:
 
 def write_csv(name: str, fieldnames: list[str], rows: list[dict[str, object]]) -> None:
     with (OUT / name).open("w", encoding="utf-8", newline="") as stream:
-        writer = csv.DictWriter(stream, fieldnames=fieldnames, extrasaction="ignore")
+        writer = csv.DictWriter(
+            stream,
+            fieldnames=fieldnames,
+            extrasaction="ignore",
+            lineterminator="\n",
+        )
         writer.writeheader()
         for row in rows:
             writer.writerow({key: row.get(key, "") for key in fieldnames})

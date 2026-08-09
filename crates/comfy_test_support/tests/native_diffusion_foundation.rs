@@ -2,7 +2,7 @@ use comfy_media::{PngLimits, encode_png_frame};
 use comfy_model::ModelTokenizerDescriptor;
 use comfy_model::clip::NativeTokenizer;
 use comfy_model::generated_native_diffusion::{
-    NativeDiffusionModelError, Sd1Tokenizer, empty_sd15_latent, encode_sd15_prompt,
+    Sd1Tokenizer, empty_sd15_latent, encode_sd15_prompt,
 };
 use comfy_runtime::{NativeDiffusionBundle, NativeDiffusionProvider, Sd15GuidanceAdapter};
 use comfy_sampler::NoiseRequest;
@@ -143,7 +143,7 @@ fn native_diffusion_fixture_catalog_and_provenance_are_exact()
 }
 
 #[test]
-fn native_diffusion_fixture_rejects_invalid_weight_keys_and_shapes()
+fn native_diffusion_fixture_rejects_tampering_before_weight_parsing()
 -> Result<(), Box<dyn std::error::Error>> {
     let checked_in = NativeDiffusionFixture::checked_in();
     let cancellation = CancellationToken::default();
@@ -156,13 +156,16 @@ fn native_diffusion_fixture_rejects_invalid_weight_keys_and_shapes()
         b"model.diffusion_model.input_blocks.0.0.weight",
         b"model.diffusion_model.input_blocks.0.0.weighx",
     )?;
-    assert!(matches!(
-        NativeDiffusionFixture::at(invalid_key_directory.path())
-            .load_model(MEMORY_LIMIT, &cancellation),
-        Err(NativeDiffusionFixtureError::Model(
-            NativeDiffusionModelError::WeightKeys { .. }
-        ))
-    ));
+    let invalid_key_error = NativeDiffusionFixture::at(invalid_key_directory.path())
+        .load_model(MEMORY_LIMIT, &cancellation)
+        .expect_err("tampered weight key must fail model admission");
+    assert!(
+        matches!(
+            &invalid_key_error,
+            NativeDiffusionFixtureError::ModelDigestMismatch { .. }
+        ),
+        "unexpected invalid-key error: {invalid_key_error:?}"
+    );
 
     let invalid_shape_directory = tempfile::tempdir()?;
     copy_fixture_admission_files(&checked_in, invalid_shape_directory.path())?;
@@ -172,13 +175,16 @@ fn native_diffusion_fixture_rejects_invalid_weight_keys_and_shapes()
         b"\"shape\":[32,4,3,3]",
         b"\"shape\":[16,8,3,3]",
     )?;
-    assert!(matches!(
-        NativeDiffusionFixture::at(invalid_shape_directory.path())
-            .load_model(MEMORY_LIMIT, &cancellation),
-        Err(NativeDiffusionFixtureError::Model(
-            NativeDiffusionModelError::WeightShape { .. }
-        ))
-    ));
+    let invalid_shape_error = NativeDiffusionFixture::at(invalid_shape_directory.path())
+        .load_model(MEMORY_LIMIT, &cancellation)
+        .expect_err("tampered weight shape must fail model admission");
+    assert!(
+        matches!(
+            &invalid_shape_error,
+            NativeDiffusionFixtureError::ModelDigestMismatch { .. }
+        ),
+        "unexpected invalid-shape error: {invalid_shape_error:?}"
+    );
     Ok(())
 }
 
@@ -479,12 +485,18 @@ fn native_diffusion_guidance_adapter_preserves_cfg_and_failure_boundaries()
     );
     let mut constrained =
         Sd15GuidanceAdapter::checked(&model, &positive, &negative, &constrained_context)?;
-    assert!(matches!(
-        constrained.execute(&backend, &latent, sigma, &scale_zero, &constrained_context),
-        Err(comfy_runtime::NativeImageRuntimeError::Execution(message))
-            if message.contains("workspace request of")
-                && message.contains("64-byte authorization")
-    ));
+    let constrained_error = constrained
+        .execute(&backend, &latent, sigma, &scale_zero, &constrained_context)
+        .expect_err("undersized workspace authorization must reject guidance");
+    assert!(
+        matches!(
+            &constrained_error,
+            comfy_runtime::NativeImageRuntimeError::ResourceExhausted(message)
+                if message.contains("workspace request of")
+                    && message.contains("64-byte authorization")
+        ),
+        "unexpected constrained-workspace error: {constrained_error:?}"
+    );
     assert_eq!(constrained_workspace.in_use_bytes(), 0);
     assert_eq!(context.scratch.in_use_bytes(), 0);
     Ok(())

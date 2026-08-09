@@ -1,6 +1,847 @@
 use serde::{Deserialize, Serialize};
+use std::{collections::BTreeSet, error::Error, fmt};
 
 pub const NODE_DESCRIPTOR_SCHEMA_VERSION: u16 = 1;
+pub const NATIVE_SCHEMA_METADATA_VERSION: u16 = 2;
+
+const MAX_SCHEMA_DEPTH: usize = 16;
+const MAX_SCHEMA_ITEMS: usize = 4_096;
+const MAX_SCHEMA_TEXT_BYTES: usize = 256 * 1024;
+const MAX_SCHEMA_TOTAL_BYTES: usize = 2 * 1024 * 1024;
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum NativeSchemaError {
+    DepthExceeded,
+    ItemCountExceeded,
+    TextTooLarge,
+    TotalBytesExceeded,
+    InvalidDecimal,
+    InvalidDigest,
+    InvalidFieldName,
+    DuplicateField(String),
+    InvalidSourceType,
+    InvalidMetadata(&'static str),
+}
+
+impl fmt::Display for NativeSchemaError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::DepthExceeded => formatter.write_str("schema value exceeds its depth bound"),
+            Self::ItemCountExceeded => {
+                formatter.write_str("schema value exceeds its item-count bound")
+            }
+            Self::TextTooLarge => formatter.write_str("schema text exceeds its byte bound"),
+            Self::TotalBytesExceeded => {
+                formatter.write_str("schema value exceeds its total byte bound")
+            }
+            Self::InvalidDecimal => {
+                formatter.write_str("schema decimal is not finite or canonical")
+            }
+            Self::InvalidDigest => formatter.write_str("schema expression digest is invalid"),
+            Self::InvalidFieldName => formatter.write_str("schema field name is invalid"),
+            Self::DuplicateField(name) => write!(formatter, "duplicate schema field `{name}`"),
+            Self::InvalidSourceType => formatter.write_str("schema source type is invalid"),
+            Self::InvalidMetadata(field) => {
+                write!(formatter, "schema metadata `{field}` is invalid")
+            }
+        }
+    }
+}
+
+impl Error for NativeSchemaError {}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum NativeSchemaValue {
+    Null,
+    Boolean { value: bool },
+    SignedInteger { value: i64 },
+    UnsignedInteger { value: u64 },
+    FiniteDecimal { value: String },
+    String { value: String },
+    List { values: Vec<NativeSchemaValue> },
+    Object { fields: Vec<NativeSchemaField> },
+    PreservedExpression { source: String, sha256: String },
+}
+
+impl NativeSchemaValue {
+    pub fn validate(&self) -> Result<(), NativeSchemaError> {
+        let mut total_bytes = 0usize;
+        let mut total_items = 0usize;
+        self.validate_bounded(0, &mut total_bytes, &mut total_items)
+    }
+
+    fn validate_bounded(
+        &self,
+        depth: usize,
+        total_bytes: &mut usize,
+        total_items: &mut usize,
+    ) -> Result<(), NativeSchemaError> {
+        if depth > MAX_SCHEMA_DEPTH {
+            return Err(NativeSchemaError::DepthExceeded);
+        }
+        *total_items = total_items
+            .checked_add(1)
+            .ok_or(NativeSchemaError::ItemCountExceeded)?;
+        if *total_items > MAX_SCHEMA_ITEMS {
+            return Err(NativeSchemaError::ItemCountExceeded);
+        }
+        match self {
+            Self::Null
+            | Self::Boolean { .. }
+            | Self::SignedInteger { .. }
+            | Self::UnsignedInteger { .. } => {}
+            Self::FiniteDecimal { value } => {
+                validate_text(value, total_bytes)?;
+                if !valid_finite_decimal(value) {
+                    return Err(NativeSchemaError::InvalidDecimal);
+                }
+            }
+            Self::String { value } => validate_text(value, total_bytes)?,
+            Self::List { values } => {
+                for value in values {
+                    value.validate_bounded(depth + 1, total_bytes, total_items)?;
+                }
+            }
+            Self::Object { fields } => {
+                let mut names = BTreeSet::new();
+                for field in fields {
+                    validate_name(&field.name)?;
+                    validate_text(&field.name, total_bytes)?;
+                    if !names.insert(field.name.as_str()) {
+                        return Err(NativeSchemaError::DuplicateField(field.name.clone()));
+                    }
+                    field
+                        .value
+                        .validate_bounded(depth + 1, total_bytes, total_items)?;
+                }
+            }
+            Self::PreservedExpression { source, sha256 } => {
+                validate_text(source, total_bytes)?;
+                if !valid_sha256(sha256) {
+                    return Err(NativeSchemaError::InvalidDigest);
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NativeSchemaField {
+    pub name: String,
+    pub value: NativeSchemaValue,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NativeSchemaProvenance {
+    SourceV1,
+    SourceV3,
+    CompatibilityV1,
+    Plugin,
+    Synthetic,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NativeUploadKind {
+    Image,
+    Audio,
+    Video,
+    Model,
+    Artifact,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NativeInputRequirement {
+    Required,
+    Optional,
+    Hidden,
+    Preserved,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NativeInputSchemaMetadata {
+    pub name: String,
+    pub source_type_names: Vec<String>,
+    pub default: Option<NativeSchemaValue>,
+    pub minimum: Option<NativeSchemaValue>,
+    pub maximum: Option<NativeSchemaValue>,
+    pub step: Option<NativeSchemaValue>,
+    pub choices: Vec<NativeSchemaValue>,
+    pub display_name: Option<String>,
+    pub tooltip: Option<String>,
+    pub multiline: bool,
+    pub socketless: bool,
+    pub widget_type: Option<String>,
+    pub force_input: bool,
+    pub raw_link: bool,
+    pub advanced: bool,
+    pub upload: Option<NativeUploadKind>,
+    pub extra: Vec<NativeSchemaField>,
+}
+
+impl NativeInputSchemaMetadata {
+    pub fn compatibility(name: impl Into<String>, source_type_name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            source_type_names: vec![source_type_name.into()],
+            default: None,
+            minimum: None,
+            maximum: None,
+            step: None,
+            choices: Vec::new(),
+            display_name: None,
+            tooltip: None,
+            multiline: false,
+            socketless: false,
+            widget_type: None,
+            force_input: false,
+            raw_link: false,
+            advanced: false,
+            upload: None,
+            extra: Vec::new(),
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), NativeSchemaError> {
+        validate_name(&self.name)?;
+        validate_source_types(&self.source_type_names)?;
+        validate_optional_values([
+            self.default.as_ref(),
+            self.minimum.as_ref(),
+            self.maximum.as_ref(),
+            self.step.as_ref(),
+        ])?;
+        validate_values(&self.choices)?;
+        validate_optional_text(self.display_name.as_deref())?;
+        validate_optional_text(self.tooltip.as_deref())?;
+        validate_optional_name(self.widget_type.as_deref())?;
+        validate_fields(&self.extra)?;
+        if self.socketless && self.force_input {
+            return Err(NativeSchemaError::InvalidMetadata("socketless"));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NativeDynamicSchemaMetadata {
+    pub identity: String,
+    pub prefix: Option<String>,
+    pub names: Vec<String>,
+    pub start_index: u32,
+    pub minimum_count: u32,
+    pub maximum_count: u32,
+    pub input: Box<NativeInputSchemaMetadata>,
+    pub extra: Vec<NativeSchemaField>,
+}
+
+impl NativeDynamicSchemaMetadata {
+    pub fn compatibility(
+        identity: impl Into<String>,
+        start_index: u32,
+        minimum_count: u32,
+        maximum_count: u32,
+        input: NativeInputSchemaMetadata,
+    ) -> Self {
+        Self {
+            identity: identity.into(),
+            prefix: None,
+            names: Vec::new(),
+            start_index,
+            minimum_count,
+            maximum_count,
+            input: Box::new(input),
+            extra: Vec::new(),
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), NativeSchemaError> {
+        validate_name(&self.identity)?;
+        validate_optional_name(self.prefix.as_deref())?;
+        let mut names = BTreeSet::new();
+        for name in &self.names {
+            validate_name(name)?;
+            if !names.insert(name.as_str()) {
+                return Err(NativeSchemaError::DuplicateField(name.clone()));
+            }
+        }
+        if self.minimum_count > self.maximum_count
+            || self.start_index.checked_add(self.maximum_count).is_none()
+        {
+            return Err(NativeSchemaError::InvalidMetadata("dynamic_count"));
+        }
+        self.input.validate()?;
+        validate_fields(&self.extra)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NativeOutputSchemaMetadata {
+    pub name: String,
+    pub source_type_name: String,
+    pub display_name: Option<String>,
+    pub tooltip: Option<String>,
+    pub choices: Vec<NativeSchemaValue>,
+    pub match_template: Option<String>,
+    pub extra: Vec<NativeSchemaField>,
+}
+
+impl NativeOutputSchemaMetadata {
+    pub fn compatibility(name: impl Into<String>, source_type_name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            source_type_name: source_type_name.into(),
+            display_name: None,
+            tooltip: None,
+            choices: Vec::new(),
+            match_template: None,
+            extra: Vec::new(),
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), NativeSchemaError> {
+        validate_name(&self.name)?;
+        validate_name(&self.source_type_name)?;
+        validate_optional_text(self.display_name.as_deref())?;
+        validate_optional_text(self.tooltip.as_deref())?;
+        validate_values(&self.choices)?;
+        validate_optional_name(self.match_template.as_deref())?;
+        validate_fields(&self.extra)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NativeNodeSchemaMetadata {
+    pub schema_version: u16,
+    pub provenance: NativeSchemaProvenance,
+    pub feature_id: Option<String>,
+    pub definition_sha256: Option<String>,
+    pub has_intermediate_output: bool,
+    pub development_only: bool,
+    pub api_node: bool,
+    pub not_idempotent: bool,
+    pub enable_expand: bool,
+    pub accept_all_inputs: bool,
+    pub essentials_category: Option<String>,
+    pub price_badge: Option<NativeSchemaValue>,
+    pub extra: Vec<NativeSchemaField>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NativeDescriptorSchemaMetadata {
+    pub node: NativeNodeSchemaMetadata,
+    pub inputs: Vec<NativeInputSchemaMetadata>,
+    pub dynamic_inputs: Vec<NativeDynamicSchemaMetadata>,
+    pub outputs: Vec<NativeOutputSchemaMetadata>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CatalogNodeInputSchemaMetadata {
+    #[serde(flatten)]
+    pub schema: NativeInputSchemaMetadata,
+    pub requirement: NativeInputRequirement,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CatalogNodeOutputSchemaMetadata {
+    pub source_name: Option<String>,
+    pub source_type_name: String,
+    pub display_name: Option<String>,
+    pub tooltip: Option<String>,
+    pub choices: Vec<NativeSchemaValue>,
+    pub match_template: Option<String>,
+    pub extra: Vec<NativeSchemaField>,
+    pub ordinal: usize,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NativeSourcePresentationMetadata {
+    pub is_deprecated: bool,
+    pub is_experimental: bool,
+    pub display_name: Option<String>,
+    pub description: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CatalogNodeSchemaMetadata {
+    pub schema_version: u16,
+    pub provenance: NativeSchemaProvenance,
+    pub catalog_sha256: String,
+    pub definition_sha256: String,
+    pub inputs: Vec<CatalogNodeInputSchemaMetadata>,
+    pub dynamic_inputs: Vec<NativeDynamicSchemaMetadata>,
+    pub outputs: Vec<CatalogNodeOutputSchemaMetadata>,
+    pub unresolved_inputs: Vec<NativeSchemaValue>,
+    pub unresolved_outputs: Vec<NativeSchemaValue>,
+    pub hidden: Vec<NativeSchemaValue>,
+    pub node: NativeNodeSchemaMetadata,
+    pub presentation: NativeSourcePresentationMetadata,
+}
+
+impl CatalogNodeSchemaMetadata {
+    pub fn validate(&self) -> Result<(), NativeSchemaError> {
+        if self.schema_version != NATIVE_SCHEMA_METADATA_VERSION
+            || !valid_sha256(&self.catalog_sha256)
+            || !valid_sha256(&self.definition_sha256)
+        {
+            return Err(NativeSchemaError::InvalidMetadata("catalog_schema"));
+        }
+        self.node.validate()?;
+        let mut names = BTreeSet::new();
+        for input in &self.inputs {
+            input.schema.validate()?;
+            if !names.insert(input.schema.name.as_str()) {
+                return Err(NativeSchemaError::DuplicateField(input.schema.name.clone()));
+            }
+        }
+        for dynamic_input in &self.dynamic_inputs {
+            dynamic_input.validate()?;
+        }
+        for (ordinal, output) in self.outputs.iter().enumerate() {
+            if output.ordinal != ordinal {
+                return Err(NativeSchemaError::InvalidMetadata("output_ordinal"));
+            }
+            validate_optional_name(output.source_name.as_deref())?;
+            validate_name(&output.source_type_name)?;
+            validate_optional_text(output.display_name.as_deref())?;
+            validate_optional_text(output.tooltip.as_deref())?;
+            validate_optional_name(output.match_template.as_deref())?;
+            validate_values(&output.choices)?;
+            validate_fields(&output.extra)?;
+        }
+        validate_values(&self.unresolved_inputs)?;
+        validate_values(&self.unresolved_outputs)?;
+        validate_values(&self.hidden)?;
+        validate_optional_text(self.presentation.display_name.as_deref())?;
+        validate_optional_text(self.presentation.description.as_deref())?;
+        Ok(())
+    }
+
+    pub fn bind_execution_ports(
+        &self,
+        input_names: &[String],
+        dynamic_inputs: &[NativeDynamicSchemaMetadata],
+        output_names: &[String],
+    ) -> Result<NativeDescriptorSchemaMetadata, NativeSchemaError> {
+        self.validate()?;
+        if !self.unresolved_inputs.is_empty()
+            || !self.unresolved_outputs.is_empty()
+            || self.inputs.len() != input_names.len()
+            || self.dynamic_inputs != dynamic_inputs
+            || self.outputs.len() != output_names.len()
+            || !self
+                .inputs
+                .iter()
+                .zip(input_names)
+                .all(|(schema, name)| schema.schema.name == *name)
+        {
+            return Err(NativeSchemaError::InvalidMetadata("execution_ports"));
+        }
+        let outputs = self
+            .outputs
+            .iter()
+            .zip(output_names)
+            .map(|(schema, name)| NativeOutputSchemaMetadata {
+                name: name.clone(),
+                source_type_name: schema.source_type_name.clone(),
+                display_name: schema.display_name.clone(),
+                tooltip: schema.tooltip.clone(),
+                choices: schema.choices.clone(),
+                match_template: schema.match_template.clone(),
+                extra: schema.extra.clone(),
+            })
+            .collect();
+        let value = NativeDescriptorSchemaMetadata {
+            node: self.node.clone(),
+            inputs: self
+                .inputs
+                .iter()
+                .map(|input| input.schema.clone())
+                .collect(),
+            dynamic_inputs: dynamic_inputs.to_vec(),
+            outputs,
+        };
+        value.validate()?;
+        Ok(value)
+    }
+}
+
+impl NativeDescriptorSchemaMetadata {
+    pub fn compatibility(
+        provenance: NativeSchemaProvenance,
+        inputs: impl IntoIterator<Item = (String, String)>,
+        dynamic_inputs: impl IntoIterator<Item = NativeDynamicSchemaMetadata>,
+        outputs: impl IntoIterator<Item = (String, String)>,
+    ) -> Self {
+        Self {
+            node: NativeNodeSchemaMetadata::compatibility(provenance),
+            inputs: inputs
+                .into_iter()
+                .map(|(name, source_type)| {
+                    NativeInputSchemaMetadata::compatibility(name, source_type)
+                })
+                .collect(),
+            dynamic_inputs: dynamic_inputs.into_iter().collect(),
+            outputs: outputs
+                .into_iter()
+                .map(|(name, source_type)| {
+                    NativeOutputSchemaMetadata::compatibility(name, source_type)
+                })
+                .collect(),
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), NativeSchemaError> {
+        if self.inputs.len() > MAX_SCHEMA_ITEMS
+            || self.dynamic_inputs.len() > MAX_SCHEMA_ITEMS
+            || self.outputs.len() > MAX_SCHEMA_ITEMS
+        {
+            return Err(NativeSchemaError::ItemCountExceeded);
+        }
+        self.node.validate()?;
+        for input in &self.inputs {
+            input.validate()?;
+        }
+        for dynamic_input in &self.dynamic_inputs {
+            dynamic_input.validate()?;
+        }
+        for output in &self.outputs {
+            output.validate()?;
+        }
+        let mut total_bytes = 0usize;
+        let mut total_items = 0usize;
+        accumulate_node_metadata(&self.node, &mut total_bytes, &mut total_items)?;
+        for input in &self.inputs {
+            accumulate_input_metadata(input, &mut total_bytes, &mut total_items)?;
+        }
+        for dynamic_input in &self.dynamic_inputs {
+            accumulate_dynamic_metadata(dynamic_input, &mut total_bytes, &mut total_items)?;
+        }
+        for output in &self.outputs {
+            accumulate_output_metadata(output, &mut total_bytes, &mut total_items)?;
+        }
+        Ok(())
+    }
+
+    pub fn synthetic(
+        input_names: impl IntoIterator<Item = String>,
+        dynamic_inputs: impl IntoIterator<Item = NativeDynamicSchemaMetadata>,
+        output_names: impl IntoIterator<Item = String>,
+    ) -> Self {
+        Self::compatibility(
+            NativeSchemaProvenance::Synthetic,
+            input_names.into_iter().map(|name| (name, "ANY".to_owned())),
+            dynamic_inputs,
+            output_names
+                .into_iter()
+                .map(|name| (name, "ANY".to_owned())),
+        )
+    }
+}
+
+fn accumulate_node_metadata(
+    metadata: &NativeNodeSchemaMetadata,
+    total_bytes: &mut usize,
+    total_items: &mut usize,
+) -> Result<(), NativeSchemaError> {
+    accumulate_optional_text(metadata.feature_id.as_deref(), total_bytes, total_items)?;
+    accumulate_optional_text(
+        metadata.definition_sha256.as_deref(),
+        total_bytes,
+        total_items,
+    )?;
+    accumulate_optional_text(
+        metadata.essentials_category.as_deref(),
+        total_bytes,
+        total_items,
+    )?;
+    if let Some(value) = &metadata.price_badge {
+        value.validate_bounded(0, total_bytes, total_items)?;
+    }
+    accumulate_fields(&metadata.extra, total_bytes, total_items)
+}
+
+fn accumulate_input_metadata(
+    metadata: &NativeInputSchemaMetadata,
+    total_bytes: &mut usize,
+    total_items: &mut usize,
+) -> Result<(), NativeSchemaError> {
+    accumulate_text(&metadata.name, total_bytes, total_items)?;
+    for source_type in &metadata.source_type_names {
+        accumulate_text(source_type, total_bytes, total_items)?;
+    }
+    for value in [
+        metadata.default.as_ref(),
+        metadata.minimum.as_ref(),
+        metadata.maximum.as_ref(),
+        metadata.step.as_ref(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        value.validate_bounded(0, total_bytes, total_items)?;
+    }
+    for choice in &metadata.choices {
+        choice.validate_bounded(0, total_bytes, total_items)?;
+    }
+    accumulate_optional_text(metadata.display_name.as_deref(), total_bytes, total_items)?;
+    accumulate_optional_text(metadata.tooltip.as_deref(), total_bytes, total_items)?;
+    accumulate_optional_text(metadata.widget_type.as_deref(), total_bytes, total_items)?;
+    accumulate_fields(&metadata.extra, total_bytes, total_items)
+}
+
+fn accumulate_dynamic_metadata(
+    metadata: &NativeDynamicSchemaMetadata,
+    total_bytes: &mut usize,
+    total_items: &mut usize,
+) -> Result<(), NativeSchemaError> {
+    accumulate_text(&metadata.identity, total_bytes, total_items)?;
+    accumulate_optional_text(metadata.prefix.as_deref(), total_bytes, total_items)?;
+    for name in &metadata.names {
+        accumulate_text(name, total_bytes, total_items)?;
+    }
+    accumulate_input_metadata(&metadata.input, total_bytes, total_items)?;
+    accumulate_fields(&metadata.extra, total_bytes, total_items)
+}
+
+fn accumulate_output_metadata(
+    metadata: &NativeOutputSchemaMetadata,
+    total_bytes: &mut usize,
+    total_items: &mut usize,
+) -> Result<(), NativeSchemaError> {
+    accumulate_text(&metadata.name, total_bytes, total_items)?;
+    accumulate_text(&metadata.source_type_name, total_bytes, total_items)?;
+    accumulate_optional_text(metadata.display_name.as_deref(), total_bytes, total_items)?;
+    accumulate_optional_text(metadata.tooltip.as_deref(), total_bytes, total_items)?;
+    accumulate_optional_text(metadata.match_template.as_deref(), total_bytes, total_items)?;
+    for choice in &metadata.choices {
+        choice.validate_bounded(0, total_bytes, total_items)?;
+    }
+    accumulate_fields(&metadata.extra, total_bytes, total_items)
+}
+
+fn accumulate_fields(
+    fields: &[NativeSchemaField],
+    total_bytes: &mut usize,
+    total_items: &mut usize,
+) -> Result<(), NativeSchemaError> {
+    for field in fields {
+        accumulate_text(&field.name, total_bytes, total_items)?;
+        field.value.validate_bounded(0, total_bytes, total_items)?;
+    }
+    Ok(())
+}
+
+fn accumulate_optional_text(
+    value: Option<&str>,
+    total_bytes: &mut usize,
+    total_items: &mut usize,
+) -> Result<(), NativeSchemaError> {
+    if let Some(value) = value {
+        accumulate_text(value, total_bytes, total_items)?;
+    }
+    Ok(())
+}
+
+fn accumulate_text(
+    value: &str,
+    total_bytes: &mut usize,
+    total_items: &mut usize,
+) -> Result<(), NativeSchemaError> {
+    *total_items = total_items
+        .checked_add(1)
+        .ok_or(NativeSchemaError::ItemCountExceeded)?;
+    if *total_items > MAX_SCHEMA_ITEMS {
+        return Err(NativeSchemaError::ItemCountExceeded);
+    }
+    validate_text(value, total_bytes)
+}
+
+impl NativeNodeSchemaMetadata {
+    pub fn compatibility(provenance: NativeSchemaProvenance) -> Self {
+        Self {
+            schema_version: NATIVE_SCHEMA_METADATA_VERSION,
+            provenance,
+            feature_id: None,
+            definition_sha256: None,
+            has_intermediate_output: false,
+            development_only: false,
+            api_node: false,
+            not_idempotent: false,
+            enable_expand: false,
+            accept_all_inputs: false,
+            essentials_category: None,
+            price_badge: None,
+            extra: Vec::new(),
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), NativeSchemaError> {
+        if self.schema_version != NATIVE_SCHEMA_METADATA_VERSION {
+            return Err(NativeSchemaError::InvalidMetadata("schema_version"));
+        }
+        validate_optional_name(self.feature_id.as_deref())?;
+        if let Some(digest) = &self.definition_sha256
+            && !valid_sha256(digest)
+        {
+            return Err(NativeSchemaError::InvalidDigest);
+        }
+        validate_optional_text(self.essentials_category.as_deref())?;
+        if let Some(value) = &self.price_badge {
+            value.validate()?;
+        }
+        validate_fields(&self.extra)
+    }
+}
+
+fn validate_values(values: &[NativeSchemaValue]) -> Result<(), NativeSchemaError> {
+    if values.len() > MAX_SCHEMA_ITEMS {
+        return Err(NativeSchemaError::ItemCountExceeded);
+    }
+    for value in values {
+        value.validate()?;
+    }
+    Ok(())
+}
+
+fn validate_optional_values<'a>(
+    values: impl IntoIterator<Item = Option<&'a NativeSchemaValue>>,
+) -> Result<(), NativeSchemaError> {
+    for value in values.into_iter().flatten() {
+        value.validate()?;
+    }
+    Ok(())
+}
+
+fn validate_fields(fields: &[NativeSchemaField]) -> Result<(), NativeSchemaError> {
+    let mut names = BTreeSet::new();
+    for field in fields {
+        validate_name(&field.name)?;
+        if !names.insert(field.name.as_str()) {
+            return Err(NativeSchemaError::DuplicateField(field.name.clone()));
+        }
+        field.value.validate()?;
+    }
+    Ok(())
+}
+
+fn validate_source_types(values: &[String]) -> Result<(), NativeSchemaError> {
+    if values.is_empty() || values.len() > 64 {
+        return Err(NativeSchemaError::InvalidSourceType);
+    }
+    let mut unique = BTreeSet::new();
+    for value in values {
+        validate_name(value).map_err(|_| NativeSchemaError::InvalidSourceType)?;
+        if !unique.insert(value.as_str()) {
+            return Err(NativeSchemaError::InvalidSourceType);
+        }
+    }
+    Ok(())
+}
+
+fn validate_optional_text(value: Option<&str>) -> Result<(), NativeSchemaError> {
+    if let Some(value) = value {
+        let mut total = 0;
+        validate_text(value, &mut total)?;
+    }
+    Ok(())
+}
+
+fn validate_optional_name(value: Option<&str>) -> Result<(), NativeSchemaError> {
+    if let Some(value) = value {
+        validate_name(value)?;
+    }
+    Ok(())
+}
+
+fn validate_name(value: &str) -> Result<(), NativeSchemaError> {
+    if value.is_empty()
+        || value.len() > MAX_SCHEMA_TEXT_BYTES
+        || value.chars().any(|character| character.is_control())
+    {
+        return Err(NativeSchemaError::InvalidFieldName);
+    }
+    Ok(())
+}
+
+fn validate_text(value: &str, total_bytes: &mut usize) -> Result<(), NativeSchemaError> {
+    if value.len() > MAX_SCHEMA_TEXT_BYTES || value.contains('\0') {
+        return Err(NativeSchemaError::TextTooLarge);
+    }
+    *total_bytes = total_bytes
+        .checked_add(value.len())
+        .ok_or(NativeSchemaError::TotalBytesExceeded)?;
+    if *total_bytes > MAX_SCHEMA_TOTAL_BYTES {
+        return Err(NativeSchemaError::TotalBytesExceeded);
+    }
+    Ok(())
+}
+
+fn valid_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn valid_finite_decimal(value: &str) -> bool {
+    if value.is_empty()
+        || value.bytes().any(|byte| byte.is_ascii_whitespace())
+        || matches!(
+            value,
+            "NaN" | "nan" | "inf" | "-inf" | "+inf" | "Infinity" | "-Infinity" | "+Infinity"
+        )
+    {
+        return false;
+    }
+    let bytes = value.as_bytes();
+    let mut index = usize::from(matches!(bytes.first(), Some(b'-') | Some(b'+')));
+    let integer_start = index;
+    while matches!(bytes.get(index), Some(byte) if byte.is_ascii_digit()) {
+        index += 1;
+    }
+    let integer_digits = index - integer_start;
+    let mut fractional_digits = 0;
+    if bytes.get(index) == Some(&b'.') {
+        index += 1;
+        let fractional_start = index;
+        while matches!(bytes.get(index), Some(byte) if byte.is_ascii_digit()) {
+            index += 1;
+        }
+        fractional_digits = index - fractional_start;
+    }
+    if integer_digits == 0 && fractional_digits == 0 {
+        return false;
+    }
+    if matches!(bytes.get(index), Some(b'e') | Some(b'E')) {
+        index += 1;
+        if matches!(bytes.get(index), Some(b'-') | Some(b'+')) {
+            index += 1;
+        }
+        let exponent_start = index;
+        while matches!(bytes.get(index), Some(byte) if byte.is_ascii_digit()) {
+            index += 1;
+        }
+        if exponent_start == index {
+            return false;
+        }
+    }
+    index == bytes.len()
+}
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -77,5 +918,130 @@ pub struct CatalogNodeDescriptor {
 impl CatalogNodeDescriptor {
     pub fn is_registered(&self) -> bool {
         self.source == CatalogNodeSource::Registered
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::error::Error;
+
+    #[test]
+    fn native_schema_values_preserve_integer_decimal_and_field_order() -> Result<(), Box<dyn Error>>
+    {
+        let value = NativeSchemaValue::Object {
+            fields: vec![
+                NativeSchemaField {
+                    name: "maximum".to_owned(),
+                    value: NativeSchemaValue::UnsignedInteger { value: u64::MAX },
+                },
+                NativeSchemaField {
+                    name: "step".to_owned(),
+                    value: NativeSchemaValue::FiniteDecimal {
+                        value: "1.25e-3".to_owned(),
+                    },
+                },
+            ],
+        };
+        value.validate()?;
+        let encoded = serde_json::to_string(&value)?;
+        let decoded: NativeSchemaValue = serde_json::from_str(&encoded)?;
+        assert_eq!(decoded, value);
+        assert!(encoded.find("maximum") < encoded.find("step"));
+        Ok(())
+    }
+
+    #[test]
+    fn native_schema_values_reject_non_finite_and_malformed_data() {
+        for value in ["NaN", "inf", "1e", ".", " 1.0"] {
+            assert_eq!(
+                NativeSchemaValue::FiniteDecimal {
+                    value: value.to_owned(),
+                }
+                .validate(),
+                Err(NativeSchemaError::InvalidDecimal)
+            );
+        }
+        assert!(matches!(
+            NativeSchemaValue::Object {
+                fields: vec![
+                    NativeSchemaField {
+                        name: "choice".to_owned(),
+                        value: NativeSchemaValue::Null,
+                    },
+                    NativeSchemaField {
+                        name: "choice".to_owned(),
+                        value: NativeSchemaValue::Null,
+                    },
+                ],
+            }
+            .validate(),
+            Err(NativeSchemaError::DuplicateField(name)) if name == "choice"
+        ));
+        assert_eq!(
+            NativeSchemaValue::PreservedExpression {
+                source: "2 ** 31 - 1".to_owned(),
+                sha256: "invalid".to_owned(),
+            }
+            .validate(),
+            Err(NativeSchemaError::InvalidDigest)
+        );
+    }
+
+    #[test]
+    fn native_schema_metadata_validates_cross_field_contracts() -> Result<(), Box<dyn Error>> {
+        let mut input = NativeInputSchemaMetadata::compatibility("seed", "INT");
+        input.minimum = Some(NativeSchemaValue::SignedInteger { value: 0 });
+        input.maximum = Some(NativeSchemaValue::UnsignedInteger { value: u64::MAX });
+        input.choices = vec![NativeSchemaValue::String {
+            value: "first".to_owned(),
+        }];
+        input.validate()?;
+        input.socketless = true;
+        input.force_input = true;
+        assert_eq!(
+            input.validate(),
+            Err(NativeSchemaError::InvalidMetadata("socketless"))
+        );
+
+        let dynamic = NativeDynamicSchemaMetadata::compatibility(
+            "images",
+            0,
+            1,
+            50,
+            NativeInputSchemaMetadata::compatibility("image", "IMAGE"),
+        );
+        dynamic.validate()?;
+        let invalid = NativeDynamicSchemaMetadata::compatibility(
+            "images",
+            u32::MAX,
+            1,
+            2,
+            NativeInputSchemaMetadata::compatibility("image", "IMAGE"),
+        );
+        assert_eq!(
+            invalid.validate(),
+            Err(NativeSchemaError::InvalidMetadata("dynamic_count"))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn native_schema_metadata_enforces_one_aggregate_budget() {
+        let mut metadata = NativeDescriptorSchemaMetadata::compatibility(
+            NativeSchemaProvenance::Synthetic,
+            [("value".to_owned(), "STRING".to_owned())],
+            std::iter::empty(),
+            [("value".to_owned(), "STRING".to_owned())],
+        );
+        metadata.inputs[0].choices = (0..9)
+            .map(|_| NativeSchemaValue::String {
+                value: "x".repeat(250_000),
+            })
+            .collect();
+        assert_eq!(
+            metadata.validate(),
+            Err(NativeSchemaError::TotalBytesExceeded)
+        );
     }
 }

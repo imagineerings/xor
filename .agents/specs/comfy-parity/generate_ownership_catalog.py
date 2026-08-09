@@ -487,6 +487,8 @@ def repository_sources(policy: dict[str, Any]) -> list[Path]:
         )
         directory_path = Path(directory)
         for file_name in sorted(file_names):
+            if file_name.startswith("._"):
+                continue
             path = directory_path / file_name
             if path.suffix not in extensions:
                 continue

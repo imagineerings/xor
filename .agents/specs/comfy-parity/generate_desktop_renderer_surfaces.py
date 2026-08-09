@@ -939,7 +939,7 @@ def write_catalog(paths: list[str]) -> list[dict[str, str]]:
         )
 
     with (CATALOGS / OUTPUT_NAME).open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=FIELDS)
+        writer = csv.DictWriter(handle, fieldnames=FIELDS, lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
     return rows
@@ -962,7 +962,7 @@ def update_source_coverage(rows: list[dict[str, str]]) -> None:
             f"Mapped to source-specific renderer contract {feature_id}; coarse parent capability IDs are retained for reverse traceability."
         )
     with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
         writer.writeheader()
         writer.writerows(coverage)
 

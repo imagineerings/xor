@@ -1,0 +1,241 @@
+#!/usr/bin/env python3
+
+import ast
+import csv
+import json
+import tempfile
+import unittest
+from pathlib import Path
+from unittest import mock
+
+import generate_node_contract_catalog as generator
+
+
+class NodeContractCatalogTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.catalog = generator.build_catalog()
+        cls.contracts = {
+            contract["feature_id"]: contract
+            for contract in cls.catalog["contracts"]
+        }
+
+    def test_catalog_is_complete_source_fingerprinted_and_deterministic(self) -> None:
+        self.assertEqual(self.catalog["schema_version"], 2)
+        self.assertEqual(self.catalog["summary"]["rows"], 789)
+        self.assertEqual(self.catalog["summary"]["executable"], 575)
+        self.assertEqual(self.catalog["summary"]["provider_required"], 214)
+        self.assertEqual(self.catalog["summary"]["normalized_v3"], 654)
+        self.assertEqual(self.catalog["summary"]["normalized_v1"], 135)
+        self.assertEqual(self.catalog["summary"]["preserved_schema_contracts"], 0)
+        self.assertEqual(len(self.contracts), 789)
+        self.assertGreater(self.catalog["source_snapshot"]["files"], 100)
+        self.assertEqual(len(self.catalog["source_snapshot"]["manifest_sha256"]), 64)
+        first = json.dumps(self.catalog, indent=2, sort_keys=True) + "\n"
+        second = generator.encoded_catalog().decode("utf-8")
+        self.assertEqual(first, second)
+
+    def test_schema_calls_preserve_exact_literals_and_unsupported_expressions(self) -> None:
+        boolean = self.contracts["COMFY-NODE-0494"]
+        self.assertEqual(boolean["binding_disposition"], "executable")
+        self.assertEqual(boolean["schema"]["status"], "normalized_v3")
+        boolean_contract = boolean["schema"]["contract"]
+        self.assertTrue(
+            any(value["constructor"].endswith("Boolean.Input") for value in boolean_contract["inputs"])
+        )
+        self.assertTrue(
+            any(value["constructor"].endswith("Boolean.Output") for value in boolean_contract["outputs"])
+        )
+
+        bounding_box = self.contracts["COMFY-NODE-0495"]
+        width_call = next(
+            call
+            for call in bounding_box["schema"]["contract"]["inputs"]
+            if call["constructor"].endswith("Int.Input")
+            and call["arguments"]
+            and call["arguments"][0].get("value") == "width"
+        )
+        keywords = {keyword["name"]: keyword["value"] for keyword in width_call["keywords"]}
+        self.assertEqual(keywords["default"]["value"], 512)
+        self.assertEqual(keywords["min"]["value"], 1)
+        self.assertEqual(keywords["max"]["name"], "MAX_RESOLUTION")
+
+        multiline = self.contracts["COMFY-NODE-0499"]
+        multiline_call = next(
+            call
+            for call in multiline["schema"]["contract"]["inputs"]
+            if call["constructor"].endswith("String.Input")
+        )
+        multiline_keywords = {
+            keyword["name"]: keyword["value"] for keyword in multiline_call["keywords"]
+        }
+        self.assertTrue(multiline_keywords["multiline"]["value"])
+
+        provider = self.contracts["COMFY-NODE-0462"]
+        provider_inputs = provider["schema"]["contract"]["inputs"]
+        width = next(value for value in provider_inputs if value.get("name") == "custom_width")
+        width_keywords = {item["name"]: item["value"] for item in width["keywords"]}
+        self.assertEqual(width_keywords["default"]["value"], 1024)
+        self.assertEqual(width_keywords["step"]["value"], 16)
+        self.assertEqual(width_keywords["max"]["value"], 3840)
+        quality = next(value for value in provider_inputs if value.get("name") == "quality")
+        quality_keywords = {item["name"]: item["value"] for item in quality["keywords"]}
+        self.assertEqual(
+            [item["value"] for item in quality_keywords["options"]["items"]],
+            ["low", "medium", "high"],
+        )
+        portable_inputs = {
+            value["name"]: value
+            for value in provider["schema"]["portable"]["inputs"]
+        }
+        self.assertEqual(
+            [choice["value"] for choice in portable_inputs["quality"]["choices"]],
+            ["low", "medium", "high"],
+        )
+        self.assertEqual(portable_inputs["custom_width"]["step"]["value"], 16)
+        self.assertEqual(
+            portable_inputs["seed"]["maximum"]["kind"],
+            "preserved_expression",
+        )
+
+    def test_v1_and_autogrow_contracts_are_structured_without_execution(self) -> None:
+        sampler = self.contracts["COMFY-NODE-0306"]
+        self.assertEqual(sampler["schema"]["status"], "normalized_v1")
+        required = next(
+            group
+            for group in sampler["schema"]["contract"]["input_groups"]
+            if group["name"] == "required"
+        )
+        seed = next(field for field in required["fields"] if field["name"] == "seed")
+        options = seed["contract"]["items"][1]
+        option_entries = {
+            entry["key"]["value"]: entry["value"] for entry in options["entries"]
+        }
+        self.assertEqual(option_entries["default"]["value"], 0)
+        self.assertEqual(option_entries["max"]["value"], 18446744073709551615)
+        portable_sampler_inputs = {
+            value["name"]: value
+            for value in sampler["schema"]["portable"]["inputs"]
+        }
+        self.assertEqual(
+            portable_sampler_inputs["seed"]["maximum"],
+            {"kind": "unsigned_integer", "value": 18446744073709551615},
+        )
+        self.assertEqual(
+            portable_sampler_inputs["cfg"]["step"],
+            {"kind": "finite_decimal", "value": "0.1"},
+        )
+
+        batch = self.contracts["COMFY-NODE-0017"]
+        bindings = batch["schema"]["contract"]["bindings"]
+        template = next(
+            binding for binding in bindings if "autogrow_template" in binding["targets"]
+        )["value"]
+        template_keywords = {item["name"]: item["value"] for item in template["keywords"]}
+        self.assertEqual(template["name"], "io.Autogrow.TemplatePrefix")
+        self.assertEqual(template_keywords["prefix"]["value"], "image")
+        self.assertEqual(template_keywords["min"]["value"], 1)
+        self.assertEqual(template_keywords["max"]["value"], 50)
+        dynamic = batch["schema"]["portable"]["dynamic_inputs"]
+        self.assertEqual(len(dynamic), 1)
+        self.assertEqual(dynamic[0]["identity"], "image{index}")
+        self.assertEqual(dynamic[0]["prefix"], "image")
+        self.assertEqual(dynamic[0]["minimum_count"], 1)
+        self.assertEqual(dynamic[0]["maximum_count"], 50)
+        self.assertEqual(dynamic[0]["input"]["source_type_names"], ["IMAGE"])
+        self.assertEqual(batch["schema"]["portable"]["inputs"], [])
+
+        inherited = self.contracts["COMFY-NODE-0159"]
+        self.assertEqual(inherited["schema"]["catalog_correlation"], "verified_inherited_base")
+        override_names = {
+            item["name"] for item in inherited["schema"]["contract"]["inherited_overrides"]
+        }
+        self.assertEqual(override_names, {"node_id", "display_name", "category"})
+
+        inherited_method = self.contracts["COMFY-NODE-0002"]
+        self.assertEqual(
+            inherited_method["schema"]["catalog_correlation"],
+            "verified_inherited_method",
+        )
+        class_targets = {
+            target
+            for statement in inherited_method["schema"]["contract"]["class_overrides"]
+            for target in statement.get("targets", [])
+        }
+        self.assertIn("node_id", class_targets)
+        self.assertIn("extra_inputs", class_targets)
+
+    def test_provider_disposition_uses_registered_api_identity_not_deprecation(self) -> None:
+        deprecated_provider = self.contracts["COMFY-NODE-0462"]
+        self.assertEqual(deprecated_provider["availability"], "deprecated/dead")
+        self.assertEqual(deprecated_provider["classification"], "API node")
+        self.assertEqual(deprecated_provider["binding_disposition"], "executable")
+
+        deprecated_builtin = self.contracts["COMFY-NODE-0498"]
+        self.assertEqual(deprecated_builtin["availability"], "deprecated/dead")
+        self.assertEqual(deprecated_builtin["classification"], "built-in node")
+        self.assertEqual(deprecated_builtin["binding_disposition"], "executable")
+
+        cloud_provider = self.contracts["COMFY-NODE-0408"]
+        self.assertEqual(cloud_provider["availability"], "cloud/paid")
+        self.assertEqual(cloud_provider["binding_disposition"], "provider_required")
+
+        local_partner_helper = self.contracts["COMFY-NODE-0148"]
+        self.assertEqual(local_partner_helper["availability"], "cloud/paid")
+        self.assertEqual(local_partner_helper["binding_disposition"], "provider_required")
+        node_options = {
+            item["name"]: item["value"]
+            for item in local_partner_helper["schema"]["contract"]["node_options"]
+        }
+        self.assertFalse(node_options["is_api_node"]["value"])
+        outputs = local_partner_helper["schema"]["contract"]["outputs"]
+        self.assertTrue(all(output["callee"]["name"] for output in outputs))
+        self.assertTrue(
+            all(
+                output["source_type_name"] != "PRESERVED_EXPRESSION"
+                for output in local_partner_helper["schema"]["portable"]["outputs"]
+            )
+        )
+
+        expanded_inputs = self.contracts["COMFY-NODE-0020"]["schema"]["portable"]
+        self.assertEqual(expanded_inputs["inputs"], [])
+        self.assertEqual(len(expanded_inputs["unresolved_inputs"]), 1)
+        self.assertIn("_common_inputs", expanded_inputs["unresolved_inputs"][0]["source"])
+
+    def test_schema_source_mismatch_fails_closed(self) -> None:
+        with generator.INPUT.open(newline="", encoding="utf-8") as handle:
+            row = next(
+                value
+                for value in csv.DictReader(handle)
+                if value["feature_id"] == "COMFY-NODE-0494"
+            )
+        source = generator.source_path(row["source_file"]).read_text(encoding="utf-8")
+        _, definition = generator.source_definition(
+            source, row["source_symbol"], int(row["source_line"])
+        )
+        self.assertIsInstance(definition, ast.ClassDef)
+        with self.assertRaisesRegex(RuntimeError, "does not match pinned"):
+            generator.schema_projection(
+                row["schema_source"].replace("PrimitiveBoolean", "WrongBoolean", 1),
+                row["schema_api"],
+                source,
+                definition,
+            )
+
+    def test_atomic_write_preserves_previous_catalog_on_replace_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output = Path(temporary_directory) / "catalog.json"
+            output.write_bytes(b"previous\n")
+            with (
+                mock.patch.object(generator, "OUTPUT", output),
+                mock.patch.object(generator, "encoded_catalog", return_value=b"replacement\n"),
+                mock.patch.object(generator.os, "replace", side_effect=OSError("injected")),
+            ):
+                with self.assertRaisesRegex(OSError, "injected"):
+                    generator.main()
+            self.assertEqual(output.read_bytes(), b"previous\n")
+            self.assertEqual(list(output.parent.glob(f".{output.name}.*.tmp")), [])
+
+
+if __name__ == "__main__":
+    unittest.main()

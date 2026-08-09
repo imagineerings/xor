@@ -158,7 +158,7 @@ impl NativeRuntimeApiHost {
         permission_policy: Arc<comfy_runtime::PermissionPolicy>,
         idempotency_store: Arc<dyn security::IdempotencySnapshotStore>,
     ) -> Result<Self, NativeApiHostError> {
-        let registry = comfy_runtime::native_image_registry_projection()
+        let registry = comfy_runtime::generated_native_node_registry_projection(None)
             .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?;
         Self::with_registry(
             profile_id,

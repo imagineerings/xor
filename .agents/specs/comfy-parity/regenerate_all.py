@@ -27,6 +27,7 @@ PIPELINE = [
     "generate_tensor_operation_contracts.py",
     "../../../crates/comfy_model/scripts/generate_model_family_catalog.py",
     "generate_conditioning_catalog.py",
+    "generate_node_contract_catalog.py",
     "generate_shell_catalog.py",
     "generate_frontend_extension_catalog.py",
     "regenerate_native_sim_evidence.py",

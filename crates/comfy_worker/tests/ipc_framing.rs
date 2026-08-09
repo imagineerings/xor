@@ -968,6 +968,40 @@ fn ipc_schema_contains_no_tensor_pointer_path_or_plugin_handle()
         0,
         workspace_authority.authorize_workspace(64 * 1024 * 1024)?,
     )?;
+    let mut forged_outputs = comfy_runtime::NativeImageWorkerResult::from_execution_report(
+        result.report.clone(),
+        Vec::new(),
+        result.executed_node_count,
+    )?;
+    forged_outputs.report.outputs = result.report.outputs.clone();
+    let forged_outputs = postcard::to_stdvec(&NativeImageWorkerEvent::Completed {
+        result: forged_outputs,
+    })?;
+    match postcard::from_bytes::<NativeImageWorkerEvent>(&forged_outputs) {
+        Err(_) => {}
+        Ok(NativeImageWorkerEvent::Completed { result: decoded }) => {
+            assert!(decoded.decode_ui_outputs().is_err());
+        }
+        Ok(_) => return Err("completed worker event changed postcard discriminant".into()),
+    }
+
+    let mut forged_events = comfy_runtime::NativeImageWorkerResult::from_execution_report(
+        result.report.clone(),
+        Vec::new(),
+        result.executed_node_count,
+    )?;
+    forged_events.report.events = result.report.events.clone();
+    assert!(!forged_events.report.events.is_empty());
+    let forged_events = postcard::to_stdvec(&NativeImageWorkerEvent::Completed {
+        result: forged_events,
+    })?;
+    match postcard::from_bytes::<NativeImageWorkerEvent>(&forged_events) {
+        Err(_) => {}
+        Ok(NativeImageWorkerEvent::Completed { result: decoded }) => {
+            assert!(decoded.decode_ui_outputs().is_err());
+        }
+        Ok(_) => return Err("completed worker event changed postcard discriminant".into()),
+    }
     for proposal in result.output_proposals {
         let wire = proposal.to_worker_proposal()?;
         let encoded = comfy_types::encode_worker_frame(&WorkerEnvelope {

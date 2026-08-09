@@ -141,7 +141,7 @@ def read_rows(name: str) -> list[dict[str, str]]:
 
 def rewrite_catalog(name: str, rows: list[dict[str, str]], fieldnames: list[str]) -> None:
     with (CATALOGS / name).open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
 
@@ -1949,7 +1949,7 @@ def add_backend_source_anchors(features: list[dict[str, str]]) -> None:
         with path.open("w", newline="", encoding="utf-8") as handle:
             writer = csv.DictWriter(handle, fieldnames=[
                 "source_file", "classification", "mapped_feature_ids", "reason", "sha256", "size_bytes"
-            ])
+            ], lineterminator="\n")
             writer.writeheader()
             writer.writerows(rows)
 
@@ -3916,7 +3916,7 @@ def synchronize_source_catalog_targets(features: list[dict[str, str]]) -> None:
                     changed = True
         if changed:
             with path.open("w", newline="", encoding="utf-8") as handle:
-                writer = csv.DictWriter(handle, fieldnames=fieldnames)
+                writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
                 writer.writeheader()
                 writer.writerows(rows)
 
@@ -3924,7 +3924,7 @@ def synchronize_source_catalog_targets(features: list[dict[str, str]]) -> None:
 def write_csv(features: list[dict[str, str]]) -> None:
     path = CATALOGS / "features.csv"
     with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=FEATURE_FIELDS)
+        writer = csv.DictWriter(handle, fieldnames=FEATURE_FIELDS, lineterminator="\n")
         writer.writeheader()
         writer.writerows(features)
 
