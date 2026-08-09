@@ -1,12 +1,14 @@
 pub use comfy_nodes::{
-    NativeCacheDependencies, NativeCachePolicy, NativeDynamicInputDescriptor, NativeEffectClass,
-    NativeHandleKind, NativeHandleStore, NativeHandleStoreError, NativeHandleStoreIdentity,
-    NativeHandleType, NativeInputDescriptor, NativeNode, NativeNodeBinding,
-    NativeNodeBindingDisposition, NativeNodeContext, NativeNodeContractError, NativeNodeDescriptor,
-    NativeNodeFailure, NativeNodeFailureKind, NativeNodeOutcome, NativeNodePresentation,
-    NativeOpaqueHandle, NativeOutputDescriptor, NativePortCardinality, NativePreparedEffectRequest,
-    NativePrimitive, NativePrimitiveType, NativeStoredObject, NativeTypeUnion, NativeValue,
-    NativeValueType,
+    CatalogNodeDescriptor, CatalogNodeSource, CatalogNodeStatus, NativeCacheDependencies,
+    NativeCachePolicy, NativeDynamicInputDescriptor, NativeEffectClass, NativeHandleKind,
+    NativeHandleStore, NativeHandleStoreError, NativeHandleStoreIdentity, NativeHandleType,
+    NativeInputDescriptor, NativeNode, NativeNodeBinding, NativeNodeBindingDisposition,
+    NativeNodeContext, NativeNodeContractError, NativeNodeDescriptor, NativeNodeFailure,
+    NativeNodeFailureKind, NativeNodeOutcome, NativeNodePresentation, NativeOpaqueHandle,
+    NativeOutputDescriptor, NativePortCardinality, NativePreparedEffectRequest, NativePrimitive,
+    NativePrimitiveType, NativeStoredObject, NativeTypeUnion, NativeValue, NativeValueType,
+    NodeRegistry, NodeRegistryError, ObjectInfoInputSchema, ObjectInfoNode, ObjectInfoOutputSchema,
+    ObjectInfoRegistry,
 };
 pub use comfy_types::{AttemptId, ExecutionId, ProfileId, PromptId, RequestId};
 

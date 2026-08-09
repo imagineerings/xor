@@ -9408,22 +9408,28 @@
     },
     {
       "concern": "native_node_registry",
-      "canonical_owner": "comfy_runtime::NativeNodeRegistry for executable bindings; comfy_nodes::NodeRegistry for built-in catalog metadata; signature-verified comfy_plugin_sdk::PluginNode for component metadata",
+      "canonical_owner": "comfy_runtime::NativeNodeRegistry for executable, provider-required, and unavailable binding state; comfy_nodes::NodeRegistry for built-in catalog metadata and checked source-module provenance; comfy_nodes::execution for the portable native node contract; signature-verified comfy_plugin_sdk::PluginNode for component metadata",
       "owner_files": [
         "crates/comfy_runtime/src/executor.rs",
+        "crates/comfy_nodes/src/execution.rs",
         "crates/comfy_nodes/src/registry_generator.rs",
         "crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs"
       ],
       "owner_symbols": [
         "NativeNodeRegistry",
+        "NativeNodeBinding",
+        "NativeValue",
+        "NativeHandleStore",
         "NodeRegistry",
         "PluginNode"
       ],
       "allowed_adapters": [
-        "comfy_nodes::NodeRegistry is the generated built-in catalog owner projected into NativeNodeRegistry",
-        "native_image_registry_projection constructs real executable nodes with exact descriptor version and implementation namespace before publication",
-        "verified PluginNode metadata maps exact display name, category, and ordered output-port names into RuntimeNodePresentation in the same atomic bound batch as its executable descriptor",
-        "NativeRuntimeHttpServices serializes the checked RuntimeNodePresentation and fails closed when it is absent rather than inventing component metadata"
+        "comfy_nodes::NodeRegistry is the generated built-in catalog owner projected into NativeNodeRegistry with exact binding disposition and checked source provenance",
+        "generated_native_node_registry_projection atomically composes the compatibility image and diffusion slices with generated family bindings and validates comprehensive executable, provider-required, and unavailable closure",
+        "native_image_registry_projection remains a deliberately narrow compatibility projection and is not the production comprehensive registry",
+        "comfy_runtime::NativeHandleStoreGeneration is the sole concrete store and lease owner; nodes receive only an attempt-scoped comfy_nodes::NativeHandleStore boundary",
+        "verified PluginNode metadata maps exact display name, category, ordered output-port names, signed namespace, and typed ports into RuntimeNodePresentation and NativeNodeBinding in the same atomic batch as its executable descriptor",
+        "NativeRuntimeHttpServices serializes checked RuntimeNodePresentation while cataloged built-ins obtain python_module only from ObjectInfoRegistry.source_python_module; unavailable rows remain visible and fail closed before execution"
       ],
       "definitions": [
         {
@@ -9445,10 +9451,34 @@
           "symbol": "PluginNode"
         },
         {
-          "path": "crates/comfy_runtime/src/prompt_compiler.rs",
-          "qualified": "comfy_runtime::RuntimeNodePresentation",
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::RuntimeNodePresentation",
           "role": "boundary_dto",
           "symbol": "RuntimeNodePresentation"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativeNodeBinding",
+          "role": "boundary_dto",
+          "symbol": "NativeNodeBinding"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativeValue",
+          "role": "boundary_dto",
+          "symbol": "NativeValue"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativeHandleStore",
+          "role": "boundary_dto",
+          "symbol": "NativeHandleStore"
+        },
+        {
+          "path": "crates/comfy_runtime/src/executor.rs",
+          "qualified": "comfy_runtime::NativeHandleStoreGeneration",
+          "role": "canonical",
+          "symbol": "NativeHandleStoreGeneration"
         },
         {
           "path": "crates/comfy_nodes/src/registry_generator.rs",
@@ -9470,10 +9500,10 @@
         },
         {
           "path": "crates/comfy_runtime/src/native_execution_controller.rs",
-          "qualified": "comfy_runtime::native_image_registry_projection",
+          "qualified": "comfy_runtime::generated_native_node_registry_projection",
           "role": "allowed_adapter",
-          "symbol": "native_image_registry_projection",
-          "pattern": "^[ \\t]*pub fn native_image_registry_projection\\("
+          "symbol": "generated_native_node_registry_projection",
+          "pattern": "^[ \\t]*pub fn generated_native_node_registry_projection\\("
         },
         {
           "path": "crates/comfy_plugin_host/src/registry_adapter.rs",
@@ -9484,7 +9514,11 @@
       ],
       "call_symbols": [
         "EarlySliceRegistry",
+        "NativeHandleStore",
+        "NativeHandleStoreGeneration",
+        "NativeNodeBinding",
         "NativeNodeRegistry",
+        "NativeValue",
         "NodeRegistry",
         "NodeRegistryGenerator",
         "ObjectInfoRegistry",
@@ -9528,7 +9562,7 @@
         {
           "name": "generated-registry-to-native-registry",
           "path": "crates/comfy_runtime/src/native_execution_controller.rs",
-          "pattern": "NodeRegistry|native_image_catalog_bindings"
+          "pattern": "fn register_generated_family_bindings\\([\\s\\S]*generated_family_node_bindings\\(\\)[\\s\\S]*register_native_bindings[\\s\\S]*validate_comprehensive_bindings"
         },
         {
           "name": "generated-registry-to-prompt-compiler-projection",
@@ -9548,6 +9582,7 @@
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
+        "comfy-parity-native-node-runtime-foundation",
         "comfy-parity-extension-host-plugin-adapter",
         "comfy-parity-authoritative-ownership-gate"
       ],
@@ -9574,7 +9609,7 @@
         "VAL-WORKER-PLUGIN-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "NativeNodeRegistry alone owns executable node identity and dispatch. NodeRegistry owns built-in catalog metadata, while the verified PluginNode owns component metadata. RuntimeNodePresentation is a checked atomic projection beside the executable binding; the API serializes it without repeating validation or inventing display, category, or output-port metadata."
+      "decision_reason": "NativeNodeRegistry alone owns runtime binding identity, dispatch, provider activation, and unavailable state. NativeHandleStoreGeneration alone owns concrete attempt staging, committed objects, leases, generation checks, and resident-byte accounting. NodeRegistry owns built-in catalog metadata and its checked source-module projection; the verified PluginNode owns signed component metadata. The portable NativeNodeBinding, NativeValue, NativeHandleStore, and presentation DTOs live below the runtime dependency boundary in comfy_nodes::execution. Production consumers use the comprehensive generated registry, while the early image projection remains compatibility-only."
     },
     {
       "concern": "native_rgb8_tensor_conversion",

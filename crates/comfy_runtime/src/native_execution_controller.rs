@@ -1468,13 +1468,19 @@ pub fn generated_native_node_registry_projection(
             true,
         )?
     };
+    register_generated_family_bindings(&mut registry)?;
+    Ok(registry)
+}
+
+fn register_generated_family_bindings(
+    registry: &mut NativeNodeRegistry,
+) -> Result<(), NativeImageRuntimeError> {
     registry
         .register_native_bindings(generated_family_node_bindings()?)
         .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
     registry
         .validate_comprehensive_bindings()
-        .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
-    Ok(registry)
+        .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))
 }
 
 pub fn compile_generated_native_prompt(
@@ -2930,6 +2936,64 @@ impl NativeImageExecutor {
             metadata_enabled,
             provider,
         )?;
+        Ok(Self {
+            profile_id,
+            input_assets,
+            nodes: Arc::new(nodes),
+            cache: Arc::new(Mutex::new(NativeCache::new(4096).map_err(|error| {
+                NativeImageRuntimeError::Execution(error.to_string())
+            })?)),
+            handle_store_generation: crate::NativeHandleStoreGeneration::new()?,
+            cpu_backend,
+            metadata_enabled,
+            diffusion_enabled: true,
+        })
+    }
+
+    pub fn new_with_generated_registry(
+        profile_id: ProfileId,
+        input_assets: BTreeMap<String, Vec<u8>>,
+        metadata_enabled: bool,
+        cpu_backend: Arc<CpuBackend>,
+    ) -> Result<Self, NativeImageRuntimeError> {
+        validate_worker_input_assets(&input_assets)?;
+        let input_assets = Arc::new(Mutex::new(input_assets));
+        let mut nodes = native_image_registry_with_execution_state(
+            input_assets.clone(),
+            cpu_backend.clone(),
+            metadata_enabled,
+        )?;
+        register_generated_family_bindings(&mut nodes)?;
+        Ok(Self {
+            profile_id,
+            input_assets,
+            nodes: Arc::new(nodes),
+            cache: Arc::new(Mutex::new(NativeCache::new(4096).map_err(|error| {
+                NativeImageRuntimeError::Execution(error.to_string())
+            })?)),
+            handle_store_generation: crate::NativeHandleStoreGeneration::new()?,
+            cpu_backend,
+            metadata_enabled,
+            diffusion_enabled: false,
+        })
+    }
+
+    pub fn new_with_generated_registry_and_diffusion_provider(
+        profile_id: ProfileId,
+        input_assets: BTreeMap<String, Vec<u8>>,
+        metadata_enabled: bool,
+        cpu_backend: Arc<CpuBackend>,
+        provider: Arc<dyn NativeDiffusionProvider>,
+    ) -> Result<Self, NativeImageRuntimeError> {
+        validate_worker_input_assets(&input_assets)?;
+        let input_assets = Arc::new(Mutex::new(input_assets));
+        let mut nodes = native_registry_with_diffusion_provider(
+            input_assets.clone(),
+            cpu_backend.clone(),
+            metadata_enabled,
+            provider,
+        )?;
+        register_generated_family_bindings(&mut nodes)?;
         Ok(Self {
             profile_id,
             input_assets,
@@ -6196,6 +6260,17 @@ mod tests {
             );
             assert!(registry.presentation(class_type).is_some());
         }
+
+        let cpu_backend = projection_only_cpu_backend()?;
+        let executor = NativeImageExecutor::new_with_generated_registry(
+            ProfileId(Uuid::new_v4()),
+            BTreeMap::new(),
+            true,
+            cpu_backend,
+        )?;
+        executor.nodes.validate_comprehensive_bindings()?;
+        assert_eq!(executor.nodes.descriptor_len(), registry.descriptor_len());
+        assert_eq!(executor.nodes.node_len(), registry.node_len());
 
         let frontend = generated_native_frontend_descriptors(None)?;
         assert_eq!(frontend.len(), registry.descriptor_len());
