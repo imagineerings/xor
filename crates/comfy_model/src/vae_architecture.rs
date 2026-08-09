@@ -679,6 +679,51 @@ fn reject_explicit_video_configuration(
 }
 
 impl VaeLoaderConfiguration {
+    pub fn owned_resident_bytes(&self) -> Option<u64> {
+        match self {
+            Self::Automatic | Self::Taesd { .. } | Self::DefaultKl { .. } => Some(0),
+            Self::DiffusersPreconverted {
+                key_mapping, inner, ..
+            } => {
+                let inline = key_mapping
+                    .capacity()
+                    .checked_mul(std::mem::size_of::<(String, String)>())?;
+                let mappings = key_mapping.iter().try_fold(
+                    u64::try_from(inline).ok()?,
+                    |total, (source, target)| {
+                        let strings = source.capacity().checked_add(target.capacity())?;
+                        total.checked_add(u64::try_from(strings).ok()?)
+                    },
+                )?;
+                mappings
+                    .checked_add(u64::try_from(std::mem::size_of::<Self>()).ok()?)?
+                    .checked_add(inner.owned_resident_bytes()?)
+            }
+            Self::LtxVideo {
+                configuration_sha256,
+                configuration_json,
+            } => owned_optional_string_bytes(configuration_sha256).and_then(|bytes| {
+                bytes.checked_add(owned_optional_string_bytes(configuration_json)?)
+            }),
+            Self::LtxAudio {
+                autoencoder_sha256,
+                autoencoder_json,
+                vocoder_sha256,
+                vocoder_json,
+                ..
+            } => owned_string_bytes([
+                autoencoder_sha256,
+                autoencoder_json,
+                vocoder_sha256,
+                vocoder_json,
+            ]),
+            Self::ExplicitAutoencoderKl {
+                params_sha256,
+                params_json,
+            } => owned_string_bytes([params_sha256, params_json]),
+        }
+    }
+
     pub fn digest(&self) -> Result<String, VaeArchitectureError> {
         let encoded = serde_json::to_vec(self)
             .map_err(|error| VaeArchitectureError::Registry(error.to_string()))?;
@@ -837,6 +882,16 @@ impl VaeLoaderConfiguration {
             )))
         }
     }
+}
+
+fn owned_optional_string_bytes(value: &Option<String>) -> Option<u64> {
+    u64::try_from(value.as_ref().map_or(0, String::capacity)).ok()
+}
+
+fn owned_string_bytes<'a>(values: impl IntoIterator<Item = &'a String>) -> Option<u64> {
+    values.into_iter().try_fold(0_u64, |total, value| {
+        total.checked_add(u64::try_from(value.capacity()).ok()?)
+    })
 }
 
 fn validate_retained_configuration(

@@ -224,6 +224,13 @@ impl QuantizedLinearMatrix {
         }
     }
 
+    pub fn resident_storage_bytes(&self) -> Result<u64, QuantizationError> {
+        match &self.storage {
+            QuantizedLinearStorage::Fp8Tensorwise { values, .. } => vec_resident_bytes(values),
+            QuantizedLinearStorage::Catalog(matrix) => matrix.resident_storage_bytes(),
+        }
+    }
+
     pub fn dequantize(
         &self,
         cancellation: &CancellationToken,
@@ -318,6 +325,28 @@ impl QuantizedMatrix {
                 .len()
                 .saturating_add(block_scales.len())
                 .saturating_add(std::mem::size_of_val(global_scale)),
+        }
+    }
+
+    pub fn resident_storage_bytes(&self) -> Result<u64, QuantizationError> {
+        match &self.storage {
+            QuantizedStorage::Int8Tensorwise { values, .. } => vec_resident_bytes(values),
+            QuantizedStorage::MxFp8 {
+                values,
+                block_scales,
+                ..
+            } => checked_resident_sum(
+                vec_resident_bytes(values)?,
+                vec_resident_bytes(block_scales)?,
+            ),
+            QuantizedStorage::NvFp4 {
+                packed_values,
+                block_scales,
+                ..
+            } => checked_resident_sum(
+                vec_resident_bytes(packed_values)?,
+                vec_resident_bytes(block_scales)?,
+            ),
         }
     }
 
@@ -752,6 +781,8 @@ impl QuantizationMetadataV1 {
 pub enum QuantizationError {
     #[error("quantization matrix shape overflow")]
     ShapeOverflow,
+    #[error("quantized resident byte accounting overflow")]
+    ResidentBytesOverflow,
     #[error("quantization matrix expected {expected} values, got {actual}")]
     ValueCount { expected: usize, actual: usize },
     #[error("quantization input contains a non-finite value at index {index}")]
@@ -778,6 +809,19 @@ pub enum QuantizationError {
     MaterializationBackend { reason: String },
     #[error("quantization was cancelled")]
     Cancelled,
+}
+
+fn vec_resident_bytes<T>(values: &Vec<T>) -> Result<u64, QuantizationError> {
+    let bytes = values
+        .capacity()
+        .checked_mul(std::mem::size_of::<T>())
+        .ok_or(QuantizationError::ResidentBytesOverflow)?;
+    u64::try_from(bytes).map_err(|_| QuantizationError::ResidentBytesOverflow)
+}
+
+fn checked_resident_sum(left: u64, right: u64) -> Result<u64, QuantizationError> {
+    left.checked_add(right)
+        .ok_or(QuantizationError::ResidentBytesOverflow)
 }
 
 impl From<comfy_types::CancellationError> for QuantizationError {
@@ -1380,5 +1424,31 @@ mod tests {
             ),
             QuantizationError::MaterializationCapacity { requested: 64 }
         ));
+    }
+
+    #[test]
+    fn resident_storage_bytes_counts_allocated_capacity_not_semantic_length()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let cancellation = CancellationToken::default();
+        let mut matrix = quantize_matrix(
+            QuantizationKind::Int8Tensorwise,
+            DType::F32,
+            &[0.0, 1.0, 2.0, 3.0],
+            2,
+            2,
+            &cancellation,
+        )?;
+        let semantic_bytes = matrix.storage_bytes();
+        let capacity = if let QuantizedStorage::Int8Tensorwise { values, .. } = &mut matrix.storage
+        {
+            values.reserve_exact(64);
+            values.capacity()
+        } else {
+            return Err("test quantization kind changed".into());
+        };
+        assert_eq!(matrix.storage_bytes(), semantic_bytes);
+        assert_eq!(matrix.resident_storage_bytes()?, u64::try_from(capacity)?);
+        assert!(matrix.resident_storage_bytes()? > u64::try_from(semantic_bytes)?);
+        Ok(())
     }
 }

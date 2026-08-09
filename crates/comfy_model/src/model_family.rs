@@ -96,6 +96,10 @@ impl ModelNativeTargetIdentifier {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    pub fn owned_resident_bytes(&self) -> Option<u64> {
+        u64::try_from(self.0.capacity()).ok()
+    }
 }
 
 impl Serialize for ModelNativeTargetIdentifier {
@@ -141,6 +145,10 @@ impl ModelTokenizerDescriptor {
 
     pub fn target(&self) -> &ModelNativeTargetIdentifier {
         &self.identifier
+    }
+
+    pub fn owned_resident_bytes(&self) -> Option<u64> {
+        self.identifier.owned_resident_bytes()
     }
 }
 
@@ -215,6 +223,15 @@ impl ModelClipConfigurationFact {
             }
         }
     }
+
+    fn owned_resident_bytes(&self) -> Option<u64> {
+        match self {
+            Self::Bind { parameter, source } => parameter
+                .owned_resident_bytes()?
+                .checked_add(source.owned_resident_bytes()?),
+            Self::Expand { source } => source.owned_resident_bytes(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -262,6 +279,20 @@ impl ModelClipModelInvocation {
         }
         Ok(())
     }
+
+    fn owned_resident_bytes(&self) -> Option<u64> {
+        let Self::Factory { configuration } = self else {
+            return Some(0);
+        };
+        let inline_bytes = configuration
+            .capacity()
+            .checked_mul(std::mem::size_of::<ModelClipConfigurationFact>())?;
+        configuration
+            .iter()
+            .try_fold(u64::try_from(inline_bytes).ok()?, |total, fact| {
+                total.checked_add(fact.owned_resident_bytes()?)
+            })
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -294,6 +325,12 @@ impl ModelClipModelDescriptor {
 
     pub fn invocation(&self) -> &ModelClipModelInvocation {
         &self.invocation
+    }
+
+    pub fn owned_resident_bytes(&self) -> Option<u64> {
+        self.target
+            .owned_resident_bytes()?
+            .checked_add(self.invocation.owned_resident_bytes()?)
     }
 }
 
@@ -364,6 +401,12 @@ impl ModelClipTargetCandidateDescriptor {
 
     pub fn clip_model(&self) -> &ModelClipModelDescriptor {
         &self.clip_model
+    }
+
+    pub fn owned_resident_bytes(&self) -> Option<u64> {
+        self.tokenizer
+            .owned_resident_bytes()?
+            .checked_add(self.clip_model.owned_resident_bytes()?)
     }
 }
 
@@ -452,6 +495,18 @@ impl ModelClipTargetDescriptor {
 
     pub fn dynamic_selection(&self) -> bool {
         self.dynamic_selection
+    }
+
+    pub fn owned_resident_bytes(&self) -> Option<u64> {
+        let inline_bytes = self
+            .candidates
+            .capacity()
+            .checked_mul(std::mem::size_of::<ModelClipTargetCandidateDescriptor>())?;
+        self.candidates
+            .iter()
+            .try_fold(u64::try_from(inline_bytes).ok()?, |total, candidate| {
+                total.checked_add(candidate.owned_resident_bytes()?)
+            })
     }
 }
 
@@ -1029,6 +1084,15 @@ impl ModelFamilyIdentity {
     }
     pub fn architecture_version(&self) -> &str {
         &self.architecture_version
+    }
+
+    pub fn owned_resident_bytes(&self) -> Option<u64> {
+        let bytes = self
+            .feature_id
+            .capacity()
+            .checked_add(self.identifier.capacity())?
+            .checked_add(self.architecture_version.capacity())?;
+        u64::try_from(bytes).ok()
     }
 }
 

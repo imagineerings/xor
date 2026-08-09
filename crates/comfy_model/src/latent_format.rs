@@ -82,6 +82,14 @@ impl LatentFormatIdentity {
     pub fn identifier(&self) -> &str {
         &self.identifier
     }
+
+    pub fn owned_resident_bytes(&self) -> Option<u64> {
+        let bytes = self
+            .feature_id
+            .capacity()
+            .checked_add(self.identifier.capacity())?;
+        u64::try_from(bytes).ok()
+    }
 }
 
 impl TryFrom<LatentFormatIdentityWire> for LatentFormatIdentity {
@@ -157,6 +165,28 @@ impl LatentFormatDescriptor {
             preview_bias: definition.preview_bias,
             decoder_name: definition.decoder_name.map(str::to_owned),
         })
+    }
+
+    pub fn owned_resident_bytes(&self) -> Option<u64> {
+        let channel_means = self
+            .channel_means
+            .capacity()
+            .checked_mul(std::mem::size_of::<f32>())?;
+        let channel_stds = self
+            .channel_stds
+            .capacity()
+            .checked_mul(std::mem::size_of::<f32>())?;
+        let preview_factors = self
+            .preview_factors
+            .capacity()
+            .checked_mul(std::mem::size_of::<[f32; 3]>())?;
+        let bytes = channel_means
+            .checked_add(channel_stds)?
+            .checked_add(preview_factors)?
+            .checked_add(self.decoder_name.as_ref().map_or(0, String::capacity))?;
+        self.identity
+            .owned_resident_bytes()?
+            .checked_add(u64::try_from(bytes).ok()?)
     }
 }
 
