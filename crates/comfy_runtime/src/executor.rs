@@ -14,7 +14,7 @@ pub use comfy_nodes::{
 };
 use comfy_nodes::{
     NativeHandleStore, NativeHandleStoreError, NativeHandleStoreIdentity, NativeHandleType,
-    NativeNodeBindingDisposition, NativeNodeContractError, NativeOpaqueHandle, NativeStoredObject,
+    NativeNodeBindingDisposition, NativeNodeContractError, NativeOpaqueHandle, NativeStoredPayload,
     NativeValue, NodeRegistry,
 };
 use comfy_tensor::{BackendCapabilityMatrix, ScratchReservation};
@@ -768,6 +768,15 @@ struct NativeHandleStoreGenerationState {
     data: Mutex<NativeHandleStoreData>,
     capacity: usize,
     byte_capacity: usize,
+    #[cfg(test)]
+    test_hooks: Mutex<NativeHandleStoreTestHooks>,
+}
+
+#[cfg(test)]
+#[derive(Default)]
+struct NativeHandleStoreTestHooks {
+    after_publish_insert: Option<Arc<dyn Fn() + Send + Sync>>,
+    after_cache_insert: Option<Arc<dyn Fn() + Send + Sync>>,
 }
 
 #[derive(Default)]
@@ -791,8 +800,8 @@ fn remove_stored_handle(
 struct StoredNativeHandle {
     handle_type: NativeHandleType,
     generation: u64,
-    digest_sha256: Option<String>,
-    value: NativeStoredObject,
+    digest_sha256: String,
+    value: Arc<NativeStoredPayload>,
     committed: bool,
     published_by: AttemptId,
     resident_bytes: usize,
@@ -801,31 +810,33 @@ struct StoredNativeHandle {
 
 #[derive(Clone)]
 pub struct NativeHandleLease {
+    inner: Arc<NativeHandleLeaseInner>,
+}
+
+struct NativeHandleLeaseInner {
     generation: NativeHandleStoreGeneration,
-    handles: Arc<Vec<NativeOpaqueHandle>>,
+    handles: Vec<NativeOpaqueHandle>,
 }
 
 impl fmt::Debug for NativeHandleLease {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("NativeHandleLease")
-            .field("handle_count", &self.handles.len())
+            .field("handle_count", &self.inner.handles.len())
             .finish_non_exhaustive()
     }
 }
 
-impl Drop for NativeHandleLease {
+impl Drop for NativeHandleLeaseInner {
     fn drop(&mut self) {
-        if Arc::strong_count(&self.handles) != 1 {
-            return;
-        }
         self.generation.release_roots(&self.handles);
     }
 }
 
 impl PartialEq for NativeHandleLease {
     fn eq(&self, other: &Self) -> bool {
-        self.generation.identity() == other.generation.identity() && self.handles == other.handles
+        self.inner.generation.identity() == other.inner.generation.identity()
+            && self.inner.handles == other.inner.handles
     }
 }
 
@@ -844,15 +855,15 @@ impl NativeHandleLease {
                 )
             })
             .collect::<BTreeMap<_, _>>();
-        unique.len() == self.handles.len()
+        unique.len() == self.inner.handles.len()
             && unique
                 .values()
-                .zip(self.handles.iter())
+                .zip(self.inner.handles.iter())
                 .all(|(expected, actual)| expected == actual)
     }
 
     pub(crate) fn store_identity(&self) -> NativeHandleStoreIdentity {
-        self.generation.identity()
+        self.inner.generation.identity()
     }
 }
 
@@ -890,6 +901,8 @@ impl NativeHandleStoreGeneration {
                 data: Mutex::new(NativeHandleStoreData::default()),
                 capacity,
                 byte_capacity,
+                #[cfg(test)]
+                test_hooks: Mutex::new(NativeHandleStoreTestHooks::default()),
             }),
         })
     }
@@ -946,7 +959,7 @@ impl NativeHandleStoreGeneration {
             {
                 return Err(NativeHandleStoreError::WrongGeneration);
             }
-            if record.digest_sha256.as_deref() != handle.digest_sha256() {
+            if Some(record.digest_sha256.as_str()) != handle.digest_sha256() {
                 return Err(NativeHandleStoreError::DigestMismatch);
             }
             if record.roots == usize::MAX {
@@ -961,8 +974,10 @@ impl NativeHandleStoreGeneration {
             }
         }
         Ok(Some(NativeHandleLease {
-            generation: self.clone(),
-            handles: Arc::new(handles.into_values().collect()),
+            inner: Arc::new(NativeHandleLeaseInner {
+                generation: self.clone(),
+                handles: handles.into_values().collect(),
+            }),
         }))
     }
 
@@ -1010,6 +1025,32 @@ impl NativeHandleStoreGeneration {
 
     pub fn handle_store_for_attempt(&self, attempt_id: AttemptId) -> Arc<dyn NativeHandleStore> {
         self.session(attempt_id)
+    }
+
+    #[cfg(test)]
+    fn set_after_publish_insert_hook(&self, hook: Arc<dyn Fn() + Send + Sync>) {
+        self.state.test_hooks.lock().after_publish_insert = Some(hook);
+    }
+
+    #[cfg(test)]
+    fn set_after_cache_insert_hook(&self, hook: Arc<dyn Fn() + Send + Sync>) {
+        self.state.test_hooks.lock().after_cache_insert = Some(hook);
+    }
+
+    #[cfg(test)]
+    fn run_after_publish_insert_hook(&self) {
+        let hook = self.state.test_hooks.lock().after_publish_insert.clone();
+        if let Some(hook) = hook {
+            hook();
+        }
+    }
+
+    #[cfg(test)]
+    fn run_after_cache_insert_hook(&self) {
+        let hook = self.state.test_hooks.lock().after_cache_insert.clone();
+        if let Some(hook) = hook {
+            hook();
+        }
     }
 }
 
@@ -1094,21 +1135,6 @@ impl RuntimeNativeHandleStoreSession {
         }
     }
 
-    fn rollback_identifier(&self, identifier: &str) {
-        let mut staged = self.staged.lock();
-        staged
-            .identifiers
-            .retain(|candidate| candidate != identifier);
-        let mut data = self.generation.state.data.lock();
-        if data
-            .values
-            .get(identifier)
-            .is_some_and(|record| !record.committed && record.published_by == self.attempt_id)
-        {
-            remove_stored_handle(&mut data, identifier);
-        }
-    }
-
     fn validate_handle(
         &self,
         handle: &NativeOpaqueHandle,
@@ -1150,7 +1176,7 @@ impl NativeHandleStore for RuntimeNativeHandleStoreSession {
         handle: &NativeOpaqueHandle,
         expected_type: &NativeHandleType,
         cancellation: &CancellationToken,
-    ) -> Result<NativeStoredObject, NativeHandleStoreError> {
+    ) -> Result<Arc<NativeStoredPayload>, NativeHandleStoreError> {
         self.validate_handle(handle, expected_type, cancellation)?;
         let data = self.generation.state.data.lock();
         let record = data
@@ -1165,25 +1191,33 @@ impl NativeHandleStore for RuntimeNativeHandleStoreSession {
         if record.generation != handle.generation() || record.handle_type != *expected_type {
             return Err(NativeHandleStoreError::WrongGeneration);
         }
-        if record.digest_sha256.as_deref() != handle.digest_sha256() {
+        if Some(record.digest_sha256.as_str()) != handle.digest_sha256() {
             return Err(NativeHandleStoreError::DigestMismatch);
+        }
+        record.value.validate()?;
+        if record.value.handle_type()? != record.handle_type
+            || record.value.digest_sha256() != record.digest_sha256
+            || record.value.resident_bytes()? != record.resident_bytes
+        {
+            return Err(NativeHandleStoreError::InvalidPayload(
+                comfy_nodes::NativeStoredPayloadError::ProjectionChanged,
+            ));
         }
         Ok(record.value.clone())
     }
 
     fn publish(
         &self,
-        handle_type: NativeHandleType,
-        value: NativeStoredObject,
-        digest_sha256: Option<String>,
-        resident_bytes: usize,
+        payload: NativeStoredPayload,
         cancellation: &CancellationToken,
     ) -> Result<NativeOpaqueHandle, NativeHandleStoreError> {
         cancellation
             .check()
             .map_err(|_| NativeHandleStoreError::Cancelled)?;
-        handle_type.validate()?;
-        let resident_bytes = resident_bytes.max(1);
+        payload.validate()?;
+        let handle_type = payload.handle_type()?;
+        let digest_sha256 = payload.digest_sha256();
+        let resident_bytes = payload.resident_bytes()?;
         let mut staged = self.staged.lock();
         if staged.closed {
             return Err(NativeHandleStoreError::Rejected(
@@ -1210,19 +1244,21 @@ impl NativeHandleStore for RuntimeNativeHandleStoreSession {
             .generation
             .state
             .next_generation
-            .fetch_add(1, Ordering::AcqRel);
-        if generation == 0 {
-            return Err(NativeHandleStoreError::Rejected(
-                "native handle generation was exhausted".to_owned(),
-            ));
-        }
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |generation| {
+                generation.checked_add(1).filter(|next| *next != 0)
+            })
+            .map_err(|_| {
+                NativeHandleStoreError::Rejected(
+                    "native handle generation was exhausted".to_owned(),
+                )
+            })?;
         let identifier = format!("native-{generation:016x}");
         let handle = NativeOpaqueHandle::new(
             handle_type.clone(),
             self.generation.identity(),
             identifier.clone(),
             generation,
-            digest_sha256.clone(),
+            Some(digest_sha256.clone()),
         )?;
         data.values.insert(
             identifier.clone(),
@@ -1230,7 +1266,7 @@ impl NativeHandleStore for RuntimeNativeHandleStoreSession {
                 handle_type,
                 generation,
                 digest_sha256,
-                value,
+                value: Arc::new(payload),
                 committed: false,
                 published_by: self.attempt_id,
                 resident_bytes,
@@ -1240,11 +1276,15 @@ impl NativeHandleStore for RuntimeNativeHandleStoreSession {
         data.resident_bytes = next_resident_bytes;
         drop(data);
         staged.identifiers.push(identifier);
-        drop(staged);
+        #[cfg(test)]
+        self.generation.run_after_publish_insert_hook();
         if cancellation.is_cancelled() {
-            self.rollback_identifier(handle.identifier());
+            staged.identifiers.pop();
+            let mut data = self.generation.state.data.lock();
+            remove_stored_handle(&mut data, handle.identifier());
             return Err(NativeHandleStoreError::Cancelled);
         }
+        drop(staged);
         Ok(handle)
     }
 
@@ -1579,6 +1619,31 @@ impl ExecutionEngine {
         Ok(self)
     }
 
+    fn publish_cache_batch(
+        &self,
+        entries: Vec<(CacheKey, CacheEntry, Option<NativeHandleLease>)>,
+        cancellation: &CancellationToken,
+    ) -> Result<(), ExecutionError> {
+        if cancellation.is_cancelled() {
+            return Err(ExecutionError::Cancelled);
+        }
+        let mut cache = self.cache.lock();
+        let prior_cache = cache.clone();
+        if !cache.insert_batch_with_handle_leases(entries) {
+            *cache = prior_cache;
+            return Err(ExecutionError::Cache(
+                "native cache handle leases did not cover the committed batch".to_owned(),
+            ));
+        }
+        #[cfg(test)]
+        self.handle_store_generation.run_after_cache_insert_hook();
+        if cancellation.is_cancelled() {
+            *cache = prior_cache;
+            return Err(ExecutionError::Cancelled);
+        }
+        Ok(())
+    }
+
     pub async fn execute(
         &self,
         plan: &CompiledPlan,
@@ -1661,24 +1726,12 @@ impl ExecutionEngine {
                     .collect_unrooted_attempt(attempt_id);
                 return Err(ExecutionError::Cancelled);
             }
-            if state.cancellation.is_cancelled() {
-                drop(report_lease);
-                drop(leased_cache_entries);
-                self.handle_store_generation
-                    .collect_unrooted_attempt(attempt_id);
-                return Err(ExecutionError::Cancelled);
-            }
-            if !self
-                .cache
-                .lock()
-                .insert_batch_with_handle_leases(leased_cache_entries)
+            if let Err(error) = self.publish_cache_batch(leased_cache_entries, &state.cancellation)
             {
                 drop(report_lease);
                 self.handle_store_generation
                     .collect_unrooted_attempt(attempt_id);
-                return Err(ExecutionError::Cache(
-                    "native cache handle leases did not cover the committed batch".to_owned(),
-                ));
+                return Err(error);
             }
             report_handle_lease = report_lease;
             self.handle_store_generation
@@ -2423,6 +2476,10 @@ fn native_output_type_accepts(
         (comfy_nodes::NativeValueType::PreservedUnknown, NativeValue::PreservedUnknown { .. }) => {
             true
         }
+        (
+            comfy_nodes::NativeValueType::NamedPreservedUnknown(expected),
+            NativeValue::PreservedUnknown { type_name, .. },
+        ) => expected == type_name,
         _ => false,
     }
 }
@@ -2558,12 +2615,17 @@ pub(crate) mod tests {
     use super::*;
     use crate::{InputMode, PromptCompiler, RuntimeNodeDescriptor, RuntimeOutputDescriptor};
     use comfy_nodes::{
-        NATIVE_NODE_CONTRACT_SCHEMA_VERSION, NativeInputDescriptor, NativePrimitive,
-        NativePrimitiveType, NativeTypeUnion, NativeValueType,
+        NATIVE_NODE_CONTRACT_SCHEMA_VERSION, NativeHandleKind, NativeInputDescriptor,
+        NativePrimitive, NativePrimitiveType, NativeProviderPayload, NativeTypeUnion,
+        NativeValueType,
     };
     use comfy_types::{ApiPrompt, PromptNode, PromptSubmission};
     use serde_json::json;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::mem;
+    use std::sync::{
+        Barrier,
+        atomic::{AtomicUsize, Ordering},
+    };
 
     const TEST_WORKSPACE_BYTES: u64 = 64 * 1024 * 1024;
 
@@ -2606,6 +2668,36 @@ pub(crate) mod tests {
         NativeValue::Primitive {
             value: NativePrimitive::Null,
         }
+    }
+
+    fn stored_test_payload(
+        abi_bytes: Vec<u8>,
+    ) -> Result<NativeStoredPayload, comfy_nodes::NativeStoredPayloadError> {
+        let semantic_digest_sha256 = format!("{:x}", Sha256::digest(&abi_bytes));
+        Ok(NativeStoredPayload::Provider(Arc::new(
+            NativeProviderPayload::checked(
+                NativeHandleType::new(NativeHandleKind::ProviderTask, "TEST_PROVIDER_TASK")?,
+                "sim.test.provider",
+                semantic_digest_sha256,
+                abi_bytes,
+            )?,
+        )))
+    }
+
+    fn test_cache_key(node_class: &str) -> Result<CacheKey, crate::NativeCacheError> {
+        CacheKey::from_inputs(
+            node_class,
+            "1",
+            &BTreeMap::new(),
+            BTreeMap::new(),
+            "cpu",
+            "f32",
+            None,
+            None,
+            "config-v1",
+            "registry-v1",
+            "stable",
+        )
     }
 
     fn native_integer_value(value: &NativeValue) -> Option<i64> {
@@ -2769,6 +2861,57 @@ pub(crate) mod tests {
 
     struct PublishingMalformedExpansionNode;
 
+    struct PublishingHandleNode {
+        calls: Arc<AtomicUsize>,
+        cancel_after_publish: bool,
+    }
+
+    impl NativeNode for PublishingHandleNode {
+        fn class_type(&self) -> &str {
+            "PublishingHandle"
+        }
+
+        fn implementation_version(&self) -> &str {
+            "1"
+        }
+
+        fn execute<'a>(
+            &'a self,
+            context: NodeContext,
+            _inputs: BTreeMap<String, NativeValue>,
+        ) -> BoxFuture<'a, Result<NodeOutcome, NodeFailure>> {
+            let call = self.calls.fetch_add(1, Ordering::SeqCst);
+            Box::pin(async move {
+                let payload =
+                    stored_test_payload(call.to_le_bytes().to_vec()).map_err(|error| {
+                        NodeFailure {
+                            code: "test_payload".to_owned(),
+                            message: error.to_string(),
+                            kind: NodeFailureKind::Failure,
+                            retryable: false,
+                        }
+                    })?;
+                let handle = context
+                    .handle_store()
+                    .publish(payload, &context.cancellation)
+                    .map_err(|error| NodeFailure {
+                        code: "publish".to_owned(),
+                        message: error.to_string(),
+                        kind: NodeFailureKind::Failure,
+                        retryable: false,
+                    })?;
+                if self.cancel_after_publish {
+                    context.cancellation.cancel();
+                }
+                Ok(NodeOutcome::Values {
+                    outputs: vec![NativeValue::Handle { value: handle }],
+                    ui: None,
+                    effects: Vec::new(),
+                })
+            })
+        }
+    }
+
     impl NativeNode for PublishingMalformedExpansionNode {
         fn class_type(&self) -> &str {
             "PublishingMalformedExpansion"
@@ -2787,16 +2930,12 @@ pub(crate) mod tests {
                 context
                     .handle_store()
                     .publish(
-                        NativeHandleType::new(comfy_nodes::NativeHandleKind::Tensor, "TEST")
-                            .map_err(|error| NodeFailure {
-                                code: "handle_type".to_owned(),
-                                message: error.to_string(),
-                                kind: NodeFailureKind::Failure,
-                                retryable: false,
-                            })?,
-                        Arc::new(9_u64),
-                        Some("e".repeat(64)),
-                        8,
+                        stored_test_payload(vec![9]).map_err(|error| NodeFailure {
+                            code: "payload".to_owned(),
+                            message: error.to_string(),
+                            kind: NodeFailureKind::Failure,
+                            retryable: false,
+                        })?,
                         &context.cancellation,
                     )
                     .map_err(|error| NodeFailure {
@@ -3106,6 +3245,30 @@ pub(crate) mod tests {
         })
     }
 
+    fn publishing_handle_descriptor() -> Result<RuntimeNodeDescriptor, NativeNodeContractError> {
+        let mut descriptor =
+            runtime_descriptor("PublishingHandle", true, BTreeMap::new(), EffectClass::Pure)?;
+        descriptor.outputs = vec![RuntimeOutputDescriptor {
+            name: "value".to_owned(),
+            produced_type: NativeValueType::Any,
+            is_list: false,
+        }];
+        Ok(descriptor)
+    }
+
+    fn report_handle(report: &ExecutionReport) -> Option<NativeOpaqueHandle> {
+        report
+            .outputs
+            .values()
+            .flat_map(|values| values.iter())
+            .find_map(|value| match value {
+                NativeValue::Handle { value } => Some(value.clone()),
+                NativeValue::Primitive { .. }
+                | NativeValue::List { .. }
+                | NativeValue::PreservedUnknown { .. } => None,
+            })
+    }
+
     fn input(
         value_type: ValueType,
         lazy: bool,
@@ -3184,42 +3347,30 @@ pub(crate) mod tests {
     #[test]
     fn native_handle_store_sessions_isolate_stage_commit_and_revoke()
     -> Result<(), Box<dyn std::error::Error>> {
-        let generation = NativeHandleStoreGeneration::with_capacities(4, 16)?;
+        let payload = stored_test_payload(vec![7])?;
+        let payload_bytes = payload.resident_bytes()?;
+        let generation = NativeHandleStoreGeneration::with_capacities(4, payload_bytes * 4)?;
         let first_attempt = AttemptId(Uuid::from_u128(10));
         let second_attempt = AttemptId(Uuid::from_u128(11));
         let first = generation.session(first_attempt);
         let second = generation.session(second_attempt);
-        let handle_type = NativeHandleType::new(comfy_nodes::NativeHandleKind::Tensor, "TEST")?;
-        let digest = "a".repeat(64);
-        let handle = first.publish(
-            handle_type.clone(),
-            Arc::new(7_u64),
-            Some(digest),
-            0,
-            &CancellationToken::default(),
-        )?;
+        let handle_type = payload.handle_type()?;
+        let handle = first.publish(payload, &CancellationToken::default())?;
 
         assert!(matches!(
             second.resolve(&handle, &handle_type, &CancellationToken::default()),
             Err(NativeHandleStoreError::Missing(_))
         ));
-        assert_eq!(
-            *first
+        assert!(matches!(
+            first
                 .resolve(&handle, &handle_type, &CancellationToken::default())?
-                .downcast::<u64>()
-                .map_err(|_| "stored test handle had the wrong object type")?,
-            7
-        );
+                .as_ref(),
+            NativeStoredPayload::Provider(_)
+        ));
 
         first.commit();
         assert!(matches!(
-            first.publish(
-                handle_type.clone(),
-                Arc::new(8_u64),
-                Some("b".repeat(64)),
-                1,
-                &CancellationToken::default(),
-            ),
+            first.publish(stored_test_payload(vec![8])?, &CancellationToken::default(),),
             Err(NativeHandleStoreError::Rejected(_))
         ));
         assert!(
@@ -3245,36 +3396,25 @@ pub(crate) mod tests {
     #[test]
     fn native_handle_store_capacity_and_lease_validation_are_atomic()
     -> Result<(), Box<dyn std::error::Error>> {
-        let generation = NativeHandleStoreGeneration::with_capacities(2, 5)?;
+        let first_payload = stored_test_payload(vec![1])?;
+        let second_payload = stored_test_payload(vec![2])?;
+        let oversized_payload = stored_test_payload(vec![3; 4_096])?;
+        let maximum_bytes = first_payload
+            .resident_bytes()?
+            .checked_add(second_payload.resident_bytes()?)
+            .ok_or("test capacity overflowed")?;
+        let generation = NativeHandleStoreGeneration::with_capacities(2, maximum_bytes)?;
         let attempt_id = AttemptId(Uuid::from_u128(12));
         let session = generation.session(attempt_id);
-        let handle_type = NativeHandleType::new(comfy_nodes::NativeHandleKind::Tensor, "TEST")?;
-        let first = session.publish(
-            handle_type.clone(),
-            Arc::new(1_u64),
-            Some("a".repeat(64)),
-            4,
-            &CancellationToken::default(),
-        )?;
+        let handle_type = first_payload.handle_type()?;
+        let first = session.publish(first_payload, &CancellationToken::default())?;
         assert!(matches!(
-            session.publish(
-                handle_type.clone(),
-                Arc::new(2_u64),
-                Some("b".repeat(64)),
-                2,
-                &CancellationToken::default(),
-            ),
+            session.publish(oversized_payload, &CancellationToken::default(),),
             Err(NativeHandleStoreError::Rejected(_))
         ));
-        let second = session.publish(
-            handle_type.clone(),
-            Arc::new(3_u64),
-            Some("c".repeat(64)),
-            0,
-            &CancellationToken::default(),
-        )?;
+        let second = session.publish(second_payload, &CancellationToken::default())?;
         assert_eq!(generation.len(), 2);
-        assert_eq!(generation.resident_bytes(), 5);
+        assert_eq!(generation.resident_bytes(), maximum_bytes);
         session.commit();
 
         let forged = NativeOpaqueHandle::new(
@@ -3297,26 +3437,237 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn native_handle_store_accepts_zero_byte_payloads_and_never_wraps_generation()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (backend, workspace_authority) =
+            comfy_tensor::CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+        let cancellation = CancellationToken::default();
+        let context = backend.execution_context(
+            comfy_tensor::StreamId::DEFAULT,
+            workspace_authority.authorize_workspace(1024 * 1024)?,
+            &cancellation,
+        );
+        let tensor = comfy_tensor::generated_native_diffusion::tensor_from_f32(
+            &backend,
+            &[0],
+            &[],
+            &context,
+        )?;
+        let payload =
+            NativeStoredPayload::Tensor(Arc::new(comfy_tensor::NativeTensorPayload::from_tensor(
+                comfy_tensor::NativeTensorRole::Sigmas,
+                tensor,
+            )?));
+        assert_eq!(payload.resident_bytes()?, 0);
+        let generation = NativeHandleStoreGeneration::with_capacities(2, 1)?;
+        let session = generation.session(AttemptId(Uuid::from_u128(121)));
+        let first = session.publish(payload.clone(), &cancellation)?;
+        let second = session.publish(payload.clone(), &cancellation)?;
+        assert_eq!(generation.resident_bytes(), 0);
+        assert_eq!(generation.len(), 2);
+        assert!(matches!(
+            session.publish(payload.clone(), &cancellation),
+            Err(NativeHandleStoreError::Rejected(message))
+                if message.contains("capacity is exhausted")
+        ));
+        session.revoke(&first, &cancellation)?;
+        session.revoke(&second, &cancellation)?;
+        assert!(generation.is_empty());
+
+        generation
+            .state
+            .next_generation
+            .store(u64::MAX - 1, Ordering::Release);
+        let final_handle = session.publish(payload.clone(), &cancellation)?;
+        assert_eq!(final_handle.generation(), u64::MAX - 1);
+        assert_eq!(final_handle.identifier(), "native-fffffffffffffffe");
+        session.revoke(&final_handle, &cancellation)?;
+        assert_eq!(
+            generation.state.next_generation.load(Ordering::Acquire),
+            u64::MAX
+        );
+        assert!(matches!(
+            session.publish(payload, &cancellation),
+            Err(NativeHandleStoreError::Rejected(message))
+                if message.contains("generation was exhausted")
+        ));
+        assert!(generation.is_empty());
+        assert_eq!(generation.resident_bytes(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn native_handle_publish_cancellation_is_atomic_before_validation_and_after_insert()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let payload = stored_test_payload(vec![1, 2, 3])?;
+        let generation =
+            NativeHandleStoreGeneration::with_capacities(2, payload.resident_bytes()?)?;
+        let session = generation.session(AttemptId(Uuid::from_u128(124)));
+
+        let pre_validation = CancellationToken::default();
+        pre_validation.cancel();
+        assert!(matches!(
+            session.publish(payload.clone(), &pre_validation),
+            Err(NativeHandleStoreError::Cancelled)
+        ));
+        assert!(generation.is_empty());
+        assert_eq!(generation.state.next_generation.load(Ordering::Acquire), 1);
+
+        let post_insert = CancellationToken::default();
+        generation.set_after_publish_insert_hook(Arc::new({
+            let post_insert = post_insert.clone();
+            move || {
+                post_insert.cancel();
+            }
+        }));
+        assert!(matches!(
+            session.publish(payload, &post_insert),
+            Err(NativeHandleStoreError::Cancelled)
+        ));
+        assert!(generation.is_empty());
+        assert_eq!(generation.resident_bytes(), 0);
+        assert_eq!(generation.state.next_generation.load(Ordering::Acquire), 2);
+        Ok(())
+    }
+
+    #[test]
+    fn native_handle_publish_racing_session_close_never_leaks_staged_values()
+    -> Result<(), Box<dyn std::error::Error>> {
+        for rollback in [false, true] {
+            for iteration in 0..64_u128 {
+                let payload = stored_test_payload(vec![u8::try_from(iteration)?])?;
+                let generation =
+                    NativeHandleStoreGeneration::with_capacities(1, payload.resident_bytes()?)?;
+                let session = generation.session(AttemptId(Uuid::from_u128(200 + iteration)));
+                let barrier = Arc::new(Barrier::new(2));
+                let publisher = std::thread::spawn({
+                    let barrier = barrier.clone();
+                    let session = session.clone();
+                    move || {
+                        barrier.wait();
+                        session.publish(payload, &CancellationToken::default())
+                    }
+                });
+                let closer = std::thread::spawn({
+                    let barrier = barrier.clone();
+                    let session = session.clone();
+                    move || {
+                        barrier.wait();
+                        if rollback {
+                            session.rollback_all();
+                        } else {
+                            session.commit();
+                        }
+                    }
+                });
+                let published = publisher.join().map_err(|_| "publisher thread panicked")?;
+                closer.join().map_err(|_| "closer thread panicked")?;
+
+                if rollback {
+                    assert!(generation.is_empty());
+                    assert!(matches!(
+                        published,
+                        Ok(_) | Err(NativeHandleStoreError::Rejected(_))
+                    ));
+                } else {
+                    match published {
+                        Ok(handle) => {
+                            let reader = generation.session(AttemptId(Uuid::from_u128(10_000)));
+                            assert!(
+                                reader
+                                    .resolve(
+                                        &handle,
+                                        handle.handle_type(),
+                                        &CancellationToken::default(),
+                                    )
+                                    .is_ok()
+                            );
+                            let lease = generation
+                                .acquire_lease([&handle])?
+                                .ok_or("committed handle lease was missing")?;
+                            drop(lease);
+                            assert!(generation.is_empty());
+                        }
+                        Err(NativeHandleStoreError::Rejected(_)) => {
+                            assert!(generation.is_empty());
+                        }
+                        Err(error) => return Err(error.into()),
+                    }
+                }
+                assert_eq!(generation.resident_bytes(), 0);
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn native_handle_resolve_rejects_forged_store_generation_type_and_digest()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let payload = stored_test_payload(vec![9])?;
+        let generation =
+            NativeHandleStoreGeneration::with_capacities(1, payload.resident_bytes()?)?;
+        let attempt_id = AttemptId(Uuid::from_u128(122));
+        let session = generation.session(attempt_id);
+        let handle = session.publish(payload, &CancellationToken::default())?;
+        let expected = handle.handle_type().clone();
+        let other = NativeHandleStoreGeneration::new()?;
+        let wrong_store = NativeOpaqueHandle::new(
+            expected.clone(),
+            other.identity(),
+            handle.identifier(),
+            handle.generation(),
+            handle.digest_sha256().map(ToOwned::to_owned),
+        )?;
+        let wrong_generation = NativeOpaqueHandle::new(
+            expected.clone(),
+            NativeHandleStoreIdentity::new(generation.identity().store_id, Uuid::from_u128(123))?,
+            handle.identifier(),
+            handle.generation(),
+            handle.digest_sha256().map(ToOwned::to_owned),
+        )?;
+        let wrong_type = NativeHandleType::new(NativeHandleKind::Model, "MODEL")?;
+        let wrong_digest = NativeOpaqueHandle::new(
+            expected.clone(),
+            generation.identity(),
+            handle.identifier(),
+            handle.generation(),
+            Some("f".repeat(64)),
+        )?;
+        assert!(matches!(
+            session.resolve(&wrong_store, &expected, &CancellationToken::default()),
+            Err(NativeHandleStoreError::WrongStore)
+        ));
+        assert!(matches!(
+            session.resolve(&wrong_generation, &expected, &CancellationToken::default()),
+            Err(NativeHandleStoreError::WrongGeneration)
+        ));
+        assert!(matches!(
+            session.resolve(&handle, &wrong_type, &CancellationToken::default()),
+            Err(NativeHandleStoreError::WrongType { .. })
+        ));
+        assert!(matches!(
+            session.resolve(&wrong_digest, &expected, &CancellationToken::default()),
+            Err(NativeHandleStoreError::DigestMismatch)
+        ));
+        assert_eq!(generation.len(), 1);
+        Ok(())
+    }
+
+    #[test]
     fn native_cache_leases_cover_aliases_and_release_on_lru_and_invalidation()
     -> Result<(), Box<dyn std::error::Error>> {
-        let generation = NativeHandleStoreGeneration::with_capacities(4, 8)?;
+        let first_payload = stored_test_payload(vec![1])?;
+        let second_payload = stored_test_payload(vec![2])?;
+        let maximum_bytes = first_payload
+            .resident_bytes()?
+            .checked_add(second_payload.resident_bytes()?)
+            .and_then(|bytes| bytes.checked_mul(2))
+            .ok_or("test capacity overflowed")?;
+        let generation = NativeHandleStoreGeneration::with_capacities(4, maximum_bytes)?;
         let attempt_id = AttemptId(Uuid::from_u128(13));
         let session = generation.session(attempt_id);
-        let handle_type = NativeHandleType::new(comfy_nodes::NativeHandleKind::Tensor, "TEST")?;
-        let first = session.publish(
-            handle_type.clone(),
-            Arc::new(1_u64),
-            Some("a".repeat(64)),
-            1,
-            &CancellationToken::default(),
-        )?;
-        let second = session.publish(
-            handle_type,
-            Arc::new(2_u64),
-            Some("b".repeat(64)),
-            1,
-            &CancellationToken::default(),
-        )?;
+        let first = session.publish(first_payload, &CancellationToken::default())?;
+        let second = session.publish(second_payload, &CancellationToken::default())?;
         session.commit();
         let first_entry = CacheEntry {
             outputs: vec![
@@ -3324,9 +3675,16 @@ pub(crate) mod tests {
                     value: first.clone(),
                 },
                 NativeValue::List {
-                    values: vec![NativeValue::Handle {
-                        value: first.clone(),
-                    }],
+                    values: vec![
+                        NativeValue::Handle {
+                            value: first.clone(),
+                        },
+                        NativeValue::List {
+                            values: vec![NativeValue::Handle {
+                                value: first.clone(),
+                            }],
+                        },
+                    ],
                 },
             ],
             ui: None,
@@ -3379,6 +3737,182 @@ pub(crate) mod tests {
         assert_eq!(generation.len(), 1);
         assert_eq!(cache.invalidate_node("Second"), 1);
         assert!(generation.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn native_cache_same_key_replacement_transfers_exact_handle_roots()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let first_payload = stored_test_payload(vec![1])?;
+        let second_payload = stored_test_payload(vec![2])?;
+        let byte_capacity = first_payload
+            .resident_bytes()?
+            .checked_add(second_payload.resident_bytes()?)
+            .ok_or("test byte capacity overflowed")?;
+        let generation = NativeHandleStoreGeneration::with_capacities(2, byte_capacity)?;
+        let session = generation.session(AttemptId(Uuid::from_u128(310)));
+        let first = session.publish(first_payload, &CancellationToken::default())?;
+        let second = session.publish(second_payload, &CancellationToken::default())?;
+        session.commit();
+
+        let key = test_cache_key("Replacement")?;
+        let first_entry = CacheEntry {
+            outputs: vec![NativeValue::Handle {
+                value: first.clone(),
+            }],
+            ui: None,
+        };
+        let second_entry = CacheEntry {
+            outputs: vec![NativeValue::Handle {
+                value: second.clone(),
+            }],
+            ui: None,
+        };
+        let mut cache = NativeCache::new(1)?;
+        assert!(cache.insert_with_handle_lease(
+            key.clone(),
+            first_entry.clone(),
+            generation.acquire_lease([&first])?,
+        ));
+        assert!(cache.insert_with_handle_lease(
+            key.clone(),
+            first_entry,
+            generation.acquire_lease([&first])?,
+        ));
+        assert_eq!(generation.len(), 2);
+        assert!(cache.insert_with_handle_lease(
+            key,
+            second_entry,
+            generation.acquire_lease([&second])?,
+        ));
+        assert_eq!(generation.len(), 1);
+        assert!(matches!(
+            session.resolve(&first, first.handle_type(), &CancellationToken::default(),),
+            Err(NativeHandleStoreError::Missing(_))
+        ));
+        assert!(
+            session
+                .resolve(&second, second.handle_type(), &CancellationToken::default(),)
+                .is_ok()
+        );
+        cache.clear();
+        assert!(generation.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn cancelled_cache_publication_restores_replaced_entry_and_exact_roots()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let first_payload = stored_test_payload(vec![1])?;
+        let second_payload = stored_test_payload(vec![2])?;
+        let byte_capacity = first_payload
+            .resident_bytes()?
+            .checked_add(second_payload.resident_bytes()?)
+            .ok_or("test byte capacity overflowed")?;
+        let generation = NativeHandleStoreGeneration::with_capacities(2, byte_capacity)?;
+        let session = generation.session(AttemptId(Uuid::from_u128(320)));
+        let first = session.publish(first_payload, &CancellationToken::default())?;
+        let second = session.publish(second_payload, &CancellationToken::default())?;
+        session.commit();
+        let key = test_cache_key("AtomicReplacement")?;
+        let first_entry = CacheEntry {
+            outputs: vec![NativeValue::Handle {
+                value: first.clone(),
+            }],
+            ui: None,
+        };
+        let second_entry = CacheEntry {
+            outputs: vec![NativeValue::Handle {
+                value: second.clone(),
+            }],
+            ui: None,
+        };
+        let cache = Arc::new(Mutex::new(NativeCache::new(1)?));
+        assert!(cache.lock().insert_with_handle_lease(
+            key.clone(),
+            first_entry.clone(),
+            generation.acquire_lease([&first])?,
+        ));
+        let (_backend, workspace_authority) =
+            CpuWorkspaceAuthority::create_backend(TEST_WORKSPACE_BYTES)?;
+        let engine = ExecutionEngine::new_with_handle_store_generation(
+            ProfileId(Uuid::from_u128(321)),
+            Arc::new(NativeNodeRegistry::default()),
+            cache.clone(),
+            Arc::new(RecordingEffectCoordinator::default()),
+            "registry-v1",
+            workspace_authority.authorize_workspace(TEST_WORKSPACE_BYTES)?,
+            generation.clone(),
+        )?;
+        let pre_publication = CancellationToken::default();
+        pre_publication.cancel();
+        assert!(matches!(
+            engine.publish_cache_batch(Vec::new(), &pre_publication),
+            Err(ExecutionError::Cancelled)
+        ));
+        assert_eq!(cache.lock().get(&key), Some(first_entry.clone()));
+        assert_eq!(generation.len(), 2);
+        let cancellation = CancellationToken::default();
+        generation.set_after_cache_insert_hook(Arc::new({
+            let cancellation = cancellation.clone();
+            move || {
+                cancellation.cancel();
+            }
+        }));
+        assert!(matches!(
+            engine.publish_cache_batch(
+                vec![(
+                    key.clone(),
+                    second_entry,
+                    generation.acquire_lease([&second])?,
+                )],
+                &cancellation,
+            ),
+            Err(ExecutionError::Cancelled)
+        ));
+        assert_eq!(cache.lock().get(&key), Some(first_entry));
+        assert_eq!(generation.len(), 1);
+        assert!(
+            session
+                .resolve(&first, first.handle_type(), &CancellationToken::default(),)
+                .is_ok()
+        );
+        assert!(matches!(
+            session.resolve(&second, second.handle_type(), &CancellationToken::default(),),
+            Err(NativeHandleStoreError::Missing(_))
+        ));
+        cache.lock().clear();
+        assert!(generation.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn cloned_native_handle_lease_releases_roots_once_under_concurrent_drop()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let payload = stored_test_payload(vec![7])?;
+        let byte_capacity = payload.resident_bytes()?;
+        let generation = NativeHandleStoreGeneration::with_capacities(1, byte_capacity)?;
+        let attempt_id = AttemptId(Uuid::from_u128(14));
+        let session = generation.session(attempt_id);
+        let handle = session.publish(payload, &CancellationToken::default())?;
+        session.commit();
+        let lease = generation
+            .acquire_lease([&handle])?
+            .ok_or("test lease was not acquired")?;
+        let second = lease.clone();
+        let barrier = Arc::new(Barrier::new(3));
+        std::thread::scope(|scope| {
+            for lease in [lease, second] {
+                let barrier = barrier.clone();
+                scope.spawn(move || {
+                    barrier.wait();
+                    drop(lease);
+                });
+            }
+            barrier.wait();
+        });
+        assert!(generation.is_empty());
+        assert_eq!(generation.resident_bytes(), 0);
         Ok(())
     }
 
@@ -3506,7 +4040,8 @@ pub(crate) mod tests {
             registry.register(Arc::new(PublishingMalformedExpansionNode))?;
             let cache = Arc::new(Mutex::new(NativeCache::new(4)?));
             let effects = Arc::new(RecordingEffectCoordinator::default());
-            let generation = NativeHandleStoreGeneration::with_capacities(4, 32)?;
+            let payload_bytes = stored_test_payload(vec![9])?.resident_bytes()?;
+            let generation = NativeHandleStoreGeneration::with_capacities(4, payload_bytes * 4)?;
             let (_backend, workspace_authority) =
                 CpuWorkspaceAuthority::create_backend(TEST_WORKSPACE_BYTES)?;
             let engine = ExecutionEngine::new_with_handle_store_generation(
@@ -3531,6 +4066,204 @@ pub(crate) mod tests {
             assert!(generation.is_empty());
             assert!(cache.lock().is_empty());
             assert!(effects.committed().is_empty());
+            Ok::<(), Box<dyn std::error::Error>>(())
+        })
+    }
+
+    #[test]
+    fn cancellation_before_store_commit_rolls_back_handles_and_cache()
+    -> Result<(), Box<dyn std::error::Error>> {
+        smol::block_on(async {
+            let descriptor = publishing_handle_descriptor()?;
+            let plan = compile_plan(
+                vec![descriptor.clone()],
+                BTreeMap::from([(
+                    NodeId("publish".to_owned()),
+                    PromptNode {
+                        class_type: descriptor.class_type.clone(),
+                        inputs: BTreeMap::new(),
+                        unknown: BTreeMap::new(),
+                    },
+                )]),
+            )?;
+            let calls = Arc::new(AtomicUsize::new(0));
+            let mut registry = NativeNodeRegistry::default();
+            registry.register_descriptor(descriptor)?;
+            registry.register(Arc::new(PublishingHandleNode {
+                calls: calls.clone(),
+                cancel_after_publish: true,
+            }))?;
+            let cache = Arc::new(Mutex::new(NativeCache::new(2)?));
+            let payload_bytes =
+                stored_test_payload(vec![0; mem::size_of::<usize>()])?.resident_bytes()?;
+            let generation = NativeHandleStoreGeneration::with_capacities(2, payload_bytes * 2)?;
+            let (_backend, workspace_authority) =
+                CpuWorkspaceAuthority::create_backend(TEST_WORKSPACE_BYTES)?;
+            let engine = ExecutionEngine::new_with_handle_store_generation(
+                ProfileId(Uuid::from_u128(401)),
+                Arc::new(registry),
+                cache.clone(),
+                Arc::new(RecordingEffectCoordinator::default()),
+                "registry-v1",
+                workspace_authority.authorize_workspace(TEST_WORKSPACE_BYTES)?,
+                generation.clone(),
+            )?;
+            let report = engine
+                .execute(
+                    &plan,
+                    AttemptId(Uuid::from_u128(402)),
+                    CancellationToken::default(),
+                )
+                .await;
+            assert_eq!(report.state, AttemptState::Cancelled);
+            assert!(report.outputs.is_empty());
+            assert!(generation.is_empty());
+            assert_eq!(generation.resident_bytes(), 0);
+            assert!(cache.lock().is_empty());
+            assert_eq!(calls.load(Ordering::SeqCst), 1);
+            Ok::<(), Box<dyn std::error::Error>>(())
+        })
+    }
+
+    #[test]
+    fn cache_and_report_hold_independent_handle_leases() -> Result<(), Box<dyn std::error::Error>> {
+        smol::block_on(async {
+            let descriptor = publishing_handle_descriptor()?;
+            let plan = compile_plan(
+                vec![descriptor.clone()],
+                BTreeMap::from([(
+                    NodeId("publish".to_owned()),
+                    PromptNode {
+                        class_type: descriptor.class_type.clone(),
+                        inputs: BTreeMap::new(),
+                        unknown: BTreeMap::new(),
+                    },
+                )]),
+            )?;
+            let calls = Arc::new(AtomicUsize::new(0));
+            let mut registry = NativeNodeRegistry::default();
+            registry.register_descriptor(descriptor)?;
+            registry.register(Arc::new(PublishingHandleNode {
+                calls,
+                cancel_after_publish: false,
+            }))?;
+            let cache = Arc::new(Mutex::new(NativeCache::new(2)?));
+            let payload_bytes =
+                stored_test_payload(vec![0; mem::size_of::<usize>()])?.resident_bytes()?;
+            let generation = NativeHandleStoreGeneration::with_capacities(2, payload_bytes * 2)?;
+            let (_backend, workspace_authority) =
+                CpuWorkspaceAuthority::create_backend(TEST_WORKSPACE_BYTES)?;
+            let engine = ExecutionEngine::new_with_handle_store_generation(
+                ProfileId(Uuid::from_u128(411)),
+                Arc::new(registry),
+                cache.clone(),
+                Arc::new(RecordingEffectCoordinator::default()),
+                "registry-v1",
+                workspace_authority.authorize_workspace(TEST_WORKSPACE_BYTES)?,
+                generation.clone(),
+            )?;
+            let report = engine
+                .execute(
+                    &plan,
+                    AttemptId(Uuid::from_u128(412)),
+                    CancellationToken::default(),
+                )
+                .await;
+            assert_eq!(report.state, AttemptState::Succeeded);
+            let handle = report_handle(&report).ok_or("report handle was missing")?;
+            assert_eq!(generation.len(), 1);
+            assert_eq!(cache.lock().invalidate_node("PublishingHandle"), 1);
+            assert_eq!(generation.len(), 1);
+            assert!(
+                generation
+                    .session(AttemptId(Uuid::from_u128(413)))
+                    .resolve(&handle, handle.handle_type(), &CancellationToken::default(),)
+                    .is_ok()
+            );
+            drop(report);
+            assert!(generation.is_empty());
+            Ok::<(), Box<dyn std::error::Error>>(())
+        })
+    }
+
+    #[test]
+    fn stale_store_generation_cache_entry_is_evicted_and_recomputed()
+    -> Result<(), Box<dyn std::error::Error>> {
+        smol::block_on(async {
+            let descriptor = publishing_handle_descriptor()?;
+            let plan = compile_plan(
+                vec![descriptor.clone()],
+                BTreeMap::from([(
+                    NodeId("publish".to_owned()),
+                    PromptNode {
+                        class_type: descriptor.class_type.clone(),
+                        inputs: BTreeMap::new(),
+                        unknown: BTreeMap::new(),
+                    },
+                )]),
+            )?;
+            let calls = Arc::new(AtomicUsize::new(0));
+            let mut registry = NativeNodeRegistry::default();
+            registry.register_descriptor(descriptor)?;
+            registry.register(Arc::new(PublishingHandleNode {
+                calls: calls.clone(),
+                cancel_after_publish: false,
+            }))?;
+            let registry = Arc::new(registry);
+            let cache = Arc::new(Mutex::new(NativeCache::new(2)?));
+            let payload_bytes =
+                stored_test_payload(vec![0; mem::size_of::<usize>()])?.resident_bytes()?;
+            let first_generation =
+                NativeHandleStoreGeneration::with_capacities(2, payload_bytes * 2)?;
+            let second_generation =
+                NativeHandleStoreGeneration::with_capacities(2, payload_bytes * 2)?;
+            let (_backend, workspace_authority) =
+                CpuWorkspaceAuthority::create_backend(TEST_WORKSPACE_BYTES * 2)?;
+            let first_engine = ExecutionEngine::new_with_handle_store_generation(
+                ProfileId(Uuid::from_u128(421)),
+                registry.clone(),
+                cache.clone(),
+                Arc::new(RecordingEffectCoordinator::default()),
+                "registry-v1",
+                workspace_authority.authorize_workspace(TEST_WORKSPACE_BYTES)?,
+                first_generation.clone(),
+            )?;
+            let first_report = first_engine
+                .execute(
+                    &plan,
+                    AttemptId(Uuid::from_u128(422)),
+                    CancellationToken::default(),
+                )
+                .await;
+            assert_eq!(first_report.state, AttemptState::Succeeded);
+            drop(first_report);
+            assert_eq!(first_generation.len(), 1);
+
+            let second_engine = ExecutionEngine::new_with_handle_store_generation(
+                ProfileId(Uuid::from_u128(423)),
+                registry,
+                cache.clone(),
+                Arc::new(RecordingEffectCoordinator::default()),
+                "registry-v1",
+                workspace_authority.authorize_workspace(TEST_WORKSPACE_BYTES)?,
+                second_generation.clone(),
+            )?;
+            let second_report = second_engine
+                .execute(
+                    &plan,
+                    AttemptId(Uuid::from_u128(424)),
+                    CancellationToken::default(),
+                )
+                .await;
+            assert_eq!(second_report.state, AttemptState::Succeeded);
+            assert_eq!(second_report.cache_hits, 0);
+            assert_eq!(calls.load(Ordering::SeqCst), 2);
+            assert!(first_generation.is_empty());
+            assert_eq!(second_generation.len(), 1);
+            drop(second_report);
+            assert_eq!(second_generation.len(), 1);
+            cache.lock().clear();
+            assert!(second_generation.is_empty());
             Ok::<(), Box<dyn std::error::Error>>(())
         })
     }
