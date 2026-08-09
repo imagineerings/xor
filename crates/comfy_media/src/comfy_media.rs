@@ -2,9 +2,11 @@ use image::{DynamicImage, ImageFormat};
 use std::io::Cursor;
 
 pub mod metadata;
+pub mod native_node_payload;
 pub mod png;
 
 pub use metadata::*;
+pub use native_node_payload::*;
 pub use png::*;
 
 pub fn encode_png(image: &DynamicImage) -> Result<Vec<u8>, image::ImageError> {
