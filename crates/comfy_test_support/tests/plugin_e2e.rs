@@ -28,14 +28,16 @@ use comfy_runtime::{
     AuthorizedCredentialPresenceRequest, AuthorizedProviderRequest, Capability, CapabilitySet,
     CredentialPresenceActuator, CredentialScope, DisconnectedExecutionController,
     ExecutionDataSource, ExecutionEventBus, ExecutionPresentationService, ExecutionSnapshotStatus,
-    NativeNodeRegistry, NodeContext, NodeOutcome, OutputCommitter, OutputExecutionScope,
-    PermissionGrant, PermissionPolicy, PluginAuthorization, PluginCapabilityBroker,
-    PluginRngPolicy, PluginServiceActuatorError, PluginServiceOperationContext, PluginTrustPolicy,
-    PluginVerificationKey, ProfileId, ProviderEndpoint, ProviderMode, ProviderPolicy,
-    ProviderRequestActuator, SecretId, SecretValue, SharedAssetService, WorkerLaunchConfig,
-    authorize_native_output_committer, authorize_native_plugin_asset_broker,
-    native_image_catalog_bindings, native_image_registry_projection,
-    open_native_profile_asset_service,
+    NativeHandleKind, NativeHandleStore, NativeHandleStoreError, NativeHandleStoreGeneration,
+    NativeHandleStoreIdentity, NativeHandleType, NativeNodeRegistry, NativeOpaqueHandle,
+    NativePrimitive, NativeStoredObject, NativeValue, NodeContext, NodeOutcome, OutputCommitter,
+    OutputExecutionScope, PermissionGrant, PermissionPolicy, PluginAuthorization,
+    PluginCapabilityBroker, PluginRngPolicy, PluginServiceActuatorError,
+    PluginServiceOperationContext, PluginTrustPolicy, PluginVerificationKey, ProfileId,
+    ProviderEndpoint, ProviderMode, ProviderPolicy, ProviderRequestActuator, SecretId, SecretValue,
+    SharedAssetService, WorkerLaunchConfig, authorize_native_output_committer,
+    authorize_native_plugin_asset_broker, native_image_catalog_bindings,
+    native_image_registry_projection, open_native_profile_asset_service,
 };
 use comfy_tensor::{CpuWorkspaceAuthority, RngAlgorithm, RngProfileVersion, ScratchReservation};
 use comfy_types::{AttemptId, HttpMethod, NodeId, PromptId, WorkerId};
@@ -842,47 +844,381 @@ fn component_inventory_error_contains(
             .is_some_and(|error| error.contains(expected))
 }
 
-fn registry_inputs() -> Result<BTreeMap<String, serde_json::Value>, Box<dyn Error>> {
+fn registry_handle(
+    store: &dyn NativeHandleStore,
+    cancellation: &CancellationToken,
+    value: PluginValue,
+    handle_kind: NativeHandleKind,
+    type_id: &str,
+) -> Result<NativeValue, Box<dyn Error>> {
+    let digest = match value.representation() {
+        comfy_plugin_sdk::PluginValueRepresentation::Tensor(value) => value.digest(),
+        comfy_plugin_sdk::PluginValueRepresentation::Artifact(value) => value.digest(),
+        comfy_plugin_sdk::PluginValueRepresentation::Model(value) => value.digest(),
+        comfy_plugin_sdk::PluginValueRepresentation::Scalar(_) => {
+            return Err("scalar plugin fixture cannot be published as a handle".into());
+        }
+    };
+    let resident_bytes = value.abi_bytes()?.len().max(1);
+    let handle = store.publish(
+        NativeHandleType::new(handle_kind, type_id)?,
+        Arc::new(value),
+        Some(digest.to_owned()),
+        resident_bytes,
+        cancellation,
+    )?;
+    Ok(NativeValue::Handle { value: handle })
+}
+
+fn registry_inputs(
+    store: &dyn NativeHandleStore,
+    cancellation: &CancellationToken,
+) -> Result<BTreeMap<String, NativeValue>, Box<dyn Error>> {
     Ok(BTreeMap::from([
         (
             "artifact-list-in".to_owned(),
-            serde_json::Value::Array(Vec::new()),
+            NativeValue::List { values: Vec::new() },
         ),
         (
             "artifact-single-in".to_owned(),
-            serde_json::to_value(artifact_value("artifact.svg")?)?,
+            registry_handle(
+                store,
+                cancellation,
+                artifact_value("artifact.svg")?,
+                NativeHandleKind::Artifact,
+                "SVG",
+            )?,
         ),
         (
             "model-list-in".to_owned(),
-            serde_json::Value::Array(vec![
-                serde_json::to_value(model_value("a")?)?,
-                serde_json::to_value(model_value("b")?)?,
-            ]),
+            NativeValue::List {
+                values: vec![
+                    registry_handle(
+                        store,
+                        cancellation,
+                        model_value("a")?,
+                        NativeHandleKind::Model,
+                        "MODEL",
+                    )?,
+                    registry_handle(
+                        store,
+                        cancellation,
+                        model_value("b")?,
+                        NativeHandleKind::Model,
+                        "MODEL",
+                    )?,
+                ],
+            },
         ),
         (
             "model-single-in".to_owned(),
-            serde_json::to_value(model_value("model")?)?,
+            registry_handle(
+                store,
+                cancellation,
+                model_value("model")?,
+                NativeHandleKind::Model,
+                "MODEL",
+            )?,
         ),
         (
             "scalar-list-in".to_owned(),
-            serde_json::Value::Array(Vec::new()),
+            NativeValue::List { values: Vec::new() },
         ),
         (
             "scalar-single-in".to_owned(),
-            serde_json::Value::String("scalar".to_owned()),
+            NativeValue::Primitive {
+                value: NativePrimitive::String("scalar".to_owned()),
+            },
         ),
         (
             "tensor-list-in".to_owned(),
-            serde_json::Value::Array(vec![
-                serde_json::to_value(tensor_value("2")?)?,
-                serde_json::to_value(tensor_value("3")?)?,
-            ]),
+            NativeValue::List {
+                values: vec![
+                    registry_handle(
+                        store,
+                        cancellation,
+                        tensor_value("2")?,
+                        NativeHandleKind::Image,
+                        "IMAGE",
+                    )?,
+                    registry_handle(
+                        store,
+                        cancellation,
+                        tensor_value("3")?,
+                        NativeHandleKind::Image,
+                        "IMAGE",
+                    )?,
+                ],
+            },
         ),
         (
             "tensor-single-in".to_owned(),
-            serde_json::to_value(tensor_value("1")?)?,
+            registry_handle(
+                store,
+                cancellation,
+                tensor_value("1")?,
+                NativeHandleKind::Image,
+                "IMAGE",
+            )?,
         ),
     ]))
+}
+
+fn registry_invocation(
+    prompt_id: PromptId,
+    attempt_id: AttemptId,
+    node_id: NodeId,
+    cancellation: CancellationToken,
+) -> Result<
+    (
+        NodeContext,
+        BTreeMap<String, NativeValue>,
+        NativeHandleStoreGeneration,
+    ),
+    Box<dyn Error>,
+> {
+    let generation = NativeHandleStoreGeneration::new()?;
+    let store = generation.handle_store_for_attempt(attempt_id);
+    let inputs = registry_inputs(store.as_ref(), &cancellation)?;
+    let context = NodeContext::new(
+        prompt_id,
+        attempt_id,
+        node_id,
+        cancellation,
+        zero_scratch()?,
+        store,
+    )?;
+    Ok((context, inputs, generation))
+}
+
+#[derive(Debug)]
+struct RejectingPublishStore {
+    inner: Arc<dyn NativeHandleStore>,
+    reject_at: usize,
+    publication_count: AtomicUsize,
+}
+
+impl NativeHandleStore for RejectingPublishStore {
+    fn identity(&self) -> NativeHandleStoreIdentity {
+        self.inner.identity()
+    }
+
+    fn attempt_id(&self) -> AttemptId {
+        self.inner.attempt_id()
+    }
+
+    fn resolve(
+        &self,
+        handle: &NativeOpaqueHandle,
+        expected_type: &NativeHandleType,
+        cancellation: &CancellationToken,
+    ) -> Result<NativeStoredObject, NativeHandleStoreError> {
+        self.inner.resolve(handle, expected_type, cancellation)
+    }
+
+    fn publish(
+        &self,
+        handle_type: NativeHandleType,
+        value: NativeStoredObject,
+        digest_sha256: Option<String>,
+        resident_bytes: usize,
+        cancellation: &CancellationToken,
+    ) -> Result<NativeOpaqueHandle, NativeHandleStoreError> {
+        let publication = self.publication_count.fetch_add(1, Ordering::AcqRel) + 1;
+        if publication == self.reject_at {
+            return Err(NativeHandleStoreError::Rejected(
+                "injected plugin output publication failure".to_owned(),
+            ));
+        }
+        self.inner.publish(
+            handle_type,
+            value,
+            digest_sha256,
+            resident_bytes,
+            cancellation,
+        )
+    }
+
+    fn revoke(
+        &self,
+        handle: &NativeOpaqueHandle,
+        cancellation: &CancellationToken,
+    ) -> Result<(), NativeHandleStoreError> {
+        self.inner.revoke(handle, cancellation)
+    }
+}
+
+fn native_handles(values: &[NativeValue]) -> Vec<NativeOpaqueHandle> {
+    fn collect(value: &NativeValue, handles: &mut Vec<NativeOpaqueHandle>) {
+        match value {
+            NativeValue::Handle { value } => handles.push(value.clone()),
+            NativeValue::List { values } => {
+                for value in values {
+                    collect(value, handles);
+                }
+            }
+            NativeValue::Primitive { .. } | NativeValue::PreservedUnknown { .. } => {}
+        }
+    }
+
+    let mut handles = Vec::new();
+    for value in values {
+        collect(value, &mut handles);
+    }
+    handles
+}
+
+async fn exercise_native_registry_value_boundary(
+    registry: &NativeNodeRegistry,
+) -> Result<(), Box<dyn Error>> {
+    let node = registry
+        .node("echo")
+        .ok_or("component registry has no echo binding")?;
+    let attempt_id = AttemptId(Uuid::from_u128(0x367));
+    let cancellation = CancellationToken::default();
+    let (context, inputs, generation) = registry_invocation(
+        PromptId(Uuid::from_u128(0x366)),
+        attempt_id,
+        NodeId("typed-plugin-roundtrip".to_owned()),
+        cancellation.clone(),
+    )?;
+    let input_handle_count = generation.len();
+    let outcome = node.execute(context, inputs).await?;
+    let NodeOutcome::Values { outputs, .. } = outcome else {
+        return Err("typed plugin adapter returned a non-value outcome".into());
+    };
+    assert!(matches!(
+        outputs.first(),
+        Some(NativeValue::Primitive {
+            value: NativePrimitive::String(value)
+        }) if value == "scalar"
+    ));
+    let output_handles = native_handles(&outputs);
+    assert_eq!(output_handles.len(), input_handle_count);
+    assert_eq!(generation.len(), input_handle_count * 2);
+    let resolver = generation.handle_store_for_attempt(attempt_id);
+    for handle in &output_handles {
+        let value = resolver.resolve(handle, handle.handle_type(), &cancellation)?;
+        value
+            .downcast::<PluginValue>()
+            .map_err(|_| "published native plugin handle did not retain its typed ABI value")?;
+    }
+    for handle in output_handles.iter().rev() {
+        resolver.revoke(handle, &cancellation)?;
+    }
+    assert_eq!(generation.len(), input_handle_count);
+
+    let (context, mut inputs, generation) = registry_invocation(
+        PromptId(Uuid::from_u128(0x368)),
+        AttemptId(Uuid::from_u128(0x369)),
+        NodeId("typed-plugin-wrong-type".to_owned()),
+        CancellationToken::default(),
+    )?;
+    let input_handle_count = generation.len();
+    let tensor = inputs
+        .get("tensor-single-in")
+        .cloned()
+        .ok_or("tensor fixture is absent")?;
+    inputs.insert("model-single-in".to_owned(), tensor);
+    let error = node
+        .execute(context, inputs)
+        .await
+        .expect_err("wrong native handle type must fail closed");
+    assert!(error.message.contains("does not match"));
+    assert_eq!(generation.len(), input_handle_count);
+
+    let attempt_id = AttemptId(Uuid::from_u128(0x36a));
+    let generation = NativeHandleStoreGeneration::new()?;
+    let store = generation.handle_store_for_attempt(attempt_id);
+    let valid_inputs = registry_inputs(store.as_ref(), &CancellationToken::default())?;
+    let NativeValue::Handle { value: original } = valid_inputs
+        .get("tensor-single-in")
+        .ok_or("tensor fixture is absent")?
+    else {
+        return Err("tensor fixture is not a native handle".into());
+    };
+    let wrong_store_identity = NativeHandleStoreIdentity::new(
+        Uuid::from_u128(0x36b),
+        original.store_identity().generation_id,
+    )?;
+    let wrong_generation_identity =
+        NativeHandleStoreIdentity::new(original.store_identity().store_id, Uuid::from_u128(0x36c))?;
+    let invalid_handles = [
+        NativeOpaqueHandle::new(
+            original.handle_type().clone(),
+            wrong_store_identity,
+            original.identifier(),
+            original.generation(),
+            original.digest_sha256().map(str::to_owned),
+        )?,
+        NativeOpaqueHandle::new(
+            original.handle_type().clone(),
+            wrong_generation_identity,
+            original.identifier(),
+            original.generation(),
+            original.digest_sha256().map(str::to_owned),
+        )?,
+        NativeOpaqueHandle::new(
+            original.handle_type().clone(),
+            original.store_identity(),
+            original.identifier(),
+            original.generation(),
+            Some("f".repeat(64)),
+        )?,
+    ];
+    let input_handle_count = generation.len();
+    for (index, invalid_handle) in invalid_handles.into_iter().enumerate() {
+        let mut inputs = valid_inputs.clone();
+        inputs.insert(
+            "tensor-single-in".to_owned(),
+            NativeValue::Handle {
+                value: invalid_handle,
+            },
+        );
+        let context = NodeContext::new(
+            PromptId(Uuid::from_u128(0x36d)),
+            attempt_id,
+            NodeId(format!("typed-plugin-invalid-handle-{index}")),
+            CancellationToken::default(),
+            zero_scratch()?,
+            store.clone(),
+        )?;
+        node.execute(context, inputs)
+            .await
+            .expect_err("forged native handle must fail closed");
+        assert_eq!(generation.len(), input_handle_count);
+    }
+
+    let cancellation = CancellationToken::default();
+    let attempt_id = AttemptId(Uuid::from_u128(0x370));
+    let generation = NativeHandleStoreGeneration::new()?;
+    let inner = generation.handle_store_for_attempt(attempt_id);
+    let inputs = registry_inputs(inner.as_ref(), &cancellation)?;
+    let input_handle_count = generation.len();
+    let rejecting_store: Arc<dyn NativeHandleStore> = Arc::new(RejectingPublishStore {
+        inner,
+        reject_at: 2,
+        publication_count: AtomicUsize::new(0),
+    });
+    let context = NodeContext::new(
+        PromptId(Uuid::from_u128(0x371)),
+        attempt_id,
+        NodeId("typed-plugin-publication-rollback".to_owned()),
+        cancellation,
+        zero_scratch()?,
+        rejecting_store,
+    )?;
+    let error = node
+        .execute(context, inputs)
+        .await
+        .expect_err("partial plugin output publication must fail");
+    assert!(
+        error
+            .message
+            .contains("injected plugin output publication failure")
+    );
+    assert_eq!(generation.len(), input_handle_count);
+    Ok(())
 }
 
 async fn invoke_registry_binding(
@@ -891,18 +1227,13 @@ async fn invoke_registry_binding(
     let node = registry
         .node("echo")
         .ok_or("component registry has no echo binding")?;
-    Ok(node
-        .execute(
-            NodeContext {
-                prompt_id: PromptId(Uuid::from_u128(1)),
-                attempt_id: AttemptId(Uuid::from_u128(2)),
-                node_id: NodeId("echo-fixture".to_owned()),
-                scratch: zero_scratch()?,
-                cancellation: CancellationToken::default(),
-            },
-            registry_inputs()?,
-        )
-        .await?)
+    let (context, inputs, _generation) = registry_invocation(
+        PromptId(Uuid::from_u128(1)),
+        AttemptId(Uuid::from_u128(2)),
+        NodeId("echo-fixture".to_owned()),
+        CancellationToken::default(),
+    )?;
+    Ok(node.execute(context, inputs).await?)
 }
 
 fn zero_scratch() -> Result<ScratchReservation, comfy_tensor::TensorError> {
@@ -1288,6 +1619,7 @@ async fn exercise_extension_store_component_lifecycle(
         invoke_registry_binding(&registry).await?,
         NodeOutcome::Values { .. }
     ));
+    exercise_native_registry_value_boundary(&registry).await?;
 
     let mut updated_manifest = signed_manifest.clone();
     updated_manifest.provenance.registry = Some("fixture://signed-registry/update".to_owned());
@@ -1655,22 +1987,21 @@ async fn val_worker_plugin_001(executor: BackgroundExecutor) {
         );
         let cancelled = CancellationToken::default();
         cancelled.cancel();
+        let (cancelled_context, cancelled_inputs, cancelled_generation) = registry_invocation(
+            PromptId(Uuid::from_u128(11)),
+            AttemptId(Uuid::from_u128(12)),
+            NodeId("cancelled-echo-fixture".to_owned()),
+            cancelled,
+        )?;
+        let staged_input_count = cancelled_generation.len();
         let cancelled_error = registry
             .node("echo")
             .ok_or("component registry has no echo binding")?
-            .execute(
-                NodeContext {
-                    prompt_id: PromptId(Uuid::from_u128(11)),
-                    attempt_id: AttemptId(Uuid::from_u128(12)),
-                    node_id: NodeId("cancelled-echo-fixture".to_owned()),
-                    scratch: zero_scratch()?,
-                    cancellation: cancelled,
-                },
-                registry_inputs()?,
-            )
+            .execute(cancelled_context, cancelled_inputs)
             .await
             .expect_err("pre-cancelled private invocation must fail");
         assert!(cancelled_error.message.contains("cancel"));
+        assert_eq!(cancelled_generation.len(), staged_input_count);
         assert_eq!(provider.calls.load(Ordering::Acquire), 2);
 
         let roots = assets
@@ -1909,23 +2240,18 @@ async fn val_worker_plugin_001(executor: BackgroundExecutor) {
             .node("echo")
             .ok_or("blocking component registry has no echo binding")?;
         let blocking_cancellation = CancellationToken::default();
-        let blocking_task = smol::spawn({
-            let blocking_cancellation = blocking_cancellation.clone();
-            async move {
-                blocking_node
-                    .execute(
-                        NodeContext {
-                            prompt_id: PromptId(Uuid::from_u128(21)),
-                            attempt_id: AttemptId(Uuid::from_u128(22)),
-                            node_id: NodeId("blocking-echo-fixture".to_owned()),
-                            scratch: zero_scratch().map_err(|error| error.to_string())?,
-                            cancellation: blocking_cancellation,
-                        },
-                        registry_inputs().map_err(|error| error.to_string())?,
-                    )
-                    .await
-                    .map_err(|error| error.to_string())
-            }
+        let (blocking_context, blocking_inputs, blocking_generation) = registry_invocation(
+            PromptId(Uuid::from_u128(21)),
+            AttemptId(Uuid::from_u128(22)),
+            NodeId("blocking-echo-fixture".to_owned()),
+            blocking_cancellation.clone(),
+        )?;
+        let staged_input_count = blocking_generation.len();
+        let blocking_task = smol::spawn(async move {
+            blocking_node
+                .execute(blocking_context, blocking_inputs)
+                .await
+                .map_err(|error| error.to_string())
         });
         for _ in 0..500 {
             if blocking_provider.entered.load(Ordering::Acquire) {
@@ -1942,6 +2268,7 @@ async fn val_worker_plugin_001(executor: BackgroundExecutor) {
             blocking_error.contains("cancel"),
             "unexpected blocking cancellation error: {blocking_error}"
         );
+        assert_eq!(blocking_generation.len(), staged_input_count);
         assert_eq!(blocking_credentials.read_calls.load(Ordering::Acquire), 1);
         assert_eq!(
             blocking_credentials

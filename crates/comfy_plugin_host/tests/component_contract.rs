@@ -1,3 +1,4 @@
+use comfy_nodes::{NativeHandleKind, NativePortCardinality, NativePrimitiveType, NativeValueType};
 use comfy_plugin_host::{
     AssetPluginCapabilityServices, CancellationToken, CapabilityLimits, CapabilityState,
     ComponentExecutionBoundary, ComponentHost, ComponentHostError, ComponentHostRouter,
@@ -1922,6 +1923,68 @@ fn extension_owned_component_host_updates_registry_atomically_and_revokes_stale_
             .descriptor("echo")
             .map(|descriptor| descriptor.implementation_version.as_str()),
         Some("1.0.0")
+    );
+    let descriptor = registry
+        .descriptor("echo")
+        .ok_or("installed component descriptor is absent")?;
+    let scalar = descriptor
+        .inputs
+        .iter()
+        .find(|input| input.name == "scalar-single-in")
+        .ok_or("scalar input descriptor is absent")?;
+    assert_eq!(scalar.cardinality, NativePortCardinality::Scalar);
+    assert_eq!(
+        scalar.accepted_types.members(),
+        &[NativeValueType::Primitive(NativePrimitiveType::String)]
+    );
+    let tensor = descriptor
+        .inputs
+        .iter()
+        .find(|input| input.name == "tensor-list-in")
+        .ok_or("tensor list input descriptor is absent")?;
+    assert_eq!(tensor.cardinality, NativePortCardinality::List);
+    assert!(tensor.lazy);
+    assert!(matches!(
+        tensor.accepted_types.members(),
+        [NativeValueType::Handle(handle_type)]
+            if handle_type.kind == NativeHandleKind::Image && handle_type.type_id == "IMAGE"
+    ));
+    let artifact = descriptor
+        .inputs
+        .iter()
+        .find(|input| input.name == "artifact-single-in")
+        .ok_or("artifact input descriptor is absent")?;
+    assert!(matches!(
+        artifact.accepted_types.members(),
+        [NativeValueType::Handle(handle_type)]
+            if handle_type.kind == NativeHandleKind::Artifact && handle_type.type_id == "SVG"
+    ));
+    let model = descriptor
+        .inputs
+        .iter()
+        .find(|input| input.name == "model-single-in")
+        .ok_or("model input descriptor is absent")?;
+    assert!(matches!(
+        model.accepted_types.members(),
+        [NativeValueType::Handle(handle_type)]
+            if handle_type.kind == NativeHandleKind::Model && handle_type.type_id == "MODEL"
+    ));
+    let presentation = registry
+        .presentation("echo")
+        .ok_or("installed component presentation is absent")?;
+    assert_eq!(presentation.display_name, "Echo");
+    assert_eq!(presentation.category, "test");
+    assert_eq!(
+        presentation.output_names,
+        manifest
+            .nodes
+            .first()
+            .ok_or("manifest node is absent")?
+            .ports
+            .iter()
+            .filter(|port| port.direction == PortDirection::Output)
+            .map(|port| port.name.clone())
+            .collect::<Vec<_>>()
     );
     assert!(registry.node("echo").is_some());
     assert_eq!(
