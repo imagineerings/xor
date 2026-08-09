@@ -6258,7 +6258,7 @@
         {
           "name": "native-diffusion-runtime-binds-tokenizer-identity-to-cache-and-handles",
           "path": "crates/comfy_runtime/src/native_execution_controller.rs",
-          "pattern": "cache_identities: CanonicalNativeDiffusionCacheIdentities[\\s\\S]*NativeDiffusionHandle::from_bundle[\\s\\S]*stored\\s*\\.metadata\\s*\\.require_exact_match\\(&expected_metadata\\)[\\s\\S]*provider_identity\\.tokenizer_digest\\(\\) != bundle\\.tokenizer_digest\\(\\)"
+          "pattern": "cache_identities: CanonicalNativeDiffusionCacheIdentities[\\s\\S]*NativeModelPayload::sd1_clip\\(bundle\\.tokenizer\\.clone\\(\\), bundle\\.clip\\.clone\\(\\)\\)[\\s\\S]*NativeStoredModelPayload::native_diffusion\\(Arc::new\\(payload\\)\\)[\\s\\S]*NativeStoredPayload::Model\\(Arc::new\\(payload\\)\\)[\\s\\S]*\\.resolve\\(handle, &expected_type, &context\\.cancellation\\)[\\s\\S]*payload\\.diffusion\\(\\)[\\s\\S]*self\\.admitted_identities\\.tokenizer_digest\\(\\) != bundle\\.tokenizer_digest\\(\\)"
         },
         {
           "name": "native-diffusion-cache-exposes-canonical-tokenizer-dependency",

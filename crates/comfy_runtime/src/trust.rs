@@ -4672,12 +4672,20 @@ mod tests {
                     && sdk_source.contains("seed: Zeroizing<[")
                     && runtime_trust_source.contains("seed: Zeroizing<[")
                     && runtime_trust_source.contains("pub struct SecretValue(Zeroizing<Vec<u8>>)")
-                    && runtime_manifest_source.contains(
-                        "[dev-dependencies]\ncomfy_plugin_sdk = { workspace = true, features = [\"signing-tooling\"] }",
-                    )
-                    && host_manifest_source.contains(
-                        "[dev-dependencies]\ncomfy_plugin_sdk = { workspace = true, features = [\"signing-tooling\"] }",
-                    ),
+                    && runtime_manifest_source
+                        .split_once("[dev-dependencies]")
+                        .is_some_and(|(_, dependencies)| {
+                            dependencies.contains(
+                                "comfy_plugin_sdk = { workspace = true, features = [\"signing-tooling\"] }",
+                            )
+                        })
+                    && host_manifest_source
+                        .split_once("[dev-dependencies]")
+                        .is_some_and(|(_, dependencies)| {
+                            dependencies.contains(
+                                "comfy_plugin_sdk = { workspace = true, features = [\"signing-tooling\"] }",
+                            )
+                        }),
             ),
             (
                 "plugin_signature_is_verified_not_asserted",

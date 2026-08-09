@@ -958,6 +958,7 @@ fn registry_invocation(
         NodeContext,
         BTreeMap<String, NativeValue>,
         NativeHandleStoreGeneration,
+        Arc<dyn NativeHandleStore>,
     ),
     Box<dyn Error>,
 > {
@@ -970,9 +971,9 @@ fn registry_invocation(
         node_id,
         cancellation,
         zero_scratch()?,
-        store,
+        store.clone(),
     )?;
-    Ok((context, inputs, generation))
+    Ok((context, inputs, generation, store))
 }
 
 #[derive(Debug)]
@@ -1058,7 +1059,7 @@ async fn exercise_native_registry_value_boundary(
         .ok_or("component registry has no echo binding")?;
     let attempt_id = AttemptId(Uuid::from_u128(0x367));
     let cancellation = CancellationToken::default();
-    let (context, inputs, generation) = registry_invocation(
+    let (context, inputs, generation, resolver) = registry_invocation(
         PromptId(Uuid::from_u128(0x366)),
         attempt_id,
         NodeId("typed-plugin-roundtrip".to_owned()),
@@ -1091,7 +1092,6 @@ async fn exercise_native_registry_value_boundary(
     let output_handles = native_handles(&outputs);
     assert_eq!(output_handles.len(), input_handles.len());
     assert_eq!(generation.len(), input_handle_count);
-    let resolver = generation.handle_store_for_attempt(attempt_id);
     for handle in &output_handles {
         assert!(input_identifiers.contains(handle.identifier()));
         resolver.resolve(handle, handle.handle_type(), &cancellation)?;
@@ -1104,7 +1104,7 @@ async fn exercise_native_registry_value_boundary(
     }
     assert_eq!(generation.len(), 0);
 
-    let (context, mut inputs, generation) = registry_invocation(
+    let (context, mut inputs, generation, _store) = registry_invocation(
         PromptId(Uuid::from_u128(0x368)),
         AttemptId(Uuid::from_u128(0x369)),
         NodeId("typed-plugin-wrong-type".to_owned()),
@@ -1221,7 +1221,7 @@ async fn invoke_registry_binding(
     let node = registry
         .node("echo")
         .ok_or("component registry has no echo binding")?;
-    let (context, inputs, _generation) = registry_invocation(
+    let (context, inputs, _generation, _store) = registry_invocation(
         PromptId(Uuid::from_u128(1)),
         AttemptId(Uuid::from_u128(2)),
         NodeId("echo-fixture".to_owned()),
@@ -2056,7 +2056,12 @@ async fn val_worker_plugin_001(executor: BackgroundExecutor) {
             ]
         );
         let cancelled = CancellationToken::default();
-        let (cancelled_context, cancelled_inputs, cancelled_generation) = registry_invocation(
+        let (
+            cancelled_context,
+            cancelled_inputs,
+            cancelled_generation,
+            _cancelled_store,
+        ) = registry_invocation(
             PromptId(Uuid::from_u128(11)),
             AttemptId(Uuid::from_u128(12)),
             NodeId("cancelled-echo-fixture".to_owned()),
@@ -2310,12 +2315,13 @@ async fn val_worker_plugin_001(executor: BackgroundExecutor) {
             .node("echo")
             .ok_or("blocking component registry has no echo binding")?;
         let blocking_cancellation = CancellationToken::default();
-        let (blocking_context, blocking_inputs, blocking_generation) = registry_invocation(
-            PromptId(Uuid::from_u128(21)),
-            AttemptId(Uuid::from_u128(22)),
-            NodeId("blocking-echo-fixture".to_owned()),
-            blocking_cancellation.clone(),
-        )?;
+        let (blocking_context, blocking_inputs, blocking_generation, _blocking_store) =
+            registry_invocation(
+                PromptId(Uuid::from_u128(21)),
+                AttemptId(Uuid::from_u128(22)),
+                NodeId("blocking-echo-fixture".to_owned()),
+                blocking_cancellation.clone(),
+            )?;
         let staged_input_count = blocking_generation.len();
         let blocking_task = smol::spawn(async move {
             blocking_node

@@ -1,9 +1,10 @@
 use comfy_runtime::{
-    CanonicalNativeDiffusionCacheIdentities, CompiledPlan, ExecutionControlCommand,
-    ExecutionControlCommandKind, ExecutionController, ExecutionDataSource, ExecutionFailure,
-    ExecutionPresentationService, ExecutionSnapshotStatus, GraphCommand, NativeDiffusionBundle,
-    NativeDiffusionProvider, NativeImageRuntimeError, ProfileId, WorkflowStorageProvider,
-    compile_native_diffusion_workflow,
+    CanonicalClipCacheIdentities, CanonicalConditioningCacheIdentities,
+    CanonicalNativeDiffusionCacheIdentities, CanonicalVaeCacheIdentities, CompiledPlan,
+    ExecutionControlCommand, ExecutionControlCommandKind, ExecutionController, ExecutionDataSource,
+    ExecutionFailure, ExecutionPresentationService, ExecutionSnapshotStatus, GraphCommand,
+    NativeDiffusionBundle, NativeDiffusionProvider, NativeImageRuntimeError, ProfileId,
+    WorkflowStorageProvider, compile_native_diffusion_workflow,
 };
 use comfy_tensor::{CancellationToken, CpuBackend, ExecutionContext};
 use comfy_types::AttemptId;
@@ -33,9 +34,38 @@ impl NativeDiffusionProvider for CompileOnlyProvider {
         if cancellation.is_cancelled() {
             return Err(NativeImageRuntimeError::Cancelled);
         }
-        Err(NativeImageRuntimeError::Execution(
-            "the GPUI compile probe does not materialize provider identities".to_owned(),
-        ))
+        let clip = CanonicalClipCacheIdentities::checked(
+            "1".repeat(64),
+            "2".repeat(64),
+            "0".repeat(64),
+            "3".repeat(64),
+            "4".repeat(64),
+            "5".repeat(64),
+        )
+        .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
+        let vae = CanonicalVaeCacheIdentities::checked(
+            "6".repeat(64),
+            "0".repeat(64),
+            "7".repeat(64),
+            "8".repeat(64),
+        )
+        .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
+        let conditioning = CanonicalConditioningCacheIdentities::checked(
+            "9".repeat(64),
+            "a".repeat(64),
+            "b".repeat(64),
+            "c".repeat(64),
+            "d".repeat(64),
+        )
+        .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
+        CanonicalNativeDiffusionCacheIdentities::checked(
+            "0".repeat(64),
+            "1".repeat(64),
+            clip,
+            vae,
+            conditioning,
+        )
+        .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))
     }
 
     fn load(

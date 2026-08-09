@@ -1027,6 +1027,11 @@ fn run_ownership_validation(
         fs::read_to_string(root.join("crates/comfy_plugin_host/src/private_worker.rs"))?;
     let plugin_registry_adapter =
         fs::read_to_string(root.join("crates/comfy_plugin_host/src/registry_adapter.rs"))?;
+    let plugin_registry_adapter_production = plugin_registry_adapter
+        .split_once("#[cfg(test)]\nmod tests")
+        .map_or(plugin_registry_adapter.as_str(), |(production, _)| {
+            production
+        });
     let worker_plugin_runtime =
         fs::read_to_string(root.join("crates/comfy_worker/src/plugin_runtime.rs"))?;
     let worker_plugin_runtime_production = worker_plugin_runtime
@@ -1094,6 +1099,9 @@ fn run_ownership_validation(
     let model_clip_text_encoder_decoder =
         fs::read_to_string(root.join("crates/comfy_model/src/clip_text_encoder_decoder.rs"))?;
     let model_clip_vision = fs::read_to_string(root.join("crates/comfy_model/src/clip_vision.rs"))?;
+    let model_clip_vision_production = model_clip_vision
+        .split_once("#[cfg(test)]\nmod tests")
+        .map_or(model_clip_vision.as_str(), |(production, _)| production);
     let model_clip_tokenizer =
         fs::read_to_string(root.join("crates/comfy_model/src/clip_tokenizer.rs"))?;
     let model_store = fs::read_to_string(root.join("crates/comfy_model/src/model_store.rs"))?;
@@ -1626,8 +1634,11 @@ fn run_ownership_validation(
             .contains("let cache_key = CacheKey::from_inputs_with_dependencies(")
         && runtime_executor_production
             .contains("self.cache.lock().get_with_handle_lease(&cache_key)")
+        && runtime_executor_production.contains("fn publish_cache_batch(")
+        && runtime_executor_production.contains("cache.insert_batch_with_handle_leases(entries)")
         && runtime_executor_production
-            .contains("insert_batch_with_handle_leases(leased_cache_entries)")
+            .contains("self.publish_cache_batch(leased_cache_entries, &state.cancellation)")
+        && runtime_executor_production.contains("*cache = prior_cache")
         && !runtime_controller_production.contains("pub struct PromptCompiler")
         && !runtime_controller_production.contains("pub struct CacheKey")
         && !runtime_controller_production.contains("pub struct NativeCache")
@@ -2025,7 +2036,7 @@ fn run_ownership_validation(
                 && !surface.contains("fn conditioning_cache_identities(")
         })
         && runtime_controller_production
-            .contains("provider_identity.tokenizer_digest() != bundle.tokenizer_digest()")
+            .contains("self.admitted_identities.tokenizer_digest() != bundle.tokenizer_digest()")
         && runtime_cache_production.contains(
             "digests.insert(\"tokenizer.sd1\".to_owned(), self.tokenizer_digest.clone());",
         )
@@ -2390,7 +2401,7 @@ fn run_ownership_validation(
                 && line.contains("authoritative_owner_confirmed")
         });
     let native_clip_vision_definitions =
-        production_source_occurrences(&sources, "pub struct NativeClipVision");
+        production_source_occurrences(&sources, "pub struct NativeClipVision {");
     let clip_preprocess_definitions =
         production_source_occurrences(&sources, "pub fn clip_preprocess_with_context(");
     let siglip2_preprocess_definitions =
@@ -2408,21 +2419,22 @@ fn run_ownership_validation(
             && siglip2_flex_resolution_definitions[0]
                 .contains("crates/comfy_model/src/clip_vision.rs")
             && !model_vision.contains("NativeClipVision")
-            && !model_clip_vision.contains("NativeEfficientNetV2S")
-            && !model_clip_vision.contains("NativeRaftLarge");
-    let task_340_clip_vision_delegates_canonical_mechanics = model_clip_vision
+            && !model_clip_vision_production.contains("NativeEfficientNetV2S")
+            && !model_clip_vision_production.contains("NativeRaftLarge");
+    let task_340_clip_vision_delegates_canonical_mechanics = model_clip_vision_production
         .contains("attention: NativeModule")
-        && model_clip_vision.contains("patch_embedding: NativeModule")
-        && model_clip_vision.contains("NativeModule::multihead_attention")
-        && model_clip_vision.contains("resize_with_context_exact_native(")
-        && model_clip_vision.contains("normalize_with_context_exact_native(")
-        && model_clip_vision.contains(".admit_backend_target(")
-        && model_clip_vision.contains("try_reserve_exact(self.layers.len())")
-        && model_clip_vision.contains("input exceeds the configured maximum patch count")
-        && !model_clip_vision.contains("ArtifactIndex")
-        && !model_clip_vision.contains("ModelStore")
-        && !model_clip_vision.contains("CpuWorkspaceAuthority")
-        && !model_clip_vision.contains("pub struct CancellationToken");
+        && model_clip_vision_production.contains("patch_embedding: NativeModule")
+        && model_clip_vision_production.contains("NativeModule::multihead_attention")
+        && model_clip_vision_production.contains("resize_with_context_exact_native(")
+        && model_clip_vision_production.contains("normalize_with_context_exact_native(")
+        && model_clip_vision_production.contains(".admit_backend_target(")
+        && model_clip_vision_production.contains("try_reserve_exact(self.layers.len())")
+        && model_clip_vision_production
+            .contains("input exceeds the configured maximum patch count")
+        && !model_clip_vision_production.contains("ArtifactIndex")
+        && !model_clip_vision_production.contains("ModelStore")
+        && !model_clip_vision_production.contains("CpuWorkspaceAuthority")
+        && !model_clip_vision_production.contains("pub struct CancellationToken");
     let task_340_clip_vision_adapter_semantics_are_executable = model_clip_vision_tests
         .contains("val_clip_001_vision_rows_execute_and_extend_cumulative_ledger")
         && model_clip_vision_tests
@@ -7801,23 +7813,29 @@ fn run_ownership_validation(
                 && plugin_host_production_capabilities.contains("model: &PluginModelHandle")
                 && plugin_host_production_capabilities
                     .contains("Result<ModelValue, InvocationError>")
-                && plugin_registry_adapter
+                && plugin_registry_adapter_production
                     .contains("artifact_value_identity(profile_id, artifact)")
-                && plugin_registry_adapter.contains("fn plugin_value_from_stored(")
-                && plugin_registry_adapter.contains("NativeStoredPayload::Tensor(stored)")
-                && plugin_registry_adapter.contains("NativeStoredPayload::Model(stored)")
-                && plugin_registry_adapter.contains("NativeStoredPayload::Conditioning(_)")
-                && plugin_registry_adapter.contains("unmaterialized_plugin_input(")
-                && plugin_registry_adapter.contains("NativeStoredPayload::Control(stored)")
-                && plugin_registry_adapter.contains("NativeStoredPayload::Provider(stored)")
-                && plugin_registry_adapter.contains("fn imported_runtime_value(")
-                && plugin_registry_adapter.contains("unmaterialized_plugin_output(&port.id)")
-                && !plugin_registry_adapter.contains("NativeProviderPayload::checked(")
-                && !plugin_registry_adapter.contains("NativeStoredObject")
-                && !plugin_registry_adapter.contains("NativeStoredTensorObject")
-                && !plugin_registry_adapter.contains("NativeStoredArtifactObject")
-                && !plugin_registry_adapter.contains("NativeStoredModelObject")
-                && !plugin_registry_adapter.contains(".downcast::<")
+                && plugin_registry_adapter_production.contains("fn plugin_value_from_stored(")
+                && plugin_registry_adapter_production
+                    .contains("NativeStoredPayload::Tensor(stored)")
+                && plugin_registry_adapter_production
+                    .contains("NativeStoredPayload::Model(stored)")
+                && plugin_registry_adapter_production
+                    .contains("NativeStoredPayload::Conditioning(_)")
+                && plugin_registry_adapter_production.contains("unmaterialized_plugin_input(")
+                && plugin_registry_adapter_production
+                    .contains("NativeStoredPayload::Control(stored)")
+                && plugin_registry_adapter_production
+                    .contains("NativeStoredPayload::Provider(stored)")
+                && plugin_registry_adapter_production.contains("fn imported_runtime_value(")
+                && plugin_registry_adapter_production
+                    .contains("unmaterialized_plugin_output(&port.id)")
+                && !plugin_registry_adapter_production.contains("NativeProviderPayload::checked(")
+                && !plugin_registry_adapter_production.contains("NativeStoredObject")
+                && !plugin_registry_adapter_production.contains("NativeStoredTensorObject")
+                && !plugin_registry_adapter_production.contains("NativeStoredArtifactObject")
+                && !plugin_registry_adapter_production.contains("NativeStoredModelObject")
+                && !plugin_registry_adapter_production.contains(".downcast::<")
                 && plugin_registry_adapter.contains("fn invocation_inputs(")
                 && plugin_registry_adapter.contains("fn invocation_outputs("),
         ),

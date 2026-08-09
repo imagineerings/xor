@@ -447,8 +447,8 @@ def expected_ledger(workspace: dict, lock: dict) -> dict:
         "prohibitions": [
             "no bindgen",
             "no user-build SDK downloads",
-            "no later Cargo manifest writer",
-            "no later Cargo.lock writer",
+            "no unscoped later Cargo manifest writer",
+            "no unscoped later Cargo.lock writer",
         ],
     }
 
@@ -468,6 +468,19 @@ def validate_later_task_writes() -> None:
         "Cargo.lock",
         "crates/comfy_runtime/Cargo.toml",
         "crates/comfy_test_support/Cargo.toml",
+    }
+    authorized_integration_writes = {
+        "comfy-parity-native-node-runtime-foundation": {
+            "Cargo.lock",
+            "crates/comfy_nodes/Cargo.toml",
+        },
+        "comfy-parity-native-node-compute-value-foundation": {
+            "Cargo.lock",
+            "crates/comfy_nodes/Cargo.toml",
+            "crates/comfy_media/Cargo.toml",
+            "crates/comfy_plugin_host/Cargo.toml",
+            "crates/comfy_plugin_sdk/Cargo.toml",
+        },
     }
     violations = []
     for block in blocks[owner_index + 1 :]:
@@ -494,6 +507,23 @@ def validate_later_task_writes() -> None:
             violations.append(
                 f"{heading}: expected exact certification dependency writes "
                 f"{sorted(certification_writes)}, found {sorted(forbidden)}"
+            )
+            continue
+        task_id = next(
+            (
+                line.removeprefix("  - _id: ")
+                for line in block.splitlines()
+                if line.startswith("  - _id: ")
+            ),
+            None,
+        )
+        if task_id in authorized_integration_writes:
+            expected_writes = authorized_integration_writes[task_id]
+            if set(forbidden) == expected_writes:
+                continue
+            violations.append(
+                f"{heading}: expected exact integration dependency writes "
+                f"{sorted(expected_writes)}, found {sorted(forbidden)}"
             )
             continue
         if forbidden:
