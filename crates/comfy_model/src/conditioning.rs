@@ -54,6 +54,8 @@ pub enum ConditioningError {
     Invalid(String),
     #[error("conditioning shape arithmetic overflowed while computing {0}")]
     ShapeOverflow(&'static str),
+    #[error("conditioning resident byte accounting overflowed")]
+    ResidentBytesOverflow,
     #[error("conditioning tensor content cannot be read on device {0:?}")]
     UnreadableDevice(DeviceId),
     #[error("conditioning descriptor encoding failed: {0}")]
@@ -107,6 +109,33 @@ impl ConditioningIdentity {
 
     pub fn latent_format(&self) -> &LatentFormatIdentity {
         &self.latent_format
+    }
+
+    pub fn digest(&self) -> Result<String, ConditioningError> {
+        let mut hasher = Sha256::new();
+        hasher.update(b"sim.comfy.conditioning-identity.v1");
+        hasher.update(CONDITIONING_SCHEMA_VERSION.to_le_bytes());
+        hash_string(&mut hasher, &self.namespace)?;
+        hash_string(&mut hasher, self.model_family.feature_id())?;
+        hash_string(&mut hasher, self.model_family.identifier())?;
+        hash_string(&mut hasher, self.model_family.architecture_version())?;
+        hash_string(&mut hasher, self.latent_format.feature_id())?;
+        hash_string(&mut hasher, self.latent_format.identifier())?;
+        Ok(format!("{:x}", hasher.finalize()))
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, ConditioningError> {
+        let mut bytes = u64::try_from(std::mem::size_of::<Self>())
+            .map_err(|_| ConditioningError::ResidentBytesOverflow)?;
+        bytes = bytes
+            .checked_add(
+                u64::try_from(self.namespace.capacity())
+                    .map_err(|_| ConditioningError::ResidentBytesOverflow)?,
+            )
+            .and_then(|bytes| bytes.checked_add(self.model_family.owned_resident_bytes()?))
+            .and_then(|bytes| bytes.checked_add(self.latent_format.owned_resident_bytes()?))
+            .ok_or(ConditioningError::ResidentBytesOverflow)?;
+        Ok(bytes)
     }
 }
 
@@ -2194,12 +2223,20 @@ mod tests {
         let encoded = serde_json::to_string(&identity)?;
         let decoded: ConditioningIdentity = serde_json::from_str(&encoded)?;
         assert_eq!(decoded, identity);
+        assert_eq!(decoded.digest()?, identity.digest()?);
+        assert_eq!(decoded.resident_bytes()?, identity.resident_bytes()?);
         let mut unsupported: serde_json::Value = serde_json::from_str(&encoded)?;
         let object = unsupported
             .as_object_mut()
             .ok_or("conditioning identity did not encode as an object")?;
         object.insert("schema_version".to_owned(), serde_json::Value::from(2));
         assert!(serde_json::from_value::<ConditioningIdentity>(unsupported).is_err());
+        let mut unknown: serde_json::Value = serde_json::from_str(&encoded)?;
+        unknown
+            .as_object_mut()
+            .ok_or("conditioning identity did not encode as an object")?
+            .insert("unknown".to_owned(), serde_json::Value::Null);
+        assert!(serde_json::from_value::<ConditioningIdentity>(unknown).is_err());
 
         let references = ConditioningReferences::checked(
             Some(ConditioningControlReference::checked("control.primary")?),

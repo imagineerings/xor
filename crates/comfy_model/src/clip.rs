@@ -363,6 +363,17 @@ pub struct ClipArchitectureSelection {
     digest: String,
 }
 
+fn add_clip_resident_bytes(
+    total: &mut u64,
+    bytes: usize,
+    field: &'static str,
+) -> Result<(), ClipError> {
+    *total = total
+        .checked_add(u64::try_from(bytes).map_err(|_| ClipError::Overflow(field))?)
+        .ok_or(ClipError::Overflow(field))?;
+    Ok(())
+}
+
 impl ClipArchitectureSelection {
     pub fn tokenizer(&self) -> &str {
         &self.tokenizer
@@ -386,6 +397,33 @@ impl ClipArchitectureSelection {
 
     pub fn digest(&self) -> &str {
         &self.digest
+    }
+
+    fn resident_owned_bytes(&self) -> Result<u64, ClipError> {
+        let mut bytes = 0_u64;
+        for text in [&self.tokenizer, &self.clip_model, &self.digest] {
+            add_clip_resident_bytes(&mut bytes, text.capacity(), "CLIP architecture strings")?;
+        }
+        add_clip_resident_bytes(
+            &mut bytes,
+            self.text_encoder_models
+                .capacity()
+                .checked_mul(std::mem::size_of::<Option<TextEncoderModel>>())
+                .ok_or(ClipError::Overflow("CLIP architecture model list"))?,
+            "CLIP architecture model list",
+        )?;
+        for configuration in [
+            self.t5xxl_configuration.as_ref(),
+            self.llama_configuration.as_ref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            if let Some(dtype) = &configuration.weight_dtype {
+                add_clip_resident_bytes(&mut bytes, dtype.capacity(), "CLIP architecture dtype")?;
+            }
+        }
+        Ok(bytes)
     }
 }
 
@@ -1817,6 +1855,17 @@ impl TokenizerIdentity {
     pub fn digest(&self) -> &str {
         &self.digest
     }
+
+    fn resident_owned_bytes(&self) -> Result<u64, ClipError> {
+        let mut bytes = self
+            .descriptor
+            .owned_resident_bytes()
+            .ok_or(ClipError::Overflow("tokenizer identity"))?;
+        for text in [&self.vocabulary_sha256, &self.merges_sha256, &self.digest] {
+            add_clip_resident_bytes(&mut bytes, text.capacity(), "tokenizer identity")?;
+        }
+        Ok(bytes)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -2127,6 +2176,57 @@ impl Sd1Tokenizer {
             byte_decoder,
             token_pattern,
         })
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, ClipError> {
+        let mut bytes = u64::try_from(std::mem::size_of::<Self>())
+            .map_err(|_| ClipError::Overflow("tokenizer resident bytes"))?;
+        for piece in self.vocabulary.keys() {
+            add_clip_resident_bytes(
+                &mut bytes,
+                std::mem::size_of::<(String, u32)>(),
+                "tokenizer vocabulary entry",
+            )?;
+            add_clip_resident_bytes(&mut bytes, piece.capacity(), "tokenizer vocabulary text")?;
+        }
+        for piece in self.inverse_vocabulary.values() {
+            add_clip_resident_bytes(
+                &mut bytes,
+                std::mem::size_of::<(u32, String)>(),
+                "inverse tokenizer vocabulary entry",
+            )?;
+            add_clip_resident_bytes(
+                &mut bytes,
+                piece.capacity(),
+                "inverse tokenizer vocabulary text",
+            )?;
+        }
+        for (left, right) in self.merge_ranks.keys() {
+            add_clip_resident_bytes(
+                &mut bytes,
+                std::mem::size_of::<((String, String), usize)>(),
+                "tokenizer merge entry",
+            )?;
+            add_clip_resident_bytes(&mut bytes, left.capacity(), "tokenizer merge text")?;
+            add_clip_resident_bytes(&mut bytes, right.capacity(), "tokenizer merge text")?;
+        }
+        add_clip_resident_bytes(
+            &mut bytes,
+            self.byte_encoder
+                .len()
+                .checked_mul(std::mem::size_of::<(u8, char)>())
+                .ok_or(ClipError::Overflow("tokenizer byte encoder"))?,
+            "tokenizer byte encoder",
+        )?;
+        add_clip_resident_bytes(
+            &mut bytes,
+            self.byte_decoder
+                .len()
+                .checked_mul(std::mem::size_of::<(char, u8)>())
+                .ok_or(ClipError::Overflow("tokenizer byte decoder"))?,
+            "tokenizer byte decoder",
+        )?;
+        Ok(bytes)
     }
 
     pub fn encode(
@@ -2445,6 +2545,11 @@ impl ClipBindingIdentity {
     pub fn as_str(&self) -> &str {
         &self.digest
     }
+
+    fn resident_owned_bytes(&self) -> Result<u64, ClipError> {
+        u64::try_from(self.digest.capacity())
+            .map_err(|_| ClipError::Overflow("CLIP binding identity"))
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -2641,6 +2746,30 @@ impl ClipExecutionPlan {
 
     pub const fn device(&self) -> DeviceId {
         self.device
+    }
+
+    fn resident_owned_bytes(&self) -> Result<u64, ClipError> {
+        let mut bytes = self.tokenizer_identity.resident_owned_bytes()?;
+        bytes = bytes
+            .checked_add(
+                self.target
+                    .owned_resident_bytes()
+                    .ok_or(ClipError::Overflow("CLIP target candidates"))?,
+            )
+            .ok_or(ClipError::Overflow("CLIP target candidates"))?;
+        for text in [&self.clip_model_identifier, &self.digest] {
+            add_clip_resident_bytes(&mut bytes, text.capacity(), "CLIP execution plan")?;
+        }
+        for identity in [
+            &self.artifact_identity,
+            &self.model_identity,
+            &self.patch_identity,
+        ] {
+            bytes = bytes
+                .checked_add(identity.resident_owned_bytes()?)
+                .ok_or(ClipError::Overflow("CLIP execution identity"))?;
+        }
+        Ok(bytes)
     }
 
     pub const fn context_length(&self) -> usize {
@@ -3120,6 +3249,59 @@ impl LoadedSd1Clip {
 
     pub fn plan(&self) -> &ClipExecutionPlan {
         self.binding.plan()
+    }
+
+    pub fn resident_storage_bytes(&self) -> Result<u64, ClipError> {
+        let mut storages = BTreeSet::new();
+        parameter_tensors(&self.encoder.parameters.tensors)
+            .into_iter()
+            .try_fold(0_u64, |total, tensor| {
+                if !storages.insert(tensor.storage_id().get()) {
+                    return Ok(total);
+                }
+                total
+                    .checked_add(tensor.storage_byte_len())
+                    .ok_or(ClipError::Overflow("CLIP resident storage bytes"))
+            })
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, ClipError> {
+        let mut bytes = u64::try_from(std::mem::size_of::<Self>())
+            .map_err(|_| ClipError::Overflow("CLIP resident object bytes"))?;
+        add_clip_resident_bytes(
+            &mut bytes,
+            self.binding.profile_identity.capacity(),
+            "CLIP profile identity",
+        )?;
+        bytes = bytes
+            .checked_add(self.binding.architecture.resident_owned_bytes()?)
+            .ok_or(ClipError::Overflow("CLIP architecture resident bytes"))?;
+        bytes = bytes
+            .checked_add(self.binding.plan.resident_owned_bytes()?)
+            .ok_or(ClipError::Overflow("CLIP plan resident bytes"))?;
+        for identity in [
+            &self.encoder.parameters.artifact_identity,
+            &self.encoder.parameters.model_identity,
+            &self.encoder.parameters.patch_identity,
+        ] {
+            bytes = bytes
+                .checked_add(identity.resident_owned_bytes()?)
+                .ok_or(ClipError::Overflow("CLIP parameter identity bytes"))?;
+        }
+        add_clip_resident_bytes(
+            &mut bytes,
+            self.encoder
+                .parameters
+                .tensors
+                .layers
+                .capacity()
+                .checked_mul(std::mem::size_of::<Sd1ClipLayerTensors>())
+                .ok_or(ClipError::Overflow("CLIP layer tensor handles"))?,
+            "CLIP layer tensor handles",
+        )?;
+        bytes
+            .checked_add(self.resident_storage_bytes()?)
+            .ok_or(ClipError::Overflow("CLIP resident total bytes"))
     }
 
     pub fn execute(
@@ -5178,6 +5360,7 @@ mod tests {
             tokenizer.identity().merges_sha256()
         );
         assert_eq!(tokenizer.identity().digest().len(), 64);
+        assert!(tokenizer.resident_bytes()? > u64::try_from(std::mem::size_of::<Sd1Tokenizer>())?);
 
         let mask = first.causal_attention_mask()?;
         assert!(!mask[1]);
@@ -5217,6 +5400,10 @@ mod tests {
             DeviceId::CPU,
         )?;
         assert_eq!(first.digest(), second.digest());
+        assert_eq!(
+            first.resident_owned_bytes()?,
+            second.resident_owned_bytes()?
+        );
         assert!(matches!(
             ClipExecutionPlan::checked_legacy(
                 target()?,

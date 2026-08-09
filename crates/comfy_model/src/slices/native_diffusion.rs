@@ -287,13 +287,10 @@ pub fn bind_sd15_empty_patch_execution(
 ) -> Result<(PatchGraph, String), NativeDiffusionModelError> {
     let patch_graph = PatchGraph::checked_semantic(artifact_digest, Vec::new())
         .map_err(|error| NativeDiffusionModelError::Patch(error.to_string()))?;
-    let mapped = MappedModelWeights::from_parts(
-        artifact_digest.to_owned(),
-        BTreeMap::new(),
-        Vec::new(),
-    )
-    .with_patch_graph_identity(&patch_graph.identity().ordered_digest)
-    .map_err(|error| NativeDiffusionModelError::Patch(error.to_string()))?;
+    let mapped =
+        MappedModelWeights::from_parts(artifact_digest.to_owned(), BTreeMap::new(), Vec::new())
+            .with_patch_graph_identity(&patch_graph.identity().ordered_digest)
+            .map_err(|error| NativeDiffusionModelError::Patch(error.to_string()))?;
     Ok((patch_graph, mapped.cache_identity().to_owned()))
 }
 
@@ -373,11 +370,9 @@ pub fn load_sd15_vae_execution(
         &SD15_LATENT_FORMAT,
         context,
     )
-    .map_err(|error| {
-        match image_vae_load_failure(&error) {
-            Some(class) => classified_load_error(error.to_string(), class),
-            None => NativeDiffusionModelError::Vae(error.to_string()),
-        }
+    .map_err(|error| match image_vae_load_failure(&error) {
+        Some(class) => classified_load_error(error.to_string(), class),
+        None => NativeDiffusionModelError::Vae(error.to_string()),
     })
 }
 
@@ -674,9 +669,7 @@ fn native_tensor_load_failure(error: &NativeDiffusionTensorError) -> Option<Load
     }
 }
 
-fn shape_layout_load_failure(
-    error: &ShapeLayoutTransformPartTwoError,
-) -> Option<LoadFailureClass> {
+fn shape_layout_load_failure(error: &ShapeLayoutTransformPartTwoError) -> Option<LoadFailureClass> {
     match error {
         ShapeLayoutTransformPartTwoError::Cancelled => Some(LoadFailureClass::Cancelled),
         ShapeLayoutTransformPartTwoError::Tensor(error) => tensor_load_failure(error),
@@ -760,10 +753,7 @@ fn patch_load_failure(error: &PatchGraphError) -> Option<LoadFailureClass> {
     }
 }
 
-fn classified_load_error(
-    message: String,
-    class: LoadFailureClass,
-) -> NativeDiffusionModelError {
+fn classified_load_error(message: String, class: LoadFailureClass) -> NativeDiffusionModelError {
     match class {
         LoadFailureClass::Cancelled => NativeDiffusionModelError::Cancelled,
         LoadFailureClass::ResourceExhausted => {
@@ -981,6 +971,63 @@ impl Sd15TinyModel {
 
     pub fn patch_execution_digest(&self) -> &str {
         &self.patch_execution_digest
+    }
+
+    pub fn resident_storage_bytes(&self) -> Result<u64, NativeDiffusionModelError> {
+        let mut storages = BTreeSet::new();
+        self.weights.values().try_fold(0_u64, |total, tensor| {
+            if !storages.insert(tensor.storage_id().get()) {
+                return Ok(total);
+            }
+            total
+                .checked_add(tensor.storage_byte_len())
+                .ok_or(NativeDiffusionModelError::Overflow(
+                    "resident model storage bytes",
+                ))
+        })
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, NativeDiffusionModelError> {
+        let mut bytes = u64::try_from(std::mem::size_of::<Self>())
+            .map_err(|_| NativeDiffusionModelError::Overflow("resident model object bytes"))?;
+        let entry_bytes = self
+            .weights
+            .len()
+            .checked_mul(std::mem::size_of::<(String, Tensor)>())
+            .ok_or(NativeDiffusionModelError::Overflow(
+                "resident model entry bytes",
+            ))?;
+        bytes =
+            bytes
+                .checked_add(u64::try_from(entry_bytes).map_err(|_| {
+                    NativeDiffusionModelError::Overflow("resident model entry bytes")
+                })?)
+                .ok_or(NativeDiffusionModelError::Overflow(
+                    "resident model entry bytes",
+                ))?;
+        for name in self.weights.keys() {
+            bytes =
+                bytes
+                    .checked_add(u64::try_from(name.capacity()).map_err(|_| {
+                        NativeDiffusionModelError::Overflow("resident model key bytes")
+                    })?)
+                    .ok_or(NativeDiffusionModelError::Overflow(
+                        "resident model key bytes",
+                    ))?;
+        }
+        bytes = bytes
+            .checked_add(self.patch_identity.owned_resident_bytes().ok_or(
+                NativeDiffusionModelError::Overflow("resident model identity bytes"),
+            )?)
+            .and_then(|bytes| {
+                bytes.checked_add(u64::try_from(self.patch_execution_digest.capacity()).ok()?)
+            })
+            .ok_or(NativeDiffusionModelError::Overflow(
+                "resident model identity bytes",
+            ))?;
+        bytes.checked_add(self.resident_storage_bytes()?).ok_or(
+            NativeDiffusionModelError::Overflow("resident model total bytes"),
+        )
     }
 
     pub fn backend(&self) -> &CpuBackend {
@@ -1672,9 +1719,9 @@ mod tests {
             Some(LoadFailureClass::Cancelled)
         ));
         assert!(matches!(
-            image_vae_load_failure(&ImageVaeError::NativeModule(
-                NativeOpsError::Quantization(QuantizationError::Cancelled),
-            )),
+            image_vae_load_failure(&ImageVaeError::NativeModule(NativeOpsError::Quantization(
+                QuantizationError::Cancelled
+            ),)),
             Some(LoadFailureClass::Cancelled)
         ));
         assert!(matches!(

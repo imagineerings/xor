@@ -7,6 +7,7 @@ use comfy_tensor::{
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
+use std::mem;
 use thiserror::Error;
 
 pub const PATCH_GRAPH_SCHEMA_VERSION: u16 = 2;
@@ -335,6 +336,14 @@ pub struct PatchGraphIdentity {
 }
 
 impl PatchGraphIdentity {
+    pub fn owned_resident_bytes(&self) -> Option<u64> {
+        let bytes = self
+            .base_artifact_digest
+            .capacity()
+            .checked_add(self.ordered_digest.capacity())?;
+        u64::try_from(bytes).ok()
+    }
+
     pub fn validate_for_base(
         &self,
         expected_base_artifact_digest: &str,
@@ -407,6 +416,41 @@ impl PatchGraph {
 
     pub fn semantic_operations(&self) -> &[SemanticPatchOperation] {
         &self.semantic_operations
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, PatchGraphError> {
+        let mut bytes = resident_allocation(mem::size_of::<Self>())?;
+        add_resident_bytes(&mut bytes, self.base_artifact_digest.capacity())?;
+        add_resident_bytes(&mut bytes, self.ordered_digest.capacity())?;
+        add_resident_bytes(
+            &mut bytes,
+            self.semantic_operations
+                .capacity()
+                .checked_mul(mem::size_of::<SemanticPatchOperation>())
+                .ok_or(PatchGraphError::ResidentBytesOverflow)?,
+        )?;
+        for operation in &self.semantic_operations {
+            add_resident_bytes(&mut bytes, operation.identifier.capacity())?;
+            add_resident_bytes(&mut bytes, operation.target_key.capacity())?;
+            add_resident_bytes(
+                &mut bytes,
+                operation
+                    .expected_shape
+                    .capacity()
+                    .checked_mul(mem::size_of::<u64>())
+                    .ok_or(PatchGraphError::ResidentBytesOverflow)?,
+            )?;
+            add_resident_bytes(
+                &mut bytes,
+                operation
+                    .slices
+                    .capacity()
+                    .checked_mul(mem::size_of::<PatchSlice>())
+                    .ok_or(PatchGraphError::ResidentBytesOverflow)?,
+            )?;
+            patch_payload_resident_bytes(&operation.payload, &mut bytes, 0)?;
+        }
+        Ok(bytes)
     }
 
     pub fn append_semantic(
@@ -562,6 +606,182 @@ impl PatchGraph {
             .cloned()
             .ok_or_else(|| PatchGraphError::MissingTarget(target_key.to_owned()))
     }
+}
+
+fn resident_allocation(bytes: usize) -> Result<u64, PatchGraphError> {
+    u64::try_from(bytes).map_err(|_| PatchGraphError::ResidentBytesOverflow)
+}
+
+fn add_resident_bytes(total: &mut u64, bytes: usize) -> Result<(), PatchGraphError> {
+    *total = total
+        .checked_add(resident_allocation(bytes)?)
+        .ok_or(PatchGraphError::ResidentBytesOverflow)?;
+    Ok(())
+}
+
+fn patch_tensor_resident_bytes(
+    tensor: &PatchTensor,
+    total: &mut u64,
+) -> Result<(), PatchGraphError> {
+    add_resident_bytes(
+        total,
+        tensor
+            .shape
+            .capacity()
+            .checked_mul(mem::size_of::<u64>())
+            .ok_or(PatchGraphError::ResidentBytesOverflow)?,
+    )?;
+    add_resident_bytes(
+        total,
+        tensor
+            .values
+            .capacity()
+            .checked_mul(mem::size_of::<f32>())
+            .ok_or(PatchGraphError::ResidentBytesOverflow)?,
+    )
+}
+
+fn optional_patch_tensor_resident_bytes(
+    tensor: Option<&PatchTensor>,
+    total: &mut u64,
+) -> Result<(), PatchGraphError> {
+    if let Some(tensor) = tensor {
+        patch_tensor_resident_bytes(tensor, total)?;
+    }
+    Ok(())
+}
+
+fn patch_payload_resident_bytes(
+    payload: &PatchPayload,
+    total: &mut u64,
+    depth: usize,
+) -> Result<(), PatchGraphError> {
+    if depth > MAX_SEMANTIC_PATCH_DEPTH {
+        return Err(PatchGraphError::NestingDepth);
+    }
+    match payload {
+        PatchPayload::DenseDiff { tensor, .. }
+        | PatchPayload::Set { tensor }
+        | PatchPayload::ModelAsLora { target: tensor } => {
+            patch_tensor_resident_bytes(tensor, total)?;
+        }
+        PatchPayload::Lora {
+            up,
+            down,
+            mid,
+            dora_scale,
+            reshape,
+            ..
+        } => {
+            patch_tensor_resident_bytes(up, total)?;
+            patch_tensor_resident_bytes(down, total)?;
+            optional_patch_tensor_resident_bytes(mid.as_ref(), total)?;
+            optional_patch_tensor_resident_bytes(dora_scale.as_ref(), total)?;
+            if let Some(reshape) = reshape {
+                add_resident_bytes(
+                    total,
+                    reshape
+                        .capacity()
+                        .checked_mul(mem::size_of::<u64>())
+                        .ok_or(PatchGraphError::ResidentBytesOverflow)?,
+                )?;
+            }
+        }
+        PatchPayload::Loha {
+            first_up,
+            first_down,
+            second_up,
+            second_down,
+            first_tucker,
+            second_tucker,
+            dora_scale,
+            ..
+        } => {
+            for tensor in [first_up, first_down, second_up, second_down] {
+                patch_tensor_resident_bytes(tensor, total)?;
+            }
+            for tensor in [
+                first_tucker.as_ref(),
+                second_tucker.as_ref(),
+                dora_scale.as_ref(),
+            ] {
+                optional_patch_tensor_resident_bytes(tensor, total)?;
+            }
+        }
+        PatchPayload::Lokr {
+            first,
+            second,
+            first_up,
+            first_down,
+            second_up,
+            second_down,
+            second_tucker,
+            dora_scale,
+            ..
+        } => {
+            for tensor in [
+                first.as_ref(),
+                second.as_ref(),
+                first_up.as_ref(),
+                first_down.as_ref(),
+                second_up.as_ref(),
+                second_down.as_ref(),
+                second_tucker.as_ref(),
+                dora_scale.as_ref(),
+            ] {
+                optional_patch_tensor_resident_bytes(tensor, total)?;
+            }
+        }
+        PatchPayload::Oft {
+            blocks,
+            rescale,
+            dora_scale,
+            ..
+        }
+        | PatchPayload::Boft {
+            blocks,
+            rescale,
+            dora_scale,
+            ..
+        } => {
+            patch_tensor_resident_bytes(blocks, total)?;
+            optional_patch_tensor_resident_bytes(rescale.as_ref(), total)?;
+            optional_patch_tensor_resident_bytes(dora_scale.as_ref(), total)?;
+        }
+        PatchPayload::Glora {
+            first_a,
+            second_a,
+            first_b,
+            second_b,
+            dora_scale,
+            ..
+        } => {
+            for tensor in [first_a, second_a, first_b, second_b] {
+                patch_tensor_resident_bytes(tensor, total)?;
+            }
+            optional_patch_tensor_resident_bytes(dora_scale.as_ref(), total)?;
+        }
+        PatchPayload::Dora {
+            difference, scale, ..
+        } => {
+            patch_tensor_resident_bytes(difference, total)?;
+            patch_tensor_resident_bytes(scale, total)?;
+        }
+        PatchPayload::Nested { base, patches, .. } => {
+            patch_tensor_resident_bytes(base, total)?;
+            add_resident_bytes(
+                total,
+                patches
+                    .capacity()
+                    .checked_mul(mem::size_of::<NestedPatch>())
+                    .ok_or(PatchGraphError::ResidentBytesOverflow)?,
+            )?;
+            for patch in patches {
+                patch_payload_resident_bytes(&patch.payload, total, depth + 1)?;
+            }
+        }
+    }
+    Ok(())
 }
 
 fn apply_semantic_operation(
@@ -2906,6 +3126,8 @@ pub enum PatchGraphError {
     },
     #[error("patch shape arithmetic overflowed")]
     ShapeOverflow,
+    #[error("patch graph resident byte accounting overflowed")]
+    ResidentBytesOverflow,
     #[error("patch operation {operation} kind {kind:?} cannot use {application:?}")]
     KindApplication {
         operation: String,
@@ -4414,6 +4636,37 @@ mod tests {
                 ..
             })
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn patch_graph_resident_bytes_track_owned_payload_without_changing_identity()
+    -> Result<(), PatchGraphError> {
+        let first = PatchGraph::checked_semantic(
+            BASE_DIGEST,
+            vec![operation(
+                "resident",
+                &[2],
+                PatchPayload::Set {
+                    tensor: tensor(&[2], &[1.0, 2.0]),
+                },
+            )],
+        )?;
+        let equivalent = first.clone();
+        let larger = PatchGraph::checked_semantic(
+            BASE_DIGEST,
+            vec![operation(
+                "resident",
+                &[4],
+                PatchPayload::Set {
+                    tensor: tensor(&[4], &[1.0, 2.0, 3.0, 4.0]),
+                },
+            )],
+        )?;
+        assert_eq!(first.identity(), equivalent.identity());
+        assert_eq!(first.resident_bytes()?, equivalent.resident_bytes()?);
+        assert!(larger.resident_bytes()? > first.resident_bytes()?);
+        assert_ne!(larger.identity(), first.identity());
         Ok(())
     }
 

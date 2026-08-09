@@ -13,7 +13,10 @@ use comfy_tensor::{
     },
 };
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    mem,
+};
 use thiserror::Error;
 
 pub const CONTROLNET_SCHEMA_VERSION: u16 = 1;
@@ -510,6 +513,23 @@ impl ControlChain {
         &self.identity
     }
 
+    pub fn resident_bytes(&self) -> Result<u64, ControlNetError> {
+        let mut bytes = resident_allocation(mem::size_of::<Self>())?;
+        add_resident_bytes(
+            &mut bytes,
+            self.nodes
+                .capacity()
+                .checked_mul(mem::size_of::<ControlNode>())
+                .ok_or(ControlNetError::ResidentBytesOverflow)?,
+        )?;
+        add_resident_bytes(&mut bytes, self.identity.0.capacity())?;
+        let mut storage_ids = HashSet::new();
+        for node in &self.nodes {
+            control_node_resident_bytes(node, &mut storage_ids, &mut bytes)?;
+        }
+        Ok(bytes)
+    }
+
     pub fn require_executor_digest(&self, digest: &str) -> Result<(), ControlNetError> {
         validate_sha256("control executor implementation", digest)?;
         for node in &self.nodes {
@@ -582,6 +602,112 @@ impl ControlChain {
         );
         hash_u64(&mut hasher, conditioning.batched_number);
         Ok(ControlExecutionIdentity(format!("{:x}", hasher.finalize())))
+    }
+}
+
+fn resident_allocation(bytes: usize) -> Result<u64, ControlNetError> {
+    u64::try_from(bytes).map_err(|_| ControlNetError::ResidentBytesOverflow)
+}
+
+fn add_resident_bytes(total: &mut u64, bytes: usize) -> Result<(), ControlNetError> {
+    *total = total
+        .checked_add(resident_allocation(bytes)?)
+        .ok_or(ControlNetError::ResidentBytesOverflow)?;
+    Ok(())
+}
+
+fn add_tensor_binding_resident_bytes(
+    binding: &ControlTensorBinding,
+    storage_ids: &mut HashSet<comfy_tensor::StorageId>,
+    total: &mut u64,
+) -> Result<(), ControlNetError> {
+    add_resident_bytes(total, binding.content_sha256.capacity())?;
+    if storage_ids.insert(binding.tensor.storage_id()) {
+        *total = total
+            .checked_add(binding.tensor.storage_byte_len())
+            .ok_or(ControlNetError::ResidentBytesOverflow)?;
+    }
+    Ok(())
+}
+
+fn add_patch_identity_resident_bytes(
+    identity: &PatchGraphIdentity,
+    total: &mut u64,
+) -> Result<(), ControlNetError> {
+    add_resident_bytes(total, identity.base_artifact_digest.capacity())?;
+    add_resident_bytes(total, identity.ordered_digest.capacity())
+}
+
+fn add_model_binding_resident_bytes(
+    binding: &ControlModelBinding,
+    total: &mut u64,
+) -> Result<(), ControlNetError> {
+    *total = total
+        .checked_add(
+            binding
+                .model_family
+                .owned_resident_bytes()
+                .ok_or(ControlNetError::ResidentBytesOverflow)?,
+        )
+        .ok_or(ControlNetError::ResidentBytesOverflow)?;
+    add_patch_identity_resident_bytes(&binding.patch, total)?;
+    add_resident_bytes(total, binding.model_state_sha256.capacity())?;
+    add_resident_bytes(total, binding.executor_sha256.capacity())
+}
+
+fn control_net_resident_bytes(
+    control: &ControlNet,
+    storage_ids: &mut HashSet<comfy_tensor::StorageId>,
+    total: &mut u64,
+) -> Result<(), ControlNetError> {
+    add_model_binding_resident_bytes(&control.model, total)?;
+    add_tensor_binding_resident_bytes(&control.hint, storage_ids, total)?;
+    if let Some(digest) = &control.expected_vae_sha256 {
+        add_resident_bytes(total, digest.capacity())?;
+    }
+    add_resident_bytes(
+        total,
+        control
+            .extra_concat
+            .capacity()
+            .checked_mul(mem::size_of::<ControlTensorBinding>())
+            .ok_or(ControlNetError::ResidentBytesOverflow)?,
+    )?;
+    for binding in &control.extra_concat {
+        add_tensor_binding_resident_bytes(binding, storage_ids, total)?;
+    }
+    add_resident_bytes(
+        total,
+        control
+            .extra_conditioning_names
+            .capacity()
+            .checked_mul(mem::size_of::<String>())
+            .ok_or(ControlNetError::ResidentBytesOverflow)?,
+    )?;
+    for name in &control.extra_conditioning_names {
+        add_resident_bytes(total, name.capacity())?;
+    }
+    Ok(())
+}
+
+fn control_node_resident_bytes(
+    node: &ControlNode,
+    storage_ids: &mut HashSet<comfy_tensor::StorageId>,
+    total: &mut u64,
+) -> Result<(), ControlNetError> {
+    match node {
+        ControlNode::ControlNet(control) => control_net_resident_bytes(control, storage_ids, total),
+        ControlNode::ControlLora(control) => {
+            control_net_resident_bytes(&control.control, storage_ids, total)?;
+            add_patch_identity_resident_bytes(&control.operations.patch, total)
+        }
+        ControlNode::ControlNetSD35(control) => {
+            control_net_resident_bytes(&control.control, storage_ids, total)
+        }
+        ControlNode::T2IAdapter(adapter) => {
+            add_model_binding_resident_bytes(&adapter.model, total)?;
+            add_tensor_binding_resident_bytes(&adapter.hint, storage_ids, total)
+        }
     }
 }
 
@@ -713,6 +839,8 @@ impl ControlResult {
 pub trait ControlModelExecutor: Send + Sync {
     fn execution_digest(&self) -> &str;
 
+    fn resident_bytes(&self) -> Result<u64, ControlNetError>;
+
     fn execute_controlnet(
         &self,
         binding: &ControlModelBinding,
@@ -734,6 +862,8 @@ pub enum ControlNetError {
     Cancelled,
     #[error("invalid control graph: {0}")]
     Invalid(String),
+    #[error("control graph resident byte accounting overflowed")]
+    ResidentBytesOverflow,
     #[error(transparent)]
     Tensor(TensorError),
     #[error("canonical tensor operation failed: {0}")]
@@ -1839,6 +1969,41 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn control_chain_resident_bytes_deduplicate_aliased_tensor_storage()
+    -> Result<(), Box<dyn Error>> {
+        let cancellation = CancellationToken::default();
+        let (backend, _authority, context) = backend_and_context(&cancellation, MEMORY_BYTES)?;
+        let shared = tensor(&backend, &[1, 1, 2, 2], &[1.0, 2.0, 3.0, 4.0], &context)?;
+        let distinct = tensor(&backend, &[1, 1, 2, 2], &[1.0, 2.0, 3.0, 4.0], &context)?;
+        let control = |extra: Tensor| -> Result<ControlNet, Box<dyn Error>> {
+            Ok(ControlNet::checked(
+                base(1.0, StrengthType::Constant, false, None)?,
+                model_binding()?,
+                binding(shared.clone(), 'a')?,
+                1,
+                ResizeMode::NearestExact,
+                ControlHintPreprocess::Identity,
+                None,
+                vec![binding(extra, 'b')?],
+                false,
+                vec!["y".into()],
+            )?)
+        };
+        let aliased =
+            ControlChain::checked(vec![ControlNode::ControlNet(control(shared.clone())?)])?;
+        let independent = ControlChain::checked(vec![ControlNode::ControlNet(control(distinct)?)])?;
+        assert_eq!(aliased.identity(), independent.identity());
+        assert_eq!(
+            independent.resident_bytes()?,
+            aliased
+                .resident_bytes()?
+                .checked_add(shared.storage_byte_len())
+                .ok_or("resident byte comparison overflow")?
+        );
+        Ok(())
+    }
+
     fn conditioning(
         noisy: ControlTensorBinding,
         timestep: ControlTensorBinding,
@@ -1867,6 +2032,11 @@ mod tests {
     impl ControlModelExecutor for RecordingExecutor {
         fn execution_digest(&self) -> &str {
             "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        }
+
+        fn resident_bytes(&self) -> Result<u64, ControlNetError> {
+            u64::try_from(mem::size_of::<Self>())
+                .map_err(|_| ControlNetError::ResidentBytesOverflow)
         }
 
         fn execute_controlnet(

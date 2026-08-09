@@ -111,6 +111,21 @@ const PROFILE_F16_F32_DTYPES: &[DType] = &[DType::F16, DType::F32];
 const PROFILE_F32_ONLY: &[DType] = &[DType::F32];
 
 impl VaeKernelProfile {
+    fn owned_resident_bytes(&self) -> Option<u64> {
+        match self {
+            Self::LtxVideoV0 {
+                configuration_sha256,
+            }
+            | Self::LtxVideoV1 {
+                configuration_sha256,
+            }
+            | Self::LtxVideoV2 {
+                configuration_sha256,
+            } => u64::try_from(configuration_sha256.as_ref().map_or(0, String::capacity)).ok(),
+            _ => Some(0),
+        }
+    }
+
     pub const fn is_conformance_only(&self) -> bool {
         match self {
             Self::BlockAverageNearestV1 => true,
@@ -373,6 +388,10 @@ impl VaeArchitectureIdentity {
 
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+
+    fn owned_resident_bytes(&self) -> Option<u64> {
+        u64::try_from(self.0.capacity()).ok()
     }
 }
 
@@ -879,6 +898,26 @@ impl VaeIdentity {
         &self.digest
     }
 
+    fn owned_resident_bytes(&self) -> Option<u64> {
+        let strings = [
+            &self.artifact_root_id,
+            &self.artifact_relative_path,
+            &self.artifact_sha256,
+            &self.digest,
+        ]
+        .into_iter()
+        .try_fold(0_u64, |total, value| {
+            total.checked_add(u64::try_from(value.capacity()).ok()?)
+        })?;
+        strings
+            .checked_add(self.family.owned_resident_bytes()?)?
+            .checked_add(self.latent_format.owned_resident_bytes()?)?
+            .checked_add(self.architecture.owned_resident_bytes()?)?
+            .checked_add(self.patch.owned_resident_bytes()?)?
+            .checked_add(self.profile.owned_resident_bytes()?)?
+            .checked_add(self.loader_configuration.owned_resident_bytes()?)
+    }
+
     fn compute_digest(&self) -> Result<String, VaeError> {
         let mut hasher = Sha256::new();
         hash_field(&mut hasher, &VAE_SCHEMA_VERSION.to_le_bytes());
@@ -1006,6 +1045,12 @@ pub struct VaeDescriptor {
 }
 
 impl VaeDescriptor {
+    fn owned_resident_bytes(&self) -> Option<u64> {
+        self.identity
+            .owned_resident_bytes()?
+            .checked_add(self.latent_format.owned_resident_bytes()?)
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn checked_selection(
         artifact: &ArtifactRecord,
@@ -1240,6 +1285,12 @@ impl VaeModelBinding {
     pub(crate) fn digest(&self) -> &str {
         &self.digest
     }
+
+    fn owned_resident_bytes(&self) -> Option<u64> {
+        self.identity
+            .owned_resident_bytes()?
+            .checked_add(u64::try_from(self.digest.capacity()).ok()?)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -1256,6 +1307,14 @@ struct VaeSpatialGeometry {
 }
 
 impl VaeSpatialGeometry {
+    fn owned_resident_bytes(&self) -> Option<u64> {
+        self.encode
+            .capacity()
+            .checked_add(self.decode.capacity())?
+            .checked_mul(std::mem::size_of::<VaeTileAxisFormula>())
+            .and_then(|bytes| u64::try_from(bytes).ok())
+    }
+
     fn checked(
         profile: &VaeKernelProfile,
         loader_configuration: &VaeLoaderConfiguration,
@@ -1498,6 +1557,33 @@ impl Sd15LearnedVaeKernel {
         &self.state_digest
     }
 
+    fn resident_storage_bytes(&self) -> Result<u64, VaeError> {
+        let mut storages = BTreeSet::new();
+        self.weights.values().try_fold(0_u64, |total, tensor| {
+            if !storages.insert(tensor.storage_id().get()) {
+                return Ok(total);
+            }
+            total
+                .checked_add(tensor.storage_byte_len())
+                .ok_or_else(|| VaeError::Allocation("resident storage byte overflow".to_owned()))
+        })
+    }
+
+    fn owned_resident_bytes(&self) -> Option<u64> {
+        let entries = self
+            .weights
+            .len()
+            .checked_mul(std::mem::size_of::<(String, Tensor)>())?;
+        let bytes = u64::try_from(std::mem::size_of::<Self>())
+            .ok()?
+            .checked_add(self.identity.owned_resident_bytes()?)?
+            .checked_add(u64::try_from(self.state_digest.capacity()).ok()?)?
+            .checked_add(u64::try_from(entries).ok()?)?;
+        self.weights.keys().try_fold(bytes, |total, name| {
+            total.checked_add(u64::try_from(name.capacity()).ok()?)
+        })
+    }
+
     fn weight(&self, key: &str) -> Result<&Tensor, VaeError> {
         self.weights
             .get(key)
@@ -1733,6 +1819,10 @@ impl VaeKernelFunctions {
             encode_raw,
             decode_raw,
         }
+    }
+
+    fn owned_resident_bytes(&self) -> Option<u64> {
+        self.architecture.owned_resident_bytes()
     }
 
     fn encode(
@@ -2126,6 +2216,56 @@ impl NativeVae {
             }
         }
         format!("{:x}", hasher.finalize())
+    }
+
+    pub fn resident_storage_bytes(&self) -> Result<u64, VaeError> {
+        match &self.kernel {
+            #[cfg(test)]
+            NativeVaeKernel::BlockAverageNearest => Ok(0),
+            #[cfg(test)]
+            NativeVaeKernel::Sd15Reduced(kernel) => kernel.resident_storage_bytes(),
+            NativeVaeKernel::Native { binding, .. } => binding
+                .module()
+                .resident_storage_bytes()
+                .map_err(Into::into),
+        }
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, VaeError> {
+        let object = u64::try_from(std::mem::size_of::<Self>())
+            .map_err(|_| VaeError::Allocation("VAE resident object byte overflow".to_owned()))?;
+        let descriptor = self.descriptor.owned_resident_bytes().ok_or_else(|| {
+            VaeError::Allocation("VAE descriptor resident byte overflow".to_owned())
+        })?;
+        let geometry = self
+            .spatial_geometry
+            .owned_resident_bytes()
+            .ok_or_else(|| {
+                VaeError::Allocation("VAE geometry resident byte overflow".to_owned())
+            })?;
+        let kernel = match &self.kernel {
+            #[cfg(test)]
+            NativeVaeKernel::BlockAverageNearest => 0,
+            #[cfg(test)]
+            NativeVaeKernel::Sd15Reduced(kernel) => {
+                kernel.owned_resident_bytes().ok_or_else(|| {
+                    VaeError::Allocation("VAE reduced kernel resident byte overflow".to_owned())
+                })?
+            }
+            NativeVaeKernel::Native { binding, functions } => binding
+                .owned_resident_bytes()
+                .and_then(|bytes| bytes.checked_add(functions.owned_resident_bytes()?))
+                .ok_or_else(|| {
+                    VaeError::Allocation("VAE native kernel resident byte overflow".to_owned())
+                })?,
+        };
+        let storage = self.resident_storage_bytes()?;
+        object
+            .checked_add(descriptor)
+            .and_then(|bytes| bytes.checked_add(geometry))
+            .and_then(|bytes| bytes.checked_add(kernel))
+            .and_then(|bytes| bytes.checked_add(storage))
+            .ok_or_else(|| VaeError::Allocation("VAE resident total byte overflow".to_owned()))
     }
 
     pub fn encode<B>(
@@ -5555,6 +5695,9 @@ mod tests {
         let first = learned_vae(&backend, &context, 1, &digest)?;
         let second = learned_vae(&backend, &context, 2, &digest)?;
         assert_ne!(first.execution_digest(), second.execution_digest());
+        assert_eq!(first.resident_bytes()?, second.resident_bytes()?);
+        assert!(first.resident_storage_bytes()? > 0);
+        assert!(first.resident_bytes()? > first.resident_storage_bytes()?);
         let pixels = upload(&backend, vec![1, 3, 16, 16], &[0.25; 3 * 16 * 16], &context)?;
         let first_plan = first.plan_encode_tiles(&pixels, vec![2, 2], vec![0, 0])?;
         assert!(matches!(

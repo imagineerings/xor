@@ -9,8 +9,8 @@ pub use comfy_tensor::generated_neural_network_module_01::{LossReduction, Upsamp
 use comfy_tensor::{
     BackendCapabilityMatrix, BinaryOperation, CancellationToken, CpuBackend, CpuWorkspaceVec,
     DType, DecodedScalar, DeviceId, ExecutionContext, Layout, LinearAlgebraOperation,
-    OperationSupport, ReductionOperation, ResizeMode, StreamId, Tensor, TensorBackend, TensorError,
-    UnaryOperation,
+    OperationSupport, ReductionOperation, ResizeMode, StorageId, StreamId, Tensor, TensorBackend,
+    TensorError, UnaryOperation,
     generated_activation_normalization_functional_01::{
         FunctionalError, group_norm_with_context_exact_native, layer_norm_with_context_exact_native,
     },
@@ -53,7 +53,7 @@ use comfy_tensor::{
 };
 use comfy_types::DeviceKind;
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use thiserror::Error;
 
 #[derive(Clone, Debug, Error, PartialEq)]
@@ -80,6 +80,8 @@ pub enum NativeOpsError {
     LeaseAlreadyCompleted { generation: u64 },
     #[error("native module generation overflowed")]
     GenerationOverflow,
+    #[error("native module resident byte accounting overflowed")]
+    ResidentBytesOverflow,
     #[error("native module operation is unavailable on device {device:?}")]
     UnsupportedDevice { device: DeviceId },
     #[error(
@@ -340,6 +342,49 @@ struct PrefetchedParameters {
     bias_dtype: DType,
     device: DeviceId,
     next_weight: Option<NativeWeight>,
+}
+
+fn tensor_resident_bytes(tensor: &Tensor, storages: &mut HashSet<StorageId>) -> u64 {
+    if storages.insert(tensor.storage_id()) {
+        tensor.storage_byte_len()
+    } else {
+        0
+    }
+}
+
+fn quantized_resident_bytes(matrix: &QuantizedMatrix) -> Result<u64, NativeOpsError> {
+    matrix
+        .resident_storage_bytes()
+        .map_err(|_| NativeOpsError::ResidentBytesOverflow)
+}
+
+fn native_weight_resident_bytes(
+    weight: &NativeWeight,
+    tensor_storages: &mut HashSet<StorageId>,
+) -> Result<u64, NativeOpsError> {
+    match weight {
+        NativeWeight::Dense(tensor) => Ok(tensor_resident_bytes(tensor, tensor_storages)),
+        NativeWeight::Quantized(matrix) => quantized_resident_bytes(matrix),
+        NativeWeight::WeightNorm(weight) => {
+            tensor_resident_bytes(&weight.magnitude, tensor_storages)
+                .checked_add(tensor_resident_bytes(&weight.direction, tensor_storages))
+                .ok_or(NativeOpsError::ResidentBytesOverflow)
+        }
+        NativeWeight::SpectralNorm(weight) => {
+            let vectors = weight
+                .left
+                .as_ref()
+                .map_or(0, Vec::capacity)
+                .checked_add(weight.right.as_ref().map_or(0, Vec::capacity))
+                .and_then(|values| values.checked_mul(std::mem::size_of::<f32>()))
+                .ok_or(NativeOpsError::ResidentBytesOverflow)?;
+            tensor_resident_bytes(&weight.original, tensor_storages)
+                .checked_add(
+                    u64::try_from(vectors).map_err(|_| NativeOpsError::ResidentBytesOverflow)?,
+                )
+                .ok_or(NativeOpsError::ResidentBytesOverflow)
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -1424,6 +1469,72 @@ impl NativeModule {
             || self.registered_buffer.is_some()
             || self.normalization_state.is_some()
             || self.children.iter().any(Self::has_execution_state)
+    }
+
+    pub fn resident_storage_bytes(&self) -> Result<u64, NativeOpsError> {
+        let mut tensor_storages = HashSet::new();
+        self.collect_resident_storage_bytes(&mut tensor_storages)
+    }
+
+    fn collect_resident_storage_bytes(
+        &self,
+        tensor_storages: &mut HashSet<StorageId>,
+    ) -> Result<u64, NativeOpsError> {
+        let mut total = 0_u64;
+        if let Some(weight) = &self.weight {
+            total = total
+                .checked_add(native_weight_resident_bytes(weight, tensor_storages)?)
+                .ok_or(NativeOpsError::ResidentBytesOverflow)?;
+        }
+        if let Some(bias) = &self.bias {
+            total = total
+                .checked_add(tensor_resident_bytes(bias, tensor_storages))
+                .ok_or(NativeOpsError::ResidentBytesOverflow)?;
+        }
+        if let Some(buffer) = &self.registered_buffer {
+            total = total
+                .checked_add(tensor_resident_bytes(buffer, tensor_storages))
+                .ok_or(NativeOpsError::ResidentBytesOverflow)?;
+        }
+        if let Some(prefetched) = &self.prefetched {
+            total = total
+                .checked_add(tensor_resident_bytes(&prefetched.weight, tensor_storages))
+                .ok_or(NativeOpsError::ResidentBytesOverflow)?;
+            if let Some(bias) = &prefetched.bias {
+                total = total
+                    .checked_add(tensor_resident_bytes(bias, tensor_storages))
+                    .ok_or(NativeOpsError::ResidentBytesOverflow)?;
+            }
+            if let Some(weight) = &prefetched.requantized_weight {
+                total = total
+                    .checked_add(quantized_resident_bytes(weight)?)
+                    .ok_or(NativeOpsError::ResidentBytesOverflow)?;
+            }
+            if let Some(weight) = &prefetched.next_weight {
+                total = total
+                    .checked_add(native_weight_resident_bytes(weight, tensor_storages)?)
+                    .ok_or(NativeOpsError::ResidentBytesOverflow)?;
+            }
+        }
+        if let Some(normalization) = &self.normalization_state {
+            let values = normalization
+                .running_mean
+                .capacity()
+                .checked_add(normalization.running_variance.capacity())
+                .and_then(|values| values.checked_mul(std::mem::size_of::<f32>()))
+                .ok_or(NativeOpsError::ResidentBytesOverflow)?;
+            total = total
+                .checked_add(
+                    u64::try_from(values).map_err(|_| NativeOpsError::ResidentBytesOverflow)?,
+                )
+                .ok_or(NativeOpsError::ResidentBytesOverflow)?;
+        }
+        for child in &self.children {
+            total = total
+                .checked_add(child.collect_resident_storage_bytes(tensor_storages)?)
+                .ok_or(NativeOpsError::ResidentBytesOverflow)?;
+        }
+        Ok(total)
     }
 
     pub fn execution_requirements(&self, dtype: DType) -> NativeExecutionRequirements {
@@ -4525,6 +4636,37 @@ mod tests {
         assert_ne!(digest, state_digest(&changed_weight)?);
         assert_ne!(digest, state_digest(&changed_bias)?);
         assert_ne!(digest, state_digest(&changed_config)?);
+        Ok(())
+    }
+
+    #[test]
+    fn resident_storage_bytes_count_shared_tensor_backing_once() -> Result<(), NativeOpsError> {
+        let test_backend = backend()?;
+        let shared = tensor(&test_backend, &[2], &[1.0, 2.0])?;
+        let independent = tensor(&test_backend, &[2], &[1.0, 2.0])?;
+        let aliased = NativeModule::sequential(
+            "root",
+            vec![
+                NativeModule::buffer("first", shared.clone())?,
+                NativeModule::buffer("second", shared.clone())?,
+            ],
+        )?;
+        let distinct = NativeModule::sequential(
+            "root",
+            vec![
+                NativeModule::buffer("first", shared.clone())?,
+                NativeModule::buffer("second", independent)?,
+            ],
+        )?;
+        assert_eq!(aliased.resident_storage_bytes()?, shared.storage_byte_len());
+        assert_eq!(
+            distinct.resident_storage_bytes()?,
+            shared
+                .storage_byte_len()
+                .checked_mul(2)
+                .ok_or(NativeOpsError::ResidentBytesOverflow)?
+        );
+        assert_eq!(state_digest(&aliased)?, state_digest(&distinct)?);
         Ok(())
     }
 
