@@ -8,9 +8,9 @@ use std::{
 
 use comfy_runtime::{
     AttemptEvent, AttemptEventKind, AttemptState, ExecutionEventBus, NativeDiffusionProvider,
-    NativeImageExecutor, NativeImageRuntimeError, NativeImageWorkerEvent, NativeImageWorkerPlan,
-    NativeImageWorkerProgress, NativeImageWorkerProgressKind, PluginAuthorizationVerifier,
-    WorkerBackendSelection,
+    InputBinding, NativeImageExecutor, NativeImageRuntimeError, NativeImageWorkerEvent,
+    NativeImageWorkerPlan, NativeImageWorkerProgress, NativeImageWorkerProgressKind, NativeValue,
+    PluginAuthorizationVerifier, WorkerBackendSelection,
 };
 use comfy_tensor::{CancellationToken, CpuBackend, DeviceId};
 use comfy_types::{
@@ -700,6 +700,7 @@ async fn run_worker_process_with_configuration(
                                         anyhow::anyhow!("invalid native image worker plan: {error}")
                                     })?;
                                 worker_plan.validate()?;
+                                validate_worker_plan_has_no_serialized_handles(&worker_plan)?;
                                 if let Some(unavailable) =
                                     backend_neutral_executor_unavailable(session.backend_device())
                                 {
@@ -726,23 +727,13 @@ async fn run_worker_process_with_configuration(
                                             continue 'worker;
                                         }
                                     };
-                                let requires_diffusion =
-                                    worker_plan.plan.nodes.values().any(|node| {
-                                        matches!(
-                                            node.class_type.as_str(),
-                                            "CheckpointLoaderSimple"
-                                                | "CLIPTextEncode"
-                                                | "EmptyLatentImage"
-                                                | "KSampler"
-                                                | "VAEDecode"
-                                        )
-                                    });
+                                let diffusion_enabled = diffusion_provider.is_some();
                                 let reuse_executor =
                                     native_image_executor.as_ref().is_some_and(|executor| {
                                         executor.profile_id() == envelope.profile_id
                                             && executor.metadata_enabled()
                                                 == worker_plan.metadata_enabled
-                                            && executor.diffusion_enabled() == requires_diffusion
+                                            && executor.diffusion_enabled() == diffusion_enabled
                                     });
                                 let executor_update = if reuse_executor {
                                     native_image_executor
@@ -758,17 +749,9 @@ async fn run_worker_process_with_configuration(
                                             )
                                         })
                                 } else {
-                                    let created = if requires_diffusion {
-                                        diffusion_provider
-                                        .clone()
-                                        .ok_or_else(|| {
-                                            NativeImageRuntimeError::Execution(
-                                                "native diffusion plan has no admitted model provider"
-                                                    .to_owned(),
-                                            )
-                                        })
-                                        .and_then(|provider| {
-                                            NativeImageExecutor::new_with_diffusion_provider(
+                                    let created = if let Some(provider) = diffusion_provider.clone()
+                                    {
+                                        NativeImageExecutor::new_with_generated_registry_and_diffusion_provider(
                                                 envelope.profile_id,
                                                 worker_plan.input_assets.clone(),
                                                 worker_plan.metadata_enabled,
@@ -780,9 +763,8 @@ async fn run_worker_process_with_configuration(
                                                 })?,
                                                 provider,
                                             )
-                                        })
                                     } else {
-                                        NativeImageExecutor::new_with_cpu_backend(
+                                        NativeImageExecutor::new_with_generated_registry(
                                             envelope.profile_id,
                                             worker_plan.input_assets.clone(),
                                             worker_plan.metadata_enabled,
@@ -1057,8 +1039,6 @@ async fn run_worker_process_with_configuration(
                             let response = session.output_proposal(proposal)?;
                             write_frame(&mut stdout, &response)?;
                         }
-                        result.report.outputs.clear();
-                        result.report.events.clear();
                         NativeImageWorkerEvent::Completed {
                             result: comfy_runtime::NativeImageWorkerResult::from_execution_report(
                                 result.report,
@@ -1140,6 +1120,32 @@ async fn run_worker_process_with_configuration(
     // supervisor receives the shutdown acknowledgement.
     drop(reader_thread);
     Ok(())
+}
+
+fn validate_worker_plan_has_no_serialized_handles(
+    worker_plan: &NativeImageWorkerPlan,
+) -> Result<(), NativeImageRuntimeError> {
+    for node in worker_plan.plan.nodes.values() {
+        for (input_name, binding) in &node.inputs {
+            if let InputBinding::Literal { value } = binding
+                && native_value_contains_handle(value)
+            {
+                return Err(NativeImageRuntimeError::Encoding(format!(
+                    "native worker plan node {:?} input `{input_name}` contains a process-local handle",
+                    node.id
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn native_value_contains_handle(value: &NativeValue) -> bool {
+    match value {
+        NativeValue::Handle { .. } => true,
+        NativeValue::List { values } => values.iter().any(native_value_contains_handle),
+        NativeValue::Primitive { .. } | NativeValue::PreservedUnknown { .. } => false,
+    }
 }
 
 fn backend_neutral_executor_unavailable(device: Option<DeviceId>) -> Option<BackendUnavailable> {
@@ -1321,6 +1327,91 @@ mod tests {
             apply_worker_control_cancellation(&WorkerMessage::Heartbeat, &clone),
             None
         );
+    }
+
+    #[test]
+    fn serialized_worker_plan_rejects_nested_process_local_handles() {
+        let handle_type = comfy_runtime::NativeHandleType::new(
+            comfy_runtime::NativeHandleKind::Model,
+            "MODEL",
+        )
+        .expect("valid model handle type");
+        let store_identity = comfy_runtime::NativeHandleStoreIdentity::new(
+            uuid::Uuid::from_u128(1),
+            uuid::Uuid::from_u128(2),
+        )
+        .expect("valid store identity");
+        let handle = comfy_runtime::NativeOpaqueHandle::new(
+            handle_type.clone(),
+            store_identity,
+            "forged-worker-handle",
+            1,
+            Some("a".repeat(64)),
+        )
+        .expect("structurally valid forged handle");
+        let node_id = comfy_types::NodeId::from("1");
+        let descriptor = comfy_runtime::NativeNodeDescriptor {
+            schema_version: comfy_runtime::NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
+            class_type: "ForgedInput".to_owned(),
+            implementation_version: "1".to_owned(),
+            inputs: Vec::new(),
+            dynamic_inputs: Vec::new(),
+            outputs: Vec::new(),
+            output_node: true,
+            effect: comfy_runtime::NativeEffectClass::Pure,
+            cache: comfy_runtime::NativeCachePolicy::InputIdentity,
+        };
+        let plan = comfy_runtime::CompiledPlan {
+            prompt_id: comfy_types::PromptId(uuid::Uuid::from_u128(3)),
+            client_id: None,
+            prompt_number: None,
+            extra_data: BTreeMap::new(),
+            unknown: BTreeMap::new(),
+            nodes: BTreeMap::from([(
+                node_id.clone(),
+                comfy_runtime::CompiledNode {
+                    id: node_id.clone(),
+                    class_type: "ForgedInput".to_owned(),
+                    descriptor,
+                    inputs: BTreeMap::from([(
+                        "model".to_owned(),
+                        InputBinding::Literal {
+                            value: NativeValue::List {
+                                values: vec![NativeValue::Handle { value: handle }],
+                            },
+                        },
+                    )]),
+                    unknown: BTreeMap::new(),
+                },
+            )]),
+            topological_order: vec![node_id.clone()],
+            static_required_nodes: std::collections::BTreeSet::from([node_id.clone()]),
+            output_nodes: vec![node_id],
+            persistence_unknown_fields: BTreeMap::new(),
+        };
+        let worker_plan = NativeImageWorkerPlan::new(plan, BTreeMap::new(), true, 0)
+            .expect("plan is valid before the private worker trust boundary");
+        let encoded = serde_json::to_vec(&worker_plan).expect("worker plan serializes");
+        let decoded: NativeImageWorkerPlan =
+            serde_json::from_slice(&encoded).expect("forged worker plan remains structural JSON");
+        let error = validate_worker_plan_has_no_serialized_handles(&decoded)
+            .expect_err("process-local handles must not cross private worker IPC");
+        assert!(error.to_string().contains("process-local handle"));
+
+        let primitive = NativeValue::Primitive {
+            value: comfy_runtime::NativePrimitive::Integer(7),
+        };
+        assert!(!native_value_contains_handle(&primitive));
+        assert!(native_value_contains_handle(&NativeValue::Handle {
+            value: comfy_runtime::NativeOpaqueHandle::new(
+                handle_type,
+                store_identity,
+                "second-handle",
+                1,
+                None,
+            )
+            .expect("valid handle"),
+        }));
     }
 
     #[test]

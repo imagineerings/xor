@@ -9,9 +9,10 @@ use comfy_runtime::{
     AuthorizedCapabilities, CompiledPlan, ExecutionCommandAck, ExecutionCommandOutcome,
     ExecutionCommandReceiptState, ExecutionControlCommand, ExecutionControlCommandKind,
     ExecutionController, ExecutionFailureOrigin, ExecutionSnapshot, ExecutionSnapshotStatus,
-    InputBinding, InputMode, NativeNodeRegistry, ProfileId, PromptCompiler, PromptId,
-    RECENT_COMMAND_RESULT_CAPACITY, RequestId, RuntimeNodeDescriptor, RuntimeNodePresentation,
-    SharedAssetService, SharedExecutionPresentationService, ValueType,
+    InputBinding, InputMode, NativeNodeBindingDisposition, NativeNodeRegistry, NodeRegistry,
+    ObjectInfoRegistry, ProfileId, PromptCompiler, PromptId, RECENT_COMMAND_RESULT_CAPACITY,
+    RequestId, RuntimeNodeDescriptor, RuntimeNodePresentation, SharedAssetService,
+    SharedExecutionPresentationService, ValueType, generated_native_node_registry_projection,
     native_image_catalog_bindings, native_image_registry_projection,
 };
 use comfy_types::{HttpMethod, PromptSubmission};
@@ -54,7 +55,7 @@ impl NativeRuntimeHttpServices {
             profile_id,
             presentation,
             controller,
-            native_image_registry_projection().map_err(|error| {
+            generated_native_node_registry_projection(None).map_err(|error| {
                 NativeServiceError::new(
                     NativeServiceErrorKind::Unavailable,
                     "native_image_registry_unavailable",
@@ -92,13 +93,13 @@ impl NativeRuntimeHttpServices {
         controller: Arc<dyn ExecutionController>,
         registry: NativeNodeRegistry,
     ) -> Result<Self, NativeServiceError> {
-        if !registry.descriptors_are_fully_bound() {
-            return Err(NativeServiceError::new(
+        registry.validate_comprehensive_bindings().map_err(|error| {
+            NativeServiceError::new(
                 NativeServiceErrorKind::Unavailable,
-                "native_execution_registry_unbound",
-                "every advertised native execution descriptor must have an executable node",
-            ));
-        }
+                "native_execution_registry_incomplete",
+                error.to_string(),
+            )
+        })?;
         let profile_identity = profile_id.0.to_string();
         let service = Self {
             profile_id,
@@ -995,6 +996,22 @@ impl NativeRuntimeHttpServices {
         &self,
         request: &NativeServiceRequest,
     ) -> Result<NativeServiceResponse, NativeServiceError> {
+        let source_registry = NodeRegistry::built_in().map_err(|error| {
+            NativeServiceError::new(
+                NativeServiceErrorKind::Internal,
+                "native_node_source_registry_invalid",
+                error.to_string(),
+            )
+        })?;
+        let object_info = ObjectInfoRegistry::from_node_registry(&source_registry).map_err(
+            |error| {
+                NativeServiceError::new(
+                    NativeServiceErrorKind::Internal,
+                    "native_object_info_registry_invalid",
+                    error.to_string(),
+                )
+            },
+        )?;
         let bindings = native_image_catalog_bindings().map_err(|error| {
             NativeServiceError::new(
                 NativeServiceErrorKind::Unavailable,
@@ -1008,24 +1025,31 @@ impl NativeRuntimeHttpServices {
             if requested.is_some_and(|requested| requested != class_type) {
                 continue;
             }
-            if !self.registry.descriptor_is_bound(class_type) {
-                return Err(NativeServiceError::new(
+            let disposition = self.registry.binding_disposition(class_type).ok_or_else(|| {
+                NativeServiceError::new(
                     NativeServiceErrorKind::Internal,
                     "native_node_binding_missing",
                     format!("{class_type} has metadata but no compiled binding"),
-                ));
-            }
+                )
+            })?;
+            let unavailable_reason = self.registry.unavailable_reason(class_type);
+            let source = object_info.nodes().get(class_type);
             let Some(binding) = bindings.get(class_type) else {
-                let implementation_namespace = self
-                    .registry
-                    .implementation_namespace(class_type)
-                    .ok_or_else(|| {
-                    NativeServiceError::new(
-                        NativeServiceErrorKind::Internal,
-                        "native_node_namespace_missing",
-                        format!("{class_type} has no implementation namespace"),
-                    )
-                })?;
+                let python_module = if let Some(source) = source {
+                    source.source_python_module.as_str()
+                } else {
+                    self.registry
+                        .implementation_namespace(class_type)
+                        .ok_or_else(|| {
+                            NativeServiceError::new(
+                                NativeServiceErrorKind::Internal,
+                                "native_plugin_namespace_missing",
+                                format!(
+                                    "{class_type} has no signed implementation namespace"
+                                ),
+                            )
+                        })?
+                };
                 let presentation = self.registry.presentation(class_type).ok_or_else(|| {
                     NativeServiceError::new(
                         NativeServiceErrorKind::Internal,
@@ -1037,13 +1061,29 @@ impl NativeRuntimeHttpServices {
                     class_type.to_owned(),
                     project_component_node(
                         class_type,
-                        implementation_namespace,
+                        python_module,
                         runtime,
                         presentation,
+                        disposition,
+                        unavailable_reason,
                     ),
                 );
                 continue;
             };
+            let source = source.ok_or_else(|| {
+                NativeServiceError::new(
+                    NativeServiceErrorKind::Internal,
+                    "native_node_source_metadata_missing",
+                    format!("{class_type} has no canonical source object-info row"),
+                )
+            })?;
+            if binding.native.python_module != source.source_python_module {
+                return Err(NativeServiceError::new(
+                    NativeServiceErrorKind::Internal,
+                    "native_node_source_module_mismatch",
+                    format!("{class_type} disagrees with its canonical source Python module"),
+                ));
+            }
             let mut required = Map::new();
             let mut optional = Map::new();
             let mut hidden = Map::new();
@@ -1107,12 +1147,13 @@ impl NativeRuntimeHttpServices {
                     "name": class_type,
                     "display_name": binding.catalog.display_name,
                     "description": binding.native.description,
-                    "python_module": binding.native.python_module,
+                    "python_module": source.source_python_module,
                     "category": binding.catalog.category,
                     "output_node": runtime.output_node,
                     "has_intermediate_output": binding.native.has_intermediate_output,
                     "search_aliases": binding.native.search_aliases,
                     "essentials_category": binding.native.essentials_category,
+                    "sim_native_binding": native_binding_projection(disposition, unavailable_reason),
                 }),
             );
         }
@@ -1479,9 +1520,11 @@ impl NativeHttpServices for NativeRuntimeHttpServices {
 
 fn project_component_node(
     class_type: &str,
-    implementation_namespace: &str,
+    python_module: &str,
     runtime: &RuntimeNodeDescriptor,
     presentation: &RuntimeNodePresentation,
+    disposition: NativeNodeBindingDisposition,
+    unavailable_reason: Option<&str>,
 ) -> Value {
     let mut required = Map::new();
     let mut optional = Map::new();
@@ -1535,12 +1578,28 @@ fn project_component_node(
         "name": class_type,
         "display_name": presentation.display_name,
         "description": "",
-        "python_module": implementation_namespace,
+        "python_module": python_module,
         "category": presentation.category,
         "output_node": runtime.output_node,
         "has_intermediate_output": false,
         "search_aliases": [],
         "essentials_category": null,
+        "sim_native_binding": native_binding_projection(disposition, unavailable_reason),
+    })
+}
+
+fn native_binding_projection(
+    disposition: NativeNodeBindingDisposition,
+    unavailable_reason: Option<&str>,
+) -> Value {
+    let disposition = match disposition {
+        NativeNodeBindingDisposition::Executable => "executable",
+        NativeNodeBindingDisposition::ProviderRequired => "provider_required",
+        NativeNodeBindingDisposition::Unavailable => "unavailable",
+    };
+    json!({
+        "disposition": disposition,
+        "reason": unavailable_reason,
     })
 }
 
@@ -2145,6 +2204,7 @@ pub(crate) mod tests {
         collections::BTreeMap,
         error::Error,
         fs,
+        sync::atomic::{AtomicUsize, Ordering},
         time::{SystemTime, UNIX_EPOCH},
     };
 
@@ -2162,7 +2222,7 @@ pub(crate) mod tests {
         fn execute<'a>(
             &'a self,
             _context: comfy_runtime::NodeContext,
-            _inputs: BTreeMap<String, Value>,
+            _inputs: BTreeMap<String, comfy_runtime::NativeValue>,
         ) -> std::pin::Pin<
             Box<
                 dyn std::future::Future<
@@ -2179,6 +2239,104 @@ pub(crate) mod tests {
                 })
             })
         }
+    }
+
+    #[derive(Clone, Debug)]
+    struct CountingExecutionController {
+        calls: Arc<AtomicUsize>,
+    }
+
+    impl ExecutionController for CountingExecutionController {
+        fn accept(
+            &self,
+            _command: &ExecutionControlCommand,
+            _assigned_attempt_id: Option<comfy_runtime::AttemptId>,
+        ) -> Result<(), comfy_runtime::ExecutionFailure> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        }
+    }
+
+    fn unavailable_registry(
+        class_type: &str,
+        reason: &str,
+    ) -> Result<NativeNodeRegistry, NativeServiceError> {
+        catalog_status_registry(class_type, reason, None)
+    }
+
+    fn provider_required_registry(
+        class_type: &str,
+        provider: &str,
+        reason: &str,
+    ) -> Result<NativeNodeRegistry, NativeServiceError> {
+        catalog_status_registry(class_type, reason, Some(provider))
+    }
+
+    fn catalog_status_registry(
+        class_type: &str,
+        reason: &str,
+        provider: Option<&str>,
+    ) -> Result<NativeNodeRegistry, NativeServiceError> {
+        let source = NodeRegistry::built_in().map_err(|error| {
+            NativeServiceError::new(
+                NativeServiceErrorKind::Internal,
+                "test_source_registry_invalid",
+                error.to_string(),
+            )
+        })?;
+        let catalog = source.descriptor(class_type).ok_or_else(|| {
+            NativeServiceError::new(
+                NativeServiceErrorKind::Internal,
+                "test_source_descriptor_missing",
+                class_type,
+            )
+        })?;
+        let category = if catalog.category == "(empty root category declared by source)" {
+            String::new()
+        } else {
+            catalog.category.clone()
+        };
+        let descriptor = comfy_runtime::NativeNodeDescriptor {
+            schema_version: comfy_runtime::NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
+            class_type: class_type.to_owned(),
+            implementation_version: "1".to_owned(),
+            inputs: Vec::new(),
+            dynamic_inputs: Vec::new(),
+            outputs: Vec::new(),
+            output_node: catalog.output_node,
+            effect: comfy_runtime::NativeEffectClass::Pure,
+            cache: comfy_runtime::NativeCachePolicy::InputIdentity,
+        };
+        let presentation = comfy_runtime::NativeNodePresentation {
+            display_name: catalog.display_name.clone(),
+            category,
+            output_names: Vec::new(),
+        };
+        let binding = if let Some(provider) = provider {
+            comfy_runtime::NativeNodeBinding::ProviderRequired {
+                feature_id: catalog.feature_id.clone(),
+                descriptor,
+                presentation,
+                provider: provider.to_owned(),
+                reason: reason.to_owned(),
+            }
+        } else {
+            comfy_runtime::NativeNodeBinding::Unavailable {
+                feature_id: catalog.feature_id.clone(),
+                descriptor,
+                presentation,
+                reason: reason.to_owned(),
+            }
+        };
+        let mut registry = NativeNodeRegistry::default();
+        registry.register_native_bindings([binding]).map_err(|error| {
+            NativeServiceError::new(
+                NativeServiceErrorKind::Internal,
+                "test_native_binding_invalid",
+                error.to_string(),
+            )
+        })?;
+        Ok(registry)
     }
 
     fn profile(value: &str) -> Result<ProfileId, NativeServiceError> {
@@ -2679,6 +2837,115 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn unavailable_object_info_uses_canonical_source_and_rejects_submission_before_controller()
+    -> Result<(), NativeServiceError> {
+        let profile_id = profile("00000000-0000-0000-0000-000000000001")?;
+        let calls = Arc::new(AtomicUsize::new(0));
+        let controller = Arc::new(CountingExecutionController {
+            calls: calls.clone(),
+        });
+        let mut presentation =
+            comfy_runtime::ExecutionPresentationService::new(MAXIMUM_HISTORY_PAGE_SIZE)
+                .map_err(presentation_error)?;
+        presentation
+            .initialize_profile(
+                profile_id,
+                comfy_runtime::ExecutionDataSource::Live,
+                ExecutionSnapshotStatus::Ready,
+            )
+            .map_err(presentation_error)?;
+        let services = NativeRuntimeHttpServices::new(
+            profile_id,
+            comfy_runtime::ExecutionPresentationOwner::ephemeral(presentation),
+            controller,
+            unavailable_registry(
+                "AutogrowNamesTestNode",
+                "inactive in the canonical source registry",
+            )?,
+        )?;
+
+        let catalog = body_json(services.dispatch(request(
+            HttpMethod::Get,
+            "/object_info/AutogrowNamesTestNode",
+            NativeServiceOperation::NodeCatalog,
+            profile_id,
+            None,
+        )?)?)?;
+        assert_eq!(
+            catalog["AutogrowNamesTestNode"]["python_module"],
+            "comfy_extras.nodes_logic"
+        );
+        assert_eq!(
+            catalog["AutogrowNamesTestNode"]["sim_native_binding"],
+            json!({
+                "disposition": "unavailable",
+                "reason": "inactive in the canonical source registry",
+            })
+        );
+
+        let error = services
+            .dispatch(request(
+                HttpMethod::Post,
+                "/prompt",
+                NativeServiceOperation::SubmitPrompt,
+                profile_id,
+                Some(json!({
+                    "prompt": {
+                        "1": {"class_type": "AutogrowNamesTestNode", "inputs": {}}
+                    }
+                })),
+            )?)
+            .expect_err("an unavailable node must fail before controller dispatch");
+        assert_eq!(error.kind, NativeServiceErrorKind::Invalid);
+        assert_eq!(error.code, "prompt_validation_failed");
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+        assert!(services.snapshot()?.queue.is_empty());
+
+        let mut provider_presentation =
+            comfy_runtime::ExecutionPresentationService::new(MAXIMUM_HISTORY_PAGE_SIZE)
+                .map_err(presentation_error)?;
+        provider_presentation
+            .initialize_profile(
+                profile_id,
+                comfy_runtime::ExecutionDataSource::Live,
+                ExecutionSnapshotStatus::Ready,
+            )
+            .map_err(presentation_error)?;
+        let provider_services = NativeRuntimeHttpServices::new(
+            profile_id,
+            comfy_runtime::ExecutionPresentationOwner::ephemeral(provider_presentation),
+            Arc::new(CountingExecutionController {
+                calls: calls.clone(),
+            }),
+            provider_required_registry(
+                "MinimaxSubjectToVideoNode",
+                "comfy_api_nodes.minimax",
+                "requires a verified native provider",
+            )?,
+        )?;
+        let provider_catalog = body_json(provider_services.dispatch(request(
+            HttpMethod::Get,
+            "/object_info/MinimaxSubjectToVideoNode",
+            NativeServiceOperation::NodeCatalog,
+            profile_id,
+            None,
+        )?)?)?;
+        assert_eq!(
+            provider_catalog["MinimaxSubjectToVideoNode"]["python_module"],
+            "comfy_api_nodes.nodes_minimax"
+        );
+        assert_eq!(
+            provider_catalog["MinimaxSubjectToVideoNode"]["sim_native_binding"],
+            json!({
+                "disposition": "provider_required",
+                "reason": "requires a verified native provider",
+            })
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+        Ok(())
+    }
+
+    #[test]
     fn component_object_info_fails_closed_without_checked_presentation()
     -> Result<(), NativeServiceError> {
         let profile_id = profile("00000000-0000-0000-0000-000000000001")?;
@@ -2713,23 +2980,22 @@ pub(crate) mod tests {
                 ExecutionSnapshotStatus::Ready,
             )
             .map_err(presentation_error)?;
-        let services = NativeRuntimeHttpServices::new(
+        let error = NativeRuntimeHttpServices::new(
             profile_id,
             comfy_runtime::ExecutionPresentationOwner::ephemeral(presentation),
             Arc::new(AcceptingExecutionController),
             registry,
-        )?;
-        let error = services
-            .dispatch(request(
-                HttpMethod::Get,
-                "/object_info",
-                NativeServiceOperation::NodeCatalog,
-                profile_id,
-                None,
-            )?)
-            .expect_err("the API must not invent component presentation metadata");
-        assert_eq!(error.kind, NativeServiceErrorKind::Internal);
-        assert_eq!(error.code, "native_node_presentation_missing");
+        )
+        .err()
+        .ok_or_else(|| {
+            NativeServiceError::new(
+                NativeServiceErrorKind::Internal,
+                "test_incomplete_registry_accepted",
+                "the API accepted a registry without checked presentation metadata",
+            )
+        })?;
+        assert_eq!(error.kind, NativeServiceErrorKind::Unavailable);
+        assert_eq!(error.code, "native_execution_registry_incomplete");
         Ok(())
     }
 
