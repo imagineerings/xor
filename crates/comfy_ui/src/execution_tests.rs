@@ -344,20 +344,16 @@ impl ExecutionPlanProvider for DeterministicPlanProvider {
 }
 
 #[derive(Clone, Default)]
-struct NativeImagePlanProviderProbe {
+struct NativeGeneratedPlanProviderProbe {
     compiled_plans: Arc<Mutex<Vec<CompiledPlan>>>,
 }
 
-impl ExecutionPlanProvider for NativeImagePlanProviderProbe {
+impl ExecutionPlanProvider for NativeGeneratedPlanProviderProbe {
     fn compile(&self, request: &ExecutionPlanRequest) -> Result<CompiledPlan, ExecutionFailure> {
-        let plan = comfy_runtime::compile_native_image_workflow(
+        let plan = compile_generated_native_workflow(
             &request.workflow_bytes,
             &request.selected_output_nodes,
-        )
-        .map_err(|error| {
-            ExecutionFailure::new("native_plan_compilation_failed", error.to_string())
-                .with_origin(ExecutionFailureOrigin::Validation)
-        })?;
+        )?;
         match self.compiled_plans.lock() {
             Ok(mut compiled_plans) => compiled_plans.push(plan.clone()),
             Err(error) => error.into_inner().push(plan.clone()),
@@ -411,6 +407,37 @@ impl ExecutionController for AcceptingExecutionActuator {
     ) -> Result<(), ExecutionFailure> {
         Ok(())
     }
+}
+
+#[test]
+fn generated_ui_compiler_tracks_the_comprehensive_frontend_projection() -> Result<(), Box<dyn Error>>
+{
+    let registry = comfy_runtime::generated_native_node_registry_projection(None)?;
+    registry.validate_comprehensive_bindings()?;
+    let frontend = comfy_runtime::generated_native_frontend_descriptors(None)?;
+    assert_eq!(frontend.len(), registry.descriptor_len());
+
+    let model = native_image_graph_fixture(LOCAL_EXECUTION_PROFILE_ID)?;
+    let WorkflowOpenState::Editable(engine) = &model.open_state else {
+        return Err("native UI fixture opened read-only".into());
+    };
+    let bytes = engine.document.to_workflow_bytes()?;
+    let plan = compile_generated_native_workflow(&bytes, &BTreeSet::new())?;
+    assert_eq!(plan.nodes.len(), 5);
+    assert!(
+        plan.nodes
+            .values()
+            .all(|node| frontend.contains_key(&node.class_type))
+    );
+
+    let error = compile_generated_native_workflow(
+        &bytes,
+        &BTreeSet::from([NodeId("missing-output".to_owned())]),
+    )
+    .expect_err("missing selected output must fail before queue mutation");
+    assert_eq!(error.origin, ExecutionFailureOrigin::Validation);
+    assert!(error.message.contains("not in the compiled plan"));
+    Ok(())
 }
 
 #[derive(Default)]
@@ -6809,7 +6836,7 @@ async fn native_image_ui_queues_projects_outputs_and_rejects_late_cancelled_outp
 ) {
     let event_bus = ExecutionEventBus::new(64).expect("valid native UI event bus");
     let controller = Arc::new(NativeUiControllerProbe::new());
-    let plan_provider = Arc::new(NativeImagePlanProviderProbe::default());
+    let plan_provider = Arc::new(NativeGeneratedPlanProviderProbe::default());
     let reference_handler = Arc::new(RecordingReferenceHandler::default());
     let model = cx.update(|cx| {
         cx.set_global(db::AppDatabase::test_new());

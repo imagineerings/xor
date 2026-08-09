@@ -7,8 +7,9 @@ use comfy_runtime::{
     ExecutionPresentationError, ExecutionPresentationOwner, ExecutionPresentationService,
     ExecutionReconciliation, ExecutionSnapshot, ExecutionSnapshotStatus, NativeExecutionController,
     NativeExecutionControllerConfig, OperationEligibility, ProfileId, RequestId, RetryPromptSource,
-    SharedAssetService, SharedExecutionPresentationService, authorize_native_output_ui,
-    compile_native_image_workflow,
+    SharedAssetService, SharedExecutionPresentationService, WorkflowFormatDocument,
+    authorize_native_output_ui, compile_generated_native_prompt,
+    generated_native_frontend_descriptors, graph_to_prompt,
 };
 use comfy_tensor::CancellationToken;
 use comfy_types::NodeId;
@@ -901,11 +902,11 @@ fn command_queue_batch_count(kind: &ExecutionControlCommandKind) -> Option<usize
     )
 }
 
-struct NativeImagePlanProvider {
+struct NativeGeneratedPlanProvider {
     profile_id: ProfileId,
 }
 
-impl ExecutionPlanProvider for NativeImagePlanProvider {
+impl ExecutionPlanProvider for NativeGeneratedPlanProvider {
     fn compile(&self, request: &ExecutionPlanRequest) -> Result<CompiledPlan, ExecutionFailure> {
         if request.profile_id != self.profile_id {
             return Err(ExecutionFailure::new(
@@ -921,12 +922,51 @@ impl ExecutionPlanProvider for NativeImagePlanProvider {
             )
             .with_origin(ExecutionFailureOrigin::Validation));
         }
-        compile_native_image_workflow(&request.workflow_bytes, &request.selected_output_nodes)
-            .map_err(|error| {
-                ExecutionFailure::new("native_plan_compilation_failed", error.to_string())
-                    .with_origin(ExecutionFailureOrigin::Validation)
-            })
+        compile_generated_native_workflow(&request.workflow_bytes, &request.selected_output_nodes)
     }
+}
+
+pub(crate) fn compile_generated_native_workflow(
+    workflow_bytes: &[u8],
+    selected_output_nodes: &BTreeSet<NodeId>,
+) -> Result<CompiledPlan, ExecutionFailure> {
+    let workflow = WorkflowFormatDocument::parse(workflow_bytes).map_err(|error| {
+        ExecutionFailure::new("native_plan_compilation_failed", error.to_string())
+            .with_origin(ExecutionFailureOrigin::Validation)
+    })?;
+    let descriptors = generated_native_frontend_descriptors(None).map_err(|error| {
+        ExecutionFailure::new("native_plan_compilation_failed", error.to_string())
+            .with_origin(ExecutionFailureOrigin::Validation)
+    })?;
+    let submission =
+        graph_to_prompt(&workflow, &descriptors, "sim-native-generated-v1").map_err(|error| {
+            ExecutionFailure::new("native_plan_compilation_failed", error.to_string())
+                .with_origin(ExecutionFailureOrigin::Validation)
+        })?;
+    let mut plan = compile_generated_native_prompt(submission, None).map_err(|error| {
+        ExecutionFailure::new("native_plan_compilation_failed", error.to_string())
+            .with_origin(ExecutionFailureOrigin::Validation)
+    })?;
+    if !selected_output_nodes.is_empty() {
+        for node_id in selected_output_nodes {
+            let node = plan.nodes.get(node_id).ok_or_else(|| {
+                ExecutionFailure::new(
+                    "native_plan_compilation_failed",
+                    format!("selected output node {node_id:?} is not in the compiled plan"),
+                )
+                .with_origin(ExecutionFailureOrigin::Validation)
+            })?;
+            if !node.descriptor.output_node {
+                return Err(ExecutionFailure::new(
+                    "native_plan_compilation_failed",
+                    format!("selected node {node_id:?} is not an output node"),
+                )
+                .with_origin(ExecutionFailureOrigin::Validation));
+            }
+        }
+        plan.output_nodes = selected_output_nodes.iter().cloned().collect();
+    }
+    Ok(plan)
 }
 
 struct NativeOutputService {
@@ -1277,7 +1317,7 @@ pub fn register_native_execution_services(
     model
         .update(cx, |model, cx| {
             model.register_runtime_controller(controller, cx);
-            model.register_plan_provider(Arc::new(NativeImagePlanProvider { profile_id }), cx);
+            model.register_plan_provider(Arc::new(NativeGeneratedPlanProvider { profile_id }), cx);
             model.register_output_operation_handler(outputs, cx);
             model.attach_profile_event_bus(profile_id, event_bus, cx);
             model.set_snapshot_status(

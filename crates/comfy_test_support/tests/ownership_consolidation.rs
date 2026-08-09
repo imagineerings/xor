@@ -7828,6 +7828,43 @@ fn run_ownership_validation(
                 && plugin_private_worker.contains("supervisor.deploy_registry("),
         ),
         (
+            "task367_production_consumers_use_the_comprehensive_generated_registry",
+            runtime_executor.contains("pub fn validate_comprehensive_bindings(")
+                && execution_ui_production.contains("generated_native_frontend_descriptors(None)")
+                && execution_ui_production.contains("compile_generated_native_prompt(")
+                && execution_ui_production.contains("graph_to_prompt(")
+                && !execution_ui_production.contains("compile_native_image_workflow(")
+                && sim_bootstrap
+                    .contains("generated_native_node_registry_projection(None)?")
+                && !sim_bootstrap.contains("comfy_runtime::native_image_registry_projection()?")
+                && api_host_production.contains("pub fn with_registry(")
+                && api_services
+                    .contains("for (class_type, runtime) in self.registry.descriptors()")
+                && worker_process.contains("RegistryDeploymentCommit")
+                && worker_process.contains("apply_compiled_registry_commit(")
+                && worker_process.contains("worker_plan.validate()?")
+                && plugin_registry_adapter.contains("fn plugin_inputs(")
+                && plugin_registry_adapter.contains("BTreeMap<String, NativeValue>")
+                && plugin_registry_adapter.contains("fn runtime_outputs(")
+                && plugin_registry_adapter.contains("context.handle_store()")
+                && plugin_registry_adapter.contains("NativeValue::Primitive")
+                && plugin_registry_adapter.contains("NativeValue::PreservedUnknown")
+                && plugin_registry_adapter.contains("NativeValue::List")
+                && plugin_registry_adapter.contains("NativeValue::Handle")
+                && !plugin_registry_adapter.contains("serde_json::to_value")
+                && !plugin_registry_adapter.contains("serde_json::from_value")
+                && runtime_controller_production
+                    .contains("pub fn generated_native_node_registry_projection(")
+                && runtime_controller_production
+                    .contains("pub fn generated_native_frontend_descriptors(")
+                && runtime_controller_production
+                    .contains("pub fn compile_generated_native_prompt(")
+                && runtime_controller_production
+                    .contains("pub fn native_image_registry_projection(")
+                && runtime_controller_production
+                    .contains("pub fn compile_native_image_workflow("),
+        ),
+        (
             "signed_component_presentation_has_one_checked_projection_owner",
             production_source_occurrences(&sources, "struct RuntimeNodePresentation").len() == 1
                 && runtime_executor
