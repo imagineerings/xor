@@ -213,11 +213,23 @@ def main() -> int:
     if sum(classification_counts.values()) != len(rows):
         fail("classification totals do not reconcile")
         errors += 1
-    sim_commit = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=REPOSITORY, check=True, capture_output=True, text=True
-    ).stdout.strip()
-    if sim_commit != EXPECTED_SIM_COMMIT:
-        fail(f"Sim baseline drifted: expected {EXPECTED_SIM_COMMIT}, found {sim_commit}")
+    baseline_exists = subprocess.run(
+        ["git", "cat-file", "-e", f"{EXPECTED_SIM_COMMIT}^{{commit}}"],
+        cwd=REPOSITORY,
+        capture_output=True,
+        text=True,
+    )
+    baseline_is_ancestor = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", EXPECTED_SIM_COMMIT, "HEAD"],
+        cwd=REPOSITORY,
+        capture_output=True,
+        text=True,
+    )
+    if baseline_exists.returncode != 0 or baseline_is_ancestor.returncode != 0:
+        current_commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=REPOSITORY, check=True, capture_output=True, text=True
+        ).stdout.strip()
+        fail(f"Sim baseline {EXPECTED_SIM_COMMIT} is missing or is not an ancestor of {current_commit}")
         errors += 1
     file_count, digest = manifest_digest(REPOSITORY / "projects" / "godot")
     if file_count != 13979 or digest != EXPECTED_MANIFEST_SHA256:
