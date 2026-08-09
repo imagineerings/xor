@@ -9,11 +9,12 @@ use comfy_runtime::{
     AuthorizedCapabilities, CompiledPlan, ExecutionCommandAck, ExecutionCommandOutcome,
     ExecutionCommandReceiptState, ExecutionControlCommand, ExecutionControlCommandKind,
     ExecutionController, ExecutionFailureOrigin, ExecutionSnapshot, ExecutionSnapshotStatus,
-    InputBinding, InputMode, NativeNodeBindingDisposition, NativeNodeRegistry, NodeRegistry,
+    InputBinding, InputMode, NativeNodeBindingDisposition, NativeNodeRegistry, NativePrimitive,
+    NativePrimitiveType, NativeValue, NativeValueType, NodeRegistry, ObjectInfoNode,
     ObjectInfoRegistry, ProfileId, PromptCompiler, PromptId, RECENT_COMMAND_RESULT_CAPACITY,
     RequestId, RuntimeNodeDescriptor, RuntimeNodePresentation, SharedAssetService,
-    SharedExecutionPresentationService, ValueType, generated_native_node_registry_projection,
-    native_image_catalog_bindings, native_image_registry_projection,
+    SharedExecutionPresentationService, generated_native_node_registry_projection,
+    native_image_catalog_bindings,
 };
 use comfy_types::{HttpMethod, PromptSubmission};
 use serde::Serialize;
@@ -93,13 +94,15 @@ impl NativeRuntimeHttpServices {
         controller: Arc<dyn ExecutionController>,
         registry: NativeNodeRegistry,
     ) -> Result<Self, NativeServiceError> {
-        registry.validate_comprehensive_bindings().map_err(|error| {
-            NativeServiceError::new(
-                NativeServiceErrorKind::Unavailable,
-                "native_execution_registry_incomplete",
-                error.to_string(),
-            )
-        })?;
+        registry
+            .validate_comprehensive_bindings()
+            .map_err(|error| {
+                NativeServiceError::new(
+                    NativeServiceErrorKind::Unavailable,
+                    "native_execution_registry_incomplete",
+                    error.to_string(),
+                )
+            })?;
         let profile_identity = profile_id.0.to_string();
         let service = Self {
             profile_id,
@@ -1003,15 +1006,14 @@ impl NativeRuntimeHttpServices {
                 error.to_string(),
             )
         })?;
-        let object_info = ObjectInfoRegistry::from_node_registry(&source_registry).map_err(
-            |error| {
+        let object_info =
+            ObjectInfoRegistry::from_node_registry(&source_registry).map_err(|error| {
                 NativeServiceError::new(
                     NativeServiceErrorKind::Internal,
                     "native_object_info_registry_invalid",
                     error.to_string(),
                 )
-            },
-        )?;
+            })?;
         let bindings = native_image_catalog_bindings().map_err(|error| {
             NativeServiceError::new(
                 NativeServiceErrorKind::Unavailable,
@@ -1025,13 +1027,16 @@ impl NativeRuntimeHttpServices {
             if requested.is_some_and(|requested| requested != class_type) {
                 continue;
             }
-            let disposition = self.registry.binding_disposition(class_type).ok_or_else(|| {
-                NativeServiceError::new(
-                    NativeServiceErrorKind::Internal,
-                    "native_node_binding_missing",
-                    format!("{class_type} has metadata but no compiled binding"),
-                )
-            })?;
+            let disposition = self
+                .registry
+                .binding_disposition(class_type)
+                .ok_or_else(|| {
+                    NativeServiceError::new(
+                        NativeServiceErrorKind::Internal,
+                        "native_node_binding_missing",
+                        format!("{class_type} has metadata but no compiled binding"),
+                    )
+                })?;
             let unavailable_reason = self.registry.unavailable_reason(class_type);
             let source = object_info.nodes().get(class_type);
             let Some(binding) = bindings.get(class_type) else {
@@ -1044,9 +1049,7 @@ impl NativeRuntimeHttpServices {
                             NativeServiceError::new(
                                 NativeServiceErrorKind::Internal,
                                 "native_plugin_namespace_missing",
-                                format!(
-                                    "{class_type} has no signed implementation namespace"
-                                ),
+                                format!("{class_type} has no signed implementation namespace"),
                             )
                         })?
                 };
@@ -1066,6 +1069,7 @@ impl NativeRuntimeHttpServices {
                         presentation,
                         disposition,
                         unavailable_reason,
+                        source,
                     ),
                 );
                 continue;
@@ -1091,16 +1095,20 @@ impl NativeRuntimeHttpServices {
             let mut optional_order = Vec::new();
             let mut hidden_order = Vec::new();
             for input in &binding.native.inputs {
-                let runtime_input = runtime.inputs.get(&input.name).ok_or_else(|| {
-                    NativeServiceError::new(
-                        NativeServiceErrorKind::Internal,
-                        "native_node_port_mismatch",
-                        format!(
-                            "{class_type} input `{}` is absent from the execution binding",
-                            input.name
-                        ),
-                    )
-                })?;
+                let runtime_input = runtime
+                    .inputs
+                    .iter()
+                    .find(|runtime_input| runtime_input.name == input.name)
+                    .ok_or_else(|| {
+                        NativeServiceError::new(
+                            NativeServiceErrorKind::Internal,
+                            "native_node_port_mismatch",
+                            format!(
+                                "{class_type} input `{}` is absent from the execution binding",
+                                input.name
+                            ),
+                        )
+                    })?;
                 if runtime_input.hidden {
                     hidden.insert(input.name.clone(), Value::String(input.type_name.clone()));
                     hidden_order.push(input.name.clone());
@@ -1140,7 +1148,7 @@ impl NativeRuntimeHttpServices {
                 json!({
                     "input": {"required": required, "optional": optional, "hidden": hidden},
                     "input_order": {"required": required_order, "optional": optional_order, "hidden": hidden_order},
-                    "is_input_list": runtime.inputs.values().any(|input| input.mode != InputMode::Scalar),
+                    "is_input_list": runtime.inputs.iter().any(|input| input.cardinality != InputMode::Scalar),
                     "output": outputs,
                     "output_is_list": runtime.outputs.iter().map(|output| output.is_list).collect::<Vec<_>>(),
                     "output_name": output_names,
@@ -1154,6 +1162,7 @@ impl NativeRuntimeHttpServices {
                     "search_aliases": binding.native.search_aliases,
                     "essentials_category": binding.native.essentials_category,
                     "sim_native_binding": native_binding_projection(disposition, unavailable_reason),
+                    "sim_source": native_source_projection(source),
                 }),
             );
         }
@@ -1525,6 +1534,7 @@ fn project_component_node(
     presentation: &RuntimeNodePresentation,
     disposition: NativeNodeBindingDisposition,
     unavailable_reason: Option<&str>,
+    source: Option<&ObjectInfoNode>,
 ) -> Value {
     let mut required = Map::new();
     let mut optional = Map::new();
@@ -1532,14 +1542,15 @@ fn project_component_node(
     let mut required_order = Vec::new();
     let mut optional_order = Vec::new();
     let mut hidden_order = Vec::new();
-    for (name, input) in &runtime.inputs {
-        let type_name = runtime_value_type_name(&input.value_type);
+    for input in &runtime.inputs {
+        let name = &input.name;
+        let type_name = runtime_type_union_name(input.accepted_types.members());
         if input.hidden {
             hidden.insert(name.clone(), Value::String(type_name));
             hidden_order.push(name.clone());
             continue;
         }
-        let mode = match input.mode {
+        let mode = match input.cardinality {
             InputMode::Scalar => "scalar",
             InputMode::List => "list",
             InputMode::Mapped => "mapped",
@@ -1561,7 +1572,7 @@ fn project_component_node(
     let outputs = runtime
         .outputs
         .iter()
-        .map(|output| Value::String(runtime_value_type_name(&output.value_type)))
+        .map(|output| Value::String(runtime_value_type_name(&output.produced_type)))
         .collect::<Vec<_>>();
     let output_names = presentation
         .output_names
@@ -1571,7 +1582,7 @@ fn project_component_node(
     json!({
         "input": {"required": required, "optional": optional, "hidden": hidden},
         "input_order": {"required": required_order, "optional": optional_order, "hidden": hidden_order},
-        "is_input_list": runtime.inputs.values().any(|input| input.mode != InputMode::Scalar),
+        "is_input_list": runtime.inputs.iter().any(|input| input.cardinality != InputMode::Scalar),
         "output": outputs,
         "output_is_list": runtime.outputs.iter().map(|output| output.is_list).collect::<Vec<_>>(),
         "output_name": output_names,
@@ -1585,6 +1596,7 @@ fn project_component_node(
         "search_aliases": [],
         "essentials_category": null,
         "sim_native_binding": native_binding_projection(disposition, unavailable_reason),
+        "sim_source": source.map(native_source_projection),
     })
 }
 
@@ -1603,21 +1615,33 @@ fn native_binding_projection(
     })
 }
 
-fn runtime_value_type_name(value_type: &ValueType) -> String {
+fn native_source_projection(source: &ObjectInfoNode) -> Value {
+    json!({
+        "feature_id": source.feature_id,
+        "availability": source.availability,
+        "catalog_status": source.catalog_status,
+        "inactive_reason": source.inactive_reason,
+    })
+}
+
+fn runtime_type_union_name(value_types: &[NativeValueType]) -> String {
+    value_types
+        .iter()
+        .map(runtime_value_type_name)
+        .collect::<Vec<_>>()
+        .join("|")
+}
+
+fn runtime_value_type_name(value_type: &NativeValueType) -> String {
     match value_type {
-        ValueType::Any => "*".to_owned(),
-        ValueType::Boolean => "BOOLEAN".to_owned(),
-        ValueType::Integer => "INT".to_owned(),
-        ValueType::Number => "FLOAT".to_owned(),
-        ValueType::String => "STRING".to_owned(),
-        ValueType::Image => "IMAGE".to_owned(),
-        ValueType::Mask => "MASK".to_owned(),
-        ValueType::Latent => "LATENT".to_owned(),
-        ValueType::Model => "MODEL".to_owned(),
-        ValueType::Conditioning => "CONDITIONING".to_owned(),
-        ValueType::Tensor => "TENSOR".to_owned(),
-        ValueType::Artifact => "ARTIFACT".to_owned(),
-        ValueType::Custom(type_name) => type_name.clone(),
+        NativeValueType::Any => "*".to_owned(),
+        NativeValueType::Primitive(NativePrimitiveType::Null) => "NULL".to_owned(),
+        NativeValueType::Primitive(NativePrimitiveType::Boolean) => "BOOLEAN".to_owned(),
+        NativeValueType::Primitive(NativePrimitiveType::Integer) => "INT".to_owned(),
+        NativeValueType::Primitive(NativePrimitiveType::Number) => "FLOAT".to_owned(),
+        NativeValueType::Primitive(NativePrimitiveType::String) => "STRING".to_owned(),
+        NativeValueType::Handle(handle_type) => handle_type.type_id.clone(),
+        NativeValueType::PreservedUnknown => "UNKNOWN".to_owned(),
     }
 }
 
@@ -1957,16 +1981,16 @@ fn queue_tuple(
             .iter()
             .map(|(name, binding)| {
                 let value = match binding {
-                    InputBinding::Literal { value } => value.clone(),
+                    InputBinding::Literal { value } => native_literal_json(value)?,
                     InputBinding::Link {
                         source,
                         output_index,
                         ..
                     } => json!([source.0, output_index]),
                 };
-                (name.clone(), value)
+                Ok((name.clone(), value))
             })
-            .collect::<Map<_, _>>();
+            .collect::<Result<Map<_, _>, NativeServiceError>>()?;
         prompt.insert(
             node_id.0.clone(),
             json!({"class_type": node.class_type, "inputs": inputs}),
@@ -1988,6 +2012,38 @@ fn queue_tuple(
         plan.extra_data,
         outputs
     ]))
+}
+
+fn native_literal_json(value: &NativeValue) -> Result<Value, NativeServiceError> {
+    match value {
+        NativeValue::Primitive { value } => Ok(match value {
+            NativePrimitive::Null => Value::Null,
+            NativePrimitive::Boolean(value) => Value::Bool(*value),
+            NativePrimitive::Integer(value) => Value::Number((*value).into()),
+            NativePrimitive::UnsignedInteger(value) => Value::Number((*value).into()),
+            NativePrimitive::Number(value) => serde_json::Number::from_f64(*value)
+                .map(Value::Number)
+                .ok_or_else(|| {
+                    NativeServiceError::new(
+                        NativeServiceErrorKind::Internal,
+                        "native_prompt_literal_invalid",
+                        "compiled prompt contains a non-finite numeric literal",
+                    )
+                })?,
+            NativePrimitive::String(value) => Value::String(value.clone()),
+        }),
+        NativeValue::List { values } => values
+            .iter()
+            .map(native_literal_json)
+            .collect::<Result<Vec<_>, _>>()
+            .map(Value::Array),
+        NativeValue::PreservedUnknown { value, .. } => Ok(value.clone()),
+        NativeValue::Handle { .. } => Err(NativeServiceError::new(
+            NativeServiceErrorKind::Internal,
+            "native_prompt_handle_not_serializable",
+            "compiled prompt contains a process-local handle literal",
+        )),
+    }
 }
 
 fn history_record(
@@ -2297,7 +2353,7 @@ pub(crate) mod tests {
             catalog.category.clone()
         };
         let descriptor = comfy_runtime::NativeNodeDescriptor {
-            schema_version: comfy_runtime::NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
+            schema_version: 1,
             class_type: class_type.to_owned(),
             implementation_version: "1".to_owned(),
             inputs: Vec::new(),
@@ -2310,7 +2366,11 @@ pub(crate) mod tests {
         let presentation = comfy_runtime::NativeNodePresentation {
             display_name: catalog.display_name.clone(),
             category,
+            description: String::new(),
             output_names: Vec::new(),
+            search_aliases: Vec::new(),
+            is_deprecated: false,
+            is_experimental: false,
         };
         let binding = if let Some(provider) = provider {
             comfy_runtime::NativeNodeBinding::ProviderRequired {
@@ -2329,13 +2389,15 @@ pub(crate) mod tests {
             }
         };
         let mut registry = NativeNodeRegistry::default();
-        registry.register_native_bindings([binding]).map_err(|error| {
-            NativeServiceError::new(
-                NativeServiceErrorKind::Internal,
-                "test_native_binding_invalid",
-                error.to_string(),
-            )
-        })?;
+        registry
+            .register_native_bindings([binding])
+            .map_err(|error| {
+                NativeServiceError::new(
+                    NativeServiceErrorKind::Internal,
+                    "test_native_binding_invalid",
+                    error.to_string(),
+                )
+            })?;
         Ok(registry)
     }
 
@@ -2700,13 +2762,14 @@ pub(crate) mod tests {
 
     pub(crate) fn validate_native_object_info_fixture() -> Result<(), NativeServiceError> {
         let profile_id = profile("00000000-0000-0000-0000-000000000001")?;
-        let bound_registry = native_image_registry_projection().map_err(|error| {
-            NativeServiceError::new(
-                NativeServiceErrorKind::Internal,
-                "test_native_registry_invalid",
-                error.to_string(),
-            )
-        })?;
+        let bound_registry =
+            comfy_runtime::native_image_registry_projection().map_err(|error| {
+                NativeServiceError::new(
+                    NativeServiceErrorKind::Internal,
+                    "test_native_registry_invalid",
+                    error.to_string(),
+                )
+            })?;
         let load_image_descriptor =
             bound_registry
                 .descriptor("LoadImage")
@@ -2774,6 +2837,11 @@ pub(crate) mod tests {
         let body = body_json(response)?;
         assert_eq!(body.as_object().map(Map::len), Some(5));
         assert_eq!(body["LoadImage"]["python_module"], "nodes");
+        assert_eq!(
+            body["LoadImage"]["sim_source"]["catalog_status"],
+            "descriptor-only"
+        );
+        assert!(body["LoadImage"]["sim_source"]["feature_id"].is_string());
         assert_eq!(
             body["LoadImage"]["input"]["required"]["image"][0],
             json!([])
@@ -2882,6 +2950,13 @@ pub(crate) mod tests {
                 "reason": "inactive in the canonical source registry",
             })
         );
+        assert_eq!(
+            catalog["AutogrowNamesTestNode"]["sim_source"]["catalog_status"],
+            "inactive"
+        );
+        assert!(catalog["AutogrowNamesTestNode"]["sim_source"]["inactive_reason"].is_string());
+        assert!(catalog["AutogrowNamesTestNode"]["sim_source"]["availability"].is_string());
+        assert!(catalog["AutogrowNamesTestNode"]["sim_source"]["feature_id"].is_string());
 
         let error = services
             .dispatch(request(
@@ -2918,29 +2993,40 @@ pub(crate) mod tests {
                 calls: calls.clone(),
             }),
             provider_required_registry(
-                "MinimaxSubjectToVideoNode",
-                "comfy_api_nodes.minimax",
+                "BeebleSwitchXImageEdit",
+                "comfy_api_nodes.beeble",
                 "requires a verified native provider",
             )?,
         )?;
         let provider_catalog = body_json(provider_services.dispatch(request(
             HttpMethod::Get,
-            "/object_info/MinimaxSubjectToVideoNode",
+            "/object_info/BeebleSwitchXImageEdit",
             NativeServiceOperation::NodeCatalog,
             profile_id,
             None,
         )?)?)?;
         assert_eq!(
-            provider_catalog["MinimaxSubjectToVideoNode"]["python_module"],
-            "comfy_api_nodes.nodes_minimax"
+            provider_catalog["BeebleSwitchXImageEdit"]["python_module"],
+            "comfy_api_nodes.nodes_beeble"
         );
         assert_eq!(
-            provider_catalog["MinimaxSubjectToVideoNode"]["sim_native_binding"],
+            provider_catalog["BeebleSwitchXImageEdit"]["sim_native_binding"],
             json!({
                 "disposition": "provider_required",
                 "reason": "requires a verified native provider",
             })
         );
+        assert_eq!(
+            provider_catalog["BeebleSwitchXImageEdit"]["sim_source"]["catalog_status"],
+            "provider-required"
+        );
+        assert!(
+            provider_catalog["BeebleSwitchXImageEdit"]["sim_source"]["inactive_reason"].is_null()
+        );
+        assert!(
+            provider_catalog["BeebleSwitchXImageEdit"]["sim_source"]["availability"].is_string()
+        );
+        assert!(provider_catalog["BeebleSwitchXImageEdit"]["sim_source"]["feature_id"].is_string());
         assert_eq!(calls.load(Ordering::SeqCst), 0);
         Ok(())
     }
@@ -2951,12 +3037,13 @@ pub(crate) mod tests {
         let profile_id = profile("00000000-0000-0000-0000-000000000001")?;
         let mut registry = NativeNodeRegistry::default();
         let descriptor = RuntimeNodeDescriptor {
+            schema_version: 1,
             class_type: "Presentationless".to_owned(),
             implementation_version: "1".to_owned(),
-            inputs: BTreeMap::new(),
+            inputs: Vec::new(),
+            dynamic_inputs: Vec::new(),
             outputs: Vec::new(),
             output_node: false,
-            availability: comfy_runtime::RuntimeAvailability::Native,
             effect: comfy_runtime::EffectClass::Pure,
             cache: comfy_runtime::RuntimeCachePolicy::InputIdentity,
         };

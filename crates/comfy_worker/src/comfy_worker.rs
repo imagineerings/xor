@@ -7,8 +7,8 @@ use std::{
 };
 
 use comfy_runtime::{
-    AttemptEvent, AttemptEventKind, AttemptState, ExecutionEventBus, NativeDiffusionProvider,
-    InputBinding, NativeImageExecutor, NativeImageRuntimeError, NativeImageWorkerEvent,
+    AttemptEvent, AttemptEventKind, AttemptState, ExecutionEventBus, InputBinding,
+    NativeDiffusionProvider, NativeImageExecutor, NativeImageRuntimeError, NativeImageWorkerEvent,
     NativeImageWorkerPlan, NativeImageWorkerProgress, NativeImageWorkerProgressKind, NativeValue,
     PluginAuthorizationVerifier, WorkerBackendSelection,
 };
@@ -1331,11 +1331,9 @@ mod tests {
 
     #[test]
     fn serialized_worker_plan_rejects_nested_process_local_handles() {
-        let handle_type = comfy_runtime::NativeHandleType::new(
-            comfy_runtime::NativeHandleKind::Model,
-            "MODEL",
-        )
-        .expect("valid model handle type");
+        let handle_type =
+            comfy_runtime::NativeHandleType::new(comfy_runtime::NativeHandleKind::Model, "MODEL")
+                .expect("valid model handle type");
         let store_identity = comfy_runtime::NativeHandleStoreIdentity::new(
             uuid::Uuid::from_u128(1),
             uuid::Uuid::from_u128(2),
@@ -1351,7 +1349,7 @@ mod tests {
         .expect("structurally valid forged handle");
         let node_id = comfy_types::NodeId::from("1");
         let descriptor = comfy_runtime::NativeNodeDescriptor {
-            schema_version: comfy_runtime::NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
+            schema_version: 1,
             class_type: "ForgedInput".to_owned(),
             implementation_version: "1".to_owned(),
             inputs: Vec::new(),
