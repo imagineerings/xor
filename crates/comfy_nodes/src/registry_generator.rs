@@ -1241,21 +1241,47 @@ mod tests {
             .all(|descriptor| descriptor.catalog_status == CatalogNodeStatus::Inactive);
         assert!(catalog_status_is_read_only);
 
-        let generated_descriptor_membership_is_exact = crate::GENERATED_MODULES
+        let generated_slice_modules = crate::GENERATED_MODULES
+            .iter()
+            .copied()
+            .filter(|module| module.starts_with("slices/"))
+            .collect::<Vec<_>>();
+        let generated_family_modules = crate::GENERATED_MODULES
+            .iter()
+            .copied()
+            .filter(|module| module.starts_with("families/"))
+            .collect::<Vec<_>>();
+        let early_descriptor_ids = IMAGE_SLICE_NODE_IDS
+            .iter()
+            .chain(DIFFUSION_SLICE_NODE_IDS)
+            .copied()
+            .collect::<BTreeSet<_>>();
+        let family_descriptor_ids = crate::GENERATED_FAMILY_DESCRIPTOR_IDS
+            .iter()
+            .copied()
+            .collect::<BTreeSet<_>>();
+        let generated_descriptor_ids = crate::GENERATED_DESCRIPTOR_IDS
+            .iter()
+            .copied()
+            .collect::<BTreeSet<_>>();
+        let generated_descriptor_membership_is_exact = generated_slice_modules
             == ["slices/native_diffusion", "slices/native_image"]
+            && generated_family_modules == crate::GENERATED_FAMILY_MODULES
+            && crate::GENERATED_MODULES
+                .windows(2)
+                .all(|pair| pair[0] < pair[1])
             && crate::GENERATED_DESCRIPTOR_IDS
-                == [
-                    "CLIPTextEncode",
-                    "CheckpointLoaderSimple",
-                    "EmptyLatentImage",
-                    "ImageInvert",
-                    "ImageScale",
-                    "KSampler",
-                    "LoadImage",
-                    "PreviewImage",
-                    "SaveImage",
-                    "VAEDecode",
-                ]
+                .windows(2)
+                .all(|pair| pair[0] < pair[1])
+            && crate::GENERATED_FAMILY_DESCRIPTOR_IDS
+                .windows(2)
+                .all(|pair| pair[0] < pair[1])
+            && early_descriptor_ids.is_disjoint(&family_descriptor_ids)
+            && generated_descriptor_ids
+                == early_descriptor_ids
+                    .union(&family_descriptor_ids)
+                    .copied()
+                    .collect()
             && crate::GENERATED_DESCRIPTOR_IDS
                 .iter()
                 .all(|identifier| registry.registered().contains_key(*identifier));
