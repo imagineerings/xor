@@ -116,7 +116,7 @@ fn portable_values_dynamic_ports_and_attempt_handles_fail_closed() -> Result<(),
         NativeValueType::Handle(image_type.clone()),
     ])?;
     let descriptor = NativeNodeDescriptor {
-        schema_version: comfy_runtime::NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
+        schema_version: comfy_nodes::NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
         class_type: "Task367PortableProbe".to_owned(),
         implementation_version: "1".to_owned(),
         inputs: vec![NativeInputDescriptor {

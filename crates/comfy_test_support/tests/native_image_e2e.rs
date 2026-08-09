@@ -11,7 +11,7 @@ use comfy_media::{PngLimits, decode_png, encode_png_frame};
 use comfy_runtime::{
     AssetNamespace, AssetRoots, AssetService, AttemptState, AuthorizedCapabilities, InputBinding,
     NATIVE_IMAGE_REGISTRY_VERSION, NativeImageOutputProposal, NativeImageWorkerEvent,
-    NativeImageWorkerPlan, OutputCommitReceipt, OutputCommitter, RuntimeSupervisor,
+    NativeImageWorkerPlan, NativeValue, OutputCommitReceipt, OutputCommitter, RuntimeSupervisor,
     RuntimeSupervisorError, SharedAssetService, SupervisorPolicy, WorkerHealth, WorkerLaunchConfig,
     authorize_native_input_reader, authorize_native_output_committer,
     compile_native_image_workflow,
@@ -500,7 +500,13 @@ fn compiled_hidden_literal<'a>(
         .and_then(|node| node.inputs.get(input_name))
         .ok_or_else(|| format!("compiled node {node_id} omitted hidden input {input_name}"))?;
     match input {
-        InputBinding::Literal { value } => Ok(value),
+        InputBinding::Literal {
+            value: NativeValue::PreservedUnknown { value, .. },
+        } => Ok(value),
+        InputBinding::Literal { .. } => Err(format!(
+            "compiled node {node_id} hidden input {input_name} was not preserved JSON"
+        )
+        .into()),
         InputBinding::Link { .. } => Err(format!(
             "compiled node {node_id} hidden input {input_name} was unexpectedly linked"
         )

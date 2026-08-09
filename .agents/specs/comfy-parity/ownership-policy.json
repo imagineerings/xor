@@ -6258,7 +6258,7 @@
         {
           "name": "native-diffusion-runtime-binds-tokenizer-identity-to-cache-and-handles",
           "path": "crates/comfy_runtime/src/native_execution_controller.rs",
-          "pattern": "cache_identities: CanonicalNativeDiffusionCacheIdentities[\\s\\S]*provider_identity\\.tokenizer_digest\\(\\) != bundle\\.tokenizer_digest\\(\\)[\\s\\S]*NativeDiffusionHandle::from_bundle[\\s\\S]*handle\\.require_exact_match"
+          "pattern": "cache_identities: CanonicalNativeDiffusionCacheIdentities[\\s\\S]*NativeDiffusionHandle::from_bundle[\\s\\S]*stored\\s*\\.metadata\\s*\\.require_exact_match\\(&expected_metadata\\)[\\s\\S]*provider_identity\\.tokenizer_digest\\(\\) != bundle\\.tokenizer_digest\\(\\)"
         },
         {
           "name": "native-diffusion-cache-exposes-canonical-tokenizer-dependency",
@@ -6388,7 +6388,7 @@
         {
           "name": "fixture-validation-rejects-invalid-weight-contracts",
           "path": "crates/comfy_test_support/tests/native_diffusion_foundation.rs",
-          "pattern": "native_diffusion_fixture_rejects_invalid_weight_keys_and_shapes"
+          "pattern": "native_diffusion_fixture_rejects_tampering_before_weight_parsing"
         }
       ],
       "known_open_reasons": [],
@@ -9597,7 +9597,7 @@
         {
           "name": "verified-plugin-registry-adapter",
           "path": "crates/comfy_plugin_host/src/registry_adapter.rs",
-          "pattern": "register_bound_batch_with_presentations\\(bindings\\)[\\s\\S]*fn runtime_presentation\\(node: &PluginNode\\) -> RuntimeNodePresentation[\\s\\S]*display_name: node\\.display_name\\.clone\\(\\)[\\s\\S]*category: node\\.category\\.clone\\(\\)[\\s\\S]*port\\.name\\.clone\\(\\)"
+          "pattern": "register_bound_batch_with_presentations\\(bindings\\)[\\s\\S]*fn native_presentation\\(node: &PluginNode\\) -> NativeNodePresentation[\\s\\S]*display_name: node\\.display_name\\.clone\\(\\)[\\s\\S]*category: node\\.category\\.clone\\(\\)[\\s\\S]*port\\.name\\.clone\\(\\)"
         },
         {
           "name": "component-api-uses-checked-presentation",

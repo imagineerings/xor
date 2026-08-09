@@ -1286,6 +1286,44 @@ fn zero_scratch() -> Result<ScratchReservation, comfy_tensor::TensorError> {
     workspace_authority.authorize_workspace(0)
 }
 
+fn native_values_semantically_equal(left: &NativeValue, right: &NativeValue) -> bool {
+    match (left, right) {
+        (NativeValue::Primitive { value: left }, NativeValue::Primitive { value: right }) => {
+            left == right
+        }
+        (
+            NativeValue::PreservedUnknown {
+                type_name: left_type,
+                value: left_value,
+            },
+            NativeValue::PreservedUnknown {
+                type_name: right_type,
+                value: right_value,
+            },
+        ) => left_type == right_type && left_value == right_value,
+        (NativeValue::List { values: left }, NativeValue::List { values: right }) => {
+            left.len() == right.len()
+                && left
+                    .iter()
+                    .zip(right)
+                    .all(|(left, right)| native_values_semantically_equal(left, right))
+        }
+        (NativeValue::Handle { value: left }, NativeValue::Handle { value: right }) => {
+            left.handle_type() == right.handle_type()
+                && left.digest_sha256() == right.digest_sha256()
+        }
+        _ => false,
+    }
+}
+
+fn native_output_sets_semantically_equal(left: &[NativeValue], right: &[NativeValue]) -> bool {
+    left.len() == right.len()
+        && left
+            .iter()
+            .zip(right)
+            .all(|(left, right)| native_values_semantically_equal(left, right))
+}
+
 async fn invoke_registry_binding_at(
     registry: &NativeNodeRegistry,
     stage: &str,
@@ -2004,7 +2042,11 @@ async fn val_worker_plugin_001(executor: BackgroundExecutor) {
         else {
             return Err("private worker plugin returned a non-value outcome".into());
         };
-        assert_eq!(first_outputs, second_outputs);
+        assert_ne!(first_outputs, second_outputs);
+        assert!(native_output_sets_semantically_equal(
+            &first_outputs,
+            &second_outputs
+        ));
         assert_eq!(first_ui, second_ui);
         assert_eq!(first_effects, second_effects);
         assert_eq!(first_effects.len(), 1);
@@ -2031,14 +2073,14 @@ async fn val_worker_plugin_001(executor: BackgroundExecutor) {
             ]
         );
         let cancelled = CancellationToken::default();
-        cancelled.cancel();
         let (cancelled_context, cancelled_inputs, cancelled_generation) = registry_invocation(
             PromptId(Uuid::from_u128(11)),
             AttemptId(Uuid::from_u128(12)),
             NodeId("cancelled-echo-fixture".to_owned()),
-            cancelled,
+            cancelled.clone(),
         )?;
         let staged_input_count = cancelled_generation.len();
+        cancelled.cancel();
         let cancelled_error = registry
             .node("echo")
             .ok_or("component registry has no echo binding")?

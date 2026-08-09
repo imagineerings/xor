@@ -3190,9 +3190,12 @@ pub(crate) mod tests {
         });
         let mut bytes = serde_json::to_vec_pretty(&artifact)?;
         bytes.push(b'\n');
-        let artifact_directory = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../..")
-            .join("target/comfy-parity");
+        let artifact_directory = std::env::var_os("CARGO_TARGET_DIR")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| {
+                std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target")
+            })
+            .join("comfy-parity");
         std::fs::create_dir_all(&artifact_directory)?;
         std::fs::write(artifact_directory.join("val-http-001.json"), bytes)?;
         Ok(())

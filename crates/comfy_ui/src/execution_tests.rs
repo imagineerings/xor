@@ -422,7 +422,12 @@ fn generated_ui_compiler_tracks_the_comprehensive_frontend_projection() -> Resul
         return Err("native UI fixture opened read-only".into());
     };
     let bytes = engine.document.to_workflow_bytes()?;
-    let plan = compile_generated_native_workflow(&bytes, &BTreeSet::new())?;
+    let plan = compile_generated_native_workflow(&bytes, &BTreeSet::new()).map_err(|error| {
+        format!(
+            "generated native workflow compilation failed: {}",
+            error.message
+        )
+    })?;
     assert_eq!(plan.nodes.len(), 5);
     assert!(
         plan.nodes

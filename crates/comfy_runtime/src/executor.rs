@@ -315,20 +315,18 @@ impl NativeNodeRegistry {
                 actual: implementation_version,
             });
         }
-        if node.implementation_namespace().trim().is_empty() {
+        let implementation_namespace = node.implementation_namespace().to_owned();
+        if implementation_namespace.trim().is_empty() {
             return Err(ExecutionError::InvalidNodeImplementation(class_type));
         }
         self.nodes.insert(class_type.clone(), node);
         self.bindings.insert(
-            class_type.clone(),
+            class_type,
             RegistryBindingState {
                 disposition: NativeNodeBindingDisposition::Executable,
                 provider_activated: false,
-                implementation_namespace: self
-                    .nodes
-                    .get(&class_type)
-                    .map(|node| node.implementation_namespace().to_owned()),
-                catalog_source: String::new(),
+                implementation_namespace: Some(implementation_namespace.clone()),
+                catalog_source: implementation_namespace,
                 reason: None,
             },
         );
@@ -3169,6 +3167,11 @@ pub(crate) mod tests {
         )])?;
         assert!(registry.descriptor_is_bound("Component"));
         assert_eq!(registry.presentation("Component"), Some(&presentation));
+        assert_eq!(
+            registry.binding_source("Component"),
+            Some("sim.native_rust")
+        );
+        registry.validate_comprehensive_bindings()?;
         Ok(())
     }
 

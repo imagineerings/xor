@@ -706,7 +706,7 @@ fn application_surface_cases() -> BTreeMap<&'static str, bool> {
             worker_source
                 .find("backend_neutral_executor_unavailable(session.backend_device())")
                 .zip(worker_source.find("prepare_native_image_memory(&session, &worker_plan)"))
-                .zip(worker_source.find("NativeImageExecutor::new_with_cpu_backend"))
+                .zip(worker_source.find("NativeImageExecutor::new_with_generated_registry"))
                 .is_some_and(|((preflight, memory), cpu_executor)| {
                     preflight < memory && preflight < cpu_executor
                 })
