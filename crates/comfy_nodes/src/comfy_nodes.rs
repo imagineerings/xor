@@ -3,6 +3,8 @@ pub mod execution;
 pub mod object_info;
 pub mod registry_generator;
 pub mod slice_registry;
+pub mod source_type;
+pub mod stored_payload;
 
 pub use descriptor::{
     CatalogNodeDescriptor, CatalogNodeInputSchemaMetadata, CatalogNodeOutputSchemaMetadata,
@@ -22,8 +24,7 @@ pub use execution::{
     NativeNodeContext, NativeNodeContractError, NativeNodeDescriptor, NativeNodeFailure,
     NativeNodeFailureKind, NativeNodeOutcome, NativeNodePresentation, NativeOpaqueHandle,
     NativeOutputDescriptor, NativePortCardinality, NativePreparedEffectRequest, NativePrimitive,
-    NativePrimitiveType, NativeStoredArtifactObject, NativeStoredModelObject, NativeStoredObject,
-    NativeStoredTensorObject, NativeTypeUnion, NativeValue, NativeValueType,
+    NativePrimitiveType, NativeTypeUnion, NativeValue, NativeValueType,
     native_value_matches_input_schema, validate_generated_family_bindings,
 };
 pub use object_info::{
@@ -36,6 +37,17 @@ pub use registry_generator::{
 };
 pub use slice_registry::{
     DIFFUSION_SLICE_NODE_IDS, EarlySliceRegistry, IMAGE_SLICE_NODE_IDS, SliceRegistryError,
+};
+pub use source_type::{
+    NativeSourceTypeError, NativeSourceTypeOwner, NativeSourceTypeProjection,
+    NativeSourceValueClass, native_custom_source_type_projection,
+    native_plugin_source_type_projection, native_source_type_projection,
+    native_value_type_for_output_schema, native_value_types_for_input_schema,
+};
+pub use stored_payload::{
+    NativePayloadResidency, NativeProviderPayload, NativeResidentAllocation,
+    NativeResidentAllocationId, NativeResidentPayloadKind, NativeStoredModelPayload,
+    NativeStoredPayload, NativeStoredPayloadError,
 };
 
 include!(concat!(env!("OUT_DIR"), "/generated_modules.rs"));

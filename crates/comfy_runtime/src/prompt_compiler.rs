@@ -576,9 +576,21 @@ fn native_scalar_literal(value: &Value, accepted_types: &NativeTypeUnion) -> Opt
         || accepted_types
             .members()
             .contains(&NativeValueType::PreservedUnknown)
+        || accepted_types
+            .members()
+            .iter()
+            .any(|value_type| matches!(value_type, NativeValueType::NamedPreservedUnknown(_)))
     {
+        let type_name = accepted_types
+            .members()
+            .iter()
+            .find_map(|value_type| match value_type {
+                NativeValueType::NamedPreservedUnknown(type_name) => Some(type_name.clone()),
+                _ => None,
+            })
+            .unwrap_or_else(|| "sim.json@1".to_owned());
         Some(NativeValue::PreservedUnknown {
-            type_name: "sim.json@1".to_owned(),
+            type_name,
             value: value.clone(),
         })
     } else {

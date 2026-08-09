@@ -220,27 +220,24 @@ pub fn native_source_type_projection(
         "CONDITIONING" => handle!("CONDITIONING", Compute, Conditioning, "conditioning"),
         "CONTROL_NET" => handle!("CONTROL_NET", Compute, ControlNet, "controlnet"),
         "CURVE" => inline!("CURVE", PreservedUnknown, "curve"),
-        "DA3MODELTYPE" => handle!("DA3MODELTYPE", Compute, Model, "da3_model"),
-        "FACEDETECTIONTYPE" => handle!("FACEDETECTIONTYPE", Compute, Model, "face_detection"),
-        "FACELANDMARKSTYPE" => handle!(
-            "FACELANDMARKSTYPE",
+        "DA3_MODEL" => handle!("DA3_MODEL", Compute, Model, "da3_model"),
+        "FACE_DETECTION_MODEL" => {
+            handle!("FACE_DETECTION_MODEL", Compute, Model, "face_detection")
+        }
+        "FACE_LANDMARKS" => handle!(
+            "FACE_LANDMARKS",
             Compute,
             StructuredCompute,
             "face_landmarks"
         ),
-        "FRAMEINTERPOLATIONMODEL" => handle!(
-            "FRAMEINTERPOLATIONMODEL",
-            Compute,
-            Model,
-            "frame_interpolation"
-        ),
+        "INTERP_MODEL" => handle!("INTERP_MODEL", Compute, Model, "frame_interpolation"),
         "GLIGEN" => handle!("GLIGEN", Compute, Model, "gligen"),
         "GUIDER" => handle!("GUIDER", Compute, StructuredCompute, "guider"),
         "HISTOGRAM" => inline!("HISTOGRAM", PreservedUnknown, "histogram"),
         "HOOKS" => handle!("HOOKS", Compute, Model, "hooks"),
         "HOOK_KEYFRAMES" => handle!("HOOK_KEYFRAMES", Compute, Model, "hook_keyframes"),
-        "ICLORAPARAMETERS" => handle!(
-            "ICLORAPARAMETERS",
+        "IC_LORA_PARAMETERS" => handle!(
+            "IC_LORA_PARAMETERS",
             Compute,
             StructuredCompute,
             "ic_lora_parameters"
@@ -259,13 +256,13 @@ pub fn native_source_type_projection(
         "LOSS_MAP" => handle!("LOSS_MAP", Compute, StructuredCompute, "loss_map"),
         "MODEL" => handle!("MODEL", Compute, Model, "model"),
         "MODEL_PATCH" => handle!("MODEL_PATCH", Compute, Model, "model_patch"),
-        "MOGEMODELTYPE" => handle!("MOGEMODELTYPE", Compute, Model, "moge_model"),
+        "MOGE_MODEL" => handle!("MOGE_MODEL", Compute, Model, "moge_model"),
         "NOISE" => handle!("NOISE", Compute, StructuredCompute, "noise"),
-        "OPTICALFLOW" => handle!("OPTICALFLOW", Compute, Model, "optical_flow"),
+        "OPTICAL_FLOW" => handle!("OPTICAL_FLOW", Compute, Model, "optical_flow"),
         "PHOTOMAKER" => handle!("PHOTOMAKER", Compute, Model, "photomaker"),
         "POSE_KEYPOINT" => handle!("POSE_KEYPOINT", Compute, StructuredCompute, "pose_keypoint"),
-        "SAM3TRACKDATA" => handle!(
-            "SAM3TRACKDATA",
+        "SAM3_TRACK_DATA" => handle!(
+            "SAM3_TRACK_DATA",
             Compute,
             StructuredCompute,
             "sam3_track_data"
@@ -286,7 +283,7 @@ pub fn native_source_type_projection(
         "AUDIO" => handle!("AUDIO", MediaAsset, Audio, "audio"),
         "AUDIO_RECORD" => handle!("AUDIO_RECORD", MediaAsset, Artifact, "audio_record"),
         "CAMERA_CONTROL" => handle!("CAMERA_CONTROL", MediaAsset, ThreeD, "camera_control"),
-        "DA3GEOMETRY" => handle!("DA3GEOMETRY", MediaAsset, ThreeD, "da3_geometry"),
+        "DA3_GEOMETRY" => handle!("DA3_GEOMETRY", MediaAsset, ThreeD, "da3_geometry"),
         "FILE_3D" => handle!("FILE_3D", MediaAsset, ThreeD, "file_any"),
         "FILE_3D_FBX" => handle!("FILE_3D_FBX", MediaAsset, ThreeD, "file_fbx"),
         "FILE_3D_GLTF" => handle!("FILE_3D_GLTF", MediaAsset, ThreeD, "file_gltf"),
@@ -311,7 +308,7 @@ pub fn native_source_type_projection(
         "LOAD3D_MODEL_INFO" => handle!("LOAD3D_MODEL_INFO", MediaAsset, ThreeD, "model_info"),
         "MASK" => handle!("MASK", MediaAsset, Mask, "mask"),
         "MESH" => handle!("MESH", MediaAsset, ThreeD, "mesh"),
-        "MOGEGEOMETRY" => handle!("MOGEGEOMETRY", MediaAsset, ThreeD, "moge_geometry"),
+        "MOGE_GEOMETRY" => handle!("MOGE_GEOMETRY", MediaAsset, ThreeD, "moge_geometry"),
         "SPLAT" => handle!("SPLAT", MediaAsset, ThreeD, "splat"),
         "SVG" => handle!("SVG", MediaAsset, Artifact, "svg"),
         "VIDEO" => handle!("VIDEO", MediaAsset, Video, "video"),
@@ -500,7 +497,7 @@ fn schema_scalar_types(
     preserved_type: &str,
 ) -> BTreeSet<NativeValueType> {
     let mut result = BTreeSet::new();
-    for choice in choices.iter().chain(default.into_iter()) {
+    for choice in choices.iter().chain(default) {
         result.insert(match choice {
             NativeSchemaValue::Null => NativeValueType::Primitive(NativePrimitiveType::Null),
             NativeSchemaValue::Boolean { .. } => {
@@ -562,12 +559,12 @@ mod tests {
         "CROP_METHODS",
         "CURVE",
         "CUSTOM",
-        "DA3GEOMETRY",
-        "DA3MODELTYPE",
+        "DA3_GEOMETRY",
+        "DA3_MODEL",
         "DICT",
         "EXTRA_PNGINFO",
-        "FACEDETECTIONTYPE",
-        "FACELANDMARKSTYPE",
+        "FACE_DETECTION_MODEL",
+        "FACE_LANDMARKS",
         "FILE_3D",
         "FILE_3D_FBX",
         "FILE_3D_GLB",
@@ -583,7 +580,7 @@ mod tests {
         "FILE_3D_USDZ",
         "FLOAT",
         "FLOATS",
-        "FRAMEINTERPOLATIONMODEL",
+        "INTERP_MODEL",
         "GEMINI_INPUT_FILES",
         "GET_FILENAME_LIST",
         "GLIGEN",
@@ -591,7 +588,7 @@ mod tests {
         "HISTOGRAM",
         "HOOKS",
         "HOOK_KEYFRAMES",
-        "ICLORAPARAMETERS",
+        "IC_LORA_PARAMETERS",
         "IMAGE",
         "IMAGECOMPARE",
         "INT",
@@ -611,19 +608,19 @@ mod tests {
         "MODEL_PATCH",
         "MODEL_TASK_ID",
         "MODEL_TASK_ID,RIG_TASK_ID,RETARGET_TASK_ID",
-        "MOGEGEOMETRY",
-        "MOGEMODELTYPE",
+        "MOGE_GEOMETRY",
+        "MOGE_MODEL",
         "NOISE",
         "OPENAI_CHAT_CONFIG",
         "OPENAI_INPUT_FILES",
-        "OPTICALFLOW",
+        "OPTICAL_FLOW",
         "PATHS",
         "PHOTOMAKER",
         "POSE_KEYPOINT",
         "PROMPT",
         "RETARGET_TASK_ID",
         "RIG_TASK_ID",
-        "SAM3TRACKDATA",
+        "SAM3_TRACK_DATA",
         "SAMPLER",
         "SAMPLERS",
         "SCHEDULERS",

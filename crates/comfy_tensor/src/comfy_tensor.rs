@@ -17,6 +17,7 @@ pub mod cpu_backend;
 pub mod dtypes;
 #[cfg(feature = "cpu")]
 pub mod image_ops;
+pub mod native_node_payload;
 pub mod operation;
 pub mod operation_contracts;
 pub mod promotion;
@@ -28,6 +29,7 @@ pub use cpu_backend::*;
 pub use dtypes::*;
 #[cfg(feature = "cpu")]
 pub use image_ops::*;
+pub use native_node_payload::*;
 pub use operation::*;
 pub use operation_contracts::*;
 pub use promotion::*;

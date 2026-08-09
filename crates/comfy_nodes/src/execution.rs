@@ -1,11 +1,13 @@
-use crate::{NativeDescriptorSchemaMetadata, NativeInputSchemaMetadata, NativeSchemaValue};
-use comfy_tensor::{ScratchReservation, TensorDescriptor};
+use crate::{
+    NativeDescriptorSchemaMetadata, NativeInputSchemaMetadata, NativeSchemaValue,
+    NativeStoredPayload, NativeStoredPayloadError,
+};
+use comfy_tensor::ScratchReservation;
 use comfy_types::{ApiPrompt, AttemptId, CancellationToken, NodeId, PromptId};
 use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
-    any::Any,
     collections::{BTreeMap, BTreeSet},
     fmt,
     sync::Arc,
@@ -86,6 +88,7 @@ pub enum NativeHandleKind {
     ThreeD,
     Artifact,
     ProviderTask,
+    StructuredCompute,
 }
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -268,6 +271,7 @@ pub enum NativeValueType {
     Primitive(NativePrimitiveType),
     Handle(NativeHandleType),
     PreservedUnknown,
+    NamedPreservedUnknown(String),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -298,6 +302,10 @@ impl NativeTypeUnion {
                 expected == value.handle_type()
             }
             (NativeValueType::PreservedUnknown, NativeValue::PreservedUnknown { .. }) => true,
+            (
+                NativeValueType::NamedPreservedUnknown(expected),
+                NativeValue::PreservedUnknown { type_name, .. },
+            ) => expected == type_name,
             _ => false,
         })
     }
@@ -311,6 +319,11 @@ impl NativeTypeUnion {
         }
         if self.0.contains(&NativeValueType::Any) && self.0.len() != 1 {
             return Err(NativeNodeContractError::InvalidTypeUnion);
+        }
+        for member in &self.0 {
+            if let NativeValueType::NamedPreservedUnknown(type_name) = member {
+                validate_identifier("preserved unknown value type", type_name)?;
+            }
         }
         Ok(())
     }
@@ -686,6 +699,51 @@ impl NativeNodeDescriptor {
             }
         }
         if let Some(source_schema) = &self.source_schema {
+            if matches!(
+                source_schema.node.provenance,
+                crate::NativeSchemaProvenance::SourceV1 | crate::NativeSchemaProvenance::SourceV3
+            ) {
+                for (input, schema) in self.inputs.iter().zip(&source_schema.inputs) {
+                    let expected =
+                        crate::native_value_types_for_input_schema(schema).map_err(|error| {
+                            NativeNodeContractError::InvalidSourceSchema(error.to_string())
+                        })?;
+                    if input.accepted_types != expected {
+                        return Err(NativeNodeContractError::InvalidSourceSchema(format!(
+                            "execution type for input `{}` does not match its source schema",
+                            input.name
+                        )));
+                    }
+                }
+                for (input, schema) in self
+                    .dynamic_inputs
+                    .iter()
+                    .zip(&source_schema.dynamic_inputs)
+                {
+                    let expected = crate::native_value_types_for_input_schema(&schema.input)
+                        .map_err(|error| {
+                            NativeNodeContractError::InvalidSourceSchema(error.to_string())
+                        })?;
+                    if input.input.accepted_types != expected {
+                        return Err(NativeNodeContractError::InvalidSourceSchema(format!(
+                            "execution type for dynamic input `{}` does not match its source schema",
+                            input.name_template
+                        )));
+                    }
+                }
+                for (output, schema) in self.outputs.iter().zip(&source_schema.outputs) {
+                    let expected =
+                        crate::native_value_type_for_output_schema(schema).map_err(|error| {
+                            NativeNodeContractError::InvalidSourceSchema(error.to_string())
+                        })?;
+                    if output.produced_type != expected {
+                        return Err(NativeNodeContractError::InvalidSourceSchema(format!(
+                            "execution type for output `{}` does not match its source schema",
+                            output.name
+                        )));
+                    }
+                }
+            }
             for (input, schema) in self.inputs.iter().zip(&source_schema.inputs) {
                 if let Some(default) = schema
                     .default
@@ -776,197 +834,6 @@ impl NativeNodePresentation {
     }
 }
 
-pub type NativeStoredObject = Arc<dyn Any + Send + Sync>;
-
-#[derive(Clone)]
-pub struct NativeStoredTensorObject {
-    descriptor: TensorDescriptor,
-    byte_length: u64,
-    digest_sha256: String,
-    payload: NativeStoredObject,
-}
-
-impl fmt::Debug for NativeStoredTensorObject {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("NativeStoredTensorObject")
-            .field("descriptor", &self.descriptor)
-            .field("byte_length", &self.byte_length)
-            .field("digest_sha256", &self.digest_sha256)
-            .finish_non_exhaustive()
-    }
-}
-
-impl NativeStoredTensorObject {
-    pub fn new(
-        descriptor: TensorDescriptor,
-        byte_length: u64,
-        digest_sha256: impl Into<String>,
-        payload: NativeStoredObject,
-    ) -> Result<Self, NativeNodeContractError> {
-        let digest_sha256 = digest_sha256.into();
-        descriptor
-            .validate_backing_byte_length(byte_length)
-            .map_err(|_| NativeNodeContractError::InvalidStoredObject)?;
-        if !valid_sha256(&digest_sha256) {
-            return Err(NativeNodeContractError::InvalidDigest);
-        }
-        Ok(Self {
-            descriptor,
-            byte_length,
-            digest_sha256,
-            payload,
-        })
-    }
-
-    pub fn descriptor(&self) -> &TensorDescriptor {
-        &self.descriptor
-    }
-
-    pub fn byte_length(&self) -> u64 {
-        self.byte_length
-    }
-
-    pub fn digest(&self) -> &str {
-        &self.digest_sha256
-    }
-
-    pub fn payload(&self) -> &NativeStoredObject {
-        &self.payload
-    }
-}
-
-#[derive(Clone)]
-pub struct NativeStoredModelObject {
-    identifier: String,
-    format: String,
-    digest_sha256: String,
-    payload: NativeStoredObject,
-}
-
-impl fmt::Debug for NativeStoredModelObject {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("NativeStoredModelObject")
-            .field("identifier", &self.identifier)
-            .field("format", &self.format)
-            .field("digest_sha256", &self.digest_sha256)
-            .finish_non_exhaustive()
-    }
-}
-
-impl NativeStoredModelObject {
-    pub fn new(
-        identifier: impl Into<String>,
-        format: impl Into<String>,
-        digest_sha256: impl Into<String>,
-        payload: NativeStoredObject,
-    ) -> Result<Self, NativeNodeContractError> {
-        let identifier = identifier.into();
-        let format = format.into();
-        let digest_sha256 = digest_sha256.into();
-        validate_identifier("stored model identifier", &identifier)?;
-        validate_identifier("stored model format", &format)?;
-        if !valid_sha256(&digest_sha256) {
-            return Err(NativeNodeContractError::InvalidDigest);
-        }
-        Ok(Self {
-            identifier,
-            format,
-            digest_sha256,
-            payload,
-        })
-    }
-
-    pub fn identifier(&self) -> &str {
-        &self.identifier
-    }
-
-    pub fn format(&self) -> &str {
-        &self.format
-    }
-
-    pub fn digest(&self) -> &str {
-        &self.digest_sha256
-    }
-
-    pub fn payload(&self) -> &NativeStoredObject {
-        &self.payload
-    }
-}
-
-#[derive(Clone)]
-pub struct NativeStoredArtifactObject {
-    namespace: String,
-    identifier: String,
-    byte_length: u64,
-    digest_sha256: String,
-    payload: NativeStoredObject,
-}
-
-impl fmt::Debug for NativeStoredArtifactObject {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("NativeStoredArtifactObject")
-            .field("namespace", &self.namespace)
-            .field("identifier", &self.identifier)
-            .field("byte_length", &self.byte_length)
-            .field("digest_sha256", &self.digest_sha256)
-            .finish_non_exhaustive()
-    }
-}
-
-impl NativeStoredArtifactObject {
-    pub fn new(
-        namespace: impl Into<String>,
-        identifier: impl Into<String>,
-        byte_length: u64,
-        digest_sha256: impl Into<String>,
-        payload: NativeStoredObject,
-    ) -> Result<Self, NativeNodeContractError> {
-        let namespace = namespace.into();
-        let identifier = identifier.into();
-        let digest_sha256 = digest_sha256.into();
-        validate_identifier("stored artifact namespace", &namespace)?;
-        validate_text(
-            "stored artifact identifier",
-            &identifier,
-            MAX_IDENTIFIER_BYTES,
-            false,
-        )?;
-        if !valid_sha256(&digest_sha256) {
-            return Err(NativeNodeContractError::InvalidDigest);
-        }
-        Ok(Self {
-            namespace,
-            identifier,
-            byte_length,
-            digest_sha256,
-            payload,
-        })
-    }
-
-    pub fn namespace(&self) -> &str {
-        &self.namespace
-    }
-
-    pub fn identifier(&self) -> &str {
-        &self.identifier
-    }
-
-    pub fn byte_length(&self) -> u64 {
-        self.byte_length
-    }
-
-    pub fn digest(&self) -> &str {
-        &self.digest_sha256
-    }
-
-    pub fn payload(&self) -> &NativeStoredObject {
-        &self.payload
-    }
-}
-
 #[derive(Debug, Error)]
 pub enum NativeHandleStoreError {
     #[error("native handle operation was cancelled")]
@@ -985,6 +852,8 @@ pub enum NativeHandleStoreError {
     Rejected(String),
     #[error("native handle contract is invalid: {0}")]
     InvalidHandle(#[from] NativeNodeContractError),
+    #[error("native stored payload is invalid: {0}")]
+    InvalidPayload(#[from] NativeStoredPayloadError),
 }
 
 pub trait NativeHandleStore: Send + Sync + fmt::Debug {
@@ -996,14 +865,11 @@ pub trait NativeHandleStore: Send + Sync + fmt::Debug {
         handle: &NativeOpaqueHandle,
         expected_type: &NativeHandleType,
         cancellation: &CancellationToken,
-    ) -> Result<NativeStoredObject, NativeHandleStoreError>;
+    ) -> Result<Arc<NativeStoredPayload>, NativeHandleStoreError>;
 
     fn publish(
         &self,
-        handle_type: NativeHandleType,
-        value: NativeStoredObject,
-        digest_sha256: Option<String>,
-        resident_bytes: usize,
+        payload: NativeStoredPayload,
         cancellation: &CancellationToken,
     ) -> Result<NativeOpaqueHandle, NativeHandleStoreError>;
 
@@ -1468,7 +1334,8 @@ fn valid_sha256(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use comfy_tensor::{CpuWorkspaceAuthority, DType, DeviceId, StreamId};
+    use comfy_sampler::{NativeNoisePayload, NativeSamplerPayloadError};
+    use comfy_tensor::CpuWorkspaceAuthority;
     use std::sync::{
         Mutex,
         atomic::{AtomicU64, Ordering},
@@ -1478,7 +1345,7 @@ mod tests {
         identity: NativeHandleStoreIdentity,
         attempt_id: AttemptId,
         next_identifier: AtomicU64,
-        values: Mutex<BTreeMap<String, (NativeStoredObject, Option<String>)>>,
+        values: Mutex<BTreeMap<String, Arc<NativeStoredPayload>>>,
     }
 
     impl fmt::Debug for TestHandleStore {
@@ -1548,15 +1415,15 @@ mod tests {
             handle: &NativeOpaqueHandle,
             expected_type: &NativeHandleType,
             cancellation: &CancellationToken,
-        ) -> Result<NativeStoredObject, NativeHandleStoreError> {
+        ) -> Result<Arc<NativeStoredPayload>, NativeHandleStoreError> {
             self.check_handle(handle, expected_type, cancellation)?;
             let values = self.values.lock().map_err(|_| {
                 NativeHandleStoreError::Rejected("test store is poisoned".to_owned())
             })?;
-            let (value, digest) = values
+            let value = values
                 .get(handle.identifier())
                 .ok_or_else(|| NativeHandleStoreError::Missing(handle.identifier().to_owned()))?;
-            if digest.as_deref() != handle.digest_sha256() {
+            if value.digest_sha256() != handle.digest_sha256().unwrap_or_default() {
                 return Err(NativeHandleStoreError::DigestMismatch);
             }
             Ok(value.clone())
@@ -1564,16 +1431,15 @@ mod tests {
 
         fn publish(
             &self,
-            handle_type: NativeHandleType,
-            value: NativeStoredObject,
-            digest_sha256: Option<String>,
-            _resident_bytes: usize,
+            payload: NativeStoredPayload,
             cancellation: &CancellationToken,
         ) -> Result<NativeOpaqueHandle, NativeHandleStoreError> {
             cancellation
                 .check()
                 .map_err(|_| NativeHandleStoreError::Cancelled)?;
-            handle_type.validate()?;
+            payload.validate()?;
+            let handle_type = payload.handle_type()?;
+            let digest_sha256 = payload.digest_sha256();
             let generation = self.next_identifier.fetch_add(1, Ordering::AcqRel);
             let identifier = format!("handle-{generation}");
             let handle = NativeOpaqueHandle::new(
@@ -1581,12 +1447,12 @@ mod tests {
                 self.identity,
                 identifier.clone(),
                 generation,
-                digest_sha256.clone(),
+                Some(digest_sha256),
             )?;
             self.values
                 .lock()
                 .map_err(|_| NativeHandleStoreError::Rejected("test store is poisoned".to_owned()))?
-                .insert(identifier, (value, digest_sha256));
+                .insert(identifier, Arc::new(payload));
             Ok(handle)
         }
 
@@ -1611,7 +1477,13 @@ mod tests {
     }
 
     fn model_type() -> Result<NativeHandleType, NativeNodeContractError> {
-        NativeHandleType::new(NativeHandleKind::Model, "MODEL")
+        NativeHandleType::new(NativeHandleKind::StructuredCompute, "NOISE")
+    }
+
+    fn test_payload(value: u64) -> Result<NativeStoredPayload, NativeSamplerPayloadError> {
+        Ok(NativeStoredPayload::Noise(Arc::new(
+            NativeNoisePayload::random(value)?,
+        )))
     }
 
     fn store_identity(
@@ -1876,13 +1748,7 @@ mod tests {
             ),
             Err(NativeNodeContractError::InvalidNodeContext)
         ));
-        let handle = handle_store.publish(
-            model_type()?,
-            Arc::new("model state".to_owned()),
-            Some("a".repeat(64)),
-            "model state".len(),
-            &CancellationToken::default(),
-        )?;
+        let handle = handle_store.publish(test_payload(6)?, &CancellationToken::default())?;
         let model = NativeValue::Handle { value: handle };
         let context = NativeNodeContext::new(
             prompt_id,
@@ -1937,18 +1803,9 @@ mod tests {
         let identity = store_identity(21, 22)?;
         let store = TestHandleStore::new(identity, attempt_id);
         let model_type = model_type()?;
-        let handle = store.publish(
-            model_type.clone(),
-            Arc::new("model state".to_owned()),
-            Some("b".repeat(64)),
-            "model state".len(),
-            &CancellationToken::default(),
-        )?;
+        let handle = store.publish(test_payload(7)?, &CancellationToken::default())?;
         let resolved = store.resolve(&handle, &model_type, &CancellationToken::default())?;
-        assert_eq!(
-            resolved.downcast_ref::<String>().map(String::as_str),
-            Some("model state")
-        );
+        resolved.validate()?;
 
         let wrong_store = NativeOpaqueHandle::new(
             model_type.clone(),
@@ -1997,7 +1854,7 @@ mod tests {
         assert!(cancellation.cancel());
         let before = store.object_count()?;
         assert!(matches!(
-            store.publish(image_type, Arc::new(vec![0_u8; 4]), None, 4, &cancellation,),
+            store.publish(test_payload(8)?, &cancellation),
             Err(NativeHandleStoreError::Cancelled)
         ));
         assert_eq!(store.object_count()?, before);
@@ -2021,50 +1878,33 @@ mod tests {
     }
 
     #[test]
-    fn stored_object_projections_bind_exact_metadata_to_one_payload()
+    fn stored_payload_derives_exact_metadata_without_an_untyped_escape()
     -> Result<(), Box<dyn std::error::Error>> {
-        let tensor_payload: NativeStoredObject = Arc::new(vec![0_u8; 16]);
-        let descriptor =
-            TensorDescriptor::contiguous(vec![2, 2], DType::F32, DeviceId::CPU, StreamId::DEFAULT)?;
-        let tensor =
-            NativeStoredTensorObject::new(descriptor.clone(), 16, "a".repeat(64), tensor_payload)?;
-        assert_eq!(tensor.descriptor(), &descriptor);
-        assert_eq!(tensor.byte_length(), 16);
-        assert_eq!(tensor.digest(), "a".repeat(64));
-        assert!(tensor.payload().downcast_ref::<Vec<u8>>().is_some());
+        let payload = test_payload(9)?;
+        payload.validate()?;
+        assert_eq!(payload.handle_type()?, model_type()?);
+        assert_eq!(payload.digest_sha256().len(), 64);
+        assert!(payload.resident_bytes()? > 0);
+        let different = test_payload(10)?;
+        different.validate()?;
+        assert_ne!(payload.digest_sha256(), different.digest_sha256());
+        let provider = crate::NativeProviderPayload::checked(
+            NativeHandleType::new(NativeHandleKind::ProviderTask, "MODEL_TASK_ID")?,
+            "signed.provider",
+            "a".repeat(64),
+            Vec::new(),
+        )?;
+        assert_eq!(provider.signed_namespace(), "signed.provider");
+        assert_ne!(provider.identity_digest_sha256(), "a".repeat(64));
         assert!(matches!(
-            NativeStoredTensorObject::new(
-                descriptor,
-                1,
-                "a".repeat(64),
-                Arc::new(Vec::<u8>::new())
+            crate::NativeProviderPayload::checked(
+                NativeHandleType::new(NativeHandleKind::Image, "IMAGE")?,
+                "signed.provider",
+                "b".repeat(64),
+                Vec::new(),
             ),
-            Err(NativeNodeContractError::InvalidStoredObject)
+            Err(NativeStoredPayloadError::InvalidProviderPayload)
         ));
-
-        let model = NativeStoredModelObject::new(
-            "fixture-model",
-            "sim-native-model-v1",
-            "b".repeat(64),
-            Arc::new("model payload".to_owned()),
-        )?;
-        assert_eq!(model.identifier(), "fixture-model");
-        assert_eq!(model.format(), "sim-native-model-v1");
-        assert_eq!(model.digest(), "b".repeat(64));
-        assert!(model.payload().downcast_ref::<String>().is_some());
-
-        let artifact = NativeStoredArtifactObject::new(
-            "output",
-            "nested/fixture.png",
-            128,
-            "c".repeat(64),
-            Arc::new(vec![0_u8; 128]),
-        )?;
-        assert_eq!(artifact.namespace(), "output");
-        assert_eq!(artifact.identifier(), "nested/fixture.png");
-        assert_eq!(artifact.byte_length(), 128);
-        assert_eq!(artifact.digest(), "c".repeat(64));
-        assert!(artifact.payload().downcast_ref::<Vec<u8>>().is_some());
         Ok(())
     }
 }

@@ -153,8 +153,7 @@ fn model_handle(
             "wanBlockSwap model input must be a MODEL handle",
         ));
     };
-    if value.handle_type().kind != NativeHandleKind::Model
-        || value.handle_type().type_id != "MODEL"
+    if value.handle_type().kind != NativeHandleKind::Model || value.handle_type().type_id != "MODEL"
     {
         return Err(invalid_inputs(
             "wanBlockSwap model input must be an exact MODEL handle",
@@ -205,9 +204,10 @@ fn interrupted_failure() -> NativeNodeFailure {
 mod tests {
     use super::*;
     use crate::{
-        NativeHandleStore, NativeHandleStoreIdentity, NativePrimitive, NativeStoredObject,
+        NativeHandleStore, NativeHandleStoreIdentity, NativePrimitive, NativeStoredPayload,
         NodeRegistry,
     };
+    use comfy_sampler::NativeNoisePayload;
     use comfy_tensor::CpuWorkspaceAuthority;
     use comfy_types::{AttemptId, CancellationToken, NodeId, PromptId};
     use serde_json::{Value, json};
@@ -221,8 +221,6 @@ mod tests {
         env!("CARGO_MANIFEST_DIR"),
         "/../comfy_test_support/fixtures/nodes/empty-root-category-declared-by-source-comfy-node-0757/fixture.json"
     ));
-    const DIGEST: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-
     #[derive(Debug)]
     struct TestStore {
         identity: NativeHandleStoreIdentity,
@@ -230,7 +228,7 @@ mod tests {
         identifier: String,
         generation: u64,
         digest: String,
-        value: NativeStoredObject,
+        value: Arc<NativeStoredPayload>,
         resolve_count: AtomicUsize,
         publish_count: AtomicUsize,
         revoke_count: AtomicUsize,
@@ -243,6 +241,10 @@ mod tests {
             generation_id: u128,
             attempt_id: AttemptId,
         ) -> Result<Arc<Self>, NativeNodeContractError> {
+            let value = Arc::new(NativeStoredPayload::Noise(Arc::new(
+                NativeNoisePayload::random(757)
+                    .map_err(|_| NativeNodeContractError::InvalidStoredObject)?,
+            )));
             Ok(Arc::new(Self {
                 identity: NativeHandleStoreIdentity::new(
                     Uuid::from_u128(store_id),
@@ -251,8 +253,8 @@ mod tests {
                 attempt_id,
                 identifier: "model-1".to_owned(),
                 generation: 1,
-                digest: DIGEST.to_owned(),
-                value: Arc::new("canonical-runtime-model-payload".to_owned()),
+                digest: value.digest_sha256(),
+                value,
                 resolve_count: AtomicUsize::new(0),
                 publish_count: AtomicUsize::new(0),
                 revoke_count: AtomicUsize::new(0),
@@ -285,7 +287,7 @@ mod tests {
             handle: &NativeOpaqueHandle,
             expected_type: &NativeHandleType,
             cancellation: &CancellationToken,
-        ) -> Result<NativeStoredObject, NativeHandleStoreError> {
+        ) -> Result<Arc<NativeStoredPayload>, NativeHandleStoreError> {
             cancellation
                 .check()
                 .map_err(|_| NativeHandleStoreError::Cancelled)?;
@@ -318,10 +320,7 @@ mod tests {
 
         fn publish(
             &self,
-            _handle_type: NativeHandleType,
-            _value: NativeStoredObject,
-            _digest_sha256: Option<String>,
-            _resident_bytes: usize,
+            _payload: NativeStoredPayload,
             _cancellation: &CancellationToken,
         ) -> Result<NativeOpaqueHandle, NativeHandleStoreError> {
             self.publish_count.fetch_add(1, Ordering::AcqRel);
@@ -390,15 +389,26 @@ mod tests {
         let fixture: Value = serde_json::from_str(FIXTURE)?;
         let (descriptor, presentation, node) = executable()?;
         assert_eq!(NODE_DESCRIPTOR_IDS, &[CLASS_TYPE]);
-        assert_eq!(fixture.pointer("/feature_id").and_then(Value::as_str), Some(FEATURE_ID));
+        assert_eq!(
+            fixture.pointer("/feature_id").and_then(Value::as_str),
+            Some(FEATURE_ID)
+        );
         assert_eq!(
             fixture.pointer("/source/sha256").and_then(Value::as_str),
             Some("4f9130b7db711de4aae861dbe47790a5a105203ffcdd98ccf5a8286a09adca62")
         );
-        assert_eq!(fixture.pointer("/source/byte_length").and_then(Value::as_u64), Some(1411));
+        assert_eq!(
+            fixture
+                .pointer("/source/byte_length")
+                .and_then(Value::as_u64),
+            Some(1411)
+        );
         assert_eq!(descriptor.class_type, CLASS_TYPE);
         assert_eq!(descriptor.implementation_version, IMPLEMENTATION_VERSION);
-        assert_eq!(descriptor.schema_version, NATIVE_NODE_CONTRACT_SCHEMA_VERSION);
+        assert_eq!(
+            descriptor.schema_version,
+            NATIVE_NODE_CONTRACT_SCHEMA_VERSION
+        );
         assert_eq!(descriptor.inputs.len(), 1);
         let input = descriptor.inputs.first().ok_or("model input is absent")?;
         assert_eq!(input.name, "model");
@@ -422,7 +432,10 @@ mod tests {
         assert!(presentation.is_deprecated);
         assert!(!presentation.is_experimental);
         assert_eq!(node.class_type(), descriptor.class_type);
-        assert_eq!(node.implementation_version(), descriptor.implementation_version);
+        assert_eq!(
+            node.implementation_version(),
+            descriptor.implementation_version
+        );
         let binding = native_node_bindings()?
             .into_iter()
             .next()
@@ -440,7 +453,10 @@ mod tests {
         let handle = store.handle()?;
         let values = inputs(handle.clone());
         let node_context = context(store.clone(), CancellationToken::default())?;
-        assert!(node.demanded_lazy_inputs(&node_context, &values)?.is_empty());
+        assert!(
+            node.demanded_lazy_inputs(&node_context, &values)?
+                .is_empty()
+        );
         assert_eq!(node.cache_change_token(&values)?, CACHE_CHANGE_TOKEN);
         assert_eq!(
             node.cache_dependencies(&node_context, &values)?,
@@ -465,7 +481,8 @@ mod tests {
     }
 
     #[test]
-    fn boundary_validation_failure_and_cancellation_publish_nothing() -> Result<(), Box<dyn Error>> {
+    fn boundary_validation_failure_and_cancellation_publish_nothing() -> Result<(), Box<dyn Error>>
+    {
         let (_, _, node) = executable()?;
         let attempt_id = AttemptId(Uuid::from_u128(0x75705));
         let store = TestStore::new(0x75706, 0x75707, attempt_id)?;
@@ -477,10 +494,7 @@ mod tests {
                     value: NativePrimitive::String("not-a-model".to_owned()),
                 },
             )]),
-            BTreeMap::from([(
-                "model".to_owned(),
-                NativeValue::List { values: Vec::new() },
-            )]),
+            BTreeMap::from([("model".to_owned(), NativeValue::List { values: Vec::new() })]),
             BTreeMap::from([
                 (
                     "model".to_owned(),
@@ -536,10 +550,7 @@ mod tests {
         let forged_handles = [
             NativeOpaqueHandle::new(
                 model_type()?,
-                NativeHandleStoreIdentity::new(
-                    Uuid::from_u128(0x7570c),
-                    Uuid::from_u128(0x75707),
-                )?,
+                NativeHandleStoreIdentity::new(Uuid::from_u128(0x7570c), Uuid::from_u128(0x75707))?,
                 store.identifier.clone(),
                 1,
                 Some(store.digest.clone()),
@@ -549,10 +560,7 @@ mod tests {
                 store.identity,
                 store.identifier.clone(),
                 1,
-                Some(
-                    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-                        .to_owned(),
-                ),
+                Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned()),
             )?,
         ];
         for forged_handle in forged_handles {
@@ -627,7 +635,12 @@ mod tests {
         let NativeNodeOutcome::Values { outputs, .. } = outcome else {
             return Err("recovered wanBlockSwap execution did not produce values".into());
         };
-        assert_eq!(outputs, [NativeValue::Handle { value: fresh_handle }]);
+        assert_eq!(
+            outputs,
+            [NativeValue::Handle {
+                value: fresh_handle
+            }]
+        );
         assert_eq!(after_restart.publish_count.load(Ordering::Acquire), 0);
         Ok(())
     }

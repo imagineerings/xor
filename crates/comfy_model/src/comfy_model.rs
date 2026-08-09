@@ -27,6 +27,7 @@ pub mod ltx_family;
 pub mod lumina_zimage_family;
 pub mod model_family;
 pub mod model_store;
+pub mod native_node_payload;
 pub mod native_ops;
 pub mod omnigen2_boogu_family;
 pub mod parser_limits;
@@ -342,6 +343,10 @@ pub use model_store::{
     ModelOperationRecord, ModelOperationStage, ModelStore, ModelStoreError,
     VerifiedEmbeddingArchivePayload, VerifiedModelTensor, VerifiedModelTensorPayload,
     VerifiedSentencePieceVocabulary,
+};
+pub use native_node_payload::{
+    AudioEncoderOutput, AudioEncoderOutputKind, IcLoraParameters, LossMap, NativeModelPayload,
+    NativeModelPayloadError, NativeModelResourceIdentity, NativeModelResourceRole,
 };
 pub use native_ops::{
     CastedParameters, ConvolutionAutopad, EmbeddingOptions, GeluApproximation, LossReduction,

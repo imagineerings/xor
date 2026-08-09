@@ -52,8 +52,8 @@ DECISIONS = [
     (31, "Describe every model family and patch graph", "`CatalogModelDescriptor` losslessly preserves every model-ledger row, source status, and all candidates for ambiguous source identifiers without claiming execution. `comfy_model::model_family` is the sole stable family identity, source-ordered registration, checked parsed-fact admission and storage-dtype normalization, UNet-prefix and consecutive-block selection, key-derived prefixed-native, standalone-native, and Diffusers layout admission, layout-to-state-plan selection, native/diffusers configuration normalization, explicit registered-only or base-fallback policy, configuration/profile selection, typed tokenizer/CLIP-target selection boundary, scored resolution and ambiguity rejection, descriptor, transactional multi-component state-dictionary mapping, checked build, shape-reduced forward-program, checkpoint, dtype/device, and family-memory owner. `ModelParsedFacts` and its tensor/format fact members are bounded DTOs at that boundary; they do not parse, cache, index, persist, or load tensor payloads. Tokenizer and CLIP candidates contain checked qualified native target identifiers plus bounded typed data-only configuration facts; raw Python expressions, calls, unpacking, or executable source text are rejected at the production boundary. Its checked transformation plans recursively revalidate every deserialized selector bound, predicate, source key, and dimension expression before admission, reject current-selected-tensor dimensions in operations without a selected-tensor evaluation context, and provide bounded key predicates and rewrites, move/drop/repeatable-copy/route, typed original-or-staged references, per-selected-tensor checked dimension expressions, selector-driven branching with per-output post-transforms, split, narrow, concat/assembly, transpose, permute, reshape, expand, conditional canonical tensor operations, constant/arange generation, checked add/multiply/exact-divide dimension expressions, explicit unmatched-key disposition, exact required-component schema coverage plus a schema for every plan-targeted optional component, optional-component absent/present semantics, declared component and required-key closure, cancellation, and atomic commit. Architecture rows select only immutable checked signatures and static or metadata-keyed plan data; they cannot install arbitrary callbacks, own family matching, or repeat tensor mechanics. `ModelStore::family_probe` is the sole focused adapter from an existing store-scoped `LoadedModel`: it projects immutable cached tensor and format metadata into `ModelParsedFacts`, delegates admission and every selector to `model_family`, and performs no artifact read, reparse, second cache, family match, normalization, state transformation, build, execution, or publication. Its typed probe errors are adapter DTOs rather than a competing validation domain. The development-only AST generator records an exact source-fingerprinted 94-row projection in source ordinal order without importing or executing ComfyUI. `PatchGraph` is the sole ordered typed patch-payload validation, base binding, target slicing and padding, copy-on-write application, rollback, and cache-digest owner for DenseDiff, Set, LoRA, LoHa, LoKr, OFT, GLoRA, BOFT, DORA, nested, model-as-LoRA, merge, and quantized replacement semantics; `comfy_model::patches` is a key-map/parser adapter only. `comfy_model::conditioning` alone owns immutable conditioning values, masks, regions, preparation, concatenation compatibility, window inputs, and conditioning identities. `comfy_model::clip` alone owns bounded weighted token batches, CLIP execution plans, native tokenizer/text-encoder execution, encodings, and their cache identities while importing model-family target selection and ModelStore artifacts. `comfy_model::vae` alone owns VAE descriptors, execution/tile plans, encode/decode execution, and cache identities while importing canonical latent transforms. `comfy_model::controlnet` alone owns immutable control/adapter chains, hint preparation, strengths, result slots, merge order, and identities. A focused `comfy_sampler::guidance` adapter alone composes canonical conditioning with SamplingProfile and sampler transactions for CFG and hook order; it cannot own conditioning validation, sigma/time equations, sampler state, tensor math, workspace, trace, callback publication, or cancellation. The generated source-fingerprinted conditioning-contract catalog is the exact closure ledger for these domains; backend-model rows are not accepted as a substitute inventory. `comfy_model::latent_format` remains the sole latent identity, geometry, transform, empty-construction, preview, cancellation, and typed-error owner. Focused multi-row architecture adapters may own only shared immutable source-derived configuration normalization; `comfy_model::cogvideox_family` is the one CogVideoX layout, shape/configuration, patch-default, and 1.0/1.5 latent-profile adapter, while the I2V, Inpaint, and T2V rows retain only channel-specific identity, detection, plans, and programs. Generated `src/families/*.rs` and `src/latent_formats/*.rs` modules contain immutable definitions and focused selectors only. `comfy_model/build.rs` emits the one sorted compile-time registry/test manifest; a distinct post-row closure rejects an empty, partial, duplicated, skipped, or provenance-incomplete 94-family result, so foundation validation cannot pass vacuously."),
     (32, "Use a demand-driven native DAG executor", "`NativeNode` exposes a static descriptor plus a cancellable `execute(NodeContext, InputSet) -> NodeFuture<OutputSet>`; inputs and outputs are keyed by explicit port IDs. `PromptCompiler` validates exact string identifiers, ports, widgets, links, values, hidden inputs, lazy dependencies, list/cardinality rules, blockers, cycles, and output reachability before producing an immutable plan that preserves unknown prompt and node fields. Hidden prompt and extra-PNG-info inputs are injected from the immutable API prompt and submission metadata rather than trusting user widgets. The compiler records a static non-lazy demand closure, while execution resolves lazy inputs only when the node requests them. Nodes declare `Pure`, `ReadsArtifact`, `WritesArtifact`, `Provider`, or `ExclusiveDevice` effect class; the scheduler maps lists deterministically with repeat-last broadcast semantics, expands compiled subgraphs into bounded namespaced child scopes, and owns structural cancellation per execution. Cache keys use canonical CBOR-equivalent field ordering over implementation/version, demanded input hashes, artifact/patch digests, backend/dtype, plugin digest/API, RNG phase, configuration, registry generation, and compatibility token. API routes submit canonical commands to this executor and never publish effects themselves. Effects prepare first and OutputCommitter alone commits one durable atomic publication batch only after successful execution; failure, cancellation, journal-write failure, or restart rolls back every prepared or partially published effect and exposes no partial output set. <!-- impl: crates/comfy_runtime/src/prompt_compiler.rs#PromptCompiler --> <!-- impl: crates/comfy_runtime/src/executor.rs#ExecutionEngine --> <!-- impl: crates/comfy_runtime/src/output_committer.rs#OutputCommitter -->"),
     (33, "Implement exact samplers, schedulers, and RNG phases", "Each sampler and scheduler identifier owns a separate or explicitly shared algorithm-family Rust module with no alias substitution. A source alias that changes only a checked family option remains a focused adapter over that family owner; CPU and accelerator aliases never cross stochastic-generation placement boundaries. `comfy_sampler::sampling_profile` owns checked projections of both Comfy's generic `get_ancestral_step` sigma-down/up coefficients and the shared CONST/rectified-flow ancestral sigma-down/renoise coefficients, and every ancestral sampler consumes them rather than retaining a row-local formula. The `dpmpp_2m_sde` family module is the sole 2M-SDE equation owner for midpoint/Heun correction and explicit CPU-seeded-transfer/native-input-device Brownian placement; the GPU and Heun rows only validate identity and select the checked family option/placement, with ABI-distinct RNG checkpoints proving the boundary. The dpmpp_3m_sde and dpmpp_sde families likewise own their equations while their GPU rows only select native-input-device Brownian placement. Every native-input-device selector reaches `BackendCapabilityMatrix` before opening the canonical compatibility RNG transaction, while CPU-source Brownian variants use CPU-seeded-transfer placement and never mint an alternate availability decision. The existing native-diffusion Euler module remains the sole Euler equation traversal: its deterministic `sample_euler` entry point is preserved as a wrapper, its checked generalized entry point owns source-exact churn/noise and callback timing, and crate-private checked prediction/derivative/callback plus advance helpers are shared with the ancestral adapter. The generated `euler` row is only the immutable definition and focused adapter; `euler_ancestral` owns only standard/CONST rescale, traversal, and noise around the canonical ancestral coefficients. The generalized `seeds_2` module is the sole SEEDS-2 and exponential-Heun traversal, intermediate-stage, callback, cancellation, commit, and stochastic RNG-transaction owner; `exp_heun_2_x0` and `exp_heun_2_x0_sde` are checked r=1 DTO/error adapters. Shared exponential-integrator phi functions remain owned by `sampling_profile`, and native noise-device admission remains owned by `native_diffusion`. Generated descriptors bind the identifier to equations, supported prediction/guidance modes, scheduler inputs, RNG phases, callback points, and cancellation sites. The canonical sampling-foundation test parses the pinned `KSAMPLER_NAMES` literal and derives every present registry sampler's zero-based source ordinal, so a row cannot validate a self-consistent but incorrect ordinal through its own fixture. Golden fixtures store every sigma, noise tensor identity, denoiser input/output, latent intermediate, callback, and terminal error for analytical tiny models; CPU comparison is exact where the source is exact and otherwise uses the row's recorded tolerance. `comfy_sampler/build.rs` is the crate-local module-manifest owner for `src/algorithms/*.rs` and `src/schedulers/*.rs`; it rejects invalid or duplicate module names and emits sorted compile-time includes and manifest identities."),
-    (34, "Implement nodes as disjoint native families", "Every registered node row maps to one descriptor, implementation, and fixture set. The portable built-in execution contract, typed value and handle vocabulary, descriptor DTOs, cache and effect requests, cancellation context, native implementation trait, and executable/provider/unavailable binding variants live below the runtime registry in `comfy_nodes`; `comfy_runtime::NativeNodeRegistry` remains the sole executable binding, validation, and dispatch owner and atomically adapts those generated bindings into the canonical prompt, cache, effect, persistence, and recovery path. Before any family leaf executes, the shared schema-v2 contract losslessly and boundedly represents source type names, defaults, numeric constraints, steps, choices, multiline and widget flags, tooltips, force/raw-link/advanced behavior, dynamic inputs, and ordered outputs; one exhaustive source-type projection decides value and handle identity for runtime, plugins, API, UI, and leaves. Public canonical tensor, model, conditioning, media, artifact, provider-task, and 3D payloads retain the one concrete object behind the runtime store, and leaves resolve or publish only those sealed payload variants rather than raw `Any` or runtime-private wrappers. Runtime-owned services enter a family only through sealed checked handles and focused asset, provider, and prepared-effect adapters, so node modules cannot create another model, tensor, media, provider, asset, workspace, queue, cache, persistence, effect, or authorization owner. Each checked-in node module declares a non-empty, simple-string `pub const NODE_DESCRIPTOR_IDS: &[&str]` and exports the shared family-binding contract; `comfy_nodes/build.rs` deterministically scans `src/slices/*.rs` and `src/families/*.rs`, emits sorted module, descriptor, and family-binding manifests into `OUT_DIR`, and rejects invalid module names plus duplicate module/descriptor IDs. This lets each disjoint family leaf compile and execute focused contract tests before final breadth closure without concurrently editing the crate root. The foundation explicitly supports bounded dynamic inputs, checked type unions, typed opaque values, source-executable deprecated rows without silently enabling source-inactive rows, provider-required bindings through the verified provider/plugin boundary, and descriptor-only unavailable preservation. The early slice registry contains exactly the five image nodes and then the six diffusion nodes; the final generated registry reconciles every row, executable/provider/unavailable binding, production runtime projection, and object-info projection."),
-    (35, "Use explicit plugin ports and legacy mappings", "First-party plugins implement checked `RustComfyPlugin` and `RustNodeInstance` source traits over the same manifest, port, value, handle, cancellation, and error types as `sim:comfy-plugin@1.0.0`; no stable Rust dylib ABI is promised. The canonical type-ID registry maps immutable `namespace:name@major` IDs to exactly one publisher namespace, wire-schema identity, scalar/tensor/artifact/model representation, and legacy-alias set; duplicate ID, namespace, alias, representation, or schema ownership fails closed. The WIT manifest is a typed projection of nodes, ports, capabilities, UI contributions, routes, legacy mappings, and bounded scalar-default trees, and typed encoded values cross ports without an opaque JSON/byte manifest or value-validation escape hatch. Native tensor, model, and artifact handles retain one concrete runtime payload behind `NativeStoredTensorObject`, `NativeStoredModelObject`, or `NativeStoredArtifactObject`; those lower-contract wrappers expose only checked neutral descriptor, identity, size, and digest metadata to the signed plugin adapter and never create a second store or JSON value tunnel. `comfy_plugin_sdk::UiContribution` is the signature-covered frontend ABI DTO. Only verified `InstalledPlugin` records may be projected through Sim's live `ComponentHostRouter` adapter into `comfy_ui`; known surface identifiers become typed read-only declarative views, while unknown or malformed entries and every member of an ambiguous duplicate-identity set preserve the exact bounded schema payload and identity in a visible placeholder. The projection cannot authorize, install, dispatch, persist, or execute extension code. A host-owned invocation reports each port's kind, exact canonical type ID, serialization, cardinality, presence, and length; indexed scalar reads, opaque value takes, checked output creation, pushes, and explicit finish-presence support required, optional, empty, singular, and list ports for every value family with transfer/revocation rules. The SDK capability vocabulary and manifest quotas are versioned ABI request DTOs with checked mappings into sealed runtime grants and independent host-owned `CapabilityLimits` ceilings. `comfy_plugin_host` owns only no-WASI invocation quotas, opaque handles, revocation, invocation leasing, and invocation-local proposal buffers; preflight denial, cancellation, deadline, operation, handle, and known-size failures occur before service access, and bounded `CapabilityServiceContext` is passed to injected services. Filesystem, network/provider, secret, clock, randomness, model, final output publication, sanitized log, declarative UI-state, and route calls delegate to their D41 production owners, and the ABI `output-commit` operation yields a `PluginOutputProposal` rather than publishing a file. `extension_host::ExtensionStore` owns installation and component lifecycle, while `InstalledComponent::checked` alone validates the lifecycle identifier and in-memory pair bounds and `InstalledComponentBinding` only maps that canonical identity/version to signed plugin identity/version/digest/provenance. Signed manifests declare exact ports, requested grants, quotas, UI/routes, and legacy mappings but cannot confer authority. Major versions must match, minor features are negotiated, undeclared or ungranted calls fail before mutation or effects, and quotas/cancellation/rollback apply to every host call. Checked-in no-WASI echo and fuel-hang components are reproducibly built from pinned Rust sources and exercise successful create/invoke/drop/finish, all value families, cancellation, capabilities, traps, and fuel interruption. Resolution order is workflow pin, explicit user choice, signed registry, unique installed mapping, then a preserved placeholder; opening never rewrites data."),
+    (34, "Implement nodes as disjoint native families", "Every registered node row maps to one descriptor, implementation, and fixture set. The portable built-in execution contract, typed value and handle vocabulary, descriptor DTOs, cache and effect requests, cancellation context, native implementation trait, and executable/provider/unavailable binding variants live below the runtime registry in `comfy_nodes`; `comfy_runtime::NativeNodeRegistry` remains the sole executable binding, validation, and dispatch owner and atomically adapts those generated bindings into the canonical prompt, cache, effect, persistence, and recovery path. Before any family leaf executes, the shared schema-v2 contract losslessly and boundedly represents source type names, defaults, numeric constraints, steps, choices, multiline and widget flags, tooltips, force/raw-link/advanced behavior, dynamic inputs, and ordered outputs; one exhaustive source-type projection decides value and handle identity for runtime, plugins, API, UI, and leaves. Public canonical tensor, model, conditioning, media, artifact, provider-task, and 3D payloads retain the one concrete object behind the runtime store, and leaves resolve or publish only those sealed payload variants rather than raw `Any` or runtime-private wrappers. Behavioral socket values such as noise sources, guiders, and samplers retain their executable strategy behind lower-domain typed payloads; a passive record or caller-supplied digest cannot stand in for executable state. Runtime-owned services enter a family only through sealed checked handles and focused asset, provider, and prepared-effect adapters, so node modules cannot create another model, tensor, media, provider, asset, workspace, queue, cache, persistence, effect, or authorization owner. Each checked-in node module declares a non-empty, simple-string `pub const NODE_DESCRIPTOR_IDS: &[&str]` and exports the shared family-binding contract; `comfy_nodes/build.rs` deterministically scans `src/slices/*.rs` and `src/families/*.rs`, emits sorted module, descriptor, and family-binding manifests into `OUT_DIR`, and rejects invalid module names plus duplicate module/descriptor IDs. This lets each disjoint family leaf compile and execute focused contract tests before final breadth closure without concurrently editing the crate root. The foundation explicitly supports bounded dynamic inputs, checked type unions, typed opaque values, source-executable deprecated rows without silently enabling source-inactive rows, provider-required bindings through the verified provider/plugin boundary, and descriptor-only unavailable preservation. The early slice registry contains exactly the five image nodes and then the six diffusion nodes; the final generated registry reconciles every row, executable/provider/unavailable binding, production runtime projection, and object-info projection."),
+    (35, "Use explicit plugin ports and legacy mappings", "First-party plugins implement checked `RustComfyPlugin` and `RustNodeInstance` source traits over the same manifest, port, value, handle, cancellation, and error types as `sim:comfy-plugin@1.0.0`; no stable Rust dylib ABI is promised. The canonical type-ID registry maps immutable `namespace:name@major` IDs to exactly one publisher namespace, wire-schema identity, scalar/tensor/artifact/model representation, and legacy-alias set; duplicate ID, namespace, alias, representation, or schema ownership fails closed. The WIT manifest is a typed projection of nodes, ports, capabilities, UI contributions, routes, legacy mappings, and bounded scalar-default trees, and typed encoded values cross ports without an opaque JSON/byte manifest or value-validation escape hatch. Native handles retain exactly one concrete object behind the closed `NativeStoredPayload` boundary; lower-domain payload owners derive canonical type, semantic digest, and resident accounting, while the signed plugin adapter receives only a checked neutral view or an exact imported handle. Plugin-supplied metadata or ABI bytes cannot construct tensor, model, media, artifact, or executable sampler state, and ambiguous, stale, wrong-role, or forged handles fail before publication without a second store or JSON value tunnel. `comfy_plugin_sdk::UiContribution` is the signature-covered frontend ABI DTO. Only verified `InstalledPlugin` records may be projected through Sim's live `ComponentHostRouter` adapter into `comfy_ui`; known surface identifiers become typed read-only declarative views, while unknown or malformed entries and every member of an ambiguous duplicate-identity set preserve the exact bounded schema payload and identity in a visible placeholder. The projection cannot authorize, install, dispatch, persist, or execute extension code. A host-owned invocation reports each port's kind, exact canonical type ID, serialization, cardinality, presence, and length; indexed scalar reads, opaque value takes, checked output creation, pushes, and explicit finish-presence support required, optional, empty, singular, and list ports for every value family with transfer/revocation rules. The SDK capability vocabulary and manifest quotas are versioned ABI request DTOs with checked mappings into sealed runtime grants and independent host-owned `CapabilityLimits` ceilings. `comfy_plugin_host` owns only no-WASI invocation quotas, opaque handles, revocation, invocation leasing, and invocation-local proposal buffers; preflight denial, cancellation, deadline, operation, handle, and known-size failures occur before service access, and bounded `CapabilityServiceContext` is passed to injected services. Filesystem, network/provider, secret, clock, randomness, model, final output publication, sanitized log, declarative UI-state, and route calls delegate to their D41 production owners, and the ABI `output-commit` operation yields a `PluginOutputProposal` rather than publishing a file. `extension_host::ExtensionStore` owns installation and component lifecycle, while `InstalledComponent::checked` alone validates the lifecycle identifier and in-memory pair bounds and `InstalledComponentBinding` only maps that canonical identity/version to signed plugin identity/version/digest/provenance. Signed manifests declare exact ports, requested grants, quotas, UI/routes, and legacy mappings but cannot confer authority. Major versions must match, minor features are negotiated, undeclared or ungranted calls fail before mutation or effects, and quotas/cancellation/rollback apply to every host call. Checked-in no-WASI echo and fuel-hang components are reproducibly built from pinned Rust sources and exercise successful create/invoke/drop/finish, all value families, cancellation, capabilities, traps, and fuel interruption. Resolution order is workflow pin, explicit user choice, signed registry, unique installed mapping, then a preserved placeholder; opening never rewrites data."),
     (36, "Use a bounded native media registry", "Versioned Rust readers and writers cover image, HDR, mask, audio, video, metadata, preview, and 3D contracts. comfy_media::MetadataDocument is the sole generic embedded-metadata identification, parse, limit, diagnostic, source-byte retention, and metadata-write owner; comfy_media::png, workflow import, and asset services are focused adapters and may not repeat carrier parsing or writing. Metadata inspection identifies content before extension and bounds PNG/APNG text and compressed iTXt, WebP and AVIF EXIF, SVG CDATA, FLAC, MP3, Ogg/Opus, WebM EBML, MP4/MOV/M4V, GLB, latent/safetensors, EXR write-only, and PLY non-carrier behavior with typed diagnostics and exact source-byte retention. Asset indexing streams the complete digest while retaining only the configured metadata prefix, so large accepted assets remain indexable without unbounded allocation. PNG, SVG, GLB, safetensors, and OpenEXR writes preserve unrelated content, implement the cataloged metadata-suppression exceptions, and repair EXR absolute chunk offsets. Reviewed native FFI is allowed; required paths do not launch FFmpeg or another transcoder command. <!-- impl: crates/comfy_media/src/metadata.rs#MetadataDocument -->"),
     (37, "Keep the Comfy oracle development-only", "Oracle launchers and adapters are reverse development dependencies. Every recorded fixture carries source fingerprint and environment provenance; production crates and packages contain neither launcher nor live-source requirement."),
     (38, "Map comfy-cli to native lifecycle services", "A native `sim comfy` command family and headless host use the same runtime services as GPUI. Commands, flags, schemas, events, errors, configuration, downloads, and lifecycle states receive explicit native, migration, or defer mappings. The generated parameter ledger retains source annotations, scalar types, nullability, per-occurrence arity, total cardinality, repeatability, exact Enum choices, explicit parser callbacks/autocompletion/metavars, paired boolean spellings, defaults, and static-extraction limitations so native parsing and invalid-input validation do not infer missing contracts."),
@@ -73,8 +73,24 @@ _D34_STAGED_FOUNDATION_SENTENCE = (
     "inactive catalog are unavailable. Deprecation and experimental state are presentation "
     "metadata and never binding disposition."
 )
+
+_D41_NATIVE_PAYLOAD_OWNERSHIP_SENTENCE = (
+    "NativeSourceTypeProjection alone owns the exhaustive case-sensitive source socket mapping; "
+    "NativeStoredPayload is the only closed native handle-store value sum; "
+    "NativeHandleStoreGeneration alone owns staging, commit, lease, generation, and resident-"
+    "accounting transitions; and comfy_tensor, comfy_model, comfy_sampler, and comfy_media own "
+    "validation, semantic digest, and resident projection for their explicit payload variants."
+)
 DECISIONS = [
-    (number, title, f"{body} {_D34_STAGED_FOUNDATION_SENTENCE}" if number == 34 else body)
+    (
+        number,
+        title,
+        f"{body} {_D34_STAGED_FOUNDATION_SENTENCE}"
+        if number == 34
+        else f"{body} {_D41_NATIVE_PAYLOAD_OWNERSHIP_SENTENCE}"
+        if number == 41
+        else body,
+    )
     for number, title, body in DECISIONS
 ]
 
@@ -8587,8 +8603,8 @@ def native_node_schema_metadata_foundation_task(dependency: str) -> dict[str, ob
         "comfy-parity-native-node-schema-metadata-foundation",
         "Preserve exact native node schema and source metadata",
         [4, 6, 7, 16, 20, 32, 34, 41, 44],
-        [8, 20, 31, 32, 33, 34, 39, 41],
-        ["VAL-DOMAIN-004", "VAL-NODE-001", "VAL-NODE-002", "VAL-NODE-REGISTRY-001", "VAL-OWNERSHIP-001"],
+        [6, 8, 20, 24, 32, 34, 35, 39, 41],
+        ["VAL-DOMAIN-004", "VAL-NODE-001", "VAL-NODE-REGISTRY-001", "VAL-OWNERSHIP-001"],
         "Upgrade the portable node descriptor to a bounded schema-v2 projection of exact V1/V3 source metadata and make that one projection authoritative for generated leaves, prompt validation, object-info, API, workflow conversion, and GPUI frontend descriptors.",
         [".agents/specs/comfy-parity/catalogs/backend-nodes.csv", ".agents/specs/comfy-parity/catalogs/backend-node-contracts.json", ".agents/specs/comfy-parity/catalogs/native-spec-mapping.json", "projects/comfy/ComfyUI/comfy_api/latest/_io.py", "crates/comfy_nodes/src/execution.rs", "crates/comfy_runtime/src/prompt_compiler.rs", "crates/comfy_api/src/services.rs", "crates/comfy_ui/src/execution_model.rs"],
         [
@@ -8632,6 +8648,7 @@ def native_node_schema_metadata_foundation_task(dependency: str) -> dict[str, ob
         dependency,
         locked=True,
         feature_scoped=True,
+        criterion_ids=["4.1", "4.2", "4.3", "6.1", "6.2", "6.3", "6.5", "16.3", "16.4", "32.1", "32.3", "32.5", "32.8", "44.2"],
     )
 
 
@@ -8640,15 +8657,62 @@ def native_node_compute_value_foundation_task(dependency: str, compute_dependenc
         "comfy-parity-native-node-compute-value-foundation",
         "Establish canonical native node compute values",
         [4, 6, 7, 31, 32, 34, 35, 36, 37, 38, 41, 44],
-        [8, 20, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 39, 41],
-        ["VAL-DOMAIN-004", "VAL-TENSOR-001", "VAL-MODEL-FAMILY-001", "VAL-NODE-002", "VAL-NATIVE-E2E-001", "VAL-OWNERSHIP-001"],
-        "Define one exhaustive source socket-to-native value/handle mapping and sealed canonical tensor, latent, conditioning, model, CLIP, VAE, control, and structured compute payload boundary, then migrate the sole handle store and early image/diffusion consumers away from raw Any and runtime-private stored wrappers.",
-        [".agents/specs/comfy-parity/catalogs/backend-nodes.csv", ".agents/specs/comfy-parity/catalogs/native-compute-closure.json", "crates/comfy_nodes/src/execution.rs", "crates/comfy_tensor", "crates/comfy_model", "crates/comfy_sampler", "crates/comfy_runtime/src/executor.rs", "crates/comfy_runtime/src/native_execution_controller.rs"],
-        ["crates/comfy_nodes/src/execution.rs", "crates/comfy_nodes/src/comfy_nodes.rs", "crates/comfy_tensor/src/native_node_payload.rs", "crates/comfy_tensor/src/comfy_tensor.rs", "crates/comfy_model/src/native_node_payload.rs", "crates/comfy_model/src/comfy_model.rs", "crates/comfy_sampler/src/native_diffusion_payload.rs", "crates/comfy_sampler/src/comfy_sampler.rs", "crates/comfy_runtime/src/executor.rs", "crates/comfy_runtime/src/cache.rs", "crates/comfy_runtime/src/native_execution_controller.rs", "crates/comfy_runtime/src/comfy_runtime.rs", "crates/comfy_test_support/tests/native_node_family_e2e.rs", "crates/comfy_test_support/tests/native_diffusion_e2e.rs", "crates/comfy_test_support/tests/native_image_e2e.rs", "crates/comfy_test_support/tests/ownership_consolidation.rs", ".agents/specs/comfy-parity/ownership-policy.json", ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv"],
-        "The exhaustive source-type table has one case-sensitive canonical value/handle identity per catalog socket family. Family leaves publish and resolve only sealed canonical compute payloads whose role, shape, dtype, identity, digest, resident bytes, store, and generation are checked atomically. Existing image and diffusion producers and consumers use the same payloads; forged, wrong-role, stale, cancelled, failed, cache-evicted, persisted, and restarted handles publish no partial value or second store state.",
+        [8, 20, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 39, 41],
+        ["VAL-DOMAIN-004", "VAL-TENSOR-001", "VAL-MODEL-FAMILY-001", "VAL-NATIVE-E2E-001", "VAL-OWNERSHIP-001"],
+        "Define one exhaustive source socket-to-native value/handle mapping and a closed NativeStoredPayload sum over explicit role-specific tensor, model, sampler, media-annotation, and provider payload owners, then migrate the sole handle store and early image/diffusion consumers away from raw Any, runtime-private wrappers, and generic structured constructors.",
+        [".agents/specs/comfy-parity/catalogs/backend-nodes.csv", ".agents/specs/comfy-parity/catalogs/native-compute-closure.json", "crates/comfy_nodes/src/execution.rs", "crates/comfy_tensor", "crates/comfy_model", "crates/comfy_model/src/vae_architecture.rs", "crates/comfy_sampler", "crates/comfy_media", "crates/comfy_runtime/src/executor.rs", "crates/comfy_runtime/src/native_execution_controller.rs", "crates/comfy_test_support/fixtures/nodes/empty-root-category-declared-by-source-comfy-node-0757"],
+        [
+            "Cargo.lock",
+            "crates/comfy_nodes/Cargo.toml",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/source_type.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_nodes/src/families/empty_root_category_declared_by_source_01.rs",
+            "crates/comfy_tensor/src/native_node_payload.rs",
+            "crates/comfy_tensor/src/comfy_tensor.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_model/src/clip_vision.rs",
+            "crates/comfy_model/src/clip.rs",
+            "crates/comfy_model/src/conditioning.rs",
+            "crates/comfy_model/src/controlnet.rs",
+            "crates/comfy_model/src/latent_format.rs",
+            "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_model/src/native_ops.rs",
+            "crates/comfy_model/src/patch_graph.rs",
+            "crates/comfy_model/src/quantization.rs",
+            "crates/comfy_model/src/slices/native_diffusion.rs",
+            "crates/comfy_model/src/vae.rs",
+            "crates/comfy_model/src/vae_architecture.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+            "crates/comfy_sampler/src/native_node_payload.rs",
+            "crates/comfy_sampler/src/comfy_sampler.rs",
+            "crates/comfy_media/Cargo.toml",
+            "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_media/src/comfy_media.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/cache.rs",
+            "crates/comfy_runtime/src/prompt_compiler.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_worker/tests/ipc_framing.rs",
+            "crates/comfy_plugin_host/src/registry_adapter.rs",
+            "crates/comfy_plugin_host/tests/component_contract.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/native_conditioning_integration.rs",
+            "crates/comfy_test_support/tests/native_diffusion_e2e.rs",
+            "crates/comfy_test_support/tests/native_image_e2e.rs",
+            "crates/comfy_test_support/tests/plugin_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+        ],
+        "The exhaustive source-type table has one case-sensitive canonical value/handle identity per catalog socket family. Family leaves publish and resolve only explicit sealed payload variants whose handle type, semantic identity, digest, resident bytes, store, and generation are checked atomically, with role-specific shape, dtype, cardinality, and topology validation wherever those facts apply. Structured-compute socket identities authorize no public generic record, wrapper, raw Any, or downcast path. Exact model, conditioning, and tensor backing aliases are charged once through process-local allocation identities with atomic reference transitions, while semantic digests and persisted handles contain no address or residency placement. Existing image and diffusion producers and consumers use the same payloads; the plugin adapter exhaustively emits a truthful checked projection or rejects the value before mutation, and forged, wrong-role, stale, cancelled, failed, cache-evicted, persisted, and restarted handles publish no partial value or second store state.",
         [dependency, compute_dependency],
         locked=True,
         feature_scoped=True,
+        criterion_ids=["34.2", "34.6", "35.2", "35.3", "35.6", "38.3", "38.6", "44.3"],
     )
 
 
@@ -8661,8 +8725,8 @@ def native_node_asset_effect_foundation_task(dependency: str) -> dict[str, objec
         ["VAL-ASSET-001", "VAL-MEDIA-001", "VAL-NODE-002", "VAL-NATIVE-E2E-001", "VAL-RECOVERY-005", "VAL-OWNERSHIP-001"],
         "Expose sealed canonical image, mask, audio, video, artifact, voxel, mesh, file-3D, camera, and splat payloads plus focused attempt-scoped AssetService and prepared OutputCommitter effect adapters to family nodes, without exposing paths or creating another asset, media, effect, output, or recovery owner.",
         ["crates/comfy_media", "crates/comfy_runtime/src/assets.rs", "crates/comfy_runtime/src/output_committer.rs", "crates/comfy_runtime/src/native_execution_controller.rs", "crates/comfy_worker/src/comfy_worker.rs", "crates/comfy_api/src/services.rs"],
-        ["crates/comfy_media/src/native_node_payload.rs", "crates/comfy_media/src/comfy_media.rs", "crates/comfy_nodes/src/execution.rs", "crates/comfy_nodes/src/comfy_nodes.rs", "crates/comfy_runtime/src/assets.rs", "crates/comfy_runtime/src/executor.rs", "crates/comfy_runtime/src/native_execution_controller.rs", "crates/comfy_runtime/src/output_committer.rs", "crates/comfy_runtime/src/comfy_runtime.rs", "crates/comfy_worker/src/comfy_worker.rs", "crates/comfy_worker/tests/ipc_framing.rs", "crates/comfy_api/src/services.rs", "crates/comfy_api/src/websocket.rs", "crates/comfy_ui/src/execution_model.rs", "crates/comfy_test_support/tests/native_node_family_e2e.rs", "crates/comfy_test_support/tests/native_worker_resilience.rs", "crates/comfy_test_support/tests/ownership_consolidation.rs", ".agents/specs/comfy-parity/ownership-policy.json", ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv"],
-        "Canonical media and 3D payloads validate bounded format, dimensions, topology, tensor ranks/dtypes, batch/count/SH relationships, identity, digest, and resident bytes. Asset reads use sealed references only; prepared effects commit through the one OutputCommitter after cancellation and output validation. Load/preview/save and generated-family round trips interoperate through existing consumers, while traversal, oversized/malformed input, wrong payload, cancellation, device/worker loss, commit failure, restart, and stale handles leave no file, proposal, cache, history, or journal residue.",
+        ["crates/comfy_media/src/native_node_payload.rs", "crates/comfy_media/src/gaussian_splat.rs", "crates/comfy_media/src/comfy_media.rs", "crates/comfy_nodes/src/execution.rs", "crates/comfy_nodes/src/stored_payload.rs", "crates/comfy_nodes/src/comfy_nodes.rs", "crates/comfy_runtime/src/assets.rs", "crates/comfy_runtime/src/executor.rs", "crates/comfy_runtime/src/native_execution_controller.rs", "crates/comfy_runtime/src/output_committer.rs", "crates/comfy_runtime/src/comfy_runtime.rs", "crates/comfy_worker/src/comfy_worker.rs", "crates/comfy_worker/tests/ipc_framing.rs", "crates/comfy_api/src/services.rs", "crates/comfy_api/src/websocket.rs", "crates/comfy_plugin_host/src/registry_adapter.rs", "crates/comfy_plugin_host/tests/component_contract.rs", "crates/comfy_ui/src/execution_model.rs", "crates/comfy_test_support/tests/native_node_family_e2e.rs", "crates/comfy_test_support/tests/native_worker_resilience.rs", "crates/comfy_test_support/tests/ownership_consolidation.rs", ".agents/specs/comfy-parity/ownership-policy.json", ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv"],
+        "Canonical media and 3D payloads validate bounded format, dimensions, topology, tensor ranks/dtypes, batch/count/SH relationships, identity, digest, and resident bytes. Asset reads use sealed references only; prepared effects commit through the one OutputCommitter after cancellation and output validation. The attempt-scoped compute session is bound to the same backend and scratch reservation, and canonical splat codecs own bounded PLY/SPLAT/KSPLAT/SPZ reads plus PLY/KSPLAT/SPZ writes. Load/preview/save and generated-family round trips interoperate through existing consumers, while traversal, oversized/malformed input, wrong payload, wrong-backend scratch, cancellation, device/worker loss, commit failure, restart, and stale handles leave no file, proposal, cache, history, or journal residue.",
         [dependency, "comfy-parity-artifact-owner-consolidation", "comfy-parity-execution-output-owner-consolidation"],
         locked=True,
         feature_scoped=True,
@@ -8677,7 +8741,7 @@ def native_node_provider_invocation_foundation_task(dependency: str) -> dict[str
         [8, 13, 17, 22, 29, 32, 34, 39, 40, 41],
         ["VAL-PLUGIN-HOST-001", "VAL-WORKER-PLUGIN-001", "VAL-NODE-002", "VAL-NATIVE-E2E-002", "VAL-OWNERSHIP-001"],
         "Adapt provider-required generated bindings through the verified Rust/WASM provider boundary so an admitted signed provider can materialize canonical native payloads under explicit grants while offline, disabled, denied, or absent providers preserve descriptors and make zero request.",
-        ["crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs", "crates/comfy_plugin_sdk/wit/comfy-plugin.wit", "crates/comfy_plugin_host", "crates/comfy_runtime/src/providers.rs", "crates/comfy_runtime/src/executor.rs", "crates/comfy_worker", "crates/comfy_api/src/services.rs"],
+        ["crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs", "crates/comfy_plugin_sdk/wit/comfy-plugin.wit", "crates/comfy_plugin_host", "crates/comfy_runtime/src/trust.rs", "crates/comfy_runtime/src/permissions.rs", "crates/comfy_runtime/src/plugin_services.rs", "crates/comfy_runtime/src/executor.rs", "crates/comfy_worker", "crates/comfy_api/src/services.rs"],
         ["crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs", "crates/comfy_plugin_sdk/wit/comfy-plugin.wit", "crates/comfy_plugin_host/src/registry_adapter.rs", "crates/comfy_plugin_host/src/component_host.rs", "crates/comfy_plugin_host/src/capabilities.rs", "crates/comfy_plugin_host/tests/component_contract.rs", "crates/comfy_runtime/src/executor.rs", "crates/comfy_runtime/src/native_execution_controller.rs", "crates/comfy_worker/src/comfy_worker.rs", "crates/comfy_worker/tests/ipc_framing.rs", "crates/comfy_api/src/services.rs", "crates/comfy_test_support/tests/plugin_e2e.rs", "crates/comfy_test_support/tests/native_node_family_e2e.rs", "crates/comfy_test_support/tests/ownership_consolidation.rs", ".agents/specs/comfy-parity/ownership-policy.json", ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv"],
         "Provider activation is complete-set, signature/namespace/version/schema checked, and atomic. Signed outputs materialize into canonical payloads before publication; metadata-only or forged outputs fail. Missing grants, secrets, cost acceptance, network, provider, cancellation, trap, timeout, malformed response, restart, and partial batch perform zero unauthorized call and publish no binding, handle, cache, effect, output, or durable state; unavailable object-info and workflows remain lossless.",
         [dependency, "comfy-parity-extension-host-plugin-adapter"],
@@ -8694,6 +8758,9 @@ def node_tasks(
 ) -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     result: list[dict[str, object]] = []
     mapping: dict[str, list[str]] = defaultdict(list)
+    contracts = {
+        str(contract["feature_id"]): contract for contract in native_node_contracts()
+    }
     image_slice = {"LoadImage", "ImageScale", "ImageInvert", "PreviewImage", "SaveImage"}
     diffusion_slice = {"CheckpointLoaderSimple", "CLIPTextEncode", "EmptyLatentImage", "KSampler", "VAEDecode", "SaveImage"}
     for category, rows in node_category_rows().items():
@@ -8704,13 +8771,56 @@ def node_tasks(
             module = f"{rust_slug(category)}_{part:02d}.rs"
             feature_ids = [row["feature_id"] for row in assigned]
             exact_assignments = ", ".join(feature_ids)
-            task_dependencies = [
-                schema_dependency,
-                compute_dependency,
-                asset_effect_dependency,
-                provider_dependency,
+            assigned_contracts = [contracts[feature_id] for feature_id in feature_ids]
+            has_executable = any(
+                contract["binding_disposition"] == "executable"
+                for contract in assigned_contracts
+            )
+            has_provider = any(
+                contract["binding_disposition"] == "provider_required"
+                for contract in assigned_contracts
+            )
+            has_asset_or_effect = any(
+                contract["binding_disposition"] == "executable"
+                and isinstance(contract.get("capability_hints"), dict)
+                and contract["capability_hints"].get("asset_or_effect") is True
+                for contract in assigned_contracts
+            )
+            task_dependencies = [schema_dependency]
+            if has_executable:
+                task_dependencies.append(compute_dependency)
+                # The asset foundation extends the sealed payload ABI, so executable
+                # leaves compile only after that serialized contract change even when
+                # their own rows do not use asset or effect capabilities.
+                task_dependencies.append(asset_effect_dependency)
+            if has_provider:
+                task_dependencies.append(provider_dependency)
+            task_reads = [
+                ".agents/specs/comfy-parity/catalogs/backend-nodes.csv",
+                ".agents/specs/comfy-parity/catalogs/backend-node-contracts.json",
+                ".agents/specs/comfy-parity/catalogs/native-spec-mapping.json",
+                "crates/comfy_nodes/src/descriptor.rs",
+                "crates/comfy_nodes/src/execution.rs",
+                "crates/comfy_nodes/src/source_type.rs",
+                "crates/comfy_nodes/src/stored_payload.rs",
+                "crates/comfy_nodes/src/registry_generator.rs",
+                "crates/comfy_nodes/src/slices",
+                "crates/comfy_tensor/src/comfy_tensor.rs",
+                "crates/comfy_tensor/src/native_node_payload.rs",
+                "crates/comfy_model/src/comfy_model.rs",
+                "crates/comfy_model/src/native_node_payload.rs",
+                "crates/comfy_sampler/src/comfy_sampler.rs",
+                "crates/comfy_sampler/src/native_diffusion_payload.rs",
             ]
-            task_reads = [".agents/specs/comfy-parity/catalogs/backend-nodes.csv", ".agents/specs/comfy-parity/catalogs/backend-node-contracts.json", ".agents/specs/comfy-parity/catalogs/native-spec-mapping.json", "crates/comfy_nodes/src/descriptor.rs", "crates/comfy_nodes/src/execution.rs", "crates/comfy_nodes/src/registry_generator.rs", "crates/comfy_nodes/src/slices", "crates/comfy_runtime", "crates/comfy_tensor", "crates/comfy_model"]
+            if has_asset_or_effect:
+                task_reads.extend(
+                    [
+                        "crates/comfy_media/src/comfy_media.rs",
+                        "crates/comfy_media/src/native_node_payload.rs",
+                    ]
+                )
+            if has_provider:
+                task_reads.append("crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs")
             if {"COMFY-NODE-0156", "COMFY-NODE-0224", "COMFY-NODE-0225"}.intersection(feature_ids):
                 task_dependencies.append("comfy-parity-hidream-o1-family-conditioning-adapter-consolidation")
                 task_reads.append("crates/comfy_model/src/hidream_o1_family.rs")
@@ -11678,6 +11788,35 @@ def task_validation_commands(item: dict[str, object]) -> str:
         commands.append(f"./script/clippy -p {' -p '.join(packages)}")
     else:
         commands = ["python3 .agents/specs/comfy-parity/regenerate_all.py --check"]
+    if identifier == "comfy-parity-native-node-schema-metadata-foundation":
+        commands.extend([
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_generate_node_contract_catalog.py",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+        ])
+    if identifier == "comfy-parity-native-node-compute-value-foundation":
+        commands.extend([
+            "cargo test --locked -p comfy_nodes --lib source_type::tests -- --nocapture",
+            "cargo test --locked -p comfy_nodes --lib stored_payload::tests -- --nocapture",
+            "cargo test --locked -p comfy_tensor --lib native_node_payload",
+            "cargo test --locked -p comfy_model --lib native_node_payload",
+            "cargo test --locked -p comfy_model --lib clip_vision",
+            "cargo test --locked -p comfy_sampler --lib native_diffusion_payload",
+            "cargo test --locked -p comfy_sampler --lib native_node_payload",
+            "cargo test --locked -p comfy_media --lib native_node_payload",
+            "cargo test --locked -p comfy_runtime --lib native_handle_store -- --nocapture",
+            "cargo test --locked -p comfy_plugin_host --lib registry_adapter::tests::explicit_stored_variants_are_exhaustively_projected_or_rejected -- --exact --nocapture",
+            "cargo test --locked -p comfy_plugin_host --lib registry_adapter::tests::explicit_model_family_handles_round_trip_without_mutating_imports -- --exact --nocapture",
+            "cargo test --locked -p comfy_plugin_host --test component_contract -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test plugin_e2e val_plugin_host_001 -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test plugin_e2e val_e2e_003 -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test plugin_e2e val_worker_plugin_001 -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001_native_stored_payload_boundary_is_closed -- --exact --nocapture",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+        ])
     if identifier == "comfy-parity-final-validation":
         commands.extend([
             "./script/clippy",
@@ -11711,6 +11850,13 @@ def task_validation_commands(item: dict[str, object]) -> str:
     if identifier == "comfy-parity-workflow-formats":
         commands.append(
             "cargo test -p comfy_test_support --test workflow_ownership val_workflow_ownership_001"
+        )
+    if identifier == "comfy-parity-native-node-asset-effect-foundation":
+        commands.extend(
+            [
+                "cargo test --locked -p comfy_plugin_host --lib registry_adapter -- --nocapture",
+                "cargo test --locked -p comfy_plugin_host --test component_contract -- --nocapture",
+            ]
         )
     if identifier == "comfy-parity-native-crate-foundation":
         for feature in DEVICE_FEATURES.values():
@@ -12377,6 +12523,8 @@ def existing_task_annotations() -> dict[str, dict[str, str | bool]]:
                 "POST-SAMPLER-SOURCE-AUDIT-CLOSURE-TASK-307",
             "comfy-parity-native-sampler-euler-cfg-pp-comfy-model-0182":
                 "POST-SAMPLER-SOURCE-AUDIT-CLOSURE-TASK-308",
+            "comfy-parity-native-node-schema-metadata-foundation":
+                "POST-NODE-SOURCE-IDENTITY-REVALIDATION",
             **DURABLE_REOPEN_EVIDENCE_MARKERS,
         }
         fresh_marker = fresh_evidence_markers.get(identifier_match.group(1))
@@ -12395,6 +12543,25 @@ def existing_task_annotations() -> dict[str, dict[str, str | bool]]:
             "Task 127",
             "the future `.agents/specs/comfy-corex-enablement/` ABI-foundation task",
         )
+        if (
+            identifier_match.group(1)
+            == "comfy-parity-native-node-schema-metadata-foundation"
+            and "POST-NODE-SOURCE-IDENTITY-REVALIDATION" not in evidence
+        ):
+            stale_marker = "STALE AFTER NODE SOURCE IDENTITY REVALIDATION"
+            if evidence and stale_marker not in evidence:
+                evidence = evidence.replace(
+                    "  - _validation_evidence: ",
+                    "  - _validation_evidence: "
+                    + stale_marker
+                    + "; the canonical `_io.py` type identities, nested MultiType/autogrow projection, and checked node-contract catalog changed after the prior evidence and require fresh catalog, descriptor, workflow, API, and registry validation. ",
+                    1,
+                )
+            annotations[identifier_match.group(1)] = {
+                "complete": False,
+                "evidence": evidence,
+            }
+            continue
         if (
             identifier_match.group(1) == "comfy-parity-quantized-autograd-adapter"
             and "POST-PATCH-QUANTIZED-IDENTITY" not in evidence

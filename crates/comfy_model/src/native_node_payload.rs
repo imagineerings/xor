@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::{mem, sync::Arc};
+use std::{collections::BTreeSet, mem, num::NonZeroU64, sync::Arc};
 use thiserror::Error;
+
+use comfy_tensor::{DType, Tensor, TensorError};
 
 use crate::{
     NativeVae,
@@ -255,6 +257,61 @@ enum NativeModelResource {
     },
 }
 
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum NativeModelBackingKind {
+    Sd15Model,
+    Sd1Tokenizer,
+    Sd1Clip,
+    NativeVae,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct NativeModelResidentAllocation {
+    kind: NativeModelBackingKind,
+    address: usize,
+    resident_bytes: u64,
+}
+
+impl NativeModelResidentAllocation {
+    pub const fn kind(&self) -> NativeModelBackingKind {
+        self.kind
+    }
+
+    pub const fn address(&self) -> usize {
+        self.address
+    }
+
+    pub const fn resident_bytes(&self) -> u64 {
+        self.resident_bytes
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeModelResidentParts {
+    owned_bytes: u64,
+    backing_allocations: Vec<NativeModelResidentAllocation>,
+}
+
+impl NativeModelResidentParts {
+    pub const fn owned_bytes(&self) -> u64 {
+        self.owned_bytes
+    }
+
+    pub fn backing_allocations(&self) -> &[NativeModelResidentAllocation] {
+        &self.backing_allocations
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, NativeModelPayloadError> {
+        self.backing_allocations
+            .iter()
+            .try_fold(self.owned_bytes, |bytes, allocation| {
+                bytes
+                    .checked_add(allocation.resident_bytes)
+                    .ok_or(NativeModelPayloadError::LengthOverflow)
+            })
+    }
+}
+
 impl NativeModelPayload {
     pub fn sd15_model(model: Arc<Sd15TinyModel>) -> Result<Self, NativeModelPayloadError> {
         let patch_identity = model.patch_identity();
@@ -344,6 +401,55 @@ impl NativeModelPayload {
         self.resident_bytes
     }
 
+    pub fn resident_parts(&self) -> Result<NativeModelResidentParts, NativeModelPayloadError> {
+        let owned_bytes = u64::try_from(mem::size_of::<Self>())
+            .map_err(|_| NativeModelPayloadError::LengthOverflow)?
+            .checked_add(self.identity.resident_owned_bytes()?)
+            .ok_or(NativeModelPayloadError::LengthOverflow)?;
+        let backing_allocations = match &self.resource {
+            NativeModelResource::Sd15Model { model } => vec![NativeModelResidentAllocation {
+                kind: NativeModelBackingKind::Sd15Model,
+                address: Arc::as_ptr(model) as usize,
+                resident_bytes: model.resident_bytes().map_err(|error| {
+                    NativeModelPayloadError::ResourceAccounting(error.to_string())
+                })?,
+            }],
+            NativeModelResource::Sd1Clip { tokenizer, clip } => vec![
+                NativeModelResidentAllocation {
+                    kind: NativeModelBackingKind::Sd1Tokenizer,
+                    address: Arc::as_ptr(tokenizer) as usize,
+                    resident_bytes: tokenizer.resident_bytes().map_err(|error| {
+                        NativeModelPayloadError::ResourceAccounting(error.to_string())
+                    })?,
+                },
+                NativeModelResidentAllocation {
+                    kind: NativeModelBackingKind::Sd1Clip,
+                    address: Arc::as_ptr(clip) as usize,
+                    resident_bytes: clip.resident_bytes().map_err(|error| {
+                        NativeModelPayloadError::ResourceAccounting(error.to_string())
+                    })?,
+                },
+            ],
+            NativeModelResource::NativeVae { vae } => vec![NativeModelResidentAllocation {
+                kind: NativeModelBackingKind::NativeVae,
+                address: Arc::as_ptr(vae) as usize,
+                resident_bytes: vae.resident_bytes().map_err(|error| {
+                    NativeModelPayloadError::ResourceAccounting(error.to_string())
+                })?,
+            }],
+        };
+        let parts = NativeModelResidentParts {
+            owned_bytes,
+            backing_allocations,
+        };
+        if parts.resident_bytes()? != self.resident_bytes {
+            return Err(NativeModelPayloadError::ResourceMismatch(
+                "model payload resident projection",
+            ));
+        }
+        Ok(parts)
+    }
+
     pub fn model(&self) -> Option<&Arc<Sd15TinyModel>> {
         match &self.resource {
             NativeModelResource::Sd15Model { model } => Some(model),
@@ -385,8 +491,341 @@ impl NativeModelPayload {
     }
 }
 
+const MAX_AUDIO_ENCODER_LAYERS: usize = 65_536;
+const MAX_LOSS_MAP_ENTRIES: usize = 100_000;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AudioEncoderOutputKind {
+    Layered,
+    WanDancer,
+}
+
+#[derive(Clone, Debug)]
+pub struct AudioEncoderOutput {
+    resource: AudioEncoderOutputResource,
+    semantic_digest_sha256: [u8; 32],
+    resident_bytes: u64,
+}
+
+#[derive(Clone, Debug)]
+enum AudioEncoderOutputResource {
+    Layered {
+        encoded_audio: Tensor,
+        encoded_audio_all_layers: Box<[Tensor]>,
+        audio_samples: u64,
+    },
+    WanDancer {
+        audio_feature: Tensor,
+        fps: f64,
+        audio_inject_scale: f64,
+    },
+}
+
+impl AudioEncoderOutput {
+    pub const SOURCE_TYPE_ID: &'static str = "AUDIO_ENCODER_OUTPUT";
+
+    pub fn layered(
+        encoded_audio: Tensor,
+        encoded_audio_all_layers: Vec<Tensor>,
+        audio_samples: u64,
+    ) -> Result<Self, NativeModelPayloadError> {
+        let resource = AudioEncoderOutputResource::Layered {
+            encoded_audio,
+            encoded_audio_all_layers: encoded_audio_all_layers.into_boxed_slice(),
+            audio_samples,
+        };
+        let (semantic_digest_sha256, resident_bytes) = project_audio_encoder_output(&resource)?;
+        Ok(Self {
+            resource,
+            semantic_digest_sha256,
+            resident_bytes,
+        })
+    }
+
+    pub fn wan_dancer(
+        audio_feature: Tensor,
+        fps: f64,
+        audio_inject_scale: f64,
+    ) -> Result<Self, NativeModelPayloadError> {
+        let resource = AudioEncoderOutputResource::WanDancer {
+            audio_feature,
+            fps,
+            audio_inject_scale,
+        };
+        let (semantic_digest_sha256, resident_bytes) = project_audio_encoder_output(&resource)?;
+        Ok(Self {
+            resource,
+            semantic_digest_sha256,
+            resident_bytes,
+        })
+    }
+
+    pub const fn kind(&self) -> AudioEncoderOutputKind {
+        match &self.resource {
+            AudioEncoderOutputResource::Layered { .. } => AudioEncoderOutputKind::Layered,
+            AudioEncoderOutputResource::WanDancer { .. } => AudioEncoderOutputKind::WanDancer,
+        }
+    }
+
+    pub fn encoded_audio(&self) -> Option<&Tensor> {
+        match &self.resource {
+            AudioEncoderOutputResource::Layered { encoded_audio, .. } => Some(encoded_audio),
+            AudioEncoderOutputResource::WanDancer { .. } => None,
+        }
+    }
+
+    pub fn encoded_audio_all_layers(&self) -> Option<&[Tensor]> {
+        match &self.resource {
+            AudioEncoderOutputResource::Layered {
+                encoded_audio_all_layers,
+                ..
+            } => Some(encoded_audio_all_layers),
+            AudioEncoderOutputResource::WanDancer { .. } => None,
+        }
+    }
+
+    pub const fn audio_samples(&self) -> Option<u64> {
+        match &self.resource {
+            AudioEncoderOutputResource::Layered { audio_samples, .. } => Some(*audio_samples),
+            AudioEncoderOutputResource::WanDancer { .. } => None,
+        }
+    }
+
+    pub fn audio_feature(&self) -> Option<&Tensor> {
+        match &self.resource {
+            AudioEncoderOutputResource::WanDancer { audio_feature, .. } => Some(audio_feature),
+            AudioEncoderOutputResource::Layered { .. } => None,
+        }
+    }
+
+    pub const fn fps(&self) -> Option<f64> {
+        match &self.resource {
+            AudioEncoderOutputResource::WanDancer { fps, .. } => Some(*fps),
+            AudioEncoderOutputResource::Layered { .. } => None,
+        }
+    }
+
+    pub const fn audio_inject_scale(&self) -> Option<f64> {
+        match &self.resource {
+            AudioEncoderOutputResource::WanDancer {
+                audio_inject_scale, ..
+            } => Some(*audio_inject_scale),
+            AudioEncoderOutputResource::Layered { .. } => None,
+        }
+    }
+
+    pub const fn semantic_digest_sha256(&self) -> &[u8; 32] {
+        &self.semantic_digest_sha256
+    }
+
+    pub const fn resident_bytes(&self) -> u64 {
+        self.resident_bytes
+    }
+
+    pub fn validate(&self) -> Result<(), NativeModelPayloadError> {
+        let (semantic_digest_sha256, resident_bytes) =
+            project_audio_encoder_output(&self.resource)?;
+        require_structured_projection(
+            self.semantic_digest_sha256,
+            semantic_digest_sha256,
+            self.resident_bytes,
+            resident_bytes,
+        )
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct IcLoraParameters {
+    reference_downscale_factor: NonZeroU64,
+    semantic_digest_sha256: [u8; 32],
+    resident_bytes: u64,
+}
+
+impl IcLoraParameters {
+    pub const SOURCE_TYPE_ID: &'static str = "IC_LORA_PARAMETERS";
+
+    pub fn checked(reference_downscale_factor: u64) -> Result<Self, NativeModelPayloadError> {
+        let reference_downscale_factor = NonZeroU64::new(reference_downscale_factor).ok_or(
+            NativeModelPayloadError::InvalidStructuredPayload(
+                "IC-LoRA reference downscale factor must be nonzero",
+            ),
+        )?;
+        let (semantic_digest_sha256, resident_bytes) =
+            project_ic_lora_parameters(reference_downscale_factor)?;
+        Ok(Self {
+            reference_downscale_factor,
+            semantic_digest_sha256,
+            resident_bytes,
+        })
+    }
+
+    pub const fn reference_downscale_factor(&self) -> u64 {
+        self.reference_downscale_factor.get()
+    }
+
+    pub const fn semantic_digest_sha256(&self) -> &[u8; 32] {
+        &self.semantic_digest_sha256
+    }
+
+    pub const fn resident_bytes(&self) -> u64 {
+        self.resident_bytes
+    }
+
+    pub fn validate(&self) -> Result<(), NativeModelPayloadError> {
+        let (semantic_digest_sha256, resident_bytes) =
+            project_ic_lora_parameters(self.reference_downscale_factor)?;
+        require_structured_projection(
+            self.semantic_digest_sha256,
+            semantic_digest_sha256,
+            self.resident_bytes,
+            resident_bytes,
+        )
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct LossMap {
+    losses: Box<[Tensor]>,
+    semantic_digest_sha256: [u8; 32],
+    resident_bytes: u64,
+}
+
+impl LossMap {
+    pub const SOURCE_TYPE_ID: &'static str = "LOSS_MAP";
+
+    pub fn checked(losses: Vec<Tensor>) -> Result<Self, NativeModelPayloadError> {
+        let losses = losses.into_boxed_slice();
+        let (semantic_digest_sha256, resident_bytes) = project_loss_map(&losses)?;
+        Ok(Self {
+            losses,
+            semantic_digest_sha256,
+            resident_bytes,
+        })
+    }
+
+    pub fn losses(&self) -> &[Tensor] {
+        &self.losses
+    }
+
+    pub const fn semantic_digest_sha256(&self) -> &[u8; 32] {
+        &self.semantic_digest_sha256
+    }
+
+    pub const fn resident_bytes(&self) -> u64 {
+        self.resident_bytes
+    }
+
+    pub fn validate(&self) -> Result<(), NativeModelPayloadError> {
+        let (semantic_digest_sha256, resident_bytes) = project_loss_map(&self.losses)?;
+        require_structured_projection(
+            self.semantic_digest_sha256,
+            semantic_digest_sha256,
+            self.resident_bytes,
+            resident_bytes,
+        )
+    }
+}
+
+fn project_audio_encoder_output(
+    resource: &AudioEncoderOutputResource,
+) -> Result<([u8; 32], u64), NativeModelPayloadError> {
+    let mut projection = NativeStructuredProjection::new::<AudioEncoderOutput>(
+        b"sim.comfy.model.audio-encoder-output.v1",
+    )?;
+    match resource {
+        AudioEncoderOutputResource::Layered {
+            encoded_audio,
+            encoded_audio_all_layers,
+            audio_samples,
+        } => {
+            if encoded_audio_all_layers.is_empty()
+                || encoded_audio_all_layers.len() > MAX_AUDIO_ENCODER_LAYERS
+                || *audio_samples == 0
+            {
+                return Err(NativeModelPayloadError::InvalidStructuredPayload(
+                    "layered audio encoder cardinality is invalid",
+                ));
+            }
+            require_tensor_shape(encoded_audio, 3, None, "encoded audio")?;
+            projection.hash_tag(1);
+            projection.hash_float_tensor(encoded_audio)?;
+            projection.hash_len(encoded_audio_all_layers.len())?;
+            projection.add_allocation::<Tensor>(encoded_audio_all_layers.len())?;
+            for layer in encoded_audio_all_layers {
+                require_tensor_shape(layer, 3, Some(encoded_audio), "encoded audio layer")?;
+                projection.hash_float_tensor(layer)?;
+            }
+            let final_layer = encoded_audio_all_layers.last().ok_or(
+                NativeModelPayloadError::InvalidStructuredPayload(
+                    "layered audio encoder output has no final layer",
+                ),
+            )?;
+            require_same_tensor_value(encoded_audio, final_layer, "encoded audio final layer")?;
+            projection.hash_u64(*audio_samples);
+        }
+        AudioEncoderOutputResource::WanDancer {
+            audio_feature,
+            fps,
+            audio_inject_scale,
+        } => {
+            let shape = audio_feature.descriptor().shape();
+            if shape.len() != 3
+                || shape.first().copied() != Some(1)
+                || shape.get(1).copied() == Some(0)
+                || shape.get(2).copied() != Some(35)
+                || !fps.is_finite()
+                || *fps <= 0.0
+                || !audio_inject_scale.is_finite()
+                || !(0.0..=10.0).contains(audio_inject_scale)
+            {
+                return Err(NativeModelPayloadError::InvalidStructuredPayload(
+                    "WanDancer audio encoder shape or scalar is invalid",
+                ));
+            }
+            projection.hash_tag(2);
+            projection.hash_float_tensor(audio_feature)?;
+            projection.hash_f64(*fps);
+            projection.hash_f64(*audio_inject_scale);
+        }
+    }
+    Ok(projection.finish())
+}
+
+fn project_ic_lora_parameters(
+    reference_downscale_factor: NonZeroU64,
+) -> Result<([u8; 32], u64), NativeModelPayloadError> {
+    let mut projection = NativeStructuredProjection::new::<IcLoraParameters>(
+        b"sim.comfy.model.ic-lora-parameters.v1",
+    )?;
+    projection.hash_u64(reference_downscale_factor.get());
+    Ok(projection.finish())
+}
+
+fn project_loss_map(losses: &[Tensor]) -> Result<([u8; 32], u64), NativeModelPayloadError> {
+    if losses.is_empty() || losses.len() > MAX_LOSS_MAP_ENTRIES {
+        return Err(NativeModelPayloadError::InvalidStructuredPayload(
+            "loss map cardinality is invalid",
+        ));
+    }
+    let mut projection =
+        NativeStructuredProjection::new::<LossMap>(b"sim.comfy.model.loss-map.v1")?;
+    projection.hash_len(losses.len())?;
+    projection.add_allocation::<Tensor>(losses.len())?;
+    for loss in losses {
+        if loss.descriptor().element_count()? == 0 {
+            return Err(NativeModelPayloadError::InvalidStructuredPayload(
+                "loss map contains an empty tensor",
+            ));
+        }
+        projection.hash_float_tensor(loss)?;
+    }
+    Ok(projection.finish())
+}
+
 #[derive(Debug, Error)]
 pub enum NativeModelPayloadError {
+    #[error(transparent)]
+    Tensor(#[from] TensorError),
     #[error("native model resource schema {0} is unsupported")]
     UnsupportedSchema(u16),
     #[error("native model resource {0} is invalid")]
@@ -401,6 +840,244 @@ pub enum NativeModelPayloadError {
     ResourceMismatch(&'static str),
     #[error("native model resource accounting failed: {0}")]
     ResourceAccounting(String),
+    #[error("native model structured payload is invalid: {0}")]
+    InvalidStructuredPayload(&'static str),
+    #[error("native model structured payload projection changed")]
+    StructuredProjectionChanged,
+    #[error("native model structured payload resident-byte accounting overflowed")]
+    StructuredResidentBytesOverflow,
+}
+
+pub(crate) struct NativeStructuredProjection {
+    hasher: Sha256,
+    resident_bytes: u64,
+    storage_ids: BTreeSet<u64>,
+}
+
+impl NativeStructuredProjection {
+    pub(crate) fn new<Payload>(domain: &[u8]) -> Result<Self, NativeModelPayloadError> {
+        let mut hasher = Sha256::new();
+        hasher.update(domain);
+        hasher.update([0]);
+        Ok(Self {
+            hasher,
+            resident_bytes: u64::try_from(mem::size_of::<Payload>())
+                .map_err(|_| NativeModelPayloadError::StructuredResidentBytesOverflow)?,
+            storage_ids: BTreeSet::new(),
+        })
+    }
+
+    pub(crate) fn hash_tag(&mut self, tag: u8) {
+        self.hasher.update([tag]);
+    }
+
+    pub(crate) fn hash_len(&mut self, length: usize) -> Result<(), NativeModelPayloadError> {
+        self.hash_u64(
+            u64::try_from(length)
+                .map_err(|_| NativeModelPayloadError::StructuredResidentBytesOverflow)?,
+        );
+        Ok(())
+    }
+
+    pub(crate) fn hash_u64(&mut self, value: u64) {
+        self.hasher.update(value.to_le_bytes());
+    }
+
+    pub(crate) fn hash_f64(&mut self, value: f64) {
+        self.hasher.update(value.to_bits().to_le_bytes());
+    }
+
+    pub(crate) fn add_allocation<Value>(
+        &mut self,
+        capacity: usize,
+    ) -> Result<(), NativeModelPayloadError> {
+        let bytes = mem::size_of::<Value>()
+            .checked_mul(capacity)
+            .ok_or(NativeModelPayloadError::StructuredResidentBytesOverflow)?;
+        self.add_bytes(bytes)
+    }
+
+    pub(crate) fn hash_float_tensor(
+        &mut self,
+        tensor: &Tensor,
+    ) -> Result<(), NativeModelPayloadError> {
+        let descriptor = tensor.descriptor();
+        if !descriptor.is_contiguous()? {
+            return Err(NativeModelPayloadError::InvalidStructuredPayload(
+                "structured tensor must be contiguous",
+            ));
+        }
+        let dtype_tag = match descriptor.dtype() {
+            DType::F64 => 1,
+            DType::F32 => 2,
+            DType::F16 => 3,
+            DType::Bf16 => 4,
+            _ => {
+                return Err(NativeModelPayloadError::InvalidStructuredPayload(
+                    "structured tensor must use a finite floating-point dtype",
+                ));
+            }
+        };
+        self.hash_tag(dtype_tag);
+        self.hash_len(descriptor.rank())?;
+        for dimension in descriptor.shape() {
+            self.hash_u64(*dimension);
+        }
+        let bytes = tensor.contiguous_bytes()?;
+        self.hash_len(bytes.len())?;
+        hash_finite_float_bytes(&mut self.hasher, descriptor.dtype(), bytes)?;
+        if self.storage_ids.insert(tensor.storage_id().get()) {
+            self.resident_bytes = self
+                .resident_bytes
+                .checked_add(tensor.storage_byte_len())
+                .ok_or(NativeModelPayloadError::StructuredResidentBytesOverflow)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn finish(self) -> ([u8; 32], u64) {
+        (self.hasher.finalize().into(), self.resident_bytes)
+    }
+
+    fn add_bytes(&mut self, bytes: usize) -> Result<(), NativeModelPayloadError> {
+        let bytes = u64::try_from(bytes)
+            .map_err(|_| NativeModelPayloadError::StructuredResidentBytesOverflow)?;
+        self.resident_bytes = self
+            .resident_bytes
+            .checked_add(bytes)
+            .ok_or(NativeModelPayloadError::StructuredResidentBytesOverflow)?;
+        Ok(())
+    }
+}
+
+fn hash_finite_float_bytes(
+    hasher: &mut Sha256,
+    dtype: DType,
+    bytes: &[u8],
+) -> Result<(), NativeModelPayloadError> {
+    match dtype {
+        DType::F64 => {
+            for chunk in bytes.chunks_exact(8) {
+                let bits = u64::from_ne_bytes(copy_array(chunk)?);
+                if !f64::from_bits(bits).is_finite() {
+                    return Err(NativeModelPayloadError::InvalidStructuredPayload(
+                        "structured tensor contains a non-finite value",
+                    ));
+                }
+                hasher.update(bits.to_le_bytes());
+            }
+            require_exact_chunks(bytes, 8)?;
+        }
+        DType::F32 => {
+            for chunk in bytes.chunks_exact(4) {
+                let bits = u32::from_ne_bytes(copy_array(chunk)?);
+                if !f32::from_bits(bits).is_finite() {
+                    return Err(NativeModelPayloadError::InvalidStructuredPayload(
+                        "structured tensor contains a non-finite value",
+                    ));
+                }
+                hasher.update(bits.to_le_bytes());
+            }
+            require_exact_chunks(bytes, 4)?;
+        }
+        DType::F16 => {
+            for chunk in bytes.chunks_exact(2) {
+                let bits = u16::from_ne_bytes(copy_array(chunk)?);
+                if bits & 0x7c00 == 0x7c00 {
+                    return Err(NativeModelPayloadError::InvalidStructuredPayload(
+                        "structured tensor contains a non-finite value",
+                    ));
+                }
+                hasher.update(bits.to_le_bytes());
+            }
+            require_exact_chunks(bytes, 2)?;
+        }
+        DType::Bf16 => {
+            for chunk in bytes.chunks_exact(2) {
+                let bits = u16::from_ne_bytes(copy_array(chunk)?);
+                if bits & 0x7f80 == 0x7f80 {
+                    return Err(NativeModelPayloadError::InvalidStructuredPayload(
+                        "structured tensor contains a non-finite value",
+                    ));
+                }
+                hasher.update(bits.to_le_bytes());
+            }
+            require_exact_chunks(bytes, 2)?;
+        }
+        _ => {
+            return Err(NativeModelPayloadError::InvalidStructuredPayload(
+                "structured tensor must use a finite floating-point dtype",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn copy_array<const LENGTH: usize>(bytes: &[u8]) -> Result<[u8; LENGTH], NativeModelPayloadError> {
+    bytes.try_into().map_err(|_| {
+        NativeModelPayloadError::InvalidStructuredPayload(
+            "structured tensor byte width does not match its dtype",
+        )
+    })
+}
+
+fn require_exact_chunks(bytes: &[u8], width: usize) -> Result<(), NativeModelPayloadError> {
+    if bytes.len().is_multiple_of(width) {
+        Ok(())
+    } else {
+        Err(NativeModelPayloadError::InvalidStructuredPayload(
+            "structured tensor byte width does not match its dtype",
+        ))
+    }
+}
+
+fn require_tensor_shape(
+    tensor: &Tensor,
+    rank: usize,
+    reference: Option<&Tensor>,
+    field: &'static str,
+) -> Result<(), NativeModelPayloadError> {
+    let descriptor = tensor.descriptor();
+    if descriptor.rank() != rank || descriptor.shape().contains(&0) {
+        return Err(NativeModelPayloadError::InvalidStructuredPayload(field));
+    }
+    if let Some(reference) = reference {
+        let reference = reference.descriptor();
+        if descriptor.shape() != reference.shape()
+            || descriptor.dtype() != reference.dtype()
+            || descriptor.device() != reference.device()
+            || descriptor.stream() != reference.stream()
+        {
+            return Err(NativeModelPayloadError::InvalidStructuredPayload(field));
+        }
+    }
+    Ok(())
+}
+
+fn require_same_tensor_value(
+    left: &Tensor,
+    right: &Tensor,
+    field: &'static str,
+) -> Result<(), NativeModelPayloadError> {
+    if left.descriptor().shape() != right.descriptor().shape()
+        || left.descriptor().dtype() != right.descriptor().dtype()
+        || left.contiguous_bytes()? != right.contiguous_bytes()?
+    {
+        return Err(NativeModelPayloadError::InvalidStructuredPayload(field));
+    }
+    Ok(())
+}
+
+pub(crate) fn require_structured_projection(
+    actual_digest: [u8; 32],
+    expected_digest: [u8; 32],
+    actual_resident_bytes: u64,
+    expected_resident_bytes: u64,
+) -> Result<(), NativeModelPayloadError> {
+    if actual_digest != expected_digest || actual_resident_bytes != expected_resident_bytes {
+        return Err(NativeModelPayloadError::StructuredProjectionChanged);
+    }
+    Ok(())
 }
 
 fn payload_resident_bytes(
@@ -454,7 +1131,38 @@ fn hash_field(hasher: &mut Sha256, bytes: &[u8]) -> Result<(), NativeModelPayloa
 #[cfg(test)]
 mod tests {
     use super::*;
+    use comfy_tensor::{
+        CancellationToken, CpuBackend, CpuWorkspaceAuthority, DeviceId, ExecutionContext, StreamId,
+        TensorDescriptor,
+    };
     use std::error::Error;
+
+    const TEST_MEMORY_LIMIT_BYTES: u64 = 1024 * 1024;
+
+    fn with_context<ResultType>(
+        run: impl FnOnce(&CpuBackend, &ExecutionContext<'_>) -> Result<ResultType, Box<dyn Error>>,
+    ) -> Result<ResultType, Box<dyn Error>> {
+        let cancellation = CancellationToken::default();
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(TEST_MEMORY_LIMIT_BYTES)?;
+        let context = backend.execution_context(
+            StreamId::DEFAULT,
+            authority.authorize_workspace(0)?,
+            &cancellation,
+        );
+        run(&backend, &context)
+    }
+
+    fn f32_tensor(
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+        shape: Vec<u64>,
+        values: &[f32],
+    ) -> Result<Tensor, Box<dyn Error>> {
+        let descriptor =
+            TensorDescriptor::contiguous(shape, DType::F32, DeviceId::CPU, StreamId::DEFAULT)?;
+        let (tensor, _) = backend.upload_f32(descriptor, values, context)?;
+        Ok(tensor)
+    }
 
     #[test]
     fn native_model_resource_identity_is_role_bound_and_forgery_checked()
@@ -523,5 +1231,113 @@ mod tests {
         );
         assert!(serde_json::to_value(sd15)?.get("resident_bytes").is_none());
         Ok(())
+    }
+
+    #[test]
+    fn audio_encoder_output_preserves_both_exact_source_shapes_and_alias_accounting()
+    -> Result<(), Box<dyn Error>> {
+        with_context(|backend, context| {
+            let first_layer = f32_tensor(backend, context, vec![1, 2, 3], &[0.0; 6])?;
+            let encoded_audio = f32_tensor(backend, context, vec![1, 2, 3], &[1.0; 6])?;
+            let layered = AudioEncoderOutput::layered(
+                encoded_audio.clone(),
+                vec![first_layer.clone(), encoded_audio.clone()],
+                16_000,
+            )?;
+            layered.validate()?;
+            assert_eq!(layered.kind(), AudioEncoderOutputKind::Layered);
+            assert_eq!(layered.audio_samples(), Some(16_000));
+            assert_eq!(
+                layered
+                    .encoded_audio_all_layers()
+                    .map(|layers| layers.len()),
+                Some(2)
+            );
+            assert_eq!(
+                layered.resident_bytes(),
+                u64::try_from(mem::size_of::<AudioEncoderOutput>())?
+                    + u64::try_from(2 * mem::size_of::<Tensor>())?
+                    + first_layer.storage_byte_len()
+                    + encoded_audio.storage_byte_len()
+            );
+
+            let audio_feature = f32_tensor(backend, context, vec![1, 2, 35], &[0.25; 70])?;
+            let dancer = AudioEncoderOutput::wan_dancer(audio_feature, 30.0, 1.5)?;
+            dancer.validate()?;
+            assert_eq!(dancer.kind(), AudioEncoderOutputKind::WanDancer);
+            assert_eq!(dancer.fps(), Some(30.0));
+            assert_eq!(dancer.audio_inject_scale(), Some(1.5));
+            assert!(dancer.encoded_audio().is_none());
+
+            let invalid_feature = f32_tensor(backend, context, vec![1, 2, 34], &[0.0; 68])?;
+            assert!(AudioEncoderOutput::wan_dancer(invalid_feature, 30.0, 1.0).is_err());
+            let invalid_scale = f32_tensor(backend, context, vec![1, 2, 35], &[0.0; 70])?;
+            assert!(AudioEncoderOutput::wan_dancer(invalid_scale, 30.0, 10.01).is_err());
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn structured_payload_digests_are_residency_independent_and_validate_finite_content()
+    -> Result<(), Box<dyn Error>> {
+        with_context(|backend, context| {
+            let first = f32_tensor(backend, context, vec![1, 1, 2], &[1.0, 2.0])?;
+            let second = f32_tensor(backend, context, vec![1, 1, 2], &[1.0, 2.0])?;
+            assert_ne!(first.storage_id(), second.storage_id());
+            let first_output = AudioEncoderOutput::layered(first.clone(), vec![first], 640)?;
+            let second_output = AudioEncoderOutput::layered(second.clone(), vec![second], 640)?;
+            assert_eq!(
+                first_output.semantic_digest_sha256(),
+                second_output.semantic_digest_sha256()
+            );
+
+            let non_finite = f32_tensor(backend, context, vec![1], &[f32::NAN])?;
+            assert!(LossMap::checked(vec![non_finite]).is_err());
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn ic_lora_and_loss_map_keep_checked_source_cardinality_without_shape_coercion()
+    -> Result<(), Box<dyn Error>> {
+        let parameters = IcLoraParameters::checked(u64::MAX)?;
+        parameters.validate()?;
+        assert_eq!(parameters.reference_downscale_factor(), u64::MAX);
+        assert_eq!(
+            parameters.resident_bytes(),
+            u64::try_from(mem::size_of::<IcLoraParameters>())?
+        );
+        assert!(IcLoraParameters::checked(0).is_err());
+
+        with_context(|backend, context| {
+            let scalar = f32_tensor(backend, context, Vec::new(), &[0.5])?;
+            let matrix = f32_tensor(backend, context, vec![1, 2], &[0.25, 0.75])?;
+            let loss_map = LossMap::checked(vec![scalar.clone(), matrix.clone()])?;
+            loss_map.validate()?;
+            assert_eq!(loss_map.losses().len(), 2);
+            assert_eq!(
+                loss_map
+                    .losses()
+                    .first()
+                    .map(|loss| loss.descriptor().rank()),
+                Some(0)
+            );
+            assert_eq!(
+                loss_map
+                    .losses()
+                    .get(1)
+                    .map(|loss| loss.descriptor().shape()),
+                Some(&[1, 2][..])
+            );
+            assert_eq!(
+                loss_map.resident_bytes(),
+                u64::try_from(mem::size_of::<LossMap>())?
+                    + u64::try_from(2 * mem::size_of::<Tensor>())?
+                    + scalar.storage_byte_len()
+                    + matrix.storage_byte_len()
+            );
+            assert!(LossMap::checked(Vec::new()).is_err());
+            Ok(())
+        })
     }
 }

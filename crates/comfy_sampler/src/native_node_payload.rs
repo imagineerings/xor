@@ -4,9 +4,7 @@ use crate::{
     execute_guidance,
     generated_native_diffusion::{NativeDiffusionSamplerError, sample_euler},
 };
-use comfy_model::conditioning::{
-    ConditioningConstant, ConditioningEntry, ConditioningRegion, ConditioningSet, ConditioningValue,
-};
+use comfy_model::conditioning::{ConditioningError, ConditioningSet};
 use comfy_model::{NativeModelPayload, NativeModelPayloadError, NativeModelResourceRole};
 use comfy_tensor::{
     CpuBackend, DType, DeviceId, ExecutionContext, RngCheckpoint, RngError, Tensor, TensorError,
@@ -183,6 +181,17 @@ pub enum NativeGuiderKind {
     Cfg,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum NativeGuiderConditioningSets<'a> {
+    Basic {
+        conditioning: &'a Arc<ConditioningSet>,
+    },
+    Cfg {
+        positive: &'a Arc<ConditioningSet>,
+        negative: &'a Arc<ConditioningSet>,
+    },
+}
+
 #[derive(Clone)]
 enum NativeGuiderStrategy {
     Basic {
@@ -236,6 +245,14 @@ impl NativeGuiderPayload {
 
     pub fn model(&self) -> &Arc<NativeModelPayload> {
         &self.model
+    }
+
+    pub fn conditioning_sets(&self) -> NativeGuiderConditioningSets<'_> {
+        self.strategy.conditioning_sets()
+    }
+
+    pub fn owned_resident_bytes(&self) -> Result<u64, NativeSamplerPayloadError> {
+        guider_owned_resident_bytes(self.semantic_digest_sha256.capacity())
     }
 
     pub fn model_execution_digest_sha256(&self) -> &str {
@@ -344,10 +361,7 @@ impl NativeGuiderPayload {
                 hasher.update(b"basic");
                 validate_conditioning_digest(conditioning)?;
                 hash_field(&mut hasher, conditioning.digest().as_bytes())?;
-                resident_bytes = checked_add(
-                    resident_bytes,
-                    conditioning_set_resident_bytes(conditioning)?,
-                )?;
+                resident_bytes = checked_add(resident_bytes, conditioning.resident_bytes()?)?;
             }
             NativeGuiderStrategy::Cfg {
                 positive,
@@ -366,10 +380,13 @@ impl NativeGuiderPayload {
                 hasher.update(guidance.to_bits().to_le_bytes());
                 hash_field(&mut hasher, positive.digest().as_bytes())?;
                 hash_field(&mut hasher, negative.digest().as_bytes())?;
-                resident_bytes =
-                    checked_add(resident_bytes, conditioning_set_resident_bytes(positive)?)?;
-                resident_bytes =
-                    checked_add(resident_bytes, conditioning_set_resident_bytes(negative)?)?;
+                resident_bytes = checked_add(
+                    resident_bytes,
+                    ConditioningSet::combined_resident_bytes(&[
+                        positive.as_ref(),
+                        negative.as_ref(),
+                    ])?,
+                )?;
             }
         }
         let semantic_digest_sha256 = format!("{:x}", hasher.finalize());
@@ -384,6 +401,26 @@ impl NativeGuiderPayload {
             resident_bytes,
         })
     }
+}
+
+impl NativeGuiderStrategy {
+    fn conditioning_sets(&self) -> NativeGuiderConditioningSets<'_> {
+        match self {
+            Self::Basic { conditioning } => NativeGuiderConditioningSets::Basic { conditioning },
+            Self::Cfg {
+                positive, negative, ..
+            } => NativeGuiderConditioningSets::Cfg { positive, negative },
+        }
+    }
+}
+
+fn guider_owned_resident_bytes(
+    semantic_digest_capacity: usize,
+) -> Result<u64, NativeSamplerPayloadError> {
+    checked_add(
+        usize_to_u64(mem::size_of::<NativeGuiderPayload>())?,
+        usize_to_u64(semantic_digest_capacity)?,
+    )
 }
 
 pub trait NativeSamplerDenoiser {
@@ -531,6 +568,8 @@ pub enum NativeSamplerPayloadError {
     NativeSampler(#[from] NativeDiffusionSamplerError),
     #[error(transparent)]
     Model(#[from] NativeModelPayloadError),
+    #[error(transparent)]
+    Conditioning(#[from] ConditioningError),
     #[error("native sampler payload {0} is not a SHA-256 digest")]
     InvalidDigest(&'static str),
     #[error("native noise input must be a contiguous CPU f32 tensor with nonzero dimensions")]
@@ -688,148 +727,23 @@ fn tensor_element_count(tensor: &Tensor) -> Result<usize, NativeSamplerPayloadEr
 
 fn hash_tensor(hasher: &mut Sha256, tensor: &Tensor) -> Result<(), NativeSamplerPayloadError> {
     let descriptor = tensor.descriptor();
+    hasher.update(b"sim.comfy.native-noise-tensor.v1");
+    hash_field(hasher, descriptor.dtype().catalog_name().as_bytes())?;
     hasher.update(usize_to_u64(descriptor.rank())?.to_le_bytes());
     for dimension in descriptor.shape() {
         hasher.update(dimension.to_le_bytes());
     }
-    for stride in descriptor.strides() {
-        hasher.update(stride.to_le_bytes());
-    }
-    hasher.update(descriptor.offset_elements().to_le_bytes());
-    hash_field(hasher, format!("{:?}", descriptor.dtype()).as_bytes())?;
-    hash_field(hasher, format!("{:?}", descriptor.layout()).as_bytes())?;
-    hash_field(
-        hasher,
-        format!("{:?}", descriptor.device().kind()).as_bytes(),
-    )?;
-    hasher.update(descriptor.device().ordinal().to_le_bytes());
-    hasher.update(descriptor.stream().get().to_le_bytes());
     hash_field(hasher, tensor.contiguous_bytes()?)
 }
 
 fn validate_conditioning_digest(
     conditioning: &ConditioningSet,
 ) -> Result<(), NativeSamplerPayloadError> {
+    conditioning.validate()?;
     if valid_sha256(conditioning.digest()) {
         Ok(())
     } else {
         Err(NativeSamplerPayloadError::InvalidConditioningDigest)
-    }
-}
-
-fn conditioning_set_resident_bytes(
-    conditioning: &ConditioningSet,
-) -> Result<u64, NativeSamplerPayloadError> {
-    let mut bytes = usize_to_u64(mem::size_of::<ConditioningSet>())?;
-    bytes = checked_add(
-        bytes,
-        conditioning
-            .identity()
-            .resident_bytes()
-            .map_err(|_| NativeSamplerPayloadError::ResidentBytesOverflow)?,
-    )?;
-    bytes = checked_add(bytes, usize_to_u64(conditioning.digest().len())?)?;
-    bytes = checked_add(
-        bytes,
-        usize_to_u64(
-            conditioning
-                .entries()
-                .len()
-                .checked_mul(mem::size_of::<ConditioningEntry>())
-                .ok_or(NativeSamplerPayloadError::ResidentBytesOverflow)?,
-        )?,
-    )?;
-    for entry in conditioning.entries() {
-        bytes = checked_add(bytes, conditioning_entry_resident_bytes(entry)?)?;
-    }
-    Ok(bytes)
-}
-
-fn conditioning_entry_resident_bytes(
-    entry: &ConditioningEntry,
-) -> Result<u64, NativeSamplerPayloadError> {
-    let mut bytes = usize_to_u64(entry.identifier().len())?;
-    bytes = checked_add(bytes, conditioning_value_resident_bytes(entry.value())?)?;
-    if let Some(region) = &entry.options().region {
-        let region_bytes = match region {
-            ConditioningRegion::Absolute { sizes, offsets } => sizes
-                .capacity()
-                .checked_add(offsets.capacity())
-                .and_then(|count| count.checked_mul(mem::size_of::<u64>())),
-            ConditioningRegion::Percentage { sizes, offsets } => sizes
-                .capacity()
-                .checked_add(offsets.capacity())
-                .and_then(|count| count.checked_mul(mem::size_of::<f64>())),
-        }
-        .ok_or(NativeSamplerPayloadError::ResidentBytesOverflow)?;
-        bytes = checked_add(bytes, usize_to_u64(region_bytes)?)?;
-    }
-    if let Some(mask) = &entry.options().mask {
-        bytes = checked_add(bytes, mask.tensor().storage_byte_len())?;
-        bytes = checked_add(
-            bytes,
-            usize_to_u64(
-                mask.feather()
-                    .len()
-                    .checked_mul(mem::size_of::<u64>())
-                    .ok_or(NativeSamplerPayloadError::ResidentBytesOverflow)?,
-            )?,
-        )?;
-    }
-    if let Some(control) = entry.references().control() {
-        bytes = checked_add(bytes, usize_to_u64(control.identifier().len())?)?;
-    }
-    for hook in entry.references().hooks() {
-        bytes = checked_add(bytes, usize_to_u64(hook.identifier().len())?)?;
-    }
-    Ok(bytes)
-}
-
-fn conditioning_value_resident_bytes(
-    value: &ConditioningValue,
-) -> Result<u64, NativeSamplerPayloadError> {
-    match value {
-        ConditioningValue::Regular(tensor)
-        | ConditioningValue::NoiseShape(tensor)
-        | ConditioningValue::CrossAttention(tensor) => Ok(tensor.storage_byte_len()),
-        ConditioningValue::Constant(value) => conditioning_constant_resident_bytes(value),
-        ConditioningValue::List(tensors) => tensors.iter().try_fold(
-            usize_to_u64(
-                tensors
-                    .len()
-                    .checked_mul(mem::size_of::<Tensor>())
-                    .ok_or(NativeSamplerPayloadError::ResidentBytesOverflow)?,
-            )?,
-            |bytes, tensor| checked_add(bytes, tensor.storage_byte_len()),
-        ),
-    }
-}
-
-fn conditioning_constant_resident_bytes(
-    value: &ConditioningConstant,
-) -> Result<u64, NativeSamplerPayloadError> {
-    match value {
-        ConditioningConstant::Null
-        | ConditioningConstant::Boolean(_)
-        | ConditioningConstant::Signed(_)
-        | ConditioningConstant::Unsigned(_)
-        | ConditioningConstant::FiniteF64Bits(_) => Ok(0),
-        ConditioningConstant::Text(value) => usize_to_u64(value.len()),
-        ConditioningConstant::Bytes(value) => usize_to_u64(value.len()),
-        ConditioningConstant::Tensor(tensor) => Ok(tensor.storage_byte_len()),
-        ConditioningConstant::List(values) | ConditioningConstant::Tuple(values) => {
-            values.iter().try_fold(0_u64, |bytes, value| {
-                checked_add(bytes, conditioning_constant_resident_bytes(value)?)
-            })
-        }
-        ConditioningConstant::Map(values) => {
-            values.iter().try_fold(0_u64, |bytes, (key, value)| {
-                checked_add(
-                    checked_add(bytes, usize_to_u64(key.len())?)?,
-                    conditioning_constant_resident_bytes(value)?,
-                )
-            })
-        }
     }
 }
 
@@ -869,7 +783,9 @@ mod tests {
     use crate::DiscreteSamplingProfile;
     use comfy_model::{
         LatentFormatIdentity, ModelFamilyIdentity,
-        conditioning::{ConditioningEntryOptions, ConditioningIdentity, ConditioningValue},
+        conditioning::{
+            ConditioningEntry, ConditioningEntryOptions, ConditioningIdentity, ConditioningValue,
+        },
     };
     use comfy_tensor::{
         CancellationToken, CpuWorkspaceAuthority, StreamId,
@@ -983,6 +899,50 @@ mod tests {
     }
 
     #[test]
+    fn fixed_noise_semantic_digest_ignores_stream_and_storage_placement()
+    -> Result<(), Box<dyn Error>> {
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(8 * 1024 * 1024)?;
+        let cancellation = CancellationToken::default();
+        let default_context = context(&backend, &authority, &cancellation)?;
+        let other_context = backend.execution_context(
+            StreamId::new(17),
+            authority.authorize_workspace(4 * 1024 * 1024)?,
+            &cancellation,
+        );
+        let first_tensor = tensor_from_f32(&backend, &[1, 1, 2], &[0.25, -0.5], &default_context)?;
+        let second_tensor = tensor_from_f32(&backend, &[1, 1, 2], &[0.25, -0.5], &other_context)?;
+        assert_ne!(first_tensor.storage_id(), second_tensor.storage_id());
+        assert_ne!(
+            first_tensor.descriptor().stream(),
+            second_tensor.descriptor().stream()
+        );
+
+        let first = NativeNoisePayload::fixed_latent(19, first_tensor)?;
+        let second = NativeNoisePayload::fixed_latent(19, second_tensor)?;
+        assert_eq!(
+            first.semantic_digest_sha256(),
+            second.semantic_digest_sha256()
+        );
+        assert_ne!(
+            first.semantic_digest_sha256(),
+            NativeNoisePayload::fixed_latent(
+                19,
+                tensor_from_f32(&backend, &[1, 1, 2], &[0.25, -0.25], &default_context)?,
+            )?
+            .semantic_digest_sha256()
+        );
+        assert_ne!(
+            first.semantic_digest_sha256(),
+            NativeNoisePayload::fixed_latent(
+                19,
+                tensor_from_f32(&backend, &[1, 2, 1], &[0.25, -0.5], &default_context)?,
+            )?
+            .semantic_digest_sha256()
+        );
+        Ok(())
+    }
+
+    #[test]
     fn cfg_guider_strategy_executes_checked_conditioning() -> Result<(), Box<dyn Error>> {
         let (backend, authority) = CpuWorkspaceAuthority::create_backend(8 * 1024 * 1024)?;
         let cancellation = CancellationToken::default();
@@ -990,12 +950,46 @@ mod tests {
         let latent = tensor_from_f32(&backend, &[1, 1, 2], &[0.0, 0.0], &context)?;
         let positive = conditioning(&backend, &context, &cancellation, "shared", 1.0)?;
         let negative = conditioning(&backend, &context, &cancellation, "shared", 0.0)?;
-        let positive_resident_bytes = conditioning_set_resident_bytes(&positive)?;
+        let positive_resident_bytes = positive.resident_bytes()?;
+        assert_eq!(
+            ConditioningSet::combined_resident_bytes(&[positive.as_ref(), positive.as_ref()])?,
+            positive_resident_bytes
+        );
+        let cfg_resident_bytes =
+            ConditioningSet::combined_resident_bytes(&[positive.as_ref(), negative.as_ref()])?;
+        let positive_address = Arc::as_ptr(&positive);
+        let negative_address = Arc::as_ptr(&negative);
         let strategy = NativeGuiderStrategy::Cfg {
             positive,
             negative,
             guidance: 2.0,
         };
+        let NativeGuiderConditioningSets::Cfg { positive, negative } = strategy.conditioning_sets()
+        else {
+            return Err("CFG guider exposed basic conditioning children".into());
+        };
+        assert_eq!(Arc::as_ptr(positive), positive_address);
+        assert_eq!(Arc::as_ptr(negative), negative_address);
+        assert_eq!(
+            ConditioningSet::combined_resident_bytes(&[positive.as_ref(), negative.as_ref(),])?,
+            cfg_resident_bytes
+        );
+        let basic_strategy = NativeGuiderStrategy::Basic {
+            conditioning: positive.clone(),
+        };
+        let NativeGuiderConditioningSets::Basic { conditioning } =
+            basic_strategy.conditioning_sets()
+        else {
+            return Err("basic guider exposed CFG conditioning children".into());
+        };
+        assert_eq!(Arc::as_ptr(conditioning), positive_address);
+        assert_eq!(conditioning.resident_bytes()?, positive_resident_bytes);
+        assert_eq!(
+            guider_owned_resident_bytes(128)?,
+            usize_to_u64(mem::size_of::<NativeGuiderPayload>())?
+                .checked_add(128)
+                .ok_or("guider owned test byte count overflowed")?
+        );
         let profile = DiscreteSamplingProfile::sd15()?;
         let plan = SamplingPlan::new(
             "euler",

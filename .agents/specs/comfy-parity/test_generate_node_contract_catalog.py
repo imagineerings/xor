@@ -145,6 +145,14 @@ class NodeContractCatalogTests(unittest.TestCase):
         self.assertEqual(dynamic[0]["input"]["source_type_names"], ["IMAGE"])
         self.assertEqual(batch["schema"]["portable"]["inputs"], [])
 
+        math_expression = self.contracts["COMFY-NODE-0083"]
+        math_dynamic = math_expression["schema"]["portable"]["dynamic_inputs"]
+        self.assertEqual(len(math_dynamic), 1)
+        self.assertEqual(
+            math_dynamic[0]["input"]["source_type_names"],
+            ["FLOAT", "INT", "BOOLEAN"],
+        )
+
         inherited = self.contracts["COMFY-NODE-0159"]
         self.assertEqual(inherited["schema"]["catalog_correlation"], "verified_inherited_base")
         override_names = {
@@ -196,11 +204,111 @@ class NodeContractCatalogTests(unittest.TestCase):
                 for output in local_partner_helper["schema"]["portable"]["outputs"]
             )
         )
+        voice_output = local_partner_helper["schema"]["portable"]["outputs"][0]
+        self.assertEqual(
+            voice_output["extra"],
+            [
+                {
+                    "name": "source_identity",
+                    "value": {"kind": "string", "value": "ELEVENLABS_VOICE"},
+                }
+            ],
+        )
+        style_reference = next(
+            value
+            for value in self.contracts["COMFY-NODE-0305"]["schema"]["portable"]["inputs"]
+            if value["name"] == "style_reference"
+        )
+        self.assertEqual(style_reference["source_type_names"], ["CUSTOM"])
+        self.assertIn(
+            {
+                "name": "source_identity",
+                "value": {"kind": "string", "value": "KreaIO.STYLE_REF"},
+            },
+            style_reference["extra"],
+        )
 
         expanded_inputs = self.contracts["COMFY-NODE-0020"]["schema"]["portable"]
-        self.assertEqual(expanded_inputs["inputs"], [])
-        self.assertEqual(len(expanded_inputs["unresolved_inputs"]), 1)
-        self.assertIn("_common_inputs", expanded_inputs["unresolved_inputs"][0]["source"])
+        self.assertEqual(
+            [value["name"] for value in expanded_inputs["inputs"]],
+            ["image", "prompt", "reference_image", "alpha_mode", "max_resolution", "seed"],
+        )
+        self.assertEqual(expanded_inputs["unresolved_inputs"], [])
+
+        inherited_inputs = self.contracts["COMFY-NODE-0672"]["schema"]["portable"]
+        self.assertEqual(inherited_inputs["inputs"][0]["name"], "clip")
+        self.assertEqual(inherited_inputs["inputs"][-1]["name"], "use_default_template")
+        self.assertEqual(inherited_inputs["unresolved_inputs"], [])
+
+        for feature_id in ("COMFY-NODE-0382", "COMFY-NODE-0405", "COMFY-NODE-0546", "COMFY-NODE-0551", "COMFY-NODE-0690"):
+            self.assertEqual(
+                self.contracts[feature_id]["schema"]["portable"]["unresolved_inputs"],
+                [],
+            )
+        self.assertTrue(
+            all(
+                contract["schema"]["portable"]["unresolved_inputs"] == []
+                for contract in self.contracts.values()
+            )
+        )
+
+        file_to_splat = self.contracts["COMFY-NODE-0172"]["schema"]["portable"]
+        self.assertEqual(file_to_splat["unresolved_inputs"], [])
+        self.assertEqual(
+            file_to_splat["inputs"][0]["source_type_names"],
+            ["FILE_3D", "FILE_3D_SPLAT_ANY", "FILE_3D_PLY", "FILE_3D_SPLAT", "FILE_3D_KSPLAT", "FILE_3D_SPZ"],
+        )
+        preview = self.contracts["COMFY-NODE-0487"]["schema"]["portable"]
+        self.assertEqual(preview["inputs"][0]["name"], "model_file")
+        self.assertEqual(preview["inputs"][0]["source_type_names"][0], "STRING")
+        self.assertIn("FILE_3D_GLB", preview["inputs"][0]["source_type_names"])
+        save_glb = self.contracts["COMFY-NODE-0592"]["schema"]["portable"]
+        self.assertEqual(save_glb["inputs"][0]["name"], "mesh")
+        self.assertEqual(save_glb["inputs"][0]["source_type_names"][0], "MESH")
+        self.assertEqual(save_glb["unresolved_inputs"], [])
+
+    def test_module_custom_aliases_preserve_declared_source_identities(self) -> None:
+        mediapipe = self.contracts["COMFY-NODE-0402"]["schema"]["portable"]
+        self.assertEqual(
+            mediapipe["inputs"][0]["source_type_names"],
+            ["FACE_DETECTION_MODEL"],
+        )
+        self.assertEqual(
+            mediapipe["outputs"][0]["source_type_name"],
+            "FACE_LANDMARKS",
+        )
+
+        ic_lora = self.contracts["COMFY-NODE-0204"]["schema"]["portable"]
+        self.assertEqual(
+            ic_lora["outputs"][0]["source_type_name"],
+            "IC_LORA_PARAMETERS",
+        )
+
+        sam3 = self.contracts["COMFY-NODE-0567"]["schema"]["portable"]
+        self.assertEqual(
+            sam3["outputs"][0]["source_type_name"],
+            "SAM3_TRACK_DATA",
+        )
+
+        labels = {
+            source_type
+            for contract in self.contracts.values()
+            for source_type in (
+                *(
+                    source_type
+                    for port in contract["schema"]["portable"]["inputs"]
+                    for source_type in port["source_type_names"]
+                ),
+                *(
+                    port["source_type_name"]
+                    for port in contract["schema"]["portable"]["outputs"]
+                ),
+            )
+        }
+        self.assertFalse(
+            {"FACEDETECTIONTYPE", "FACELANDMARKSTYPE", "ICLORAPARAMETERS", "SAM3TRACKDATA"}
+            & labels
+        )
 
     def test_schema_source_mismatch_fails_closed(self) -> None:
         with generator.INPUT.open(newline="", encoding="utf-8") as handle:

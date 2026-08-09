@@ -9,12 +9,11 @@ pub use comfy_nodes::{
     NativeNodeFailure, NativeNodeFailureKind, NativeNodeOutcome, NativeNodePresentation,
     NativeNodeSchemaMetadata, NativeOpaqueHandle, NativeOutputDescriptor,
     NativeOutputSchemaMetadata, NativePortCardinality, NativePreparedEffectRequest,
-    NativePrimitive, NativePrimitiveType, NativeSchemaError, NativeSchemaField,
-    NativeSchemaProvenance, NativeSchemaValue, NativeSourcePresentationMetadata,
-    NativeStoredArtifactObject, NativeStoredModelObject, NativeStoredObject,
-    NativeStoredTensorObject, NativeTypeUnion, NativeUploadKind, NativeValue, NativeValueType,
-    NodeRegistry, NodeRegistryError, ObjectInfoInputSchema, ObjectInfoNode, ObjectInfoOutputSchema,
-    ObjectInfoRegistry,
+    NativePrimitive, NativePrimitiveType, NativeProviderPayload, NativeSchemaError,
+    NativeSchemaField, NativeSchemaProvenance, NativeSchemaValue, NativeSourcePresentationMetadata,
+    NativeStoredModelPayload, NativeStoredPayload, NativeStoredPayloadError, NativeTypeUnion,
+    NativeUploadKind, NativeValue, NativeValueType, NodeRegistry, NodeRegistryError,
+    ObjectInfoInputSchema, ObjectInfoNode, ObjectInfoOutputSchema, ObjectInfoRegistry,
 };
 pub use comfy_types::{AttemptId, ExecutionId, ProfileId, PromptId, RequestId};
 

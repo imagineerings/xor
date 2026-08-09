@@ -1,4 +1,7 @@
-use comfy_nodes::{NativeHandleKind, NativePortCardinality, NativePrimitiveType, NativeValueType};
+use comfy_nodes::{
+    NativeHandleKind, NativePortCardinality, NativePrimitiveType, NativeValueType,
+    native_plugin_source_type_projection,
+};
 use comfy_plugin_host::{
     AssetPluginCapabilityServices, CancellationToken, CapabilityLimits, CapabilityState,
     ComponentExecutionBoundary, ComponentHost, ComponentHostError, ComponentHostRouter,
@@ -96,7 +99,7 @@ fn manifest(component_digest: String) -> Result<PluginManifest, Box<dyn Error>> 
     for (family, source_type, presence) in [
         ("scalar", "String", PortPresence::Required),
         ("tensor", "Image", PortPresence::Required),
-        ("artifact", "SVG", PortPresence::Required),
+        ("artifact", "SVG", PortPresence::Optional),
         ("model", "Model", PortPresence::Hidden),
     ] {
         ports.push(port(
@@ -113,7 +116,11 @@ fn manifest(component_digest: String) -> Result<PluginManifest, Box<dyn Error>> 
             PortDirection::Output,
             source_type,
             PortCardinality::Singular,
-            PortPresence::Required,
+            if family == "artifact" {
+                PortPresence::Optional
+            } else {
+                PortPresence::Required
+            },
         )?);
         ports.push(port(
             &registry,
@@ -1927,6 +1934,25 @@ fn extension_owned_component_host_updates_registry_atomically_and_revokes_stale_
     let descriptor = registry
         .descriptor("echo")
         .ok_or("installed component descriptor is absent")?;
+    let manifest_node = manifest.nodes.first().ok_or("manifest node is absent")?;
+    for plugin_port in manifest_node
+        .ports
+        .iter()
+        .filter(|port| port.direction == PortDirection::Input)
+    {
+        let native_input = descriptor
+            .inputs
+            .iter()
+            .find(|input| input.name == plugin_port.id)
+            .ok_or("installed native input is absent")?;
+        let canonical =
+            native_plugin_source_type_projection(plugin_port.type_id.name())?.value_type()?;
+        assert_eq!(native_input.accepted_types.members(), &[canonical.clone()]);
+        assert_eq!(
+            native_input.allows_literal,
+            !matches!(canonical, NativeValueType::Handle(_))
+        );
+    }
     let scalar = descriptor
         .inputs
         .iter()

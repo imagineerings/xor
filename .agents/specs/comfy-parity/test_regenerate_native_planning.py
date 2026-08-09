@@ -9,6 +9,34 @@ import regenerate_native_planning as planning
 
 
 class ValidationGenerationTests(unittest.TestCase):
+    def test_schema_foundation_reopens_until_source_identity_evidence_is_fresh(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "tasks.md").write_text(
+                "- [x] 368. Preserve exact native node schema and source metadata\n"
+                "  - _id: comfy-parity-native-node-schema-metadata-foundation\n"
+                "  - _validation_evidence: prior catalog evidence\n",
+                encoding="utf-8",
+            )
+            with patch.object(planning, "ROOT", root):
+                stale = planning.existing_task_annotations()[
+                    "comfy-parity-native-node-schema-metadata-foundation"
+                ]
+            self.assertFalse(stale["complete"])
+            self.assertIn("STALE AFTER NODE SOURCE IDENTITY REVALIDATION", stale["evidence"])
+
+            (root / "tasks.md").write_text(
+                "- [x] 368. Preserve exact native node schema and source metadata\n"
+                "  - _id: comfy-parity-native-node-schema-metadata-foundation\n"
+                "  - _validation_evidence: POST-NODE-SOURCE-IDENTITY-REVALIDATION fresh evidence\n",
+                encoding="utf-8",
+            )
+            with patch.object(planning, "ROOT", root):
+                fresh = planning.existing_task_annotations()[
+                    "comfy-parity-native-node-schema-metadata-foundation"
+                ]
+            self.assertTrue(fresh["complete"])
+
     def test_native_node_runtime_foundation_orders_disjoint_leaves_and_registry(self) -> None:
         tasks, mapping = planning.all_tasks()
         tasks_by_id = {str(item["id"]): item for item in tasks}
@@ -31,7 +59,14 @@ class ValidationGenerationTests(unittest.TestCase):
         for identifier in (schema_id, value_id, asset_id, provider_id):
             self.assertTrue(tasks_by_id[identifier]["feature_scoped"])
         self.assertEqual(tasks_by_id[schema_id]["dependencies"], [foundation_id])
-        self.assertEqual(tasks_by_id[value_id]["dependencies"], [schema_id, compute_id])
+        self.assertEqual(
+            tasks_by_id[value_id]["dependencies"],
+            [
+                schema_id,
+                compute_id,
+                "comfy-parity-model-detection-any-of-key-selector-consolidation",
+            ],
+        )
         self.assertEqual(
             tasks_by_id[asset_id]["dependencies"],
             [
@@ -49,9 +84,30 @@ class ValidationGenerationTests(unittest.TestCase):
             for identifier in node_ids
         }
         self.assertEqual(sum(schema_id in value for value in dependencies.values()), 102)
-        self.assertEqual(sum(value_id in value for value in dependencies.values()), 102)
-        self.assertEqual(sum(asset_id in value for value in dependencies.values()), 102)
-        self.assertEqual(sum(provider_id in value for value in dependencies.values()), 102)
+        self.assertEqual(sum(value_id in value for value in dependencies.values()), 84)
+        self.assertEqual(sum(asset_id in value for value in dependencies.values()), 84)
+        self.assertEqual(sum(provider_id in value for value in dependencies.values()), 25)
+        self.assertEqual(
+            sum(
+                value_id in value and provider_id in value
+                for value in dependencies.values()
+            ),
+            7,
+        )
+        self.assertEqual(
+            sum(
+                value_id in value and provider_id not in value
+                for value in dependencies.values()
+            ),
+            77,
+        )
+        self.assertEqual(
+            sum(
+                provider_id in value and value_id not in value
+                for value in dependencies.values()
+            ),
+            18,
+        )
         mapped_values = {
             identifier: sum(
                 identifier in task_ids for task_ids in mapping.values()
@@ -83,6 +139,9 @@ class ValidationGenerationTests(unittest.TestCase):
         schema_writes = set(tasks_by_id["comfy-parity-native-node-schema-metadata-foundation"]["writes"])
         value_writes = set(tasks_by_id["comfy-parity-native-node-compute-value-foundation"]["writes"])
         asset_writes = set(tasks_by_id["comfy-parity-native-node-asset-effect-foundation"]["writes"])
+        provider_reads = set(
+            tasks_by_id["comfy-parity-native-node-provider-invocation-foundation"]["reads"]
+        )
         provider_writes = set(tasks_by_id["comfy-parity-native-node-provider-invocation-foundation"]["writes"])
         registry_writes = set(
             tasks_by_id["comfy-parity-native-registry-integration"]["writes"]
@@ -116,12 +175,40 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertIn("crates/comfy_api/src/services.rs", schema_writes)
         self.assertIn("crates/comfy_plugin_host/src/registry_adapter.rs", schema_writes)
         self.assertIn("crates/comfy_worker/src/comfy_worker.rs", schema_writes)
+        schema_task = tasks_by_id["comfy-parity-native-node-schema-metadata-foundation"]
+        self.assertEqual(
+            schema_task["criterion_ids"],
+            [
+                "4.1", "4.2", "4.3", "6.1", "6.2", "6.3", "6.5",
+                "16.3", "16.4", "32.1", "32.3", "32.5", "32.8", "44.2",
+            ],
+        )
+        self.assertNotIn("VAL-NODE-002", schema_task["validations"])
         self.assertIn("crates/comfy_model/src/native_node_payload.rs", value_writes)
+        self.assertIn("crates/comfy_model/src/clip_vision.rs", value_writes)
         self.assertIn("crates/comfy_tensor/src/native_node_payload.rs", value_writes)
         self.assertIn("crates/comfy_sampler/src/native_diffusion_payload.rs", value_writes)
+        self.assertIn("crates/comfy_sampler/src/native_node_payload.rs", value_writes)
+        self.assertIn("crates/comfy_media/Cargo.toml", value_writes)
+        self.assertIn("crates/comfy_media/src/native_node_payload.rs", value_writes)
         self.assertIn("crates/comfy_runtime/src/executor.rs", value_writes)
+        self.assertIn("crates/comfy_nodes/src/source_type.rs", value_writes)
+        self.assertIn("crates/comfy_nodes/src/stored_payload.rs", value_writes)
+        self.assertIn("crates/comfy_plugin_host/src/registry_adapter.rs", value_writes)
+        self.assertIn("crates/comfy_test_support/tests/plugin_e2e.rs", value_writes)
+        value_task = tasks_by_id["comfy-parity-native-node-compute-value-foundation"]
+        self.assertNotIn("VAL-NODE-002", value_task["validations"])
         self.assertIn("crates/comfy_media/src/native_node_payload.rs", asset_writes)
+        self.assertIn("crates/comfy_media/src/gaussian_splat.rs", asset_writes)
+        self.assertIn("crates/comfy_nodes/src/execution.rs", asset_writes)
+        self.assertIn("crates/comfy_nodes/src/stored_payload.rs", asset_writes)
         self.assertIn("crates/comfy_runtime/src/output_committer.rs", asset_writes)
+        self.assertIn("crates/comfy_plugin_host/src/registry_adapter.rs", asset_writes)
+        self.assertIn("crates/comfy_plugin_host/tests/component_contract.rs", asset_writes)
+        self.assertNotIn("crates/comfy_runtime/src/providers.rs", provider_reads)
+        self.assertIn("crates/comfy_runtime/src/trust.rs", provider_reads)
+        self.assertIn("crates/comfy_runtime/src/permissions.rs", provider_reads)
+        self.assertIn("crates/comfy_runtime/src/plugin_services.rs", provider_reads)
         self.assertIn("crates/comfy_plugin_host/src/registry_adapter.rs", provider_writes)
         self.assertIn("crates/comfy_plugin_host/src/capabilities.rs", provider_writes)
         self.assertIn("crates/comfy_plugin_sdk/wit/comfy-plugin.wit", provider_writes)
@@ -131,6 +218,27 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertIn("crates/comfy_worker/src/comfy_worker.rs", registry_writes)
         self.assertIn("crates/comfy_api/src/services.rs", registry_writes)
         self.assertIn("crates/sim/src/sim.rs", registry_writes)
+
+        value_commands = planning.task_validation_commands(
+            tasks_by_id["comfy-parity-native-node-compute-value-foundation"]
+        )
+        for command in [
+            "cargo test --locked -p comfy_model --lib clip_vision",
+            "cargo test --locked -p comfy_sampler --lib native_node_payload",
+            "cargo test --locked -p comfy_media --lib native_node_payload",
+            "registry_adapter::tests::explicit_stored_variants_are_exhaustively_projected_or_rejected -- --exact",
+            "val_ownership_001_native_stored_payload_boundary_is_closed",
+            "validate_spec.py .agents/specs/comfy-parity --require-complete",
+        ]:
+            self.assertIn(command, value_commands)
+        asset_commands = planning.task_validation_commands(
+            tasks_by_id["comfy-parity-native-node-asset-effect-foundation"]
+        )
+        for command in [
+            "cargo test --locked -p comfy_plugin_host --lib registry_adapter -- --nocapture",
+            "cargo test --locked -p comfy_plugin_host --test component_contract -- --nocapture",
+        ]:
+            self.assertIn(command, asset_commands)
 
     def test_catalog_pass_signal_is_command_only_and_other_artifact_classes_remain(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

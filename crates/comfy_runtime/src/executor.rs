@@ -14,8 +14,9 @@ pub use comfy_nodes::{
 };
 use comfy_nodes::{
     NativeHandleStore, NativeHandleStoreError, NativeHandleStoreIdentity, NativeHandleType,
-    NativeNodeBindingDisposition, NativeNodeContractError, NativeOpaqueHandle, NativeStoredPayload,
-    NativeValue, NodeRegistry,
+    NativeNodeBindingDisposition, NativeNodeContractError, NativeOpaqueHandle,
+    NativePayloadResidency, NativeResidentAllocationId, NativeStoredPayload, NativeValue,
+    NodeRegistry,
 };
 use comfy_tensor::{BackendCapabilityMatrix, ScratchReservation};
 #[cfg(test)]
@@ -782,16 +783,54 @@ struct NativeHandleStoreTestHooks {
 #[derive(Default)]
 struct NativeHandleStoreData {
     values: BTreeMap<String, StoredNativeHandle>,
+    allocations: BTreeMap<NativeResidentAllocationId, StoredResidentAllocation>,
     resident_bytes: usize,
+}
+
+#[derive(Clone)]
+struct StoredResidentAllocation {
+    resident_bytes: usize,
+    handle_references: usize,
 }
 
 fn remove_stored_handle(
     data: &mut NativeHandleStoreData,
     identifier: &str,
 ) -> Option<StoredNativeHandle> {
-    let resident_bytes = data.values.get(identifier)?.resident_bytes;
-    let next_resident_bytes = data.resident_bytes.checked_sub(resident_bytes)?;
+    let residency = data.values.get(identifier)?.residency.clone();
+    let removed_shared_bytes =
+        residency
+            .shared_allocations()
+            .iter()
+            .try_fold(0usize, |bytes, allocation| {
+                let stored = data.allocations.get(allocation.id())?;
+                if stored.resident_bytes != allocation.resident_bytes()
+                    || stored.handle_references == 0
+                {
+                    return None;
+                }
+                if stored.handle_references == 1 {
+                    bytes.checked_add(stored.resident_bytes)
+                } else {
+                    Some(bytes)
+                }
+            })?;
+    let removed_bytes = residency
+        .exclusive_bytes()
+        .checked_add(removed_shared_bytes)?;
+    let next_resident_bytes = data.resident_bytes.checked_sub(removed_bytes)?;
     let removed = data.values.remove(identifier)?;
+    for allocation in residency.shared_allocations() {
+        let remove = data
+            .allocations
+            .get(allocation.id())
+            .is_some_and(|stored| stored.handle_references == 1);
+        if remove {
+            data.allocations.remove(allocation.id());
+        } else if let Some(stored) = data.allocations.get_mut(allocation.id()) {
+            stored.handle_references -= 1;
+        }
+    }
     data.resident_bytes = next_resident_bytes;
     Some(removed)
 }
@@ -804,7 +843,7 @@ struct StoredNativeHandle {
     value: Arc<NativeStoredPayload>,
     committed: bool,
     published_by: AttemptId,
-    resident_bytes: usize,
+    residency: NativePayloadResidency,
     roots: usize,
 }
 
@@ -1195,9 +1234,10 @@ impl NativeHandleStore for RuntimeNativeHandleStoreSession {
             return Err(NativeHandleStoreError::DigestMismatch);
         }
         record.value.validate()?;
+        let residency = record.value.residency()?;
         if record.value.handle_type()? != record.handle_type
             || record.value.digest_sha256() != record.digest_sha256
-            || record.value.resident_bytes()? != record.resident_bytes
+            || residency != record.residency
         {
             return Err(NativeHandleStoreError::InvalidPayload(
                 comfy_nodes::NativeStoredPayloadError::ProjectionChanged,
@@ -1217,7 +1257,7 @@ impl NativeHandleStore for RuntimeNativeHandleStoreSession {
         payload.validate()?;
         let handle_type = payload.handle_type()?;
         let digest_sha256 = payload.digest_sha256();
-        let resident_bytes = payload.resident_bytes()?;
+        let residency = payload.residency()?;
         let mut staged = self.staged.lock();
         if staged.closed {
             return Err(NativeHandleStoreError::Rejected(
@@ -1225,9 +1265,35 @@ impl NativeHandleStore for RuntimeNativeHandleStoreSession {
             ));
         }
         let mut data = self.generation.state.data.lock();
+        let mut resident_delta = residency.exclusive_bytes();
+        for allocation in residency.shared_allocations() {
+            match data.allocations.get(allocation.id()) {
+                Some(stored) => {
+                    if stored.resident_bytes != allocation.resident_bytes() {
+                        return Err(NativeHandleStoreError::InvalidPayload(
+                            comfy_nodes::NativeStoredPayloadError::ResidentAllocationChanged,
+                        ));
+                    }
+                    stored.handle_references.checked_add(1).ok_or_else(|| {
+                        NativeHandleStoreError::Rejected(
+                            "native resident allocation reference count overflowed".to_owned(),
+                        )
+                    })?;
+                }
+                None => {
+                    resident_delta = resident_delta
+                        .checked_add(allocation.resident_bytes())
+                        .ok_or_else(|| {
+                            NativeHandleStoreError::Rejected(
+                                "native handle resident byte count overflowed".to_owned(),
+                            )
+                        })?;
+                }
+            }
+        }
         let next_resident_bytes =
             data.resident_bytes
-                .checked_add(resident_bytes)
+                .checked_add(resident_delta)
                 .ok_or_else(|| {
                     NativeHandleStoreError::Rejected(
                         "native handle resident byte count overflowed".to_owned(),
@@ -1260,6 +1326,19 @@ impl NativeHandleStore for RuntimeNativeHandleStoreSession {
             generation,
             Some(digest_sha256.clone()),
         )?;
+        for allocation in residency.shared_allocations() {
+            match data.allocations.entry(allocation.id().clone()) {
+                std::collections::btree_map::Entry::Occupied(mut entry) => {
+                    entry.get_mut().handle_references += 1;
+                }
+                std::collections::btree_map::Entry::Vacant(entry) => {
+                    entry.insert(StoredResidentAllocation {
+                        resident_bytes: allocation.resident_bytes(),
+                        handle_references: 1,
+                    });
+                }
+            }
+        }
         data.values.insert(
             identifier.clone(),
             StoredNativeHandle {
@@ -1269,7 +1348,7 @@ impl NativeHandleStore for RuntimeNativeHandleStoreSession {
                 value: Arc::new(payload),
                 committed: false,
                 published_by: self.attempt_id,
-                resident_bytes,
+                residency,
                 roots: 0,
             },
         );
@@ -3433,6 +3512,70 @@ pub(crate) mod tests {
         drop(data);
         generation.collect_unrooted_attempt(attempt_id);
         assert!(generation.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn native_handle_store_deduplicates_shared_allocations_until_final_owner()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let semantic_digest_sha256 = format!("{:x}", Sha256::digest(b"shared-payload"));
+        let shared = Arc::new(NativeProviderPayload::checked(
+            NativeHandleType::new(NativeHandleKind::ProviderTask, "TEST_PROVIDER_TASK")?,
+            "sim.test.provider",
+            semantic_digest_sha256,
+            b"shared-payload".to_vec(),
+        )?);
+        let payload = NativeStoredPayload::Provider(shared.clone());
+        let payload_bytes = payload.resident_bytes()?;
+        let generation = NativeHandleStoreGeneration::with_capacities(2, payload_bytes)?;
+        let attempt_id = AttemptId(Uuid::from_u128(0x2f01));
+        let session = generation.session(attempt_id);
+        let first = session.publish(
+            NativeStoredPayload::Provider(shared.clone()),
+            &CancellationToken::default(),
+        )?;
+        let second = session.publish(
+            NativeStoredPayload::Provider(shared),
+            &CancellationToken::default(),
+        )?;
+        assert_eq!(generation.len(), 2);
+        assert_eq!(generation.resident_bytes(), payload_bytes);
+
+        session.commit();
+        let first_lease = generation
+            .acquire_lease([&first])?
+            .ok_or("first handle did not produce a lease")?;
+        let second_lease = generation
+            .acquire_lease([&second])?
+            .ok_or("second handle did not produce a lease")?;
+        generation.collect_unrooted_attempt(attempt_id);
+        drop(first_lease);
+        assert_eq!(generation.len(), 1);
+        assert_eq!(generation.resident_bytes(), payload_bytes);
+        drop(second_lease);
+        assert!(generation.is_empty());
+        assert_eq!(generation.resident_bytes(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn native_handle_store_allocation_capacity_rejection_is_atomic()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let first = stored_test_payload(b"first-allocation".to_vec())?;
+        let first_bytes = first.resident_bytes()?;
+        let generation = NativeHandleStoreGeneration::with_capacities(2, first_bytes)?;
+        let session = generation.session(AttemptId(Uuid::from_u128(0x2f02)));
+        session.publish(first, &CancellationToken::default())?;
+        let second = stored_test_payload(b"second-distinct-allocation".to_vec())?;
+        assert!(matches!(
+            session.publish(second, &CancellationToken::default()),
+            Err(NativeHandleStoreError::Rejected(_))
+        ));
+        assert_eq!(generation.len(), 1);
+        assert_eq!(generation.resident_bytes(), first_bytes);
+        session.rollback_all();
+        assert!(generation.is_empty());
+        assert_eq!(generation.resident_bytes(), 0);
         Ok(())
     }
 

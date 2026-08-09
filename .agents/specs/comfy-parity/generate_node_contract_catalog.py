@@ -23,6 +23,7 @@ INPUT = CATALOGS / "backend-nodes.csv"
 OUTPUT = CATALOGS / "backend-node-contracts.json"
 SCHEMA_VERSION = 2
 MAX_SCHEMA_SOURCE_BYTES = 4 * 1024 * 1024
+_IO_TYPE_NAMES: dict[str, str] | None = None
 
 
 def sha256_bytes(value: bytes) -> str:
@@ -48,6 +49,75 @@ def dotted_name(node: ast.AST) -> str | None:
         if parent is not None:
             return f"{parent}.{node.attr}"
     return None
+
+
+def io_type_names() -> dict[str, str]:
+    global _IO_TYPE_NAMES
+    if _IO_TYPE_NAMES is not None:
+        return _IO_TYPE_NAMES
+    source = (SOURCE_ROOT / "comfy_api/latest/_io.py").read_text(encoding="utf-8")
+    mapping: dict[str, str] = {}
+    for statement in ast.parse(source).body:
+        if not isinstance(statement, ast.ClassDef):
+            continue
+        for decorator in statement.decorator_list:
+            if not isinstance(decorator, ast.Call) or dotted_name(decorator.func) != "comfytype":
+                continue
+            io_type = next(
+                (
+                    keyword.value.value
+                    for keyword in decorator.keywords
+                    if keyword.arg == "io_type"
+                    and isinstance(keyword.value, ast.Constant)
+                    and isinstance(keyword.value.value, str)
+                ),
+                None,
+            )
+            if io_type is None:
+                raise RuntimeError(
+                    f"Comfy type `{statement.name}` has no literal io_type declaration"
+                )
+            previous = mapping.setdefault(statement.name, io_type)
+            if previous != io_type:
+                raise RuntimeError(
+                    f"Comfy type `{statement.name}` has conflicting io_type declarations"
+                )
+    if not mapping:
+        raise RuntimeError("pinned Comfy type registry is empty")
+    _IO_TYPE_NAMES = mapping
+    return mapping
+
+
+def module_custom_type_names(source: str) -> dict[str, str]:
+    mapping: dict[str, str] = {}
+    for statement in ast.parse(source).body:
+        if not isinstance(statement, (ast.Assign, ast.AnnAssign)):
+            continue
+        value = statement.value
+        if not isinstance(value, ast.Call) or dotted_name(value.func) not in {
+            "IO.Custom",
+            "io.Custom",
+        }:
+            continue
+        if (
+            len(value.args) != 1
+            or not isinstance(value.args[0], ast.Constant)
+            or not isinstance(value.args[0].value, str)
+            or not value.args[0].value
+        ):
+            raise RuntimeError("custom source type identity must be one literal string")
+        if isinstance(statement, ast.Assign):
+            targets = statement.targets
+        else:
+            targets = [statement.target]
+        if len(targets) != 1 or not isinstance(targets[0], ast.Name):
+            raise RuntimeError("custom source type alias must be one module name")
+        name = targets[0].id
+        identity = value.args[0].value
+        previous = mapping.setdefault(name, identity)
+        if previous != identity:
+            raise RuntimeError(f"custom source type alias `{name}` is conflicting")
+    return mapping
 
 
 def expression_projection(node: ast.AST, source: str) -> dict[str, Any]:
@@ -217,7 +287,17 @@ def v3_port_projection(node: ast.AST, source: str) -> dict[str, Any]:
         projection["callee"] = expression_projection(node.func, source)
         if isinstance(node.func, ast.Attribute):
             projection["source_type"] = expression_projection(node.func.value, source)
-        projection["name"] = literal_string(node.args[0]) if node.args else None
+        name = literal_string(node.args[0]) if node.args else None
+        if name is None:
+            name = next(
+                (
+                    literal_string(keyword.value)
+                    for keyword in node.keywords
+                    if keyword.arg == "id"
+                ),
+                None,
+            )
+        projection["name"] = name
     return projection
 
 
@@ -300,13 +380,18 @@ def literal_text(value: dict[str, Any] | None) -> str | None:
     return None
 
 
-def source_type_name(value: dict[str, Any]) -> str:
+def source_type_name(
+    value: dict[str, Any], custom_type_names: dict[str, str]
+) -> str:
     literal = literal_text(value)
     if literal:
         return literal
     name = value.get("name") if value.get("kind") in {"name", "attribute"} else None
     if isinstance(name, str) and name:
-        return name.rsplit(".", 1)[-1].upper()
+        terminal = name.rsplit(".", 1)[-1]
+        if terminal in custom_type_names:
+            return custom_type_names[terminal]
+        return io_type_names().get(terminal, terminal.upper())
     if value.get("kind") == "call":
         call_name = value.get("name")
         if isinstance(call_name, str) and call_name:
@@ -315,8 +400,34 @@ def source_type_name(value: dict[str, Any]) -> str:
                 custom = literal_text(value["arguments"][0])
                 if custom:
                     return custom
-            return terminal.upper()
+            if terminal in custom_type_names:
+                return custom_type_names[terminal]
+            return io_type_names().get(terminal, terminal.upper())
     return "PRESERVED_EXPRESSION"
+
+
+def source_type_class_name(value: dict[str, Any]) -> str | None:
+    if value.get("kind") in {"name", "attribute"}:
+        name = value.get("name")
+    elif value.get("kind") == "call":
+        name = value.get("name")
+    else:
+        return None
+    return name.rsplit(".", 1)[-1] if isinstance(name, str) and name else None
+
+
+def custom_source_identity(value: dict[str, Any]) -> str | None:
+    if value.get("kind") != "call" or value.get("name") not in {"IO.Custom", "io.Custom"}:
+        return None
+    arguments = value.get("arguments", [])
+    if len(arguments) != 1 or not isinstance(arguments[0], dict):
+        return None
+    identity = arguments[0]
+    if identity.get("kind") == "literal" and isinstance(identity.get("value"), str):
+        return identity["value"]
+    if identity.get("kind") in {"name", "attribute"} and isinstance(identity.get("name"), str):
+        return identity["name"]
+    return None
 
 
 RECOGNIZED_INPUT_OPTIONS = {
@@ -346,6 +457,7 @@ def portable_input(
     source_type: dict[str, Any],
     options: list[dict[str, Any]],
     requirement: str,
+    custom_type_names: dict[str, str],
 ) -> dict[str, Any]:
     by_name = {option["name"]: option["value"] for option in options}
     choices = by_name.get("options")
@@ -353,7 +465,7 @@ def portable_input(
         choices = source_type
         source_type_names = ["COMBO"]
     else:
-        source_type_names = [source_type_name(source_type)]
+        source_type_names = [source_type_name(source_type, custom_type_names)]
     static_choices = []
     extra = []
     if isinstance(choices, dict) and choices.get("kind") in {"list", "tuple", "set"}:
@@ -364,6 +476,16 @@ def portable_input(
         if option["name"] not in RECOGNIZED_INPUT_OPTIONS:
             extra.append(
                 {"name": option["name"], "value": portable_expression(option["value"])}
+            )
+    if source_type_names == ["CUSTOM"]:
+        identity = custom_source_identity(source_type)
+        if identity is None:
+            extra.append(
+                {"name": "source_identity_expression", "value": portable_expression(source_type)}
+            )
+        else:
+            extra.append(
+                {"name": "source_identity", "value": {"kind": "string", "value": identity}}
             )
     upload = None
     for key, kind in (
@@ -397,6 +519,75 @@ def portable_input(
     }
 
 
+def v3_multitype_input(
+    port: dict[str, Any], custom_type_names: dict[str, str]
+) -> dict[str, Any] | None:
+    arguments = port.get("arguments", [])
+    if not arguments or not isinstance(arguments[0], dict):
+        return None
+    inner = arguments[0]
+    inner_source = None
+    inner_options = []
+    if inner.get("kind") == "call":
+        inner_arguments = inner.get("arguments", [])
+        name = literal_text(inner_arguments[0]) if inner_arguments else None
+        if name is None:
+            name = next(
+                (
+                    literal_text(keyword.get("value"))
+                    for keyword in inner.get("keywords", [])
+                    if keyword.get("name") == "id"
+                ),
+                None,
+            )
+        call_name = inner.get("name")
+        if not isinstance(call_name, str) or not call_name.endswith(".Input"):
+            return None
+        inner_source = {"kind": "attribute", "name": call_name.removesuffix(".Input")}
+        inner_options = list(inner.get("keywords", []))
+    else:
+        name = literal_text(inner)
+    if not isinstance(name, str):
+        return None
+    outer_keywords = port.get("keywords", [])
+    types = next(
+        (
+            keyword.get("value")
+            for keyword in outer_keywords
+            if keyword.get("name") == "types"
+        ),
+        None,
+    )
+    if types is None and len(arguments) > 1:
+        types = arguments[1]
+    if not isinstance(types, dict) or types.get("kind") not in {"list", "tuple", "set"}:
+        return None
+    source_type_names = []
+    if inner_source is not None:
+        source_type_names.append(source_type_name(inner_source, custom_type_names))
+    for member in types.get("items", []):
+        member_name = source_type_name(member, custom_type_names)
+        if member_name == "PRESERVED_EXPRESSION":
+            return None
+        if member_name not in source_type_names:
+            source_type_names.append(member_name)
+    options = inner_options
+    options.extend(
+        keyword for keyword in outer_keywords if keyword.get("name") != "types"
+    )
+    by_name = {keyword["name"]: keyword["value"] for keyword in options}
+    requirement = "optional" if literal_boolean(by_name.get("optional")) else "required"
+    projection = portable_input(
+        name,
+        inner_source or {"kind": "attribute", "name": "IO.MultiType"},
+        options,
+        requirement,
+        custom_type_names,
+    )
+    projection["source_type_names"] = source_type_names
+    return projection
+
+
 def literal_u32(value: dict[str, Any] | None, default: int) -> int:
     if (
         isinstance(value, dict)
@@ -410,7 +601,9 @@ def literal_u32(value: dict[str, Any] | None, default: int) -> int:
 
 
 def v3_dynamic_input(
-    port: dict[str, Any], bindings: dict[str, dict[str, Any]]
+    port: dict[str, Any],
+    bindings: dict[str, dict[str, Any]],
+    custom_type_names: dict[str, str],
 ) -> dict[str, Any] | None:
     keywords = {keyword["name"]: keyword["value"] for keyword in port.get("keywords", [])}
     template = keywords.get("template")
@@ -441,12 +634,18 @@ def v3_dynamic_input(
         "kind": "attribute",
         "name": inner_callee.rsplit(".", 1)[0],
     } if isinstance(inner_callee, str) and "." in inner_callee else inner
-    inner_input = portable_input(
-        inner_name,
-        inner_source_type,
-        inner.get("keywords", []),
-        "optional",
-    )
+    if source_type_class_name(inner_source_type) == "MultiType":
+        inner_input = v3_multitype_input(inner, custom_type_names)
+        if inner_input is None:
+            return None
+    else:
+        inner_input = portable_input(
+            inner_name,
+            inner_source_type,
+            inner.get("keywords", []),
+            "optional",
+            custom_type_names,
+        )
     inner_input.pop("requirement", None)
     prefix = literal_text(template_keywords.get("prefix"))
     names_expression = template_keywords.get("names")
@@ -517,7 +716,9 @@ def v3_dynamic_input(
     }
 
 
-def v3_portable_schema(contract: dict[str, Any]) -> dict[str, Any]:
+def v3_portable_schema(
+    contract: dict[str, Any], custom_type_names: dict[str, str]
+) -> dict[str, Any]:
     inputs = []
     dynamic_inputs = []
     unresolved_inputs = []
@@ -528,15 +729,25 @@ def v3_portable_schema(contract: dict[str, Any]) -> dict[str, Any]:
         for target in binding.get("targets", [])
     }
     for port in contract.get("inputs", []):
-        if port.get("kind") != "call" or not isinstance(port.get("name"), str):
+        if port.get("kind") != "call":
             unresolved_inputs.append(portable_expression(port))
             continue
         if not any(port.get(field) for field in ("constructor", "source_type", "callee")):
             unresolved_inputs.append(portable_expression(port))
             continue
         source_type = port.get("source_type") or port.get("callee") or port
-        if source_type_name(source_type) == "AUTOGROW":
-            dynamic_input = v3_dynamic_input(port, bindings)
+        if source_type_class_name(source_type) == "MultiType":
+            multitype_input = v3_multitype_input(port, custom_type_names)
+            if multitype_input is None:
+                unresolved_inputs.append(portable_expression(port))
+            else:
+                inputs.append(multitype_input)
+            continue
+        if not isinstance(port.get("name"), str):
+            unresolved_inputs.append(portable_expression(port))
+            continue
+        if source_type_class_name(source_type) == "Autogrow":
+            dynamic_input = v3_dynamic_input(port, bindings, custom_type_names)
             if dynamic_input is None:
                 unresolved_inputs.append(portable_expression(port))
             else:
@@ -546,7 +757,11 @@ def v3_portable_schema(contract: dict[str, Any]) -> dict[str, Any]:
         requirement = "optional" if literal_boolean(by_name.get("optional")) else "required"
         inputs.append(
             portable_input(
-                port["name"], source_type, port.get("keywords", []), requirement
+                port["name"],
+                source_type,
+                port.get("keywords", []),
+                requirement,
+                custom_type_names,
             )
         )
     outputs = []
@@ -557,19 +772,36 @@ def v3_portable_schema(contract: dict[str, Any]) -> dict[str, Any]:
             continue
         source_type = port.get("source_type") or port.get("callee") or port
         keywords = {keyword["name"]: keyword["value"] for keyword in port.get("keywords", [])}
+        extra = [
+            {"name": name, "value": portable_expression(value)}
+            for name, value in keywords.items()
+            if name not in {"display_name", "tooltip", "match_template"}
+        ]
+        if source_type_name(source_type, custom_type_names) == "CUSTOM":
+            identity = custom_source_identity(source_type)
+            if identity is None:
+                extra.append(
+                    {
+                        "name": "source_identity_expression",
+                        "value": portable_expression(source_type),
+                    }
+                )
+            else:
+                extra.append(
+                    {
+                        "name": "source_identity",
+                        "value": {"kind": "string", "value": identity},
+                    }
+                )
         outputs.append(
             {
                 "source_name": port.get("name"),
-                "source_type_name": source_type_name(source_type),
+                "source_type_name": source_type_name(source_type, custom_type_names),
                 "display_name": literal_text(keywords.get("display_name")),
                 "tooltip": literal_text(keywords.get("tooltip")),
                 "choices": [],
                 "match_template": literal_text(keywords.get("match_template")),
-                "extra": [
-                    {"name": name, "value": portable_expression(value)}
-                    for name, value in keywords.items()
-                    if name not in {"display_name", "tooltip", "match_template"}
-                ],
+                "extra": extra,
                 "ordinal": index,
             }
         )
@@ -636,7 +868,9 @@ def v1_options(field: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, An
     return source_type, options
 
 
-def v1_portable_schema(contract: dict[str, Any]) -> dict[str, Any]:
+def v1_portable_schema(
+    contract: dict[str, Any], custom_type_names: dict[str, str]
+) -> dict[str, Any]:
     inputs = []
     for group in contract.get("input_groups", []):
         requirement = group.get("name") or "preserved"
@@ -644,7 +878,15 @@ def v1_portable_schema(contract: dict[str, Any]) -> dict[str, Any]:
             if not isinstance(field.get("name"), str):
                 continue
             source_type, options = v1_options(field)
-            inputs.append(portable_input(field["name"], source_type, options, requirement))
+            inputs.append(
+                portable_input(
+                    field["name"],
+                    source_type,
+                    options,
+                    requirement,
+                    custom_type_names,
+                )
+            )
     metadata = {field["name"]: field["value"] for field in contract.get("class_metadata", [])}
     return_types = metadata.get("RETURN_TYPES", {"kind": "tuple", "items": []})
     return_names = metadata.get("RETURN_NAMES", {"kind": "tuple", "items": []})
@@ -652,7 +894,7 @@ def v1_portable_schema(contract: dict[str, Any]) -> dict[str, Any]:
     outputs = [
         {
             "source_name": names[index] if index < len(names) else None,
-            "source_type_name": source_type_name(value),
+            "source_type_name": source_type_name(value, custom_type_names),
             "display_name": None,
             "tooltip": None,
             "choices": [],
@@ -693,15 +935,18 @@ def v1_portable_schema(contract: dict[str, Any]) -> dict[str, Any]:
 
 
 def portable_schema(
-    schema_api: str, schema: dict[str, Any], feature_id: str
+    schema_api: str,
+    schema: dict[str, Any],
+    feature_id: str,
+    custom_type_names: dict[str, str],
 ) -> dict[str, Any]:
     contract = schema.get("contract")
     if not isinstance(contract, dict):
         raise RuntimeError("normalized node schema lacks its source contract")
     result = (
-        v3_portable_schema(contract)
+        v3_portable_schema(contract, custom_type_names)
         if schema_api == "V3"
-        else v1_portable_schema(contract)
+        else v1_portable_schema(contract, custom_type_names)
     )
     result["schema_version"] = 2
     result["catalog_sha256"] = schema["catalog_sha256"]
@@ -724,9 +969,327 @@ def portable_schema(
     return result
 
 
+class StaticPortResolver:
+    def __init__(self, source: str, class_definition: ast.ClassDef):
+        self.source = source
+        tree = ast.parse(source)
+        self.classes = {
+            statement.name: statement
+            for statement in tree.body
+            if isinstance(statement, ast.ClassDef)
+        }
+        self.class_definition = class_definition
+        self.functions = {
+            statement.name: statement
+            for statement in tree.body
+            if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+        self.module_bindings = self._assignment_bindings(tree.body)
+        self.class_bindings = self._class_assignment_bindings(class_definition, set())
+
+    @staticmethod
+    def _assignment_bindings(statements: list[ast.stmt]) -> dict[str, ast.AST]:
+        bindings: dict[str, ast.AST] = {}
+        for statement in statements:
+            value = statement.value if isinstance(statement, (ast.Assign, ast.AnnAssign)) else None
+            if value is None:
+                continue
+            targets = statement.targets if isinstance(statement, ast.Assign) else [statement.target]
+            for target in targets:
+                if isinstance(target, ast.Name):
+                    bindings[target.id] = value
+        return bindings
+
+    def _class_assignment_bindings(
+        self, class_definition: ast.ClassDef, visited: set[str]
+    ) -> dict[str, ast.AST]:
+        if class_definition.name in visited:
+            return {}
+        visited = visited | {class_definition.name}
+        bindings: dict[str, ast.AST] = {}
+        for base in class_definition.bases:
+            base_definition = self.classes.get(dotted_name(base) or "")
+            if base_definition is not None:
+                bindings.update(
+                    self._class_assignment_bindings(base_definition, visited)
+                )
+        bindings.update(self._assignment_bindings(class_definition.body))
+        return bindings
+
+    def resolve_method(self, definition: ast.AST, fallback: ast.AST) -> ast.AST:
+        if not isinstance(definition, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            return fallback
+        environment = {**self.module_bindings, **self.class_bindings}
+        resolved = self._execute(definition.body, environment, set())
+        return resolved if resolved is not None else fallback
+
+    def _resolve(
+        self,
+        node: ast.AST,
+        environment: dict[str, ast.AST],
+        stack: set[str],
+    ) -> ast.AST:
+        if isinstance(node, ast.Name) and node.id in environment and node.id not in stack:
+            return self._resolve(environment[node.id], environment, stack | {node.id})
+        if (
+            isinstance(node, ast.Attribute)
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "cls"
+            and node.attr in self.class_bindings
+        ):
+            return self._resolve(
+                self.class_bindings[node.attr], environment, stack | {f"cls.{node.attr}"}
+            )
+        if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
+            values: list[ast.AST] = []
+            for value in node.elts:
+                if isinstance(value, ast.Starred):
+                    expanded = self._resolve(value.value, environment, stack)
+                    if isinstance(expanded, (ast.List, ast.Tuple, ast.Set)):
+                        values.extend(expanded.elts)
+                    else:
+                        values.append(ast.Starred(value=expanded, ctx=ast.Load()))
+                else:
+                    values.append(self._resolve(value, environment, stack))
+            if isinstance(node, ast.List):
+                return ast.List(elts=values, ctx=ast.Load())
+            if isinstance(node, ast.Tuple):
+                return ast.Tuple(elts=values, ctx=ast.Load())
+            return ast.Set(elts=values)
+        if isinstance(node, ast.Call):
+            function_name = dotted_name(node.func)
+            if function_name in self.functions and function_name not in stack:
+                return self._call_helper(
+                    self.functions[function_name], node, environment, stack | {function_name}
+                )
+            if self._is_super_schema_call(node):
+                inherited = self._resolve_super_schema(stack)
+                if inherited is not None:
+                    return inherited
+        return self._substitute(node, environment, stack)
+
+    @staticmethod
+    def _is_super_schema_call(node: ast.Call) -> bool:
+        return (
+            isinstance(node.func, ast.Attribute)
+            and node.func.attr == "define_schema"
+            and isinstance(node.func.value, ast.Call)
+            and isinstance(node.func.value.func, ast.Name)
+            and node.func.value.func.id == "super"
+        )
+
+    def _resolve_super_schema(self, stack: set[str]) -> ast.AST | None:
+        for base in self.class_definition.bases:
+            base_name = dotted_name(base)
+            base_class = self.classes.get(base_name or "")
+            if base_class is None:
+                continue
+            method = next(
+                (
+                    statement
+                    for statement in base_class.body
+                    if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef))
+                    and statement.name == "define_schema"
+                ),
+                None,
+            )
+            if method is None:
+                continue
+            fallback = returned_expression(method)
+            if fallback is None:
+                continue
+            marker = f"{base_class.name}.define_schema"
+            if marker in stack:
+                return None
+            return StaticPortResolver(self.source, base_class).resolve_method(
+                method, fallback
+            )
+        return None
+
+    def _substitute(
+        self,
+        node: ast.AST,
+        environment: dict[str, ast.AST],
+        stack: set[str],
+    ) -> ast.AST:
+        resolver = self
+
+        class Substituter(ast.NodeTransformer):
+            def visit_Name(self, value: ast.Name) -> ast.AST:
+                if (
+                    value.id in environment
+                    and value.id not in stack
+                    and value.id not in resolver.module_bindings
+                    and value.id not in resolver.class_bindings
+                ):
+                    return ast.copy_location(
+                        resolver._resolve(
+                            environment[value.id], environment, stack | {value.id}
+                        ),
+                        value,
+                    )
+                return value
+
+            def visit_Attribute(self, value: ast.Attribute) -> ast.AST:
+                if (
+                    isinstance(value.value, ast.Name)
+                    and value.value.id == "cls"
+                    and value.attr in resolver.class_bindings
+                ):
+                    return ast.copy_location(
+                        resolver._resolve(
+                            resolver.class_bindings[value.attr],
+                            environment,
+                            stack | {f"cls.{value.attr}"},
+                        ),
+                        value,
+                    )
+                if isinstance(value.value, ast.Name) and value.value.id in environment:
+                    owner = resolver._resolve(
+                        environment[value.value.id],
+                        environment,
+                        stack | {value.value.id},
+                    )
+                    if isinstance(owner, ast.Call) and (
+                        dotted_name(owner.func) or ""
+                    ).endswith("Schema"):
+                        projected = next(
+                            (
+                                keyword.value
+                                for keyword in owner.keywords
+                                if keyword.arg == value.attr
+                            ),
+                            None,
+                        )
+                        if projected is not None:
+                            return ast.copy_location(
+                                resolver._resolve(projected, environment, stack), value
+                            )
+                return self.generic_visit(value)
+
+            def visit_Call(self, value: ast.Call) -> ast.AST:
+                function_name = dotted_name(value.func)
+                if function_name in resolver.functions and function_name not in stack:
+                    return ast.copy_location(
+                        resolver._call_helper(
+                            resolver.functions[function_name],
+                            value,
+                            environment,
+                            stack | {function_name},
+                        ),
+                        value,
+                    )
+                if resolver._is_super_schema_call(value):
+                    inherited = resolver._resolve_super_schema(stack)
+                    if inherited is not None:
+                        return ast.copy_location(inherited, value)
+                return self.generic_visit(value)
+
+            def visit_Starred(self, value: ast.Starred) -> ast.AST:
+                resolved = resolver._resolve(value.value, environment, stack)
+                return ast.copy_location(ast.Starred(value=resolved, ctx=ast.Load()), value)
+
+        return Substituter().visit(copy.deepcopy(node))
+
+    def _literal_boolean(
+        self, node: ast.AST, environment: dict[str, ast.AST], stack: set[str]
+    ) -> bool | None:
+        resolved = self._resolve(node, environment, stack)
+        if isinstance(resolved, ast.Constant) and isinstance(resolved.value, bool):
+            return resolved.value
+        if isinstance(resolved, ast.UnaryOp) and isinstance(resolved.op, ast.Not):
+            value = self._literal_boolean(resolved.operand, environment, stack)
+            return None if value is None else not value
+        return None
+
+    def _call_helper(
+        self,
+        function: ast.FunctionDef | ast.AsyncFunctionDef,
+        call: ast.Call,
+        environment: dict[str, ast.AST],
+        stack: set[str],
+    ) -> ast.AST:
+        helper_environment = dict(environment)
+        positional = list(function.args.args)
+        defaults_start = len(positional) - len(function.args.defaults)
+        for index, parameter in enumerate(positional):
+            if index >= defaults_start:
+                helper_environment[parameter.arg] = function.args.defaults[index - defaults_start]
+        for parameter, default in zip(
+            function.args.kwonlyargs, function.args.kw_defaults, strict=True
+        ):
+            if default is not None:
+                helper_environment[parameter.arg] = default
+        for parameter, value in zip(positional, call.args, strict=False):
+            helper_environment[parameter.arg] = self._resolve(value, environment, stack)
+        for keyword in call.keywords:
+            if keyword.arg is not None:
+                helper_environment[keyword.arg] = self._resolve(
+                    keyword.value, environment, stack
+                )
+        resolved = self._execute(function.body, helper_environment, stack)
+        return resolved if resolved is not None else self._substitute(call, environment, stack)
+
+    def _execute(
+        self,
+        statements: list[ast.stmt],
+        environment: dict[str, ast.AST],
+        stack: set[str],
+    ) -> ast.AST | None:
+        for statement in statements:
+            if isinstance(statement, (ast.Assign, ast.AnnAssign)) and statement.value is not None:
+                value = self._resolve(statement.value, environment, stack)
+                targets = statement.targets if isinstance(statement, ast.Assign) else [statement.target]
+                for target in targets:
+                    if isinstance(target, ast.Name):
+                        environment[target.id] = value
+                continue
+            if isinstance(statement, ast.Expr) and isinstance(statement.value, ast.Call):
+                call = statement.value
+                if (
+                    isinstance(call.func, ast.Attribute)
+                    and isinstance(call.func.value, ast.Name)
+                    and call.func.value.id in environment
+                    and call.func.attr in {"append", "extend"}
+                    and len(call.args) == 1
+                ):
+                    current = self._resolve(environment[call.func.value.id], environment, stack)
+                    if isinstance(current, (ast.List, ast.Tuple)):
+                        addition = self._resolve(call.args[0], environment, stack)
+                        values = list(current.elts)
+                        if call.func.attr == "extend" and isinstance(
+                            addition, (ast.List, ast.Tuple)
+                        ):
+                            values.extend(addition.elts)
+                        else:
+                            values.append(addition)
+                        environment[call.func.value.id] = ast.List(elts=values, ctx=ast.Load())
+                continue
+            if isinstance(statement, ast.If):
+                condition = self._literal_boolean(statement.test, environment, stack)
+                if condition is not None:
+                    returned = self._execute(
+                        statement.body if condition else statement.orelse,
+                        environment,
+                        stack,
+                    )
+                    if returned is not None:
+                        return returned
+                continue
+            if isinstance(statement, ast.Return) and statement.value is not None:
+                return self._resolve(statement.value, environment, stack)
+        return None
+
+
 def v3_schema_contract(
-    definition: ast.AST, source: str, expression: ast.AST
+    definition: ast.AST,
+    source: str,
+    expression: ast.AST,
+    class_definition: ast.ClassDef,
 ) -> dict[str, Any]:
+    expression = StaticPortResolver(source, class_definition).resolve_method(
+        definition, expression
+    )
     if not isinstance(expression, ast.Call) or not (
         dotted_name(expression.func) or ""
     ).endswith("Schema"):
@@ -739,6 +1302,19 @@ def v3_schema_contract(
     outputs = keywords.get("outputs")
     hidden = keywords.get("hidden")
     body = definition.body if isinstance(definition, (ast.FunctionDef, ast.AsyncFunctionDef)) else []
+    def expanded(values: ast.AST | None) -> list[ast.AST]:
+        if not isinstance(values, (ast.List, ast.Tuple)):
+            return [values] if values is not None else []
+        result = []
+        for value in values.elts:
+            if isinstance(value, ast.Starred) and isinstance(
+                value.value, (ast.List, ast.Tuple, ast.Set)
+            ):
+                result.extend(value.value.elts)
+            else:
+                result.append(value)
+        return result
+
     return {
         "status": "normalized_v3",
         "bindings": [
@@ -746,15 +1322,9 @@ def v3_schema_contract(
             for statement in body
             if isinstance(statement, (ast.Assign, ast.AnnAssign))
         ],
-        "inputs": [v3_port_projection(value, source) for value in inputs.elts]
-        if isinstance(inputs, (ast.List, ast.Tuple))
-        else ([expression_projection(inputs, source)] if inputs is not None else []),
-        "outputs": [v3_port_projection(value, source) for value in outputs.elts]
-        if isinstance(outputs, (ast.List, ast.Tuple))
-        else ([expression_projection(outputs, source)] if outputs is not None else []),
-        "hidden": [expression_projection(value, source) for value in hidden.elts]
-        if isinstance(hidden, (ast.List, ast.Tuple))
-        else ([expression_projection(hidden, source)] if hidden is not None else []),
+        "inputs": [v3_port_projection(value, source) for value in expanded(inputs)],
+        "outputs": [v3_port_projection(value, source) for value in expanded(outputs)],
+        "hidden": [expression_projection(value, source) for value in expanded(hidden)],
         "node_options": [
             {"name": keyword.arg, "value": expression_projection(keyword.value, source)}
             for keyword in expression.keywords
@@ -957,7 +1527,9 @@ def schema_projection(
                 and base_expression is not None
                 and correlation_dump(parsed_catalog[1]) == correlation_dump(base_expression)
             ):
-                contract = v3_schema_contract(base_methods[0], source, base_expression)
+                contract = v3_schema_contract(
+                    base_methods[0], source, base_expression, class_definition
+                )
                 contract["class_overrides"] = [
                     statement_projection(statement, source)
                     for statement in class_definition.body
@@ -1021,7 +1593,9 @@ def schema_projection(
         contract_method, contract_expression, overrides = inherited_context
         correlation = "verified_inherited_base"
     contract = (
-        v3_schema_contract(contract_method, source, contract_expression)
+        v3_schema_contract(
+            contract_method, source, contract_expression, class_definition
+        )
         if schema_api == "V3"
         else v1_schema_contract(class_definition, method, source, contract_expression)
     )
@@ -1096,7 +1670,10 @@ def build_catalog() -> dict[str, Any]:
             row["schema_source"], row["schema_api"], source, definition
         )
         schema["portable"] = portable_schema(
-            row["schema_api"], schema, row["feature_id"]
+            row["schema_api"],
+            schema,
+            row["feature_id"],
+            module_custom_type_names(source),
         )
         schema["portable"]["presentation"]["is_deprecated"] |= (
             row["availability"] == "deprecated/dead"

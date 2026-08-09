@@ -3,15 +3,15 @@ use crate::{
     capabilities::artifact_value_identity,
 };
 use comfy_nodes::{
-    NATIVE_NODE_CONTRACT_SCHEMA_VERSION, NativeHandleKind, NativeHandleType, NativeInputDescriptor,
-    NativeNode, NativeNodeContext, NativeNodeFailure, NativeNodeFailureKind, NativeNodeOutcome,
-    NativeNodePresentation, NativeOutputDescriptor, NativePortCardinality,
-    NativePreparedEffectRequest, NativePrimitive, NativePrimitiveType, NativeStoredArtifactObject,
-    NativeStoredModelObject, NativeStoredObject, NativeStoredTensorObject, NativeTypeUnion,
-    NativeValue, NativeValueType,
+    NATIVE_NODE_CONTRACT_SCHEMA_VERSION, NativeHandleKind, NativeHandleStoreIdentity,
+    NativeHandleType, NativeInputDescriptor, NativeNode, NativeNodeContext, NativeNodeFailure,
+    NativeNodeFailureKind, NativeNodeOutcome, NativeNodePresentation, NativeOpaqueHandle,
+    NativeOutputDescriptor, NativePortCardinality, NativePreparedEffectRequest, NativePrimitive,
+    NativeStoredPayload, NativeTypeUnion, NativeValue, NativeValueType,
+    native_plugin_source_type_projection,
 };
 use comfy_plugin_sdk::{
-    ArtifactValue, CachePolicy, EffectPolicy, ModelValue, PluginNode, PluginPort, PluginValue,
+    CachePolicy, EffectPolicy, ModelValue, PluginNode, PluginPort, PluginValue,
     PluginValueRepresentation, PortCardinality, PortDirection, PortPresence, ScalarValue,
     TensorValue, TypeRegistry, ValueFamily,
 };
@@ -95,6 +95,27 @@ struct PluginNativeNode {
     implementation_version: String,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum ImportedHandle {
+    Exact(NativeOpaqueHandle),
+    Ambiguous,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct ImportedHandles {
+    store_identity: NativeHandleStoreIdentity,
+    handles: BTreeMap<(String, String), ImportedHandle>,
+}
+
+impl ImportedHandles {
+    fn new(store_identity: NativeHandleStoreIdentity) -> Self {
+        Self {
+            store_identity,
+            handles: BTreeMap::new(),
+        }
+    }
+}
+
 impl NativeNode for PluginNativeNode {
     fn class_type(&self) -> &str {
         &self.node.id
@@ -116,7 +137,7 @@ impl NativeNode for PluginNativeNode {
         Box::pin(async move {
             context.validate().map_err(plugin_failure)?;
             let profile_id = self.plugin.authorization().capabilities().profile_id();
-            let invocation_inputs = invocation_inputs(
+            let (invocation_inputs, imported_handles) = invocation_inputs(
                 &self.node,
                 inputs,
                 &self.type_registry,
@@ -140,6 +161,7 @@ impl NativeNode for PluginNativeNode {
                 &self.type_registry,
                 profile_id,
                 &context,
+                &imported_handles,
             )?;
             let ui = (!result.effects.ui_state.is_empty() || !result.effects.logs.is_empty()).then(
                 || {
@@ -189,7 +211,7 @@ fn native_descriptor(
         match port.direction {
             PortDirection::Input => inputs.push(NativeInputDescriptor {
                 name: port.id.clone(),
-                accepted_types: NativeTypeUnion::new([value_type]).map_err(|error| {
+                accepted_types: NativeTypeUnion::new([value_type.clone()]).map_err(|error| {
                     PluginRegistryAdapterError::InvalidPort {
                         node: node.id.clone(),
                         message: error.to_string(),
@@ -203,7 +225,7 @@ fn native_descriptor(
                 } else {
                     NativePortCardinality::Scalar
                 },
-                allows_literal: family == ValueFamily::Scalar,
+                allows_literal: !matches!(value_type, NativeValueType::Handle(_)),
             }),
             PortDirection::Output => outputs.push(NativeOutputDescriptor {
                 name: port.name.clone(),
@@ -261,63 +283,48 @@ fn native_value_type(
     port: &PluginPort,
     family: ValueFamily,
 ) -> Result<NativeValueType, comfy_nodes::NativeNodeContractError> {
-    Ok(match family {
-        ValueFamily::Scalar => match port.type_id.name() {
-            "boolean" => NativeValueType::Primitive(NativePrimitiveType::Boolean),
-            "integer" => NativeValueType::Primitive(NativePrimitiveType::Integer),
-            "float" | "number" => NativeValueType::Primitive(NativePrimitiveType::Number),
-            "string" => NativeValueType::Primitive(NativePrimitiveType::String),
-            "any" => NativeValueType::Any,
-            _ => NativeValueType::PreservedUnknown,
-        },
+    let value_type = native_plugin_source_type_projection(port.type_id.name())
+        .map_err(|error| {
+            comfy_nodes::NativeNodeContractError::InvalidSourceSchema(error.to_string())
+        })?
+        .value_type()
+        .map_err(|error| {
+            comfy_nodes::NativeNodeContractError::InvalidSourceSchema(error.to_string())
+        })?;
+    let representation_matches = match family {
+        ValueFamily::Scalar => !matches!(value_type, NativeValueType::Handle(_)),
         ValueFamily::Tensor | ValueFamily::Artifact | ValueFamily::Model => {
-            NativeValueType::Handle(native_handle_type(port, family)?)
+            matches!(value_type, NativeValueType::Handle(_))
         }
-    })
+    };
+    if !representation_matches {
+        return Err(comfy_nodes::NativeNodeContractError::InvalidSourceSchema(
+            format!(
+                "plugin type `{}` disagrees with canonical source value class",
+                port.type_id
+            ),
+        ));
+    }
+    Ok(value_type)
 }
 
 fn native_handle_type(
     port: &PluginPort,
-    family: ValueFamily,
 ) -> Result<NativeHandleType, comfy_nodes::NativeNodeContractError> {
-    let name = port.type_id.name();
-    let kind = match family {
-        ValueFamily::Tensor => match name {
-            "image" => NativeHandleKind::Image,
-            "mask" => NativeHandleKind::Mask,
-            "audio" => NativeHandleKind::Audio,
-            "video" => NativeHandleKind::Video,
-            "conditioning" => NativeHandleKind::Conditioning,
-            "latent" => NativeHandleKind::Latent,
-            _ => NativeHandleKind::Tensor,
-        },
-        ValueFamily::Artifact
-            if name.starts_with("file-3d") || matches!(name, "load-3d" | "mesh" | "splat") =>
-        {
-            NativeHandleKind::ThreeD
-        }
-        ValueFamily::Artifact => NativeHandleKind::Artifact,
-        ValueFamily::Model => match name {
-            "model" => NativeHandleKind::Model,
-            "clip" | "clip-vision" => NativeHandleKind::Clip,
-            "vae" => NativeHandleKind::Vae,
-            "control-net" => NativeHandleKind::ControlNet,
-            _ => NativeHandleKind::Model,
-        },
-        ValueFamily::Scalar => NativeHandleKind::Artifact,
-    };
-    NativeHandleType::new(kind, source_type_identity(name))
-}
-
-fn source_type_identity(name: &str) -> String {
-    match name {
-        "integer" => "INT".to_owned(),
-        "float-list" => "FLOATS".to_owned(),
-        "color-list" => "COLORS".to_owned(),
-        "bounding-box-editor" => "BOUNDING_BOXES".to_owned(),
-        "dictionary" => "DICT".to_owned(),
-        name => name.replace('-', "_").to_ascii_uppercase(),
-    }
+    native_plugin_source_type_projection(port.type_id.name())
+        .map_err(|error| {
+            comfy_nodes::NativeNodeContractError::InvalidSourceSchema(error.to_string())
+        })?
+        .handle_type()
+        .map_err(|error| {
+            comfy_nodes::NativeNodeContractError::InvalidSourceSchema(error.to_string())
+        })?
+        .ok_or_else(|| {
+            comfy_nodes::NativeNodeContractError::InvalidSourceSchema(format!(
+                "plugin type `{}` is not handle-backed",
+                port.type_id
+            ))
+        })
 }
 
 fn invocation_inputs(
@@ -326,8 +333,9 @@ fn invocation_inputs(
     registry: &TypeRegistry,
     profile_id: &str,
     context: &NativeNodeContext,
-) -> Result<InvocationInputs, NativeNodeFailure> {
+) -> Result<(InvocationInputs, ImportedHandles), NativeNodeFailure> {
     let mut inputs = InvocationInputs::default();
+    let mut imported_handles = ImportedHandles::new(context.handle_store().identity());
     for port in node
         .ports
         .iter()
@@ -348,16 +356,37 @@ fn invocation_inputs(
             }
             vec![value]
         };
-        let values = values
-            .into_iter()
-            .map(|value| plugin_value(port, value, registry, profile_id, context))
-            .collect::<Result<Vec<_>, _>>()?;
-        inputs.set_present(&port.id, values);
+        let mut plugin_values = Vec::with_capacity(values.len());
+        for value in values {
+            let (plugin_value, imported_handle) =
+                plugin_value(port, value, registry, profile_id, context)?;
+            if let Some((key, handle)) = imported_handle {
+                remember_imported_handle(&mut imported_handles, key, handle);
+            }
+            plugin_values.push(plugin_value);
+        }
+        inputs.set_present(&port.id, plugin_values);
     }
     if let Some((unknown, _)) = values.into_iter().next() {
         return Err(invalid_value(&unknown));
     }
-    Ok(inputs)
+    Ok((inputs, imported_handles))
+}
+
+fn remember_imported_handle(
+    imported_handles: &mut ImportedHandles,
+    key: (String, String),
+    handle: NativeOpaqueHandle,
+) {
+    imported_handles
+        .handles
+        .entry(key)
+        .and_modify(|imported| {
+            if matches!(imported, ImportedHandle::Exact(existing) if existing != &handle) {
+                *imported = ImportedHandle::Ambiguous;
+            }
+        })
+        .or_insert(ImportedHandle::Exact(handle));
 }
 
 fn plugin_value(
@@ -366,33 +395,51 @@ fn plugin_value(
     registry: &TypeRegistry,
     profile_id: &str,
     context: &NativeNodeContext,
-) -> Result<PluginValue, NativeNodeFailure> {
+) -> Result<(PluginValue, Option<((String, String), NativeOpaqueHandle)>), NativeNodeFailure> {
     let family = registry.family(&port.type_id).map_err(plugin_failure)?;
     match family {
-        ValueFamily::Scalar => PluginValue::scalar(
-            port.type_id.clone(),
-            scalar_from_native(value, &port.type_id.to_string())?,
-            registry,
-        )
-        .map_err(plugin_failure),
+        ValueFamily::Scalar => Ok((
+            PluginValue::scalar(
+                port.type_id.clone(),
+                scalar_from_native(value, &port.type_id.to_string())?,
+                registry,
+            )
+            .map_err(plugin_failure)?,
+            None,
+        )),
         ValueFamily::Tensor | ValueFamily::Artifact | ValueFamily::Model => {
             let NativeValue::Handle { value: handle } = value else {
                 return Err(invalid_value(&port.id));
             };
-            let expected_type = native_handle_type(port, family).map_err(plugin_failure)?;
+            let expected_type = native_handle_type(port).map_err(plugin_failure)?;
             let stored = context
                 .handle_store()
                 .resolve(&handle, &expected_type, &context.cancellation)
                 .map_err(plugin_failure)?;
+            let provider_semantic_digest = match stored.as_ref() {
+                NativeStoredPayload::Provider(payload) => {
+                    Some(payload.semantic_digest_sha256().to_owned())
+                }
+                _ => None,
+            };
             let stored = plugin_value_from_stored(port, family, stored, registry)?;
             if stored.type_id() != &port.type_id || stored.family() != family {
                 return Err(invalid_value(&port.id));
             }
-            validate_value_digest(&handle, &stored, &port.id)?;
+            if let Some(expected_digest) = provider_semantic_digest {
+                if value_digest(&stored) != Some(expected_digest.as_str()) {
+                    return Err(invalid_value(&port.id));
+                }
+            } else {
+                validate_value_digest(&handle, &stored, &port.id)?;
+            }
             if let PluginValueRepresentation::Artifact(artifact) = stored.representation() {
                 artifact_value_identity(profile_id, artifact).map_err(plugin_failure)?;
             }
-            Ok(stored)
+            let digest = value_digest(&stored)
+                .ok_or_else(|| invalid_value(&port.id))?
+                .to_owned();
+            Ok((stored, Some(((port.type_id.to_string(), digest), handle))))
         }
     }
 }
@@ -400,47 +447,98 @@ fn plugin_value(
 fn plugin_value_from_stored(
     port: &PluginPort,
     family: ValueFamily,
-    stored: NativeStoredObject,
+    stored: Arc<NativeStoredPayload>,
     registry: &TypeRegistry,
 ) -> Result<PluginValue, NativeNodeFailure> {
-    if let Ok(value) = stored.clone().downcast::<PluginValue>() {
-        return Ok((*value).clone());
-    }
-    match family {
-        ValueFamily::Tensor => {
-            let stored = stored
-                .downcast::<NativeStoredTensorObject>()
-                .map_err(|_| invalid_value(&port.id))?;
+    match stored.as_ref() {
+        NativeStoredPayload::Provider(stored) => {
+            let expected_type = native_handle_type(port).map_err(plugin_failure)?;
+            if expected_type.kind != NativeHandleKind::ProviderTask
+                || stored.handle_type() != &expected_type
+            {
+                return Err(invalid_value(&port.id));
+            }
+            let value = PluginValue::from_abi_bytes(stored.abi_bytes(), registry)
+                .map_err(plugin_failure)?;
+            if value.type_id() != &port.type_id || value.family() != family {
+                return Err(invalid_value(&port.id));
+            }
+            Ok(value)
+        }
+        NativeStoredPayload::Tensor(stored) => {
+            if family != ValueFamily::Tensor {
+                return Err(invalid_value(&port.id));
+            }
+            let projection = stored.projection();
             let value = TensorValue::new(
-                stored.descriptor().clone(),
-                stored.byte_length(),
-                stored.digest(),
+                projection.descriptor().clone(),
+                projection.resident_bytes(),
+                projection.content_digest(),
             )
             .map_err(plugin_failure)?;
             PluginValue::tensor(port.type_id.clone(), value, registry).map_err(plugin_failure)
         }
-        ValueFamily::Artifact => {
-            let stored = stored
-                .downcast::<NativeStoredArtifactObject>()
-                .map_err(|_| invalid_value(&port.id))?;
-            let value = ArtifactValue::new(
-                stored.namespace(),
-                stored.identifier(),
-                stored.byte_length(),
-                stored.digest(),
+        NativeStoredPayload::Model(stored) => {
+            if family != ValueFamily::Model {
+                return Err(invalid_value(&port.id));
+            }
+            let identity = stored.diffusion().model_payload().identity();
+            let value = ModelValue::new(
+                identity.identifier(),
+                identity.format(),
+                stored.digest_sha256(),
             )
             .map_err(plugin_failure)?;
-            PluginValue::artifact(port.type_id.clone(), value, registry).map_err(plugin_failure)
-        }
-        ValueFamily::Model => {
-            let stored = stored
-                .downcast::<NativeStoredModelObject>()
-                .map_err(|_| invalid_value(&port.id))?;
-            let value = ModelValue::new(stored.identifier(), stored.format(), stored.digest())
-                .map_err(plugin_failure)?;
             PluginValue::model(port.type_id.clone(), value, registry).map_err(plugin_failure)
         }
-        ValueFamily::Scalar => Err(invalid_value(&port.id)),
+        NativeStoredPayload::Control(stored) => {
+            if family != ValueFamily::Model {
+                return Err(invalid_value(&port.id));
+            }
+            let value = ModelValue::new(
+                stored.digest_sha256(),
+                "sim-native-control-v1",
+                stored.digest_sha256(),
+            )
+            .map_err(plugin_failure)?;
+            PluginValue::model(port.type_id.clone(), value, registry).map_err(plugin_failure)
+        }
+        NativeStoredPayload::Guider(stored) => {
+            if family != ValueFamily::Model {
+                return Err(invalid_value(&port.id));
+            }
+            let identity = stored.model().identity();
+            let value = ModelValue::new(
+                identity.identifier(),
+                "sim-native-guider-v1",
+                stored.semantic_digest_sha256(),
+            )
+            .map_err(plugin_failure)?;
+            PluginValue::model(port.type_id.clone(), value, registry).map_err(plugin_failure)
+        }
+        NativeStoredPayload::Sampler(stored) => {
+            if family != ValueFamily::Model {
+                return Err(invalid_value(&port.id));
+            }
+            let value = ModelValue::new(
+                stored.identity().as_str(),
+                "sim-native-sampler-v1",
+                stored.semantic_digest_sha256(),
+            )
+            .map_err(plugin_failure)?;
+            PluginValue::model(port.type_id.clone(), value, registry).map_err(plugin_failure)
+        }
+        NativeStoredPayload::Conditioning(_)
+        | NativeStoredPayload::Noise(_)
+        | NativeStoredPayload::BoundingBox(_)
+        | NativeStoredPayload::FaceLandmarks(_)
+        | NativeStoredPayload::PoseKeypoint(_)
+        | NativeStoredPayload::Sam3TrackData(_)
+        | NativeStoredPayload::Tracks(_)
+        | NativeStoredPayload::AudioEncoderOutput(_)
+        | NativeStoredPayload::ClipVisionOutput(_)
+        | NativeStoredPayload::IcLoraParameters(_)
+        | NativeStoredPayload::LossMap(_) => Err(unmaterialized_plugin_input(&port.id)),
     }
 }
 
@@ -507,8 +605,8 @@ fn invocation_outputs(
     registry: &TypeRegistry,
     profile_id: &str,
     context: &NativeNodeContext,
+    imported_handles: &ImportedHandles,
 ) -> Result<Vec<NativeValue>, NativeNodeFailure> {
-    let mut published = Vec::new();
     let result = node
         .ports
         .iter()
@@ -523,9 +621,7 @@ fn invocation_outputs(
             if port.cardinality == PortCardinality::List {
                 values
                     .into_iter()
-                    .map(|value| {
-                        runtime_value(value, port, registry, profile_id, context, &mut published)
-                    })
+                    .map(|value| runtime_value(value, port, registry, profile_id, imported_handles))
                     .collect::<Result<Vec<_>, _>>()
                     .map(|values| NativeValue::List { values })
             } else {
@@ -534,28 +630,14 @@ fn invocation_outputs(
                 if values.next().is_some() {
                     return Err(invalid_value(&port.id));
                 }
-                runtime_value(value, port, registry, profile_id, context, &mut published)
+                runtime_value(value, port, registry, profile_id, imported_handles)
             }
         })
-        .collect::<Result<Vec<_>, _>>();
-    if let Err(mut failure) = result {
-        let cleanup_errors = revoke_published(context, &published);
-        if !cleanup_errors.is_empty() {
-            failure.message.push_str("; output cleanup failed: ");
-            failure.message.push_str(&cleanup_errors.join(", "));
-        }
-        return Err(failure);
-    }
+        .collect::<Result<Vec<_>, _>>()?;
     if context.cancellation.is_cancelled() {
-        let cleanup_errors = revoke_published(context, &published);
-        let mut failure = plugin_failure("plugin output publication was cancelled");
-        if !cleanup_errors.is_empty() {
-            failure.message.push_str("; output cleanup failed: ");
-            failure.message.push_str(&cleanup_errors.join(", "));
-        }
-        return Err(failure);
+        return Err(plugin_failure("plugin output projection was cancelled"));
     }
-    result
+    Ok(result)
 }
 
 fn runtime_value(
@@ -563,8 +645,7 @@ fn runtime_value(
     port: &PluginPort,
     registry: &TypeRegistry,
     profile_id: &str,
-    context: &NativeNodeContext,
-    published: &mut Vec<comfy_nodes::NativeOpaqueHandle>,
+    imported_handles: &ImportedHandles,
 ) -> Result<NativeValue, NativeNodeFailure> {
     if value.type_id() != &port.type_id {
         return Err(invalid_value(&port.id));
@@ -575,88 +656,44 @@ fn runtime_value(
         }
         PluginValueRepresentation::Artifact(artifact) => {
             artifact_value_identity(profile_id, artifact).map_err(plugin_failure)?;
-            publish_plugin_value(value, port, registry, context, published)
+            imported_runtime_value(value, port, registry, imported_handles)
         }
         PluginValueRepresentation::Tensor(_) | PluginValueRepresentation::Model(_) => {
-            publish_plugin_value(value, port, registry, context, published)
+            imported_runtime_value(value, port, registry, imported_handles)
         }
     }
 }
 
-fn publish_plugin_value(
+fn imported_runtime_value(
     value: PluginValue,
     port: &PluginPort,
     registry: &TypeRegistry,
-    context: &NativeNodeContext,
-    published: &mut Vec<comfy_nodes::NativeOpaqueHandle>,
+    imported_handles: &ImportedHandles,
 ) -> Result<NativeValue, NativeNodeFailure> {
     let family = registry.family(&port.type_id).map_err(plugin_failure)?;
     if family == ValueFamily::Scalar || value.family() != family {
         return Err(invalid_value(&port.id));
     }
-    let digest = value_digest(&value)
-        .ok_or_else(|| invalid_value(&port.id))?
-        .to_owned();
-    let resident_bytes = value.abi_bytes().map_err(plugin_failure)?.len().max(1);
-    let stored = stored_plugin_value(&value, &digest)?;
-    let handle = context
-        .handle_store()
-        .publish(
-            native_handle_type(port, family).map_err(plugin_failure)?,
-            stored,
-            Some(digest),
-            resident_bytes,
-            &context.cancellation,
-        )
-        .map_err(plugin_failure)?;
-    published.push(handle.clone());
-    Ok(NativeValue::Handle { value: handle })
-}
-
-fn stored_plugin_value(
-    value: &PluginValue,
-    digest: &str,
-) -> Result<NativeStoredObject, NativeNodeFailure> {
-    let payload: NativeStoredObject = Arc::new(value.clone());
-    match value.representation() {
-        PluginValueRepresentation::Tensor(value) => NativeStoredTensorObject::new(
-            value.descriptor().clone(),
-            value.byte_length(),
-            digest,
-            payload,
-        )
-        .map(|value| Arc::new(value) as NativeStoredObject)
-        .map_err(plugin_failure),
-        PluginValueRepresentation::Artifact(value) => NativeStoredArtifactObject::new(
-            value.namespace(),
-            value.identifier(),
-            value.byte_length(),
-            digest,
-            payload,
-        )
-        .map(|value| Arc::new(value) as NativeStoredObject)
-        .map_err(plugin_failure),
-        PluginValueRepresentation::Model(value) => {
-            NativeStoredModelObject::new(value.identifier(), value.format(), digest, payload)
-                .map(|value| Arc::new(value) as NativeStoredObject)
-                .map_err(plugin_failure)
-        }
-        PluginValueRepresentation::Scalar(_) => Err(invalid_value("scalar-output")),
+    let digest = value_digest(&value).ok_or_else(|| invalid_value(&port.id))?;
+    let key = (port.type_id.to_string(), digest.to_owned());
+    let ImportedHandle::Exact(handle) = imported_handles
+        .handles
+        .get(&key)
+        .ok_or_else(|| unmaterialized_plugin_output(&port.id))?
+    else {
+        return Err(unmaterialized_plugin_output(&port.id));
+    };
+    let expected = native_handle_type(port).map_err(plugin_failure)?;
+    if handle.handle_type() != &expected
+        || handle.store_identity() != imported_handles.store_identity
+        || (expected.kind != NativeHandleKind::ProviderTask
+            && handle.digest_sha256() != Some(digest))
+    {
+        return Err(invalid_value(&port.id));
     }
-}
-
-fn revoke_published(
-    context: &NativeNodeContext,
-    handles: &[comfy_nodes::NativeOpaqueHandle],
-) -> Vec<String> {
-    let cleanup_cancellation = comfy_types::CancellationToken::default();
-    let mut errors = Vec::new();
-    for handle in handles.iter().rev() {
-        if let Err(error) = context.handle_store().revoke(handle, &cleanup_cancellation) {
-            errors.push(error.to_string());
-        }
-    }
-    errors
+    Ok(NativeValue::Handle {
+        value: handle.clone(),
+    })
 }
 
 fn validate_value_digest(
@@ -781,6 +818,28 @@ fn invalid_value(port: &str) -> NativeNodeFailure {
     }
 }
 
+fn unmaterialized_plugin_output(port: &str) -> NativeNodeFailure {
+    NativeNodeFailure {
+        code: "unmaterialized_plugin_payload".to_owned(),
+        message: format!(
+            "plugin port `{port}` returned non-scalar metadata without a host-materialized payload"
+        ),
+        kind: NativeNodeFailureKind::Failure,
+        retryable: false,
+    }
+}
+
+fn unmaterialized_plugin_input(port: &str) -> NativeNodeFailure {
+    NativeNodeFailure {
+        code: "unmaterialized_plugin_payload".to_owned(),
+        message: format!(
+            "plugin port `{port}` has no lossless representation in the plugin SDK value families"
+        ),
+        kind: NativeNodeFailureKind::Failure,
+        retryable: false,
+    }
+}
+
 fn plugin_failure(error: impl std::fmt::Display) -> NativeNodeFailure {
     NativeNodeFailure {
         code: "plugin_invocation_failed".to_owned(),
@@ -793,6 +852,7 @@ fn plugin_failure(error: impl std::fmt::Display) -> NativeNodeFailure {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use comfy_nodes::NativePrimitiveType;
     use comfy_plugin_sdk::{
         ArtifactValue, DType, DeviceId, PortSerialization, StreamId, TensorDescriptor,
     };
@@ -827,11 +887,47 @@ mod tests {
         })
     }
 
-    #[test]
-    fn neutral_stored_objects_bridge_native_and_plugin_values() -> Result<(), Box<dyn Error>> {
+    fn opaque_handle(
+        handle_type: NativeHandleType,
+        identifier: &str,
+        generation: u64,
+        digest: &str,
+    ) -> Result<NativeOpaqueHandle, Box<dyn Error>> {
+        opaque_handle_with_identity(
+            handle_type,
+            test_store_identity()?,
+            identifier,
+            generation,
+            digest,
+        )
+    }
+
+    fn opaque_handle_with_identity(
+        handle_type: NativeHandleType,
+        store_identity: NativeHandleStoreIdentity,
+        identifier: &str,
+        generation: u64,
+        digest: &str,
+    ) -> Result<NativeOpaqueHandle, Box<dyn Error>> {
+        Ok(NativeOpaqueHandle::new(
+            handle_type,
+            store_identity,
+            identifier,
+            generation,
+            Some(digest.to_owned()),
+        )?)
+    }
+
+    fn test_store_identity() -> Result<NativeHandleStoreIdentity, Box<dyn Error>> {
+        Ok(NativeHandleStoreIdentity::new(
+            Uuid::from_u128(0x100),
+            Uuid::from_u128(0x200),
+        )?)
+    }
+
+    fn tensor_value(digest: &str) -> Result<PluginValue, Box<dyn Error>> {
         let registry = TypeRegistry::built_in()?;
-        let tensor_digest = "1".repeat(64);
-        let tensor = PluginValue::tensor(
+        Ok(PluginValue::tensor(
             registry.resolve("IMAGE")?.clone(),
             TensorValue::new(
                 TensorDescriptor::contiguous(
@@ -841,94 +937,348 @@ mod tests {
                     StreamId::DEFAULT,
                 )?,
                 4,
-                &tensor_digest,
+                digest,
             )?,
             &registry,
-        )?;
-        let artifact = artifact_value("bridge.svg")?;
-        let model_digest = "3".repeat(64);
-        let model = PluginValue::model(
-            registry.resolve("MODEL")?.clone(),
-            ModelValue::new("bridge-model", "safetensors", &model_digest)?,
+        )?)
+    }
+
+    fn model_value(digest: &str) -> Result<PluginValue, Box<dyn Error>> {
+        model_value_for("MODEL", "model", "safetensors", digest)
+    }
+
+    fn model_value_for(
+        type_name: &str,
+        identifier: &str,
+        format: &str,
+        digest: &str,
+    ) -> Result<PluginValue, Box<dyn Error>> {
+        let registry = TypeRegistry::built_in()?;
+        Ok(PluginValue::model(
+            registry.resolve(type_name)?.clone(),
+            ModelValue::new(identifier, format, digest)?,
             &registry,
-        )?;
+        )?)
+    }
+
+    #[test]
+    fn signed_plugin_families_delegate_to_canonical_source_projections()
+    -> Result<(), Box<dyn Error>> {
+        let registry = TypeRegistry::built_in()?;
+        let cases = [
+            (
+                "String",
+                NativeValueType::Primitive(NativePrimitiveType::String),
+            ),
+            (
+                "Image",
+                NativeValueType::Handle(NativeHandleType::new(NativeHandleKind::Image, "IMAGE")?),
+            ),
+            (
+                "SVG",
+                NativeValueType::Handle(NativeHandleType::new(NativeHandleKind::Artifact, "SVG")?),
+            ),
+            (
+                "Model",
+                NativeValueType::Handle(NativeHandleType::new(NativeHandleKind::Model, "MODEL")?),
+            ),
+            (
+                "AudioEncoderOutput",
+                NativeValueType::Handle(NativeHandleType::new(
+                    NativeHandleKind::StructuredCompute,
+                    "AUDIO_ENCODER_OUTPUT",
+                )?),
+            ),
+            (
+                "File3DGLB",
+                NativeValueType::Handle(NativeHandleType::new(
+                    NativeHandleKind::ThreeD,
+                    "FILE_3D_GLB",
+                )?),
+            ),
+        ];
+        for (source_type, expected) in cases {
+            let port = input_port(&registry, source_type, PortSerialization::Handle)?;
+            assert_eq!(
+                native_value_type(&port, registry.family(&port.type_id)?)?,
+                expected
+            );
+        }
+        let curve = input_port(&registry, "Curve", PortSerialization::Handle)?;
+        assert!(native_value_type(&curve, registry.family(&curve.type_id)?).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn imported_tensor_artifact_and_model_handles_round_trip_exactly() -> Result<(), Box<dyn Error>>
+    {
+        let registry = TypeRegistry::built_in()?;
+        let digest = "a".repeat(64);
         let cases = [
             (
                 input_port(&registry, "IMAGE", PortSerialization::Handle)?,
-                ValueFamily::Tensor,
-                tensor,
+                tensor_value(&digest)?,
             ),
             (
                 input_port(&registry, "SVG", PortSerialization::ArtifactReference)?,
-                ValueFamily::Artifact,
-                artifact,
+                PluginValue::artifact(
+                    registry.resolve("SVG")?.clone(),
+                    ArtifactValue::new("input", "fixture.svg", 4, &digest)?,
+                    &registry,
+                )?,
             ),
             (
                 input_port(&registry, "MODEL", PortSerialization::Handle)?,
-                ValueFamily::Model,
-                model,
+                model_value(&digest)?,
             ),
         ];
-        for (port, family, expected) in cases {
-            let digest = value_digest(&expected).ok_or("fixture has no digest")?;
-            let native_payload: NativeStoredObject = Arc::new("native-payload".to_owned());
-            let native: NativeStoredObject = match expected.representation() {
-                PluginValueRepresentation::Tensor(value) => {
-                    Arc::new(NativeStoredTensorObject::new(
-                        value.descriptor().clone(),
-                        value.byte_length(),
-                        digest,
-                        native_payload,
-                    )?)
-                }
-                PluginValueRepresentation::Artifact(value) => {
-                    Arc::new(NativeStoredArtifactObject::new(
-                        value.namespace(),
-                        value.identifier(),
-                        value.byte_length(),
-                        digest,
-                        native_payload,
-                    )?)
-                }
-                PluginValueRepresentation::Model(value) => Arc::new(NativeStoredModelObject::new(
-                    value.identifier(),
-                    value.format(),
-                    digest,
-                    native_payload,
-                )?),
-                PluginValueRepresentation::Scalar(_) => {
-                    return Err("unexpected scalar fixture".into());
-                }
-            };
-            let projected = plugin_value_from_stored(&port, family, native, &registry)?;
-            assert_eq!(projected, expected);
-            let republished = stored_plugin_value(&projected, digest)?;
-            let payload = match family {
-                ValueFamily::Tensor => republished
-                    .downcast::<NativeStoredTensorObject>()
-                    .map_err(|_| "tensor was not wrapped")?
-                    .payload()
-                    .clone(),
-                ValueFamily::Artifact => republished
-                    .downcast::<NativeStoredArtifactObject>()
-                    .map_err(|_| "artifact was not wrapped")?
-                    .payload()
-                    .clone(),
-                ValueFamily::Model => republished
-                    .downcast::<NativeStoredModelObject>()
-                    .map_err(|_| "model was not wrapped")?
-                    .payload()
-                    .clone(),
-                ValueFamily::Scalar => return Err("unexpected scalar fixture".into()),
-            };
+        for (index, (port, value)) in cases.into_iter().enumerate() {
+            let handle = opaque_handle(
+                native_handle_type(&port)?,
+                &format!("imported-{index}"),
+                u64::try_from(index)? + 1,
+                &digest,
+            )?;
+            let key = (port.type_id.to_string(), digest.clone());
+            let mut imported = ImportedHandles::new(test_store_identity()?);
+            remember_imported_handle(&mut imported, key, handle.clone());
             assert_eq!(
-                payload
-                    .downcast::<PluginValue>()
-                    .map_err(|_| "wrapper payload was not a plugin value")?
-                    .as_ref(),
-                &expected
+                runtime_value(value, &port, &registry, "profile-a", &imported)?,
+                NativeValue::Handle { value: handle }
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn explicit_model_family_handles_round_trip_without_mutating_imports()
+    -> Result<(), Box<dyn Error>> {
+        let registry = TypeRegistry::built_in()?;
+        for (index, type_name) in ["Model", "Clip", "Vae", "ControlNet", "Guider", "Sampler"]
+            .into_iter()
+            .enumerate()
+        {
+            let digest = format!("{index:x}").repeat(64);
+            let port = input_port(&registry, type_name, PortSerialization::Handle)?;
+            let value = model_value_for(
+                type_name,
+                &format!("{type_name}-identity"),
+                "sim-native-test-v1",
+                &digest,
+            )?;
+            let handle = opaque_handle(
+                native_handle_type(&port)?,
+                &format!("imported-{type_name}"),
+                u64::try_from(index)? + 1,
+                &digest,
+            )?;
+            let mut imported = ImportedHandles::new(test_store_identity()?);
+            remember_imported_handle(
+                &mut imported,
+                (port.type_id.to_string(), digest),
+                handle.clone(),
+            );
+            let before = imported.clone();
+            assert_eq!(
+                runtime_value(value, &port, &registry, "profile-a", &imported)?,
+                NativeValue::Handle { value: handle }
+            );
+            assert_eq!(imported, before);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn explicit_stored_variants_are_exhaustively_projected_or_rejected()
+    -> Result<(), Box<dyn Error>> {
+        let source = include_str!("registry_adapter.rs");
+        let projection = source
+            .split_once("fn plugin_value_from_stored(")
+            .and_then(|(_, source)| source.split_once("fn scalar_from_native("))
+            .map(|(projection, _)| projection)
+            .ok_or("stored payload projection function is missing")?;
+        for projected in [
+            "NativeStoredPayload::Provider(stored)",
+            "NativeStoredPayload::Tensor(stored)",
+            "NativeStoredPayload::Model(stored)",
+            "NativeStoredPayload::Control(stored)",
+            "NativeStoredPayload::Guider(stored)",
+            "NativeStoredPayload::Sampler(stored)",
+        ] {
+            assert!(
+                projection.contains(projected),
+                "missing projection {projected}"
+            );
+        }
+        for rejected in [
+            "NativeStoredPayload::Conditioning(_)",
+            "NativeStoredPayload::Noise(_)",
+            "NativeStoredPayload::BoundingBox(_)",
+            "NativeStoredPayload::FaceLandmarks(_)",
+            "NativeStoredPayload::PoseKeypoint(_)",
+            "NativeStoredPayload::Sam3TrackData(_)",
+            "NativeStoredPayload::Tracks(_)",
+            "NativeStoredPayload::AudioEncoderOutput(_)",
+            "NativeStoredPayload::ClipVisionOutput(_)",
+            "NativeStoredPayload::IcLoraParameters(_)",
+            "NativeStoredPayload::LossMap(_)",
+        ] {
+            assert!(
+                projection.contains(rejected),
+                "missing rejection {rejected}"
+            );
+        }
+        assert!(projection.contains("Err(unmaterialized_plugin_input(&port.id))"));
+        assert!(!projection.contains("StructuredCompute"));
+        assert!(!projection.contains("serde_json"));
+        assert!(!projection.contains("remember_imported_handle"));
+        assert!(!projection.contains(".publish("));
+        assert!(!projection.contains(".revoke("));
+
+        let failure = unmaterialized_plugin_input("tracks");
+        assert_eq!(failure.code, "unmaterialized_plugin_payload");
+        assert!(failure.message.contains("no lossless representation"));
+        let failure = unmaterialized_plugin_input("conditioning");
+        assert_eq!(failure.code, "unmaterialized_plugin_payload");
+        assert!(failure.message.contains("no lossless representation"));
+        Ok(())
+    }
+
+    #[test]
+    fn forged_or_unmaterialized_plugin_outputs_fail_without_changing_imports()
+    -> Result<(), Box<dyn Error>> {
+        let registry = TypeRegistry::built_in()?;
+        let digest = "b".repeat(64);
+        let port = input_port(&registry, "IMAGE", PortSerialization::Handle)?;
+        let value = tensor_value(&digest)?;
+        let mut imported = ImportedHandles::new(test_store_identity()?);
+        let wrong_type = opaque_handle(
+            NativeHandleType::new(NativeHandleKind::Model, "MODEL")?,
+            "wrong-type",
+            1,
+            &digest,
+        )?;
+        remember_imported_handle(
+            &mut imported,
+            (port.type_id.to_string(), digest.clone()),
+            wrong_type,
+        );
+        let before = imported.clone();
+        let failure = runtime_value(value.clone(), &port, &registry, "profile-a", &imported)
+            .expect_err("a wrong-type imported handle must fail closed");
+        assert_eq!(failure.code, "invalid_plugin_value");
+        assert_eq!(imported, before);
+
+        let unmaterialized = ImportedHandles::new(test_store_identity()?);
+        let failure = runtime_value(
+            value.clone(),
+            &port,
+            &registry,
+            "profile-a",
+            &unmaterialized,
+        )
+        .expect_err("metadata-only output must not allocate a native handle");
+        assert_eq!(failure.code, "unmaterialized_plugin_payload");
+        assert!(unmaterialized.handles.is_empty());
+
+        let first = opaque_handle(native_handle_type(&port)?, "first", 1, &digest)?;
+        let second = opaque_handle(native_handle_type(&port)?, "second", 2, &digest)?;
+        let mut ambiguous = ImportedHandles::new(test_store_identity()?);
+        let key = (port.type_id.to_string(), digest);
+        remember_imported_handle(&mut ambiguous, key.clone(), first);
+        remember_imported_handle(&mut ambiguous, key, second);
+        let failure = runtime_value(value, &port, &registry, "profile-a", &ambiguous)
+            .expect_err("equal metadata from distinct handles must not alias");
+        assert_eq!(failure.code, "unmaterialized_plugin_payload");
+
+        for (label, handle) in [
+            (
+                "store",
+                opaque_handle_with_identity(
+                    native_handle_type(&port)?,
+                    NativeHandleStoreIdentity::new(Uuid::from_u128(0x101), Uuid::from_u128(0x200))?,
+                    "wrong-store",
+                    1,
+                    &"b".repeat(64),
+                )?,
+            ),
+            (
+                "generation",
+                opaque_handle_with_identity(
+                    native_handle_type(&port)?,
+                    NativeHandleStoreIdentity::new(Uuid::from_u128(0x100), Uuid::from_u128(0x201))?,
+                    "wrong-generation",
+                    1,
+                    &"b".repeat(64),
+                )?,
+            ),
+            (
+                "digest",
+                opaque_handle(
+                    native_handle_type(&port)?,
+                    "wrong-digest",
+                    1,
+                    &"c".repeat(64),
+                )?,
+            ),
+        ] {
+            let mut forged = ImportedHandles::new(test_store_identity()?);
+            remember_imported_handle(
+                &mut forged,
+                (port.type_id.to_string(), "b".repeat(64)),
+                handle,
+            );
+            let failure = runtime_value(
+                tensor_value(&"b".repeat(64))?,
+                &port,
+                &registry,
+                "profile-a",
+                &forged,
+            )
+            .expect_err("forged imported handle provenance must fail closed");
+            assert_eq!(failure.code, "invalid_plugin_value", "{label}");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn unmaterialized_plugin_payloads_cannot_forge_native_store_objects()
+    -> Result<(), Box<dyn Error>> {
+        let registry = TypeRegistry::built_in()?;
+        let port = input_port(&registry, "IMAGE", PortSerialization::Handle)?;
+        let payload =
+            NativeStoredPayload::Provider(Arc::new(comfy_nodes::NativeProviderPayload::checked(
+                NativeHandleType::new(NativeHandleKind::ProviderTask, "TEST_TASK")?,
+                "test.signed",
+                "1".repeat(64),
+                vec![1],
+            )?));
+        let failure =
+            plugin_value_from_stored(&port, ValueFamily::Tensor, Arc::new(payload), &registry)
+                .expect_err("an unrelated sealed payload must not satisfy an IMAGE input");
+        assert_eq!(failure.code, "invalid_plugin_value");
+
+        let failure = unmaterialized_plugin_output("image");
+        assert_eq!(failure.code, "unmaterialized_plugin_payload");
+        assert!(failure.message.contains("host-materialized payload"));
+
+        let artifact_port = input_port(&registry, "SVG", PortSerialization::ArtifactReference)?;
+        let artifact = artifact_value("provider.svg")?;
+        let semantic_digest = value_digest(&artifact).ok_or("artifact digest is absent")?;
+        let provider = comfy_nodes::NativeProviderPayload::checked(
+            NativeHandleType::new(NativeHandleKind::ProviderTask, "SVG")?,
+            "test.provider",
+            semantic_digest,
+            artifact.abi_bytes()?,
+        )?;
+        let failure = plugin_value_from_stored(
+            &artifact_port,
+            ValueFamily::Artifact,
+            Arc::new(NativeStoredPayload::Provider(Arc::new(provider))),
+            &registry,
+        )
+        .expect_err("artifact provider payloads are not provider-task identities");
+        assert_eq!(failure.code, "invalid_plugin_value");
         Ok(())
     }
 
@@ -960,10 +1310,7 @@ mod tests {
             return Err("fixture is not an artifact".into());
         };
         assert!(artifact_value_identity("profile-a", invalid).is_err());
-        assert_eq!(
-            native_handle_type(&port, ValueFamily::Artifact)?.type_id,
-            "SVG"
-        );
+        assert_eq!(native_handle_type(&port)?.type_id, "SVG");
         Ok(())
     }
 }

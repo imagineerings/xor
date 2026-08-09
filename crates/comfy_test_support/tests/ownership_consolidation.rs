@@ -2015,11 +2015,13 @@ fn run_ownership_validation(
         && runtime_cache_production.contains(
             "digests.insert(\"tokenizer.sd1\".to_owned(), self.tokenizer_digest.clone());",
         )
+        && runtime_controller_production.contains(
+            "NativeModelPayload::sd1_clip(bundle.tokenizer.clone(), bundle.clip.clone())",
+        )
+        && runtime_controller_production.contains("NativeStoredPayload::Model(Arc::new(payload))")
         && runtime_controller_production
-            .contains("NativeDiffusionHandle::from_bundle(&bundle, role)")
-        && runtime_controller_production
-            .contains("NativeDiffusionHandle::from_bundle(&expected, role)")
-        && runtime_controller_production.contains(".require_exact_match(&expected_metadata)")
+            .contains(".map_err(|error| invalid_diffusion_input(&error.to_string()))?")
+        && !runtime_controller_production.contains("NativeDiffusionHandle")
         && fixture_provider_identity_surface.is_some_and(|surface| {
             surface.contains("fn cache_identities(")
                 && surface.contains("checkpoint_identity_snapshot(cancellation)")
@@ -7776,7 +7778,7 @@ fn run_ownership_validation(
                 ),
         ),
         (
-            "plugin_abi_artifact_and_model_values_have_checked_domain_adapters",
+            "plugin_abi_values_use_sealed_native_payload_adapters",
             plugin_host_production_capabilities.contains("fn artifact_value_identity(")
                 && plugin_host_production_capabilities.contains("value: &ArtifactValue")
                 && plugin_host_production_capabilities
@@ -7788,14 +7790,22 @@ fn run_ownership_validation(
                 && plugin_registry_adapter
                     .contains("artifact_value_identity(profile_id, artifact)")
                 && plugin_registry_adapter.contains("fn plugin_value_from_stored(")
-                && plugin_registry_adapter.contains("NativeStoredTensorObject")
-                && plugin_registry_adapter.contains("NativeStoredArtifactObject")
-                && plugin_registry_adapter.contains("NativeStoredModelObject")
+                && plugin_registry_adapter.contains("NativeStoredPayload::Tensor(stored)")
+                && plugin_registry_adapter.contains("NativeStoredPayload::Model(stored)")
+                && plugin_registry_adapter.contains("NativeStoredPayload::Conditioning(_)")
+                && plugin_registry_adapter.contains("unmaterialized_plugin_input(")
+                && plugin_registry_adapter.contains("NativeStoredPayload::Control(stored)")
+                && plugin_registry_adapter.contains("NativeStoredPayload::Provider(stored)")
+                && plugin_registry_adapter.contains("fn imported_runtime_value(")
+                && plugin_registry_adapter.contains("unmaterialized_plugin_output(&port.id)")
+                && !plugin_registry_adapter.contains("NativeProviderPayload::checked(")
+                && !plugin_registry_adapter.contains("NativeStoredObject")
+                && !plugin_registry_adapter.contains("NativeStoredTensorObject")
+                && !plugin_registry_adapter.contains("NativeStoredArtifactObject")
+                && !plugin_registry_adapter.contains("NativeStoredModelObject")
+                && !plugin_registry_adapter.contains(".downcast::<")
                 && plugin_registry_adapter.contains("fn invocation_inputs(")
-                && plugin_registry_adapter.contains("fn invocation_outputs(")
-                && plugin_registry_adapter.contains(
-                    "runtime_value(value, port, registry, profile_id, context, &mut published)",
-                ),
+                && plugin_registry_adapter.contains("fn invocation_outputs("),
         ),
         (
             "private_worker_preserves_authoritative_component_limits_and_diagnostics",
@@ -9785,5 +9795,213 @@ fn val_ownership_001_task346_text_encoder_registry_preserves_canonical_owners()
         design.contains("is the sole versioned routing and contract-ownership table"),
         "design.md must document the text-encoder registry as the sole versioned routing table"
     );
+    Ok(())
+}
+
+#[test]
+fn val_ownership_001_native_stored_payload_boundary_is_closed()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let sources = rust_sources(&root)?
+        .into_iter()
+        .map(|path| {
+            let source = fs::read_to_string(&path)?;
+            Ok((path, source))
+        })
+        .collect::<Result<Vec<_>, std::io::Error>>()?;
+
+    for forbidden in [
+        "NativeStructuredComputePayload",
+        "NativeStructuredComputeRole",
+        "NativeStructuredComputeValue",
+        "NativeStoredObject",
+        "NativeStoredTensorObject",
+        "NativeStoredModelObject",
+        "NativeStoredArtifactObject",
+        "StoredNativeTensor",
+        "StoredNativeDiffusion",
+        "StoredNativeModel",
+        "StoredNativeArtifact",
+    ] {
+        let occurrences = production_identifier_occurrences(&sources, forbidden);
+        assert!(
+            occurrences.is_empty(),
+            "legacy native payload owner {forbidden} remains at {occurrences:?}"
+        );
+    }
+
+    let boundary_paths = [
+        "crates/comfy_nodes/src/execution.rs",
+        "crates/comfy_nodes/src/stored_payload.rs",
+        "crates/comfy_runtime/src/executor.rs",
+        "crates/comfy_plugin_host/src/registry_adapter.rs",
+    ];
+    for relative_path in boundary_paths {
+        let source = fs::read_to_string(root.join(relative_path))?;
+        let production = source
+            .split_once("#[cfg(test)]\nmod tests")
+            .map_or(source.as_str(), |(production, _)| production);
+        for forbidden in [
+            "Arc<dyn Any",
+            "Arc < dyn Any",
+            ".downcast::<",
+            ".downcast_ref::<",
+            ".downcast_mut::<",
+            ".as_any()",
+        ] {
+            assert!(
+                !production.contains(forbidden),
+                "native payload boundary {relative_path} contains {forbidden}"
+            );
+        }
+    }
+
+    let owner_definitions = [
+        (
+            "pub enum NativeStoredPayload {",
+            "crates/comfy_nodes/src/stored_payload.rs",
+        ),
+        (
+            "pub struct NativeStoredModelPayload {",
+            "crates/comfy_nodes/src/stored_payload.rs",
+        ),
+        (
+            "pub struct NativeTensorPayload {",
+            "crates/comfy_tensor/src/native_node_payload.rs",
+        ),
+        (
+            "pub struct NativeModelPayload {",
+            "crates/comfy_model/src/native_node_payload.rs",
+        ),
+        (
+            "pub struct ConditioningSet {",
+            "crates/comfy_model/src/conditioning.rs",
+        ),
+        (
+            "pub struct NativeControlPayload {",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+        ),
+        (
+            "pub struct NativeConditioningPayload {",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+        ),
+        (
+            "pub struct NativeDiffusionPayload {",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+        ),
+        (
+            "pub struct NativeNoisePayload {",
+            "crates/comfy_sampler/src/native_node_payload.rs",
+        ),
+        (
+            "pub struct NativeGuiderPayload {",
+            "crates/comfy_sampler/src/native_node_payload.rs",
+        ),
+        (
+            "pub struct NativeSamplerPayload {",
+            "crates/comfy_sampler/src/native_node_payload.rs",
+        ),
+        (
+            "pub struct NativeBoundingBoxPayload {",
+            "crates/comfy_media/src/native_node_payload.rs",
+        ),
+        (
+            "pub struct NativeFaceLandmarksPayload {",
+            "crates/comfy_media/src/native_node_payload.rs",
+        ),
+        (
+            "pub struct NativePoseKeypointPayload {",
+            "crates/comfy_media/src/native_node_payload.rs",
+        ),
+        (
+            "pub struct NativeSam3TrackDataPayload {",
+            "crates/comfy_media/src/native_node_payload.rs",
+        ),
+        (
+            "pub struct NativeTracksPayload {",
+            "crates/comfy_media/src/native_node_payload.rs",
+        ),
+        (
+            "pub struct AudioEncoderOutput {",
+            "crates/comfy_model/src/native_node_payload.rs",
+        ),
+        (
+            "pub struct ClipVisionOutput {",
+            "crates/comfy_model/src/clip_vision.rs",
+        ),
+        (
+            "pub struct IcLoraParameters {",
+            "crates/comfy_model/src/native_node_payload.rs",
+        ),
+        (
+            "pub struct LossMap {",
+            "crates/comfy_model/src/native_node_payload.rs",
+        ),
+        (
+            "pub struct NativeProviderPayload {",
+            "crates/comfy_nodes/src/stored_payload.rs",
+        ),
+    ];
+    for (definition, owner_path) in owner_definitions {
+        let occurrences = production_source_occurrences(&sources, definition);
+        assert_eq!(
+            occurrences.len(),
+            1,
+            "{definition} must have exactly one production owner: {occurrences:?}"
+        );
+        assert!(
+            occurrences[0].contains(owner_path),
+            "{definition} is not owned by {owner_path}: {occurrences:?}"
+        );
+    }
+
+    let source_type_mapper =
+        production_source_occurrences(&sources, "pub fn native_source_type_projection(");
+    assert_eq!(source_type_mapper.len(), 1);
+    assert!(source_type_mapper[0].contains("crates/comfy_nodes/src/source_type.rs"));
+
+    let stored_payload = fs::read_to_string(root.join("crates/comfy_nodes/src/stored_payload.rs"))?;
+    let stored_payload_production = stored_payload
+        .split_once("#[cfg(test)]\nmod tests")
+        .map_or(stored_payload.as_str(), |(production, _)| production);
+    for closed_variant in [
+        "Tensor(Arc<NativeTensorPayload>)",
+        "Model(Arc<NativeStoredModelPayload>)",
+        "Control(Arc<NativeControlPayload>)",
+        "Conditioning(Arc<ConditioningSet>)",
+        "Noise(Arc<NativeNoisePayload>)",
+        "Guider(Arc<NativeGuiderPayload>)",
+        "Sampler(Arc<NativeSamplerPayload>)",
+        "BoundingBox(Arc<NativeBoundingBoxPayload>)",
+        "FaceLandmarks(Arc<NativeFaceLandmarksPayload>)",
+        "PoseKeypoint(Arc<NativePoseKeypointPayload>)",
+        "Sam3TrackData(Arc<NativeSam3TrackDataPayload>)",
+        "Tracks(Arc<NativeTracksPayload>)",
+        "AudioEncoderOutput(Arc<AudioEncoderOutput>)",
+        "ClipVisionOutput(Arc<ClipVisionOutput>)",
+        "IcLoraParameters(Arc<IcLoraParameters>)",
+        "LossMap(Arc<LossMap>)",
+        "Provider(Arc<NativeProviderPayload>)",
+    ] {
+        assert!(
+            stored_payload_production.contains(closed_variant),
+            "closed NativeStoredPayload omits {closed_variant}"
+        );
+    }
+    assert!(stored_payload_production.contains("native_source_type_projection(source_type)?"));
+    assert!(!stored_payload_production.contains("Diffusion(Arc<NativeDiffusionPayload>)"));
+
+    let nodes_root = fs::read_to_string(root.join("crates/comfy_nodes/src/comfy_nodes.rs"))?;
+    let runtime_root = fs::read_to_string(root.join("crates/comfy_runtime/src/comfy_runtime.rs"))?;
+    assert!(nodes_root.contains("NativeStoredPayload"));
+    assert!(runtime_root.contains("NativeStoredPayload"));
+    for forbidden in [
+        "NativeStructuredComputePayload",
+        "NativeStructuredComputeRole",
+        "NativeStructuredComputeValue",
+    ] {
+        assert!(!nodes_root.contains(forbidden));
+        assert!(!runtime_root.contains(forbidden));
+    }
     Ok(())
 }

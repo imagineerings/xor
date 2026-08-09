@@ -1,3 +1,6 @@
+use crate::native_node_payload::{
+    NativeModelPayloadError, NativeStructuredProjection, require_structured_projection,
+};
 use crate::native_ops::{
     GeluApproximation, NativeExecutionRequirements, NativeModule, NativeOpsError,
 };
@@ -199,10 +202,74 @@ pub struct ClipVisionOutput {
     pub intermediate: Option<Tensor>,
     pub image_embeds: Tensor,
     pub projected_intermediate: Option<Tensor>,
+    image_sizes: Box<[[u64; 3]]>,
+    semantic_digest_sha256: [u8; 32],
+    resident_bytes: u64,
+}
+
+impl ClipVisionOutput {
+    pub const SOURCE_TYPE_ID: &'static str = "CLIP_VISION_OUTPUT";
+
+    pub fn checked(
+        last_hidden_state: Tensor,
+        intermediate: Option<Tensor>,
+        image_embeds: Tensor,
+        projected_intermediate: Option<Tensor>,
+        image_sizes: Vec<[u64; 3]>,
+    ) -> Result<Self, ClipVisionError> {
+        let image_sizes = image_sizes.into_boxed_slice();
+        let (semantic_digest_sha256, resident_bytes) = project_clip_vision_output(
+            &last_hidden_state,
+            intermediate.as_ref(),
+            &image_embeds,
+            projected_intermediate.as_ref(),
+            &image_sizes,
+        )?;
+        Ok(Self {
+            last_hidden_state,
+            intermediate,
+            image_embeds,
+            projected_intermediate,
+            image_sizes,
+            semantic_digest_sha256,
+            resident_bytes,
+        })
+    }
+
+    pub fn image_sizes(&self) -> &[[u64; 3]] {
+        &self.image_sizes
+    }
+
+    pub const fn semantic_digest_sha256(&self) -> &[u8; 32] {
+        &self.semantic_digest_sha256
+    }
+
+    pub const fn resident_bytes(&self) -> u64 {
+        self.resident_bytes
+    }
+
+    pub fn validate(&self) -> Result<(), ClipVisionError> {
+        let (semantic_digest_sha256, resident_bytes) = project_clip_vision_output(
+            &self.last_hidden_state,
+            self.intermediate.as_ref(),
+            &self.image_embeds,
+            self.projected_intermediate.as_ref(),
+            &self.image_sizes,
+        )?;
+        require_structured_projection(
+            self.semantic_digest_sha256,
+            semantic_digest_sha256,
+            self.resident_bytes,
+            resident_bytes,
+        )?;
+        Ok(())
+    }
 }
 
 #[derive(Debug, Error)]
 pub enum ClipVisionError {
+    #[error(transparent)]
+    StructuredPayload(#[from] NativeModelPayloadError),
     #[error(transparent)]
     Tensor(#[from] TensorError),
     #[error(transparent)]
@@ -259,6 +326,143 @@ impl From<comfy_types::CancellationError> for ClipVisionError {
     fn from(_: comfy_types::CancellationError) -> Self {
         Self::Cancelled
     }
+}
+
+fn project_clip_vision_output(
+    last_hidden_state: &Tensor,
+    intermediate: Option<&Tensor>,
+    image_embeds: &Tensor,
+    projected_intermediate: Option<&Tensor>,
+    image_sizes: &[[u64; 3]],
+) -> Result<([u8; 32], u64), ClipVisionError> {
+    let last_descriptor = last_hidden_state.descriptor();
+    let last_shape = last_descriptor.shape();
+    if last_shape.len() != 3 || last_shape.contains(&0) {
+        return Err(ClipVisionError::InvalidInput(
+            "CLIP vision last hidden state must be nonempty [batch, tokens, hidden]",
+        ));
+    }
+    let batch = usize::try_from(last_shape[0])
+        .map_err(|_| ClipVisionError::Overflow("CLIP vision output batch"))?;
+    let first_image_size = image_sizes
+        .first()
+        .copied()
+        .ok_or(ClipVisionError::InvalidInput(
+            "CLIP vision image sizes must contain one entry per batch item",
+        ))?;
+    if image_sizes.len() != batch
+        || first_image_size[0] != 3
+        || first_image_size[1] == 0
+        || first_image_size[2] == 0
+        || image_sizes.iter().any(|size| *size != first_image_size)
+    {
+        return Err(ClipVisionError::InvalidInput(
+            "CLIP vision image sizes must repeat a nonempty [3, height, width] source shape",
+        ));
+    }
+
+    let image_embed_shape = image_embeds.descriptor().shape();
+    if !matches!(image_embed_shape.len(), 2 | 3)
+        || image_embed_shape.first().copied() != Some(last_shape[0])
+        || image_embed_shape.contains(&0)
+    {
+        return Err(ClipVisionError::InvalidInput(
+            "CLIP vision image embeds must be nonempty [batch, projection] or [batch, tokens, projection]",
+        ));
+    }
+    require_clip_output_target(last_hidden_state, image_embeds, "image embeds")?;
+
+    if let Some(intermediate) = intermediate {
+        let shape = intermediate.descriptor().shape();
+        let shape_matches = match shape {
+            [intermediate_batch, tokens, hidden] => {
+                *intermediate_batch == last_shape[0]
+                    && *tokens == last_shape[1]
+                    && *hidden == last_shape[2]
+            }
+            [intermediate_batch, layers, tokens, hidden] => {
+                *intermediate_batch == last_shape[0]
+                    && *layers > 0
+                    && *tokens == last_shape[1]
+                    && *hidden == last_shape[2]
+            }
+            _ => false,
+        };
+        if !shape_matches {
+            return Err(ClipVisionError::InvalidInput(
+                "CLIP vision intermediate must preserve batch, token, and hidden dimensions",
+            ));
+        }
+        require_clip_output_target(last_hidden_state, intermediate, "intermediate")?;
+    }
+
+    if let Some(projected_intermediate) = projected_intermediate {
+        let intermediate = intermediate.ok_or(ClipVisionError::InvalidInput(
+            "projected CLIP vision intermediate requires a selected intermediate layer",
+        ))?;
+        let intermediate_shape = intermediate.descriptor().shape();
+        let projected_shape = projected_intermediate.descriptor().shape();
+        if intermediate_shape.len() != 3
+            || projected_shape.len() != 3
+            || projected_shape[0] != last_shape[0]
+            || intermediate_shape[1] <= 1
+            || projected_shape[1] != intermediate_shape[1] - 1
+            || projected_shape[2] == 0
+        {
+            return Err(ClipVisionError::InvalidInput(
+                "projected CLIP vision intermediate must drop exactly the class token",
+            ));
+        }
+        require_clip_output_target(
+            last_hidden_state,
+            projected_intermediate,
+            "projected intermediate",
+        )?;
+    }
+
+    let mut projection = NativeStructuredProjection::new::<ClipVisionOutput>(
+        b"sim.comfy.model.clip-vision-output.v1",
+    )?;
+    projection.hash_float_tensor(last_hidden_state)?;
+    match intermediate {
+        Some(intermediate) => {
+            projection.hash_tag(1);
+            projection.hash_float_tensor(intermediate)?;
+        }
+        None => projection.hash_tag(0),
+    }
+    projection.hash_float_tensor(image_embeds)?;
+    match projected_intermediate {
+        Some(projected_intermediate) => {
+            projection.hash_tag(1);
+            projection.hash_float_tensor(projected_intermediate)?;
+        }
+        None => projection.hash_tag(0),
+    }
+    projection.hash_len(image_sizes.len())?;
+    projection.add_allocation::<[u64; 3]>(image_sizes.len())?;
+    for image_size in image_sizes {
+        for dimension in image_size {
+            projection.hash_u64(*dimension);
+        }
+    }
+    Ok(projection.finish())
+}
+
+fn require_clip_output_target(
+    reference: &Tensor,
+    tensor: &Tensor,
+    field: &'static str,
+) -> Result<(), ClipVisionError> {
+    let expected = reference.descriptor();
+    let actual = tensor.descriptor();
+    if expected.dtype() != actual.dtype()
+        || expected.device() != actual.device()
+        || expected.stream() != actual.stream()
+    {
+        return Err(ClipVisionError::InvalidInput(field));
+    }
+    Ok(())
 }
 
 impl NativeClipVision {
@@ -637,6 +841,10 @@ impl NativeClipVision {
                 "pixel values must have nonempty [batch, 3, height, width] shape",
             ));
         }
+        let image_sizes = vec![
+            [shape[1], shape[2], shape[3]];
+            u64_to_usize(shape[0], "CLIP vision output batch")?
+        ];
         let patch_size = usize_to_u64(self.configuration.patch_size, "patch size")?;
         if !shape[2].is_multiple_of(patch_size) || !shape[3].is_multiple_of(patch_size) {
             return Err(ClipVisionError::InvalidInput(
@@ -743,12 +951,13 @@ impl NativeClipVision {
                 }
             };
         context.check()?;
-        Ok(ClipVisionOutput {
+        ClipVisionOutput::checked(
             last_hidden_state,
             intermediate,
             image_embeds,
             projected_intermediate,
-        })
+            image_sizes,
+        )
     }
 
     fn patch_embeddings(
@@ -1879,4 +2088,136 @@ fn u64_to_i64(value: u64, operation: &'static str) -> Result<i64, ClipVisionErro
 
 fn u64_to_usize(value: u64, operation: &'static str) -> Result<usize, ClipVisionError> {
     usize::try_from(value).map_err(|_| ClipVisionError::Overflow(operation))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use comfy_tensor::{CancellationToken, CpuWorkspaceAuthority};
+    use std::{error::Error, mem};
+
+    const TEST_MEMORY_LIMIT_BYTES: u64 = 1024 * 1024;
+
+    fn with_context<ResultType>(
+        run: impl FnOnce(&CpuBackend, &ExecutionContext<'_>) -> Result<ResultType, Box<dyn Error>>,
+    ) -> Result<ResultType, Box<dyn Error>> {
+        let cancellation = CancellationToken::default();
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(TEST_MEMORY_LIMIT_BYTES)?;
+        let context = backend.execution_context(
+            StreamId::DEFAULT,
+            authority.authorize_workspace(0)?,
+            &cancellation,
+        );
+        run(&backend, &context)
+    }
+
+    fn f32_tensor(
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+        shape: Vec<u64>,
+        values: &[f32],
+    ) -> Result<Tensor, Box<dyn Error>> {
+        let descriptor =
+            TensorDescriptor::contiguous(shape, DType::F32, DeviceId::CPU, StreamId::DEFAULT)?;
+        let (tensor, _) = backend.upload_f32(descriptor, values, context)?;
+        Ok(tensor)
+    }
+
+    #[test]
+    fn clip_vision_output_checks_source_shapes_and_deduplicates_aliased_storage()
+    -> Result<(), Box<dyn Error>> {
+        with_context(|backend, context| {
+            let last_hidden_state = f32_tensor(backend, context, vec![1, 5, 4], &[0.25; 20])?;
+            let image_embeds = f32_tensor(backend, context, vec![1, 3], &[0.5; 3])?;
+            let projected_intermediate = f32_tensor(backend, context, vec![1, 4, 6], &[0.75; 24])?;
+            let output = ClipVisionOutput::checked(
+                last_hidden_state.clone(),
+                Some(last_hidden_state.clone()),
+                image_embeds.clone(),
+                Some(projected_intermediate.clone()),
+                vec![[3, 224, 224]],
+            )?;
+            output.validate()?;
+            assert_eq!(output.image_sizes(), &[[3, 224, 224]]);
+            assert_eq!(
+                output.resident_bytes(),
+                u64::try_from(mem::size_of::<ClipVisionOutput>())?
+                    + u64::try_from(mem::size_of::<[u64; 3]>())?
+                    + last_hidden_state.storage_byte_len()
+                    + image_embeds.storage_byte_len()
+                    + projected_intermediate.storage_byte_len()
+            );
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn clip_vision_output_digest_excludes_storage_identity_and_rejects_nonfinite_content()
+    -> Result<(), Box<dyn Error>> {
+        with_context(|backend, context| {
+            let output = |backend: &CpuBackend,
+                          context: &ExecutionContext<'_>|
+             -> Result<ClipVisionOutput, Box<dyn Error>> {
+                let hidden = f32_tensor(backend, context, vec![1, 2, 2], &[1.0; 4])?;
+                let embeds = f32_tensor(backend, context, vec![1, 2], &[2.0; 2])?;
+                Ok(ClipVisionOutput::checked(
+                    hidden.clone(),
+                    Some(hidden),
+                    embeds,
+                    None,
+                    vec![[3, 32, 32]],
+                )?)
+            };
+            let first = output(backend, context)?;
+            let second = output(backend, context)?;
+            assert_ne!(
+                first.last_hidden_state.storage_id(),
+                second.last_hidden_state.storage_id()
+            );
+            assert_eq!(
+                first.semantic_digest_sha256(),
+                second.semantic_digest_sha256()
+            );
+            assert_eq!(first.resident_bytes(), second.resident_bytes());
+
+            let non_finite = f32_tensor(backend, context, vec![1, 1, 1], &[f32::INFINITY])?;
+            let embeds = f32_tensor(backend, context, vec![1, 1], &[0.0])?;
+            assert!(
+                ClipVisionOutput::checked(non_finite, None, embeds, None, vec![[3, 16, 16]],)
+                    .is_err()
+            );
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn clip_vision_output_preserves_all_layer_cardinality_and_projection_rules()
+    -> Result<(), Box<dyn Error>> {
+        with_context(|backend, context| {
+            let last_hidden_state = f32_tensor(backend, context, vec![1, 3, 2], &[0.0; 6])?;
+            let all_layers = f32_tensor(backend, context, vec![1, 2, 3, 2], &[0.0; 12])?;
+            let image_embeds = f32_tensor(backend, context, vec![1, 3, 4], &[0.0; 12])?;
+            let output = ClipVisionOutput::checked(
+                last_hidden_state.clone(),
+                Some(all_layers.clone()),
+                image_embeds.clone(),
+                None,
+                vec![[3, 32, 48]],
+            )?;
+            output.validate()?;
+
+            let projected = f32_tensor(backend, context, vec![1, 2, 4], &[0.0; 8])?;
+            assert!(
+                ClipVisionOutput::checked(
+                    last_hidden_state,
+                    Some(all_layers),
+                    image_embeds,
+                    Some(projected),
+                    vec![[3, 32, 48]],
+                )
+                .is_err()
+            );
+            Ok(())
+        })
+    }
 }

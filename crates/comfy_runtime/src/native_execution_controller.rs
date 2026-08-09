@@ -22,18 +22,15 @@ use comfy_media::{
     MetadataWritePolicy, PngError, PngLimits, decode_png, encode_png_frame_with_policy_and_context,
 };
 use comfy_model::{
-    AttentionError, ClipTextError, LatentFormatError, ModelStoreError, NativeOpsError, NativeVae,
-    PatchGraph, QuantizationError, VaeArchitectureError, VaeBoundaryKind, VaeError,
-    VaeKernelProfile,
+    AttentionError, ClipTextError, LatentFormatError, ModelStoreError, NativeModelPayload,
+    NativeOpsError, NativeVae, PatchGraph, QuantizationError, VaeArchitectureError,
+    VaeBoundaryKind, VaeError, VaeKernelProfile,
     clip::{ClipError, LoadedSd1Clip, NativeTokenizer, WeightedText},
     conditioning::{
         ConditioningEntry, ConditioningEntryOptions, ConditioningError, ConditioningIdentity,
         ConditioningSet, ConditioningValue,
     },
-    controlnet::{
-        ControlChain, ControlConditioning, ControlIsolation, ControlModelExecutor, ControlNetError,
-        ControlResult, ControlRuntime, ControlTensorBinding,
-    },
+    controlnet::{ControlChain, ControlModelExecutor, ControlNetError},
     generated_native_diffusion::{
         NativeDiffusionModelError, Sd1Tokenizer, Sd15TinyModel, empty_sd15_latent,
         sd15_latent_format_identity, sd15_model_family_identity,
@@ -44,13 +41,16 @@ use comfy_nodes::{
     NativeHandleStoreError, NativeHandleType, NativeImageDescriptor, NativeImageDescriptorError,
     NativeImageEffect, NativeInputDescriptor, NativeNodeBinding, NativeNodeBindingDisposition,
     NativeNodeContractError, NativeNodePresentation, NativeOpaqueHandle, NativePrimitive,
-    NativePrimitiveType, NativeStoredModelObject, NativeStoredTensorObject, NativeTypeUnion,
+    NativePrimitiveType, NativeStoredModelPayload, NativeStoredPayload, NativeTypeUnion,
     NativeValue, NativeValueType, NodeDescriptor, NodeRegistry, PortDescriptor,
     generated_family_node_bindings, native_diffusion_descriptors, native_image_descriptors,
+    native_source_type_projection,
 };
 use comfy_sampler::{
     DiscreteSamplingProfile, GUIDANCE_ADAPTER_ID, GuidanceDenoiser, GuidanceError,
-    GuidanceEvaluation, GuidanceOptions, GuidanceResult, INITIAL_NOISE_PHASE_ID, NoiseError,
+    GuidanceEvaluation, GuidanceOptions, GuidanceResult, INITIAL_NOISE_PHASE_ID,
+    NativeConditioningPayload as PortableConditioningPayload,
+    NativeControlExecution as PortableControlExecution, NativeDiffusionPayload, NoiseError,
     NoiseRequest, SamplingError, SamplingPlan, SamplingProfileError, SchedulerError,
     execute_guidance,
     generated_native_diffusion::{
@@ -61,15 +61,17 @@ use comfy_sampler::{
 };
 use comfy_tensor::{
     BackendCapabilityMatrix, CancellationToken, CpuBackend, CpuWorkspaceAuthority, DType,
-    ExecutionContext, ImageTensor, ResizeCrop, ResizeMode, RngCompatibilityError, RngError,
-    ScratchReservation, StreamId, TensorDescriptor, TensorError,
+    ExecutionContext, ImageTensor, NativeTensorPayload, NativeTensorRole, ResizeCrop, ResizeMode,
+    RngCompatibilityError, RngError, ScratchReservation, StreamId, TensorError,
 };
+#[cfg(test)]
+use comfy_tensor::{DeviceId, TensorDescriptor};
 use comfy_tensor::{
     Tensor,
     generated_activation_normalization_functional_01::FunctionalError,
     generated_comfy_operator_indirection_01::OperatorIndirectionError,
     generated_external_tensor_kernel_01::ExternalTensorKernelPartOneError,
-    generated_native_diffusion::{NativeDiffusionTensorError, tensor_from_f32, tensor_to_f32},
+    generated_native_diffusion::{NativeDiffusionTensorError, tensor_to_f32},
     generated_neural_network_module_02::NeuralNetworkModulePartTwoError,
     generated_shape_layout_transform_01::ShapeLayoutTransformPartOneError,
     generated_shape_layout_transform_02::ShapeLayoutTransformPartTwoError,
@@ -98,8 +100,6 @@ use uuid::Uuid;
 
 pub const NATIVE_IMAGE_REGISTRY_VERSION: &str = "native-image-v1";
 pub const NATIVE_DIFFUSION_REGISTRY_VERSION: &str = "native-diffusion-v1";
-pub const NATIVE_TENSOR_HANDLE_SCHEMA_VERSION: u16 = 1;
-const NATIVE_DIFFUSION_HANDLE_SCHEMA_VERSION: u16 = 5;
 const MAX_NATIVE_IMAGE_INPUT_BYTES: u64 = 256 * 1024 * 1024;
 const MAX_NATIVE_WORKER_INPUT_BYTES: usize = 12 * 1024 * 1024;
 const MAX_NATIVE_OUTPUT_PROPOSALS: usize = 4_096;
@@ -147,7 +147,6 @@ pub enum NativeTensorKind {
 
 #[derive(Clone)]
 pub struct NativeDiffusionBundle {
-    fixture_id: String,
     model: Arc<Sd15TinyModel>,
     tokenizer: Arc<Sd1Tokenizer>,
     clip: Arc<LoadedSd1Clip>,
@@ -343,60 +342,6 @@ impl NativeConditioningExecution {
     pub fn cache_identities(&self) -> &CanonicalConditioningCacheIdentities {
         &self.cache_identities
     }
-
-    #[allow(clippy::too_many_arguments)]
-    fn execute_control(
-        &self,
-        backend: &CpuBackend,
-        vae: &NativeVae,
-        latent: &Tensor,
-        model_time: f32,
-        cross_attention: &Tensor,
-        sampling_percent: f64,
-        context: &ExecutionContext<'_>,
-    ) -> Result<Option<ControlResult>, ControlNetError> {
-        let Some(control) = &self.control else {
-            context.check().map_err(|_| ControlNetError::Cancelled)?;
-            return Ok(None);
-        };
-        let timestep =
-            tensor_from_f32(backend, &[1], &[model_time], context).map_err(
-                |error| match error {
-                    NativeDiffusionTensorError::Tensor(error) => ControlNetError::Tensor(error),
-                    error => ControlNetError::CanonicalTensor(Box::new(error)),
-                },
-            )?;
-        let binding = |tensor: Tensor| -> Result<ControlTensorBinding, ControlNetError> {
-            let digest = format!("{:x}", Sha256::digest(tensor.contiguous_bytes()?));
-            ControlTensorBinding::checked(tensor, digest)
-        };
-        let batch = latent
-            .descriptor()
-            .shape()
-            .first()
-            .copied()
-            .ok_or_else(|| {
-                ControlNetError::Invalid("canonical ControlNet latent has no batch axis".to_owned())
-            })?;
-        let conditioning = ControlConditioning::checked(
-            binding(latent.clone())?,
-            binding(timestep)?,
-            binding(cross_attention.clone())?,
-            None,
-            Vec::new(),
-            None,
-            BTreeMap::new(),
-            sampling_percent as f32,
-            batch,
-        )?;
-        ControlRuntime::new(backend, control.executor.as_ref()).execute(
-            &control.chain,
-            ControlIsolation::CompleteChain,
-            &conditioning,
-            control.vae_execution_digest.as_ref().map(|_| vae),
-            context,
-        )
-    }
 }
 
 fn sha256_serialized(
@@ -557,7 +502,6 @@ impl NativeDiffusionBundle {
         )
         .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
         Ok(Self {
-            fixture_id,
             model,
             tokenizer,
             clip,
@@ -654,8 +598,7 @@ fn map_clip_runtime_error(error: ClipError) -> NativeImageRuntimeError {
 
 struct Sd15GuidanceDenoiser<'a> {
     model: &'a Sd15TinyModel,
-    vae: Option<&'a NativeVae>,
-    conditioning: Option<&'a NativeConditioningExecution>,
+    conditioning: Option<&'a PortableConditioningPayload>,
     runtime_failure: Option<NativeImageRuntimeError>,
 }
 
@@ -730,11 +673,10 @@ impl GuidanceDenoiser for Sd15GuidanceDenoiser<'_> {
             };
             let model_time = sd15_model_time(evaluation.sigma())
                 .map_err(|error| GuidanceError::Invalid(error.to_string()))?;
-            let control = match (self.conditioning, self.vae) {
-                (Some(execution), Some(vae)) => execution
+            let control = match self.conditioning {
+                Some(execution) => execution
                     .execute_control(
                         self.model.backend(),
-                        vae,
                         evaluation.latent(),
                         model_time,
                         conditioning,
@@ -746,12 +688,7 @@ impl GuidanceDenoiser for Sd15GuidanceDenoiser<'_> {
                         self.runtime_failure = Some(control_runtime_error(error));
                         GuidanceError::Invalid(message)
                     })?,
-                (None, None) => None,
-                _ => {
-                    return Err(GuidanceError::Invalid(
-                        "SD15 prebound conditioning is incomplete".to_owned(),
-                    ));
-                }
+                None => None,
             };
             let output = self
                 .model
@@ -815,7 +752,6 @@ impl<'a> Sd15GuidanceAdapter<'a> {
             negative: conditioning("sd15-negative", "cross-attention", negative)?,
             denoiser: Sd15GuidanceDenoiser {
                 model,
-                vae: None,
                 conditioning: None,
                 runtime_failure: None,
             },
@@ -824,16 +760,39 @@ impl<'a> Sd15GuidanceAdapter<'a> {
 
     pub fn checked_prebound(
         model: &'a Sd15TinyModel,
-        vae: &'a NativeVae,
-        execution: &'a NativeConditioningExecution,
+        execution: &'a PortableConditioningPayload,
         positive: &Tensor,
         negative: &Tensor,
         context: &ExecutionContext<'_>,
     ) -> Result<Self, NativeImageRuntimeError> {
         let mut adapter = Self::checked(model, positive, negative, context)?;
-        adapter.denoiser.vae = Some(vae);
         adapter.denoiser.conditioning = Some(execution);
         Ok(adapter)
+    }
+
+    pub fn checked_prebound_conditioning_sets(
+        model: &'a Sd15TinyModel,
+        execution: &'a PortableConditioningPayload,
+        positive: &ConditioningSet,
+        negative: &ConditioningSet,
+    ) -> Result<Self, NativeImageRuntimeError> {
+        positive
+            .validate()
+            .map_err(map_conditioning_runtime_error)?;
+        negative
+            .validate()
+            .map_err(map_conditioning_runtime_error)?;
+        Ok(Self {
+            profile: DiscreteSamplingProfile::sd15()
+                .map_err(|error| NativeImageRuntimeError::Execution(error.to_string()))?,
+            positive: positive.clone(),
+            negative: negative.clone(),
+            denoiser: Sd15GuidanceDenoiser {
+                model,
+                conditioning: Some(execution),
+                runtime_failure: None,
+            },
+        })
     }
 
     pub fn execute(
@@ -882,88 +841,6 @@ pub trait NativeDiffusionProvider: Send + Sync {
         backend: Arc<CpuBackend>,
         context: &ExecutionContext<'_>,
     ) -> Result<NativeDiffusionBundle, NativeImageRuntimeError>;
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(try_from = "NativeTensorHandleWire")]
-pub struct NativeTensorHandle {
-    schema_version: u16,
-    kind: NativeTensorKind,
-    content_digest: String,
-    descriptor: TensorDescriptor,
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct NativeTensorHandleWire {
-    schema_version: u16,
-    kind: NativeTensorKind,
-    content_digest: String,
-    descriptor: TensorDescriptor,
-}
-
-impl TryFrom<NativeTensorHandleWire> for NativeTensorHandle {
-    type Error = NativeImageRuntimeError;
-
-    fn try_from(value: NativeTensorHandleWire) -> Result<Self, Self::Error> {
-        let handle = Self {
-            schema_version: value.schema_version,
-            kind: value.kind,
-            content_digest: value.content_digest,
-            descriptor: value.descriptor,
-        };
-        handle.validate(handle.kind)?;
-        Ok(handle)
-    }
-}
-
-impl NativeTensorHandle {
-    pub fn new(
-        kind: NativeTensorKind,
-        content_digest: impl Into<String>,
-        descriptor: TensorDescriptor,
-    ) -> Result<Self, NativeImageRuntimeError> {
-        let handle = Self {
-            schema_version: NATIVE_TENSOR_HANDLE_SCHEMA_VERSION,
-            kind,
-            content_digest: content_digest.into(),
-            descriptor,
-        };
-        handle.validate(kind)?;
-        Ok(handle)
-    }
-
-    pub const fn schema_version(&self) -> u16 {
-        self.schema_version
-    }
-
-    pub const fn kind(&self) -> NativeTensorKind {
-        self.kind
-    }
-
-    pub fn content_digest(&self) -> &str {
-        &self.content_digest
-    }
-
-    pub const fn descriptor(&self) -> &TensorDescriptor {
-        &self.descriptor
-    }
-
-    fn validate(&self, expected_kind: NativeTensorKind) -> Result<(), NativeImageRuntimeError> {
-        if self.schema_version != NATIVE_TENSOR_HANDLE_SCHEMA_VERSION
-            || self.kind != expected_kind
-            || self.content_digest.len() != 64
-            || !self
-                .content_digest
-                .bytes()
-                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-        {
-            return Err(NativeImageRuntimeError::Handle(
-                "schema, kind, or digest did not match the typed port".to_owned(),
-            ));
-        }
-        Ok(())
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -1589,6 +1466,7 @@ fn frontend_type_name(types: &[NativeValueType]) -> Result<String, NativeImageRu
         NativeValueType::Primitive(NativePrimitiveType::String) => "STRING".to_owned(),
         NativeValueType::Handle(handle_type) => handle_type.type_id.clone(),
         NativeValueType::PreservedUnknown => "UNKNOWN".to_owned(),
+        NativeValueType::NamedPreservedUnknown(type_name) => type_name.clone(),
     };
     let projected = types.iter().map(project).collect::<Vec<_>>();
     Ok(projected.join("|"))
@@ -1683,11 +1561,12 @@ fn native_registry_with_diffusion_provider(
         cpu_backend.clone(),
         metadata_enabled,
     )?;
-    let state = Arc::new(NativeDiffusionState {
+    let cancellation = CancellationToken::default();
+    let state = Arc::new(NativeDiffusionState::checked(
         provider,
-        backend: cpu_backend.clone(),
-        loaded: Mutex::new(None),
-    });
+        cpu_backend.clone(),
+        &cancellation,
+    )?);
     let nodes = BTreeMap::<String, Arc<dyn NativeNode>>::from([
         (
             "CheckpointLoaderSimple".to_owned(),
@@ -1833,7 +1712,7 @@ fn runtime_descriptor(
                 allows_literal,
             })
         })
-        .collect::<Result<Vec<_>, NativeNodeContractError>>()?;
+        .collect::<Result<Vec<_>, NativeImageRuntimeError>>()?;
     let outputs = descriptor
         .outputs
         .iter()
@@ -1844,7 +1723,7 @@ fn runtime_descriptor(
                 is_list: false,
             })
         })
-        .collect::<Result<Vec<_>, NativeNodeContractError>>()?;
+        .collect::<Result<Vec<_>, NativeImageRuntimeError>>()?;
     let input_names = descriptor
         .inputs
         .iter()
@@ -1920,81 +1799,26 @@ fn native_executable_binding(
     })
 }
 
-fn native_value_type(type_name: &str) -> Result<NativeValueType, NativeNodeContractError> {
-    Ok(match type_name {
-        "BOOLEAN" => NativeValueType::Primitive(NativePrimitiveType::Boolean),
-        "INT" => NativeValueType::Primitive(NativePrimitiveType::Integer),
-        "FLOAT" => NativeValueType::Primitive(NativePrimitiveType::Number),
-        "STRING" => NativeValueType::Primitive(NativePrimitiveType::String),
-        "PROMPT" | "EXTRA_PNGINFO" => NativeValueType::Any,
-        "IMAGE" => {
-            NativeValueType::Handle(NativeHandleType::new(NativeHandleKind::Image, type_name)?)
-        }
-        "MASK" => {
-            NativeValueType::Handle(NativeHandleType::new(NativeHandleKind::Mask, type_name)?)
-        }
-        "TENSOR" => {
-            NativeValueType::Handle(NativeHandleType::new(NativeHandleKind::Tensor, type_name)?)
-        }
-        "LATENT" => {
-            NativeValueType::Handle(NativeHandleType::new(NativeHandleKind::Latent, type_name)?)
-        }
-        "MODEL" => {
-            NativeValueType::Handle(NativeHandleType::new(NativeHandleKind::Model, type_name)?)
-        }
-        "CLIP" => {
-            NativeValueType::Handle(NativeHandleType::new(NativeHandleKind::Clip, type_name)?)
-        }
-        "VAE" => NativeValueType::Handle(NativeHandleType::new(NativeHandleKind::Vae, type_name)?),
-        "CONDITIONING" => NativeValueType::Handle(NativeHandleType::new(
-            NativeHandleKind::Conditioning,
+fn native_value_type(type_name: &str) -> Result<NativeValueType, NativeImageRuntimeError> {
+    if type_name == "TENSOR" {
+        return Ok(NativeValueType::Handle(NativeHandleType::new(
+            NativeHandleKind::Tensor,
             type_name,
-        )?),
-        other => NativeValueType::Handle(NativeHandleType::new(NativeHandleKind::Artifact, other)?),
-    })
-}
-
-#[derive(Clone)]
-enum StoredNativeTensor {
-    Image {
-        metadata: NativeTensorHandle,
-        tensor: Arc<ImageTensor>,
-    },
-    Tensor {
-        metadata: NativeTensorHandle,
-        tensor: Tensor,
-    },
-}
-
-fn native_stored_tensor_object(
-    metadata: &NativeTensorHandle,
-    resident_bytes: usize,
-    payload: StoredNativeTensor,
-) -> Result<NativeStoredTensorObject, NativeImageRuntimeError> {
-    let byte_length = u64::try_from(resident_bytes).map_err(|_| {
-        NativeImageRuntimeError::Handle("native tensor byte length overflowed".to_owned())
-    })?;
-    Ok(NativeStoredTensorObject::new(
-        metadata.descriptor().clone(),
-        byte_length,
-        metadata.content_digest(),
-        Arc::new(payload),
-    )?)
-}
-
-fn prepare_image_metadata(
-    kind: NativeTensorKind,
-    tensor: &ImageTensor,
-) -> Result<NativeTensorHandle, NativeImageRuntimeError> {
-    if !matches!(kind, NativeTensorKind::Image | NativeTensorKind::Mask) {
-        return Err(NativeImageRuntimeError::Handle(
-            "image tensor handles require image or mask kind".to_owned(),
-        ));
+        )?));
     }
-    let descriptor = tensor.tensor().descriptor().clone();
-    let bytes = tensor.tensor().contiguous_bytes()?;
-    let content_digest = native_tensor_digest(kind, &descriptor, &bytes)?;
-    NativeTensorHandle::new(kind, content_digest, descriptor)
+    native_source_type_projection(type_name)
+        .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?
+        .value_type()
+        .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))
+}
+
+fn native_tensor_role(kind: NativeTensorKind) -> NativeTensorRole {
+    match kind {
+        NativeTensorKind::Image => NativeTensorRole::Image,
+        NativeTensorKind::Mask => NativeTensorRole::Mask,
+        NativeTensorKind::Conditioning => NativeTensorRole::Conditioning,
+        NativeTensorKind::Latent => NativeTensorRole::Latent,
+    }
 }
 
 fn native_tensor_handle_type(
@@ -2014,29 +1838,12 @@ fn publish_image(
     kind: NativeTensorKind,
     tensor: ImageTensor,
 ) -> Result<NativeValue, NodeFailure> {
-    let metadata = prepare_image_metadata(kind, &tensor).map_err(runtime_failure)?;
-    let resident_bytes = tensor
-        .tensor()
-        .contiguous_bytes()
-        .map_err(tensor_failure)?
-        .len();
+    let payload = NativeTensorPayload::from_image(native_tensor_role(kind), tensor)
+        .map_err(|error| invalid_diffusion_input(&error.to_string()))?;
     let handle = context
         .handle_store()
         .publish(
-            native_tensor_handle_type(kind).map_err(runtime_failure)?,
-            Arc::new(
-                native_stored_tensor_object(
-                    &metadata,
-                    resident_bytes,
-                    StoredNativeTensor::Image {
-                        metadata: metadata.clone(),
-                        tensor: Arc::new(tensor),
-                    },
-                )
-                .map_err(runtime_failure)?,
-            ),
-            Some(metadata.content_digest().to_owned()),
-            resident_bytes,
+            NativeStoredPayload::Tensor(Arc::new(payload)),
             &context.cancellation,
         )
         .map_err(|error| runtime_failure(error.into()))?;
@@ -2072,69 +1879,24 @@ fn resolve_image(
 ) -> Result<Arc<ImageTensor>, NodeFailure> {
     let handle = required_opaque_handle(inputs, name)?;
     let expected_type = native_tensor_handle_type(expected_kind).map_err(runtime_failure)?;
-    let projected = context
+    let stored = context
         .handle_store()
         .resolve(handle, &expected_type, &context.cancellation)
-        .map_err(|error| runtime_failure(error.into()))?
-        .downcast::<NativeStoredTensorObject>()
-        .map_err(|_| invalid_diffusion_input("native image handle stored the wrong object type"))?;
-    if projected.digest() != handle.digest_sha256().unwrap_or_default() {
-        return Err(invalid_diffusion_input(
-            "native image handle projection digest changed",
-        ));
-    }
-    let stored = projected
-        .payload()
-        .clone()
-        .downcast::<StoredNativeTensor>()
-        .map_err(|_| invalid_diffusion_input("native image handle payload type is invalid"))?;
-    let StoredNativeTensor::Image { metadata, tensor } = stored.as_ref() else {
+        .map_err(|error| runtime_failure(error.into()))?;
+    let NativeStoredPayload::Tensor(payload) = stored.as_ref() else {
         return Err(invalid_diffusion_input(
             "native image handle stored a raw tensor object",
         ));
     };
-    metadata.validate(expected_kind).map_err(runtime_failure)?;
-    if !matches!(
-        expected_kind,
-        NativeTensorKind::Image | NativeTensorKind::Mask
-    ) {
+    if payload.role() != native_tensor_role(expected_kind) {
         return Err(runtime_failure(NativeImageRuntimeError::Handle(
             "image tensor handle kind or schema is invalid".to_owned(),
         )));
     }
-    if tensor.tensor().descriptor() != metadata.descriptor() {
-        return Err(runtime_failure(NativeImageRuntimeError::Handle(
-            "handle descriptor does not match worker storage".to_owned(),
-        )));
-    }
-    let bytes = tensor.tensor().contiguous_bytes().map_err(tensor_failure)?;
-    if native_tensor_digest(expected_kind, tensor.tensor().descriptor(), &bytes)
-        .map_err(runtime_failure)?
-        != metadata.content_digest()
-    {
-        return Err(runtime_failure(NativeImageRuntimeError::Handle(
-            "image tensor content identity changed".to_owned(),
-        )));
-    }
-    Ok(tensor.clone())
-}
-
-fn prepare_tensor_metadata(
-    kind: NativeTensorKind,
-    tensor: &Tensor,
-) -> Result<NativeTensorHandle, NativeImageRuntimeError> {
-    if !matches!(
-        kind,
-        NativeTensorKind::Conditioning | NativeTensorKind::Latent
-    ) {
-        return Err(NativeImageRuntimeError::Handle(
-            "raw tensor handles require conditioning or latent kind".to_owned(),
-        ));
-    }
-    let descriptor = tensor.descriptor().clone();
-    let bytes = tensor.contiguous_bytes()?;
-    let content_digest = native_tensor_digest(kind, &descriptor, &bytes)?;
-    NativeTensorHandle::new(kind, content_digest, descriptor)
+    let image = payload.image().ok_or_else(|| {
+        invalid_diffusion_input("native image handle stored a non-image tensor payload")
+    })?;
+    Ok(Arc::new(image.clone()))
 }
 
 fn publish_tensor(
@@ -2142,29 +1904,56 @@ fn publish_tensor(
     kind: NativeTensorKind,
     tensor: Tensor,
 ) -> Result<NativeValue, NodeFailure> {
-    let metadata = prepare_tensor_metadata(kind, &tensor).map_err(runtime_failure)?;
-    let resident_bytes = tensor.contiguous_bytes().map_err(tensor_failure)?.len();
+    let payload = NativeTensorPayload::from_tensor(native_tensor_role(kind), tensor)
+        .map_err(|error| invalid_diffusion_input(&error.to_string()))?;
     let handle = context
         .handle_store()
         .publish(
-            native_tensor_handle_type(kind).map_err(runtime_failure)?,
-            Arc::new(
-                native_stored_tensor_object(
-                    &metadata,
-                    resident_bytes,
-                    StoredNativeTensor::Tensor {
-                        metadata: metadata.clone(),
-                        tensor,
-                    },
-                )
-                .map_err(runtime_failure)?,
-            ),
-            Some(metadata.content_digest().to_owned()),
-            resident_bytes,
+            NativeStoredPayload::Tensor(Arc::new(payload)),
             &context.cancellation,
         )
         .map_err(|error| runtime_failure(error.into()))?;
     Ok(NativeValue::Handle { value: handle })
+}
+
+fn publish_conditioning(
+    context: &NodeContext,
+    conditioning: ConditioningSet,
+) -> Result<NativeValue, NodeFailure> {
+    conditioning
+        .validate()
+        .map_err(|error| invalid_diffusion_input(&error.to_string()))?;
+    let handle = context
+        .handle_store()
+        .publish(
+            NativeStoredPayload::Conditioning(Arc::new(conditioning)),
+            &context.cancellation,
+        )
+        .map_err(|error| runtime_failure(error.into()))?;
+    Ok(NativeValue::Handle { value: handle })
+}
+
+fn resolve_conditioning(
+    context: &NodeContext,
+    inputs: &BTreeMap<String, NativeValue>,
+    name: &str,
+) -> Result<Arc<ConditioningSet>, NodeFailure> {
+    let handle = required_opaque_handle(inputs, name)?;
+    let expected_type = NativeHandleType::new(NativeHandleKind::Conditioning, "CONDITIONING")
+        .map_err(|error| invalid_diffusion_input(&error.to_string()))?;
+    let stored = context
+        .handle_store()
+        .resolve(handle, &expected_type, &context.cancellation)
+        .map_err(|error| runtime_failure(error.into()))?;
+    let NativeStoredPayload::Conditioning(payload) = stored.as_ref() else {
+        return Err(invalid_diffusion_input(
+            "native CONDITIONING handle stored a non-conditioning payload",
+        ));
+    };
+    payload
+        .validate()
+        .map_err(|error| invalid_diffusion_input(&error.to_string()))?;
+    Ok(payload.clone())
 }
 
 fn resolve_tensor(
@@ -2175,72 +1964,21 @@ fn resolve_tensor(
 ) -> Result<Tensor, NodeFailure> {
     let handle = required_opaque_handle(inputs, name)?;
     let expected_type = native_tensor_handle_type(expected_kind).map_err(runtime_failure)?;
-    let projected = context
+    let stored = context
         .handle_store()
         .resolve(handle, &expected_type, &context.cancellation)
-        .map_err(|error| runtime_failure(error.into()))?
-        .downcast::<NativeStoredTensorObject>()
-        .map_err(|_| {
-            invalid_diffusion_input("native tensor handle stored the wrong object type")
-        })?;
-    if projected.digest() != handle.digest_sha256().unwrap_or_default() {
-        return Err(invalid_diffusion_input(
-            "native tensor handle projection digest changed",
-        ));
-    }
-    let stored = projected
-        .payload()
-        .clone()
-        .downcast::<StoredNativeTensor>()
-        .map_err(|_| invalid_diffusion_input("native tensor handle payload type is invalid"))?;
-    let StoredNativeTensor::Tensor { metadata, tensor } = stored.as_ref() else {
+        .map_err(|error| runtime_failure(error.into()))?;
+    let NativeStoredPayload::Tensor(payload) = stored.as_ref() else {
         return Err(invalid_diffusion_input(
             "native tensor handle stored an image object",
         ));
     };
-    metadata.validate(expected_kind).map_err(runtime_failure)?;
-    if !matches!(
-        expected_kind,
-        NativeTensorKind::Conditioning | NativeTensorKind::Latent
-    ) {
+    if payload.role() != native_tensor_role(expected_kind) || payload.image().is_some() {
         return Err(runtime_failure(NativeImageRuntimeError::Handle(
             "raw tensor handle kind or schema is invalid".to_owned(),
         )));
     }
-    if tensor.descriptor() != metadata.descriptor() {
-        return Err(runtime_failure(NativeImageRuntimeError::Handle(
-            "raw tensor descriptor changed".to_owned(),
-        )));
-    }
-    let bytes = tensor.contiguous_bytes().map_err(tensor_failure)?;
-    if native_tensor_digest(expected_kind, tensor.descriptor(), &bytes).map_err(runtime_failure)?
-        != metadata.content_digest()
-    {
-        return Err(runtime_failure(NativeImageRuntimeError::Handle(
-            "raw tensor content identity changed".to_owned(),
-        )));
-    }
-    Ok(tensor.clone())
-}
-
-fn native_tensor_digest(
-    kind: NativeTensorKind,
-    descriptor: &TensorDescriptor,
-    bytes: &[u8],
-) -> Result<String, NativeImageRuntimeError> {
-    let mut hasher = Sha256::new();
-    hasher.update([match kind {
-        NativeTensorKind::Image => 1,
-        NativeTensorKind::Mask => 2,
-        NativeTensorKind::Conditioning => 3,
-        NativeTensorKind::Latent => 4,
-    }]);
-    hasher.update(
-        serde_json::to_vec(descriptor)
-            .map_err(|error| NativeImageRuntimeError::Encoding(error.to_string()))?,
-    );
-    hasher.update(bytes);
-    Ok(format!("{:x}", hasher.finalize()))
+    Ok(payload.tensor().clone())
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -2251,148 +1989,10 @@ enum NativeDiffusionRole {
     Vae,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(try_from = "NativeDiffusionHandleWire")]
-struct NativeDiffusionHandle {
-    schema_version: u16,
-    role: NativeDiffusionRole,
-    fixture_id: String,
-    model_digest: String,
-    tokenizer_digest: String,
-    clip_execution_digest: String,
-    vae_identity_digest: String,
-    vae_execution_digest: String,
-    conditioning_execution_digest: String,
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct NativeDiffusionHandleWire {
-    schema_version: u16,
-    role: NativeDiffusionRole,
-    fixture_id: String,
-    model_digest: String,
-    tokenizer_digest: String,
-    clip_execution_digest: String,
-    vae_identity_digest: String,
-    vae_execution_digest: String,
-    conditioning_execution_digest: String,
-}
-
-impl TryFrom<NativeDiffusionHandleWire> for NativeDiffusionHandle {
-    type Error = NativeImageRuntimeError;
-
-    fn try_from(value: NativeDiffusionHandleWire) -> Result<Self, Self::Error> {
-        Self::checked(
-            value.schema_version,
-            value.role,
-            value.fixture_id,
-            value.model_digest,
-            value.tokenizer_digest,
-            value.clip_execution_digest,
-            value.vae_identity_digest,
-            value.vae_execution_digest,
-            value.conditioning_execution_digest,
-        )
-    }
-}
-
-impl NativeDiffusionHandle {
-    #[allow(clippy::too_many_arguments)]
-    fn checked(
-        schema_version: u16,
-        role: NativeDiffusionRole,
-        fixture_id: impl Into<String>,
-        model_digest: impl Into<String>,
-        tokenizer_digest: impl Into<String>,
-        clip_execution_digest: impl Into<String>,
-        vae_identity_digest: impl Into<String>,
-        vae_execution_digest: impl Into<String>,
-        conditioning_execution_digest: impl Into<String>,
-    ) -> Result<Self, NativeImageRuntimeError> {
-        let handle = Self {
-            schema_version,
-            role,
-            fixture_id: fixture_id.into(),
-            model_digest: model_digest.into(),
-            tokenizer_digest: tokenizer_digest.into(),
-            clip_execution_digest: clip_execution_digest.into(),
-            vae_identity_digest: vae_identity_digest.into(),
-            vae_execution_digest: vae_execution_digest.into(),
-            conditioning_execution_digest: conditioning_execution_digest.into(),
-        };
-        if handle.schema_version != NATIVE_DIFFUSION_HANDLE_SCHEMA_VERSION
-            || handle.fixture_id.is_empty()
-            || [
-                handle.model_digest.as_str(),
-                handle.tokenizer_digest.as_str(),
-                handle.clip_execution_digest.as_str(),
-                handle.vae_identity_digest.as_str(),
-                handle.vae_execution_digest.as_str(),
-                handle.conditioning_execution_digest.as_str(),
-            ]
-            .into_iter()
-            .any(|digest| {
-                digest.len() != 64
-                    || !digest
-                        .bytes()
-                        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-            })
-        {
-            return Err(NativeImageRuntimeError::Handle(
-                "native diffusion handle schema or identity digest is invalid".to_owned(),
-            ));
-        }
-        Ok(handle)
-    }
-
-    fn from_bundle(
-        bundle: &NativeDiffusionBundle,
-        role: NativeDiffusionRole,
-    ) -> Result<Self, NativeImageRuntimeError> {
-        let identities = bundle.cache_identities();
-        Self::checked(
-            NATIVE_DIFFUSION_HANDLE_SCHEMA_VERSION,
-            role,
-            bundle.fixture_id.clone(),
-            identities.model_digest(),
-            identities.tokenizer_digest(),
-            identities.clip().execution(),
-            identities.vae().identity(),
-            identities.vae().execution(),
-            identities.conditioning().execution(),
-        )
-    }
-
-    fn require_exact_match(&self, expected: &Self) -> Result<(), NativeImageRuntimeError> {
-        if self == expected {
-            Ok(())
-        } else {
-            Err(NativeImageRuntimeError::Handle(
-                "native diffusion handle does not belong to the loaded model".to_owned(),
-            ))
-        }
-    }
-}
-
 struct NativeDiffusionState {
     provider: Arc<dyn NativeDiffusionProvider>,
     backend: Arc<CpuBackend>,
-    loaded: Mutex<Option<Arc<NativeDiffusionBundle>>>,
-}
-
-#[derive(Clone)]
-struct StoredNativeDiffusion {
-    metadata: NativeDiffusionHandle,
-    bundle: Arc<NativeDiffusionBundle>,
-}
-
-fn native_diffusion_model_format(role: NativeDiffusionRole) -> &'static str {
-    match role {
-        NativeDiffusionRole::Model => "sim-native-diffusion-model-v1",
-        NativeDiffusionRole::Clip => "sim-native-diffusion-clip-v1",
-        NativeDiffusionRole::Vae => "sim-native-diffusion-vae-v1",
-    }
+    admitted_identities: CanonicalNativeDiffusionCacheIdentities,
 }
 
 fn native_diffusion_handle_type(
@@ -2406,35 +2006,71 @@ fn native_diffusion_handle_type(
     Ok(NativeHandleType::new(kind, type_id)?)
 }
 
+fn portable_diffusion_payload(
+    bundle: &NativeDiffusionBundle,
+    role: NativeDiffusionRole,
+) -> Result<NativeDiffusionPayload, NativeImageRuntimeError> {
+    let payload = match role {
+        NativeDiffusionRole::Model => {
+            let model = Arc::new(
+                NativeModelPayload::sd15_model(bundle.model.clone())
+                    .map_err(|error| NativeImageRuntimeError::Handle(error.to_string()))?,
+            );
+            let control = bundle
+                .conditioning
+                .control
+                .as_ref()
+                .map(|control| {
+                    if control.vae_execution_digest.is_some() {
+                        PortableControlExecution::checked_with_vae(
+                            control.chain.clone(),
+                            control.executor.clone(),
+                            bundle.vae.clone(),
+                        )
+                    } else {
+                        PortableControlExecution::checked(
+                            control.chain.clone(),
+                            control.executor.clone(),
+                        )
+                    }
+                })
+                .transpose()
+                .map_err(|error| NativeImageRuntimeError::Handle(error.to_string()))?;
+            let conditioning = Arc::new(
+                PortableConditioningPayload::checked_sd15(
+                    bundle.model_digest(),
+                    bundle.model.as_ref(),
+                    bundle.conditioning.patch_graph.clone(),
+                    control,
+                )
+                .map_err(|error| NativeImageRuntimeError::Handle(error.to_string()))?,
+            );
+            NativeDiffusionPayload::model(model, conditioning)
+        }
+        NativeDiffusionRole::Clip => NativeDiffusionPayload::clip(Arc::new(
+            NativeModelPayload::sd1_clip(bundle.tokenizer.clone(), bundle.clip.clone())
+                .map_err(|error| NativeImageRuntimeError::Handle(error.to_string()))?,
+        )),
+        NativeDiffusionRole::Vae => NativeDiffusionPayload::vae(Arc::new(
+            NativeModelPayload::native_vae(bundle.vae.clone())
+                .map_err(|error| NativeImageRuntimeError::Handle(error.to_string()))?,
+        )),
+    };
+    payload.map_err(|error| NativeImageRuntimeError::Handle(error.to_string()))
+}
+
 fn publish_diffusion_bundle(
-    state: &NativeDiffusionState,
+    bundle: &NativeDiffusionBundle,
     context: &NodeContext,
-    tensor_context: &ExecutionContext<'_>,
     role: NativeDiffusionRole,
 ) -> Result<NativeValue, NodeFailure> {
-    let bundle = state.bundle(tensor_context).map_err(runtime_failure)?;
-    let metadata = NativeDiffusionHandle::from_bundle(&bundle, role).map_err(runtime_failure)?;
-    let encoded_metadata = serde_json::to_vec(&metadata).map_err(encoding_failure)?;
-    let digest = format!("{:x}", Sha256::digest(&encoded_metadata));
-    let resident_bytes = encoded_metadata
-        .len()
-        .checked_add(std::mem::size_of_val(bundle.as_ref()))
-        .ok_or_else(|| invalid_diffusion_input("native diffusion resident size overflowed"))?;
+    let payload = portable_diffusion_payload(bundle, role).map_err(runtime_failure)?;
+    let payload = NativeStoredModelPayload::native_diffusion(Arc::new(payload))
+        .map_err(|error| invalid_diffusion_input(&error.to_string()))?;
     let handle = context
         .handle_store()
         .publish(
-            native_diffusion_handle_type(role).map_err(runtime_failure)?,
-            Arc::new(
-                NativeStoredModelObject::new(
-                    metadata.fixture_id.clone(),
-                    native_diffusion_model_format(role),
-                    digest.clone(),
-                    Arc::new(StoredNativeDiffusion { metadata, bundle }),
-                )
-                .map_err(|error| runtime_failure(error.into()))?,
-            ),
-            Some(digest),
-            resident_bytes,
+            NativeStoredPayload::Model(Arc::new(payload)),
             &context.cancellation,
         )
         .map_err(|error| runtime_failure(error.into()))?;
@@ -2442,61 +2078,88 @@ fn publish_diffusion_bundle(
 }
 
 fn resolve_diffusion_bundle(
-    state: &NativeDiffusionState,
     context: &NodeContext,
     inputs: &BTreeMap<String, NativeValue>,
     name: &str,
     role: NativeDiffusionRole,
-    tensor_context: &ExecutionContext<'_>,
-) -> Result<Arc<NativeDiffusionBundle>, NodeFailure> {
+) -> Result<Arc<NativeDiffusionPayload>, NodeFailure> {
     let handle = required_opaque_handle(inputs, name)?;
     let expected_type = native_diffusion_handle_type(role).map_err(runtime_failure)?;
-    let projected = context
+    let stored = context
         .handle_store()
         .resolve(handle, &expected_type, &context.cancellation)
-        .map_err(|error| runtime_failure(error.into()))?
-        .downcast::<NativeStoredModelObject>()
-        .map_err(|_| {
-            invalid_diffusion_input("native diffusion handle stored the wrong object type")
-        })?;
-    if projected.digest() != handle.digest_sha256().unwrap_or_default() {
+        .map_err(|error| runtime_failure(error.into()))?;
+    let NativeStoredPayload::Model(payload) = stored.as_ref() else {
         return Err(invalid_diffusion_input(
-            "native diffusion handle projection digest changed",
+            "native diffusion handle stored the wrong object type",
+        ));
+    };
+    let payload = payload.diffusion();
+    if payload.role().source_type_id() != expected_type.type_id {
+        return Err(invalid_diffusion_input(
+            "native diffusion handle stored the wrong resource role",
         ));
     }
-    let stored = projected
-        .payload()
-        .clone()
-        .downcast::<StoredNativeDiffusion>()
-        .map_err(|_| invalid_diffusion_input("native diffusion handle payload type is invalid"))?;
-    let expected = state.bundle(tensor_context).map_err(runtime_failure)?;
-    let expected_metadata =
-        NativeDiffusionHandle::from_bundle(&expected, role).map_err(runtime_failure)?;
-    stored
-        .metadata
-        .require_exact_match(&expected_metadata)
-        .map_err(runtime_failure)?;
-    Ok(stored.bundle.clone())
+    payload
+        .validate()
+        .map_err(|error| invalid_diffusion_input(&error.to_string()))?;
+    Ok(payload.clone())
 }
 
 impl NativeDiffusionState {
+    fn checked(
+        provider: Arc<dyn NativeDiffusionProvider>,
+        backend: Arc<CpuBackend>,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, NativeImageRuntimeError> {
+        let admitted_identities = provider.cache_identities(cancellation)?;
+        Ok(Self {
+            provider,
+            backend,
+            admitted_identities,
+        })
+    }
+
+    fn validate_current_provider_identity(
+        &self,
+        current: &CanonicalNativeDiffusionCacheIdentities,
+    ) -> Result<(), NativeImageRuntimeError> {
+        if current.model_digest() != self.admitted_identities.model_digest()
+            || current.tokenizer_digest() != self.admitted_identities.tokenizer_digest()
+            || current.clip() != self.admitted_identities.clip()
+            || current.vae() != self.admitted_identities.vae()
+        {
+            return Err(NativeImageRuntimeError::Registry(
+                "native diffusion provider cache identity does not match its admitted identity"
+                    .to_owned(),
+            ));
+        }
+        current
+            .conditioning()
+            .require_exact_match(self.admitted_identities.conditioning())
+            .map_err(|_| {
+                NativeImageRuntimeError::Registry(
+                    "native diffusion provider conditioning identity does not match its loaded bundle"
+                        .to_owned(),
+                )
+            })
+    }
+
     fn validate_provider_bundle(
         &self,
         bundle: &NativeDiffusionBundle,
-        cancellation: &CancellationToken,
     ) -> Result<(), NativeImageRuntimeError> {
-        let provider_identity = self.provider.cache_identities(cancellation)?;
-        if provider_identity.model_digest() != bundle.model_digest()
-            || provider_identity.tokenizer_digest() != bundle.tokenizer_digest()
-            || provider_identity.clip() != bundle.clip_cache_identities()
-            || provider_identity.vae() != bundle.vae_cache_identities()
+        if self.admitted_identities.model_digest() != bundle.model_digest()
+            || self.admitted_identities.tokenizer_digest() != bundle.tokenizer_digest()
+            || self.admitted_identities.clip() != bundle.clip_cache_identities()
+            || self.admitted_identities.vae() != bundle.vae_cache_identities()
         {
             return Err(NativeImageRuntimeError::Registry(
                 "native diffusion provider cache identity does not match its loaded bundle"
                     .to_owned(),
             ));
         }
-        provider_identity
+        self.admitted_identities
             .conditioning()
             .require_exact_match(bundle.conditioning_cache_identities())
             .map_err(|_| {
@@ -2508,24 +2171,16 @@ impl NativeDiffusionState {
         Ok(())
     }
 
-    fn bundle(
+    fn load_bundle(
         &self,
         context: &ExecutionContext<'_>,
     ) -> Result<Arc<NativeDiffusionBundle>, NativeImageRuntimeError> {
-        if let Some(bundle) = self.loaded.lock().clone() {
-            context.check()?;
-            self.validate_provider_bundle(&bundle, context.cancellation)?;
-            return Ok(bundle);
-        }
+        let current = self.provider.cache_identities(context.cancellation)?;
+        self.validate_current_provider_identity(&current)?;
         let bundle = Arc::new(self.provider.load(self.backend.clone(), context)?);
         context.check()?;
-        self.validate_provider_bundle(&bundle, context.cancellation)?;
-        let mut loaded = self.loaded.lock();
-        let selected = loaded.get_or_insert_with(|| bundle.clone()).clone();
-        drop(loaded);
-        context.check()?;
-        self.validate_provider_bundle(&selected, context.cancellation)?;
-        Ok(selected)
+        self.validate_provider_bundle(&bundle)?;
+        Ok(bundle)
     }
 }
 
@@ -2570,24 +2225,13 @@ impl NativeNode for CheckpointLoaderNode {
                 ));
             }
             let tensor_context = native_image_tensor_context(&self.state.backend, &context);
-            let model = publish_diffusion_bundle(
-                &self.state,
-                &context,
-                &tensor_context,
-                NativeDiffusionRole::Model,
-            )?;
-            let clip = publish_diffusion_bundle(
-                &self.state,
-                &context,
-                &tensor_context,
-                NativeDiffusionRole::Clip,
-            )?;
-            let vae = publish_diffusion_bundle(
-                &self.state,
-                &context,
-                &tensor_context,
-                NativeDiffusionRole::Vae,
-            )?;
+            let bundle = self
+                .state
+                .load_bundle(&tensor_context)
+                .map_err(runtime_failure)?;
+            let model = publish_diffusion_bundle(&bundle, &context, NativeDiffusionRole::Model)?;
+            let clip = publish_diffusion_bundle(&bundle, &context, NativeDiffusionRole::Clip)?;
+            let vae = publish_diffusion_bundle(&bundle, &context, NativeDiffusionRole::Vae)?;
             Ok(NodeOutcome::Values {
                 outputs: vec![model, clip, vae],
                 ui: Some(json!({"checkpoint": "model.safetensors", "family": "COMFY-MODEL-0117"})),
@@ -2633,19 +2277,51 @@ impl NativeNode for ClipTextEncodeNode {
     ) -> BoxFuture<'a, Result<NodeOutcome, NodeFailure>> {
         Box::pin(async move {
             let tensor_context = native_image_tensor_context(&self.state.backend, &context);
-            let bundle = resolve_diffusion_bundle(
-                &self.state,
-                &context,
-                &inputs,
-                "clip",
-                NativeDiffusionRole::Clip,
-                &tensor_context,
-            )?;
+            let payload =
+                resolve_diffusion_bundle(&context, &inputs, "clip", NativeDiffusionRole::Clip)?;
             let text = required_string(&inputs, "text")?;
-            let (tokens, conditioning) = bundle
-                .encode_text(text, &tensor_context)
-                .map_err(runtime_failure)?;
-            let output = publish_tensor(&context, NativeTensorKind::Conditioning, conditioning)?;
+            let (tokenizer, clip) = payload.model_payload().clip().ok_or_else(|| {
+                invalid_diffusion_input("native CLIP handle has no canonical CLIP resource")
+            })?;
+            let prompts =
+                vec![vec![WeightedText::checked(text, 1.0).map_err(|error| {
+                    runtime_failure(map_clip_runtime_error(error))
+                })?]];
+            let batch = tokenizer
+                .tokenize_batch(&prompts, tensor_context.cancellation)
+                .map_err(|error| runtime_failure(map_clip_runtime_error(error)))?;
+            let tokens = batch
+                .rows()
+                .first()
+                .ok_or_else(|| {
+                    invalid_diffusion_input("canonical SD1 tokenizer returned no prompt row")
+                })?
+                .sd1_token_ids()
+                .map_err(|error| runtime_failure(map_clip_runtime_error(error)))?;
+            let conditioning = clip
+                .execute(&batch, &tensor_context)
+                .map_err(|error| runtime_failure(map_clip_runtime_error(error)))?
+                .conditioning()
+                .clone();
+            let identity = ConditioningIdentity::new(
+                "sd15-clip-text",
+                sd15_model_family_identity()
+                    .map_err(|error| invalid_diffusion_input(&error.to_string()))?,
+                sd15_latent_format_identity()
+                    .map_err(|error| invalid_diffusion_input(&error.to_string()))?,
+            )
+            .map_err(|error| invalid_diffusion_input(&error.to_string()))?;
+            let entry = ConditioningEntry::checked(
+                "cross-attention",
+                ConditioningValue::cross_attention(conditioning)
+                    .map_err(|error| invalid_diffusion_input(&error.to_string()))?,
+                ConditioningEntryOptions::default(),
+            )
+            .map_err(|error| invalid_diffusion_input(&error.to_string()))?;
+            let conditioning =
+                ConditioningSet::checked(identity, vec![entry], tensor_context.cancellation)
+                    .map_err(|error| invalid_diffusion_input(&error.to_string()))?;
+            let output = publish_conditioning(&context, conditioning)?;
             let ui = json!({"tokens": tokens.to_vec()});
             tensor_context.check().map_err(tensor_failure)?;
             Ok(NodeOutcome::Values {
@@ -2736,14 +2412,14 @@ impl NativeNode for KSamplerNode {
     ) -> BoxFuture<'a, Result<NodeOutcome, NodeFailure>> {
         Box::pin(async move {
             let tensor_context = native_image_tensor_context(&self.state.backend, &context);
-            let bundle = resolve_diffusion_bundle(
-                &self.state,
-                &context,
-                &inputs,
-                "model",
-                NativeDiffusionRole::Model,
-                &tensor_context,
-            )?;
+            let payload =
+                resolve_diffusion_bundle(&context, &inputs, "model", NativeDiffusionRole::Model)?;
+            let (model_payload, conditioning) = payload.model_resources().ok_or_else(|| {
+                invalid_diffusion_input("native MODEL handle has no canonical model resources")
+            })?;
+            let model = model_payload.model().ok_or_else(|| {
+                invalid_diffusion_input("native MODEL handle has no canonical SD15 model")
+            })?;
             let steps = u32::try_from(required_u64(&inputs, "steps")?)
                 .map_err(|_| invalid_diffusion_input("steps exceed u32"))?;
             let seed = required_u64(&inputs, "seed")?;
@@ -2756,18 +2432,8 @@ impl NativeNode for KSamplerNode {
                 required_f32(&inputs, "denoise")?,
             )
             .map_err(native_diffusion_sampler_failure)?;
-            let positive = resolve_tensor(
-                &context,
-                &inputs,
-                "positive",
-                NativeTensorKind::Conditioning,
-            )?;
-            let negative = resolve_tensor(
-                &context,
-                &inputs,
-                "negative",
-                NativeTensorKind::Conditioning,
-            )?;
+            let positive = resolve_conditioning(&context, &inputs, "positive")?;
+            let negative = resolve_conditioning(&context, &inputs, "negative")?;
             let latent =
                 resolve_tensor(&context, &inputs, "latent_image", NativeTensorKind::Latent)?;
             let stream = NoiseRequest::native_diffusion(
@@ -2803,13 +2469,11 @@ impl NativeNode for KSamplerNode {
                 &tensor_context,
             )
             .map_err(native_diffusion_sampler_failure)?;
-            let mut guidance = Sd15GuidanceAdapter::checked_prebound(
-                &bundle.model,
-                &bundle.vae,
-                &bundle.conditioning,
+            let mut guidance = Sd15GuidanceAdapter::checked_prebound_conditioning_sets(
+                model,
+                conditioning,
                 &positive,
                 &negative,
-                &tensor_context,
             )
             .map_err(runtime_diffusion_failure)?;
             let mut typed_denoiser_failure = None;
@@ -2945,17 +2609,13 @@ impl NativeNode for VaeDecodeNode {
     ) -> BoxFuture<'a, Result<NodeOutcome, NodeFailure>> {
         Box::pin(async move {
             let tensor_context = native_image_tensor_context(&self.state.backend, &context);
-            let bundle = resolve_diffusion_bundle(
-                &self.state,
-                &context,
-                &inputs,
-                "vae",
-                NativeDiffusionRole::Vae,
-                &tensor_context,
-            )?;
+            let payload =
+                resolve_diffusion_bundle(&context, &inputs, "vae", NativeDiffusionRole::Vae)?;
+            let vae = payload.model_payload().vae().ok_or_else(|| {
+                invalid_diffusion_input("native VAE handle has no canonical VAE resource")
+            })?;
             let latent = resolve_tensor(&context, &inputs, "samples", NativeTensorKind::Latent)?;
-            let decoded = bundle
-                .vae
+            let decoded = vae
                 .decode(self.state.backend.as_ref(), &latent, &tensor_context)
                 .map_err(vae_failure)?;
             if decoded.descriptor().shape() != [1, 3, 32, 32] {
@@ -5803,15 +5463,18 @@ mod tests {
     -> Result<(), Box<dyn std::error::Error>> {
         let (backend, workspace_authority) = CpuWorkspaceAuthority::create_backend(1 << 20)?;
         let cache_identity_calls = Arc::new(AtomicUsize::new(0));
-        let node = KSamplerNode {
-            state: Arc::new(NativeDiffusionState {
-                provider: Arc::new(WorkspaceProbeDiffusionProvider {
-                    observed: Arc::new(AtomicBool::new(false)),
-                    cache_identity_calls: cache_identity_calls.clone(),
-                }),
-                backend: Arc::new(backend),
-                loaded: Mutex::new(None),
+        let cancellation = CancellationToken::default();
+        let state = NativeDiffusionState::checked(
+            Arc::new(WorkspaceProbeDiffusionProvider {
+                observed: Arc::new(AtomicBool::new(false)),
+                cache_identity_calls: cache_identity_calls.clone(),
             }),
+            Arc::new(backend),
+            &cancellation,
+        )?;
+        cache_identity_calls.store(0, Ordering::SeqCst);
+        let node = KSamplerNode {
+            state: Arc::new(state),
         };
         let inputs = BTreeMap::from([
             ("model".to_owned(), native(json!("model-digest-a"))),
@@ -5826,7 +5489,6 @@ mod tests {
             ("cfg".to_owned(), native(json!(7.0))),
             ("seed".to_owned(), native(json!(1))),
         ]);
-        let cancellation = CancellationToken::default();
         let attempt_id = AttemptId(Uuid::from_u128(0x5101));
         let handle_generation = crate::NativeHandleStoreGeneration::new()?;
         let scratch = workspace_authority.authorize_workspace(1 << 20)?;
@@ -6492,17 +6154,17 @@ mod tests {
         let cancellation = CancellationToken::default();
         let context = backend.execution_context(StreamId::DEFAULT, scratch.clone(), &cancellation);
         let observed = Arc::new(AtomicBool::new(false));
-        let state = NativeDiffusionState {
-            provider: Arc::new(WorkspaceProbeDiffusionProvider {
+        let state = NativeDiffusionState::checked(
+            Arc::new(WorkspaceProbeDiffusionProvider {
                 observed: observed.clone(),
                 cache_identity_calls: Arc::new(AtomicUsize::new(0)),
             }),
             backend,
-            loaded: Mutex::new(None),
-        };
+            &cancellation,
+        )?;
 
         assert!(matches!(
-            state.bundle(&context),
+            state.load_bundle(&context),
             Err(NativeImageRuntimeError::Execution(message))
                 if message == "workspace authority probe completed"
         ));
@@ -6786,56 +6448,6 @@ mod tests {
     }
 
     #[test]
-    fn native_diffusion_handles_deserialize_fail_closed_and_reject_stale_membership()
-    -> Result<(), Box<dyn std::error::Error>> {
-        let expected = NativeDiffusionHandle::checked(
-            NATIVE_DIFFUSION_HANDLE_SCHEMA_VERSION,
-            NativeDiffusionRole::Model,
-            "sd15-tiny-v1",
-            "0".repeat(64),
-            "1".repeat(64),
-            "2".repeat(64),
-            "3".repeat(64),
-            "4".repeat(64),
-            "5".repeat(64),
-        )?;
-        let value = serde_json::to_value(&expected)?;
-        assert_eq!(
-            serde_json::from_value::<NativeDiffusionHandle>(value.clone())?,
-            expected
-        );
-
-        let mut unknown = value.clone();
-        unknown
-            .as_object_mut()
-            .ok_or("native diffusion handle must serialize as an object")?
-            .insert("unexpected".to_owned(), json!(true));
-        assert!(serde_json::from_value::<NativeDiffusionHandle>(unknown).is_err());
-
-        let mut wrong_schema = value.clone();
-        wrong_schema["schema_version"] = json!(NATIVE_DIFFUSION_HANDLE_SCHEMA_VERSION + 1);
-        assert!(serde_json::from_value::<NativeDiffusionHandle>(wrong_schema).is_err());
-
-        let mut uppercase_digest = value.clone();
-        uppercase_digest["model_digest"] = json!("A".repeat(64));
-        assert!(serde_json::from_value::<NativeDiffusionHandle>(uppercase_digest).is_err());
-
-        let mut malformed_digest = value.clone();
-        malformed_digest["tokenizer_digest"] = json!("not-a-sha256");
-        assert!(serde_json::from_value::<NativeDiffusionHandle>(malformed_digest).is_err());
-
-        let mut stale_value = value;
-        stale_value["model_digest"] = json!("f".repeat(64));
-        let stale = serde_json::from_value::<NativeDiffusionHandle>(stale_value)?;
-        assert!(matches!(
-            stale.require_exact_match(&expected),
-            Err(NativeImageRuntimeError::Handle(message))
-                if message == "native diffusion handle does not belong to the loaded model"
-        ));
-        Ok(())
-    }
-
-    #[test]
     fn typed_tensor_handles_are_content_addressed_and_kind_checked()
     -> Result<(), Box<dyn std::error::Error>> {
         let cancellation = CancellationToken::default();
@@ -6846,68 +6458,56 @@ mod tests {
         let tensor =
             ImageTensor::from_f32(&cpu_backend, &tensor_context, 1, 1, 1, 3, &[0.0, 0.5, 1.0])?;
         let raw_tensor = tensor.tensor().clone();
-        let first = prepare_image_metadata(NativeTensorKind::Image, &tensor)?;
-        let second = prepare_image_metadata(NativeTensorKind::Image, &tensor)?;
-        assert_eq!(first, second);
-        first.validate(NativeTensorKind::Image)?;
-        assert!(first.validate(NativeTensorKind::Mask).is_err());
-        let mut forged_image_kind = serde_json::to_value(&first)?;
-        forged_image_kind["kind"] = json!("mask");
-        let forged_image_kind = serde_json::from_value::<NativeTensorHandle>(forged_image_kind)?;
-        forged_image_kind.validate(NativeTensorKind::Mask)?;
-        assert!(forged_image_kind.validate(NativeTensorKind::Image).is_err());
-        let raw_handle = prepare_tensor_metadata(NativeTensorKind::Conditioning, &raw_tensor)?;
-        raw_handle.validate(NativeTensorKind::Conditioning)?;
-        let mut forged_raw_kind = serde_json::to_value(&raw_handle)?;
-        forged_raw_kind["kind"] = json!("latent");
-        let forged_raw_kind = serde_json::from_value::<NativeTensorHandle>(forged_raw_kind)?;
-        forged_raw_kind.validate(NativeTensorKind::Latent)?;
+        let first = NativeTensorPayload::from_image(NativeTensorRole::Image, tensor.clone())?;
+        let second = NativeTensorPayload::from_image(NativeTensorRole::Image, tensor.clone())?;
+        assert_eq!(first.projection(), second.projection());
+        let mask_tensor = ImageTensor::from_f32(&cpu_backend, &tensor_context, 1, 1, 1, 1, &[0.5])?;
+        let mask = NativeTensorPayload::from_image(NativeTensorRole::Mask, mask_tensor)?;
+        assert_ne!(first.projection(), mask.projection());
         assert!(
-            forged_raw_kind
-                .validate(NativeTensorKind::Conditioning)
+            NativeTensorPayload::from_tensor(NativeTensorRole::Image, raw_tensor.clone()).is_err()
+        );
+        let conditioning_descriptor = TensorDescriptor::contiguous(
+            vec![1, 1, 3],
+            DType::F32,
+            DeviceId::CPU,
+            StreamId::DEFAULT,
+        )?;
+        let (conditioning_tensor, _) =
+            cpu_backend.upload_f32(conditioning_descriptor, &[0.0, 0.5, 1.0], &tensor_context)?;
+        let raw_payload =
+            NativeTensorPayload::from_tensor(NativeTensorRole::Conditioning, conditioning_tensor)?;
+        let latent_payload =
+            NativeTensorPayload::from_tensor(NativeTensorRole::Latent, raw_tensor)?;
+        assert_ne!(raw_payload.projection(), latent_payload.projection());
+        let mut invalid_raw_digest = serde_json::to_value(raw_payload.projection())?;
+        invalid_raw_digest["content_digest"] = json!("g".repeat(64));
+        assert!(
+            serde_json::from_value::<comfy_tensor::NativeTensorProjection>(invalid_raw_digest)
                 .is_err()
         );
-        let mut invalid_raw_digest = serde_json::to_value(&raw_handle)?;
-        invalid_raw_digest["content_digest"] = json!("g".repeat(64));
-        assert!(serde_json::from_value::<NativeTensorHandle>(invalid_raw_digest).is_err());
 
-        let non_hex_digest = NativeTensorHandle::new(
-            NativeTensorKind::Image,
-            "g".repeat(64),
-            first.descriptor().clone(),
-        );
-        assert!(matches!(
-            non_hex_digest,
-            Err(NativeImageRuntimeError::Handle(message))
-                if message == "schema, kind, or digest did not match the typed port"
-        ));
-
-        let mismatched = NativeTensorHandle::new(
-            first.kind(),
-            first.content_digest(),
-            TensorDescriptor::contiguous(
-                vec![1, 1, 1, 3],
-                first.descriptor().dtype(),
-                first.descriptor().device(),
-                comfy_tensor::StreamId::new(1),
-            )?,
-        )?;
-        assert_ne!(mismatched.descriptor(), first.descriptor());
-
-        let mut invalid_wire = serde_json::to_value(&first)?;
+        let mut invalid_wire = serde_json::to_value(first.projection())?;
         let strides = invalid_wire
             .pointer_mut("/descriptor/strides")
             .ok_or("native tensor handle descriptor strides are unavailable")?;
         *strides = json!([0, 0, 0, 0]);
-        assert!(serde_json::from_value::<NativeTensorHandle>(invalid_wire).is_err());
+        assert!(
+            serde_json::from_value::<comfy_tensor::NativeTensorProjection>(invalid_wire).is_err()
+        );
 
-        let mut invalid_schema = serde_json::to_value(&first)?;
-        invalid_schema["schema_version"] = json!(NATIVE_TENSOR_HANDLE_SCHEMA_VERSION + 1);
-        assert!(serde_json::from_value::<NativeTensorHandle>(invalid_schema).is_err());
+        let mut invalid_schema = serde_json::to_value(first.projection())?;
+        invalid_schema["schema_version"] =
+            json!(comfy_tensor::NATIVE_TENSOR_PROJECTION_SCHEMA_VERSION + 1);
+        assert!(
+            serde_json::from_value::<comfy_tensor::NativeTensorProjection>(invalid_schema).is_err()
+        );
 
-        let mut unknown_field = serde_json::to_value(&first)?;
+        let mut unknown_field = serde_json::to_value(first.projection())?;
         unknown_field["future"] = json!(true);
-        assert!(serde_json::from_value::<NativeTensorHandle>(unknown_field).is_err());
+        assert!(
+            serde_json::from_value::<comfy_tensor::NativeTensorProjection>(unknown_field).is_err()
+        );
         Ok(())
     }
 
@@ -6921,12 +6521,19 @@ mod tests {
             cpu_backend.execution_context(StreamId::DEFAULT, workspace, &cancellation);
         let image =
             ImageTensor::from_f32(&cpu_backend, &tensor_context, 1, 1, 1, 3, &[0.0, 0.5, 1.0])?;
-        let image_resident_bytes = image.tensor().contiguous_bytes()?.len();
-        let raw_tensor = image.tensor().clone();
-        let image_handle = prepare_image_metadata(NativeTensorKind::Image, &image)?;
-        let raw_handle = prepare_tensor_metadata(NativeTensorKind::Conditioning, &raw_tensor)?;
-        serde_json::to_value(&image_handle)?;
-        serde_json::to_value(&raw_handle)?;
+        let image_payload = NativeTensorPayload::from_image(NativeTensorRole::Image, image)?;
+        let conditioning_descriptor = TensorDescriptor::contiguous(
+            vec![1, 1, 3],
+            DType::F32,
+            DeviceId::CPU,
+            StreamId::DEFAULT,
+        )?;
+        let (conditioning_tensor, _) =
+            cpu_backend.upload_f32(conditioning_descriptor, &[0.0, 0.5, 1.0], &tensor_context)?;
+        let raw_payload =
+            NativeTensorPayload::from_tensor(NativeTensorRole::Conditioning, conditioning_tensor)?;
+        serde_json::to_value(image_payload.projection())?;
+        serde_json::to_value(raw_payload.projection())?;
 
         cancellation.cancel();
         assert!(tensor_context.check().is_err());
@@ -6935,17 +6542,7 @@ mod tests {
         let attempt_id = AttemptId(Uuid::from_u128(1));
         let store = generation.handle_store_for_attempt(attempt_id);
         let result = store.publish(
-            native_tensor_handle_type(NativeTensorKind::Image)?,
-            Arc::new(native_stored_tensor_object(
-                &image_handle,
-                image_resident_bytes,
-                StoredNativeTensor::Image {
-                    metadata: image_handle.clone(),
-                    tensor: Arc::new(image),
-                },
-            )?),
-            Some(image_handle.content_digest().to_owned()),
-            0,
+            NativeStoredPayload::Tensor(Arc::new(image_payload)),
             &cancellation,
         );
         assert!(matches!(result, Err(NativeHandleStoreError::Cancelled)));

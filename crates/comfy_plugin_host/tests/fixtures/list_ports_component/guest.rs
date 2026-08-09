@@ -196,7 +196,7 @@ fn manifest_ports() -> Vec<types::Port> {
         (
             types::ValueFamily::Artifact,
             "comfy:svg@1",
-            types::PortPresence::Required,
+            types::PortPresence::Optional,
             types::PortSerialization::ArtifactReference,
         ),
         (
@@ -206,11 +206,11 @@ fn manifest_ports() -> Vec<types::Port> {
             types::PortSerialization::Handle,
         ),
     ] {
-        let name = match family {
-            types::ValueFamily::Scalar => "scalar",
-            types::ValueFamily::Tensor => "tensor",
-            types::ValueFamily::Artifact => "artifact",
-            types::ValueFamily::Model => "model",
+        let (name, output_presence) = match family {
+            types::ValueFamily::Scalar => ("scalar", types::PortPresence::Required),
+            types::ValueFamily::Tensor => ("tensor", types::PortPresence::Required),
+            types::ValueFamily::Artifact => ("artifact", types::PortPresence::Optional),
+            types::ValueFamily::Model => ("model", types::PortPresence::Required),
         };
         ports.push(port(
             &format!("{name}-single-in"),
@@ -226,7 +226,7 @@ fn manifest_ports() -> Vec<types::Port> {
             types::PortDirection::Output,
             type_id,
             types::PortCardinality::Singular,
-            types::PortPresence::Required,
+            output_presence,
             false,
             serialization,
         ));

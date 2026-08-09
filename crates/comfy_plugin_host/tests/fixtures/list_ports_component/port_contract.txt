@@ -7,8 +7,8 @@ tensor-single-in|input|comfy:image@1|singular|required|visible|eager|handle|
 tensor-single-out|output|comfy:image@1|singular|required|visible|eager|handle|
 tensor-list-in|input|comfy:image@1|list|optional|visible|lazy|handle|
 tensor-list-out|output|comfy:image@1|list|optional|visible|eager|handle|
-artifact-single-in|input|comfy:svg@1|singular|required|visible|eager|artifact-reference|
-artifact-single-out|output|comfy:svg@1|singular|required|visible|eager|artifact-reference|
+artifact-single-in|input|comfy:svg@1|singular|optional|visible|eager|artifact-reference|
+artifact-single-out|output|comfy:svg@1|singular|optional|visible|eager|artifact-reference|
 artifact-list-in|input|comfy:svg@1|list|optional|visible|lazy|artifact-reference|
 artifact-list-out|output|comfy:svg@1|list|optional|visible|eager|artifact-reference|
 model-single-in|input|comfy:model@1|singular|required|hidden|eager|handle|

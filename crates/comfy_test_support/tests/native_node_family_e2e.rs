@@ -4,12 +4,15 @@ use comfy_runtime::{
     NativeHandleStoreGeneration, NativeHandleType, NativeImageWorkerEvent, NativeImageWorkerPlan,
     NativeInputDescriptor, NativeNodeDescriptor, NativeNodeFailure, NativeNodeFailureKind,
     NativeNodeOutcome, NativePortCardinality, NativePreparedEffectRequest, NativePrimitive,
-    NativePrimitiveType, NativeTypeUnion, NativeValue, NativeValueType, RuntimeSupervisor,
-    SupervisorPolicy, WorkerHealth, WorkerLaunchConfig, compile_generated_native_prompt,
-    generated_native_frontend_descriptors, generated_native_node_registry_projection,
-    graph_to_prompt, native_image_registry_projection,
+    NativePrimitiveType, NativeStoredPayload, NativeTypeUnion, NativeValue, NativeValueType,
+    RuntimeSupervisor, SupervisorPolicy, WorkerHealth, WorkerLaunchConfig,
+    compile_generated_native_prompt, generated_native_frontend_descriptors,
+    generated_native_node_registry_projection, graph_to_prompt, native_image_registry_projection,
 };
-use comfy_tensor::CancellationToken;
+use comfy_tensor::{
+    CancellationToken, CpuWorkspaceAuthority, ImageTensor, NativeTensorPayload, NativeTensorRole,
+    StreamId,
+};
 use comfy_types::{AttemptId, NodeId, ProfileId, PromptId, WorkerId, WorkerMessage};
 use serde_json::json;
 use std::{
@@ -180,13 +183,19 @@ fn portable_values_dynamic_ports_and_attempt_handles_fail_closed() -> Result<(),
     let first_generation = NativeHandleStoreGeneration::with_capacities(4, 1024)?;
     let attempt_id = AttemptId(Uuid::from_u128(0x3674));
     let first_store = first_generation.handle_store_for_attempt(attempt_id);
-    let handle = first_store.publish(
-        image_type.clone(),
-        Arc::new(vec![1_u8, 2, 3]),
-        None,
-        3,
-        &CancellationToken::default(),
-    )?;
+    let (backend, workspace_authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+    let image_cancellation = CancellationToken::default();
+    let image_context = backend.execution_context(
+        StreamId::DEFAULT,
+        workspace_authority.authorize_workspace(1024 * 1024)?,
+        &image_cancellation,
+    );
+    let image = ImageTensor::from_f32(&backend, &image_context, 1, 1, 1, 3, &[0.25, 0.5, 0.75])?;
+    let payload = NativeStoredPayload::Tensor(Arc::new(NativeTensorPayload::from_image(
+        NativeTensorRole::Image,
+        image,
+    )?));
+    let handle = first_store.publish(payload.clone(), &CancellationToken::default())?;
     let handle_value = NativeValue::Handle {
         value: handle.clone(),
     };
@@ -206,7 +215,7 @@ fn portable_values_dynamic_ports_and_attempt_handles_fail_closed() -> Result<(),
     let cancellation = CancellationToken::default();
     cancellation.cancel();
     assert!(matches!(
-        first_store.publish(image_type, Arc::new(0_u8), None, 1, &cancellation),
+        first_store.publish(payload, &cancellation),
         Err(NativeHandleStoreError::Cancelled)
     ));
 

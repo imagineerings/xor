@@ -1,5 +1,6 @@
 use crate::{
-    ArtifactIndex, LoadedModel, ModelStore, ModelStoreError, NativeModule, NativeOpsError,
+    ArtifactIndex, LoadedModel, ModelStore, ModelStoreError, NativeModelResourceIdentity,
+    NativeModelResourceRole, NativeModule, NativeOpsError,
 };
 use comfy_tensor::{
     CancellationToken, CpuBackend, CpuWorkspaceVec, DType, DeviceId, ExecutionContext, Tensor,
@@ -14,12 +15,20 @@ use comfy_tensor::{
         ExternalTensorKernelPartOneError, NativeBilinearBoundary, checked_bilinear_weights,
     },
 };
-use std::collections::{BTreeMap, BTreeSet};
+use sha2::{Digest, Sha256};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    mem,
+};
 use thiserror::Error;
 
 pub const EFFICIENTNET_V2_S_OPERATION_ID: &str = "COMFY-TENSOR-OP-638DE6179D46";
 pub const RAFT_LARGE_OPERATION_ID: &str = "COMFY-TENSOR-OP-852D8E9DBC9C";
+pub const RAFT_LARGE_SOURCE_TYPE_ID: &str = "OPTICAL_FLOW";
+pub const RAFT_LARGE_RESOURCE_ROLE: &str = "optical_flow";
 const EFFICIENTNET_V2_S_FEATURE_MODULE: &str = "efficientnet_v2_s.features";
+const RAFT_LARGE_ARCHITECTURE_ID: &str = "torchvision.models.optical_flow.raft_large";
+const RAFT_LARGE_RESOURCE_FORMAT: &str = "sim-native-torchvision-raft-large-v1";
 
 #[derive(Clone, Debug, Error)]
 pub enum NativeVisionModelError {
@@ -61,6 +70,8 @@ pub enum NativeVisionModelError {
     Cancelled,
     #[error("native vision model shape arithmetic overflowed")]
     ShapeOverflow,
+    #[error("native RAFT-large semantic identity changed")]
+    SemanticIdentityChanged,
 }
 
 impl From<comfy_types::CancellationError> for NativeVisionModelError {
@@ -867,6 +878,193 @@ fn find_unique_feature_execution_module(
     }
 }
 
+struct RaftSemanticHasher(Sha256);
+
+impl RaftSemanticHasher {
+    fn new(domain: &[u8]) -> Result<Self, NativeVisionModelError> {
+        let mut hasher = Self(Sha256::new());
+        hasher.field(domain)?;
+        Ok(hasher)
+    }
+
+    fn field(&mut self, value: &[u8]) -> Result<(), NativeVisionModelError> {
+        let length =
+            u64::try_from(value.len()).map_err(|_| NativeVisionModelError::ShapeOverflow)?;
+        self.0.update(length.to_le_bytes());
+        self.0.update(value);
+        Ok(())
+    }
+
+    fn u64(&mut self, value: u64) {
+        self.0.update(value.to_le_bytes());
+    }
+
+    fn finish(self) -> String {
+        format!("{:x}", self.0.finalize())
+    }
+}
+
+fn raft_architecture_digest(
+    schema: &[NativeVisionStateSpec],
+) -> Result<String, NativeVisionModelError> {
+    let mut digest = RaftSemanticHasher::new(b"sim.comfy.model.raft-large-architecture.v1")?;
+    digest.field(RAFT_LARGE_ARCHITECTURE_ID.as_bytes())?;
+    digest.field(RAFT_LARGE_OPERATION_ID.as_bytes())?;
+    digest.field(RAFT_LARGE_SOURCE_TYPE_ID.as_bytes())?;
+    digest.field(RAFT_LARGE_RESOURCE_ROLE.as_bytes())?;
+    digest.u64(parameter_count(schema)?);
+    digest.u64(u64::try_from(schema.len()).map_err(|_| NativeVisionModelError::ShapeOverflow)?);
+    for spec in schema {
+        digest.field(spec.name.as_bytes())?;
+        digest.field(&[raft_dtype_tag(spec.dtype)])?;
+        digest.field(&[match spec.kind {
+            NativeVisionStateKind::Parameter => 1,
+            NativeVisionStateKind::Buffer => 2,
+        }])?;
+        digest.u64(
+            u64::try_from(spec.shape.len()).map_err(|_| NativeVisionModelError::ShapeOverflow)?,
+        );
+        for dimension in &spec.shape {
+            digest.u64(*dimension);
+        }
+    }
+    Ok(digest.finish())
+}
+
+fn raft_state_digest(
+    state: &BTreeMap<String, Tensor>,
+    cancellation: &CancellationToken,
+) -> Result<String, NativeVisionModelError> {
+    cancellation.check()?;
+    let mut digest = RaftSemanticHasher::new(b"sim.comfy.model.raft-large-state.v1")?;
+    digest.u64(u64::try_from(state.len()).map_err(|_| NativeVisionModelError::ShapeOverflow)?);
+    for (name, tensor) in state {
+        cancellation.check()?;
+        let descriptor = tensor.descriptor();
+        digest.field(name.as_bytes())?;
+        digest.field(&[raft_dtype_tag(descriptor.dtype())])?;
+        digest.u64(
+            u64::try_from(descriptor.shape().len())
+                .map_err(|_| NativeVisionModelError::ShapeOverflow)?,
+        );
+        for dimension in descriptor.shape() {
+            digest.u64(*dimension);
+        }
+        let bytes = tensor.contiguous_bytes()?;
+        for chunk in bytes.chunks(64 * 1024) {
+            cancellation.check()?;
+            digest.field(chunk)?;
+        }
+    }
+    cancellation.check()?;
+    Ok(digest.finish())
+}
+
+fn raft_module_state_digest(
+    modules: &[NativeModuleSlot],
+    residual_state: &BTreeMap<String, Tensor>,
+    cancellation: &CancellationToken,
+) -> Result<String, NativeVisionModelError> {
+    cancellation.check()?;
+    let mut digest = RaftSemanticHasher::new(b"sim.comfy.model.raft-large-modules.v1")?;
+    digest.u64(u64::try_from(modules.len()).map_err(|_| NativeVisionModelError::ShapeOverflow)?);
+    for slot in modules {
+        cancellation.check()?;
+        digest.field(slot.weight_name.as_bytes())?;
+        match &slot.bias_name {
+            Some(name) => digest.field(name.as_bytes())?,
+            None => digest.field(b"")?,
+        }
+        digest.field(slot.module.semantic_state_digest(cancellation)?.as_bytes())?;
+    }
+    digest.field(raft_state_digest(residual_state, cancellation)?.as_bytes())?;
+    cancellation.check()?;
+    Ok(digest.finish())
+}
+
+fn raft_dtype_tag(dtype: DType) -> u8 {
+    match dtype {
+        DType::F64 => 1,
+        DType::F32 => 2,
+        DType::F16 => 3,
+        DType::Bf16 => 4,
+        DType::I64 => 5,
+        DType::I32 => 6,
+        DType::I16 => 7,
+        DType::I8 => 8,
+        DType::U64 => 9,
+        DType::U32 => 10,
+        DType::U16 => 11,
+        DType::U8 => 12,
+        DType::Bool => 13,
+        DType::Complex64 => 14,
+        DType::Complex128 => 15,
+        DType::Float8E4m3Fn => 16,
+        DType::Float8E5m2 => 17,
+        DType::Float8E4m3Fnuz => 18,
+        DType::Float8E5m2Fnuz => 19,
+        DType::Float8E8m0Fnu => 20,
+    }
+}
+
+fn checked_resident_add(
+    total: u64,
+    bytes: usize,
+    _subject: &'static str,
+) -> Result<u64, NativeVisionModelError> {
+    total
+        .checked_add(u64::try_from(bytes).map_err(|_| NativeVisionModelError::ShapeOverflow)?)
+        .ok_or(NativeVisionModelError::ShapeOverflow)
+}
+
+fn raft_state_map_resident_bytes(
+    mut total: u64,
+    state: &BTreeMap<String, Tensor>,
+) -> Result<u64, NativeVisionModelError> {
+    total = checked_resident_add(
+        total,
+        state
+            .len()
+            .checked_mul(mem::size_of::<(String, Tensor)>())
+            .ok_or(NativeVisionModelError::ShapeOverflow)?,
+        "RAFT state entries",
+    )?;
+    for name in state.keys() {
+        total = checked_resident_add(total, name.capacity(), "RAFT state names")?;
+    }
+    Ok(total)
+}
+
+fn raft_semantic_identity(
+    architecture_digest_sha256: String,
+    state_digest_sha256: String,
+) -> Result<NativeModelResourceIdentity, NativeVisionModelError> {
+    NativeModelResourceIdentity::checked(
+        NativeModelResourceRole::OpticalFlow,
+        RAFT_LARGE_ARCHITECTURE_ID,
+        RAFT_LARGE_RESOURCE_FORMAT,
+        state_digest_sha256,
+        architecture_digest_sha256,
+    )
+    .map_err(|error| NativeVisionModelError::Invalid(error.to_string()))
+}
+
+fn raft_identity_resident_bytes(
+    identity: &NativeModelResourceIdentity,
+) -> Result<u64, NativeVisionModelError> {
+    [
+        identity.identifier(),
+        identity.format(),
+        identity.artifact_sha256(),
+        identity.execution_sha256(),
+        identity.digest_sha256(),
+    ]
+    .into_iter()
+    .try_fold(0_u64, |total, value| {
+        checked_resident_add(total, value.len(), "RAFT identity strings")
+    })
+}
+
 #[derive(Clone, Debug)]
 pub struct NativeRaftLarge {
     root: NativeModule,
@@ -875,6 +1073,37 @@ pub struct NativeRaftLarge {
     schema: Vec<NativeVisionStateSpec>,
     training: bool,
     parameters_loaded: bool,
+    canonical_state: BTreeMap<String, Tensor>,
+    semantic_identity: Option<NativeModelResourceIdentity>,
+    module_state_digest_sha256: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeRaftLargeExecutionSession {
+    model: NativeRaftLarge,
+}
+
+impl NativeRaftLargeExecutionSession {
+    pub fn semantic_identity(
+        &self,
+    ) -> Result<&NativeModelResourceIdentity, NativeVisionModelError> {
+        self.model
+            .semantic_identity
+            .as_ref()
+            .ok_or(NativeVisionModelError::ParametersNotLoaded)
+    }
+
+    pub fn forward_with_context(
+        &mut self,
+        backend: &CpuBackend,
+        image1: &Tensor,
+        image2: &Tensor,
+        number_of_flow_updates: usize,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Vec<Tensor>, NativeVisionModelError> {
+        self.model
+            .forward_impl(backend, image1, image2, number_of_flow_updates, context)
+    }
 }
 
 impl NativeRaftLarge {
@@ -898,6 +1127,127 @@ impl NativeRaftLarge {
         self.training
     }
 
+    pub fn semantic_identity(
+        &self,
+    ) -> Result<&NativeModelResourceIdentity, NativeVisionModelError> {
+        self.semantic_identity
+            .as_ref()
+            .ok_or(NativeVisionModelError::ParametersNotLoaded)
+    }
+
+    pub fn semantic_digest_sha256(&self) -> Result<&str, NativeVisionModelError> {
+        Ok(self.semantic_identity()?.digest_sha256())
+    }
+
+    pub fn resident_storage_bytes(&self) -> Result<u64, NativeVisionModelError> {
+        if !self.parameters_loaded {
+            return Err(NativeVisionModelError::ParametersNotLoaded);
+        }
+        let mut storages = BTreeSet::new();
+        self.canonical_state
+            .values()
+            .try_fold(0_u64, |total, tensor| {
+                if !storages.insert(tensor.storage_id().get()) {
+                    return Ok(total);
+                }
+                total
+                    .checked_add(tensor.storage_byte_len())
+                    .ok_or(NativeVisionModelError::ShapeOverflow)
+            })
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, NativeVisionModelError> {
+        let identity = self.semantic_identity()?;
+        let mut bytes = u64::try_from(mem::size_of::<Self>())
+            .map_err(|_| NativeVisionModelError::ShapeOverflow)?;
+        bytes = checked_resident_add(
+            bytes,
+            self.modules
+                .capacity()
+                .checked_mul(mem::size_of::<NativeModuleSlot>())
+                .ok_or(NativeVisionModelError::ShapeOverflow)?,
+            "RAFT module slots",
+        )?;
+        for slot in &self.modules {
+            bytes = checked_resident_add(bytes, slot.weight_name.capacity(), "RAFT module names")?;
+            if let Some(name) = &slot.bias_name {
+                bytes = checked_resident_add(bytes, name.capacity(), "RAFT module names")?;
+            }
+        }
+        bytes = checked_resident_add(
+            bytes,
+            self.schema
+                .capacity()
+                .checked_mul(mem::size_of::<NativeVisionStateSpec>())
+                .ok_or(NativeVisionModelError::ShapeOverflow)?,
+            "RAFT schema entries",
+        )?;
+        for spec in &self.schema {
+            bytes = checked_resident_add(bytes, spec.name.capacity(), "RAFT schema names")?;
+            bytes = checked_resident_add(
+                bytes,
+                spec.shape
+                    .capacity()
+                    .checked_mul(mem::size_of::<u64>())
+                    .ok_or(NativeVisionModelError::ShapeOverflow)?,
+                "RAFT schema shapes",
+            )?;
+        }
+        bytes = raft_state_map_resident_bytes(bytes, &self.canonical_state)?;
+        bytes = raft_state_map_resident_bytes(bytes, &self.residual_state)?;
+        if let Some(digest) = &self.module_state_digest_sha256 {
+            bytes = checked_resident_add(bytes, digest.capacity(), "RAFT module digest")?;
+        }
+        bytes = bytes
+            .checked_add(raft_identity_resident_bytes(identity)?)
+            .ok_or(NativeVisionModelError::ShapeOverflow)?;
+        bytes = bytes
+            .checked_add(self.resident_storage_bytes()?)
+            .ok_or(NativeVisionModelError::ShapeOverflow)?;
+        Ok(bytes)
+    }
+
+    pub fn validate(&self, cancellation: &CancellationToken) -> Result<(), NativeVisionModelError> {
+        cancellation.check()?;
+        if !self.parameters_loaded {
+            return Err(NativeVisionModelError::ParametersNotLoaded);
+        }
+        validate_state_dictionary(&self.schema, &self.canonical_state, cancellation)?;
+        let expected_identity = raft_semantic_identity(
+            raft_architecture_digest(&self.schema)?,
+            raft_state_digest(&self.canonical_state, cancellation)?,
+        )?;
+        let identity = self.semantic_identity()?;
+        identity
+            .validate()
+            .map_err(|error| NativeVisionModelError::Invalid(error.to_string()))?;
+        if identity != &expected_identity {
+            return Err(NativeVisionModelError::SemanticIdentityChanged);
+        }
+        let module_state_digest =
+            raft_module_state_digest(&self.modules, &self.residual_state, cancellation)?;
+        if self.module_state_digest_sha256.as_deref() != Some(module_state_digest.as_str()) {
+            return Err(NativeVisionModelError::SemanticIdentityChanged);
+        }
+        self.resident_bytes()?;
+        cancellation.check()?;
+        Ok(())
+    }
+
+    pub fn execution_session(
+        &self,
+        cancellation: &CancellationToken,
+    ) -> Result<NativeRaftLargeExecutionSession, NativeVisionModelError> {
+        self.validate(cancellation)?;
+        if self.training {
+            return Err(NativeVisionModelError::EvaluationRequired("RAFT-large"));
+        }
+        cancellation.check()?;
+        Ok(NativeRaftLargeExecutionSession {
+            model: self.clone(),
+        })
+    }
+
     pub fn train(&mut self) {
         self.training = true;
     }
@@ -912,9 +1262,20 @@ impl NativeRaftLarge {
         cancellation: &CancellationToken,
     ) -> Result<(), NativeVisionModelError> {
         validate_state_dictionary(&self.schema, &state, cancellation)?;
+        let canonical_state = state.clone();
         let loaded = load_state_dictionary(&self.schema, &self.modules, state, cancellation)?;
+        let semantic_identity = raft_semantic_identity(
+            raft_architecture_digest(&self.schema)?,
+            raft_state_digest(&canonical_state, cancellation)?,
+        )?;
+        let module_state_digest_sha256 =
+            raft_module_state_digest(&loaded.modules, &loaded.residual_state, cancellation)?;
+        cancellation.check()?;
         self.modules = loaded.modules;
         self.residual_state = loaded.residual_state;
+        self.canonical_state = canonical_state;
+        self.semantic_identity = Some(semantic_identity);
+        self.module_state_digest_sha256 = Some(module_state_digest_sha256);
         self.parameters_loaded = true;
         Ok(())
     }
@@ -1082,6 +1443,9 @@ pub fn raft_large_exact_native(
         schema: builder.schema,
         training: true,
         parameters_loaded: false,
+        canonical_state: BTreeMap::new(),
+        semantic_identity: None,
+        module_state_digest_sha256: None,
     };
     if model.parameter_count()? != 5_257_536 {
         return Err(NativeVisionModelError::Invalid(
@@ -3047,8 +3411,240 @@ const fn make_divisible(value: usize, divisor: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::{NativeValues, NativeVisionModelError, VisionExecution, normalize_raft_image};
-    use comfy_tensor::{CancellationToken, DeviceId, ExecutionContext, StreamId, TensorDescriptor};
+    use super::{
+        NativeModelResourceRole, NativeRaftLarge, NativeValues, NativeVisionModelError,
+        RAFT_LARGE_ARCHITECTURE_ID, RAFT_LARGE_OPERATION_ID, RAFT_LARGE_RESOURCE_FORMAT,
+        RAFT_LARGE_RESOURCE_ROLE, RAFT_LARGE_SOURCE_TYPE_ID, VisionExecution, normalize_raft_image,
+        raft_large_exact_native,
+    };
+    use comfy_tensor::{
+        CancellationToken, CpuBackend, CpuWorkspaceAuthority, DType, DeviceId, ExecutionContext,
+        StreamId, Tensor, TensorDescriptor,
+    };
+    use std::{collections::BTreeMap, mem};
+
+    fn loaded_zero_raft(
+        backend: &CpuBackend,
+        workspace_authority: &CpuWorkspaceAuthority,
+        cancellation: &CancellationToken,
+    ) -> Result<NativeRaftLarge, NativeVisionModelError> {
+        let mut model = raft_large_exact_native(false, false, cancellation)?;
+        let mut shared_tensors: Vec<(Vec<u64>, DType, Tensor)> = Vec::new();
+        let mut state = BTreeMap::new();
+        for spec in model.state_schema() {
+            cancellation.check()?;
+            let tensor = match shared_tensors
+                .iter()
+                .find(|(shape, dtype, _)| shape == &spec.shape && *dtype == spec.dtype)
+            {
+                Some((_, _, tensor)) => tensor.clone(),
+                None => {
+                    let encoded_bytes = spec
+                        .shape
+                        .iter()
+                        .try_fold(spec.dtype.byte_width(), |bytes, dimension| {
+                            bytes.checked_mul(*dimension)
+                        })
+                        .ok_or(NativeVisionModelError::ShapeOverflow)?;
+                    let encoded_bytes = usize::try_from(encoded_bytes)
+                        .map_err(|_| NativeVisionModelError::ShapeOverflow)?;
+                    let descriptor = TensorDescriptor::contiguous(
+                        spec.shape.clone(),
+                        spec.dtype,
+                        DeviceId::CPU,
+                        StreamId::DEFAULT,
+                    )?;
+                    let context = ExecutionContext {
+                        stream: StreamId::DEFAULT,
+                        scratch: workspace_authority.authorize_workspace(encoded_bytes.max(1))?,
+                        rng_phase: None,
+                        cancellation,
+                    };
+                    let bytes = vec![0_u8; encoded_bytes];
+                    let tensor = backend.upload_bytes(descriptor, &bytes, &context)?.0;
+                    shared_tensors.push((spec.shape.clone(), spec.dtype, tensor.clone()));
+                    tensor
+                }
+            };
+            state.insert(spec.name.clone(), tensor);
+        }
+        model.load_state_dict(state, cancellation)?;
+        model.eval();
+        Ok(model)
+    }
+
+    fn test_image(
+        backend: &CpuBackend,
+        workspace_authority: &CpuWorkspaceAuthority,
+        cancellation: &CancellationToken,
+        side: u64,
+    ) -> Result<Tensor, NativeVisionModelError> {
+        let elements = side
+            .checked_mul(side)
+            .and_then(|value| value.checked_mul(3))
+            .ok_or(NativeVisionModelError::ShapeOverflow)?;
+        let elements =
+            usize::try_from(elements).map_err(|_| NativeVisionModelError::ShapeOverflow)?;
+        let descriptor = TensorDescriptor::contiguous(
+            vec![1, 3, side, side],
+            DType::F32,
+            DeviceId::CPU,
+            StreamId::DEFAULT,
+        )?;
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: workspace_authority.authorize_workspace(
+                elements
+                    .checked_mul(mem::size_of::<f32>())
+                    .ok_or(NativeVisionModelError::ShapeOverflow)?,
+            )?,
+            rng_phase: None,
+            cancellation,
+        };
+        Ok(backend
+            .upload_f32(descriptor, &vec![0.0; elements], &context)?
+            .0)
+    }
+
+    #[test]
+    fn raft_resource_identity_and_residency_are_owner_derived_and_alias_aware()
+    -> Result<(), NativeVisionModelError> {
+        let cancellation = CancellationToken::default();
+        let (backend, workspace_authority) =
+            CpuWorkspaceAuthority::create_backend(8 * 1024 * 1024)?;
+        let model = loaded_zero_raft(&backend, &workspace_authority, &cancellation)?;
+        model.validate(&cancellation)?;
+
+        let identity = model.semantic_identity()?;
+        assert_eq!(identity.role(), NativeModelResourceRole::OpticalFlow);
+        assert_eq!(identity.role().source_type_id(), RAFT_LARGE_SOURCE_TYPE_ID);
+        assert_eq!(RAFT_LARGE_RESOURCE_ROLE, "optical_flow");
+        assert_eq!(RAFT_LARGE_OPERATION_ID, "COMFY-TENSOR-OP-852D8E9DBC9C");
+        assert_eq!(identity.identifier(), RAFT_LARGE_ARCHITECTURE_ID);
+        assert_eq!(identity.format(), RAFT_LARGE_RESOURCE_FORMAT);
+        assert_eq!(identity.execution_sha256().len(), 64);
+        assert_eq!(identity.artifact_sha256().len(), 64);
+        assert_eq!(identity.digest_sha256().len(), 64);
+
+        let unique_storage =
+            model
+                .canonical_state
+                .values()
+                .fold(BTreeMap::new(), |mut storages, tensor| {
+                    storages
+                        .entry(tensor.storage_id().get())
+                        .or_insert(tensor.storage_byte_len());
+                    storages
+                });
+        let expected_storage = unique_storage.values().try_fold(0_u64, |total, bytes| {
+            total
+                .checked_add(*bytes)
+                .ok_or(NativeVisionModelError::ShapeOverflow)
+        })?;
+        let unaliased_storage =
+            model
+                .canonical_state
+                .values()
+                .try_fold(0_u64, |total, tensor| {
+                    total
+                        .checked_add(tensor.storage_byte_len())
+                        .ok_or(NativeVisionModelError::ShapeOverflow)
+                })?;
+        assert_eq!(model.resident_storage_bytes()?, expected_storage);
+        assert!(expected_storage < unaliased_storage);
+        assert!(model.resident_bytes()? > expected_storage);
+
+        let mut drifted = model.clone();
+        let removed_name = drifted
+            .canonical_state
+            .keys()
+            .next()
+            .cloned()
+            .ok_or(NativeVisionModelError::ParametersNotLoaded)?;
+        if drifted.canonical_state.remove(&removed_name).is_none() {
+            return Err(NativeVisionModelError::MissingState(removed_name));
+        }
+        assert!(matches!(
+            drifted.validate(&cancellation),
+            Err(NativeVisionModelError::MissingState(name)) if name == removed_name
+        ));
+
+        let mut drifted = model.clone();
+        drifted.module_state_digest_sha256 = Some("0".repeat(64));
+        assert!(matches!(
+            drifted.validate(&cancellation),
+            Err(NativeVisionModelError::SemanticIdentityChanged)
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn raft_execution_sessions_are_fresh_deterministic_and_do_not_mutate_semantic_state()
+    -> Result<(), NativeVisionModelError> {
+        let cancellation = CancellationToken::default();
+        let (backend, workspace_authority) =
+            CpuWorkspaceAuthority::create_backend(8 * 1024 * 1024)?;
+        let model = loaded_zero_raft(&backend, &workspace_authority, &cancellation)?;
+        let source_digest = model.semantic_digest_sha256()?.to_owned();
+        let image = test_image(&backend, &workspace_authority, &cancellation, 64)?;
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: workspace_authority.authorize_workspace(4 * 1024 * 1024)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        let mut first = model.execution_session(&cancellation)?;
+        let mut second = model.execution_session(&cancellation)?;
+        assert_eq!(first.semantic_identity()?, second.semantic_identity()?);
+        let first_failure = match first.forward_with_context(&backend, &image, &image, 1, &context)
+        {
+            Err(error) => error,
+            Ok(_) => {
+                return Err(NativeVisionModelError::Invalid(
+                    "undersized RAFT input was accepted".to_owned(),
+                ));
+            }
+        };
+        let second_failure =
+            match second.forward_with_context(&backend, &image, &image, 1, &context) {
+                Err(error) => error,
+                Ok(_) => {
+                    return Err(NativeVisionModelError::Invalid(
+                        "undersized RAFT input was accepted".to_owned(),
+                    ));
+                }
+            };
+        assert_eq!(first_failure.to_string(), second_failure.to_string());
+        assert_eq!(first.semantic_identity()?.digest_sha256(), source_digest);
+        assert_eq!(second.semantic_identity()?.digest_sha256(), source_digest);
+        assert_eq!(model.semantic_digest_sha256()?, source_digest.as_str());
+        model.validate(&cancellation)?;
+
+        let mut cancelled_session = model.execution_session(&cancellation)?;
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        let cancelled_context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: workspace_authority.authorize_workspace(4 * 1024 * 1024)?,
+            rng_phase: None,
+            cancellation: &cancelled,
+        };
+        assert!(matches!(
+            cancelled_session.forward_with_context(&backend, &image, &image, 1, &cancelled_context),
+            Err(NativeVisionModelError::Cancelled)
+        ));
+        assert_eq!(
+            cancelled_session.semantic_identity()?.digest_sha256(),
+            source_digest
+        );
+        assert!(matches!(
+            model.execution_session(&cancelled),
+            Err(NativeVisionModelError::Cancelled)
+        ));
+        assert_eq!(model.semantic_digest_sha256()?, source_digest.as_str());
+        model.validate(&cancellation)?;
+        Ok(())
+    }
 
     #[test]
     fn raft_image_preprocessing_maps_unit_interval_to_signed_interval()

@@ -1,6 +1,6 @@
 use crate::{LatentFormatIdentity, ModelFamilyIdentity};
 use comfy_tensor::{
-    CpuBackend, DType, DeviceId, ExecutionContext, ResizeMode, Tensor, TensorDescriptor,
+    CpuBackend, DType, DeviceId, ExecutionContext, ResizeMode, StorageId, Tensor, TensorDescriptor,
     TensorError,
     generated_comfy_operator_indirection_01::{
         OperatorIndirectionError, cast_to_with_context_exact_native,
@@ -20,7 +20,10 @@ use comfy_tensor::{
 use comfy_types::CancellationError;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    mem,
+};
 use thiserror::Error;
 
 pub const CONDITIONING_SCHEMA_VERSION: u16 = 1;
@@ -137,6 +140,13 @@ impl ConditioningIdentity {
             .ok_or(ConditioningError::ResidentBytesOverflow)?;
         Ok(bytes)
     }
+
+    fn validate(&self) -> Result<(), ConditioningError> {
+        validate_identifier("conditioning namespace", &self.namespace)?;
+        self.digest()?;
+        self.resident_bytes()?;
+        Ok(())
+    }
 }
 
 impl Serialize for ConditioningIdentity {
@@ -212,13 +222,19 @@ impl ConditioningReferences {
         control: Option<ConditioningControlReference>,
         hooks: Vec<ConditioningHookReference>,
     ) -> Result<Self, ConditioningError> {
-        if hooks.len() > MAX_CONDITIONING_HOOK_REFERENCES {
+        let references = Self { control, hooks };
+        references.validate()?;
+        Ok(references)
+    }
+
+    fn validate(&self) -> Result<(), ConditioningError> {
+        if self.hooks.len() > MAX_CONDITIONING_HOOK_REFERENCES {
             return Err(ConditioningError::Invalid(format!(
                 "conditioning entry contains more than {MAX_CONDITIONING_HOOK_REFERENCES} hook references"
             )));
         }
         let mut identifiers = BTreeSet::new();
-        for hook in &hooks {
+        for hook in &self.hooks {
             validate_identifier("conditioning hook reference", hook.identifier())?;
             if !identifiers.insert(hook.identifier()) {
                 return Err(ConditioningError::Invalid(format!(
@@ -227,10 +243,10 @@ impl ConditioningReferences {
                 )));
             }
         }
-        if let Some(control) = &control {
+        if let Some(control) = &self.control {
             validate_identifier("conditioning control reference", control.identifier())?;
         }
-        Ok(Self { control, hooks })
+        Ok(())
     }
 
     pub fn control(&self) -> Option<&ConditioningControlReference> {
@@ -593,35 +609,46 @@ impl ConditioningValue {
         &self,
         cancellation: &comfy_types::CancellationToken,
     ) -> Result<String, ConditioningError> {
-        cancellation.check()?;
+        let mut checkpoint = || cancellation.check().map_err(ConditioningError::from);
+        self.deterministic_digest_with_checkpoint(&mut checkpoint)
+    }
+
+    fn deterministic_digest_with_checkpoint<Checkpoint>(
+        &self,
+        checkpoint: &mut Checkpoint,
+    ) -> Result<String, ConditioningError>
+    where
+        Checkpoint: FnMut() -> Result<(), ConditioningError>,
+    {
+        checkpoint()?;
         self.validate()?;
         let mut hasher = Sha256::new();
         match self {
             Self::Regular(tensor) => {
                 hasher.update([1]);
-                hash_tensor(&mut hasher, tensor, cancellation)?;
+                hash_tensor(&mut hasher, tensor, checkpoint)?;
             }
             Self::NoiseShape(tensor) => {
                 hasher.update([2]);
-                hash_tensor(&mut hasher, tensor, cancellation)?;
+                hash_tensor(&mut hasher, tensor, checkpoint)?;
             }
             Self::CrossAttention(tensor) => {
                 hasher.update([3]);
-                hash_tensor(&mut hasher, tensor, cancellation)?;
+                hash_tensor(&mut hasher, tensor, checkpoint)?;
             }
             Self::Constant(value) => {
                 hasher.update([4]);
-                hash_conditioning_constant(&mut hasher, value, cancellation)?;
+                hash_conditioning_constant(&mut hasher, value, checkpoint)?;
             }
             Self::List(tensors) => {
                 hasher.update([5]);
                 hash_u64(&mut hasher, tensors.len())?;
                 for tensor in tensors {
-                    hash_tensor(&mut hasher, tensor, cancellation)?;
+                    hash_tensor(&mut hasher, tensor, checkpoint)?;
                 }
             }
         }
-        cancellation.check()?;
+        checkpoint()?;
         Ok(format!("{:x}", hasher.finalize()))
     }
 
@@ -864,20 +891,12 @@ pub struct ConditioningWindow {
 
 impl ConditioningWindow {
     pub fn new(start_percent: f64, end_percent: f64) -> Result<Self, ConditioningError> {
-        if !start_percent.is_finite()
-            || !end_percent.is_finite()
-            || !(0.0..=1.0).contains(&start_percent)
-            || !(0.0..=1.0).contains(&end_percent)
-            || start_percent > end_percent
-        {
-            return Err(ConditioningError::Invalid(
-                "conditioning window must be a finite ordered range within [0, 1]".to_owned(),
-            ));
-        }
-        Ok(Self {
+        let window = Self {
             start_percent,
             end_percent,
-        })
+        };
+        window.validate()?;
+        Ok(window)
     }
 
     pub fn full() -> Self {
@@ -898,6 +917,20 @@ impl ConditioningWindow {
     pub fn contains(self, percent: f64) -> bool {
         percent.is_finite() && percent >= self.start_percent && percent <= self.end_percent
     }
+
+    fn validate(self) -> Result<(), ConditioningError> {
+        if !self.start_percent.is_finite()
+            || !self.end_percent.is_finite()
+            || !(0.0..=1.0).contains(&self.start_percent)
+            || !(0.0..=1.0).contains(&self.end_percent)
+            || self.start_percent > self.end_percent
+        {
+            return Err(ConditioningError::Invalid(
+                "conditioning window must be a finite ordered range within [0, 1]".to_owned(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -915,41 +948,47 @@ impl ConditioningMask {
         feather: Vec<u64>,
         set_region_to_nonzero_bounds: bool,
     ) -> Result<Self, ConditioningError> {
+        let mask = Self {
+            tensor,
+            strength,
+            feather,
+            set_region_to_nonzero_bounds,
+        };
+        mask.validate()?;
+        Ok(mask)
+    }
+
+    fn validate(&self) -> Result<(), ConditioningError> {
         if !matches!(
-            tensor.descriptor().dtype(),
+            self.tensor.descriptor().dtype(),
             DType::F32 | DType::F16 | DType::Bf16
         ) {
             return Err(ConditioningError::Invalid(
                 "conditioning mask must use a floating-point dtype".to_owned(),
             ));
         }
-        if tensor.descriptor().rank() == 0 || tensor.descriptor().shape().contains(&0) {
+        if self.tensor.descriptor().rank() == 0 || self.tensor.descriptor().shape().contains(&0) {
             return Err(ConditioningError::Invalid(
                 "conditioning mask must have nonzero spatial dimensions".to_owned(),
             ));
         }
-        if !strength.is_finite() {
+        if !self.strength.is_finite() {
             return Err(ConditioningError::Invalid(
                 "conditioning mask strength must be finite".to_owned(),
             ));
         }
-        if feather.is_empty() {
+        if self.feather.is_empty() {
             return Err(ConditioningError::Invalid(
                 "conditioning mask feather rank must be nonzero".to_owned(),
             ));
         }
-        if feather.iter().any(|value| *value != 0) {
+        if self.feather.iter().any(|value| *value != 0) {
             return Err(ConditioningError::Invalid(
                 "conditioning mask feather must be zero because source feathering applies only to unmasked areas"
                     .to_owned(),
             ));
         }
-        Ok(Self {
-            tensor,
-            strength,
-            feather,
-            set_region_to_nonzero_bounds,
-        })
+        Ok(())
     }
 
     pub fn tensor(&self) -> &Tensor {
@@ -1297,27 +1336,40 @@ impl ConditioningEntry {
         references: ConditioningReferences,
     ) -> Result<Self, ConditioningError> {
         let identifier = identifier.into();
-        validate_identifier("conditioning entry", &identifier)?;
-        if !options.strength.is_finite() {
-            return Err(ConditioningError::Invalid(
-                "conditioning entry strength must be finite".to_owned(),
-            ));
-        }
-        value.validate()?;
-        if let Some(region) = &options.region {
-            region.validate()?;
-        }
-        if options.default_region && (options.region.is_some() || options.mask.is_some()) {
-            return Err(ConditioningError::Invalid(
-                "default-region conditioning cannot own an explicit region or mask".to_owned(),
-            ));
-        }
-        Ok(Self {
+        let entry = Self {
             identifier,
             value,
             options,
             references,
-        })
+        };
+        entry.validate()?;
+        Ok(entry)
+    }
+
+    fn validate(&self) -> Result<(), ConditioningError> {
+        validate_identifier("conditioning entry", &self.identifier)?;
+        if !self.options.strength.is_finite() {
+            return Err(ConditioningError::Invalid(
+                "conditioning entry strength must be finite".to_owned(),
+            ));
+        }
+        self.value.validate()?;
+        if let Some(region) = &self.options.region {
+            region.validate()?;
+        }
+        if let Some(mask) = &self.options.mask {
+            mask.validate()?;
+        }
+        self.options.window.validate()?;
+        self.references.validate()?;
+        if self.options.default_region
+            && (self.options.region.is_some() || self.options.mask.is_some())
+        {
+            return Err(ConditioningError::Invalid(
+                "default-region conditioning cannot own an explicit region or mask".to_owned(),
+            ));
+        }
+        Ok(())
     }
 
     pub fn identifier(&self) -> &str {
@@ -1500,6 +1552,48 @@ pub struct ConditioningSet {
     digest: String,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ConditioningTensorResidentAllocation {
+    storage_id: StorageId,
+    resident_bytes: u64,
+}
+
+impl ConditioningTensorResidentAllocation {
+    pub const fn storage_id(&self) -> StorageId {
+        self.storage_id
+    }
+
+    pub const fn resident_bytes(&self) -> u64 {
+        self.resident_bytes
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ConditioningResidentParts {
+    owned_bytes: u64,
+    tensor_allocations: Vec<ConditioningTensorResidentAllocation>,
+}
+
+impl ConditioningResidentParts {
+    pub const fn owned_bytes(&self) -> u64 {
+        self.owned_bytes
+    }
+
+    pub fn tensor_allocations(&self) -> &[ConditioningTensorResidentAllocation] {
+        &self.tensor_allocations
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, ConditioningError> {
+        self.tensor_allocations
+            .iter()
+            .try_fold(self.owned_bytes, |bytes, allocation| {
+                bytes
+                    .checked_add(allocation.resident_bytes)
+                    .ok_or(ConditioningError::ResidentBytesOverflow)
+            })
+    }
+}
+
 impl ConditioningSet {
     pub fn checked(
         identity: ConditioningIdentity,
@@ -1507,26 +1601,9 @@ impl ConditioningSet {
         cancellation: &comfy_types::CancellationToken,
     ) -> Result<Self, ConditioningError> {
         cancellation.check()?;
-        if entries.is_empty() {
-            return Err(ConditioningError::Invalid(
-                "conditioning set must contain at least one entry".to_owned(),
-            ));
-        }
-        if entries.len() > MAX_CONDITIONING_ENTRIES {
-            return Err(ConditioningError::Invalid(format!(
-                "conditioning set contains more than {MAX_CONDITIONING_ENTRIES} entries"
-            )));
-        }
-        let mut identifiers = BTreeSet::new();
-        for entry in &entries {
-            cancellation.check()?;
-            if !identifiers.insert(entry.identifier()) {
-                return Err(ConditioningError::Invalid(format!(
-                    "conditioning entry identifier is duplicated: {}",
-                    entry.identifier()
-                )));
-            }
-        }
+        validate_conditioning_set(&identity, &entries, || {
+            cancellation.check().map_err(ConditioningError::from)
+        })?;
         let digest = hash_set(&identity, &entries, cancellation)?;
         Ok(Self {
             identity,
@@ -1547,6 +1624,38 @@ impl ConditioningSet {
         &self.digest
     }
 
+    pub fn validate(&self) -> Result<(), ConditioningError> {
+        validate_conditioning_set(&self.identity, &self.entries, || Ok(()))?;
+        let mut checkpoint = || Ok(());
+        if hash_set_with_checkpoint(&self.identity, &self.entries, &mut checkpoint)? != self.digest
+        {
+            return Err(ConditioningError::Invalid(
+                "conditioning set digest no longer matches its contents".to_owned(),
+            ));
+        }
+        self.resident_bytes()?;
+        Ok(())
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, ConditioningError> {
+        self.resident_parts()?.resident_bytes()
+    }
+
+    pub fn resident_parts(&self) -> Result<ConditioningResidentParts, ConditioningError> {
+        let mut accounting = ConditioningResidentAccounting::default();
+        accounting.add_set(self)?;
+        accounting.resident_bytes()?;
+        Ok(accounting.into_parts())
+    }
+
+    pub fn combined_resident_bytes(sets: &[&Self]) -> Result<u64, ConditioningError> {
+        let mut accounting = ConditioningResidentAccounting::default();
+        for set in sets {
+            accounting.add_set(set)?;
+        }
+        accounting.resident_bytes()
+    }
+
     pub fn resolve(
         &self,
         target: &TensorDescriptor,
@@ -1563,6 +1672,231 @@ impl ConditioningSet {
         }
         context.cancellation.check()?;
         Ok(entries)
+    }
+}
+
+fn validate_conditioning_set<Checkpoint>(
+    identity: &ConditioningIdentity,
+    entries: &[ConditioningEntry],
+    mut checkpoint: Checkpoint,
+) -> Result<(), ConditioningError>
+where
+    Checkpoint: FnMut() -> Result<(), ConditioningError>,
+{
+    checkpoint()?;
+    identity.validate()?;
+    if entries.is_empty() {
+        return Err(ConditioningError::Invalid(
+            "conditioning set must contain at least one entry".to_owned(),
+        ));
+    }
+    if entries.len() > MAX_CONDITIONING_ENTRIES {
+        return Err(ConditioningError::Invalid(format!(
+            "conditioning set contains more than {MAX_CONDITIONING_ENTRIES} entries"
+        )));
+    }
+    let mut identifiers = BTreeSet::new();
+    for entry in entries {
+        checkpoint()?;
+        entry.validate()?;
+        if !identifiers.insert(entry.identifier()) {
+            return Err(ConditioningError::Invalid(format!(
+                "conditioning entry identifier is duplicated: {}",
+                entry.identifier()
+            )));
+        }
+    }
+    checkpoint()?;
+    Ok(())
+}
+
+#[derive(Default)]
+struct ConditioningResidentAccounting {
+    owned_bytes: u64,
+    sets: BTreeSet<usize>,
+    storages: BTreeMap<u64, (StorageId, u64)>,
+}
+
+impl ConditioningResidentAccounting {
+    fn add_set(&mut self, set: &ConditioningSet) -> Result<(), ConditioningError> {
+        if !self.sets.insert(std::ptr::from_ref(set) as usize) {
+            return Ok(());
+        }
+        self.add_inline::<ConditioningSet>()?;
+        self.add_bytes(set.identity.namespace.capacity())?;
+        self.add_u64(
+            set.identity
+                .model_family
+                .owned_resident_bytes()
+                .ok_or(ConditioningError::ResidentBytesOverflow)?,
+        )?;
+        self.add_u64(
+            set.identity
+                .latent_format
+                .owned_resident_bytes()
+                .ok_or(ConditioningError::ResidentBytesOverflow)?,
+        )?;
+        self.add_allocation::<ConditioningEntry>(set.entries.capacity())?;
+        self.add_bytes(set.digest.capacity())?;
+        for entry in &set.entries {
+            self.add_entry_allocations(entry)?;
+        }
+        Ok(())
+    }
+
+    fn add_entry_allocations(
+        &mut self,
+        entry: &ConditioningEntry,
+    ) -> Result<(), ConditioningError> {
+        self.add_bytes(entry.identifier.capacity())?;
+        self.add_value_allocations(&entry.value)?;
+        if let Some(region) = &entry.options.region {
+            self.add_region_allocations(region)?;
+        }
+        if let Some(mask) = &entry.options.mask {
+            self.add_tensor_storage(mask.tensor())?;
+            self.add_allocation::<u64>(mask.feather.capacity())?;
+        }
+        if let Some(control) = &entry.references.control {
+            self.add_bytes(control.0.capacity())?;
+        }
+        self.add_allocation::<ConditioningHookReference>(entry.references.hooks.capacity())?;
+        for hook in &entry.references.hooks {
+            self.add_bytes(hook.0.capacity())?;
+        }
+        Ok(())
+    }
+
+    fn add_value_allocations(
+        &mut self,
+        value: &ConditioningValue,
+    ) -> Result<(), ConditioningError> {
+        match value {
+            ConditioningValue::Regular(tensor)
+            | ConditioningValue::NoiseShape(tensor)
+            | ConditioningValue::CrossAttention(tensor) => self.add_tensor_storage(tensor),
+            ConditioningValue::Constant(value) => self.add_constant_allocations(value),
+            ConditioningValue::List(tensors) => {
+                self.add_allocation::<Tensor>(tensors.capacity())?;
+                for tensor in tensors {
+                    self.add_tensor_storage(tensor)?;
+                }
+                Ok(())
+            }
+        }
+    }
+
+    fn add_constant_allocations(
+        &mut self,
+        value: &ConditioningConstant,
+    ) -> Result<(), ConditioningError> {
+        match value {
+            ConditioningConstant::Null
+            | ConditioningConstant::Boolean(_)
+            | ConditioningConstant::Signed(_)
+            | ConditioningConstant::Unsigned(_)
+            | ConditioningConstant::FiniteF64Bits(_) => Ok(()),
+            ConditioningConstant::Text(value) => self.add_bytes(value.capacity()),
+            ConditioningConstant::Bytes(value) => self.add_bytes(value.capacity()),
+            ConditioningConstant::Tensor(tensor) => self.add_tensor_storage(tensor),
+            ConditioningConstant::List(values) | ConditioningConstant::Tuple(values) => {
+                self.add_allocation::<ConditioningConstant>(values.capacity())?;
+                for value in values {
+                    self.add_constant_allocations(value)?;
+                }
+                Ok(())
+            }
+            ConditioningConstant::Map(values) => {
+                self.add_allocation::<(String, ConditioningConstant)>(values.len())?;
+                for (key, value) in values {
+                    self.add_bytes(key.capacity())?;
+                    self.add_constant_allocations(value)?;
+                }
+                Ok(())
+            }
+        }
+    }
+
+    fn add_region_allocations(
+        &mut self,
+        region: &ConditioningRegion,
+    ) -> Result<(), ConditioningError> {
+        match region {
+            ConditioningRegion::Absolute { sizes, offsets } => {
+                self.add_allocation::<u64>(sizes.capacity())?;
+                self.add_allocation::<u64>(offsets.capacity())
+            }
+            ConditioningRegion::Percentage { sizes, offsets } => {
+                self.add_allocation::<f64>(sizes.capacity())?;
+                self.add_allocation::<f64>(offsets.capacity())
+            }
+        }
+    }
+
+    fn add_tensor_storage(&mut self, tensor: &Tensor) -> Result<(), ConditioningError> {
+        let storage_id = tensor.storage_id();
+        let resident_bytes = tensor.storage_byte_len();
+        if let Some((_, existing_bytes)) = self.storages.get(&storage_id.get()) {
+            if *existing_bytes != resident_bytes {
+                return Err(ConditioningError::Invalid(
+                    "conditioning tensors disagree about shared storage residency".to_owned(),
+                ));
+            }
+            return Ok(());
+        }
+        self.storages
+            .insert(storage_id.get(), (storage_id, resident_bytes));
+        Ok(())
+    }
+
+    fn add_inline<Value>(&mut self) -> Result<(), ConditioningError> {
+        self.add_bytes(mem::size_of::<Value>())
+    }
+
+    fn add_allocation<Value>(&mut self, capacity: usize) -> Result<(), ConditioningError> {
+        let bytes = capacity
+            .checked_mul(mem::size_of::<Value>())
+            .ok_or(ConditioningError::ResidentBytesOverflow)?;
+        self.add_bytes(bytes)
+    }
+
+    fn add_bytes(&mut self, bytes: usize) -> Result<(), ConditioningError> {
+        let bytes = u64::try_from(bytes).map_err(|_| ConditioningError::ResidentBytesOverflow)?;
+        self.add_u64(bytes)
+    }
+
+    fn add_u64(&mut self, bytes: u64) -> Result<(), ConditioningError> {
+        self.owned_bytes = self
+            .owned_bytes
+            .checked_add(bytes)
+            .ok_or(ConditioningError::ResidentBytesOverflow)?;
+        Ok(())
+    }
+
+    fn resident_bytes(&self) -> Result<u64, ConditioningError> {
+        self.storages
+            .values()
+            .try_fold(self.owned_bytes, |bytes, (_, resident_bytes)| {
+                bytes
+                    .checked_add(*resident_bytes)
+                    .ok_or(ConditioningError::ResidentBytesOverflow)
+            })
+    }
+
+    fn into_parts(self) -> ConditioningResidentParts {
+        ConditioningResidentParts {
+            owned_bytes: self.owned_bytes,
+            tensor_allocations: self
+                .storages
+                .into_values()
+                .map(
+                    |(storage_id, resident_bytes)| ConditioningTensorResidentAllocation {
+                        storage_id,
+                        resident_bytes,
+                    },
+                )
+                .collect(),
+        }
     }
 }
 
@@ -1968,6 +2302,18 @@ fn hash_set(
     entries: &[ConditioningEntry],
     cancellation: &comfy_types::CancellationToken,
 ) -> Result<String, ConditioningError> {
+    let mut checkpoint = || cancellation.check().map_err(ConditioningError::from);
+    hash_set_with_checkpoint(identity, entries, &mut checkpoint)
+}
+
+fn hash_set_with_checkpoint<Checkpoint>(
+    identity: &ConditioningIdentity,
+    entries: &[ConditioningEntry],
+    checkpoint: &mut Checkpoint,
+) -> Result<String, ConditioningError>
+where
+    Checkpoint: FnMut() -> Result<(), ConditioningError>,
+{
     let mut hasher = Sha256::new();
     hasher.update(CONDITIONING_SCHEMA_VERSION.to_le_bytes());
     hash_string(&mut hasher, identity.namespace())?;
@@ -1978,11 +2324,13 @@ fn hash_set(
     hash_string(&mut hasher, identity.latent_format().identifier())?;
     hash_u64(&mut hasher, entries.len())?;
     for entry in entries {
-        cancellation.check()?;
+        checkpoint()?;
         hash_string(&mut hasher, entry.identifier())?;
         hash_string(
             &mut hasher,
-            &entry.value().deterministic_digest(cancellation)?,
+            &entry
+                .value()
+                .deterministic_digest_with_checkpoint(checkpoint)?,
         )?;
         hasher.update(entry.options().strength.to_bits().to_le_bytes());
         hash_region(&mut hasher, entry.options().region.as_ref())?;
@@ -2003,7 +2351,7 @@ fn hash_set(
         match &entry.options().mask {
             Some(mask) => {
                 hasher.update([1]);
-                hash_tensor(&mut hasher, mask.tensor(), cancellation)?;
+                hash_tensor(&mut hasher, mask.tensor(), checkpoint)?;
                 hasher.update(mask.strength().to_bits().to_le_bytes());
                 hash_u64(&mut hasher, mask.feather().len())?;
                 for feather in mask.feather() {
@@ -2014,16 +2362,19 @@ fn hash_set(
             None => hasher.update([0]),
         }
     }
-    cancellation.check()?;
+    checkpoint()?;
     Ok(format!("{:x}", hasher.finalize()))
 }
 
-fn hash_conditioning_constant(
+fn hash_conditioning_constant<Checkpoint>(
     hasher: &mut Sha256,
     value: &ConditioningConstant,
-    cancellation: &comfy_types::CancellationToken,
-) -> Result<(), ConditioningError> {
-    cancellation.check()?;
+    checkpoint: &mut Checkpoint,
+) -> Result<(), ConditioningError>
+where
+    Checkpoint: FnMut() -> Result<(), ConditioningError>,
+{
+    checkpoint()?;
     match value {
         ConditioningConstant::Null => hasher.update([0]),
         ConditioningConstant::Boolean(value) => hasher.update([1, u8::from(*value)]),
@@ -2050,7 +2401,7 @@ fn hash_conditioning_constant(
         }
         ConditioningConstant::Tensor(tensor) => {
             hasher.update([7]);
-            hash_tensor(hasher, tensor, cancellation)?;
+            hash_tensor(hasher, tensor, checkpoint)?;
         }
         ConditioningConstant::List(values) | ConditioningConstant::Tuple(values) => {
             hasher.update([if matches!(value, ConditioningConstant::List(_)) {
@@ -2060,7 +2411,7 @@ fn hash_conditioning_constant(
             }]);
             hash_u64(hasher, values.len())?;
             for value in values {
-                hash_conditioning_constant(hasher, value, cancellation)?;
+                hash_conditioning_constant(hasher, value, checkpoint)?;
             }
         }
         ConditioningConstant::Map(values) => {
@@ -2068,7 +2419,7 @@ fn hash_conditioning_constant(
             hash_u64(hasher, values.len())?;
             for (key, value) in values {
                 hash_string(hasher, key)?;
-                hash_conditioning_constant(hasher, value, cancellation)?;
+                hash_conditioning_constant(hasher, value, checkpoint)?;
             }
         }
     }
@@ -2099,12 +2450,15 @@ fn hash_region(
     Ok(())
 }
 
-fn hash_tensor(
+fn hash_tensor<Checkpoint>(
     hasher: &mut Sha256,
     tensor: &Tensor,
-    cancellation: &comfy_types::CancellationToken,
-) -> Result<(), ConditioningError> {
-    cancellation.check()?;
+    checkpoint: &mut Checkpoint,
+) -> Result<(), ConditioningError>
+where
+    Checkpoint: FnMut() -> Result<(), ConditioningError>,
+{
+    checkpoint()?;
     if tensor.descriptor().device() != DeviceId::CPU {
         return Err(ConditioningError::UnreadableDevice(
             tensor.descriptor().device(),
@@ -2122,11 +2476,11 @@ fn hash_tensor(
     let elements = tensor.descriptor().element_count()?;
     for index in 0..elements {
         if index.is_multiple_of(1024) {
-            cancellation.check()?;
+            checkpoint()?;
         }
         hasher.update(tensor.linear_element_bytes(index)?);
     }
-    cancellation.check()?;
+    checkpoint()?;
     Ok(())
 }
 
@@ -2194,6 +2548,65 @@ mod tests {
             "native.conditioning.test",
             ModelFamilyIdentity::new("COMFY-MODEL-0999", "conditioning_test", "v1")?,
             LatentFormatIdentity::new("COMFY-MODEL-0045", "SD15")?,
+        )?)
+    }
+
+    fn structured_conditioning_set(
+        tensors: Vec<Tensor>,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<ConditioningSet, Box<dyn Error>> {
+        let mut tensors = tensors.into_iter();
+        let list_first = tensors.next().ok_or("missing first list tensor")?;
+        let list_second = tensors.next().ok_or("missing second list tensor")?;
+        let constant_tensor = tensors.next().ok_or("missing constant tensor")?;
+        let cross_attention = tensors.next().ok_or("missing cross-attention tensor")?;
+        let mask_tensor = tensors.next().ok_or("missing mask tensor")?;
+        if tensors.next().is_some() {
+            return Err("too many structured conditioning tensors".into());
+        }
+
+        let listed = ConditioningEntry::checked_with_references(
+            "listed",
+            ConditioningValue::list(vec![list_first, list_second])?,
+            ConditioningEntryOptions {
+                region: Some(ConditioningRegion::absolute(vec![1, 2], vec![0, 0])?),
+                window: ConditioningWindow::new(0.1, 0.9)?,
+                ..ConditioningEntryOptions::default()
+            },
+            ConditioningReferences::checked(
+                Some(ConditioningControlReference::checked("control.primary")?),
+                vec![
+                    ConditioningHookReference::checked("hook.first")?,
+                    ConditioningHookReference::checked("hook.second")?,
+                ],
+            )?,
+        )?;
+        let constant = ConditioningEntry::checked(
+            "constant",
+            ConditioningValue::constant(ConditioningConstant::Map(BTreeMap::from([
+                (
+                    "tensor".to_owned(),
+                    ConditioningConstant::Tensor(constant_tensor),
+                ),
+                (
+                    "text".to_owned(),
+                    ConditioningConstant::Text("metadata".to_owned()),
+                ),
+            ])))?,
+            ConditioningEntryOptions::default(),
+        )?;
+        let masked = ConditioningEntry::checked(
+            "masked",
+            ConditioningValue::cross_attention(cross_attention)?,
+            ConditioningEntryOptions {
+                mask: Some(ConditioningMask::new(mask_tensor, 0.75, vec![0, 0], false)?),
+                ..ConditioningEntryOptions::default()
+            },
+        )?;
+        Ok(ConditioningSet::checked(
+            identity()?,
+            vec![listed, constant, masked],
+            cancellation,
         )?)
     }
 
@@ -2743,6 +3156,98 @@ mod tests {
                 &cancelled,
             ),
             Err(ConditioningError::Cancelled)
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn conditioning_set_validation_and_residency_cover_metadata_and_unique_tensor_aliases()
+    -> TestResult {
+        let (backend, authority) = runtime()?;
+        let cancellation = comfy_types::CancellationToken::default();
+        let aliased_tensor = upload_f32(&backend, &authority, vec![1, 1, 2], &[0.25, 0.75])?;
+        let aliased = structured_conditioning_set(vec![aliased_tensor.clone(); 5], &cancellation)?;
+        let mut distinct_tensors = Vec::new();
+        for _ in 0..5 {
+            distinct_tensors.push(upload_f32(
+                &backend,
+                &authority,
+                vec![1, 1, 2],
+                &[0.25, 0.75],
+            )?);
+        }
+        let distinct = structured_conditioning_set(distinct_tensors, &cancellation)?;
+
+        aliased.validate()?;
+        distinct.validate()?;
+        let aliased_parts = aliased.resident_parts()?;
+        assert!(aliased_parts.owned_bytes() > 0);
+        assert_eq!(aliased_parts.resident_bytes()?, aliased.resident_bytes()?);
+        assert_eq!(aliased_parts.tensor_allocations().len(), 1);
+        let aliased_allocation = aliased_parts
+            .tensor_allocations()
+            .first()
+            .ok_or("aliased conditioning did not expose its tensor allocation")?;
+        assert_eq!(aliased_allocation.storage_id(), aliased_tensor.storage_id());
+        assert_eq!(
+            aliased_allocation.resident_bytes(),
+            aliased_tensor.storage_byte_len()
+        );
+        let distinct_parts = distinct.resident_parts()?;
+        assert_eq!(distinct_parts.resident_bytes()?, distinct.resident_bytes()?);
+        assert_eq!(distinct_parts.tensor_allocations().len(), 5);
+        assert!(
+            distinct_parts
+                .tensor_allocations()
+                .windows(2)
+                .all(|pair| pair[0].storage_id().get() < pair[1].storage_id().get())
+        );
+        assert_eq!(aliased.digest(), distinct.digest());
+        assert_eq!(
+            distinct
+                .resident_bytes()?
+                .checked_sub(aliased.resident_bytes()?)
+                .ok_or("aliased conditioning residency exceeded distinct residency")?,
+            aliased_tensor
+                .storage_byte_len()
+                .checked_mul(4)
+                .ok_or("conditioning test storage byte count overflowed")?
+        );
+        assert_eq!(
+            ConditioningSet::combined_resident_bytes(&[&aliased, &aliased])?,
+            aliased.resident_bytes()?
+        );
+        let aliased_clone = aliased.clone();
+        assert_eq!(
+            aliased_clone.resident_parts()?.tensor_allocations(),
+            aliased_parts.tensor_allocations()
+        );
+        assert_eq!(
+            ConditioningSet::combined_resident_bytes(&[&aliased, &aliased_clone])?,
+            aliased
+                .resident_bytes()?
+                .checked_add(aliased_clone.resident_bytes()?)
+                .and_then(|bytes| bytes.checked_sub(aliased_tensor.storage_byte_len()))
+                .ok_or("combined conditioning resident byte count overflowed")?
+        );
+
+        let mut forged_digest = aliased.clone();
+        forged_digest.digest = "0".repeat(64);
+        assert!(matches!(
+            forged_digest.validate(),
+            Err(ConditioningError::Invalid(message))
+                if message.contains("digest no longer matches")
+        ));
+        let mut duplicated_entry = aliased;
+        let duplicate = duplicated_entry
+            .entries
+            .first()
+            .cloned()
+            .ok_or("conditioning set unexpectedly contained no entry")?;
+        duplicated_entry.entries.push(duplicate);
+        assert!(matches!(
+            duplicated_entry.validate(),
+            Err(ConditioningError::Invalid(message)) if message.contains("duplicated")
         ));
         Ok(())
     }

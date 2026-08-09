@@ -2742,28 +2742,96 @@ pub(crate) mod tests {
                 class_type,
             )
         })?;
+        let object_info = ObjectInfoRegistry::from_node_registry(&source).map_err(|error| {
+            NativeServiceError::new(
+                NativeServiceErrorKind::Internal,
+                "test_source_projection_invalid",
+                error.to_string(),
+            )
+        })?;
+        let source_node = object_info.nodes().get(class_type).ok_or_else(|| {
+            NativeServiceError::new(
+                NativeServiceErrorKind::Internal,
+                "test_source_projection_missing",
+                class_type,
+            )
+        })?;
+        let source_schema = source_node.source_schema.as_ref();
         let category = if catalog.category == "(empty root category declared by source)" {
             String::new()
         } else {
             catalog.category.clone()
         };
+        let inputs = source_schema
+            .map(|schema| {
+                schema
+                    .inputs
+                    .iter()
+                    .map(|input| {
+                        Ok(comfy_runtime::NativeInputDescriptor {
+                            name: input.schema.name.clone(),
+                            accepted_types: comfy_runtime::NativeTypeUnion::new([
+                                comfy_runtime::NativeValueType::Any,
+                            ])?,
+                            required: input.requirement == NativeInputRequirement::Required,
+                            hidden: input.requirement == NativeInputRequirement::Hidden,
+                            lazy: false,
+                            cardinality: comfy_runtime::NativePortCardinality::Scalar,
+                            allows_literal: true,
+                        })
+                    })
+                    .collect::<Result<Vec<_>, comfy_runtime::NativeNodeContractError>>()
+            })
+            .transpose()
+            .map_err(|error| {
+                NativeServiceError::new(
+                    NativeServiceErrorKind::Internal,
+                    "test_source_inputs_invalid",
+                    error.to_string(),
+                )
+            })?
+            .unwrap_or_default();
+        let outputs = source_schema
+            .map(|schema| {
+                schema
+                    .outputs
+                    .iter()
+                    .map(|output| comfy_runtime::RuntimeOutputDescriptor {
+                        name: output
+                            .source_name
+                            .clone()
+                            .unwrap_or_else(|| output.source_type_name.clone()),
+                        produced_type: comfy_runtime::NativeValueType::Any,
+                        is_list: false,
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
         let descriptor = comfy_runtime::NativeNodeDescriptor {
             schema_version: 1,
             class_type: class_type.to_owned(),
             implementation_version: "1".to_owned(),
             source_schema: None,
-            inputs: Vec::new(),
+            inputs,
             dynamic_inputs: Vec::new(),
-            outputs: Vec::new(),
+            outputs,
             output_node: catalog.output_node,
-            effect: comfy_runtime::NativeEffectClass::Pure,
+            effect: if provider.is_some() {
+                comfy_runtime::NativeEffectClass::Provider
+            } else {
+                comfy_runtime::NativeEffectClass::Pure
+            },
             cache: comfy_runtime::NativeCachePolicy::InputIdentity,
         };
         let presentation = comfy_runtime::NativeNodePresentation {
             display_name: catalog.display_name.clone(),
             category,
             description: String::new(),
-            output_names: Vec::new(),
+            output_names: descriptor
+                .outputs
+                .iter()
+                .map(|output| output.name.clone())
+                .collect(),
             search_aliases: Vec::new(),
             is_deprecated: false,
             is_experimental: false,

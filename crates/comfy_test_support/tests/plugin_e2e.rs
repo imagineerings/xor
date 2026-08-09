@@ -6,6 +6,7 @@ use comfy_api::{
     NativeHeadlessService, NativeRuntimeApiHost, NativeRuntimeHttpServices, WebSocketLimits,
     security::{ApiSecurityConfig, ArtifactIdempotencySnapshotStore},
 };
+use comfy_model::NativeModelPayload;
 use comfy_nodes::NodeRegistry as CatalogNodeRegistry;
 use comfy_plugin_host::{
     CancellationToken, ComponentExecutionBoundary, ComponentHost, ComponentHostError,
@@ -28,19 +29,23 @@ use comfy_runtime::{
     AuthorizedCredentialPresenceRequest, AuthorizedProviderRequest, Capability, CapabilitySet,
     CredentialPresenceActuator, CredentialScope, DisconnectedExecutionController,
     ExecutionDataSource, ExecutionEventBus, ExecutionPresentationService, ExecutionSnapshotStatus,
-    NativeHandleKind, NativeHandleStore, NativeHandleStoreError, NativeHandleStoreGeneration,
+    NativeHandleStore, NativeHandleStoreError, NativeHandleStoreGeneration,
     NativeHandleStoreIdentity, NativeHandleType, NativeNodeRegistry, NativeOpaqueHandle,
-    NativePrimitive, NativeStoredArtifactObject, NativeStoredModelObject, NativeStoredObject,
-    NativeStoredTensorObject, NativeValue, NodeContext, NodeOutcome, OutputCommitter,
-    OutputExecutionScope, PermissionGrant, PermissionPolicy, PluginAuthorization,
-    PluginCapabilityBroker, PluginRngPolicy, PluginServiceActuatorError,
+    NativePrimitive, NativeStoredModelPayload, NativeStoredPayload, NativeValue, NodeContext,
+    NodeOutcome, OutputCommitter, OutputExecutionScope, PermissionGrant, PermissionPolicy,
+    PluginAuthorization, PluginCapabilityBroker, PluginRngPolicy, PluginServiceActuatorError,
     PluginServiceOperationContext, PluginTrustPolicy, PluginVerificationKey, ProfileId,
     ProviderEndpoint, ProviderMode, ProviderPolicy, ProviderRequestActuator, SecretId, SecretValue,
     SharedAssetService, WorkerLaunchConfig, authorize_native_output_committer,
     authorize_native_plugin_asset_broker, native_image_catalog_bindings,
     native_image_registry_projection, open_native_profile_asset_service,
 };
-use comfy_tensor::{CpuWorkspaceAuthority, RngAlgorithm, RngProfileVersion, ScratchReservation};
+use comfy_sampler::{NativeConditioningPayload, NativeDiffusionPayload};
+use comfy_tensor::{
+    CpuWorkspaceAuthority, ImageTensor, NativeTensorPayload, NativeTensorRole, RngAlgorithm,
+    RngProfileVersion, ScratchReservation, StreamId as TensorStreamId,
+};
+use comfy_test_support::NativeDiffusionFixture;
 use comfy_types::{AttemptId, HttpMethod, NodeId, PromptId, WorkerId};
 use extension_host::{
     ComponentLifecycleAdapter, ComponentRuntime, ExtensionIndexEntry, ExtensionManifest,
@@ -56,7 +61,7 @@ use std::{
     fs,
     path::{Path, PathBuf},
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, OnceLock},
     time::{Duration, Instant},
 };
 use uuid::Uuid;
@@ -171,7 +176,7 @@ fn manifest(component_digest: String) -> Result<PluginManifest, Box<dyn Error>> 
     for (family, source_type, presence) in [
         ("scalar", "String", PortPresence::Required),
         ("tensor", "Image", PortPresence::Required),
-        ("artifact", "SVG", PortPresence::Required),
+        ("artifact", "SVG", PortPresence::Optional),
         ("model", "Model", PortPresence::Hidden),
     ] {
         ports.push(port(
@@ -188,7 +193,11 @@ fn manifest(component_digest: String) -> Result<PluginManifest, Box<dyn Error>> 
             PortDirection::Output,
             source_type,
             PortCardinality::Singular,
-            PortPresence::Required,
+            if family == "artifact" {
+                PortPresence::Optional
+            } else {
+                PortPresence::Required
+            },
         )?);
         ports.push(port(
             &registry,
@@ -845,108 +854,73 @@ fn component_inventory_error_contains(
             .is_some_and(|error| error.contains(expected))
 }
 
-fn registry_handle(
+fn registry_payload_handle(
     store: &dyn NativeHandleStore,
     cancellation: &CancellationToken,
-    value: PluginValue,
-    handle_kind: NativeHandleKind,
-    type_id: &str,
+    payload: NativeStoredPayload,
 ) -> Result<NativeValue, Box<dyn Error>> {
-    let digest = match value.representation() {
-        comfy_plugin_sdk::PluginValueRepresentation::Tensor(value) => value.digest().to_owned(),
-        comfy_plugin_sdk::PluginValueRepresentation::Artifact(value) => value.digest().to_owned(),
-        comfy_plugin_sdk::PluginValueRepresentation::Model(value) => value.digest().to_owned(),
-        comfy_plugin_sdk::PluginValueRepresentation::Scalar(_) => {
-            return Err("scalar plugin fixture cannot be published as a handle".into());
-        }
-    };
-    let resident_bytes = value.abi_bytes()?.len().max(1);
-    let payload: NativeStoredObject = Arc::new(value.clone());
-    let stored: NativeStoredObject = match value.representation() {
-        comfy_plugin_sdk::PluginValueRepresentation::Tensor(value) => {
-            Arc::new(NativeStoredTensorObject::new(
-                value.descriptor().clone(),
-                value.byte_length(),
-                &digest,
-                payload,
-            )?)
-        }
-        comfy_plugin_sdk::PluginValueRepresentation::Artifact(value) => {
-            Arc::new(NativeStoredArtifactObject::new(
-                value.namespace(),
-                value.identifier(),
-                value.byte_length(),
-                &digest,
-                payload,
-            )?)
-        }
-        comfy_plugin_sdk::PluginValueRepresentation::Model(value) => Arc::new(
-            NativeStoredModelObject::new(value.identifier(), value.format(), &digest, payload)?,
-        ),
-        comfy_plugin_sdk::PluginValueRepresentation::Scalar(_) => {
-            return Err("scalar plugin fixture cannot be published as a handle".into());
-        }
-    };
-    let handle = store.publish(
-        NativeHandleType::new(handle_kind, type_id)?,
-        stored,
-        Some(digest),
-        resident_bytes,
-        cancellation,
-    )?;
+    let handle = store.publish(payload, cancellation)?;
     Ok(NativeValue::Handle { value: handle })
+}
+
+fn canonical_image_payload(seed: u8) -> Result<NativeStoredPayload, Box<dyn Error>> {
+    let (backend, workspace_authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+    let scratch = workspace_authority.authorize_workspace(1024 * 1024)?;
+    let cancellation = CancellationToken::default();
+    let context = backend.execution_context(TensorStreamId::DEFAULT, scratch, &cancellation);
+    let value = f32::from(seed) / 255.0;
+    let image = ImageTensor::from_f32(&backend, &context, 1, 1, 1, 3, &[value, value, value])?;
+    Ok(NativeStoredPayload::Tensor(Arc::new(
+        NativeTensorPayload::from_image(NativeTensorRole::Image, image)?,
+    )))
+}
+
+fn canonical_model_payload() -> Result<NativeStoredPayload, Box<dyn Error>> {
+    static MODEL_PAYLOAD: OnceLock<Arc<NativeStoredPayload>> = OnceLock::new();
+    if let Some(payload) = MODEL_PAYLOAD.get() {
+        return Ok(payload.as_ref().clone());
+    }
+
+    let fixture = NativeDiffusionFixture::checked_in();
+    let (backend, workspace_authority) =
+        CpuWorkspaceAuthority::create_backend(2 * 1024 * 1024 * 1024)?;
+    let backend = Arc::new(backend);
+    let cancellation = CancellationToken::default();
+    let scratch = workspace_authority.authorize_workspace(2 * 1024 * 1024 * 1024)?;
+    let context = backend.execution_context(TensorStreamId::DEFAULT, scratch, &cancellation);
+    let bundle = fixture.load_bundle_with_context(backend, &context)?;
+    let model = Arc::new(NativeModelPayload::sd15_model(bundle.model().clone())?);
+    let conditioning = Arc::new(NativeConditioningPayload::checked_sd15(
+        bundle.model_digest(),
+        bundle.model().as_ref(),
+        bundle.conditioning().patch_graph().clone(),
+        None,
+    )?);
+    let diffusion = Arc::new(NativeDiffusionPayload::model(model, conditioning)?);
+    let payload = Arc::new(NativeStoredPayload::Model(Arc::new(
+        NativeStoredModelPayload::native_diffusion(diffusion)?,
+    )));
+    let _ = MODEL_PAYLOAD.set(payload.clone());
+    Ok(payload.as_ref().clone())
 }
 
 fn registry_inputs(
     store: &dyn NativeHandleStore,
     cancellation: &CancellationToken,
 ) -> Result<BTreeMap<String, NativeValue>, Box<dyn Error>> {
+    let model = registry_payload_handle(store, cancellation, canonical_model_payload()?)?;
     Ok(BTreeMap::from([
         (
             "artifact-list-in".to_owned(),
             NativeValue::List { values: Vec::new() },
         ),
         (
-            "artifact-single-in".to_owned(),
-            registry_handle(
-                store,
-                cancellation,
-                artifact_value("artifact.svg")?,
-                NativeHandleKind::Artifact,
-                "SVG",
-            )?,
-        ),
-        (
             "model-list-in".to_owned(),
             NativeValue::List {
-                values: vec![
-                    registry_handle(
-                        store,
-                        cancellation,
-                        model_value("a")?,
-                        NativeHandleKind::Model,
-                        "MODEL",
-                    )?,
-                    registry_handle(
-                        store,
-                        cancellation,
-                        model_value("b")?,
-                        NativeHandleKind::Model,
-                        "MODEL",
-                    )?,
-                ],
+                values: vec![model.clone(), model.clone()],
             },
         ),
-        (
-            "model-single-in".to_owned(),
-            registry_handle(
-                store,
-                cancellation,
-                model_value("model")?,
-                NativeHandleKind::Model,
-                "MODEL",
-            )?,
-        ),
+        ("model-single-in".to_owned(), model),
         (
             "scalar-list-in".to_owned(),
             NativeValue::List { values: Vec::new() },
@@ -961,32 +935,14 @@ fn registry_inputs(
             "tensor-list-in".to_owned(),
             NativeValue::List {
                 values: vec![
-                    registry_handle(
-                        store,
-                        cancellation,
-                        tensor_value("2")?,
-                        NativeHandleKind::Image,
-                        "IMAGE",
-                    )?,
-                    registry_handle(
-                        store,
-                        cancellation,
-                        tensor_value("3")?,
-                        NativeHandleKind::Image,
-                        "IMAGE",
-                    )?,
+                    registry_payload_handle(store, cancellation, canonical_image_payload(2)?)?,
+                    registry_payload_handle(store, cancellation, canonical_image_payload(3)?)?,
                 ],
             },
         ),
         (
             "tensor-single-in".to_owned(),
-            registry_handle(
-                store,
-                cancellation,
-                tensor_value("1")?,
-                NativeHandleKind::Image,
-                "IMAGE",
-            )?,
+            registry_payload_handle(store, cancellation, canonical_image_payload(1)?)?,
         ),
     ]))
 }
@@ -1039,16 +995,13 @@ impl NativeHandleStore for RejectingPublishStore {
         handle: &NativeOpaqueHandle,
         expected_type: &NativeHandleType,
         cancellation: &CancellationToken,
-    ) -> Result<NativeStoredObject, NativeHandleStoreError> {
+    ) -> Result<Arc<NativeStoredPayload>, NativeHandleStoreError> {
         self.inner.resolve(handle, expected_type, cancellation)
     }
 
     fn publish(
         &self,
-        handle_type: NativeHandleType,
-        value: NativeStoredObject,
-        digest_sha256: Option<String>,
-        resident_bytes: usize,
+        value: NativeStoredPayload,
         cancellation: &CancellationToken,
     ) -> Result<NativeOpaqueHandle, NativeHandleStoreError> {
         let publication = self.publication_count.fetch_add(1, Ordering::AcqRel) + 1;
@@ -1057,13 +1010,7 @@ impl NativeHandleStore for RejectingPublishStore {
                 "injected plugin output publication failure".to_owned(),
             ));
         }
-        self.inner.publish(
-            handle_type,
-            value,
-            digest_sha256,
-            resident_bytes,
-            cancellation,
-        )
+        self.inner.publish(value, cancellation)
     }
 
     fn revoke(
@@ -1098,6 +1045,13 @@ fn native_handles(values: &[NativeValue]) -> Vec<NativeOpaqueHandle> {
 async fn exercise_native_registry_value_boundary(
     registry: &NativeNodeRegistry,
 ) -> Result<(), Box<dyn Error>> {
+    let artifact_output_index = registry
+        .descriptor("echo")
+        .ok_or("component registry has no echo descriptor")?
+        .outputs
+        .iter()
+        .position(|output| output.name == "artifact-single-out")
+        .ok_or("component registry has no artifact output descriptor")?;
     let node = registry
         .node("echo")
         .ok_or("component registry has no echo binding")?;
@@ -1110,6 +1064,13 @@ async fn exercise_native_registry_value_boundary(
         cancellation.clone(),
     )?;
     let input_handle_count = generation.len();
+    let input_values = inputs.values().cloned().collect::<Vec<_>>();
+    let input_handles = native_handles(&input_values);
+    let input_identifiers = input_handles
+        .iter()
+        .map(|handle| handle.identifier().to_owned())
+        .collect::<BTreeSet<_>>();
+    assert_eq!(input_handle_count, input_identifiers.len());
     let outcome = node.execute(context, inputs).await?;
     let NodeOutcome::Values { outputs, .. } = outcome else {
         return Err("typed plugin adapter returned a non-value outcome".into());
@@ -1120,38 +1081,27 @@ async fn exercise_native_registry_value_boundary(
             value: NativePrimitive::String(value)
         }) if value == "scalar"
     ));
+    assert!(matches!(
+        outputs.get(artifact_output_index),
+        Some(NativeValue::Primitive {
+            value: NativePrimitive::Null
+        })
+    ));
     let output_handles = native_handles(&outputs);
-    assert_eq!(output_handles.len(), input_handle_count);
-    assert_eq!(generation.len(), input_handle_count * 2);
+    assert_eq!(output_handles.len(), input_handles.len());
+    assert_eq!(generation.len(), input_handle_count);
     let resolver = generation.handle_store_for_attempt(attempt_id);
     for handle in &output_handles {
-        let value = resolver.resolve(handle, handle.handle_type(), &cancellation)?;
-        let payload = match handle.handle_type().kind {
-            NativeHandleKind::Image => value
-                .downcast::<NativeStoredTensorObject>()
-                .map_err(|_| "plugin tensor output did not publish the neutral stored wrapper")?
-                .payload()
-                .clone(),
-            NativeHandleKind::Artifact => value
-                .downcast::<NativeStoredArtifactObject>()
-                .map_err(|_| "plugin artifact output did not publish the neutral stored wrapper")?
-                .payload()
-                .clone(),
-            NativeHandleKind::Model => value
-                .downcast::<NativeStoredModelObject>()
-                .map_err(|_| "plugin model output did not publish the neutral stored wrapper")?
-                .payload()
-                .clone(),
-            kind => return Err(format!("unexpected plugin output handle kind {kind:?}").into()),
-        };
-        payload.downcast::<PluginValue>().map_err(
-            |_| "published neutral wrapper did not retain the plugin ABI value as its payload",
-        )?;
+        assert!(input_identifiers.contains(handle.identifier()));
+        resolver.resolve(handle, handle.handle_type(), &cancellation)?;
     }
-    for handle in output_handles.iter().rev() {
-        resolver.revoke(handle, &cancellation)?;
+    let mut revoked_identifiers = BTreeSet::new();
+    for handle in input_handles.iter().rev() {
+        if revoked_identifiers.insert(handle.identifier()) {
+            resolver.revoke(handle, &cancellation)?;
+        }
     }
-    assert_eq!(generation.len(), input_handle_count);
+    assert_eq!(generation.len(), 0);
 
     let (context, mut inputs, generation) = registry_invocation(
         PromptId(Uuid::from_u128(0x368)),
@@ -1239,10 +1189,12 @@ async fn exercise_native_registry_value_boundary(
     let generation = NativeHandleStoreGeneration::new()?;
     let inner = generation.handle_store_for_attempt(attempt_id);
     let inputs = registry_inputs(inner.as_ref(), &cancellation)?;
-    let input_handle_count = generation.len();
-    let rejecting_store: Arc<dyn NativeHandleStore> = Arc::new(RejectingPublishStore {
+    let input_handle_cardinality =
+        native_handles(&inputs.values().cloned().collect::<Vec<_>>()).len();
+    let input_object_count = generation.len();
+    let rejecting_store = Arc::new(RejectingPublishStore {
         inner,
-        reject_at: 2,
+        reject_at: 1,
         publication_count: AtomicUsize::new(0),
     });
     let context = NodeContext::new(
@@ -1251,18 +1203,14 @@ async fn exercise_native_registry_value_boundary(
         NodeId("typed-plugin-publication-rollback".to_owned()),
         cancellation,
         zero_scratch()?,
-        rejecting_store,
+        rejecting_store.clone(),
     )?;
-    let error = node
-        .execute(context, inputs)
-        .await
-        .expect_err("partial plugin output publication must fail");
-    assert!(
-        error
-            .message
-            .contains("injected plugin output publication failure")
-    );
-    assert_eq!(generation.len(), input_handle_count);
+    let NodeOutcome::Values { outputs, .. } = node.execute(context, inputs).await? else {
+        return Err("imported plugin handles returned a non-value outcome".into());
+    };
+    assert_eq!(native_handles(&outputs).len(), input_handle_cardinality);
+    assert_eq!(rejecting_store.publication_count.load(Ordering::Acquire), 0);
+    assert_eq!(generation.len(), input_object_count);
     Ok(())
 }
 

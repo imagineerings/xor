@@ -16,11 +16,11 @@ use comfy_runtime::NativeNpuPackageSettings;
 ))]
 use comfy_runtime::RuntimeSupervisorError;
 use comfy_runtime::{
-    AssetNamespace, AssetRoots, AssetService, NativeImageExecutor, NativeImageOutputProposal,
-    NativeImageWorkerEvent, NativeImageWorkerPlan, NativeImageWorkerProgress,
-    NativeImageWorkerProgressKind, ProcessOwnership, PromptCompiler, RuntimeSupervisor,
-    SupervisorPolicy, WorkerHealth, WorkerLaunchConfig, authorize_native_input_reader,
-    native_image_registry_projection,
+    AssetNamespace, AssetRoots, AssetService, NativeHandleKind, NativeImageExecutor,
+    NativeImageOutputProposal, NativeImageWorkerEvent, NativeImageWorkerPlan,
+    NativeImageWorkerProgress, NativeImageWorkerProgressKind, ProcessOwnership, PromptCompiler,
+    RuntimeSupervisor, SupervisorPolicy, WorkerHealth, WorkerLaunchConfig,
+    authorize_native_input_reader, native_image_registry_projection,
 };
 #[cfg(any(
     feature = "cuda",
@@ -39,6 +39,35 @@ use tempfile::TempDir;
 
 fn worker_config() -> WorkerLaunchConfig {
     worker_config_with_memory_limit(1024 * 1024 * 1024)
+}
+
+#[test]
+fn native_handle_kind_postcard_discriminants_are_append_only()
+-> Result<(), Box<dyn std::error::Error>> {
+    let kinds = [
+        NativeHandleKind::Tensor,
+        NativeHandleKind::Model,
+        NativeHandleKind::Clip,
+        NativeHandleKind::Vae,
+        NativeHandleKind::ControlNet,
+        NativeHandleKind::Conditioning,
+        NativeHandleKind::Latent,
+        NativeHandleKind::Image,
+        NativeHandleKind::Mask,
+        NativeHandleKind::Audio,
+        NativeHandleKind::Video,
+        NativeHandleKind::ThreeD,
+        NativeHandleKind::Artifact,
+        NativeHandleKind::ProviderTask,
+        NativeHandleKind::StructuredCompute,
+    ];
+    for (discriminant, kind) in kinds.into_iter().enumerate() {
+        assert_eq!(
+            postcard::to_stdvec(&kind)?,
+            vec![u8::try_from(discriminant)?],
+        );
+    }
+    Ok(())
 }
 
 fn worker_config_with_memory_limit(memory_limit_bytes: u64) -> WorkerLaunchConfig {

@@ -538,12 +538,12 @@ Direct runtime validation covers **103/13,242 (0.78%)** independently testable m
 
 | Status | Features |
 | --- | ---: |
-| missing | 9,940 |
+| missing | 9,957 |
 | deferred | 2,274 |
 | conflicting | 788 |
 | partial | 189 |
 | uncertain | 87 |
-| equivalent | 17 |
+| equivalent | 0 |
 | **Total** | **13,295** |
 
 Generic workspace, GPUI, settings, persistence, subprocess, action, focus, Wasmtime, wgpu/Metal, media, and visual-test primitives alone are design inputs, not Comfy behavior. Native Comfy foundations now have task-level implementation and validation evidence, but master feature rows remain `missing`, `conflicting`, `deferred`, or narrowly `partial` until their exact per-feature behavior and final closure artifacts pass; planned code is never promoted. Python/JavaScript extension execution and Python/server lifecycle rows are `conflicting` with the production-native boundary and map to Rust/WASM or native lifecycle migrations. The accessibility bootstrap, native graph semantics, and implemented graph keybinding rows are `partial`: production now enables GPUI accessibility without an environment gate. Exact later-owned accessibility rows retain their prior missing or conflicting status until their surface tasks and whole-application audits pass. Cross-product disagreements remain `conflicting`. `deferred` rows are still source-traced and preserve compatibility or an explicit service/product decision.

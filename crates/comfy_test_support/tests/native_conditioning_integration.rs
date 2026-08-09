@@ -160,6 +160,11 @@ impl ControlModelExecutor for FixtureControlExecutor {
         FIXTURE_CONTROL_EXECUTOR_DIGEST
     }
 
+    fn resident_bytes(&self) -> Result<u64, ControlNetError> {
+        u64::try_from(std::mem::size_of::<Self>())
+            .map_err(|_| ControlNetError::ResidentBytesOverflow)
+    }
+
     fn execute_controlnet(
         &self,
         _binding: &ControlModelBinding,
