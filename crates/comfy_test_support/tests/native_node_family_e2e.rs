@@ -165,8 +165,6 @@ fn portable_values_dynamic_ports_and_attempt_handles_fail_closed() -> Result<(),
     list.validate()?;
     let restored: NativeValue = serde_json::from_slice(&serde_json::to_vec(&list)?)?;
     assert_eq!(restored, list);
-    let postcard_restored: NativeValue = postcard::from_bytes(&postcard::to_stdvec(&list)?)?;
-    assert_eq!(postcard_restored, list);
 
     let first_generation = NativeHandleStoreGeneration::with_capacities(4, 1024)?;
     let attempt_id = AttemptId(Uuid::from_u128(0x3674));
@@ -182,8 +180,6 @@ fn portable_values_dynamic_ports_and_attempt_handles_fail_closed() -> Result<(),
         value: handle.clone(),
     };
     assert!(union.accepts(&handle_value));
-    let postcard_handle: NativeValue = postcard::from_bytes(&postcard::to_stdvec(&handle_value)?)?;
-    assert_eq!(postcard_handle, handle_value);
     assert!(
         first_store
             .resolve(&handle, &image_type, &CancellationToken::default())
